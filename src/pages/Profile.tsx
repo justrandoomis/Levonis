@@ -73,7 +73,7 @@ const bundleShelfPrice = (b: BundleShelfCard): number | null => {
 };
 
 export default function Profile() {
-  const { money } = useMoney();
+  const { money, walletMoney, currency } = useMoney();
   const [suggestedProducts, setSuggestedProducts] = useState<ApiProduct[]>([]);
   // Bundle cards from /api/bundles. The card shape changed with the
   // composition model (docs/BUNDLES_MYSTERY.md §10): the listing is light on
@@ -489,7 +489,12 @@ export default function Profile() {
             </button>
             <button type="button" className="flex flex-col items-center justify-center min-h-[48px] border-e hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold border-zinc-700" onClick={() => navigate('/wallet')}>
               <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('الرصيد', 'Balance', 'باڵانس')}</span>
-              <span className="text-[12px] font-bold font-mono">{dir === 'rtl' ? 'د.ع' : 'IQD'} {balanceIqd.toLocaleString()}</span>
+              {/* A WALLET AMOUNT, at the wallet's own rate (critique M2): in
+                  dollars it is the ledger's own cents, never the market-rate
+                  `money()`; in dinars it reads as it always has. */}
+              <span className="text-[12px] font-bold font-mono" data-profile-balance>
+                {currency === 'USD' ? <bdi dir="ltr">{walletMoney(balanceIqd, balanceUsdCents)}</bdi> : `${dir === 'rtl' ? 'د.ع' : 'IQD'} ${balanceIqd.toLocaleString()}`}
+              </span>
             </button>
             <button type="button" className="flex flex-col items-center justify-center min-h-[48px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded-e-lg" onClick={() => navigate('/warranty')}>
                <span className="text-[11px] font-medium mb-1 whitespace-nowrap">{loc('الحماية', 'Protection', 'پاراستن')}</span>

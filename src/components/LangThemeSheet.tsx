@@ -1,12 +1,25 @@
 /**
- * «اللغة والمظهر» — THE GLOBE OPENS ONE SHEET FOR BOTH.
+ * «المظهر واللغة والعملة» — THE GLOBE OPENS ONE MENU FOR ALL THREE
+ * (FX programme plan §13).
  *
  * The owner: «في اختيار اللغة ادمج بهذه الأيقونة اللغة والمظهر يعني يظهر نافذة
- * منبثقة مثل الإشعارات من الأسفل … بسطرين السطر الأول اللغة والسطر الثاني
- * المظهر». The globe in the header used to open a three-line language dropdown;
- * it now opens a bottom sheet in the notifications sheet's clothes (the same
- * `Sheet` from ui/Overlay: grabber, rounded top, scrim, swipe-down, Escape,
- * focus trap, safe area) with two rows — the language, then the appearance.
+ * منبثقة مثل الإشعارات من الأسفل …». The globe in the header used to open a
+ * three-line language dropdown; it opens a bottom sheet in the notifications
+ * sheet's clothes (the same `Sheet` from ui/Overlay: grabber, rounded top,
+ * scrim, swipe-down, Escape, focus trap, safe area). The FX brief makes it the
+ * ONE place a customer sets how the shop reads, in the brief's order:
+ *   1. the appearance — light, dark, or the device's own;
+ *   2. the language — العربية, English, کوردی;
+ *   3. the display currency — IQD or USD (home only).
+ *
+ * THE DASHBOARD KEEPS TWO ROWS. Admin and merchant screens print dinars of
+ * record with `formatIqd` and never follow a reading preference, so a
+ * currency row there would promise a conversion that never happens.
+ *
+ * THE CURRENCY IS A READING, NEVER A CHARGE. `setCurrency` is synchronous and
+ * cheap: prices re-render from memory at the shop's rate (src/CurrencyContext.tsx)
+ * — no request, no engine, no provider is called. Cart bodies, checkout
+ * charges, the wallet and every stored figure stay in dinars.
  *
  * THE SHEET LEAVES FIRST, THEN THE CHANGE. A choice closes the sheet at once;
  * only when it has fully slid away (`onExited`) is the change made, so the
@@ -15,20 +28,20 @@
  *     widens into a circle until it fills it (src/lib/theme.ts,
  *     `{ origin: 'center' }`);
  *   - a language: the page fades out drifting toward the side it read from and
- *     the new language fades in from its own side (src/lib/langSwap.ts).
+ *     the new language fades in from its own side (src/lib/langSwap.ts);
+ *   - a currency: the prices re-render in place.
  * Choosing what is already chosen — or «حسب الجهاز» when the device is already
  * in that theme — only closes the sheet.
  *
- * EVERY WIDTH IS A BOTTOM SHEET (`docked`). The notifications panel becomes a
- * dropdown from `sm` up, but the owner photographed this on an iPad and asked
- * for a window «من الأسفل» that is lowered away before the theme changes — a
- * dropdown cannot be lowered. At iPad width it is the same sheet, capped at
- * `max-w-md` and centred on the bottom edge.
+ * EVERY WIDTH IS A BOTTOM SHEET (`docked`). The owner photographed this on an
+ * iPad and asked for a window «من الأسفل» that is lowered away before the
+ * theme changes — a dropdown cannot be lowered. At iPad width it is the same
+ * sheet, capped at `max-w-md` and centred on the bottom edge.
  *
  * KEYBOARD. The rows are `Segmented` radio groups. Arrow keys MOVE the choice
  * without committing it (a radio group that closed its window on the first
- * arrow press would make «English» unreachable from «العربية»); Enter, Space
- * or a click commits.
+ * arrow press would make «English» unreachable from «العربية»), and they
+ * follow the writing direction; Enter, Space or a click commits.
  */
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { Globe } from 'lucide-react';
@@ -64,18 +77,23 @@ function prewarmPanel(): void {
 
 export interface LangThemeButtonProps {
   /**
-   * `home`: the 44px square the home header's controls share.
+   * `home`: the 44px square the home header's controls share; the menu has
+   * three rows — appearance, language, display currency.
    * `dash`: the dashboard topbar's quieter icon, with the language code beside
-   * it from `sm` up.
+   * it from `sm` up; the menu has two rows — appearance, language.
    */
   variant?: 'home' | 'dash';
   className?: string;
 }
 
-/** The header's globe, and the «اللغة والمظهر» sheet it opens. */
+/** The header's globe, and the «المظهر واللغة والعملة» sheet it opens. */
 export default function LangThemeButton({ variant = 'home', className = '' }: LangThemeButtonProps) {
   const { lang, setLang, loc, dir } = useLanguage();
   const { preference } = useTheme();
+  // The display currency, on the home header only. Its row — the pick, the
+  // captions, the commit — lives in the lazy panel, so the first paint carries
+  // none of it (tests/bundleBudget.test.ts).
+  const withCurrency = variant === 'home';
   const titleId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -115,7 +133,7 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
     }).catch(() => {
       if (!mounted.current) return;
       setOpen(false);
-      toast.error(loc('تعذّر فتح اللغة والمظهر. اضغط للمحاولة مجددًا.', 'Could not open language and appearance. Tap to retry.'));
+      toast.error(loc('تعذّر فتح القائمة — اضغط للمحاولة مجددًا.', 'Could not open the menu — tap to retry.', 'نەتوانرا لیستەکە بکرێتەوە — دووبارە هەوڵ بدەرەوە'));
     });
   };
 
@@ -127,26 +145,27 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
     if (change) fallback.current = window.setTimeout(flush, EXIT_FALLBACK_MS);
   };
 
-  const chooseLang = (id: string) => {
-    const next = id as Language;
-    setLangPick(next);
+  /** A tap, Enter or Space commits (the sheet leaves first); an arrow key only moved the pick. */
+  const commit = (change: (() => void) | null) => {
     if (navigating.current) {
       navigating.current = false;
       return;
     }
-    closeThen(next === lang ? null : () => setLang(next));
+    closeThen(change);
+  };
+
+  const chooseLang = (id: string) => {
+    const next = id as Language;
+    setLangPick(next);
+    commit(next === lang ? null : () => setLang(next));
   };
 
   const chooseTheme = (id: string) => {
     const next = id as ThemePreference;
     setThemePick(next);
-    if (navigating.current) {
-      navigating.current = false;
-      return;
-    }
     // A choice that paints the same theme is stored and nothing moves
     // (setThemePreference decides that, against what is on screen).
-    closeThen(next === preference ? null : () => setThemePreference(next, { origin: 'center', duration: CENTER_REVEAL_MS }));
+    commit(next === preference ? null : () => setThemePreference(next, { origin: 'center', duration: CENTER_REVEAL_MS }));
   };
 
   const onRowKeyDownCapture = (e: KeyboardEvent) => {
@@ -156,12 +175,13 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
     navigating.current = false;
   };
 
-  // OWNER: Sorani to be written by hand. (The title below falls back to
-  // Arabic in Sorani; «زمان» is the Settings page's own Sorani word.)
-  const title = loc('اللغة والمظهر', 'Language & appearance');
+  // Every string in all three languages; the Sorani is its own (row 183).
+  // «زمان» is the Settings page's own Sorani word.
+  const title = withCurrency
+    ? loc('المظهر واللغة والعملة', 'Appearance, language & currency', 'ڕووکار و زمان و دراو')
+    : loc('المظهر واللغة', 'Appearance & language', 'ڕووکار و زمان');
   const langLabel = loc('اللغة', 'Language', 'زمان');
-  // OWNER: Sorani to be written by hand (the four appearance strings below).
-  const themeLabel = loc('المظهر', 'Appearance');
+  const themeLabel = loc('المظهر', 'Appearance', 'ڕووکار');
 
   const buttonClass =
     variant === 'home'
@@ -202,11 +222,13 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
         title={title}
         langLabel={langLabel}
         themeLabel={themeLabel}
+        withCurrency={withCurrency}
         dir={dir}
         langPick={langPick}
         themePick={themePick}
         chooseLang={chooseLang}
         chooseTheme={chooseTheme}
+        commit={commit}
         onRowKeyDownCapture={onRowKeyDownCapture}
         onRowPointerDownCapture={onRowPointerDownCapture}
       />}

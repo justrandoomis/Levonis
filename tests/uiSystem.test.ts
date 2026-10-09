@@ -60,7 +60,7 @@ test('language sheet and modal layers use portals and one documented stack', () 
   assert.match(overlay, /visualViewport/);
   assert.match(overlay, /document\.getElementById\('main-scroll-container'\)/);
   assert.match(overlay, /createPortal\([\s\S]+document\.body/);
-  // The globe opens the «اللغة والمظهر» sheet now (tests/langThemeSheet.test.ts);
+  // The globe opens the «المظهر واللغة والعملة» sheet now (tests/langThemeSheet.test.ts);
   // that sheet is the same portal-and-stack primitive.
   assert.match(header, /<LangThemeButton\b/);
   assert.match(read('src/components/LangThemePanel.tsx'), /<Sheet[\s\S]{0,300}testId="lang-theme-sheet"/);

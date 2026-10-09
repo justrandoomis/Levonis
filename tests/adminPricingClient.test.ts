@@ -53,25 +53,69 @@ test('the tab is the owner’s: can_write_cost === true for the entry and the bo
   assert.match(admin, /const AdminPricing = React\.lazy\(\(\) => import\('\.\.\/components\/adminPricing\/AdminPricing'\)\);/);
   for (const file of srcFiles(join(ROOT, 'src'))) {
     if (file === 'src/pages/Admin.tsx' || file.startsWith(DIR)) continue;
+    // FX-1: the owner's dashboard card reads the rates route, the panel's own
+    // words and its formatter — never a component of the tab.
+    if (file === 'src/components/admin/OwnerRatesCard.tsx') {
+      const reached = [...codeOf(file).matchAll(/from '\.\.\/adminPricing\/([^']+)'/g)].map((m) => m[1]).sort();
+      assert.deepEqual(reached, ['api', 'format', 'fxStrings'], `${file} reaches further into the pricing screen`);
+      continue;
+    }
     assert.doesNotMatch(codeOf(file), /adminPricing\//, `${file} reaches into the pricing screen`);
   }
 });
 
-test('it speaks to /api/admin/pricing alone — GET overview, GET product, POST what-if — and stores nothing in the browser', () => {
+test('FX-1: the exchange-rate panel is the tab’s first section, in its chunk; the dashboard card is the owner’s alone, lazily', () => {
+  const root = codeOf(`${DIR}/AdminPricing.tsx`);
+  assert.match(root, /import RatesPanel from '\.\/RatesPanel';/);
+  const panel = root.indexOf('<RatesPanel');
+  assert.ok(panel > 0 && panel < root.indexOf('<PreviewBanner') && panel < root.indexOf('<PricingProducts'), 'the rates panel is not the first section');
+  assert.match(root, /\{!productId && <RatesPanel lang=\{lang\} dir=\{dir\} \/>\}/);
+  // Nothing outside the tab imports the panel or its cards.
+  for (const file of srcFiles(join(ROOT, 'src'))) {
+    if (file.startsWith(DIR)) continue;
+    assert.doesNotMatch(codeOf(file), /RatesPanel|FxPairCard|FxReviewSheet|FxHistorySheet|ShippingRatesCard/, `${file} mounts the owner's FX panel`);
+  }
+  // The overview: its own chunk, behind the same fail-closed hint as the tab.
+  const overview = codeOf('src/components/AdminOverview.tsx');
+  assert.match(overview, /const OwnerRatesCard = React\.lazy\(\(\) => import\('\.\/admin\/OwnerRatesCard'\)\);/);
+  assert.match(overview, /const canSeeRates = user\?\.can_write_cost === true;/);
+  assert.match(overview, /\{canSeeRates && \(\s*<React\.Suspense fallback=\{null\}>\s*<OwnerRatesCard /);
+  assert.equal((overview.match(/<OwnerRatesCard\b/g) ?? []).length, 1);
+  // A refusal or an older database shows nothing — never a dead end on the first screen.
+  assert.match(codeOf('src/components/admin/OwnerRatesCard.tsx'), /if \(failed\) return null;/);
+});
+
+test('it speaks to /api/admin/pricing alone — the preview’s three, the owner’s rates routes — and stores nothing in the browser', () => {
   const api = codeOf(`${DIR}/api.ts`);
   assert.match(api, /export const PRICING_API = '\/api\/admin\/pricing';/);
   const calls = [...api.matchAll(/api\.(get|post|put|patch|delete)<[^>]+>\(`([^`]+)`/g)].map((m) => `${m[1]} ${m[2]}`);
   assert.deepEqual(calls.sort(), [
     'get ${PRICING_API}/overview?page=${Math.max(1, Math.floor(page))}',
     'get ${PRICING_API}/products/${encodeURIComponent(id)}',
+    // FX-1 (plan §8): the owner's exchange and shipping rates.
+    'get ${PRICING_API}/rates',
+    'get ${PRICING_API}/rates/history?${p.toString()}',
     'post ${PRICING_API}/products/${encodeURIComponent(id)}/what-if',
-  ]);
-  for (const file of files) {
+    'post ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/confirm',
+    'post ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/review',
+    'post ${PRICING_API}/rates/fx/refresh',
+    'put ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/manual',
+    'put ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/settings',
+    'put ${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}',
+  ].sort());
+  // The one write that is not a rate is none: the product preview still writes nothing.
+  for (const [, method, path] of api.matchAll(/api\.(put|patch|delete|post)<[^>]+>\(`([^`]+)`/g)) {
+    if (method === 'post' && path!.endsWith('/what-if')) continue;
+    assert.match(path!, /^\$\{PRICING_API\}\/rates\//, `a write outside the rates routes: ${method} ${path}`);
+  }
+  for (const file of [...files, 'src/components/admin/OwnerRatesCard.tsx']) {
     const code = codeOf(file);
     assert.doesNotMatch(code, /\b(localStorage|sessionStorage|indexedDB)\b/, `${file}: cost data must not persist in the browser`);
-    assert.doesNotMatch(code, /api\.(put|patch|delete)\b/, `${file}: the preview never writes`);
-    if (file !== `${DIR}/api.ts`) assert.doesNotMatch(code, /['"`]\/api\//, `${file}: a request outside api.ts`);
-    assert.doesNotMatch(code, /parseFloat\(/, `${file}: no float parsing near money`);
+    if (file !== `${DIR}/api.ts`) {
+      assert.doesNotMatch(code, /\bapi\.(get|post|put|patch|delete)\b/, `${file}: a request outside api.ts`);
+      assert.doesNotMatch(code, /['"`]\/api\//, `${file}: a request outside api.ts`);
+    }
+    assert.doesNotMatch(code, /parseFloat\(|Number\(\s*(p|pair|row|pending)\.[a-z_]*rate/, `${file}: no float parsing near money or a rate`);
   }
 });
 
@@ -134,10 +178,15 @@ test('the what-if request: decimals as text, Iraqi digits read, a half box refus
   assert.equal(wholeOf('0', 0), 0);
 });
 
-test('the client never computes a price: no import of the engine, and the panel shows the server’s figures', () => {
+test('the client never computes a price or a rate: no import of the engine or the FX chain anywhere in src/, and the panel shows the server’s figures', () => {
+  for (const file of srcFiles(join(ROOT, 'src'))) {
+    const code = codeOf(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    // (packages/pricing has client-safe leaves — quantity, trade-in — that other screens use; the cost and FX maths are not among them.)
+    assert.doesNotMatch(code, /from '[^']*(costToPrice|ruleResolution|legacyTargets|pricingEngine|fxChain)[^']*'/, `${file} imports pricing or FX maths`);
+  }
   for (const file of files) {
     const code = codeOf(file);
-    assert.doesNotMatch(code, /costToPrice|ruleResolution|legacyTargets|pricingEngine|packages\/pricing/, `${file} imports pricing maths`);
+    assert.doesNotMatch(code, /costToPrice|ruleResolution|legacyTargets|pricingEngine|packages\/pricing|fxChain/, `${file} imports pricing maths`);
   }
   const panel = codeOf(`${DIR}/WhatIfPanel.tsx`);
   assert.match(panel, /<Money iqd=\{c\.computed_price_iqd\} \/>/);
@@ -367,4 +416,115 @@ test('a collapsed model says its state at every width — on a phone under its n
     assert.ok(textOf(html).includes(s.channelUnpriced), lang);
     assert.doesNotMatch(html, /OPTION_INACTIVE|TRANSPORT_DISABLED/, lang);
   }
+});
+
+// ------------------------------------------------- FX-1: the pair card, rendered
+
+import FxPairCard from '../src/components/adminPricing/FxPairCard';
+import { FX_STRINGS } from '../src/components/adminPricing/fxStrings';
+import type { FxPairDto, FxRatesAnswer } from '../src/components/adminPricing/api';
+
+const usdPair = (over: Partial<FxPairDto> = {}): FxPairDto => ({
+  pair: 'USD_IQD',
+  provider: 'iqwealth',
+  attribution: { text: 'IQWealth', url: 'https://iraqsm.com' },
+  mode: 'AUTO',
+  interval_hours: 6,
+  market_rate: '1660',
+  market_buy: '1655',
+  official_rate: '1310',
+  adjustment_iqd_per_usd: '15',
+  manual_rate: null,
+  effective_rate: '1675',
+  effective_version: 3,
+  effective_source: 'provider',
+  effective_applied_at: '2026-10-09T00:00:00.000Z',
+  last_known_good_rate: '1675',
+  drift_anchor_rate: '1650',
+  drift_anchor_at: '2026-10-08T00:00:00.000Z',
+  published_at: '2026-10-08T23:58:00.000Z',
+  last_checked_at: '2026-10-09T00:00:00.000Z',
+  last_check_result: 'APPLIED',
+  last_successful_at: '2026-10-09T00:00:00.000Z',
+  status: 'REVIEW_REQUIRED',
+  fetch_status: 'OK',
+  last_error_code: null,
+  failing_since: null,
+  pending: { market_rate: '1720', effective_rate: '1735', published_at: '2026-10-09T05:58:00.000Z', observed_at: '2026-10-09T06:00:00.000Z', reason: 'ANOMALY', change_pct: '3.5820' },
+  rejected: null,
+  last_observed: null,
+  anomaly_threshold_pct: '3',
+  drift_threshold_pct: '6',
+  min_change_pct: '0.5',
+  bound_min: '1000',
+  bound_max: '3000',
+  next_check_at: '2026-10-09T12:00:00.000Z',
+  owner_version: 4,
+  ...over,
+});
+
+const ratesOf = (pairs: FxPairDto[], key = true): FxRatesAnswer => ({
+  success: true,
+  pairs,
+  effective_rates_iqd: { USD: { rate_iqd: '1675', version: 3, updated_at: null } },
+  shipping: [],
+  key_configured: key,
+  refresh_budget: { used_today: 1, limit: 40 },
+  provider_budget: { USD_IQD: { used_today: 4, cap: 150 } },
+  engine_products: 0,
+  reprice_blocked: 0,
+  stale_products: 0,
+});
+
+test('FX-1: the USD card says the source, the shop’s effective rate, the held value and the attribution — in ar, en and ckb, with no request', () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (() => {
+    throw new Error('the card fetched during render');
+  }) as typeof fetch;
+  try {
+    for (const lang of ['ar', 'en', 'ckb'] as const) {
+      const s = FX_STRINGS[lang];
+      const p = usdPair();
+      const html = render(createElement(FxPairCard, { pair: p, rates: ratesOf([p]), lang, s, onAnswer: () => {}, onStale: () => {}, onReview: () => {} }));
+      // The digits follow the system's number format (an earlier test pins Arabic-Indic); read them back as ASCII.
+      const text = textOf(html).replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/\u066C/g, ',');
+      for (const want of [s.pairName.USD_IQD, s.srcParallel, s.effective, s.st.REVIEW_REQUIRED, s.reviewTitle, s.reviewOpen, s.tracking, s.guards]) {
+        assert.ok(text.includes(want), `${lang}: «${want}» missing`);
+      }
+      assert.ok(text.includes('1,675'), `${lang}: the effective rate`);
+      assert.ok(text.includes('1,735'), `${lang}: the held rate`);
+      assert.match(html, /<a href="https:\/\/iraqsm\.com" target="_blank" rel="noopener noreferrer"/);
+      assert.ok(text.includes(s.attribution), `${lang}: the attribution`);
+      assert.match(html, /data-fx-confirm-current/, 'the effective rate differs from the anchor: «تأكيد السعر الحالي» is offered');
+    }
+    // A missing key is said; MANUAL says automatic updates never change it and offers the observed value.
+    const manual = usdPair({ mode: 'MANUAL', manual_rate: '1675', pending: null, status: 'OK', last_observed: { market_rate: '1700', candidate: '1715', observed_at: '2026-10-09T06:00:00.000Z' } });
+    const html = render(createElement(FxPairCard, { pair: manual, rates: ratesOf([manual], false), lang: 'en', s: FX_STRINGS.en, onAnswer: () => {}, onStale: () => {}, onReview: () => {} }));
+    const text = textOf(html);
+    assert.ok(text.includes(FX_STRINGS.en.keyMissing));
+    assert.ok(text.includes(FX_STRINGS.en.manualNote));
+    assert.ok(text.includes('Use 1,715 as my manual rate'));
+    assert.match(html, /data-fx-back-auto/);
+    assert.doesNotMatch(html, /data-fx-pending/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('FX-1: owner acts carry owner_version, decimals as text, and the large-change confirmation only when the owner gives it', () => {
+  const card = codeOf(`${DIR}/FxPairCard.tsx`);
+  assert.match(card, /const base = \{ owner_version: p\.owner_version \};/);
+  assert.match(card, /setFxManual\(p\.pair, \{ \.\.\.base, rate, \.\.\.\(confirm_large_change \? \{ confirm_large_change: true \} : \{\}\) \}\)/);
+  const review = codeOf(`${DIR}/FxReviewSheet.tsx`);
+  assert.match(review, /reviewFxRate\(p\.pair, \{ owner_version: p\.owner_version, decision, /);
+  const parts = codeOf(`${DIR}/fxParts.tsx`);
+  // Refused once for want of the confirmation → the message offers it; a stale panel reloads.
+  assert.match(parts, /code === 'PRICING_LARGE_CHANGE_CONFIRM' && !confirmLarge/);
+  assert.match(parts, /if \(code === 'PRICING_CHANGED'\) onStale\(\);/);
+  assert.match(parts, /error\.code === 'REAUTH_REQUIRED'\) return s\.reauth;/);
+  // The tracking is a choice, then «حفظ» — an arrow key never sends a request.
+  assert.match(card, /onChange=\{\(id\) => setTracking\(id as Tracking\)\}/);
+  // Inputs are read as people in Iraq type them and travel as text.
+  const input = codeOf(`${DIR}/fxInput.ts`);
+  assert.match(input, /import \{ decimalOf \} from '\.\/whatIfRequest';/);
 });

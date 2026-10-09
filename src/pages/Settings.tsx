@@ -43,7 +43,9 @@
  *    button and its refusals is not written yet.
  *  - Unlinking any sign-in method: no endpoint — so the "never lock yourself
  *    out by removing the last method" rule cannot be violated from here.
- *  - Per-account display currency: none is stored; the ledger is IQD.
+ *  - Per-ACCOUNT display currency: none is stored. The choice is per device
+ *    (src/CurrencyContext.tsx), the same one the top bar's «المظهر واللغة
+ *    والعملة» menu sets, and it is a reading only: the ledger is IQD.
  *  - Web Push delivery: no server-side push service. The browser permission
  *    state is shown as what it is; permission is never presented as
  *    "notifications enabled".
@@ -68,6 +70,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, User, MapPin, Bell, Globe, LogOut, ShieldCheck, Mail, KeyRound, Link2, FileText, LifeBuoy, Loader2, Check, Coins, CheckCircle2, Download, Sun, Moon, SunMoon } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useMoney } from '../CurrencyContext';
+import { groupRateText } from '../lib/rateText';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, listSessions, revokeSession, revokeOtherSessions, type ApiSession } from '../lib/api';
 import { apiRefusal, refusalText } from '../lib/refusalStrings';
@@ -156,6 +159,7 @@ const STRINGS = {
     currency: 'العملة',
     currencyNote: 'اختر العملة التي تقرأ بها الأسعار. الدفاتر والطلبات تبقى بالدينار العراقي، ولن تُعاد تسعير طلبات مؤكدة.',
     currencyRate: (rate: string) => `سعر الصرف: 1 دولار = ${rate} دينار — يحدده المتجر.`,
+    currencyRateShop: (rate: string) => `سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر بناءً على السوق الموازية، للعرض فقط.`,
     currencyConvertedNote: 'الأسعار بالدولار تحويل تقريبي بهذا السعر. المبلغ المسحوب من بطاقتك أو المدفوع عند الاستلام هو الدينار، ولذلك يبقى الدينار ظاهراً عند الدفع.',
     pushTitle: 'إشعارات المتصفح (Web Push)',
     pushUnsupported: 'غير مدعوم في هذا المتصفح', pushBlocked: 'محظورة من إعدادات المتصفح',
@@ -239,6 +243,7 @@ const STRINGS = {
     currency: 'Currency',
     currencyNote: 'Choose the currency you read prices in. The ledgers and your orders stay in Iraqi dinar, and no confirmed order is ever re-priced.',
     currencyRate: (rate: string) => `Exchange rate: $1 = ${rate} IQD — set by the shop.`,
+    currencyRateShop: (rate: string) => `Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate based on the parallel market, display only.`,
     currencyConvertedNote: 'Dollar prices are an approximate conversion at that rate. What is charged is the dinar, which is why the dinar stays on screen at checkout.',
     pushTitle: 'Browser notifications (Web Push)',
     pushUnsupported: 'Not supported in this browser', pushBlocked: 'Blocked in browser settings',
@@ -325,6 +330,7 @@ const STRINGS = {
     currency: 'دراو',
     currencyNote: 'ئەو دراوە هەڵبژێرە کە نرخەکانی پێ دەخوێنیتەوە. دەفتەر و داواکارییەکانت بە دیناری عێراقی دەمێننەوە، و هیچ داواکارییەکی پەسەندکراو دووبارە نرخ نادرێت.',
     currencyRate: (rate: string) => `نرخی ئاڵوگۆڕ: ١ دۆلار = ${rate} دینار — لەلایەن فرۆشگاوە دانراوە.`,
+    currencyRateShop: (rate: string) => `نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا لەسەر بنەمای بازاڕی هاوتەریب، تەنها بۆ پیشاندان.`,
     currencyConvertedNote: 'نرخەکانی دۆلار گۆڕینێکی نزیکەیەن بەو نرخە. ئەوەی وەردەگیرێت دینارە، بۆیە لە کاتی پارەدان دینار لەسەر شاشە دەمێنێتەوە.',
     pushTitle: 'ئاگادارکردنەوەی وێبگەڕ (Web Push)',
     pushUnsupported: 'لەم وێبگەڕەدا پشتگیری نەکراوە', pushBlocked: 'لە ڕێکخستنی وێبگەڕ ڕێگری کراوە',
@@ -1129,9 +1135,16 @@ export default function Settings() {
                   ))}
                 </div>
                 <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
-                  {s.currencyRate(rate.toLocaleString('en-US'))}
-                </p>
+                {/* THE SHOP'S RATE once the owner has approved one (plan §13):
+                    the effective USD/IQD, named as the shop's because it
+                    includes the owner's adjustment (critique L8). Until then,
+                    the old sentence at the wallet's rate. No rate known yet —
+                    prices read in dinars, so no sentence. */}
+                {rate ? (
+                  <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-rate-source={rate.source}>
+                    {rate.source === 'shop' ? s.currencyRateShop(groupRateText(rate.text)) : s.currencyRate(groupRateText(rate.text))}
+                  </p>
+                ) : null}
                 {converted ? (
                   <p className="mt-1 text-[12px] text-amber-300/90 leading-relaxed">
                     {s.currencyConvertedNote}

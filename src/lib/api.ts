@@ -1522,7 +1522,15 @@ export interface ManualPaymentMethod { id: string; name: string; details: string
 export interface PayoutMethod { id: string; name: string; requires_account: boolean }
 
 export interface PublicSettings {
+  /** The WALLET's rate: IQD per 1 USD for the ledger, deposits and refunds. */
   exchangeRate: number;
+  /**
+   * THE SHOP'S EFFECTIVE USD/IQD, as decimal text ("1703.9167") — the display
+   * currency's rate (FX programme plan §8 "Public", §13). Null until the owner
+   * approves the first automatic value, and absent on an older server; the
+   * display then falls back to `exchangeRate`. The only FX figure that is public.
+   */
+  displayUsdRate?: string | null;
   currency: 'IQD' | 'USD';
   adVideoUrl: string;
   paymentMethods: ManualPaymentMethod[];

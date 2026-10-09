@@ -29,8 +29,29 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { iqdToUsdCentsAt, formatUsdFromIqd, DEFAULT_DISPLAY_CURRENCY } from '../src/CurrencyContext';
-import { iqdToUsdCents as walletIqdToUsdCents } from '../src/lib/api';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import {
+  iqdToUsdCentsAt,
+  formatUsdFromIqd,
+  DEFAULT_DISPLAY_CURRENCY,
+  currencyValue,
+  resolveDisplayRate,
+  CurrencyValueProvider,
+} from '../src/CurrencyContext';
+import { iqdToUsdCents as walletIqdToUsdCents, formatIqd } from '../src/lib/api';
+import {
+  DISPLAY_RATE_CACHE_KEY,
+  DISPLAY_RATE_CACHE_MAX_AGE_MS,
+  iqdToUsdCentsExact,
+  readCachedDisplayRate,
+  rememberDisplayRate,
+  usableRate,
+} from '../src/lib/displayRate';
+import { LanguageProvider } from '../src/LanguageContext';
+import { CheckoutBar } from '../src/components/subscription/CheckoutBar';
+import type { ApiPlan, PurchaseQuote } from '../src/components/subscription/types';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -69,12 +90,114 @@ test('the cent is kept — a price is not rounded twice', () => {
   assert.equal(iqdToUsdCentsAt(50_000, 1400), 3571);
 });
 
-test('a broken rate is zero, never Infinity or NaN on a price tag', () => {
+test('the wallet’s number helper: a broken rate is zero, never Infinity or NaN', () => {
   for (const rate of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
     assert.equal(iqdToUsdCentsAt(1000, rate), 0, `rate ${rate}`);
     assert.equal(formatUsdFromIqd(1000, rate), '$0.00', `rate ${rate}`);
   }
   assert.equal(formatUsdFromIqd(Number.NaN, 1400), '$0.00');
+});
+
+// ------------------------------------- the shop's rate (FX programme plan §13)
+
+const noop = () => {};
+const shop = (text: string) => ({ text, source: 'shop' as const });
+
+test('1,500,000 dinars at the shop’s 1,500 is $1,000.00 — exactly, from the decimal text', () => {
+  assert.equal(iqdToUsdCentsExact(1_500_000, '1500'), 100_000);
+  assert.equal(currencyValue('USD', noop, shop('1500')).money(1_500_000), '$1,000.00');
+  // A rate with a fraction is read as two integers, never a float: 1,000,000 / 1703.9167.
+  assert.equal(iqdToUsdCentsExact(1_000_000, '1703.9167'), 58_688);
+  assert.equal(iqdToUsdCentsExact(1_703_917, '1703.9167'), 100_000);
+  // The same floor the wallet reads with, on every whole-number rate.
+  for (const rate of [1, 7, 1300, 1400, 1450, 1500, 1600]) {
+    for (const iqd of [0, 1, 13, 14, 15, 999, 1400, 49_999, 50_000, 50_007, 1_750_000, 99_999_999]) {
+      assert.equal(iqdToUsdCentsExact(iqd, String(rate)), iqdToUsdCentsAt(iqd, rate), `${iqd} at ${rate}`);
+    }
+  }
+  // A refund line reads with its sign; the magnitude is the same floor.
+  assert.equal(iqdToUsdCentsExact(-1_500_000, '1500'), -100_000);
+  assert.equal(currencyValue('USD', noop, shop('1703.9167')).money(1_000_000), '$586.88');
+});
+
+test('no usable rate → dinars, never $0.00', () => {
+  for (const bad of [null, '', '0', '0.0', '-1400', '1e3', '1,400', ' 1400', 'NaN', 'Infinity', '1400.', '.5']) {
+    assert.equal(usableRate(bad), null, String(bad));
+    assert.equal(iqdToUsdCentsExact(1000, bad as string | null), null, String(bad));
+  }
+  assert.equal(usableRate(1400), null, 'a number is not decimal text');
+  const none = currencyValue('USD', noop, null);
+  assert.equal(none.converted, false);
+  assert.equal(none.money(1_750_000), formatIqd(1_750_000));
+  assert.equal(none.moneyBoth(1_750_000), formatIqd(1_750_000));
+  assert.doesNotMatch(none.money(5000), /\$/);
+  // Dinars chosen: dinars, whatever the rate.
+  assert.equal(currencyValue('IQD', noop, shop('1500')).money(1_500_000), formatIqd(1_500_000));
+});
+
+test('the rate source: displayUsdRate first; exchangeRate only while it is null; the cached rate only before the settings arrive', () => {
+  const r = (displayUsdRate: unknown, settingsLoaded = true, cached: string | null = null, exchangeRate: unknown = 1400) =>
+    resolveDisplayRate({ settingsLoaded, displayUsdRate, exchangeRate, cached });
+  assert.deepEqual(r('1703.9167'), { text: '1703.9167', source: 'shop' });
+  assert.deepEqual(r(null), { text: '1400', source: 'wallet' }, 'not approved yet: today’s rate, nothing regresses');
+  assert.deepEqual(r(undefined), { text: '1400', source: 'wallet' }, 'an older server');
+  assert.deepEqual(r('garbage'), { text: '1400', source: 'wallet' });
+  assert.equal(r(null, true, null, 0), null, 'no usable rate anywhere');
+  // Before the settings: the last rate this device showed prices at, or nothing (dinars) — never a hard-coded 1,400.
+  assert.deepEqual(r(undefined, false, '1700'), { text: '1700', source: 'cache' });
+  assert.equal(r(undefined, false, null), null);
+  // The context reads WalletContext's `displayUsdRate` (undefined until the settings arrive).
+  const ctx = read('src/CurrencyContext.tsx');
+  assert.match(ctx, /const \{ exchangeRate, displayUsdRate \} = useWallet\(\);/);
+  assert.match(ctx, /const settingsLoaded = displayUsdRate !== undefined;/);
+  assert.match(read('src/WalletContext.tsx'), /displayUsdRate: settings \? \(settings\.displayUsdRate \?\? null\) : undefined,/);
+  assert.match(read('src/lib/api.ts'), /displayUsdRate\?: string \| null;/);
+});
+
+test('the last good display rate is cached per device as {rate, at}; a stale, future or broken entry is ignored; storage that throws is fine', () => {
+  const g = globalThis as Record<string, unknown>;
+  const saved = g.localStorage;
+  const store = new Map<string, string>();
+  try {
+    g.localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    const now = 1_800_000_000_000;
+    rememberDisplayRate('1703.9167', now);
+    assert.deepEqual(JSON.parse(store.get(DISPLAY_RATE_CACHE_KEY)!), { rate: '1703.9167', at: now });
+    assert.equal(readCachedDisplayRate(now + 1000), '1703.9167');
+    assert.equal(readCachedDisplayRate(now + DISPLAY_RATE_CACHE_MAX_AGE_MS + 1), null, 'too old');
+    store.set(DISPLAY_RATE_CACHE_KEY, JSON.stringify({ rate: '1703.9167', at: now + 3_600_000 }));
+    assert.equal(readCachedDisplayRate(now), null, 'from the future');
+    store.set(DISPLAY_RATE_CACHE_KEY, JSON.stringify({ rate: '0', at: now }));
+    assert.equal(readCachedDisplayRate(now), null, 'not a usable rate');
+    store.set(DISPLAY_RATE_CACHE_KEY, '{not json');
+    assert.equal(readCachedDisplayRate(now), null);
+    rememberDisplayRate('1e3', now);
+    assert.equal(store.get(DISPLAY_RATE_CACHE_KEY), '{not json', 'an unusable rate is never written');
+    g.localStorage = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+    assert.equal(readCachedDisplayRate(now), null);
+    assert.doesNotThrow(() => rememberDisplayRate('1500', now));
+    delete g.localStorage;
+    assert.equal(readCachedDisplayRate(now), null, 'no storage at all');
+  } finally {
+    g.localStorage = saved;
+  }
+  // The context caches the rate prices were shown at — never the cache itself, and only when it changed.
+  assert.match(read('src/CurrencyContext.tsx'), /if \(rate && rate\.source !== 'cache' && rate\.text !== cached\) rememberDisplayRate\(rate\.text\);/);
+});
+
+test('two tabs agree: a storage event for the preference key moves this tab too', () => {
+  const ctx = read('src/CurrencyContext.tsx');
+  assert.match(ctx, /window\.addEventListener\('storage', onStorage\)/);
+  assert.match(ctx, /if \(e\.key !== STORAGE_KEY\) return;\s*setCurrencyState\(readStored\(\) \?\? DEFAULT_DISPLAY_CURRENCY\);/);
+  assert.match(ctx, /return \(\) => window\.removeEventListener\('storage', onStorage\);/);
+  assert.match(ctx, /const STORAGE_KEY = 'levonis\.displayCurrency\.v1';/);
+});
+
+test('a tab left open picks up a new rate: settings are read again on return after 30 minutes', () => {
+  const w = read('src/WalletContext.tsx');
+  assert.match(w, /export const SETTINGS_STALE_MS = 30 \* 60 \* 1000;/);
+  assert.match(w, /document\.addEventListener\('visibilitychange', onVisible\)/);
+  assert.match(w, /Date\.now\(\) - settingsAt\.current > SETTINGS_STALE_MS\) void refreshSettings\(\)/);
 });
 
 test('the shop’s own currency is what an unanswered question means', () => {
@@ -94,6 +217,34 @@ test('the conversion never leaves the screen', () => {
   // It stores ONE thing, and it is the preference itself.
   assert.match(src, /window\.localStorage\.setItem\(STORAGE_KEY, currency\)/);
   assert.equal((code.match(/setItem\(/g) ?? []).length, 1);
+  // The rate module asks nothing of the network either: the rate arrives with
+  // the public settings, and the browser never calls an exchange-rate provider.
+  const rate = read('src/lib/displayRate.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  for (const forbidden of ['api.', 'fetch(', 'XMLHttpRequest', 'import(']) {
+    assert.ok(!rate.includes(forbidden), `the display-rate module reaches for ${forbidden}`);
+  }
+});
+
+test('no FX provider is ever called from the browser: no provider host, no rates route outside the owner’s panel', () => {
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(rel, out);
+      else if (/\.(ts|tsx)$/.test(entry.name)) out.push(rel);
+    }
+    return out;
+  };
+  const iqwealthMentions: string[] = [];
+  for (const file of walk('src')) {
+    const code = read(file);
+    assert.doesNotMatch(code, /iraqsm\.com\/api|eurofxref|ecb\.europa\.eu\/stats|IRAQ_PARALLEL_FX_API_KEY|X-API-Key/i, `${file} names a provider endpoint or key`);
+    if (/iraqsm\.com/.test(code)) iqwealthMentions.push(file);
+    const bare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    if (!file.startsWith('src/components/adminPricing/')) assert.doesNotMatch(bare, /\/rates\/fx|\/api\/admin\/pricing\/rates/, `${file} calls the owner's rates routes`);
+  }
+  // The one mention is the attribution link IQWealth's terms ask for, in the top-bar menu.
+  assert.deepEqual(iqwealthMentions, ['src/components/LangThemePanel.tsx']);
+  assert.match(read('src/components/LangThemePanel.tsx'), /export const IQWEALTH_URL = 'https:\/\/iraqsm\.com';/);
 });
 
 test('storage that throws is not a blank shop', () => {
@@ -113,7 +264,7 @@ test('the checkout total keeps the dinar, whatever the switch says', () => {
   // approximate: a converted figure at a rate the shop can change tomorrow is
   // not the number the customer's bank will see.
   assert.match(src, /data-testid="checkout-order-total"[\s\S]{0,200}\{moneyBoth\(orderTotal\)\}/);
-  assert.match(src, /const \{ money, moneyBoth \} = useMoney\(\);/);
+  assert.match(src, /const \{ money, moneyBoth, walletMoney, walletCharge \} = useMoney\(\);/);
 });
 
 test('an order’s total keeps the dinar too — it is a record of a charge', () => {
@@ -123,10 +274,10 @@ test('an order’s total keeps the dinar too — it is a record of a charge', ()
 
 test('moneyBoth really shows both, and the charge first', () => {
   const src = read('src/CurrencyContext.tsx');
-  assert.match(
-    src,
-    /converted \? `\$\{formatIqd\(iqd\)\} · \$\{formatUsdFromIqd\(iqd, exchangeRate\)\}` : formatIqd\(iqd\)/
-  );
+  assert.match(src, /return usd \? `\$\{formatIqd\(iqd\)\} · \$\{usd\}` : formatIqd\(iqd\);/);
+  const v = currencyValue('USD', noop, shop('1400'));
+  assert.equal(v.moneyBoth(1_750_000), `${formatIqd(1_750_000)} · $1,250.00`);
+  assert.equal(currencyValue('IQD', noop, shop('1400')).moneyBoth(1_750_000), formatIqd(1_750_000));
 });
 
 // ------------------------------------------------- no figure left behind
@@ -210,7 +361,12 @@ test('the settings row is a real switch and states the rate it converts at', () 
   assert.match(src, /aria-pressed=\{currency === code\}/);
   // A conversion whose rate is not on screen is a number the reader cannot
   // check, and the disclosure only appears while a conversion is being shown.
-  assert.match(src, /\{s\.currencyRate\(rate\.toLocaleString\('en-US'\)\)\}/);
+  // The shop's rate once the owner approved one (named as the shop's, critique
+  // L8); the old sentence at the wallet's rate until then; none without a rate.
+  assert.match(src, /\{rate\.source === 'shop' \? s\.currencyRateShop\(groupRateText\(rate\.text\)\) : s\.currencyRate\(groupRateText\(rate\.text\)\)\}/);
+  assert.ok(src.includes('سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر بناءً على السوق الموازية، للعرض فقط.'));
+  assert.ok(src.includes("Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate based on the parallel market, display only."));
+  assert.ok(src.includes('نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا لەسەر بنەمای بازاڕی هاوتەریب، تەنها بۆ پیشاندان.'));
   assert.match(src, /\{converted \? \([\s\S]{0,200}currencyConvertedNote/);
   // The old copy said there was no such setting. It must not still say so.
   assert.ok(!src.includes('لا يوجد إعداد عملة عرض'), 'the row still denies the setting exists');
@@ -218,7 +374,7 @@ test('the settings row is a real switch and states the rate it converts at', () 
 
 test('all three dictionaries carry the new currency strings', () => {
   const src = read('src/pages/Settings.tsx');
-  for (const key of ['currency', 'currencyNote', 'currencyRate', 'currencyConvertedNote']) {
+  for (const key of ['currency', 'currencyNote', 'currencyRate', 'currencyRateShop', 'currencyConvertedNote']) {
     assert.equal(
       (src.match(new RegExp(`^ *${key}:`, 'gm')) ?? []).length,
       3,
@@ -233,4 +389,93 @@ test('the wallet’s own toggle opens on the same answer as the shop', () => {
   const src = read('src/pages/Wallet.tsx');
   assert.match(src, /const \{ currency: siteCurrency \} = useMoney\(\);/);
   assert.match(src, /useState<'IQD' \| 'USD'>\(siteCurrency \?\? defaultCurrency\)/);
+});
+
+test('the wallet toggle still converts at the wallet’s own rate (Q5)', () => {
+  const src = read('src/pages/Wallet.tsx');
+  assert.match(src, /const \{ paymentMethods, currency: defaultCurrency, exchangeRate, refreshWallet, settings \} = useWallet\(\);/);
+  assert.match(src, /iqdToUsdCents\(iqd, exchangeRate\)/);
+  assert.doesNotMatch(src, /displayUsdRate|money\(/, 'the wallet page never reads the market-rate display');
+});
+
+// ------------------------------- critique M2: one charge, one dollar figure
+
+const plan: ApiPlan = { id: 'pro_12mo', tier: 'pro', duration_months: 12, price_iqd: 140_000, purchasable: true, per_month_iqd: null, sort: 1 };
+const quote = (over: Partial<Extract<PurchaseQuote, { ok: true }>> = {}): PurchaseQuote => ({
+  ok: true,
+  plan,
+  price_iqd: 140_000,
+  credit_iqd: 0,
+  charge_iqd: 140_000,
+  exchange_rate: 1400,
+  charge_usd_cents: 10_000,
+  balance_usd_cents: 10_000,
+  shortfall_usd_cents: 0,
+  balance_iqd: 140_000,
+  shortfall_iqd: 0,
+  activate_now: true,
+  launch_at: null,
+  expires_at: '2027-09-23T00:00:00.000Z',
+  upgrade_from_tier: null,
+  ...over,
+});
+
+function renderBarUsd(q: PurchaseQuote, rate = '1500'): string {
+  const bar = createElement(CheckoutBar, {
+    plan,
+    standing: 'open',
+    quote: q,
+    quoteLoading: false,
+    quoteError: null,
+    onRetryQuote: noop,
+    isGuest: false,
+    busy: false,
+    onSubscribe: noop,
+    ctaRef: { current: null },
+    currentExpiry: null,
+  });
+  return renderToStaticMarkup(
+    createElement(LanguageProvider, {
+      children: createElement(CurrencyValueProvider, { value: currencyValue('USD', noop, shop(rate)), children: createElement(MemoryRouter, null, bar) }),
+    })
+  );
+}
+
+test('in USD mode no screen shows one charge in two dollar figures at different rates (critique M2)', () => {
+  // A 140,000 IQD membership and a $100 wallet. At the shop's 1,500 the charge
+  // would read $93.33 — beside a wallet debit of $100.00 at the wallet's 1,400.
+  const html = renderBarUsd(quote());
+  const dollars = [...html.matchAll(/\$[\d,]+\.\d{2}/g)].map((m) => m[0]);
+  assert.ok(!dollars.includes('$93.33'), `a market-rate dollar figure for the charge: ${dollars.join(' ')}`);
+  for (const d of dollars) assert.equal(d, '$100.00', `only the ledger's own cents may be dollars: ${d}`);
+  assert.ok(html.includes(formatIqd(140_000)), 'the charge is said in dinars');
+  // A shortfall is the ledger's figure too.
+  const short = renderBarUsd(quote({ balance_usd_cents: 5000, balance_iqd: 70_000, shortfall_iqd: 70_000, shortfall_usd_cents: 5000 }));
+  for (const d of [...short.matchAll(/\$[\d,]+\.\d{2}/g)].map((m) => m[0])) assert.equal(d, '$50.00');
+
+  // The value itself: wallet amounts are the ledger's cents, a wallet charge is dinars, a catalogue price the shop's rate.
+  const v = currencyValue('USD', noop, shop('1500'));
+  assert.equal(v.walletMoney(140_000, 10_000), '$100.00');
+  assert.equal(v.walletMoney(140_000), formatIqd(140_000), 'only dinars known: dinars');
+  assert.equal(v.walletCharge(140_000), formatIqd(140_000));
+  assert.equal(v.money(140_000), '$93.33');
+  assert.equal(currencyValue('IQD', noop, shop('1500')).walletMoney(140_000, 10_000), formatIqd(140_000));
+
+  // The confirmation sheet: no market-rate money() at all.
+  const confirm = read('src/components/subscription/PurchaseConfirm.tsx').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.doesNotMatch(confirm, /\bmoney\(/);
+  assert.match(confirm, /walletCharge\(ok\.price_iqd\)/);
+  assert.match(confirm, /walletCharge\(ok\.charge_iqd\)/);
+  assert.match(confirm, /walletMoney\(ok\.balance_iqd, ok\.balance_usd_cents\)/);
+  assert.match(confirm, /walletMoney\(result\.res\.charged_iqd, result\.res\.charged_usd_cents\)/);
+  // The checkout's wallet block: every figure at the wallet's rate or in dinars.
+  const checkout = read('src/pages/Checkout.tsx');
+  const block = checkout.slice(checkout.indexOf('<div data-checkout-wallet '), checkout.indexOf('POINTS, AS A QUIET LINE'));
+  assert.ok(block.length > 1000, 'the wallet block was not found');
+  assert.doesNotMatch(block, /\bmoney\(/);
+  assert.match(block, /walletMoney\(quote\.wallet\.applied_iqd\)/);
+  assert.match(block, /walletMoney\(walletRemainderIqd\)/);
+  assert.match(checkout, /−\{walletMoney\(walletDiscount\)\}/);
+  // The profile's balance card: the ledger's cents in dollars.
+  assert.match(read('src/pages/Profile.tsx'), /currency === 'USD' \? <bdi dir="ltr">\{walletMoney\(balanceIqd, balanceUsdCents\)\}<\/bdi>/);
 });

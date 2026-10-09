@@ -266,3 +266,174 @@ export function fetchPricingProduct(id: string, opts?: RequestOptions): Promise<
 export function runPricingWhatIf(id: string, body: PricingWhatIfRequest, opts?: RequestOptions): Promise<PricingWhatIfAnswer> {
   return api.post<PricingWhatIfAnswer>(`${PRICING_API}/products/${encodeURIComponent(id)}/what-if`, body, opts);
 }
+
+// ============================================================= FX-1: the central rates
+//
+// FX programme plan §8 and §12. The owner's exchange-rate panel speaks to the
+// same router, behind the same door (`requireCostRead`; every write also
+// `assertCostWrite`); every answer is `private, no-store`. The browser never
+// calls an exchange-rate provider: «تحديث الآن» asks the SERVER to check, and
+// the server alone reaches IQWealth or the ECB.
+//
+// EVERY FIGURE IS THE SERVER'S. Rates are exact decimal TEXT; the client
+// formats them and never computes one. What the owner types travels as TEXT
+// too (the server refuses a JSON number for a decimal). Owner acts carry the
+// pair's `owner_version`, so a panel left open across another act answers 409
+// PRICING_CHANGED instead of overwriting it — a routine scheduler check never
+// moves that version.
+
+export type FxPairId = 'USD_IQD' | 'EUR_USD' | 'CNY_USD';
+export const FX_PAIR_IDS: readonly FxPairId[] = ['USD_IQD', 'EUR_USD', 'CNY_USD'];
+export type FxMode = 'AUTO' | 'MANUAL';
+export type FxFetchStatus = 'OK' | 'FAILED' | 'STALE' | 'NOT_CONFIGURED';
+export type FxStatus = FxFetchStatus | 'REVIEW_REQUIRED';
+export type FxPendingReason = 'FIRST_VALUE' | 'ANOMALY' | 'ANOMALY_24H' | 'DRIFT' | 'BACK_TO_AUTO';
+export type FxCheckResult =
+  | 'APPLIED'
+  | 'UNCHANGED'
+  | 'REVIEW_HELD'
+  | 'DEFERRED'
+  | 'SUPERSEDED'
+  | 'FAILED'
+  | 'STALE'
+  | 'INVALID'
+  | 'NOT_CONFIGURED'
+  | 'OBSERVED';
+
+export interface FxPendingDto {
+  market_rate: string | null;
+  effective_rate: string;
+  published_at: string | null;
+  observed_at: string | null;
+  reason: FxPendingReason | null;
+  /** Signed percentage TEXT from the server, against the effective rate; null on a first value. */
+  change_pct: string | null;
+}
+
+export interface FxPairDto {
+  pair: FxPairId;
+  provider: 'iqwealth' | 'ecb';
+  attribution: { text: string; url: string };
+  mode: FxMode;
+  /** 6 or 12 for USD/IQD; 24 for the ECB pairs. */
+  interval_hours: number;
+  market_rate: string | null;
+  market_buy: string | null;
+  official_rate: string | null;
+  /** USD/IQD only: signed dinars per dollar (Q1). */
+  adjustment_iqd_per_usd: string | null;
+  manual_rate: string | null;
+  effective_rate: string | null;
+  effective_version: number;
+  effective_source: 'provider' | 'manual' | 'review_approved' | null;
+  effective_applied_at: string | null;
+  last_known_good_rate: string | null;
+  drift_anchor_rate: string | null;
+  drift_anchor_at: string | null;
+  published_at: string | null;
+  last_checked_at: string | null;
+  last_check_result: FxCheckResult | null;
+  last_successful_at: string | null;
+  status: FxStatus;
+  fetch_status: FxFetchStatus;
+  last_error_code: string | null;
+  failing_since: string | null;
+  pending: FxPendingDto | null;
+  /** The value the owner last rejected, remembered 24 hours (critique M4.2). */
+  rejected: { rejected_rate: string; rejected_at: string | null } | null;
+  /** While MANUAL: what a refresh observed (critique L14). */
+  last_observed: { market_rate: string | null; candidate: string; observed_at: string } | null;
+  anomaly_threshold_pct: string;
+  drift_threshold_pct: string;
+  min_change_pct: string;
+  bound_min: string;
+  bound_max: string;
+  next_check_at: string | null;
+  owner_version: number;
+}
+
+export interface FxShippingDto {
+  profile: PricingProfile;
+  basis: 'weight' | 'volume';
+  rate_iqd: string | null;
+  version: number;
+  updated_at: string | null;
+  /** The purchase screens' value, offered as a one-tap suggestion. */
+  procurement_suggestion: string | null;
+}
+
+export interface FxRatesAnswer {
+  success: true;
+  pairs: FxPairDto[];
+  effective_rates_iqd: Partial<Record<PricingCurrency, { rate_iqd: string | null; version: number; updated_at: string | null }>>;
+  shipping: FxShippingDto[];
+  /** Whether the IQWealth key is set — a boolean, never the key. */
+  key_configured: boolean;
+  refresh_budget: { used_today: number; limit: number };
+  provider_budget: { USD_IQD: { used_today: number; cap: number } };
+  engine_products: number;
+  reprice_blocked: number;
+  stale_products: number;
+  /** Only on «تحديث الآن». */
+  report?: { checked: FxPairId[]; lease_held: FxPairId[]; budget_deferred: FxPairId[] };
+}
+
+export interface FxHistoryItem {
+  id: string;
+  pair: FxPairId;
+  event: string;
+  trigger_kind: 'cron' | 'refresh' | 'owner' | 'back_to_auto' | string;
+  provider: string | null;
+  market_rate: string | null;
+  effective_before: string | null;
+  effective_after: string | null;
+  pending_rate: string | null;
+  change_ppm: number | null;
+  published_at: string | null;
+  result: string;
+  error_code: string | null;
+  repriced_products: number | null;
+  created_at: string;
+}
+
+/** The body of a settings act: `owner_version` plus only the fields the owner changed. */
+export interface FxSettingsBody {
+  owner_version: number;
+  mode?: FxMode;
+  interval_hours?: 6 | 12;
+  adjustment_iqd_per_usd?: string;
+  anomaly_threshold_pct?: string;
+  drift_threshold_pct?: string;
+  min_change_pct?: string;
+  bound_min?: string;
+  bound_max?: string;
+  confirm_large_change?: boolean;
+}
+
+export const fetchFxRates = (opts?: RequestOptions) => api.get<FxRatesAnswer>(`${PRICING_API}/rates`, opts);
+
+export function fetchFxHistory(q: { pair?: FxPairId | null; before?: string | null; limit?: number }, opts?: RequestOptions): Promise<{ success: true; items: FxHistoryItem[] }> {
+  const p = new URLSearchParams();
+  if (q.pair) p.set('pair', q.pair);
+  if (q.before) p.set('before', q.before);
+  p.set('limit', String(Math.min(100, Math.max(1, Math.floor(q.limit ?? 30)))));
+  return api.get<{ success: true; items: FxHistoryItem[] }>(`${PRICING_API}/rates/history?${p.toString()}`, opts);
+}
+
+export const saveFxSettings = (pair: FxPairId, body: FxSettingsBody) =>
+  api.put<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/settings`, body);
+
+export const setFxManual = (pair: FxPairId, body: { owner_version: number; rate: string; confirm_large_change?: boolean }) =>
+  api.put<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/manual`, body);
+
+export const confirmFxRate = (pair: FxPairId, body: { owner_version: number }) =>
+  api.post<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/confirm`, body);
+
+export const refreshFxRates = (pairs?: FxPairId[]) =>
+  api.post<FxRatesAnswer>(`${PRICING_API}/rates/fx/refresh`, pairs ? { pairs } : {});
+
+export const reviewFxRate = (pair: FxPairId, body: { owner_version: number; decision: 'approve' | 'reject' | 'keep_manual'; confirm_large_change?: boolean }) =>
+  api.post<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/review`, body);
+
+export const saveShippingRate = (profile: PricingProfile, body: { version: number; rate_iqd: string; confirm_large_change?: boolean }) =>
+  api.put<FxRatesAnswer>(`${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}`, body);

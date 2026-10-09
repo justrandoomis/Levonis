@@ -600,7 +600,7 @@ function offeredCheckoutDays(
 }
 
 export default function Checkout() {
-  const { money, moneyBoth } = useMoney();
+  const { money, moneyBoth, walletMoney, walletCharge } = useMoney();
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, loc } = useLanguage();
@@ -2972,7 +2972,7 @@ export default function Checkout() {
                     worth the tone change. */}
                 {printerAdvanceUnmet && (
                   <span className="mt-1 block font-medium">
-                    {S.printerAdvanceShort(money(printerNoteIqd), money(walletBalanceShown))}
+                    {S.printerAdvanceShort(money(printerNoteIqd), walletMoney(walletBalanceShown))}
                   </span>
                 )}
               </Note>
@@ -3083,6 +3083,14 @@ export default function Checkout() {
               deduction that never appears. It used to vanish outright, which
               left a customer who had seen it a moment ago with no idea why.
             */}
+            {/*
+              WALLET FIGURES KEEP THE WALLET'S RATE (FX programme critique
+              M2). The checkout quote knows the wallet only in dinars, so the
+              balance, the deduction and the remainder below read in dinars in
+              either currency (`walletMoney` with no cents is the dinars) —
+              never through the market-rate `money()`, which would put a
+              second dollar figure beside the ledger's own.
+            */}
             <div data-checkout-wallet className="mt-4 pt-4 border-t border-white/5 transition-all">
                 <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
@@ -3091,15 +3099,18 @@ export default function Checkout() {
                         </div>
                         <div className="min-w-0">
                             <span id="checkout-wallet-label" className="font-normal text-white block text-sm">
-                                {/* OWNER: Sorani to be written by hand. */}
                                 {loc(
-                                  `استخدام رصيد المحفظة (${money(walletBalanceShown)})`,
-                                  `Use wallet balance (${money(walletBalanceShown)})`
+                                  `استخدام رصيد المحفظة (${walletMoney(walletBalanceShown)})`,
+                                  `Use wallet balance (${walletMoney(walletBalanceShown)})`,
+                                  `بەکارهێنانی باڵانسی جزدان (${walletMoney(walletBalanceShown)})`
                                 )}
                             </span>
                             <span className="text-xs text-zinc-500 font-light block">
-                                {/* OWNER: Sorani to be written by hand. */}
-                                {loc('يُخصم من إجمالي الطلب، والباقي بطريقة الدفع التي اخترتها', 'Deducted from the order total; the rest is paid by the method you chose')}
+                                {loc(
+                                  'يُخصم من إجمالي الطلب، والباقي بطريقة الدفع التي اخترتها',
+                                  'Deducted from the order total; the rest is paid by the method you chose',
+                                  'لە کۆی داواکارییەکە دەبڕدرێت، و ئەوەی دەمێنێتەوە بەو ڕێگەی پارەدانە دەدرێت کە هەڵتبژاردووە'
+                                )}
                             </span>
                         </div>
                     </div>
@@ -3145,10 +3156,10 @@ export default function Checkout() {
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                         <div className="text-xs leading-relaxed font-light">
                             <p>
-                                {/* OWNER: Sorani to be written by hand. */}
                                 {loc(
-                                  `رصيدك (${money(walletBalanceShown)}) لا يغطي كامل المبلغ (${money(orderTotal)}) للدفع المقدم بالكامل.`,
-                                  `Your balance (${money(walletBalanceShown)}) does not cover the full ${money(orderTotal)} for paying everything in advance.`
+                                  `رصيدك (${walletMoney(walletBalanceShown)}) لا يغطي كامل المبلغ (${walletCharge(orderTotal)}) للدفع المقدم بالكامل.`,
+                                  `Your balance (${walletMoney(walletBalanceShown)}) does not cover the full ${walletCharge(orderTotal)} for paying everything in advance.`,
+                                  `باڵانسەکەت (${walletMoney(walletBalanceShown)}) هەموو بڕی (${walletCharge(orderTotal)}) بۆ پارەدانی تەواوی پێشوەختە داناپۆشێت.`
                                 )}
                             </p>
                             {partialWalletMethodId && walletBalanceShown > 0 && (
@@ -3163,10 +3174,10 @@ export default function Checkout() {
                                     }}
                                     className="mt-2 inline-flex items-center rounded-md border border-red-400/40 px-2.5 py-1 font-medium text-red-300 hover:text-white hover:border-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                                 >
-                                    {/* OWNER: Sorani to be written by hand. */}
                                     {loc(
-                                      `استخدم ${money(walletBalanceShown)} من الرصيد وادفع الباقي عند الاستلام`,
-                                      `Use ${money(walletBalanceShown)} from the balance and pay the rest on delivery`
+                                      `استخدم ${walletMoney(walletBalanceShown)} من الرصيد وادفع الباقي عند الاستلام`,
+                                      `Use ${walletMoney(walletBalanceShown)} from the balance and pay the rest on delivery`,
+                                      `${walletMoney(walletBalanceShown)} لە باڵانسەکە بەکاربهێنە و ئەوەی دەمێنێتەوە لە کاتی وەرگرتندا بدە`
                                     )}
                                 </button>
                             )}
@@ -3184,20 +3195,18 @@ export default function Checkout() {
                 {quote && walletSwitchOn && !isAdvanceRequired && quote.wallet.applied_iqd > 0 && (
                     <dl data-checkout-wallet-breakdown className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-1.5">
                         <div className="flex justify-between items-center gap-3 text-emerald-300">
-                            {/* OWNER: Sorani to be written by hand. */}
-                            <dt>{loc('يُخصم من المحفظة', 'Deducted from your wallet')}</dt>
-                            <dd data-testid="checkout-wallet-applied" className="tabular-nums font-medium">−{money(quote.wallet.applied_iqd)}</dd>
+                            <dt>{loc('يُخصم من المحفظة', 'Deducted from your wallet', 'لە جزدانەکەت دەبڕدرێت')}</dt>
+                            <dd data-testid="checkout-wallet-applied" className="tabular-nums font-medium">−{walletMoney(quote.wallet.applied_iqd)}</dd>
                         </div>
                         <div className="flex justify-between items-center gap-3 text-white">
-                            {/* OWNER: Sorani to be written by hand. */}
                             <dt>
                                 {walletRemainderIqd === 0
-                                  ? loc('المتبقي — مدفوع بالكامل من المحفظة', 'Remaining — paid in full from your wallet')
+                                  ? loc('المتبقي — مدفوع بالكامل من المحفظة', 'Remaining — paid in full from your wallet', 'ماوە — بە تەواوی لە جزدانەکەتەوە دراوە')
                                   : isBnplMethod
-                                    ? loc('المتبقي — يُموَّل عبر BNPL', 'Remaining — financed with BNPL')
-                                    : loc('المتبقي — يُدفع عند الاستلام', 'Remaining — paid on delivery')}
+                                    ? loc('المتبقي — يُموَّل عبر BNPL', 'Remaining — financed with BNPL', 'ماوە — بە BNPL دابین دەکرێت')
+                                    : loc('المتبقي — يُدفع عند الاستلام', 'Remaining — paid on delivery', 'ماوە — لە کاتی وەرگرتندا دەدرێت')}
                             </dt>
-                            <dd data-testid="checkout-wallet-remaining" className="tabular-nums font-bold">{money(walletRemainderIqd)}</dd>
+                            <dd data-testid="checkout-wallet-remaining" className="tabular-nums font-bold">{walletMoney(walletRemainderIqd)}</dd>
                         </div>
                     </dl>
                 )}
@@ -3305,7 +3314,7 @@ export default function Checkout() {
                 {walletDiscount > 0 ? (
                   <div className="flex justify-between items-center text-text-secondary">
                     <span>{loc('مدفوع من المحفظة', 'Paid from your wallet', 'لە جزدان درا')}</span>
-                    <span className="tabular-nums">−{money(walletDiscount)}</span>
+                    <span className="tabular-nums">−{walletMoney(walletDiscount)}</span>
                   </div>
                 ) : null}
 

@@ -21,7 +21,10 @@
  * it, «كل المنتجات» pops back to the same search, filter and scroll position.
  * The open product is kept in the address (`?product=`) so a reload reopens it.
  *
- * NOTHING HERE WRITES. Two GETs and a POST that only answers a question.
+ * THE PRODUCT PREVIEW WRITES NOTHING: two GETs and a POST that only answers
+ * a question. The one section that writes is the exchange-rate panel above it
+ * (FX-1, RatesPanel): the owner's rates, through their own owner-only routes —
+ * and no product price moves with them until automatic pricing (FX-5).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
@@ -30,6 +33,7 @@ import { fetchPricingProducts, OVERVIEW_PAGE_LIMIT, type PricingOverview, type P
 import { PreviewBanner, PricingFailure } from './parts';
 import PricingProducts, { type StatusFilter } from './PricingProducts';
 import ProductPricingSheet from './ProductPricingSheet';
+import RatesPanel from './RatesPanel';
 import { pricingStrings } from './strings';
 
 const PRODUCT_PARAM = 'product';
@@ -140,6 +144,11 @@ export default function AdminPricing() {
         <h2 className="text-[22px] font-black leading-snug text-text-primary sm:text-[26px]">{s.title}</h2>
         <p className="max-w-[68ch] text-[14px] leading-relaxed text-text-muted">{s.subtitle}</p>
       </header>
+
+      {/* FX-1: the exchange and shipping rates come first — they are LIVE
+          (the shop's dollar rate, the calculator's rates); the preview banner
+          below speaks for the product prices, which nothing here changes. */}
+      {!productId && <RatesPanel lang={lang} dir={dir} />}
 
       <PreviewBanner lang={lang} body={s.previewBody} />
 

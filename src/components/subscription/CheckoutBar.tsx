@@ -77,7 +77,7 @@ export function CheckoutBar({
   currentExpiry,
 }: CheckoutBarProps) {
   const { t, loc, lang } = useLanguage();
-  const { money } = useMoney();
+  const { walletMoney, walletCharge } = useMoney();
   if (!plan) return null;
 
   const meta = TIER_META[plan.tier];
@@ -136,8 +136,11 @@ export function CheckoutBar({
             ? t('includedInYours')
             : t('subscribeNow');
 
-  const balance = ok ? (ok.balance_iqd !== undefined ? money(ok.balance_iqd) : formatUsdCents(ok.balance_usd_cents)) : null;
-  const shortfall = ok ? (ok.shortfall_iqd !== undefined ? money(ok.shortfall_iqd) : formatUsdCents(ok.shortfall_usd_cents)) : null;
+  // Wallet amounts at the wallet's own rate, never the market's (critique M2):
+  // the ledger's cents in dollars, its dinars otherwise. The charge the wallet
+  // pays is said in dinars, as the confirmation window says it.
+  const balance = ok ? (ok.balance_iqd !== undefined ? walletMoney(ok.balance_iqd, ok.balance_usd_cents) : formatUsdCents(ok.balance_usd_cents)) : null;
+  const shortfall = ok ? (ok.shortfall_iqd !== undefined ? walletMoney(ok.shortfall_iqd, ok.shortfall_usd_cents) : formatUsdCents(ok.shortfall_usd_cents)) : null;
 
   // One line that says where this account stands. On a desktop the ready
   // states are the list below instead, so the line is for the rest.
@@ -174,7 +177,7 @@ export function CheckoutBar({
     status = `${t('shortfall')}: ${shortfall}`;
     statusDesktop = false;
   } else if (ok && ok.credit_iqd > 0) {
-    status = `${t('amountDue')}: ${money(ok.charge_iqd)}`;
+    status = `${t('amountDue')}: ${walletCharge(ok.charge_iqd)}`;
     statusDesktop = false;
   } else if (ok) {
     status = `${t('walletBalance')}: ${balance}`;
@@ -207,13 +210,15 @@ export function CheckoutBar({
             </p>
           )}
         </div>
+        {/* The price the wallet will pay: dinars, as the confirmation says it
+            (critique M2) — never a market-rate dollar beside the ledger's. */}
         <p data-summary-price className="shrink-0 text-[16px] font-extrabold tabular-nums text-text-primary lg:hidden">
-          {priced ? money(plan.price_iqd as number) : '—'}
+          {priced ? walletCharge(plan.price_iqd as number) : '—'}
         </p>
       </div>
       {/* From 1024px the price has the width to be the headline. */}
       <p className="hidden lg:block mt-3 text-[1.75rem] leading-tight font-extrabold tabular-nums text-text-primary">
-        {priced ? money(plan.price_iqd as number) : t('priceTBA')}
+        {priced ? walletCharge(plan.price_iqd as number) : t('priceTBA')}
       </p>
 
       {/* The server's answer for this account, in full — from 1024px. A <dl>
@@ -221,11 +226,11 @@ export function CheckoutBar({
       {ok && (
         <div className="hidden lg:block mt-3 border-t border-border-subtle/70">
           <dl className="divide-y divide-border-subtle/60" data-summary-quote>
-            <Row label={t('price')} value={money(ok.price_iqd)} />
+            <Row label={t('price')} value={walletCharge(ok.price_iqd)} />
             {ok.credit_iqd > 0 && (
-              <Row label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`} value={`− ${money(ok.credit_iqd)}`} tone="credit" />
+              <Row label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`} value={`− ${walletCharge(ok.credit_iqd)}`} tone="credit" />
             )}
-            {ok.credit_iqd > 0 && <Row label={t('amountDue')} value={money(ok.charge_iqd)} />}
+            {ok.credit_iqd > 0 && <Row label={t('amountDue')} value={walletCharge(ok.charge_iqd)} />}
             <Row label={t('walletBalance')} value={balance} tone="muted" />
             {short && <Row label={t('shortfall')} value={shortfall} tone="warn" />}
             {ok.activate_now && ok.expires_at && <Row label={t('activeUntil')} value={formatDate(ok.expires_at, lang)} />}

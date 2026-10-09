@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 // THE SAME NORMALIZER THE SERVER CHARGES FROM, not a second guard beside it.
 // packages/shipping/src/codTax is a pure leaf with no imports, so nothing of
@@ -51,6 +51,14 @@ interface WalletContextType {
   cartShippingMethods: CartShippingMethod[];
   exchangeRate: number;
   /**
+   * THE SHOP'S EFFECTIVE USD/IQD, as decimal text — the display currency's
+   * rate (FX programme plan §13). `undefined` until the settings arrive;
+   * `null` when the server sends none (the owner has not approved a first
+   * value, or an older server), and the display then falls back to
+   * `exchangeRate`. Never used for money: the wallet keeps `exchangeRate`.
+   */
+  displayUsdRate: string | null | undefined;
+  /**
    * THE DOOR CHARGE, as two numbers: what one block costs and how big a block
    * is. Read from the same public settings the exchange rate comes from, and
    * falling back to the shipping module's compiled default so a client talking
@@ -79,6 +87,9 @@ interface WalletContextType {
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
+/** Settings older than this are read again when the tab comes back to the front. */
+export const SETTINGS_STALE_MS = 30 * 60 * 1000;
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const { user, isLoaded: authLoaded } = useAuth();
 
@@ -100,14 +111,33 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // When the settings last arrived, for the freshness check below.
+  const settingsAt = useRef(0);
   const refreshSettings = useCallback(async () => {
     try {
       const data = await api.get<{ settings: PublicSettings }>('/api/settings/public');
+      settingsAt.current = Date.now();
       setSettings(data.settings);
     } catch (e) {
       console.error('Failed to fetch settings', e);
     }
   }, []);
+
+  /**
+   * A TAB LEFT OPEN FOR HOURS PICKS UP A NEW DISPLAY RATE (plan §13
+   * "Freshness"). The shop's USD/IQD can move every six hours; a tab brought
+   * back to the front more than 30 minutes after the settings were read asks
+   * again. `/api/settings/public` is edge-cached, so this is cheap.
+   */
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (settingsAt.current > 0 && Date.now() - settingsAt.current > SETTINGS_STALE_MS) void refreshSettings();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshSettings]);
 
   const refreshWallet = useCallback(async () => {
     if (!user) {
@@ -184,6 +214,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     checkoutPaymentMethods: settings?.checkoutPaymentMethods ?? [],
     cartShippingMethods: settings?.cartShippingMethods ?? [],
     exchangeRate: settings?.exchangeRate ?? 1400,
+    displayUsdRate: settings ? (settings.displayUsdRate ?? null) : undefined,
     codTaxPerBlockIqd: codTaxRate.perBlockIqd,
     codTaxBlockIqd: codTaxRate.blockIqd,
     currency: settings?.currency ?? 'IQD',

@@ -431,8 +431,11 @@ export function speedAttention(rows: readonly VitalsDayRow[], today: string): Sp
  * closure 46.6 KB = 229.6 KB after P4/P5, docs/PERFORMANCE_LOG.md 2026-09-30).
  * The bundle test pins it within 3 KB of the build, so it cannot drift; it is
  * shown as context beside the merchant's own weight, never as a finding.
+ * FX-1 (2026-10-09): 232.6 → 233.4 KB measured — the display currency's exact
+ * rate, its per-device cache, tab sync and freshness are first-paint code
+ * (FX programme plan §13); the figure follows the build.
  */
-export const STOREFRONT_FIXED_KB = 230;
+export const STOREFRONT_FIXED_KB = 231;
 /** The Arabic Cairo subset every store page preloads (index.html: 30,896 B); the Latin subsets load on demand. */
 export const STOREFRONT_FONT_KB = 31;
 

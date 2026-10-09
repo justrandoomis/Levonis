@@ -724,7 +724,8 @@ test('the wallet is stated in dinars — the figure /wallet prints — never in 
   const confirm = read(`${COMPONENT_DIR}/PurchaseConfirm.tsx`);
   assert.equal((confirm.match(/formatUsdCents\(ok\.charge_usd_cents\)/g) || []).length, 1);
   assert.match(confirm, /data-usd-line/);
-  assert.match(confirm, /ok\.balance_iqd !== undefined \? money\(ok\.balance_iqd\)/);
+  // A wallet amount at the wallet's own rate, never the market-rate money() (FX critique M2).
+  assert.match(confirm, /ok\.balance_iqd !== undefined \? walletMoney\(ok\.balance_iqd, ok\.balance_usd_cents\)/);
 });
 
 test('the current card and a card already included are information, not an amber error', () => {

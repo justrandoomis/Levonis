@@ -97,8 +97,17 @@ test('static: only scheduler.ts imports the providers; only index.ts and adminPr
   const providerImporters = importers(/from\s+['"][^'"]*\/providers\/(iqwealth|ecb|transport)['"]|from\s+['"]\.\/(iqwealth|ecb|transport)['"]/).filter((f) => !f.startsWith('worker/lib/fx/providers/'));
   assert.deepEqual(providerImporters, ['worker/lib/fx/scheduler.ts']);
   assert.deepEqual(importers(/from\s+['"][^'"]*fx\/scheduler['"]|from\s+['"]\.\/scheduler['"]/), ['worker/index.ts', 'worker/routes/adminPricing.ts']);
-  // The client never names a provider host or the key.
-  for (const f of tsFiles(join(ROOT, 'src'))) assert.doesNotMatch(readFileSync(f, 'utf8'), /iraqsm\.com|eurofxref|IRAQ_PARALLEL_FX_API_KEY/, relative(ROOT, f));
+  // The client never names a provider endpoint or the key. The one mention of
+  // IQWealth's site is the attribution link its terms ask for, in the top-bar
+  // menu (plan §13, §14.4 risk 3) — a link the reader follows, never a request.
+  for (const f of tsFiles(join(ROOT, 'src'))) {
+    const code = readFileSync(f, 'utf8');
+    assert.doesNotMatch(code, /iraqsm\.com\/|eurofxref|ecb\.europa\.eu\/stats|IRAQ_PARALLEL_FX_API_KEY/, relative(ROOT, f));
+    if (/iraqsm\.com/.test(code)) {
+      assert.equal(relative(ROOT, f), 'src/components/LangThemePanel.tsx', `${relative(ROOT, f)} names IQWealth's host`);
+      assert.deepEqual(code.match(/[^'"`\s]*iraqsm\.com[^'"`\s]*/g), ['https://iraqsm.com'], 'only the bare attribution link');
+    }
+  }
 });
 
 test('the browser cannot reach a provider either: the CSP connect-src names neither host', () => {

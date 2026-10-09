@@ -3,11 +3,13 @@
  * other rates: the exchange rates (USD, EUR, CNY → IQD) and the shipping
  * rates (Germany land and China air per kg, China sea per CBM).
  *
- * They are read by the server from the purchase screens' cost profiles, so
- * every one says «not confirmed» (b.ratesFromPurchases): P1 has no central
- * rates card yet, and a value nobody confirmed is labelled as one. A rate the
- * purchases never held — USD today — is shown as MISSING, with the contract's
- * own sentence, never as 0 and never as the wallet's exchange rate.
+ * Since FX-1 the server reads the CENTRAL rates the owner applied on the
+ * exchange-rate panel (origin 'central', confirmed) and, for a rate not set
+ * there yet, the purchase screens' cost profiles — unconfirmed, and the
+ * warning (b.ratesFromPurchases) is shown while any rate still comes from
+ * them. A rate nobody holds — USD before the first approval — is shown as
+ * MISSING, with the contract's own sentence, never as 0 and never as the
+ * wallet's exchange rate.
  *
  * Figures are the server's exact decimal TEXT, grouped for reading only.
  */
@@ -22,6 +24,7 @@ export default function RatesReference({ rates, lang, s, headingLevel = 3 }: { r
   const Heading = `h${headingLevel}` as 'h3' | 'h4';
   const titleId = useId();
   const unit = lang === 'en' ? 'IQD' : 'د.ع';
+  const fromPurchases = [...rates.fx_rates, ...rates.shipping_rates].some((r) => r.rate_origin === 'procurement_profiles');
   // The banner above says every purchase rate is unconfirmed; a row carries a
   // chip only when it differs from that — a rate the owner typed for a
   // calculation. One cue per fact, not one per row.
@@ -34,9 +37,13 @@ export default function RatesReference({ rates, lang, s, headingLevel = 3 }: { r
         {s.ratesHeading}
       </Heading>
       <p className="mt-0.5 text-[13px] leading-relaxed text-text-muted">{s.ratesIntro}</p>
-      <p role="note" className="lv-alert lv-alert-warning mt-3 text-[13px] leading-relaxed text-text-secondary">
-        {ratesFromPurchasesText(lang)}
-      </p>
+      {/* FX-1: a rate the owner applied centrally is confirmed; the warning
+          speaks only while some rate still comes from the purchase screens. */}
+      {fromPurchases && (
+        <p role="note" className="lv-alert lv-alert-warning mt-3 text-[13px] leading-relaxed text-text-secondary">
+          {ratesFromPurchasesText(lang)}
+        </p>
+      )}
 
       <div className="mt-4 grid gap-5 md:grid-cols-2">
         <div className="min-w-0">

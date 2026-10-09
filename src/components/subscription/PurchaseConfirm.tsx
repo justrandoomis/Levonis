@@ -8,6 +8,14 @@
  * run to. The dollar debit the wallet records is one quiet line under it: the
  * ledger keeps cents, the customer thinks in dinars (migration 0108).
  *
+ * ONE CHARGE, ONE DOLLAR FIGURE (FX programme critique M2). The membership is
+ * paid FROM THE WALLET, whose ledger converts at its own rate (1,400). A
+ * dollar reader used to see the price at the shop's market rate and the debit
+ * line at 1,400 — two dollar figures for one charge. Now the charge (price,
+ * credit, amount due) is said in dinars always (`walletCharge`), and every
+ * wallet amount (balance, shortfall, debit) in the ledger's own cents or
+ * dinars (`walletMoney`) — never at the market rate.
+ *
  * The site is live, so there is no reservation branch: confirming pays, and
  * the membership runs from that moment.
  *
@@ -85,7 +93,7 @@ function Fact({ label, value, tone = 'plain' }: { label: React.ReactNode; value:
 }
 
 export function PurchaseConfirm(props: PurchaseConfirmProps) {
-  const { money } = useMoney();
+  const { walletMoney, walletCharge } = useMoney();
   const { open, onClose, plan, quote, quoteLoading, quoteError, onRetryQuote, phase, result, quoteChanged, onConfirm, onRetry, anchor } = props;
   const { t, lang, dir } = useLanguage();
   const m = useMotion();
@@ -154,20 +162,20 @@ export function PurchaseConfirm(props: PurchaseConfirmProps) {
           ) : ok ? (
             <>
               <dl className="mt-4 lv-surface divide-y divide-border-subtle/70" data-confirm-facts>
-                <Fact label={t('price')} value={money(ok.price_iqd)} tone={ok.credit_iqd > 0 ? 'plain' : 'strong'} />
+                <Fact label={t('price')} value={walletCharge(ok.price_iqd)} tone={ok.credit_iqd > 0 ? 'plain' : 'strong'} />
                 {ok.credit_iqd > 0 && (
-                  <Fact label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`} value={`− ${money(ok.credit_iqd)}`} tone="credit" />
+                  <Fact label={`${t('upgradeCredit')} (${tierLabel(ok.upgrade_from_tier)})`} value={`− ${walletCharge(ok.credit_iqd)}`} tone="credit" />
                 )}
-                {ok.credit_iqd > 0 && <Fact label={t('amountDue')} value={money(ok.charge_iqd)} tone="strong" />}
+                {ok.credit_iqd > 0 && <Fact label={t('amountDue')} value={walletCharge(ok.charge_iqd)} tone="strong" />}
                 <Fact
                   label={t('walletBalance')}
-                  value={ok.balance_iqd !== undefined ? money(ok.balance_iqd) : formatUsdCents(ok.balance_usd_cents)}
+                  value={ok.balance_iqd !== undefined ? walletMoney(ok.balance_iqd, ok.balance_usd_cents) : formatUsdCents(ok.balance_usd_cents)}
                   tone="muted"
                 />
                 {short && (
                   <Fact
                     label={t('shortfall')}
-                    value={ok.shortfall_iqd !== undefined ? money(ok.shortfall_iqd) : formatUsdCents(ok.shortfall_usd_cents)}
+                    value={ok.shortfall_iqd !== undefined ? walletMoney(ok.shortfall_iqd, ok.shortfall_usd_cents) : formatUsdCents(ok.shortfall_usd_cents)}
                     tone="warn"
                   />
                 )}
@@ -227,12 +235,12 @@ export function PurchaseConfirm(props: PurchaseConfirmProps) {
               </p>
               {result.res.credit_iqd > 0 && (
                 <p className="mt-1 text-[12.5px] text-text-secondary tabular-nums">
-                  {t('upgradeCredit')}: − {money(result.res.credit_iqd)}
+                  {t('upgradeCredit')}: − {walletCharge(result.res.credit_iqd)}
                 </p>
               )}
               {result.res.charged_iqd > 0 && (
                 <p className="mt-1 text-[12.5px] text-text-secondary tabular-nums">
-                  {t('walletDebit')}: {money(result.res.charged_iqd)}
+                  {t('walletDebit')}: {walletMoney(result.res.charged_iqd, result.res.charged_usd_cents)}
                 </p>
               )}
             </div>

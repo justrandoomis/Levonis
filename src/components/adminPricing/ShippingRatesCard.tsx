@@ -1,0 +1,141 @@
+/**
+ * «أسعار الشحن المركزية» — THE THREE CENTRAL SHIPPING RATES (FX programme
+ * plan §12, brief §21).
+ *
+ * Germany land and China air in dinars per kg, China sea in dinars per CBM.
+ * They are IQD and stay IQD: no exchange rate ever converts them. The value
+ * the purchase screens hold is offered as a one-tap suggestion — it fills the
+ * field, it never saves by itself. Each save carries the row's version, so a
+ * card left open across another save answers 409 instead of overwriting it.
+ * (From FX-5 a save reprices behind a preview; in FX-1 nothing is repriced.)
+ */
+import React, { useId, useState } from 'react';
+import { Pencil } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { Field, Input } from '../ui/Field';
+import type { Language } from '../../translations';
+import { iqdUnit } from '../../lib/money';
+import { saveShippingRate, type FxRatesAnswer, type FxShippingDto } from './api';
+import type { FxStrings } from './fxStrings';
+import { shippingRateInput } from './fxInput';
+import { FxMessage, fxDate, useFxAct } from './fxParts';
+import { readDecimal } from './format';
+import { Figure } from './parts';
+
+export interface ShippingRatesCardProps {
+  shipping: FxShippingDto[];
+  lang: Language;
+  s: FxStrings;
+  onAnswer: (answer: FxRatesAnswer) => void;
+  onStale: () => void;
+}
+
+export default function ShippingRatesCard({ shipping, lang, s, onAnswer, onStale }: ShippingRatesCardProps) {
+  const titleId = useId();
+  return (
+    <section aria-labelledby={titleId} data-fx-shipping className="lv-surface-raised min-w-0 p-4">
+      <h4 id={titleId} className="text-[15px] font-bold leading-snug text-text-primary">
+        {s.shipTitle}
+      </h4>
+      <p className="mt-0.5 text-[12px] leading-relaxed text-text-muted">{s.shipIntro}</p>
+      <ul className="mt-3 divide-y divide-border-subtle/60">
+        {shipping.map((row) => (
+          <ShippingRow key={row.profile} row={row} lang={lang} s={s} onAnswer={onAnswer} onStale={onStale} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; lang: Language; s: FxStrings; onAnswer: (a: FxRatesAnswer) => void; onStale: () => void }) {
+  const { busy, message, run } = useFxAct({ lang, s, onAnswer, onStale });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const label = s.ship[row.profile];
+  const suggestion = row.procurement_suggestion && row.procurement_suggestion !== row.rate_iqd ? row.procurement_suggestion : null;
+
+  const save = async () => {
+    const rate_iqd = shippingRateInput(draft);
+    if (!rate_iqd) {
+      setError(s.invalidRate);
+      return;
+    }
+    setError(null);
+    const ok = await run('save', (confirm_large_change) =>
+      saveShippingRate(row.profile, { version: row.version, rate_iqd, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
+    );
+    if (ok) setEditing(false);
+  };
+
+  return (
+    <li className="py-3" data-shipping-rate={row.profile}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="min-w-0 text-[14px] font-semibold text-text-primary">{label}</span>
+        <span className="flex items-center gap-2">
+          {row.rate_iqd ? (
+            <span className="text-[14px] font-semibold text-text-primary">
+              <Figure>{readDecimal(row.rate_iqd, lang)}</Figure> {iqdUnit(lang)}
+            </span>
+          ) : (
+            <span className="text-[13px] font-semibold text-warning">{s.shipNotSet}</span>
+          )}
+          {!editing && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Pencil aria-hidden="true" className="h-3.5 w-3.5" />}
+              aria-label={`${s.shipEdit} — ${label}`}
+              onClick={() => {
+                setDraft(row.rate_iqd ?? '');
+                setEditing(true);
+              }}
+            >
+              {s.shipEdit}
+            </Button>
+          )}
+        </span>
+      </div>
+      {row.updated_at && !editing && <p className="mt-0.5 text-[12px] text-text-muted">{`${s.lastUpdate}: ${fxDate(row.updated_at, lang)}`}</p>}
+      {editing && (
+        <form
+          className="mt-2 space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <Field label={s.shipRateLabel} error={error}>
+            <Input ltr inputMode="decimal" autoComplete="off" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          </Field>
+          {suggestion && (
+            <button
+              type="button"
+              onClick={() => setDraft(suggestion)}
+              className="min-h-[44px] rounded-md text-start text-[13px] font-semibold text-text-secondary underline decoration-border-subtle underline-offset-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              data-shipping-suggestion
+            >
+              {s.shipUseSuggestion(readDecimal(suggestion, lang))}
+            </button>
+          )}
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" variant="primary" loading={busy === 'save'}>
+              {s.save}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+              }}
+            >
+              {s.cancel}
+            </Button>
+          </div>
+        </form>
+      )}
+      <FxMessage message={message} s={s} />
+    </li>
+  );
+}

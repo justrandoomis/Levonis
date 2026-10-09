@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, WalletTx, formatIqd, formatUsdCents, formatWalletIqd } from '../lib/api';
 import { useWallet } from '../WalletContext';
+import { useAuth } from '../AuthContext';
 import {
   Users,
   ShoppingCart,
@@ -68,6 +69,13 @@ const EMPTY_STATS: OverviewStats = {
   support_tickets_waiting: 0,
 };
 
+/**
+ * The owner's exchange rates at a glance (FX programme plan §12). Its own
+ * chunk, mounted for `can_write_cost === true` only — the same fail-closed
+ * hint as «التسعير والشحن»; the server refuses everyone else regardless.
+ */
+const OwnerRatesCard = React.lazy(() => import('./admin/OwnerRatesCard'));
+
 const ORDER_STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-300',
   confirmed: 'bg-blue-500/20 text-blue-300',
@@ -89,6 +97,8 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
    * cents.
    */
   const { exchangeRate } = useWallet();
+  const { user } = useAuth();
+  const canSeeRates = user?.can_write_cost === true;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -320,6 +330,13 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           'bg-moss/10'
         )}
       </div>
+
+      {/* The owner's exchange rates (FX-1): owner only, its own chunk. */}
+      {canSeeRates && (
+        <React.Suspense fallback={null}>
+          <OwnerRatesCard onOpen={onNavigateTab ? () => onNavigateTab('pricing') : undefined} />
+        </React.Suspense>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 

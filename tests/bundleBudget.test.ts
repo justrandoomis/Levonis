@@ -406,9 +406,19 @@ test('the split really happened: every page and panel §10 names has a chunk of 
  * EVERY moved byte in an aggregate cap: 233 KB, the upper bound already
  * enforced by the speed report's 230 KB estimate plus its 3 KB tolerance.
  * This does not reward moving shared UI back into the public first paint.
+ *
+ * OCTOBER 9 (FX-1): the display currency reads the shop's effective USD/IQD
+ * exactly (BigInt, src/lib/displayRate.ts), caches the last good rate per
+ * device for the first paint, follows other tabs and re-reads the settings
+ * when a tab returns (FX programme plan §13) — first-paint code by nature.
+ * After moving everything that is not (the currency row and its captions
+ * into the lazy menu panel, the rate formatter into its own module), a clean
+ * build measures 233.4 KB against 232.6 KB at the server commit (+0.8 KB).
+ * The speed tab's figure moves to 231 (worker/lib/storeSpeed.ts) and the cap
+ * stays that figure plus the same 3 KB tolerance: 234 KB.
  */
 const STOREFRONT_BUDGET = 47 * KB;
-const STOREFRONT_APP_BUDGET = 233 * KB;
+const STOREFRONT_APP_BUDGET = 234 * KB;
 const STOREFRONT_SHARED_UI = ['Overlay', 'overlayStack', 'Segmented'];
 /** Vendor chunks a lazy page may share; they are budgeted on their own, not against a page. */
 const isSharedVendor = (f: string) => /^vendor-/.test(f);

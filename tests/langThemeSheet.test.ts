@@ -1,11 +1,15 @@
 /**
  * «في اختيار اللغة ادمج بهذه الأيقونة اللغة والمظهر يعني يظهر نافذة منبثقة مثل
- *  الإشعارات من الأسفل … بسطرين السطر الأول اللغة والسطر الثاني المظهر».
+ *  الإشعارات من الأسفل …» — and the FX brief adds the display currency to the
+ *  same place (FX programme plan §13).
  *
- * The header globe opens ONE bottom sheet, «اللغة والمظهر», with two rows; a
- * choice closes the sheet first and only then changes the theme (a circle from
- * the centre, tests/themeSystem.test.ts) or the language (a calm View
- * Transition, src/lib/langSwap.ts — driven below against a stubbed document).
+ * The header globe opens ONE bottom sheet, «المظهر واللغة والعملة», with three
+ * rows on the home header — the appearance, the language, the display
+ * currency — and two on the dashboard (no currency: admin and merchant screens
+ * print dinars of record). A choice closes the sheet first and only then
+ * changes the theme (a circle from the centre, tests/themeSystem.test.ts), the
+ * language (a calm View Transition, src/lib/langSwap.ts — driven below against
+ * a stubbed document) or the currency (prices re-render from memory).
  *
  * Run: npx tsx --test tests/langThemeSheet.test.ts
  */
@@ -31,12 +35,24 @@ function walk(dir: string, out: string[] = []): string[] {
 
 // ------------------------------------------------------------ the headers
 
-test('every header globe opens the «اللغة والمظهر» sheet', () => {
+test('every header globe opens the «المظهر واللغة والعملة» sheet; the dashboard keeps two rows', () => {
   for (const f of ['src/components/Header.tsx', 'src/components/DashboardLayout.tsx']) {
     const src = read(f);
     assert.match(src, /import LangThemeButton from '\.\/LangThemeSheet'/, `${f} does not use the sheet`);
     assert.match(src, /<LangThemeButton\b/, `${f} does not render the globe that opens the sheet`);
   }
+  // Home: the 44px square, three rows. Dashboard: the quieter icon, two rows.
+  assert.match(read('src/components/Header.tsx'), /<LangThemeButton\b(?![^>]*variant="dash")/);
+  assert.match(read('src/components/DashboardLayout.tsx'), /<LangThemeButton\b[^>]*variant="dash"/);
+  const sheet = read('src/components/LangThemeSheet.tsx');
+  assert.match(sheet, /const withCurrency = variant === 'home';/);
+  assert.match(sheet, /withCurrency=\{withCurrency\}/);
+  // The panel offers the row only on the home header and inside a CurrencyProvider.
+  const panel = read('src/components/LangThemePanel.tsx');
+  assert.match(panel, /const currencyLabel = withCurrency && money \? loc\('عملة العرض', 'Display currency', 'دراوی پیشاندان'\) : null;/);
+  assert.match(panel, /\{currencyLabel !== null && \(/);
+  // The first paint carries none of the currency row: the eager trigger never imports the currency context.
+  assert.doesNotMatch(sheet.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, ''), /CurrencyContext|useOptionalMoney|setCurrency/);
 });
 
 test('the old language dropdown is gone', () => {
@@ -57,26 +73,37 @@ test('the old language dropdown is gone', () => {
   }
 });
 
-test('the sheet is the notifications sheet: grabber, title, two rows, the theme store', () => {
+test('the sheet is the notifications sheet: grabber, title, the three rows in the brief\u2019s order, the theme store', () => {
   const src = read('src/components/LangThemeSheet.tsx') + '\n' + read('src/components/LangThemePanel.tsx');
   // The same primitive as the notifications sheet, at every width.
   assert.match(src, /import \{ Sheet \} from '\.\/ui\/Overlay'/);
   assert.match(src, /<Sheet[\s\S]{0,400}docked[\s\S]{0,300}testId="lang-theme-sheet"/);
   assert.match(src, /labelledBy=\{titleId\}/);
-  assert.ok(src.includes("'اللغة والمظهر'"), 'the title');
-  // Row 1, the language; row 2, the appearance — in that order.
-  const langRow = src.indexOf('data-lang-theme-row="language"');
-  const themeRow = src.indexOf('data-lang-theme-row="appearance"');
-  assert.ok(langRow > 0 && themeRow > langRow, 'the language row comes first');
-  for (const s of ['العربية', 'English', 'کوردی', "'فاتح'", "'داكن'", "'حسب الجهاز'"]) {
+  // The title, in all three languages — the Sorani its own (row 183).
+  assert.ok(src.includes("loc('المظهر واللغة والعملة', 'Appearance, language & currency', 'ڕووکار و زمان و دراو')"), 'the home title');
+  assert.ok(src.includes("loc('المظهر واللغة', 'Appearance & language', 'ڕووکار و زمان')"), 'the dashboard title');
+  assert.ok(src.includes("loc('المظهر', 'Appearance', 'ڕووکار')"));
+  assert.ok(src.includes("loc('عملة العرض', 'Display currency', 'دراوی پیشاندان')"));
+  assert.ok(src.includes("'نەتوانرا لیستەکە بکرێتەوە — دووبارە هەوڵ بدەرەوە'"), 'the chunk-failure toast in Sorani');
+  // Row 1 the appearance, row 2 the language, row 3 the currency — in that order.
+  const panel = read('src/components/LangThemePanel.tsx');
+  const themeRow = panel.indexOf('data-lang-theme-row="appearance"');
+  const langRow = panel.indexOf('data-lang-theme-row="language"');
+  const currencyRow = panel.indexOf('data-lang-theme-row="currency"');
+  assert.ok(themeRow > 0 && langRow > themeRow && currencyRow > langRow, 'appearance → language → currency');
+  for (const s of ['العربية', 'English', 'کوردی', "'فاتح', 'Light', 'ڕووناک'", "'داكن', 'Dark', 'تاریک'", "'حسب الجهاز', 'System', 'بەپێی ئامێر'"]) {
     assert.ok(src.includes(s), `${s} is missing`);
   }
+  // The currency row: a radiogroup with the probe attribute, the two names in three languages.
+  assert.match(panel, /dataAttr="data-currency-choice"/);
+  assert.match(panel, /IQD: \{ ar: 'الدينار العراقي', en: 'Iraqi dinar', ckb: 'دیناری عێراقی' \}/);
+  assert.match(panel, /USD: \{ ar: 'الدولار الأمريكي', en: 'US dollar', ckb: 'دۆلاری ئەمریکی' \}/);
   assert.match(src, /<Sun\b/);
   assert.match(src, /<Moon\b/);
   assert.match(src, /from '\.\.\/lib\/theme'/);
   assert.match(src, /useTheme\(\)/);
-  // Sorani is written by hand, never by a machine.
-  assert.match(src, /OWNER: Sorani to be written by hand/);
+  // Every string is written in all three languages: no hand-off marker left (row 183).
+  assert.doesNotMatch(src, /OWNER: Sorani/);
   // The trigger is 44px.
   assert.match(src, /h-11 w-11/);
   assert.match(src, /min-h-11 min-w-11/);
@@ -119,12 +146,22 @@ test('first paint does not load the unopened settings panel or overlay primitive
   assert.match(trigger, /buttonRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
 });
 
-test('a choice closes the sheet FIRST, and changes things only once it has gone', () => {
+test('a choice closes the sheet FIRST, and changes things only once it has gone — the currency too', () => {
   const src = read('src/components/LangThemeSheet.tsx');
   assert.match(src, /onExited=\{flush\}/);
   assert.match(src, /setThemePreference\(next, \{ origin: 'center', duration: CENTER_REVEAL_MS \}\)/);
-  assert.match(src, /closeThen\(next === lang \? null : \(\) => setLang\(next\)\)/);
-  assert.match(src, /closeThen\(next === preference \? null :/);
+  assert.match(src, /commit\(next === preference \? null :/);
+  // Every row commits through the same door: an arrow key only moves the pick; a choice closes, then changes.
+  const commit = src.slice(src.indexOf('const commit = '), src.indexOf('const chooseLang'));
+  assert.match(commit, /if \(navigating\.current\) \{\s*navigating\.current = false;\s*return;\s*\}\s*closeThen\(change\);/);
+  assert.match(src, /commit\(next === lang \? null : \(\) => setLang\(next\)\)/);
+  // The currency rides the same path from the panel: the sheet leaves, then setCurrency — synchronous, no request.
+  const panel = read('src/components/LangThemePanel.tsx');
+  assert.match(panel, /commit\(next === currency \|\| !money \? null : \(\) => money\.setCurrency\(next\)\)/);
+  const choose = panel.slice(panel.indexOf('const chooseCurrency'), panel.indexOf('return ('));
+  assert.doesNotMatch(choose, /api\.|fetch\(/, 'choosing a currency asks nothing of the network');
+  // Each opening starts from the currency in use.
+  assert.match(panel, /if \(open\) setCurrencyPick\(currency\);/);
   // A hidden tab never reports the exit: the change still happens.
   assert.match(src, /EXIT_FALLBACK_MS/);
   const overlay = read('src/components/ui/Overlay.tsx');
@@ -132,6 +169,8 @@ test('a choice closes the sheet FIRST, and changes things only once it has gone'
   assert.match(overlay, /dock: 'items-end justify-center p-0'/);
   // Swipe-down and the grabber are Sheet's, under reduced motion too the slide is a fade.
   assert.match(overlay, /travel: number \| string = dock \? \(m\.reduced \? 0 : '100%'\)/);
+  // Arrow keys follow the writing direction in every row (the shared radiogroup).
+  assert.match(read('src/components/ui/Segmented.tsx'), /dir/);
 });
 
 test('Settings keeps its own «المظهر» and «اللغة», on the same stores', () => {
@@ -252,4 +291,65 @@ test('the CSS: a 8–16px drift plus a fade, a crossfade for the same direction,
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*html\.lv-lang-vt::view-transition-group\(root\),/);
   assert.match(css, /html\[data-lang-swap='fade'\] main/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*html\[data-lang-swap\] main/);
+});
+
+// ------------------------------------------------- the currency row, rendered
+
+/** Render in one language: LanguageProvider reads it from storage, as a returning visitor's browser holds it. */
+function inLanguage<T>(lang: 'ar' | 'en' | 'ckb', fn: () => T): T {
+  const g = globalThis as Record<string, unknown>;
+  const saved = g.localStorage;
+  g.localStorage = { getItem: (k: string) => (k === 'levo_lang' ? lang : null), setItem() {}, removeItem() {} };
+  try {
+    return fn();
+  } finally {
+    g.localStorage = saved;
+  }
+}
+
+async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'wallet' | 'cache' } | null) {
+  const { createElement } = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { LanguageProvider } = await import('../src/LanguageContext');
+  const { CurrencyValueProvider, currencyValue } = await import('../src/CurrencyContext');
+  const { CurrencyCaptions } = await import('../src/components/LangThemePanel');
+  return inLanguage(lang, () =>
+    renderToStaticMarkup(
+      createElement(LanguageProvider, {
+        children: createElement(CurrencyValueProvider, { value: currencyValue(pick, () => {}, rate), children: createElement(CurrencyCaptions, { pick }) }),
+      })
+    )
+  );
+}
+
+test('the currency captions: display only, then the SHOP’s rate with the IQWealth attribution — in all three languages (§13, critique L8)', async () => {
+  const shop = { text: '1703.9167', source: 'shop' as const };
+  const want = {
+    ar: ['للعرض فقط — الدفع والفواتير بالدينار', 'سعر المتجر، بناءً على بيانات', 'د.ع'],
+    en: ['Display only — you pay and are billed in dinars', 'the shop&#x27;s rate, based on', 'IQWealth data'],
+    ckb: ['تەنها بۆ پیشاندانە — پارەدان و پسوولە بە دینارە', 'نرخی فرۆشگا، لەسەر بنەمای زانیاریی', 'دینار'],
+  } as const;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const html = await captions(lang, 'USD', shop);
+    for (const w of want[lang]) assert.ok(html.includes(w), `${lang}: «${w}» missing in ${html}`);
+    assert.ok(html.includes('1 $ ≈ 1,703.9167'), `${lang}: the rate as the server wrote it`);
+    // The link: IQWealth's own site, a new tab, no opener, no referrer.
+    assert.match(html, /<a href="https:\/\/iraqsm\.com" target="_blank" rel="noopener noreferrer" data-iqwealth-attribution="true"/);
+    assert.match(html, /data-currency-rate="shop"/);
+  }
+  // The Sorani is its own, never the Arabic.
+  assert.notEqual(want.ckb[0], want.ar[0]);
+});
+
+test('the currency captions: a rate the shop sets by hand is never credited to IQWealth; dinars show no rate line', async () => {
+  const wallet = await captions('en', 'USD', { text: '1400', source: 'wallet' });
+  assert.match(wallet, /data-currency-rate="fixed"/);
+  assert.match(wallet, /a rate set by the shop/);
+  assert.doesNotMatch(wallet, /iraqsm|IQWealth/);
+  const dinars = await captions('en', 'IQD', { text: '1703.9167', source: 'shop' });
+  assert.match(dinars, /Display only/);
+  assert.doesNotMatch(dinars, /data-currency-rate=/);
+  // No usable rate at all: the caption only, never «1 $ ≈ 0».
+  const none = await captions('ar', 'USD', null);
+  assert.doesNotMatch(none, /≈/);
 });

@@ -27,6 +27,7 @@ import {
   reasonText,
   reasonTone,
 } from '../src/components/adminPricing/strings';
+import { FX_STRINGS, fxEventLabel } from '../src/components/adminPricing/fxStrings';
 import { COST_REFUSALS } from '../packages/contracts/src/costRefusals';
 import { PRICING_ISSUES } from '../packages/contracts/src/pricingIssues';
 import { iqdUnit } from '../src/lib/money';
@@ -181,4 +182,78 @@ test('the breakdown says a direct sale adds the Direct Sale Extra after the roun
   // Counts are formatted by the screen, never inside the sentence.
   assert.equal(PRICING_UI_STRINGS.ar.productsCount('٤١'), 'عدد المنتجات: ٤١');
   assert.equal(PRICING_UI_STRINGS.ar.shownCount('٢'), 'المنتجات المعروضة: ٢');
+});
+
+// ------------------------------------------------- FX-1: the exchange-rate panel
+
+/** Every leaf of the FX table, nested records flattened as `a.b`, functions called with sample arguments. */
+function flattenDeep(table: Record<string, unknown>, prefix = '', out = new Map<string, string>()): Map<string, string> {
+  for (const [key, value] of Object.entries(table)) {
+    const k = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === 'string') out.set(k, value);
+    else if (typeof value === 'function') out.set(k, String((value as (...a: unknown[]) => unknown)('7', '8', '9', '10')));
+    else if (value && typeof value === 'object') flattenDeep(value as Record<string, unknown>, k, out);
+    else assert.fail(`${k}: not a string, a function or a table`);
+  }
+  return out;
+}
+
+test('FX panel: every string exists in ar, en and ckb with the same keys; the Sorani is its own (row 183)', () => {
+  const ar = flattenDeep(FX_STRINGS.ar as unknown as Record<string, unknown>);
+  const en = flattenDeep(FX_STRINGS.en as unknown as Record<string, unknown>);
+  const ckb = flattenDeep(FX_STRINGS.ckb as unknown as Record<string, unknown>);
+  assert.ok(ar.size >= 120, `only ${ar.size} strings`);
+  assert.deepEqual([...en.keys()].sort(), [...ar.keys()].sort());
+  assert.deepEqual([...ckb.keys()].sort(), [...ar.keys()].sort());
+  for (const [key, value] of [...ar, ...en, ...ckb]) {
+    assert.ok(value.trim().length > 0, `${key} is empty`);
+    assert.equal(value, value.trim(), `${key} has stray whitespace`);
+  }
+  for (const [key, value] of ckb) {
+    assert.notEqual(value, ar.get(key), `${key}: the Sorani slot carries the Arabic`);
+    assert.notEqual(value, en.get(key), `${key}: the Sorani slot carries the English`);
+    assert.match(value, SORANI_ONLY, `${key}: no Sorani-only letter in «${value}»`);
+    assert.doesNotMatch(value, ARABIC_ONLY, `${key}: an Arabic-only letter in the Sorani «${value}»`);
+  }
+  for (const [key, value] of ar) assert.match(value, ARABIC_SCRIPT, `${key}: the Arabic is not Arabic script`);
+  for (const [key, value] of en) assert.doesNotMatch(value, ARABIC_SCRIPT, `${key}: Arabic script in the English`);
+});
+
+test('FX panel: the plan’s own wording (§12), the attribution, and «the shop’s rate» (critique L8)', () => {
+  const want: Array<[keyof typeof FX_STRINGS.ar, string, string, string]> = [
+    ['title', 'أسعار الصرف', 'Exchange rates', 'نرخەکانی ئاڵوگۆڕ'],
+    ['srcParallel', 'المصدر: السوق الموازية العراقية', 'Source: Iraqi parallel market', 'سەرچاوە: بازاڕی هاوتەریبی عێراق'],
+    ['effective', 'السعر المعتمد', 'Effective rate', 'نرخی کارپێکراو'],
+    ['approve', 'اعتماد السعر الجديد', 'Apply the new rate', 'نرخە نوێیەکە جێبەجێ بکە'],
+    ['reject', 'رفض والإبقاء على الحالي', 'Reject and keep the current rate', 'ڕەتی بکەرەوە و نرخی ئێستا بهێڵەوە'],
+    ['keepManual', 'أبقِ سعري الحالي يدويًا', 'Keep my current rate as manual', 'نرخی ئێستام وەک دەستی بهێڵەوە'],
+    ['refresh', 'تحديث الآن', 'Refresh now', 'ئێستا نوێی بکەرەوە'],
+    ['manual', 'تعيين سعر يدوي', 'Set a manual rate', 'نرخێکی دەستی دابنێ'],
+    ['backAuto', 'العودة إلى التلقائي', 'Back to automatic', 'گەڕانەوە بۆ خۆکار'],
+    ['confirmCurrent', 'تأكيد السعر الحالي', 'Confirm the current rate', 'نرخی ئێستا پشتڕاست بکەرەوە'],
+    ['guards', 'إعدادات الحماية', 'Safety settings', 'ڕێکخستنەکانی پاراستن'],
+    ['reauth', 'لحماية الأسعار، سجّل الدخول مجددًا ثم أعد المحاولة', 'To protect prices, sign in again, then retry', 'بۆ پاراستنی نرخەکان، دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە'],
+    ['shipTitle', 'أسعار الشحن المركزية', 'Central shipping rates', 'نرخەکانی ناردنی ناوەندی'],
+  ];
+  for (const [key, ar, en, ckb] of want) {
+    assert.equal(FX_STRINGS.ar[key], ar, `ar ${String(key)}`);
+    assert.equal(FX_STRINGS.en[key], en, `en ${String(key)}`);
+    assert.equal(FX_STRINGS.ckb[key], ckb, `ckb ${String(key)}`);
+  }
+  for (const lang of ['ar', 'en', 'ckb'] as const) assert.match(FX_STRINGS[lang].attribution, /IQWealth$/);
+  assert.equal(FX_STRINGS.en.attribution, 'Data: IQWealth');
+  assert.match(FX_STRINGS.ar.intro, /سعر المتجر/);
+  assert.match(FX_STRINGS.en.intro, /the shop's rate/);
+  assert.match(FX_STRINGS.ckb.intro, /نرخی فرۆشگا/);
+  // The review sentence carries its figures in the slots, as the screen wrote them.
+  assert.equal(
+    FX_STRINGS.en.reviewBody('1,720', '1,660', '3.6', '3'),
+    'The new rate 1,720 differs from the effective 1,660 by 3.6%, above the 3% limit. It was not applied, and no price changes until you decide.'
+  );
+  // An event a later push adds is shown by its code, never dropped.
+  assert.equal(fxEventLabel(FX_STRINGS.ar, 'apply'), 'طُبّق سعر جديد');
+  assert.equal(fxEventLabel(FX_STRINGS.ar, 'SOMETHING_NEW'), 'SOMETHING_NEW');
+  // The dashboard card names the tab as the tab names itself.
+  assert.equal(FX_STRINGS.ar.ownerCardOpen, `فتح «${PRICING_UI_STRINGS.ar.title}»`);
+  assert.equal(FX_STRINGS.ckb.ownerCardOpen, `«${PRICING_UI_STRINGS.ckb.title}» بکەرەوە`);
 });
