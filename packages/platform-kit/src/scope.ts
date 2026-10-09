@@ -354,6 +354,38 @@ export const FINANCIAL_FIELDS = [
   'fx_usd_iqd_at_purchase',
   'fx_eur_usd_at_purchase',
   'fx_cny_usd_at_purchase',
+  // -- USD-pricing design (owner brief 2026-10-09) §9. P-A (accounting stays
+  // -- IQD): the profit page's USD display block (every cent figure, rate and
+  // -- basis under it), the report-only deductions, the estimate kept apart
+  // -- (F1), today's rate and the promotion rate suggestion. P-B..P-D: the
+  // -- minimum profit in USD and the engine's USD figures, the 4-cell summary
+  // -- of the procurement card, the migrated dinar target and the actual
+  // -- landed parts — named now so no later push ships one outside the net.
+  // -- NOT coupon_iqd: the order.create audit detail carries it (worker/routes
+  // -- /orders.ts) and it is no cost; the report's coupon column stays as is.
+  'display_usd',
+  'price_protection_iqd',
+  'net_after_report_adjustments_iqd',
+  'owner_period_net_after_report_adjustments_iqd',
+  'estimated_revenue_iqd',
+  'today_rate',
+  'rate_suggestion',
+  'minimum_target_profit_usd',
+  'target_profit_usd',
+  'target_profit_iqd_exact',
+  'amount_usd',
+  'current_total_cost_usd',
+  'supplier_cost_usd',
+  'shipping_cost_usd',
+  'additional_cost_usd',
+  'final_price_usd',
+  'current_total_cost_cents',
+  'final_price_cents',
+  'pricing_summary',
+  'legacy_amount_iqd',
+  'legacy_usd_iqd_rate',
+  'actual_purchase_cost_iqd',
+  'actual_additional_costs_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

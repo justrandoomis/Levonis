@@ -102,6 +102,17 @@ const AREAS: Record<string, readonly string[]> = {
     // the FX history rows' rate columns: before, after and the held candidate
     'effective_before', 'effective_after', 'pending_rate',
   ],
+  // USD-pricing design §9 (owner brief 2026-10-09). P-A: the profit page's USD
+  // display block, the report-only deductions, the estimate apart, today's rate
+  // and the promotion-rate suggestion; P-B..P-D names joined in the same push.
+  USD_DESIGN: [
+    'display_usd', 'price_protection_iqd', 'net_after_report_adjustments_iqd', 'owner_period_net_after_report_adjustments_iqd',
+    'estimated_revenue_iqd', 'today_rate', 'rate_suggestion', 'fx_rate_snapshot',
+    'minimum_target_profit_usd', 'target_profit_usd', 'target_profit_iqd_exact', 'amount_usd', 'current_total_cost_usd',
+    'supplier_cost_usd', 'shipping_cost_usd', 'additional_cost_usd', 'final_price_usd', 'current_total_cost_cents',
+    'final_price_cents', 'pricing_summary', 'legacy_amount_iqd', 'legacy_usd_iqd_rate', 'actual_purchase_cost_iqd',
+    'actual_landed_cost_iqd', 'actual_additional_costs_iqd',
+  ],
 };
 
 /**
@@ -202,6 +213,22 @@ const FX_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
 };
 
 /**
+ * P-A (design §8-§9): the profit page's USD display. Every key below sits
+ * INSIDE `display_usd` (in the net, so the whole block is stripped from any
+ * non-owner answer) or beside a stripped figure; none carries an amount.
+ * `usd_basis` is named for what it is — `basis` is customer-visible in a
+ * price-protection policy snapshot (worker/routes/returns.ts). `coupon_iqd`
+ * stays out of the net on purpose: the order.create audit detail carries it
+ * and it is no cost (the overlay's coupon is a deduction the customer saw).
+ */
+const PA_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
+  usd_basis: "'at_time' / 'today' — which rate an order was shown at, never the rate",
+  at_time_count: 'how many orders were converted at the rate of their own time — a count',
+  today_count: "how many orders fell back to today's rate («≈») — a count",
+  approximate: 'yes/no: some figure fell back to today\'s rate',
+};
+
+/**
  * NEVER private names (F18, security spec §4.1, critique A6): each is a public
  * or wallet field elsewhere, so stripping it would break those screens — and a
  * private value under one of them would slip through. A private column must
@@ -236,7 +263,7 @@ test('none of the forbidden names is in the list (F18)', () => {
 });
 
 test('a name is either in the net or registered as private-but-not-in-the-net, never both', () => {
-  for (const dict of [PRIVATE_NON_FINANCIAL, FX_PRIVATE_NON_FINANCIAL]) {
+  for (const dict of [PRIVATE_NON_FINANCIAL, FX_PRIVATE_NON_FINANCIAL, PA_PRIVATE_NON_FINANCIAL]) {
     assert.deepEqual(Object.keys(dict).filter((k) => LIST.has(k)), []);
     for (const [k, why] of Object.entries(dict)) assert.ok(why.trim().length > 0, `${k} needs its reason`);
   }
@@ -416,3 +443,47 @@ test('FX-1: every key the rates routes answer is in FINANCIAL_FIELDS, in FX_PRIV
   const stripped = JSON.stringify(stripFinancials(answers));
   for (const v of [...FX_SENTINELS, FX_PUBLIC_RATE]) assert.equal(stripped.includes(v), false, `${v} survives the strip`);
 });
+
+// ------------------------------------------------------------- the profit page's USD display (P-A)
+
+/**
+ * `display=USD` on «الأرباح والتكاليف» adds ONE block, `display_usd`, and the
+ * net strips it whole: a stripped answer carries no cent figure, no rate and
+ * none of the report-only deduction amounts — the same answer an IQD read
+ * gives once stripped. Every P-A key that is not in the net is registered and
+ * really answered.
+ */
+test('P-A: the USD display block and the report deductions are stripped whole; the registered keys are answered', async () => {
+  const { asD1, freshDb, stubApp, get, json } = await import('./fixtures/app');
+  const { adminFinanceWorkspaceRoutes } = await import('../worker/routes/adminFinanceWorkspace');
+  const raw = freshDb();
+  raw.exec(`INSERT INTO users(id,email,name,role,admin_scope) VALUES ('boss','boss@x.co','Owner','admin','full'),('buyer','buyer@x.co','Buyer','customer',NULL);
+    INSERT INTO products(id,name,slug,price_iqd,product_cost_iqd) VALUES ('p','Printer','union-usd-printer',99000,1);
+    INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at,coupon_snapshot)
+      VALUES ('o','buyer','delivered','{}','standard','{}','cash',320000,1400,320000,320000,0,'2026-03-04T09:00:00.000Z','2026-03-05T10:00:00.000Z','{"code":"S","discount_iqd":7777}');
+    INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('o:1','o','p','Printer',1,320000,320000,111111,'snapshot');
+    INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state) VALUES ('c','buyer','o','o:1',320000,316543,1,3457,'credited');
+    UPDATE fx_rate_pairs SET effective_rate='1612.5', effective_version=1, drift_anchor_rate='1612.5', effective_source='provider' WHERE pair='USD_IQD';
+    INSERT INTO fx_rate_log(id,pair,event,trigger_kind,effective_before,effective_after,result,created_at) VALUES ('l1','USD_IQD','apply','cron',NULL,'1587.25','APPLIED','2026-03-01T00:00:00.000Z');`);
+  const app = stubApp(asD1(raw), { id: 'boss', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => a.route('/f', adminFinanceWorkspaceRoutes));
+  const keys = new Set<string>();
+  const walk = (v: unknown) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { keys.add(k); walk(x); }
+  };
+  const answers: unknown[] = [];
+  for (const path of ['/f/summary?from=2026-03-01&to=2026-03-31&display=USD', '/f/orders?from=2026-03-01&to=2026-03-31&display=USD', '/f/orders/o?display=USD']) {
+    const res = await get(app, path);
+    assert.equal(res.status, 200, path);
+    const body = await json(res);
+    assert.equal(body.display_usd.available, true, path);
+    answers.push(body);
+    walk(body.display_usd);
+  }
+  assert.deepEqual(Object.keys(PA_PRIVATE_NON_FINANCIAL).filter((k) => !keys.has(k)), [], 'every registered P-A key is answered');
+  const stripped = JSON.stringify(stripFinancials(answers));
+  assert.equal(stripped.includes('display_usd'), false);
+  // (`wallet_applied_usd_cents` is an orders column the wallet owns, not this block's.)
+  assert.doesNotMatch(stripped, /"(net_goods|cogs|gross_profit|owner_net|owner_period_net|coupon|price_protection)_cents"|1587\.25|1612\.5|"price_protection_iqd"|net_after_report_adjustments/, 'no cent figure, rate or deduction survives the strip');
+});
+

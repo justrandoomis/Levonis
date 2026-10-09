@@ -17,6 +17,8 @@ import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { enrichOrderProfitReview } from '../lib/orderProfitReview';
 import { enrichOrderCostProjections } from '../lib/orderCostProjection';
 import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportOverlay';
+import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/historyRate';
+import { baghdadDayStart, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, sumCents, type Cents } from '../lib/financeUsdDisplay';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -74,10 +76,12 @@ function chartAmounts(t:Row,general=0,unallocated=0,truncated=false){
   return {revenue_iqd:revenue,cost_iqd:cost,owner_net_iqd:t.owner_net_iqd===null||truncated?null:n(t.owner_net_iqd)-general-unallocated,
     investor_iqd:t.investor_iqd===null||truncated?null:n(t.investor_iqd),orders_count:n(t.orders_count),unknown_lines:n(t.unknown_lines),pending_costs:n(t.pending_costs)};
 }
+/** The Baghdad day an order was delivered on — the chart's bucket. */
+function deliveredDay(b:OrderProfitBase){const at=s(b.order.delivered_at).replace(' ','T'),stamp=Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(at)?at:`${at}Z`);
+  return new Date(stamp+3*3600000).toISOString().slice(0,10);}
 function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocated:Map<string,number>,totals:Row,truncated:boolean){
   const groups=new Map<string,Row[]>(),generalByDay=new Map(expenses.map((e)=>[s(e.expense_day),n(e.total)]));
-  for(const b of bases){const at=s(b.order.delivered_at).replace(' ','T'),stamp=Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(at)?at:`${at}Z`);
-    const day=new Date(stamp+3*3600000).toISOString().slice(0,10),rows=groups.get(day)??[];rows.push(b.totals);groups.set(day,rows);}
+  for(const b of bases){const day=deliveredDay(b),rows=groups.get(day)??[];rows.push(b.totals);groups.set(day,rows);}
   const daily=[];
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10),rows=groups.get(day)??[],t=sumRows(rows);t.orders_count=rows.length;
     const general=generalByDay.get(day)??0;
@@ -142,6 +146,74 @@ async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
     if(pending)b.warnings.push('investor:pending');}
   return bases;
 }
+// ------------------------------------------------- display=USD (design P-A §8)
+/**
+ * «عملة العرض»: `?display=IQD|USD` on /summary, /orders and /orders/:id. IQD
+ * (the default) answers exactly as before. USD adds ONE `display_usd` block
+ * beside the answer — every IQD field stays byte-identical and nothing is
+ * written. Each order is converted at the SHOP's effective USD/IQD in force
+ * when it was created (worker/lib/fx/historyRate, the rate history), else at
+ * today's rate marked «≈» (`usd_basis: 'today'`); never at the wallet's rate.
+ * Expenses convert at the start of their own Baghdad day, an unallocated
+ * promotion at the start of its month. With no applied rate at all,
+ * `display_usd.available` is false and the page stays in dinars. Owner only,
+ * private and no-store, as the rest of this router (the door above).
+ */
+type Display='IQD'|'USD';
+function displayOf(value:string|undefined):Display{
+  if(value===undefined||value===''||value==='IQD')return 'IQD';
+  if(value==='USD')return 'USD';
+  throw badRequest('عملة العرض غير معروفة / Unknown display currency','DISPLAY_CURRENCY_INVALID');
+}
+async function usdSteps(db:D1Database,instants:Array<number|null>){
+  const known=instants.filter((x):x is number=>x!==null&&Number.isFinite(x));
+  const now=Date.now(),anchor=known.length?Math.min(...known):now;
+  return loadUsdRateSteps(db,new Date(Math.min(anchor,now)).toISOString(),new Date(now).toISOString());
+}
+const unavailableUsd=()=>({available:false as const});
+interface OrderUsd{usd_basis:'at_time'|'today';fx_rate_snapshot:string;cents:Cents;lines:Map<string,Cents>}
+/** Each order and each of its lines in cents, at the order's own creation-time rate. Null when no rate exists at all. */
+function ordersInUsd(bases:OrderProfitBase[],steps:UsdRateSteps|null){
+  const out=new Map<string,OrderUsd>();
+  for(const b of bases){const hit=usdRateAt(steps,instantOf(b.order.created_at));if(!hit)return null;
+    out.set(b.order_id,{usd_basis:hit.basis,fx_rate_snapshot:hit.rate,cents:centsOf(b.totals,hit.rate),lines:new Map(b.lines.map((l)=>[l.id,centsOf(l,hit.rate)]))});}
+  return out;
+}
+const basisCounts=(orders:Map<string,OrderUsd>)=>{const today=[...orders.values()].filter((o)=>o.usd_basis==='today').length;return {at_time_count:orders.size-today,today_count:today};};
+const orderBlock=(orders:Map<string,OrderUsd>)=>Object.fromEntries([...orders].map(([id,o])=>[id,{usd_basis:o.usd_basis,fx_rate_snapshot:o.fx_rate_snapshot,cents:o.cents}]));
+function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',orders:Map<string,OrderUsd>){
+  const groups=new Map<string,Cents[]>();
+  for(const l of lines){const id=kind==='product'?l.product_id||l.id:kind==='main'?l.main_catalog_id:l.sub_catalog_id;
+    if(kind==='sub'&&!id)continue;
+    const key=id||'unclassified',rows=groups.get(key)??[];rows.push(orders.get(s(l.order_id))?.lines.get(l.id)??{});groups.set(key,rows);}
+  return Object.fromEntries([...groups].map(([id,rows])=>[id,sumCents(rows)]));
+}
+async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean){
+  const expenseStarts=expenses.map((e)=>baghdadDayStart(s(e.expense_day))),monthStarts=[...unallocatedDays.keys()].map((d)=>baghdadDayStart(d));
+  const steps=await usdSteps(db,[...bases.map((b)=>instantOf(b.order.created_at)),...expenseStarts,...monthStarts]);
+  const orders=ordersInUsd(bases,steps);if(!orders||(!steps?.today&&!steps?.steps.length))return unavailableUsd();
+  let approximate=[...orders.values()].some((o)=>o.usd_basis==='today');
+  const atDay=(day:string,iqd:number)=>{const hit=usdRateAt(steps,baghdadDayStart(day));if(!hit)return null;if(hit.basis==='today')approximate=true;return iqdToCents(iqd,hit.rate);};
+  const generalByDay=new Map<string,number>();for(const e of expenses){const c=atDay(s(e.expense_day),n(e.total));if(c===null)return unavailableUsd();generalByDay.set(s(e.expense_day),c);}
+  const unallocatedByDay=new Map<string,number>();for(const [day,amount] of unallocatedDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();unallocatedByDay.set(day,c);}
+  const general=[...generalByDay.values()].reduce((v,x)=>v+x,0),unallocated=[...unallocatedByDay.values()].reduce((v,x)=>v+x,0);
+  const totals=sumCents([...orders.values()].map((o)=>o.cents));
+  const ownerNet=totals.owner_net_cents??null;
+  const periodNet=ownerNet===null||truncated?null:ownerNet-general-unallocated;
+  Object.assign(totals,{general_expenses_cents:general,unallocated_promotion_cents:unallocated,owner_period_net_cents:periodNet,
+    owner_period_net_after_report_adjustments_cents:periodNet===null?null:periodNet-(totals.coupon_cents??0)-(totals.price_protection_cents??0)});
+  const byDay=new Map<string,Cents[]>();for(const b of bases){const day=deliveredDay(b),rows=byDay.get(day)??[];rows.push(orders.get(b.order_id)!.cents);byDay.set(day,rows);}
+  const daily:Record<string,ReturnType<typeof chartCents>>={};
+  for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10);
+    daily[day]=chartCents(sumCents(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated);}
+  const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sumCents(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
+  const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
+  return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,
+    orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',orders),
+    categories:{main:groupedCents(lines,'main',orders),sub:groupedCents(lines,'sub',orders)},
+    chart:{...chartCents(totals,general,unallocated,truncated),daily,expense_composition:expenseCompositionCents(totals,general,unallocated,pendingCosts,truncated)},
+    totals};
+}
 async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:string;offset?:number;summary?:boolean;kind?:string}={}){
   const q=opts.q??'',kind=opts.kind??'';
   // Profit lists, counts, summaries and exports share realised deliveries.
@@ -163,7 +235,7 @@ async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:str
 }
 adminFinanceWorkspaceRoutes.get('/participant-report',async c=>{const r=range(c.req.query('from'),c.req.query('to'));return c.json({success:true,...await participantReport(c.env.DB,r)});});
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
-  const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to'));
+  const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),display=displayOf(c.req.query('display'));
   const {bases,truncated}=await selectOrders(db,r,{summary:true});
   const [expenses,failures,promotions]=await Promise.all([
     db.prepare(`SELECT e.expense_day,COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
@@ -185,13 +257,20 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  return c.json({success:true,range:r,totals,orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'});
+  const answer={success:true,range:r,totals,orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'};
+  if(display==='IQD')return c.json(answer);
+  return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0)});
 });
 adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),offset=whole(c.req.query('offset')??0,'الصفحة',0,100000);
   const kind=text(c.req.query('kind'),20);if(kind&&!['normal','quick_buy','gift'].includes(kind))throw badRequest('نوع الطلب غير معروف');
+  const display=displayOf(c.req.query('display'));
   const result=await selectOrders(c.env.DB,r,{offset,q:text(c.req.query('q'),100),kind});
-  return c.json({success:true,orders:result.bases.map(orderRow),total:result.total,offset,range:r});
+  const answer={success:true,orders:result.bases.map(orderRow),total:result.total,offset,range:r};
+  if(display==='IQD')return c.json(answer);
+  const steps=await usdSteps(c.env.DB,result.bases.map((b)=>instantOf(b.order.created_at)));
+  const orders=ordersInUsd(result.bases,steps);
+  return c.json({...answer,display_usd:!orders||(!steps?.today&&!steps?.steps.length)?unavailableUsd():{available:true,today_rate:steps?.today??null,...basisCounts(orders),orders:orderBlock(orders)}});
 });
 async function detail(db:D1Database,id:string,canVerify=true){
   const base=await getOrderProfitBase(db,id);if(base.order.seller_type!=='levonis')throw notFound('Order not found');
@@ -209,13 +288,17 @@ async function reconcileWorkspace(db:D1Database,id:string,actor:string,day:strin
   return !result.complete;
 }
 adminFinanceWorkspaceRoutes.get('/orders/:id',async(c)=>{
-  const actor=c.get('user')!;
+  const actor=c.get('user')!,display=displayOf(c.req.query('display'));
   const permissions=(await c.env.DB.prepare("SELECT capability,allowed FROM ops_permissions WHERE user_id=? AND capability IN ('accounting','rules')").bind(actor.id).all<{capability:string;allowed:number}>()).results??[];
   // Owner, or (only once delegation exists) a cost grantee with an explicit
   // permission row: a missing row no longer means allowed (owner decision 2).
   const canVerify=isOwner(c.env,actor)||(canViewCost(c.env,actor)&&permissions.find(p=>p.capability==='accounting')?.allowed===1);
   const canReconcile=isOwner(c.env,actor)||(canViewCost(c.env,actor)&&permissions.find(p=>p.capability==='rules')?.allowed===1);
-  return c.json({success:true,...await detail(c.env.DB,c.req.param('id'),canVerify),can_reconcile:canReconcile});
+  const answer={success:true,...await detail(c.env.DB,c.req.param('id'),canVerify),can_reconcile:canReconcile};
+  if(display==='IQD')return c.json(answer);
+  const steps=await usdSteps(c.env.DB,[instantOf(answer.order.created_at)]);
+  const order=ordersInUsd([answer],steps)?.get(answer.order_id);
+  return c.json({...answer,display_usd:!order?unavailableUsd():{available:true,today_rate:steps?.today??null,usd_basis:order.usd_basis,fx_rate_snapshot:order.fx_rate_snapshot,cents:order.cents,lines:Object.fromEntries(order.lines)}});
 });
 adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
   const db=c.env.DB,actor=c.get('user')!,id=c.req.param('id');await requireCapability(c.env,actor,'accounting');
@@ -249,7 +332,13 @@ adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
 });
 adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
   const month=text(c.req.query('month'),7)||baghdadDay().slice(0,7),allocation=await monthlyPromotionShares(c.env.DB,month);
-  return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sold_units'});
+  // P-A F3: a SUGGESTION for the rate field — the shop's USD/IQD in force on the
+  // month's first day (worker/lib/fx/historyRate), never the wallet's. The page
+  // shows it and fills the field only when the owner taps it; the server never
+  // books a promotion at it unless that rate is sent as the rate actually paid.
+  const start=baghdadDayStart(`${month}-01`),steps=start===null?null:await usdSteps(c.env.DB,[start]),hit=usdRateAt(steps,start);
+  const rate_suggestion=hit?{rate:hit.rate,date:`${month}-01`,usd_basis:hit.basis}:null;
+  return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sold_units',rate_suggestion});
 });
 async function promotionValues(db:D1Database,b:Row,old?:Row){
   const month=b.month===undefined?s(old?.month):text(b.month,7);if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw badRequest('الشهر غير صحيح');
