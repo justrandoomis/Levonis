@@ -84,7 +84,33 @@ export interface Promotion {
   version: number;
 }
 
+/** Integer US cents keyed `<field>_cents` (design P-A §8); null = incomplete («—»). */
+export type UsdCents = Record<string, number | null>;
+export interface UsdOrderCents { usd_basis: 'at_time' | 'today'; fx_rate_snapshot: string; cents: UsdCents }
+/** `display_usd` of `GET /summary?display=USD` — display only; every IQD field beside it is unchanged. */
+export interface DisplayUsdSummary {
+  available: boolean;
+  today_rate?: string | null;
+  at_time_count?: number;
+  today_count?: number;
+  approximate?: boolean;
+  orders?: Record<string, UsdOrderCents>;
+  kinds?: Record<string, UsdCents>;
+  products?: Record<string, UsdCents>;
+  categories?: { main: Record<string, UsdCents>; sub: Record<string, UsdCents> };
+  chart?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null;
+    daily: Record<string, { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null }>;
+    expense_composition: Array<{ key: string; amount_cents: number | null }> };
+  totals?: UsdCents;
+}
+/** `display_usd` of `GET /orders?display=USD`. */
+export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; orders?: Record<string, UsdOrderCents> }
+/** `display_usd` of `GET /orders/:id?display=USD`. */
+export interface DisplayUsdOrder { available: boolean; today_rate?: string | null; usd_basis?: 'at_time' | 'today'; fx_rate_snapshot?: string; cents?: UsdCents; lines?: Record<string, UsdCents> }
+
 export interface FinanceSummary {
+  /** Present only with `?display=USD`. */
+  display_usd?: DisplayUsdSummary;
   range?: FinanceRange;
   totals: ProfitTotals;
   orders: FinanceOrder[];
@@ -213,6 +239,8 @@ export interface OrderProfit {
   costs: ProfitCost[];
   warnings: string[];
   history: FinancialHistory[];
+  /** Present only with `?display=USD`. */
+  display_usd?: DisplayUsdOrder;
 }
 
 export const WORKSPACE_API = '/api/admin/finance-workspace';

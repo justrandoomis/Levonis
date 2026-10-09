@@ -24,16 +24,19 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
   const [revision, setRevision] = useState(0);
   const [expensesOpen, setExpensesOpen] = useState(false);
   const [unallocated, setUnallocated] = useState(0);
+  // P-A F3: the shop's USD/IQD on the month's first day — a SUGGESTION, filled only on a tap.
+  const [suggestion, setSuggestion] = useState<{ rate: string; date: string; usd_basis: 'at_time' | 'today' } | null>(null);
   const operation = useRef(crypto.randomUUID());
   const range = monthRange(month);
   const selected = promotions.find((p) => p.enabled);
   useEffect(() => {
     let live = true;
     setLoading(true); setError(''); setExchange('');
-    api.get<{ promotions: Promotion[]; unallocated_iqd?: number }>(`${WORKSPACE_API}/promotions?month=${month}`)
+    api.get<{ promotions: Promotion[]; unallocated_iqd?: number; rate_suggestion?: { rate: string; date: string; usd_basis: 'at_time' | 'today' } | null }>(`${WORKSPACE_API}/promotions?month=${month}`)
       .then((r) => {
         if (!live) return;
         setPromotions(r.promotions ?? []);
+        setSuggestion(r.rate_suggestion ?? null);
         setUnallocated(r.unallocated_iqd ?? 0);
         const primary = r.promotions?.find((p) => p.enabled);
         setAmount(primary ? String(primary.amount) : ''); setCurrency(primary?.currency ?? 'USD');
@@ -64,7 +67,11 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
   const keepsRate = !!selected && selected.currency === currency;
   const rateField = <Field label={tri(loc, PA_STRINGS.promotionRateLabel)} hint={keepsRate ? tri(loc, PA_STRINGS.promotionRateKeep, { rate: String(selected!.exchange_rate) }) : tri(loc, PA_STRINGS.promotionRateHint)}>
     <input className="fw-input" type="number" min="0" step="any" inputMode="decimal" dir="ltr" value={exchange} required={!keepsRate} data-finance-promotion-rate
-      onChange={(e) => { setExchange(e.target.value); operation.current = crypto.randomUUID(); }} placeholder={keepsRate ? String(selected!.exchange_rate) : ''} />
+      onChange={(e) => { setExchange(e.target.value); operation.current = crypto.randomUUID(); }} placeholder={keepsRate ? String(selected!.exchange_rate) : currency === 'USD' && suggestion ? suggestion.rate : ''} />
+    {currency === 'USD' && suggestion && !keepsRate && exchange.trim() === '' && <button type="button" className="fw-pill" data-finance-promotion-rate-suggestion
+      onClick={() => { setExchange(suggestion.rate); operation.current = crypto.randomUUID(); }}>
+      {tri(loc, PA_STRINGS.promotionRateSuggestion, { date: suggestion.date, rate: suggestion.usd_basis === 'today' ? `≈ ${suggestion.rate}` : suggestion.rate })}
+    </button>}
   </Field>;
   const remove = async () => {
     if (!selected || saving) return;

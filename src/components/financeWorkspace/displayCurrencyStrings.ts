@@ -68,6 +68,63 @@ export const PA_STRINGS = {
     en: 'Deducted in this report only; it does not change recorded investor shares, wages or journal entries',
     ckb: 'تەنها لەم ڕاپۆرتەدا دەردەکرێت؛ بەشی وەبەرهێنەران و کرێ و تۆمارە ژمێریارییەکان ناگۆڕێت',
   },
+
+  // ---- §8: the IQD/USD display toggle (display only; accounting stays IQD)
+  displayCurrency: {
+    ar: 'عملة العرض',
+    en: 'Display currency',
+    ckb: 'دراوی پیشاندان',
+  },
+  dinarOption: {
+    ar: 'دينار',
+    en: 'IQD',
+    ckb: 'دینار',
+  },
+  dollarOption: {
+    ar: 'دولار',
+    en: 'USD',
+    ckb: 'دۆلار',
+  },
+  usdNote: {
+    ar: 'عرض بالدولار فقط. المبالغ المحاسبية محفوظة بالدينار ولا تتغير.',
+    en: 'Shown in US dollars only. Accounting amounts are kept in dinars and do not change.',
+    ckb: 'تەنها بە دۆلار پیشان دەدرێت. بڕە ژمێریارییەکان بە دینار پارێزراون و ناگۆڕێن.',
+  },
+  usdAtTime: {
+    ar: 'بسعر الدولار المعتمد في المتجر وقت الطلب: {rate}',
+    en: 'At the shop’s dollar rate when ordered: {rate}',
+    ckb: 'بە نرخی دۆلاری فرۆشگا لە کاتی داواکردن: {rate}',
+  },
+  usdAtTimeEach: {
+    ar: 'كل طلب بسعر الدولار المعتمد في المتجر وقت إنشائه.',
+    en: 'Each order at the shop’s dollar rate when it was placed.',
+    ckb: 'هەر داواکارییەک بە نرخی دۆلاری فرۆشگا لە کاتی دروستکردنیدا.',
+  },
+  usdToday: {
+    ar: '≈ بسعر اليوم {rate} — لم يُسجَّل سعر وقت هذا الطلب',
+    en: '≈ at today’s rate {rate} — no rate was recorded when this order was placed',
+    ckb: '≈ بە نرخی ئەمڕۆ {rate} — لە کاتی ئەم داواکارییەدا هیچ نرخێک تۆمار نەکرابوو',
+  },
+  usdMixed: {
+    ar: '≈ المجموع يضم {n} طلبًا حُوِّل بسعر اليوم',
+    en: '≈ The total includes {n} orders converted at today’s rate',
+    ckb: '≈ کۆی گشتی {n} داواکاری لەخۆ دەگرێت کە بە نرخی ئەمڕۆ گۆڕدراون',
+  },
+  usdNone: {
+    ar: 'لا يوجد سعر دولار معتمد بعد؛ تبقى الأرقام بالدينار.',
+    en: 'No approved dollar rate yet; figures stay in dinars.',
+    ckb: 'هێشتا نرخی دۆلاری پەسەندکراو نییە؛ ژمارەکان بە دینار دەمێننەوە.',
+  },
+  accountingValue: {
+    ar: 'القيمة المحاسبية: {amount}',
+    en: 'Accounting value: {amount}',
+    ckb: 'بەهای ژمێریاری: {amount}',
+  },
+  chartsInUsd: {
+    ar: 'القيم بالدولار للعرض، كل طلب بسعر وقت إنشائه؛ حسب يوم استلام الطلب بتوقيت بغداد.',
+    en: 'Values in US dollars for display, each order at the rate of its own time; by delivered date in Baghdad time.',
+    ckb: 'بەهاکان بە دۆلار بۆ پیشاندان، هەر داواکارییەک بە نرخی کاتی خۆی؛ بەپێی ڕۆژی گەیاندن بە کاتی بەغدا.',
+  },
 } as const satisfies Record<string, Tri>;
 
 export type PaStringKey = keyof typeof PA_STRINGS;
