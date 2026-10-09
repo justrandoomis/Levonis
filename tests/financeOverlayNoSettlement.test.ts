@@ -59,6 +59,8 @@ test('the profit base every writer reads is the same with and without a coupon a
   const comparable = (b: typeof plain, id: string) => {
     const copy = strip(b, id) as { order: Record<string, unknown> };
     delete copy.order.coupon_snapshot;
+    // The two orders are inserted a moment apart; the row's own clock is not part of the profit base.
+    delete copy.order.updated_at;
     return copy;
   };
   assert.deepEqual(comparable(overlay, 'overlay'), comparable(plain, 'plain'));
