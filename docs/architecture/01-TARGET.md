@@ -259,7 +259,7 @@ Longest prefix, then host class. `→ CORE` rows are the strangler default and f
 | `/api/uploads/sessions/*` | all under root | CORE → FILES (4) | resumable multipart sessions (0156, §4d): create, `PUT /:id/parts/:n` with a raw body ≤ `SESSION_PART_MAX_BYTES` (40 MB — the admin ceiling of `chunk_mb`, and the largest body the platform accepts anywhere), resume point, complete, abort — owner-only |
 | `/api/product-files/*` | all under root | CORE → MARKETPLACE (6) | the storefront's files on products (0157, §4d): list by role (per viewer, not cacheable), viewer token, grant-checked download streamed as an attachment; never a key |
 | `/api/invoices/*` | main | CORE → INVOICES (4) | |
-| `/api/devices/*`, `/api/warranty/*`, `/api/admin/warranties/*` | main (+ merchant for `/api/warranty/verify`) | CORE → DEVICES (7) | |
+| `/api/devices/*`, `/api/warranty/*`, `/api/admin/warranties/*`, `/api/admin/serial-rules/*` (0180) | main (+ merchant for `/api/warranty/verify`) | CORE → DEVICES (7) | |
 | `/api/kyc/*` | main | CORE → KYC (4) | |
 | `/api/policies/*` | all under root | CORE → POLICIES (4) | |
 | `/api/support/*` | main | CORE → SUPPORT (4); `/api/support/admin/restrictions*` → RISK (4) | |

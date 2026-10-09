@@ -222,6 +222,8 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/admin/orders', pattern: /^\/api\/admin\/orders\/[^/]+\/(stage|delivery)/, hosts: 'main', owner: 'FULFILMENT', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   // 0178: a serial bound to an order unit at preparation — the device's own record (serial_assignments is Devices').
   { prefix: '/api/admin/orders', pattern: /^\/api\/admin\/orders\/[^/]+\/serials/, hosts: 'main', owner: 'DEVICES', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
+  // 0180 (owner decision 2): the owner's serial FORMAT rules per brand and product — Devices' records.
+  { prefix: '/api/admin/serial-rules', hosts: 'main', owner: 'DEVICES', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/delivery', hosts: 'main', owner: 'FULFILMENT', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/labels', hosts: 'main', owner: 'FULFILMENT', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },
   { prefix: '/api/admin/coupons', hosts: 'main', owner: 'COMMERCE', flipPhase: 7, requires: 'admin', rateClass: 'admin-write' },

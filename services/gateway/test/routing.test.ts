@@ -117,6 +117,8 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/community-reviews': 'MARKETPLACE',
   '/api/community-favorites': 'IDENTITY',
   '/files': 'FILES',
+  // 0180 (owner decision 2): serial format rules, the devices' own records.
+  '/api/admin/serial-rules': 'DEVICES',
 };
 
 test('every mount in worker/index.ts resolves to exactly one rule, with the owner this design records', () => {
