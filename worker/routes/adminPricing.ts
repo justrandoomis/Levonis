@@ -57,15 +57,7 @@ import { toStatements } from '../lib/fx/write';
 import { historyItemDto, ratesDto } from '../lib/fx/dto';
 import { engineProductCount, loadHistory, loadRatesReadModel } from '../lib/fx/read';
 import { notifyOwnerFx } from '../lib/fx/notify';
-import {
-  FX_REFRESH_BUCKET,
-  FX_REFRESH_GLOBAL_BUCKET,
-  FX_REFRESH_GLOBAL_KEY,
-  FX_REFRESH_GLOBAL_LIMIT,
-  FX_REFRESH_GLOBAL_WINDOW_S,
-  FX_REFRESH_LIMIT,
-  FX_REFRESH_WINDOW_S,
-} from '../lib/fx/limits';
+import { FX_REFRESH_GLOBAL_KEY } from '../lib/fx/limits';
 import {
   LARGE_CHANGE_PCT,
   fxRefusal,
@@ -178,10 +170,20 @@ async function priceMovingGate(c: Context<AppContext>, moves: boolean): Promise<
   if (moves && (await engineProductCount(c.env.DB)) > 0) requireFreshSession(c);
 }
 
-/** Both refresh buckets (critique F4): 10 an hour per user, 40 a day for the shop. */
+/**
+ * Both refresh buckets (critique F4): 10 an hour per user, 40 a day for the shop.
+ *
+ * The bucket, the limit and the window are LITERALS here on purpose. The
+ * gateway's rate-limit parity test (services/gateway/test/rateLimitParity.test.ts)
+ * reads every rate-limit call in worker/routes from the source and compares
+ * its numbers with the gateway class over the same prefix; an imported
+ * constant is a number it cannot read. worker/lib/fx/limits.ts still exports
+ * the same values — the owner panel's day budget and its count read them —
+ * and tests/fxRefreshLimitsLiteral.test.ts fails the moment the two differ.
+ */
 async function chargeRefresh(c: Context<AppContext>): Promise<void> {
-  await rateLimit(c, FX_REFRESH_BUCKET, FX_REFRESH_LIMIT, FX_REFRESH_WINDOW_S);
-  await rateLimit(c, FX_REFRESH_GLOBAL_BUCKET, FX_REFRESH_GLOBAL_LIMIT, FX_REFRESH_GLOBAL_WINDOW_S, FX_REFRESH_GLOBAL_KEY);
+  await rateLimit(c, 'fx-refresh', 10, 3600);
+  await rateLimit(c, 'fx-refresh-global', 40, 86_400, FX_REFRESH_GLOBAL_KEY);
 }
 
 /** One owner act, committed in one batch; the display rate's caches purged and the bell rung after. */

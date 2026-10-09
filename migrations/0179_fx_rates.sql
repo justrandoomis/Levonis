@@ -83,7 +83,11 @@ CREATE TABLE IF NOT EXISTS fx_rate_pairs (
   CHECK (pair <> 'USD_IQD' OR (source_usd_per_eur IS NULL AND source_cny_per_eur IS NULL)),
   CHECK (mode = 'AUTO' OR (manual_rate IS NOT NULL AND effective_rate = manual_rate)),
   -- H1: one status, derived; a failed fetch while a review is pending is legal.
-  CHECK (status = CASE WHEN pending_effective_rate IS NOT NULL THEN 'REVIEW_REQUIRED' ELSE fetch_status END),
+  -- A space between this END and its closing parenthesis, always: Wrangler's statement splitter
+  -- closes a CASE only on an END followed by whitespace or ';', so an END touching the parenthesis
+  -- would leave the CASE open and fold every later statement of this file into one
+  -- (tests/sqlSplit.test.ts holds Wrangler's split equal to the harness's from 0179 on).
+  CHECK (status = CASE WHEN pending_effective_rate IS NOT NULL THEN 'REVIEW_REQUIRED' ELSE fetch_status END ),
   CHECK ((pending_effective_rate IS NULL) = (pending_reason IS NULL)),
   CHECK ((pending_effective_rate IS NULL) = (pending_observed_at IS NULL)),
   CHECK (mode = 'AUTO' OR pending_effective_rate IS NULL),

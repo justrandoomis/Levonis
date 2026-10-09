@@ -9,7 +9,9 @@
  *   1. the real session loader, then /api/auth/me: the hints are right;
  *   2. every GET of the base mounts answers EXACTLY as it does on the
  *      migrated database, for the owner and for a full admin (same status,
- *      and the full admin still sees no cost);
+ *      and the full admin still sees no cost) — except the few routes that
+ *      read only a LATER migration's tables, listed by name with the exact
+ *      refusal they must give (tests/fixtures/deployAhead.ts);
  *   3. the writes S1 changed — the user PATCH promotion, the withdrawal
  *      notice to the owner — work without the tables.
  *
@@ -21,6 +23,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import { asD1, count, dbThrough, freshDb, json, patch, post, row, stubApp } from './fixtures/app';
 import { NOT_A_COST, OWNER, ROLES, appFor, call, getPaths, leaks, seedRoleMatrix } from './fixtures/roleMatrix';
+import { DESIGNED_ON_OLDER_DB, judge, unknownMigrations, unreached } from './fixtures/deployAhead';
 import { loadSessionUser } from '../worker/lib/session';
 import { sha256Hex } from '../worker/lib/crypto';
 import { authRoutes } from '../worker/routes/auth';
@@ -82,20 +85,20 @@ test('1 — the real session loader on 0176: the owner’s and the full admin’
   assert.equal(grantee.can_view_cost, false, 'no grants table, no grants — and delegation is off anyway');
 });
 
-test('2 — every GET answers on 0176 exactly as on the migrated database, for the owner and a full admin', async () => {
+test('2 — every GET answers on 0176 exactly as on the migrated database, for the owner and a full admin; the listed later-migration routes give exactly their refusal', async () => {
+  assert.deepEqual(unknownMigrations(), [], 'every listed refusal names a real migration');
+  assert.ok(DESIGNED_ON_OLDER_DB.length <= 4, 'the list is for routes that read ONLY a later migration, not a way to wave differences through');
   const paths = getPaths();
   const diffs: string[] = [];
   const fullLeaks: string[] = [];
+  const reached = new Set<string>();
   for (const [name, user] of [['owner', OWNER], ['full', ROLES.full]] as const) {
     const ahead = appFor(seedRoleMatrix(freshDb()), user);
     const behind = appFor(seedRoleMatrix(dbThrough('0176')), user);
     for (const path of paths) {
       const a = await call(ahead, 'GET', path);
       const b = await call(behind, 'GET', path);
-      if (a.status !== b.status) diffs.push(`${name} ${path}: ${a.status} on 0177, ${b.status} on 0176`);
-      // A designed 503 (R2 or a closed community, the same on both) is an answer;
-      // a crash or a hang is not.
-      if (b.status === 500 || b.status === 599) diffs.push(`${name} ${path}: ${b.status} on 0176`);
+      diffs.push(...judge(name, path, '0176', a, b, reached));
       if (name === 'full' && b.status >= 200 && b.status < 300) {
         for (const l of leaks(b.body)) {
           if (!NOT_A_COST.some((x) => x.path.test(path) && x.leak.test(l))) fullLeaks.push(`${path}  ${l}`);
@@ -103,7 +106,8 @@ test('2 — every GET answers on 0176 exactly as on the migrated database, for t
       }
     }
   }
-  assert.deepEqual(diffs, [], 'the Worker behaves differently one migration behind');
+  assert.deepEqual(diffs, [], 'the Worker behaves differently on 0176 than designed');
+  assert.deepEqual(unreached(['owner', 'full'], '0176', reached), [], 'a listed route the sweep never reached');
   assert.deepEqual(fullLeaks, [], 'a full admin sees no cost on 0176 either');
 });
 

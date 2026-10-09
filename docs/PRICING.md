@@ -76,6 +76,17 @@ throughout, never a float.
 **One scheduler, one cron.** `0 */6 * * *` runs `runFxScheduler`
 (`worker/lib/fx/scheduler.ts`); a pair is due by its interval measured from
 the run's `scheduledTime`. No provider is ever called from a customer request.
+The cron strings and the exact-match dispatch table live in
+`worker/lib/cronSchedules.ts` (the six-hour string maps to the FX job set and
+nothing else); `worker/index.ts` never spells a cron step.
+
+**Deploy ahead of 0179.** On a database at 0178 the owner's
+`/api/admin/pricing/rates` and `/rates/history` answer 503
+`PRICING_NOT_INSTALLED`, the scheduler skips without calling a provider, and
+`displayUsdRate` is null; every other GET answers as on the migrated database
+(`tests/fxDeployAhead.test.ts`; the two routes are the named entries of
+`tests/fixtures/deployAhead.ts`, which the 0176 sweep in
+`tests/costDeployAhead.test.ts` reads too).
 
 **Rollback runbook (cron triggers).** Cron triggers are Worker settings, not
 part of a version. A workflow 7 redeploy of an older commit replaces them with

@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import worker from '../worker/index';
+import { CRON_DISPATCH, CRON_EVERY_SIX_HOURS, cronJobs } from '../worker/lib/cronSchedules';
 import { resetEventBus } from '../worker/lib/eventBus';
 import { ROOT } from './fixtures/d1';
 import { asD1, freshDb, providerFetch, row } from './fixtures/app';
@@ -83,10 +84,18 @@ test('the minute and */15 branches never call it', async () => {
   }
 });
 
-test('an unknown cron string runs nothing (F13): the FX scheduler included', () => {
+test('an unknown cron string runs nothing (F13): the FX scheduler runs on its own string only, which lives outside worker/index.ts', () => {
+  // The exact-match table is worker/lib/cronSchedules.ts: the six-hour string
+  // maps to the 'fx' job set and to nothing else.
+  assert.equal(CRON_EVERY_SIX_HOURS, FX_CRON);
+  assert.equal(cronJobs(FX_CRON), 'fx');
+  assert.deepEqual([...CRON_DISPATCH].filter(([, jobs]) => jobs === 'fx').map(([cron]) => cron), [FX_CRON]);
   const src = readFileSync(join(ROOT, 'worker/index.ts'), 'utf8');
-  assert.match(src, /if \(_event\.cron === '0 \*\/6 \* \* \*'\) \{/);
+  assert.match(src, /if \(jobs === 'fx'\) \{/);
   assert.match(src, /runFxScheduler\(env, \{ now: new Date\(\), scheduledTime: new Date\(_event\.scheduledTime\) \}, \{ trigger: 'cron' \}\)/);
+  // A cron step is spelled with the pair that closes a block comment; worker/index.ts
+  // keeps that pair for real comment ends only (tests/storefrontIsolation.test.ts).
+  assert.equal(src.includes(FX_CRON), false, 'the six-hour string is not written in worker/index.ts');
   // The dispatch itself (every known and unknown string) is pinned by tests/scheduledCronDispatch.test.ts.
   assert.match(readFileSync(join(ROOT, 'tests/scheduledCronDispatch.test.ts'), 'utf8'), /'0 \*\/6 \* \* \*': 1/);
 });

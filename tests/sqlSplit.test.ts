@@ -71,3 +71,23 @@ test('the newest migration matches Wrangler local D1 statement boundaries', () =
     `${newest} is valid SQLite, but Wrangler would merge or split its statements differently`
   );
 });
+
+test('every migration from 0179 on matches Wrangler local D1 statement boundaries, and none closes a CASE with END touching a parenthesis', () => {
+  // Wrangler opens a CASE on whitespace + CASE + whitespace and closes it only
+  // on whitespace + END + (whitespace or ';'). An END touching its closing
+  // parenthesis never closes, and every later statement of the file is folded
+  // into one: 0179 first carried exactly that and Wrangler saw ONE statement
+  // where the harness saw 24. The check above reads only the newest file, so
+  // it would stop looking at 0179 the day 0180 lands; this one keeps reading
+  // every file from 0179 on. Older files are applied everywhere and stay as
+  // they are (additive migrations only).
+  const normalize = (statement: string) => statement.replace(/\s+/g, ' ').trim();
+  const files = readdirSync('migrations').filter((file) => /^\d{4}_.*\.sql$/.test(file) && Number(file.slice(0, 4)) >= 179).sort();
+  assert.ok(files.includes('0179_fx_rates.sql'), 'the FX migration is read');
+  for (const file of files) {
+    const sql = readFileSync(`migrations/${file}`, 'utf8');
+    const code = splitStatements(sql).join(';\n');
+    assert.doesNotMatch(code, /\bEND\)/i, `${file}: write END ) with a space so Wrangler closes the CASE`);
+    assert.deepEqual(splitWithWrangler(sql).map(normalize), splitStatements(sql).map(normalize), `${file}: Wrangler would merge or split its statements differently`);
+  }
+});
