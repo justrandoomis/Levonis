@@ -153,6 +153,51 @@ after one, run `npx wrangler triggers deploy --env staging` from the rollback
 target's checkout. (A target from P1 on ignores the 6-hour trigger anyway:
 `scheduled()` runs only the crons it knows.)
 
+## Accounting stays IQD — «الأرباح والتكاليف» (USD-pricing design P-A, DECISIONS row 194)
+
+Owner brief 2026-10-09, "Accounting Currency": USD is the base of the
+**pricing engine only**. Costs, profit, inventory, batch costs, actual
+shipping, expenses, revenue and order reports stay in the **IQD recorded at
+the time of the operation**, and IQD is always the default. P-A (no
+migration) closes the places that did otherwise and adds a display toggle.
+
+| Fix | Where | What it does now |
+|---|---|---|
+| **F1** | `worker/lib/financeReport.ts` | A line whose cost was never recorded at sale (`cost_confidence = 'estimated'`: today's `products.product_cost_iqd`) leaves `costed_revenue_iqd` and `cogs_iqd`, so gross and net profit carry recorded costs only. The estimate stands apart: `estimated_revenue_iqd`, `estimated_cogs_iqd`, `estimated_profit_iqd`, shown as «تقدير بتكلفة اليوم — ليس ربحاً فعلياً». `costed + uncosted + estimated revenue = revenue`. |
+| **F2** | `worker/lib/orderCostProjection.ts` | A delivered (or returned, refunded, cancelled) order gets no current-catalogue and no current-stock cost, not even as a suggestion; the cost recorded on the line at sale is its only suggestion, otherwise manual entry («لا توجد تكلفة مسجلة وقت البيع…»). Orders in flight keep their labelled forecast. |
+| **F3** | `worker/routes/adminFinanceWorkspace.ts` | A promotion in USD/EUR/CNY needs the exchange rate **actually paid**: without it, and without an existing same-currency row, 400 `PROMOTION_RATE_REQUIRED`. The wallet's 1 USD = 1,400 IQD never fills the gap (owner decision 9). The page suggests the shop's rate on the month's first day (`rate_suggestion`) and fills it only on a tap. |
+| **F4/F5** | `worker/lib/financeReportOverlay.ts` | The order-level coupon (`coupon_snapshot.discount_iqd` ?? `orders.coupon_discount_iqd`, less any line share) and credited price-protection claims are **deductions in this report only** (owner question Q3, default "report only"): `coupon_iqd`, `price_protection_iqd`, `net_after_report_adjustments_iqd` = owner net − both. Products take `min(coupon, net goods)`; the excess stays at the order. `calculateGoods`, `getOrderProfitBase(s)` and every writer are untouched — no investor share, wage or journal moves (`tests/financeOverlayNoSettlement.test.ts`). |
+
+**The display toggle «عملة العرض» (IQD / USD).** `?display=IQD|USD` on
+`GET /api/admin/finance-workspace/summary`, `/orders` and `/orders/:id`
+(anything else is 400 `DISPLAY_CURRENCY_INVALID`). IQD answers exactly as
+before. USD adds one `display_usd` block and changes no IQD field and writes
+nothing:
+
+- **The rate**: the shop's **effective** USD/IQD in force when each order was
+  **created**, from the append-only `fx_rate_log` (`worker/lib/fx/historyRate.ts`,
+  the only FX import of the profit route) → `usd_basis: 'at_time'`. An order
+  older than the first applied rate uses today's effective rate, marked «≈»
+  (`'today'`). No applied rate, or a database before 0179 → `available: false`
+  and the page stays in dinars. Never the wallet rate, never a purchase rate.
+  Expenses convert at the start of their own Baghdad day, an unallocated
+  promotion at the start of its month.
+- **The cents** (`worker/lib/financeUsdDisplay.ts`, pure): each additive dinar
+  field converts exactly to integer cents, half away from zero; derived figures
+  (retained revenue, gross and contribution profit, profit basis, owner net,
+  net after the report deductions) are recomputed from the cents with the same
+  formulas, so revenue − cost = profit to the cent; groups, kinds, days and
+  totals are sums of rows; margins come from IQD; the CSV stays IQD.
+- **The client** (`src/components/financeWorkspace/displayCurrency.tsx`)
+  starts at IQD on every load, stores nothing, formats the server's cents with
+  `formatUsdCents` and shows «القيمة المحاسبية: … د.ع» beneath each dollar
+  figure. Overview (figures, breakdown, kinds, charts), delivered orders,
+  products and the order sheet; edits stay in dinars.
+- **Privacy**: owner only, private, no-store — the workspace door
+  (`requireCostRead`). `display_usd`, the deduction amounts, today's rate and the
+  suggestion are in both FINANCIAL_FIELDS copies; `usd_basis` and the counts are
+  registered as private keys that carry no amount.
+
 ## The four price fields
 
 At **product**, **option** and **color** level:
