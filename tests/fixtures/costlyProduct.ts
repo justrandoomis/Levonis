@@ -48,6 +48,18 @@ export interface LeakExtra {
   decimals?: Iterable<string>;
 }
 
+/**
+ * A generated id — newId's 20 hex characters behind an optional prefix
+ * (`pol_3f6333ab…`), an `ORD-` order id, or a UUID — is random text that can
+ * spell a four-digit sentinel by chance (measured: about 1 in 130 sweeps of the
+ * 54 policy documents). It is never a cost, so the digit scan skips a string
+ * that is exactly such an id. A cost inside any other text is still caught.
+ */
+const GENERATED_ID =
+  /^(?:[A-Za-z][A-Za-z0-9]*[_-])?(?:[0-9A-Fa-f]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+export const isGeneratedId = (s: string): boolean =>
+  GENERATED_ID.test(s) && /[A-Fa-f]/.test(s.replace(/^[A-Za-z][A-Za-z0-9]*[_-]/, ''));
+
 const FINANCIAL_KEYS: ReadonlySet<string> = new Set(FINANCIAL_FIELDS as readonly string[]);
 const snakeOf = (k: string) => k.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
 
@@ -82,7 +94,7 @@ export function leaks(value: unknown, extra: LeakExtra = {}): string[] {
         walk(x, `${path}.${k}`);
       }
     } else if (typeof v === 'number' && numbers.has(v)) out.push(`${path} = ${v}`);
-    else if (typeof v === 'string') {
+    else if (typeof v === 'string' && !isGeneratedId(v)) {
       for (const n of v.match(/\d[\d,]{3,}/g) ?? []) {
         if (SENTINELS.has(Number(n.replace(/,/g, '')))) out.push(`${path} ⊃ "${n}"`);
       }
