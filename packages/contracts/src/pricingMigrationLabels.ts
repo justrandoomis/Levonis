@@ -13,15 +13,22 @@
  *   - every reason code `packages/pricing/src/legacyTargets.ts` and the P1
  *     preview raise (tests/pricingMigrationLabels.test.ts holds the two lists
  *     equal), with its severity;
- *   - the §6.2 labels (`b.*`, `I.*`, `R.*`, `L.*`, `s.*`, `btn.*`, `chk.*`,
- *     `gate.*`) and the shipping-profile names `p.*`.
+ *   - the §6.2 labels (`b.*`, `I.*`, `R.*`, `L.*`, `s.*`, `btn.*`, `chk.*`)
+ *     and the shipping-profile names `p.*`.
  *
- * Two deliberate changes to the §6.2 wording, both binding owner text:
+ * Three deliberate changes to the §6.2 wording, all binding owner text:
  *   - «الربح المستهدف» / "target profit" / «قازانجی ئامانج» is the MINIMUM
  *     target profit (owner clarification 2026-10-07): «الحد الأدنى للربح»,
  *     "minimum target profit", «کەمترین قازانجی مەبەست» — the words
  *     pricingFieldLabels.ts and pricingIssues.ts already use;
- *   - shipping is «ناردن» on pricing screens, never «گواستنەوە» (C46).
+ *   - shipping is «ناردن» on pricing screens, never «گواستنەوە» (C46);
+ *   - there is no switch and no gate (owner decision 8, 2026-10-09;
+ *     DECISIONS row 191): the save that completes a product's pricing data
+ *     shows the new prices, and «حفظ واعتماد الأسعار الجديدة» adopts the
+ *     engine and writes them. So a complete product waits to be reviewed and
+ *     saved, never to be "switched", the switch button is `btn.saveAndApply`,
+ *     and the first-switch-on conditions title is gone. `READY_TO_SWITCH`
+ *     keeps its key: it is a status value the server answers.
  *
  * Every `ckb` is its own Sorani — never the Arabic or the English pasted across
  * (docs/DECISIONS.md row 183) — with at least one Sorani-only letter and no
@@ -66,9 +73,9 @@ export const PRICING_MIGRATION_STATUS_LABELS: Readonly<Record<PricingMigrationSt
     ckb: 'تەنها چاوەڕێی تێچووی دابینکەرە',
   },
   READY_TO_SWITCH: {
-    ar: 'مكتمل — بانتظار تحويله إلى التسعير الجديد',
-    en: 'Complete — waiting for you to switch it to the new pricing',
-    ckb: 'تەواوە — چاوەڕێیە تۆ بیگۆڕیت بۆ نرخدانانی نوێ',
+    ar: 'مكتمل — راجع الأسعار الجديدة واحفظ',
+    en: 'Complete — review the new prices and save',
+    ckb: 'تەواوە — نرخە نوێیەکان ببینە و پاشەکەوتی بکە',
   },
   READY: {
     ar: 'جاهز — يعمل بالتسعير الجديد',
@@ -291,9 +298,9 @@ export const LEGACY_REASONS = {
   ROUTE_FEE_INCLUDED: {
     severity: 'info',
     label: {
-      ar: 'عمولة المسار القديمة ({method}: {iqd}) جزء مما دفعه الزبون، فحُسبت في الحد الأدنى للربح؛ تُصفَّر عند التحويل لأن السعر الجديد يشمل الشحن.',
-      en: 'The old route fee ({method}: {iqd}) was part of what the customer paid, so it counts in the minimum target profit; it is set to zero at the switch because the new price includes shipping.',
-      ckb: 'کرێی کۆنی ڕێگا ({method}: {iqd}) بەشێک بوو لەوەی کڕیار دەیدا، بۆیە لە کەمترین قازانجی مەبەستدا حیساب کرا؛ لە کاتی گۆڕیندا دەکرێتە سفر، چونکە نرخی نوێ کرێی ناردنی تێدایە.',
+      ar: 'عمولة المسار القديمة ({method}: {iqd}) جزء مما دفعه الزبون، فحُسبت في الحد الأدنى للربح؛ تُصفَّر عند حفظ الأسعار الجديدة لأن السعر الجديد يشمل الشحن.',
+      en: 'The old route fee ({method}: {iqd}) was part of what the customer paid, so it counts in the minimum target profit; it is set to zero when you save the new prices, because the new price includes shipping.',
+      ckb: 'کرێی کۆنی ڕێگا ({method}: {iqd}) بەشێک بوو لەوەی کڕیار دەیدا، بۆیە لە کەمترین قازانجی مەبەستدا حیساب کرا؛ لە کاتی پاشەکەوتکردنی نرخە نوێیەکاندا دەکرێتە سفر، چونکە نرخی نوێ کرێی ناردنی تێدایە.',
     },
   },
   DIRECT_SALE_EXTRA_ZERO_DIRECT_ONLY: {
@@ -307,9 +314,9 @@ export const LEGACY_REASONS = {
   LEGACY_MEMBER_PRICE_DROPPED: {
     severity: 'info',
     label: {
-      ar: 'سعر العضوية المكتوب يدوياً لن يُستخدم بعد التحويل؛ تُطبَّق مزايا العضوية العامة.',
-      en: 'The typed membership price will not be used after the switch; the general membership benefits apply.',
-      ckb: 'نرخی ئەندامێتیی دەستنووس دوای گۆڕین بەکارناهێنرێت؛ سوودە گشتییەکانی ئەندامێتی جێبەجێ دەکرێن.',
+      ar: 'سعر العضوية المكتوب يدوياً لن يُستخدم بعد حفظ الأسعار الجديدة؛ تُطبَّق مزايا العضوية العامة.',
+      en: 'The typed membership price will not be used once you save the new prices; the general membership benefits apply.',
+      ckb: 'نرخی ئەندامێتیی دەستنووس دوای پاشەکەوتکردنی نرخە نوێیەکان بەکارناهێنرێت؛ سوودە گشتییەکانی ئەندامێتی جێبەجێ دەکرێن.',
     },
   },
 } as const satisfies Record<string, LegacyReasonDefinition>;
@@ -401,10 +408,10 @@ export const PRICING_MIGRATION_LABELS = {
     ckb: 'ℹ هیچ تێچوویەکی زیادە تۆمار نەکراوە',
   },
   's.READY_TO_SWITCH': PRICING_MIGRATION_STATUS_LABELS.READY_TO_SWITCH,
-  'btn.switch': {
-    ar: 'تحويل هذا المنتج إلى التسعير الجديد',
-    en: 'Switch this product to the new pricing',
-    ckb: 'ئەم بەرهەمە بگۆڕە بۆ نرخدانانی نوێ',
+  'btn.saveAndApply': {
+    ar: 'حفظ واعتماد الأسعار الجديدة',
+    en: 'Save and apply the new prices',
+    ckb: 'پاشەکەوتکردن و جێبەجێکردنی نرخە نوێیەکان',
   },
   'chk.measuresConfirmed': {
     ar: 'راجعت قياسات الشحن المستخدمة',
@@ -416,7 +423,6 @@ export const PRICING_MIGRATION_LABELS = {
     en: 'Enter a box or CBM for several products',
     ckb: 'سندوق یان قەبارە بۆ چەند بەرهەمێک بنووسە',
   },
-  'gate.title': { ar: 'شروط التشغيل الأول', en: 'First switch-on conditions', ckb: 'مەرجەکانی یەکەم دەستپێکردن' },
   'p.CHINA_AIR': { ar: 'شحن جوي — الصين', en: 'China air', ckb: 'ناردنی ئاسمانی — چین' },
   'p.CHINA_SEA': { ar: 'شحن بحري — الصين', en: 'China sea', ckb: 'ناردنی دەریایی — چین' },
   'p.GERMANY_LAND': { ar: 'شحن بري — ألمانيا', en: 'Germany land', ckb: 'ناردنی وشکانی — ئەڵمانیا' },

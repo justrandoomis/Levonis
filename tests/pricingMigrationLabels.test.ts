@@ -9,8 +9,9 @@
  *   - every string exists in ar, en and real Sorani: the ckb is never the
  *     Arabic or the English, carries a Sorani-only letter and no Arabic-only
  *     one; the `{slots}` agree across the three languages;
- *   - the §6.2 wording is kept verbatim, except the two binding owner changes:
- *     the MINIMUM target profit (2026-10-07) and «ناردن» for shipping (C46).
+ *   - the §6.2 wording is kept verbatim, except the binding owner changes:
+ *     the MINIMUM target profit (2026-10-07), «ناردن» for shipping (C46), and
+ *     no switch and no gate (decision 8, 2026-10-09; DECISIONS row 191).
  *
  * Run: node --import tsx --test tests/pricingMigrationLabels.test.ts
  */
@@ -100,14 +101,55 @@ test('the §6.2 rows the owner did not change are verbatim', () => {
     en: "The pre-order routes give different old profits for this selection once each route's fee is counted. Choose the route to use or set the profit yourself; no average is taken.",
     ckb: 'ڕێگاکانی پێشداواکاری دوای حیسابکردنی کرێی هەر ڕێگایەک قازانجی کۆنی جیاواز دەدەن بۆ ئەم هەڵبژاردنە. ئەو ڕێگایە هەڵبژێرە کە بەکاردێت یان خۆت قازانج دیاری بکە؛ تێکڕا وەرناگیرێت.',
   });
-  assert.deepEqual(PRICING_MIGRATION_LABELS['s.READY_TO_SWITCH'], {
-    ar: 'مكتمل — بانتظار تحويله إلى التسعير الجديد',
-    en: 'Complete — waiting for you to switch it to the new pricing',
-    ckb: 'تەواوە — چاوەڕێیە تۆ بیگۆڕیت بۆ نرخدانانی نوێ',
-  });
   assert.equal(LEGACY_REASONS.LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP.label.en, 'The extracted Direct Sale Extra ({iqd}) is not a multiple of 1,000. Choose the nearest lower or higher value, or set it yourself.');
   assert.equal(PRICING_MIGRATION_LABELS['L.NO_ADDITIONAL_COSTS'].ckb, 'ℹ هیچ تێچوویەکی زیادە تۆمار نەکراوە');
   assert.equal(PRICING_MIGRATION_LABELS['b.previewOnly'].en, 'Preview only — nothing changes in the store.');
+});
+
+/**
+ * DECISION 8 (owner, 2026-10-09; DECISIONS row 191): «ENGINE STARTS WHEN THE
+ * PRODUCT IS COMPLETE». The save that completes a product's pricing data shows
+ * the new prices, and saving adopts the engine and writes them — no extra
+ * activation step, no gate. So nothing the owner reads may still speak of a
+ * switch or a first switch-on: the complete status asks for a review and a
+ * save, the one button is «حفظ واعتماد الأسعار الجديدة», and the two reasons
+ * that said "at / after the switch" now say "when you save the new prices".
+ */
+test('decision 8: a complete product is reviewed and saved, never switched — no switch button, no gate title', () => {
+  assert.deepEqual(PRICING_MIGRATION_LABELS['s.READY_TO_SWITCH'], {
+    ar: 'مكتمل — راجع الأسعار الجديدة واحفظ',
+    en: 'Complete — review the new prices and save',
+    ckb: 'تەواوە — نرخە نوێیەکان ببینە و پاشەکەوتی بکە',
+  });
+  assert.deepEqual(PRICING_MIGRATION_STATUS_LABELS.READY_TO_SWITCH, PRICING_MIGRATION_LABELS['s.READY_TO_SWITCH']);
+  assert.deepEqual(PRICING_MIGRATION_LABELS['btn.saveAndApply'], {
+    ar: 'حفظ واعتماد الأسعار الجديدة',
+    en: 'Save and apply the new prices',
+    ckb: 'پاشەکەوتکردن و جێبەجێکردنی نرخە نوێیەکان',
+  });
+  const keys = Object.keys(PRICING_MIGRATION_LABELS);
+  assert.ok(!keys.includes('btn.switch'), 'the switch button is gone');
+  assert.ok(!keys.some((k) => k.startsWith('gate.')), 'the first switch-on conditions are gone');
+  // Nothing the owner reads speaks of a switch or of switching on.
+  for (const [key, { ar, en, ckb }] of ALL) {
+    assert.doesNotMatch(en, /\bswitch/i, `${key}: «${en}»`);
+    assert.doesNotMatch(ar, /التحويل|تحويله|التشغيل الأول/, `${key}: «${ar}»`);
+    assert.doesNotMatch(ckb, /گۆڕین|بیگۆڕیت/, `${key}: «${ckb}»`);
+  }
+  assert.equal(
+    LEGACY_REASONS.LEGACY_MEMBER_PRICE_DROPPED.label.en,
+    'The typed membership price will not be used once you save the new prices; the general membership benefits apply.'
+  );
+  assert.match(LEGACY_REASONS.ROUTE_FEE_INCLUDED.label.ar, /تُصفَّر عند حفظ الأسعار الجديدة لأن السعر الجديد يشمل الشحن\.$/);
+  assert.match(LEGACY_REASONS.ROUTE_FEE_INCLUDED.label.ckb, /لە کاتی پاشەکەوتکردنی نرخە نوێیەکاندا/);
+  assert.match(LEGACY_REASONS.LEGACY_MEMBER_PRICE_DROPPED.label.ckb, /دوای پاشەکەوتکردنی نرخە نوێیەکان/);
+  // The refusal a save answers when the measures are unconfirmed says the same.
+  assert.deepEqual(
+    [COST_REFUSALS.PRICING_MEASURES_UNCONFIRMED.ar.endsWith('قبل حفظ أسعار المنتج الجديدة.'),
+     COST_REFUSALS.PRICING_MEASURES_UNCONFIRMED.en.endsWith("before saving the product's new prices."),
+     COST_REFUSALS.PRICING_MEASURES_UNCONFIRMED.ckb.includes('پێش پاشەکەوتکردنی نرخە نوێیەکانی بەرهەمەکە')],
+    [true, true, true]
+  );
 });
 
 test('the §2.3 statuses, worst first, and the worst of a set', () => {
@@ -127,7 +169,7 @@ test('every reason the derivation raises has a label and a severity; migrationTe
   for (const code of ['CHANNEL_NOT_PRICED', 'COLOR_PRICE_UNSUPPORTED', 'OPTION_GROUPS_UNSUPPORTED', 'LEGACY_MEMBER_PRICE_DROPPED']) assert.ok(isLegacyReasonCode(code), code);
   assert.equal(
     migrationText(LEGACY_REASONS.ROUTE_FEE_INCLUDED.label, 'en', { method: 'air', iqd: '25,000' }),
-    'The old route fee (air: 25,000) was part of what the customer paid, so it counts in the minimum target profit; it is set to zero at the switch because the new price includes shipping.'
+    'The old route fee (air: 25,000) was part of what the customer paid, so it counts in the minimum target profit; it is set to zero when you save the new prices, because the new price includes shipping.'
   );
   assert.match(migrationText(LEGACY_REASONS.LEGACY_DIRECT_SALE_EXTRA_NOT_ON_STEP.label, 'ckb', {}), /\(\{iqd\}\)/, 'an unfilled slot is left visible, never guessed');
 });

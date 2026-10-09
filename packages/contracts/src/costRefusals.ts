@@ -431,10 +431,14 @@ export const COST_REFUSALS = {
     ckb: 'سڕینەوەی ئەم بەهایە نرخدانانی بەرهەمەکە ناتەواو دەهێڵێتەوە و ئیتر سیستەمەکە ناتوانێت نرخەکەی هەژمار بکات. ئەگەر مەبەستتە، بە ڕوونی پشتڕاستی بکەرەوە.',
   },
   PRICING_MEASURES_UNCONFIRMED: {
-    ar: 'وزن هذا المنتج أو أبعاده مأخوذة من المواصفات العامة ولم تؤكَّد بعد. راجعها وأكّدها قبل تفعيل التسعير التلقائي.',
-    en: "This product's weight or dimensions come from its public specifications and are not confirmed yet. Review and confirm them before turning on automatic pricing.",
-    ckb: 'کێش یان ئەندازەکانی ئەم بەرهەمە لە تایبەتمەندییە گشتییەکانەوە وەرگیراون و هێشتا پشتڕاست نەکراونەتەوە. پێش چالاککردنی نرخدانانی خۆکار بیانپشکنە و پشتڕاستیان بکەرەوە.',
+    ar: 'وزن هذا المنتج أو أبعاده مأخوذة من المواصفات العامة ولم تؤكَّد بعد. راجعها وأكّدها قبل حفظ أسعار المنتج الجديدة.',
+    en: "This product's weight or dimensions come from its public specifications and are not confirmed yet. Review and confirm them before saving the product's new prices.",
+    ckb: 'کێش یان ئەندازەکانی ئەم بەرهەمە لە تایبەتمەندییە گشتییەکانەوە وەرگیراون و هێشتا پشتڕاست نەکراونەتەوە. پێش پاشەکەوتکردنی نرخە نوێیەکانی بەرهەمەکە بیانپشکنە و پشتڕاستیان بکەرەوە.',
   },
+  // Retired by owner decision 8 (2026-10-09): never raised. There is no gate
+  // and no switch — the save that completes a product's data adopts the
+  // engine (DECISIONS row 191). Both codes stay because the contract only
+  // grows; tests/programmeRefusals.test.ts holds that nothing raises them.
   PRICING_GATE_ITEMS_MISSING: {
     ar: 'لم تُقبل كل بنود التفعيل الأول للتسعير التلقائي. راجع كل بند وأشّر عليه، ثم أكّد من جديد.',
     en: 'Not every item for the first activation of automatic pricing was accepted. Review and tick each item, then confirm again.',

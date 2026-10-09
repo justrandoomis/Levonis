@@ -21,6 +21,9 @@ import {
   type CostRefusalCode,
 } from '../packages/contracts/src/costRefusals';
 import { REFUSAL_STRINGS, refusalText } from '../src/lib/refusalStrings';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { ROOT } from './fixtures/d1';
 
 const CODES = Object.keys(COST_REFUSALS) as CostRefusalCode[];
 
@@ -96,7 +99,11 @@ const REQUIRED: Record<string, readonly string[]> = {
   ],
   // MVP plan V14: §6.1's PRICING_INPUT_INVALID, landed with P1's what-if validation.
   'MVP plan V14 (P1)': ['PRICING_INPUT_INVALID'],
-  // L3 `confirm_incomplete`, L4 `measures_confirmed`, and GATE (C52).
+  // L3 `confirm_incomplete`, L4 `measures_confirmed`, and GATE (C52). The two
+  // PRICING_GATE_* codes were retired by owner decision 8 (2026-10-09;
+  // DECISIONS row 191): there is no gate, the save that completes a product
+  // adopts the engine. They stay listed because the contract only grows, and
+  // the test at the end of this file holds that nothing raises them.
   'master plan v2 check §3.9': [
     'PRICING_CLEAR_INCOMPLETE_CONFIRM',
     'PRICING_MEASURES_UNCONFIRMED',
@@ -317,4 +324,27 @@ test('OWNER_FIRST_PROOF_REQUIRED says what the first proof ends and asks to conf
   // Google on the same address is not "lost": it links again (review U3).
   assert.match(en, /or with Google on this same email/);
   assert.deepEqual(REFUSAL_STRINGS.OWNER_FIRST_PROOF_REQUIRED, COST_REFUSALS.OWNER_FIRST_PROOF_REQUIRED);
+});
+
+/** Every .ts / .tsx file under one directory, at any depth. */
+function sources(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) sources(p, out);
+    else if (/\.(ts|tsx)$/.test(name)) out.push(p);
+  }
+  return out;
+}
+
+test('decision 8: the retired gate codes stay in the contract, and no server or client file raises them', () => {
+  const RETIRED = ['PRICING_GATE_ITEMS_MISSING', 'PRICING_GATE_NOT_CONFIRMED'] as const;
+  for (const code of RETIRED) assert.ok(isCostRefusalCode(code), `${code} left the contract, which only grows`);
+  const files = [...sources(join(ROOT, 'worker')), ...sources(join(ROOT, 'src'))];
+  assert.ok(files.length >= 500, `only ${files.length} files scanned`);
+  const hits: string[] = [];
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8');
+    for (const code of RETIRED) if (text.includes(code)) hits.push(`${relative(ROOT, file)}: ${code}`);
+  }
+  assert.deepEqual(hits, [], 'there is no gate: the save that completes a product adopts the engine (DECISIONS row 191)');
 });
