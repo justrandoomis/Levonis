@@ -1062,8 +1062,9 @@ export default function App() {
       <LanguageProvider>
         <WalletProvider>
           {/* INSIDE WalletProvider, because the rate it converts at is that
-              provider's `exchangeRate` — the administrator's own setting,
-              served to every visitor by /api/settings/public. Outside the
+              provider's `displayUsdRate` — the shop's effective USD/IQD,
+              served to every visitor by /api/settings/public; never the
+              wallet's `exchangeRate` (owner decision 9). Outside the
               Router, because a reading preference is not a route. */}
           <CurrencyProvider>
           <NavigationRouter>

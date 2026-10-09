@@ -14,8 +14,9 @@
  *   - a manual rate; back to automatic; «استخدم {rate} سعرًا يدويًا» after a
  *     refresh while manual (critique L14);
  *   - the adjustment (USD only, `market_adjustment_iqd`: a FIXED number of
- *     dinars per dollar, never a percentage — owner decision 5), with the sum
- *     «market + adjustment = effective» when it holds (`formula_holds`);
+ *     dinars per dollar, never a percentage — owner decision 5), behind a
+ *     fresh sign-in, with the sum «market + adjustment = effective» when it
+ *     holds (`formula_holds`), each figure isolated left-to-right;
  *   - «تأكيد السعر الحالي», which moves the drift anchor (critique F1);
  *   - the safety settings, collapsed, behind a fresh sign-in (critique F3);
  *   - a held value is decided in the review sheet (FxReviewSheet).
@@ -33,7 +34,7 @@ import { confirmFxRate, saveFxSettings, setFxManual, type FxPairDto, type FxRate
 import type { FxStrings } from './fxStrings';
 import { adjustmentInput, fxRateInput, pctInput } from './fxInput';
 import { DERIVED_IQD_SHOWN_PLACES, Fact, FX_DAY_HOURS, FxFigure, FxMessage, FX_STATUS_TONE, fxDate, pctText, RATE_SHOWN_PLACES, RateLine, useFxAct } from './fxParts';
-import { adjustmentFigure, fxCount, fxFigure } from './format';
+import { adjustmentFigure, fxCount, fxFigure, ltrIsolate } from './format';
 import { iqdUnit } from '../../lib/money';
 
 type Tracking = 'off' | '6' | '12' | '24';
@@ -344,9 +345,11 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
       {/* «سعر السوق 1,660 + الزيادة 20 = السعر المعتمد 1,680» (owner decision 5) — the server's three
           figures, shown only when the server says the sum holds: inside the dead band, while a value
           is held, or on a manual rate it does not, and no sum is better than a wrong one. */}
+      {/* Each figure is isolated left-to-right (LRI … PDI): inside an Arabic or Sorani line a bare «−20»
+          took the paragraph's direction and read «20−» (FX-1A review: security #2). */}
       {usd && !notSetUp && p.formula_holds && p.market_rate && p.effective_rate && (
         <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary" data-fx-formula>
-          {s.formula(fxFigure(p.market_rate), adjustmentFigure(p.market_adjustment_iqd ?? '0'), fxFigure(p.effective_rate))}
+          {s.formula(ltrIsolate(fxFigure(p.market_rate)), ltrIsolate(adjustmentFigure(p.market_adjustment_iqd ?? '0')), ltrIsolate(fxFigure(p.effective_rate)))}
         </p>
       )}
 
@@ -362,6 +365,12 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
               </Button>
             )}
           </div>
+          {/* Said before the act: an adjustment moves the shop's rate, so saving it asks for a fresh sign-in. */}
+          {adjustmentInput(adjustment) !== (p.market_adjustment_iqd ?? '0') && (
+            <p className="mt-1 text-[12px] leading-relaxed text-text-muted" data-fx-adjustment-reauth>
+              {s.guardsHint}
+            </p>
+          )}
           {p.mode === 'MANUAL' && (
             <p className="mt-1 text-[12px] leading-relaxed text-text-muted" data-fx-manual-final>
               {s.manualFinal}

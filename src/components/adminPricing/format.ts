@@ -95,6 +95,15 @@ export function adjustmentFigure(text: string): string {
   return `${neg ? '−' : ''}${fxFigure(abs)}`;
 }
 
+/**
+ * A figure kept left-to-right inside a sentence of any direction: wrapped in
+ * LEFT-TO-RIGHT ISOLATE … POP DIRECTIONAL ISOLATE (U+2066 … U+2069), the
+ * plain-text twin of `<bdi dir="ltr">`, for a figure that goes into a string.
+ * A minus (U+2212) is a weak character: unisolated in an Arabic or Sorani
+ * line, «−20» reads «20−».
+ */
+export const ltrIsolate = (figure: string): string => `\u2066${figure}\u2069`;
+
 /** A figure as SHOWN: rounded for reading when `places` says so («≈»), the exact text kept for a tooltip. */
 export interface ShownFigure {
   text: string;

@@ -10,7 +10,8 @@
  *                cents are floor(dinars × 100 / 1,400), never / 1,680
  *   preview      the admin price preview reads the SHOP's rate (null before
  *                the first approval), never the wallet's
- *   source       no wallet, escrow, Quick Buy, membership or checkout code
+ *   source       no wallet, escrow, Quick Buy, membership or checkout code —
+ *                nor any worker file that names the wallet's exchangeRate —
  *                imports the FX module or names its tables; no FX or engine
  *                code reads the wallet's exchangeRate
  *
@@ -169,8 +170,8 @@ function tsFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-test('the wallet side never reaches the FX module: wallet, escrow, Quick Buy, memberships and checkout import nothing of it and name none of its tables', () => {
-  const walletSide = [
+test('the wallet side never reaches the FX module: wallet, escrow, Quick Buy, memberships, checkout — and every worker file that converts at the wallet rate — import nothing of it and name none of its tables', () => {
+  const named = [
     'worker/lib/walletOps.ts',
     'worker/routes/wallet.ts',
     'worker/lib/escrowOps.ts',
@@ -178,8 +179,17 @@ test('the wallet side never reaches the FX module: wallet, escrow, Quick Buy, me
     'worker/routes/memberships.ts',
     'worker/lib/membershipOps.ts',
     'worker/routes/orders.ts',
+    'worker/lib/walletAdjust.ts',
   ];
-  assert.ok(walletSide.length >= 10);
+  // EVERY worker file whose code names the wallet's `exchangeRate` is wallet side, so a new one is
+  // held without being listed here (FX-1A review: security #5 — escrow checkout in storeOrders, the
+  // wallet adjustments and their notices were missed). The FX module itself is the other side.
+  const walletRateReaders = tsFiles(join(ROOT, 'worker')).filter((f) => !f.startsWith('worker/lib/fx/') && /\bexchangeRate\b/.test(codeOf(f)));
+  for (const f of ['worker/routes/storeOrders.ts', 'worker/routes/adminWalletAdjust.ts', 'worker/lib/walletNotify.ts', 'worker/routes/adminFinanceWorkspace.ts']) {
+    assert.ok(walletRateReaders.includes(f), `${f} converts at the wallet rate and is held`);
+  }
+  const walletSide = [...new Set([...named, ...walletRateReaders])];
+  assert.ok(walletSide.length >= 18, String(walletSide.length));
   for (const f of walletSide) {
     const src = codeOf(f);
     assert.doesNotMatch(src, /from\s+['"][^'"]*\/fx\/[^'"]+['"]/, `${f} imports the FX module`);

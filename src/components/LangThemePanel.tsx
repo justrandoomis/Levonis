@@ -87,7 +87,10 @@ function RowLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) 
  * decimals there were false precision (UX review #15); the conversion itself
  * uses the exact text. The wallet's rate is never shown here (owner decision
  * 9): with dollars chosen and no shop rate yet, prices read in dinars and the
- * caption says the dollar reading comes once the shop's rate is approved.
+ * caption says the dollar reading comes once the shop's rate is approved —
+ * only once the settings are in: before they arrive, no rate means "not known
+ * yet", and the note would be false for a shop whose rate is approved
+ * (FX-1A review #5).
  */
 export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
   const { lang, loc } = useLanguage();
@@ -130,7 +133,7 @@ export function CurrencyCaptions({ pick }: { pick: DisplayCurrency }) {
           {loc('سعر يحدده المتجر', 'a rate set by the shop', 'نرخێک کە فرۆشگا دایناوە')}
         </p>
       )}
-      {pick === 'USD' && !rate && (
+      {pick === 'USD' && !rate && money?.settingsLoaded !== false && (
         <p data-currency-usd-pending>
           {loc(
             'القراءة بالدولار متاحة بعد اعتماد سعر المتجر؛ الأسعار تُعرض بالدينار الآن.',

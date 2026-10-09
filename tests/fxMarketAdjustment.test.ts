@@ -18,7 +18,9 @@
  *                PRICING_INPUT_INVALID naming market_adjustment_iqd; the old
  *                body key → 400 UNKNOWN_FIELD; a refusal writes nothing
  *   card         «market + adjustment = effective» only when it holds, in ar,
- *                en and ckb; a manual rate says the adjustment is not added
+ *                en and ckb, each figure isolated left-to-right (a minus
+ *                stays in front); a manual rate says the adjustment is not
+ *                added; saving an adjustment says it asks for a fresh sign-in
  *
  * Run: node --import tsx --test tests/fxMarketAdjustment.test.ts
  */
@@ -37,6 +39,8 @@ import { LanguageProvider } from '../src/LanguageContext';
 import FxPairCard from '../src/components/adminPricing/FxPairCard';
 import { RATE_EVENTS } from '../src/components/adminPricing/FxHistorySheet';
 import { FX_STRINGS } from '../src/components/adminPricing/fxStrings';
+import { ltrIsolate } from '../src/components/adminPricing/format';
+import { codeOf } from './fixtures/source';
 import type { FxPairDto, FxRatesAnswer } from '../src/components/adminPricing/api';
 
 const BASE = '/api/admin/pricing';
@@ -334,17 +338,21 @@ test('the card: «market + adjustment = effective» in ar, en and ckb when it ho
   for (const lang of LANGS) {
     const s = FX_STRINGS[lang];
     const shown = formulaOf(card(usdPair(), lang));
-    assert.equal(shown, s.formula('1,660', '20', '1,680'), lang);
+    assert.equal(shown, s.formula(ltrIsolate('1,660'), ltrIsolate('20'), ltrIsolate('1,680')), lang);
     assert.match(shown!, /1,660.*20.*1,680/, `${lang}: the server's three figures`);
     assert.equal(formulaOf(card(usdPair({ formula_holds: false, market_rate: '1662' }), lang)), null, `${lang}: inside the dead band, no sum`);
     const negative = formulaOf(card(usdPair({ market_adjustment_iqd: '-20', effective_rate: '1640' }), lang));
     assert.match(negative!, /−20/, `${lang}: a minus when it lowers the rate`);
+    // Each figure is isolated left-to-right: a bare «−20» in an Arabic or Sorani line reads «20−» (FX-1A review: security #2).
+    for (const fig of ['1,660', '−20', '1,640']) assert.ok(negative!.includes(`\u2066${fig}\u2069`), `${lang}: «${fig}» isolated in ${JSON.stringify(negative)}`);
     const manual = card(usdPair({ mode: 'MANUAL', manual_rate: '1700', effective_rate: '1700', effective_source: 'manual', formula_holds: false }), lang);
     assert.equal(formulaOf(manual), null);
     assert.ok(manual.includes(s.manualFinal), `${lang}: the manual hint`);
     assert.equal(card(usdPair(), lang).includes(s.manualFinal), false, `${lang}: no manual hint in AUTO`);
     assert.ok(card(usdPair(), lang).includes(s.adjustment), `${lang}: the label names the fixed dinars`);
   }
+  // Saving an adjustment asks for a fresh sign-in, and the card says so before the act, beside «حفظ».
+  assert.match(codeOf('src/components/adminPricing/FxPairCard.tsx'), /data-fx-adjustment-reauth>\s*\{s\.guardsHint\}/);
   assert.match(FX_STRINGS.en.adjustment, /fixed IQD per USD/);
   assert.match(FX_STRINGS.en.adjustmentHint, /not a percentage/);
   assert.doesNotMatch(FX_STRINGS.ar.adjustment + FX_STRINGS.ar.adjustmentHint, /%|٪|نسبة مئوية/);

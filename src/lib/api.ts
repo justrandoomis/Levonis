@@ -1527,8 +1527,9 @@ export interface PublicSettings {
   /**
    * THE SHOP'S EFFECTIVE USD/IQD, as decimal text ("1703.9167") — the display
    * currency's rate (FX programme plan §8 "Public", §13). Null until the owner
-   * approves the first automatic value, and absent on an older server; the
-   * display then falls back to `exchangeRate`. The only FX figure that is public.
+   * approves the first automatic value, and absent on an older server; prices
+   * then read in dinars — never at `exchangeRate`, the wallet's own rate (owner
+   * decision 9). The only FX figure that is public.
    */
   displayUsdRate?: string | null;
   /** True when that rate is the provider's figure (credited to IQWealth); false when the owner typed it (FX-1 review #10). */

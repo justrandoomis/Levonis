@@ -183,6 +183,12 @@ interface CurrencyContextValue {
   /** True while prices on screen are a conversion rather than the stored
    *  figure. Screens that must disclose that read this. */
   converted: boolean;
+  /**
+   * The public settings have arrived. Until then a null `rate` means only
+   * "not known yet", not "the shop has no rate": a note that says the shop's
+   * rate is not approved waits for this (FX-1A review #5).
+   */
+  settingsLoaded: boolean;
   /** An IQD amount, formatted in the currency the customer chose. */
   money: (iqd: number) => string;
   /**
@@ -205,7 +211,12 @@ interface CurrencyContextValue {
 const CurrencyContext = createContext<CurrencyContextValue | undefined>(undefined);
 
 /** Build the context value. Exported for the tests, which render screens in either currency. */
-export function currencyValue(currency: DisplayCurrency, setCurrency: (next: DisplayCurrency) => void, rate: DisplayRate | null): CurrencyContextValue {
+export function currencyValue(
+  currency: DisplayCurrency,
+  setCurrency: (next: DisplayCurrency) => void,
+  rate: DisplayRate | null,
+  settingsLoaded = true
+): CurrencyContextValue {
   const usdOf = (iqd: number): string | null => {
     if (!rate) return null;
     const cents = iqdToUsdCentsExact(iqd, rate.text);
@@ -218,6 +229,7 @@ export function currencyValue(currency: DisplayCurrency, setCurrency: (next: Dis
     setCurrency,
     rate,
     converted,
+    settingsLoaded,
     money,
     // «1,750,000 د.ع · ‎$1,250.00» — the charge first, the reading after it.
     moneyBoth: (iqd: number) => {
@@ -270,7 +282,10 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (rate && rate.source === 'shop' && rate.text !== cached) rememberDisplayRate(rate.text);
   }, [rate, cached]);
 
-  const value = useMemo<CurrencyContextValue>(() => currencyValue(currency, setCurrency, rate), [currency, setCurrency, rate]);
+  const value = useMemo<CurrencyContextValue>(
+    () => currencyValue(currency, setCurrency, rate, settingsLoaded),
+    [currency, setCurrency, rate, settingsLoaded]
+  );
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;
 }

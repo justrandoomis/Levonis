@@ -307,7 +307,7 @@ function inLanguage<T>(lang: 'ar' | 'en' | 'ckb', fn: () => T): T {
   }
 }
 
-async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'cache'; attributed?: boolean } | null) {
+async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { text: string; source: 'shop' | 'cache'; attributed?: boolean } | null, settingsLoaded = true) {
   const { createElement } = await import('react');
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { LanguageProvider } = await import('../src/LanguageContext');
@@ -316,7 +316,7 @@ async function captions(lang: 'ar' | 'en' | 'ckb', pick: 'IQD' | 'USD', rate: { 
   return inLanguage(lang, () =>
     renderToStaticMarkup(
       createElement(LanguageProvider, {
-        children: createElement(CurrencyValueProvider, { value: currencyValue(pick, () => {}, rate), children: createElement(CurrencyCaptions, { pick }) }),
+        children: createElement(CurrencyValueProvider, { value: currencyValue(pick, () => {}, rate, settingsLoaded), children: createElement(CurrencyCaptions, { pick }) }),
       })
     )
   );
@@ -377,6 +377,11 @@ test('dollars chosen before the shop has a rate: prices read in dinars and the m
     // With a shop rate, or with dinars chosen, the note is not shown.
     assert.doesNotMatch(await captions(lang, 'USD', { text: '1680', source: 'shop' }), /data-currency-usd-pending/, lang);
     assert.doesNotMatch(await captions(lang, 'IQD', null), /data-currency-usd-pending/, lang);
+    // Nor while the settings are still loading (no cached rate yet): no rate then means "not known
+    // yet", and «not approved» would be false for a shop whose rate is approved (FX-1A review #5).
+    const loading = await captions(lang, 'USD', null, false);
+    assert.doesNotMatch(loading, /data-currency-usd-pending/, `${lang}: no note before the settings arrive`);
+    assert.ok(!loading.includes(want[lang]), lang);
   }
   assert.notEqual(want.ckb, want.ar);
 });

@@ -689,7 +689,7 @@ function Field({
 export default function Settings() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
-  const { currency, setCurrency, rate, converted } = useMoney();
+  const { currency, setCurrency, rate, converted, settingsLoaded } = useMoney();
   const { lang, setLang, dir, t, loc } = useLanguage();
   const { preference: themePref, theme } = useTheme();
   const s = STRINGS[lang];
@@ -1153,7 +1153,9 @@ export default function Settings() {
                     shown before the settings arrive. Whole dinars after «≈»
                     (review #15). NEVER the wallet's rate (owner decision 9):
                     until the owner approves a rate, dollars are not offered —
-                    prices read in dinars and a dollar reader is told why. */}
+                    prices read in dinars and a dollar reader is told why, once
+                    the settings are in (before that, no rate is only "not
+                    known yet" — FX-1A review #5). */}
                 {rate ? (
                   <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-rate-source={rate.source}>
                     {rate.source === 'shop' && rate.attributed !== false ? (
@@ -1174,7 +1176,7 @@ export default function Settings() {
                       s.currencyRateSet(wholeRateText(rate.text))
                     )}
                   </p>
-                ) : currency === 'USD' ? (
+                ) : currency === 'USD' && settingsLoaded ? (
                   <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-usd-pending>
                     {s.usdPending}
                   </p>

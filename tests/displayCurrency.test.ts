@@ -156,6 +156,10 @@ test('the rate source: displayUsdRate, or nothing (dinars) — NEVER the wallet 
   // The context reads WalletContext's `displayUsdRate` (undefined until the settings arrive) — and not its exchangeRate.
   assert.match(ctx, /const \{ displayUsdRate, displayUsdRateAttributed: attributed \} = useWallet\(\);/);
   assert.match(ctx, /const settingsLoaded = displayUsdRate !== undefined;/);
+  // …and hands it to the screens, so a «not approved yet» note can wait for the settings (FX-1A review #5).
+  assert.match(ctx, /currencyValue\(currency, setCurrency, rate, settingsLoaded\)/);
+  assert.equal(currencyValue('USD', noop, null, false).settingsLoaded, false);
+  assert.equal(currencyValue('USD', noop, null).settingsLoaded, true);
   assert.match(read('src/WalletContext.tsx'), /displayUsdRate: settings \? \(settings\.displayUsdRate \?\? null\) : undefined,/);
   assert.match(read('src/lib/api.ts'), /displayUsdRate\?: string \| null;/);
   assert.match(read('src/WalletContext.tsx'), /displayUsdRateAttributed: settings\?\.displayUsdRateAttributed !== false,/);
@@ -377,7 +381,9 @@ test('the settings row is a real switch and states the rate it converts at', () 
   assert.match(src, /\{s\.currencyRateShop\(wholeRateText\(rate\.text\)\)\}\{' '\}\s*<a\s+href=\{IQWEALTH_URL\}\s+target="_blank"\s+rel="noopener noreferrer"/);
   assert.match(src, /s\.currencyRateSet\(wholeRateText\(rate\.text\)\)/);
   assert.doesNotMatch(src, /s\.currencyRate\(|groupRateText/, 'the old sentence at the wallet rate is gone');
-  assert.match(src, /\) : currency === 'USD' \? \(\s*<p[^>]*data-currency-usd-pending>\s*\{s\.usdPending\}/);
+  // The note waits for the settings: before they arrive, no rate is only "not known yet" (FX-1A review #5).
+  assert.match(src, /\) : currency === 'USD' && settingsLoaded \? \(\s*<p[^>]*data-currency-usd-pending>\s*\{s\.usdPending\}/);
+  assert.match(src, /const \{ currency, setCurrency, rate, converted, settingsLoaded \} = useMoney\(\);/);
   assert.ok(src.includes('سعر الصرف: 1 دولار ≈ ${rate} دينار — سعر المتجر للعرض فقط، بناءً على بيانات'));
   assert.ok(src.includes("Exchange rate: 1 dollar ≈ ${rate} dinars — the shop's rate, display only, based on"));
   assert.ok(src.includes('نرخی ئاڵوگۆڕ: 1 دۆلار ≈ ${rate} دینار — نرخی فرۆشگا، تەنها بۆ پیشاندان، لەسەر بنەمای زانیاریی'));
