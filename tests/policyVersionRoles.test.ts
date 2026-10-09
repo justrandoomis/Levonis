@@ -86,7 +86,7 @@ test('every role reads the same new versions and the same text, in all three lan
       assert.equal(res.policy.lang, lang, `${role}: ${lang} fell back to another language`);
       assert.equal(res.policy.hash, LEDGER[`purchase@${MOVED.purchase}:${lang}`], `${role}/${lang}: not the ledgered text`);
       assert.ok(String(res.policy.body).includes(NAME[lang]), `${role}/${lang}: «${NAME[lang]}» missing`);
-      assert.doesNotMatch(String(res.policy.body), /علاوة|premium/, `${role}/${lang}`);
+      assert.doesNotMatch(String(res.policy.body), /علاو[ةتا]|premium/, `${role}/${lang}`);
       fingerprint.push(res.policy.hash, res.policy.body);
     }
     for (const key of ['faq', 'membership', 'price_protection'] as const) {

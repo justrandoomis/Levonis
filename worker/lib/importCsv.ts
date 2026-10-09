@@ -568,7 +568,7 @@ export function labelRow(shape: TemplateShape): string[] {
     prime_price_iqd: 'سعر PRIME',
     pro_price_iqd: 'سعر PRO',
     cost_iqd: 'التكلفة (إداري — لا تُنشر)',
-    direct_surcharge_iqd: 'زيادة التوفر الفوري (للبيع المباشر)',
+    direct_surcharge_iqd: 'زيادة البيع المباشر',
     stock: 'المخزون',
     low_stock_threshold: 'حد التنبيه',
     capacity: 'سعة الطلب المسبق',

@@ -19,11 +19,13 @@
  * THE CUSTOMER'S TEXT IS NO LONGER OUT OF SCOPE (owner decision 7,
  * 2026-10-09; DECISIONS row 190). «علاوة» could be read as LEVO PREMIUM, so
  * it left the policies too (purchase 6, faq 5, membership 5,
- * price_protection 4), and the Arabic word is now banned in EVERY source file
- * under src/, worker/ and packages/ — code, labels, comments and policy
- * bodies alike. The English word stays allowed outside the engine files above
- * because LEVO PREMIUM is a real tier name; in the policy corpus a lowercase
- * "premium" is refused by tests/policyCorpus.test.ts instead.
+ * price_protection 4), and the Arabic word — in every form: «علاوة», the
+ * plural «علاوات», «علاوته» with a pronoun — is now banned in EVERY source
+ * file under src/, worker/, packages/ and services/ (the notification
+ * service's customer templates live there) — code, labels, comments and
+ * policy bodies alike. The English word stays allowed outside the engine
+ * files above because LEVO PREMIUM is a real tier name; in the policy corpus a
+ * lowercase "premium" is refused by tests/policyCorpus.test.ts instead.
  *
  * Run: node --import tsx --test tests/noPremiumWord.test.ts
  */
@@ -36,9 +38,15 @@ import { FINANCIAL_FIELDS } from '../worker/lib/adminScope';
 import { FINANCIAL_FIELDS as KIT_FIELDS } from '../packages/platform-kit/src/scope';
 import { PRICING_FIELD_LABELS } from '../packages/contracts/src/pricingFieldLabels';
 import { PRICING_UI_STRINGS } from '../src/components/adminPricing/strings';
+import { labelRow, templateShape } from '../worker/lib/importCsv';
 
-/** premium in any case, «علاوة» (with or without the article), and the Sorani spellings of the loanword. */
-const PREMIUM_WORD = /premium|علاوة|پریمیۆم|پرێمیۆم|پریمیەم/i;
+/**
+ * «علاوة» in every form the word takes: with or without the article, the
+ * plural «علاوات», and with a pronoun attached («علاوته», «علاوتها»).
+ */
+const ALAWA = /علاو[ةتا]/;
+/** premium in any case, «علاوة» in any form, and the Sorani spellings of the loanword. */
+const PREMIUM_WORD = new RegExp(`premium|${ALAWA.source}|پریمیۆم|پرێمیۆم|پریمیەم`, 'i');
 
 /** Files that MUST exist (a missing one would make the scan vacuous). */
 const REQUIRED_FILES = [
@@ -56,6 +64,7 @@ const LATER_DIRS = ['worker/lib/fx'];
 
 function walk(dir: string, out: string[]): string[] {
   for (const name of readdirSync(dir)) {
+    if (name === 'node_modules') continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p, out);
     else if (/\.(ts|tsx)$/.test(name)) out.push(p);
@@ -118,21 +127,22 @@ test('FINANCIAL_FIELDS keeps every old premium name beside its Direct Sale Extra
   }
 });
 
-/** Every .ts / .tsx file under src/, worker/ and packages/ (none of them holds a node_modules). */
+/** Every .ts / .tsx file under src/, worker/, packages/ and services/ (walk() never enters a node_modules). */
 function everySourceFile(): string[] {
   const files: string[] = [];
-  for (const d of ['src', 'worker', 'packages']) {
+  for (const d of ['src', 'worker', 'packages', 'services']) {
     assert.ok(existsSync(join(ROOT, d)), `${d} is gone: move the guard with it`);
     walk(join(ROOT, d), files);
   }
-  return files.filter((f) => !f.split(/[\\/]/).includes('node_modules'));
+  return files;
 }
 
 test('«علاوة» is in no source file at all — not in code, a label, a comment or a policy body (owner decision 7)', () => {
   const files = everySourceFile();
   assert.ok(files.length >= 1000, `only ${files.length} files scanned`);
-  // The scan must reach the policy corpus, the one place the word lived last.
-  for (const f of ['worker/lib/policies/purchase.ts', 'worker/lib/policies/membership.ts', 'worker/lib/policies/faq.ts', 'worker/lib/policies/price_protection.ts']) {
+  // The scan must reach the policy corpus, the one place the word lived last,
+  // and the notification service's customer templates.
+  for (const f of ['worker/lib/policies/purchase.ts', 'worker/lib/policies/membership.ts', 'worker/lib/policies/faq.ts', 'worker/lib/policies/price_protection.ts', 'services/notifications/src/templates.ts']) {
     assert.ok(files.includes(join(ROOT, f)), `${f} is not scanned`);
   }
   const hits: string[] = [];
@@ -140,7 +150,7 @@ test('«علاوة» is in no source file at all — not in code, a label, a com
     readFileSync(file, 'utf8')
       .split('\n')
       .forEach((line, i) => {
-        if (/علاوة/.test(line)) hits.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 160)}`);
+        if (ALAWA.test(line)) hits.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 160)}`);
       });
   }
   assert.deepEqual(hits, [], 'say «زيادة البيع المباشر» — the full term, never a bare «الزيادة»');
@@ -153,4 +163,17 @@ test('one name in three languages, the same on the contracts and on the owner sc
   // Real Sorani: its own word with Sorani-only letters, never the Arabic pasted across (DECISIONS row 183).
   assert.match(NAME.ckb, /[ێۆڕڵەڤ]/);
   assert.notEqual(NAME.ckb, NAME.ar);
+});
+
+test('the admin screens that set a product’s direct-sale fee call it by the same name — product form, quick price, CSV import sheet', () => {
+  const NAME = { ar: 'زيادة البيع المباشر', en: 'Direct Sale Extra' } as const;
+  // The import sheet's human label row (the parser reads the machine row, never this one).
+  const shape = templateShape('printer', ['printers'], { includeCost: true });
+  const at = shape.columns.indexOf('direct_surcharge_iqd');
+  assert.ok(at >= 0, 'the import sheet has no direct_surcharge_iqd column');
+  assert.equal(labelRow(shape)[at], NAME.ar);
+  // The two admin forms show ar + en side by side.
+  for (const f of ['src/components/adminProducts/form/OptionsSection.tsx', 'src/components/adminProducts/QuickPricePanel.tsx']) {
+    assert.match(readFileSync(join(ROOT, f), 'utf8'), new RegExp(`ar="${NAME.ar}" en="${NAME.en}"`), f);
+  }
 });

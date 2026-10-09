@@ -59,7 +59,10 @@ import type { PolicyDocument } from './types';
  * 4.10 and 6.3 now do: «زيادة البيع المباشر» / "Direct Sale Extra" (the
  * Sorani already read «زیادەی فرۆشتنی ڕاستەوخۆ»). The retired Arabic word and
  * the English "premium" are gone, so the answer cannot be read as the
- * LEVO PREMIUM membership. Wording only.
+ * LEVO PREMIUM membership. And 12.7 now says the price MAY carry it, in all
+ * three languages, as purchase 4.10 does: an active PRO pays none, and a
+ * product may have none set — the FAQ never states more than the rule it
+ * routes to. Wording only.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
@@ -273,7 +276,7 @@ PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا 
 لأن السلة الواحدة تحمل بائعاً واحداً: إما متجر Levonis الرسمي وإما تاجراً واحداً من المجتمع. ولكل بائع وسائل دفعه وتسليمه ومسؤوليته ومدده، وخلطهم في سلة واحدة يجعل الطلب الواحد محكوماً بقواعد متعارضة. والحل أن تُتمّ الطلب الأول ثم تبدأ سلة جديدة. المرجع: وثيقة الشراء، المادة 4.7، وسياسة مجتمع ليفو، المادة 7.3.
 
 ### 12.7 ما الفرق بين البيع المباشر والطلب المسبق؟
-البيع المباشر بضاعة موجودة فعلاً وجاهزة للشحن، وسعرها يحمل زيادة البيع المباشر. والطلب المسبق بضاعة تُجلب بعد طلبك، فسعر بضاعتها أقل وتُضاف إليه عمولة نقل، ومدته أطول بطبيعته. ولا يُحوَّل طلب مسبق إلى بيع مباشر بعد تثبيته. المرجع: وثيقة الشراء، المواد 4.1 و4.2 و4.8 و4.10.
+البيع المباشر بضاعة موجودة فعلاً وجاهزة للشحن، وقد يحمل سعرها زيادة البيع المباشر. والطلب المسبق بضاعة تُجلب بعد طلبك، فسعر بضاعتها أقل وتُضاف إليه عمولة نقل، ومدته أطول بطبيعته. ولا يُحوَّل طلب مسبق إلى بيع مباشر بعد تثبيته. المرجع: وثيقة الشراء، المواد 4.1 و4.2 و4.8 و4.10.
 
 ### 12.8 لماذا يستغرق الشحن البحري كل هذه المدة؟
 لأن المسار البحري نفسه طويل: حجز الحاوية، ثم الإبحار، ثم التفريغ في الميناء، ثم التخليص الكمركي، ثم النقل البري إلى المخزن، ثم التوزيع. وكل محطة من هذه المحطات لها طابورها ولا يملك المتجر تقصيره. ولهذا يُعرض المسار الجوي والبري والبحري بمدد مختلفة وأسعار مختلفة، وتبقى المدد كلها تقديرية لا وعداً. المرجع: وثيقة التوصيل، المادتان 3.8 و3.9، ووثيقة الشراء، المادتان 4.3 و4.4.
@@ -496,7 +499,7 @@ Because in that path the seller is an independent merchant and not the Store, an
 Because one cart carries one seller: either the official Levonis store or one community merchant. Each seller has their own means of payment and delivery, their own liability and their own periods, and mixing them in one cart makes a single order subject to conflicting rules. The remedy is to complete the first order and then begin a new cart. Reference: the Purchase document, article 4.7, and the Levo Community Policy, article 7.3.
 
 ### 12.7 What is the difference between a direct sale and a pre-order?
-A direct sale is goods that actually exist and are ready to ship, and its price carries the Direct Sale Extra. A pre-order is goods brought in after your order, so the price of the goods is lower and a transport commission is added to it, and its period is by nature longer. A pre-order is not converted into a direct sale after it is committed. Reference: the Purchase document, articles 4.1, 4.2, 4.8 and 4.10.
+A direct sale is goods that actually exist and are ready to ship, and its price may carry the Direct Sale Extra. A pre-order is goods brought in after your order, so the price of the goods is lower and a transport commission is added to it, and its period is by nature longer. A pre-order is not converted into a direct sale after it is committed. Reference: the Purchase document, articles 4.1, 4.2, 4.8 and 4.10.
 
 ### 12.8 Why does sea freight take all that time?
 Because the sea route itself is long: booking the container, then the voyage, then unloading at the port, then customs clearance, then land transport to the warehouse, then distribution. Each of these stages has its own queue, which the Store cannot shorten. That is why the air, land and sea routes are offered with different periods and different prices, and why all the periods remain estimates and not a promise. Reference: the Delivery document, articles 3.8 and 3.9, and the Purchase document, articles 4.3 and 4.4.
@@ -719,7 +722,7 @@ PRO بە شێوەیەکی کاتی ڕاگیراوە — بەم زووانە، س
 چونکە یەک سەبەتە یەک فرۆشیار هەڵدەگرێت: یان فرۆشگای فەرمی Levonis یان یەک بازرگانی کۆمەڵگە. هەر فرۆشیارێک ڕێگاکانی پارەدان و گەیاندنی خۆی و بەرپرسیارێتی و ماوەکانی خۆی هەیە، و تێکەڵکردنیان لە یەک سەبەتەدا یەک داواکاری دەخاتە ژێر یاسای دژبەیەک. چارەسەرەکە ئەوەیە داواکاری یەکەم تەواو بکەیت و پاشان سەبەتەیەکی نوێ دەست پێ بکەیت. سەرچاوە: بەڵگەنامەی کڕین، ماددەی 4.7، و سیاسەتی کۆمەڵگەی لێڤۆ، ماددەی 7.3.
 
 ### 12.7 جیاوازی نێوان فرۆشتنی ڕاستەوخۆ و داواکاری پێشوەختە چییە؟
-فرۆشتنی ڕاستەوخۆ کاڵایەکە کە بەڕاستی هەیە و ئامادەیە بۆ ناردن، و نرخەکەی زیادەی فرۆشتنی ڕاستەوخۆ هەڵدەگرێت. داواکاری پێشوەختە کاڵایەکە کە دوای داواکارییەکەت دەهێنرێت، بۆیە نرخی کاڵاکەی کەمترە و کۆمیسیۆنی گواستنەوەی بۆ زیاد دەکرێت، و ماوەکەی بە سروشتی خۆی درێژترە. داواکاری پێشوەختە دوای جێگیرکردنی نابێتە فرۆشتنی ڕاستەوخۆ. سەرچاوە: بەڵگەنامەی کڕین، ماددەکانی 4.1 و 4.2 و 4.8 و 4.10.
+فرۆشتنی ڕاستەوخۆ کاڵایەکە کە بەڕاستی هەیە و ئامادەیە بۆ ناردن، و لەوانەیە نرخەکەی زیادەی فرۆشتنی ڕاستەوخۆ هەڵبگرێت. داواکاری پێشوەختە کاڵایەکە کە دوای داواکارییەکەت دەهێنرێت، بۆیە نرخی کاڵاکەی کەمترە و کۆمیسیۆنی گواستنەوەی بۆ زیاد دەکرێت، و ماوەکەی بە سروشتی خۆی درێژترە. داواکاری پێشوەختە دوای جێگیرکردنی نابێتە فرۆشتنی ڕاستەوخۆ. سەرچاوە: بەڵگەنامەی کڕین، ماددەکانی 4.1 و 4.2 و 4.8 و 4.10.
 
 ### 12.8 بۆچی ناردنی دەریایی هەموو ئەو ماوەیە دەخایەنێت؟
 چونکە خودی ڕێگای دەریایی درێژە: گرتنی کۆنتەینەرەکە، پاشان دەریاوانی، پاشان بارکردنەوە لە بەندەر، پاشان دەرکردنی گومرگی، پاشان گواستنەوەی وشکانی بۆ کۆگا، پاشان دابەشکردن. هەر قۆناغێک لەمانە ڕیزی خۆی هەیە کە فرۆشگا ناتوانێت کورتی بکاتەوە. بۆیە ڕێگای ئاسمانی و وشکانی و دەریایی بە ماوەی جیاواز و نرخی جیاواز پێشکەش دەکرێن، و هەموو ماوەکان خەمڵاندنن نەک بەڵێن. سەرچاوە: بەڵگەنامەی گەیاندن، ماددەکانی 3.8 و 3.9، و بەڵگەنامەی کڕین، ماددەکانی 4.3 و 4.4.

@@ -700,7 +700,7 @@ test('no policy says «علاوة», a lowercase "premium" or the Sorani loanwor
     for (const doc of corpus) {
       for (const lang of POLICY_LANGS) {
         for (const [part, text] of [['title', doc.title[lang]], ['body', doc.body[lang]]] as const) {
-          assert.doesNotMatch(text, /علاوة/, `${label} ${doc.key}/${lang} ${part}: «علاوة»`);
+          assert.doesNotMatch(text, /علاو[ةتا]/, `${label} ${doc.key}/${lang} ${part}: «علاوة» (or «علاوات», «علاوته»)`);
           assert.doesNotMatch(text, /premium/, `${label} ${doc.key}/${lang} ${part}: a lowercase "premium"`);
           assert.doesNotMatch(text, /پریمیۆم|پرێمیۆم|پریمیەم/, `${label} ${doc.key}/${lang} ${part}: the Sorani loanword`);
         }
@@ -740,4 +740,31 @@ test('every article that names what a direct sale adds names it «زيادة ا�
   // Real Sorani: its own words, never the Arabic pasted across (row 183).
   assert.notEqual(articleOf(purchase.body.ckb, '6.3'), articleOf(purchase.body.ar, '6.3'));
   assert.match(DIRECT_SALE_EXTRA.ckb, /[ێۆڕەڤ]/);
+});
+
+/**
+ * …AND NO ARTICLE SAYS EVERY DIRECT SALE CARRIES IT. The engine charges no
+ * Direct Sale Extra to an active PRO (`packages/pricing/src/pricing.ts`), and
+ * a product may have none set; purchase 4.10 and 6.3 say a direct-sale price
+ * MAY carry it. faq 12.7 routes to 4.10, so it says the same — an FAQ that
+ * states more than the rule it points to is the looser text a claim is argued
+ * on (faq 1.2, 1.3). Review finding (WP-POL, 2026-10-09).
+ */
+test('a direct-sale price MAY carry the Direct Sale Extra — purchase 4.10, 6.3 and faq 12.7 say so, and no policy says it always does', () => {
+  const MAY: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: new RegExp(`قد يحمل[^.]*${DIRECT_SALE_EXTRA.ar}`),
+    en: new RegExp(`may carry the ${DIRECT_SALE_EXTRA.en}`),
+    ckb: new RegExp(`لەوانەیە[^.]*${DIRECT_SALE_EXTRA.ckb} هەڵبگرێت`),
+  };
+  const ALWAYS: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: new RegExp(`(?<!قد )يحمل ${DIRECT_SALE_EXTRA.ar}`),
+    en: new RegExp(`carries the ${DIRECT_SALE_EXTRA.en}`),
+    ckb: new RegExp(`${DIRECT_SALE_EXTRA.ckb} هەڵدەگرێت`),
+  };
+  for (const [key, num] of [['purchase', '4.10'], ['purchase', '6.3'], ['faq', '12.7']] as const) {
+    for (const lang of POLICY_LANGS) assert.match(articleOf(published(key).body[lang], num), MAY[lang], `${key} ${num}/${lang}`);
+  }
+  for (const doc of POLICY_DOCUMENTS) {
+    for (const lang of POLICY_LANGS) assert.doesNotMatch(doc.body[lang], ALWAYS[lang], `${doc.key}/${lang}: says every direct sale carries it`);
+  }
 });
