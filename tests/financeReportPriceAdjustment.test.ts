@@ -114,7 +114,10 @@ test('pre-0095 schema still answers without probing a nonexistent accepted-price
   const db = seed('0094'); order(db, { legacy: true, points: 20, shipping: 10 }); item(db, 'a', 'p1', 100, { legacy: true });
   const r = await reports(db);
   assert.equal(r.summary.totals.revenue_iqd, 100);
-  assert.equal(r.summary.totals.net_profit_iqd, 90);
+  // P-A F1: with no cost-at-sale column the line's cost is today's catalogue —
+  // an estimate — so its 100 stays out of gross and net: 0 + 10 − 20.
+  assert.equal(r.summary.totals.net_profit_iqd, -10);
+  assert.equal(r.summary.totals.estimated_revenue_iqd, 100);
   assert.equal(r.summary.meta.cost_snapshot_available, false);
   db.close();
 });

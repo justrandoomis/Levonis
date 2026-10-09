@@ -242,7 +242,12 @@
  *                `estimated_lines`, `estimated_units` and `estimated_cogs_iqd`,
  *                with `estimated: true` on the bucket. A dashboard that mixes
  *                measured and estimated profit without saying so is the one
- *                defect this flag exists to prevent. An 'unrecorded' row whose
+ *                defect this flag exists to prevent — and since P-A (F1,
+ *                owner brief 2026-10-09) the estimate is not mixed at all: its
+ *                revenue and cost leave gross and net profit and are reported
+ *                apart (`estimated_revenue_iqd`, `estimated_cogs_iqd`,
+ *                `estimated_profit_iqd`), because profit is computed from the
+ *                values recorded at the time of sale only. An 'unrecorded' row whose
  *                product has no cost either — or whose product was deleted — is
  *                UNKNOWN, not zero. Zero cost means 100% margin, which would be
  *                a lie told confidently.
@@ -519,6 +524,8 @@ export interface SaleFact {
   estimated_lines: number;
   estimated_units: number;
   estimated_cogs_iqd: number;
+  /** F1: the revenue of the estimated lines, kept out of `costed_revenue_iqd`. */
+  estimated_revenue_iqd: number;
   /** Lines whose COGS came from the lots the sale ate, not from a snapshot. */
   fifo_lines: number;
   /** The part of `cogs_iqd` those lines account for. */
@@ -554,6 +561,8 @@ export interface RefundFact {
   estimated_lines: number;
   estimated_units: number;
   estimated_cogs_iqd: number;
+  /** F1: the revenue of the estimated lines, kept out of `costed_revenue_iqd`. */
+  estimated_revenue_iqd: number;
   /** Lines whose COGS came from the lots the sale ate, not from a snapshot. */
   fifo_lines: number;
   /** The part of `cogs_iqd` those lines account for. */
@@ -602,6 +611,7 @@ export const saleFactOf = (r: Record<string, unknown>): SaleFact => ({
   estimated_lines: num(r.estimated_lines),
   estimated_units: num(r.estimated_units),
   estimated_cogs_iqd: num(r.estimated_cogs_iqd),
+  estimated_revenue_iqd: num(r.estimated_revenue_iqd),
   fifo_lines: num(r.fifo_lines),
   fifo_cogs_iqd: num(r.fifo_cogs_iqd),
 });
@@ -619,6 +629,7 @@ export const refundFactOf = (r: Record<string, unknown>): RefundFact => ({
   estimated_lines: num(r.estimated_lines),
   estimated_units: num(r.estimated_units),
   estimated_cogs_iqd: num(r.estimated_cogs_iqd),
+  estimated_revenue_iqd: num(r.estimated_revenue_iqd),
   fifo_lines: num(r.fifo_lines),
   fifo_cogs_iqd: num(r.fifo_cogs_iqd),
 });
@@ -1173,16 +1184,30 @@ const COGS_L = lineCogs('l');
  *  Written against the COGS expression itself so the "is it costed" test and
  *  the number can never come apart. */
 const UNCOSTED_L = `(${COGS_L}) IS NULL`;
+/**
+ * AN ESTIMATE IS NOT A PROFIT (owner brief 2026-10-09, «التكلفة الفعلية»; P-A
+ * fix F1). A line whose cost could only be priced from TODAY's catalogue
+ * (`cost_confidence = 'estimated'`: a pre-0095 row, or a bundle whose pieces
+ * are) re-derives last month's cost from today's figure. It used to sit inside
+ * `costed_revenue_iqd` and `cogs_iqd`, so gross and net profit moved when a
+ * supplier price changed. It now leaves BOTH sides of the margin and is
+ * reported apart — `estimated_revenue_iqd` beside the long-standing
+ * `estimated_cogs_iqd` — under «تقدير بتكلفة اليوم — ليس ربحاً فعلياً». So
+ * `costed + uncosted + estimated revenue = revenue`. Read only: no row is
+ * written, and a recorded snapshot or FIFO cost is never touched.
+ */
+const ESTIMATED_L = `l.cost_confidence = 'estimated'`;
 
 const LINE_AGGREGATES = `
        COUNT(DISTINCT l.order_id) AS orders,
        COUNT(*) AS lines,
        SUM(CASE WHEN l.is_parent THEN 0 ELSE l.qty END) AS units,
        SUM(l.net_iqd) AS revenue_iqd,
-       SUM(CASE WHEN ${UNCOSTED_L} THEN 0 ELSE l.net_iqd END) AS costed_revenue_iqd,
+       SUM(CASE WHEN ${UNCOSTED_L} OR ${ESTIMATED_L} THEN 0 ELSE l.net_iqd END) AS costed_revenue_iqd,
        SUM(CASE WHEN ${UNCOSTED_L} THEN l.net_iqd ELSE 0 END) AS uncosted_revenue_iqd,
-       SUM(COALESCE(${COGS_L}, 0)) AS cogs_iqd,
-       SUM(CASE WHEN ${UNCOSTED_L} OR l.is_parent THEN 0 ELSE l.qty END) AS costed_units,
+       SUM(CASE WHEN ${ESTIMATED_L} AND NOT ${UNCOSTED_L} THEN l.net_iqd ELSE 0 END) AS estimated_revenue_iqd,
+       SUM(CASE WHEN ${ESTIMATED_L} THEN 0 ELSE COALESCE(${COGS_L}, 0) END) AS cogs_iqd,
+       SUM(CASE WHEN ${UNCOSTED_L} OR ${ESTIMATED_L} OR l.is_parent THEN 0 ELSE l.qty END) AS costed_units,
        SUM(CASE WHEN ${UNCOSTED_L} THEN l.qty ELSE 0 END) AS uncosted_units,
        SUM(CASE WHEN ${UNCOSTED_L} THEN 1 ELSE 0 END) AS uncosted_lines,
        SUM(CASE WHEN l.cost_confidence = 'estimated' THEN 1 ELSE 0 END) AS estimated_lines,
@@ -1295,15 +1320,19 @@ const REFUND_COGS = `CASE
 const UNCOSTED_R = `(${REFUND_COGS}) IS NULL`;
 
 const REFUND_REVENUE = `CASE WHEN r.operational=1 THEN r.actual_refund_iqd ELSE r.net_iqd * r.ref_qty / r.line_qty END`;
+/** F1 again: a refund of an estimated line reverses the ESTIMATE, never the measured margin. */
+const ESTIMATED_R = `r.cost_confidence = 'estimated'`;
 const REFUND_AGGREGATES = `
          COUNT(*) AS cases,
          SUM(r.ref_qty) AS units,
          SUM((${REFUND_REVENUE})) AS revenue_iqd,
-         SUM(CASE WHEN ${UNCOSTED_R} THEN 0
+         SUM(CASE WHEN ${UNCOSTED_R} OR ${ESTIMATED_R} THEN 0
                   ELSE (${REFUND_REVENUE}) END) AS costed_revenue_iqd,
-         SUM(COALESCE(${REFUND_COGS}, 0)) AS cogs_iqd,
+         SUM(CASE WHEN ${ESTIMATED_R} THEN 0 ELSE COALESCE(${REFUND_COGS}, 0) END) AS cogs_iqd,
          SUM(CASE WHEN ${UNCOSTED_R}
                   THEN (${REFUND_REVENUE}) ELSE 0 END) AS uncosted_revenue_iqd,
+         SUM(CASE WHEN ${ESTIMATED_R} AND NOT ${UNCOSTED_R}
+                  THEN (${REFUND_REVENUE}) ELSE 0 END) AS estimated_revenue_iqd,
          SUM(CASE WHEN ${UNCOSTED_R} THEN r.ref_qty ELSE 0 END) AS uncosted_units,
          SUM(CASE WHEN ${UNCOSTED_R} AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS uncosted_lines,
          SUM(CASE WHEN r.cost_confidence = 'estimated' AND r.ref_qty >= r.line_qty THEN 1 ELSE 0 END) AS estimated_lines,
@@ -1526,7 +1555,7 @@ export interface Totals {
   refunded_revenue_iqd: number;
   /** `gross_revenue − refunded_revenue`. The headline «المبيعات». */
   revenue_iqd: number;
-  /** The part of `revenue_iqd` whose cost is known, measured or estimated. */
+  /** The part of `revenue_iqd` whose cost was RECORDED (snapshot or FIFO); estimates are apart (F1). */
   costed_revenue_iqd: number;
   /** The part whose cost is UNKNOWN and which the margin does not speak for. */
   uncosted_revenue_iqd: number;
@@ -1568,7 +1597,12 @@ export interface Totals {
   estimated: boolean;
   estimated_lines: number;
   estimated_units: number;
+  /** F1: today's-catalogue cost of those lines — NOT part of `cogs_iqd`. */
   estimated_cogs_iqd: number;
+  /** F1: their revenue — NOT part of `costed_revenue_iqd`, so not in gross or net. */
+  estimated_revenue_iqd: number;
+  /** F1: `estimated_revenue − estimated_cogs`, «تقدير بتكلفة اليوم — ليس ربحاً فعلياً». */
+  estimated_profit_iqd: number;
   /** Lines and units whose cost is unknown, excluded from the margin base. */
   uncosted_lines: number;
   uncosted_units: number;
@@ -1614,6 +1648,8 @@ const zeroTotals = (): Totals => ({
   estimated_lines: 0,
   estimated_units: 0,
   estimated_cogs_iqd: 0,
+  estimated_revenue_iqd: 0,
+  estimated_profit_iqd: 0,
   uncosted_lines: 0,
   uncosted_units: 0,
   fifo_lines: 0,
@@ -1675,6 +1711,8 @@ function seal(t: Totals): Totals {
   t.estimated_lines = Math.max(0, t.estimated_lines);
   t.estimated_units = Math.max(0, t.estimated_units);
   t.estimated_cogs_iqd = Math.max(0, t.estimated_cogs_iqd);
+  // Money, so not floored: `costed + uncosted + estimated revenue = revenue` must hold.
+  t.estimated_profit_iqd = t.estimated_revenue_iqd - t.estimated_cogs_iqd;
   t.fifo_lines = Math.max(0, t.fifo_lines);
   t.fifo_cogs_iqd = Math.max(0, t.fifo_cogs_iqd);
   t.estimated = t.estimated_lines > 0;
@@ -1692,6 +1730,7 @@ function addSale(t: Totals, f: SaleFact): void {
   t.estimated_lines += f.estimated_lines;
   t.estimated_units += f.estimated_units;
   t.estimated_cogs_iqd += f.estimated_cogs_iqd;
+  t.estimated_revenue_iqd += f.estimated_revenue_iqd;
   t.uncosted_lines += f.uncosted_lines;
   t.uncosted_units += f.uncosted_units;
   t.fifo_lines += f.fifo_lines;
@@ -1722,6 +1761,7 @@ function addRefund(t: Totals, f: RefundFact): void {
   t.estimated_lines -= f.estimated_lines;
   t.estimated_units -= f.estimated_units;
   t.estimated_cogs_iqd -= f.estimated_cogs_iqd;
+  t.estimated_revenue_iqd -= f.estimated_revenue_iqd;
   t.fifo_lines -= f.fifo_lines;
   t.fifo_cogs_iqd -= f.fifo_cogs_iqd;
 }

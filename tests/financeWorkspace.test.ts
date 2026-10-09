@@ -118,18 +118,18 @@ test('order-wide reduction never creates negative costs on a zero-cost line',asy
 });
 test('100 USD monthly owner promotion uses every sold unit, preserves entitlement basis and excludes duplicate overhead',async()=>{
   const {raw,db,add,app}=setup();add('other',1);
-  const operation=crypto.randomUUID(),created=await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',operation_id:operation});assert.equal(created.status,200,JSON.stringify(await json(created)));
-  assert.equal((await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',operation_id:operation})).status,200);
+  const operation=crypto.randomUUID(),created=await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400,operation_id:operation});assert.equal(created.status,200,JSON.stringify(await json(created)));
+  assert.equal((await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400,operation_id:operation})).status,200);
   assert.equal(count(raw,'SELECT COUNT(*) n FROM finance_monthly_promotions'),1);assert.equal(balance(raw,'1000'),-140000);
   const all=await monthlyPromotionShares(db,month());assert.equal(all.total_iqd,140000);assert.equal([...all.shares.values()].reduce((a,b)=>a+b,0),140000);
   const filtered=await json(await get(app,`/f/orders?${period()}&q=order`));assert.equal(filtered.orders.length,1);assert.equal(filtered.orders[0].promotion_iqd,all.shares.get('order:item'));
   const profit=await json(await get(app,'/f/orders/order'));assert.equal(profit.totals.profit_basis_iqd,35000);assert.equal(profit.totals.owner_net_iqd,35000-n(all.shares.get('order:item')));
   const summary=await json(await get(app,`/f/summary?${period()}`));assert.equal(summary.totals.promotion_iqd,140000);assert.equal(summary.totals.general_expenses_iqd,0);
-  assert.equal((await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD'})).status,409);
+  assert.equal((await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400})).status,409);
 });
 const n=(v:unknown)=>Number(v??0);
 test('monthly revision reverses its source once, blocks ordinary expense tampering and closed-period edits',async()=>{
-  const {raw,app}=setup();const create=await json(await post(app,'/f/promotions',{month:month(),currency:'USD',amount:100})),id=create.id;
+  const {raw,app}=setup();const create=await json(await post(app,'/f/promotions',{month:month(),currency:'USD',amount:100,exchange_rate:1400})),id=create.id;
   const changed=await patch(app,`/f/promotions/${id}`,{amount:120});assert.equal(changed.status,200,JSON.stringify(await json(changed)));assert.equal(balance(raw,'1000'),-168000);
   assert.equal(count(raw,'SELECT COUNT(*) n FROM finance_promotion_history'),2);
   assert.throws(()=>raw.exec('UPDATE operating_expenses SET amount_iqd=1'),/promotion source/);
@@ -139,7 +139,7 @@ test('monthly revision reverses its source once, blocks ordinary expense tamperi
 });
 test('a month with no sales still deducts unallocated promotion and rent exactly once from period owner result',async()=>{
   const {raw,app}=setup();raw.exec("UPDATE orders SET status='confirmed',delivered_at=NULL");
-  await post(app,'/f/promotions',{month:month(),currency:'USD',amount:100});raw.prepare("INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent-1','rent',20000,?,'Rent','admin')").run(`${month()}-01`);
+  await post(app,'/f/promotions',{month:month(),currency:'USD',amount:100,exchange_rate:1400});raw.prepare("INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent-1','rent',20000,?,'Rent','admin')").run(`${month()}-01`);
   const result=await json(await get(app,`/f/summary?${period()}`));assert.equal(result.totals.orders_count,0);assert.equal(result.totals.unallocated_promotion_iqd,140000);assert.equal(result.totals.general_expenses_iqd,20000);assert.equal(result.totals.owner_period_net_iqd,-160000);
 });
 test('late FIFO cost shares enter central goods cost once, including allocation-level source evidence',async()=>{

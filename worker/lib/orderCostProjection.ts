@@ -23,9 +23,19 @@ const money = (value: unknown): number | null => typeof value === 'number' && Nu
 export const hasOrderFinancialActivity = (base: OrderProfitBase) => !!base.order.delivered_at || base.costs.length > 0 || Number(base.totals.collected_iqd ?? 0) > 0 || base.lines.some(line => line.allocations.length > 0 || line.returned_qty > 0);
 
 /** Batched read-only catalogue/lot evidence for report previews. None of these
- * fields feeds getOrderProfitBase, posting, staff wages or investor accrual. */
+ * fields feeds getOrderProfitBase, posting, staff wages or investor accrual.
+ *
+ * A SALE THAT HAPPENED IS NEVER RE-COSTED FROM TODAY (owner brief 2026-10-09,
+ * «التكلفة الفعلية»; P-A fix F2). A delivered, returned, refunded or cancelled
+ * order gets no current-catalogue cost and no current-stock cost, not even as
+ * a "suggestion to confirm": both re-derive a past sale's cost from values
+ * that did not exist when it was sold. Its only suggestion is the cost
+ * RECORDED on the order line at the time of sale (orderProfitReview,
+ * `order_snapshot`); with none, the order sheet offers manual entry of the
+ * actual cost only («لا توجد تكلفة مسجلة وقت البيع…»). An order still in
+ * flight keeps its forecast, labelled a forecast, as before. */
 export async function enrichOrderCostProjections(db: D1Database, bases: OrderProfitBase[], historicalSuggestions = false) {
-  const candidates = bases.flatMap(base => (historicalSuggestions || !terminal.has(String(base.order.status))) ? base.lines.filter(line => !isConfirmedOrderCost(line.cost_confidence) && !line.allocations.length && line.product_id).map(line => ({ base, line })) : []);
+  const candidates = bases.flatMap(base => !terminal.has(String(base.order.status)) ? base.lines.filter(line => !isConfirmedOrderCost(line.cost_confidence) && !line.allocations.length && line.product_id).map(line => ({ base, line })) : []);
   const productIds = [...new Set(candidates.map(({ line }) => line.product_id!))];
   const suggestions = new Map<string, OrderCostProjection>();
   if (productIds.length) {
@@ -84,8 +94,9 @@ export async function enrichOrderCostProjections(db: D1Database, bases: OrderPro
       const suggestion = suggestions.get(line.id);
       if (projecting && suggestion) line.cost_projection = suggestion;
       // Historical suggestions always require an explicit per-order action;
-      // an unknown/incomplete FIFO allocation is never replaced by a guess.
-      if (historicalSuggestions && !line.cost_review?.suggestion && suggestion?.total_cost_iqd !== null && suggestion?.total_cost_iqd !== undefined && suggestion.unit_cost_iqd !== null && line.cost_review) {
+      // an unknown/incomplete FIFO allocation is never replaced by a guess,
+      // and a terminal order never reaches here (F2: no candidate above).
+      if (historicalSuggestions && projecting && !line.cost_review?.suggestion && suggestion?.total_cost_iqd !== null && suggestion?.total_cost_iqd !== undefined && suggestion.unit_cost_iqd !== null && line.cost_review) {
         line.cost_review.suggestion = { source: suggestion.source, unit_cost_iqd: suggestion.unit_cost_iqd, total_cost_iqd: suggestion.total_cost_iqd, as_of: suggestion.as_of, requires_confirmation: true };
       }
     }

@@ -529,6 +529,14 @@ export const COST_REFUSALS = {
     en: 'This input already exists; it is edited, never replaced',
     ckb: 'ئەم داخڵکردنە هەیە؛ دەستکاری دەکرێت، نەک جێگۆڕکێ',
   },
+  // ---- P-A (owner brief 2026-10-09, "Accounting Currency"): accounting stays
+  // ---- in the dinars actually paid. A promotion in another currency names the
+  // ---- rate it was paid at; the wallet's rate never fills the gap (fix F3).
+  PROMOTION_RATE_REQUIRED: {
+    ar: 'أدخل سعر التحويل الذي دفعته فعلًا لهذا الترويج',
+    en: 'Enter the exchange rate you actually paid for this promotion',
+    ckb: 'ئەو نرخی گۆڕینەوەیە بنووسە کە بەڕاستی بۆ ئەم بانگەشەیە داتە',
+  },
   BATCH_COST_IMMUTABLE: {
     ar: 'تكلفة الدفعة ثابتة ولا تتغير',
     en: 'A batch cost is fixed and never changes',

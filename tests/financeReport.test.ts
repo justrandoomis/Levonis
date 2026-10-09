@@ -364,12 +364,17 @@ test('March carries the midnight order, the estimate, the unknown cost and the r
   assert.equal(t.uncosted_revenue_iqd, 50_000);
   assert.equal(t.uncosted_units, 2);
   assert.equal(t.uncosted_lines, 1);
-  // 30,000 + 540,000 − 500,000 refunded
-  assert.equal(t.costed_revenue_iqd, 70_000);
-  // 12,000 estimated + 310,000 measured − 290,000 refunded
-  assert.equal(t.cogs_iqd, 32_000);
-  assert.equal(t.gross_profit_iqd, 38_000);
-  assert.equal(t.gross_margin_percent, 54.29);
+  // 540,000 − 500,000 refunded. O2's 30,000 is NOT here (P-A F1): its cost
+  // was never recorded, so it is an estimate and stays out of the margin.
+  assert.equal(t.costed_revenue_iqd, 40_000);
+  // 310,000 measured − 290,000 refunded; today's-catalogue 12,000 is apart.
+  assert.equal(t.cogs_iqd, 20_000);
+  assert.equal(t.gross_profit_iqd, 20_000);
+  assert.equal(t.gross_margin_percent, 50);
+  // F1: the estimate on its own line, «تقدير بتكلفة اليوم — ليس ربحاً فعلياً».
+  assert.equal(t.estimated_revenue_iqd, 30_000);
+  assert.equal(t.estimated_profit_iqd, 18_000);
+  assert.equal(t.costed_revenue_iqd + t.uncosted_revenue_iqd + t.estimated_revenue_iqd, t.revenue_iqd);
 
   // The estimate flag survived aggregation, with its counts.
   assert.equal(t.estimated, true);
@@ -386,8 +391,8 @@ test('March carries the midnight order, the estimate, the unknown cost and the r
   // The voided expense row is excluded: 100,000 + 250,000, not 1,250,000.
   assert.equal(t.operating_expenses_iqd, 350_000);
   assert.equal(t.expense_entries, 2);
-  // 38,000 + 13,000 + 6,000 − 20,000 − 15,000 − 350,000
-  assert.equal(t.net_profit_iqd, -328_000);
+  // 20,000 + 13,000 + 6,000 − 20,000 − 15,000 − 350,000 (the estimate is not in it)
+  assert.equal(t.net_profit_iqd, -346_000);
 
   // Where the money went, by the owner's own categories, in three languages.
   const cats = new Map<string, { amount_iqd: number; name_ar: string; name_ckb: string }>(
@@ -532,9 +537,9 @@ test('month buckets and the equal-length comparison', async () => {
   assert.equal(r.previous.totals.gross_profit_iqd, 210_000);
 
   assert.equal(r.change.revenue_iqd, 120_000 - 500_000);
-  assert.equal(r.change.gross_profit_iqd, 38_000 - 210_000);
-  // (38,000 − 210,000) / 210,000 = −81.9047…%
-  assert.equal(r.change.gross_profit_percent, -81.9);
+  assert.equal(r.change.gross_profit_iqd, 20_000 - 210_000);
+  // (20,000 − 210,000) / 210,000 = −90.476…% (P-A F1: March's estimate is out)
+  assert.equal(r.change.gross_profit_percent, -90.48);
   assert.equal(r.change.orders, 1);
 });
 
@@ -564,7 +569,11 @@ test('the product breakdown adds up to the period, and carries no net profit', a
   assert.equal(by.get('p_printer')?.cogs_iqd, 20_000); // 310,000 − 290,000
   assert.equal(by.get('p_printer')?.gross_profit_iqd, 20_000);
   assert.equal(by.get('p_filament')?.revenue_iqd, 30_000);
-  assert.equal(by.get('p_filament')?.gross_profit_iqd, 18_000);
+  // P-A F1: its only sale is an estimate, so no measured profit — the 18,000
+  // is reported apart, never as gross profit.
+  assert.equal(by.get('p_filament')?.gross_profit_iqd, 0);
+  assert.equal(by.get('p_filament')?.estimated_revenue_iqd, 30_000);
+  assert.equal(by.get('p_filament')?.estimated_profit_iqd, 18_000);
   assert.equal(by.get('p_filament')?.estimated, true);
   // The 'unpriced' product: real revenue, no margin, and it says why.
   assert.equal(by.get('p_nocost')?.revenue_iqd, 50_000);
@@ -595,7 +604,7 @@ test('the category breakdown keeps unfiled revenue instead of dropping it', asyn
     (r.categories as Array<{ id: string | null; totals: Record<string, number> }>).map((x) => [x.id, x.totals])
   );
   assert.equal(by.get('cat_main')?.revenue_iqd, 70_000); // printer 40,000 + filament 30,000
-  assert.equal(by.get('cat_main')?.gross_profit_iqd, 38_000);
+  assert.equal(by.get('cat_main')?.gross_profit_iqd, 20_000); // the filament estimate is apart (P-A F1)
   // The product in no catalogue is its own row, not a missing one.
   assert.equal(by.get(null)?.revenue_iqd, 50_000);
   const total = [...by.values()].reduce((n, t) => n + t.revenue_iqd, 0);
@@ -639,7 +648,7 @@ test('the owner is financial even when the row says assistant', async () => {
   const a = appFor(raw, { ...OWNER, admin_scope: 'assistant' });
   const res = await get(a, '/api/admin/finance/report/summary?from=2026-03-01&to=2026-03-31&granularity=range');
   assert.equal(res.status, 200);
-  assert.equal((await json(res)).totals.gross_profit_iqd, 38_000);
+  assert.equal((await json(res)).totals.gross_profit_iqd, 20_000);
 });
 
 test('a merchant subdomain does not know these endpoints exist', async () => {
@@ -677,15 +686,19 @@ test('a deployment ahead of migration 0095 answers honestly instead of failing',
   assert.equal(r.meta.cost_snapshot_available, false);
   assert.equal(r.meta.operating_expenses_available, false);
   // The cost still resolves — from TODAY's catalogue — and is flagged as the
-  // estimate it is, rather than being reported as a measured profit.
-  assert.equal(r.totals.cogs_iqd, 60_000);
-  assert.equal(r.totals.gross_profit_iqd, 40_000);
+  // estimate it is: since P-A F1 it is reported APART and never as a measured
+  // profit, so gross and net carry none of it.
+  assert.equal(r.totals.cogs_iqd, 0);
+  assert.equal(r.totals.gross_profit_iqd, 0);
   assert.equal(r.totals.estimated, true);
   assert.equal(r.totals.estimated_lines, 1);
+  assert.equal(r.totals.estimated_cogs_iqd, 60_000);
+  assert.equal(r.totals.estimated_revenue_iqd, 100_000);
+  assert.equal(r.totals.estimated_profit_iqd, 40_000);
   // No ledger means no expenses — and `operating_expenses_available: false` is
   // what stops that zero being read as «ما صرفنا شي».
   assert.equal(r.totals.operating_expenses_iqd, 0);
-  assert.equal(r.totals.net_profit_iqd, 40_000);
+  assert.equal(r.totals.net_profit_iqd, 0);
   assert.deepEqual(r.expense_categories, []);
 });
 
@@ -729,7 +742,7 @@ test('mounted under track A\'s ledger prefix, both routers still answer', async 
 
   const report = await get(a, '/api/admin/finance/report/summary?from=2026-03-01&to=2026-03-31&granularity=range');
   assert.equal(report.status, 200);
-  assert.equal((await json(report)).totals.gross_profit_iqd, 38_000);
+  assert.equal((await json(report)).totals.gross_profit_iqd, 20_000);
 
   // And track A's own ledger is untouched by the neighbour.
   const ledger = await get(a, '/api/admin/finance/expenses?from=2026-03-01&to=2026-03-31');
@@ -890,10 +903,15 @@ test('a bundle sold before 0095 is still a bundle: its goods are charged once, a
   // which is what a parent that is not recognised as a parent adds on top. A
   // month that reads −1,107,999 instead of −108,000 is a month that tells the
   // owner to stop selling their best kit.
-  assert.equal(t.cogs_iqd, 308_000);
-  assert.equal(t.gross_profit_iqd, -108_000);
+  //
+  // And since P-A F1 that estimate is reported APART: its revenue and cost
+  // leave gross profit, and the −108,000 is the estimate's own line.
+  assert.equal(t.cogs_iqd, 0);
+  assert.equal(t.gross_profit_iqd, 0);
   assert.equal(t.estimated, true);
   assert.equal(t.estimated_cogs_iqd, 308_000);
+  assert.equal(t.estimated_revenue_iqd, 200_000);
+  assert.equal(t.estimated_profit_iqd, -108_000);
   // The parent's qty is bundles, the components' are pieces: 1 + 2, not 1+1+2.
   assert.equal(t.units, 3);
 });
@@ -914,7 +932,8 @@ test('a refund of an uncosted line takes the uncosted disclosure with it', async
   // refund reversed the disclosure side, a period could report `revenue` of
   // one figure with `costed + uncosted` of another, and the honesty panel
   // announced uncosted revenue that had already been given back.
-  assert.equal(t.costed_revenue_iqd + t.uncosted_revenue_iqd, t.revenue_iqd);
+  // P-A F1 adds the third part: the estimate's revenue (O2's 30,000).
+  assert.equal(t.costed_revenue_iqd + t.uncosted_revenue_iqd + t.estimated_revenue_iqd, t.revenue_iqd);
   assert.equal(t.uncosted_revenue_iqd, 0); // sold for 50,000, all of it returned
   assert.equal(t.uncosted_lines, 0);
 });

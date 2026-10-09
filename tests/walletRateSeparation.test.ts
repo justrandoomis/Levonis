@@ -185,11 +185,16 @@ test('the wallet side never reaches the FX module: wallet, escrow, Quick Buy, me
   // held without being listed here (FX-1A review: security #5 — escrow checkout in storeOrders, the
   // wallet adjustments and their notices were missed). The FX module itself is the other side.
   const walletRateReaders = tsFiles(join(ROOT, 'worker')).filter((f) => !f.startsWith('worker/lib/fx/') && /\bexchangeRate\b/.test(codeOf(f)));
-  for (const f of ['worker/routes/storeOrders.ts', 'worker/routes/adminWalletAdjust.ts', 'worker/lib/walletNotify.ts', 'worker/routes/adminFinanceWorkspace.ts']) {
+  for (const f of ['worker/routes/storeOrders.ts', 'worker/routes/adminWalletAdjust.ts', 'worker/lib/walletNotify.ts']) {
     assert.ok(walletRateReaders.includes(f), `${f} converts at the wallet rate and is held`);
   }
+  // P-A F3 (owner brief 2026-10-09): the profit workspace no longer fills a
+  // promotion's missing rate with the wallet's — it books the rate actually
+  // paid — so it is no wallet-rate reader any more, and may read the shop's
+  // rate history for its display toggle (tests/pricingCurrencyRoles.test.ts).
+  assert.equal(walletRateReaders.includes('worker/routes/adminFinanceWorkspace.ts'), false, 'the profit workspace reads the wallet rate again');
   const walletSide = [...new Set([...named, ...walletRateReaders])];
-  assert.ok(walletSide.length >= 18, String(walletSide.length));
+  assert.ok(walletSide.length >= 17, String(walletSide.length)); // 18 before P-A F3 took the profit workspace off the wallet rate
   for (const f of walletSide) {
     const src = codeOf(f);
     assert.doesNotMatch(src, /from\s+['"][^'"]*\/fx\/[^'"]+['"]/, `${f} imports the FX module`);

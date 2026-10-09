@@ -95,6 +95,20 @@ export function financeStrings(loc: Loc) {
     honestyTitle: loc('ما الذي يجب أن تعرفه عن هذه الأرقام', 'What you need to know about these figures', 'ئەوەی پێویستە دەربارەی ئەم ژمارانە بزانیت'),
     estimatedBadge: loc('مقدَّر جزئيًا', 'Partly estimated', 'بەشێکی خەمڵێنراوە'),
     /*
+     * P-A F1 (owner brief 2026-10-09, «التكلفة الفعلية»): a sale whose cost was
+     * never recorded is no longer priced into gross or net profit from today's
+     * catalogue. The badge beside those figures now says what is LEFT OUT, and
+     * the estimate stands on its own line with this label.
+     */
+    estimateKeptOutBadge: loc('التقدير خارج الربح', 'Estimate kept out', 'خەمڵاندن لە دەرەوەی قازانجە'),
+    estimateApartTitle: loc('تقدير بتكلفة اليوم — ليس ربحاً فعلياً', 'Estimate at today\'s cost — not actual profit', 'خەمڵاندن بە تێچووی ئەمڕۆ — قازانجی ڕاستەقینە نییە'),
+    estimateApartNote: (revenue: string, cost: string) =>
+      loc(
+        `مبيعات بلا تكلفة مسجلة وقت البيع: ${revenue}، وتكلفتها بسعر الكلفة الحالي ${cost}. لا تدخل في الربح الإجمالي ولا الصافي.`,
+        `Sales with no cost recorded at the time of sale: ${revenue}, costing ${cost} at today's catalogue price. They are not in gross or net profit.`,
+        `فرۆشتن بەبێ تێچووی تۆمارکراو لە کاتی فرۆشتن: ${revenue}، و تێچوویان بە نرخی ئێستای کەتەلۆگ ${cost}. ناچنە ناو قازانجی گشتی و ساف.`
+      ),
+    /*
      * COUNTED NOUNS ARE PHRASED AROUND THE AGREEMENT, NOT THROUGH IT.
      *
      * Arabic takes the broken plural after 3–10 («٧ أسطر») and the singular
@@ -110,9 +124,9 @@ export function financeStrings(loc: Loc) {
      */
     estimatedLines: (lines: string, cost: string) =>
       loc(
-        `عدد أسطر البيع بلا تكلفة محفوظة لحظة البيع: ${lines}. حُسبت تكلفتها بسعر الكلفة الحالي (${cost}). إذا غيّرت سعر تكلفة لاحقًا تغيّر هذا الرقم — وهو تقدير، لا قياس.`,
-        `Sale lines with no cost captured at the moment of sale: ${lines}. Their cost was computed from today's catalogue price (${cost}). Change a supplier price later and this figure moves — it is an estimate, not a measurement.`,
-        `ژمارەی هێڵە فرۆشتنەکان بەبێ تێچووی تۆمارکراو لە کاتی فرۆشتن: ${lines}. تێچوویان بە نرخی ئێستای کەتەلۆگ حیسابکراوە (${cost}). ئەگەر دواتر نرخی تێچوو بگۆڕیت ئەم ژمارەیە دەگۆڕێت — خەمڵاندنە، پێوانە نییە.`
+        `عدد أسطر البيع بلا تكلفة محفوظة لحظة البيع: ${lines}. تكلفتها بسعر الكلفة الحالي (${cost}) تقدير لا قياس، فأُبعدت مع مبيعاتها عن الربح الإجمالي والصافي وتظهر وحدها تحت «تقدير بتكلفة اليوم».`,
+        `Sale lines with no cost captured at the moment of sale: ${lines}. Their cost at today's catalogue price (${cost}) is an estimate, not a measurement, so they and their sales are kept out of gross and net profit and shown on their own under "Estimate at today's cost".`,
+        `ژمارەی هێڵە فرۆشتنەکان بەبێ تێچووی تۆمارکراو لە کاتی فرۆشتن: ${lines}. تێچوویان بە نرخی ئێستای کەتەلۆگ (${cost}) خەمڵاندنە نەک پێوانە، بۆیە خۆیان و فرۆشتنەکانیان لە قازانجی گشتی و ساف دوورخراونەتەوە و بە تەنها لەژێر «خەمڵاندن بە تێچووی ئەمڕۆ» پیشان دەدرێن.`
       ),
     /**
      * THE GOOD-NEWS DISCLOSURE. Written to say what was MEASURED and against
@@ -127,9 +141,9 @@ export function financeStrings(loc: Loc) {
         `هێڵە فرۆشتنەکانی کە بەپێی ئەو کۆگایانەی بەڕاستی لێیان هاتوون حیسابکراون: ${lines}، بە تێچووی ${cost} لە کۆی ${total}. ئەمە بەهێزترین بنەمای تێچوویە لە سیستەمەکەدا — هەر یەکەیەک بە نرخی کۆگای خۆی حیسابکراوە، نە بە مامناوەند و نە بە نرخی ئەمڕۆ.`
       ),
     noSnapshotColumn: loc(
-      'عمود التكلفة لحظة البيع غير موجود في قاعدة البيانات بعد (ترحيل 0095). كل تكلفة على هذه الشاشة مقدَّرة بسعر الكلفة الحالي، وكل ربح هنا تقدير.',
-      'The cost-at-sale column is not in the database yet (migration 0095). Every cost on this screen is estimated from today’s catalogue price, and every profit here is an estimate.',
-      'ستوونی تێچوو لە کاتی فرۆشتن هێشتا لە بنکەی دراوەکە نییە (گواستنەوەی 0095). هەموو تێچووەکانی ئەم شاشەیە بە نرخی تێچووی ئێستا خەمڵێنراون، و هەموو قازانجێکی لێرە خەمڵاندنە.'
+      'عمود التكلفة لحظة البيع غير موجود في قاعدة البيانات بعد (ترحيل 0095). كل تكلفة غير محسوبة من دفعات الشراء مقدَّرة بسعر الكلفة الحالي، فتبقى خارج الربح وتظهر وحدها تقديرًا.',
+      'The cost-at-sale column is not in the database yet (migration 0095). Every cost not measured from purchase batches is estimated from today’s catalogue price, so it stays out of profit and is shown on its own as an estimate.',
+      'ستوونی تێچوو لە کاتی فرۆشتن هێشتا لە بنکەی دراوەکە نییە (گواستنەوەی 0095). هەر تێچوویەک کە لە کۆگاکانی کڕین حیساب نەکرابێت بە نرخی تێچووی ئێستا خەمڵێنراوە، بۆیە لە دەرەوەی قازانج دەمێنێتەوە و بە تەنها وەک خەمڵاندن پیشان دەدرێت.'
     ),
     uncosted: (lines: string, revenue: string) =>
       loc(

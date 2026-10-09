@@ -90,10 +90,11 @@ test('order review distinguishes a recorded sale-time cost from unrecorded or un
   assert.equal(response.status, 200, JSON.stringify(detail));
   assert.equal(detail.lines[0].cogs_iqd, null);
   assert.equal(detail.lines[0].cost_review.issues[0].code, 'fifo_missing');
-  assert.equal(detail.lines[0].cost_review.suggestion.source, 'current_catalogue');
-  assert.equal(detail.lines[0].cost_review.suggestion.total_cost_iqd, 240000);
-  assert.equal(detail.lines[0].cost_review.suggestion.requires_confirmation, true);
-  assert.equal(detail.lines[0].cost_review.can_verify, true);
+  // P-A F2: a delivered sale is never re-costed from today's catalogue, not
+  // even as a suggestion — no cost was recorded, so only manual entry remains.
+  assert.equal(detail.lines[0].cost_review.suggestion, null);
+  assert.equal(detail.lines[0].cost_projection, undefined);
+  assert.equal(detail.lines[0].cost_review.can_verify, false);
   assert.equal(detail.can_reconcile, true);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_order_adjustments'), before);
   assert.equal((await getOrderProfitBase(db, 'order')).totals.cogs_iqd, null);

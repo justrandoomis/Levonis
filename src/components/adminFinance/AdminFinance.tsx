@@ -373,7 +373,7 @@ export function LegacyAdminFinance() {
               marker={
                 estimated ? (
                   <EstimateBadge
-                    label={s.estimatedBadge}
+                    label={s.estimateKeptOutBadge}
                     detail={s.estimatedLines(countText(totals.estimated_lines, latin), money(totals.estimated_cogs_iqd))}
                   />
                 ) : undefined
@@ -448,7 +448,7 @@ export function LegacyAdminFinance() {
                 marker={
                   estimated ? (
                     <EstimateBadge
-                      label={s.estimatedBadge}
+                      label={s.estimateKeptOutBadge}
                       detail={s.estimatedLines(countText(totals.estimated_lines, latin), money(totals.estimated_cogs_iqd))}
                     />
                   ) : undefined
@@ -477,6 +477,17 @@ export function LegacyAdminFinance() {
                 note={`${countText(totals.expense_entries, latin)} ${s.colEntries}`}
               />
             </div>
+            {/* P-A F1: the estimate on its own line, never inside gross or net. */}
+            {totals.estimated_lines > 0 && totals.estimated_revenue_iqd !== undefined && (
+              <div className="mt-2">
+                <StatTile
+                  testId="estimate-apart"
+                  label={s.estimateApartTitle}
+                  value={money(totals.estimated_profit_iqd ?? totals.estimated_revenue_iqd - totals.estimated_cogs_iqd)}
+                  note={s.estimateApartNote(money(totals.estimated_revenue_iqd), money(totals.estimated_cogs_iqd))}
+                />
+              </div>
+            )}
           </div>
 
           {/* ------------------------------- 4. WHAT THE SCREEN MUST ADMIT */}

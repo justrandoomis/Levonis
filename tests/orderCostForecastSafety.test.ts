@@ -129,10 +129,9 @@ test('terminal orders never create a new forecast and a delivered unknown cost r
     assert.equal(detail.lines[0].cost_projection, undefined);
     assert.equal(detail.lines[0].cogs_iqd, null);
     assert.equal(detail.has_financial_activity, status === 'delivered');
-    if (status === 'delivered') {
-      assert.equal(detail.lines[0].cost_review.suggestion.total_cost_iqd, 10000);
-      assert.equal(detail.lines[0].cost_review.suggestion.requires_confirmation, true);
-    }
+    // P-A F2: a terminal order is never re-costed from today's catalogue or
+    // today's stock, not even as a suggestion to confirm.
+    assert.equal(detail.lines[0].cost_review.suggestion, null);
   }
   assert.equal(x.history(), before);
 });

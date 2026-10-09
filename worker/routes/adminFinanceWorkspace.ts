@@ -9,7 +9,7 @@ import { limitByMethod } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, decimal, fence, periodOpen, requireCapability, whole } from '../lib/operations';
-import { exchangeRate } from '../lib/escrowOps';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { planExpenseAccounting } from '../lib/expenseAccounting';
 import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrderProfitBases, monthlyPromotionShares, planProfitAdjustment, planWorkspaceAccounting, profitFields, profitSourceFingerprint, workspaceInstalled, type OrderProfitBase, type ProfitAdjustment, type ProfitField, type ProfitLine } from '../lib/orderProfit';
 import { investorFinanceInstalled, investorOrderSplit, investorProjectionStaleSql } from '../lib/investorFinance';
@@ -226,8 +226,15 @@ async function promotionValues(db:D1Database,b:Row,old?:Row){
   const currency=b.currency===undefined?s(old?.currency||'USD'):text(b.currency,3);if(!['IQD','USD','EUR','CNY'].includes(currency))throw badRequest('العملة غير صحيحة');
   const amount=b.amount===undefined&&old?n(old.amount_minor)/(old.currency==='IQD'?1:100):decimal(b.amount,'المبلغ',0.01),scale=currency==='IQD'?1:100;
   const minor=Math.round(amount*scale);if(!Number.isSafeInteger(minor)||minor<=0||Math.abs(amount*scale-minor)>0.000001)throw badRequest('عدد المنازل العشرية غير صحيح');
-  const fx=currency==='IQD'?1:b.exchange_rate===undefined?(old&&currency===old.currency?n(old.exchange_rate):currency==='USD'?await exchangeRate(db):0):decimal(b.exchange_rate,'سعر التحويل',0.000001);
-  if(!Number.isFinite(fx)||fx<=0)throw badRequest('أدخل سعر تحويل هذه العملة إلى الدينار');
+  // P-A F3 (owner brief 2026-10-09; owner decision 9): a promotion in another
+  // currency is booked at the rate ACTUALLY PAID. The wallet's 1 USD = 1,400
+  // IQD used to fill a missing rate and was stored as the expense — a rate
+  // nobody paid. Now a missing rate is refused unless an existing row of the
+  // same currency already carries its own (an edit keeps the stored rate);
+  // the page only SUGGESTS the shop's rate, it never submits it.
+  const missing=b.exchange_rate===undefined||b.exchange_rate===null||b.exchange_rate==='';
+  const fx=currency==='IQD'?1:missing?(old&&currency===old.currency?n(old.exchange_rate):0):decimal(b.exchange_rate,'سعر التحويل',0.000001);
+  if(!Number.isFinite(fx)||fx<=0)throw badRequest(serverMessage('PROMOTION_RATE_REQUIRED'),'PROMOTION_RATE_REQUIRED');
   const iqd=Math.round(amount*fx);whole(iqd,'قيمة الدينار',1);
   return {month,title:b.title===undefined?s(old?.title||'ترويج شهري'):text(b.title,200)||'ترويج شهري',currency,amount_minor:minor,exchange_rate:fx,amount_iqd:iqd,enabled:b.enabled===undefined?n(old?.enabled??1):b.enabled?1:0};
 }

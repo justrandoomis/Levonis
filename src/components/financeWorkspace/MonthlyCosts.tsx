@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Megaphone, Plus } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
+import { refusalText } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import ExpenseLedger from '../adminFinance/ExpenseLedger';
 import { financeStrings } from '../adminFinance/strings';
 import { isLatin } from '../adminFinance/format';
 import { Button, Field, Loading, Money, Row, Surface } from './ui';
 import { monthRange, WORKSPACE_API, type Promotion } from './types';
+import { PA_STRINGS, tri } from './displayCurrencyStrings';
 
 export default function MonthlyCosts({ month, onChanged }: { month: string; onChanged: () => void }) {
   const { loc, dir, lang } = useLanguage();
@@ -52,9 +54,18 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
       else await api.post(`${WORKSPACE_API}/promotions`, body);
       operation.current = crypto.randomUUID(); setRevision((v) => v + 1); onChanged();
       setNotice(loc('حُفظ ترويج الشهر وأعيد حساب نصيب المنتجات', 'Monthly promotion saved and product shares recalculated'));
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    } catch (e) { setError(e instanceof ApiError && e.code ? refusalText(e.code, lang, e.message) : e instanceof Error ? e.message : String(e)); }
     finally { setSaving(false); }
   };
+  // P-A F3: any currency but the dinar books at the rate actually paid. The
+  // field is in view (not under the advanced options) and blank only keeps the
+  // rate an existing same-currency row already carries.
+  const foreign = currency !== 'IQD';
+  const keepsRate = !!selected && selected.currency === currency;
+  const rateField = <Field label={tri(loc, PA_STRINGS.promotionRateLabel)} hint={keepsRate ? tri(loc, PA_STRINGS.promotionRateKeep, { rate: String(selected!.exchange_rate) }) : tri(loc, PA_STRINGS.promotionRateHint)}>
+    <input className="fw-input" type="number" min="0" step="any" inputMode="decimal" dir="ltr" value={exchange} required={!keepsRate} data-finance-promotion-rate
+      onChange={(e) => { setExchange(e.target.value); operation.current = crypto.randomUUID(); }} placeholder={keepsRate ? String(selected!.exchange_rate) : ''} />
+  </Field>;
   const remove = async () => {
     if (!selected || saving) return;
     setSaving(true); setError('');
@@ -80,14 +91,12 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
           {selected && <span>{loc('المبلغ المسجل بالدينار', 'Recorded IQD amount')}: <Money value={selected.amount_iqd} /></span>}
           <span>{loc('الشهر', 'Month')}: <span dir="ltr">{month}</span> · {loc('يتحمله المالك فقط', 'Owner borne')}</span>
         </div>
-        <Button variant="primary" busy={saving} disabled={loading || amount.trim() === ''} onClick={save}><Check size={16} />{loc('حفظ مبلغ الشهر', 'Save monthly amount')}</Button>
+        {foreign && rateField}
+        <Button variant="primary" busy={saving} disabled={loading || amount.trim() === '' || (foreign && !keepsRate && exchange.trim() === '')} onClick={save}><Check size={16} />{loc('حفظ مبلغ الشهر', 'Save monthly amount')}</Button>
         {selected && <Button variant="ghost" busy={saving} onClick={remove}>{loc('إيقاف الترويج لهذا الشهر', 'Disable this month’s promotion')}</Button>}
-        <details className="fw-advanced"><summary>{loc('خيارات متقدمة', 'Advanced options')}</summary>
-          <Field label={loc('سعر الصرف (اختياري)', 'Exchange rate (optional)')} hint={loc('فارغ = سعر صرف المتجر. يُثبت السعر مع المصروف.', 'Blank uses the store exchange rate, locked with the expense.')}>
-            <input className="fw-input" type="number" min="0" step="any" inputMode="decimal" value={exchange} onChange={(e) => { setExchange(e.target.value); operation.current = crypto.randomUUID(); }} placeholder={selected ? String(selected.exchange_rate) : ''} />
-          </Field>
-          {promotions.length > 1 && promotions.map((p) => <Row key={p.id} label={p.title} value={<Money value={p.amount_iqd} />} />)}
-        </details>
+        {promotions.length > 1 && <details className="fw-advanced"><summary>{loc('خيارات متقدمة', 'Advanced options')}</summary>
+          {promotions.map((p) => <Row key={p.id} label={p.title} value={<Money value={p.amount_iqd} />} />)}
+        </details>}
       </div>
       <span className="fw-promo-symbol" aria-hidden><Megaphone size={30} strokeWidth={1.6} /></span>
     </Surface>}

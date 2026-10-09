@@ -132,6 +132,10 @@ const REQUIRED: Record<string, readonly string[]> = {
     'PRICING_INPUT_REINSERT',
     'BATCH_COST_IMMUTABLE',
   ],
+  // P-A of the USD-pricing design (owner brief 2026-10-09, "Accounting
+  // Currency"): a promotion in another currency is booked at the rate actually
+  // paid, never at the wallet's (fix F3, worker/routes/adminFinanceWorkspace.ts).
+  'P-A fix F3': ['PROMOTION_RATE_REQUIRED'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

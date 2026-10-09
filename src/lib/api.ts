@@ -2352,7 +2352,12 @@ export interface FinanceTotals {
   estimated: boolean;
   estimated_lines: number;
   estimated_units: number;
+  /** Today's-catalogue cost of the estimated lines — not part of `cogs_iqd` (P-A F1). */
   estimated_cogs_iqd: number;
+  /** Their revenue — not part of `costed_revenue_iqd`, so not in gross or net (P-A F1). Absent from an older server. */
+  estimated_revenue_iqd?: number;
+  /** `estimated_revenue − estimated_cogs`: «تقدير بتكلفة اليوم — ليس ربحاً فعلياً» (P-A F1). */
+  estimated_profit_iqd?: number;
   uncosted_lines: number;
   uncosted_units: number;
   /**
