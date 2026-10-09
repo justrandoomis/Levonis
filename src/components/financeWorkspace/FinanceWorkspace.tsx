@@ -10,6 +10,7 @@ import OrderProfitSheet from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
 import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
+import ReportDeductions from './ReportDeductions';
 
 const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
 const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
@@ -176,6 +177,7 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       <Row label={loc('حصة المستثمرين', 'Investor share')} value={<Money value={t.investor_iqd} />} onClick={() => onNavigate('investors')} hint={(t.investor_iqd ?? 0) < 0 ? loc('مساهمة المستثمر في الخسارة', 'Investor contribution to the loss') : undefined} />
       <Row label={loc('المصاريف العامة', 'General expenses')} value={<Money value={t.general_expenses_iqd} />} onClick={() => onNavigate('monthly')} />
       <Row label={loc('صافي المالك', 'Owner net')} value={<Money value={t.owner_period_net_iqd !== undefined ? t.owner_period_net_iqd : t.owner_net_iqd} />} prominent />
+      <ReportDeductions totals={t} net={t.owner_period_net_after_report_adjustments_iqd} />
     </Surface></details>
     {data.kinds && <Surface title={loc('حسب نوع الطلب', 'By order type', 'بەپێی جۆری داواکاری')} subtitle={loc('الطلبات المستلمة في الفترة نفسها، مقسومة حسب طريقة إنشائها.', 'The same delivered orders, split by how each was placed.', 'هەمان داواکارییە گەیەندراوەکان، بەپێی شێوازی دروستکردنیان.')}>
       {data.kinds.map((k) => <Row key={k.kind} label={orderKindName(k.kind, loc)}
@@ -278,8 +280,10 @@ function Products({ data, onOpenOrders }: { data: FinanceSummary; onOpenOrders: 
       <div className="fw-line-metrics"><div className="fw-line-metric"><span>{loc('صافي البيع', 'Net sales')}</span><Money value={p.net_goods_iqd} /></div><div className="fw-line-metric"><span>{loc('تكلفة البضاعة', 'Goods cost')}</span><Money value={p.cogs_iqd} /></div><div className="fw-line-metric"><span>{loc('الأجور والمواد', 'Wages and materials')}</span><Money value={p.wages_iqd == null || p.materials_iqd == null ? null : p.wages_iqd + p.materials_iqd} /></div><div className="fw-line-metric"><span>{loc('نصيب الترويج', 'Promotion share')}</span><Money value={p.promotion_iqd} /></div></div>
       <Row label={loc('حصة المستثمر', 'Investor share')} value={<Money value={p.investor_iqd} />} />
       <Row label={loc('صافي المالك', 'Owner net')} value={<Money value={p.owner_net_iqd} />} prominent />
+      <ReportDeductions totals={p} net={p.net_after_report_adjustments_iqd} compact />
     </Surface>)}</div> : <Empty title={loc('لا توجد منتجات في هذه الفترة', 'No products in this period')} text={loc('تظهر منتجات الطلبات المستلمة خلال الفترة هنا.', 'Products from orders delivered in the selected range appear here.')} />}
     <p className="fw-note">{loc('تكلفة الترويج توزيع إداري على المنتجات، وتُحمّل على المالك فقط.', 'Promotion shares are a management allocation borne by the owner only.')}</p>
     <Button variant="ghost" onClick={onOpenOrders}><CheckCircle2 size={16} />{loc('راجع الطلبات الأصلية', 'Review source orders')}</Button>
   </Surface>;
 }
+

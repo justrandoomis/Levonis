@@ -47,6 +47,27 @@ export const PA_STRINGS = {
     ckb: 'پێشنیار: نرخی دۆلاری فرۆشگا لە {date}: {rate}',
   },
 
+  // ---- F4/F5: report-only deductions (owner question Q3, default "report only")
+  couponDeduction: {
+    ar: 'خصم القسيمة',
+    en: 'Coupon discount',
+    ckb: 'داشکانی کوپۆن',
+  },
+  priceProtectionCredit: {
+    ar: 'تعويض حماية السعر',
+    en: 'Price-protection credit',
+    ckb: 'قەرەبووی پاراستنی نرخ',
+  },
+  netAfterReportDeductions: {
+    ar: 'الصافي بعد خصومات التقرير',
+    en: 'Net after report deductions',
+    ckb: 'پوختە دوای داشکانەکانی ڕاپۆرت',
+  },
+  reportOnlyNote: {
+    ar: 'خصم للعرض في التقرير فقط؛ لا يغيّر حصص المستثمرين ولا الأجور ولا القيود المسجلة',
+    en: 'Deducted in this report only; it does not change recorded investor shares, wages or journal entries',
+    ckb: 'تەنها لەم ڕاپۆرتەدا دەردەکرێت؛ بەشی وەبەرهێنەران و کرێ و تۆمارە ژمێریارییەکان ناگۆڕێت',
+  },
 } as const satisfies Record<string, Tri>;
 
 export type PaStringKey = keyof typeof PA_STRINGS;

@@ -27,6 +27,14 @@ export interface ProfitTotals {
   refund_iqd?: number | null;
   collected_iqd?: number | null;
   collection_difference_iqd?: number | null;
+  /** P-A F4: the order-level coupon, deducted in this report only (never in investor shares, wages or journals). */
+  coupon_iqd?: number | null;
+  /** P-A F5: price-protection credits paid back, deducted in this report only. */
+  price_protection_iqd?: number | null;
+  /** `owner_net − coupon − price protection` — «الصافي بعد خصومات التقرير». */
+  net_after_report_adjustments_iqd?: number | null;
+  /** The period figure: `owner_period_net − coupon − price protection` (summary totals only). */
+  owner_period_net_after_report_adjustments_iqd?: number | null;
   pending_costs?: number;
   unknown_lines?: number;
   orders_count?: number;

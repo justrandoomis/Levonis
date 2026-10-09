@@ -8,6 +8,7 @@ import { financeDay, monthRange, statusName, WORKSPACE_API, type OrderProfit, ty
 import { hasPendingWagesWithConfirmedCosts, displayedCostAmount, groupOrderCosts } from './orderCostGroups';
 import { orderFinancePresentation, projectedLineCost, visibleOrderReviewReasons } from './orderFinancePresentation';
 import { PA_STRINGS, tri } from './displayCurrencyStrings';
+import ReportDeductions from './ReportDeductions';
 
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
 
@@ -161,6 +162,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
         {!view?.expectsDelivery && view?.hasFinancialActivity && <div className="fw-metric"><span>{loc('حصة المستثمر', 'Investor share')}</span><Money value={data.totals.investor_iqd} /></div>}
         {view?.amountKind !== 'not_earned' && <div className="fw-metric"><span>{amountLabel}</span><Money value={view?.amount} /></div>}
       </div>
+      {data.order.status === 'delivered' && <ReportDeductions totals={data.totals} net={data.totals.net_after_report_adjustments_iqd} />}
       {data.lines.map((line) => <Surface className="fw-line-item" key={line.id}>
         <div className="fw-line-heading">
           {line.image_snapshot || line.product_image || line.image_url ? <img className="fw-product-image" src={line.image_snapshot || line.product_image || line.image_url} alt="" /> : <span className="fw-order-icon"><Package size={20} /></span>}

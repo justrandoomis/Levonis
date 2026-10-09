@@ -176,3 +176,57 @@ test('F3 client: the rate field is in view for a foreign currency, required unle
   assert.match(src, /\(foreign && !keepsRate && exchange\.trim\(\) === ''\)/);
   assert.doesNotMatch(src, /سعر صرف المتجر|store exchange rate/, 'the old «blank = the store rate» hint is gone');
 });
+
+// ------------------------------------------------------------------ F4 + F5
+
+test('F4: the order-level coupon is deducted in full at the order, only min(coupon, goods) reaches the products, and orders.coupon_discount_iqd is the fallback', async () => {
+  const w = world();
+  // 10,000 of goods + 5,000 shipping; a 12,000 coupon also cut the shipping.
+  w.order('big', 'delivered', { coupon: 12000 });
+  w.raw.exec("UPDATE orders SET shipping_iqd = 5000 WHERE id = 'big'");
+  w.item('big:1', 'big', 'p_kit', 1, 10000, 3000, 'snapshot');
+  // No snapshot JSON: the column the store builder writes is the fallback.
+  w.order('col', 'delivered');
+  w.raw.exec("UPDATE orders SET coupon_discount_iqd = 4000 WHERE id = 'col'");
+  w.item('col:1', 'col', 'p_cam', 1, 90000, 50000, 'snapshot');
+  // A coupon partly carried by a line already: only the rest is order-level.
+  w.order('split', 'delivered', { coupon: 6000 });
+  w.item('split:1', 'split', 'p_kit', 1, 10000, 3000, 'snapshot');
+  w.raw.exec("UPDATE order_items SET coupon_discount_iqd = 2500 WHERE id = 'split:1'");
+
+  const res = await get(w.workspace(), '/f/summary?from=2026-03-01&to=2026-03-31');
+  const summary = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(summary));
+  const orders = Object.fromEntries(summary.orders.map((o: Record<string, unknown>) => [o.id, o]));
+  assert.equal(orders.big.coupon_iqd, 12000, 'the whole coupon at the order');
+  assert.equal(orders.big.net_after_report_adjustments_iqd, (orders.big.owner_net_iqd as number) - 12000);
+  assert.equal(orders.col.coupon_iqd, 4000, 'orders.coupon_discount_iqd when no snapshot');
+  assert.equal(orders.split.coupon_iqd, 3500, '6,000 less the 2,500 a line already carries');
+  const kit = summary.products.find((p: { id: string }) => p.id === 'p_kit');
+  // big gives the kit at most its 10,000 of goods; split gives 3,500 of its 7,500.
+  assert.equal(kit.coupon_iqd, 10000 + 3500);
+  assert.equal(kit.net_after_report_adjustments_iqd, kit.owner_net_iqd - kit.coupon_iqd);
+  assert.equal(summary.totals.coupon_iqd, 12000 + 4000 + 3500, 'totals are the orders summed');
+  assert.equal(summary.totals.owner_period_net_after_report_adjustments_iqd, summary.totals.owner_period_net_iqd - summary.totals.coupon_iqd - summary.totals.price_protection_iqd);
+  // The accounting basis is untouched: owner net is what it was without the overlay.
+  assert.equal(orders.big.net_goods_iqd, 10000);
+  assert.equal(orders.big.owner_net_iqd, 10000 - 3000 + 5000);
+});
+
+test('F5: a credited price-protection claim is deducted on its line and order; a requested one is not', async () => {
+  const w = world();
+  w.order('pp', 'delivered');
+  w.item('pp:1', 'pp', 'p_cam', 2, 90000, 50000, 'snapshot');
+  w.raw.exec(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state)
+    VALUES ('ppc_paid','buyer','pp','pp:1',90000,85000,2,10000,'credited'),('ppc_open','buyer','pp','pp:1',90000,80000,2,0,'requested')`);
+  const summary = await json(await get(w.workspace(), '/f/summary?from=2026-03-01&to=2026-03-31'));
+  assert.equal(summary.orders[0].price_protection_iqd, 10000);
+  assert.equal(summary.orders[0].net_after_report_adjustments_iqd, summary.orders[0].owner_net_iqd - 10000);
+  assert.equal(summary.products.find((p: { id: string }) => p.id === 'p_cam').price_protection_iqd, 10000);
+  assert.equal(summary.totals.price_protection_iqd, 10000);
+  const detail = await json(await get(w.workspace(), '/f/orders/pp'));
+  assert.equal(detail.totals.price_protection_iqd, 10000);
+  assert.equal(detail.lines[0].price_protection_iqd, 10000);
+  assert.equal(detail.totals.owner_net_iqd, 180000 - 100000, 'owner net — the settled figure — does not move');
+});
+

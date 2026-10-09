@@ -11,11 +11,12 @@ import { auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, decimal, fence, periodOpen, requireCapability, whole } from '../lib/operations';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { planExpenseAccounting } from '../lib/expenseAccounting';
-import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrderProfitBases, monthlyPromotionShares, planProfitAdjustment, planWorkspaceAccounting, profitFields, profitSourceFingerprint, workspaceInstalled, type OrderProfitBase, type ProfitAdjustment, type ProfitField, type ProfitLine } from '../lib/orderProfit';
+import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrderProfitBases, monthlyPromotionShares, planProfitAdjustment, planWorkspaceAccounting, profitFields, profitSourceFingerprint, spread, workspaceInstalled, type OrderProfitBase, type ProfitAdjustment, type ProfitField, type ProfitLine } from '../lib/orderProfit';
 import { investorFinanceInstalled, investorOrderSplit, investorProjectionStaleSql } from '../lib/investorFinance';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { enrichOrderProfitReview } from '../lib/orderProfitReview';
 import { enrichOrderCostProjections } from '../lib/orderCostProjection';
+import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportOverlay';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -36,7 +37,7 @@ function range(fromValue?:string,toValue?:string){
   if(days<0||days>365)throw badRequest('اختر فترة لا تتجاوز سنة');
   return {from,to};
 }
-const sumFields=['net_goods_iqd','retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','direct_cost_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','contribution_profit_iqd','profit_basis_iqd','promotion_iqd','investor_iqd','owner_net_iqd','refunded_iqd','refund_iqd','collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','units'];
+const sumFields=['net_goods_iqd','retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','direct_cost_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','contribution_profit_iqd','profit_basis_iqd','promotion_iqd','investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','net_after_report_adjustments_iqd','refunded_iqd','refund_iqd','collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','units'];
 function sumRows(rows:Row[]):Row {
   const totals:Row={};
   for(const key of sumFields)totals[key]=rows.some((r)=>r[key]===null)?null:rows.reduce((v,r)=>v+n(r[key]),0);
@@ -93,6 +94,31 @@ function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expense
   ];
   return {daily,expense_composition,basis:'delivered_baghdad_day',...chartAmounts(totals,n(totals.general_expenses_iqd),n(totals.unallocated_promotion_iqd),truncated)};
 }
+/**
+ * P-A F4 + F5: the order-level coupon and the credited price-protection
+ * amounts, as DEDUCTIONS IN THIS REPORT ONLY (owner question Q3, default
+ * "report only"; worker/lib/financeReportOverlay.ts). Applied to the bases
+ * this route already built, after the investor split, so `calculateGoods`,
+ * `getOrderProfitBase(s)` and every writer that settles investors, wages and
+ * journals never see them. A line takes its share of `min(coupon, net goods)`
+ * by net goods plus its own claims; the excess of a coupon above the goods
+ * (it cut shipping, then the COD fee) stays at the order level, so the
+ * products never carry more than their goods.
+ */
+function applyReportAdjustments(bases:OrderProfitBase[],adjustments:Map<string,ReportAdjustments>){
+  for(const b of bases){
+    const a=adjustments.get(b.order_id);const coupon=a?.coupon_iqd??0,claims=a?.price_protection_by_line??new Map<string,number>();
+    const goods=b.lines.map((l)=>Math.max(0,n(l.net_goods_iqd))),toLines=Math.min(coupon,goods.reduce((v,x)=>v+x,0));
+    const shares=spread(toLines,goods);
+    b.lines.forEach((l,i)=>{const share=shares[i]??0,credit=claims.get(l.id)??0;
+      l.coupon_iqd=share;l.price_protection_iqd=credit;
+      l.net_after_report_adjustments_iqd=l.owner_net_iqd===null||l.owner_net_iqd===undefined?null:n(l.owner_net_iqd)-share-credit;});
+    const credited=a?.price_protection_iqd??0;
+    b.totals.coupon_iqd=coupon;b.totals.price_protection_iqd=credited;
+    b.totals.net_after_report_adjustments_iqd=b.totals.owner_net_iqd===null||b.totals.owner_net_iqd===undefined?null:n(b.totals.owner_net_iqd)-coupon-credited;
+  }
+  return bases;
+}
 async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
   await addOwnerPromotions(db,bases);
   if(!await investorFinanceInstalled(db)){for(const b of bases){b.totals.investor_iqd=0;for(const l of b.lines)l.investor_iqd=0;}return bases;}
@@ -132,7 +158,8 @@ async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:str
   for(let i=0;i<orderIds.length;i+=250)rawBases.push(...await getOrderProfitBases(db,orderIds.slice(i,i+250)));
   const byId=new Map(rawBases.map((b)=>[b.order_id,b]));
   const bases=orderIds.map((id)=>byId.get(id)!).filter(Boolean);
-  await addInvestors(db,bases);if(!opts.summary)await enrichOrderCostProjections(db,bases);return {bases,total:total?.total??0,truncated:false};
+  await addInvestors(db,bases);applyReportAdjustments(bases,await reportAdjustments(db,bases.map((b)=>b.order_id)));
+  if(!opts.summary)await enrichOrderCostProjections(db,bases);return {bases,total:total?.total??0,truncated:false};
 }
 adminFinanceWorkspaceRoutes.get('/participant-report',async c=>{const r=range(c.req.query('from'),c.req.query('to'));return c.json({success:true,...await participantReport(c.env.DB,r)});});
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
@@ -151,6 +178,8 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const month of new Set((promotions.results??[]).map((p)=>s(p.month))))if(`${month}-01`>=r.from&&`${month}-01`<=r.to){const amount=(await monthlyPromotionShares(db,month)).unallocated_iqd;unallocated+=amount;unallocatedDays.set(`${month}-01`,amount);}
   totals.unallocated_promotion_iqd=unallocated;
   totals.owner_period_net_iqd=totals.owner_net_iqd===null||truncated?null:n(totals.owner_net_iqd)-n(totals.general_expenses_iqd)-unallocated;
+  // F4/F5 at the period level: «الصافي بعد خصومات التقرير» beside «صافي المالك».
+  totals.owner_period_net_after_report_adjustments_iqd=totals.owner_period_net_iqd===null?null:n(totals.owner_period_net_iqd)-n(totals.coupon_iqd)-n(totals.price_protection_iqd);
   if(truncated)totals.owner_net_iqd=null;
   const exceptions:Row[]=[...(failures.results??[]).map((e)=>({...e,type:'posting_failed'}))];
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
@@ -167,6 +196,7 @@ adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
 async function detail(db:D1Database,id:string,canVerify=true){
   const base=await getOrderProfitBase(db,id);if(base.order.seller_type!=='levonis')throw notFound('Order not found');
   await addInvestors(db,[base],true);
+  applyReportAdjustments([base],await reportAdjustments(db,[base.order_id]));
   await enrichOrderCostProjections(db,[base],true);
   await enrichOrderProfitReview(db,base,canVerify);
   const history=await db.prepare('SELECT a.id,a.order_item_id line_id,a.field,a.old_value_iqd,a.new_value_iqd,a.version,a.actor_id,u.name actor_name,a.created_at,a.reason,a.journal_id FROM finance_order_adjustments a LEFT JOIN users u ON u.id=a.actor_id WHERE a.order_id=? ORDER BY a.version DESC LIMIT 200').bind(id).all<Row>();
