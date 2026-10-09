@@ -3,9 +3,11 @@
  * §19, §25, §29; owner defaults 3 and 6; critique-2 L7) — through the real
  * routes over the real migrations.
  *
- *   - The owner (INITIAL_ADMIN_EMAIL) and full-scope admins see the whole
- *     serial; an assistant sees the masked form on every serial surface, and
- *     no order numbers on the serial page.
+ *   - Every admin — the owner (INITIAL_ADMIN_EMAIL), full-scope admins and
+ *     assistants — sees the whole serial on every serial surface (owner
+ *     decision 1, 2026-10-09); an assistant sees no order numbers on the
+ *     serial page (option A). tests/serialVisibilityRoles.test.ts walks the
+ *     whole matrix.
  *   - The order that holds a serial is named to the Main Admin only (§10).
  *   - Every exception, the serial policy and the gate switch are the owner's.
  *   - The owner can take the `receive` capability from a member of staff.
@@ -28,7 +30,7 @@ const MASKED = /^\*{4}[0-9A-Z]{4}$|^\*+[0-9A-Z]{1,6}$/;
 
 // ------------------------------------------------------------------ masking
 
-test('owner default 3: the owner and a full-scope admin see the whole serial; an assistant sees it masked on every serial surface', async () => {
+test('owner decision 1: the owner, a full-scope admin and an assistant all see the whole serial on every serial surface', async () => {
   const w = world();
   order(w.raw, 'ORD-M', [{ id: 'l1', product: 'pA1', qty: 3 }]);
   order(w.raw, 'ORD-N', [{ id: 'l2', product: 'pA1' }]);
@@ -39,26 +41,19 @@ test('owner default 3: the owner and a full-scope admin see the whole serial; an
     const text = await res.clone().text();
     const body = await json(res);
     assert.equal(res.status, 200, text);
-    if (who === 'ast') {
-      assert.equal(body.slot.assignment.serial_full, undefined);
-      assert.match(body.slot.assignment.serial_display, MASKED);
-      assert.ok(!text.includes(code), 'the assistant\'s answer never carries the whole serial');
-    } else {
-      assert.equal(body.slot.assignment.serial_full, code, who);
-      assert.equal(body.slot.assignment.serial_display, code, who);
-    }
+    assert.equal(body.slot.assignment.serial_full, code, who);
+    assert.equal(body.slot.assignment.serial_display, code, who);
+    assert.doesNotMatch(body.slot.assignment.serial_display, MASKED, `${who}: never the masked form`);
   }
 
   // The order window and the serials door.
   for (const path of ['/api/admin/orders/ORD-M', '/api/admin/orders/ORD-M/serials']) {
-    const astBody = await json(await get(w.as('ast'), path));
-    const serials = astBody.order?.serials ?? astBody.serials;
-    const text = JSON.stringify(serials);
-    for (const s of [SN, SN2, SN3]) assert.ok(!text.includes(s), `${path}: no whole serial for an assistant`);
-    assert.ok(serials.slots.every((x: { assignment: { serial_display: string } }) => MASKED.test(x.assignment.serial_display)));
-    const admBody = await json(await get(w.as('adm'), path));
-    const full = (admBody.order?.serials ?? admBody.serials).slots.map((x: { assignment: { serial_full: string } }) => x.assignment.serial_full);
-    assert.deepEqual(full, [SN, SN2, SN3], `${path}: a full-scope admin sees them whole`);
+    for (const who of ['ast', 'adm', 'boss'] as const) {
+      const body = await json(await get(w.as(who), path));
+      const slots = (body.order?.serials ?? body.serials).slots as Array<{ assignment: { serial_full: string; serial_display: string } }>;
+      assert.deepEqual(slots.map((x) => x.assignment.serial_full), [SN, SN2, SN3], `${path}: ${who} sees them whole`);
+      assert.deepEqual(slots.map((x) => x.assignment.serial_display), [SN, SN2, SN3], `${path}: ${who}`);
+    }
   }
 
   // A re-opened order's suggestion of its previous serial.
@@ -69,13 +64,13 @@ test('owner default 3: the owner and a full-scope admin see the whole serial; an
       VALUES ('sa_prev','03919D580600001','03919D580600001','ORD-N','l2','ORD-N',1,'camera','scan:prev-1','adm','2026-10-01T00:00:00.000Z','order_cancelled')`);
   await patch(w.as('boss'), '/api/admin/orders/ORD-N/stage', { stage: 'confirmed' });
   const prevAst = (await json(await get(w.as('ast'), '/api/admin/orders/ORD-N/serials'))).serials.slots[0].previous;
-  assert.equal(prevAst.serial_full, undefined);
-  assert.match(prevAst.serial_display, MASKED);
+  assert.equal(prevAst.serial_full, '03919D580600001', 'the assistant sees the previous serial whole too');
+  assert.equal(prevAst.serial_display, '03919D580600001');
   const prevBoss = (await json(await get(w.as('boss'), '/api/admin/orders/ORD-N/serials'))).serials.slots[0].previous;
   assert.equal(prevBoss.serial_full, '03919D580600001');
 });
 
-test('L7 the serial page: an assistant sees the masked serial and no order numbers — in the story and in every history line', async () => {
+test('L7 the serial page: an assistant sees the whole serial (decision 1) and no order numbers (option A) — in the story and in every history line', async () => {
   const w = world();
   order(w.raw, 'ORD-111', [{ id: 'l1', product: 'pA1' }]);
   order(w.raw, 'ORD-222', [{ id: 'l2', product: 'pA1' }]);
@@ -85,14 +80,16 @@ test('L7 the serial page: an assistant sees the masked serial and no order numbe
 
   const ast = await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`));
   const story = ast.story;
-  assert.equal(story.serial, undefined);
-  assert.equal(story.serial_norm, null);
-  assert.match(story.serial_display, MASKED);
+  assert.equal(story.serial, SN);
+  assert.equal(story.serial_norm, SN);
+  assert.equal(story.serial_display, SN);
+  assert.equal(ast.row.serial, SN, 'the row too');
   assert.equal(story.current_order.order_id, null);
   assert.ok(story.previous_orders.every((p: { order_id: string | null }) => p.order_id === null));
   const storyText = JSON.stringify(story);
   for (const o of ['ORD-111', 'ORD-222']) assert.ok(!storyText.includes(o), `no ${o} anywhere in the assistant's story`);
   assert.ok(story.history.length >= 4, 'the timeline is still there, only without the order numbers');
+  assert.ok(!JSON.stringify(ast.row).includes('ORD-'), 'and no order number in the row');
 
   const adm = await json(await get(w.as('adm'), `/api/devices/admin/serial-inventory/${SN}`));
   assert.equal(adm.story.serial, SN);

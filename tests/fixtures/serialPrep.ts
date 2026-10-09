@@ -4,9 +4,10 @@
  * the session stubbed (tests/fixtures/app.ts). Shared by the serialPrep*
  * tests.
  *
- *   boss  — the owner (INITIAL_ADMIN_EMAIL = boss@x.co), sees full serials
+ *   boss  — the owner (INITIAL_ADMIN_EMAIL = boss@x.co)
  *   adm   — a full-scope admin (not the owner)
- *   ast   — an assistant-scope admin (masked serials)
+ *   ast   — an assistant-scope admin: the whole serial like every admin
+ *           (owner decision 1, 2026-10-09), no order numbers on the serial page
  *   u1/u2 — customers
  *
  * Products: pA1 «Bambu Lab A1 Combo» and pX2D «Bambu Lab X2D Combo» filed

@@ -174,10 +174,11 @@ test('§32.6/§32.7 cancel releases (trigger, every door); the same serial links
   const story = page.story.history.map((h: { action: string }) => h.action);
   assert.deepEqual(story.slice(0, 3), ['serial.linked', 'serial.released', 'serial.linked']);
   assert.equal(story[story.length - 1], 'serial_inventory.add');
-  const masked = await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`));
-  assert.equal(masked.story.serial, undefined);
-  assert.match(masked.story.serial_display, /^\*{4}/);
-  assert.equal(masked.story.current_order.order_id, null, 'no order numbers for an assistant');
+  // Owner decision 1 (2026-10-09): the assistant reads the serial whole, still without order numbers.
+  const astPage = await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`));
+  assert.equal(astPage.story.serial, SN);
+  assert.equal(astPage.story.serial_display, SN);
+  assert.equal(astPage.story.current_order.order_id, null, 'no order numbers for an assistant');
 });
 
 // ------------------------------------------------------------------ §32.13 / H1

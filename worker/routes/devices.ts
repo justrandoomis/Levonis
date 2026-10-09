@@ -112,7 +112,7 @@ import { canonicalSerial, maskedDetail, refuse as serialRefuse, serialActor, ser
 import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
-import { fence } from '../lib/operations';
+import { fence, requireSerialWrite } from '../lib/operations';
 import { isLostRace } from '../lib/gifts/fence';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
@@ -1261,9 +1261,9 @@ deviceRoutes.get('/admin/units/:unitId/history', async (c) => {
   const unitId = c.req.param('unitId');
   // The serial page's privacy, on the same rows (landing round 3, F5): a
   // `device.serial_reassign` names the OTHER device's serial and the order it
-  // came from, which an assistant's serial page never shows them. The same
-  // viewer rule (`serialActor` → canMoveMoney) and the same masking
-  // (`maskedDetail`); the owner and full-scope admins read them whole.
+  // came from. The same viewer rules (`serialActor`) and the same filter
+  // (`maskedDetail`): the whole serial for every admin (owner decision 1,
+  // 2026-10-09), order numbers for the owner and full-scope admins only.
   const actor = serialActor(c.env, c.get('user')!);
   const unit = await c.env.DB.prepare('SELECT id FROM order_item_units WHERE id = ?').bind(unitId).first<{ id: string }>();
   if (!unit) throw notFound('Unit not found');
@@ -1356,6 +1356,9 @@ deviceRoutes.post('/admin/units/backfill-delivered', async (c) => {
  */
 deviceRoutes.post('/admin/units/:unitId/serial', async (c) => {
   const admin = c.get('user')!;
+  // It ADDS a serial, so it follows `receive` like every intake door (owner
+  // decision 1, 2026-10-09); moving a serial off an open warranty stays the owner's.
+  await requireSerialWrite(c.env, admin);
   const unitId = c.req.param('unitId');
   const body = await c.req.json().catch(() => ({}));
   str(body.serial, 'serial', { min: 1, max: 80 });

@@ -16,9 +16,9 @@
  * value that is a BOX SN (critique-2 H1): the next read is that box's own
  * device serial and belongs to the SAME unit.
  *
- * LINKED: a check, «تم ربط الرقم التسلسلي», the serial (whole for the owner
- * and full-scope admins, masked for assistants — the server decides which it
- * sends), «تغيير» and «إزالة». Removing releases only the link; the device
+ * LINKED: a check, «تم ربط الرقم التسلسلي», the serial (whole for every
+ * admin since owner decision 1, 2026-10-09 — the server decides what it
+ * sends, and a masked form still renders), «تغيير» and «إزالة». Removing releases only the link; the device
  * keeps its record, warranty identity and history (§20).
  *
  * Nothing is decided here: every value goes to the server, which validates,
@@ -291,7 +291,7 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
     }
   };
 
-  /** §30 «أعد ربطه»: the slot's previous serial, by its released binding (works masked too). */
+  /** §30 «أعد ربطه»: the slot's previous serial, by its released binding (the client never needs to hold it). */
   const relink = async (slot: SerialSlotView) => {
     const prev = slot.previous;
     if (!prev) return;

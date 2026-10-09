@@ -47,7 +47,9 @@ const scene = params.get('scene') ?? 'order';
 const state = params.get('state') ?? 'fresh';
 const owner = params.get('owner') !== '0';
 const assistant = params.get('scope') === 'assistant';
-const full = owner || !assistant;
+// Owner decision 1 (2026-10-09): every admin reads the whole serial; order
+// numbers on the serial page follow canMoveMoney (the owner and full admins).
+const orderRefs = owner || !assistant;
 const gateOn = params.get('gate') === '1';
 const shipped = params.get('shipped') === '1';
 localStorage.setItem('levo_lang', lang);
@@ -57,8 +59,6 @@ document.documentElement.setAttribute('data-theme', params.get('theme') === 'lig
 
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 const ORDER = 'ORD-2026-0142';
-const mask = (raw: string) => (raw.length <= 4 ? '****' : `****${raw.slice(-4)}`);
-const shown = (raw: string) => (full ? raw : mask(raw));
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ----------------------------------------------------------- the order
@@ -101,8 +101,8 @@ const LOT = { id: 'lot_2026_09_21_a', received_at: '2026-09-21T09:00:00.000Z', l
 function assignment(raw: string, extra: Partial<Assignment> = {}): Assignment {
   return {
     id: `sa_${++seq}`,
-    serial_display: shown(raw),
-    ...(full ? { serial_full: raw } : {}),
+    serial_display: raw,
+    serial_full: raw,
     linked_at: ago(12),
     linked_by: 'u_sara',
     source: 'camera',
@@ -142,8 +142,8 @@ if (state === 'partial' || state === 'done') {
 }
 if (state === 'done') link('oi_a1', 2, '03919D580607842', { source: 'scanner' });
 if (state === 'reopen') {
-  slotOf('oi_a1', 1)!.previous = { serial_display: shown('03919D580607841'), ...(full ? { serial_full: '03919D580607841' } : {}), released_at: ago(60 * 26), reason: 'order_cancelled', free: true };
-  slotOf('oi_a1', 2)!.previous = { serial_display: shown('03919D580607899'), ...(full ? { serial_full: '03919D580607899' } : {}), released_at: ago(60 * 26), reason: 'order_cancelled', free: false };
+  slotOf('oi_a1', 1)!.previous = { serial_display: '03919D580607841', serial_full: '03919D580607841', released_at: ago(60 * 26), reason: 'order_cancelled', free: true };
+  slotOf('oi_a1', 2)!.previous = { serial_display: '03919D580607899', serial_full: '03919D580607899', released_at: ago(60 * 26), reason: 'order_cancelled', free: false };
   slotOf('oi_a1', 2)!.flags = ['STOCK_NOT_RETAKEN'];
 }
 
@@ -232,32 +232,32 @@ function story(serial: string) {
   const live = !!s;
   const by = (email: string) => ({ id: `u_${email.split('@')[0]}`, email, username: null });
   const history = [
-    ...(live ? [{ id: 9, action: 'serial.linked', created_at: ago(12), actor: by('sara@levonis.iq'), detail: { order_id: full ? ORDER : null, unit_index: s!.unit_index, source: 'camera' } }] : []),
+    ...(live ? [{ id: 9, action: 'serial.linked', created_at: ago(12), actor: by('sara@levonis.iq'), detail: { order_id: orderRefs ? ORDER : null, unit_index: s!.unit_index, source: 'camera' } }] : []),
     ...(ams
       ? [
-          { id: 8, action: 'serial.returned', created_at: ago(60 * 24 * 9), actor: by('owner@levonis.iq'), detail: { order_id: full ? 'ORD-2026-0057' : null, return_case_id: 'rc_19' } },
-          { id: 7, action: 'serial.warranty_activated', created_at: ago(60 * 24 * 160), actor: null, detail: { order_id: full ? 'ORD-2026-0057' : null } },
-          { id: 6, action: 'serial.linked', created_at: ago(60 * 24 * 163), actor: by('ali@levonis.iq'), detail: { order_id: full ? 'ORD-2026-0057' : null } },
+          { id: 8, action: 'serial.returned', created_at: ago(60 * 24 * 9), actor: by('owner@levonis.iq'), detail: { order_id: orderRefs ? 'ORD-2026-0057' : null, return_case_id: 'rc_19' } },
+          { id: 7, action: 'serial.warranty_activated', created_at: ago(60 * 24 * 160), actor: null, detail: { order_id: orderRefs ? 'ORD-2026-0057' : null } },
+          { id: 6, action: 'serial.linked', created_at: ago(60 * 24 * 163), actor: by('ali@levonis.iq'), detail: { order_id: orderRefs ? 'ORD-2026-0057' : null } },
         ]
       : [
-          { id: 5, action: 'serial.released', created_at: ago(60 * 26), actor: { id: 'u_omar', email: 'omar@levonis.iq', username: null, via: 'order_status_history' }, detail: { order_id: full ? 'ORD-2026-0111' : null, reason: 'order_cancelled' } },
-          { id: 4, action: 'serial.linked', created_at: ago(60 * 30), actor: by('omar@levonis.iq'), detail: { order_id: full ? 'ORD-2026-0111' : null } },
+          { id: 5, action: 'serial.released', created_at: ago(60 * 26), actor: { id: 'u_omar', email: 'omar@levonis.iq', username: null, via: 'order_status_history' }, detail: { order_id: orderRefs ? 'ORD-2026-0111' : null, reason: 'order_cancelled' } },
+          { id: 4, action: 'serial.linked', created_at: ago(60 * 30), actor: by('omar@levonis.iq'), detail: { order_id: orderRefs ? 'ORD-2026-0111' : null } },
         ]),
     { id: 1, action: 'serial_inventory.add', created_at: ago(60 * 24 * (ams ? 170 : 2)), actor: by('ali@levonis.iq'), detail: { source: ams ? 'bulk' : 'prep_scan' } },
   ];
   return {
-    serial_display: shown(serial),
-    ...(full ? { serial } : {}),
-    serial_norm: full ? serial : null,
+    serial_display: serial,
+    serial,
+    serial_norm: serial,
     legacy: false,
     product: ams ? { id: 'p_ams', name: 'Bambu Lab AMS Lite', name_ar: 'Bambu Lab AMS Lite' } : { id: 'p_a1', name: 'Bambu Lab A1 Combo', name_ar: 'Bambu Lab A1 Combo' },
     variant: ams ? null : { id: 'v_combo', label: 'Combo · AMS Lite' },
     sku: ams ? 'BL-AMS-LITE' : 'BL-A1-COMBO',
     status: live ? 'reserved' : 'in_stock',
-    current_order: live ? { order_id: full ? ORDER : null, unit_index: s!.unit_index, linked_at: ago(12), activated: false } : null,
+    current_order: live ? { order_id: orderRefs ? ORDER : null, unit_index: s!.unit_index, linked_at: ago(12), activated: false } : null,
     previous_orders: ams
-      ? [{ order_id: full ? 'ORD-2026-0057' : null, released_at: ago(60 * 24 * 9), reason: 'returned', linked_at: ago(60 * 24 * 163) }]
-      : [{ order_id: full ? 'ORD-2026-0111' : null, released_at: ago(60 * 26), reason: 'order_cancelled', linked_at: ago(60 * 30) }],
+      ? [{ order_id: orderRefs ? 'ORD-2026-0057' : null, released_at: ago(60 * 24 * 9), reason: 'returned', linked_at: ago(60 * 24 * 163) }]
+      : [{ order_id: orderRefs ? 'ORD-2026-0111' : null, released_at: ago(60 * 26), reason: 'order_cancelled', linked_at: ago(60 * 30) }],
     warranty: ams
       ? { state: live ? 'PENDING_DELIVERY' : 'RETURNED', start_at: ago(60 * 24 * 160), end_at: '2027-03-14T00:00:00.000Z', remaining_days: null, mode: live ? 'carry' : null, closed_reason: 'returned' }
       : { state: live ? 'PENDING_DELIVERY' : 'NOT_ACTIVATED', start_at: null, end_at: null, remaining_days: null, mode: live ? 'new' : null, closed_reason: null },

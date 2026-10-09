@@ -429,24 +429,24 @@ test('regressions #3: the owner-only placement rule reads the product\'s own cat
 
 // ------------------------------------------------------------ UX #1, #16
 
-test('UX #1: the serial page shows an assistant the masked serial everywhere — the row, the copy, and another device named in a change', async () => {
+test('UX #1 under owner decision 1: the serial page shows an assistant the whole serial everywhere — the row, the copy, and another device named in a change — and no order number', async () => {
   const w = world();
   order(w.raw, 'ORD-M', [{ id: 'lm', product: 'pA1' }]);
   const s = await json(await scan(w, 'adm', 'ORD-M', 'lm', 1, SN));
   assert.equal((await post(w.as('adm'), '/api/admin/orders/ORD-M/serials/change', { assignment_id: s.assignment_id, code: SN2, source: 'camera', op_id: op() })).status, 200);
   const page = await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`));
-  assert.equal(page.row.serial, '****7841');
-  assert.equal(page.row.serial_norm, '****7841');
-  assert.equal(page.story.serial, undefined, 'nothing whole to copy');
-  const text = JSON.stringify(page);
-  assert.ok(!text.includes(SN) && !text.includes(SN2), 'no full serial anywhere in the answer');
+  assert.equal(page.row.serial, SN);
+  assert.equal(page.row.serial_norm, SN);
+  assert.equal(page.story.serial, SN, 'the whole serial to copy');
   const change = page.history.find((h: { action: string; detail: { reason?: string } }) => h.action === 'serial.released' && h.detail.reason === 'changed');
-  assert.equal(change.detail.new_serial, '****7842');
+  assert.equal(change.detail.new_serial, SN2, 'the other device named whole');
+  assert.ok(!JSON.stringify(page).includes('ORD-M'), 'no order number anywhere in the assistant\'s answer');
   const boss = await json(await get(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}`));
   assert.equal(boss.row.serial, SN, 'the owner sees it whole');
+  assert.ok(JSON.stringify(boss).includes('ORD-M'), 'and the order number');
 });
 
-test('UX #16: an assistant re-links a re-opened order\'s previous serial by its binding — without ever holding the full serial', async () => {
+test('UX #16: an assistant re-links a re-opened order\'s previous serial by its binding — the client never sends the serial', async () => {
   const w = world();
   order(w.raw, 'ORD-RL', [{ id: 'l1', product: 'pA1' }]);
   assert.equal((await scan(w, 'adm', 'ORD-RL', 'l1', 1, SN)).status, 200);
@@ -455,13 +455,13 @@ test('UX #16: an assistant re-links a re-opened order\'s previous serial by its 
   assert.equal((await stage(w, 'ORD-RL', 'preparing')).status, 200);
   const view = await json(await get(w.as('ast'), '/api/admin/orders/ORD-RL/serials'));
   const prev = view.serials.slots[0].previous;
-  assert.equal(prev.serial_full, undefined);
+  assert.equal(prev.serial_full, SN, 'owner decision 1: the assistant sees it whole');
   assert.ok(prev.assignment_id);
   const relink = await post(w.as('ast'), '/api/admin/orders/ORD-RL/serials/scan', { order_item_id: 'l1', unit_index: 1, previous_assignment_id: prev.assignment_id, op_id: op() });
   assert.equal(relink.status, 200, await relink.clone().text());
   const res = await json(relink);
   assert.equal(res.outcome, 'existing');
-  assert.equal(res.slot.assignment.serial_display, '****7841');
+  assert.equal(res.slot.assignment.serial_display, SN);
   assert.equal(res.slot.assignment.source, 'relink');
   // Another order's binding is not a way to name a serial.
   order(w.raw, 'ORD-OT', [{ id: 'lo', product: 'pA1' }], { user: 'u2' });

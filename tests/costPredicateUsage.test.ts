@@ -66,7 +66,9 @@ test('C1: none of the alias names the area specs invented exists, in code or as 
 
 test('the predicates are DEFINED in worker/lib/adminScope.ts and nowhere else', () => {
   const def = (name: string) => new RegExp(`(function\\s+${name}\\s*[(<]|(const|let|var)\\s+${name}\\s*[=:])`);
-  for (const name of ['canViewCost', 'canWriteCost', 'canMoveMoney', 'viewerClass', 'hasPrivateGrant', 'projectForAdmin', 'isUnverifiedOwner']) {
+  // canSeeFullSerial (owner decision 1, 2026-10-09) is no cost predicate, but it is one
+  // more admin-scope answer, so it lives with the family and nowhere else.
+  for (const name of ['canViewCost', 'canWriteCost', 'canMoveMoney', 'canSeeFullSerial', 'viewerClass', 'hasPrivateGrant', 'projectForAdmin', 'isUnverifiedOwner']) {
     const where = ALL.filter((f) => def(name).test(code(f)));
     assert.deepEqual(where, ['worker/lib/adminScope.ts'], `${name} is defined once`);
   }

@@ -11,8 +11,9 @@
  *   mandatory reason; the camera sheet (a real camera read through a fake
  *   device that films a label, §32.11) with its typed field; «✓ تم ربط
  *   الرقم التسلسلي»; the serial / warranty page with its history; remove;
- *   the §19 blocker, the refused move and «اذهب إلى الوحدة»; the masked
- *   serial for an assistant; the orders board chip; the owner's gate switch;
+ *   the §19 blocker, the refused move and «اذهب إلى الوحدة»; the whole
+ *   serial for an assistant too (owner decision 1, 2026-10-09), with no order
+ *   numbers on its serial page; the orders board chip; the owner's gate switch;
  *   the product and section policy controls, locked for everyone else.
  *
  * Arabic, English and Sorani; dark and light; 390 and 1280 px; the Sorani
@@ -275,24 +276,25 @@ for (const pass of PASSES) {
     await openOrder(page, { ...L, state: 'partial', owner: pass.full ? '1' : '0', scope: pass.full ? 'full' : 'assistant' });
     const value = slot(page, 'oi_a1:1').locator('[data-serial-value]');
     const text = await value.innerText();
-    check(`${tag}: the serial is ${pass.full ? 'whole' : 'masked'} for this viewer`, pass.full ? text.includes('03919D580607841') : text.includes('****7841') && !text.includes('03919D58'), text);
-    if (pass.full) {
-      await value.click();
-      const page2 = page.locator('[data-serial-detail]');
-      await page2.locator('[data-serial-detail-value]').waitFor({ timeout: 8000 });
-      await page.waitForTimeout(500);
-      const events = await page2.locator('[data-serial-event]').count();
-      check(`${tag}: the serial page shows the history, newest first`, events >= 3, String(events));
-      check(`${tag}: …with the reserved status`, (await page2.locator('[data-serial-detail-status="reserved"]').count()) === 1);
-      await shot(page, `07-serial-page-${tag}`);
-      await page2.locator('[data-serial-timeline]').scrollIntoViewIfNeeded();
-      await page.waitForTimeout(300);
-      await shot(page, `07b-serial-history-${tag}`);
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(600);
-    } else {
-      await shot(page.locator('[data-warranty-section]'), `07-masked-${tag}`);
+    // Owner decision 1 (2026-10-09): the owner, a full admin AND an assistant read the whole serial.
+    check(`${tag}: the serial is whole for this viewer (${pass.full ? 'owner' : 'assistant'})`, text.includes('03919D580607841') && !text.includes('****'), text);
+    await value.click();
+    const page2 = page.locator('[data-serial-detail]');
+    await page2.locator('[data-serial-detail-value]').waitFor({ timeout: 8000 });
+    await page.waitForTimeout(500);
+    const events = await page2.locator('[data-serial-event]').count();
+    check(`${tag}: the serial page shows the history, newest first`, events >= 3, String(events));
+    check(`${tag}: …with the reserved status`, (await page2.locator('[data-serial-detail-status="reserved"]').count()) === 1);
+    if (!pass.full) {
+      const detailText = await page2.innerText();
+      check(`${tag}: …and no order number for an assistant (option A)`, !/ORD-2026-0\d{3}/.test(detailText), detailText.slice(0, 200));
     }
+    await shot(page, `07-serial-page-${tag}`);
+    await page2.locator('[data-serial-timeline]').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await shot(page, `07b-serial-history-${tag}`);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
     await slot(page, 'oi_a1:1').locator('[data-serial-remove]').click();
     const confirm = page.locator('[data-confirm-action]');
     await confirm.waitFor({ timeout: 5000 });

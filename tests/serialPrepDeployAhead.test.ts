@@ -42,7 +42,7 @@ type W = ReturnType<typeof world>;
 const before = () => world({ through: BEFORE_SERIALS });
 const scan = (w: W, o: string, item: string, unit: number, code: string) =>
   post(w.as('adm'), `/api/admin/orders/${o}/serials/scan`, { order_item_id: item, unit_index: unit, code, source: 'camera', op_id: op() });
-const ACTOR = { id: 'boss', owner: true, fullSerial: true };
+const ACTOR = { id: 'boss', owner: true, fullSerial: true, orderRefs: true };
 
 test('the fixture is what it claims: one migration behind has none of the new schema; the code expects the serial migration', () => {
   const w = before();

@@ -5,7 +5,11 @@
  * behind that file's `/admin/*` guard (main host, admin role) and carrying
  * the same guard itself, so it stays closed if it is ever mounted elsewhere.
  * Inventory rows hold no money; an assistant-scoped admin sees them like any
- * other device screen.
+ * other device screen — the whole serial included (owner decision 1,
+ * 2026-10-09). ADDING a serial (`/commit`, `/scan`, `/link-ean`) follows the
+ * `receive` operations capability (`requireSerialWrite`); the preview, PATCH,
+ * void and restore keep their own gates, and their owner-only parts
+ * (`guardSerialHistory`) are unchanged.
  *
  *   GET   /                     keyset page (?q=&status=&product_id=&cursor=&limit=) + counts
  *   GET   /export               CSV of the same filter (formula-safe cells)
@@ -34,6 +38,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAdmin, requireMainHost, badRequest, str, int } from '../lib/http';
+import { requireSerialWrite } from '../lib/operations';
 import type { Context } from 'hono';
 import { audit } from '../lib/audit';
 import { maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled, serialStory, setWarrantyMode } from '../lib/serialAssignments';
@@ -131,6 +136,7 @@ serialInventoryRoutes.post('/preview', async (c) => {
 
 serialInventoryRoutes.post('/commit', async (c) => {
   const admin = c.get('user')!;
+  await requireSerialWrite(c.env, admin);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const source: InventorySource = body.source === 'scan' ? 'scan' : body.source === 'manual' ? 'manual' : 'bulk';
   const { rows, too_many } = candidateRows(body);
@@ -184,6 +190,7 @@ serialInventoryRoutes.post('/commit', async (c) => {
  */
 serialInventoryRoutes.post('/scan', async (c) => {
   const admin = c.get('user')!;
+  await requireSerialWrite(c.env, admin);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const s = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).slice(0, 200) : '');
   // «إدخال يدوي» registers its one serial through this same door (same
@@ -245,6 +252,7 @@ serialInventoryRoutes.post('/scan', async (c) => {
  */
 serialInventoryRoutes.post('/link-ean', async (c) => {
   const admin = c.get('user')!;
+  await requireSerialWrite(c.env, admin);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const ean = normalizeEan(typeof body.ean === 'string' ? body.ean : '');
   if (!ean) throw badRequest('Invalid EAN', 'EAN_INVALID');
@@ -305,13 +313,16 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   const norm = serialParam(c.req.param('serial'));
   const row = await loadInventoryRow(c.env.DB, norm);
   const actor = serialActor(c.env, c.get('user')!);
-  // WHO SEES THE WHOLE SERIAL is decided by the viewer alone (and, before
+  // WHAT THIS VIEWER SEES is decided by the viewer alone (and, before
   // migration 0178, by HEAD's rule: the row as it always was) — never by
-  // whether the story happened to load (landing round 3, F6). A story that
-  // fails on a migrated database is a 503 the page can retry, never an
-  // unmasked 200.
+  // whether the story happened to load (landing round 3, F6). Two rules:
+  // the whole serial for every admin (owner decision 1, 2026-10-09; the
+  // masking stays as defence in depth), the order number for `orderRefs`
+  // (the owner and full-scope admins). A story that fails on a migrated
+  // database is a 503 the page can retry, never an unfiltered 200.
   const installed = await serialAssignmentsInstalled(c.env.DB);
-  const masked = installed && !actor.fullSerial;
+  const hideSerial = installed && !actor.fullSerial;
+  const hideOrders = installed && !actor.orderRefs;
   let story: Awaited<ReturnType<typeof serialStory>> = null;
   if (installed) {
     try {
@@ -336,21 +347,16 @@ serialInventoryRoutes.get('/:serial', async (c) => {
   )
     .bind(norm, row.unit_id)
     .all<Record<string, unknown>>();
-  // With the story (0178), the page follows the owner default everywhere on
-  // it (UX review #1, critique L7): an assistant gets the masked serial and no
-  // order number in the row too, not only in the story. Before the migration
-  // the row is exactly what it always was.
+  // With the story (0178), the row follows the same two rules as the story
+  // (UX review #1, critique L7): no order number for an assistant, in the row
+  // too; a masked serial for a viewer without `fullSerial` (none since
+  // decision 1). Before the migration the row is exactly what it always was.
   const pub = inventoryRowPublic(row);
-  const shownRow =
-    masked
-      ? {
-          ...pub,
-          serial: maskSerial(pub.serial),
-          serial_norm: maskSerial(pub.serial_norm),
-          box_sn: pub.box_sn ? maskSerial(pub.box_sn) : pub.box_sn,
-          unit: pub.unit ? { ...pub.unit, order_id: null } : null,
-        }
-      : pub;
+  const serialPart = hideSerial
+    ? { serial: maskSerial(pub.serial), serial_norm: maskSerial(pub.serial_norm), box_sn: pub.box_sn ? maskSerial(pub.box_sn) : pub.box_sn }
+    : {};
+  const unitPart = hideOrders && pub.unit ? { unit: { ...pub.unit, order_id: null } } : {};
+  const shownRow = { ...pub, ...serialPart, ...unitPart };
   return c.json({
     success: true,
     row: shownRow,
@@ -363,7 +369,7 @@ serialInventoryRoutes.get('/:serial', async (c) => {
             action: h.action,
             created_at: h.created_at,
             actor: h.actor_id ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null } : null,
-            detail: masked ? maskedDetail(detail, actor) : detail,
+            detail: hideSerial || hideOrders ? maskedDetail(detail, actor) : detail,
           };
         }),
     ...(story ? { story } : {}),

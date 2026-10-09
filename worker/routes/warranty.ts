@@ -302,8 +302,8 @@ warrantyAdminRoutes.get('/:id', async (c) => {
   // The serial page's privacy on the receipt's trail (landing round 3, F5):
   // `warranty.replaced` names the replacement's serial and the replaced one,
   // `warranty.reissued` the corrected serial, and rows carry order numbers.
-  // An assistant gets them masked (`maskedDetail`, viewer by `serialActor`);
-  // the owner and full-scope admins read them whole.
+  // `maskedDetail`, viewer by `serialActor`: every admin reads the serials
+  // whole (owner decision 1, 2026-10-09); an assistant gets no order numbers.
   const actor = serialActor(c.env, c.get('user')!);
   const row = await c.env.DB.prepare(`SELECT ${RECEIPT_COLS} FROM warranty_receipts WHERE id = ? OR receipt_no = ?`)
     .bind(id, id)

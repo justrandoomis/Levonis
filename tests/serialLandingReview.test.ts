@@ -244,8 +244,10 @@ test('S1 #2 variant: the TXT template door judges `serialized` and the filing li
 
 // ------------------------------------------------------------------ S1 #3
 
-test('S1 #3: the serial page masks every serial a history row names, at any depth', async () => {
-  const assistant = { fullSerial: false };
+test('S1 #3: the masking path (defence in depth since owner decision 1) masks every serial a history row names, at any depth', async () => {
+  // No admin is shown a masked serial since owner decision 1 (2026-10-09);
+  // the path stays, and a viewer without either right is masked by it.
+  const assistant = { fullSerial: false, orderRefs: false };
   const replaced = maskedDetail({ replaced_receipt_no: 'W-1', replaced_serial: SN, new_serial: SN2, new_unit_id: 'u2' }, assistant);
   assert.equal(replaced.replaced_serial, maskSerial(SN));
   assert.equal(replaced.new_serial, maskSerial(SN2));
@@ -256,9 +258,15 @@ test('S1 #3: the serial page masks every serial a history row names, at any dept
   const updated = maskedDetail({ from: { box_sn: BOX, product_id: 'pA1', order_id: 'ORD-9' }, to: { box_sn: 'B07119G5811000AC' } }, assistant);
   assert.deepEqual(updated, { from: { box_sn: maskSerial(BOX), product_id: 'pA1', order_id: null }, to: { box_sn: maskSerial('B07119G5811000AC') } });
   assert.deepEqual(maskedDetail({ serials: [SN, SN2] }, assistant), { serials: [maskSerial(SN), maskSerial(SN2)] });
-  assert.deepEqual(maskedDetail({ corrected_serial: { from: SN } }, { fullSerial: true }), { corrected_serial: { from: SN } }, 'the owner sees it whole');
+  assert.deepEqual(maskedDetail({ corrected_serial: { from: SN } }, { fullSerial: true, orderRefs: true }), { corrected_serial: { from: SN } }, 'the owner sees it whole');
+  // The two halves are separate: an assistant today — whole serials, no order numbers.
+  assert.deepEqual(
+    maskedDetail({ from: { box_sn: BOX, order_id: 'ORD-9' }, new_serial: SN2 }, { fullSerial: true, orderRefs: false }),
+    { from: { box_sn: BOX, order_id: null }, new_serial: SN2 }
+  );
+  assert.deepEqual(maskedDetail({ new_serial: SN2, order_id: 'ORD-9' }, { fullSerial: false, orderRefs: true }), { new_serial: maskSerial(SN2), order_id: 'ORD-9' });
 
-  // Through the page itself.
+  // Through the page itself: every admin reads the serials whole (decision 1).
   const w = world();
   w.raw.exec(`
     INSERT INTO serial_inventory (serial_norm, serial_raw, model_name, product_id, box_sn, created_by) VALUES ('${SN}','${SN}','A1 Combo','pA1','${BOX}','boss');
@@ -270,10 +278,8 @@ test('S1 #3: the serial page masks every serial a history row names, at any dept
   const page = await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`));
   assert.equal(page.success, true, JSON.stringify(page));
   assert.equal(page.history.length, 4, 'three rows and the rebuilt «added»');
-  // The WHOLE answer, not only the history: the rebuilt «added» row's id
-  // carried the full serial too.
-  const text = JSON.stringify(page);
-  for (const whole of [SN, SN2, BOX, 'B07119G5811000AC']) assert.equal(text.includes(whole), false, `${whole} reached an assistant: ${text}`);
+  const text = JSON.stringify(page.history);
+  for (const whole of [SN2, BOX, 'B07119G5811000AC']) assert.ok(text.includes(whole), `${whole}: the assistant reads it whole`);
   const ownerPage = JSON.stringify((await json(await get(w.as('boss'), `/api/devices/admin/serial-inventory/${SN}`))).history);
   assert.ok(ownerPage.includes(SN2) && ownerPage.includes(BOX), 'the owner reads them whole');
 });

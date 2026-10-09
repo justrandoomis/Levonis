@@ -15,7 +15,9 @@
  * WHO. Any admin may scan, change and unlink while the order is being
  * prepared, unless the owner revoked their `receive` operations capability
  * (worker/lib/operations.ts — the capability that already gates serial→lot
- * linking). Every exception is the OWNER's (INITIAL_ADMIN_EMAIL): taking a
+ * linking; `requireSerialWrite` on the doors that add a serial, the same rule
+ * as the inventory's intake doors). Every admin sees the whole serial (owner
+ * decision 1, 2026-10-09). Every exception is the OWNER's (INITIAL_ADMIN_EMAIL): taking a
  * serial from another order, a delivered or unavailable device, outside the
  * window, a batch or model mismatch — each with a 5–500 character reason,
  * audited inside the same batch.
@@ -27,7 +29,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, int, str, oneOf } from '../lib/http';
-import { requireCapability } from '../lib/operations';
+import { requireCapability, requireSerialWrite } from '../lib/operations';
 import {
   OVERRIDE_KINDS,
   linkSerial,
@@ -77,8 +79,8 @@ async function requireInstalled(c: Context<AppContext>) {
 
 /**
  * §30 «أعد ربطه» by the released binding's id (UX review #16): the slot's
- * previous serial, re-linked without the client holding it — so an assistant,
- * who only ever sees the masked form, can re-link a device that is still free.
+ * previous serial, re-linked without the client holding it — one tap, and it
+ * works for a viewer shown the masked form too (none since owner decision 1).
  * Only a binding of THIS order on THIS unit; the link then runs every rule.
  */
 async function previousSerialOf(c: Context<AppContext>, orderId: string, itemId: string, unitIndex: number, previousId: string): Promise<string> {
@@ -95,7 +97,7 @@ async function previousSerialOf(c: Context<AppContext>, orderId: string, itemId:
 
 adminOrderSerialRoutes.post('/:id/serials/scan', async (c) => {
   const user = c.get('user')!;
-  await requireCapability(c.env, user, 'receive');
+  await requireSerialWrite(c.env, user);
   const b = await body(c);
   const orderId = orderIdOf(c);
   const orderItemId = str(b.order_item_id, 'order_item_id', { min: 1, max: 80 });
@@ -139,7 +141,7 @@ async function targetOf(c: Context<AppContext>, orderId: string, assignmentId: s
 
 adminOrderSerialRoutes.post('/:id/serials/change', async (c) => {
   const user = c.get('user')!;
-  await requireCapability(c.env, user, 'receive');
+  await requireSerialWrite(c.env, user);
   await requireInstalled(c);
   const b = await body(c);
   const orderId = orderIdOf(c);

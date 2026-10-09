@@ -77,6 +77,20 @@ export async function requireCapability(env: Env, user: SessionUser, capability:
   if (permission?.allowed === 0) throw forbidden('ليس لديك صلاحية لهذه العملية');
 }
 
+/**
+ * ADDING A SERIAL (owner decision 1, 2026-10-09; DECISIONS row 192). Every
+ * door that adds a serial — the preparation scan, the inventory's commit,
+ * scan and link-EAN, the post-delivery assign — follows the `receive`
+ * operations capability, as the preparation doors already did: the owner
+ * always passes, a missing row allows, `allowed = 0` refuses. No new
+ * capability value (the CHECK of migration 0162 cannot be widened
+ * additively). Sensitive edits and exceptions keep their own gates.
+ */
+export async function requireSerialWrite(env: Env, user: SessionUser | null | undefined) {
+  if (!user || user.role !== 'admin') throw forbidden('ليس لديك صلاحية لهذه العملية');
+  await requireCapability(env, user, 'receive');
+}
+
 /** The capabilities that read or write cost: owner only (decision 2). */
 export const FINANCIAL_CAPABILITIES: readonly Capability[] = ['purchase', 'rules', 'pay', 'accounting', 'close'];
 export function fence(db: D1Database, sqlCondition: string, args: unknown[] = []): D1PreparedStatement[] {

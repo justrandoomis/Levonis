@@ -181,6 +181,30 @@ export function canMoveMoney(env: Env, user: CostSubject | null | undefined): bo
   return normalizeAdminScope(user.admin_scope) !== 'assistant';
 }
 
+/**
+ * SERIAL VISIBILITY (owner decision 1, 2026-10-09; DECISIONS row 192): every
+ * platform admin — the owner, full and legacy NULL scope, and assistants (the
+ * preparer «المجهز», support) — sees the whole serial, because their work
+ * needs it (scanning at preparation, device and warranty checks). A serial is
+ * NOT cost: this never feeds canViewCost / canWriteCost / canMoveMoney or
+ * projectForAdmin, and a customer, a merchant or a visitor is never an admin
+ * here. Order numbers stay with canMoveMoney (the serial actor's `orderRefs`).
+ */
+export function canSeeFullSerial(env: Env, user: CostSubject | null | undefined): boolean {
+  if (!user || user.role !== 'admin') return false;
+  if (isOwner(env, user)) return true;
+  const scope = normalizeAdminScope(user.admin_scope);
+  switch (scope) {
+    case null:
+    case 'full':
+    case 'assistant':
+      return true;
+  }
+  // A scope added later must decide here, or this stops compiling.
+  const exhaustive: never = scope;
+  return exhaustive;
+}
+
 export type ViewerClass =
   | 'guest'
   | 'customer'

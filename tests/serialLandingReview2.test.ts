@@ -40,7 +40,7 @@ import { adminMysteryRoutes } from '../worker/routes/mystery';
 import { toCsv } from '../worker/lib/importCsv';
 import { IMPORT_ROW_CHANGED_RETRY, IMPORT_SERIALIZED_OWNER_ONLY, IMPORT_SERIAL_REFILE_OWNER_ONLY, importPlacements } from '../worker/lib/importApply';
 import { catalogEditSerialFlips, lineDevicePolicy, printerFlagSerialFlips, reparentSerialFlips, serializationContext } from '../worker/lib/serialPolicy';
-import { maskSerial, createUnitsOnDelivery, sweepDeliveredOrdersWithoutUnits } from '../worker/lib/deviceOps';
+import { createUnitsOnDelivery, sweepDeliveredOrdersWithoutUnits } from '../worker/lib/deviceOps';
 import { contractRefusal, refusalLang, refusalText, REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 import { COST_REFUSALS, serverMessage } from '../packages/contracts/src/costRefusals';
 import { seedCatalogue, addBundle, orderBody } from './lib/bundles';
@@ -304,7 +304,7 @@ test('F3: the OWNER_ONLY refusal renders by code in ar / en / ckb on the admin s
 
 // ====================================================================== F5
 
-test('F5: the unit history masks serials and order numbers for an assistant, as the serial page does', async () => {
+test('F5: the unit history hides order numbers from an assistant, as the serial page does — and shows the serials whole (owner decision 1)', async () => {
   const w = world();
   order(w.raw, 'ORD-SECRET', [{ id: 'oi1', product: 'pA1' }], { status: 'delivered', stage: 'delivered' });
   w.raw.exec(`
@@ -315,16 +315,15 @@ test('F5: the unit history masks serials and order numbers for an assistant, as 
   const ast = await json(await get(w.as('ast'), '/api/devices/admin/units/un1/history'));
   assert.equal(ast.success, true, JSON.stringify(ast));
   const text = JSON.stringify(ast);
-  for (const whole of [SN, SN2, 'ORD-SECRET']) assert.equal(text.includes(whole), false, `${whole} reached an assistant: ${text}`);
-  assert.equal(ast.history[0].detail.detached_serial, maskSerial(SN2));
-  assert.equal(ast.history[0].detail.reason, 'swap', 'the rest of the row is untouched');
+  assert.equal(text.includes('ORD-SECRET'), false, `the order number reached an assistant: ${text}`);
+  assert.deepEqual(ast.history[0].detail, { serial_norm: SN, detached_serial: SN2, order_id: null, reason: 'swap' }, 'whole serials, no order number, the rest untouched');
   for (const who of ['adm', 'boss'] as const) {
     const full = await json(await get(w.as(who), '/api/devices/admin/units/un1/history'));
     assert.deepEqual(full.history[0].detail, { serial_norm: SN, detached_serial: SN2, order_id: 'ORD-SECRET', reason: 'swap' }, who);
   }
 });
 
-test('F5: the warranty receipt\'s history masks the replaced and corrected serials for an assistant', async () => {
+test('F5: the warranty receipt\'s history shows an assistant the replaced and corrected serials whole (owner decision 1), without the order number', async () => {
   const w = world();
   order(w.raw, 'ORD-W', [{ id: 'oiw', product: 'pA1' }], { status: 'delivered', stage: 'delivered' });
   w.raw.exec(`
@@ -338,10 +337,14 @@ test('F5: the warranty receipt\'s history masks the replaced and corrected seria
   const ast = await json(await get(w.as('ast'), '/api/admin/warranties/wr1'));
   assert.equal(ast.success, true, JSON.stringify(ast));
   const history = JSON.stringify(ast.history);
-  for (const whole of [SN, SN2, 'ORD-W']) assert.equal(history.includes(whole), false, `${whole} reached an assistant: ${history}`);
+  assert.equal(history.includes('ORD-W'), false, `the order number reached an assistant: ${history}`);
   const replaced = (ast.history as Array<{ action: string; detail: Record<string, unknown> }>).find((h) => h.action === 'warranty.replaced')!;
-  assert.equal(replaced.detail.replaced_serial, maskSerial(SN));
-  assert.equal(replaced.detail.replaced_receipt_no, 'LV-W-000001', 'a receipt number is not a serial');
+  assert.equal(replaced.detail.replaced_serial, SN);
+  assert.equal(replaced.detail.new_serial, SN2);
+  assert.equal(replaced.detail.order_id, null);
+  assert.equal(replaced.detail.replaced_receipt_no, 'LV-W-000001', 'a receipt number is not an order number');
+  const reissued = (ast.history as Array<{ action: string; detail: Record<string, unknown> }>).find((h) => h.action === 'warranty.reissued')!;
+  assert.deepEqual(reissued.detail.corrected_serial, { from: SN2, to: SN });
   for (const who of ['adm', 'boss'] as const) {
     const full = JSON.stringify((await json(await get(w.as(who), '/api/admin/warranties/wr1'))).history);
     assert.ok(full.includes(SN2) && full.includes('ORD-W'), `${who} reads them whole`);
@@ -350,14 +353,15 @@ test('F5: the warranty receipt\'s history masks the replaced and corrected seria
 
 // ====================================================================== F6
 
-test('F6: when the serial story fails on a migrated database the page answers 503 — never the whole serial', async () => {
+test('F6: when the serial story fails on a migrated database the page answers 503 — never an unfiltered page', async () => {
   const w = world();
   w.raw.exec(`
     INSERT INTO serial_inventory (serial_norm, serial_raw, model_name, product_id, box_sn, created_by) VALUES ('${SN}','${SN}','A1 Combo','pA1','${BOX}','boss');
     INSERT INTO audit_log (actor_id, action, target, detail) VALUES ('boss','serial_inventory.update','${SN}','{"from":{"box_sn":"${BOX}","order_id":"ORD-SECRET"}}');
   `);
   const ok = JSON.stringify(await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`)));
-  assert.equal(ok.includes(SN), false);
+  assert.ok(ok.includes(SN), 'owner decision 1: the assistant reads the serial whole');
+  assert.equal(ok.includes('ORD-SECRET'), false, 'but never the order number');
   // A transient failure inside the story only (its warranty_receipts read).
   w.raw.exec(`ALTER TABLE warranty_receipts RENAME TO warranty_receipts_x`);
   for (const who of ['ast', 'adm'] as const) {
@@ -370,7 +374,8 @@ test('F6: when the serial story fails on a migrated database the page answers 50
   w.raw.exec(`ALTER TABLE warranty_receipts_x RENAME TO warranty_receipts`);
   const back = await json(await get(w.as('ast'), `/api/devices/admin/serial-inventory/${SN}`));
   assert.equal(back.success, true);
-  assert.equal(back.row.serial, maskSerial(SN), 'masked again once the story reads');
+  assert.equal(back.row.serial, SN, 'whole again once the story reads');
+  assert.equal(JSON.stringify(back).includes('ORD-SECRET'), false, 'and still no order number');
 });
 
 // ====================================================================== F7

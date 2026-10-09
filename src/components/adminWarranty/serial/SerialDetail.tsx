@@ -13,9 +13,9 @@
  * Grouped lists in the settings style: what the device is, where it stands,
  * its one warranty, its batch, then the whole history — newest first, who and
  * when. PRIVACY: the server already decided what this viewer may see (the
- * whole serial and the order numbers for the owner and full-scope admins; the
- * masked serial and no order numbers for an assistant), and no cost ever
- * travels here. The one control is the owner's: how a returned device's
+ * whole serial for every admin — owner decision 1, 2026-10-09; the order
+ * numbers for the owner and full-scope admins only, none for an assistant),
+ * and no cost ever travels here. The one control is the owner's: how a returned device's
  * warranty runs when it is sold again (§14).
  */
 import React, { useCallback, useEffect, useId, useState } from 'react';
@@ -176,8 +176,9 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
     owner && !!story?.current_order && !story.current_order.activated && (story.warranty.mode === 'carry' || story.warranty.mode === 'restart');
 
   // What may be copied is what this viewer may see whole: with a story, only
-  // its `serial` (absent for an assistant — UX review #1); without one (the
-  // database before 0178), the inventory row as it always was.
+  // its `serial` (every admin since owner decision 1; absent for a viewer the
+  // server masks — UX review #1); without one (the database before 0178), the
+  // inventory row as it always was.
   const copyable = story ? story.serial ?? null : data?.row?.serial ?? null;
   const copy = () => {
     if (!copyable) return;

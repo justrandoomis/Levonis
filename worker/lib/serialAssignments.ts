@@ -44,7 +44,7 @@ import { newId } from './crypto';
 import { auditStatements } from './audit';
 import { fence } from './operations';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
-import { canMoveMoney, isOwner } from './adminScope';
+import { canMoveMoney, canSeeFullSerial, isOwner } from './adminScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
@@ -122,17 +122,24 @@ export interface SerialActor {
    */
   owner: boolean;
   /**
-   * The owner and full-scope (or legacy NULL-scope) admins see the whole
-   * serial; assistants the masked form. That is exactly S1's `canMoveMoney`
-   * (the owner first, then any admin whose scope is not 'assistant') — a
-   * serial is no cost, so the cost predicates do not decide it.
+   * The whole serial (owner decision 1, 2026-10-09; DECISIONS row 192): every
+   * platform admin — the owner, full and legacy NULL scope, and assistants
+   * (the preparer, support) — because their work needs it. `canSeeFullSerial`
+   * in worker/lib/adminScope.ts; a serial is no cost, so the cost predicates
+   * never decide it. The masking path below stays as defence in depth.
    */
   fullSerial: boolean;
+  /**
+   * Order numbers on the serial page and in serial histories: the owner and
+   * full-scope (or legacy NULL-scope) admins, S1's `canMoveMoney` — unchanged
+   * by decision 1, which covers serials, not order numbers (option A).
+   */
+  orderRefs: boolean;
 }
 
 export function serialActor(env: Env, user: SessionUser): SerialActor {
   const owner = user.role === 'admin' && isOwner(env, user);
-  return { id: user.id, owner, fullSerial: canMoveMoney(env, user) };
+  return { id: user.id, owner, fullSerial: canSeeFullSerial(env, user), orderRefs: canMoveMoney(env, user) };
 }
 
 const shown = (raw: string, actor: Pick<SerialActor, 'fullSerial'>) => (actor.fullSerial ? raw : maskSerial(raw));
@@ -2309,8 +2316,9 @@ export async function orderSerialsView(env: Env, actor: SerialActor, orderId: st
  * rows, `serial.*` rows, `device.*` on EVERY unit the serial was bound to,
  * the `warranty.*` rows of its receipts, and the «Added to system» event
  * rebuilt from created_at for assets added in bulk (critique-1 #18).
- * Privacy (L7): order ids and the full serial for the owner and full-scope
- * admins only; an assistant sees the masked serial and no order numbers.
+ * Privacy: the whole serial for every admin (owner decision 1, 2026-10-09);
+ * order ids for the owner and full-scope admins only (`orderRefs`) — an
+ * assistant sees no order numbers (L7).
  */
 /**
  * Detail keys that hold an order number, and keys that hold a serial (this
@@ -2324,28 +2332,33 @@ const SERIAL_KEYS = new Set([
   'replaced_serial', 'corrected_serial', 'serials', 'box_sn',
 ]);
 
-function maskDeep(value: unknown, isSerial: boolean, depth: number): unknown {
-  if (typeof value === 'string') return isSerial ? maskSerial(value) : value;
+type MaskFlags = { serials: boolean; orders: boolean };
+
+function maskDeep(value: unknown, isSerial: boolean, depth: number, mask: MaskFlags): unknown {
+  if (typeof value === 'string') return isSerial && mask.serials ? maskSerial(value) : value;
   if (depth > 6 || value === null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map((v) => maskDeep(v, isSerial, depth + 1));
+  if (Array.isArray(value)) return value.map((v) => maskDeep(v, isSerial, depth + 1, mask));
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    out[k] = ORDER_KEYS.has(k) ? null : maskDeep(v, isSerial || SERIAL_KEYS.has(k), depth + 1);
+    out[k] = mask.orders && ORDER_KEYS.has(k) ? null : maskDeep(v, isSerial || SERIAL_KEYS.has(k), depth + 1, mask);
   }
   return out;
 }
 
 /**
- * A history row as an assistant may see it (UX review #1, critique L7): no
- * order numbers, and every serial in it masked — a «change» row names the
- * OTHER device's full serial, which the page itself never shows them. At
- * every depth (S1 review #3): `warranty.reissued` nests the corrected serial
- * under `corrected_serial.{from,to}`, `serial_inventory.update` the box SN
- * under `from` / `to`.
+ * A history row as this viewer may see it. Two separate rules:
+ *   - order numbers are nulled for a viewer without `orderRefs` (an
+ *     assistant, critique L7);
+ *   - serials are masked for a viewer without `fullSerial` — since owner
+ *     decision 1 (2026-10-09) no admin, so this half is defence in depth: a
+ *     «change» row names the OTHER device's serial, and at every depth (S1
+ *     review #3) `warranty.reissued` nests the corrected serial under
+ *     `corrected_serial.{from,to}`, `serial_inventory.update` the box SN
+ *     under `from` / `to`.
  */
-export function maskedDetail(detail: Record<string, unknown>, actor: Pick<SerialActor, 'fullSerial'>): Record<string, unknown> {
-  if (actor.fullSerial) return detail;
-  return maskDeep(detail, false, 0) as Record<string, unknown>;
+export function maskedDetail(detail: Record<string, unknown>, actor: Pick<SerialActor, 'fullSerial' | 'orderRefs'>): Record<string, unknown> {
+  if (actor.fullSerial && actor.orderRefs) return detail;
+  return maskDeep(detail, false, 0, { serials: !actor.fullSerial, orders: !actor.orderRefs }) as Record<string, unknown>;
 }
 
 export async function serialStory(env: Env, actor: SerialActor, norm: string) {
@@ -2397,7 +2410,7 @@ export async function serialStory(env: Env, actor: SerialActor, norm: string) {
     if (unit.warranty_closed_at) warrantyState = unit.warranty_closed_reason?.startsWith('returned') ? 'RETURNED' : 'CLOSED';
     else if (!(live && !live.activated_at)) warrantyState = cov?.state === 'active' ? 'ACTIVE' : cov?.state === 'expired' ? 'EXPIRED' : 'NEEDS_CONFIG';
   }
-  const orderOf = (a: AssignmentRow) => (actor.fullSerial ? a.order_id ?? a.order_ref : null);
+  const orderOf = (a: AssignmentRow) => (actor.orderRefs ? a.order_id ?? a.order_ref : null);
   // §25 who cancelled: the trigger writes its rows with no actor (orders has
   // no cancelled_by) — the order's own stage history knows (critique-1 #17).
   const cancelledBy = new Map<string, string>();
