@@ -50,6 +50,14 @@ export interface EngineSaveStrings {
   nothing: string;
   exit: string;
   exitConfirm: string;
+  // FX-5: the automatic repricing's status line, on «التسعير والشحن» and in the rates panel.
+  autoTitle: string;
+  autoActive: Fill;
+  autoIdle: string;
+  autoPaused: string;
+  autoLastRun: Fill2;
+  autoBlocked: Fill;
+  blockedLine: Fill;
 }
 
 const ar: EngineSaveStrings = {
@@ -75,7 +83,7 @@ const ar: EngineSaveStrings = {
   listTitle: 'منتجات تنتظر حفظ أسعارها الجديدة',
   staleCount: (n) => `تغيّر سعر صرف أو شحن معتمد: ${n}`,
   readyCount: (n) => `اكتملت بياناتها وما زالت يدوية: ${n}`,
-  staleHint: 'أسعارها المخزنة حُسبت بسعر تغيّر منذ ذلك؛ عاينها ثم احفظها مرة واحدة (إعادة التسعير التلقائية بتغيّر الصرف في التحديث القادم).',
+  staleHint: 'أسعارها المخزنة حُسبت بسعر تغيّر منذ ذلك؛ يُعاد تسعيرها تلقائياً، ويمكنك أيضاً معاينتها وحفظها الآن مرة واحدة.',
   readyHint: 'مكتمل — راجع الأسعار الجديدة واحفظ',
   reasons: (list) => `بسبب: ${list}`,
   previewAll: 'معاينة الأسعار الجديدة',
@@ -85,6 +93,13 @@ const ar: EngineSaveStrings = {
   nothing: 'لا شيء ينتظر الحفظ',
   exit: 'رجوع إلى التسعير اليدوي',
   exitConfirm: 'تبقى الأسعار كما هي الآن، ويعود تعديلها يدويًا. متابعة؟',
+  autoTitle: 'يُعاد التسعير تلقائياً',
+  autoActive: (n) => `تُحدَّث أسعار ${n} من المنتجات بالسعر المعتمد الجديد خلال 15 دقيقة، الأبعد عن التكلفة أولاً`,
+  autoIdle: 'كل الأسعار التلقائية محسوبة بآخر سعر صرف وشحن معتمد',
+  autoPaused: 'إعادة التسعير التلقائية متوقفة مؤقتاً — الأسعار الحالية باقية',
+  autoLastRun: (when, n) => `آخر تشغيل: ${when} — أُعيد تسعير ${n}`,
+  autoBlocked: (n) => `يحتاج انتباهك: ${n} لم يُعَد تسعيرها تلقائياً وبقيت أسعارها كما هي`,
+  blockedLine: (code) => `لم يُعَد تسعيره تلقائياً: ${code}`,
 };
 
 const en: EngineSaveStrings = {
@@ -110,7 +125,7 @@ const en: EngineSaveStrings = {
   listTitle: 'Products waiting for their new prices to be saved',
   staleCount: (n) => `An approved exchange or shipping rate changed: ${n}`,
   readyCount: (n) => `Data complete, still priced by hand: ${n}`,
-  staleHint: 'Their stored prices were computed at a rate that has changed since; preview them, then save them in one go (automatic repricing on rate changes arrives in the next update).',
+  staleHint: 'Their stored prices were computed at a rate that has changed since; they are repriced automatically, and you can also preview and save them now in one go.',
   readyHint: 'Complete — review the new prices and save',
   reasons: (list) => `Because of: ${list}`,
   previewAll: 'Preview the new prices',
@@ -120,6 +135,13 @@ const en: EngineSaveStrings = {
   nothing: 'Nothing is waiting to be saved',
   exit: 'Back to manual pricing',
   exitConfirm: 'Prices stay exactly as they are now and are edited by hand again. Continue?',
+  autoTitle: 'Repriced automatically',
+  autoActive: (n) => `${n} products get their new price at the approved rate within 15 minutes, the furthest below cost first`,
+  autoIdle: 'Every automatic price is computed at the latest approved exchange and shipping rates',
+  autoPaused: 'Automatic repricing is paused — current prices stay',
+  autoLastRun: (when, n) => `Last run: ${when} — ${n} repriced`,
+  autoBlocked: (n) => `Needs your attention: ${n} could not be repriced automatically and keep their prices`,
+  blockedLine: (code) => `Not repriced automatically: ${code}`,
 };
 
 const ckb: EngineSaveStrings = {
@@ -145,7 +167,7 @@ const ckb: EngineSaveStrings = {
   listTitle: 'ئەو بەرهەمانەی چاوەڕێی پاشەکەوتکردنی نرخە نوێیەکانیانن',
   staleCount: (n) => `نرخێکی پەسەندکراوی ئاڵوگۆڕ یان ناردن گۆڕاوە: ${n}`,
   readyCount: (n) => `زانیارییەکانیان تەواوە و هێشتا بە دەست نرخیان بۆ دادەنرێت: ${n}`,
-  staleHint: 'نرخە هەڵگیراوەکانیان بە نرخێک هەژمار کراون کە لەو کاتەوە گۆڕاوە؛ پێشبینینیان بکە، پاشان بە یەک جار پاشەکەوتیان بکە (نوێکردنەوەی خۆکاری نرخ بە گۆڕانی ئاڵوگۆڕ لە نوێکردنەوەی داهاتوودا دێت).',
+  staleHint: 'نرخە هەڵگیراوەکانیان بە نرخێک هەژمار کراون کە لەو کاتەوە گۆڕاوە؛ بە خۆکاری نرخیان نوێ دەکرێتەوە، هەروەها دەتوانیت ئێستا پێشبینینیان بکەیت و بە یەک جار پاشەکەوتیان بکەیت.',
   readyHint: 'تەواوە — نرخە نوێیەکان ببینە و پاشەکەوتیان بکە',
   reasons: (list) => `بەهۆی: ${list}`,
   previewAll: 'پێشبینینی نرخە نوێیەکان',
@@ -155,6 +177,13 @@ const ckb: EngineSaveStrings = {
   nothing: 'هیچ شتێک چاوەڕێی پاشەکەوتکردن نییە',
   exit: 'گەڕانەوە بۆ نرخدانانی دەستی',
   exitConfirm: 'نرخەکان وەک ئێستا دەمێننەوە و دووبارە بە دەست دەستکاری دەکرێن. بەردەوام دەبیت؟',
+  autoTitle: 'نرخەکان بە خۆکاری نوێ دەکرێنەوە',
+  autoActive: (n) => `نرخی ${n} بەرهەم لە ماوەی 15 خولەکدا بە نرخی پەسەندکراوی نوێ نوێ دەکرێتەوە؛ ئەوانەی زۆرترین دووری لە تێچوویان هەیە یەکەم`,
+  autoIdle: 'هەموو نرخە خۆکارییەکان بە دوایین نرخی پەسەندکراوی ئاڵوگۆڕ و ناردن هەژمار کراون',
+  autoPaused: 'نوێکردنەوەی خۆکاری نرخ بۆ ماوەیەک ڕاگیراوە — نرخەکانی ئێستا دەمێننەوە',
+  autoLastRun: (when, n) => `دوایین جار: ${when} — نرخی ${n} بەرهەم نوێ کرایەوە`,
+  autoBlocked: (n) => `پێویستی بە سەرنجی تۆیە: نرخی ${n} بەرهەم بە خۆکاری نوێ نەکرایەوە و وەک خۆی ماوە`,
+  blockedLine: (code) => `بە خۆکاری نرخی نوێ نەکرایەوە: ${code}`,
 };
 
 export const ENGINE_SAVE_STRINGS: Readonly<Record<Language, EngineSaveStrings>> = { ar, en, ckb };

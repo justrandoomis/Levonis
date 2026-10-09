@@ -18,7 +18,9 @@
  *      (`WHERE rate_iqd IS NOT ?`, §31) — the `pricing_fx_rates_in_step`
  *      trigger refuses any row stamped with a version that is not current;
  *   5. `audit_log` rows (built by the caller): ids and codes only, never a rate.
- * From FX-5 the repricing statements follow, within the statement budget.
+ * FX-5: once this batch has committed a rate move, the engine's writer
+ * reprices the products it left stale — one fenced batch per product, within
+ * the same statement budget (fx/reprice.ts) — never inside this batch.
  */
 import { composeIqdRates } from '@levonis/pricing/fxChain';
 import { FX_PAIRS, PAIR_CURRENCY, type FxPairId, type FxPairRow } from './pairs';

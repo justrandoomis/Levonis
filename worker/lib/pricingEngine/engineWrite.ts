@@ -30,7 +30,8 @@
  *   4. the price rows (writer.ts), one UPDATE per table through json_each;
  *   5. `price_history` under `sku:<combo>@<channel>`, field `regular`, with the
  *      U the price was computed at and `price_source = 'engine_owner'` (owner
- *      decision 6's observations);
+ *      decision 6's observations; `engine_fx` for FX-5's automatic repricing
+ *      when only exchange rates moved);
  *   6. `pricing_sku_costs`: the product's rows replaced (Final Price USD stored
  *      privately beside the dinar price);
  *   7. `product_pricing_state`: mode engine, write_seq + 1, priced_*;
@@ -130,6 +131,41 @@ export async function priceImageOf(db: D1Database, productId: string): Promise<s
   return String(r?.image ?? '');
 }
 
+/**
+ * The price images of several products in ONE statement (FX-5's sweep reads
+ * every candidate's image before its documents). The SAME expression as
+ * PRICE_IMAGE_SQL, each product id taken from the one JSON list parameter
+ * (D1's 100-parameter cap never binds), so a write fenced on
+ * PRICE_IMAGE_SQL compares exactly what was read here
+ * (tests/fxRepricing.test.ts holds the two equal over the whole census).
+ */
+export const PRICE_IMAGES_SQL = `SELECT j.value AS product_id, (${PRICE_IMAGE_SQL.replace(/\?/g, 'j.value')}) AS image FROM json_each(?) j`;
+
+export async function priceImagesOf(db: D1Database, ids: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!ids.length) return out;
+  const { results } = await db.prepare(PRICE_IMAGES_SQL).bind(JSON.stringify([...new Set(ids)])).all<{ product_id: string; image: string }>();
+  for (const r of results ?? []) out.set(String(r.product_id), String(r.image ?? ''));
+  return out;
+}
+
+/**
+ * The same images, one PRICE_IMAGE_SQL statement per product in one batch (one
+ * snapshot): the fallback for an engine that refuses the correlated form
+ * above. Costs one statement per product.
+ */
+export async function priceImagesEach(db: D1Database, ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  const out = new Map<string, string>();
+  if (!unique.length) return out;
+  const answers = await db.batch(unique.map((id) => db.prepare(`${PRICE_IMAGE_SQL} AS image`).bind(...imageBinds(id))));
+  unique.forEach((id, i) => {
+    const r = ((answers[i] as D1Result<{ image: string }> | undefined)?.results ?? [])[0];
+    out.set(id, String(r?.image ?? ''));
+  });
+  return out;
+}
+
 // ------------------------------------------------------------ the engine's control row and stored results
 
 export interface EngineControl {
@@ -181,8 +217,9 @@ const same = (a: string | null | undefined, b: string | null | undefined) => {
 /**
  * A stored engine price whose confirmed rate moved since it was computed: the
  * supplier currency's IQD rate, U (the minimum profit's T × U), or the route's
- * central shipping rate. Automatic FX repricing is the next package; until
- * then the owner previews and re-saves these (the stale list).
+ * central shipping rate. The automatic repricing (FX-5, autoReprice.ts) works
+ * through exactly this list, deficit first, within the invocation's statement
+ * budget; the owner can still preview and re-save them (the stale list).
  */
 export function staleReasons(rows: readonly StoredSkuCost[], rates: PricingRates): string[] {
   const out = new Set<string>();
@@ -576,15 +613,36 @@ const SKU_COST_COLUMNS = [
 const MEMBER_NULLS = 'prime_price_iqd = NULL, pro_price_iqd = NULL, regular_adjust_iqd = NULL, prime_adjust_iqd = NULL, pro_adjust_iqd = NULL';
 const priceFrom = (table: string) => `(SELECT json_extract(j.value, '$.p') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = ${table}.id)`;
 
+/**
+ * FX-5: an AUTOMATIC repricing of an engine product after a confirmed rate
+ * moved (autoReprice.ts). The same plan, verification and batch as an owner
+ * save — only the labels differ: `price_history.price_source` (`engine_fx`
+ * when only exchange rates moved, `engine_owner` when the owner's shipping
+ * rate did), the `pricing_audit` action `reprice_auto`, the `audit_log`
+ * action `pricing.engine.repriced_auto`. When no customer price moves (the
+ * new figures round to today's), the price rows and the history are left
+ * untouched and only the stored engine figures are re-stamped.
+ */
+export interface AutoWrite {
+  priceSource: 'engine_fx' | 'engine_owner';
+  pricesUnchanged: boolean;
+  trigger: string;
+  /** What moved (currency or shipping profile codes) — codes only, never a rate. */
+  reasons: readonly string[];
+}
+
 export interface EngineWriteOptions {
   actor: string;
+  /** The audit_log actor when it differs from `actor` (null: the system, for the cron). */
+  auditActor?: string | null;
   now: string;
-  /** product_form | purchase | bulk — the audit's source. */
+  /** product_form | purchase | bulk | fx_auto — the audit's source. */
   source: string;
   idempotencyKey: string;
   /** The drafts' own audit rows (inputs, rules), built by the caller. */
   extraAudits?: D1PreparedStatement[];
   auditDetail?: Record<string, unknown>;
+  auto?: AutoWrite;
 }
 
 export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation, inputWrites: readonly InputWrite[], ruleWrites: readonly RuleWrite[], o: EngineWriteOptions): Promise<D1PreparedStatement[]> {
@@ -592,15 +650,22 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
   const pid = ev.product_id;
   const u = ev.rates.usd_iqd;
   const adopt = ev.kind === 'adopt';
+  const auto = o.auto ?? null;
+  // An automatic repricing never adopts and never carries drafts: only the owner's save does.
+  if (auto && (adopt || inputWrites.length || ruleWrites.length)) throw new Error('engineWriteStatements: an automatic repricing writes prices only');
+  const writePrices = !auto?.pricesUnchanged;
   const auditId = newId('paud');
-  const batchId = `pe_${newId()}`;
+  const batchId = `${auto ? 'fx' : 'pe'}_${newId()}`;
   const plan = ev.plan;
   const json = (list: ReadonlyArray<{ id: string; price: number }>) => JSON.stringify(list.map((x) => ({ id: x.id, p: x.price })));
   const today = (optionId: string, channel: SkuChannel) => ev.rows.find((r) => r.option_id === optionId && r.channel === channel)?.old_iqd ?? null;
-  const history = plan.prices
-    .filter((p) => adopt || today(p.option_id, p.channel) !== p.price.computed_price_iqd)
-    .map((p) => ({ k: skuPriceHistoryKey(p.combo_key, p.channel), o: today(p.option_id, p.channel), n: p.price.computed_price_iqd }));
+  const history = writePrices
+    ? plan.prices
+        .filter((p) => adopt || today(p.option_id, p.channel) !== p.price.computed_price_iqd)
+        .map((p) => ({ k: skuPriceHistoryKey(p.combo_key, p.channel), o: today(p.option_id, p.channel), n: p.price.computed_price_iqd }))
+    : [];
   const skuRows = plan.prices.map((p) => skuCostRow(ev, p, o.now));
+  const auditActor = o.auditActor === undefined ? o.actor : o.auditActor;
   const statements: D1PreparedStatement[] = [
     ...batchHead(db, ev.stored, o.now),
     ...fence(db, 'EXISTS(SELECT 1 FROM pricing_engine_control WHERE id = 1 AND paused = 0)'),
@@ -619,31 +684,36 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
         )
         .bind(c.amount_usd, c.legacy_amount_iqd, c.usd_iqd_rate, o.actor, o.now, c.rule.id, c.rule.version)
     ),
-    // The price rows (writer.ts), one statement per table.
-    db
-      .prepare(
-        `UPDATE products SET price_iqd = ?, prime_price_iqd = NULL, pro_price_iqd = NULL, direct_surcharge_iqd = NULL,
-                preorder_transports = COALESCE(?, preorder_transports), updated_at = ? WHERE id = ?`
-      )
-      .bind(plan.product!.price_iqd, plan.product!.preorder_transports, o.now, pid),
-    ...(plan.values.length
+    // The price rows (writer.ts), one statement per table — none when an automatic repricing moves no customer price.
+    ...(writePrices
+      ? [
+          db
+            .prepare(
+              `UPDATE products SET price_iqd = ?, prime_price_iqd = NULL, pro_price_iqd = NULL, direct_surcharge_iqd = NULL,
+                      preorder_transports = COALESCE(?, preorder_transports), updated_at = ? WHERE id = ?`
+            )
+            .bind(plan.product!.price_iqd, plan.product!.preorder_transports, o.now, pid),
+        ]
+      : []),
+    ...(writePrices && plan.values.length
       ? [db.prepare(`UPDATE product_option_values SET regular_price_iqd = ${priceFrom('product_option_values')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.values), pid, json(plan.values))]
       : []),
-    ...(plan.cells.length
+    ...(writePrices && plan.cells.length
       ? [db.prepare(`UPDATE product_option_fulfillment SET regular_price_iqd = ${priceFrom('product_option_fulfillment')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.cells), pid, json(plan.cells))]
       : []),
-    ...(plan.routes.length
+    ...(writePrices && plan.routes.length
       ? [db.prepare(`UPDATE product_option_transports SET regular_price_iqd = ${priceFrom('product_option_transports')}, surcharge_iqd = 0, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.routes), pid, json(plan.routes))]
       : []),
-    // Owner decision 6's observations: the engine price and the U it was computed at.
+    // Owner decision 6's observations: the engine price and the U it was computed at
+    // (`engine_fx` for an automatic repricing that only exchange rates moved).
     ...(history.length
       ? [
           db
             .prepare(
               `INSERT INTO price_history (product_id, variant_key, field, old_iqd, new_iqd, changed_by, batch_id, usd_iqd_rate, price_source)
-               SELECT ?, json_extract(value, '$.k'), 'regular', json_extract(value, '$.o'), json_extract(value, '$.n'), ?, ?, ?, 'engine_owner' FROM json_each(?)`
+               SELECT ?, json_extract(value, '$.k'), 'regular', json_extract(value, '$.o'), json_extract(value, '$.n'), ?, ?, ?, ? FROM json_each(?)`
             )
-            .bind(pid, o.actor, batchId, u, JSON.stringify(history)),
+            .bind(pid, o.actor, batchId, u, auto?.priceSource ?? 'engine_owner', JSON.stringify(history)),
         ]
       : []),
     db.prepare('DELETE FROM pricing_sku_costs WHERE product_id = ?').bind(pid),
@@ -684,7 +754,7 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
       entity: 'sku_price',
       entity_key: pid,
       product_id: pid,
-      action: adopt ? 'engine_entry' : 'reprice_owner',
+      action: auto ? 'reprice_auto' : adopt ? 'engine_entry' : 'reprice_owner',
       before: ev.rows.map((r) => ({ option_id: r.option_id, channel: r.channel, price_iqd: r.old_iqd })),
       after: plan.prices.map((p) => ({
         option_id: p.option_id,
@@ -693,17 +763,25 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
         final_price_usd: p.price.final_price_usd,
         usd_iqd_rate: p.price.usd_iqd_rate,
       })),
-      summary: { kind: ev.kind, source: o.source, rows: plan.prices.length, history_batch: batchId, conversions: ev.conversions.length },
+      summary: {
+        kind: ev.kind,
+        source: o.source,
+        rows: plan.prices.length,
+        history_batch: batchId,
+        conversions: ev.conversions.length,
+        ...(auto ? { trigger: auto.trigger, reasons: [...auto.reasons], prices_unchanged: auto.pricesUnchanged } : {}),
+      },
       idempotency_key: o.idempotencyKey,
       actor: o.actor,
       now: o.now,
     }),
     ...(
-      await auditStatements(db, o.actor, adopt ? 'pricing.engine.adopted' : 'pricing.engine.repriced', pid, {
+      await auditStatements(db, auditActor, auto ? 'pricing.engine.repriced_auto' : adopt ? 'pricing.engine.adopted' : 'pricing.engine.repriced', pid, {
         product_id: pid,
         rows_changed: history.length,
         entered: adopt,
         source: o.source,
+        ...(auto ? { trigger: auto.trigger, reasons: [...auto.reasons] } : {}),
         ...(o.auditDetail ?? {}),
       })
     ).statements,

@@ -31,6 +31,7 @@ import { runDurableJobs } from './lib/jobs';
 import { drainStaffReconciliations } from './lib/financeStaffAccrual';
 import { drainOrderFinanceRecovery } from './lib/financeOrderRecovery';
 import { runFxScheduler } from './lib/fx/scheduler';
+import { sweepStaleEnginePrices } from './lib/fx/reprice';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -1146,7 +1147,8 @@ export default {
     // scheduler for USD/IQD (IQWealth, every 6 or 12 hours, or off) and
     // EUR/USD and CNY/USD (the ECB, once a day). Its due logic reads the
     // cron's SCHEDULED time, so a late run never shifts the phase. It never
-    // throws; it writes rates, never a product price (repricing is FX-5).
+    // throws. A confirmed rate it commits reprices the engine products it left
+    // stale through the engine's own writer, within the run's budget (FX-5).
     if (jobs === 'fx') {
       ctx.waitUntil(
         runFxScheduler(env, { now: new Date(), scheduledTime: new Date(_event.scheduledTime) }, { trigger: 'cron' }).catch((error) => {
@@ -1180,6 +1182,16 @@ export default {
     ctx.waitUntil(
       sweepExpiredUploadSessions(env).catch((error) => {
         console.error('scheduled upload-session sweep rejected:', error);
+      })
+    );
+    // FX-5 (FX plan 7.4): engine products a confirmed exchange or shipping
+    // rate left stale — beyond what the six-hour run or an owner's rate act
+    // could cover — are repriced here by the engine's own writer, deficit
+    // first, within the sweep's own sub-budget of 200 statements, so the jobs
+    // above keep theirs. One indexed read when nothing is stale. Never throws.
+    ctx.waitUntil(
+      sweepStaleEnginePrices(env, { trigger: 'sweep' }).catch((error) => {
+        console.error('scheduled engine repricing rejected:', error instanceof Error ? error.name : 'unknown');
       })
     );
   },

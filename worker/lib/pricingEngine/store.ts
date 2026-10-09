@@ -406,10 +406,21 @@ export function pricingAuditStatement(
   row: {
     /** Set when another row of the batch names this one (product_pricing_state.activation_audit_id). */
     id?: string;
-    entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode';
+    /** 'run': one automatic repricing run (FX-5), product_id null, counts only. */
+    entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode' | 'run';
     entity_key: string;
-    product_id: string;
-    action: 'input_from_purchase' | 'rule_set' | 'legacy_accept' | 'update' | 'engine_entry' | 'reprice_owner' | 'rule_convert' | 'engine_exit';
+    product_id: string | null;
+    action:
+      | 'input_from_purchase'
+      | 'rule_set'
+      | 'legacy_accept'
+      | 'update'
+      | 'engine_entry'
+      | 'reprice_owner'
+      | 'rule_convert'
+      | 'engine_exit'
+      | 'reprice_auto'
+      | 'run_finished';
     before?: unknown;
     after?: unknown;
     summary?: Record<string, unknown>;

@@ -492,8 +492,10 @@ export const saveShippingRate = (profile: PricingProfile, body: { version: numbe
 //                                 one price write of this screen, after that preview; each product
 //                                 its own atomic, fenced, audited batch on the server
 //
-// Every figure is the server's. Automatic repricing on a rate change is the
-// next package (FX-5): until then a changed rate lists the products here.
+// Every figure is the server's. FX-5: a confirmed rate change reprices these
+// engine products automatically (the server, deficit first, every quarter
+// hour until none is left); this list stays the owner's manual tool, and
+// `auto` says «يُعاد التسعير تلقائياً» with the last run.
 
 /** The most products one preview or bulk save carries (the server's own bound). */
 export const ENGINE_BULK_MAX = 20;
@@ -503,12 +505,35 @@ export interface SaveListItem extends PricingNames {
   slug: string;
   /** What moved: a supplier currency (USD / EUR / CNY) or a shipping profile. */
   reasons: string[];
+  /** Stale items only: the code the automatic repricing could not get past (never a figure). */
+  blocked_code?: string | null;
+}
+
+/** The automatic repricing's last run that had work (counts only). */
+export interface AutoRepriceLastRun {
+  at: string;
+  trigger: 'fx' | 'owner_rate' | 'shipping' | 'sweep' | string;
+  repriced: number;
+  blocked: number;
+  remaining: number;
+}
+
+/** «يُعاد التسعير تلقائياً» — FX-5's status: counts, the pause, the last run. */
+export interface AutoRepriceStatus {
+  /** Stale engine products are being repriced on the next ticks. */
+  active: boolean;
+  paused: boolean;
+  stale: number;
+  blocked: number;
+  last_run: AutoRepriceLastRun | null;
 }
 
 export interface SaveListAnswer {
   success: boolean;
   stale: { count: number; items: SaveListItem[] };
   ready: { count: number; items: SaveListItem[] };
+  /** Null before the engine is installed. */
+  auto?: AutoRepriceStatus | null;
 }
 
 export interface SaveListPreviewItem extends PricingNames {

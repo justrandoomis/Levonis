@@ -6,6 +6,7 @@
  */
 import { rateLimitKey } from '../ratelimit';
 import { loadProcurementReference } from '../pricingEngine/load';
+import { autoRepriceStatus } from '../pricingEngine/autoReprice';
 import { isMissingTable, loadPairs, type FxPairId } from './pairs';
 import { LOG_COLUMNS, type FxLogRow, type RatesReadModel } from './dto';
 import { FX_REFRESH_GLOBAL_BUCKET, FX_REFRESH_GLOBAL_KEY, FX_REFRESH_GLOBAL_WINDOW_S } from './limits';
@@ -25,7 +26,7 @@ export async function loadRatesReadModel(db: D1Database, now: Date): Promise<Rat
   if (pairs === null) return null;
   const window = Math.floor(now.getTime() / 1000);
   const windowStart = window - (window % FX_REFRESH_GLOBAL_WINDOW_S);
-  const [derived, shipping, observedRows, used, reference, engineProducts] = await Promise.all([
+  const [derived, shipping, observedRows, used, reference, engineProducts, repricing] = await Promise.all([
     db
       .prepare("SELECT currency, rate_iqd, version, updated_at FROM pricing_fx_rates ORDER BY CASE currency WHEN 'USD' THEN 0 WHEN 'EUR' THEN 1 ELSE 2 END")
       .all<RatesReadModel['derived'][number]>(),
@@ -47,6 +48,8 @@ export async function loadRatesReadModel(db: D1Database, now: Date): Promise<Rat
       .catch(() => null),
     loadProcurementReference(db),
     engineProductCount(db),
+    // FX-5: how many engine products wait for a repricing, and how many it could not reach (counts only).
+    autoRepriceStatus(db).catch(() => null),
   ]);
   const observed = new Map<FxPairId, FxLogRow>();
   for (const r of observedRows.results ?? []) observed.set(r.pair, { ...r });
@@ -63,6 +66,8 @@ export async function loadRatesReadModel(db: D1Database, now: Date): Promise<Rat
     },
     refreshUsedToday: Number(used?.count ?? 0),
     engineProducts,
+    staleProducts: repricing?.stale ?? 0,
+    repriceBlocked: repricing?.blocked ?? 0,
   };
 }
 

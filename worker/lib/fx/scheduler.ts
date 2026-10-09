@@ -14,13 +14,17 @@
  *     with one re-plan after a fence miss (no second fetch) and, after any
  *     other refusal, each pair alone, then COMMIT_REFUSED (critiques H1, M10)
  *   → the public display rate's caches purged when the USD rate moved (L4)
- *   → the owner's bell for a review or a long failure (never a figure).
+ *   → the owner's bell for a review or a long failure (never a figure)
+ *   → FX-5: the engine products the committed rates left stale repriced at
+ *     once, deficit first, with whatever is left of the run's statement
+ *     budget (reprice.ts); the rest follow on the quarter-hour sweep.
  *
  * NEVER THROWS: every failure is a recorded status, the last known good rate
  * stays in force, and a rate is never 0 (the CHECKs refuse it). NEVER IN THE
  * CUSTOMER PATH: imported only by worker/index.ts (the cron) and the owner's
- * routes (tests/fxNoCustomerPath.test.ts). FX-1 changes no product price: the
- * repricing statements arrive in FX-5, within the same statement budget.
+ * routes (tests/fxNoCustomerPath.test.ts). The scheduler itself names no
+ * price column: the repricing is the engine's own writer, one fenced batch per
+ * product, after the rates' batch has committed (FX-5).
  */
 import type { Env } from '../types';
 import { purgeCatalogueFromJob } from '../edgePolicy';
@@ -33,6 +37,8 @@ import { R24_WINDOW_MS, WINDOW_MAX_ROWS, adjustmentOf, decideSafely, type Decisi
 import { isFenceMiss, planFxCommit, refusalCodeOf } from './commit';
 import { toStatements } from './write';
 import { notifyOwnerFx } from './notify';
+import { sweepStaleEnginePrices } from './reprice';
+import type { AutoRepriceReport } from '../pricingEngine/autoReprice';
 
 export type { FxClock, FxTrigger } from './decide';
 
@@ -73,6 +79,10 @@ export interface FxRunReport {
   /** Pairs over their provider day budget: no request was made. */
   budgetDeferred: FxPairId[];
   displayRateChanged: boolean;
+  /** An effective rate committed by this run moved a derived IQD rate (the engine's input). */
+  ratesMoved?: boolean;
+  /** FX-5: what the repricing at the end of the run did (counts and ids, never a figure). */
+  repricing?: AutoRepriceReport;
 }
 
 const emptyReport = (skipped?: FxRunReport['skipped']): FxRunReport => ({
@@ -344,6 +354,7 @@ async function commitWithOneRetry(
       if (d.attention) attention.push(d.attention);
     }
     if (plan.displayRateChanged) report.displayRateChanged = true;
+    if (plan.derived.length) report.ratesMoved = true;
     return 'ok';
   };
 
@@ -449,17 +460,23 @@ export async function runFxScheduler(env: Env, clock: FxClock, opts: FxRunOption
     }
     const outcomes = new Map<FxPairId, PairOutcome>(claimed.map((p) => [p.pair, quoteFor(p.pair, usd, ecb)]));
     const ctx = await loadDecisionContext(db, claimed, clock.now, budget);
-    // FX-5 appends the repricing statements of the affected engine products to the commit, within `budget` (§7.4).
     const done = await commitWithOneRetry(db, outcomes, ctx, claimed, rows, clock, opts, token, budget);
     const report: FxRunReport = {
       checked: [...pre.checked, ...done.report.checked],
       leaseHeld: pre.leaseHeld,
       budgetDeferred: pre.budgetDeferred,
       displayRateChanged: done.report.displayRateChanged,
+      ratesMoved: done.report.ratesMoved === true,
     };
     if (report.displayRateChanged) await purgeCatalogueFromJob(env, [], { settings: true });
     if (done.attention.length) await notifyOwnerFx(env, done.attention);
-    // FX-5: await sweepStaleEnginePrices(env, budget) with whatever budget is left (§7.4).
+    // FX-5 (§7.1, §7.4): a committed rate move reprices the engine products it left stale in this
+    // same run, deficit first, with whatever the budget has left; the cron's run always sweeps, so
+    // products a budget left behind earlier are taken up too. Below the dead band, held for review
+    // or rejected, no rate moved: nothing is stale, nothing is written or purged.
+    if (report.ratesMoved || opts.trigger === 'cron') {
+      report.repricing = await sweepStaleEnginePrices(env, { trigger: 'fx', budget, actorId: opts.actorId ?? null, now: clock.now });
+    }
     return report;
   } catch (e) {
     // A database error outside every recorded path: the lease expires in 120 s and the next tick retries.

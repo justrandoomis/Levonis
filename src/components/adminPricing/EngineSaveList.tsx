@@ -8,8 +8,13 @@
  * still priced by hand (ready). The owner sees the count, previews the new
  * prices of up to 20 at once (the same sheet as the product form) and saves
  * them in one bulk request — each product its own atomic, fenced, audited
- * write on the server, each answered saved / unchanged / refused. Automatic
- * repricing on a rate change is the next package (FX-5); nothing here prices.
+ * write on the server, each answered saved / unchanged / refused.
+ *
+ * FX-5: the server reprices stale engine products by itself (deficit first,
+ * within each run's statement budget, every quarter hour until none is left).
+ * The status line «يُعاد التسعير تلقائياً» says so, with the last run and how
+ * many it could not reach (each listed with its code); this list stays the
+ * owner's manual tool. Nothing here computes a price.
  *
  * Owner only: mounted inside the pricing tab (`can_write_cost`), every route
  * behind it refuses everyone but the verified owner.
@@ -23,12 +28,40 @@ import { profileName } from '../adminOperations/procurementPricingStrings';
 import { writesPrices } from '../adminOperations/procurementPricing';
 import EngineSaveSheet from '../adminOperations/EngineSaveSheet';
 import { engineSaveStrings } from '../adminOperations/engineSaveStrings';
-import { fetchSaveList, firstBatch, previewSaveList, saveBulk, type SaveListAnswer, type SaveListItem, type SaveListPreviewItem } from './api';
+import { fetchSaveList, firstBatch, previewSaveList, saveBulk, type AutoRepriceStatus, type SaveListAnswer, type SaveListItem, type SaveListPreviewItem } from './api';
+import { fxCount } from './format';
+import { fxDate } from './fxParts';
 
 const PROFILES = new Set(['GERMANY_LAND', 'CHINA_AIR', 'CHINA_SEA']);
 
 const nameOf = (x: { name_ar: string; name_en: string; name_ckb: string; slug?: string }, lang: Language) =>
   (lang === 'en' ? x.name_en || x.name_ar : lang === 'ckb' ? x.name_ckb || x.name_ar : x.name_ar || x.name_en) || x.slug || '—';
+
+/** Whether the automatic repricing has anything to say: work waiting, a product it could not reach, or a last run. */
+const autoWorthShowing = (auto: AutoRepriceStatus | null | undefined): auto is AutoRepriceStatus =>
+  !!auto && (auto.stale > 0 || auto.blocked > 0 || auto.paused || auto.last_run !== null);
+
+/** «يُعاد التسعير تلقائياً» — FX-5's status line: what waits, the pause, the last run, what needs the owner. */
+function AutoRepriceLine({ auto, lang, titled }: { auto: AutoRepriceStatus; lang: Language; titled: boolean }) {
+  const s = engineSaveStrings(lang);
+  const state = auto.paused ? 'paused' : auto.active ? 'active' : 'idle';
+  return (
+    <div data-engine-auto={state} role="status" className="mt-2 rounded-lg border border-border-subtle px-3 py-2 text-[13px] leading-relaxed">
+      {titled && <p className="font-semibold text-text-primary">{s.autoTitle}</p>}
+      <p className={auto.paused ? 'text-warning' : 'text-text-muted'}>{auto.paused ? s.autoPaused : auto.active ? s.autoActive(fxCount(auto.stale)) : s.autoIdle}</p>
+      {auto.blocked > 0 && (
+        <p className="text-warning" data-engine-auto-blocked={auto.blocked}>
+          {s.autoBlocked(fxCount(auto.blocked))}
+        </p>
+      )}
+      {auto.last_run && (
+        <p className="text-text-muted" data-engine-auto-last-run>
+          {s.autoLastRun(fxDate(auto.last_run.at, lang), fxCount(auto.last_run.repriced))}
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function EngineSaveList({ lang, compact = false, reloadKey = 0 }: { lang: Language; compact?: boolean; reloadKey?: number }) {
   const s = engineSaveStrings(lang);
@@ -102,15 +135,18 @@ export default function EngineSaveList({ lang, compact = false, reloadKey = 0 }:
   };
 
   const total = list ? list.stale.count + list.ready.count : 0;
+  const auto = list?.auto;
   if (!list && !error) return null;
-  if (list && total === 0 && !outcome.length) return null;
+  if (list && total === 0 && !outcome.length && !autoWorthShowing(auto)) return null;
 
   const reasonText = (i: SaveListItem) => s.reasons(i.reasons.map((r) => (PROFILES.has(r) ? profileName(r, lang) : r)).join(lang === 'en' ? ', ' : '، '));
 
   return (
     <section data-engine-save-list={compact ? 'compact' : 'full'} className={compact ? 'mt-4 rounded-xl border border-border-subtle p-3' : 'lv-surface min-w-0 p-4'}>
-      <h3 className="text-[15px] font-bold leading-snug text-text-primary">{s.listTitle}</h3>
+      {/* With nothing to save by hand, the section is the automatic repricing's status alone, under its own name. */}
+      <h3 className="text-[15px] font-bold leading-snug text-text-primary">{total > 0 || !autoWorthShowing(auto) ? s.listTitle : s.autoTitle}</h3>
       {error && <p role="alert" className="mt-1 text-[13px] text-danger">{error}</p>}
+      {autoWorthShowing(auto) && <AutoRepriceLine auto={auto} lang={lang} titled={total > 0} />}
       {list && total > 0 && (
         <>
           <ul className="mt-1 grid gap-0.5 text-[13px] text-text-muted">
@@ -123,6 +159,11 @@ export default function EngineSaveList({ lang, compact = false, reloadKey = 0 }:
               {list.stale.items.slice(0, 20).map((i) => (
                 <li key={`s:${i.product_id}`} className="text-text-primary">
                   {nameOf(i, lang)} <span className="text-text-muted">— {reasonText(i)}</span>
+                  {i.blocked_code && (
+                    <span className="block text-[12px] text-warning" data-engine-blocked-code={i.blocked_code}>
+                      {s.blockedLine(i.blocked_code)}
+                    </span>
+                  )}
                 </li>
               ))}
               {list.ready.items.slice(0, 20).map((i) => (

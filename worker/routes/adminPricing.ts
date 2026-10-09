@@ -38,7 +38,12 @@
  *   POST /rates/fx/refresh               «تحديث الآن»
  *   POST /rates/fx/:pair/review          approve / reject / keep as manual
  *   PUT  /rates/shipping/:profile        a central shipping rate in IQD
- * They write rates, never a product price (repricing is FX-5).
+ * They write rates, never a product price themselves. FX-5: once an act has
+ * committed a rate that moves the engine's inputs (an approval, a manual rate,
+ * the adjustment, a shipping rate), the engine products it left stale are
+ * repriced by the engine's own writer inside the same request's statement
+ * budget, deficit first (worker/lib/fx/reprice.ts); the rest follow on the
+ * quarter-hour sweep.
  */
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -57,6 +62,9 @@ import { toStatements } from '../lib/fx/write';
 import { historyItemDto, ratesDto } from '../lib/fx/dto';
 import { engineProductCount, loadHistory, loadRatesReadModel } from '../lib/fx/read';
 import { notifyOwnerFx } from '../lib/fx/notify';
+import { sweepStaleEnginePrices } from '../lib/fx/reprice';
+import { FX_INVOCATION_STATEMENT_BUDGET, statementBudget } from '../lib/fx/budget';
+import { autoRepriceStatus } from '../lib/pricingEngine/autoReprice';
 import { FX_REFRESH_GLOBAL_KEY } from '../lib/fx/limits';
 import {
   LARGE_CHANGE_PCT,
@@ -190,8 +198,9 @@ adminPricingRoutes.post('/products/:id/what-if', async (c) => {
 // fenced on the pair's `owner_version` (a routine check never moves it), and
 // a write that moves an effective rate is fenced on all three pairs'
 // `effective_version` too. Bodies are allow-lists. A database without
-// migration 0179 answers 503 PRICING_NOT_INSTALLED. NO PRODUCT PRICE IS
-// WRITTEN HERE: repricing arrives in FX-5.
+// migration 0179 answers 503 PRICING_NOT_INSTALLED. No route here writes a
+// product price itself: after a committed rate move, the engine's writer
+// reprices the stale engine products (FX-5, `repriceAfterAct`).
 
 const fxNotInstalled = () => new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED');
 const newFxLogId = () => `fxl_${crypto.randomUUID()}`;
@@ -239,6 +248,20 @@ async function chargeRefresh(c: Context<AppContext>): Promise<void> {
   await rateLimit(c, 'fx-refresh-global', 40, 86_400, FX_REFRESH_GLOBAL_KEY);
 }
 
+/**
+ * FX-5 (§7.1, §7.4): after an owner act committed a rate the engine prices at,
+ * the engine products it left stale are repriced at once by the engine's own
+ * writer, deficit first, within this request's statement budget (the act's
+ * own batch already charged); the rest follow on the quarter-hour sweep. Only
+ * confirmed rates price: an act that holds, rejects or keeps a rate moved
+ * nothing, so nothing is stale. Never throws.
+ */
+async function repriceAfterAct(c: Context<AppContext>, spent: number): Promise<void> {
+  const budget = statementBudget(FX_INVOCATION_STATEMENT_BUDGET);
+  budget.spend(Math.min(spent, FX_INVOCATION_STATEMENT_BUDGET));
+  await sweepStaleEnginePrices(c.env, { trigger: 'owner_rate', budget, actorId: c.get('user')!.id, origin: originOf(c) });
+}
+
 /** One owner act, committed in one batch; the display rate's caches purged and the bell rung after. */
 async function commitAct(c: Context<AppContext>, planned: PlannedAct, rows: readonly FxPairRow[], now: Date): Promise<void> {
   const actor = c.get('user')!.id;
@@ -259,6 +282,8 @@ async function commitAct(c: Context<AppContext>, planned: PlannedAct, rows: read
   );
   if (plan.displayRateChanged || usdSourceChanged) await purgeCatalogueFromJob(c.env, [], { settings: true, origin: originOf(c) });
   if (planned.attention.length) await notifyOwnerFx(c.env, planned.attention);
+  // An effective rate moved (the derived IQD rates were rewritten): reprice what it left stale.
+  if (plan.derived.length) await repriceAfterAct(c, plan.cost);
 }
 
 const pairRow = (rows: readonly FxPairRow[], pair: FxPairId): FxPairRow => rows.find((r) => r.pair === pair)!;
@@ -404,6 +429,12 @@ adminPricingRoutes.put('/rates/shipping/:profile', async (c) => {
   } catch (e) {
     if (isFenceMiss(e)) throw fxRefusal(409, 'PRICING_CHANGED');
     throw e;
+  }
+  // FX-5: the engine products priced on this route are repriced at the new central rate (the owner's cost change).
+  if (row.rate_iqd !== input.rate) {
+    const budget = statementBudget(FX_INVOCATION_STATEMENT_BUDGET);
+    budget.spend(statements.length + 1);
+    await sweepStaleEnginePrices(c.env, { trigger: 'shipping', budget, actorId: actor, origin: originOf(c) });
   }
   return ratesAnswer(c);
 });
@@ -934,11 +965,14 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
 // ------------------------------------------------------------ the save list: stale engine prices and complete-but-manual products
 //
 //   GET  /save-list                every engine product whose stored price was computed at a confirmed rate
-//                                  that moved since (stale), and every manual product whose data is complete
-//                                  (ready) — the counts the «التسعير والشحن» page and the rates panel show
+//                                  that moved since (stale; with the code of one the automatic repricing could
+//                                  not reach), every manual product whose data is complete (ready), and the
+//                                  automatic repricing's status «يُعاد التسعير تلقائياً» (counts, the pause, the
+//                                  last run) — what the «التسعير والشحن» page and the rates panel show
 //   POST /save-list/preview        {product_ids} (≤ 20): each product's preview and hash, for one bulk save
 //   POST /products/save-bulk       {items:[{product_id, preview_hash}], confirm_large_change?} (≤ 20): each
-//                                  product its own atomic batch (automatic FX repricing is the next package)
+//                                  product its own atomic batch — the owner's manual tool beside FX-5's
+//                                  automatic repricing, which works through the same stale list
 
 const BULK_MAX = 20;
 
@@ -954,11 +988,13 @@ adminPricingRoutes.get('/save-list', async (c) => {
   // Deploy-ahead of 0181 (CLAUDE.md rule 2): without the engine's tables no product is engine-priced
   // and none holds stored pricing data, so both lists are truthfully empty — the rates panel (FX-1)
   // and «التسعير والشحن» keep answering exactly as on a migrated database with no engine product.
-  if (!(await engineCoreInstalled(db))) return c.json({ success: true, stale: { count: 0, items: [] }, ready: { count: 0, items: [] } });
+  if (!(await engineCoreInstalled(db))) return c.json({ success: true, stale: { count: 0, items: [] }, ready: { count: 0, items: [] }, auto: null });
   const rates = await engineRates(db);
   const { results } = await db
-    .prepare("SELECT s.product_id, s.mode, s.opted_out_at FROM product_pricing_state s JOIN products p ON p.id = s.product_id WHERE COALESCE(p.composition, '') = '' ORDER BY s.product_id")
-    .all<{ product_id: string; mode: string; opted_out_at: string | null }>();
+    .prepare(
+      "SELECT s.product_id, s.mode, s.opted_out_at, s.reprice_blocked_code FROM product_pricing_state s JOIN products p ON p.id = s.product_id WHERE COALESCE(p.composition, '') = '' ORDER BY s.product_id"
+    )
+    .all<{ product_id: string; mode: string; opted_out_at: string | null; reprice_blocked_code: string | null }>();
   const states = results ?? [];
   const ids = states.map((s) => s.product_id);
   const [loaded, stores, costs, ctx, control] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadStoredSkuCosts(db, ids), loadPreviewContext(db), loadEngineControl(db)]);
@@ -969,7 +1005,8 @@ adminPricingRoutes.get('/save-list', async (c) => {
     if (!product) continue;
     if (st.mode === 'engine') {
       const reasons = staleReasons(costs.filter((r) => r.product_id === st.product_id), rates);
-      if (reasons.length) stale.push({ product_id: st.product_id, ...productNames(product), reasons });
+      // `blocked_code`: the automatic repricing could not reach it (a code, never a figure).
+      if (reasons.length) stale.push({ product_id: st.product_id, ...productNames(product), reasons, blocked_code: st.reprice_blocked_code ?? null });
       continue;
     }
     if (st.opted_out_at) continue;
@@ -977,7 +1014,18 @@ adminPricingRoutes.get('/save-list', async (c) => {
     const ev = await evaluateEngineWrite({ loaded: product, stored, ctx, rates, control, inputs: stored.inputs, inputWrites: [], ruleWrites: [], image: '', storedCosts: [] });
     if (ev.kind === 'adopt') ready.push({ product_id: st.product_id, ...productNames(product), reasons: [] });
   }
-  return c.json({ success: true, stale: { count: stale.length, items: stale }, ready: { count: ready.length, items: ready } });
+  const status = await autoRepriceStatus(db, rates);
+  const auto = status
+    ? {
+        // «يُعاد التسعير تلقائياً»: stale engine products are being repriced on the next ticks.
+        active: status.stale > 0 && !status.paused && !status.derived_stale,
+        paused: status.paused,
+        stale: status.stale,
+        blocked: status.blocked,
+        last_run: status.last_run,
+      }
+    : null;
+  return c.json({ success: true, stale: { count: stale.length, items: stale }, ready: { count: ready.length, items: ready }, auto });
 });
 
 /** One product's bulk evaluation (no drafts): its preview and hash. */

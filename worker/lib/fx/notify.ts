@@ -97,3 +97,45 @@ export async function notifyOwnerFx(env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>
     console.error('fx: owner notice not written:', e instanceof Error ? e.name : 'unknown');
   }
 }
+
+/**
+ * FX-5: a product the automatic repricing could not reach (FX programme plan
+ * §7.4: the owner's bell rings once per product). The same verified-owner
+ * door; no figure and no name (a product name may carry digits) — the pricing
+ * tab lists the product with its code.
+ */
+export const REPRICE_BLOCKED_NOTICE = {
+  title: {
+    ar: 'منتج يحتاج انتباهك في التسعير',
+    en: 'A product needs your attention in pricing',
+    ckb: 'بەرهەمێک لە نرخداناندا پێویستی بە سەرنجی تۆیە',
+  },
+  body: {
+    ar: 'تعذّرت إعادة تسعيره تلقائيًا بعد تغيّر سعر معتمد — بقي سعره كما هو. راجعه في «التسعير والشحن».',
+    en: 'It could not be repriced automatically after an approved rate changed — its price is unchanged. Review it in Pricing & shipping.',
+    ckb: 'دوای گۆڕانی نرخێکی پەسەندکراو نەتوانرا بە خۆکاری نرخەکەی نوێ بکرێتەوە — نرخەکەی وەک خۆی ماوە. لە «نرخدانان و ناردنی بەرهەم» پێیدا بچۆرەوە.',
+  },
+} as const;
+
+export async function notifyOwnerRepriceBlocked(env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>, items: ReadonlyArray<{ product_id: string; key: string }>): Promise<void> {
+  try {
+    if (!items.length) return;
+    const ownerId = await verifiedOwnerId(env);
+    if (!ownerId) return;
+    for (const item of items) {
+      await notify(env.DB, {
+        userId: ownerId,
+        kind: 'fx_attention',
+        title_ar: REPRICE_BLOCKED_NOTICE.title.ar,
+        title_en: REPRICE_BLOCKED_NOTICE.title.en,
+        body_ar: REPRICE_BLOCKED_NOTICE.body.ar,
+        body_en: REPRICE_BLOCKED_NOTICE.body.en,
+        link: '/admin?tab=pricing',
+        meta: { title_ckb: REPRICE_BLOCKED_NOTICE.title.ckb, body_ckb: REPRICE_BLOCKED_NOTICE.body.ckb, reason: 'reprice_blocked', product_id: item.product_id },
+        eventKey: item.key,
+      });
+    }
+  } catch (e) {
+    console.error('fx: reprice notice not written:', e instanceof Error ? e.name : 'unknown');
+  }
+}

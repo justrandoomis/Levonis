@@ -190,6 +190,10 @@ export interface RatesReadModel {
   procurementShipping: Record<string, string | null>;
   refreshUsedToday: number;
   engineProducts: number;
+  /** FX-5: engine products whose stored price waits for a repricing — a count. */
+  staleProducts?: number;
+  /** FX-5: engine products the automatic repricing could not reach — a count. */
+  repriceBlocked?: number;
 }
 
 export function ratesDto(keyConfigured: boolean, m: RatesReadModel, now: Date) {
@@ -218,8 +222,8 @@ export function ratesDto(keyConfigured: boolean, m: RatesReadModel, now: Date) {
       },
     },
     engine_products: m.engineProducts,
-    // FX-5 (repricing) fills these; FX-1 prices nothing.
-    reprice_blocked: 0,
-    stale_products: 0,
+    // FX-5: the automatic repricing's counts (the status line itself is on GET /save-list).
+    reprice_blocked: m.repriceBlocked ?? 0,
+    stale_products: m.staleProducts ?? 0,
   };
 }

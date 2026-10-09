@@ -7,7 +7,10 @@
  * the purchase screens hold is offered as a one-tap suggestion — it fills the
  * field, it never saves by itself. Each save carries the row's version, so a
  * card left open across another save answers 409 instead of overwriting it.
- * (From FX-5 a save reprices behind a preview; in FX-1 nothing is repriced.)
+ * FX-5: a saved rate reprices the engine products on that route on the
+ * server, through the engine's own writer, within the request's budget; the
+ * rest follow on the quarter-hour sweep. (A preview of those prices before
+ * the save is not built yet.)
  */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';

@@ -26,7 +26,10 @@
  * RatesPanel), the owner's rates through their own owner-only routes; and the
  * stale list (EngineSaveList, owner decision 8), which saves the new prices of
  * the products a changed rate left behind — after their preview, in one bulk
- * request. No price moves with a rate on its own until automatic pricing (FX-5).
+ * request. FX-5: a confirmed rate change reprices those engine products on
+ * the server by itself (deficit first, every quarter hour until none is
+ * left); the list says so — «يُعاد التسعير تلقائياً» — and stays the owner's
+ * manual tool.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';

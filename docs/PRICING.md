@@ -91,8 +91,8 @@ throughout, never a float.
   `min_change_pct`, seeded 0.5% USD/IQD, 0.3% EUR/USD and CNY/USD, strictly
   below (exactly 0.5% is a move) — a check records one `check` row and one
   `fx.check` audit and nothing else: no `pricing_fx_rates` revision, no
-  product price (from FX-5: no repricing, no final_price write) and no cache
-  purge. Such a tick also clears a value held for review, since the market is
+  product price (no repricing, no final_price write — FX-5 reprices only from
+  a committed rate) and no cache purge. Such a tick also clears a value held for review, since the market is
   back near the rate in force; that is neither a repricing nor a purge. The
   owner edits each band at `PUT /api/admin/pricing/rates/fx/:pair/settings`
   (owner only, a fresh sign-in, 0 to 5 and below the 3% guard); the
@@ -129,7 +129,8 @@ throughout, never a float.
   owner typed the rate, so the menu and Settings credit IQWealth only for its
   own figure. Every other FX figure is the verified owner's
   (`/api/admin/pricing/rates*`).
-- **FX-1 moves no price.** Repricing from a rate change is FX-5.
+- **The rates move engine prices automatically (FX-5)** — see "Automatic
+  repricing" below. The FX module itself still names no price column.
 
 **One scheduler, one cron.** `0 */6 * * *` runs `runFxScheduler`
 (`worker/lib/fx/scheduler.ts`); a pair is due by its interval measured from
@@ -235,10 +236,65 @@ engine** and writes its prices in that same batch.
   `ENGINE_MANAGED` (the product's price, the option price cells, the quick
   price grid and its undo, the selection price, the CSV import); the
   database's value-compared lock is the enforcement. Cost stays editable.
-- **Not yet**: automatic repricing when a rate changes (FX-5; until then the
-  products appear in the stale list), and colour / SKU-level prices (FX-7; a
-  product priced per colour or variant, or with more than one option group, is
-  refused `PRICE_SHAPE_UNSUPPORTED` and stays manual).
+- **Not yet**: colour / SKU-level prices (FX-7; a product priced per colour or
+  variant, or with more than one option group, is refused
+  `PRICE_SHAPE_UNSUPPORTED` and stays manual).
+
+## Automatic repricing when a confirmed rate changes (FX-5)
+
+`worker/lib/pricingEngine/autoReprice.ts`, called through
+`worker/lib/fx/reprice.ts`. No migration: it uses 0181's
+`product_pricing_state.reprice_blocked_code` / `_at`, the `reprice_auto`
+action and `price_history.price_source = 'engine_fx'`.
+
+- **When.** The FX scheduler commits a new effective rate (USD/IQD, EUR/USD,
+  CNY/USD) — the engine products it left stale are repriced at the end of the
+  same run; the owner approves a held rate, sets a manual rate or changes the
+  adjustment, or changes a central shipping rate — repriced inside the same
+  request; and every quarter hour the sweep takes up whatever is still stale.
+  Below the dead band nothing is committed, so nothing is written or purged
+  (owner decision 10). A rate held for review (REVIEW_REQUIRED) or rejected is
+  never effective, so it reprices nothing until the owner approves it; the
+  approval makes it the Confirmed Rate and reprices at it (decision 11).
+- **What.** Exactly the stale list: engine products whose stored price was
+  computed at a confirmed rate that has changed since. Manual products are
+  never read for writing.
+- **How.** The writer's own path, never a second computation: the evaluation
+  (E1 at the last confirmed central rates, the plan, the exact check against
+  the cart's resolver), then one atomic batch per product, fenced on its
+  pricing state, the engine's config version and pause, its price image and
+  the very rates it was priced at; idempotent (`auto:<product>:<hash>`);
+  audited — values in `pricing_audit` (`reprice_auto`), ids and codes only in
+  `audit_log` (`pricing.engine.repriced_auto`), one `run_finished` record per
+  run with counts. A price that only exchange rates moved is recorded as
+  `engine_fx` (decision 6: an FX-only drop is not price protection); a
+  shipping rate the owner changed is `engine_owner`. When the new figures round
+  to today's prices, only the stored engine figures are re-stamped (no price
+  row, no history, no purge).
+- **Deficit first, within the budget.** Every due product is evaluated from
+  bulk reads (a constant number of statements), then written in order of how
+  far today's price lies below the new replacement cost + minimum profit,
+  largest first. Every read and batch is charged to the invocation's statement
+  budget — 600 for the six-hour run and an owner's request, 200 for the
+  quarter-hour sweep (so that invocation's other jobs keep theirs). A batch the
+  budget cannot cover is not sent; it and the products after it wait, in the
+  same order, for the next tick, until the list is empty.
+- **A product that cannot be repriced** (incomplete, a shape the fields cannot
+  carry, a resolver mismatch, a database refusal) keeps its prices, stays on
+  the stale list with its code (`blocked_code`, never a figure), rings the
+  verified owner's bell once (no figure), and never blocks the others. It is
+  tried again when a rate changes again, when the owner saves it (the writer
+  clears the code), or after 24 hours.
+- **The purge.** After the run, `purgeCatalogueFromJob` for the products whose
+  customer price moved (their `/api/products/<slug>`, the listing and the home
+  shelves); nothing moved, nothing purged.
+- **The owner sees** «يُعاد التسعير تلقائياً» on «التسعير والشحن» and in the
+  rates panel (`GET /save-list` → `auto`: whether products wait, the pause,
+  how many could not be reached, the last run); `GET /rates` carries the
+  counts (`stale_products`, `reprice_blocked`). The stale list's preview and
+  bulk save stay the owner's manual tool.
+- **Never in the customer path**: the storefront, the cart and checkout read
+  the stored prices only (tests/fxRepricing.test.ts, tests/fxNoCustomerPath.test.ts).
 
 **Price protection on the USD base price (owner decision 6, policy v5).** An
 order line bought at an engine price snapshots its base price in USD and the
