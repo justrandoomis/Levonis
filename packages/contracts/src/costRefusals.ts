@@ -174,7 +174,7 @@ export const COST_REFUSALS = {
     ckb: 'گۆڕانکارییەکانی ترت پاشەکەوت کران؛ نرخەکان وەک خۆیان مانەوە چونکە بزوێنەری نرخدانان بەڕێوەیان دەبات.',
   },
   PREMIUM_NOT_ON_STEP: {
-    ar: 'يجب أن تكون العلاوة من مضاعفات 1,000 د.ع.',
+    ar: 'يجب أن تكون زيادة البيع المباشر من مضاعفات 1,000 د.ع.',
     en: 'The premium must be a multiple of 1,000 IQD.',
     ckb: 'زیادەکە دەبێت چەندجارەی 1,000 دینار بێت.',
   },
@@ -389,7 +389,7 @@ export const COST_REFUSALS = {
   CENTRAL_RATES_MOVED: {
     ar: 'أسعار الصرف والشحن المركزية تُعدّل من شاشة «التسعير والشحن» فقط.',
     en: 'Central exchange and shipping rates are edited only on the Pricing & Shipping screen.',
-    ckb: 'نرخە ناوەندییەکانی ئاڵوگۆڕ و ناردن تەنها لە شاشەی «نرخدانان و ناردن» دەستکاری دەکرێن.',
+    ckb: 'نرخە ناوەندییەکانی ئاڵوگۆڕ و ناردن تەنها لە شاشەی «نرخدانان و ناردنی بەرهەم» دەستکاری دەکرێن.',
   },
 
   // ---- adversarial review amendments (critique-2 §6) ----------------------

@@ -139,7 +139,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   },
   DIRECT_PREMIUM_MISSING: {
     severity: 'error',
-    label: { ar: 'علاوة البيع المباشر غير مضبوطة', en: 'Direct sale premium is not set', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دانەنراوە' },
+    label: { ar: 'زيادة البيع المباشر غير مضبوطة', en: 'Direct sale premium is not set', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دانەنراوە' },
   },
   INPUT_CONFLICT: {
     severity: 'error',
@@ -234,7 +234,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
     label: {
       ar: 'سعر صرف {currency} لم يُؤكَّد بعد من شاشة «التسعير والشحن»',
       en: 'The {currency} exchange rate has not been confirmed yet on the Pricing & Shipping screen',
-      ckb: 'نرخی ئاڵوگۆڕی {currency} هێشتا لە شاشەی «نرخدانان و ناردن» پشتڕاست نەکراوەتەوە',
+      ckb: 'نرخی ئاڵوگۆڕی {currency} هێشتا لە شاشەی «نرخدانان و ناردنی بەرهەم» پشتڕاست نەکراوەتەوە',
     },
   },
   SHIPPING_RATE_UNCONFIRMED: {
@@ -242,7 +242,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
     label: {
       ar: 'سعر {profile} لم يُؤكَّد بعد من شاشة «التسعير والشحن»',
       en: 'The {profile} rate has not been confirmed yet on the Pricing & Shipping screen',
-      ckb: 'نرخی {profile} هێشتا لە شاشەی «نرخدانان و ناردن» پشتڕاست نەکراوەتەوە',
+      ckb: 'نرخی {profile} هێشتا لە شاشەی «نرخدانان و ناردنی بەرهەم» پشتڕاست نەکراوەتەوە',
     },
   },
   CHANNEL_INCOMPLETE: {
@@ -280,7 +280,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   RULE_ORPHANED: {
     severity: 'warning',
     label: {
-      ar: 'قاعدة ربح أو علاوة تشير إلى قسم أو خيار أو تركيبة لم تعد موجودة؛ لا تُطبَّق',
+      ar: 'قاعدة ربح أو زيادة بيع مباشر تشير إلى قسم أو خيار أو تركيبة لم تعد موجودة؛ لا تُطبَّق',
       en: 'A profit or premium rule points to a category, option or SKU that no longer exists; it is not applied',
       ckb: 'ڕێسایەکی قازانج یان زیادە ئاماژە بە بەش، هەڵبژاردە یان SKU-یەک دەکات کە چیتر بوونی نییە؛ جێبەجێ ناکرێت',
     },
@@ -288,7 +288,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   PREMIUM_NOT_ON_STEP: {
     severity: 'error',
     label: {
-      ar: 'يجب أن تكون علاوة البيع المباشر من مضاعفات خطوة التقريب (1,000 د.ع)',
+      ar: 'يجب أن تكون زيادة البيع المباشر من مضاعفات خطوة التقريب (1,000 د.ع)',
       en: 'The direct sale premium must be a multiple of the rounding step (1,000 IQD)',
       ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ دەبێت چەندجارەی هەنگاوی خڕکردنەوە بێت (1,000 دینار)',
     },
@@ -336,7 +336,7 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   DIRECT_PREMIUM_BLOCKED: {
     severity: 'error',
     label: {
-      ar: 'علاوة البيع المباشر موقوفة حتى تقرر',
+      ar: 'زيادة البيع المباشر موقوفة حتى تقرر',
       en: 'The direct sale premium is on hold until you decide',
       ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ ڕاگیراوە تا تۆ بڕیار دەدەیت',
     },

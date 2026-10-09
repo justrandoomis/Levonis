@@ -163,7 +163,8 @@ test('every code has ar, en and ckb — non-empty, trimmed, the Sorani its own (
 
 test('the terminology of C32 holds in every Sorani sentence: «بەرهەم», never «کاڵا»', () => {
   for (const code of CODES) assert.doesNotMatch(COST_REFUSALS[code].ckb, /کاڵا/, code);
-  assert.match(COST_REFUSALS.CENTRAL_RATES_MOVED.ckb, /نرخدانان و ناردن/, 'the screen is «نرخدانان و ناردن»');
+  // The screen's Sorani name, as its tab and title write it (tests/adminPricingStrings.test.ts holds them equal).
+  assert.match(COST_REFUSALS.CENTRAL_RATES_MOVED.ckb, /«نرخدانان و ناردنی بەرهەم»/, 'the screen is «نرخدانان و ناردنی بەرهەم»');
   assert.match(COST_REFUSALS.LOT_PRODUCT_MISMATCH.ckb, /وەجبە/, 'batch is «وەجبە»');
 });
 

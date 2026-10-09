@@ -43,7 +43,8 @@ import {
 import type { PricingChannel, PricingProfile, PricingRoute, PricingSaleMix, PricingNames } from './api';
 
 type Lang = Language;
-type Count = (n: number) => string;
+/** A sentence around a figure the screen has already written in the reader's digits (`readWhole`). */
+type Count = (n: string) => string;
 
 interface UiStrings {
   title: string;
@@ -51,6 +52,7 @@ interface UiStrings {
   previewBody: string;
   productsHeading: string;
   productsCount: Count;
+  shownCount: Count;
   searchLabel: string;
   searchPlaceholder: string;
   filterLabel: string;
@@ -66,6 +68,7 @@ interface UiStrings {
   notLive: string;
   back: string;
   decisionHeading: string;
+  decisionLater: string;
   nothingHeld: string;
   notesHeading: string;
   factsSale: string;
@@ -115,6 +118,7 @@ interface UiStrings {
   calculating: string;
   clear: string;
   invalidCost: string;
+  decimalComma: string;
   invalidWhole: string;
   invalidWholeZero: string;
   invalidDecimal: string;
@@ -127,7 +131,7 @@ interface UiStrings {
   noChange: string;
   notPriced: string;
   minimumKept: string;
-  minimumKeptHow: string;
+  minimumKeptHow: Count;
   breakdown: string;
   ratesUsed: string;
   weightUsed: string;
@@ -155,6 +159,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     previewBody: 'لا يُحفظ من هذه الصفحة أي سعر أو تكلفة أو إعداد. تتغير أسعار المتجر فقط عندما تحوّل منتجاً إلى التسعير الجديد، في تحديث لاحق.',
     productsHeading: 'المنتجات',
     productsCount: (n) => `عدد المنتجات: ${n}`,
+    shownCount: (n) => `المنتجات المعروضة: ${n}`,
     searchLabel: 'ابحث في المنتجات',
     searchPlaceholder: 'الاسم أو الرابط',
     filterLabel: 'تصفية حسب الحالة',
@@ -164,12 +169,13 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     clearFilters: 'مسح البحث والتصفية',
     models: (n) => `الموديلات: ${n}`,
     modelsLabel: 'الموديلات',
-    typedMemberPrices: 'أسعار عضوية مكتوبة',
+    typedMemberPrices: 'أسعار عضوية مكتوبة يدوياً',
     typedMemberSummary: (n) => `منتجات فيها أسعار PRIME/PRO مكتوبة يدوياً: ${n}`,
     truncated: (n) => `تُعرض أول ${n} منتج فقط.`,
     notLive: 'غير معروض في المتجر',
     back: 'كل المنتجات',
     decisionHeading: 'ما يحتاج قرارك',
+    decisionLater: 'هذه الصفحة تعرض ما يحتاج قرارك فقط؛ تتخذ هذه القرارات هنا في التحديث القادم.',
     nothingHeld: 'لا شيء يوقف هذا المنتج سوى تكلفة المورد، وتُدخلها في التحديث القادم.',
     notesHeading: 'للعلم',
     factsSale: 'طريقة البيع',
@@ -219,6 +225,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     calculating: 'جارٍ الحساب…',
     clear: 'مسح',
     invalidCost: 'اكتب رقماً أكبر من صفر، بأربعة منازل عشرية على الأكثر.',
+    decimalComma: 'استخدم النقطة للكسور (12.5) أو «٫»؛ الفاصلة تفصل الآلاف فقط (1,250).',
     invalidWhole: 'اكتب عدداً صحيحاً أكبر من صفر.',
     invalidWholeZero: 'اكتب عدداً صحيحاً، صفراً أو أكثر.',
     invalidDecimal: 'اكتب رقماً أكبر من صفر.',
@@ -231,7 +238,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     noChange: 'بلا تغيير',
     notPriced: 'لا يمكن تسعيره بعد',
     minimumKept: 'الحد الأدنى للربح محفوظ',
-    minimumKeptHow: 'السعر الجديد يغطي تكلفة الاستبدال الحالية والحد الأدنى للربح، ثم يُقرَّب للأعلى إلى أقرب 1,000.',
+    minimumKeptHow: (step) => `السعر الجديد يغطي تكلفة الاستبدال الحالية والحد الأدنى للربح، ثم يُقرَّب للأعلى إلى أقرب ${step}؛ وفي البيع المباشر تُضاف إليه بعد ذلك زيادة البيع المباشر.`,
     breakdown: 'التفاصيل',
     ratesUsed: 'الأسعار المستخدمة',
     weightUsed: 'الوزن المعتمد',
@@ -256,6 +263,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     previewBody: 'Nothing on this page saves a price, a cost or a setting. Store prices change only when you switch a product to the new pricing, in a later update.',
     productsHeading: 'Products',
     productsCount: (n) => `Products: ${n}`,
+    shownCount: (n) => `Products shown: ${n}`,
     searchLabel: 'Search products',
     searchPlaceholder: 'Name or slug',
     filterLabel: 'Filter by status',
@@ -271,6 +279,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     notLive: 'Not shown in the store',
     back: 'All products',
     decisionHeading: 'What needs your decision',
+    decisionLater: 'This page only shows what needs your decision; you make these choices here in the next update.',
     nothingHeld: 'Nothing holds this product except the supplier cost, which you enter in the next update.',
     notesHeading: 'For your information',
     factsSale: 'Sold as',
@@ -320,6 +329,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     calculating: 'Calculating…',
     clear: 'Clear',
     invalidCost: 'Enter a number above zero, with at most four decimal places.',
+    decimalComma: 'Use a point for decimals (12.5); a comma only separates thousands (1,250).',
     invalidWhole: 'Enter a whole number above zero.',
     invalidWholeZero: 'Enter a whole number, zero or more.',
     invalidDecimal: 'Enter a number above zero.',
@@ -332,7 +342,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     noChange: 'No change',
     notPriced: 'Cannot be priced yet',
     minimumKept: 'Minimum profit kept',
-    minimumKeptHow: 'The new price covers the current replacement cost and the minimum profit, then rounds up to the next 1,000.',
+    minimumKeptHow: (step) => `The new price covers the current replacement cost and the minimum profit, then rounds up to the next ${step}; a direct sale then adds the direct-sale premium on top.`,
     breakdown: 'Breakdown',
     ratesUsed: 'Rates used',
     weightUsed: 'Weight used',
@@ -357,6 +367,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     previewBody: 'لەم پەڕەیەوە هیچ نرخ، تێچوو یان ڕێکخستنێک پاشەکەوت ناکرێت. نرخەکانی فرۆشگا تەنها ئەو کاتە دەگۆڕێن کە بەرهەمێک دەگۆڕیت بۆ نرخدانانی نوێ، لە نوێکردنەوەیەکی داهاتوودا.',
     productsHeading: 'بەرهەمەکان',
     productsCount: (n) => `ژمارەی بەرهەمەکان: ${n}`,
+    shownCount: (n) => `بەرهەمە پیشاندراوەکان: ${n}`,
     searchLabel: 'گەڕان لە بەرهەمەکان',
     searchPlaceholder: 'ناو یان بەستەر',
     filterLabel: 'پاڵاوتن بەپێی دۆخ',
@@ -372,6 +383,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     notLive: 'لە فرۆشگادا پیشان نادرێت',
     back: 'هەموو بەرهەمەکان',
     decisionHeading: 'ئەوەی پێویستی بە بڕیاری تۆیە',
+    decisionLater: 'ئەم پەڕەیە تەنها ئەوە پیشان دەدات کە پێویستی بە بڕیاری تۆیە؛ لە نوێکردنەوەی داهاتوودا لێرەوە ئەم بڕیارانە دەدەیت.',
     nothingHeld: 'جگە لە تێچووی دابینکەر هیچ شتێک ئەم بەرهەمە ڕاناگرێت، کە لە نوێکردنەوەی داهاتوودا دەینووسیت.',
     notesHeading: 'بۆ زانیاریت',
     factsSale: 'شێوەی فرۆشتن',
@@ -407,7 +419,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     missingHeading: 'ئەوەی نرخی نوێ هێشتا پێویستیەتی',
     missingNone: 'هیچ.',
     whatIfTitle: 'نرخەکە چەند دەبێت؟',
-    whatIfIntro: 'تێچووی دابینکەر و دراوەکەی بنووسە. نرخەکە لە ڕاژەکار بە یاسا نوێیەکان حیساب دەکرێت، و هیچ شتێک پاشەکەوت ناکرێت.',
+    whatIfIntro: 'تێچووی دابینکەر و دراوەکەی بنووسە. نرخەکە لە ڕاژەکار بە ڕێسا نوێیەکان حیساب دەکرێت، و هیچ شتێک پاشەکەوت ناکرێت.',
     supplierCostHint: 'بە دراوی دابینکەر، بۆ نموونە 250 یان 12.5',
     modelLabel: 'مۆدێل',
     allModels: 'هەموو مۆدێلەکان',
@@ -415,12 +427,13 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     moreHint: 'بەتاڵیان بهێڵەرەوە بۆ بەکارهێنانی پێوانەکانی پەڕەی بەرهەم و ئەو نرخانەی لە کڕینەکانتەوە وەرگیراون.',
     profileAuto: 'بەپێی ڕێگا',
     ratesSection: 'نرخ تەنها بۆ ئەم حیسابە',
-    perKg: 'دینار بۆ هەر کیلۆگرامێک',
-    perCbm: 'دینار بۆ هەر CBM',
+    perKg: 'د.ع بۆ هەر کیلۆگرام',
+    perCbm: 'د.ع بۆ هەر CBM',
     calculate: 'حیسابی بکە',
     calculating: 'حیساب دەکرێت…',
     clear: 'پاککردنەوە',
     invalidCost: 'ژمارەیەکی سەرووی سفر بنووسە، لە چوار ژمارەی دوای خاڵ زیاتر نەبێت.',
+    decimalComma: 'بۆ ژمارەی دوای خاڵ، خاڵ بەکاربهێنە (12.5) یان «٫»؛ فاریزە تەنها هەزارەکان جیا دەکاتەوە (1,250).',
     invalidWhole: 'ژمارەیەکی تەواوی سەرووی سفر بنووسە.',
     invalidWholeZero: 'ژمارەیەکی تەواو بنووسە، سفر یان زیاتر.',
     invalidDecimal: 'ژمارەیەکی سەرووی سفر بنووسە.',
@@ -433,7 +446,7 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     noChange: 'بێ گۆڕان',
     notPriced: 'هێشتا نرخی بۆ دانانرێت',
     minimumKept: 'کەمترین قازانج پارێزراوە',
-    minimumKeptHow: 'نرخی نوێ تێچووی ئێستای جێگرتنەوە و کەمترین قازانج دەگرێتەوە، پاشان بۆ سەرەوە بۆ نزیکترین 1,000 خڕ دەکرێتەوە.',
+    minimumKeptHow: (step) => `نرخی نوێ تێچووی ئێستای جێگرتنەوە و کەمترین قازانج دەگرێتەوە، پاشان بۆ سەرەوە بۆ نزیکترین ${step} خڕ دەکرێتەوە؛ لە فرۆشتنی ڕاستەوخۆدا دواتر زیادەی فرۆشتنی ڕاستەوخۆی بۆ زیاد دەکرێت.`,
     breakdown: 'وردەکاری',
     ratesUsed: 'نرخە بەکارهاتووەکان',
     weightUsed: 'کێشی بەکارهاتوو',

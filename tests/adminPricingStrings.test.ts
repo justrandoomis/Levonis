@@ -27,6 +27,10 @@ import {
   reasonText,
   reasonTone,
 } from '../src/components/adminPricing/strings';
+import { COST_REFUSALS } from '../packages/contracts/src/costRefusals';
+import { PRICING_ISSUES } from '../packages/contracts/src/pricingIssues';
+import { iqdUnit } from '../src/lib/money';
+import { codeOf } from './fixtures/source';
 
 const SORANI_ONLY = /[ڕڵێۆەڤگچپژ]/;
 const ARABIC_ONLY = /[ةىيك]/;
@@ -136,4 +140,45 @@ test('a name falls back across the three languages, then to the caller’s word'
   assert.equal(nameOf(n, 'en'), 'Product');
   assert.equal(nameOf({ name_ar: '', name_en: '', name_ckb: '' }, 'ar', 'slug-x'), 'slug-x');
   assert.equal(nameOf(null, 'ar', 'x'), 'x');
+});
+
+// ------------------------------------------------------------- review fixes
+
+test('the screen has ONE name in each language — the tab, the title and every contract sentence that sends the owner to it (review finding 5)', () => {
+  // The contracts point the owner at the screen by name; the tab and the heading must carry that very name.
+  const named = [COST_REFUSALS.CENTRAL_RATES_MOVED, PRICING_ISSUES.FX_RATE_UNCONFIRMED.label, PRICING_ISSUES.SHIPPING_RATE_UNCONFIRMED.label];
+  for (const label of named) {
+    assert.equal(/«([^»]+)»/.exec(label.ar)?.[1], PRICING_UI_STRINGS.ar.title, label.ar);
+    assert.equal(/«([^»]+)»/.exec(label.ckb)?.[1], PRICING_UI_STRINGS.ckb.title, label.ckb);
+  }
+  const admin = codeOf('src/pages/Admin.tsx');
+  assert.ok(
+    admin.includes(`loc('${PRICING_UI_STRINGS.ar.title}', '${PRICING_UI_STRINGS.en.title}', '${PRICING_UI_STRINGS.ckb.title}')`),
+    'the sidebar tab is not the screen title'
+  );
+  // The Sorani name is real Sorani (row 183 rule, master plan v2 rule 7): it carries a Sorani-only letter.
+  assert.match(PRICING_UI_STRINGS.ckb.title, SORANI_ONLY);
+});
+
+test('Sorani wording: rules are «ڕێسا», never «یاسا» (law); rate units say «د.ع» like every price (review findings 7, 11)', () => {
+  for (const [key, value] of flatten(PRICING_UI_STRINGS.ckb as unknown as Record<string, unknown>)) assert.doesNotMatch(value, /یاسا/, key);
+  assert.match(PRICING_UI_STRINGS.ckb.whatIfIntro, /بە ڕێسا نوێیەکان/);
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(PRICING_UI_STRINGS[lang].perKg.startsWith(`${iqdUnit(lang)} `), `${lang} perKg «${PRICING_UI_STRINGS[lang].perKg}»`);
+    assert.ok(PRICING_UI_STRINGS[lang].perCbm.startsWith(`${iqdUnit(lang)} `), `${lang} perCbm «${PRICING_UI_STRINGS[lang].perCbm}»`);
+  }
+});
+
+test('the breakdown says a direct sale adds the premium after the rounding, and takes the step in the reader’s digits; the member chip says «يدوياً» (review finding 14)', () => {
+  const premium = { ar: /زيادة البيع المباشر/, en: /direct-sale premium/, ckb: /زیادەی فرۆشتنی ڕاستەوخۆ/ } as const;
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const how = PRICING_UI_STRINGS[lang].minimumKeptHow('١٬٠٠٠');
+    assert.match(how, premium[lang], lang);
+    assert.ok(how.includes('١٬٠٠٠'), `${lang}: the step is the caller's, written in the reader's digits`);
+    assert.doesNotMatch(how, /1,000/, lang);
+  }
+  assert.equal(PRICING_UI_STRINGS.ar.typedMemberPrices, 'أسعار عضوية مكتوبة يدوياً');
+  // Counts are formatted by the screen, never inside the sentence.
+  assert.equal(PRICING_UI_STRINGS.ar.productsCount('٤١'), 'عدد المنتجات: ٤١');
+  assert.equal(PRICING_UI_STRINGS.ar.shownCount('٢'), 'المنتجات المعروضة: ٢');
 });

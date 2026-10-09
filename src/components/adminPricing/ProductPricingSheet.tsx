@@ -95,13 +95,10 @@ function TodayChannels({ channels, lang, s }: { channels: PricingChannelToday[];
   // product-level fee only when one is charged — otherwise there is none.
   const feeOf = (c: PricingChannelToday) =>
     c.route || (c.today_fee_iqd ?? 0) > 0 ? <Money iqd={c.today_fee_iqd} /> : <span className="text-text-muted">—</span>;
+  // The sentence only: the resolver's machine codes have no words in any of
+  // the three languages, and CHANNEL_NOT_PRICED above already says what to do.
   const unpriced = (c: PricingChannelToday) =>
-    c.resolver_errors.length > 0 && (
-      <span className="block text-[12px] text-warning">
-        {s.channelUnpriced}
-        <Figure className="ms-1 text-text-muted">({c.resolver_errors.join(', ')})</Figure>
-      </span>
-    );
+    c.resolver_errors.length > 0 && <span className="block text-[12px] text-warning">{s.channelUnpriced}</span>;
   return (
     <>
       {/* Wide screens: one row per channel, the columns the owner compares. */}
@@ -226,7 +223,8 @@ function DerivedValue({
 
 // ------------------------------------------------------------- one model
 
-function ModelSection({ model, lang, s, defaultOpen, single }: { model: PricingModel; lang: Language; s: PricingUiStrings; defaultOpen: boolean; single: boolean }) {
+/** One model: today's channels, its derived values, measures and what is missing. Exported for its render test. */
+export function ModelSection({ model, lang, s, defaultOpen, single }: { model: PricingModel; lang: Language; s: PricingUiStrings; defaultOpen: boolean; single: boolean }) {
   const name = nameOf(model, lang, s.productItself);
   const titleId = useId();
   const m = model.suggested_measures;
@@ -365,6 +363,10 @@ function ModelSection({ model, lang, s, defaultOpen, single }: { model: PricingM
       <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-3 rounded-[var(--radius-lg)] px-4 py-3 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus [&::-webkit-details-marker]:hidden">
         <span className="min-w-0 flex-1">
           <span id={titleId} className="block text-[15px] font-bold text-text-primary">{name}</span>
+          {/* Phones: the state on its own line under the name (the wide layout shows it at the end). */}
+          <span className="mt-1 flex sm:hidden" data-model-state="narrow">
+            <ValueStateChip state={worstState(model)} lang={lang} />
+          </span>
           <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-text-muted">
             <span>
               {s.minProfit}: <Money iqd={model.target.target_profit_iqd} className="font-semibold text-text-secondary" />
@@ -376,7 +378,7 @@ function ModelSection({ model, lang, s, defaultOpen, single }: { model: PricingM
             )}
           </span>
         </span>
-        <span className="hidden sm:inline-flex">
+        <span className="hidden shrink-0 sm:inline-flex" data-model-state="wide">
           <ValueStateChip state={worstState(model)} lang={lang} />
         </span>
         <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted transition-transform group-open:rotate-180" />
@@ -534,7 +536,12 @@ export default function ProductPricingSheet({
         <h4 id="pricing-decision-title" className="text-[15px] font-bold text-text-primary">{s.decisionHeading}</h4>
         <div className="mt-2.5">
           {holding.length ? (
-            <ReasonList items={holding} lang={lang} />
+            <>
+              <p className="mb-2 text-[12px] leading-relaxed text-text-muted" data-pricing-decision-later>
+                {s.decisionLater}
+              </p>
+              <ReasonList items={holding} lang={lang} />
+            </>
           ) : (
             <p className="flex items-start gap-2 text-[13px] leading-relaxed text-text-secondary">
               <CheckCircle2 aria-hidden="true" className="mt-[2px] h-4 w-4 shrink-0 text-success" />
@@ -551,7 +558,7 @@ export default function ProductPricingSheet({
           </div>
         )}
         <details className="group mt-4 border-t border-border-subtle/60 pt-3">
-          <summary className="inline-flex min-h-[40px] cursor-pointer list-none items-center gap-1.5 rounded-md text-[13px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 rounded-md text-[13px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus [&::-webkit-details-marker]:hidden">
             <Info aria-hidden="true" className="h-4 w-4 text-info" />
             {s.landedNoteTitle}
             <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />

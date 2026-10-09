@@ -64,7 +64,7 @@ export const PRICING_FIELD_LABELS = {
     en: 'Minimum target profit (above current replacement cost)',
     ckb: 'کەمترین قازانجی مەبەست (لەسەر تێچووی ئێستای جێگرتنەوە)',
   },
-  direct_premium_iqd: { ar: 'علاوة البيع المباشر', en: 'Direct sale premium', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ' },
+  direct_premium_iqd: { ar: 'زيادة البيع المباشر', en: 'Direct sale premium', ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ' },
   rounding_step_iqd: { ar: 'خطوة التقريب', en: 'Rounding step', ckb: 'هەنگاوی خڕکردنەوە' },
   rounding_added_iqd: { ar: 'زيادة التقريب للأعلى', en: 'Added by rounding up', ckb: 'زیادکراو بە خڕکردنەوە بۆ سەرەوە' },
   preorder_base_iqd: { ar: 'سعر الطلب المسبق الأساسي', en: 'Pre-order base price', ckb: 'نرخی بنەڕەتیی پێشداواکاری' },

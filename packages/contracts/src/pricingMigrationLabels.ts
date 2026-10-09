@@ -48,10 +48,12 @@ export const PRICING_MIGRATION_STATUS_LABELS: Readonly<Record<PricingMigrationSt
     en: 'Conflicting legacy data',
     ckb: 'ناکۆکی لە زانیارییە کۆنەکاندا',
   },
+  // A held direct-sale premium rolls up here too (master plan v2 check (1)7),
+  // so the PRODUCT status names both values; one value's own state is below.
   TARGET_PROFIT_REVIEW_REQUIRED: {
-    ar: 'الحد الأدنى للربح يحتاج مراجعة',
-    en: 'Minimum target profit needs review',
-    ckb: 'کەمترین قازانجی مەبەست پێویستی بە پێداچوونەوە هەیە',
+    ar: 'الحد الأدنى للربح أو زيادة البيع المباشر يحتاج مراجعة',
+    en: 'Minimum profit or direct-sale premium needs review',
+    ckb: 'کەمترین قازانج یان زیادەی فرۆشتنی ڕاستەوخۆ پێویستی بە پێداچوونەوە هەیە',
   },
   NEEDS_MANUAL_REVIEW: {
     ar: 'يحتاج مراجعة يدوية',
@@ -233,9 +235,9 @@ export const LEGACY_REASONS = {
   NO_BASE_ROUTE: {
     severity: 'review',
     label: {
-      ar: 'للطلب المسبق أكثر من مسار بأسعار مختلفة؛ اختر المسار الأساسي الذي تُحسب منه زيادة البيع المباشر.',
-      en: 'Pre-order has more than one route at different prices; choose the base route the direct-sale premium is measured from.',
-      ckb: 'پێشداواکاری زیاتر لە یەک ڕێگای بە نرخی جیاواز هەیە؛ ئەو ڕێگا بنەڕەتییە هەڵبژێرە کە زیادەی فرۆشتنی ڕاستەوخۆی لێوە حیساب دەکرێت.',
+      ar: 'للطلب المسبق أكثر من مسار؛ اختر المسار الأساسي الذي تُحسب منه زيادة البيع المباشر، فالسعر الجديد للبيع المباشر يُبنى على شحن ذلك المسار.',
+      en: "Pre-order has more than one route; choose the base route the direct-sale premium is measured from, because the new direct-sale price is built on that route's shipping.",
+      ckb: 'پێشداواکاری زیاتر لە یەک ڕێگای هەیە؛ ئەو ڕێگا بنەڕەتییە هەڵبژێرە کە زیادەی فرۆشتنی ڕاستەوخۆی لێوە حیساب دەکرێت، چونکە نرخی نوێی فرۆشتنی ڕاستەوخۆ لەسەر ناردنی ئەو ڕێگایە دادەنرێت.',
     },
   },
   DIRECT_ONLY_PREMIUM_UNKNOWN: {

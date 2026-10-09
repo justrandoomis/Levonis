@@ -18,6 +18,10 @@
  *
  * A refusal names a FIELD: PRICING_INPUT_INVALID carries `details.field`, and
  * the message is drawn under that field.
+ *
+ * WHILE THE SERVER WORKS the button says so («جارٍ الحساب…», `aria-busy`) and
+ * refuses further presses, so a slow answer is never a dead button that sends
+ * the same question three times.
  */
 import React, { useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, CheckCircle2, ChevronDown, Minus } from 'lucide-react';
@@ -58,6 +62,9 @@ import { SERVER_FIELD, buildRequest, defaultCurrency, emptyDraft, type Draft, ty
 
 /** The rate warnings every P1 answer carries (no rate is confirmed before P2) — said once, above the results. */
 const UNCONFIRMED = new Set(['FX_RATE_UNCONFIRMED', 'SHIPPING_RATE_UNCONFIRMED']);
+
+/** E1's rounding step, as the breakdown names it (the server's answer carries what rounding added). */
+const ROUNDING_STEP_SHOWN = 1_000;
 
 function ChangeLine({ change, today, lang, s }: { change: number | null; today: number | null; lang: Language; s: PricingUiStrings }) {
   if (change === null) return <span className="text-[13px] text-text-muted">—</span>;
@@ -132,11 +139,11 @@ function ResultChannel({ c, lang, s, currency }: { c: PricingWhatIfChannel; lang
       )}
       {priced && (
         <details className="group mt-2.5">
-          <summary className="inline-flex min-h-[36px] cursor-pointer list-none items-center gap-1 rounded-md text-[12px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus [&::-webkit-details-marker]:hidden">
+          <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-1 rounded-md text-[12px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus [&::-webkit-details-marker]:hidden">
             <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
             {s.breakdown}
           </summary>
-          <p className="mb-1.5 text-[12px] leading-relaxed text-text-muted">{s.minimumKeptHow}</p>
+          <p className="mb-1.5 text-[12px] leading-relaxed text-text-muted">{s.minimumKeptHow(readWhole(ROUNDING_STEP_SHOWN, lang))}</p>
           <dl className="divide-y divide-border-subtle/50">
             {row(fieldLabel('supplier_cost_iqd', lang), <Money iqd={c.supplier_cost_iqd} />, 'sup')}
             {row(fieldLabel('shipping_cost_iqd', lang), <Money iqd={c.shipping_cost_iqd} />, 'ship')}
@@ -195,6 +202,7 @@ export default function WhatIfPanel({
   const [errors, setErrors] = useState<Partial<Record<FormKey, string>>>({});
   const [failure, setFailure] = useState('');
   const [answer, setAnswer] = useState<PricingWhatIfAnswer | null>(null);
+  const [busy, setBusy] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const controller = useRef<AbortController | null>(null);
@@ -208,6 +216,8 @@ export default function WhatIfPanel({
   );
 
   const submit = async () => {
+    // One question at a time: an Enter in a field while the answer is on its way asks nothing more.
+    if (busy) return;
     setFailure('');
     const { body, errors: found } = buildRequest(draft, s);
     setErrors(found);
@@ -218,6 +228,7 @@ export default function WhatIfPanel({
     controller.current?.abort();
     const ac = new AbortController();
     controller.current = ac;
+    setBusy(true);
     try {
       const res = await runPricingWhatIf(productId, body, { signal: ac.signal });
       if (ac.signal.aborted) return;
@@ -235,11 +246,15 @@ export default function WhatIfPanel({
       } else {
         setFailure(apiRefusal(e, lang, s.whatIfFailed));
       }
+    } finally {
+      // Only the question still being asked clears the busy state; one cleared or replaced does not.
+      if (controller.current === ac) setBusy(false);
     }
   };
 
   const clear = () => {
     controller.current?.abort();
+    setBusy(false);
     setDraft(emptyDraft(defaultCurrency(routes)));
     setErrors({});
     setFailure('');
@@ -394,7 +409,7 @@ export default function WhatIfPanel({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" variant="primary" loadingLabel={s.calculating} data-whatif-submit>
+          <Button type="submit" variant="primary" loading={busy} loadingLabel={s.calculating} data-whatif-submit>
             {s.calculate}
           </Button>
           {(answer || draft.cost) && (
@@ -418,7 +433,7 @@ export default function WhatIfPanel({
           </div>
           {unconfirmed && (
             <p className="flex items-center gap-2 text-[12px] text-text-muted">
-              <StatusChip tone="warning">{s.notConfirmed}</StatusChip>
+              <StatusChip tone="warning" className="shrink-0">{s.notConfirmed}</StatusChip>
               {ratesFromPurchasesText(lang)}
             </p>
           )}

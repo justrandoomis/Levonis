@@ -20,10 +20,19 @@
  *   specifically than its cost, a negative or off-step premium → REVIEW, with
  *   the floor and the ceiling as candidates for an off-step premium.
  *
+ * BASE ROUTE (§2.5). The premium is measured from the owner's base route, or
+ * from the only route. A model with more than one route and no owner choice is
+ * NO_BASE_ROUTE — even when every route charged the same, because the engine
+ * builds the direct price on the base route's own shipping (MVP plan: direct =
+ * pre(base route) + premium); the per-route premiums are its candidates.
+ *
  * PLACEMENT. A value goes at product scope when every model that has one agrees
  * — otherwise each model gets its own option-scope value. A model whose value
  * is held for review, unresolved or in conflict gets a BLOCKED option-scope
- * marker, so it never silently inherits a value it has no evidence for.
+ * marker, so it never silently inherits a value it has no evidence for. That
+ * includes a model the store offers but cannot price on any channel
+ * (CHANNEL_NOT_PRICED): it is held, never left out. Only a model offered on no
+ * channel at all (MODEL_NOT_SELLABLE) is left out of the placement.
  *
  * ROUND TRIP (check (1)6). With the replacement cost set to the old cost, the
  * placed values must give back the old prices through E1's own maths —
@@ -81,6 +90,12 @@ export interface LegacyModelInput {
   routes: readonly LegacyRouteObservation[];
   /** `product_variants.cost_iqd` of this model's SKUs that state one. */
   variant_costs?: readonly number[];
+  /**
+   * Channels the store offers this model today but the resolver could not
+   * price (`CHANNEL_NOT_PRICED`). When none of its channels is priced, the
+   * model is held — never given the product's values without evidence.
+   */
+  unpriced?: { direct: boolean; routes: readonly PreorderRoute[] };
 }
 
 export interface LegacyProductInput {
@@ -110,6 +125,7 @@ export const LEGACY_TARGET_REASON_CODES = [
   'DIRECT_ONLY_PREMIUM_UNKNOWN',
   'PLACEMENT_INVARIANT_FAILED',
   'MODEL_NOT_SELLABLE',
+  'CHANNEL_NOT_PRICED',
   'ROUTE_FEE_INCLUDED',
   'PREMIUM_ZERO_DIRECT_ONLY',
 ] as const;
@@ -232,6 +248,8 @@ const paidOf = (obs: LegacyChannelObservation): number => obs.item_iqd + obs.fee
 interface Working extends LegacyModelResult {
   /** The cost the direct price is rebuilt from in the round trip (C_base, or C_dir). */
   direct_cost_for_roundtrip: number | null;
+  /** Offered, but no channel priced: held with BLOCKED markers (null otherwise). */
+  unpriced_hold: { direct: boolean; preorder: boolean } | null;
 }
 
 function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: PreorderRoute | undefined): Working {
@@ -263,9 +281,19 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
     premium: { state: 'NOT_APPLICABLE', value_iqd: null, reasons: [], candidates: [] },
     roundtrip_ok: null,
     direct_cost_for_roundtrip: null,
+    unpriced_hold: null,
   };
 
   if (mix === 'NOT_SELLABLE') {
+    const u = model.unpriced;
+    if (u && (u.direct || u.routes.length > 0)) {
+      // Offered today, but the resolver priced none of it: nothing to derive
+      // from, and nothing to inherit either — held for the owner.
+      result.unpriced_hold = { direct: u.direct, preorder: u.routes.length > 0 };
+      result.target = { state: 'TARGET_PROFIT_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'CHANNEL_NOT_PRICED' }], candidates: [] };
+      if (u.direct) result.premium = { state: 'DIRECT_PREMIUM_REVIEW_REQUIRED', value_iqd: null, reasons: [{ code: 'CHANNEL_NOT_PRICED' }], candidates: [] };
+      return result;
+    }
     result.target.reasons = [{ code: 'MODEL_NOT_SELLABLE' }];
     return result;
   }
@@ -308,10 +336,10 @@ function deriveModel(model: LegacyModelInput, singleModel: boolean, baseChoice: 
     const d = model.direct!;
     const pDir = paidOf(d);
     const reasons: LegacyReason[] = [];
-    // The base route: the owner's choice, the only route, or any route when every route charged the same.
+    // The base route: the owner's choice, or the only route. More than one route
+    // and no choice is NO_BASE_ROUTE, even at equal paid prices (see the header).
     const chosen = baseChoice && routes.some((r) => r.route === baseChoice) ? baseChoice : undefined;
-    const paids = new Set(routeResults.map((r) => r.paid_iqd));
-    const base = chosen ?? (routes.length === 1 || paids.size === 1 ? routes[0]!.route : null);
+    const base = chosen ?? (routes.length === 1 ? routes[0]!.route : null);
     result.base_route = base;
     const premiumCandidates = routeResults.map((r): LegacyCandidate => ({ kind: 'route', route: r.route, value_iqd: pDir - r.paid_iqd }));
     if (!isWhole(pDir) || pDir <= 0) {
@@ -429,7 +457,14 @@ export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductRes
   const choice = (id: string) => input.base_route?.[id] ?? input.base_route?.['*'];
 
   const work = input.models.map((m) => deriveModel(m, singleModel, choice(m.option_id)));
-  const directOnlyProduct = work.every((w) => w.mix === 'DIRECT_ONLY' || w.mix === 'NOT_SELLABLE') && work.some((w) => w.mix === 'DIRECT_ONLY');
+  // A model offered for pre-order but unpriced still makes the product a pre-order seller.
+  const directOnlyProduct =
+    work.every((w) => w.mix === 'DIRECT_ONLY' || w.mix === 'NOT_SELLABLE') &&
+    work.some((w) => w.mix === 'DIRECT_ONLY') &&
+    !work.some((w) => w.unpriced_hold?.preorder);
+  // Held for its unpriced channels: a BLOCKED marker for BOTH rules (the profit's is placed below) —
+  // what it will sell as is unknown until its channels price, so it inherits neither.
+  const unpricedPremium = work.filter((w) => w.unpriced_hold).map((w) => ({ option_id: w.option_id, value: null, blocked: true }));
 
   const blockedFlags = new Set<string>();
   let rules: PricingRuleRow[] = [];
@@ -454,17 +489,19 @@ export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductRes
 
     const directOnly = work.filter((w) => w.mix === 'DIRECT_ONLY');
     const premiumRows = directOnlyProduct
-      ? place(input.product_id, 'direct_premium', directOnly.length ? [{ option_id: '', value: 0, blocked: false }] : [])
+      ? place(input.product_id, 'direct_premium', directOnly.length ? [{ option_id: '', value: 0, blocked: false }, ...unpricedPremium] : [])
       : place(input.product_id, 'direct_premium', [
           ...premiumModels,
           // A mixed product's direct-only model inherits the product premium, or is held.
           ...directOnly.filter((w) => w.premium.state !== 'MIGRATED' || blockedFlags.has(w.option_id)).map((w) => ({ option_id: w.option_id, value: null, blocked: true })),
+          ...unpricedPremium,
         ]);
     const targetRows = place(
       input.product_id,
       'target_profit',
       work
-        .filter((w) => w.mix !== 'NOT_SELLABLE')
+        // An unpriced hold is placed too (its held state makes it a BLOCKED marker).
+        .filter((w) => w.mix !== 'NOT_SELLABLE' || w.unpriced_hold)
         .map((w) => ({
           option_id: w.option_id,
           value: w.target.state === 'MIGRATED' ? w.target.value_iqd : null,
@@ -499,8 +536,9 @@ export function deriveLegacyTargets(input: LegacyProductInput): LegacyProductRes
     algorithm: LEGACY_TARGETS_ALGORITHM,
     product_id: input.product_id,
     models: work.map((w) => {
-      const { direct_cost_for_roundtrip, ...out } = w;
+      const { direct_cost_for_roundtrip, unpriced_hold, ...out } = w;
       void direct_cost_for_roundtrip;
+      void unpriced_hold;
       return out;
     }),
     rules,

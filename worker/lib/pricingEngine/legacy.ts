@@ -204,9 +204,14 @@ const observation = (c: ChannelToday): LegacyChannelObservation => ({
   cost_rung: c.cost_iqd === null ? null : (c.cost_rung ?? 'base'),
 });
 
-/** The legacy-derivation input of one model, from its priced channels. */
+/**
+ * The legacy-derivation input of one model, from its priced channels — and the
+ * offered channels the resolver could not price, so a model with no priced
+ * channel is held rather than left out (CHANNEL_NOT_PRICED).
+ */
 export function legacyInputOf(model: ModelToday, variantCosts: readonly number[]): LegacyModelInput {
   const priced = model.channels.filter((c) => c.ok);
+  const failed = model.channels.filter((c) => !c.ok);
   const directChannel = priced.find((c) => c.route === null) ?? null;
   const routes: LegacyRouteObservation[] = priced
     .filter((c) => c.route !== null)
@@ -216,6 +221,9 @@ export function legacyInputOf(model: ModelToday, variantCosts: readonly number[]
     direct: directChannel ? observation(directChannel) : null,
     routes,
     ...(variantCosts.length ? { variant_costs: variantCosts } : {}),
+    ...(failed.length
+      ? { unpriced: { direct: failed.some((c) => c.route === null), routes: failed.filter((c) => c.route !== null).map((c) => c.route as PreorderRoute) } }
+      : {}),
   };
 }
 

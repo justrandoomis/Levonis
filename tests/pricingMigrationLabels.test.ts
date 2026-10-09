@@ -28,7 +28,8 @@ import {
   migrationText,
   worstMigrationStatus,
 } from '../packages/contracts/src/pricingMigrationLabels';
-import { isPricingIssueCode } from '../packages/contracts/src/pricingIssues';
+import { PRICING_ISSUES, isPricingIssueCode } from '../packages/contracts/src/pricingIssues';
+import { PRICING_FIELD_LABELS } from '../packages/contracts/src/pricingFieldLabels';
 import { COST_REFUSALS } from '../packages/contracts/src/costRefusals';
 import type { PricingLabel } from '../packages/contracts/src/pricingFieldLabels';
 import { LEGACY_TARGET_REASON_CODES } from '../packages/pricing/src/legacyTargets';
@@ -148,4 +149,37 @@ test('every code the preview answers on the census is labelled — a legacy reas
   }
   assert.ok(codes.size >= 10, `only ${codes.size} codes seen`);
   assert.deepEqual([...codes].filter((c) => !isLegacyReasonCode(c) && !isPricingIssueCode(c)).sort(), []);
+});
+
+test('the PRODUCT status a held premium rolls up to names both values; one value’s own state names only its own (review finding 1)', () => {
+  // check (1)7: a held direct-sale premium rolls up to TARGET_PROFIT_REVIEW_REQUIRED, so the product chip must not
+  // say only «the minimum profit needs review» above a minimum-profit card that reads «taken from the old prices».
+  const product = PRICING_MIGRATION_STATUS_LABELS.TARGET_PROFIT_REVIEW_REQUIRED;
+  assert.deepEqual(product, {
+    ar: 'الحد الأدنى للربح أو زيادة البيع المباشر يحتاج مراجعة',
+    en: 'Minimum profit or direct-sale premium needs review',
+    ckb: 'کەمترین قازانج یان زیادەی فرۆشتنی ڕاستەوخۆ پێویستی بە پێداچوونەوە هەیە',
+  });
+  // The per-value labels are unchanged: each names its own value only.
+  assert.equal(LEGACY_VALUE_STATE_LABELS.TARGET_PROFIT_REVIEW_REQUIRED.en, 'Minimum target profit needs review');
+  assert.equal(LEGACY_VALUE_STATE_LABELS.DIRECT_PREMIUM_REVIEW_REQUIRED.en, 'Direct-sale premium needs review');
+});
+
+test('NO_BASE_ROUTE does not claim the routes charge different prices — it is raised for every model with more than one route and no owner choice (review finding M2)', () => {
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.doesNotMatch(LEGACY_REASONS.NO_BASE_ROUTE.label[lang], /different prices|بأسعار مختلفة|بە نرخی جیاواز/, lang);
+  }
+  assert.match(LEGACY_REASONS.NO_BASE_ROUTE.label.en, /^Pre-order has more than one route; choose the base route/);
+});
+
+test('one Arabic word for the direct-sale premium on every pricing screen: «زيادة البيع المباشر», never «علاوة» (review finding 4; DECISIONS rows 70, 90)', () => {
+  const labels: Array<[string, string]> = [
+    ...Object.entries(PRICING_ISSUES).map(([k, v]) => [`issue.${k}`, v.label.ar] as [string, string]),
+    ...Object.entries(PRICING_FIELD_LABELS).map(([k, v]) => [`field.${k}`, (v as PricingLabel).ar] as [string, string]),
+    ...ALL.map(([k, v]) => [k, v.ar] as [string, string]),
+    ['refusal.PREMIUM_NOT_ON_STEP', COST_REFUSALS.PREMIUM_NOT_ON_STEP.ar],
+  ];
+  for (const [key, ar] of labels) assert.doesNotMatch(ar, /علاوة/, `${key}: «${ar}»`);
+  assert.equal(PRICING_FIELD_LABELS.direct_premium_iqd.ar, 'زيادة البيع المباشر');
+  assert.equal(PRICING_ISSUES.DIRECT_PREMIUM_BLOCKED.label.ar, 'زيادة البيع المباشر موقوفة حتى تقرر');
 });

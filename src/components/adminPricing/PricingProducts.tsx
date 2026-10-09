@@ -11,6 +11,10 @@
  * A row is one button: name, slug, status, how it sells and how many models.
  * The status is a chip with a dot and a word (never colour alone); the reasons
  * are read on the product's own page, where there is room to say them whole.
+ *
+ * A search or a filter is announced as ONE short sentence (how many products
+ * are shown, `role="status"`), never as the whole list read out again; and
+ * every count is written in the same digits as the rest of the screen.
  */
 import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
@@ -21,7 +25,7 @@ import type { Language } from '../../translations';
 import { PRICING_MIGRATION_STATUSES, type PricingMigrationStatus } from '../../../packages/contracts/src/pricingMigrationLabels';
 import type { PricingOverview, PricingProductSummary } from './api';
 import { MigrationStatusChip, STATUS_TONE } from './parts';
-import { mixLabel, nameOf, routeLabel, statusLabel, type PricingUiStrings } from './strings';
+import { mixLabel, nameOf, readWhole, routeLabel, statusLabel, type PricingUiStrings } from './strings';
 
 export type StatusFilter = 'all' | PricingMigrationStatus;
 
@@ -86,8 +90,8 @@ export default function PricingProducts({
           {s.productsHeading}
         </h3>
         <p className="text-[13px] text-text-muted">
-          {s.productsCount(overview.total)}
-          {overview.typed_member_price_products > 0 && <> · {s.typedMemberSummary(overview.typed_member_price_products)}</>}
+          {s.productsCount(readWhole(overview.total, lang))}
+          {overview.typed_member_price_products > 0 && <> · {s.typedMemberSummary(readWhole(overview.typed_member_price_products, lang))}</>}
         </p>
       </div>
 
@@ -105,7 +109,7 @@ export default function PricingProducts({
           className="lv-choice press-scale inline-flex shrink-0 items-center gap-2 px-3 text-[13px] font-semibold"
         >
           {s.all}
-          <Badge>{overview.total}</Badge>
+          <Badge className="tabular-nums">{readWhole(overview.total, lang)}</Badge>
         </button>
         {statuses.map((st) => (
           <button
@@ -118,7 +122,7 @@ export default function PricingProducts({
           >
             <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${DOT[STATUS_TONE[st]]}`} />
             <span className="whitespace-nowrap">{statusLabel(st, lang)}</span>
-            <Badge>{counts.get(st) ?? 0}</Badge>
+            <Badge className="tabular-nums">{readWhole(counts.get(st) ?? 0, lang)}</Badge>
           </button>
         ))}
       </div>
@@ -128,6 +132,7 @@ export default function PricingProducts({
           {s.searchLabel}
         </label>
         <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+        {/* One clear button, ours: the browser's own × (type="search") is hidden. */}
         <input
           id="pricing-search"
           type="search"
@@ -136,7 +141,7 @@ export default function PricingProducts({
           placeholder={s.searchPlaceholder}
           autoComplete="off"
           enterKeyHint="search"
-          className="lv-input ps-9 pe-10"
+          className="lv-input ps-9 pe-10 [&::-webkit-search-cancel-button]:hidden"
         />
         {query && (
           <button
@@ -150,7 +155,12 @@ export default function PricingProducts({
         )}
       </div>
 
-      {truncatedAt !== null && <p className="text-[12px] text-text-muted">{s.truncated(truncatedAt)}</p>}
+      {truncatedAt !== null && <p className="text-[12px] text-text-muted">{s.truncated(readWhole(truncatedAt, lang))}</p>}
+
+      {/* What a screen reader hears after a search or a filter: the count, not every row again. */}
+      <p role="status" className="sr-only" data-pricing-shown-count>
+        {shown.length > 0 ? s.shownCount(readWhole(shown.length, lang)) : ''}
+      </p>
 
       {shown.length === 0 ? (
         <EmptyState
@@ -172,7 +182,7 @@ export default function PricingProducts({
           }
         />
       ) : (
-        <ul className="lv-surface divide-y divide-border-subtle/70 overflow-hidden" data-pricing-product-list aria-live="polite">
+        <ul className="lv-surface divide-y divide-border-subtle/70 overflow-hidden" data-pricing-product-list>
           {shown.map((p) => {
             const name = nameOf(p, lang, p.slug);
             const routes = p.routes.map((r) => routeLabel(r, lang)).join(lang === 'en' ? ', ' : '، ');
@@ -196,7 +206,7 @@ export default function PricingProducts({
                       {routes && <span className="text-text-muted"> · {routes}</span>}
                       <span className="text-text-muted md:block md:text-[12px]">
                         <span className="md:hidden"> · </span>
-                        {s.models(p.model_count)}
+                        {s.models(readWhole(p.model_count, lang))}
                       </span>
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5 md:mt-0">

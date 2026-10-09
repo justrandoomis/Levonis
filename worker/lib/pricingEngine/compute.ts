@@ -189,8 +189,11 @@ export function evaluateProduct(loaded: LoadedProduct, ctx: PricingContext, refe
   });
 
   // ---- the codes that hold the product, and the status they give (§2.3, worst first)
-  const sellable = models.filter((m) => m.legacy.mix !== 'NOT_SELLABLE');
-  const considered = sellable.length ? sellable : models;
+  // Every model the store offers is weighed — one whose every channel fails in
+  // the resolver too (CHANNEL_NOT_PRICED); only a model offered on no channel
+  // at all is left out, unless no model is offered anywhere.
+  const offered = models.filter((m) => m.legacy.mix !== 'NOT_SELLABLE' || m.channels.length > 0);
+  const considered = offered.length ? offered : models;
   const holding = new Set<string>();
   const info = new Set<string>();
   const statuses: PricingMigrationStatus[] = [];
@@ -201,8 +204,11 @@ export function evaluateProduct(loaded: LoadedProduct, ctx: PricingContext, refe
   };
   for (const m of considered) {
     for (const r of [...m.legacy.target.reasons, ...m.legacy.premium.reasons]) legacyCode(r.code);
-    if (m.legacy.target.state === 'CONFLICT' || m.legacy.premium.state === 'CONFLICT') statuses.push('CONFLICT');
-    else if (m.legacy.target.state !== 'MIGRATED' || m.legacy.premium.state === 'DIRECT_PREMIUM_REVIEW_REQUIRED') {
+    // Offered but priced on no channel: its values are held (BLOCKED markers)
+    // for the channel setup alone — NEEDS_MANUAL_REVIEW, from the channel check below.
+    const unpricedHold = m.legacy.mix === 'NOT_SELLABLE' && m.channels.length > 0;
+    if (!unpricedHold && (m.legacy.target.state === 'CONFLICT' || m.legacy.premium.state === 'CONFLICT')) statuses.push('CONFLICT');
+    else if (!unpricedHold && (m.legacy.target.state !== 'MIGRATED' || m.legacy.premium.state === 'DIRECT_PREMIUM_REVIEW_REQUIRED')) {
       // A held premium rolls up with the profit (master plan v2 check (1)7).
       statuses.push('TARGET_PROFIT_REVIEW_REQUIRED');
     }

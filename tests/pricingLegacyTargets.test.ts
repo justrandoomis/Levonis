@@ -107,12 +107,27 @@ test('two routes with different fees → CONFLICT, one candidate per route, neve
   assert.equal(ruleAt(res, 'target_profit', 'o').status, 'blocked');
 });
 
-test('two routes with the same old profit and the same paid price: migrated, and the premium needs no base route', () => {
-  const res = one({ option_id: 'o', direct: obs(960_000, 0, 700_000), routes: [route('air', 900_000, 10_000, 700_000), route('land', 900_000, 10_000, 700_000)] });
+test('two routes at the same paid price: the profit migrates, but the premium still needs the owner’s base route (NO_BASE_ROUTE, §2.5) — never the first route by default', () => {
+  const model: LegacyModelInput = { option_id: 'o', direct: obs(960_000, 0, 700_000), routes: [route('air', 900_000, 10_000, 700_000), route('land', 900_000, 10_000, 700_000)] };
+  const res = one(model);
   const m = res.models[0]!;
+  assert.equal(m.target.state, 'MIGRATED');
   assert.equal(m.target.value_iqd, 210_000);
-  assert.equal(m.premium.value_iqd, 50_000);
-  assert.equal(m.base_route, 'air');
+  // No silent «measured from: air»: the base route is the owner's to pick, because the
+  // engine builds the direct price on that route's own shipping (MVP plan: pre(base) + premium).
+  assert.equal(m.base_route, null);
+  assert.equal(m.premium.state, 'DIRECT_PREMIUM_REVIEW_REQUIRED');
+  assert.equal(m.premium.value_iqd, null);
+  assert.deepEqual(m.premium.reasons.map((r) => r.code), ['NO_BASE_ROUTE']);
+  // Both routes are offered as candidates — here they agree, so either choice gives 50,000.
+  assert.deepEqual(m.premium.candidates.map((c) => [c.route, c.value_iqd]), [['air', 50_000], ['land', 50_000]]);
+  assert.equal(ruleAt(res, 'direct_premium', 'o').status, 'blocked');
+  // The owner's choice decides it.
+  const chosen = one(model, { base_route: { o: 'air' } }).models[0]!;
+  assert.deepEqual([chosen.base_route, chosen.premium.state, chosen.premium.value_iqd, chosen.roundtrip_ok], ['air', 'MIGRATED', 50_000, true]);
+  // One route is its own base: no choice needed.
+  const single = one({ ...model, routes: [route('land', 900_000, 10_000, 700_000)] }).models[0]!;
+  assert.deepEqual([single.base_route, single.premium.state, single.premium.value_iqd], ['land', 'MIGRATED', 50_000]);
 });
 
 test('the same old profit at different paid prices: the premium needs the owner’s base route (NO_BASE_ROUTE), then migrates', () => {
@@ -248,6 +263,53 @@ test('a stored SKU cost that differs from the ladder → CONFLICT (VARIANT_COST_
   assert.equal(m.target.state, 'CONFLICT');
   assert.ok(m.target.reasons.some((r) => r.code === 'VARIANT_COST_CONFLICT'));
   assert.equal(one({ option_id: 'o', direct: null, routes: [route('land', 900_000, 0, 700_000)], variant_costs: [700_000] }).models[0]!.target.state, 'MIGRATED');
+});
+
+test('a model offered but priced on no channel is HELD — BLOCKED markers for both rules — never given the product’s values', () => {
+  // Models a and b agree (product scope); x is offered for land and direct sale but the resolver priced neither.
+  const res = deriveLegacyTargets({
+    product_id: 'p',
+    models: [
+      { option_id: 'a', direct: obs(960_000, 0, 700_000), routes: [route('land', 900_000, 10_000, 700_000)] },
+      { option_id: 'b', direct: obs(960_000, 0, 700_000), routes: [route('land', 900_000, 10_000, 700_000)] },
+      { option_id: 'x', direct: null, routes: [], unpriced: { direct: true, routes: ['land'] } },
+    ],
+  });
+  const x = res.models[2]!;
+  assert.equal(x.mix, 'NOT_SELLABLE');
+  assert.deepEqual([x.target.state, x.target.reasons.map((r) => r.code)], ['TARGET_PROFIT_REVIEW_REQUIRED', ['CHANNEL_NOT_PRICED']]);
+  assert.deepEqual([x.premium.state, x.premium.reasons.map((r) => r.code)], ['DIRECT_PREMIUM_REVIEW_REQUIRED', ['CHANNEL_NOT_PRICED']]);
+  assert.deepEqual(res.rules.map((r) => [r.kind, r.scope, r.scope_id, r.state, r.amount_iqd]), [
+    ['target_profit', 'product', '', 'ACTIVE', 210_000],
+    ['target_profit', 'option', 'x', 'BLOCKED', null],
+    ['direct_premium', 'product', '', 'ACTIVE', 50_000],
+    ['direct_premium', 'option', 'x', 'BLOCKED', null],
+  ]);
+  // Read back through E1: a and b take the product values, x inherits neither.
+  assert.equal(ruleAt(res, 'target_profit', 'a').status, 'active');
+  assert.equal(ruleAt(res, 'target_profit', 'x').status, 'blocked');
+  assert.equal(ruleAt(res, 'direct_premium', 'x').status, 'blocked');
+  // Pre-order only and unpriced: still blocked for both; its premium state says no direct sale.
+  const pre = deriveLegacyTargets({
+    product_id: 'p',
+    models: [
+      { option_id: 'a', direct: obs(960_000, 0, 700_000), routes: [route('land', 900_000, 10_000, 700_000)] },
+      { option_id: 'x', direct: null, routes: [], unpriced: { direct: false, routes: ['land'] } },
+    ],
+  });
+  assert.equal(pre.models[1]!.premium.state, 'NOT_APPLICABLE');
+  assert.equal(ruleAt(pre, 'target_profit', 'x').status, 'blocked');
+  assert.equal(ruleAt(pre, 'direct_premium', 'x').status, 'blocked');
+  // A direct-only product whose other model offers an unpriced pre-order route is not «direct only».
+  const mixed = deriveLegacyTargets({
+    product_id: 'p',
+    models: [
+      { option_id: 'd', direct: obs(150_000, 0, 120_000), routes: [] },
+      { option_id: 'x', direct: null, routes: [], unpriced: { direct: false, routes: ['sea'] } },
+    ],
+  });
+  assert.ok(!mixed.models[0]!.premium.reasons.some((r) => r.code === 'PREMIUM_ZERO_DIRECT_ONLY'));
+  assert.equal(ruleAt(mixed, 'target_profit', 'x').status, 'blocked');
 });
 
 test('a model the store cannot sell today derives nothing and is left out of the placement', () => {
@@ -439,8 +501,11 @@ test('the census statuses: no cost (h2c, h2d, x2d combo) → held; ams-2-pro →
     assert.equal(get(slug).status, 'TARGET_PROFIT_REVIEW_REQUIRED', slug);
     assert.ok(get(slug).reason_codes.includes('MISSING_LEGACY_COST'), slug);
   }
+  // ams-2-pro: air and land at the same paid price — the base route is the owner's (NO_BASE_ROUTE, edge case #20),
+  // and the held premium rolls up with the profit (check (1)7).
   const ams = get('bambu-lab-ams-2-pro');
-  assert.deepEqual([ams.status, ams.routes, ams.reason_codes], ['NEEDS_MANUAL_REVIEW', ['air', 'land'], ['SHIPPING_PROFILE_MISSING']]);
+  assert.deepEqual([ams.status, ams.routes, ams.reason_codes], ['TARGET_PROFIT_REVIEW_REQUIRED', ['air', 'land'], ['NO_BASE_ROUTE', 'SHIPPING_PROFILE_MISSING']]);
+  assert.deepEqual([ams.models[0]!.legacy.base_route, ams.models[0]!.legacy.target.state, ams.models[0]!.legacy.target.value_iqd], [null, 'MIGRATED', 26_000]);
   for (const slug of ['bambu-lab-petg-basic', 'bambu-lab-round-magnet', 'levo-switch-blue-3pin', 'bambu-lab-x2d-combo-open-box-workshop-2026']) {
     const p = get(slug);
     assert.equal(p.mix, 'DIRECT_ONLY', slug);
@@ -467,4 +532,30 @@ test('the census statuses: no cost (h2c, h2d, x2d combo) → held; ams-2-pro →
   // P1 stores no supplier cost: nothing is ready to switch.
   assert.ok(all.every((p) => p.status !== 'READY_TO_SWITCH' && p.status !== 'READY'));
   assert.equal(legacyProductId('bambu-hotend-a1-a2'), 'lp_01');
+});
+
+test('the census, one model broken (review finding): every channel of h2s model 3 fails — CHANNEL_NOT_PRICED, NEEDS_MANUAL_REVIEW, and that model inherits neither product value', async () => {
+  const raw = freshDb();
+  seedLegacyCatalogue(raw);
+  seedProfileRates(raw);
+  const h2s = legacyProductId('bambu-lab-h2s');
+  const broken = legacyOptionId('bambu-lab-h2s', 2);
+  // Its direct cell and its own land route are switched off while the product still lists land:
+  // the store offers land, the resolver answers TRANSPORT_DISABLED.
+  raw.exec(`UPDATE product_option_fulfillment SET enabled = 0 WHERE id = '${broken}_d'; UPDATE product_option_transports SET enabled = 0 WHERE id = '${broken}_p_land';`);
+  const db = asD1(raw);
+  const [ctx, ref] = await Promise.all([loadPreviewContext(db), loadRateReference(db)]);
+  const [p] = await evaluateProducts(db, [h2s], ctx, ref);
+  assert.ok(p);
+  assert.equal(p.status, 'NEEDS_MANUAL_REVIEW');
+  assert.ok(p.reason_codes.includes('CHANNEL_NOT_PRICED'), p.reason_codes.join());
+  const m = p.models.find((x) => x.option_id === broken)!;
+  assert.ok(m.channels.length > 0 && m.channels.every((c) => !c.ok));
+  assert.equal(m.legacy.target.state, 'TARGET_PROFIT_REVIEW_REQUIRED');
+  const at = { product_id: h2s, option_value_ids: [broken], color_id: null, ancestry: [] };
+  assert.equal(resolveRuleAt(p.rules, 'target_profit', at).status, 'blocked');
+  assert.equal(resolveRuleAt(p.rules, 'direct_premium', at).status, 'blocked');
+  // The healthy models keep their product-scope values.
+  const ok = { ...at, option_value_ids: [legacyOptionId('bambu-lab-h2s', 0)] };
+  assert.equal(resolveRuleAt(p.rules, 'target_profit', ok).status, 'active');
 });

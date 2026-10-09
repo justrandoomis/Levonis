@@ -74,11 +74,20 @@ const AREAS: Record<string, readonly string[]> = {
 };
 
 /**
- * PRIVATE, BUT NOT IN THE NET (master plan v2 §2.3). A private column whose
- * name collides with a public or wallet field elsewhere stays out of
- * FINANCIAL_FIELDS and is kept out of every non-owner DTO by allowlist
- * instead. Each entry says where the collision is. Later steps add here — not
- * to adminScope.ts — when a grep of the public DTOs finds a collision.
+ * PRIVATE, BUT NOT IN THE NET (master plan v2 §2.3). Two kinds of entry, each
+ * with its reason:
+ *   - a private column whose name collides with a public or wallet field
+ *     elsewhere: it stays out of FINANCIAL_FIELDS and is kept out of every
+ *     non-owner DTO by allowlist instead (the entry says where the collision
+ *     is). Later steps add here — not to adminScope.ts — when a grep of the
+ *     public DTOs finds a collision;
+ *   - an owner-only key that carries no amount (a code, a state, a count, a
+ *     flag, a container), served only behind requireCostRead (P1 below).
+ * Note: a few CODE keys can still name a fact about cost — `reason_codes` may
+ * hold LEGACY_COST_ZERO, LEGACY_SALE_NOT_ABOVE_COST or
+ * COST_LESS_SPECIFIC_THAN_PRICE. That is fine while only the verified owner is
+ * answered; a DTO reused for anyone else must move those keys into
+ * FINANCIAL_FIELDS first.
  */
 const PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   // Pricing engine MVP P1 («التسعير والشحن», worker/lib/pricingEngine/dto.ts):
