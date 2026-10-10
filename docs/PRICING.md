@@ -275,10 +275,39 @@ action and `price_history.price_source = 'engine_fx'`.
   bulk reads (a constant number of statements), then written in order of how
   far today's price lies below the new replacement cost + minimum profit,
   largest first. Every read and batch is charged to the invocation's statement
-  budget — 600 for the six-hour run and an owner's request, 200 for the
-  quarter-hour sweep (so that invocation's other jobs keep theirs). A batch the
-  budget cannot cover is not sent; it and the products after it wait, in the
-  same order, for the next tick, until the list is empty.
+  budget — 600 for the six-hour run and an owner's request; the quarter-hour
+  sweep runs LAST in its invocation, after the staff recalculation, the durable
+  jobs and the upload sweep have settled, with its own 200 cut to what they
+  left of D1's 1,000 less a reserve of 50 (`quarterHourSweepBudget`; the jobs
+  run on a counting view of the binding, `worker/lib/d1Count.ts`). So the
+  sweep never takes the tick past the limit and never costs the jobs a
+  statement; when they leave nothing, it yields completely. A batch the budget
+  cannot cover is not sent; it and the products after it wait, in the same
+  order, for the next tick, until the list is empty
+  (tests/fxSweepBudget.test.ts: the usual tick at its bounds — 200 upload
+  sessions, a full outbox, a dozen stale products — executes about 600
+  statements; a staff recalculation at its own bound of 2 × 10 orders, or a
+  search-index catch-up chunk, takes the jobs ALONE past 1,000 — theirs, not
+  the sweep's, which then spends nothing).
+- **The preview before an owner rate act (§7.8).** `POST /rates/fx/:pair/review/preview`,
+  `POST /rates/fx/:pair/manual/preview {rate | market_adjustment_iqd}` and
+  `POST /rates/shipping/:profile/preview {rate_iqd}` answer, writing nothing,
+  what the act would reprice: every affected engine product with today's
+  customer price → the new one per model × channel, the change, the deficit
+  (new replacement cost + minimum profit − today's price, the order the run
+  writes in), the 15% and 30% flags, the products the engine cannot reprice
+  (a code), how many follow on the quarter-hour sweep, whether the act will
+  ask for a fresh sign-in, and `preview_hash` — over the act, the pair's owner
+  version (or the profile's version), every rate read and each affected
+  product's own evaluation hash. Once any product is engine-priced, an act
+  that moves a rate (an approval, a manual rate, the adjustment, a shipping
+  rate) without that hash is 409 `PRICING_PREVIEW_REQUIRED`, one read before
+  something moved is 409 `PRICING_PREVIEW_STALE`, both carrying the fresh
+  preview; a customer price moving more than 15% also needs
+  `confirm_large_change`, and the act a sign-in within the last ten minutes.
+  The rates panel shows the preview sheet («قبل التطبيق: ما الذي سيتغيّر»)
+  before a manual rate, the adjustment or a shipping rate is applied, and the
+  review sheet shows it under a held rate before «اعتماد السعر الجديد».
 - **A product that cannot be repriced** (incomplete, a shape the fields cannot
   carry, a resolver mismatch, a database refusal) keeps its prices, stays on
   the stale list with its code (`blocked_code`, never a figure), rings the

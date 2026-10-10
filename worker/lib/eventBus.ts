@@ -30,6 +30,7 @@
  * that configures one for a different database, gets `null` and the legacy
  * path — the isolation is by object identity, not by hope.
  */
+import { d1Base } from './d1Count';
 import { RpcFanoutBus, selectConsumers, type ConsumerBinding, type QueueBinding } from '@levonis/platform-kit/bus';
 import { busEnabled, defaultProbe, outboxTables, type PublishGuard } from '@levonis/platform-kit/outbox';
 import { pruneAuditDetailsStatement } from '@levonis/platform-kit/audit';
@@ -180,7 +181,8 @@ export function resetEventBus(): void {
  * each caller's memory: a handle that cannot publish is not a bus.
  */
 export function busFor(db: D1Database | undefined | null): Handle | null {
-  if (!db || !current || current.env.DB !== db) return null;
+  // The quarter-hour tick's counting view of the binding (d1Count.ts) IS the binding.
+  if (!db || !current || current.env.DB !== d1Base(db)) return null;
   if (!eventsEnabled(current.env)) return null;
   return current;
 }

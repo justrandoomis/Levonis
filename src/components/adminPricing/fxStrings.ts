@@ -161,12 +161,34 @@ export interface FxStrings {
   ownerCardOpen: string;
   ownerCardReview: One;
   ownerCardEmpty: string;
+  // FX-5 (§7.8, §8): the preview before an owner rate act.
+  previewTitle: string;
+  previewLoading: string;
+  /** «{label}: from {before} to {after}» — the act, each figure the server's. */
+  previewAct: Three;
+  /** Products repriced and their prices (model × channel), as counts. */
+  previewSummary: Two;
+  previewNone: string;
+  previewLarge: One;
+  previewLargeConfirm: string;
+  previewDrop: One;
+  previewToday: string;
+  previewNew: string;
+  /** How far today's price lies below the new cost + minimum profit. */
+  previewBelowFloor: One;
+  previewBlockedTitle: string;
+  /** «and {n} more products within {minutes} minutes» (plan §12 `price.followsSoon`). */
+  previewFollows: Two;
+  previewApply: string;
+  previewStale: string;
+  /** The adjustment's own line: what the shop's rate becomes. */
+  adjustmentLabel: string;
 }
 
 export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
   ar: {
     title: 'أسعار الصرف',
-    intro: 'السعر المعتمد هو سعر المتجر: به تُعرض الأسعار بالدولار للزبائن، وتستخدمه حاسبة التسعير. تغيير سعر الصرف هنا لا يغيّر أسعار المنتجات حاليًا.',
+    intro: 'السعر المعتمد هو سعر المتجر: به تُعرض الأسعار بالدولار للزبائن، وبه تُسعَّر المنتجات المسعّرة تلقائيًا. قبل أي تغيير منك ترى ما سيتغيّر في أسعارها.',
     pairName: { USD_IQD: 'الدولار ← الدينار', EUR_USD: 'اليورو ← الدولار', CNY_USD: 'اليوان ← الدولار' },
     srcParallel: 'المصدر: السوق الموازية العراقية',
     srcEcb: 'المصدر: البنك المركزي الأوروبي (السعر المرجعي اليومي)',
@@ -357,10 +379,26 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     ownerCardOpen: 'فتح «التسعير والشحن»',
     ownerCardReview: (n) => `بانتظار مراجعتك: ${n}`,
     ownerCardEmpty: 'لم يُعتمد سعر بعد',
+    previewTitle: 'قبل التطبيق: ما الذي سيتغيّر',
+    previewLoading: 'نحسب الأسعار الجديدة…',
+    previewAct: (label, before, after) => `${label}: من ${before} إلى ${after}`,
+    previewSummary: (n, m) => `المنتجات التي يُعاد تسعيرها: ${n} — الأسعار: ${m}`,
+    previewNone: 'لن يتغيّر سعر أي منتج.',
+    previewLarge: (pct) => `سعر واحد على الأقل يتغيّر أكثر من ${pct}٪.`,
+    previewLargeConfirm: 'أؤكد هذا التغيير الكبير',
+    previewDrop: (pct) => `سعر واحد على الأقل ينخفض أكثر من ${pct}٪.`,
+    previewToday: 'اليوم',
+    previewNew: 'الجديد',
+    previewBelowFloor: (amount) => `أقل من التكلفة الجديدة + الحد الأدنى للربح بـ ${amount}`,
+    previewBlockedTitle: 'لن يُعاد تسعيرها تلقائيًا — تبقى أسعارها كما هي',
+    previewFollows: (n, minutes) => `و${n} منتجًا آخر خلال ${minutes} دقيقة`,
+    previewApply: 'تطبيق',
+    previewStale: 'تغيّر شيء منذ فتحت المعاينة — هذه هي الأسعار الآن. راجعها ثم طبّق.',
+    adjustmentLabel: 'سعر المتجر بعد الزيادة',
   },
   en: {
     title: 'Exchange rates',
-    intro: "The effective rate is the shop's rate: customers see dollar prices at it, and the pricing calculator uses it. Changing an exchange rate here does not change product prices for now.",
+    intro: "The effective rate is the shop's rate: customers see dollar prices at it, and the automatically priced products are priced at it. Before any change you make, you see what it will change in their prices.",
     pairName: { USD_IQD: 'USD → IQD', EUR_USD: 'EUR → USD', CNY_USD: 'CNY → USD' },
     srcParallel: 'Source: Iraqi parallel market',
     srcEcb: 'Source: European Central Bank (daily reference rate)',
@@ -551,10 +589,26 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     ownerCardOpen: 'Open Pricing & shipping',
     ownerCardReview: (n) => `Waiting for your review: ${n}`,
     ownerCardEmpty: 'No rate approved yet',
+    previewTitle: 'Before you apply: what will change',
+    previewLoading: 'Working out the new prices…',
+    previewAct: (label, before, after) => `${label}: from ${before} to ${after}`,
+    previewSummary: (n, m) => `Products repriced: ${n} — prices: ${m}`,
+    previewNone: 'No product price will change.',
+    previewLarge: (pct) => `At least one price moves by more than ${pct}%.`,
+    previewLargeConfirm: 'I confirm this large change',
+    previewDrop: (pct) => `At least one price drops by more than ${pct}%.`,
+    previewToday: 'Today',
+    previewNew: 'New',
+    previewBelowFloor: (amount) => `Below the new cost + minimum profit by ${amount}`,
+    previewBlockedTitle: 'Will not be repriced automatically — they keep their prices',
+    previewFollows: (n, minutes) => `and ${n} more products within ${minutes} minutes`,
+    previewApply: 'Apply',
+    previewStale: 'Something changed since you opened this preview — these are the prices now. Review them, then apply.',
+    adjustmentLabel: "The shop's rate with the adjustment",
   },
   ckb: {
     title: 'نرخەکانی ئاڵوگۆڕ',
-    intro: 'نرخی کارپێکراو نرخی فرۆشگایە: نرخەکان بە دۆلار پێی بۆ کڕیاران پیشان دەدرێن و ژمێرەری نرخدانانیش بەکاری دەهێنێت. گۆڕینی نرخی ئاڵوگۆڕ لێرە بۆ ئێستا نرخی بەرهەمەکان ناگۆڕێت.',
+    intro: 'نرخی کارپێکراو نرخی فرۆشگایە: نرخەکان بە دۆلار پێی بۆ کڕیاران پیشان دەدرێن و بەرهەمە خۆکار نرخدارکراوەکانیش پێی نرخ دەکرێن. پێش هەر گۆڕانێک لە لایەن تۆوە، دەبینیت چی لە نرخەکانیاندا دەگۆڕێت.',
     pairName: { USD_IQD: 'دۆلار ← دینار', EUR_USD: 'یۆرۆ ← دۆلار', CNY_USD: 'یوان ← دۆلار' },
     srcParallel: 'سەرچاوە: بازاڕی هاوتەریبی عێراق',
     srcEcb: 'سەرچاوە: بانکی ناوەندیی ئەورووپا (نرخی سەرچاوەی ڕۆژانە)',
@@ -747,6 +801,22 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     ownerCardOpen: '«نرخدانان و ناردنی بەرهەم» بکەرەوە',
     ownerCardReview: (n) => `چاوەڕێی پێداچوونەوەی تۆن: ${n}`,
     ownerCardEmpty: 'هێشتا هیچ نرخێک پەسەند نەکراوە',
+    previewTitle: 'پێش جێبەجێکردن: چی دەگۆڕێت',
+    previewLoading: 'نرخە نوێیەکان هەژمار دەکەین…',
+    previewAct: (label, before, after) => `${label}: لە ${before} بۆ ${after}`,
+    previewSummary: (n, m) => `ئەو بەرهەمانەی نرخیان نوێ دەکرێتەوە: ${n} — نرخەکان: ${m}`,
+    previewNone: 'نرخی هیچ بەرهەمێک ناگۆڕێت.',
+    previewLarge: (pct) => `لانیکەم نرخێک زیاتر لە ${pct}٪ دەگۆڕێت.`,
+    previewLargeConfirm: 'ئەم گۆڕانە گەورەیە پشتڕاست دەکەمەوە',
+    previewDrop: (pct) => `لانیکەم نرخێک زیاتر لە ${pct}٪ دادەبەزێت.`,
+    previewToday: 'ئەمڕۆ',
+    previewNew: 'نوێ',
+    previewBelowFloor: (amount) => `${amount} کەمترە لە تێچووی نوێ + کەمترین قازانج`,
+    previewBlockedTitle: 'بە خۆکاری نرخیان نوێ ناکرێتەوە — نرخەکانیان وەک خۆیان دەمێننەوە',
+    previewFollows: (n, minutes) => `و ${n} بەرهەمی تر لە ماوەی ${minutes} خولەکدا`,
+    previewApply: 'جێبەجێی بکە',
+    previewStale: 'لەو کاتەوەی پێشبینینەکەت کردەوە شتێک گۆڕا — ئەمانە نرخەکانی ئێستان. پێیاندا بچۆرەوە و پاشان جێبەجێی بکە.',
+    adjustmentLabel: 'نرخی فرۆشگا لەگەڵ زیادەکە',
   },
 };
 

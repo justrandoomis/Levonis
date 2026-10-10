@@ -4,8 +4,10 @@
  *
  * Three pairs (FxPairCard) — USD → IQD from the Iraqi parallel market,
  * EUR → USD and CNY → USD from the ECB — the three central shipping rates
- * (ShippingRatesCard), the history (FxHistorySheet) and the decision on a
- * held value (FxReviewSheet).
+ * (ShippingRatesCard), the history (FxHistorySheet), the decision on a
+ * held value (FxReviewSheet) and, from FX-5, the preview before a manual
+ * rate, the adjustment or a shipping rate moves engine prices
+ * (RatePreviewSheet, §7.8).
  *
  * WHO. It lives inside the pricing tab, which src/pages/Admin.tsx mounts only
  * on `can_write_cost === true`; every route behind it refuses everyone but
@@ -35,6 +37,7 @@ import ShippingRatesCard from './ShippingRatesCard';
 import { PricingFailure } from './parts';
 import { fxCount } from './format';
 import EngineSaveList from './EngineSaveList';
+import RatePreviewSheet, { type RateActRequest } from './RatePreview';
 
 export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' | 'ltr' }) {
   const s = fxStrings(lang);
@@ -44,6 +47,8 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
   const [reload, setReload] = useState(0);
   const [reviewPair, setReviewPair] = useState<FxPairDto['pair'] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // FX-5 (§7.8): the act a card asked to preview — shown, then applied with the preview's hash.
+  const [actRequest, setActRequest] = useState<RateActRequest | null>(null);
   // Every rate act answers with the rates: the stale list's count follows it (owner decision 8).
   const [ratesSeq, setRatesSeq] = useState(0);
 
@@ -131,11 +136,28 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {data.pairs.map((p) => (
             <div key={p.pair} className={p.pair === 'USD_IQD' ? 'md:col-span-2' : ''}>
-              <FxPairCard pair={p} rates={data} lang={lang} s={s} onAnswer={onAnswer} onStale={onStale} onReview={(pair) => setReviewPair(pair.pair)} />
+              <FxPairCard
+                pair={p}
+                rates={data}
+                lang={lang}
+                s={s}
+                onAnswer={onAnswer}
+                onStale={onStale}
+                onReview={(pair) => setReviewPair(pair.pair)}
+                onPreviewAct={setActRequest}
+              />
             </div>
           ))}
           <div className="md:col-span-2">
-            <ShippingRatesCard shipping={data.shipping} lang={lang} s={s} onAnswer={onAnswer} onStale={onStale} />
+            <ShippingRatesCard
+              shipping={data.shipping}
+              lang={lang}
+              s={s}
+              onAnswer={onAnswer}
+              onStale={onStale}
+              engineProducts={data.engine_products}
+              onPreviewAct={setActRequest}
+            />
           </div>
         </div>
       )}
@@ -143,7 +165,17 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
       {/* A confirmed rate that moved leaves engine prices behind: their count and the one-click preview + save. */}
       {data && <EngineSaveList lang={lang} compact reloadKey={ratesSeq} />}
 
-      <FxReviewSheet pair={reviewing && reviewing.pending ? reviewing : null} onClose={() => setReviewPair(null)} lang={lang} dir={dir} s={s} onAnswer={onAnswer} onStale={onStale} />
+      <FxReviewSheet
+        pair={reviewing && reviewing.pending ? reviewing : null}
+        engineProducts={data?.engine_products ?? 0}
+        onClose={() => setReviewPair(null)}
+        lang={lang}
+        dir={dir}
+        s={s}
+        onAnswer={onAnswer}
+        onStale={onStale}
+      />
+      <RatePreviewSheet request={actRequest} onClose={() => setActRequest(null)} onAnswer={onAnswer} onStale={onStale} lang={lang} dir={dir} s={s} />
       <FxHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} lang={lang} dir={dir} s={s} />
     </section>
   );

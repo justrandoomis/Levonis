@@ -106,6 +106,10 @@ test('it speaks to /api/admin/pricing alone — the preview’s three, the owner
     'get ${PRICING_API}/save-list',
     'post ${PRICING_API}/save-list/preview',
     'post ${PRICING_API}/products/save-bulk',
+    // FX-5 (plan §7.8, §8): the preview before an owner rate act — reads only.
+    'post ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/review/preview',
+    'post ${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/manual/preview',
+    'post ${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}/preview',
   ].sort());
   // The product preview still writes nothing: the writes are the rates' and the stale list's bulk save.
   for (const [, method, path] of api.matchAll(/api\.(put|patch|delete|post)<[^>]+>\(`([^`]+)`/g)) {
@@ -522,7 +526,7 @@ test('FX-1: owner acts carry owner_version, decimals as text, and the large-chan
   assert.match(card, /const base = \{ owner_version: p\.owner_version \};/);
   assert.match(card, /setFxManual\(p\.pair, \{ \.\.\.base, rate, \.\.\.\(confirm_large_change \? \{ confirm_large_change: true \} : \{\}\) \}\)/);
   const review = codeOf(`${DIR}/FxReviewSheet.tsx`);
-  assert.match(review, /reviewFxRate\(p\.pair, \{ owner_version: p\.owner_version, decision, /);
+  assert.match(review, /reviewFxRate\(p\.pair, \{\s*owner_version: p\.owner_version,\s*decision,/);
   const parts = codeOf(`${DIR}/fxParts.tsx`);
   // Refused once for want of the confirmation → the message offers it; a stale panel reloads.
   assert.match(parts, /code === 'PRICING_LARGE_CHANGE_CONFIRM' && !confirmLarge/);

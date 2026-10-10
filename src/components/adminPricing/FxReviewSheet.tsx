@@ -15,13 +15,22 @@
  *   - «أبقِ سعري الحالي يدويًا» (keep_manual: the rate in force becomes manual).
  * A decision above 15% asks for the explicit confirmation and a fresh sign-in
  * (§7.8) — said here, beside the buttons.
+ *
+ * FX-5 (§7.8, §8): once a product is engine-priced, approving reprices it, so
+ * the sheet reads the approval's preview (…/review/preview, nothing written)
+ * and shows it under the figures — every product's price today → after, the
+ * blocked ones, how many follow within 15 minutes — and the approval carries
+ * that preview's hash. When something moved since (409 PRICING_PREVIEW_STALE),
+ * the fresh preview the refusal carries replaces it.
  */
-import React, { useId } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { X } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import type { Language } from '../../translations';
-import { reviewFxRate, type FxPairDto, type FxRatesAnswer } from './api';
+import { ApiError } from '../../lib/api';
+import { previewFxReview, previewOfRefusal, reviewFxRate, type FxPairDto, type FxRatePreview, type FxRatesAnswer } from './api';
+import { RatePreviewBody } from './RatePreview';
 import type { FxStrings } from './fxStrings';
 import { Fact, FX_DAY_HOURS, FxFigure, FxMessage, fxDate, pctText, RATE_SHOWN_PLACES, RateLine, useFxAct } from './fxParts';
 import { signedPct } from './FxPairCard';
@@ -30,6 +39,8 @@ import { Figure } from './parts';
 
 export interface FxReviewSheetProps {
   pair: FxPairDto | null;
+  /** How many products the engine prices: above 0, approving is previewed first (FX-5). */
+  engineProducts?: number;
   onClose: () => void;
   lang: Language;
   dir: 'rtl' | 'ltr';
@@ -38,21 +49,56 @@ export interface FxReviewSheetProps {
   onStale: () => void;
 }
 
-export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer, onStale }: FxReviewSheetProps) {
+export default function FxReviewSheet({ pair: p, engineProducts = 0, onClose, lang, dir, s, onAnswer, onStale }: FxReviewSheetProps) {
   const titleId = useId();
   const bodyId = useId();
   const keepHintId = useId();
   const { busy, message, run, clear } = useFxAct({ lang, s, onAnswer, onStale });
   const pending = p?.pending ?? null;
   const open = !!p && !!pending;
+  // FX-5: what approving reprices (null until read; never read when no product is engine-priced).
+  const [preview, setPreview] = useState<FxRatePreview | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const previewKey = open && engineProducts > 0 ? `${p!.pair}:${p!.owner_version}:${pending!.effective_rate}` : null;
+  useEffect(() => {
+    setPreview(null);
+    setPreviewFailed(false);
+    if (!previewKey || !p) return;
+    let live = true;
+    previewFxReview(p.pair).then(
+      (answer) => {
+        if (live) setPreview(answer);
+      },
+      () => {
+        if (live) setPreviewFailed(true);
+      }
+    );
+    return () => {
+      live = false;
+    };
+    // The preview follows the pair's owner version and the held value (previewKey), not every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewKey]);
 
   const decide = (decision: 'approve' | 'reject' | 'keep_manual') =>
     p &&
     run(decision, (confirm_large_change) =>
-      reviewFxRate(p.pair, { owner_version: p.owner_version, decision, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
+      reviewFxRate(p.pair, {
+        owner_version: p.owner_version,
+        decision,
+        ...(decision === 'approve' && preview ? { preview_hash: preview.preview_hash } : {}),
+        ...(confirm_large_change ? { confirm_large_change: true } : {}),
+      }).catch((e: unknown) => {
+        // Something moved since the preview: the refusal carries the fresh one — shown before approving again.
+        const fresh = e instanceof ApiError ? previewOfRefusal(e.details) : null;
+        if (fresh) setPreview(fresh);
+        throw e;
+      })
     ).then((ok) => {
       if (ok) onClose();
     });
+  // While the preview is being read, approving waits for it (the server would ask for it anyway).
+  const approveWaits = engineProducts > 0 && !preview && !previewFailed;
 
   const close = () => {
     clear();
@@ -89,7 +135,13 @@ export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer
       footer={
         p && pending ? (
           <div className="flex flex-col gap-2 px-4 pb-3 pt-2 sm:flex-row-reverse sm:flex-wrap" dir={dir}>
-            <Button variant="primary" loading={busy === 'approve'} disabled={!!busy && busy !== 'approve'} onClick={() => decide('approve')} data-fx-decision="approve">
+            <Button
+              variant="primary"
+              loading={busy === 'approve'}
+              disabled={(!!busy && busy !== 'approve') || approveWaits}
+              onClick={() => decide('approve')}
+              data-fx-decision="approve"
+            >
               {s.approve}
             </Button>
             {p.effective_rate && (
@@ -165,6 +217,22 @@ export default function FxReviewSheet({ pair: p, onClose, lang, dir, s, onAnswer
             {pending.observed_at && <Fact label={s.lastCheck}>{fxDate(pending.observed_at, lang)}</Fact>}
           </dl>
           {pending.observed_at && <p className="mt-3 text-[12.5px] text-text-muted">{s.waitingSince(fxDate(pending.observed_at, lang))}</p>}
+          {/* FX-5 (§7.8): what approving reprices, before it is approved. */}
+          {engineProducts > 0 && (
+            <section className="mt-4 border-t border-border-subtle/60 pt-4" aria-label={s.previewTitle} data-fx-review-preview>
+              <h3 className="mb-2 text-[13px] font-bold text-text-muted">{s.previewTitle}</h3>
+              {preview ? (
+                <RatePreviewBody preview={preview} label={s.pairName[p.pair]} lang={lang} s={s} />
+              ) : previewFailed ? (
+                <p className="text-[13px] text-text-muted">{s.loadFailed}</p>
+              ) : (
+                <p className="text-[13px] text-text-muted" role="status">
+                  {s.previewLoading}
+                </p>
+              )}
+              {preview?.fresh_sign_in && <p className="mt-2 text-[12.5px] leading-relaxed text-text-muted" data-fx-review-fresh>{s.reauth}</p>}
+            </section>
+          )}
           <FxMessage message={message} s={s} />
         </div>
       )}

@@ -9,8 +9,9 @@
  * card left open across another save answers 409 instead of overwriting it.
  * FX-5: a saved rate reprices the engine products on that route on the
  * server, through the engine's own writer, within the request's budget; the
- * rest follow on the quarter-hour sweep. (A preview of those prices before
- * the save is not built yet.)
+ * rest follow on the quarter-hour sweep. Once a product is engine-priced the
+ * save is previewed first (§7.8): the panel's preview sheet shows each
+ * product's price today → after, and applies the rate with the preview's hash.
  */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
@@ -18,7 +19,8 @@ import { Button } from '../ui/Button';
 import { Field, Input } from '../ui/Field';
 import type { Language } from '../../translations';
 import { iqdUnit } from '../../lib/money';
-import { saveShippingRate, type FxRatesAnswer, type FxShippingDto } from './api';
+import { previewShippingRate, saveShippingRate, type FxRatesAnswer, type FxShippingDto } from './api';
+import type { RateActRequest } from './RatePreview';
 import type { FxStrings } from './fxStrings';
 import { shippingRateInput } from './fxInput';
 import { FxFigure, FxMessage, fxDate, useFxAct } from './fxParts';
@@ -30,9 +32,12 @@ export interface ShippingRatesCardProps {
   s: FxStrings;
   onAnswer: (answer: FxRatesAnswer) => void;
   onStale: () => void;
+  /** How many products the engine prices: above 0, a save is previewed first (FX-5, §7.8). */
+  engineProducts?: number;
+  onPreviewAct?: (request: RateActRequest) => void;
 }
 
-export default function ShippingRatesCard({ shipping, lang, s, onAnswer, onStale }: ShippingRatesCardProps) {
+export default function ShippingRatesCard({ shipping, lang, s, onAnswer, onStale, engineProducts = 0, onPreviewAct }: ShippingRatesCardProps) {
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} data-fx-shipping className="lv-surface-raised min-w-0 p-4">
@@ -42,14 +47,36 @@ export default function ShippingRatesCard({ shipping, lang, s, onAnswer, onStale
       <p className="mt-0.5 text-[12px] leading-relaxed text-text-muted">{s.shipIntro}</p>
       <ul className="mt-3 divide-y divide-border-subtle/60">
         {shipping.map((row) => (
-          <ShippingRow key={row.profile} row={row} lang={lang} s={s} onAnswer={onAnswer} onStale={onStale} />
+          <ShippingRow
+            key={row.profile}
+            row={row}
+            lang={lang}
+            s={s}
+            onAnswer={onAnswer}
+            onStale={onStale}
+            onPreviewAct={engineProducts > 0 ? onPreviewAct : undefined}
+          />
         ))}
       </ul>
     </section>
   );
 }
 
-function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; lang: Language; s: FxStrings; onAnswer: (a: FxRatesAnswer) => void; onStale: () => void }) {
+function ShippingRow({
+  row,
+  lang,
+  s,
+  onAnswer,
+  onStale,
+  onPreviewAct,
+}: {
+  row: FxShippingDto;
+  lang: Language;
+  s: FxStrings;
+  onAnswer: (a: FxRatesAnswer) => void;
+  onStale: () => void;
+  onPreviewAct?: (request: RateActRequest) => void;
+}) {
   const { busy, message, run } = useFxAct({ lang, s, onAnswer, onStale });
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -72,13 +99,24 @@ function ShippingRow({ row, lang, s, onAnswer, onStale }: { row: FxShippingDto; 
       return;
     }
     setError(null);
+    const done = () => {
+      setEditing(false);
+      setFocusEdit(true);
+    };
+    if (onPreviewAct) {
+      onPreviewAct({
+        label: label,
+        load: () => previewShippingRate(row.profile, rate_iqd),
+        commit: (preview_hash, confirm) =>
+          saveShippingRate(row.profile, { version: row.version, rate_iqd, preview_hash, ...(confirm ? { confirm_large_change: true } : {}) }),
+        onDone: done,
+      });
+      return;
+    }
     const ok = await run('save', (confirm_large_change) =>
       saveShippingRate(row.profile, { version: row.version, rate_iqd, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
     );
-    if (ok) {
-      setEditing(false);
-      setFocusEdit(true);
-    }
+    if (ok) done();
   };
 
   return (

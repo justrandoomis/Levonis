@@ -240,7 +240,8 @@ test('the cron entrypoint really drains the queue — scheduled → runDurableJo
 test('the entrypoint contains its own rejection, the way every step inside the run does', () => {
   const index = code(readFileSync(join(ROOT, 'worker/index.ts'), 'utf8'));
   assert.match(index, /scheduled\(\s*_event: ScheduledEvent/, 'the Worker must still export a scheduled handler');
-  assert.match(index, /runDurableJobs\(env\)\.catch\(/, 'the entrypoint must contain what it schedules');
+  // `tickEnv`: the same bindings, the D1 one through the quarter-hour tick's counting view (FX-5, worker/lib/d1Count.ts).
+  assert.match(index, /runDurableJobs\(tickEnv\)\.catch\(/, 'the entrypoint must contain what it schedules');
 });
 
 /**

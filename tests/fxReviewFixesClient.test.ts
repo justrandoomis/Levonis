@@ -313,8 +313,11 @@ test('UX #12: the intro does not say «this update» (read as «Refresh now»), 
   assert.doesNotMatch(FX_STRINGS.ar.intro, /هذا التحديث|يحسب الحاسب/);
   assert.doesNotMatch(FX_STRINGS.en.intro, /this update/);
   assert.doesNotMatch(FX_STRINGS.ckb.intro, /لەم نوێکردنەوەیەدا/);
-  assert.match(FX_STRINGS.ar.intro, /لا يغيّر أسعار المنتجات حاليًا/);
-  assert.match(FX_STRINGS.en.intro, /does not change product prices for now/);
+  // FX-5: a rate the engine prices at reprices those products — the intro says so, and that a preview comes first (§7.8).
+  assert.doesNotMatch(FX_STRINGS.ar.intro, /لا يغيّر أسعار المنتجات حاليًا/);
+  assert.match(FX_STRINGS.ar.intro, /المنتجات المسعّرة تلقائيًا/);
+  assert.match(FX_STRINGS.en.intro, /Before any change you make, you see what it will change/);
+  assert.match(FX_STRINGS.ckb.intro, /پێش هەر گۆڕانێک/);
 });
 
 // ------------------------------------------------------------- #13 what «تأكيد السعر الحالي» does

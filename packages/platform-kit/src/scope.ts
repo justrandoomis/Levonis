@@ -407,6 +407,9 @@ export const FINANCIAL_FIELDS = [
   'pro_after_iqd',
   'prime_before_iqd',
   'prime_after_iqd',
+  // -- FX-5 (FX plan §7.8, §8): the preview before an owner rate act — how far today's price lies
+  // -- below the new replacement cost + minimum profit (a cost oracle).
+  'deficit_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

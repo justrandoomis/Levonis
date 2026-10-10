@@ -14,7 +14,8 @@
  * (tests/pricingPreviewNoWrite.test.ts), so it is a cost READ.
  *
  * FX-1 adds the central rates (FX programme plan §8): two cost reads and six
- * cost writes, behind the same door, each write with `assertCostWrite`.
+ * cost writes, behind the same door, each write with `assertCostWrite`. FX-5
+ * adds the three previews before an owner rate act (cost reads).
  */
 import type { RouteClassFile } from './_types';
 import { adminPricingRoutes } from '../../worker/routes/adminPricing';
@@ -82,6 +83,27 @@ export default {
           path: '/api/admin/pricing/rates/shipping/GERMANY_LAND',
           body: { version: 1, rate_iqd: '12000' },
           why: 'a central shipping rate in IQD per kg or per CBM',
+        },
+        // FX-5 (FX programme plan §7.8, §8): the preview before an owner rate act —
+        // each affected engine product's price before → after, the deficit and the
+        // preview hash the act must carry. Priced in memory, nothing written; POST
+        // only for its body.
+        'POST /rates/fx/:pair/review/preview': {
+          cls: 'cost_read',
+          path: '/api/admin/pricing/rates/fx/USD_IQD/review/preview',
+          why: 'what approving the held rate would reprice; the seeded database holds none (409 FX_REVIEW_NOT_PENDING)',
+        },
+        'POST /rates/fx/:pair/manual/preview': {
+          cls: 'cost_read',
+          path: '/api/admin/pricing/rates/fx/USD_IQD/manual/preview',
+          body: { rate: '1650' },
+          why: 'what a manual rate (or the adjustment) would reprice: old → new per model × channel and the deficits',
+        },
+        'POST /rates/shipping/:profile/preview': {
+          cls: 'cost_read',
+          path: '/api/admin/pricing/rates/shipping/GERMANY_LAND/preview',
+          body: { rate_iqd: '12000' },
+          why: 'what a central shipping rate would reprice on that route',
         },
         // The Inputs stage (USD design §3-§6.3; the owner's request of 2026-10-09:
         // pricing and shipping entered in the product form). Inputs and rules only —

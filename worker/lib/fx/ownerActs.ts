@@ -114,10 +114,15 @@ function optionalBool(raw: unknown, field: string): boolean {
   return raw;
 }
 
-/** `preview_hash` is accepted (FX-5 makes it required once a product is engine-priced) and never stored. */
-function previewHash(raw: unknown): void {
-  if (raw === undefined || raw === null) return;
+/**
+ * `preview_hash`: the hash of the preview the owner read before a rate act
+ * (FX-5, §7.8 — required once a product is engine-priced, compared by the
+ * route with a fresh preview's). Never stored.
+ */
+function previewHash(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return null;
   if (typeof raw !== 'string' || raw.length > 128 || !/^[A-Za-z0-9_-]*$/.test(raw)) throw inputInvalid('preview_hash');
+  return raw;
 }
 
 export function pairParam(raw: string | undefined): FxPairId {
@@ -601,14 +606,17 @@ export const SHIPPING_KEYS = ['version', 'rate_iqd', 'preview_hash', 'confirm_la
 export const SHIPPING_PROFILES = ['GERMANY_LAND', 'CHINA_AIR', 'CHINA_SEA'] as const;
 export type ShippingProfileId = (typeof SHIPPING_PROFILES)[number];
 
-export function parseShipping(profileRaw: string | undefined, raw: unknown): { profile: ShippingProfileId; version: number; rate: string; confirm: boolean } {
+export function parseShipping(
+  profileRaw: string | undefined,
+  raw: unknown
+): { profile: ShippingProfileId; version: number; rate: string; confirm: boolean; preview_hash: string | null } {
   if (!(SHIPPING_PROFILES as readonly string[]).includes(profileRaw ?? '')) throw inputInvalid('profile');
   const b = strictBody(raw, SHIPPING_KEYS);
   const version = ownerVersionOf(b.version, 'version');
-  previewHash(b.preview_hash);
+  const preview_hash = previewHash(b.preview_hash);
   const confirm = optionalBool(b.confirm_large_change, 'confirm_large_change');
   // IQD per kg or per CBM, decimal text > 0 — never multiplied by any exchange rate (§21).
   const rate = positiveDecimal(b.rate_iqd, 'rate_iqd', 9, 6);
   if (rate.length > 20) throw inputInvalid('rate_iqd');
-  return { profile: profileRaw as ShippingProfileId, version, rate, confirm };
+  return { profile: profileRaw as ShippingProfileId, version, rate, confirm, preview_hash };
 }

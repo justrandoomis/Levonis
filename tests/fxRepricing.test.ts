@@ -284,10 +284,13 @@ test('REVIEW_REQUIRED reprices nothing until the owner approves; the approval re
     assert.equal(priceImage(w, [AMS]), image, 'held: no price moved');
     assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_audit'), audits);
 
+    // An approval moves prices: it carries the hash of the preview the owner read (FX-5, §7.8; tests/fxRatePreview.test.ts).
+    const preview_hash =
+      decision === 'approve' ? (await json(await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/review/preview', {}))).preview.preview_hash : undefined;
     const trap = trapPurges();
     let res: Response;
     try {
-      res = await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/review', { owner_version: Number(pairOf(w.raw, 'USD_IQD').owner_version), decision });
+      res = await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/review', { owner_version: Number(pairOf(w.raw, 'USD_IQD').owner_version), decision, ...(preview_hash ? { preview_hash } : {}) });
     } finally {
       trap.restore();
     }
@@ -481,7 +484,8 @@ test("a central shipping rate the owner changes reprices the products on that ro
   const w = pricingWorld();
   await adoptAms(w);
   const version = row<{ v: number }>(w.raw, "SELECT version AS v FROM pricing_shipping_rates WHERE profile = 'GERMANY_LAND'")!.v;
-  const res = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version, rate_iqd: '3400' });
+  const { preview } = await json(await post(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND/preview', { rate_iqd: '3400' }));
+  const res = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version, rate_iqd: '3400', preview_hash: preview.preview_hash });
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
   // ceil_1000(EUR 450 × 1.1 × 1,600 + 2.5 kg × 3,400 + $120 × 1,600) = ceil_1000(992,500)
   assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`]!.prepaid, 993_000);
@@ -544,10 +548,11 @@ const importersOf = (pattern: RegExp) =>
 
 test('static: the storefront never imports the repricing or the engine — only the cron, the FX run and the owner door do', () => {
   assert.deepEqual(importersOf(/from\s+['"][^'"]*fx\/reprice['"]|from\s+['"]\.\/reprice['"]/), ['worker/index.ts', 'worker/lib/fx/scheduler.ts', 'worker/routes/adminPricing.ts']);
-  assert.deepEqual(importersOf(/from\s+['"][^'"]*pricingEngine\/autoReprice['"]/), [
+  assert.deepEqual(importersOf(/from\s+['"][^'"]*(pricingEngine\/|\.\/)autoReprice['"]/), [
     'worker/lib/fx/read.ts',
     'worker/lib/fx/reprice.ts',
     'worker/lib/fx/scheduler.ts',
+    'worker/lib/pricingEngine/ratePreview.ts',
     'worker/routes/adminPricing.ts',
   ]);
   // The client and every customer route import nothing of the engine.

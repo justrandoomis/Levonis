@@ -441,6 +441,8 @@ export interface FxSettingsBody {
   bound_min?: string;
   bound_max?: string;
   confirm_large_change?: boolean;
+  /** FX-5: the hash of the preview the owner read (required once a product is engine-priced and the act moves a rate). */
+  preview_hash?: string;
 }
 
 export const fetchFxRates = (opts?: RequestOptions) => api.get<FxRatesAnswer>(`${PRICING_API}/rates`, opts);
@@ -467,7 +469,7 @@ export function fetchFxHistory(
 export const saveFxSettings = (pair: FxPairId, body: FxSettingsBody) =>
   api.put<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/settings`, body);
 
-export const setFxManual = (pair: FxPairId, body: { owner_version: number; rate: string; confirm_large_change?: boolean }) =>
+export const setFxManual = (pair: FxPairId, body: { owner_version: number; rate: string; confirm_large_change?: boolean; preview_hash?: string }) =>
   api.put<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/manual`, body);
 
 export const confirmFxRate = (pair: FxPairId, body: { owner_version: number }) =>
@@ -476,11 +478,82 @@ export const confirmFxRate = (pair: FxPairId, body: { owner_version: number }) =
 export const refreshFxRates = (pairs?: FxPairId[]) =>
   api.post<FxRatesAnswer>(`${PRICING_API}/rates/fx/refresh`, pairs ? { pairs } : {});
 
-export const reviewFxRate = (pair: FxPairId, body: { owner_version: number; decision: 'approve' | 'reject' | 'keep_manual'; confirm_large_change?: boolean }) =>
-  api.post<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/review`, body);
+export const reviewFxRate = (
+  pair: FxPairId,
+  body: { owner_version: number; decision: 'approve' | 'reject' | 'keep_manual'; confirm_large_change?: boolean; preview_hash?: string }
+) => api.post<FxRatesAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/review`, body);
 
-export const saveShippingRate = (profile: PricingProfile, body: { version: number; rate_iqd: string; confirm_large_change?: boolean }) =>
+export const saveShippingRate = (profile: PricingProfile, body: { version: number; rate_iqd: string; confirm_large_change?: boolean; preview_hash?: string }) =>
   api.put<FxRatesAnswer>(`${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}`, body);
+
+// ------------------------------------------------------------- FX-5: the preview before a rate act (§7.8, §8)
+//
+//   POST /rates/fx/:pair/review/preview   approving the held rate
+//   POST /rates/fx/:pair/manual/preview   {rate} or {market_adjustment_iqd}
+//   POST /rates/shipping/:profile/preview {rate_iqd}
+// Reads only. Each answers every engine product the act would reprice — today's
+// customer price → the new one per model × channel, the deficit, the flags —
+// the products the engine could not reprice (a code), how many follow on the
+// quarter-hour sweep, and `preview_hash`, which the act then carries. Once a
+// product is engine-priced, an act without it is 409 PRICING_PREVIEW_REQUIRED
+// and one read before something moved is 409 PRICING_PREVIEW_STALE; both
+// carry the fresh preview under `details.preview`. Every figure is the server's.
+
+export interface FxRatePreviewRow {
+  product_id: string;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  option_id: string;
+  model_ar: string;
+  model_en: string;
+  model_ckb: string;
+  channel: PricingChannel;
+  today_prepaid_iqd: number | null;
+  computed_price_iqd: number;
+  change_iqd: number | null;
+  /** Signed percentage TEXT from the server. */
+  change_pct: string | null;
+  /** The new replacement cost + minimum profit − today's price (positive: today's price lies below it). */
+  deficit_iqd: number;
+  large: boolean;
+  drop_flag: boolean;
+}
+
+export interface FxRatePreview {
+  act: { kind: 'review' | 'manual' | 'adjustment' | 'shipping'; pair: FxPairId | null; profile: PricingProfile | null; effective_before: string | null; effective_after: string | null };
+  engine_products: number;
+  affected: { products: number; models: number };
+  changed_products: number;
+  rows: FxRatePreviewRow[];
+  blocked: Array<{ product_id: string; name_ar: string; name_en: string; name_ckb: string; code: string }>;
+  /** Products the request's budget leaves to the quarter-hour sweep («خلال 15 دقيقة»). */
+  follows: number;
+  /** A customer price moves more than 15%: the act needs the explicit confirmation. */
+  large_change: boolean;
+  /** A customer price drops more than 30%. */
+  drop_flag: boolean;
+  /** The act will ask for a sign-in within the last ten minutes, and this session is older. */
+  fresh_sign_in: boolean;
+  preview_hash: string;
+}
+
+type PreviewAnswer = { success: true; preview: FxRatePreview };
+
+export const previewFxReview = (pair: FxPairId) =>
+  api.post<PreviewAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/review/preview`, {}, { mascot: 'silent' }).then((a) => a.preview);
+
+export const previewFxManual = (pair: FxPairId, body: { rate: string } | { market_adjustment_iqd: string }) =>
+  api.post<PreviewAnswer>(`${PRICING_API}/rates/fx/${encodeURIComponent(pair)}/manual/preview`, body, { mascot: 'silent' }).then((a) => a.preview);
+
+export const previewShippingRate = (profile: PricingProfile, rate_iqd: string) =>
+  api.post<PreviewAnswer>(`${PRICING_API}/rates/shipping/${encodeURIComponent(profile)}/preview`, { rate_iqd }, { mascot: 'silent' }).then((a) => a.preview);
+
+/** The fresh preview a 409 PRICING_PREVIEW_REQUIRED / PRICING_PREVIEW_STALE carries, or null. */
+export function previewOfRefusal(details: Record<string, unknown> | undefined): FxRatePreview | null {
+  const p = details?.preview as FxRatePreview | undefined;
+  return p && typeof p === 'object' && typeof p.preview_hash === 'string' && Array.isArray(p.rows) ? p : null;
+}
 
 // ============================================================= The stale list (owner decision 8; USD design §6.5)
 //

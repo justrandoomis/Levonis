@@ -30,7 +30,8 @@ import { StatusChip } from '../ui/Badge';
 import { Field, Input } from '../ui/Field';
 import { Segmented } from '../ui/Segmented';
 import type { Language } from '../../translations';
-import { confirmFxRate, saveFxSettings, setFxManual, type FxPairDto, type FxRatesAnswer, type FxSettingsBody } from './api';
+import { confirmFxRate, previewFxManual, saveFxSettings, setFxManual, type FxPairDto, type FxRatesAnswer, type FxSettingsBody } from './api';
+import type { RateActRequest } from './RatePreview';
 import type { FxStrings } from './fxStrings';
 import { adjustmentInput, fxRateInput, pctInput } from './fxInput';
 import { DERIVED_IQD_SHOWN_PLACES, Fact, FX_DAY_HOURS, FxFigure, FxMessage, FX_STATUS_TONE, fxDate, pctText, RATE_SHOWN_PLACES, RateLine, useFxAct } from './fxParts';
@@ -59,9 +60,15 @@ export interface FxPairCardProps {
   onAnswer: (answer: FxRatesAnswer) => void;
   onStale: () => void;
   onReview: (pair: FxPairDto) => void;
+  /**
+   * FX-5 (§7.8): once a product is engine-priced, a manual rate or the
+   * adjustment is previewed first — the panel's preview sheet shows what it
+   * reprices and applies it with the preview's hash.
+   */
+  onPreviewAct?: (request: RateActRequest) => void;
 }
 
-export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale, onReview }: FxPairCardProps) {
+export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale, onReview, onPreviewAct }: FxPairCardProps) {
   const usd = p.pair === 'USD_IQD';
   const titleId = useId();
   const confirmHintId = useId();
@@ -95,6 +102,9 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
   }, [p]);
 
   const base = { owner_version: p.owner_version };
+  /** A rate the engine prices at moves: preview first once any product is engine-priced (§7.8, §8). */
+  const previewed = rates.engine_products > 0 && !!onPreviewAct;
+  const confirmOf = (confirm: boolean) => (confirm ? { confirm_large_change: true as const } : {});
 
   const saveTracking = () =>
     run('tracking', (confirm_large_change) => {
@@ -117,14 +127,37 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
       return;
     }
     setManualError(null);
-    const ok = await run('manual', (confirm_large_change) =>
-      setFxManual(p.pair, { ...base, rate, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
-    );
-    if (ok) {
+    const done = () => {
       setManualOpen(false);
       setManual('');
       setFocusBack('manual');
+    };
+    if (previewed) {
+      onPreviewAct!({
+        label: s.pairName[p.pair],
+        load: () => previewFxManual(p.pair, { rate }),
+        commit: (preview_hash, confirm) => setFxManual(p.pair, { ...base, rate, preview_hash, ...confirmOf(confirm) }),
+        onDone: done,
+      });
+      return;
     }
+    const ok = await run('manual', (confirm_large_change) =>
+      setFxManual(p.pair, { ...base, rate, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
+    );
+    if (ok) done();
+  };
+
+  /** «استخدم {rate} سعرًا يدويًا» (L14): the observed figure, through the same manual route — previewed like any manual rate. */
+  const applyObserved = (rate: string) => {
+    if (previewed) {
+      onPreviewAct!({
+        label: s.pairName[p.pair],
+        load: () => previewFxManual(p.pair, { rate }),
+        commit: (preview_hash, confirm) => setFxManual(p.pair, { ...base, rate, preview_hash, ...confirmOf(confirm) }),
+      });
+      return;
+    }
+    void run('observed', (confirm_large_change) => setFxManual(p.pair, { ...base, rate, ...(confirm_large_change ? { confirm_large_change: true } : {}) }));
   };
 
   const saveAdjustment = () => {
@@ -134,6 +167,15 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
       return;
     }
     setAdjustmentError(null);
+    // On automatic, the adjustment moves the shop's rate: previewed once a product is engine-priced (on manual it moves nothing).
+    if (previewed && p.mode === 'AUTO') {
+      onPreviewAct!({
+        label: s.adjustmentLabel,
+        load: () => previewFxManual(p.pair, { market_adjustment_iqd: adj }),
+        commit: (preview_hash, confirm) => saveFxSettings(p.pair, { ...base, market_adjustment_iqd: adj, preview_hash, ...confirmOf(confirm) }),
+      });
+      return;
+    }
     void run('adjustment', (confirm_large_change) =>
       saveFxSettings(p.pair, { ...base, market_adjustment_iqd: adj, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
     );
@@ -266,11 +308,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
                 size="sm"
                 variant="secondary"
                 loading={busy === 'observed'}
-                onClick={() =>
-                  run('observed', (confirm_large_change) =>
-                    setFxManual(p.pair, { ...base, rate: p.last_observed!.candidate, ...(confirm_large_change ? { confirm_large_change: true } : {}) })
-                  )
-                }
+                onClick={() => applyObserved(p.last_observed!.candidate)}
                 data-fx-use-observed
               >
                 {s.useObserved(fxFigure(p.last_observed.candidate))}

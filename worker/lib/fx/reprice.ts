@@ -7,8 +7,10 @@
  *   - an owner act that commits an effective rate (approve a review, a manual
  *     rate, the adjustment) or a central shipping rate, inside the request's
  *     own budget (worker/routes/adminPricing.ts);
- *   - the quarter-hour sweep, with its own sub-budget of 200 statements, so
- *     the jobs of that invocation keep theirs (worker/index.ts).
+ *   - the quarter-hour sweep, LAST in that invocation, with its own
+ *     sub-budget of 200 statements cut to what the tick's other jobs left of
+ *     D1's 1,000 (`quarterHourSweepBudget`, worker/index.ts), so the jobs keep
+ *     theirs and the invocation stays under the limit.
  * Each brings its statement budget; a product left over waits, in deficit
  * order, for the next tick. The owner's bell for a product that cannot be
  * repriced rings through notify.ts (the verified owner, no figure).
@@ -23,6 +25,23 @@ import { notifyOwnerRepriceBlocked } from './notify';
 
 /** The quarter-hour sweep's own sub-budget (plan §7.4): about 6–7 products a tick. */
 export const AUTO_REPRICE_SWEEP_BUDGET = 200;
+/** D1's queries per Worker invocation (the paid plan's limit; a batch counts each statement). */
+export const D1_INVOCATION_STATEMENT_LIMIT = 1000;
+/** Kept free under that limit in the quarter-hour invocation, for anything a counter could miss. */
+export const QUARTER_HOUR_RESERVE = 50;
+
+/**
+ * THE SWEEP'S SHARE OF THE QUARTER-HOUR INVOCATION (plan §7.4, critique H2):
+ * its own 200, cut to what the tick's other jobs left of D1's 1,000 less the
+ * reserve — never below zero. The sweep runs after those jobs and executes no
+ * more than its budget (autoReprice.ts charges every statement first), so the
+ * invocation's total is at most max(jobs, 1,000 − reserve): the sweep never
+ * takes the tick over the limit, and the jobs never lose a statement to it.
+ */
+export function quarterHourSweepBudget(usedByJobs: number): number {
+  const left = D1_INVOCATION_STATEMENT_LIMIT - QUARTER_HOUR_RESERVE - Math.max(0, Math.ceil(usedByJobs));
+  return Math.max(0, Math.min(AUTO_REPRICE_SWEEP_BUDGET, left));
+}
 
 export interface SweepOptions {
   trigger: AutoRepriceTrigger;
