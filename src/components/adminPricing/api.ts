@@ -505,6 +505,8 @@ export interface FxRatePreviewRow {
   name_en: string;
   name_ckb: string;
   option_id: string;
+  /** FX-7: the unit's key (a model's own, or one SKU's); absent from a server before FX-7. */
+  combo_key?: string;
   model_ar: string;
   model_en: string;
   model_ckb: string;

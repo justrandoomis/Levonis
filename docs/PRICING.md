@@ -292,7 +292,9 @@ Owner decision 1 of 2026-10-07 (DECISIONS row 184 (1)): «SKU آخر درجة و
   deleting an engine product's rows needs it too. Every refusal is
   `ENGINE_MANAGED`. A product being deleted takes its rows with it.
 - **Everything per SKU**: the six-figure preview (one row per SKU × channel),
-  the FX-5 automatic repricing and the stale list (a per-SKU product missing a
+  the FX-5 automatic repricing, the preview before an owner rate act (one row
+  per SKU × channel, each carrying its `combo_key`; its reads charged with the
+  SKU rung's, as the run charges them) and the stale list (a per-SKU product missing a
   row for a sellable SKU is listed with reason `SKUS`), and the decision-6
   order snapshot (`order_items.engine_combo_key` is the SKU's key; a claim
   looks the SKU up first, then its model).

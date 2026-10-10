@@ -110,8 +110,9 @@ export function RatePreviewBody({ preview: p, label, lang, s }: { preview: FxRat
                 <ul className="mt-1.5 space-y-2">
                   {rows.map((r) => {
                     const model = nameOf({ name_ar: r.model_ar, name_en: r.model_en, name_ckb: r.model_ckb }, lang, '');
+                    // Priced per SKU (FX-7) several rows share a model: the unit's key keeps each row its own.
                     return (
-                      <li key={`${r.option_id}@${r.channel}`} className="text-[12.5px] leading-relaxed" data-fx-preview-row={`${r.option_id}@${r.channel}`}>
+                      <li key={`${r.combo_key ?? r.option_id}@${r.channel}`} className="text-[12.5px] leading-relaxed" data-fx-preview-row={`${r.combo_key ?? r.option_id}@${r.channel}`}>
                         <p className="text-text-muted">
                           {model ? `${model} — ` : ''}
                           {channelLabel(r.channel, lang)}

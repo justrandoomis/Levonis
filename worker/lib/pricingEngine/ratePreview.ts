@@ -46,7 +46,18 @@ import { loadPreviewContext, loadProducts } from './load';
 import { loadProductsPricing } from './store';
 import type { PricingRates } from './rates';
 import { canonical } from './procurementPreview';
-import { blockCodeOf, deficitOf, loadEngineStates, pricesUnchanged, priceSourceOf, staleEngineProducts, AUTO_REPRICE_SOURCE, type EngineStateRow } from './autoReprice';
+import {
+  blockCodeOf,
+  deficitOf,
+  loadEngineStates,
+  pricesUnchanged,
+  priceSourceOf,
+  staleEngineProducts,
+  AUTO_REPRICE_SOURCE,
+  PRODUCT_CHUNK,
+  READS_PER_CHUNK,
+  type EngineStateRow,
+} from './autoReprice';
 import { engineWriteStatements, evaluateEngineWrite, loadEngineControl, loadStoredSkuCosts, priceImagesOf, type EngineEvaluation } from './engineWrite';
 
 /** What an owner act moves. */
@@ -123,6 +134,8 @@ export interface RatePreviewRow {
   name_en: string;
   name_ckb: string;
   option_id: string;
+  /** FX-7: the unit's key — the model's own, or, priced per SKU, the exact SKU's (several rows then share one option_id). */
+  combo_key: string;
   model_ar: string;
   model_en: string;
   model_ckb: string;
@@ -168,9 +181,7 @@ export interface RatePreviewResult {
   statements: number;
 }
 
-/** loadProducts reads in chunks of 50: one product read and eight relation reads per chunk. */
-const PRODUCT_CHUNK = 50;
-const READS_PER_CHUNK = 9;
+// loadProducts' reads per chunk of 50 (autoReprice.ts PRODUCT_CHUNK / READS_PER_CHUNK, the SKU rung's read included — FX-7).
 /** The automatic run's own reads before it writes (autoReprice.ts steps 1-2), with the run record and the bell. */
 const RUN_READS = (n: number) => 1 + 3 + 1 + 1 + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 4 + 1 + 2;
 /** A blocked product's record and its bell (autoReprice.ts `block`). */
@@ -257,6 +268,7 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
           product_id: pid,
           ...productNames,
           option_id: r.option_id,
+          combo_key: r.combo_key,
           model_ar: r.name_ar,
           model_en: r.name_en,
           model_ckb: r.name_ckb,

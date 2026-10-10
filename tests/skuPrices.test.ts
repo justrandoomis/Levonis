@@ -47,6 +47,8 @@ import { resolveCartLine } from '../worker/routes/cart';
 import { compositionSelect, resolveCompositionLines } from '../worker/lib/bundleRead';
 import { priceTarget } from '../worker/lib/tradeIn';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
+import { PRODUCT_CHUNK, READS_PER_CHUNK } from '../worker/lib/pricingEngine/autoReprice';
+import { countingD1 } from '../worker/lib/d1Count';
 import type { Env } from '../worker/lib/types';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -413,6 +415,17 @@ test('non-owners see nothing: no colour or SKU input, rule, cost or per-SKU summ
 test('FX-5 reprices every SKU when the dollar moves; the stale list names a colour added since; back to manual returns each SKU to its model’s highest, never lower', async () => {
   const w = pricingWorld();
   await save(w, PID, { ...BASE, inputs: [...BASE.inputs, { scope: 'color', scope_id: C(0), supplier_cost_amount: '12', supplier_cost_currency: 'USD' }] });
+
+  // The owner's rate-act preview (FX-5 previews) is one row per SKU × channel, each with its own key — never two rows
+  // under one model's key — and writes nothing.
+  const pv = await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1632' });
+  assert.equal(pv.status, 200);
+  const rows = ((await json(pv)).preview.rows as Array<{ product_id: string; option_id: string; combo_key: string; channel: string; computed_price_iqd: number }>).filter((r) => r.product_id === PID);
+  assert.equal(new Set(rows.map((r) => `${r.combo_key}@${r.channel}`)).size, rows.length, 'one row per SKU × channel');
+  assert.ok(rows.filter((r) => r.option_id === M0).length > 2, 'a model\'s SKUs are rows of their own');
+  assert.equal(rows.find((r) => r.combo_key === sku([M0], C(0)) && r.channel === 'pre_order_sea')?.computed_price_iqd, sea(12, 3, 1632));
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM price_history WHERE product_id = ? AND price_source = \'engine_fx\'', PID), 0, 'a preview is no act');
+
   const now = new Date();
   const m = market({ sell: 1632, usd: '1.1', cny: '7.857143' });
   m.state.at = now;
@@ -488,4 +501,19 @@ test('deploy-ahead: on a database before 0183 the engine behaves exactly as befo
 
   // The storefront reads without the table: the cart prices as the ladder says, no error.
   assert.equal(await charge(old, PID, [M0], C(4), 'sea'), sea(10, 3));
+});
+
+test('the statement budget charges what loadProducts executes, the SKU rung\'s read included — the automatic run and the owner rate preview share the one count', async () => {
+  for (const w of [pricingWorld(), worldThrough('0182')]) {
+    const ids = all<{ id: string }>(w.raw, 'SELECT id FROM products ORDER BY id').map((r) => r.id);
+    assert.ok(ids.length > 1 && ids.length <= PRODUCT_CHUNK, `${ids.length} products: one chunk`);
+    const counted = countingD1(w.db);
+    for (const some of [ids.slice(0, 1), ids]) {
+      const before = counted.executed;
+      const loaded = await loadProducts(counted.db, some);
+      assert.equal(loaded.size, some.length);
+      // One product read and nine relation reads per chunk, the ninth the SKU rung (a soft miss before 0183 is still a statement).
+      assert.equal(counted.executed - before, READS_PER_CHUNK * Math.ceil(some.length / PRODUCT_CHUNK), `${some.length} products`);
+    }
+  }
 });

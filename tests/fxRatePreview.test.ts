@@ -379,7 +379,7 @@ test('every key of the preview is classified: amounts in FINANCIAL_FIELDS, the r
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'fx.%'"), 0, 'a preview is no act');
   const non = [...keys].filter((k) => !LIST.has(k)).sort();
   assert.deepEqual(non, [
-    'act', 'affected', 'blocked', 'changed_products', 'channel', 'drop_flag', 'engine_products', 'follows', 'fresh_sign_in', 'kind', 'large', 'large_change',
+    'act', 'affected', 'blocked', 'changed_products', 'channel', 'combo_key', 'drop_flag', 'engine_products', 'follows', 'fresh_sign_in', 'kind', 'large', 'large_change',
     'model_ar', 'model_ckb', 'model_en', 'models', 'name_ar', 'name_ckb', 'name_en', 'option_id', 'pair', 'product_id', 'products', 'profile', 'rows',
   ]);
 });
