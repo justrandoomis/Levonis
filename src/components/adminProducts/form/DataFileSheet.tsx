@@ -534,7 +534,7 @@ function ProductBlock({
             {card.pricing.kind === 'data' ? t(S.pricingData) : card.pricing.adoption?.kind === 'adopt' ? t(S.pricingAdopt) : t(S.pricingReprice)}
           </p>
           {rows.length > 0 && (
-            <ul className="space-y-0.5 text-[11px] text-sky-100/80">
+            <ul className="space-y-0.5 text-[11px] text-sky-200">
               {rows.slice(0, 40).map((r, i) => (
                 <li key={`${r.channel}-${i}`} dir="auto">
                   {rowName(r)} · {fill(t(S.pricingRow), { channel: r.channel, old: iqd(r.today_prepaid_iqd), new: iqd(r.computed_price_iqd) })}
