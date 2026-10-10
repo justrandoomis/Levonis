@@ -251,7 +251,7 @@ test('the session type documents the hints and the legacy alias', () => {
 });
 
 test('critique G-31: no owner cost screen keeps data in browser storage (localStorage, sessionStorage, IndexedDB)', () => {
-  const dirs = ['src/components/adminPricing', 'src/components/adminInventory', 'src/components/financeWorkspace', 'src/components/adminFinance'];
+  const dirs = ['src/components/adminPricing', 'src/components/adminInventory', 'src/components/adminOperations', 'src/components/financePeople', 'src/components/financeWorkspace', 'src/components/adminFinance'];
   const files: string[] = [];
   const walk = (d: string) => {
     const abs = join(ROOT, d);

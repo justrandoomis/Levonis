@@ -17,6 +17,7 @@
  */
 
 import { safeParse } from './types';
+import { stripFinancials } from './adminScope';
 import { isOwnedMediaUrl, isSafeMediaKey } from './mediaStorage';
 import { safeLink } from './homeContent';
 import { badRequest } from './http';
@@ -1642,7 +1643,7 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     sub_category_id: doc.sub_category_id,
     template_family: doc.template_family,
     sku: doc.sku,
-    spec_fields: doc.spec_fields,
+    spec_fields: stripFinancials(doc.spec_fields),
     // Public physical facts are needed to resolve a selected model/colour
     // field-by-field. Relation rows only carry overrides; without this base
     // the storefront would turn an inherited dimension into an unknown one.

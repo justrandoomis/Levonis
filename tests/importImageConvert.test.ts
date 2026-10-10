@@ -652,7 +652,8 @@ test('CSV create relation-batch failure leaves no product, JSON mirror or produc
   const confirm = await json(confirmRes);
   assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
   assert.equal(confirm.summary.failed, 1, JSON.stringify(confirm));
-  assert.match(String(confirm.rows[0].reason), /simulated D1 failure/);
+  assert.match(String(confirm.rows[0].reason), /could not be imported/);
+  assert.doesNotMatch(String(confirm.rows[0].reason), /simulated D1 failure/);
 
   const productId = String(confirm.rows[0].product_id);
   const after = productSnapshot(raw, productId);
@@ -819,7 +820,8 @@ test('CSV update relation failure preserves scalars, dimensions, mirrors and rel
   const confirm = await json(confirmRes);
   assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
   assert.equal(confirm.summary.failed, 1, JSON.stringify(confirm));
-  assert.match(String(confirm.rows[0].reason), /simulated D1 failure/);
+  assert.match(String(confirm.rows[0].reason), /could not be imported/);
+  assert.doesNotMatch(String(confirm.rows[0].reason), /simulated D1 failure/);
   const after = productSnapshot(raw, 'csv_rollback');
   assert.deepEqual(after, before, 'every product-owned scalar, dimension and relation must roll back together');
   assert.equal(after.product?.name, 'CSV rollback', 'the attempted rename must not leak out of a failed relation save');
@@ -871,7 +873,8 @@ test('CSV membership failure rolls product, relation, rule, version and rule aud
   const confirm = await json(confirmRes);
   assert.equal(confirmRes.status, 200, JSON.stringify(confirm));
   assert.equal(confirm.summary.failed, 1, JSON.stringify(confirm));
-  assert.match(String(confirm.rows[0].reason), /simulated D1 failure/);
+  assert.match(String(confirm.rows[0].reason), /could not be imported/);
+  assert.doesNotMatch(String(confirm.rows[0].reason), /simulated D1 failure/);
   assert.deepEqual(
     productSnapshot(raw, 'csv_membership_atomic'),
     before,

@@ -24,6 +24,7 @@ import { freshDb, asD1, stubApp, post, get, json, row, type Mount, type StubUser
 import { ROOT } from './fixtures/d1';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { printRequestRoutes } from '../worker/routes/printRequests';
+import { COST, leaks } from './fixtures/costlyProduct';
 
 const mount: Mount = (a) => {
   a.route('/api/marketplace/print', printRequestRoutes);
@@ -107,6 +108,50 @@ test('p6: an order row written before the fix is stripped on read as well', asyn
   raw.prepare(`UPDATE community_orders SET request_snapshot = json_set(request_snapshot, '$.estimate.cost_iqd', 9999, '$.estimate.cost_lines', json('[1]')) WHERE id = ?`).run(orderId);
   const e = (await json(await get(as(raw, 'buyer'), `/api/marketplace/orders/${orderId}`))).order.request_snapshot.estimate;
   assert.ok(!('cost_iqd' in e) && !('cost_lines' in e));
+});
+
+test('stored estimates strip nested and later private fields on request, revision and order reads', async () => {
+  const raw = seed();
+  try {
+    const id = await published(raw);
+    const estimate = JSON.stringify({ price_iqd: 40000, confidence: 'medium', supplier_cost_iqd: COST.product,
+      breakdown: { target_profit_iqd: COST.option, cost_iqd: COST.cell } });
+    raw.prepare('UPDATE community_print_requests SET estimate=? WHERE request_id=?').run(estimate, id);
+    raw.prepare('UPDATE community_request_revisions SET estimate=? WHERE request_id=?').run(estimate, id);
+    const problems: string[] = [];
+    for (const who of ['buyer', 'owner', null]) {
+      for (const path of [`/api/marketplace/print/requests/${id}`, `/api/marketplace/print/requests/${id}/revisions`]) {
+        const res = await get(as(raw, who), path);
+        assert.equal(res.status, 200);
+        problems.push(...leaks(await json(res)).map((l) => `${who} ${path}: ${l}`));
+      }
+    }
+    const orderId = await accept(raw, id, 'owner');
+    for (const who of ['buyer', 'owner']) {
+      const res = await get(as(raw, who), `/api/marketplace/orders/${orderId}`);
+      assert.equal(res.status, 200);
+      const body = await json(res);
+      assert.equal(body.order.price_iqd, 40000);
+      problems.push(...leaks(body).map((l) => `${who} order: ${l}`));
+    }
+    assert.deepEqual(problems, []);
+  } finally { raw.close(); }
+});
+
+test('acceptance replay projects a historical order snapshot as safely as the order detail', async () => {
+  const raw = seed();
+  try {
+    const id = await published(raw);
+    const orderId = await accept(raw, id, 'owner');
+    raw.prepare("UPDATE community_orders SET request_snapshot=json_set(request_snapshot,'$.estimate.cost_iqd',?) WHERE id=?").run(COST.orderLine, orderId);
+    const stored = row<{ offer_id: string }>(raw, 'SELECT offer_id FROM community_orders WHERE id=?', orderId)!;
+    const replay = await post(as(raw, 'buyer'), `/api/marketplace/offers/${stored.offer_id}/accept`, { expected_price_iqd: 40000, offer_revision: 1, address_id: 'a1' });
+    assert.equal(replay.status, 200);
+    const body = await json(replay);
+    assert.equal(body.replayed, true);
+    assert.equal(body.order.price_iqd, 40000);
+    assert.deepEqual(leaks(body), []);
+  } finally { raw.close(); }
 });
 
 test('#7: a store with no published phone reveals no phone — never the merchant account’s private one', async () => {

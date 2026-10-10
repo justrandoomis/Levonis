@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
-import { api, ApiUser } from './lib/api';
+import { api, ApiUser, clearApiSessionRequests } from './lib/api';
 import { clearPageCache } from './lib/pageCache';
 import { clearPrimedRequests } from './lib/bootFetch';
+import { privateDrafts, purgeLegacyPrivateDrafts } from './lib/privateDrafts';
 
 /**
  * Authentication state. The session lives in a Secure HttpOnly cookie managed
@@ -23,8 +24,31 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<ApiUser | null>(null);
+  const [user, setSessionUser] = useState<ApiUser | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const sessionScope = useRef<string | null>(null);
+  const setUser = useCallback((next: ApiUser | null) => {
+    const scope = next ? JSON.stringify([next.id, next.role, next.admin_scope, next.can_view_cost, next.can_move_money]) : '';
+    if (scope !== sessionScope.current) {
+      // The first /me only identifies the cookie the opening requests already
+      // carry. Cancelling those reads would break a signed-in first paint.
+      if (sessionScope.current !== null) {
+        clearApiSessionRequests();
+        clearPrimedRequests();
+      }
+      sessionScope.current = scope;
+      clearPageCache();
+      privateDrafts.clear();
+    }
+    // Invalidate before rendering the new account; a parent effect runs after
+    // child effects and would let their first reads join the old request.
+    setSessionUser(next);
+  }, []);
+
+  useEffect(purgeLegacyPrivateDrafts, []);
+  useEffect(() => {
+    if (user?.can_view_cost !== true) privateDrafts.clear();
+  }, [user?.can_view_cost]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,46 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  /**
-   * THE BACK-NAVIGATION SNAPSHOTS ARE IDENTITY-SCOPED.
-   *
-   * src/lib/pageCache.ts holds what a list page last showed so `back` paints
-   * instantly instead of running its skeleton again. Catalogue prices are
-   * membership-dependent — a PRIME member and a signed-out visitor are quoted
-   * different numbers for the same product — so a snapshot taken as one
-   * identity must never be painted for another.
-   *
-   * The ref starts at `null` because that is what the app IS until
-   * `/api/auth/me` answers: a visitor. So the boot case is covered by the same
-   * line as sign-in and sign-out — the moment the answer arrives and it is a
-   * user, the identity changed and anything cached while the page was still
-   * anonymous goes with it. Deciding which of those rows were
-   * identity-dependent would be guesswork; dropping the lot is cheap and
-   * cannot be wrong.
-   */
-  const lastIdentityRef = useRef<string | null>(null);
-  useEffect(() => {
-    const id = user?.id ?? null;
-    if (lastIdentityRef.current === id) return;
-    const previous = lastIdentityRef.current;
-    lastIdentityRef.current = id;
-    clearPageCache();
-    clearPrimedRequests();
-    // The purchase editor parks its draft — supplier prices, freight and
-    // extras — in localStorage. It belongs to the account that typed it, so it
-    // goes when that account signs out or another signs in on this browser.
-    // Not on the first answer of a page load (previous is null then), or every
-    // reload would throw the owner's own draft away.
-    if (previous !== null) {
-      try {
-        localStorage.removeItem('levonis-purchase-draft-v2');
-      } catch {
-        /* storage blocked: nothing was stored either */
-      }
-    }
-  }, [user?.id]);
+  }, [setUser]);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -88,26 +73,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* keep the current state on transient errors */
     }
-  }, []);
+  }, [setUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await api.post<{ user: ApiUser }>('/api/auth/login', { email, password });
     clearPrimedRequests();
     setUser(data.user);
-  }, []);
+  }, [setUser]);
 
   const loginWithGoogle = useCallback(async (credential: string) => {
     const data = await api.post<{ user: ApiUser }>('/api/auth/google', { credential });
     clearPrimedRequests();
     setUser(data.user);
-  }, []);
+  }, [setUser]);
 
   const register = useCallback(async (username: string, name: string, email: string, password: string) => {
     // Email-first sign-up (mail configured) answers pending_email with no
     // account object: the account opens from the link in the inbox.
     const data = await api.post<{ user?: ApiUser; pending_email?: boolean }>('/api/auth/register', { username, name, email, password });
     if (data.user) { clearPrimedRequests(); setUser(data.user); }
-  }, []);
+  }, [setUser]);
 
   const logout = useCallback(async () => {
     try {
@@ -116,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearPrimedRequests();
       setUser(null);
     }
-  }, []);
+  }, [setUser]);
 
   return (
     <AuthContext.Provider

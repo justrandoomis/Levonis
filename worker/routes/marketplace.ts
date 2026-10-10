@@ -2248,7 +2248,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       const esc = await c.env.DB.prepare('SELECT id FROM community_escrows WHERE community_order_id = ?')
         .bind(String(placed.id))
         .first<{ id: string }>();
-      return c.json({ success: true, order: placed, escrow_id: esc?.id ?? null, replayed: true });
+      return c.json({ success: true, order: { ...placed, request_snapshot: JSON.stringify(publicSnapshot(placed.request_snapshot)) }, escrow_id: esc?.id ?? null, replayed: true });
     }
   }
 
@@ -2512,7 +2512,7 @@ marketplaceRoutes.post('/offers/:id/accept', requireAuth, async (c) => {
       expect: { storeId: String(offer.store_id ?? ''), customerId: user.id },
     });
   }
-  return c.json({ success: true, order, escrow_id: escrowId }, 201);
+  return c.json({ success: true, order: order ? { ...order, request_snapshot: JSON.stringify(publicSnapshot(order.request_snapshot)) } : null, escrow_id: escrowId }, 201);
 });
 
 // -------------------------------------------------------- order lifecycle

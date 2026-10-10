@@ -3952,21 +3952,20 @@ adminRoutes.delete('/coupons/:id', async (c) => {
  * The rest of the settings (home, ads, shipping text…) stay with every admin.
  */
 const COST_SETTING_KEYS: readonly string[] = ['minMarginPercent', 'printPricingConfig', 'printMaterials'];
+// Mixed documents keep their public labels/fees readable, but changing the
+// whole value also changes its private margin or acquisition costs.
+const COST_WRITE_SETTING_KEYS: readonly string[] = [...COST_SETTING_KEYS, 'printServicePricing', 'printAccessories'];
 const MONEY_SETTING_KEYS: readonly string[] = [
   ...COST_SETTING_KEYS,
   'exchangeRate',
   'proPricingPolicy',
   'preorderTransportDefaults',
-  // Readable (the per-piece price is published on /api/print-quote/accessories
-  // by design), but it is what every print quote bills, so it is set by a
-  // financial admin.
-  'printAccessories',
 ];
 
 adminRoutes.get('/settings', async (c) => {
   const settings = await getSettings(c.env.DB);
   if (!canViewCost(c.env, c.get('user'))) for (const key of COST_SETTING_KEYS) delete settings[key];
-  return c.json({ success: true, settings });
+  return c.json({ success: true, settings: projectForAdmin(c.env, c.get('user'), settings) });
 });
 
 // ------------------------------------------------------- main page media
@@ -4092,7 +4091,7 @@ adminRoutes.put('/settings/:key', async (c) => {
   if (!SETTING_KEYS.includes(key)) throw badRequest('Unknown setting');
   // COST keys are the owner's (decision 2); the other money keys need money
   // scope. The audit below never stores a cost key's value.
-  if (COST_SETTING_KEYS.includes(key)) assertCostWrite(c);
+  if (COST_WRITE_SETTING_KEYS.includes(key)) assertCostWrite(c);
   else if (MONEY_SETTING_KEYS.includes(key)) assertFinancialScope(c);
   // The farm's balancing document has exactly one write path — the route that
   // normalises it, refuses an unusable one, bumps its version and audits the

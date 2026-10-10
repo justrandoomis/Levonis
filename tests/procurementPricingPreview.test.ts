@@ -231,7 +231,8 @@ test('the Direct Sale Extra typed in the review: without it the direct row is mi
   assert.equal(direct.computed_price_iqd, 992_000);
   assert.equal(direct.computed_price_iqd, direct.preorder_base_iqd, '0: the direct price is the base pre-order price');
   assert.equal(direct.direct_sale_extra_iqd, 0);
-  assert.equal(rowOf(p1, 'pre_order_land').computed_price_iqd, 992_000, 'the pre-order price moves with the same current cost');
+  assert.ok(p1.rows.every((r: { channel: string }) => r.channel === 'direct_sale'), 'stock purchase preview contains direct-sale prices only');
+  assert.ok(p1.adoption.rows.every((r: { channel: string }) => r.channel === 'direct_sale'), 'apply preview cannot request a preorder write');
   assert.equal(summaryOf(zero.body).direct_sale_price_iqd, 992_000);
   assert.equal(summaryOf(zero.body).direct_sale_extra_iqd, 0);
 

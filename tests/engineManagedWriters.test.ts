@@ -85,7 +85,12 @@ test('the product form: a changed price is refused by the database (ENGINE_MANAG
 
 test('the CSV import names an engine product’s refused row in words, never the driver’s text; the form locks the price cells', () => {
   const src = readFileSync(join(ROOT, 'worker/routes/adminImport.ts'), 'utf8');
-  assert.match(src, /reason: engineDbRefusal\(error\)\?\.message \?\?/);
+  assert.match(src, /reason: importFailureReason\(error\)/);
+  const failureReason = src.slice(src.indexOf('function importFailureReason('), src.indexOf('\ninterface PreviewRow'));
+  assert.match(failureReason, /const pricing = engineDbRefusal\(error\);\s*if \(pricing\) return pricing\.message;/,
+    'engine refusals retain their deliberate translated message before the generic error fallback');
+  assert.doesNotMatch(failureReason, /String\(error\)|error instanceof Error \? error\.message/,
+    'an unexpected driver error must never be serialized into the report');
   const form = readFileSync(join(ROOT, 'src/components/adminProducts/ProductForm.tsx'), 'utf8');
   assert.match(form, /pricesLocked=\{engineManaged \|\| \(canSeeCost && pricing\.engine\)\}/);
   const options = readFileSync(join(ROOT, 'src/components/adminProducts/form/OptionsSection.tsx'), 'utf8');

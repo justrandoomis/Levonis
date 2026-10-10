@@ -3,16 +3,11 @@
  * «المخزون هو للبيع المباشر … المفروض هو فقط بيع مباشر»):
  * src/components/adminOperations/ProcurementPricingReview.tsx, rendered.
  *
- * Proves: a product that sells direct leads with «البيع المباشر» — the Direct
- * Sale Extra field (0 one click, today's value when every model has a clean
- * one) and a direct table without the channel column — before the pre-order
- * disclosure, which is CLOSED when the confirm writes nothing and OPEN when it
- * writes prices (owner decision 8: never a price unseen), with the COD note
- * and the route hint inside; the large-change tick stays under the product; a
- * pre-order-only product keeps its one table with a notice; `PricingRowsTable`
- * without a variant is the eight columns every other screen reads; the client
- * helpers normalise and validate a typed extra as the server does; the Sorani
- * screen reads Sorani.
+ * Proves: the Direct Sale Extra field and direct table contain only direct-sale
+ * rows, even if a stale response still carries preorder rows. A preorder-only
+ * product has an explanation and no price table. The generic table remains
+ * available to the product form and global pricing screens. Typed extras keep
+ * the existing validation, large-change confirmation and Sorani translations.
  *
  * Run: node --import tsx --test tests/procurementPricingReview.test.ts
  */
@@ -77,46 +72,38 @@ const review = (p: PricingProduct, extras: Record<string, string> = {}) =>
       confirmLarge: {}, onConfirmLarge: () => {}, extras, onExtras: () => {},
     })
   );
-const between = (html: string, from: string, to: string) => html.slice(html.indexOf(from), html.indexOf(to, html.indexOf(from)));
 const headers = (html: string) => [...html.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
 
-test('data only (no Direct Sale Extra yet): «البيع المباشر» and its field lead; the pre-order rows follow, closed; the notice asks for the extra in place', () => {
+test('data only: only direct rows and their extra field are reviewed; stale preorder rows never appear', () => {
   const html = review(A1);
   const direct = html.indexOf('data-direct-block');
-  const preorder = html.indexOf('data-preorder-block');
-  assert.ok(direct > 0 && preorder > direct, 'the direct block comes before the pre-order disclosure');
-  assert.match(html, /<details data-preorder-block="true" class="[^"]*">/, 'closed: the confirm writes no price');
-  const block = between(html, 'data-direct-block', 'data-preorder-block');
+  assert.ok(direct > 0);
+  assert.ok(!html.includes('data-preorder-block'), 'stock procurement has no preorder disclosure');
+  const block = html.slice(direct);
   assert.ok(block.includes(S.sectionDirect));
   assert.ok(block.includes(S.extraLabel) && block.includes(S.extraHint));
   assert.ok(block.includes(S.noExtra));
   assert.ok(block.includes(S.todayExtra('50,000 د.ع')), 'every direct model has today’s value: the button offers it');
   assert.deepEqual(headers(block), [S.colModel, S.colReplacement, S.colMinProfit, S.colBeforeExtra, S.colExtra, S.colNewDirect, S.colOldNew], 'the direct table: no channel column');
-  assert.ok(!block.includes('طلب مسبق'), 'no pre-order row in the direct block');
-  // The notices: the extra asked for in place (not the generic «data only» line), the route the direct price is built on.
+  assert.equal((block.match(/<tr class="border-b/g) ?? []).length, 2, 'one row for each direct model');
+  assert.ok(!block.includes('749,000') && !block.includes('915,000'), 'neither preorder price is exposed as an applicable stock price');
   assert.ok(html.includes(S.extraNeeded));
   assert.ok(!html.includes(S.incomplete('')), 'not the generic data-only notice');
   assert.ok(html.includes(S.directRoute('الشحن البري من ألمانيا')));
   assert.ok(!html.includes('مسار الشحن الأساسي'), 'the old pre-order wording of the route notice is gone for a direct product');
-  // Inside the disclosure: the pre-order rows, the COD note and why pre-order shows.
-  const inside = html.slice(preorder);
-  assert.ok(inside.includes(S.preorderFollow('2')));
-  assert.deepEqual(headers(inside), [S.colModel, S.colChannel, S.colReplacement, S.colMinProfit, S.colNewPreorder, S.colOldNew]);
-  assert.ok(inside.includes('749,000 د.ع ← 875,000 د.ع') && inside.includes('915,000 د.ع ← 1,100,000 د.ع'));
-  assert.ok(inside.includes(S.cod), 'the COD note sits with the pre-order rows');
-  assert.ok(inside.includes(S.preorderWhy('الشحن البري من ألمانيا')));
-  assert.ok(html.indexOf(S.cod) > preorder, 'and not above the direct block');
 });
 
-test('a confirm that writes prices: the disclosure is OPEN, the direct rows read the base + the extra, and the 15% tick stays under the product', () => {
+test('a confirm that writes prices: direct base plus extra only, with the 15% tick beneath the direct table', () => {
   const html = review({ ...A1, missing_codes: [], adoption: writes });
-  assert.match(html, /<details open="" data-preorder-block="true"/, 'every price the confirm writes is on screen');
-  const block = between(html, 'data-direct-block', 'data-preorder-block');
+  assert.ok(!html.includes('data-preorder-block'));
+  const block = html.slice(html.indexOf('data-direct-block'));
   assert.ok(block.includes('875,000 د.ع') && block.includes('1,100,000 د.ع'));
   assert.ok(block.includes('799,000 د.ع ← 875,000 د.ع'), 'old → new of the direct cell');
+  assert.ok(!block.includes('749,000') && !block.includes('915,000'), 'a stale mixed-channel adoption is filtered too');
+  assert.equal((block.match(/<tr class="border-b/g) ?? []).length, 2);
   assert.ok(block.includes('0 د.ع'), 'the extra the owner typed');
   const tick = html.indexOf('data-pricing-large');
-  assert.ok(tick > html.indexOf('data-preorder-block'), 'the tick covers both blocks, under them');
+  assert.ok(tick > html.indexOf('</table>'), 'the tick covers the direct prices shown above it');
   assert.ok(html.includes(engineSaveStrings('ar').adoptIntro));
   assert.ok(!html.includes(S.extraNeeded));
 });
@@ -135,14 +122,16 @@ test('the field: the stored value as placeholder, the typed value shown, an off-
   assert.ok(mixed.includes(S.todayExtra('50,000 د.ع – 100,000 د.ع')));
 });
 
-test('a product that sells pre-order only keeps its one table, with a notice; no direct block, no field', () => {
+test('a preorder-only product has a notice without any purchase pricing table or extra field', () => {
   const preorderOnly: PricingProduct = { ...A1, rows: ROWS.filter((r) => r.channel !== 'direct_sale'), missing_codes: [], cod_priced_as_direct: false, extra_suggestions: [] };
   const html = review(preorderOnly);
   assert.ok(!html.includes('data-direct-block'));
   assert.ok(!html.includes('data-extra-field'));
   assert.ok(html.includes(S.preorderOnly));
-  assert.ok(html.includes(S.proposedProfile('الشحن البري من ألمانيا')), 'the pre-order wording stays for a pre-order product');
-  assert.deepEqual(headers(html), [S.colModel, S.colChannel, S.colReplacement, S.colMinProfit, S.colNewPreorder, S.colExtra, S.colNewDirect, S.colOldNew]);
+  assert.ok(!html.includes('data-pricing-rows'));
+  assert.ok(!html.includes('data-preorder-block'));
+  assert.deepEqual(headers(html), []);
+  assert.ok(!html.includes('749,000') && !html.includes('915,000'));
 });
 
 test('PricingRowsTable without a variant is the eight columns the product form and the save sheet read, unchanged', () => {
@@ -188,14 +177,14 @@ test('the client helpers: typed extras by product, the request body, and the sam
   assert.equal(hasSomethingToApply(quiet, { ...base, extras: [{ product_id: 'p_a1', scope: 'product', scope_id: '', amount_iqd: '0' }] }), true);
 });
 
-test('the Sorani screen reads Sorani: the direct block, the field and the disclosure', () => {
+test('the Sorani screen reads Sorani: the direct block and the field', () => {
   const store = globalThis as unknown as { localStorage?: unknown };
   const before = store.localStorage;
   store.localStorage = { getItem: () => 'ckb', setItem: () => {}, removeItem: () => {} };
   try {
     const html = review(A1);
     const K = PROCUREMENT_PRICING_STRINGS.ckb;
-    for (const s of [K.sectionDirect, K.extraLabel, K.noExtra, K.extraNeeded, K.preorderFollow('2'), K.colBeforeExtra]) assert.ok(html.includes(s), s);
+    for (const s of [K.sectionDirect, K.extraLabel, K.noExtra, K.extraNeeded, K.colBeforeExtra]) assert.ok(html.includes(s), s);
     assert.ok(!html.includes(S.extraLabel) && !html.includes(S.noExtra), 'never the Arabic in the Sorani screen');
   } finally {
     store.localStorage = before;

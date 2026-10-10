@@ -62,9 +62,11 @@ export async function auditStatements(
   if (!ctx) return { statements: [legacyStatement(db, actorId, action, target, detail)], eventId: null };
   try {
     return await kitAuditStatements(db, ctx, actorId, action, target, detail);
-  } catch (e) {
+  } catch {
     // A bus that cannot build its envelope never costs the audit row.
-    console.error('audit event not built', action, e instanceof Error ? e.message : String(e));
+    // Driver errors can embed bound cost values; the event identifies the
+    // failed operation without copying its private data into log readers.
+    console.error('audit event not built', action);
     return { statements: [legacyStatement(db, actorId, action, target, detail)], eventId: null };
   }
 }
@@ -82,7 +84,7 @@ export async function audit(
     if (statements.length === 1) await statements[0].run();
     else await db.batch(statements);
     pumpAfter(db, [eventId]);
-  } catch (e) {
-    console.error('audit write failed', action, e);
+  } catch {
+    console.error('audit write failed', action);
   }
 }

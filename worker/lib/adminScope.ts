@@ -339,6 +339,7 @@ export const FINANCIAL_FIELDS = [
   'store_borne_shipping_iqd',
   'store_borne_cod_iqd',
   'pricing_inputs',
+  'direct_purchase',
   'pricing_rules',
   'pricing_breakdown',
   'cost_breakdown',

@@ -121,6 +121,7 @@ import {
   type ProductPricingData,
   type RuleWrite,
 } from '../lib/pricingEngine/store';
+import { pruneDirectPurchaseStatements, directPurchaseStore, nextDirectPurchase, directPurchaseStatement, type DirectPurchaseOverlay } from '../lib/pricingEngine/directPurchase';
 import { MinimumProfitError, parseMinimumProfit, purchaseIneligibility, type DirectSaleExtraDraft, type MinimumProfitDraft, type PurchaseForPricing } from '../lib/pricingEngine/fromPurchase';
 import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
 import { lineDto, productPreviewDto, ratesHeadDto, storedRulesDto } from '../lib/pricingEngine/procurementDto';
@@ -152,7 +153,6 @@ import {
   withRuleIds,
   type EngineEvaluation,
 } from '../lib/pricingEngine/engineWrite';
-import { mergedInputs } from '../lib/pricingEngine/fromPurchase';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { canonical } from '../lib/pricingEngine/procurementPreview';
 import { sha256Hex } from '../lib/crypto';
@@ -794,7 +794,7 @@ async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForP
   const applied = await appliedProducts(db, purchase.purchase_id);
   const products = [];
   const previews = new Map<string, ProductPreview>();
-  const engine = new Map<string, { ev: EngineEvaluation; writes: { inputWrites: InputWriteList; ruleWrites: RuleWriteList } }>();
+  const engine = new Map<string, { ev: EngineEvaluation; writes: { inputWrites: InputWriteList; ruleWrites: RuleWriteList }; overlay: DirectPurchaseOverlay }>();
   const [control, storedCosts] = await Promise.all([loadEngineControl(db), loadStoredSkuCosts(db, ids)]);
   for (const id of ids) {
     const product = loaded.get(id);
@@ -806,25 +806,28 @@ async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForP
       inputWrites: preview.derived.entries.map((e) => ({ ...e.write, source_ref: `purchase:${purchase.purchase_id}` })).filter((w) => !inputWriteIsNoop(w)),
       ruleWrites: withRuleIds(preview.rule_writes.filter((w) => !ruleWriteIsNoop(w))),
     };
+    const overlay = nextDirectPurchase(data, writes.inputWrites, writes.ruleWrites);
     const ev = await evaluateEngineWrite({
       loaded: product,
       stored: data,
       ctx,
       rates,
       control,
-      inputs: mergedInputs(data.inputs, writes.inputWrites),
-      inputWrites: writes.inputWrites,
-      ruleWrites: writes.ruleWrites,
+      inputs: data.inputs,
+      inputWrites: [],
+      ruleWrites: [],
+      channel: 'direct_sale',
+      directPurchase: overlay,
       image: await priceImageOf(db, id),
       storedCosts: storedCosts.filter((r) => r.product_id === id),
       allowAdopt: !data.state?.opted_out_at,
     });
-    engine.set(id, { ev, writes });
-    // An apply that writes prices carries the engine write's hash too (the prices the owner read).
+    engine.set(id, { ev, writes, overlay });
     if (ev.kind && ev.complete && ev.hash) preview.preview_hash = await sha256Hex(canonical({ purchase: preview.preview_hash, engine: ev.hash }));
+    if (ev.codes.includes('DIRECT_PURCHASE_PRICE_SHAPE')) preview.missing_codes.push('DIRECT_PURCHASE_PRICE_SHAPE');
     previews.set(id, preview);
-    const cancelled = purchase.status === 'cancelled' && data.inputs.some((r) => r.source_ref === `purchase:${purchase.purchase_id}`);
-    products.push({ ...productPreviewDto(preview, { applied: applied.has(id), cancelled_source: cancelled, rules: data.rules }), adoption: engineEvaluationDto(ev) });
+    const cancelled = purchase.status === 'cancelled' && directPurchaseStore(data).inputs.some((r) => r.source_ref === `purchase:${purchase.purchase_id}`);
+    products.push({ ...productPreviewDto(preview, { applied: applied.has(id), cancelled_source: cancelled, rules: directPurchaseStore(data).rules }), adoption: engineEvaluationDto(ev) });
   }
   const lines = purchase.lines
     .filter((l) => previews.has(l.product_id))
@@ -908,7 +911,9 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
 
   const actor = c.get('user')!.id;
   const now = new Date().toISOString();
-  const { ev, writes } = priced;
+  if (!data.direct_purchase_available) throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED');
+  if (!preview.models.some((m) => m.channels.some((c) => c.ok && c.channel === 'direct_sale'))) throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE');
+  const { ev, writes, overlay } = priced;
   const inputWrites = writes.inputWrites;
   const ruleWrites = writes.ruleWrites;
   const pricesWritten = !!ev.kind && (ev.needs_write || !ev.complete);
@@ -971,10 +976,10 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
       status = await commitEngine(
         c,
         ev,
-        writes,
+        { inputWrites: [], ruleWrites: [] },
         // The combined hash was checked above; the engine gate reads the engine write's own.
         { hash: ev.hash, confirm: body.confirm_large_change },
-        { source: 'purchase', preview: async () => productPreview, extraAudits: [...audits, ...(await appliedAudit(ev.kind === 'adopt'))], auditDetail: { purchase_id: purchase.purchase_id } }
+        { source: 'purchase', preview: async () => productPreview, extraInputs: [directPurchaseStatement(db, data, overlay, actor, now)], extraAudits: [...audits, ...(await appliedAudit(ev.kind === 'adopt'))], auditDetail: { purchase_id: purchase.purchase_id } }
       );
     } catch (e) {
       if (e instanceof Error && /UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(e.message)) return c.json({ success: true, already: true, product_id: pid, rows_changed: 0, priced: false });
@@ -985,8 +990,7 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
 
   const statements = [
     ...batchHead(db, data, now),
-    ...inputStatements(db, pid, inputWrites, actor, now),
-    ...ruleStatements(db, pid, ruleWrites, actor, now),
+    directPurchaseStatement(db, data, overlay, actor, now),
     ...audits,
     ...(await appliedAudit(false)),
     ...batchTail(db, pid),
@@ -1088,7 +1092,7 @@ async function commitEngine(
   ev: EngineEvaluation,
   writes: { inputWrites: InputWriteList; ruleWrites: RuleWriteList },
   gate: { hash: unknown; confirm: unknown; dataHash?: string | null },
-  opts: { source: string; preview: () => Promise<unknown>; extraAudits?: D1PreparedStatement[]; auditDetail?: Record<string, unknown>; extraStatements?: D1PreparedStatement[] }
+  opts: { source: string; preview: () => Promise<unknown>; extraAudits?: D1PreparedStatement[]; auditDetail?: Record<string, unknown>; extraStatements?: D1PreparedStatement[]; extraInputs?: D1PreparedStatement[] }
 ): Promise<'saved' | 'already'> {
   const db = c.env.DB;
   const pid = ev.product_id;
@@ -1115,6 +1119,7 @@ async function commitEngine(
       source: opts.source,
       idempotencyKey: priceKey(pid, ev.hash!),
       extraAudits: opts.extraAudits,
+      extraInputs: opts.extraInputs,
       auditDetail: opts.auditDetail,
     })),
   ];
@@ -1214,6 +1219,7 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
       ...batchHead(db, stored, now),
       ...inputStatements(db, pid, writes.inputWrites, actor, now),
       ...ruleStatements(db, pid, writes.ruleWrites, actor, now),
+      ...pruneDirectPurchaseStatements(db, stored, writes.inputWrites, writes.ruleWrites, actor, now),
       ...inputAudits('product_form'),
       ...(await auditStatements(db, actor, 'pricing.inputs.updated', pid, { product_id: pid, inputs_changed: writes.inputWrites.length, rules_changed: writes.ruleWrites.length, inputs_seq: stored.state?.inputs_seq ?? 0 })).statements,
       ...batchTail(db, pid),
@@ -1458,6 +1464,7 @@ async function commitRuleWrites(c: Context<AppContext>, data: ProductPricingData
   const statements = [
     ...batchHead(db, data, now),
     ...ruleStatements(db, pid, writes, actor, now),
+    ...pruneDirectPurchaseStatements(db, data, [], writes, actor, now),
     ...writes.map((w) =>
       pricingAuditStatement(db, { entity: 'rule', entity_key: `${w.kind}:${w.scope}:${w.scope_id}`, product_id: pid, action, before: ruleImage(w.existing), after: ruleImage(w.next), actor, now })
     ),

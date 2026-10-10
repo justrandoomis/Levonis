@@ -5,6 +5,7 @@
  * the review sends a Direct Sale Extra, then the prices the confirm writes.
  * `?lang=ckb|en` picks the language, `?theme=light|dark` the theme. */
 import React from 'react';
+import { privateDrafts } from '../../src/lib/privateDrafts';
 import { createRoot } from 'react-dom/client';
 import { LanguageProvider } from '../../src/LanguageContext';
 import ProcurementPanel from '../../src/components/adminOperations/ProcurementPanel';
@@ -20,7 +21,7 @@ Object.assign(window, { procurementRequests: requests });
 const profile = { id: 'germany_land', name_ar: 'ألمانيا — شحن بري', name_en: 'Germany · land freight', currency: 'EUR', shipping_basis: 'weight', exchange_rate: 1650, shipping_rate_iqd: 6100, version: 5 };
 const draftLine = (scope_id: string, label: string, unit: number) => ({ product_id: 'a1', scope: 'option', scope_id, label, sku: `A1-${scope_id}`, stock: 0, reserved: 0, selling_price_iqd: 749000, cost_source: 'procurement_default', weight_g: 9000, volume_mm3: 0, qty_ordered: 7, invoiced_qty: 7, purchase_cost_mode: 'unit', source_unit_amount: unit, source_total_amount: unit * 7 });
 const header = { supplier_id: 'germany', warehouse_id: '', invoice_no: '', currency: 'EUR', exchange_rate: 1650, cost_profile_id: 'germany_land', cost_profile_version: 5, shipping_basis: 'weight', shipping_rate_iqd: 6100, purchase_day: '2026-10-10', expected_day: '', tracking: '', note: '', attachment_url: '', invoice_total_iqd: '', cost_state: 'final' };
-localStorage.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines: [draftLine('std', 'A1', 320), draftLine('combo', 'A1 Combo', 445)], charges: [], operationId: 'op-direct-fixture' }));
+privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines: [draftLine('std', 'A1', 320), draftLine('combo', 'A1 Combo', 445)], charges: [], operationId: 'op-direct-fixture' }));
 
 // ----------------------------------------------------------------- the pricing preview
 const names = (n: string) => ({ name_ar: n, name_en: n, name_ckb: n });

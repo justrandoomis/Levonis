@@ -19,7 +19,7 @@ import { safeParse, localeToApi } from '../lib/types';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
 import { notFound, int, str } from '../lib/http';
-import { getSetting, getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
+import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, publicPrintServiceRates } from '../lib/settings';
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
@@ -3118,18 +3118,15 @@ productRoutes.get('/print-calculator', async (c) => {
     });
   }
 
-  const rates = await getSetting(c.env.DB, 'printServicePricing');
+  const rates = publicPrintServiceRates(await getSetting(c.env.DB, 'printServicePricing'));
   return c.json({
     success: true,
     filaments,
     // Honest nulls, echoed as they are stored. `configured` exists so a screen
     // does not have to decide what "0" means.
     rates: {
-      machine_iqd_per_hour: rates?.machine_iqd_per_hour ?? null,
-      setup_fee_iqd: rates?.setup_fee_iqd ?? null,
-      margin_percent: rates?.margin_percent ?? null,
-      configured:
-        rates?.machine_iqd_per_hour !== null && rates?.machine_iqd_per_hour !== undefined,
+      ...rates,
+      configured: rates.machine_iqd_per_hour !== null,
     },
   });
 });
@@ -4411,7 +4408,7 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   // Normalize on the way OUT as well as on the way in: rows written before
   // lib/homeContent.ts existed never went through the validator, and the
   // storefront puts these straight into an <img src> and an <a href>.
-  const raw = settings as Record<string, unknown>;
+  const raw = projectPublicSettings(settings);
   const safeSettings = {
     ...raw,
     homeBanners: normalizeHomeBanners(raw.homeBanners),

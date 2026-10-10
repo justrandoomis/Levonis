@@ -23,11 +23,8 @@ import { engineNotices, engineSaveStrings } from './engineSaveStrings';
  * «المفروض هو فقط بيع مباشر»). A product that sells direct leads with
  * «البيع المباشر»: the Direct Sale Extra field — the one input the direct price
  * lacks, asked for in place and never invented (row 184 (4)); 0 is one click —
- * and the direct rows. The pre-order rows the same current cost moves (rows
- * 184, 196: one replacement cost prices every channel) follow in one
- * disclosure, OPEN whenever the confirm writes them (decision 8: never a price
- * unseen) and closed when it writes nothing. A product that sells pre-order
- * only keeps its one table, with a notice.
+ * and the direct rows. Purchase costs and minimums apply to direct sale alone;
+ * pre-order pricing stays outside this review and its write.
  */
 
 /** The typed Direct Sale Extras of one product, by `scope|scope_id` ('' amount = inherit). */
@@ -36,7 +33,6 @@ export type TypedExtras = Record<string, string>;
 export type ExtraEntries = Array<{ scope: 'product' | 'option'; scope_id: string; amount: string }> | null;
 
 const EMPTY_CHOICES: PricingChoices = { minimums: [], optIn: [], usePurchase: {}, prefer: {} };
-const PREORDER_PROFILE: Readonly<Record<string, string>> = { pre_order_air: 'CHINA_AIR', pre_order_sea: 'CHINA_SEA', pre_order_land: 'GERMANY_LAND' };
 const isDirect = (r: Pick<PricingPreviewRow, 'channel'>) => r.channel === 'direct_sale';
 /** The product sells direct today (an enabled direct-sale cell on some model). */
 export const sellsDirect = (p: Pick<PricingProduct, 'rows'>) => p.rows.some(isDirect);
@@ -122,10 +118,10 @@ export function ProductPreview({ p, use, prefer, onUse, onPrefer, large, onLarge
   const notices: string[] = [];
   if (p.reason === 'estimated') notices.push(s.estimated);
   if (p.shadowed.length) notices.push(s.shadowed);
-  for (const x of p.proposals) notices.push((direct ? s.directRoute : s.proposedProfile)(profileName(x.shipping_profile, lang)));
-  if (p.cod_priced_as_direct && !direct) notices.push(s.cod);
+  for (const x of p.proposals) if (direct) notices.push(s.directRoute(profileName(x.shipping_profile, lang)));
+
   if (p.missing_codes.length) notices.push(direct && onlyExtraMissing(p) ? s.extraNeeded : s.incomplete(p.missing_codes.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')));
-  if (!direct && p.rows.length > 0) notices.push(s.preorderOnly);
+  if (!direct) notices.push(s.preorderOnly);
   const intro = writes && (
     <>
       <p className={`text-[13px] ${T.text1}`}>{writes.kind === 'adopt' ? es.adoptIntro : es.repriceIntro}</p>
@@ -139,7 +135,7 @@ export function ProductPreview({ p, use, prefer, onUse, onPrefer, large, onLarge
       <span className={`text-[12px] ${T.text3}`}>{es.largeNote}</span>
     </label>
   );
-  const rows = writes ? adoptionRows(writes) : p.rows;
+  const rows = (writes ? adoptionRows(writes) : p.rows).filter(isDirect);
   return (
     <article className="inventory-line" data-pricing-product={p.product_id}>
       <strong className={T.text1}>{p.label}</strong>
@@ -154,36 +150,10 @@ export function ProductPreview({ p, use, prefer, onUse, onPrefer, large, onLarge
             {onExtras && <DirectSaleExtraField p={p} typed={extras} onChange={onExtras} />}
             <PricingRowsTable rows={rows.filter(isDirect)} variant="direct" />
           </section>
-          <PreorderBlock p={p} rows={rows} open={!!writes} />
           {tick}
         </div>
-      ) : writes ? (
-        <div className="mt-2 grid gap-2" data-pricing-adoption={writes.kind}>
-          {intro}
-          <PricingRowsTable rows={adoptionRows(writes)} />
-          {tick}
-        </div>
-      ) : (
-        p.rows.length > 0 && <PricingRowsTable rows={p.rows} />
-      )}
+      ) : null}
     </article>
-  );
-}
-
-/** The pre-order rows the same current cost moves: open whenever the confirm writes them. */
-function PreorderBlock({ p, rows, open }: { p: PricingProduct; rows: readonly PricingPreviewRow[]; open: boolean }) {
-  const { lang } = useLanguage();
-  const s = procurementPricingStrings(lang);
-  const preorder = rows.filter((r) => !isDirect(r));
-  if (!preorder.length) return null;
-  const routes = [...new Set(preorder.map((r) => profileName(PREORDER_PROFILE[r.channel] ?? null, lang)))].join(lang === 'en' ? ', ' : '، ');
-  return (
-    <details open={open} data-preorder-block className="min-w-0 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] px-3 py-2">
-      <summary className={`cursor-pointer text-[13px] ${T.text2}`}>{s.preorderFollow(String(preorder.length))}</summary>
-      <PricingRowsTable rows={preorder} variant="preorder" />
-      {p.cod_priced_as_direct && <p className={`mt-2 text-[13px] ${T.text2}`}>{s.cod}</p>}
-      <p className={`mt-1 text-[12px] ${T.text3}`}>{s.preorderWhy(routes)}</p>
-    </details>
   );
 }
 
@@ -391,7 +361,7 @@ export function SavedPurchasePricing({ preview, purchaseId, failures, choices, o
         {writes && (
           <>
             <p className={`text-[13px] ${T.text2}`}>{writes.kind === 'adopt' ? es.adoptIntro : es.repriceIntro}</p>
-            <PricingRowsTable rows={adoptionRows(writes)} />
+            <PricingRowsTable rows={adoptionRows(writes).filter(isDirect)} variant="direct" />
             {writes.large_change && (
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={ticks[p.product_id] === true} onChange={(e) => setTicks((m) => ({ ...m, [p.product_id]: e.target.checked }))} />

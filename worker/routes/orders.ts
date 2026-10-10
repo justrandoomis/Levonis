@@ -7,6 +7,7 @@ import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
+import { stripFinancials } from '../lib/adminScope';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
@@ -869,11 +870,11 @@ export function orderPublic(
          */
         is_gift: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '',
         gift_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
-        // Resolver snapshots persisted at checkout time (cost fields stripped
-        // before persistence — safe for the buyer to see).
-        pricing: safeParse(it.pricing_snapshot, null),
-        warranty: safeParse(it.warranty_snapshot, null),
-        transport: safeParse(it.transport_snapshot, null),
+        // Read-side projection also protects historical/imported snapshots
+        // written before current checkout validation existed.
+        pricing: stripFinancials(safeParse(it.pricing_snapshot, null)),
+        warranty: stripFinancials(safeParse(it.warranty_snapshot, null)),
+        transport: stripFinancials(safeParse(it.transport_snapshot, null)),
         /**
          * The exact selection that was bought, in the shape POST /api/cart/items
          * accepts — so "buy again" repeats THIS line instead of the product's

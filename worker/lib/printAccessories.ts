@@ -133,6 +133,23 @@ export interface PricedAccessory {
   unit: AccessoryUnit;
 }
 
+/** A customer's choice carries identity and units, never acquisition costs. */
+export function publicAccessory(a: PrintAccessory) {
+  const text = (value: unknown, max: number) => typeof value === 'string' ? value.slice(0, max) : '';
+  return { id: text(a.id, 40), name_ar: text(a.name_ar, 200), name_en: text(a.name_en, 200), name_ckb: text(a.name_ckb, 200),
+    unit: ['piece', 'pair', 'set', 'cm', 'gram'].includes(a.unit) ? a.unit : 'piece',
+    category: ['magnet', 'motion', 'electronics', 'fastener', 'finishing'].includes(a.category) ? a.category : 'finishing' };
+}
+
+/** The selected bill of materials; its monetary contribution is already in
+ * the final job quote. Also used for historical estimate snapshots. */
+export function publicAccessoryLine(value: unknown) {
+  const a = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const text = (key: string) => typeof a[key] === 'string' ? a[key].slice(0, 200) : '';
+  return { id: text('id'), qty: typeof a.qty === 'number' && Number.isSafeInteger(a.qty) && a.qty >= 0 ? a.qty : 0,
+    name_ar: text('name_ar'), name_en: text('name_en'), name_ckb: text('name_ckb'), unit: text('unit') };
+}
+
 /** The largest count of any one accessory a single part may carry. A model
  *  wanting more than this is a data-entry slip, and a quote built on a slip is
  *  worse than a refusal. */

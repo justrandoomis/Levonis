@@ -45,6 +45,10 @@ async function fundingReceiptPlan(db:D1Database,purchaseId:string,investorId:str
     ...await surplusReturnStatements(db,{purchaseId,userId:investorId,receiptId:operation,amount:returned,actor}));
   for(const [i,a] of allocations.entries()){
     const delta=targets[i]-a.funded_iqd;if(delta<0)throw conflict('راجع التمويل السابق قبل إعادة توزيعه');
+    // A previously unfunded contract can be voided while this receipt is being
+    // prepared. Abort the whole receipt in that case: the retry excludes the
+    // voided contract and returns its unallocated cash to the investor.
+    statements.push(...fence(db,"EXISTS(SELECT 1 FROM investment_contracts WHERE id=? AND user_id=? AND state='active' AND version=? AND principal_iqd=?)",[a.contract.id,investorId,a.contract.version,a.principal_iqd]));
     statements.push(...fence(db,"(SELECT COALESCE(SUM(amount_iqd),0) FROM investor_finance_events WHERE contract_id=? AND kind='funding')=?",[a.contract.id,a.funded_iqd]));
     if(delta)statements.push(db.prepare("INSERT INTO investor_finance_events(id,event_key,contract_id,kind,amount_iqd,event_day,actor_id,snapshot,created_at) VALUES (?,?,?,'funding',?,?,?,?,?)").bind(newId('ive'),`purchase-funding:${operation}:${a.contract.id}`,a.contract.id,delta,day,actor,JSON.stringify({purchase_id:purchaseId,receipt_id:operation,reference,allocated_iqd:delta}),now));
     statements.push(...planInvestorSources(db,a.contract,day));

@@ -109,8 +109,9 @@ test('the product form: a held save opens the sheet; the confirm re-sends the bo
 
 test('the purchase review: the prices an apply writes, the 15% tick, and no unseen prices on a retry', () => {
   const review = src('src/components/adminOperations/ProcurementPricingReview.tsx');
-  assert.match(review, /data-pricing-adoption=\{writes\.kind\}/);
-  assert.match(review, /<PricingRowsTable rows=\{adoptionRows\(writes\)\} \/>/);
+  assert.match(review, /data-pricing-direct-first=\{writes\?\.kind \?\? 'data'\}/);
+  assert.match(review, /writes\?\.large_change && onLarge/, 'the direct review retains the large-price confirmation');
+  assert.match(review, /<PricingRowsTable rows=\{adoptionRows\(writes\)\.filter\(isDirect\)\} variant="direct" \/>/, 'stock purchase confirms only the direct prices it can write');
   assert.match(review, /if \(!shown\?\.preview_hash \|\| !samePrices\(shown\.adoption, product\.adoption\)\) throw e;/);
   const panel = src('src/components/adminOperations/ProcurementPanel.tsx');
   assert.match(panel, /applyPurchase\(product\.product_id, purchaseId, hash, own, confirmLarge\[product\.product_id\] === true\)/);

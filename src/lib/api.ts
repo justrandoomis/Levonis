@@ -121,6 +121,7 @@ export const DEFAULT_TIMEOUT_MS = 20000;
 
 /** The event the access-blocked notice listens for, with the reference to quote. */
 export const ACCESS_BLOCKED_EVENT = 'levonis:access-blocked';
+let apiSessionEpoch = 0;
 function noteAccessBlocked(details: Record<string, unknown> | undefined): void {
   try {
     const reference = typeof details?.reference === 'string' ? details.reference : '';
@@ -131,6 +132,7 @@ function noteAccessBlocked(details: Record<string, unknown> | undefined): void {
 }
 
 async function requestRaw<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+  const requestEpoch = apiSessionEpoch;
   const init: RequestInit = { method, credentials: 'same-origin', headers: { ...opts?.headers } };
   if (body !== undefined && !(body instanceof FormData)) {
     // After the caller's headers, never before: the body encoding is this
@@ -187,6 +189,9 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
       if (controller.signal.aborted) throw err;
       throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
     }
+    // A response belongs to the credentials used when it started. In
+    // particular, a late owner cost read must not repaint a different account.
+    if (requestEpoch !== apiSessionEpoch) throw new ApiError(0, 'Request cancelled', 'ABORTED');
     if (!res.ok || data.success === false) {
       // BLOCKED BY THE DECEPTION LAYER (DECISIONS row 206): every screen hears
       // it at once, and the full-screen notice (components/security/
@@ -224,6 +229,10 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
   const feedback = beginRequestFeedback(method, path, opts?.mascot);
   try {
     const result = await requestRaw<T>(method, path, body, opts);
+    // These responses change the cookie before AuthContext publishes the new
+    // user. Close the coalescer's old session immediately at that boundary.
+    if (method !== 'GET' && path.startsWith('/api/auth/') &&
+      (path === '/api/auth/logout' || (result && typeof result === 'object' && 'user' in result))) clearApiSessionRequests();
     feedback.finish();
     return result;
   } catch (error) {
@@ -261,12 +270,19 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: R
  */
 const inflightGets = new Map<string, Promise<unknown>>();
 
+/** Call before publishing an identity or permissions change, including a
+ * same-account loss of owner access. Pending results become cancellations. */
+export function clearApiSessionRequests(): void {
+  apiSessionEpoch++;
+  inflightGets.clear();
+}
+
 function coalescedGet<T>(path: string, opts?: RequestOptions): Promise<T> {
-  if (opts?.signal) return request<T>('GET', path, undefined, opts);
+  if (opts?.signal || opts?.headers) return request<T>('GET', path, undefined, opts);
   const existing = inflightGets.get(path);
   if (existing) return existing as Promise<T>;
   const started = request<T>('GET', path, undefined, opts).finally(() => {
-    inflightGets.delete(path);
+    if (inflightGets.get(path) === started) inflightGets.delete(path);
   });
   inflightGets.set(path, started);
   return started;

@@ -45,6 +45,7 @@
  * accounting table (orders, order lines, lots, the wallet) and never writes a
  * purchase row.
  */
+import { pruneDirectPurchase, directPurchaseStatement, directPurchaseStore, type DirectPurchaseOverlay } from './directPurchase';
 import { resolveSkuInputs, type ChannelPrice } from '@levonis/pricing/costToPrice';
 import { currentUsdCost } from '@levonis/pricing/fxChain';
 import { skuPriceHistoryKey, type SkuChannel } from '@levonis/pricing/skuChannel';
@@ -264,7 +265,7 @@ export function legacyConversions(productId: string, rules: readonly StoredRuleR
 
 const applyConversions = (rules: readonly StoredRuleRow[], conversions: readonly LegacyConversion[]): StoredRuleRow[] =>
   rules.map((r) => {
-    const c = conversions.find((x) => x.rule.id === r.id);
+    const c = r.source === 'LEGACY_MIGRATION' ? conversions.find((x) => x.rule.id === r.id) : undefined;
     return c ? { ...r, amount_usd: c.amount_usd, amount_iqd: null, legacy_amount_iqd: c.legacy_amount_iqd, legacy_usd_iqd_rate: c.usd_iqd_rate, version: r.version + 1 } : r;
   });
 
@@ -301,6 +302,7 @@ export interface EngineRow {
 }
 
 export interface EngineEvaluation {
+  direct_inputs?: Array<Partial<StoredInputRow>>;
   product_id: string;
   mode: 'manual' | 'engine';
   /** adopt: a manual product the save leaves complete; reprice: an engine product; null: incomplete, data only. */
@@ -333,6 +335,9 @@ export interface EngineEvaluation {
 }
 
 export interface EngineEvaluationInput {
+  channel?: 'direct_sale';
+  allChannels?: boolean;
+  directPurchase?: DirectPurchaseOverlay | null;
   loaded: LoadedProduct;
   stored: ProductPricingData;
   ctx: PricingContext;
@@ -434,6 +439,7 @@ export function withRuleIds(writes: readonly RuleWrite[]): RuleWrite[] {
 }
 
 export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<EngineEvaluation> {
+  if (!a.channel && !a.allChannels && a.stored.direct_purchase?.direct_only) return evaluateEngineWrite({ ...a, channel: 'direct_sale' });
   // Per SKU or per model, and which SKU rows the write replaces, both read the rung: never on a failed read.
   refuseUnreadSkus(a.loaded);
   const pid = a.loaded.id;
@@ -441,17 +447,24 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   const rates = a.rates;
   const u = rates?.usd_iqd ?? null;
   const drafted = mergedRules(a.stored, a.ruleWrites) as StoredRuleRow[];
-  const conversions = legacyConversions(pid, drafted, u);
+  const conversions = a.channel ? [] : legacyConversions(pid, drafted, u);
   const rules = applyConversions(drafted, conversions);
+  // The form's explicit edits beat only the corresponding stock fields. The
+  // preorder store itself never receives purchase inputs or minimums.
+  const overlay = a.directPurchase === undefined ? pruneDirectPurchase(a.stored, a.inputWrites, a.ruleWrites) ?? a.stored.direct_purchase : a.directPurchase;
+  const direct = directPurchaseStore({ ...a.stored, inputs: a.inputs as StoredInputRow[], rules: drafted }, overlay);
+  direct.rules = applyConversions(direct.rules, conversions);
+
   const groups = modelsOf(a.loaded.doc, a.loaded.view).groups;
   const skuTable = skuTableOf(a.loaded);
   // Without the SKU rung (a database before 0183) every product is priced per model, exactly as
   // before FX-7: a shape that needs a price per SKU is refused (PRICE_SHAPE_UNSUPPORTED).
-  const wantsSku = needsSkuPricing(a.loaded, a.inputs, rules, groups);
+  const wantsSku = needsSkuPricing(a.loaded, [...a.inputs, ...direct.inputs], [...rules, ...direct.rules], groups);
   const perSku = wantsSku && skuTable;
   // Priced per SKU (FX-7) every sellable SKU is a unit; per model, every model — exactly as before.
   const legacy = evaluateLegacy(pid, a.loaded.doc, a.loaded.view, a.ctx, { perSku });
-  const models = priceModels(pid, legacy.units, a.inputs, rules, rates);
+  const units = a.channel ? legacy.units.map((m) => ({ ...m, channels: m.channels.filter((c) => c.channel === a.channel) })) : legacy.units;
+  const models = priceModels(pid, units, a.inputs, rules, rates, overlay ? direct : undefined);
   const codes = new Set<string>();
   if (!rates || !u) codes.add('FX_RATE_MISSING');
   if (rates?.derived_stale) codes.add('FX_DERIVED_STALE');
@@ -460,12 +473,17 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
     const sold = m.channels.filter((c) => c.ok).map((c) => c.channel);
     for (const i of m.result?.issues ?? []) if (i.severity === 'error' && (!i.channel || sold.includes(i.channel))) codes.add(i.code);
   }
-  const plan = planWrites(a.loaded, legacy, models, { skuTable });
+  const plan = planWrites(a.loaded, legacy, models, { skuTable, channel: a.channel });
   for (const c of plan.codes) codes.add(c);
   if (wantsSku && !skuTable) codes.add('PRICE_SHAPE_UNSUPPORTED');
   const verification = codes.size ? { ok: false, mismatches: [], rows: [] } : verifyPlan(a.loaded, legacy, plan, a.ctx);
   if (!codes.size && !verification.ok) codes.add('RESOLVER_MISMATCH');
   const complete = codes.size === 0;
+  // A stock purchase can activate direct pricing before the ordinary preorder
+  // inputs are complete. Later rates still refresh that direct price without
+  // inventing or borrowing a preorder cost. A fully configured global save
+  // continues to preview and reprice all channels through the ordinary path.
+  if (!complete && !a.channel && mode === 'engine' && overlay) return evaluateEngineWrite({ ...a, channel: 'direct_sale' });
   const kind: EngineEvaluation['kind'] = mode === 'engine' ? 'reprice' : complete && a.allowAdopt !== false ? 'adopt' : null;
 
   // The six figures and the flags, per model × channel.
@@ -497,7 +515,7 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
         preorder_base_iqd: p.price.preorder_base_iqd,
         direct_sale_extra_iqd: p.price.direct_sale_extra_iqd,
         final_price_usd: p.price.final_price_usd,
-        route_fee_removed: !!today?.ok && (today.fee_iqd ?? 0) > 0,
+        route_fee_removed: !!today?.ok && (today.fee_iqd ?? 0) > 0 && plan.direct_surcharge_iqd === undefined,
         pro_before_iqd: tiers?.pro_before_iqd ?? null,
         pro_after_iqd: tiers?.pro_after_iqd ?? null,
         prime_before_iqd: tiers?.prime_before_iqd ?? null,
@@ -509,7 +527,7 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   // A migrated minimum that rounds up a price step is flagged (L4).
   let legacyStep = false;
   if (complete && conversions.length) {
-    const before = priceModels(pid, legacy.units, a.inputs, drafted, rates);
+    const before = priceModels(pid, units, a.inputs, drafted, rates, overlay ? direct : undefined);
     legacyStep = plan.prices.some((p) => {
       const m = before.find((x) => x.combo_key === p.combo_key);
       const c = m?.result?.channels.find((x) => x.channel === p.channel);
@@ -520,16 +538,17 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   // Would the save write a price? Adoption always; an engine product when a draft moves an input or a
   // rule, a price differs from today's, or its stored figures were computed at rates that moved since.
   const pricesDiffer = rows.some((r) => r.old_iqd !== r.new_iqd);
-  const storedKeys = new Set(a.storedCosts.map((s) => `${s.combo_key}@${s.channel}`));
+  const relevantCosts = a.channel ? a.storedCosts.filter((s) => s.channel === a.channel) : a.storedCosts;
+  const storedKeys = new Set(relevantCosts.map((s) => `${s.combo_key}@${s.channel}`));
   const costsStale =
     mode === 'engine' &&
-    (!!(rates && staleReasons(a.storedCosts, rates).length) ||
+    (!!(rates && staleReasons(relevantCosts, rates).length) ||
       storedKeys.size !== plan.prices.length ||
       plan.prices.some((p) => {
         const s = a.storedCosts.find((x) => x.combo_key === p.combo_key && x.channel === p.channel);
         return !s || s.computed_price_iqd !== p.price.computed_price_iqd;
       }));
-  const drafts = a.inputWrites.length > 0 || a.ruleWrites.length > 0;
+  const drafts = a.channel === 'direct_sale' || a.inputWrites.length > 0 || a.ruleWrites.length > 0;
   const needsWrite = kind === 'adopt' || (kind === 'reprice' && (drafts || pricesDiffer || costsStale || conversions.length > 0));
 
   const hash =
@@ -537,6 +556,8 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
       ? await sha256Hex(
           canonical({
             v: 1,
+            channel: a.channel ?? null,
+            direct_purchase: a.directPurchase === undefined ? a.stored.direct_purchase ?? null : a.directPurchase,
             product_id: pid,
             kind,
             state: a.stored.state ? { mode: a.stored.state.mode, inputs_seq: a.stored.state.inputs_seq, write_seq: a.stored.state.write_seq } : null,
@@ -575,6 +596,7 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
     conversions,
     rules,
     inputs: [...a.inputs],
+    direct_inputs: direct.inputs,
     models,
     legacy,
     image: a.image,
@@ -656,7 +678,7 @@ function skuCostRow(ev: EngineEvaluation, p: { option_id: string; combo_key: str
     shipping_profile: c.shipping_profile,
     supplier_amount: c.supplier_amount,
     supplier_currency: currency,
-    supplier_input_mode: supplierModeOf(ev.inputs, p, ev.plan.per_sku),
+    supplier_input_mode: supplierModeOf(p.channel === 'direct_sale' ? ev.direct_inputs ?? ev.inputs : ev.inputs, p, ev.plan.per_sku),
     current_supplier_cost_usd_exact: currentUsdCost({ amount: c.supplier_amount, currency }, rates.eur_usd, rates.cny_usd),
     usd_iqd_rate: rates.usd_iqd,
     usd_fx_version: rates.pair_versions.USD_IQD,
@@ -739,6 +761,7 @@ export interface EngineWriteOptions {
   idempotencyKey: string;
   /** The drafts' own audit rows (inputs, rules), built by the caller. */
   extraAudits?: D1PreparedStatement[];
+  extraInputs?: D1PreparedStatement[];
   auditDetail?: Record<string, unknown>;
   auto?: AutoWrite;
   /** New input and rule rows as multi-row INSERTs (store.ts `packRows`): the same rows, fewer statements. */
@@ -771,6 +794,19 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
   const skuJson = JSON.stringify(plan.skus.map((k) => ({ k: k.combo_key, c: k.channel, p: k.price })));
   const variantJson = JSON.stringify(plan.variants.map((v) => ({ id: v.id, p: v.price })));
   const auditActor = o.auditActor === undefined ? o.actor : o.auditActor;
+  let revisedOverlay = pruneDirectPurchase(ev.stored, inputWrites, ruleWrites);
+  if (!plan.channel && ev.stored.direct_purchase?.direct_only) revisedOverlay = { ...(revisedOverlay ?? ev.stored.direct_purchase), direct_only: false, version: (ev.stored.direct_purchase?.version ?? 0) + 1 };
+  // An automatic legacy-IQD normalization is not an explicit owner rule edit.
+  // Carry its version fence forward so the stock minimum survives unchanged.
+  const baselineOverlay = revisedOverlay ?? ev.stored.direct_purchase;
+  if (baselineOverlay && ev.conversions.some((c) => baselineOverlay.rules.some((r) => r.kind === c.rule.kind && r.scope === c.rule.scope && r.scope_id === c.rule.scope_id && r.baseline_version === c.rule.version))) {
+    revisedOverlay = { ...baselineOverlay, version: (ev.stored.direct_purchase?.version ?? 0) + 1, rules: baselineOverlay.rules.map((r) => {
+      const c = ev.conversions.find((c) => r.kind === c.rule.kind && r.scope === c.rule.scope && r.scope_id === c.rule.scope_id && r.baseline_version === c.rule.version);
+      return c ? { ...r, baseline_version: c.rule.version + 1 } : r;
+    }) };
+  }
+
+
   const statements: D1PreparedStatement[] = [
     ...batchHead(db, ev.stored, o.now),
     ...fence(db, 'EXISTS(SELECT 1 FROM pricing_engine_control WHERE id = 1 AND paused = 0)'),
@@ -781,6 +817,8 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
     ...(adopt ? [db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`pricing-mode:${pid}`)] : []),
     ...inputStatements(db, pid, inputWrites, o.actor, o.now, { pack: o.pack }),
     ...ruleStatements(db, pid, ruleWrites, o.actor, o.now, { pack: o.pack }),
+    ...(o.extraInputs ?? []),
+    ...(revisedOverlay ? [directPurchaseStatement(db, ev.stored, revisedOverlay, o.actor, o.now)] : []),
     ...ev.conversions.map((c) =>
       db
         .prepare(
@@ -790,7 +828,7 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
         .bind(c.amount_usd, c.legacy_amount_iqd, c.usd_iqd_rate, o.actor, o.now, c.rule.id, c.rule.version)
     ),
     // The price rows (writer.ts), one statement per table — none when an automatic repricing moves no customer price.
-    ...(writePrices
+    ...(writePrices && plan.product
       ? [
           db
             .prepare(
@@ -800,6 +838,8 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
             .bind(plan.product!.price_iqd, plan.product!.preorder_transports, o.now, pid),
         ]
       : []),
+    ...(writePrices && plan.direct_surcharge_iqd !== undefined
+      ? [db.prepare('UPDATE products SET direct_surcharge_iqd = ?, updated_at = ? WHERE id = ?').bind(plan.direct_surcharge_iqd, o.now, pid)] : []),
     ...(writePrices && plan.values.length
       ? [db.prepare(`UPDATE product_option_values SET regular_price_iqd = ${priceFrom('product_option_values')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.values), pid, json(plan.values))]
       : []),
@@ -829,7 +869,7 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
             .bind(variantJson, pid, variantJson),
         ]
       : []),
-    ...(writePrices && plan.sku_table && (plan.skus.length || plan.had_skus) ? [db.prepare('DELETE FROM product_sku_prices WHERE product_id = ?').bind(pid)] : []),
+    ...(writePrices && plan.sku_table && (plan.skus.length || plan.had_skus) ? [db.prepare(`DELETE FROM product_sku_prices WHERE product_id = ?${plan.channel ? ' AND channel = ?' : ''}`).bind(pid, ...(plan.channel ? [plan.channel] : []))] : []),
     ...(writePrices && plan.sku_table && plan.skus.length
       ? [
           db
@@ -854,7 +894,7 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
             .bind(pid, o.actor, batchId, u, auto?.priceSource ?? 'engine_owner', JSON.stringify(history)),
         ]
       : []),
-    db.prepare('DELETE FROM pricing_sku_costs WHERE product_id = ?').bind(pid),
+    db.prepare(`DELETE FROM pricing_sku_costs WHERE product_id = ?${plan.channel ? ' AND channel = ?' : ''}`).bind(pid, ...(plan.channel ? [plan.channel] : [])),
     ...costChunks.map((chunk) =>
       db
         .prepare(

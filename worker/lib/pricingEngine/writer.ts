@@ -67,6 +67,8 @@ export interface PlannedPrice {
 }
 
 export interface PricePlan {
+  channel?: 'direct_sale';
+  direct_surcharge_iqd?: number;
   ok: boolean;
   /** Why the shape cannot be written (pricing issue codes), sorted. */
   codes: string[];
@@ -90,6 +92,7 @@ export interface PricePlan {
 
 /** What the plan may write beyond the per-model fields (FX-7): is the SKU rung (0183) on this database. */
 export interface PlanOptions {
+  channel?: 'direct_sale';
   skuTable?: boolean;
 }
 
@@ -208,7 +211,7 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
       if (price !== null ? v.regular_price_iqd !== price || present(v.prime_price_iqd) || present(v.pro_price_iqd) : variantStatesPrice(v)) variants.push({ id: v.id, price });
     }
   }
-  return {
+  const plan: PricePlan = {
     ok: true,
     codes: [],
     product: { price_iqd: basePrice, preorder_transports: zeroCommissions(loaded.row.preorder_transports) },
@@ -223,6 +226,29 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
     colors,
     variants,
   };
+  if (opts.channel === 'direct_sale') {
+    plan.channel = 'direct_sale';
+    // Common option/colour/product fields also feed preorder. Leave them and
+    // every preorder rung byte-for-byte unchanged, even during adoption.
+    plan.values = [];
+    plan.routes = [];
+    plan.colors = [];
+    plan.product = null;
+    plan.cells = plan.cells.filter((c) => view?.fulfillments.some((f) => f.id === c.id && f.fulfillment_type === 'direct_sale'));
+    const hasPreorder = legacy.units.some((m) => m.channels.some((c) => c.ok && c.channel !== 'direct_sale'));
+    if (!hasModels && !perSku) {
+      if (hasPreorder) {
+        // A base product can express a Direct Sale Extra without touching its
+        // common preorder price. A lower direct price requires a direct cell.
+        const directExtra = all[0]! - loaded.doc.price_iqd;
+        if (directExtra < 0 || all.length !== 1) {
+          plan.ok = false;
+          plan.codes.push('DIRECT_PURCHASE_PRICE_SHAPE');
+        } else plan.direct_surcharge_iqd = directExtra;
+      } else plan.product = { price_iqd: basePrice, preorder_transports: null };
+    }
+  }
+  return plan;
 }
 
 /** The product's route list with every commission at 0 (other keys kept); null when it is not a JSON list. */
@@ -249,6 +275,7 @@ const MEMBER_CLEARED = {
 /** The product's row and relations as they would be after the plan (an in-memory copy). */
 export function documentAfter(loaded: LoadedProduct, plan: PricePlan) {
   const row: Record<string, unknown> = { ...loaded.row };
+  if (plan.direct_surcharge_iqd !== undefined) row.direct_surcharge_iqd = plan.direct_surcharge_iqd;
   if (plan.product) {
     row.price_iqd = plan.product.price_iqd;
     row.prime_price_iqd = null;
@@ -278,7 +305,7 @@ export function documentAfter(loaded: LoadedProduct, plan: PricePlan) {
           const w = plan.variants.find((x) => x.id === v.id);
           return w ? { ...v, regular_price_iqd: w.price, prime_price_iqd: null, pro_price_iqd: null } : v;
         }),
-        sku_prices: plan.sku_table ? plan.skus.map((k) => ({ combo_key: k.combo_key, channel: k.channel, regular_price_iqd: k.price })) : loaded.view.sku_prices,
+        sku_prices: plan.sku_table ? [...(plan.channel ? (loaded.view.sku_prices ?? []).filter((k) => k.channel !== plan.channel) : []), ...plan.skus.map((k) => ({ combo_key: k.combo_key, channel: k.channel, regular_price_iqd: k.price }))] : loaded.view.sku_prices,
       }
     : undefined;
   const parsed = parseProductRow(row);
@@ -349,7 +376,7 @@ export function verifyPlan(loaded: LoadedProduct, legacy: LegacyEvaluation, plan
   if (!plan.ok) return { ok: false, mismatches: ['plan'], rows: [] };
   const after = documentAfter(loaded, plan);
   const { models } = modelsOf(after.doc, after.view);
-  const older = plan.per_sku ? withoutSkuRung(after.doc) : null;
+  const older = plan.per_sku && !plan.channel ? withoutSkuRung(after.doc) : null;
   const mismatches: string[] = [];
   const rows: VerifiedRow[] = [];
   for (const before of legacy.units) {
@@ -372,13 +399,22 @@ export function verifyPlan(loaded: LoadedProduct, legacy: LegacyEvaluation, plan
     // FX-7: the same unit as an older Worker reads it (no SKU rung) — never below the engine's price.
     const old = older ? observeModel(older, option, ctx, sku) : null;
     for (const c of observed.channels.filter((x) => x.ok)) {
+      if (plan.channel && c.channel !== plan.channel) {
+        const previous = before.channels.find((x) => x.channel === c.channel);
+        const tiersBefore = tierUnits(loaded.doc, before.option_id, c.channel, ctx, sku);
+        const tiersAfter = tierUnits(after.doc, before.option_id, c.channel, ctx, sku);
+        if (!previous || previous.prepaid_iqd !== c.prepaid_iqd || previous.item_iqd !== c.item_iqd || previous.fee_iqd !== c.fee_iqd || tiersBefore.pro !== tiersAfter.pro || tiersBefore.prime !== tiersAfter.prime)
+          mismatches.push(`${label}:${c.channel}:preserved`);
+        continue;
+      }
       const engine = priceOf(c.channel);
       const key = `${label}:${c.channel}`;
       if (engine === null) {
         mismatches.push(key);
         continue;
       }
-      if (c.item_iqd !== engine || c.prepaid_iqd !== engine || (c.fee_iqd ?? 0) !== 0) mismatches.push(`${key}:prepaid`);
+      const directExtra = c.channel === 'direct_sale' ? plan.direct_surcharge_iqd ?? 0 : 0;
+      if ((c.item_iqd ?? 0) + directExtra !== engine || c.prepaid_iqd !== engine || (c.fee_iqd ?? 0) !== directExtra) mismatches.push(`${key}:prepaid`);
       const codExpected = c.route !== null && directCell ? direct : engine;
       if (codExpected === null || c.cod_iqd !== codExpected) mismatches.push(`${key}:cod`);
       if (engine < 1000) mismatches.push(`${key}:floor`);

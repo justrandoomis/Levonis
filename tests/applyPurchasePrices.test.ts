@@ -15,6 +15,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { all, count, row } from './fixtures/app';
 import { pricingWorld, AMS, AMS_MODEL } from './fixtures/procurementPricing';
+import { directPurchaseStore } from '../worker/lib/pricingEngine/directPurchase';
+import { loadProductPricing } from '../worker/lib/pricingEngine/store';
 
 type World = ReturnType<typeof pricingWorld>;
 const MIN = { product_id: AMS, scope: 'product', amount_usd: '120' };
@@ -45,9 +47,11 @@ test('a purchase that completes the product: the review preview shows the six fi
   const product = look.body.products[0];
   assert.equal(product.adoption.kind, 'adopt');
   assert.equal(product.adoption.complete, true);
-  const land = (product.adoption.rows as Array<Record<string, unknown>>).find((r) => r.channel === 'pre_order_land')!;
-  assert.equal(land.computed_price_iqd, 992_000, 'the brief: EUR 450 → $495 + $5 freight + $120 → 992,000');
-  assert.equal(land.today_prepaid_iqd, 450_000);
+  const direct = (product.adoption.rows as Array<Record<string, unknown>>).find((r) => r.channel === 'direct_sale')!;
+  assert.equal(direct.preorder_base_iqd, 992_000, 'the direct base: EUR 450 → $495 + $5 freight + $120 → 992,000');
+  assert.equal(direct.computed_price_iqd, 1_042_000, 'direct base plus the existing 50,000 extra');
+  assert.equal(direct.today_prepaid_iqd, 500_000);
+  assert.ok(product.adoption.rows.every((r: { channel: string }) => r.channel === 'direct_sale'));
   assert.equal(product.adoption.large_change, true);
   const hash = String(saved.body.products[0].preview_hash);
   const books = accounting(w);
@@ -68,11 +72,14 @@ test('a purchase that completes the product: the review preview shows the six fi
     "SELECT t.regular_price_iqd AS p, t.surcharge_iqd AS s FROM product_option_transports t JOIN product_option_fulfillment f ON f.id = t.fulfillment_id WHERE f.option_id = ? AND t.method = 'land'",
     AMS_MODEL
   )!;
-  assert.deepEqual({ ...route }, { p: 992_000, s: 0 });
+  assert.deepEqual({ ...route }, { p: null, s: null }, 'the existing preorder price and route fee are untouched');
   assert.equal(row<{ p: number }>(w.raw, "SELECT regular_price_iqd AS p FROM product_option_fulfillment WHERE option_id = ? AND fulfillment_type = 'direct_sale'", AMS_MODEL)!.p, 1_042_000);
-  assert.equal(row<{ v: string }>(w.raw, "SELECT final_price_usd AS v FROM pricing_sku_costs WHERE channel = 'pre_order_land'")!.v, '620');
-  // The inputs came from the committed purchase, in the same batch.
-  assert.equal(row<{ s: string }>(w.raw, "SELECT source_ref AS s FROM pricing_inputs WHERE scope = 'option'")!.s, `purchase:${id}`);
+  assert.equal(row<{ v: string }>(w.raw, "SELECT final_price_usd AS v FROM pricing_sku_costs WHERE channel = 'direct_sale'")!.v, '620');
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_sku_costs WHERE channel <> 'direct_sale'"), 0);
+  // The committed purchase feeds the direct overlay in the same batch, leaving preorder inputs untouched.
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_inputs'), 0);
+  const effective = directPurchaseStore(await loadProductPricing(w.db, AMS));
+  assert.equal(effective.inputs.find((r) => r.scope === 'option')!.source_ref, `purchase:${id}`);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_audit WHERE action = 'input_from_purchase' AND entity = 'product_write'"), 1);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_audit WHERE action = 'engine_entry'"), 1);
   // Accounting stays IQD and untouched: the purchase, its lots, orders and the wallet.
@@ -105,7 +112,7 @@ test('a purchase that leaves the product incomplete stores its costs only; the p
 const ZERO = [{ scope: 'product', scope_id: '', amount_iqd: 0 }];
 const typedExtras = (amount_iqd: number) => [{ product_id: AMS, scope: 'product', scope_id: '', amount_iqd }];
 
-test('the confirm with a typed Direct Sale Extra of 0: the rule, the inputs and both channels’ prices in one apply, under the purchase’s key; a replay writes nothing', async () => {
+test('typed Direct Sale Extra 0: the direct overlay and direct price commit together, preorder is unchanged and a replay writes nothing', async () => {
   const w = pricingWorld();
   const d = w.draft();
   const look = await w.preview({ draft: d, pricing: { minimum_profits: [MIN], direct_sale_extras: typedExtras(0) } });
@@ -125,16 +132,19 @@ test('the confirm with a typed Direct Sale Extra of 0: the rule, the inputs and 
   const r = await w.apply(AMS, { ...body, confirm_large_change: true });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.priced, true);
-  const rule = row<Record<string, unknown>>(w.raw, "SELECT kind, scope, scope_id, state, source, amount_iqd, version FROM pricing_rules WHERE kind = 'direct_sale_extra'")!;
-  assert.deepEqual({ ...rule }, { kind: 'direct_sale_extra', scope: 'product', scope_id: '', state: 'ACTIVE', source: 'OWNER', amount_iqd: 0, version: 1 });
-  assert.equal(row<{ s: string }>(w.raw, "SELECT source_ref AS s FROM pricing_inputs WHERE scope = 'option'")!.s, `purchase:${id}`);
+  const effective = directPurchaseStore(await loadProductPricing(w.db, AMS));
+  const rule = effective.rules.find((r) => r.kind === 'direct_sale_extra')!;
+  assert.deepEqual([rule.kind, rule.scope, rule.scope_id, rule.state, rule.source, rule.amount_iqd], ['direct_sale_extra', 'product', '', 'ACTIVE', 'OWNER', 0]);
+  assert.equal(effective.inputs.find((r) => r.scope === 'option')!.source_ref, `purchase:${id}`);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_inputs'), 0);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_rules'), 0);
   const direct = row<{ p: number }>(w.raw, "SELECT regular_price_iqd AS p FROM product_option_fulfillment WHERE option_id = ? AND fulfillment_type = 'direct_sale'", AMS_MODEL)!.p;
   const land = row<{ p: number }>(
     w.raw,
     "SELECT t.regular_price_iqd AS p FROM product_option_transports t JOIN product_option_fulfillment f ON f.id = t.fulfillment_id WHERE f.option_id = ? AND t.method = 'land'",
     AMS_MODEL
   )!.p;
-  assert.deepEqual([direct, land], [992_000, 992_000], 'direct = base pre-order + 0; the pre-order price moved with the same cost');
+  assert.deepEqual([direct, land], [992_000, null], 'direct = base + 0; stored preorder price remains unchanged');
   const keys = all<{ k: string }>(w.raw, "SELECT idempotency_key AS k FROM pricing_audit WHERE idempotency_key LIKE 'apply:%'").map((x) => x.k);
   assert.equal(keys.length, 1);
   assert.match(keys[0]!, new RegExp(`^apply:${id}:${AMS}:[0-9a-f]{64}$`));
@@ -144,15 +154,16 @@ test('the confirm with a typed Direct Sale Extra of 0: the rule, the inputs and 
   const replay = await w.apply(AMS, { ...body, confirm_large_change: true });
   assert.equal(replay.body.already, true);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_audit'), audits);
-  assert.equal(row<{ v: number }>(w.raw, "SELECT version AS v FROM pricing_rules WHERE kind = 'direct_sale_extra'")!.v, 1, 'no second rule version');
+  assert.equal(row<{ v: number }>(w.raw, 'SELECT version AS v FROM pricing_direct_purchase WHERE product_id = ?', AMS)!.v, 1, 'no second overlay version');
 
-  // The same purchase with another extra: a new key and one new version of the same rule row — corrected, never deleted.
+  // Another typed extra updates the direct overlay once; the ordinary rule store stays unchanged.
   const again = await w.preview({ purchase_id: id, pricing: { minimum_profits: [MIN], direct_sale_extras: typedExtras(50_000) } });
   assert.notEqual(again.body.products[0].preview_hash, hash);
   const moved = await w.apply(AMS, { ...body, direct_sale_extras: [{ scope: 'product', scope_id: '', amount_iqd: 50_000 }], preview_hash: again.body.products[0].preview_hash, confirm_large_change: true });
   assert.equal(moved.status, 200, JSON.stringify(moved.body));
-  assert.deepEqual({ ...row<Record<string, unknown>>(w.raw, "SELECT amount_iqd, version FROM pricing_rules WHERE kind = 'direct_sale_extra'")! }, { amount_iqd: 50_000, version: 2 });
-  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_rules WHERE kind = 'direct_sale_extra'"), 1);
+  assert.equal(directPurchaseStore(await loadProductPricing(w.db, AMS)).rules.find((r) => r.kind === 'direct_sale_extra')!.amount_iqd, 50_000);
+  assert.equal(row<{ v: number }>(w.raw, 'SELECT version AS v FROM pricing_direct_purchase WHERE product_id = ?', AMS)!.v, 2);
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_rules WHERE kind = 'direct_sale_extra'"), 0);
   assert.equal(row<{ p: number }>(w.raw, "SELECT regular_price_iqd AS p FROM product_option_fulfillment WHERE option_id = ? AND fulfillment_type = 'direct_sale'", AMS_MODEL)!.p, 1_042_000);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_audit WHERE idempotency_key LIKE 'apply:%'"), 2);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_audit WHERE entity = 'rule' AND entity_key = 'direct_sale_extra:product:'"), 2, 'each version of the rule is audited, before → after');
@@ -167,7 +178,12 @@ test('«استعمل هذا الشراء» unticked with a typed Direct Sale Ext
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.priced, false);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_inputs WHERE source_ref LIKE 'purchase:%'"), 0);
-  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_rules WHERE kind = 'direct_sale_extra' AND amount_iqd = 0 AND source = 'OWNER'"), 1);
+  const effective = directPurchaseStore(await loadProductPricing(w.db, AMS));
+  const extra = effective.rules.find((r) => r.kind === 'direct_sale_extra')!;
+  assert.equal(extra.amount_iqd, 0);
+  assert.equal(extra.source, 'OWNER');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_rules'), 0);
+  assert.equal(effective.inputs.length, 0, 'unticked purchase contributes no direct cost input');
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_sku_costs'), 0);
   // The apply door validates its own entries: one product's own scope only.
   const bad = await w.apply(AMS, { purchase_id: id, use_purchase: false, direct_sale_extras: [{ product_id: AMS, scope: 'product', scope_id: '', amount_iqd: 0 }], preview_hash: saved.body.products[0].preview_hash });

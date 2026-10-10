@@ -46,8 +46,6 @@ export interface GramsQuoteRequest {
 export interface PricedAccessoryLine {
   id: string;
   qty: number;
-  unit_iqd: number;
-  iqd: number;
   name_ar: string;
   name_en: string;
   name_ckb: string;
@@ -98,7 +96,6 @@ export interface GramsQuoteResponse {
   /** Ids the catalogue no longer has. Shown, never swallowed — a customer
    *  whose menu is stale must know their magnet was not counted. */
   accessories_unknown: string[];
-  accessories_iqd: number;
 }
 
 export const quoteByGrams = (body: GramsQuoteRequest, signal?: AbortSignal) =>

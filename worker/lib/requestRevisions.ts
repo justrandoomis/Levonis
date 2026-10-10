@@ -26,6 +26,8 @@
  */
 import { sha256Hex } from './crypto';
 import { safeParse } from './types';
+import { stripFinancials } from './adminScope';
+import { publicAccessoryLine } from './printAccessories';
 
 /** How long an untouched draft lives before the sweep calls it abandoned. */
 export const DRAFT_TTL_DAYS = 14;
@@ -203,7 +205,8 @@ export function publicEstimate(raw: unknown): Record<string, unknown> {
   delete e.cost_iqd;
   delete e.floor_iqd;
   delete e.margin_percent;
-  return e;
+  if (Array.isArray(e.accessory_lines)) e.accessory_lines = e.accessory_lines.map(publicAccessoryLine);
+  return stripFinancials(e);
 }
 
 /** The spec half of a snapshot: the priced facts plus what describes the job. */

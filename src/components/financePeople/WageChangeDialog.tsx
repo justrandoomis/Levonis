@@ -19,18 +19,19 @@ export default function WageChangeDialog({rule,staff,catalogs,products:knownProd
   const [preview,setPreview]=useState<WageImpact|null>(null);const operation=useRef(crypto.randomUUID());
   const percent=basis.endsWith('percent');
   const payload=()=>({version:rule.version,basis,amount:percent?Math.round((amount??0)*100):amount,effective_from:from,effective_to:until||null,reason:reason.trim(),scope,active});
-  const mounted=useRef(true),previewJob=useRef<string|undefined>(undefined);
+  const mounted=useRef(true),previewJob=useRef<string|undefined>(undefined),previewRequest=useRef<string|undefined>(undefined);
   const [processed,setProcessed]=useState<number|null>(null);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const inspect=()=>op.run(async()=>{
     let result:WageImpact;
-    const key=`wage-preview:${rule.id}`,request=JSON.stringify(payload());
-    try{const saved=JSON.parse(sessionStorage.getItem(key)||'null');previewJob.current=saved?.request===request?saved.id:undefined;}catch{previewJob.current=undefined;}
+    const request=JSON.stringify(payload());
+    if(previewRequest.current!==request)previewJob.current=undefined;
+    previewRequest.current=request;
     setProcessed(0);
     try{
-      do {result=await api.post<WageImpact>(`${PEOPLE}/rules/${encodeURIComponent(rule.id)}/preview`,{...payload(),preview_job_id:previewJob.current},{mascot:'silent'});previewJob.current=result.preview_job_id;sessionStorage.setItem(key,JSON.stringify({request,id:result.preview_job_id}));if(mounted.current)setProcessed(result.processed_orders??result.orders_count);}while(mounted.current&&result.complete===false);
+      do {result=await api.post<WageImpact>(`${PEOPLE}/rules/${encodeURIComponent(rule.id)}/preview`,{...payload(),preview_job_id:previewJob.current},{mascot:'silent'});previewJob.current=result.preview_job_id;if(mounted.current)setProcessed(result.processed_orders??result.orders_count);}while(mounted.current&&result.complete===false);
       if(mounted.current){setPreview(result);setRelease(false);setStep(2);}
-    }catch(e){if(e instanceof ApiError && e.status>=400 && e.status<500){sessionStorage.removeItem(key);previewJob.current=undefined;}throw e;}
+    }catch(e){if(e instanceof ApiError && e.status>=400 && e.status<500){previewJob.current=undefined;}throw e;}
     finally{if(mounted.current)setProcessed(null);}
   });
   const save=()=>op.run(async()=>{if(!preview)return;const result=await api.post<Record<string,never>>(`${PEOPLE}/rules/${encodeURIComponent(rule.id)}/apply`,{...payload(),preview_token:preview.preview_token,preview_job_id:preview.preview_job_id,operation_id:operation.current,release_withdrawals:release});onSaved(result);});

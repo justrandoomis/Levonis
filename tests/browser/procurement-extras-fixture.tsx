@@ -3,6 +3,7 @@
  * ?draft=route|manual seeds a local draft (the owner's X2D Combo × 5 at
  * 1,616.88 IQD/EUR and 5,944 IQD/kg); the route's current rates are newer. */
 import React from 'react';
+import { privateDrafts } from '../../src/lib/privateDrafts';
 import { createRoot } from 'react-dom/client';
 import { LanguageProvider } from '../../src/LanguageContext';
 import ProcurementPanel from '../../src/components/adminOperations/ProcurementPanel';
@@ -21,8 +22,8 @@ const header = { supplier_id: '', warehouse_id: '', invoice_no: '', currency: 'E
 const manual = { ...header, cost_profile_id: null, cost_profile_version: null, shipping_basis: null, shipping_rate_iqd: null };
 const seed = params.get('draft');
 if (seed === 'route' || seed === 'manual')
-  localStorage.setItem('levonis-purchase-draft-v2', JSON.stringify({ header: seed === 'route' ? header : manual, lines: [line], charges: seed === 'manual' ? [{ title: 'شحن', amount_iqd: 466330, basis: 'quantity' }] : [], operationId: 'op-fixture' }));
-else localStorage.removeItem('levonis-purchase-draft-v2');
+  privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header: seed === 'route' ? header : manual, lines: [line], charges: seed === 'manual' ? [{ title: 'شحن', amount_iqd: 466330, basis: 'quantity' }] : [], operationId: 'op-fixture' }));
+else privateDrafts.removeItem('levonis-purchase-draft-v2');
 
 const purchase = { id: 'doc-1', invoice_no: 'DE-2026-17', supplier_name: '', supplier_id: '', warehouse_id: '', status: 'ordered', cost_state: 'final', total_cost_iqd: 7634918, paid_iqd: 0, version: 1, request_json: '{}', ...header };
 const saved = { ...line, id: 'inc-1', line_id: 'pol-1', qty_received: 0, rejected_qty: 0, purchase_unit_iqd: 1382432, purchase_total_iqd: 6912162, auto_shipping_iqd: 662756, charges_iqd: 662756 + 60000 };

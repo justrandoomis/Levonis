@@ -37,12 +37,14 @@
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import type { AppContext, Env } from '../lib/types';
-import { requireAdmin, badRequest, conflict, notFound, forbidden, str } from '../lib/http';
+import { requireAdmin, badRequest, conflict, notFound, forbidden, str, HttpError } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { canViewCost, canWriteCost, isOwner } from '../lib/adminScope';
+import { costRefusal } from '../lib/costAccess';
 import { rateLimit } from '../lib/ratelimit';
 import { HEIF_REFUSAL, isHeifBytes, sniff } from './uploads';
 import { IMAGE_SOURCE_CAP } from '../lib/imageConvert';
@@ -1360,6 +1362,16 @@ function cellRefusal(relations: Record<string, unknown>, shape: ExistingShape | 
   }
 }
 
+/** Only deliberate user-facing refusals belong in a downloadable report.
+ * Database and provider failures may carry SQL bindings, including the
+ * stored cost carried through an assistant's otherwise safe import. */
+function importFailureReason(error: unknown): string {
+  const pricing = engineDbRefusal(error);
+  if (pricing) return pricing.message;
+  if (error instanceof HttpError && error.status < 500) return error.message;
+  return 'تعذّر استيراد هذا المنتج. أعد المحاولة. / This product could not be imported. Please retry. / هاوردەکردنی ئەم بەرهەمە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بدەوە.';
+}
+
 interface PreviewRow {
   key: string;
   line: number;
@@ -1500,6 +1512,10 @@ adminImportRoutes.post('/preview', async (c) => {
   const usedBrandIds = new Set(importable.map((r) => String((r.doc as { brand_id?: unknown }).brand_id ?? '')));
   const brandsToCreate = [...brands.pending.values()].filter((b) => usedBrandIds.has(b.id));
   const payload = {
+    // Reports contain parser messages, including rejected private input values.
+    // Keep the permission the preview used so a later session cannot replay
+    // an owner's report after its cost access has been removed.
+    cost_access: money,
     category_id: categoryId,
     family: shape.family,
     section_slugs: shape.sectionSlugs,
@@ -1831,6 +1847,7 @@ adminImportRoutes.post('/confirm', async (c) => {
   if (rec.actor_user_id && rec.actor_user_id !== admin.id) {
     throw forbidden('This import was prepared by another admin');
   }
+  assertImportReportRead(c, rec);
 
   const replay = (stored: Record<string, unknown>) =>
     c.json({
@@ -1944,7 +1961,7 @@ adminImportRoutes.post('/confirm', async (c) => {
         const stored = item.doc as Record<string, unknown>;
         const reserved = String(stored.brand_id ?? '');
         const refused = brandRefused.get(reserved);
-        if (refused) throw new Error(refused);
+        if (refused) throw badRequest(refused);
         const remapped = brandRemap.get(reserved);
         // The stored payload carries the product's EXISTING cost for an
         // assistant (importApply keeps it); judging price against it would
@@ -2007,7 +2024,7 @@ adminImportRoutes.post('/confirm', async (c) => {
             prevDoc ? { id: productId, doc: { ops_policy: prevDoc.ops_policy ?? {} } } : null,
             { doc: doc as unknown as Record<string, unknown>, catalogIds: placed }
           );
-          if (issue) throw new Error(`سطر ${issue.line}: ${issue.message}`);
+          if (issue) throw badRequest(`سطر ${issue.line}: ${issue.message}`);
           if (doc.serialized === null) delete doc.ops_policy.serialized;
           else doc.ops_policy.serialized = doc.serialized;
           // …and the row's batch re-checks the product's answer before and
@@ -2075,7 +2092,7 @@ adminImportRoutes.post('/confirm', async (c) => {
           await saveProductAtomic(c.env.DB, plan);
         } catch (e) {
           // R2 / R3: the product changed under this row — not written, retry.
-          if (isLostRace(e)) throw new Error(`سطر ${line}: ${IMPORT_ROW_CHANGED_RETRY}`);
+          if (isLostRace(e)) throw conflict(`سطر ${line}: ${IMPORT_ROW_CHANGED_RETRY}`);
           throw e;
         }
         checkpoints.set(index, {
@@ -2114,7 +2131,7 @@ adminImportRoutes.post('/confirm', async (c) => {
           product_id: productId,
           // An engine-priced product's row refused by the database's price lock reads as the
           // trilingual ENGINE_MANAGED sentence, never the driver's text (owner decision 8).
-          reason: engineDbRefusal(error)?.message ?? (error instanceof Error ? error.message : String(error)),
+          reason: importFailureReason(error),
         };
         // Planning/verification failed before a product write, or D1 rolled
         // the attempted product batch back. Persist that terminal result under
@@ -2221,8 +2238,8 @@ adminImportRoutes.post('/confirm', async (c) => {
   } finally {
     try {
       await releaseImportApplyLease(c.env.DB, importId, lease.token);
-    } catch (error) {
-      console.error('import apply lease release failed', importId, error);
+    } catch {
+      console.error('import apply lease release failed', importId);
     }
   }
 });
@@ -2255,13 +2272,36 @@ function hashOf(s: string): number {
 
 // ------------------------------------------------------------- reports
 
+function assertImportReportRead(c: Context<AppContext>, rec: Record<string, unknown>): void {
+  const user = c.get('user')!;
+  if (canViewCost(c.env, user)) return;
+  // An import report is the uploader's data. Its errors are prose and cannot
+  // be protected by stripping cost-named JSON keys after serialization.
+  if (!rec.actor_user_id || rec.actor_user_id !== user.id) throw costRefusal(c.env, user);
+  let includedCost = true;
+  try {
+    const payload = JSON.parse(String(rec.payload || '{}')) as { cost_access?: boolean };
+    // Historical reports have no permission stamp and may contain a prior
+    // owner's validation errors. Only an explicit safe stamp permits replay.
+    includedCost = payload.cost_access !== false || isOwner(c.env, user);
+  } catch {
+    // An unreadable record cannot establish safe provenance.
+  }
+  if (includedCost) throw costRefusal(c.env, user);
+}
+
 adminImportRoutes.get('/history', async (c) => {
+  const user = c.get('user')!;
+  const cost = canViewCost(c.env, user);
   const { results } = await c.env.DB
     .prepare(
       `SELECT id, template_family, category_id, state, created_count, updated_count, skipped_count,
               failed_count, source_name, created_at, applied_at
-         FROM product_imports ORDER BY created_at DESC LIMIT 30`
+         FROM product_imports
+        ${cost ? '' : "WHERE actor_user_id = ? AND json_valid(payload) AND COALESCE(json_extract(payload, '$.cost_access'), 1) = 0"}
+        ORDER BY created_at DESC LIMIT 30`
     )
+    .bind(...(cost ? [] : [isOwner(c.env, user) ? '' : user.id]))
     .all<Record<string, unknown>>();
   return c.json({ success: true, imports: results });
 });
@@ -2273,6 +2313,7 @@ adminImportRoutes.get('/:id/report', async (c) => {
     .bind(id)
     .first<Record<string, unknown>>();
   if (!rec) throw notFound('No import with that id');
+  assertImportReportRead(c, rec);
   const rows = JSON.parse(String(rec.report || '[]')) as Array<Record<string, unknown>>;
 
   if (c.req.query('format') !== 'csv') {

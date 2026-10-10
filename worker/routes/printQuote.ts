@@ -93,6 +93,8 @@ import { afterPrintCatalogueWrite, anonymousCached } from '../lib/edgePolicy';
 import {
   MAX_ACCESSORY_QTY,
   priceAccessories,
+  publicAccessory,
+  publicAccessoryLine,
   type AccessorySelection,
   type PricedAccessory,
   type PrintAccessory,
@@ -356,14 +358,8 @@ printQuoteRoutes.get('/printers', (c) => anonymousCached(c, { perViewer: true },
 /**
  * «إكسسوارات ميكر وورد» — the hardware catalogue the calculator offers.
  *
- * PUBLIC, and it shows the per-piece price, which the material list
- * deliberately does not. The two are different kinds of secret: a filament's
- * buying price per kilo is the shop's negotiated cost and telling a customer
- * would hand a competitor the shop's margin. A magnet is a part the customer
- * could buy themselves for the same money in the same market — what the shop
- * sells is having it in a drawer and fitting it. Hiding the figure would make a
- * bill of materials unreadable and invite the very question this feature was
- * added to answer.
+ * Choices and units are public. Acquisition prices stay on the server and
+ * contribute to the final job quote through the same pricing engine.
  *
  * Retired rows are filtered out here, so a picker never offers something the
  * quote would then refuse to price.
@@ -380,15 +376,7 @@ printQuoteRoutes.get('/accessories', (c) => anonymousCached(c, {}, async () => {
     success: true,
     accessories: rows
       .filter((a) => a && a.active !== false)
-      .map((a) => ({
-        id: a.id,
-        name_ar: a.name_ar,
-        name_en: a.name_en,
-        name_ckb: a.name_ckb,
-        unit: a.unit,
-        category: a.category,
-        cost_iqd: a.cost_iqd,
-      })),
+      .map(publicAccessory),
   });
 }));
 
@@ -921,19 +909,17 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
   // copy count, so ten keychains need ten rings. The floor and the hardware are
   // read the same way for the same reason — the file calculator and the grams
   // calculator must never answer the same question with two numbers.
+  const accessories = await pricedAccessories(c.env.DB, readAccessories(body.accessories), quantity);
   const priced = await priceForPrinter(c, {
     analysis: loaded.analysis,
     printer,
     merchantId,
     merchantPrinter: null,
     quantity,
-    // E5. A merchant pricing their own job may name their margin; every other
-    // caller gets the platform's. The body used to be read for everyone, which
-    // let an anonymous caller have the platform's estimate priced at any margin.
-    targetMarginPercent: merchantId ? merchantMargin(body) : PLATFORM_TARGET_MARGIN_PERCENT,
+    targetMarginPercent: calculatorMargin(merchantId ? merchantMargin(body) : undefined, accessories.total_iqd),
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     platformMachineHourIqd: await platformMachineHourIqd(c.env.DB, printer.technology),
-    accessories: await pricedAccessories(c.env.DB, readAccessories(body.accessories), quantity),
+    accessories,
   });
 
   const quoteId = newId('pq');
@@ -961,7 +947,7 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     quote_id: quoteId,
     // TWO PAYLOADS, NOT ONE WITH A FLAG. The customer's shape physically cannot
     // carry a cost line, so no future edit can leak one by forgetting a check.
-    quote: merchantId ? merchantQuote(priced.result) : publicQuote(priced.result),
+    quote: calculatorQuote(priced.result, !!merchantId),
     // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E4): the same
     // shape the request wizard's engine answers in, so one card reads both.
     // The curve is `priceJob` re-run, pure, at each quantity.
@@ -1284,8 +1270,8 @@ async function quoteStatedWeight(
     rows: GramsRow[];
     printMinutes: number;
     accessories: AccessorySelection[];
-    /** A margin the caller asked for. Applied only when the caller turns out
-     *  to be a merchant (E5); a customer's estimate is always the platform's. */
+    /** Applied to the merchant's own no-hardware economics (E5). Platform
+     *  hardware quotes always use the platform selling margin. */
     merchantTargetMarginPercent?: number;
   }
 ) {
@@ -1293,11 +1279,6 @@ async function quoteStatedWeight(
   const user = c.get('user');
   const store = user ? await storeForUser(c.env.DB, user.id) : null;
   const merchantId = store?.merchant?.id ?? null;
-  const targetMarginPercent =
-    merchantId && input.merchantTargetMarginPercent !== undefined
-      ? input.merchantTargetMarginPercent
-      : PLATFORM_TARGET_MARGIN_PERCENT;
-
   // The stated grams already describe the whole job, so the accessory counts
   // are taken as stated too — `perPart` of 1, matching the `quantity` below.
   const accessories = await pricedAccessories(c.env.DB, input.accessories, 1);
@@ -1310,7 +1291,7 @@ async function quoteStatedWeight(
     // The stated grams already describe the whole job, so there is nothing left
     // for a quantity to multiply — the same reading the file routes take.
     quantity: 1,
-    targetMarginPercent,
+    targetMarginPercent: calculatorMargin(merchantId ? input.merchantTargetMarginPercent : undefined, accessories.total_iqd),
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     // Read for the same reason the floor is: the file calculator and the grams
     // calculator must never answer the same question with two numbers, and an
@@ -1322,7 +1303,7 @@ async function quoteStatedWeight(
   return {
     // §22 again: the same two shapes, chosen the same way. A merchant asking
     // the counter question sees their own economics; a customer never does.
-    quote: merchantId ? merchantQuote(priced.result) : publicQuote(priced.result),
+    quote: calculatorQuote(priced.result, !!merchantId),
     // Echoed so the screen can show the rows it priced without adding anything
     // up itself — a total computed in the browser is a total that can disagree
     // with the one the engine charged.
@@ -1337,9 +1318,8 @@ async function quoteStatedWeight(
     // charged for rather than adding anything up itself. `unknown` names the
     // ids the catalogue no longer has, so a stale menu is visible instead of
     // quietly under-quoting.
-    accessories: accessories.lines,
+    accessories: accessories.lines.map(publicAccessoryLine),
     accessories_unknown: accessories.unknown,
-    accessories_iqd: accessories.total_iqd,
     print_minutes: printMinutes,
     covers: gramsCoverage(rows, printMinutes),
   };
@@ -1546,6 +1526,13 @@ function merchantMargin(body: Record<string, unknown>): number {
   return Number.isFinite(n) && n > 0 && n <= 90 ? n : PLATFORM_TARGET_MARGIN_PERCENT;
 }
 
+/** A merchant may set the margin on their own work, but not on the platform's
+ * acquisition costs. A near-zero requested margin otherwise turns the final
+ * hardware-price difference into the exact amount the platform paid. */
+function calculatorMargin(requested: number | undefined, platformHardwareIqd: number): number {
+  return platformHardwareIqd > 0 ? PLATFORM_TARGET_MARGIN_PERCENT : requested ?? PLATFORM_TARGET_MARGIN_PERCENT;
+}
+
 export interface PriceForPrinterInput {
   analysis: PrintAnalysis;
   printer: PrinterModel;
@@ -1714,7 +1701,15 @@ function publicQuote(r: QuoteResult) {
   };
 }
 
-/** What a merchant may see: all of it. */
+/** Platform hardware belongs to the shop, even when a merchant is using the
+ * public calculator. Hiding only its line would leave the acquisition amount
+ * recoverable from the cost/profit totals, so those quotes use the final-price
+ * shape. The merchant's own no-hardware calculations keep their economics. */
+function calculatorQuote(r: QuoteResult, merchant: boolean) {
+  return merchant && !r.lines.some((line) => line.component === 'HARDWARE') ? merchantQuote(r) : publicQuote(r);
+}
+
+/** What a merchant may see of their own workshop economics. */
 export function merchantQuote(r: QuoteResult) {
   return {
     confidence: r.confidence,

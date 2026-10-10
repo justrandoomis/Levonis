@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, unavailable, str, oneOf } from '../lib/http';
-import { getSettings, PUBLIC_SETTING_KEYS } from '../lib/settings';
+import { getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings } from '../lib/settings';
 import { rateLimit } from '../lib/ratelimit';
 import { readSchemaStatus } from '../lib/schemaVersion';
 import { anonymousCached } from '../lib/edgePolicy';
@@ -51,7 +51,7 @@ miscRoutes.get('/health', async (c) => {
 miscRoutes.get('/settings/public', (c) =>
   anonymousCached(c, {}, async () => {
     const [settings, display] = await Promise.all([getSettings(c.env.DB, PUBLIC_SETTING_KEYS), getPublicDisplayRate(c.env.DB)]);
-    return c.json({ success: true, settings: { ...settings, ...display } });
+    return c.json({ success: true, settings: { ...projectPublicSettings(settings), ...display } });
   })
 );
 

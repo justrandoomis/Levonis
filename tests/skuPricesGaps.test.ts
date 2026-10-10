@@ -18,11 +18,11 @@
  *   3. a product with no option whose colours are gone: its orphaned colour
  *      inputs are dropped from the plan — it is priced as the product itself
  *      again, no SKU row under an empty key, the old SKU rows removed;
- *   4. purchase lines per variant (and per colour) feed that variant's (that
- *      colour's) own level as well as the model's (the product's): only where
+ *   4. purchase lines per variant (and per colour) feed direct pricing at that
+ *      variant's (that colour's) level as well as the model's (the product's): only where
  *      the purchase differs from what the level inherits, never above the
  *      owner's pricing weight, never with route freight (the double-freight
- *      guard); without 0183 exactly as before.
+ *      guard); preorder stays unchanged; without 0183 the preview stays per model.
  *
  * Run: node --import tsx --test tests/skuPricesGaps.test.ts
  */
@@ -36,7 +36,9 @@ import { legacyProductId, seedLegacyCatalogue, seedProfileRates } from './fixtur
 import { loadPreviewContext, loadProducts } from '../worker/lib/pricingEngine/load';
 import { loadRelationsView, loadRelationsViews } from '../worker/lib/productOverlay';
 import { deriveProductEntries, type PurchaseForPricing, type PurchaseSkuLevels } from '../worker/lib/pricingEngine/fromPurchase';
-import type { ProductPricingData, StoredInputRow } from '../worker/lib/pricingEngine/store';
+import { loadProductPricing, type ProductPricingData, type StoredInputRow } from '../worker/lib/pricingEngine/store';
+import { directPurchaseStore } from '../worker/lib/pricingEngine/directPurchase';
+import { samePrices, type EngineAdoption } from '../src/components/adminOperations/procurementPricing';
 import { resolveCartLine } from '../worker/routes/cart';
 import { pricingCtxForUser, publicWithDisplayPrice, resolveVariantPricing } from '../worker/routes/products';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
@@ -334,14 +336,14 @@ function plaPurchase(w: World, lines: Array<[number, number]>) {
   });
 }
 
-test('purchase lines per variant feed that variant’s own level as well as its model’s — only where the purchase differs from what the SKU inherits; the cart charges each SKU its own; without 0183 as before', async () => {
+test('purchase lines per variant feed direct pricing at that variant’s own level as well as its model’s; preorder stays unchanged, the cart charges each direct SKU its own, and without 0183 preview keeps model scope', async () => {
   const w = pricingWorld();
   await save(w, PID, BASE);
   // v0 = model 1 · colour 1 at CNY 100 ($14), v1 = model 1 · colour 2 at CNY 50 ($7).
   const d = plaPurchase(w, [[0, 100], [1, 50]]);
   const look = await w.preview({ draft: d });
   assert.equal(look.status, 200, JSON.stringify(look.body).slice(0, 400));
-  const product = (look.body.products as Array<{ product_id: string; preview_hash: string; entries: Array<{ scope: string; scope_id: string; changes: Record<string, { after: unknown }> }> }>).find((p) => p.product_id === PID)!;
+  const product = (look.body.products as Array<{ product_id: string; preview_hash: string; adoption: EngineAdoption; entries: Array<{ scope: string; scope_id: string; changes: Record<string, { after: unknown }> }> }>).find((p) => p.product_id === PID)!;
   const entryAt = (scope: string, id: string) => product.entries.find((e) => e.scope === scope && e.scope_id === id);
   // The model (narrow, the maximum: what an older store did) and each variant's own level.
   assert.equal(entryAt('option', M0)?.changes.supplier_cost_amount?.after, '100');
@@ -350,21 +352,41 @@ test('purchase lines per variant feed that variant’s own level as well as its 
   assert.equal(entryAt('sku', sku([M0], C(1)))?.changes.manual_cbm, undefined, 'the CBM it inherits is the same: not pinned');
 
   const id = await w.save(d);
-  const applied = await w.apply(PID, { purchase_id: id, preview_hash: product.preview_hash, confirm_large_change: true });
+  const pricingSnapshot = () => JSON.stringify(['pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'product_sku_prices', 'pricing_direct_purchase'].map((table) => all(w.raw, `SELECT * FROM ${table} WHERE product_id = ? ORDER BY rowid`, PID)));
+  const beforeApply = pricingSnapshot();
+  const ordinaryInputs = all(w.raw, 'SELECT * FROM pricing_inputs WHERE product_id = ? ORDER BY rowid', PID);
+  const preorderCosts = all(w.raw, "SELECT * FROM pricing_sku_costs WHERE product_id = ? AND channel <> 'direct_sale' ORDER BY rowid", PID);
+  const preorderPrices = all(w.raw, "SELECT * FROM product_sku_prices WHERE product_id = ? AND channel <> 'direct_sale' ORDER BY rowid", PID);
+  // The committed purchase gets its durable source id. The confirm loop takes
+  // its fresh hash only when it writes exactly the direct prices reviewed.
+  const stale = await w.apply(PID, { purchase_id: id, preview_hash: product.preview_hash, confirm_large_change: true });
+  assert.equal(stale.status, 409, JSON.stringify(stale.body));
+  assert.equal(stale.body.code, 'PRICING_PREVIEW_STALE');
+  assert.equal(pricingSnapshot(), beforeApply, 'the refused draft hash writes nothing');
+  assert.equal(samePrices(stale.body.details.preview.adoption, product.adoption), true, 'the UI can safely retry only the already-reviewed direct prices');
+  const applyBody = { purchase_id: id, preview_hash: stale.body.details.preview.preview_hash, confirm_large_change: true };
+  const applied = await w.apply(PID, applyBody);
   assert.equal(applied.status, 200, JSON.stringify(applied.body).slice(0, 400));
-  const skuInputs = all<{ scope_id: string; supplier_cost_amount: string; source_ref: string; manual_cbm: string | null }>(
-    w.raw,
-    "SELECT scope_id, supplier_cost_amount, source_ref, manual_cbm FROM pricing_inputs WHERE product_id = ? AND scope = 'sku'",
-    PID
-  );
+  const direct = directPurchaseStore(await loadProductPricing(w.db, PID));
+  const skuInputs = direct.inputs.filter((r) => r.scope === 'sku').map(({ scope_id, supplier_cost_amount, source_ref, manual_cbm }) => ({ scope_id, supplier_cost_amount, source_ref, manual_cbm }));
   assert.deepEqual(skuInputs, [{ scope_id: sku([M0], C(1)), supplier_cost_amount: '50', source_ref: `purchase:${id}`, manual_cbm: null }]);
-  assert.equal(await charge(w, PID, [M0], C(0), 'sea'), sea(14, 3), 'v0: its purchase');
-  assert.equal(await charge(w, PID, [M0], C(1), 'sea'), sea(7, 3), 'v1: its own purchase, not its model’s CNY 100');
-  assert.equal(await charge(w, PID, [M0], C(5), 'sea'), sea(14, 3), 'a colour not bought: its model’s new value');
-  assert.equal(await charge(w, PID, [M1], C(1), 'sea'), sea(10, 3), 'the other model: untouched');
-  assert.equal(await charge(w, PID, [M0], C(1), ''), sea(7, 3) + 2000);
+  assert.deepEqual(all(w.raw, 'SELECT * FROM pricing_inputs WHERE product_id = ? ORDER BY rowid', PID), ordinaryInputs, 'ordinary input rows remain unchanged');
+  assert.deepEqual(all(w.raw, "SELECT * FROM pricing_sku_costs WHERE product_id = ? AND channel <> 'direct_sale' ORDER BY rowid", PID), preorderCosts, 'preorder cost rows remain unchanged');
+  assert.deepEqual(all(w.raw, "SELECT * FROM product_sku_prices WHERE product_id = ? AND channel <> 'direct_sale' ORDER BY rowid", PID), preorderPrices, 'preorder price rows remain unchanged');
+  for (const [model, colour] of [[M0, C(0)], [M0, C(1)], [M0, C(5)], [M1, C(1)]]) {
+    assert.equal(await charge(w, PID, [model!], colour!, 'sea'), sea(10, 3), 'preorder retains its ordinary supplier cost');
+  }
+  assert.equal(await charge(w, PID, [M0], C(0), ''), sea(14, 3) + 2000, 'v0 direct: its purchase');
+  assert.equal(await charge(w, PID, [M0], C(1), ''), sea(7, 3) + 2000, 'v1 direct: its own purchase, not its model’s CNY 100');
+  assert.equal(await charge(w, PID, [M0], C(5), ''), sea(14, 3) + 2000, 'an unbought colour inherits its model’s new direct value');
+  assert.equal(await charge(w, PID, [M1], C(1), ''), sea(10, 3) + 2000, 'the other model stays untouched');
+  const afterApply = pricingSnapshot();
+  const replay = await w.apply(PID, applyBody);
+  assert.equal(replay.status, 200, JSON.stringify(replay.body));
+  assert.equal(replay.body.already, true);
+  assert.equal(pricingSnapshot(), afterApply, 'an exact replay changes neither price nor input rows');
 
-  // Deploy-ahead: without 0183 the same purchase feeds the model alone, exactly as before.
+  // Deploy-ahead: without 0183 the same purchase preview stays at model scope.
   const old = worldThrough('0182');
   const od = plaPurchase(old, [[0, 100], [1, 50]]);
   const oldLook = await old.preview({ draft: od });

@@ -26,6 +26,7 @@
  * prices. `apply-purchase` recomputes it from the COMMITTED purchase; a
  * mismatch is PRICING_PREVIEW_STALE.
  */
+import { directPurchaseStore } from './directPurchase';
 import { priceSku, resolveSkuInputs, ROUNDING_STEP_IQD, type ChannelPrice, type PricingIssue } from '@levonis/pricing/costToPrice';
 import { resolveRuleAt, type PricingRuleRow, type RuleTarget } from '@levonis/pricing/ruleResolution';
 import { channelOfRoute, ROUTE_PROFILE, PREORDER_ROUTES, type PreorderRoute, type ShippingProfile, type SkuChannel } from '@levonis/pricing/skuChannel';
@@ -275,7 +276,7 @@ const setImage = (set: Partial<InputFields>) => Object.fromEntries(INPUT_FIELD_N
 /** Evaluate one product of the purchase (derived entries, merged store, E1 per model × channel, the hashes). */
 export async function previewProduct(p: PurchaseForPricing, input: ProductInput, ctx: PricingContext, rates: PricingRates | null, opts: PreviewOptions): Promise<ProductPreview> {
   const pid = input.loaded.id;
-  const { stored } = input;
+  const stored = directPurchaseStore(input.stored);
   const usePurchase = opts.use_purchase.get(pid) !== false;
   const prefer = opts.prefer.get(pid) === true;
   const productLines = p.lines.filter((l) => l.product_id === pid);
@@ -288,18 +289,21 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
   const inputs = mergedInputs(stored.inputs, derived.entries.map((e) => e.write));
   const rules: PricingRuleRow[] = mergedRules(stored, ruleWrites);
   const legacy = evaluateLegacy(pid, input.loaded.doc, input.loaded.view, ctx);
-  const models = priceModels(pid, legacy.models, inputs, rules, rates);
+  const models = priceModels(pid, legacy.models.map((m) => ({ ...m, channels: m.channels.filter((c) => c.channel === 'direct_sale') })), inputs, rules, rates);
   const direct = new Set(legacy.models.filter((m) => m.channels.some((c) => c.ok && c.channel === 'direct_sale')).map((m) => m.option_id));
   const extraSuggestions = legacy.legacy.models
     .filter((m) => direct.has(m.option_id) && m.extra.state === 'MIGRATED' && typeof m.extra.value_iqd === 'number' && m.extra.value_iqd >= 0 && m.extra.value_iqd % ROUNDING_STEP_IQD === 0)
     .map((m) => ({ option_id: m.option_id, value_iqd: m.extra.value_iqd as number }));
   const missing = rates ? [...new Set(models.flatMap((m) => (m.result ? uniqueCodes(m.result.issues) : [])))].sort() : ['FX_RATE_MISSING'];
-  const feeds = productLines.some((l) => lineFeeds(p, l, optIn));
+  const hasDirect = models.some((m) => m.channels.some((c) => c.ok && c.channel === 'direct_sale'));
+  const feeds = hasDirect && productLines.some((l) => lineFeeds(p, l, optIn));
+  if (!hasDirect) { derived.entries = []; ruleWrites.length = 0; }
   const reason = purchaseIneligibility({ status: p.status, cost_state: p.cost_state, lines: productLines });
   const toggles = { use_purchase: usePurchase, prefer, opt_in: [...optIn].sort() };
   // What this purchase and the owner's choices say, independent of what is stored: a replay of the
   // same apply has the same key even after the first one moved the store (USD design §6.4).
   const derivedBasis = {
+    channel: 'direct_sale',
     route: p.profile?.id ?? null,
     currency: p.currency,
     raw: derived.raw,
@@ -307,7 +311,8 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
     toggles,
   };
   const basis = {
-    v: 1,
+    v: 2,
+    direct_purchase_version: input.stored.direct_purchase?.version ?? null,
     product_id: pid,
     ...derivedBasis,
     entries: derived.entries.map((e) => ({ scope: e.write.scope, scope_id: e.write.scope_id, set: setImage(e.write.set), kept: [...e.kept_higher].sort() })),
@@ -352,7 +357,8 @@ export function priceModels(
   models: readonly ModelToday[],
   inputs: ReadonlyArray<Partial<StoredInputRow>>,
   rules: readonly PricingRuleRow[],
-  rates: PricingRates | null
+  rates: PricingRates | null,
+  direct?: Pick<ProductPricingData, 'inputs' | 'rules'>
 ): PricedModel[] {
   const u = rates?.usd_iqd ?? null;
   return models.map((m) => {
@@ -363,13 +369,21 @@ export function priceModels(
     // A SKU (FX-7) resolves over every level of its selection; a model over the product and itself.
     const isSku = m.combo_key !== undefined;
     const at = isSku ? unitRuleTarget(productId, unit) : ruleTargetOf(productId, m.option_id);
-    const result = priceSku({
-      chain: isSku ? chainOfUnit(inputs, unit) : chainOf(inputs, m.option_id),
+    const run = (channels: SkuChannel[], inputRows: ReadonlyArray<Partial<StoredInputRow>>, ruleRows: readonly PricingRuleRow[]) => priceSku({
+      chain: isSku ? chainOfUnit(inputRows, unit) : chainOf(inputRows, m.option_id),
       rates: rates.central,
       channels,
-      target: resolveRuleAt(rules, 'target_profit', at, { usdIqdRate: u }),
-      extra: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_sale_extra', at) : null,
+      target: resolveRuleAt(ruleRows, 'target_profit', at, { usdIqdRate: u }),
+      extra: channels.includes('direct_sale') ? resolveRuleAt(ruleRows, 'direct_sale_extra', at) : null,
     });
+    const result = run(direct ? channels.filter((c) => c !== 'direct_sale') : channels, inputs, rules);
+    if (direct && channels.includes('direct_sale')) {
+      const stock = run(['direct_sale'], direct.inputs, direct.rules);
+      result.channels.push(...stock.channels);
+      result.issues.push(...stock.issues);
+      result.ok = result.ok && stock.ok;
+      if (channels.length === 1) result.inputs = stock.inputs;
+    }
     return { option_id: m.option_id, names, channels: m.channels, result, ...unit };
   });
 }
@@ -415,8 +429,8 @@ export function lineSummary(p: PurchaseForPricing, line: PurchaseLineForPricing,
   return modelSummary({
     productId: input.loaded.id,
     model: model ?? null,
-    inputs: mergedInputs(input.stored.inputs, preview.derived.entries.map((e) => e.write)),
-    rules: mergedRules(input.stored, preview.rule_writes),
+    inputs: mergedInputs(directPurchaseStore(input.stored).inputs, preview.derived.entries.map((e) => e.write)),
+    rules: mergedRules(directPurchaseStore(input.stored), preview.rule_writes),
     stored: input.stored,
     rates,
     engine: preview.mode === 'engine',

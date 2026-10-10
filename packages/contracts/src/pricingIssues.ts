@@ -80,6 +80,7 @@ export const PRICING_ISSUE_CODES = [
   'DIRECT_SALE_EXTRA_BLOCKED',
   // The writer (owner decision 8): what keeps a product's prices from being written exactly.
   'PRICE_SHAPE_UNSUPPORTED',
+  'DIRECT_PURCHASE_PRICE_SHAPE',
   'FX_DERIVED_STALE',
   'PRICING_ENGINE_PAUSED',
 ] as const;
@@ -343,6 +344,14 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ar: 'زيادة البيع المباشر موقوفة حتى تقرر',
       en: 'The Direct Sale Extra is on hold until you decide',
       ckb: 'زیادەی فرۆشتنی ڕاستەوخۆ ڕاگیراوە تا تۆ بڕیار دەدەیت',
+    },
+  },
+  DIRECT_PURCHASE_PRICE_SHAPE: {
+    severity: 'error',
+    label: {
+      ar: 'لا يمكن فصل سعر البيع المباشر عن الطلب المسبق بهذا الإعداد؛ أضف خيارًا له خانة بيع مباشر مستقلة ثم أعد الاعتماد',
+      en: 'This setup cannot separate direct sale from preorder; add an option with its own direct-sale price, then apply again',
+      ckb: 'بەم ڕێکخستنە نرخی فرۆشتنی ڕاستەوخۆ لە پێشداواکاری جیا ناکرێتەوە؛ هەڵبژاردەیەک بە نرخی فرۆشتنی ڕاستەوخۆی تایبەت زیاد بکە و دووبارە پەسەندی بکە',
     },
   },
   PRICE_SHAPE_UNSUPPORTED: {

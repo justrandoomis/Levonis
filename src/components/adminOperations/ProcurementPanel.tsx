@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { privateDrafts } from '../../lib/privateDrafts';
 import SelectionPriceUpdate from './SelectionPriceUpdate';
 import StockSelection from './StockSelection';
 import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
@@ -179,7 +180,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [funding, setFunding] = useState<FundingDraft>(newFunding),
     [quickReceive, setQuickReceive] = useState(false),
     [recent, setRecent] = useState<Selection[]>([]),
-    [draftAvailable, setDraftAvailable] = useState(() => !!localStorage.getItem('levonis-purchase-draft-v2')),
+    [draftAvailable, setDraftAvailable] = useState(() => !!privateDrafts.getItem('levonis-purchase-draft-v2')),
     [fundReceipt, setFundReceipt] = useState(''),
     [fundReference, setFundReference] = useState(''),
     [fundReceiptId, setFundReceiptId] = useState(() => crypto.randomUUID()),
@@ -207,7 +208,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setPurchases(r.purchases);
   }, [offset, receiveOnly]);
   const { run } = op;
-  useEffect(() => { if (!editing || (!lines.length && funding.mode === 'store')) return; const timer = setTimeout(() => { localStorage.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); }, 600); return () => clearTimeout(timer); }, [editing, header, lines, charges, funding, editId, editVersion, operationId, quickReceive]);
+  useEffect(() => { if (!editing || (!lines.length && funding.mode === 'store')) return; const timer = setTimeout(() => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); }, 600); return () => clearTimeout(timer); }, [editing, header, lines, charges, funding, editId, editVersion, operationId, quickReceive]);
   useEffect(() => {
     run(load);
   }, [load, run]);
@@ -348,7 +349,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     const r = editId
       ? await api.put<{ id: string }>(`${PROCUREMENT}/documents/${editId}`, body)
       : await api.post<{ id: string }>(`${PROCUREMENT}/documents`, body);
-    localStorage.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false);
+    privateDrafts.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false);
     // Cached picker rows belong to the completed draft. A future purchase must
     // fetch the just-saved supplier defaults, not reuse its pre-save snapshot.
     setRecent([]);
@@ -454,8 +455,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     if (l.scope === 'color') parts.push(ps.colourLine);
     return parts.join(' ');
   };
-  const saveLocal = () => { localStorage.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); };
-  const restoreLocal = () => { try { const d = JSON.parse(localStorage.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { localStorage.removeItem('levonis-purchase-draft-v2'); } };
+  const saveLocal = () => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); };
+  const restoreLocal = () => { try { const d = JSON.parse(privateDrafts.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { privateDrafts.removeItem('levonis-purchase-draft-v2'); } };
   const addChoice = () => { if (!choice) return; setLines((old) => [...old, selectionCostDraft(choice, header.cost_profile_id)]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
   return (
     <div className="inventory-workspace">
@@ -464,7 +465,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       {investmentFor && <Suspense fallback={<p role="status">{loc('جارٍ تحميل اتفاق التمويل…', 'Loading funding agreement…')}</p>}><InvestorContractForm initialIncomingId={investmentFor} onClose={() => setInvestmentFor('')} onSaved={() => { setInvestmentFor(''); onChanged(); }} /></Suspense>}
       <div className="mb-4 flex flex-wrap gap-2">
         <button type="button" className={T.btnPrimary} onClick={() => start(undefined, false, true)}>{loc('إضافة مخزون موجود', 'Add stock on hand')}</button>
-        {draftAvailable && <><button type="button" className={T.btnSecondary} onClick={restoreLocal}>{loc('استكمال المسودة المحفوظة', 'Resume saved draft')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => { setEditing(false); localStorage.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false); }}>{loc('حذف المسودة المحلية', 'Discard local draft')}</button></>}
+        {draftAvailable && <><button type="button" className={T.btnSecondary} onClick={restoreLocal}>{loc('استكمال مسودة هذه الجلسة', 'Resume this session’s draft', 'بەردەوامبوون لە ڕەشنووسی ئەم دانیشتنە')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => { setEditing(false); privateDrafts.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false); }}>{loc('حذف مسودة الجلسة', 'Discard session draft', 'سڕینەوەی ڕەشنووسی دانیشتن')}</button></>}
         <button type="button" className={T.btnPrimary} onClick={() => start()}>
           {loc('شراء قادم', 'Incoming purchase')}
         </button>

@@ -180,15 +180,11 @@ test('the money pages are deliberately NOT cached', () => {
 test('the identity change empties it, and does so from one place', () => {
   const auth = read('src/AuthContext.tsx');
   assert.match(auth, /import \{ clearPageCache \} from '\.\/lib\/pageCache';/);
-  assert.match(auth, /const lastIdentityRef = useRef<string \| null>\(null\);/);
-  assert.match(auth, /if \(lastIdentityRef\.current === id\) return;[\s\S]{0,120}clearPageCache\(\);/);
-  // Starting at `null` is what makes the BOOT case work: the app is a visitor
-  // until /api/auth/me answers, so a user arriving is a change and drops
-  // whatever was cached while the page was still anonymous.
-  assert.ok(
-    !/useRef<string \| null \| undefined>/.test(auth),
-    'an undefined seed would skip the first transition — the boot case'
-  );
+  assert.match(auth, /const sessionScope = useRef<string \| null>\(null\);/);
+  const publish = auth.slice(auth.indexOf('const setUser = useCallback'), auth.indexOf('useEffect(purgeLegacyPrivateDrafts'));
+  assert.match(publish, /if \(scope !== sessionScope\.current\)/);
+  assert.ok(publish.indexOf('clearPageCache();') < publish.indexOf('setSessionUser(next);'), 'clear before child effects can read the previous identity');
+  assert.match(publish, /next\.id, next\.role, next\.admin_scope, next\.can_view_cost/);
 });
 
 // ---------------------------------------------------------- the scroll

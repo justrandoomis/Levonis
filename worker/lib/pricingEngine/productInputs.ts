@@ -45,6 +45,7 @@
  *   - each answer carries owner decision 8's six figures per model × channel
  *     (`rows`), for «المعاينة والحفظ».
  */
+import { directPurchaseStore, pruneDirectPurchase } from './directPurchase';
 import { MAX_ADDITIONAL_COST_IQD, MAX_BOX_MM, MAX_WEIGHT_G, SUPPLIER_CURRENCIES, type SupplierCurrency } from '@levonis/pricing/costToPrice';
 import { SHIPPING_PROFILES, type ShippingProfile } from '@levonis/pricing/skuChannel';
 import { iqdToCanonicalUsd } from '@levonis/pricing/fxChain';
@@ -312,6 +313,7 @@ export async function productEngineEvaluation(
 ): Promise<EngineEvaluation> {
   const writes = opts.writes ?? effectiveWrites(draft);
   return evaluateEngineWrite({
+    allChannels: true,
     loaded,
     stored,
     ctx,
@@ -395,10 +397,11 @@ export async function productInputsAnswer(
   // «تفاصيل» reads an IQD conversion's provenance from the rows as they would be after the drafts.
   const drafted: ProductPricingData = { ...stored, inputs: inputs as StoredInputRow[] };
   const rules = mergedRules(stored, draft.rules);
+  const stock = directPurchaseStore({ ...drafted, rules }, pruneDirectPurchase(stored, draft.inputs, draft.rules) ?? stored.direct_purchase);
   // FX-7: priced per SKU (a colour or SKU level holds a value, or a second option group) — the
   // same decision the save makes; the colour and SKU levels are offered only with the SKU rung (0183).
   const skuLevels = skuTableOf(loaded);
-  const perSku = skuLevels && needsSkuPricing(loaded, inputs, rules, modelsOf(loaded.doc, loaded.view).groups);
+  const perSku = skuLevels && needsSkuPricing(loaded, [...inputs, ...stock.inputs], [...rules, ...stock.rules], modelsOf(loaded.doc, loaded.view).groups);
   const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx, { perSku });
   const engine = stored.state?.mode === 'engine';
   const names = (o: { name_ar?: string; name_en?: string; name_ckb?: string } | null | undefined) => ({
@@ -431,9 +434,9 @@ export async function productInputsAnswer(
     const summary = modelSummary({
       productId: pid,
       model: m,
-      inputs,
-      rules,
-      stored: drafted,
+      inputs: direct ? stock.inputs : inputs,
+      rules: direct ? stock.rules : rules,
+      stored: direct ? stock : drafted,
       rates,
       engine,
       proposals: [],
@@ -468,9 +471,9 @@ export async function productInputsAnswer(
     const summary = modelSummary({
       productId: pid,
       model: { option_id: u.option_id, channels: u.channels, combo_key: u.combo_key, option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, sku: true },
-      inputs,
-      rules,
-      stored: drafted,
+      inputs: direct ? stock.inputs : inputs,
+      rules: direct ? stock.rules : rules,
+      stored: direct ? stock : drafted,
       rates,
       engine,
       proposals: [],
@@ -510,7 +513,7 @@ export async function productInputsAnswer(
     models,
     skus,
     // Owner decision 8's six figures per model (or SKU) × channel, priced as the drafts would leave the store.
-    rows: previewRowsDto(priceModels(pid, legacy.units, inputs, rules, rates)),
+    rows: previewRowsDto(priceModels(pid, legacy.units, inputs, rules, rates, stored.direct_purchase ? stock : undefined)),
     // The save's own preview (owner decision 8): adopt / reprice / data only, the six figures, the flags.
     adoption: evaluation ? engineEvaluationDto(evaluation) : null,
     // What the save carries: the engine write's hash when the save writes prices, else the hash of

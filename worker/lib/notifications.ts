@@ -451,12 +451,15 @@ export function peopleAr(n: number): string {
  * admin and are still in their bells, so every reader that may not see cost
  * reads the inbox through this clause. It matches the admin notice only — the
  * one that links to the finance screen — never the participant's own
- * «اعتماد طلب سحب الأرباح» (same kind, links to /earnings). NULL-safe: a row
+ * «اعتماد طلب سحب الأرباح» (same kind, links to /earnings). FX and security
+ * notices also stop being readable when their recipient is no longer the
+ * verified owner; delivery-time authorization must not outlive that role.
+ * NULL-safe: a row
  * with no entity or link is never hidden by it.
  */
-export const HIDE_OWNER_FINANCE_NOTICES_SQL = `NOT (kind = 'payout_available'
+export const HIDE_OWNER_FINANCE_NOTICES_SQL = `NOT (kind IN ('fx_attention', 'security_alert') OR (kind = 'payout_available'
       AND COALESCE(entity_type, '') = 'payout'
-      AND COALESCE(link, '') LIKE '/admin?tab=finance%')`;
+      AND COALESCE(link, '') LIKE '/admin?tab=finance%'))`;
 
 export async function listNotifications(
   db: D1Database,

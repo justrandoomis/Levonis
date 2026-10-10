@@ -113,6 +113,13 @@ function chargeView(rows: ChargeRow[], items: Line[]) {
   return charges;
 }
 const text = (v: unknown, max = 200) => str(v, 'text', { max, required: false }) ?? '';
+const PURCHASE_NAME_MAX = 120;
+const normalizedPurchaseName = (value: unknown) => {
+  const name = text(value, 10_000).replace(/\s+/g, ' ').trim();
+  if (name.length > PURCHASE_NAME_MAX)
+    throw new HttpError(400, serverMessage('PURCHASE_NAME_TOO_LONG'), 'PURCHASE_NAME_TOO_LONG', { max: PURCHASE_NAME_MAX });
+  return name;
+};
 async function document(db: D1Database, id: string) {
   const p = await db
     .prepare(
@@ -433,7 +440,7 @@ async function planDocument(
   }
   const header = {
     supplier_id: supplier,
-    invoice_no: text(b.invoice_no),
+    invoice_no: normalizedPurchaseName(b.invoice_no),
     currency,
     exchange_rate: rate,
     cost_profile_id: profile?.id ?? null,
@@ -512,7 +519,7 @@ async function planDocument(
           l.source,
           rate,
           supplier,
-          text(b.invoice_no),
+          normalizedPurchaseName(b.invoice_no),
           day,
           b.expected_day ? dateValue(b.expected_day) : null,
           text(b.tracking),
@@ -582,9 +589,22 @@ adminProcurementRoutes.post('/documents', async (c) => {
       throw conflict('رقم العملية مستخدم لمحتوى مختلف', 'IDEMPOTENCY_MISMATCH');
     return c.json({ success: true, id, already: true });
   }
-  const statements = await planDocument(c.env.DB, b, user.id, id);
-  try { await c.env.DB.batch(statements); }
+  try {
+    const statements = await planDocument(c.env.DB, b, user.id, id);
+    await c.env.DB.batch(statements);
+  }
   catch (error) {
+    // The first request may finish after our idempotency read, including while
+    // we prepare its funding agreement. Re-read the immutable request after a
+    // failed plan/batch so the same confirm is an exact replay, never a 500 or
+    // a second capital credit. A reused key with different content stays 409.
+    const raced = await c.env.DB.prepare('SELECT request_json FROM purchase_orders WHERE id=?')
+      .bind(id).first<{ request_json: string }>();
+    if (raced) {
+      if (raced.request_json !== JSON.stringify(b))
+        throw conflict('رقم العملية مستخدم لمحتوى مختلف', 'IDEMPOTENCY_MISMATCH');
+      return c.json({ success: true, id, already: true });
+    }
     if (b.cost_profile_id && /CHECK constraint/i.test(String(error)))
       throw conflict('تغيرت بيانات الشراء أو أسعار المسار؛ حدّث البيانات وأعد المحاولة', 'COST_PROFILE_CHANGED');
     throw error;
@@ -633,7 +653,6 @@ adminProcurementRoutes.put('/documents/:id', async (c) => {
  * an open editor — and `request_json` is untouched, so a replayed POST stays
  * `already`. No cost column is written.
  */
-const PURCHASE_NAME_MAX = 120;
 adminProcurementRoutes.patch('/documents/:id/name', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'purchase');
@@ -646,18 +665,17 @@ adminProcurementRoutes.patch('/documents/:id/name', async (c) => {
   // The name is always sent (an empty one clears it): a body without it is a mistake, never a rename to nothing.
   if (typeof b.name !== 'string') throw badRequest('اسم الشراء نص / The purchase name is text');
   if (b.before !== undefined && b.before !== null && typeof b.before !== 'string') throw badRequest('اسم الشراء نص / The purchase name is text');
-  const name = b.name.replace(/\s+/g, ' ').trim();
-  if (name.length > PURCHASE_NAME_MAX) throw new HttpError(400, serverMessage('PURCHASE_NAME_TOO_LONG'), 'PURCHASE_NAME_TOO_LONG', { max: PURCHASE_NAME_MAX });
+  const name = normalizedPurchaseName(b.name);
   const db = c.env.DB;
   const current = await db.prepare('SELECT invoice_no FROM purchase_orders WHERE id=?').bind(id).first<{ invoice_no: string | null }>();
   if (!current) throw notFound('Purchase not found');
   const before = current.invoice_no ?? '';
   if (before === name) return c.json({ success: true, id, name, already: true });
-  if (typeof b.before === 'string' && b.before.replace(/\s+/g, ' ').trim() !== before)
+  if (typeof b.before === 'string' && b.before.replace(/\s+/g, ' ').trim() !== before.replace(/\s+/g, ' ').trim())
     throw conflict(serverMessage('PURCHASE_NAME_CHANGED'), 'PURCHASE_NAME_CHANGED');
   const now = new Date().toISOString();
   const statements = [
-    ...fence(db, 'EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND invoice_no=?)', [id, before]),
+    ...fence(db, 'EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND invoice_no IS ?)', [id, current.invoice_no]),
     db.prepare('UPDATE purchase_orders SET invoice_no=?, updated_at=? WHERE id=?').bind(name, now, id),
     db.prepare('UPDATE incoming_inventory SET supplier_ref=? WHERE id IN (SELECT incoming_id FROM purchase_lines WHERE purchase_id=?)').bind(name, id),
     ...(await auditStatements(db, user.id, 'purchase.renamed', id, { before, after: name })).statements,

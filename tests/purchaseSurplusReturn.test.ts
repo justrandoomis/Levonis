@@ -393,6 +393,46 @@ test('several investors and purchases: each sees only their own remainder; a man
   assert.deepEqual(after.map((e) => [e.id, e.amount_iqd]), [[`invsurplus:${b.id}`, 100_000]]);
 });
 
+test('receipt input cannot redirect a confirmed agreement to another investor or let them withdraw its remainder', async () => {
+  const x = setup(); await profiles(x, 'investor', 'investor2');
+  const p = await x.confirm(x.payload(x.investorFunding()));
+  const received = await post(x.app, `/p/documents/${p.id}/investor-receipts`, {
+    operation_id: 'wrong-investor-receipt', amount_iqd: AGREED, reference: 'BANK',
+    user_id: 'investor2', investor_id: 'investor2',
+  });
+  assert.equal(received.status, 200, JSON.stringify(await json(received)));
+  assert.equal((await x.surplusOf('investor', p.id))?.available_iqd, SURPLUS);
+  assert.equal(await x.surplusOf('investor2', p.id), undefined);
+  assert.equal(x.notices('investor').length, 1);
+  assert.equal(x.notices('investor2').length, 0);
+  const withdrawal = await post(x.earnings('investor2'), '/api/finance-earnings/withdrawals', {
+    operation_id: 'wrong-investor-withdrawal', amount_iqd: SURPLUS, balance_type: 'capital',
+    user_id: 'investor', source_id: `invsurplus:${p.id}`,
+  });
+  assert.notEqual(withdrawal.status, 200);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_withdrawals'), 0);
+  assert.equal((await x.surplusOf('investor', p.id))?.available_iqd, SURPLUS);
+});
+
+test('a draft with received cash typed creates no return before confirmation; negative funding cannot create one', async () => {
+  const x = setup(); await profiles(x, 'investor');
+  const draft = await x.confirm(x.payload(x.investorFunding(AGREED, AGREED), { status: 'draft' }));
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM purchase_investor_agreements'), 0);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM purchase_investor_receipts'), 0);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_lines'), 0);
+  assert.equal(await x.surplusOf('investor', draft.id), undefined);
+  assert.equal((await x.receipt(draft.id, AGREED)).status, 404);
+  assert.equal(x.notices().length, 0);
+
+  const before = count(x.raw, 'SELECT COUNT(*) n FROM purchase_orders');
+  for (const funding of [x.investorFunding(-1, AGREED), x.investorFunding(AGREED, -1)]) {
+    assert.equal((await post(x.app, '/p/documents', x.payload(funding))).status, 400);
+  }
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM purchase_orders'), before);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM purchase_investor_receipts'), 0);
+  assert.equal((await participantOverview(x.db, 'investor')).summary.capital_available_iqd, 0);
+});
+
 test('the confirm guards: an estimated cost is refused with investor funding (a draft still saves); a second agreement is a 409, never a 500', async () => {
   const x = setup(); await profiles(x, 'investor');
   const estimated = x.payload(x.investorFunding(AGREED, AGREED), { cost_state: 'estimated' });

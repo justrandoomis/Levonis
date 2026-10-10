@@ -12,9 +12,9 @@
  *
  * It is one line of code to multiply a count by a price in a component, and the
  * moment that line exists the shop has two prices for one job: the one the
- * customer was shown and the one the engine charged. The per-piece figure below
- * is rendered as a LABEL on the option, exactly as the server sent it; every
- * total on the screen comes back from `priceJob`. The same rule the panel
+ * customer was shown and the one the engine charged. The picker names the
+ * selected parts and their units; the final quote includes their price.
+ * Every total on the screen comes back from `priceJob`. The same rule the panel
  * around it already follows, for the same reason.
  *
  * ---------------------------------------------------------------------------
@@ -31,7 +31,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, Package, Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { useMoney } from '../../CurrencyContext';
 import { IconButton } from '../ui/Button';
 
 export type AccessoryUnit = 'piece' | 'pair' | 'set' | 'cm' | 'gram';
@@ -43,7 +42,6 @@ export interface AccessoryOption {
   name_ckb: string;
   unit: AccessoryUnit;
   category: 'magnet' | 'motion' | 'electronics' | 'fastener' | 'finishing';
-  cost_iqd: number;
 }
 
 export interface AccessoryRow {
@@ -88,7 +86,6 @@ export default function AccessoryPicker({
   onChange: (rows: AccessoryRow[]) => void;
   disabled?: boolean;
 }) {
-  const { money } = useMoney();
   const { loc } = useLanguage();
   // Closed by default. Most jobs have no hardware at all, and a section that
   // opens itself asks every customer a question that only some of them have.
@@ -171,7 +168,7 @@ export default function AccessoryPicker({
                     <optgroup key={g.category} label={g.label}>
                       {g.items.map((o) => (
                         <option key={o.id} value={o.id}>
-                          {`${name(o)} — ${money(o.cost_iqd)}/${unitLabel(o.unit)}`}
+                          {`${name(o)} — ${unitLabel(o.unit)}`}
                         </option>
                       ))}
                     </optgroup>
@@ -230,10 +227,9 @@ export function AccessoryBreakdown({
   lines,
   unknown,
 }: {
-  lines: ReadonlyArray<{ id: string; qty: number; iqd: number; name_ar: string; name_en: string; name_ckb: string }>;
+  lines: ReadonlyArray<{ id: string; qty: number; name_ar: string; name_en: string; name_ckb: string }>;
   unknown: readonly string[];
 }) {
-  const { money } = useMoney();
   const { loc } = useLanguage();
   if (lines.length === 0 && unknown.length === 0) return null;
   return (
@@ -241,7 +237,6 @@ export function AccessoryBreakdown({
       {lines.map((l) => (
         <div key={l.id} className="flex items-center justify-between gap-2 text-[11.5px] leading-5 text-text-secondary">
           <span dir="auto" className="min-w-0 truncate">{`${l.qty}× ${loc(l.name_ar, l.name_en, l.name_ckb)}`}</span>
-          <span className="shrink-0 tabular-nums">{money(l.iqd)}</span>
         </div>
       ))}
       {unknown.length > 0 ? (

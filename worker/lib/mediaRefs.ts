@@ -718,6 +718,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'pricing_audit.pricing_before_json': 'private pricing values before a change (amounts, rates, ids); no media',
   'pricing_audit.pricing_after_json': 'private pricing values after a change (amounts, rates, ids); no media',
   'pricing_audit.summary_json': 'counts and codes of a pricing change; no media',
+  // 0186 — private stock-purchase inputs and rules, used for direct sale only.
+  'pricing_direct_purchase.payload_json': 'private input/rule patches: amounts, currency/profile codes, ids and versions; no media',
   // 0182 — FX plan §4.3: a batch's purchase snapshot. Enum words, a timestamp and a currency code.
   'inventory_lots.snapshot_source': "where a batch's snapshot came from (purchase / legacy_incoming / adjustment); no media",
   'inventory_lots.fx_snapshot_at': 'a timestamp: when the purchase captured the central rates the batch carries; no media',

@@ -329,6 +329,14 @@ export const ADMIN_ROLES: readonly RoleName[] = ['assistant', 'full', 'legacy_nu
  */
 export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
   seedCostlyProduct(raw);
+  // A NULL default hides a margin leak from every role sweep. Exercise a
+  // configured public service tariff with its private sibling present.
+  raw.prepare('INSERT OR REPLACE INTO admin_settings (key,value) VALUES (?,?)').run('printServicePricing', JSON.stringify({
+    machine_iqd_per_hour: 2500, setup_fee_iqd: 1500, margin_percent: 37,
+  }));
+  raw.prepare('INSERT OR REPLACE INTO admin_settings (key,value) VALUES (?,?)').run('printAccessories', JSON.stringify([
+    { id: 'privacy-magnet', name_ar: 'مغناطيس', name_en: 'Magnet', name_ckb: 'ماگنێت', unit: 'piece', category: 'magnet', active: true, cost_iqd: COST.product },
+  ]));
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,admin_scope,is_investor,email_verified_at) VALUES
       ('u_m','Merchant','m@x.co','h','merchant',NULL,0,NULL),
@@ -441,11 +449,6 @@ export const NOT_A_COST: readonly NotACost[] = [
     path: /^\/api\/finance-earnings$/,
     leak: /\.pending_costs = /,
     why: 'a COUNT of the caller’s own wage rows still waiting for an amount — how many, never how much',
-  },
-  {
-    path: /^\/api\/(print-quote\/accessories|marketplace\/print\/catalog|admin\/settings)$/,
-    leak: /\.(accessories|printAccessories)\[\d+\]\.cost_iqd = /,
-    why: 'the per-piece accessory price a print quote bills — published by design (worker/routes/printQuote.ts, and the print-request catalogue that lists the same accessories)',
   },
   {
     path: /^\/api\/(admin\/)?farm\/(config|state)$|^\/api\/admin\/settings$/,

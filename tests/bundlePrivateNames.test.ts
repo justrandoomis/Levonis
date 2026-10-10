@@ -52,6 +52,11 @@ const NEVER_IN_CUSTOMER_CODE = [
 /** Also absent from the first paint: the owner routes and the owner panel's own words. */
 const NEVER_AT_FIRST_PAINT = [
   ...NEVER_IN_CUSTOMER_CODE,
+  'product_cost_iqd',
+  'purchase_unit_iqd',
+  'target_profit_iqd',
+  'printServicePricing',
+  'margin_percent',
   'iraqsm',
   '/rates/fx',
   '/api/admin/pricing',

@@ -608,7 +608,7 @@ export default function GramsQuotePanel({
             </p>
           )}
 
-          {/* What the hardware came to, itemised — rendered from the RESPONSE
+          {/* The included hardware, itemised — rendered from the RESPONSE
               and never from the form, because what was charged for is not
               always what is currently typed. */}
           <AccessoryBreakdown

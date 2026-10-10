@@ -5,6 +5,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { listNotifications, markRead, unreadCount } from '../lib/notifications';
 import { canViewCost } from '../lib/adminScope';
 import { channelReadiness, setPrimaryChannelStatements, type ChannelId } from '../lib/channelReadiness';
+import { noStoreUnlessSet } from '../lib/edgePolicy';
 
 /** The four channels the schema's CHECK admits (migration 0092). Declared here
  *  as the request validator's allowlist so a body can never write a fifth and
@@ -24,6 +25,7 @@ const CHANNEL_IDS = ['inapp', 'telegram', 'whatsapp', 'email'] as const satisfie
  */
 
 export const notificationRoutes = new Hono<AppContext>();
+notificationRoutes.use('*', noStoreUnlessSet);
 notificationRoutes.use('*', requireAuth);
 
 /**

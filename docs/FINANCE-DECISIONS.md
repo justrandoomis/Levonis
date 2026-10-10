@@ -197,7 +197,7 @@ job-title edits do not start another financial recalculation.
 The employee earnings page keeps balances, withdrawals and investment capital;
 the order-by-order earnings section is no longer shown there. Finance retains
 the order-level audit and cost detail. Since 2026-10-10 (owner request,
-DECISIONS row 211) the page also has no movements log («سجل الحركات»): the
+DECISIONS row 215) the page also has no movements log («سجل الحركات»): the
 server no longer builds or sends `movements`, `movement_count` or
 `history_review_count` (`worker/lib/financeAccountHistory.ts` was deleted).
 No ledger row changed; the owner's staff and payout views read the same

@@ -100,6 +100,13 @@ export function cacheControlFor(lifetime: EdgeLifetime = ANONYMOUS_LIFETIME): st
 /** The header the anonymous routes emit by default — spelled once, pinned by the tests. */
 export const ANONYMOUS_CACHE_CONTROL = cacheControlFor(ANONYMOUS_LIFETIME);
 
+/** Public projections changed at this privacy release. An older cached body
+ * can carry removed fields even after every route is corrected, and its ETag
+ * could otherwise authorize a browser to reuse those bytes. Only entries
+ * built by this projection revision may answer. Bump when removing fields. */
+export const PUBLIC_PROJECTION_REVISION = 'cost-privacy-2026-10-10';
+const PROJECTION_HEADER = 'X-Levonis-Public-Projection';
+
 /**
  * Could this request's answer be somebody's? A GET with no session cookie,
  * no Authorization and no user set by anything upstream is nobody's.
@@ -202,7 +209,7 @@ export async function anonymousCached(
 
   if (cache) {
     const hit = await cache.match(key).catch(() => undefined);
-    if (hit) return stamp(hit);
+    if (hit?.headers.get(PROJECTION_HEADER) === PUBLIC_PROJECTION_REVISION) return stamp(hit);
   }
 
   const built = await build();
@@ -212,6 +219,7 @@ export async function anonymousCached(
   if (text.length === 0) return new Response(text, { status: 200, headers: built.headers });
   const headers = new Headers(built.headers);
   headers.set('Cache-Control', cacheControl);
+  headers.set(PROJECTION_HEADER, PUBLIC_PROJECTION_REVISION);
   headers.set('ETag', await weakEtag(text));
   if (opts.perViewer) varyOnViewer(headers);
   const res = new Response(text, { status: 200, headers });

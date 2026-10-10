@@ -571,10 +571,11 @@ export const SETTING_DEFAULTS = {
    * is built from — labour, machine hours, energy, waste, supports, purge,
    * failure risk, complexity, the margin floor and the minimum job.
    *
-   * NOT PUBLIC, and `printServicePricing` above is left exactly as it was. That
-   * one IS in PUBLIC_SETTING_KEYS, so anything added to it would be readable by
-   * a signed-out visitor — and a competitor should not be able to download the
-   * owner's cost structure by opening the site.
+   * NOT PUBLIC. `printServicePricing` is in PUBLIC_SETTING_KEYS, but its
+   * contents go through publicPrintServiceRates before reaching a visitor.
+   * Keep private cost inputs here instead of mixing them into the public
+   * tariff: a competitor must not download the owner's cost structure by
+   * opening the site.
    */
   printPricingConfig: DEFAULT_PRICING as PrintPricingConfig,
 
@@ -723,8 +724,8 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // Which section each square of «تسوق حسب الفئة» opens — the storefront
   // draws the bento from it on the first screen.
   'homeBento',
-  // The calculator is a public tool; the rates on it are a published price
-  // list, not internal policy.
+  // Only the billed service rates are published by projectPublicSettings;
+  // the margin stored beside them remains private.
   'printServicePricing',
   // The printer note is customer-facing copy: the product page and the cart
   // read it before any quote exists.
@@ -746,6 +747,29 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // NOTE: proPricingPolicy, preorderTransportDefaults, launchConfig and
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
+
+/** Public service prices; the configured profit margin is never a price. */
+export function publicPrintServiceRates(value: unknown) {
+  const rates = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+  const tariff = (raw: unknown): number | null => {
+    const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw) : NaN;
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  return {
+    machine_iqd_per_hour: tariff(rates.machine_iqd_per_hour),
+    setup_fee_iqd: tariff(rates.setup_fee_iqd),
+  };
+}
+
+/** A public setting may contain private siblings; project its contents too. */
+export function projectPublicSettings(settings: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...settings,
+    ...(Object.hasOwn(settings, 'printServicePricing')
+      ? { printServicePricing: publicPrintServiceRates(settings.printServicePricing) } : {}),
+  };
+}
 
 /** The serial preparation gate as stored: a switch and its cutover. */
 export interface SerialPrepGate {

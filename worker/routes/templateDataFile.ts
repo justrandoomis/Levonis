@@ -79,6 +79,7 @@ import { scopedCountingD1 } from '../lib/d1Count';
 import { detachQueueQueries } from '../lib/mediaRefs';
 import { SPEC_FIELD_LABEL_CKB } from '../lib/specFieldLabelsCkb';
 import { engineWriteStatements } from '../lib/pricingEngine/engineWrite';
+import { pruneDirectPurchaseStatements } from '../lib/pricingEngine/directPurchase';
 import {
   MAX_DATA_FILE_PRODUCTS,
   buildPatch,
@@ -1047,6 +1048,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
           ...batchHead(db, p.stored, now),
           ...inputStatements(db, productId, w.inputWrites, viewer.id, now, { pack: true }),
           ...ruleStatements(db, productId, w.ruleWrites, viewer.id, now, { pack: true }),
+          ...pruneDirectPurchaseStatements(db, p.stored, w.inputWrites, w.ruleWrites, viewer.id, now),
           ...pricingAuditStatements(db, auditRows),
           ...batchTail(db, productId)
         );

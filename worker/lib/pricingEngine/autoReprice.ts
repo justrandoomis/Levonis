@@ -266,7 +266,7 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     // 2. The candidates, in a constant number of reads: the control row, the price images FIRST (every
     //    write is fenced on them), then the documents, the stores and the guest pricing context.
     const ids = due.map((p) => p.state.product_id);
-    if (!budget.spend(1 + 1 + READS_PER_CHUNK * Math.ceil(ids.length / PRODUCT_CHUNK) + 4 + 1)) return finish('BUDGET');
+    if (!budget.spend(1 + 1 + READS_PER_CHUNK * Math.ceil(ids.length / PRODUCT_CHUNK) + 5 + 1)) return finish('BUDGET');
     const control = await loadEngineControl(db);
     if (control.paused) return finish('PAUSED');
     let images: Map<string, string>;

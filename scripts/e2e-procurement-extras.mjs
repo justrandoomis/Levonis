@@ -17,7 +17,7 @@ const noOverflow = (page) => page.evaluate(() => document.documentElement.scroll
 const next = (page) => page.locator('.inventory-footer').getByRole('button', { name: 'التالي', exact: true });
 const row = (page, label) => page.locator('dl.inventory-review > div').filter({ has: page.locator('dt', { hasText: label }) }).first().locator('dd').first();
 const toCosts = async (page) => {
-  await page.getByRole('button', { name: 'استكمال المسودة المحفوظة', exact: true }).click();
+  await page.getByRole('button', { name: 'استكمال مسودة هذه الجلسة', exact: true }).click();
   await next(page).click();
   await next(page).click();
 };

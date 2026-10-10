@@ -1,14 +1,14 @@
 /**
  * `POST /api/admin/pricing/products/:id/apply-purchase` — A CONFIRMED PURCHASE
- * → THE PRODUCT'S CURRENT COSTS AND THE OWNER'S TYPED MINIMUM PROFITS (USD
+ * → THE PRODUCT'S DIRECT-SALE COSTS AND TYPED MINIMUM PROFITS (USD
  * design §3.1, §6.3, §6.4, §12 P-C; owner question Q1's default: yes).
  *
  * Proves: which purchases may feed (ordered / partial / received with a final
  * cost; never draft, cancelled or estimated); the body carries no cost amount;
  * `source_ref = purchase:<id>`; a replay after the receive's version bump is
  * `already: true`; the purchase's own batch holds no pricing statement; an
- * IQD-converted supplier cost is replaced with its snapshot cleared under the
- * owner token; a cancelled source is flagged; the apply writes no procurement
+ * IQD-converted ordinary cost stays intact while the direct overlay uses the
+ * new supplier currency without the old conversion snapshot; a cancelled source is flagged; the apply writes no procurement
  * or lot row and no price; audit_log carries ids and counts only.
  *
  * Run: node --import tsx --test tests/applyPurchaseInputs.test.ts
@@ -17,6 +17,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { all, count, post, row } from './fixtures/app';
 import { pricingWorld, AMS, AMS_MODEL } from './fixtures/procurementPricing';
+import { directPurchaseStore } from '../worker/lib/pricingEngine/directPurchase';
+import { loadProductPricing } from '../worker/lib/pricingEngine/store';
 
 type World = ReturnType<typeof pricingWorld>;
 const MIN = [{ scope: 'product', amount_usd: '120' }];
@@ -53,13 +55,16 @@ test('an ordered purchase with a final cost applies: inputs from the committed l
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.already, false);
   assert.equal(snapshot(w), before, 'no purchase, lot or price row changed');
-  const input = row<Record<string, unknown>>(w.raw, "SELECT * FROM pricing_inputs WHERE scope = 'option' AND scope_id = ?", AMS_MODEL)!;
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_inputs'), 0, 'preorder inputs are untouched');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_rules WHERE product_id IS NOT NULL'), 0, 'preorder profit rules are untouched');
+  const direct = directPurchaseStore(await loadProductPricing(w.db, AMS));
+  const input = direct.inputs.find((r) => r.scope === 'option' && r.scope_id === AMS_MODEL)!;
   assert.equal(input.source_ref, `purchase:${id}`);
   assert.equal(input.supplier_cost_amount, '450');
   assert.equal(input.supplier_cost_currency, 'EUR');
   assert.equal(input.shipping_weight_g, 2500);
   assert.equal(input.shipping_profile, 'GERMANY_LAND');
-  assert.equal(row<{ amount_usd: string }>(w.raw, "SELECT amount_usd FROM pricing_rules WHERE product_id = ? AND kind = 'target_profit'", AMS)!.amount_usd, '120');
+  assert.equal(direct.rules.find((r) => r.product_id === AMS && r.kind === 'target_profit')!.amount_usd, '120');
   const log = row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action = 'pricing.applied_from_purchase'")!;
   assert.deepEqual(Object.keys(JSON.parse(log.detail)).sort(), ['entered', 'product_id', 'purchase_id', 'rows_changed']);
   assert.doesNotMatch(log.detail, /450|120|2500/);
@@ -125,7 +130,7 @@ test('the body carries no cost amount: any amount key is UNKNOWN_FIELD; a change
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_inputs'), 0);
 });
 
-test('an IQD-converted supplier cost is replaced by the purchase’s, its snapshot columns cleared under the owner token', async () => {
+test('an IQD-converted preorder cost stays frozen while direct sale uses the purchase currency without its old snapshot', async () => {
   const w = pricingWorld();
   w.raw.exec(`INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, supplier_cost_amount, supplier_cost_currency, supplier_input_mode,
       original_input_amount, original_input_currency, conversion_rate_snapshot, conversion_fx_version, canonical_supplier_cost_usd, converted_at,
@@ -134,14 +139,16 @@ test('an IQD-converted supplier cost is replaced by the purchase’s, its snapsh
       '2026-10-01T00:00:00.000Z', 'owner', 1, '2026-10-01T00:00:00.000Z')`);
   // Without the token the converted cost is frozen.
   assert.throws(() => w.raw.exec(`UPDATE pricing_inputs SET supplier_cost_amount = '310', canonical_supplier_cost_usd = '310' WHERE product_id = '${AMS}'`), /FX_SNAPSHOT_IMMUTABLE/);
+  const frozen = row<Record<string, unknown>>(w.raw, 'SELECT * FROM pricing_inputs WHERE product_id = ?', AMS)!;
   const { id, hash } = await confirmed(w);
   const r = await w.apply(AMS, { purchase_id: id, minimum_profits: MIN, preview_hash: hash });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  const after = row<Record<string, unknown>>(w.raw, 'SELECT * FROM pricing_inputs WHERE product_id = ?', AMS)!;
+  assert.deepEqual(row(w.raw, 'SELECT * FROM pricing_inputs WHERE product_id = ?', AMS), frozen, 'every ordinary snapshot column stays unchanged');
+  const after = directPurchaseStore(await loadProductPricing(w.db, AMS)).inputs.find((r) => r.scope === 'option' && r.scope_id === AMS_MODEL)!;
   assert.equal(after.supplier_cost_amount, '450');
   assert.equal(after.supplier_cost_currency, 'EUR');
   assert.equal(after.supplier_input_mode, 'SOURCE_CURRENCY');
-  for (const k of ['original_input_amount', 'original_input_currency', 'conversion_rate_snapshot', 'conversion_fx_version', 'canonical_supplier_cost_usd', 'converted_at'])
+  for (const k of ['original_input_amount', 'original_input_currency', 'conversion_rate_snapshot', 'conversion_fx_version', 'canonical_supplier_cost_usd', 'converted_at'] as const)
     assert.equal(after[k], null, k);
 });
 
@@ -154,7 +161,9 @@ test('a cost from a purchase cancelled afterwards is flagged on the saved docume
   const view = await w.preview({ purchase_id: id });
   assert.equal(view.status, 200, JSON.stringify(view.body));
   assert.equal(view.body.products[0].cancelled_source, true);
-  assert.equal(row<{ supplier_cost_amount: string }>(w.raw, 'SELECT supplier_cost_amount FROM pricing_inputs WHERE product_id = ?', AMS)!.supplier_cost_amount, '450');
+  const direct = directPurchaseStore(await loadProductPricing(w.db, AMS));
+  assert.equal(direct.inputs.find((r) => r.scope === 'option' && r.scope_id === AMS_MODEL)!.supplier_cost_amount, '450');
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_inputs'), 0, 'cancellation never promotes the stock cost into preorder pricing');
 });
 
 test('only the owner applies: every other admin is refused at the door and nothing is written', async () => {

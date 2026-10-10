@@ -20,8 +20,8 @@ const NAME = 'شحنة ألمانيا تشرين الأول';
 const RENAMED = 'شحنة ألمانيا — الدفعة الأولى';
 
 const T = {
-  ar: { resume: 'استكمال المسودة المحفوظة', next: 'التالي', name: 'اسم الشراء أو رقم الفاتورة', row: 'الاسم', direct: 'البيع المباشر', none: 'بدون زيادة البيع المباشر (0)', needed: 'لتسعير البيع المباشر أدخل زيادة البيع المباشر أعلاه', channel: 'طريقة البيع', cell: 'سعر البيع المباشر المقترح', caption: 'زيادة البيع المباشر 0', confirm: 'تأكيد الشراء القادم', rename: 'تغيير الاسم', save: 'حفظ الاسم', edit: 'تعديل / إكمال المسودة', fallback: 'شراء بلا اسم' },
-  ckb: { resume: 'استكمال المسودة المحفوظة', next: 'بەردەوامبە', name: 'ناوی کڕین یان ژمارەی پسوولە', row: 'ناوی کڕین', direct: 'فرۆشتنی ڕاستەوخۆ', none: 'بێ زیادەی فرۆشتنی ڕاستەوخۆ (0)', needed: 'بۆ نرخدانانی فرۆشتنی ڕاستەوخۆ', channel: 'جۆری فرۆشتن', cell: 'نرخی پێشنیارکراوی فرۆشتنی ڕاستەوخۆ', caption: 'زیادەی فرۆشتنی ڕاستەوخۆ 0', confirm: 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو', rename: 'گۆڕینی ناو', save: 'پاشەکەوتکردنی ناو', edit: 'تعديل / إكمال المسودة', fallback: 'کڕینی بێ ناو' },
+  ar: { resume: 'استكمال مسودة هذه الجلسة', next: 'التالي', name: 'اسم الشراء أو رقم الفاتورة', row: 'الاسم', direct: 'البيع المباشر', none: 'بدون زيادة البيع المباشر (0)', needed: 'لتسعير البيع المباشر أدخل زيادة البيع المباشر أعلاه', channel: 'طريقة البيع', cell: 'سعر البيع المباشر المقترح', caption: 'زيادة البيع المباشر 0', confirm: 'تأكيد الشراء القادم', rename: 'تغيير الاسم', save: 'حفظ الاسم', edit: 'تعديل / إكمال المسودة', fallback: 'شراء بلا اسم' },
+  ckb: { resume: 'بەردەوامبوون لە ڕەشنووسی ئەم دانیشتنە', next: 'بەردەوامبە', name: 'ناوی کڕین یان ژمارەی پسوولە', row: 'ناوی کڕین', direct: 'فرۆشتنی ڕاستەوخۆ', none: 'بێ زیادەی فرۆشتنی ڕاستەوخۆ (0)', needed: 'بۆ نرخدانانی فرۆشتنی ڕاستەوخۆ', channel: 'جۆری فرۆشتن', cell: 'نرخی پێشنیارکراوی فرۆشتنی ڕاستەوخۆ', caption: 'زیادەی فرۆشتنی ڕاستەوخۆ 0', confirm: 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو', rename: 'گۆڕینی ناو', save: 'پاشەکەوتکردنی ناو', edit: 'تعديل / إكمال المسودة', fallback: 'کڕینی بێ ناو' },
 };
 
 try {
@@ -32,7 +32,7 @@ try {
     const crashes = [];
     page.on('pageerror', (e) => crashes.push(e.message));
     await page.goto(`${base}?theme=${theme}&lang=${lang}`, { waitUntil: 'networkidle' });
-    // «استكمال المسودة المحفوظة» is a 2-argument string today: Arabic in both Arabic-script languages.
+    // The session draft action is translated in all three languages.
     await page.getByRole('button', { name: t.resume, exact: true }).click();
 
     // 1. The name sits above the four steps, on every step.
@@ -51,27 +51,27 @@ try {
     const nameRow = page.locator('dl.inventory-review > div').filter({ has: page.locator('dt', { hasText: t.row }) }).first().locator('dd');
     check(`${tag}: the review's name row`, (await nameRow.innerText()).trim() === NAME);
 
-    // 2. Data only: the direct block leads, the pre-order disclosure follows, closed.
+    // 2. Data only: the review contains direct-sale rows and no preorder disclosure.
     await page.locator('[data-direct-block]').first().waitFor();
     const layout = await page.evaluate(() => {
       const block = document.querySelector('[data-direct-block]');
       const pre = document.querySelector('[data-preorder-block]');
-      return { order: !!(block && pre && block.compareDocumentPosition(pre) & Node.DOCUMENT_POSITION_FOLLOWING), open: pre?.hasAttribute('open') ?? null, heads: [...(block?.querySelectorAll('th') ?? [])].map((th) => th.textContent) };
+      return { direct: !!block, preorder: !!pre, heads: [...(block?.querySelectorAll('th') ?? [])].map((th) => th.textContent) };
     });
-    check(`${tag}: the direct block comes first`, layout.order);
-    check(`${tag}: the pre-order disclosure is closed while nothing is written`, layout.open === false);
+    check(`${tag}: the direct block is present`, layout.direct);
+    check(`${tag}: no preorder disclosure is present`, layout.preorder === false);
     check(`${tag}: the direct table has no channel column`, !layout.heads.includes(t.channel));
     check(`${tag}: the notice asks for the extra in place`, (await page.locator('[data-pricing-product="a1"]').innerText()).includes(t.needed));
     await page.screenshot({ path: `${output}/${tag}-1-data-only.png`, fullPage: true });
 
     // 3. «بدون زيادة البيع المباشر (0)»: the next preview carries it; the confirm now writes, and shows what.
     await page.getByRole('button', { name: t.none, exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('[data-preorder-block]')?.hasAttribute('open'), null, { timeout: 5000 });
+    await page.waitForFunction(() => document.querySelector('[data-direct-block]')?.textContent.includes('875,000'), null, { timeout: 5000 });
     const sent = (await requests(page)).filter((r) => r.path === '/api/admin/pricing/procurement/preview').at(-1);
     check(`${tag}: the preview request carries the typed extra`, JSON.stringify(sent.body.pricing.direct_sale_extras) === JSON.stringify([{ product_id: 'a1', scope: 'product', scope_id: '', amount_iqd: 0 }]));
     const direct = await page.locator('[data-direct-block]').innerText();
     check(`${tag}: the direct row reads 875,000`, direct.includes('875,000'));
-    check(`${tag}: the pre-order rows are on screen once written`, (await page.locator('[data-preorder-block]').innerText()).includes('749,000'));
+    check(`${tag}: preorder rows remain absent after the direct price is computed`, await page.locator('[data-preorder-block]').count() === 0 && !direct.includes('749,000'));
     const bar = await page.locator('[data-pricing-summary]').first().innerText();
     check(`${tag}: the line bar's cell 4 is the direct sale price`, bar.includes(t.cell) && bar.includes('875,000'));
     check(`${tag}: …with its two parts in the caption`, bar.includes(t.caption));

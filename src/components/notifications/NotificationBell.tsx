@@ -230,6 +230,13 @@ function Row({ n, asMenu, onOpen, expanded = false }: RowProps) {
 }
 
 export default function NotificationBell() {
+  const { user } = useAuth();
+  // An inbox is account- and permission-scoped. Remount before painting the
+  // new viewer so old owner finance rows never flash during an effect reset.
+  return <NotificationBellSession key={`${user?.id ?? ''}:${user?.can_view_cost === true}`} />;
+}
+
+function NotificationBellSession() {
   const { isAuthenticated, user } = useAuth();
   const { loc, dir } = useLanguage();
   const navigate = useNavigate();

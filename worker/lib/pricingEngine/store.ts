@@ -25,6 +25,7 @@
  */
 import type { PricingInputRow, SkuInputChain, SupplierCurrency } from '@levonis/pricing/costToPrice';
 import type { PricingRuleKind, PricingRuleRow, PricingRuleScope, PricingRuleState, PricingRuleSource } from '@levonis/pricing/ruleResolution';
+import type { DirectPurchaseOverlay } from './directPurchase';
 import type { ShippingProfile } from '@levonis/pricing/skuChannel';
 import { fence } from '../operations';
 import { newId } from '../crypto';
@@ -100,6 +101,8 @@ export interface ProductPricingData {
   inputs: StoredInputRow[];
   rules: StoredRuleRow[];
   config_version: number;
+  direct_purchase?: DirectPurchaseOverlay | null;
+  direct_purchase_available?: boolean;
 }
 
 /** One product's store, in one batch (one snapshot). */
@@ -123,6 +126,14 @@ export async function loadProductsPricing(db: D1Database, ids: readonly string[]
   const inputRows = ((inputs as D1Result<StoredInputRow>).results ?? []) as StoredInputRow[];
   const ruleRows = ((rules as D1Result<StoredRuleRow>).results ?? []) as StoredRuleRow[];
   const config = Number(((control as D1Result<{ config_version: number }>).results ?? [])[0]?.config_version ?? 0);
+  let directRows: Array<{ product_id: string; payload_json: string; version: number }> = [];
+  let directAvailable = true;
+  try {
+    directRows = (await db.prepare('SELECT product_id, payload_json, version FROM pricing_direct_purchase WHERE product_id IN (SELECT value FROM json_each(?))').bind(list).all<{ product_id: string; payload_json: string; version: number }>()).results ?? [];
+  } catch (e) {
+    if (!/no such table: (?:main\.)?pricing_direct_purchase/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    directAvailable = false;
+  }
   const out = new Map<string, ProductPricingData>();
   for (const id of unique) {
     out.set(id, {
@@ -131,6 +142,11 @@ export async function loadProductsPricing(db: D1Database, ids: readonly string[]
       inputs: inputRows.filter((r) => r.product_id === id),
       rules: ruleRows.filter((r) => r.product_id === id || r.product_id === null),
       config_version: config,
+      direct_purchase_available: directAvailable,
+      direct_purchase: (() => {
+        const row = directRows.find((r) => r.product_id === id);
+        return row ? { ...JSON.parse(row.payload_json), version: row.version } as DirectPurchaseOverlay : null;
+      })(),
     });
   }
   return out;

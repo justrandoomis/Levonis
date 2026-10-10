@@ -10,6 +10,7 @@ import { anonymousCached } from '../lib/edgePolicy';
 import { fromEngineA, quantityCurve } from '../lib/printEstimate';
 import {
   MAX_ACCESSORY_QTY,
+  publicAccessory,
   type AccessorySelection,
   type PrintAccessory,
 } from '../lib/printAccessories';
@@ -225,23 +226,7 @@ printRequestRoutes.get('/catalog', (c) => anonymousCached(c, {}, async () => {
       .map(([id, cap]) => ({ id, ...cap })),
     // The wizard shows this so a customer knows what "more detail" buys them.
     min_job_iqd: cfg.min_job_iqd,
-    /**
-     * «إكسسوارات ميكر وورد». The buying price IS shown here, unlike
-     * `publicMaterial`'s — and that is deliberate rather than an oversight.
-     * A magnet is a part the customer could buy themselves for the same money;
-     * what the shop sells is fitting it. Hiding the per-piece figure would
-     * make a bill of materials unreadable and invite the question the whole
-     * feature exists to answer.
-     */
-    accessories: accs.map((a) => ({
-      id: a.id,
-      name_ar: a.name_ar,
-      name_en: a.name_en,
-      name_ckb: a.name_ckb,
-      unit: a.unit,
-      category: a.category,
-      cost_iqd: a.cost_iqd,
-    })),
+    accessories: accs.map(publicAccessory),
   });
 }));
 
@@ -1228,8 +1213,7 @@ export async function publishRequest(
     }>();
   const revision = Number(forMatching?.revision ?? readRevision);
   const revised = revision > readRevision;
-  const { cost_lines, cost_iqd, floor_iqd, margin_percent, ...publicQuote } = quote;
-  void cost_lines; void cost_iqd; void floor_iqd; void margin_percent;
+  const publicQuote = publicEstimate(JSON.stringify(quote));
 
   // ---- nothing a merchant priced changed: nobody is matched again -----------
   if (!firstPublish && !changed) {
@@ -1604,14 +1588,10 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   if (!row) return c.json({ success: true, print: null });
 
   const analysis = parseJson<ModelAnalysis | null>(row.analysis, null);
-  const estimate = parseJson<Record<string, unknown>>(row.estimate, {});
   // The cost breakdown is the platform's, not the merchant's and not the
   // customer's. Everyone sees the range and the confidence; nobody sees how it
   // was built.
-  delete estimate.cost_lines;
-  delete estimate.cost_iqd;
-  delete estimate.floor_iqd;
-  delete estimate.margin_percent;
+  const estimate = publicEstimate(row.estimate);
 
   return c.json({
     success: true,

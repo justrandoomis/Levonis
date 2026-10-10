@@ -183,7 +183,7 @@ export interface RatePreviewResult {
 
 // loadProducts' reads per chunk of 50 (autoReprice.ts PRODUCT_CHUNK / READS_PER_CHUNK, the SKU rung's read included — FX-7).
 /** The automatic run's own reads before it writes (autoReprice.ts steps 1-2), with the run record and the bell. */
-const RUN_READS = (n: number) => 1 + 3 + 1 + 1 + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 4 + 1 + 2;
+const RUN_READS = (n: number) => 1 + 3 + 1 + 1 + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 5 + 1 + 2;
 /** A blocked product's record and its bell (autoReprice.ts `block`). */
 const BLOCK_COST = 8;
 
@@ -221,7 +221,7 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
     const control = await loadEngineControl(db);
     const images = await priceImagesOf(db, ids);
     const [loaded, stores, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
-    statements += 1 + 1 + READS_PER_CHUNK * Math.ceil(ids.length / PRODUCT_CHUNK) + 4 + 1;
+    statements += 1 + 1 + READS_PER_CHUNK * Math.ceil(ids.length / PRODUCT_CHUNK) + 5 + 1;
     for (const p of stale) {
       const pid = p.state.product_id;
       const product = loaded.get(pid);
