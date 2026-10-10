@@ -17,6 +17,11 @@ import { authPathWithSupportRef } from '../../lib/supportRef';
  * `classifyError` is the single mapping from a thrown error to a state kind;
  * `ErrorState` dispatches on it so pages can simply do
  * `<ErrorState error={err} onRetry={reload} />`.
+ *
+ * Clay (docs/DECISIONS.md row 209): the panel is a resting card
+ * (`lv-surface`), its icon sits in a sunk 48px well, retry and back are the
+ * secondary button and sign-in is the primary — the house `lv-button`s, with
+ * their focus ring, dent and 44px floor.
  */
 
 export type AsyncErrorKind =
@@ -168,14 +173,14 @@ function StateShell({
   return (
     <div
       role={role}
-      className={`flex flex-col items-center justify-center text-center gap-3 rounded-xl border border-zinc-800/50 bg-zinc-900/50 ${
+      className={`lv-surface flex flex-col items-center justify-center text-center gap-3 ${
         compact ? 'px-4 py-6' : 'px-6 py-12'
       } ${className}`}
     >
-      <div className="w-12 h-12 rounded-full bg-zinc-800/60 flex items-center justify-center text-zinc-500">
+      <div className="w-12 h-12 rounded-full lv-well flex items-center justify-center text-text-muted">
         {icon}
       </div>
-      <p className="text-white font-bold text-[15px]">{title}</p>
+      <p className="text-text-primary font-bold text-[15px]">{title}</p>
       {description ? (
         <p className="text-text-muted text-sm max-w-xs leading-relaxed">{description}</p>
       ) : null}
@@ -189,7 +194,7 @@ function RetryButton({ onRetry, label }: { onRetry: () => void; label: string })
     <button
       type="button"
       onClick={onRetry}
-      className="mt-1 min-h-[44px] px-5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold flex items-center gap-2 transition-colors"
+      className="lv-button lv-button-secondary mt-1"
     >
       <RefreshCw aria-hidden="true" className="w-4 h-4" />
       {label}
@@ -319,7 +324,7 @@ export function NotFoundState({
         <button
           type="button"
           onClick={onBack}
-          className="mt-1 min-h-[44px] px-5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-bold flex items-center gap-2 transition-colors"
+          className="lv-button lv-button-secondary mt-1"
         >
           <ArrowRight aria-hidden="true" className={`w-4 h-4 ${dir === 'ltr' ? 'rotate-180' : ''}`} />
           {s.back}
@@ -361,7 +366,7 @@ export function UnauthorizedState({
     >
       <Link
         to={authPathWithSupportRef(dest)}
-        className="mt-1 min-h-[44px] px-6 rounded-xl bg-gold text-accent-contrast text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+        className="lv-button lv-button-primary mt-1"
       >
         <LogIn aria-hidden="true" className="w-4 h-4" />
         {s.signIn}

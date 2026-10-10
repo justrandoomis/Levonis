@@ -80,10 +80,12 @@ export default function Note({
   const m = useMotion();
   const t = TONES[tone];
   // A softer radius on the start edge would fight the hairline that defines
-  // it, so the note is squared off there and rounded away from it.
+  // it, so the note is squared off there and rounded away from it. Flat
+  // information (clay, docs/DECISIONS.md row 209): an inner-panel radius,
+  // never a card's — the role scale made `xl`/`2xl` card and dialog corners.
   const shape = compact
-    ? 'rounded-e-xl ps-3 pe-3 py-2 text-[12.5px]'
-    : 'rounded-e-2xl ps-3.5 pe-4 py-3 text-[13px]';
+    ? 'rounded-e-lg ps-3 pe-3 py-2 text-[12.5px]'
+    : 'rounded-e-lg ps-3.5 pe-4 py-3 text-[13px]';
   return (
     <motion.div
       role="note"

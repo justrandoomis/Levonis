@@ -194,7 +194,7 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
           </span>
         </button>
         {discounted && (
-          <span className="absolute top-1.5 end-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-danger text-snow" dir="ltr">
+          <span className="absolute top-1.5 end-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-crimson text-snow" dir="ltr">
             −{Math.round((1 - product.price_iqd / (product.original_price_iqd as number)) * 100)}%
           </span>
         )}

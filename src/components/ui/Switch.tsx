@@ -12,7 +12,9 @@
  * toward the inline END in either direction of writing — no physical
  * left/right to get backwards in Arabic — and a second tap mid-flight
  * reverses it from where it is. The ON state is the one accent (the track
- * fills) plus the thumb's position: never colour alone.
+ * fills) plus the thumb's position: never colour alone. In clay
+ * (docs/DECISIONS.md row 209) the OFF track is a well with the 3:1 field
+ * line, the ON track is a flat accent fill, and the knob is lifted clay.
  *
  * A CHECKBOX is a choice that is submitted later, or one of many (selection
  * in a list). It is the platform's own input — the one control every screen
@@ -79,7 +81,7 @@ export function Switch({ checked, onChange, label, description, disabled = false
         <span
           aria-hidden="true"
           className={`flex h-7 w-12 items-center rounded-full border p-0.5 transition-colors ${
-            checked ? 'justify-end border-transparent bg-accent' : 'justify-start border-border-subtle bg-white/10'
+            checked ? 'justify-end border-transparent bg-accent' : 'justify-start lv-well border-[var(--clay-field)]'
           }`}
         >
           <MotionFeatures>

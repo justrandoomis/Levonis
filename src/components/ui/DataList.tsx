@@ -37,6 +37,11 @@
  *   ROWS ARE OPENED BY A LINK, the title cell (`rowHref`), never by a
  *   clickable `<tr>`: a link is reachable by keyboard, announced, and opens in
  *   a new tab when asked to.
+ *
+ *   CLAY (docs/DECISIONS.md row 209): the list is ONE resting tray
+ *   (`lv-surface`); its rows are flat, divided by hairlines. A selected row
+ *   is the selected fill plus a 2px gold bar at its inline start — never a
+ *   raised row.
  */
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -232,7 +237,10 @@ export function DataList<T>({
             return (
               <tr key={key} data-row={key} aria-selected={selection ? on : undefined} className={on ? 'bg-surface-selected' : ''}>
                 {selection && (
-                  <td className="border-b border-border-subtle ps-2">
+                  // The selected row's second cue: a 2px gold bar at its
+                  // inline start (logical, so it mirrors in Arabic), held in
+                  // a transparent border at rest so nothing shifts.
+                  <td className={`border-b border-s-2 border-border-subtle ps-2 ${on ? 'border-s-gold' : 'border-s-transparent'}`}>
                     <Checkbox checked={on} onChange={(v) => toggleRow(key, v)} aria-label={selectRow(row)} />
                   </td>
                 )}
@@ -268,7 +276,12 @@ export function DataList<T>({
         const badges = columns.filter((c) => c.card === 'badge');
         const fields = columns.filter((c) => c !== titleColumn && (c.card ?? 'field') === 'field');
         return (
-          <li key={key} data-row={key} aria-selected={selection ? on : undefined} className={`flex items-start gap-2 py-2 pe-1 ps-3 ${on ? 'bg-surface-selected' : ''}`}>
+          <li
+            key={key}
+            data-row={key}
+            aria-selected={selection ? on : undefined}
+            className={`flex items-start gap-2 py-2 pe-1 ps-3 ${selection ? `border-s-2 ${on ? 'border-s-gold bg-surface-selected' : 'border-s-transparent'}` : ''}`}
+          >
             {selection && (
               <Checkbox checked={on} onChange={(v) => toggleRow(key, v)} aria-label={selectRow(row)} className="-ms-2 shrink-0" />
             )}

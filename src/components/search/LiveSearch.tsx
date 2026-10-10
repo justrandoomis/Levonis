@@ -330,12 +330,13 @@ export default function LiveSearch({
   const mirrorStyle: React.CSSProperties = inputFontSize ? { ...padding, fontSize: inputFontSize } : padding;
   const heightClass = compact ? 'h-11' : 'h-[50px]';
   const textClass = compact ? 'text-[14px]' : 'text-[15px]';
-  const fieldSkin =
-    tone === 'bar'
-      ? 'rounded-full border border-zinc-800/70 bg-zinc-900 focus-within:border-focus'
-      : `rounded-xl border border-border-subtle shadow-sm focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20 focus-within:bg-surface-raised ${
-          compact ? 'bg-surface/95' : 'bg-surface/86'
-        }`;
+  // A search field is a pill WELL in clay (docs/DECISIONS.md row 209): sunk
+  // into whatever it sits on, with the 3:1 field line, and focus keeps the
+  // well (the line turns to the focus ink, plus the halo). Both tones are the
+  // same well; `bar` only drops the halo.
+  const fieldSkin = `rounded-full lv-well border border-[var(--clay-field)] focus-within:border-focus ${
+    tone === 'bar' ? '' : 'focus-within:ring-2 focus-within:ring-focus/20'
+  }`;
 
   const announcement = !panelShown
     ? ''

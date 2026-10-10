@@ -8,7 +8,7 @@ import type { ListingState } from '../../lib/catalog/types';
  * One-tap filters (§7 item 5): «متوفر الآن», «طلب مسبق», «هيكل مغلق», «متعدد
  * الألوان» and the top brand for printers; the materials and «1.75 مم» for
  * filament. A chip is a toggle (`aria-pressed`) drawn 32 px and hit 44 px;
- * on = ink fill plus a check. The row scrolls sideways and bleeds to the
+ * on = pressed into a well plus a check. The row scrolls sideways and bleeds to the
  * screen edge. Chips that would not change the list are not offered
  * (src/lib/catalog/listingModel.ts `quickChips`).
  */
@@ -34,7 +34,10 @@ export default function QuickFilterChips({ chips, onChange }: { chips: QuickChip
         >
           <span
             className={`inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-[12.5px] font-bold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
-              c.active ? 'bg-text-primary text-canvas' : 'border border-border-subtle bg-surface text-text-secondary group-hover:text-text-primary'
+              // Clay filter chip: flush at rest, pressed (well + press + check) when on.
+              c.active
+                ? 'border border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                : 'border border-border-subtle bg-surface-raised text-text-secondary shadow-xs group-hover:text-text-primary'
             }`}
           >
             {c.active ? <Check aria-hidden="true" className="size-3.5" strokeWidth={2.6} /> : null}

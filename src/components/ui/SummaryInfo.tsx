@@ -61,7 +61,7 @@ export default function SummaryInfo({
     <div data-summary-row={testId}>
       <div
         className={`flex justify-between items-center gap-3 ${
-          tone === 'quiet' ? 'text-zinc-500 text-[13px]' : 'text-zinc-400'
+          tone === 'quiet' ? 'text-text-muted text-[13px]' : 'text-text-secondary'
         }`}
       >
         <span className="font-light inline-flex items-center min-w-0">
@@ -76,14 +76,14 @@ export default function SummaryInfo({
             // A 24px target inside a 13px row. The height comes back out as
             // negative margin so asking the question never makes the row
             // taller than the rows around it.
-            className={`-my-1 ms-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-              open ? 'text-gold' : 'text-zinc-600 hover:text-zinc-300'
+            className={`-my-1 ms-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+              open ? 'text-gold' : 'text-text-muted hover:text-text-primary'
             }`}
           >
             {/*
               «علامة تعجب» — the owner's own word, twice, so it is an
               exclamation and not the circled «i» a designer would reach for.
-              It is drawn in zinc at 14px and carries no tint: everything else
+              It is drawn in the muted ink at 14px and carries no tint: everything else
               in this column that uses this glyph (the advance warning, the
               refused quote) is amber or red WITH a sentence beside it, so a
               neutral mark alone at the end of a label cannot be read as an
@@ -101,13 +101,13 @@ export default function SummaryInfo({
           role="region"
           aria-label={question}
           data-summary-info-panel={testId}
-          className="mt-2 rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2.5 text-xs font-light leading-relaxed text-zinc-400 space-y-2"
+          className="mt-2 rounded-lg border border-border-subtle px-3 py-2.5 text-xs font-light leading-relaxed text-text-secondary space-y-2"
         >
           {children}
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="block pt-0.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="block pt-0.5 text-[11px] text-text-muted hover:text-text-primary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {loc('إخفاء', 'Hide', 'شاردنەوە')}
           </button>

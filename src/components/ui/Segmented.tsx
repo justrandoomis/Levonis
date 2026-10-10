@@ -21,7 +21,13 @@
  *   roving tabindex, and arrow keys that follow the writing direction.
  *
  * Each option may carry its own accent (the tier's colour), applied to the
- * indicator and the label only while that option is chosen.
+ * label only while that option is chosen.
+ *
+ * CLAY (docs/DECISIONS.md row 209): the track is a well sunk into its
+ * surface, and the indicator is one lifted thumb in the raised fill — the
+ * platform's own exception to "selection is a press". One neutral thumb for
+ * every option: an accent tints the label, never the thumb. Every label has
+ * the same weight, so choosing one never reflows a Sorani row.
  */
 import React, { useRef } from 'react';
 // `m`, not the `motion` proxy: this control is in the eager chunk (the
@@ -38,8 +44,8 @@ export interface SegmentedItem {
   icon?: React.ReactNode;
   /** A small trailing mark, e.g. "current". */
   badge?: React.ReactNode;
-  /** Classes for the moving indicator and the label while this option is chosen. */
-  accent?: { indicator: string; text: string };
+  /** Classes for the label while this option is chosen (the thumb stays neutral clay). */
+  accent?: { text: string };
   disabled?: boolean;
 }
 
@@ -68,7 +74,7 @@ export interface SegmentedProps {
   size?: 'md' | 'sm';
 }
 
-const DEFAULT_ACCENT = { indicator: 'bg-white/10 border-white/20', text: 'text-white' };
+const DEFAULT_ACCENT = { text: 'text-text-primary' };
 
 export function Segmented({ items, value, onChange, label, group, className = '', dataAttr, size = 'md' }: SegmentedProps) {
   const m = useMotion();
@@ -117,7 +123,7 @@ export function Segmented({ items, value, onChange, label, group, className = ''
       aria-label={label}
       data-segmented={group}
       onKeyDown={onKeyDown}
-      className={`grid ${size === 'sm' ? 'h-9 box-border gap-0.5 p-0.5 rounded-xl' : 'gap-1 p-1 rounded-2xl'} border border-white/10 bg-zinc-900/60 ${className}`}
+      className={`grid ${size === 'sm' ? 'h-9 box-border gap-0.5 p-0.5' : 'gap-1 p-1'} rounded-full lv-well border border-border-subtle ${className}`}
       style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}
     >
       {items.map((it, idx) => {
@@ -137,11 +143,11 @@ export function Segmented({ items, value, onChange, label, group, className = ''
             disabled={it.disabled}
             onClick={() => onChange(it.id)}
             {...stamp}
-            className={`relative min-w-0 px-2 flex items-center justify-center gap-1.5 press-scale transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 disabled:opacity-40 ${
+            className={`relative min-w-0 px-2 flex items-center justify-center gap-1.5 rounded-full font-bold press-scale transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${
               // `sm` DRAWS 30px and HITS 44px: a transparent ::after reaches 7px past the track above and below (W6).
-              size === 'sm' ? "h-full rounded-[10px] text-[12px] font-bold after:absolute after:inset-x-0 after:-inset-y-[7px] after:content-['']" : 'min-h-11 rounded-xl text-[13px] font-black'
+              size === 'sm' ? "h-full text-[12px] after:absolute after:inset-x-0 after:-inset-y-[7px] after:content-['']" : 'min-h-11 text-[13px]'
             } ${
-              checked ? accent.text : 'text-zinc-400 hover:text-white'
+              checked ? accent.text : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {checked && (
@@ -153,7 +159,7 @@ export function Segmented({ items, value, onChange, label, group, className = ''
                   layoutId={`segmented-${group}`}
                   data-segmented-indicator
                   aria-hidden
-                  className={`absolute inset-0 ${size === 'sm' ? 'rounded-[10px]' : 'rounded-xl'} border ${accent.indicator}`}
+                  className="absolute inset-0 rounded-full border border-border-subtle bg-surface-raised shadow-1"
                   transition={m.reduced ? { duration: 0 } : m.spring('quick')}
                 />
               </MotionFeatures>

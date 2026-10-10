@@ -309,13 +309,13 @@ function SheetV2({
         onClick={toggle}
         aria-label={detent === 'large' ? strings.collapse : strings.expand}
         aria-expanded={detent === 'large'}
-        className="flex h-7 w-full items-center justify-center rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="flex h-7 w-full items-center justify-center rounded-t-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <span aria-hidden="true" className="h-1 w-9 rounded-full bg-white/25" />
+        <span aria-hidden="true" className="h-1 w-9 rounded-full bg-text-muted/40" />
       </button>
     ) : phone && !m.reduced ? (
       <div className="flex justify-center pt-2.5 pb-1" aria-hidden data-sheet-grabber>
-        <span className="h-1 w-9 rounded-full bg-white/25" />
+        <span className="h-1 w-9 rounded-full bg-text-muted/40" />
       </div>
     ) : null;
 

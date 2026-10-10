@@ -40,10 +40,10 @@ export function StatCard({
     <div className={`rounded-xl border p-2.5 min-w-0 ${t.box}`}>
       <div className="flex items-center gap-1.5 mb-1.5">
         <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${t.icon}`}>{icon}</span>
-        <span className="text-zinc-400 text-[10.5px] font-semibold truncate">{label}</span>
+        <span className="text-text-secondary text-[10.5px] font-semibold truncate">{label}</span>
       </div>
-      <div className="text-white font-bold text-[19px] leading-tight"><span dir="ltr">{value}</span></div>
-      <div className="text-zinc-500 text-[10px] truncate mb-1">{sub}</div>
+      <div className="text-text-primary font-bold text-[19px] leading-tight"><span dir="ltr">{value}</span></div>
+      <div className="text-text-muted text-[10px] truncate mb-1">{sub}</div>
       <Spark series={series} className={t.spark} />
     </div>
   );

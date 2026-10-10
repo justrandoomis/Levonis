@@ -460,7 +460,7 @@ export default function NotificationBell() {
         aria-label={openLabel}
         aria-expanded={open}
         aria-haspopup={phone ? 'dialog' : 'menu'}
-        className="relative flex h-11 w-11 items-center justify-center rounded-full border border-zinc-800/60 bg-zinc-900/80 text-zinc-300 shadow-sm transition-all hover:border-olive/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full bg-surface shadow-xs text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <Bell className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
         {unread > 0 && (

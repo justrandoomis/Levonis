@@ -197,7 +197,7 @@ export default function JobSheet({
               items={PRINT_QUALITIES.map((q) => ({
                 id: q,
                 label: qualityLabel(q, s),
-                accent: { indicator: 'bg-gold/10 border-gold/40', text: 'text-gold' },
+                accent: { text: 'text-gold' },
               }))}
             />
           </div>

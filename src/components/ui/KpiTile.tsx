@@ -20,7 +20,9 @@
  *     invent a flat line either — absence is absence).
  *
  * `to` makes the whole tile a link to the screen that explains the figure
- * (the Command Center's tiles are doors, not decorations).
+ * (the Command Center's tiles are doors, not decorations). A door is clay you
+ * can press (docs/DECISIONS.md row 209): resting card, a step higher under a
+ * pointer, dented while held. A tile sits on the canvas, never in a card.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -114,7 +116,7 @@ export function KpiTile({ label, value, delta, trend, hint, icon, loading = fals
         to={to}
         data-kpi
         aria-busy={loading || undefined}
-        className={`${shell} transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+        className={`${shell} no-press transition-colors hover:bg-surface-raised hover:shadow-lg active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
       >
         {body}
       </Link>

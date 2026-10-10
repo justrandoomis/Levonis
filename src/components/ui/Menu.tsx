@@ -140,7 +140,9 @@ function MenuList({ id, label, items, start, large, onPick, onTab }: MenuListPro
         if (isSeparator(entry)) {
           return <div key={entry.id} role="separator" className="my-1 h-px bg-border-subtle" />;
         }
-        const row = `flex w-full items-center gap-3 rounded-md px-3 text-start outline-none transition-colors focus:bg-white/[0.07] ${
+        // Flat rows in a lifted menu: 10px corners inside its 18px, the hover
+        // (= focus) fill, and a dent to the well fill while pressed.
+        const row = `flex w-full items-center gap-3 rounded-sm px-3 text-start outline-none transition-colors focus:bg-white/[0.07] active:bg-[var(--clay-well-bg)] ${
           large ? 'min-h-12 text-[15px]' : 'min-h-11 text-sm'
         } ${entry.destructive ? 'text-danger' : 'text-text-primary'} ${entry.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`;
         const content = (

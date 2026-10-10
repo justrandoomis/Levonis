@@ -199,8 +199,13 @@ export default function BottomNav() {
         dir={dir}
         aria-label={badge > 0 ? `${item.label} (${badge})` : item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 transition-[color,background-color,opacity,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.98] ${
-          isActive ? 'bg-white/[0.07] text-text-primary' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-secondary'
+        // CLAY (docs/DECISIONS.md row 209): the current tab is a DIMPLE
+        // pressed into its pod — the well fill and the press shadow — and
+        // the gold notch is its one secondary cue. `data-clay-dimple` lets
+        // forced colours (which drop every shadow) outline it instead.
+        data-clay-dimple={isActive || undefined}
+        className={`relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 transition-[color,background-color,opacity,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.98] ${
+          isActive ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'text-text-muted hover:bg-white/[0.04] hover:text-text-secondary'
         }`}
       >
         {isActive && (
@@ -218,7 +223,7 @@ export default function BottomNav() {
             <span
               aria-hidden="true"
               data-nav-badge={item.path === '/cart' ? 'cart' : item.path === '/chats' ? 'messages' : undefined}
-              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-danger text-snow text-[10px] font-black leading-[16px] text-center tabular-nums"
+              className="absolute -top-1.5 -end-2 min-w-[16px] h-[16px] px-1 rounded-full bg-crimson text-snow text-[10px] font-black leading-[16px] text-center tabular-nums"
             >
               {badge > 99 ? '99+' : badge}
             </span>
@@ -229,7 +234,9 @@ export default function BottomNav() {
             </React.Suspense>
           ) : null}
         </span>
-        <span className={`max-w-full truncate text-[9px] sm:text-[10px] ${isActive ? 'font-bold text-text-primary' : 'font-medium'}`}>{item.label}</span>
+        {/* One weight in both states: a bolder current label made a Sorani
+            label wider than its slot and reflowed the pod. */}
+        <span className="max-w-full truncate text-[9px] font-medium sm:text-[10px]">{item.label}</span>
       </Link>
     );
   };
@@ -259,7 +266,7 @@ export default function BottomNav() {
           restores the document direction for its Arabic/English label. */}
       <div
         data-bottom-nav-group="account-cart"
-        className="material material-thin flex h-16 min-w-0 max-w-[160px] flex-1 items-center gap-0.5 rounded-2xl border border-border-subtle p-1.5 shadow-2xl pointer-events-auto sm:h-[68px] sm:max-w-[180px] sm:p-2"
+        className="material flex h-16 min-w-0 max-w-[160px] flex-1 items-center gap-0.5 rounded-2xl border border-border-subtle p-1.5 shadow-lg pointer-events-auto sm:h-[68px] sm:max-w-[180px] sm:p-2"
       >
         {leftItems.map(renderItem)}
       </div>
@@ -282,7 +289,7 @@ export default function BottomNav() {
 
       <div
         data-bottom-nav-group="messages-community"
-        className="material material-thin flex h-16 min-w-0 max-w-[160px] flex-1 items-center gap-0.5 rounded-2xl border border-border-subtle p-1.5 shadow-2xl pointer-events-auto sm:h-[68px] sm:max-w-[180px] sm:p-2"
+        className="material flex h-16 min-w-0 max-w-[160px] flex-1 items-center gap-0.5 rounded-2xl border border-border-subtle p-1.5 shadow-lg pointer-events-auto sm:h-[68px] sm:max-w-[180px] sm:p-2"
       >
         {rightItems.map(renderItem)}
       </div>

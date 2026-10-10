@@ -45,6 +45,16 @@ import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/p
  *    a stretched `::after`, and the toggle sits above that.
  *
  *  regular — the previous card, kept for any caller not yet moved.
+ *
+ * CLAY (docs/DECISIONS.md row 209). A product card is resting clay (level 1:
+ * the lit rim, the shaded base and ONE soft cast — the one blurred layer a
+ * scrolling list of forty cards repaints) that dents while it is pressed.
+ * The photograph sits in a tray 4 px inside the card (22 − 4 = 18 px
+ * corners). Only the card's own link dents it — pressing the compare toggle
+ * on its photograph does not. Hover changes the fill only — no lift and no image zoom on a
+ * repeated item — and nothing on the card blurs what is behind it. A long
+ * grid hands `lv-cv` to the card itself (`className`), never to a wrapper:
+ * paint containment clips a descendant's shadow at the wrapper's edge.
  */
 export default function ProductCard({
   p,
@@ -54,6 +64,7 @@ export default function ProductCard({
   compareToggle = false,
   eager = false,
   imageSizes,
+  className,
 }: {
   p: ApiProduct;
   /** An explicit width utility; overrides `width`. */
@@ -67,12 +78,14 @@ export default function ProductCard({
   eager?: boolean;
   /** Override for a shelf that changes from a fixed-width rail to a grid. */
   imageSizes?: string;
+  /** Extra classes on the compact card's root (a long grid's `lv-cv`). */
+  className?: string;
 }) {
   if (density === 'compact') {
     return (
       <CompactCard
         p={p as CardProduct}
-        widthClass={widthClass ?? (width === 'rail' ? 'w-[148px] shrink-0' : 'w-full')}
+        widthClass={`${widthClass ?? (width === 'rail' ? 'w-[148px] shrink-0' : 'w-full')}${className ? ` ${className}` : ''}`}
         compareToggle={compareToggle}
         eager={eager}
         imageSizes={imageSizes ?? (width === 'rail' ? '148px' : '(min-width: 1280px) calc((100vw - 72px) / 5), (min-width: 1024px) calc((100vw - 68px) / 4), (min-width: 640px) calc((100vw - 56px) / 3), calc((100vw - 42px) / 2)')}
@@ -112,9 +125,9 @@ function CompactCard({
   return (
     <div
       data-product-card="compact"
-      className={`${widthClass} group relative flex min-w-0 flex-col overflow-hidden rounded-[14px] border border-border-subtle bg-surface transition-colors hover:bg-surface-raised has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus`}
+      className={`${widthClass} group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-sm transition-colors hover:bg-surface-raised has-[a:active]:shadow-press has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus`}
     >
-      <div className={`relative aspect-[6/5] overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
+      <div className={`relative mx-1 mt-1 aspect-[6/5] overflow-hidden rounded-lg ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
         <SafeImage
           src={image}
           alt=""
@@ -124,13 +137,13 @@ function CompactCard({
           className="h-full w-full"
           bgClassName={lightShown ? 'bg-surface-selected' : 'bg-charcoal'}
           fallbackClassName="text-snow/35"
-          imgClassName="object-[50%_4%] transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
+          imgClassName="object-[50%_4%]"
         />
         {hasSale && <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>}
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
         {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
-          <span className="absolute bottom-1.5 start-1.5 rounded-md bg-onyx/80 px-1.5 py-0.5">
+          <span className="absolute bottom-1.5 start-1.5 rounded-sm bg-onyx/80 px-1.5 py-0.5">
             <Countdown
               target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
               kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
@@ -141,7 +154,7 @@ function CompactCard({
         {/* Graded stock says so on the card, on the photograph so the
             card's height does not change. */}
         {condition && (
-          <span className="absolute bottom-1.5 end-1.5 rounded-md bg-onyx/80 px-1.5 py-0.5 text-[10px] font-bold leading-4 text-snow">
+          <span className="absolute bottom-1.5 end-1.5 rounded-sm bg-onyx/80 px-1.5 py-0.5 text-[10px] font-bold leading-4 text-snow">
             {condition}
           </span>
         )}
@@ -149,7 +162,7 @@ function CompactCard({
 
       <Link
         to={cardHref(p)}
-        className="flex min-w-0 flex-1 flex-col px-2.5 pb-2.5 pt-[9px] focus-visible:outline-none after:absolute after:inset-0 after:z-[1] after:content-['']"
+        className="no-press flex min-w-0 flex-1 flex-col px-2.5 pb-2.5 pt-[9px] focus-visible:outline-none after:absolute after:inset-0 after:z-[1] after:content-['']"
       >
         <h3
           dir="ltr"
@@ -188,7 +201,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
   return (
     <Link
       to={cardHref(p)}
-      className={`${widthClass} relative shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+      className={`${widthClass} relative shrink-0 overflow-hidden flex flex-col group bg-surface rounded-xl border border-border-subtle shadow-sm no-press hover:bg-surface-raised active:shadow-press transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
     >
       <div className={`relative aspect-square overflow-hidden ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
         <SafeImage
@@ -196,13 +209,13 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
           alt={name}
           aspect="auto"
           sizes="160px"
-          className="w-full h-full group-hover:scale-[1.04] transition-transform duration-500 motion-reduce:transition-none"
+          className="w-full h-full"
         />
         {hasSale && (
           <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>
         )}
         {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
-          <span className="absolute bottom-2 start-2 rounded-md bg-onyx/80 px-1.5 py-0.5">
+          <span className="absolute bottom-2 start-2 rounded-sm bg-onyx/80 px-1.5 py-0.5">
             <Countdown
               target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
               kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}

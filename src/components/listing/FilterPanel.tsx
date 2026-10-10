@@ -226,5 +226,5 @@ function CountLabel({ text, count }: { text: string; count: number }) {
   );
 }
 
-const SEG_ACCENT = { indicator: 'bg-surface-raised border-border-subtle shadow-1', text: 'text-text-primary' };
+const SEG_ACCENT = { text: 'text-text-primary' };
 

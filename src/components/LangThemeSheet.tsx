@@ -185,7 +185,7 @@ export default function LangThemeButton({ variant = 'home', className = '' }: La
 
   const buttonClass =
     variant === 'home'
-      ? 'flex h-11 w-11 items-center justify-center rounded-xl bg-surface/95 text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+      ? 'flex h-11 w-11 items-center justify-center rounded-xl bg-surface shadow-xs text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
       : 'hover:text-gilt transition-colors flex items-center gap-1.5 min-h-11 min-w-11 justify-center px-1 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
   return (

@@ -15,9 +15,12 @@
  *   SYMMETRY. Enter and exit run the same path in reverse. There is exactly one
  *   place that decides the path, so the two can never drift apart.
  *
- *   MATERIALIZE, DON'T FADE. Glass arrives as glass: the blur radius and the
- *   scale animate together, so the surface reads as a real material coming into
- *   place rather than a rectangle whose opacity went up.
+ *   ARRIVE, DON'T JUST FADE. A window scales up from just under its size as
+ *   it fades in, so it reads as a solid slab coming into place rather than a
+ *   rectangle whose opacity went up. It is solid clay, not glass
+ *   (docs/DECISIONS.md rows 208–209): nothing blurs on the way in or out — a
+ *   filter on a whole window is re-rasterised on every frame of the spring,
+ *   the most expensive paint on the mid-range phones most customers use.
  *
  *   ANCHORED ORIGIN. A menu or a popover scales from the control that opened
  *   it, not from its own centre, so the relationship between the button and
@@ -319,10 +322,10 @@ export interface OverlayProps {
    */
   panelMotion?: Record<string, unknown> & { ref?: (el: HTMLDivElement | null) => void };
   /**
-   * Opt OUT of the glass material, for a surface whose content needs its own
-   * ground: a QR code has to stay dark-on-light to scan at all, and a photo
-   * viewer wants nothing tinted behind it. The window still arrives and leaves
-   * the same way every other window does; it is just not translucent. The
+   * Opt OUT of the raised clay fill and its border, for a surface whose
+   * content needs its own ground: a QR code has to stay dark-on-light to scan
+   * at all, and a photo viewer wants nothing tinted behind it. The window
+   * still arrives, leaves and casts the way every other window does. The
    * caller supplies the background in `panelClassName`.
    */
   solid?: boolean;
@@ -553,12 +556,11 @@ export function Overlay({
   const dock = placement === 'dock';
   // A docked sheet travels its whole height: it rises from the bottom edge and
   // is lowered back below it («إنزال النافذة بشكل سلس للأسفل»). It does not
-  // scale or blur — a sheet slides, it does not materialize — and it stays
+  // scale — a sheet slides, it does not grow into place — and it stays
   // opaque while it moves, except under reduced motion, where the slide is a
   // cross-fade.
   const travel: number | string = dock ? (m.reduced ? 0 : '100%') : placement === 'bottom' ? m.travel(28) : m.travel(14);
   const scaleFrom = m.reduced || dock ? 1 : anchor ? 0.9 : 0.96;
-  const blurFrom = m.reduced || dock ? 0 : 8;
   const fadeFrom = dock && !m.reduced ? 1 : 0;
   const callerStyle = panelMotionRest.style as React.CSSProperties | undefined;
 
@@ -587,18 +589,21 @@ export function Overlay({
             aria-describedby={describedBy}
             tabIndex={-1}
             data-overlay-panel
-            // ENTER AND EXIT ARE THE SAME OBJECT, so they cannot disagree. The
-            // blur travels with the scale: the surface materializes. When the
-            // feature chunk has failed, the panel paints at rest instead of
-            // waiting below the viewport for motion that will not come.
-            initial={atRest ? false : { opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
-            animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: fadeFrom, scale: scaleFrom, y: travel, filter: `blur(${blurFrom}px)` }}
+            // ENTER AND EXIT ARE THE SAME OBJECT, so they cannot disagree.
+            // When the feature chunk has failed, the panel paints at rest
+            // instead of waiting below the viewport for motion that will not come.
+            initial={atRest ? false : { opacity: fadeFrom, scale: scaleFrom, y: travel }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: fadeFrom, scale: scaleFrom, y: travel }}
             transition={m.spring(placement === 'bottom' || dock ? 'sheet' : 'ui')}
             {...panelMotionRest}
             style={{ transformOrigin: originRef.current, outline: 'none', ...callerStyle }}
-            className={`relative min-w-0 ${solid ? 'shadow-2xl' : 'bg-surface-raised border border-border-subtle shadow-2xl'} ${
-              dock ? 'rounded-t-xl' : placement === 'bottom' ? 'rounded-t-xl sm:rounded-xl' : 'rounded-xl'
+            // CLAY (docs/DECISIONS.md row 209): a window is the slab, the one
+            // level-3 surface on screen (--clay-3); a sheet on the bottom
+            // edge casts upward onto the page instead (--clay-dock). Dialog
+            // corners are 24px, a sheet's top corners 32px.
+            className={`relative min-w-0 ${solid ? '' : 'bg-surface-raised border border-border-subtle '}${
+              dock ? 'shadow-dock rounded-t-3xl' : placement === 'bottom' ? 'shadow-dock rounded-t-3xl sm:shadow-2xl sm:rounded-2xl' : 'shadow-2xl rounded-2xl'
             } ${panelClassName}`}
           >
             {typeof children === 'function' ? children({ close: requestClose }) : children}
@@ -702,7 +707,7 @@ export function Sheet({ open, onClose, children, height, docked = false, panelCl
               tried — an affordance has to precede its gesture. */}
           {!m.reduced && (
             <div className="flex justify-center pt-2.5 pb-1" aria-hidden data-sheet-grabber>
-              <span className="h-1 w-9 rounded-full bg-white/25" />
+              <span className="h-1 w-9 rounded-full bg-text-muted/40" />
             </div>
           )}
           {typeof children === 'function' ? children(api) : children}
@@ -883,7 +888,8 @@ export function Anchored({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: m.reduced ? 1 : 0.92, y: m.travel(-6) }}
           transition={m.spring('quick')}
-          className={`fixed overflow-hidden rounded-md border border-border-subtle bg-surface-raised shadow-2xl ${className}`}
+          // Lifted clay (level 2), 18px: a menu sits above the page, under any window.
+          className={`fixed overflow-hidden rounded-lg border border-border-subtle bg-surface-raised shadow-lg ${className}`}
           style={{
             zIndex: zRef.current ?? Math.max(z, UI_LAYERS.popover),
             top: position?.top ?? 0,

@@ -41,8 +41,11 @@ export default function ProductGrid({ products, divider, withColumn }: { product
               <span aria-hidden="true" className="h-px flex-1 bg-border-subtle" />
             </li>
           ) : null}
-          <li className={`flex ${i >= 8 ? 'lv-cv' : ''}`}>
-            <ProductCard p={p} density="compact" compareToggle eager={i < 4} />
+          {/* `lv-cv` (content-visibility) goes on the CARD, not this <li>:
+              paint containment clips a descendant's ink at the container's
+              edge, which would cut every card's clay shadow from the 9th on. */}
+          <li className="flex">
+            <ProductCard p={p} density="compact" compareToggle eager={i < 4} className={i >= 8 ? 'lv-cv' : undefined} />
           </li>
         </React.Fragment>
       ))}

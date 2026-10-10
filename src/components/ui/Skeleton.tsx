@@ -32,7 +32,7 @@ export function Skeleton({ className = '' }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`${display}bg-zinc-800/60 rounded animate-pulse motion-reduce:animate-none ${className}`}
+      className={`${display}bg-surface-selected rounded animate-pulse motion-reduce:animate-none ${className}`}
     />
   );
 }
@@ -59,7 +59,7 @@ export function SkeletonGroup({
 /**
  * Mirrors the storefront product card (src/components/home/ProductCard.tsx).
  * `regular`: square image, two title lines, one price line. `compact`: the
- * compact card's exact geometry — 6:5 photo, 34 px name box, the price row,
+ * compact card's exact geometry — 6:5 photo in its 4 px tray, 34 px name box, the price row,
  * the member row and the availability row — so the real card replaces it
  * without a single pixel of shift (262 px tall at 174 px wide).
  */
@@ -75,9 +75,9 @@ export function ProductCardSkeleton({
       <div
         aria-hidden="true"
         data-product-card-skeleton="compact"
-        className={`flex flex-col overflow-hidden rounded-[14px] border border-border-subtle bg-surface ${className}`}
+        className={`flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface ${className}`}
       >
-        <div className="aspect-[6/5] bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+        <div className="mx-1 mt-1 aspect-[6/5] rounded-lg bg-surface-selected animate-pulse motion-reduce:animate-none" />
         <div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-[9px]">
           <div className="flex h-[34px] flex-col justify-center gap-1.5">
             <Skeleton className="h-3 w-full" />
@@ -99,9 +99,9 @@ export function ProductCardSkeleton({
   return (
     <div
       aria-hidden="true"
-      className={`bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col ${className}`}
+      className={`bg-surface border border-border-subtle rounded-xl overflow-hidden flex flex-col ${className}`}
     >
-      <div className="aspect-square bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+      <div className="aspect-square bg-surface-selected animate-pulse motion-reduce:animate-none" />
       <div className="p-3 flex flex-col flex-1 gap-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-2/3" />
@@ -169,8 +169,8 @@ export function ProductDetailSkeleton() {
       <div aria-hidden="true" className="mx-auto w-full max-w-[1540px] px-4 sm:px-6 xl:px-8 pt-2">
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px] lg:gap-8 xl:gap-12 lg:items-start">
           <div className="min-w-0">
-            <div className="w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-zinc-800/70 bg-zinc-950 overflow-hidden">
-              <div className="w-full h-full bg-zinc-800/40 animate-pulse motion-reduce:animate-none" />
+            <div className="w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-border-subtle bg-surface overflow-hidden">
+              <div className="w-full h-full bg-surface-selected animate-pulse motion-reduce:animate-none" />
             </div>
             <div className="mt-3 flex gap-2 pb-1">
               {Array.from({ length: 4 }, (_, i) => (
@@ -185,10 +185,10 @@ export function ProductDetailSkeleton() {
                 <Line w="w-32" h="h-2.5" />
               </p>
               <div className="mt-3 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
-                <span className="inline-flex items-center border border-zinc-800 rounded-full px-2.5 py-1 text-[11px] leading-normal">
+                <span className="inline-flex items-center border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal">
                   <Line w="w-16" h="h-2.5" />
                 </span>
-                <span className="inline-flex items-center border border-zinc-800 rounded-full px-2.5 py-1 text-[11px] leading-normal">
+                <span className="inline-flex items-center border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal">
                   <Line w="w-20" h="h-2.5" />
                 </span>
               </div>
@@ -270,9 +270,9 @@ export function BundleCardSkeleton({ className = '' }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={`bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col ${className}`}
+      className={`bg-surface border border-border-subtle rounded-xl overflow-hidden flex flex-col ${className}`}
     >
-      <div className="aspect-square bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+      <div className="aspect-square bg-surface-selected animate-pulse motion-reduce:animate-none" />
       <div className="p-3 flex flex-col flex-1 gap-2">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-2/3" />
@@ -314,17 +314,17 @@ export function BundleGridSkeleton({
 export function BundleDetailSkeleton() {
   return (
     <SkeletonGroup className="w-full">
-      <div aria-hidden="true" className="h-64 sm:h-80 bg-zinc-800/60 animate-pulse motion-reduce:animate-none" />
+      <div aria-hidden="true" className="h-64 sm:h-80 bg-surface-selected animate-pulse motion-reduce:animate-none" />
       <div className="p-4 space-y-4">
         <Skeleton className="h-6 w-2/3" />
         <Skeleton className="h-4 w-1/3" />
-        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 space-y-2">
+        <div className="bg-surface border border-border-subtle rounded-2xl p-4 space-y-2">
           <Skeleton className="h-7 w-32" />
           <Skeleton className="h-4 w-40" />
         </div>
         <div className="space-y-2">
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="flex items-center gap-3 bg-zinc-900/40 border border-zinc-800/50 rounded-xl p-3">
+            <div key={i} className="flex items-center gap-3 bg-surface border border-border-subtle rounded-xl p-3">
               <Skeleton className="w-12 h-12 rounded-lg shrink-0" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-2/3" />

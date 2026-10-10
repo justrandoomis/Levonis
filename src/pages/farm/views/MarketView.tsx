@@ -180,7 +180,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                       {s.spoolSize(g)}
                     </span>
                   ),
-                  accent: { indicator: 'bg-gold/10 border-gold/40', text: 'text-gold' },
+                  accent: { text: 'text-gold' },
                 }))}
               />
             </div>

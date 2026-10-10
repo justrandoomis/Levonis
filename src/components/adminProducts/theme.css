@@ -37,11 +37,15 @@
   --ap-info: #82b1f2;
   --ap-info-bg: rgb(60 126 230 / 0.14);
   --ap-info-border: rgb(60 126 230 / 0.28);
-  --ap-radius-sm: 8px;
-  --ap-radius-md: 10px;
-  --ap-radius-lg: 14px;
-  --ap-shadow-1: 0 1px 2px rgb(0 0 0 / 0.35), 0 10px 30px -14px rgb(0 0 0 / 0.6);
-  --ap-shadow-menu: 0 12px 40px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.07);
+  /* Clay (docs/DECISIONS.md row 209): the app's role radii and elevations,
+     so a section here is the same material as a card anywhere else. The
+     shadows resolve from the theme's own clay primitives — warm on cream,
+     black on the dark ground — so the light block needs no copy of them. */
+  --ap-radius-sm: var(--radius-sm);
+  --ap-radius-md: var(--radius-md);
+  --ap-radius-lg: var(--radius-lg);
+  --ap-shadow-1: var(--clay-1);
+  --ap-shadow-menu: var(--clay-2);
 }
 
 
@@ -84,8 +88,6 @@
   --ap-info: #2d5f9a;
   --ap-info-bg: rgb(45 95 154 / 0.1);
   --ap-info-border: rgb(45 95 154 / 0.3);
-  --ap-shadow-1: 0 1px 2px rgb(22 24 27 / 0.06), 0 10px 30px -14px rgb(22 24 27 / 0.14);
-  --ap-shadow-menu: 0 12px 40px -12px rgb(22 24 27 / 0.22), 0 0 0 1px rgb(22 24 27 / 0.08);
 }
 .ap select.ap-select {
   appearance: none;

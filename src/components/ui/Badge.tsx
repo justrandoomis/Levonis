@@ -8,8 +8,12 @@
  * a leading dot, and the tint, so it survives colour blindness, a greyscale
  * screenshot and a screen reader alike (apple-design §5, §7).
  *
- * Restrained on purpose: a 10% tint and tone-coloured text — no border plus
- * fill plus glow for one state.
+ * Restrained on purpose: an opaque tint and tone-coloured text — no border
+ * plus fill plus glow for one state. Information is flat clay: `.lv-chip`
+ * mixes 12% of the tone into the raised fill (docs/DECISIONS.md row 209),
+ * which reads at 4.5:1 or better in both themes on any ground, where the old
+ * translucent `bg-<tone>/10` measured about 4.1:1 on the cream canvas.
+ * Danger reads its darker error ink.
  *
  * A BADGE is a count («3») or a short tag beside something else. Numbers are
  * tabular and set as an LTR island, so «12» never reads «21» in an Arabic row.
@@ -20,11 +24,11 @@ export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'in
 
 const CHIP: Record<Tone, string> = {
   neutral: 'bg-white/[0.06] text-text-secondary',
-  accent: 'bg-gold/10 text-gold',
-  success: 'bg-success/10 text-success',
-  warning: 'bg-warning/10 text-warning',
-  danger: 'bg-danger/10 text-danger',
-  info: 'bg-info/10 text-info',
+  accent: 'lv-chip [--chip:var(--color-gold)]',
+  success: 'lv-chip [--chip:var(--color-success)]',
+  warning: 'lv-chip [--chip:var(--color-warning)]',
+  danger: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
+  info: 'lv-chip [--chip:var(--color-info)]',
 };
 
 const DOT: Record<Tone, string> = {

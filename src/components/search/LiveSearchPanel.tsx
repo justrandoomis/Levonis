@@ -56,7 +56,7 @@ export default function LiveSearchPanel({ shown, children }: LiveSearchPanelProp
             transition={m.reduced ? { ...CROSS_FADE, height: { duration: 0 } } : m.spring('ui')}
             // Keeps the caret in the field while a row is tapped.
             onMouseDown={(e) => e.preventDefault()}
-            className="material material-thick pointer-events-auto absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border-subtle shadow-2xl shadow-black/50"
+            className="material pointer-events-auto absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-lg border border-border-subtle shadow-lg"
           >
             <div ref={contentRef}>{children}</div>
           </Motion.div>

@@ -144,7 +144,9 @@ export default function LatestProducts({
         ref={setRail}
         aria-live="polite"
         aria-busy={waiting || undefined}
-        className="-mx-4 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-1 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0 2xl:grid-cols-6 2xl:gap-5"
+        // -my-2 pt-2 pb-3: a scroller clips on both axes, so it keeps room for
+        // the cards' clay cast and focus ring; the layout nets the old pb-1.
+        className="-mx-4 -my-2 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pt-2 pb-3 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0 2xl:grid-cols-6 2xl:gap-5"
       >
         {waiting
           ? Array.from({ length: 4 }, (_, i) => (

@@ -70,7 +70,7 @@ export function PlanPicker({ tier, tierPlans, selectedPlanId, onSelectPlan }: Pl
         dataAttr="data-plan"
         items={tierPlans.map((p) => ({
           id: p.id,
-          accent: { indicator: 'bg-surface-selected border-border-subtle', text: 'text-text-primary' },
+          accent: { text: 'text-text-primary' },
           label: (
             <span className="flex flex-col items-center leading-tight py-1">
               <span className="text-[13px] font-bold">{durationLabel(p.duration_months, lang)}</span>

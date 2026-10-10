@@ -15,6 +15,11 @@ import React from 'react';
  * the joins and renders the word as disconnected glyphs. §13.3 states the rule
  * ("no letter-spacing on Arabic text"); this is where the badge obeys it,
  * rather than every call site remembering to.
+ *
+ * CLAY (docs/DECISIONS.md row 209): information is flat. SALE is one solid
+ * fill on the photograph; the inline saving and member pills are the opaque
+ * `.lv-chip` tone mix (AA on any ground, both themes) instead of a
+ * translucent tint plus a border — one cue, not two, and no glow.
  */
 
 const LATIN_ONLY = /^[\x20-\x7E]*$/;
@@ -34,9 +39,9 @@ export default function OfferBadge({
   const latin = LATIN_ONLY.test(text);
 
   const tones: Record<string, string> = {
-    sale: 'bg-rose-600/95 text-snow',
-    saving: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-    member: 'bg-gold/15 text-gold border border-gold/30',
+    sale: 'bg-rose-600 text-snow',
+    saving: 'lv-chip [--chip:var(--color-success)]',
+    member: 'lv-chip [--chip:var(--color-gold)]',
   };
 
   return (

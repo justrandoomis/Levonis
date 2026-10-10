@@ -80,6 +80,6 @@ const ListingToolbar = forwardRef<HTMLButtonElement, {
   );
 });
 
-const ACCENT = { indicator: 'bg-surface-selected border-transparent', text: 'text-text-primary' };
+const ACCENT = { text: 'text-text-primary' };
 
 export default ListingToolbar;

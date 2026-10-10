@@ -25,10 +25,13 @@ test('Segmented gains a compact size and keeps its default untouched', () => {
   const seg = read('src/components/ui/Segmented.tsx');
   assert.match(seg, /size = 'md'/, 'the default stays md');
   // W6: the sm option still DRAWS 30px; a transparent ::after 7px above and below makes it HIT 44px.
-  assert.match(seg, /size === 'sm' \? "h-full rounded-\[10px\] text-\[12px\] font-bold after:absolute after:inset-x-0 after:-inset-y-\[7px\] after:content-\[''\]" : 'min-h-11 rounded-xl text-\[13px\] font-black'/);
+  // Clay (docs/DECISIONS.md row 209): the track is a pill well and the thumb a
+  // pill, so both sizes share `rounded-full`, and every label is bold (the md
+  // `font-black` swap is gone) — the geometry and the 12px bold are unchanged.
+  assert.match(seg, /gap-1\.5 rounded-full font-bold press-scale [^`]*\$\{\s*\/\/[^\n]*\n\s*size === 'sm' \? "h-full text-\[12px\] after:absolute after:inset-x-0 after:-inset-y-\[7px\] after:content-\[''\]" : 'min-h-11 text-\[13px\]'/);
   // The sm TRACK is 36px with its padding and border — the same h-9 as the
   // select and the search button beside it. A 36px option inside them drew 42px.
-  assert.match(seg, /size === 'sm' \? 'h-9 box-border gap-0\.5 p-0\.5 rounded-xl'/);
+  assert.match(seg, /size === 'sm' \? 'h-9 box-border gap-0\.5 p-0\.5' : 'gap-1 p-1'\} rounded-full lv-well/);
   assert.doesNotMatch(seg, /size === 'sm' \? 'min-h-9/);
 });
 

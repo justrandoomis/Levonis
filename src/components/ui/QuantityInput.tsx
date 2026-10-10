@@ -23,7 +23,7 @@
  *     `limitKind` says whose it is — the shelf, the pre-order quota, or the
  *     per-line ceiling — so the sentence is true.
  *
- * GEOMETRY. Both steppers are 44×44. The number cell has a FIXED width that
+ * GEOMETRY. Both steppers hit 44×44 (drawn 36 inside the well). The number cell has a FIXED width that
  * holds six digits, so 1 → 100,000 moves nothing around it. The hint is an
  * overlay bubble, not a row: showing it never pushes the price or the button.
  * Holding − or + repeats (after 400 ms), for the buyer who still prefers it.
@@ -202,15 +202,19 @@ export function QuantityInput({
   const atMax = value >= ceiling;
   const name = label ?? loc('الكمية', 'Quantity', 'بڕ');
   const numberWidth = size === 'sm' ? 'w-14 text-[15px]' : 'w-[4.5rem] text-[16px]';
+  // CLAY (docs/DECISIONS.md row 209): ONE well holding the figure, with two
+  // lifted keys inside it (10px corners inside the well's 14px) that dent
+  // while held. A key draws 36px and hits 44px (`lv-hit`), and the well is
+  // 46px tall, as the old bordered strip was.
   const btn =
-    'flex h-11 w-11 shrink-0 items-center justify-center text-text-secondary transition-colors [touch-action:manipulation] ' +
-    'hover:bg-surface-raised active:bg-surface-selected disabled:opacity-35 disabled:hover:bg-transparent ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus';
+    'relative lv-hit flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-surface-raised text-text-secondary shadow-1 transition-colors [touch-action:manipulation] ' +
+    'no-press hover:text-text-primary active:shadow-press disabled:opacity-35 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
   return (
     <div className={`relative inline-flex ${className}`} data-testid={testId} data-quantity-input>
       <div
-        className={`inline-flex items-stretch overflow-hidden rounded-xl border border-border-subtle bg-surface ${
+        className={`inline-flex items-center gap-1 rounded-md lv-well border border-[var(--clay-field)] p-1 ${
           disabled ? 'opacity-60' : ''
         }`}
       >
@@ -282,7 +286,7 @@ export function QuantityInput({
               if (next !== value) onChange(next, 'step');
             }
           }}
-          className={`${numberWidth} h-11 min-w-0 cursor-text border-x border-border-subtle bg-transparent px-0.5 text-center font-bold tabular-nums text-text-primary outline-none transition-colors hover:bg-surface-raised focus:bg-surface-raised focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus`}
+          className={`${numberWidth} -my-1 h-11 min-w-0 cursor-text bg-transparent px-0.5 text-center font-bold tabular-nums text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus`}
         />
         <button
           type="button"

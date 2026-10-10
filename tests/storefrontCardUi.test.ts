@@ -68,7 +68,9 @@ test('L10: the card marks a video, holds its second frame as state, and carries 
   assert.match(html, /role="img" aria-label="يحتوي على فيديو"/, 'the mark says what it is');
   assert.match(html, /data-card-frame="1"/, 'the first frame renders; the second is a state swap, not a transform');
   assert.doesNotMatch(html, /v1-2\.webp/, 'the second frame is not in the first paint');
-  assert.match(html, /bg-danger text-snow/, 'the deal badge is tokens');
+  // The count / deal badge is crimson (clay, docs/DECISIONS.md row 209): snow on
+  // the danger tone measured 3.15:1 in dark; on crimson it reads 5.62:1 in both.
+  assert.match(html, /bg-crimson text-snow/, 'the deal badge is tokens');
   const parts = code('src/components/storefront/parts.tsx');
   assert.doesNotMatch(parts, /#[0-9a-fA-F]{3,8}\b/, 'no hex in the card');
   assert.doesNotMatch(parts, /bg-red-600|text-white"\s*dir="ltr"/, 'no raw red');

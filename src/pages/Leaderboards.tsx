@@ -71,7 +71,7 @@ export default function Leaderboards() {
           items={LEADERBOARD_BOARDS.map((b) => ({
             id: b,
             label: boardLabel(b, s),
-            accent: { indicator: 'bg-gold/10 border-gold/40', text: 'text-gold' },
+            accent: { text: 'text-gold' },
           }))}
         />
 

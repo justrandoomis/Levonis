@@ -138,7 +138,7 @@ export function CompareMatrix({
           items={tiers.map((tier) => ({
             id: tier,
             label: TIER_META[tier].label,
-            accent: { indicator: 'bg-surface-selected border-border-subtle', text: TIER_META[tier].text },
+            accent: { text: TIER_META[tier].text },
           }))}
         />
       )}

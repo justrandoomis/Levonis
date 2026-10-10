@@ -93,8 +93,11 @@ export function TabStrip({
   onChange,
   group,
   indicatorClassName = 'bg-olive',
-  activeClassName = 'text-white',
-  idleClassName = 'text-text-muted hover:text-zinc-300',
+  // Tabs are FLAT navigation text (clay, docs/DECISIONS.md row 209): secondary
+  // ink at rest, primary when chosen, one weight for both so a Sorani strip
+  // never reflows, and the 2px indicator at the block end.
+  activeClassName = 'text-text-primary',
+  idleClassName = 'text-text-secondary hover:text-text-primary',
   className = '',
   fill = true,
   label,
@@ -134,7 +137,7 @@ export function TabStrip({
 
   const strip = shown.map((t, i) => {
     const active = t.id === value;
-    const classes = `relative ${fill ? 'flex-1 px-2' : 'shrink-0 px-3'} py-3 text-sm font-medium text-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+    const classes = `relative ${fill ? 'flex-1 px-2' : 'shrink-0 px-3'} py-3 text-sm font-semibold text-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
       active ? activeClassName : idleClassName
     }`;
     const inner = (

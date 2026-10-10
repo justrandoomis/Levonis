@@ -23,6 +23,12 @@
  * 44px transparent target and the visible pill inside it is 36px. Its
  * accessible name is required — an icon alone names nothing — and the same
  * text is the tooltip a mouse user gets.
+ *
+ * CLAY (docs/DECISIONS.md row 209): a ghost disc is flat and a secondary disc
+ * lifted clay; either DENTS while it is held (the well fill and the press
+ * shadow, a dimple). The dent replaces the base layer's press dim
+ * and the old scale, so the 44px target answers on the way down without
+ * moving.
  */
 import React, { useRef, useState } from 'react';
 import Spinner from './Spinner';
@@ -140,7 +146,7 @@ const ICON_TONE: Record<NonNullable<IconButtonProps['variant']>, string> = {
 
 const ICON_DISC: Record<NonNullable<IconButtonProps['variant']>, string> = {
   ghost: 'group-hover:bg-white/[0.06]',
-  secondary: 'bg-surface-raised border border-border-subtle',
+  secondary: 'bg-surface-raised border border-border-subtle shadow-1',
   danger: 'group-hover:bg-danger/10',
 };
 
@@ -170,12 +176,12 @@ export function IconButton({
       aria-disabled={busy || undefined}
       data-icon-button
       onClick={handle}
-      className={`group relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${ICON_TONE[variant]} ${className}`}
+      className={`group relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${ICON_TONE[variant]} ${className}`}
     >
       <span
         aria-hidden="true"
         data-icon-disc
-        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${ICON_DISC[variant]}`}
+        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors group-active:bg-[var(--clay-well-bg)] group-active:shadow-press ${ICON_DISC[variant]}`}
       >
         {busy ? <Spinner size="sm" delayMs={0} decorative /> : icon}
       </span>

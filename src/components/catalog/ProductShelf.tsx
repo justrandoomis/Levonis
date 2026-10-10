@@ -61,7 +61,11 @@ export default function ProductShelf({
       </div>
       {subline ? <p className="-mt-1 mb-2.5 line-clamp-1 text-[12px] leading-[18px] text-text-muted lg:mb-4 lg:text-[13.5px]">{subline}</p> : <div className="h-1.5" />}
       {products && products.length ? (
-        <ul className="-mx-4 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-1 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0">
+        <ul
+          // -my-2 pt-2 pb-3: a scroller clips on both axes, so it keeps 8 / 12 px
+          // of room for the cards' clay cast and focus ring without moving the
+          // layout (the old pb-1 net is unchanged).
+          className="-mx-4 -my-2 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pt-2 pb-3 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0">
           {products.map((p, i) => (
             <li key={p.id} className={`flex shrink-0 snap-start ${i >= 5 ? 'lg:hidden' : ''}`}>
               <ProductCard p={p} density="compact" compareToggle widthClass="w-[148px] shrink-0 lg:w-full" imageSizes="(min-width: 1024px) calc((100vw - 128px) / 5), 148px" />

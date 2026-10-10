@@ -1626,3 +1626,44 @@ Paint: no element in `src/` has a backdrop filter or a filter glow any more (hel
 `tests/claySystem.test.ts`, item 5, over every TypeScript source and every public stylesheet; the
 operations sheet's `fw-sheet::backdrop` waits for Phase 3.5a). The scroll trace on a ×4-throttled
 360 × 800 phone (plan §8) is still owed.
+
+## 2026-10-10 — clay Phase 2: the shared primitives and the app chrome (DECISIONS row 209)
+
+The build plan's Phase 2. The primitives in `src/components/ui` take the clay grammar (IconButton dents,
+Segmented is a pill well with one lifted thumb, Switch's off track is a well, StatusChip/Badge/OfferBadge
+are the opaque `lv-chip`, dialogs are the level-3 slab at 24 px and phone sheets cast upward, menus are
+lifted at 18 px, the quantity steppers are one well with two lifted keys, DataList marks a selected row
+with the gold start bar, skeletons and AsyncStates lose their zinc shells); the top bar (flush account
+pill and icon buttons, a pill-well search, the purple «لوحة الأدمن» pill in gold, D1), the bottom bar
+(opaque pods, the current tab a dimple, one label weight, a crimson count badge), the product card
+(`rounded-xl shadow-sm`, a 4 px photo tray, no image zoom, a press) and the two scoped sheets (storefront
+`raised` → `var(--clay-1)`, D3; `.ap` radii and shadows → the role tokens). Nothing was measured in the
+lab; these are the gate's figures.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (push 1.2, `0f7792af`, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 47,762 B (328,012 B raw) | **47,885 B** (328,845 B raw) | — |
+| storefront `theme-*.css` | 1,516 B | **1,492 B** (`raised` is `var(--clay-1)`) | — |
+| `.ap` `theme-*.css` | 1,243 B | **1,185 B** (role radii and clay shadows; the light copies deleted) | — |
+| CSS, public files (8) | 60,659 B | **60,700 B (+41 B)**; local headroom 740 B (≈ 730 B on CI, which builds ≈ 10 B larger) | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,216 B | 7,216 B (untouched) | 7.5 KB |
+| entry chunk / initial payload | 63.8 KB / 180.4 KB | 63.7 KB / 180.3 KB over 4 files | 72 KB / 200 KB |
+| merchant workspace shell closure | — | 32,733 B (35 B under) | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: the new named variants (`shadow-xs`, `shadow-press`, `active:`/`group-active:`/
+`has-[a:active]:shadow-press`, `hover:shadow-lg`, `sm:shadow-2xl`), the well fill and field line as
+arbitrary values (`bg-[var(--clay-well-bg)]` with its `active:`/`group-active:` forms,
+`border-[var(--clay-field)]`), `rounded-t-3xl`/`sm:rounded-2xl`, `bg-crimson`, `bg-text-muted/40`, the
+four `lv-chip` tone properties and `bg-rose-600`; against the storefront `raised` recipe (−24 B), the
+`.ap` light shadow copies and literal radii (−58 B) and the class strings nothing names any more. The
+workspace shell's JS closure (Button, Menu, Overlay, Segmented, Sheet) grew by its new class strings and
+was funded by dropping the dialog's `filter: blur()` enter/exit — a raster of the whole window on every
+frame of the spring, and glass in a solid-clay system.
+
+Paint: a product card is one blurred layer at rest and a press (no shadow transition, no image zoom), and
+`content-visibility` moved from the grid's `<li>` to the card (and to the list row), so the cast of every
+card from the 9th on is no longer clipped at the wrapper; the two horizontal shelves keep 8 / 12 px of
+room for the cast. No window animates a filter any more. The scroll trace on a ×4-throttled 360 × 800
+phone (plan §8) is still owed.

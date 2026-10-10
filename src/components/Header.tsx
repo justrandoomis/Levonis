@@ -151,14 +151,16 @@ export default function Header() {
       // `lv-topbar-*` (src/index.css, THE TOP AND BOTTOM BARS): on the dark
       // theme exactly these utilities; on the light one a clean ivory bar with
       // a hairline, and no scrim over the hero at all.
-      isScrolled ? 'lv-topbar-solid material material-thin pt-2.5 pb-2.5 shadow-lg' : 'lv-topbar-scrim bg-gradient-to-b from-black/88 via-black/48 to-transparent pt-4 pb-2'
+      isScrolled ? 'lv-topbar-solid material pt-2.5 pb-2.5' : 'lv-topbar-scrim bg-gradient-to-b from-black/88 via-black/48 to-transparent pt-4 pb-2'
     }`}>
       <div className={`flex items-center justify-between pointer-events-auto transition-all duration-500 ease-in-out origin-top ${
         isScrolled ? 'h-0 opacity-0 mb-0 scale-95 overflow-hidden' : 'h-11 opacity-100 mb-3 scale-100'
       }`}>
         {/* Left: Profile/Brand Pill + Admin Button */}
         <div className="flex items-center gap-2">
-          <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex min-w-0 shrink items-center gap-2.5 rounded-xl bg-surface/95 p-1.5 pe-3.5 text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+          {/* The account pill is flush clay (the rim alone): it sits on the
+              hero and carries its own opaque ground. */}
+          <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex min-w-0 shrink items-center gap-2.5 rounded-xl bg-surface shadow-xs p-1.5 pe-3.5 text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <div className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-snow font-bold text-sm shadow-inner overflow-hidden">
               {isAuthenticated ? (
                  <img
@@ -178,14 +180,16 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Admin Dashboard Button */}
+          {/* Admin Dashboard Button — the one accent, gold (owner decision
+              D1, docs/DECISIONS.md row 209): no purple gradient, no coloured
+              glow, no pulse. Lifted clay that dents while held. */}
           {isAdminUser && (
-            <Link 
-              to="/admin" 
-              className="flex items-center gap-1.5 bg-gradient-to-r from-[#6B46FF] to-[#A855F7] text-snow px-3.5 py-1.5 rounded-full text-xs font-black shadow-lg shadow-iris/30 border border-white/20 hover:brightness-110 transition-all hover:scale-105 active:scale-95 shrink-0"
+            <Link
+              to="/admin"
+              className="flex items-center gap-1.5 bg-gold-fill text-onyx px-3.5 py-1.5 rounded-full text-xs font-bold shadow-1 no-press active:shadow-press shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               title={dir === 'rtl' ? 'لوحة التحكم بالإدارة' : 'Admin Dashboard'}
             >
-              <ShieldCheck className="w-4 h-4 text-white animate-pulse" />
+              <ShieldCheck className="w-4 h-4" aria-hidden="true" />
               <span className="text-[11px] sm:text-xs font-bold">{dir === 'rtl' ? 'لوحة الأدمن' : 'Admin'}</span>
             </Link>
           )}

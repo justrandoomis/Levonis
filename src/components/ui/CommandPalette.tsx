@@ -218,8 +218,10 @@ export function CommandPalette({
       className="sm:pt-[12vh]"
       panelClassName="flex w-full max-w-xl flex-col overflow-hidden"
     >
-      {/* The field's focus is shown on its whole row: the caret alone is not a focus indicator. */}
-      <div className="flex items-center gap-3 border-b border-border-subtle px-4 focus-within:border-focus" data-command-field>
+      {/* The field is a pill well (clay, docs/DECISIONS.md row 209) with the 3:1
+          field line, and its focus is shown on the whole well: the caret alone
+          is not a focus indicator. */}
+      <div className="mx-2 mt-2 flex items-center gap-3 rounded-full lv-well border border-[var(--clay-field)] px-4 focus-within:border-focus" data-command-field>
         <Search aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-text-muted" />
         <input
           ref={inputRef}
@@ -241,7 +243,7 @@ export function CommandPalette({
             onQueryChange?.(e.currentTarget.value);
           }}
           onKeyDown={onKeyDown}
-          className="min-h-14 min-w-0 flex-1 bg-transparent text-[15px] text-text-primary outline-none placeholder:text-text-muted"
+          className="min-h-12 min-w-0 flex-1 bg-transparent text-[15px] text-text-primary outline-none placeholder:text-text-muted"
         />
         {loading && <Spinner size="sm" delayMs={0} />}
       </div>

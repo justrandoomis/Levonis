@@ -24,7 +24,15 @@
  *     the generator's own contrast(): 4.5:1 for text, 3:1 for boundaries;
  *  5. solid clay, not glass (row 208): nothing blurs what is behind it, no
  *     filter glow, and no shadow colour or shadow token is hand-written into
- *     a class string, where it would bypass the per-theme clay primitives.
+ *     a class string, where it would bypass the per-theme clay primitives;
+ *  6. the product card (row 209) is resting clay that a scrolling list can
+ *     afford — no blur, no animated shadow, no image zoom — and a long
+ *     grid's `content-visibility` never sits on a wrapper that would clip the
+ *     card's cast;
+ *  7. THE RATCHET: the hand-drawn styling the tokens cannot reach (legacy
+ *     cards, ad-hoc buttons, raw inputs, arbitrary radii), counted by the
+ *     same code as `node scripts/clay-census.mjs`, never rises above the
+ *     numbers checked in here. Each family push lowers them.
  *
  * Run: node --import tsx --test tests/claySystem.test.ts
  */
@@ -34,6 +42,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBlock, contrast, parseColor, rgbToOklch, SEMANTIC, FIXED, IVORY, PAPER } from '../scripts/theme-tokens.mjs';
+import { census, RATCHET, sourceFiles, type RatchetKey } from '../scripts/clay-census.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -335,4 +344,92 @@ test('solid clay, not glass: no backdrop blur, no filter glow, no hand-written s
   // A shadow token read inside a class string resolves on the element that names
   // it, skipping the clay composites a dark island re-resolves; use var(--clay-*).
   assert.deepEqual(hits(/\[[^\]\s'"`]*var\(--shadow-[^\]\s'"`]*\]/g), [], 'a class reads var(--shadow-*) instead of a clay composite');
+});
+
+// ---------------------------------------------------------------------- 6
+/** The opening tag of every `<li>` in a source, read up to the `>` that closes it (not an arrow's). */
+function liTags(src: string): string[] {
+  const out: string[] = [];
+  for (const m of src.matchAll(/<li\b/g)) {
+    let depth = 0;
+    let i = m.index! + m[0].length;
+    for (; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      else if (ch === '>' && depth === 0 && src[i - 1] !== '=') break;
+    }
+    out.push(src.slice(m.index!, i + 1));
+  }
+  return out;
+}
+
+test('the product card is clay a scrolling list can afford, and content-visibility never clips its cast', () => {
+  const card = read('src/components/home/ProductCard.tsx');
+  // The two roots: the compact card (a div under a stretched link) and the regular one (the link itself).
+  const compact = /data-product-card="compact"\s*className=\{`([^`]*)`\}/.exec(card)?.[1];
+  const regular = /<Link\s+to=\{cardHref\(p\)\}\s+className=\{`(\$\{widthClass\} relative shrink-0[^`]*)`\}/.exec(card)?.[1];
+  assert.ok(compact, 'the compact card root is not where it was');
+  assert.ok(regular, 'the regular card root is not where it was');
+  for (const [name, root] of [['compact', compact!], ['regular', regular!]] as const) {
+    assert.match(root, /(^|\s)rounded-xl(\s|$)/, `${name}: a card takes the card radius (22px)`);
+    assert.match(root, /(^|\s)shadow-sm(\s|$)/, `${name}: a card is resting clay (--clay-1, one blurred layer)`);
+    assert.match(root, /(^|\s)(has-\[a:active\]:|active:)shadow-press(\s|$)/, `${name}: a card dents while it is pressed`);
+  }
+  // A repeated item never animates its shadow or its photograph, and nothing
+  // on it blurs what is behind it: forty of these scroll on a mid-range phone.
+  assert.doesNotMatch(card, /backdrop-blur|backdropFilter/, 'the product card blurs what is behind it');
+  assert.doesNotMatch(card, /transition-all|transition-shadow|transition-\[[^\]]*shadow/, 'the product card animates its shadow');
+  assert.doesNotMatch(card, /group-hover:scale|hover:scale/, 'the product card zooms its photograph');
+  // `content-visibility: auto` turns on paint containment, which clips a
+  // DESCENDANT's ink at the container's edge: on an <li> around a shadowed
+  // card it cut the cast of every card from the 9th on. It belongs on the
+  // card itself — or on a wrapper padded wide enough for the cast.
+  const offenders: string[] = [];
+  for (const file of sourceFiles()) {
+    for (const tag of liTags(read(file))) {
+      if (/\blv-cv(-row)?\b/.test(tag) && !/(^|[\s"'`{])p[xy]?-\d/.test(tag)) offenders.push(`${file}: ${tag.slice(0, 160)}`);
+    }
+  }
+  assert.deepEqual(offenders, [], 'an unpadded <li> carries content-visibility and clips its card');
+  // And the listing grid still skips the far cards (the containment moved, it did not go).
+  assert.match(read('src/components/listing/ProductGrid.tsx'), /<ProductCard\b[^>]*className=\{i >= 8 \? 'lv-cv' : undefined\}/);
+  assert.match(read('src/components/listing/ProductList.tsx'), /data-product-row\s*className=\{`[^`]*\$\{i >= 10 \? 'lv-cv-row' : ''\}`\}/);
+  assert.match(read('src/styles/catalog.css'), /\.lv-cv \{\s*content-visibility: auto;/);
+});
+
+// ---------------------------------------------------------------------- 7
+/**
+ * THE CEILING, today's census (node scripts/clay-census.mjs). A family push
+ * that converts hand-drawn styling LOWERS these numbers in the same commit;
+ * nothing may raise them. Heuristic counts (a quoted string with a radius, a
+ * border and a ground but no semantic class is a "legacy card"), so a rewrite
+ * that moves a quote can shift one by one — lower the ceiling, never raise it.
+ */
+const CEILING: Record<RatchetKey, number> = {
+  legacy: 422,
+  btn: 159,
+  rawIn: 461,
+  arbR: 100,
+};
+
+test('the ratchet: hand-drawn styling the clay tokens cannot reach never grows', () => {
+  assert.deepEqual(Object.keys(CEILING).sort(), Object.keys(RATCHET).sort(), 'the ceiling and the census disagree on what is counted');
+  const files = sourceFiles();
+  assert.ok(files.length > 500, 'the census walked too few sources to prove anything');
+  const { totals, rows } = census();
+  const over = (Object.keys(CEILING) as RatchetKey[])
+    .filter((k) => totals[k] > CEILING[k])
+    .map((k) => {
+      const worst = rows
+        .filter((r) => r.counts[k] > 0)
+        .sort((a, b) => b.counts[k] - a.counts[k])
+        .slice(0, 5)
+        .map((r) => `${r.file} (${r.counts[k]})`)
+        .join(', ');
+      return `${RATCHET[k]}: ${totals[k]}, over the ceiling of ${CEILING[k]} — most in ${worst}. Use the house primitive (node scripts/clay-census.mjs --suggest <file>).`;
+    });
+  assert.deepEqual(over, [], over.join('\n'));
+  // The census only reads: it is a suggestion generator, never a codemod.
+  assert.doesNotMatch(read('scripts/clay-census.mjs'), /writeFile|appendFile|rmSync|unlink|renameSync|copyFile/, 'the census writes to the tree');
 });

@@ -29,12 +29,15 @@ export default function ProductList({ products }: { products: ApiProduct[] }) {
         const name = cardName(p);
         const type = compareTypeOf(p);
         return (
-          <li key={p.id} className={i >= 10 ? 'lv-cv-row' : undefined}>
+          // `lv-cv-row` sits on the row itself, not the <li>: paint
+          // containment clips a descendant's ink (its focus ring) at the
+          // container's edge. A list row is flat (clay: rows are never raised).
+          <li key={p.id}>
             <div
               data-product-row
-              className="group relative flex min-w-0 gap-3 rounded-[14px] border border-border-subtle bg-surface p-2.5 transition-colors hover:bg-surface-raised has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
+              className={`group relative flex min-w-0 gap-3 rounded-xl border border-border-subtle bg-surface p-2.5 transition-colors hover:bg-surface-raised has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus ${i >= 10 ? 'lv-cv-row' : ''}`}
             >
-              <div className={`relative size-24 shrink-0 overflow-hidden rounded-[10px] ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
+              <div className={`relative size-24 shrink-0 overflow-hidden rounded-sm ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
                 <SafeImage
                   src={image}
                   alt=""

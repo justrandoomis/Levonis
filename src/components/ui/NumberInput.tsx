@@ -22,8 +22,11 @@
  * and sit flush with the start of the field in the page's own direction. The
  * unit («د.ع» / «IQD») sits at the inline end, outside the typed text.
  *
- * `kind="quantity"` adds − / + steppers (44px each, the cart's order and
- * labels) for the common one-more / one-fewer change.
+ * `kind="quantity"` adds − / + steppers (44px targets, the cart's order and
+ * labels) for the common one-more / one-fewer change. In clay
+ * (docs/DECISIONS.md row 209) that is ONE well holding the centred figure,
+ * with two lifted keys inside it that dent while held — the cart's
+ * QuantityInput, so a count reads the same everywhere.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
@@ -48,6 +51,10 @@ export interface NumberInputProps
   /** Shown at the inline end; defaults to the dinar unit for money. */
   unit?: React.ReactNode;
 }
+
+/** A stepper key: lifted clay inside the well (10px corners in its 14px), 36px drawn, 44px hit. */
+const KEY =
+  'relative lv-hit flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-surface-raised text-text-secondary shadow-1 transition-colors no-press hover:text-text-primary active:shadow-press disabled:opacity-35';
 
 export function NumberInput({
   value,
@@ -141,6 +148,7 @@ export function NumberInput({
   const ownErrorId = problem && !field?.invalid ? `${id}-problem` : undefined;
   const describedBy = [rest['aria-describedby'], field?.describedBy, ownErrorId].filter(Boolean).join(' ') || undefined;
   const invalid = !!problem || !!field?.invalid;
+  const stepper = kind === 'quantity';
 
   const input = (
     <div className="relative min-w-0 flex-1">
@@ -171,8 +179,10 @@ export function NumberInput({
           if (!problem) setText(groupedNumber(value, decimals));
           onBlur?.(e);
         }}
-        style={{ textAlign: dir === 'rtl' ? 'right' : 'left' }}
-        className={`lv-input tabular-nums ${unit ? 'pe-14' : ''} ${className}`}
+        style={{ textAlign: stepper ? 'center' : dir === 'rtl' ? 'right' : 'left' }}
+        // A quantity's figure sits bare inside the stepper's well, which draws
+        // the field line, the invalid line and the focus line for it.
+        className={`${stepper ? '-my-1 h-11 w-full bg-transparent px-1 text-text-primary outline-none placeholder:text-text-muted' : 'lv-input'} tabular-nums ${unit ? 'pe-14' : ''} ${className}`}
       />
       {unit && (
         <span
@@ -187,15 +197,19 @@ export function NumberInput({
 
   return (
     <div className="min-w-0">
-      {kind === 'quantity' ? (
-        <div className="flex items-stretch gap-2">
+      {stepper ? (
+        <div
+          className={`flex items-center gap-1 rounded-md lv-well border p-1 focus-within:border-focus ${invalid ? 'border-danger' : 'border-[var(--clay-field)]'} ${
+            disabled ? 'opacity-55' : ''
+          }`}
+        >
           <button
             type="button"
             onClick={() => stepBy(-1)}
             disabled={disabled || (min !== undefined && value !== null && value <= min)}
             aria-label={loc('إنقاص الكمية', 'Decrease quantity', 'کەمکردنەوەی بڕ')}
             aria-controls={id}
-            className="lv-button lv-button-secondary w-11 shrink-0 px-0"
+            className={`${KEY} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
           >
             <Minus aria-hidden="true" className="h-4 w-4" />
           </button>
@@ -206,7 +220,7 @@ export function NumberInput({
             disabled={disabled || (max !== undefined && value !== null && value >= max)}
             aria-label={loc('زيادة الكمية', 'Increase quantity', 'زیادکردنی بڕ')}
             aria-controls={id}
-            className="lv-button lv-button-secondary w-11 shrink-0 px-0"
+            className={`${KEY} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
           >
             <Plus aria-hidden="true" className="h-4 w-4" />
           </button>
