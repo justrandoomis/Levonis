@@ -1,6 +1,6 @@
 /**
  * MONEY SAFETY OF THE PRODUCT FORM'S DATA-FIRST PRICING SAVE — «البيانات أولاً» / `data_only`
- * (owner report 2026-10-10; docs/DECISIONS.md row 211; the verifiers' money review).
+ * (owner report 2026-10-10; docs/DECISIONS.md row 213; the verifiers' money review).
  *
  * Every test here asks one question: can the product form's pricing save
  * (PUT …/products/:id/inputs, `commitPricing`) move a store price, an

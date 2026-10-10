@@ -1,5 +1,5 @@
 /**
- * THE WORDS OF THE «التسعير بالدولار والشحن» SAVE (owner report 2026-10-10; docs/DECISIONS.md row 211;
+ * THE WORDS OF THE «التسعير بالدولار والشحن» SAVE (owner report 2026-10-10; docs/DECISIONS.md row 213;
  * the verifiers' strings review): what the owner reads after each save is true, in ar, en and ckb.
  *
  *   S1 a stored («ready») review never says the held write's «this save completes the data … in the same step»

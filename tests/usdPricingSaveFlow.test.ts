@@ -1,6 +1,6 @@
 /**
  * «التسعير بالدولار والشحن» — WHAT THE NEXT SAVE SENDS AFTER A REFUSED ONE, AND A NEW PRODUCT'S DINARS
- * (the verifiers' round on the owner's report of 2026-10-10; docs/DECISIONS.md row 211).
+ * (the verifiers' round on the owner's report of 2026-10-10; docs/DECISIONS.md row 213).
  *
  *   F1  a box corrected after an invalid or refused «نشر» is the box pricing saves: the product save
  *       leaves the owner's ACT behind (`adopt_measure`), never the box frozen at the first press;
