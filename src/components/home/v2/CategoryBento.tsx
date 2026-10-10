@@ -66,7 +66,7 @@ function useTileCopy(): Record<BentoTileId, Copy> {
 }
 
 const TILE =
-  'group relative isolate block h-full overflow-hidden rounded-[14px] lv-bleed-ground ring-1 ring-inset ring-white/[0.06] transition-transform duration-150 active:scale-[0.985] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:rounded-[18px]';
+  'group relative isolate block h-full overflow-hidden rounded-[14px] lv-bleed-ground transition-transform duration-150 active:scale-[0.985] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:rounded-[18px]';
 
 /**
  * The photograph over the whole tile and the scrim over it. `size` is only the

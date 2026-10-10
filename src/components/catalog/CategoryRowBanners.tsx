@@ -77,7 +77,7 @@ export function CategoryRowBanner({
       data-category-row={rowKey}
       data-row-photo={photo ? (cover ? 'cover' : 'product') : 'none'}
       {...prefetchProps(to)}
-      className={`group relative isolate flex w-full overflow-hidden lv-row-banner-ground ring-1 ring-inset ring-white/[0.06] transition-transform duration-150 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted ${ROW_BANNER_SIZE}`}
+      className={`group relative isolate flex w-full overflow-hidden lv-row-banner-ground transition-transform duration-150 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted ${ROW_BANNER_SIZE}`}
     >
       {photo ? (
         <CropPhoto

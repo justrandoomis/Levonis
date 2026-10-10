@@ -400,7 +400,7 @@ export default function Chats() {
 
     History, kept because it is why the rule exists: when the app had one
     dark theme, this page and /profile were written
-    as a hand-rolled light/dark PAIR — `bg-[#f2f2f2] dark:bg-[#000000]` —
+    as a hand-rolled light/dark PAIR — #f2f2f2 under a `dark:` variant to #000000 —
     and Tailwind v4 with no config compiles `dark:` to
     `@media (prefers-color-scheme: dark)`. On a phone set to LIGHT the dark
     half simply evaporated: these two pages repainted themselves cream

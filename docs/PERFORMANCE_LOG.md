@@ -1667,3 +1667,34 @@ Paint: a product card is one blurred layer at rest and a press (no shadow transi
 card from the 9th on is no longer clipped at the wrapper; the two horizontal shelves keep 8 / 12 px of
 room for the cast. No window animates a filter any more. The scroll trace on a ×4-throttled 360 × 800
 phone (plan §8) is still owed.
+
+## 2026-10-10 — clay foundation QA: the screenshot pass after Phases 1–2 and one batch of fixes (DECISIONS row 210)
+
+Every screen of `scripts/e2e-theme-shots.mjs` at 390 px in both themes (plus 1280 px for home, product, admin
+overview, the merchant workspace and the kit) against the `a68790b9` baseline, with a read-only DOM pass over
+the same screens (a raised container inside a raised one, a black shadow on cream, a cast cut by a clipping
+ancestor, and the keyboard focus ring). Fixed in one batch: a card inside a card, a dialog or a sheet is flush
+(one components-layer rule; AsyncStates sat raised inside cards), the admin tab wrapper is a flat tray, a
+focused `lv-input` adds a solid 1 px focus ring (on cream the field line and the focus ink are a near match),
+the quantity stepper's figure shows its own focus, four photo tiles drop the resting inset hairline that put
+their focus ring under the photo, and the workspace quick dock leaves room for its buttons' cast.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (Phase 2, `fea0b7e8`, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 47,885 B (328,845 B raw) | **47,806 B** | — |
+| CSS, public files (8) | 60,700 B | **60,621 B (−79 B)**; local headroom 819 B (≈ 809 B on CI, which builds ≈ 10 B larger) | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,216 B | 7,216 B (untouched) | 7.5 KB |
+| entry chunk / initial payload | 63.7 KB / 180.3 KB | 63.7 KB / 180.3 KB over 4 files | 72 KB / 200 KB |
+| merchant workspace shell closure | 32,733 B | under 32 KB (gate green; the dock and the stepper are in lazy screens) | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: the nested-card rule and the input's 1 px focus ring (about +40 B) against ten comment
+mentions of utilities no code uses (`bg-canvas/88`, `from-olive/40`, the multiply and screen blends, a light/dark
+hex pair and the cart's old 80/100 px offset), which Tailwind had been compiling out of the comments — reworded,
+−118 B. No new class names: every utility the fixes use (`-my-1/-my-2`, `py-1/py-2`, `focus-visible:ring-inset`)
+was already in the sheet.
+
+Paint: unchanged in kind — a nested card loses its blurred cast (one fewer blurred layer per nested card), the
+admin wrapper loses its `--clay-2` cast, and the four photo tiles lose an inset ring layer. The scroll trace on a
+×4-throttled 360 × 800 phone (plan §8) is still owed.

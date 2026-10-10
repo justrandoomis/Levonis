@@ -6,7 +6,7 @@ import { useLanguage } from '../../LanguageContext';
 /**
  * THE DISCOVERY PAGES' TOP BAR (docs/ux/CATALOG_DISCOVERY.md §5–§7).
  *
- * 56 px, translucent over the page (`bg-canvas/88` + blur, so content scrolls
+ * 56 px, translucent over the page (the canvas at 88 % plus a blur, so content scrolls
  * under it rather than past a hard edge), sticky at the top of the app's
  * scroll container. The hairline under it appears only once the page has
  * scrolled — at rest there is nothing to separate it from.

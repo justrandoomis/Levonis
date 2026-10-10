@@ -63,7 +63,7 @@ export default function QuickDock() {
           bleed and would cross the side column on a desk. In the 340 px side
           column at `lg` the four doors WRAP: a hidden scrollbar there left the
           fourth door clipped with no way to reach it by mouse (§3.2). */}
-      <nav aria-label={s.dock.title} data-quick-dock className="-mx-4 flex gap-2 overflow-x-auto px-4 hide-scrollbar sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
+      <nav aria-label={s.dock.title} data-quick-dock className="-mx-4 -my-2 flex gap-2 overflow-x-auto px-4 py-2 hide-scrollbar sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-visible">
         {doors.map((d) => {
           const Icon = d.icon;
           if ('open' in d) {

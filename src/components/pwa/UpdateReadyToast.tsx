@@ -145,7 +145,7 @@ export default function UpdateReadyToast() {
           // bottom edge the floating BottomNav owns (src/index.css). Guessing
           // a pixel offset here is precisely how the cart's summary bar ended
           // up inside the nav's gradient scrim, which is what
-          // `bottom-[80px] sm:bottom-[100px]` was.
+          // its old fixed 80px (100px from sm) offset was.
           style={{ bottom: 'calc(var(--nav-stack) + 0.5rem)', zIndex: UI_LAYERS.popover }}
           className="fixed inset-x-3 mx-auto max-w-sm rounded-xl border border-border-subtle bg-surface-raised px-4 py-3 shadow-2xl"
           role="status"

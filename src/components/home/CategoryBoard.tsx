@@ -70,7 +70,7 @@ function monogramOf(name: string): string {
  * THESE COLOURS ARE NOT DECORATIVE CHOICES, they are measured ones. The first
  * attempt used the olive tokens, and olive on this page is nearly black:
  * `--color-olive` is #1B2010 and `--color-olive-dark` is #0F1208, so
- * `from-olive/40` over `--color-surface` (#131519) composites to #161915 — a
+ * olive at 40 % over `--color-surface` (#131519) composites to #161915 — a
  * contrast of 1.03:1 against the card it sits in, which is to say invisible.
  * The tint would have been a no-op and every plate would have read as an
  * empty black rectangle with a letter in it.

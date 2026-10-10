@@ -181,8 +181,10 @@ export function NumberInput({
         }}
         style={{ textAlign: stepper ? 'center' : dir === 'rtl' ? 'right' : 'left' }}
         // A quantity's figure sits bare inside the stepper's well, which draws
-        // the field line, the invalid line and the focus line for it.
-        className={`${stepper ? '-my-1 h-11 w-full bg-transparent px-1 text-text-primary outline-none placeholder:text-text-muted' : 'lv-input'} tabular-nums ${unit ? 'pe-14' : ''} ${className}`}
+        // the field line and the invalid line for it. Its keyboard focus is its
+        // own inset ring: on cream the focus line of the well is a near match
+        // for the 3:1 field line, so that swap alone did not show focus.
+        className={`${stepper ? '-my-1 h-11 w-full rounded-sm bg-transparent px-1 text-text-primary outline-none placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus' : 'lv-input'} tabular-nums ${unit ? 'pe-14' : ''} ${className}`}
       />
       {unit && (
         <span

@@ -1004,7 +1004,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
        *
        * 2. THE BACKGROUND RULE IS THE REVERSE OF THE BRAND-LOGO RULE ABOVE, and
        *    the two sit side by side on one screen. A service tile composites
-       *    its icon with `mix-blend-screen`, and screen(0, b) = b exactly —
+       *    its icon with a screen blend, and screen(0, b) = b exactly —
        *    which is why a pure-black background disappears into the card. The
        *    same blend has screen(white, b) = white, so an icon exported on a
        *    WHITE background turns the tile into a solid white square. The

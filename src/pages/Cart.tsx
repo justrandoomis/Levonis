@@ -1555,7 +1555,7 @@ export default function Cart() {
                     className="w-full h-full"
                     /* The only pure-white surface in the entire app sat here,
                        as a 100×100 plate on a near-black page — and
-                       `mix-blend-multiply` existed to hide the white edges of
+                       a multiply blend existed to hide the white edges of
                        product cutouts against it. A neutral dark plate needs
                        neither, and it is what every other image surface in the
                        app already uses. */
@@ -2361,7 +2361,7 @@ export default function Cart() {
            centred here by `inset-x-0` plus `mx-auto`, which is symmetric and
            therefore identical in both scripts, and uses no transform.
 
-        2. It SAT INSIDE THE NAV. At `bottom-[80px] z-40` it floated within the
+        2. It SAT INSIDE THE NAV. At 80px from the bottom, z-40, it floated within the
            bottom nav's black gradient scrim (`z-[120]`, and the scrim overhangs
            the pills by 28px), so its lower edge faded to black — and on any
            device with a safe-area inset the pills covered part of it outright.

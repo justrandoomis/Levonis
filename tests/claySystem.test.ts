@@ -32,7 +32,13 @@
  *  7. THE RATCHET: the hand-drawn styling the tokens cannot reach (legacy
  *     cards, ad-hoc buttons, raw inputs, arbitrary radii), counted by the
  *     same code as `node scripts/clay-census.mjs`, never rises above the
- *     numbers checked in here. Each family push lowers them.
+ *     numbers checked in here. Each family push lowers them;
+ *  8. what the foundation's screenshot QA found (row 210): a card dropped
+ *     into a card, a dialog or a sheet sits flush; a focused field shows a
+ *     solid focus line on cream, where the 3:1 field line and the focus ink
+ *     are a near match; photo tiles keep their focus ring off the photo; the
+ *     admin tab wrapper is a flat tray; a scroller of clay buttons leaves
+ *     room for their cast.
  *
  * Run: node --import tsx --test tests/claySystem.test.ts
  */
@@ -432,4 +438,39 @@ test('the ratchet: hand-drawn styling the clay tokens cannot reach never grows',
   assert.deepEqual(over, [], over.join('\n'));
   // The census only reads: it is a suggestion generator, never a codemod.
   assert.doesNotMatch(read('scripts/clay-census.mjs'), /writeFile|appendFile|rmSync|unlink|renameSync|copyFile/, 'the census writes to the tree');
+});
+
+// ---------------------------------------------------------------------- 8
+test('the foundation QA: one raised container per stack, focus that shows on cream, rings off the photo, casts not cut', () => {
+  const layerStart = css.indexOf('@layer components {');
+  // AsyncStates (an lv-surface) inside a card, or any card inside a card, a
+  // dialog or a sheet, sits flush — in the components layer, so a utility
+  // (a link card's hover:shadow-lg) still wins.
+  const nested = /:is\(\.lv-surface, \.lv-surface-raised, \[data-overlay-panel\]\) \.lv-surface \{\s*--tw-shadow:\s*var\(--clay-0\);\s*\}/.exec(css);
+  assert.ok(nested, 'a card nested in a card, a dialog or a sheet is no longer demoted to flush clay');
+  assert.ok(nested.index > layerStart, 'the nested-card rule must sit in the components layer');
+  // On cream the field line (#7c715c) and the focus ink (#6f592b) are a near
+  // match: focus adds a solid 1px ring, not only a colour swap and a halo.
+  assert.match(css, /\.lv-input:focus-visible \{[^}]*box-shadow:\s*var\(--clay-well\),\s*0 0 0 1px var\(--color-focus\),/);
+  // The stepper's bare figure shows its own keyboard focus (QuantityInput's recipe).
+  assert.match(
+    read('src/components/ui/NumberInput.tsx'),
+    /'-my-1 h-11 w-full[^']*focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus'/
+  );
+  // A resting ring-inset makes the focus ring inset too, painted under the
+  // photo the tile is filled with: a ring nobody sees.
+  for (const f of [
+    'src/components/home/v2/CategoryBento.tsx',
+    'src/components/home/v2/EditorialBanners.tsx',
+    'src/components/catalog/CategoryRowBanners.tsx',
+    'src/components/catalog/RelatedCategories.tsx',
+  ]) {
+    const src = read(f);
+    assert.match(src, /focus-visible:ring-2/, `${f} lost its focus ring`);
+    assert.doesNotMatch(src.replace(/focus-visible:ring-inset/g, ''), /(^|[\s'"`])ring-inset\b/, `${f}: a resting ring-inset hides the focus ring under the photo`);
+  }
+  // The admin tab wrapper is a flat tray: the cards inside it are the raised things.
+  assert.doesNotMatch(read('src/pages/Admin.tsx'), /rounded-2xl p-4 md:p-5 shadow-/);
+  // A horizontal scroller of clay buttons leaves room for their cast (overflow-x clips y too).
+  assert.match(read('src/components/merchant/counter/QuickDock.tsx'), /data-quick-dock className="[^"]*-my-2[^"]*overflow-x-auto[^"]*py-2/);
 });

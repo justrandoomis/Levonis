@@ -133,10 +133,10 @@ function monogramOf(name: string): string {
  * every one of them over the floor — the worst, QIDI, reaches 3.9:1 and the
  * rest 4.9:1 to 15:1 — while keeping the hue that makes a logo recognisable.
  * The three things it is NOT, because the next reader will be tempted:
- *   - `mix-blend-multiply` multiplies against the backdrop, and this backdrop
+ *   - a multiply blend multiplies against the backdrop, and this backdrop
  *     is near-black, so it would crush every logo to black. It erases white
  *     only against a WHITE page, which this is not.
- *   - `mix-blend-screen` erases BLACK, not white; a white matte would survive
+ *   - a screen blend erases BLACK, not white; a white matte would survive
  *     it untouched while dark lettering washed away.
  *   - `invert(1)` turns Bambu Lab's green magenta.
  * A logo that is already light simply clamps toward white under this filter,
