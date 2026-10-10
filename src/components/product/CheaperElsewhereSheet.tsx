@@ -99,7 +99,6 @@ const LABEL = 'block text-[12.5px] font-bold text-zinc-300 mb-1.5';
    whenever a focused control computes under 16px and does not zoom back out.
    src/index.css carries the coarse-pointer floor that enforces this globally;
    stating it here keeps the field honest at every pointer type. */
-const FIELD = 'lv-input text-[16px] w-full';
 
 export default function CheaperElsewhereSheet({
   open,
@@ -207,6 +206,7 @@ export default function CheaperElsewhereSheet({
                   clearing the field the way a number input does.
                 */}
                 <input
+                  className="lv-input text-[16px] w-full"
                   id="cheaper-price"
                   type="text"
                   inputMode="numeric"
@@ -215,7 +215,6 @@ export default function CheaperElsewhereSheet({
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder={s.pricePlaceholder}
                   disabled={busy}
-                  className={FIELD}
                 />
               </div>
 
@@ -224,6 +223,7 @@ export default function CheaperElsewhereSheet({
                   {s.seller}
                 </label>
                 <input
+                  className="lv-input text-[16px] w-full"
                   id="cheaper-seller"
                   type="text"
                   value={seller}
@@ -231,7 +231,6 @@ export default function CheaperElsewhereSheet({
                   placeholder={s.sellerPlaceholder}
                   maxLength={MAX_SELLER}
                   disabled={busy}
-                  className={FIELD}
                 />
               </div>
 
@@ -243,6 +242,7 @@ export default function CheaperElsewhereSheet({
                     backwards inside an RTL paragraph. The label stays in the
                     page's own direction. */}
                 <input
+                  className="lv-input text-[16px] w-full"
                   id="cheaper-url"
                   type="url"
                   dir="ltr"
@@ -253,7 +253,6 @@ export default function CheaperElsewhereSheet({
                   placeholder="https://"
                   maxLength={MAX_URL}
                   disabled={busy}
-                  className={FIELD}
                 />
               </div>
             </div>

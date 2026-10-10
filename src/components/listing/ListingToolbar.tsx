@@ -27,7 +27,7 @@ const ListingToolbar = forwardRef<HTMLButtonElement, {
   const tb =
     'group relative inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none';
   const face =
-    'inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[11px] border border-border-subtle bg-surface px-3 text-[13px] font-extrabold text-text-primary transition-colors group-hover:bg-surface-raised group-focus-visible:ring-2 group-focus-visible:ring-focus';
+    'inline-flex h-[38px] items-center gap-1.5 whitespace-nowrap rounded-sm border border-border-subtle bg-surface px-3 text-[13px] font-extrabold text-text-primary shadow-xs transition-colors group-hover:bg-surface-raised group-active:shadow-press group-focus-visible:ring-2 group-focus-visible:ring-focus';
   // OWNER: Sorani to be written by hand (every loc() in this file without a third argument).
   const sortText = sort === 'newest' ? loc('الأحدث', 'Newest', 'نوێترین') : sortLabel(sort, lang);
   return (

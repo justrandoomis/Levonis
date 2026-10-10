@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { api, type ApiProduct } from '../../../lib/api';
 import { inSections, orderLatest, type LatestChip, type LatestChipId } from '../../../lib/homeLayout';
@@ -125,10 +126,14 @@ export default function LatestProducts({
                 className="group inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none"
               >
                 <span
-                  className={`inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
-                    on ? 'bg-white text-black' : 'border border-border-subtle bg-surface text-text-secondary group-hover:border-zinc-700 group-hover:text-text-primary'
+                  className={`inline-flex h-8 items-center gap-1 rounded-full px-3.5 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
+                    // Clay filter chip: flush at rest, pressed (well + press + check) when on.
+                    on
+                      ? 'border border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                      : 'border border-border-subtle bg-surface-raised text-text-secondary shadow-xs group-hover:text-text-primary'
                   }`}
                 >
+                  {on ? <Check aria-hidden="true" className="size-3.5" strokeWidth={2.6} /> : null}
                   {label[c.id]}
                 </span>
               </button>

@@ -46,7 +46,7 @@ export function ProductGallery({
       <div className="aspect-square sm:aspect-[4/3] bg-black/40 overflow-hidden">
         {!current ? (
           <div className="w-full h-full flex items-center justify-center">
-            <ShoppingBag className="w-12 h-12 text-zinc-700" aria-hidden="true" />
+            <ShoppingBag className="w-12 h-12 text-text-muted" aria-hidden="true" />
           </div>
         ) : current.kind === 'video' ? (
           <video
@@ -71,7 +71,7 @@ export function ProductGallery({
               onClick={() => setIndex(i)}
               aria-label={showLabel(i + 1)}
               aria-current={i === index ? 'true' : undefined}
-              className={`relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border ${i === index ? 'border-gold' : 'border-white/10'} focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold`}
+              className={`relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border ${i === index ? 'border-text-primary' : 'border-border-subtle'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
             >
               {m.kind === 'video' ? (
                 <span className="flex w-full h-full items-center justify-center bg-black/60">

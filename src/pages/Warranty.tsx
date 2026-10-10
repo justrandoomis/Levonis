@@ -14,7 +14,8 @@ import { ClaimCard } from '../components/warranty/ClaimCard';
 import { DeviceClaimOverlay } from '../components/warranty/ClaimForms';
 import { ClaimThreadOverlay } from '../components/warranty/ClaimThreadOverlay';
 import { UnlinkSheet } from '../components/warranty/UnlinkSheet';
-import { CARD, FOCUS, OK_BOX } from '../components/warranty/ui';
+import { FOCUS, OK_BOX } from '../components/warranty/ui';
+import { IconButton } from '../components/ui/Button';
 
 /**
  * Warranty center, built around the PHYSICAL printers linked to an account:
@@ -239,40 +240,41 @@ export default function Warranty() {
   const priority = mine?.priority_service === true;
 
   return (
-    <div className="w-full pb-24 text-zinc-300 min-h-screen">
+    <div className="w-full pb-24 text-text-secondary min-h-screen">
       {/* Translucent chrome over content: the page passes under it. */}
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label={s.back}
-          className={`p-2 bg-zinc-900/80 rounded-full hover:bg-zinc-800 transition-colors ${FOCUS}`}
-        >
-          {dir === 'rtl' ? <ArrowRight aria-hidden="true" className="w-5 h-5" /> : <ArrowLeft aria-hidden="true" className="w-5 h-5" />}
-        </button>
-        <h1 className="text-white font-bold text-lg">{s.title}</h1>
+        <IconButton
+          variant="secondary"
+          onClick={() => {
+            goBack();
+          }}
+          label={s.back}
+          icon={dir === 'rtl' ? <ArrowRight aria-hidden="true" className="w-5 h-5" /> : <ArrowLeft aria-hidden="true" className="w-5 h-5" />}
+          className="-my-1.5"
+        />
+        <h1 className="text-text-primary font-bold text-lg">{s.title}</h1>
       </header>
 
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
         {/* ------------------------------------------------ intro + membership */}
         <section className="space-y-3">
-          <p className="text-zinc-400 text-[13px] leading-relaxed">{s.intro}</p>
+          <p className="text-text-secondary text-[13px] leading-relaxed">{s.intro}</p>
           {priority ? (
             <div className="flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3" data-testid="warranty-pro-strip">
               <Crown aria-hidden="true" className="w-5 h-5 text-gold shrink-0" />
-              <p className="text-[13px] text-zinc-100 flex-1 min-w-0 leading-snug">{s.proStrip}</p>
+              <p className="text-[13px] text-text-primary flex-1 min-w-0 leading-snug">{s.proStrip}</p>
               <Link to="/subscription" className={`text-[12px] font-bold text-gold whitespace-nowrap hover:underline underline-offset-2 rounded ${FOCUS}`}>
                 {s.proStripLink}
               </Link>
             </div>
           ) : mine ? (
-            <p className="text-[12px] text-zinc-500">
-              <Link to="/subscription" className={`hover:text-zinc-300 underline underline-offset-2 rounded ${FOCUS}`}>
+            <p className="text-[12px] text-text-muted">
+              <Link to="/subscription" className={`hover:text-text-primary underline underline-offset-2 rounded ${FOCUS}`}>
                 {s.proTeaser}
               </Link>
             </p>
           ) : null}
-          <p className="text-[11px] text-zinc-600">{s.coverageNote}</p>
+          <p className="text-[11px] text-text-muted">{s.coverageNote}</p>
         </section>
 
         {/* ------------------------------------------------------ add a printer */}
@@ -281,10 +283,10 @@ export default function Warranty() {
         {/* --------------------------------------------------------- my printers */}
         <section aria-labelledby="warranty-devices-title" className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 id="warranty-devices-title" className="text-white font-bold text-base">
+            <h2 id="warranty-devices-title" className="text-text-primary font-bold text-base">
               {s.myPrinters}
             </h2>
-            {devices.length > 0 && <span className="text-zinc-500 text-[12px] tabular-nums">{fmtInt(devices.length, lang)}</span>}
+            {devices.length > 0 && <span className="text-text-muted text-[12px] tabular-nums">{fmtInt(devices.length, lang)}</span>}
           </div>
           {devicesNotice && (
             <div role="status" className={OK_BOX}>
@@ -294,9 +296,9 @@ export default function Warranty() {
           {devicesLoading ? (
             <SkeletonGroup className="space-y-3">
               {[0, 1].map((i) => (
-                <div key={i} className={`${CARD} p-4`} aria-hidden="true">
+                <div key={i} className="rounded-xl border border-border-subtle bg-surface p-4" aria-hidden="true">
                   <div className="flex gap-3">
-                    <Skeleton className="w-16 h-16 rounded-xl shrink-0" />
+                    <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
                     <div className="flex-1 space-y-2 pt-1">
                       <Skeleton className="h-4 w-2/3" />
                       <Skeleton className="h-3 w-1/2" />
@@ -309,8 +311,8 @@ export default function Warranty() {
                     <Skeleton className="h-3 w-24" />
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-4">
-                    <Skeleton className="h-11 rounded-xl" />
-                    <Skeleton className="h-11 rounded-xl" />
+                    <Skeleton className="h-11 rounded-md" />
+                    <Skeleton className="h-11 rounded-md" />
                   </div>
                 </div>
               ))}
@@ -339,15 +341,15 @@ export default function Warranty() {
         {/* ----------------------------------------------------------- my claims */}
         <section aria-labelledby="warranty-claims-title" className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 id="warranty-claims-title" className="text-white font-bold text-base">
+            <h2 id="warranty-claims-title" className="text-text-primary font-bold text-base">
               {s.claims}
             </h2>
-            {claims.length > 0 && <span className="text-zinc-500 text-[12px] tabular-nums">{fmtInt(claims.length, lang)}</span>}
+            {claims.length > 0 && <span className="text-text-muted text-[12px] tabular-nums">{fmtInt(claims.length, lang)}</span>}
           </div>
           {/* WHAT A TAP ON A CLAIM DOES, said before anyone has to guess —
               «لا يوجد هنالك توضيح … أن عند الضغط على مطالباتي تفتح المحادثة». */}
           {claims.length > 0 && (
-            <p className="text-zinc-400 text-[12px] leading-relaxed flex items-start gap-1.5" data-claims-hint>
+            <p className="text-text-secondary text-[12px] leading-relaxed flex items-start gap-1.5" data-claims-hint>
               <MessageSquare aria-hidden="true" className="w-3.5 h-3.5 mt-0.5 text-gold shrink-0" />
               <span>{s.claimsHint}</span>
             </p>
@@ -360,7 +362,7 @@ export default function Warranty() {
           {claimsLoading ? (
             <SkeletonGroup className="space-y-3">
               {[0, 1].map((i) => (
-                <div key={i} className={`${CARD} p-4`} aria-hidden="true">
+                <div key={i} className="rounded-xl border border-border-subtle bg-surface p-4" aria-hidden="true">
                   <div className="flex justify-between gap-3">
                     <Skeleton className="h-4 w-1/2" />
                     <Skeleton className="h-3 w-16" />

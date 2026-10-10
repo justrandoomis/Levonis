@@ -98,7 +98,7 @@ function ColorNeedFollowUp({
     box.current?.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
   }, []);
   return (
-    <div ref={box} data-finder-followup="mc" className="mt-5 rounded-[20px] border border-border-subtle bg-surface-raised p-3.5 sm:p-4">
+    <div ref={box} data-finder-followup="mc" className="mt-5 rounded-lg border border-border-subtle bg-surface-raised p-3.5 sm:p-4">
       <h2 id="finder-q-mc" className="text-[16px] font-extrabold leading-[22px] text-text-primary">
         {q.title}
       </h2>

@@ -20,8 +20,9 @@ import { useCommunityAccess } from '../../../pages/community/access';
  * A band with a hairline plate texture, the one beat between the bento and
  * the product rail whose job is to stop the scroll for a moment. It follows
  * the theme (`data-feature`, src/index.css FEATURE SURFACES): charcoal with
- * olive hairlines and the muted-gold primary on the dark theme; a cream card
- * with ink type, a charcoal primary and an outlined secondary on the light.
+ * olive hairlines on the dark theme, a cream card with ink type on the light.
+ * Clay at the frame only (radius 24, resting cast); its three doors are the
+ * house buttons — one primary, two secondary — with the house focus ring.
  */
 export default function PrinterFinder() {
   const { loc } = useLanguage();
@@ -29,14 +30,14 @@ export default function PrinterFinder() {
   const communityShut = access?.may_enter === false;
 
   const secondary =
-    'inline-flex min-h-11 min-w-0 flex-auto items-center justify-center rounded-xl border border-white/15 px-2.5 text-center text-[11.5px] font-semibold leading-4 text-ivory transition-colors hover:border-white/30 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:flex-none lg:px-6 lg:text-[14px]';
+    'lv-button lv-button-secondary min-w-0 flex-auto px-2.5 text-center text-[11.5px] font-semibold leading-4 lg:flex-none lg:px-6 lg:text-[14px]';
 
   return (
     <section
       data-home-section="printer_finder"
       data-feature=""
       aria-labelledby="home-finder-title"
-      className="lv-finder-texture relative overflow-hidden rounded-2xl shadow-sm bg-charcoal px-3 py-4 ring-1 ring-inset ring-white/[0.05] lg:flex lg:items-center lg:justify-between lg:gap-10 lg:px-10 lg:py-8"
+      className="lv-finder-texture relative overflow-hidden rounded-2xl bg-charcoal px-3 py-4 shadow-sm lg:flex lg:items-center lg:justify-between lg:gap-10 lg:px-10 lg:py-8"
     >
       <div className="text-center lg:text-start">
         {/* OWNER: Sorani to be written by hand (this section's three strings and three labels). */}
@@ -56,7 +57,7 @@ export default function PrinterFinder() {
         </Link>
         <Link
           to="/support?ask=choose_printer"
-          className="inline-flex min-h-11 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-xl bg-gold-muted px-2.5 text-center text-[11.5px] font-bold leading-4 text-gold-ink transition-[filter] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ivory lg:flex-none lg:px-7 lg:text-[14px]"
+          className="lv-button lv-button-primary min-w-0 flex-auto gap-1.5 px-2.5 text-center text-[11.5px] leading-4 lg:flex-none lg:px-7 lg:text-[14px]"
         >
           <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="hidden h-4 w-4 shrink-0 lg:block">
             <path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l1.8 1.8M10.8 10.8l1.8 1.8M3.4 12.6l1.8-1.8M10.8 5.2l1.8-1.8" />

@@ -22,7 +22,7 @@ export default function LoadMore({ remaining, state, onMore }: { remaining: numb
         disabled={state === 'loading'}
         aria-busy={state === 'loading' || undefined}
         data-load-more
-        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border-subtle bg-surface px-5 text-[13px] font-bold text-text-primary transition-colors hover:bg-surface-raised disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="lv-button lv-button-secondary px-5 text-[13px]"
       >
         {state === 'loading' ? <Spinner size="sm" /> : null}
         {state === 'error' ? t('retry') : loc('عرض المزيد', 'Load more', 'زیاتر پیشان بدە')}

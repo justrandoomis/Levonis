@@ -13,9 +13,10 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ShieldCheck, ShieldX, ShieldAlert, Search, Loader2 } from 'lucide-react';
+import { ShieldCheck, ShieldX, ShieldAlert, Search } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
+import { Button } from '../components/ui/Button';
 import { monthsWords } from '../../packages/pricing/src/warrantyTime';
 
 interface PublicWarranty {
@@ -187,11 +188,11 @@ export default function WarrantyVerify() {
   return (
     <div className="min-h-[70vh] px-4 py-8 flex justify-center" dir={dir} data-page="warranty-verify">
       <div className="w-full max-w-xl">
-        <h1 className="text-2xl font-black text-white mb-1 flex items-center gap-2">
+        <h1 className="text-2xl font-black text-text-primary mb-1 flex items-center gap-2">
           <ShieldCheck className="w-6 h-6 text-olive-light" aria-hidden />
           {t.title}
         </h1>
-        <p className="text-zinc-400 text-sm mb-5">{t.lead}</p>
+        <p className="text-text-secondary text-sm mb-5">{t.lead}</p>
 
         <form
           className="flex gap-2 mb-5"
@@ -207,23 +208,25 @@ export default function WarrantyVerify() {
           }}
         >
           <input
+            className="lv-input flex-1 min-w-0 min-h-12 px-3 font-mono text-[15px]"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.placeholder}
             aria-label={t.placeholder}
             dir="ltr"
             data-warranty-input
-            className="flex-1 min-w-0 min-h-12 rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono text-[15px] focus:border-olive focus:outline-none"
           />
-          <button
+          <Button
             type="submit"
-            disabled={loading}
+            variant="primary"
+            loading={loading}
+            loadingLabel={t.checking}
+            icon={<Search className="w-4 h-4" aria-hidden />}
             data-warranty-verify
-            className="inline-flex items-center gap-2 min-h-12 px-5 rounded-xl bg-olive hover:bg-olive-light text-snow font-bold disabled:opacity-50"
+            className="min-h-12 px-5"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Search className="w-4 h-4" aria-hidden />}
-            {loading ? t.checking : t.check}
-          </button>
+            {t.check}
+          </Button>
         </form>
 
         {error && (
@@ -233,12 +236,12 @@ export default function WarrantyVerify() {
         )}
 
         {notFound && (
-          <div className="rounded-2xl border border-zinc-700 bg-zinc-900/60 p-5" data-warranty-notfound>
-            <p className="text-white font-bold flex items-center gap-2">
-              <ShieldX className="w-5 h-5 text-zinc-400" aria-hidden />
+          <div className="lv-surface p-5" data-warranty-notfound>
+            <p className="text-text-primary font-bold flex items-center gap-2">
+              <ShieldX className="w-5 h-5 text-text-secondary" aria-hidden />
               {t.notFound}
             </p>
-            <p className="text-zinc-400 text-sm mt-1">{t.notFoundHint}</p>
+            <p className="text-text-secondary text-sm mt-1">{t.notFoundHint}</p>
           </div>
         )}
 
@@ -257,7 +260,7 @@ export default function WarrantyVerify() {
               </div>
             </div>
 
-            <dl className="rounded-2xl border border-zinc-800 bg-zinc-900/60 divide-y divide-zinc-800">
+            <dl className="lv-surface overflow-hidden divide-y divide-border-subtle">
               {([
                 [t.receiptNo, result.receipt_no, true],
                 [t.product, result.product, false],
@@ -274,23 +277,23 @@ export default function WarrantyVerify() {
                 .filter(([, value]) => value && value !== '—')
                 .map(([label, value, ltr]) => (
                   <div key={label} className="flex gap-3 px-4 py-2.5">
-                    <dt className="w-32 shrink-0 text-[13px] font-bold text-zinc-400">{label}</dt>
-                    <dd className="min-w-0 break-words text-[14px] text-white" dir={ltr ? 'ltr' : undefined}>
+                    <dt className="w-32 shrink-0 text-[13px] font-bold text-text-secondary">{label}</dt>
+                    <dd className="min-w-0 break-words text-[14px] text-text-primary" dir={ltr ? 'ltr' : undefined}>
                       {value}
                     </dd>
                   </div>
                 ))}
             </dl>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-              <p className="text-[13px] font-bold text-zinc-400 mb-1">{t.retailer}</p>
-              <p className="text-white font-black tracking-wide">{result.retailer.name}</p>
-              <p className="text-zinc-400 text-sm" dir="ltr">
+            <div className="lv-surface p-4">
+              <p className="text-[13px] font-bold text-text-secondary mb-1">{t.retailer}</p>
+              <p className="text-text-primary font-black tracking-wide">{result.retailer.name}</p>
+              <p className="text-text-secondary text-sm" dir="ltr">
                 {result.retailer.website} · {result.retailer.instagram} · {result.retailer.phone}
               </p>
             </div>
 
-            <p className="text-[12px] text-zinc-500">{t.privacy}</p>
+            <p className="text-[12px] text-text-muted">{t.privacy}</p>
           </div>
         )}
       </div>

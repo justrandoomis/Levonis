@@ -17,7 +17,7 @@ import { RotateCcw, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import type { ApiOrderItem } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import Spinner from '../ui/Spinner';
+import { Button } from '../ui/Button';
 import { asLang } from './format';
 
 const STRINGS = {
@@ -219,16 +219,18 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
 
   return (
     <div className={className} data-reorder>
-      <button
-        type="button"
+      <Button
+        variant="primary"
+        block
         onClick={() => run(false)}
-        disabled={busy || items.length === 0}
+        loading={busy}
+        loadingLabel={s.adding}
+        disabled={items.length === 0}
+        icon={<RotateCcw className="w-4 h-4" aria-hidden />}
         data-buy-again
-        className="w-full min-h-[46px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
       >
-        {busy ? <Spinner size="sm" delayMs={0} decorative className="text-white" /> : <RotateCcw className="w-4 h-4" aria-hidden />}
-        {busy ? s.adding : s.buyAgain}
-      </button>
+        {s.buyAgain}
+      </Button>
 
       <div role="status" aria-live="polite">
         {conflict && (
@@ -245,21 +247,12 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
                   : conflict.message}
             </p>
             <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConflict(null)}
-                className="flex-1 min-h-[40px] rounded-lg border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-              >
+              <Button variant="secondary" size="sm" onClick={() => setConflict(null)} className="flex-1">
                 {s.keep}
-              </button>
-              <button
-                type="button"
-                onClick={() => run(true)}
-                data-replace-cart
-                className="flex-1 min-h-[40px] rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-100 text-[12.5px] font-bold hover:bg-amber-500/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-              >
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => run(true)} data-replace-cart className="flex-1">
                 {s.replace}
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -277,7 +270,7 @@ export default function ReorderButton({ items, className = '' }: { items: ApiOrd
             {addedAny && (
               <Link
                 to="/cart"
-                className="mt-3 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-lg border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                className="lv-button lv-button-secondary lv-button-sm mt-3"
               >
                 <ShoppingCart className="w-3.5 h-3.5" aria-hidden />
                 {s.goCart}

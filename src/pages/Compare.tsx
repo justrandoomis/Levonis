@@ -579,8 +579,8 @@ export default function Compare() {
             the bleed its rail may use to exactly its padding (0.75rem), so
             opening it can never draw outside its frame or widen the page.
           */}
-          <details data-compare-details className="lv-section group min-w-0 overflow-clip rounded-[20px] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] [&_summary::-webkit-details-marker]:hidden">
-            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-[14px] font-bold text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] rounded-[20px]">
+          <details data-compare-details className="lv-surface lv-section group min-w-0 overflow-clip [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-[14px] font-bold text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] rounded-xl">
               {ls.details}
               <ChevronDown aria-hidden="true" className="h-5 w-5 text-[var(--color-text-muted)] transition-transform group-open:rotate-180 motion-reduce:transition-none" />
             </summary>

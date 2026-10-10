@@ -10,8 +10,8 @@ import { Headphones } from 'lucide-react';
  */
 export default function HumanHelpBand({ title, body, cta, to }: { title: string; body: string; cta: string; to: string }) {
   return (
-    <section data-feature="" className="flex flex-wrap items-center gap-4 rounded-2xl border border-border-subtle bg-charcoal shadow-sm px-5 py-5">
-      <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-raised text-gold">
+    <section data-feature="" className="flex flex-wrap items-center gap-4 rounded-2xl border border-border-subtle bg-charcoal px-5 py-5 shadow-sm">
+      <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-md bg-surface-raised text-gold">
         <Headphones className="size-5" strokeWidth={2} />
       </span>
       <div className="min-w-0 flex-1 basis-[180px]">
@@ -20,7 +20,7 @@ export default function HumanHelpBand({ title, body, cta, to }: { title: string;
       </div>
       <Link
         to={to}
-        className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-2xl bg-gold-fill px-6 text-[15px] font-extrabold text-ink transition-[filter,transform] duration-150 hover:brightness-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal motion-reduce:transition-none"
+        className="lv-button min-h-12 shrink-0 bg-gold-fill px-6 text-[15px] font-extrabold text-ink hover:brightness-105"
       >
         {cta}
       </Link>

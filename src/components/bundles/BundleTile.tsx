@@ -6,6 +6,7 @@ import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
 import OfferBadge from '../ui/OfferBadge';
+import { StatusChip, type Tone } from '../ui/Badge';
 import Countdown from '../ui/Countdown';
 import BundleSavingLine from './BundleSavingLine';
 import { tierLabel } from '../subscription/tierMeta';
@@ -67,17 +68,17 @@ export interface BundleCard extends Partial<ApiProduct> {
 
 /** The eight states §13.3 requires, and nothing else. A state the server sends
  *  that is not in this table renders NO chip rather than a guessed one. */
-export const STATE_LABELS: Record<string, { ar: string; en: string; ckb: string; tone: string }> = {
-  in_stock: { ar: 'متوفر', en: 'In stock', ckb: 'بەردەستە', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  low: { ar: 'الكمية محدودة', en: 'Only a few left', ckb: 'کەمە', tone: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  sold_out: { ar: 'نفدت الكمية', en: 'Sold out', ckb: 'تەواو بوو', tone: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  upcoming: { ar: 'قريباً', en: 'Coming soon', ckb: 'بەم زووانە', tone: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-  ending_soon: { ar: 'ينتهي قريباً', en: 'Ending soon', ckb: 'بەزوویی کۆتایی دێت', tone: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  ended: { ar: 'انتهى العرض', en: 'Offer ended', ckb: 'کۆتایی هات', tone: 'bg-zinc-700/40 text-zinc-400 border-zinc-700' },
-  preorder: { ar: 'طلب مسبق', en: 'Pre-order', ckb: 'پێش-داواکاری', tone: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-  locked: { ar: 'حصري للمشتركين', en: 'Members only', ckb: 'تەنها ئەندامان', tone: 'bg-gold/15 text-gold border-gold/30' },
-  member_exclusive: { ar: 'متاح لك', en: 'Yours', ckb: 'بۆ تۆ', tone: 'bg-gold/15 text-gold border-gold/30' },
-  unconfigured: { ar: 'غير مكتمل', en: 'Not ready', ckb: 'ئامادە نییە', tone: 'bg-zinc-700/40 text-zinc-400 border-zinc-700' },
+export const STATE_LABELS: Record<string, { ar: string; en: string; ckb: string; tone: Tone }> = {
+  in_stock: { ar: 'متوفر', en: 'In stock', ckb: 'بەردەستە', tone: 'success' },
+  low: { ar: 'الكمية محدودة', en: 'Only a few left', ckb: 'کەمە', tone: 'warning' },
+  sold_out: { ar: 'نفدت الكمية', en: 'Sold out', ckb: 'تەواو بوو', tone: 'danger' },
+  upcoming: { ar: 'قريباً', en: 'Coming soon', ckb: 'بەم زووانە', tone: 'info' },
+  ending_soon: { ar: 'ينتهي قريباً', en: 'Ending soon', ckb: 'بەزوویی کۆتایی دێت', tone: 'warning' },
+  ended: { ar: 'انتهى العرض', en: 'Offer ended', ckb: 'کۆتایی هات', tone: 'neutral' },
+  preorder: { ar: 'طلب مسبق', en: 'Pre-order', ckb: 'پێش-داواکاری', tone: 'info' },
+  locked: { ar: 'حصري للمشتركين', en: 'Members only', ckb: 'تەنها ئەندامان', tone: 'accent' },
+  member_exclusive: { ar: 'متاح لك', en: 'Yours', ckb: 'بۆ تۆ', tone: 'accent' },
+  unconfigured: { ar: 'غير مكتمل', en: 'Not ready', ckb: 'ئامادە نییە', tone: 'neutral' },
 };
 
 export function StateChip({ state, className = '' }: { state: string; className?: string }) {
@@ -85,9 +86,10 @@ export function StateChip({ state, className = '' }: { state: string; className?
   const meta = STATE_LABELS[state];
   if (!meta) return null;
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${meta.tone} ${className}`}>
+    // Information is flat clay: the house status chip (word + dot + opaque tint).
+    <StatusChip tone={meta.tone} className={className}>
       {meta[lang]}
-    </span>
+    </StatusChip>
   );
 }
 
@@ -115,14 +117,14 @@ export default function BundleTile({
   return (
     <Link
       to={`/bundles/${b.product_slug}`}
-      className={`bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors min-w-0 ${className}`}
+      className={`bg-surface rounded-xl border border-border-subtle overflow-hidden flex flex-col group shadow-sm hover:bg-surface-raised active:shadow-press transition-colors min-w-0 ${className}`}
     >
-      <div className="relative aspect-square overflow-hidden bg-black">
+      <div className="relative aspect-square overflow-hidden bg-surface-raised">
         <SafeImage
           src={b.image}
           alt={b.name}
           aspect="auto"
-          className="w-full h-full group-hover:scale-105 transition-transform duration-500 motion-reduce:transition-none"
+          className="w-full h-full"
         />
         <span className="absolute top-2 start-2">
           <StateChip state={b.availability_state} />
@@ -149,7 +151,7 @@ export default function BundleTile({
         {/* §13.3: the bundle's own title is owner-authored ar/en/ckb, but it is
             rendered `dir="ltr"` like every product name so a latin name inside
             an Arabic paragraph is not bidi-reordered. */}
-        <h3 dir="ltr" className="text-white font-medium text-[13px] leading-snug line-clamp-2 min-h-[2.2rem] text-start">
+        <h3 dir="ltr" className="text-text-primary font-medium text-[13px] leading-snug line-clamp-2 min-h-[2.2rem] text-start">
           {b.name}
         </h3>
 
@@ -158,15 +160,15 @@ export default function BundleTile({
             {b.composition.main_items.map((m) => (
               <span
                 key={m.product_id}
-                className="relative w-8 h-8 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0 grid place-items-center"
+                className="relative w-8 h-8 rounded-sm overflow-hidden lv-well shrink-0 grid place-items-center"
               >
                 {m.image ? (
                   <SafeImage src={m.image} alt={m.name} aspect="auto" className="w-full h-full" />
                 ) : (
-                  <Package aria-hidden className="w-3.5 h-3.5 text-zinc-700" />
+                  <Package aria-hidden className="w-3.5 h-3.5 text-text-muted" />
                 )}
                 {m.qty > 1 && (
-                  <span className="absolute bottom-0 end-0 bg-zinc-950/90 text-zinc-200 text-[8px] font-bold px-1 rounded-tl rtl:rounded-tl-none rtl:rounded-tr">
+                  <span className="absolute bottom-0 end-0 bg-onyx/80 text-snow text-[8px] font-bold px-1 rounded-tl rtl:rounded-tl-none rtl:rounded-tr">
                     ×{m.qty}
                   </span>
                 )}
@@ -181,7 +183,7 @@ export default function BundleTile({
               {/* The ONLY price a locked card may carry, and only when the
                   offer allows a preview: never a member rung nobody sold. */}
               {typeof b.display_regular_iqd === 'number' && (
-                <span className="text-zinc-400 font-bold text-[13px] tabular-nums">{money(b.display_regular_iqd)}</span>
+                <span className="text-text-secondary font-bold text-[13px] tabular-nums">{money(b.display_regular_iqd)}</span>
               )}
               <div className="text-[10px] text-gold font-bold mt-0.5">
                 {membersOnly}

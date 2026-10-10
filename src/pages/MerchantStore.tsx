@@ -5,6 +5,7 @@ import { api, ApiError, formatIqd } from '../lib/api';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { toast } from '../components/ui/Toast';
+import { IconButton } from '../components/ui/Button';
 import ProMerchantBadge from '../components/merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import {
@@ -151,14 +152,14 @@ export default function MerchantStore() {
 
   if (loadError || !merchant) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 p-8">
-        <StoreIcon className="w-14 h-14 text-zinc-700" />
-        <p className="text-zinc-400 text-center">
+      <div className="min-h-screen bg-black text-text-primary flex flex-col items-center justify-center gap-4 p-8">
+        <StoreIcon className="w-14 h-14 text-text-muted" />
+        <p className="text-text-secondary text-center">
           {!loadError || (loadError instanceof ApiError && loadError.status === 404)
             ? dir === 'rtl' ? 'المتجر غير موجود' : 'Store not found'
             : (loadError instanceof ApiError && loadError.message) || (dir === 'rtl' ? 'تعذر تحميل المتجر' : 'Failed to load store')}
         </p>
-        <button onClick={() => navigate(-1)} className="border border-zinc-700 bg-zinc-900 text-white rounded-full px-6 py-2.5 font-bold hover:bg-zinc-800 transition-colors">
+        <button onClick={() => navigate(-1)} className="lv-button lv-button-secondary px-6">
           {dir === 'rtl' ? 'رجوع' : 'Go Back'}
         </button>
       </div>
@@ -170,22 +171,27 @@ export default function MerchantStore() {
     : null;
 
   return (
-    <div className="w-full min-h-screen bg-black text-white font-sans">
+    <div className="w-full min-h-screen bg-black text-text-primary font-sans">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-black px-4 py-3 flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
-        </button>
+        <IconButton
+          variant="secondary"
+          onClick={() => {
+            navigate(-1);
+          }}
+          label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+        />
       </div>
 
       <div className="px-5 pt-[76px] pb-32">
         {/* Profile Info */}
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-20 h-20 rounded-full overflow-hidden bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
+          <div className="w-20 h-20 rounded-full overflow-hidden bg-surface border border-border-subtle flex items-center justify-center shrink-0">
             {merchant.avatarUrl ? (
               <img referrerPolicy="no-referrer" src={merchant.avatarUrl} alt={merchant.name} className="w-full h-full object-cover" />
             ) : (
-              <StoreIcon className="w-8 h-8 text-zinc-600" />
+              <StoreIcon className="w-8 h-8 text-text-muted" />
             )}
           </div>
           <div className="relative z-0">
@@ -196,16 +202,16 @@ export default function MerchantStore() {
               {merchant.premium_badge && <PremiumMemberBadge />}
             </div>
             {joined && (
-              <p className="text-zinc-400 text-sm">{dir === 'rtl' ? 'انضم في' : 'Joined'} {joined}</p>
+              <p className="text-text-secondary text-sm">{dir === 'rtl' ? 'انضم في' : 'Joined'} {joined}</p>
             )}
           </div>
         </div>
 
-        {merchant.bio && <h2 className="text-lg font-medium mb-3 text-white">{merchant.bio}</h2>}
+        {merchant.bio && <h2 className="text-lg font-medium mb-3 text-text-primary">{merchant.bio}</h2>}
 
-        <div className="flex items-center gap-1 text-sm font-medium mb-6 text-zinc-300">
+        <div className="flex items-center gap-1 text-sm font-medium mb-6 text-text-secondary">
           <span>{followers} {dir === 'rtl' ? 'متابعين' : 'followers'}</span>
-          <span className="text-zinc-600 mx-1">·</span>
+          <span className="text-text-muted mx-1">·</span>
           <span>{products.length} {dir === 'rtl' ? 'منتجات' : 'products'}</span>
         </div>
 
@@ -214,7 +220,7 @@ export default function MerchantStore() {
           <button
             onClick={toggleFollow}
             disabled={followBusy}
-            className={`flex-1 rounded-full py-3 font-bold transition-colors disabled:opacity-60 ${isFollowing ? 'border border-zinc-700 bg-black text-white hover:bg-zinc-900' : 'bg-white text-black hover:bg-zinc-200'}`}
+            className={`lv-button flex-1 ${isFollowing ? 'lv-button-secondary' : 'lv-button-primary'}`}
           >
             {isFollowing ? (dir === 'rtl' ? 'تمت المتابعة' : 'Following') : (dir === 'rtl' ? 'متابعة' : 'Follow')}
           </button>
@@ -224,29 +230,29 @@ export default function MerchantStore() {
             type="button"
             onClick={() => void openChat()}
             disabled={messageBusy || !merchant.user_id}
-            className="flex-1 border border-zinc-700 bg-zinc-900 text-white rounded-full py-3 font-bold hover:bg-zinc-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="lv-button lv-button-secondary flex-1"
           >
             {messageBusy ? (dir === 'rtl' ? 'جارٍ الفتح…' : 'Opening…') : dir === 'rtl' ? 'مراسلة' : 'Message'}
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-zinc-800 mb-6 overflow-x-auto hide-scrollbar sticky top-[60px] z-40 bg-black pt-2">
+        <div className="flex border-b border-border-subtle mb-6 overflow-x-auto hide-scrollbar sticky top-[60px] z-40 bg-black pt-2">
           <button
             onClick={() => setActiveTab('products')}
-            className={`flex-none px-4 pb-3 text-center font-bold text-sm border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'products' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-400'}`}
+            className={`flex-none px-4 pb-3 text-center font-bold text-sm border-b-2 transition-colors flex items-center justify-center gap-2 ${activeTab === 'products' ? 'border-text-primary text-text-primary' : 'border-transparent text-text-muted hover:text-text-secondary'}`}
           >
-            {dir === 'rtl' ? 'المنتجات' : 'Products'} <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${activeTab === 'products' ? 'bg-zinc-800 text-white' : 'bg-zinc-900 text-zinc-400'}`}>{products.length}</span>
+            {dir === 'rtl' ? 'المنتجات' : 'Products'} <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${activeTab === 'products' ? 'bg-surface-selected text-text-primary' : 'bg-surface text-text-secondary'}`}>{products.length}</span>
           </button>
           <button
             onClick={() => setActiveTab('reviews')}
-            className={`flex-none px-4 pb-3 text-center font-bold text-sm border-b-2 transition-colors ${activeTab === 'reviews' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-400'}`}
+            className={`flex-none px-4 pb-3 text-center font-bold text-sm border-b-2 transition-colors ${activeTab === 'reviews' ? 'border-text-primary text-text-primary' : 'border-transparent text-text-muted hover:text-text-secondary'}`}
           >
             {dir === 'rtl' ? 'التقييمات' : 'Reviews'}
           </button>
           <button
             onClick={() => setActiveTab('about')}
-            className={`flex-none px-4 pb-3 text-center font-bold text-sm border-b-2 transition-colors ${activeTab === 'about' ? 'border-white text-white' : 'border-transparent text-zinc-500 hover:text-zinc-400'}`}
+            className={`flex-none px-4 pb-3 text-center font-bold text-sm border-b-2 transition-colors ${activeTab === 'about' ? 'border-text-primary text-text-primary' : 'border-transparent text-text-muted hover:text-text-secondary'}`}
           >
             {dir === 'rtl' ? 'حول' : 'About'}
           </button>
@@ -256,7 +262,7 @@ export default function MerchantStore() {
         <div className="relative z-0">
           {activeTab === 'products' && (
             products.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+              <div className="flex flex-col items-center justify-center py-16 text-text-muted">
                 <Box className="w-12 h-12 mb-3 opacity-40" />
                 <p className="text-sm">{dir === 'rtl' ? 'لا توجد منتجات بعد' : 'No products yet'}</p>
               </div>
@@ -266,22 +272,22 @@ export default function MerchantStore() {
                   const firstImage = (p.images && p.images[0]) || null;
                   const name = lang === 'ar' && p.name_ar ? p.name_ar : p.name;
                   return (
-                    <Link to={`/product/${p.slug}`} key={p.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden flex flex-col group hover:border-olive/50 transition-colors">
-                      <div className="relative aspect-square overflow-hidden bg-black">
+                    <Link to={`/product/${p.slug}`} key={p.id} className="bg-surface rounded-xl border border-border-subtle overflow-hidden flex flex-col group shadow-sm hover:bg-surface-raised active:shadow-press transition-colors">
+                      <div className="relative aspect-square overflow-hidden bg-surface-raised">
                         {firstImage ? (
-                          <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                          <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-700">
+                          <div className="w-full h-full flex items-center justify-center text-text-muted">
                             <Box className="w-10 h-10" />
                           </div>
                         )}
                       </div>
                       <div className="p-3">
-                        <h3 className="text-white font-medium text-sm line-clamp-2 mb-1">{name}</h3>
+                        <h3 className="text-text-primary font-medium text-sm line-clamp-2 mb-1">{name}</h3>
                         <div className="flex items-baseline gap-2">
-                          <div className="text-white font-bold text-sm">{formatIqd(p.price_iqd || 0)}</div>
+                          <div className="text-text-primary font-bold text-sm">{formatIqd(p.price_iqd || 0)}</div>
                           {p.original_price_iqd != null && p.original_price_iqd > p.price_iqd && (
-                            <div className="text-zinc-500 text-xs line-through">{formatIqd(p.original_price_iqd)}</div>
+                            <div className="text-text-muted text-xs line-through">{formatIqd(p.original_price_iqd)}</div>
                           )}
                         </div>
                       </div>
@@ -293,7 +299,7 @@ export default function MerchantStore() {
           )}
 
           {activeTab === 'reviews' && (
-            <div className="flex flex-col items-center justify-center py-16 text-zinc-500">
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted">
               <Star className="w-12 h-12 mb-3 opacity-40" />
               <p className="text-sm">{dir === 'rtl' ? 'لا توجد تقييمات بعد' : 'No reviews yet'}</p>
             </div>
@@ -301,29 +307,29 @@ export default function MerchantStore() {
 
           {activeTab === 'about' && (
             <div className="space-y-6">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-                <h3 className="font-bold text-white mb-2">{dir === 'rtl' ? 'عن التاجر' : 'About the Merchant'}</h3>
+              <div className="lv-surface p-5">
+                <h3 className="font-bold text-text-primary mb-2">{dir === 'rtl' ? 'عن التاجر' : 'About the Merchant'}</h3>
                 {merchant.bio ? (
-                  <p className="text-sm text-zinc-400 leading-relaxed">{merchant.bio}</p>
+                  <p className="text-sm text-text-secondary leading-relaxed">{merchant.bio}</p>
                 ) : (
-                  <p className="text-sm text-zinc-500">{dir === 'rtl' ? 'لم يضف التاجر وصفاً بعد' : 'This merchant has not added a description yet.'}</p>
+                  <p className="text-sm text-text-muted">{dir === 'rtl' ? 'لم يضف التاجر وصفاً بعد' : 'This merchant has not added a description yet.'}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 {joined && (
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
-                    <div className="text-zinc-500 text-xs mb-1">{dir === 'rtl' ? 'انضم' : 'Joined'}</div>
-                    <div className="font-bold text-white">{joined}</div>
+                  <div className="lv-surface p-4 flex flex-col justify-center">
+                    <div className="text-text-muted text-xs mb-1">{dir === 'rtl' ? 'انضم' : 'Joined'}</div>
+                    <div className="font-bold text-text-primary">{joined}</div>
                   </div>
                 )}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
-                  <div className="text-zinc-500 text-xs mb-1">{dir === 'rtl' ? 'المنتجات' : 'Products'}</div>
-                  <div className="font-bold text-white">{products.length}</div>
+                <div className="lv-surface p-4 flex flex-col justify-center">
+                  <div className="text-text-muted text-xs mb-1">{dir === 'rtl' ? 'المنتجات' : 'Products'}</div>
+                  <div className="font-bold text-text-primary">{products.length}</div>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
-                  <div className="text-zinc-500 text-xs mb-1">{dir === 'rtl' ? 'المتابعون' : 'Followers'}</div>
-                  <div className="font-bold text-white">{followers}</div>
+                <div className="lv-surface p-4 flex flex-col justify-center">
+                  <div className="text-text-muted text-xs mb-1">{dir === 'rtl' ? 'المتابعون' : 'Followers'}</div>
+                  <div className="font-bold text-text-primary">{followers}</div>
                 </div>
               </div>
             </div>

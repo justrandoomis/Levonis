@@ -47,7 +47,7 @@ export function ProductFacts({ attributes, loc, lang }: { attributes: Attributes
   }
   if (!rows.length) return null;
   return (
-    <dl className="mb-6 grid grid-cols-2 gap-x-4 gap-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-[12.5px]" data-product-facts>
+    <dl className="mb-6 grid grid-cols-2 gap-x-4 gap-y-2 sf-card p-3 text-[12.5px]" data-product-facts>
       {rows.map((r) => (
         <div key={r.k} className="min-w-0">
           <dt className="text-zinc-500">{r.label}</dt>

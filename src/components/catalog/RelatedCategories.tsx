@@ -56,7 +56,7 @@ export default function RelatedCategories({ nodes }: { nodes: CatalogTreeNode[] 
               {...prefetchProps(n.path)}
               data-feature=""
               data-related={n.slug}
-              className="group relative isolate block h-[118px] overflow-hidden rounded-2xl shadow-sm bg-charcoal text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:h-[168px]"
+              className="group relative isolate block h-[118px] overflow-hidden rounded-2xl shadow-sm bg-charcoal text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:h-[168px]"
             >
               {photo ? <CropPhoto src={photo.src} lightSrc={photo.lightSrc} mobileSrc={photo.mobileSrc} lightMobileSrc={photo.lightMobileSrc} crop={photo.productPhoto} size={240} className="lv-fade-top inset-x-0 bottom-0 top-[30%]" /> : null}
               <span className="relative block p-2.5 text-[12px] font-extrabold leading-[17px] lg:p-4 lg:text-[15px] lg:leading-6">{nodeName(n, lang)}</span>

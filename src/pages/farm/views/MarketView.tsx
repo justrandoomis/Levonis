@@ -7,7 +7,7 @@
  * lands it in the lowest free slot — the room redraws from the returned state.
  */
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { Segmented } from '../../../components/ui/Segmented';
 import { colorNameOf, farmApi, materialList, printerCatalog, type FarmState } from '../../../lib/farmApi';
 import type { FarmStrings } from '../strings';
@@ -113,14 +113,16 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                     dir="ltr"
                   >
                     <span
-                      className={`inline-flex items-center gap-1 h-9 px-3 rounded-full border text-[12px] font-bold group-focus-visible:ring-2 group-focus-visible:ring-gold ${
+                      className={`inline-flex items-center gap-1 h-9 px-3 rounded-full border text-[12px] font-bold group-focus-visible:ring-2 group-focus-visible:ring-focus ${
+                        // Clay filter chip: flush at rest, pressed (well + press + check) when chosen.
                         checked
-                          ? 'border-gold/50 bg-gold/10 text-gold'
+                          ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
                           : locked
-                            ? 'border-zinc-800 text-zinc-600'
-                            : 'border-zinc-800 text-zinc-300 group-hover:text-white'
+                            ? 'border-border-subtle text-text-muted'
+                            : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs group-hover:text-text-primary'
                       }`}
                     >
+                      {checked && <Check aria-hidden="true" className="size-3.5" strokeWidth={2.6} />}
                       {locked && <Lock aria-hidden="true" className="w-3 h-3" />}
                       {key}
                     </span>
@@ -147,18 +149,16 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                     title={label}
                     data-farm-color={c}
                     onClick={() => setColor(c)}
-                    className={`w-11 h-11 rounded-xl border flex items-center justify-center press-scale ${FOCUS} ${
-                      checked ? 'border-gold bg-gold/10' : 'border-zinc-800 hover:border-zinc-600'
-                    }`}
+                    className={`lv-choice w-11 h-11 flex items-center justify-center press-scale ${FOCUS}`}
                   >
                     <Swatch color={swatchFor(config, c)} size="md" />
                   </button>
                 );
               })}
-              {colors.length === 0 && <span className="text-[12px] text-zinc-500">—</span>}
+              {colors.length === 0 && <span className="text-[12px] text-text-muted">—</span>}
             </div>
             {color && (
-              <p className="text-[12px] text-zinc-300">
+              <p className="text-[12px] text-text-secondary">
                 <span dir="ltr">{material}</span> · {nameOf(colorNameOf(config, color), lang, color)}
               </p>
             )}
@@ -186,17 +186,17 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
             </div>
           )}
 
-          <dl className="grid grid-cols-2 gap-3 text-[12px] border-t border-zinc-800/70 pt-3">
+          <dl className="grid grid-cols-2 gap-3 text-[12px] border-t border-border-subtle pt-3">
             <div>
-              <dt className="text-zinc-500">{s.price}</dt>
+              <dt className="text-text-muted">{s.price}</dt>
               <dd className="text-gold font-black tabular-nums text-[16px]" dir="ltr">
                 {formatCoins(price, lang)}
               </dd>
-              {matDef && <dd className="text-zinc-500 tabular-nums text-[11px]">{s.pricePerGram(String(matDef.price_per_gram))}</dd>}
+              {matDef && <dd className="text-text-muted tabular-nums text-[11px]">{s.pricePerGram(String(matDef.price_per_gram))}</dd>}
             </div>
             <div>
-              <dt className="text-zinc-500">{s.inventory}</dt>
-              <dd className={`tabular-nums ${storageOk ? 'text-zinc-200' : 'text-honey'}`}>{s.storageLeft(storageFree, storageTotal)}</dd>
+              <dt className="text-text-muted">{s.inventory}</dt>
+              <dd className={`tabular-nums ${storageOk ? 'text-text-primary' : 'text-honey'}`}>{s.storageLeft(storageFree, storageTotal)}</dd>
             </div>
           </dl>
 
@@ -238,16 +238,16 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
               <article key={key} className={`${PANEL} p-4 space-y-3 ${locked ? 'opacity-80' : ''}`} data-farm-model={key} data-farm-model-locked={locked || undefined}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="text-white font-bold text-[14px] truncate" dir="ltr">
+                    <h3 className="text-text-primary font-bold text-[14px] truncate" dir="ltr">
                       {nameOf(model.name, lang, key)}
                     </h3>
-                    <p className="text-[11px] text-zinc-500">
+                    <p className="text-[11px] text-text-muted">
                       {s.family(model.family)}
-                      {have > 0 && <span className="text-zinc-400"> · {s.owned(have)}</span>}
+                      {have > 0 && <span className="text-text-secondary"> · {s.owned(have)}</span>}
                     </p>
                   </div>
                   {locked ? (
-                    <Chip className="border-zinc-700 text-zinc-400 bg-zinc-800/60">
+                    <Chip className="border-border-subtle text-text-secondary bg-surface-raised">
                       <Lock aria-hidden="true" className="w-3 h-3" />
                       {s.lockedLevel(model.min_level)}
                     </Chip>
@@ -260,7 +260,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                 {/* The volume and the materials list run past a 90px column at
                     360px: they wrap to a second line (never "180×180×…"), and
                     reserve it so every card in the grid stays the same height. */}
-                <div className="grid grid-cols-3 gap-x-3 gap-y-2 border-t border-zinc-800/70 pt-3">
+                <div className="grid grid-cols-3 gap-x-3 gap-y-2 border-t border-border-subtle pt-3">
                   <Spec label={s.specSpeed} value={`${formatInt(model.speed, lang)} mm/s`} />
                   <Spec label={s.specVolume} value={formatVolume(model.volume_mm)} wrap />
                   <Spec label={s.specPower} value={`${formatInt(model.watts, lang)} W`} />
@@ -269,7 +269,7 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
                   <Spec label={s.specMaterials} value={model.materials.join(' ')} wrap />
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-[11px] text-text-muted">
                     {locked ? s.lockedLevel(model.min_level) : freeSlots <= 0 ? s.noFreeSlot : !affordable ? s.notEnoughCoins : ''}
                   </span>
                   <button
@@ -297,10 +297,10 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
       {/* -------------------------------------------------------- confirmations */}
       <Window open={confirmFilament} onClose={() => setConfirmFilament(false)} label={s.buyFilamentTitle} labelledBy={filamentTitleId} busy={busy !== null} anchor={filamentBtn} testId="farm-buy-filament">
         <div className={WINDOW_BODY}>
-          <h3 id={filamentTitleId} className="text-white font-bold text-[16px]">
+          <h3 id={filamentTitleId} className="text-text-primary font-bold text-[16px]">
             {s.buyFilamentTitle}
           </h3>
-          <p className="text-[13px] text-zinc-300 leading-relaxed">
+          <p className="text-[13px] text-text-secondary leading-relaxed">
             {s.buyFilamentBody(material, nameOf(colorNameOf(config, color), lang, color), size, formatCoins(price, lang))}
           </p>
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -324,11 +324,11 @@ export default function MarketView({ state, lang, s, busy, run, onError, focusCa
 
       <Window open={confirmModel !== null} onClose={() => setConfirmModel(null)} label={s.buyPrinterTitle} labelledBy={printerTitleId} busy={busy !== null} anchor={modelAnchor} testId="farm-buy-printer">
         <div className={WINDOW_BODY}>
-          <h3 id={printerTitleId} className="text-white font-bold text-[16px]">
+          <h3 id={printerTitleId} className="text-text-primary font-bold text-[16px]">
             {s.buyPrinterTitle}
           </h3>
           {confirmModelDef && (
-            <p className="text-[13px] text-zinc-300 leading-relaxed">
+            <p className="text-[13px] text-text-secondary leading-relaxed">
               {s.buyPrinterBody(nameOf(confirmModelDef.name, lang, confirmModel ?? ''), formatCoins(confirmModelDef.price, lang))}
             </p>
           )}

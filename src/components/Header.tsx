@@ -217,8 +217,8 @@ export default function Header() {
               asked for an account before showing what it costs. */}
           <Link
             to="/subscription"
-            className={`relative rounded-full overflow-hidden flex items-center h-11 group ${
-              subTier !== 'free' ? 'p-[1.5px]' : 'border border-zinc-800/60'
+            className={`relative rounded-full overflow-hidden flex items-center h-11 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+              subTier !== 'free' ? 'p-[1.5px]' : 'border border-border-subtle'
             }`}
           >
             {tierMeta && (
@@ -237,7 +237,7 @@ export default function Header() {
                 : 'bg-surface/95 hover:bg-surface-raised'
             }`}>
               <span className={`text-[13px] tracking-wide capitalize ${
-                subTier !== 'free' ? 'text-white font-bold' : 'text-zinc-300 font-medium'
+                subTier !== 'free' ? 'text-text-primary font-bold' : 'text-text-secondary font-medium'
               }`}>
                 {subTier === 'free' || !tiers ? 'free' : tiers.tierLabel(subTier)}
               </span>
@@ -270,7 +270,7 @@ export default function Header() {
       {/* Subscription-based border line when scrolled */}
       <div className={`absolute bottom-0 left-0 right-0 h-[2px] w-full overflow-hidden transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>
          {!tierMeta ? (
-           <div className="w-full h-full bg-zinc-800/80" />
+           <div className="w-full h-full bg-border-subtle" />
          ) : (
            <div
              className="w-[200%] h-full"

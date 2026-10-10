@@ -20,7 +20,7 @@ export default function StatusHairline({
   const total = progress && progress.total > 0 ? progress.total : 0;
   const pct = cancelled ? 100 : total > 0 ? Math.min(100, Math.max(0, (progress!.index / total) * 100)) : 0;
   return (
-    <div aria-hidden="true" data-status-hairline className="absolute inset-x-0 top-0 flex h-px bg-zinc-800/70">
+    <div aria-hidden="true" data-status-hairline className="absolute inset-x-0 top-0 flex h-px bg-border-subtle/70">
       <span
         className={`block h-full transition-[width] duration-500 ease-out motion-reduce:transition-none ${
           cancelled ? 'bg-red-500/45' : 'bg-gold'

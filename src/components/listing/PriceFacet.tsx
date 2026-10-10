@@ -62,13 +62,13 @@ export default function PriceFacet({
         {histogram.map((n, i) => (
           <span
             key={i}
-            className={`block flex-1 rounded-t-[3px] transition-colors ${inRange[i] ? 'bg-text-primary' : 'bg-zinc-700'}`}
+            className={`block flex-1 rounded-t transition-colors ${inRange[i] ? 'bg-text-primary' : 'bg-border-subtle'}`}
             style={{ height: `${n === 0 ? 8 : 18 + (n / peak) * 82}%` }}
           />
         ))}
       </div>
       <div className="relative mx-0.5 h-11">
-        <span aria-hidden="true" className="absolute inset-x-0 top-[21px] h-0.5 rounded-full bg-zinc-700" />
+        <span aria-hidden="true" className="absolute inset-x-0 top-[21px] h-0.5 rounded-full bg-border-subtle" />
         <span
           aria-hidden="true"
           className="absolute top-[21px] h-0.5 rounded-full bg-text-primary"
@@ -122,7 +122,7 @@ function PriceField({ id, label, value, onCommit }: { id: string; label: string;
   return (
     <label
       htmlFor={id}
-      className="flex min-h-11 flex-1 cursor-text flex-col justify-center rounded-[10px] border border-border-subtle bg-surface px-2.5 focus-within:border-text-muted focus-within:ring-2 focus-within:ring-focus"
+      className="lv-well flex min-h-11 flex-1 cursor-text flex-col justify-center rounded-md border border-[var(--clay-field)] px-2.5 focus-within:border-focus focus-within:ring-2 focus-within:ring-focus"
     >
       <span className="text-[10.5px] leading-3 text-text-muted">{label}</span>
       <input

@@ -37,9 +37,9 @@ export default function DiscoveryFooterTiles() {
           key={t.id}
           to={t.to}
           data-discovery-tile={t.id}
-          className="group flex min-h-[104px] flex-col gap-1.5 rounded-2xl border border-border-subtle bg-surface p-3.5 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:min-h-[120px] lg:flex-row lg:items-center lg:gap-4 lg:p-5"
+          className="lv-surface group flex min-h-[104px] flex-col gap-1.5 p-3.5 transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:min-h-[120px] lg:flex-row lg:items-center lg:gap-4 lg:p-5"
         >
-          <span className="grid size-[34px] shrink-0 place-items-center rounded-[10px] bg-surface-selected text-text-primary lg:size-11">
+          <span className="grid size-[34px] shrink-0 place-items-center rounded-sm bg-surface-selected text-text-primary lg:size-11">
             {t.icon}
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">

@@ -48,7 +48,7 @@ export default function ContactBlock({ block, store }: BlockProps<'contact'>) {
           </div>
         )}
         {s.show_chat && (
-          <rt.ChatButton className="w-full min-h-[44px] rounded-xl border border-white/10 bg-white/[0.03] text-zinc-100 font-bold text-[13px] flex items-center justify-center gap-1.5">
+          <rt.ChatButton className="w-full min-h-[44px] sf-row text-zinc-100 font-bold text-[13px] flex items-center justify-center gap-1.5">
             <MessageCircle className="w-4 h-4" aria-hidden="true" />
             {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
           </rt.ChatButton>

@@ -169,27 +169,27 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
 
   const tone =
     req.status === 'completed' || req.status === 'awaiting_payment'
-      ? 'text-emerald-300 bg-emerald-950/30 border-emerald-900/60'
+      ? 'lv-chip [--chip:var(--color-success)]'
       : req.status === 'cancelled' || req.status === 'customer_rejected'
-        ? 'text-zinc-400 bg-zinc-900 border-zinc-800'
+        ? 'bg-white/[0.06] text-text-secondary'
         : req.status === 'value_changed'
-          ? 'text-amber-300 bg-amber-950/30 border-amber-900/60'
-          : 'text-gold bg-gold/[0.06] border-gold/30';
+          ? 'lv-chip [--chip:var(--color-warning)]'
+          : 'lv-chip [--chip:var(--color-gold)]';
   const target = req.target;
 
   return (
     <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:space-y-0 lg:items-start" data-trade-in-request={req.id} data-status={req.status}>
       <div className="space-y-4 min-w-0">
         <Card>
-          <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-bold ${tone}`} data-status-chip>
+          <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-bold ${tone}`} data-status-chip>
             {req.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden /> : req.status === 'cancelled' || req.status === 'customer_rejected' ? <XCircle className="w-3.5 h-3.5" aria-hidden /> : <Clock className="w-3.5 h-3.5" aria-hidden />}
             {loc(req.status_label.ar, req.status_label.en)}
           </span>
           <div className="flex items-center gap-3 mt-3">
-            <SafeImage src={req.source.image} alt="" aspect="square" className="w-14 h-14 rounded-xl shrink-0" bgClassName="bg-zinc-950" />
+            <SafeImage src={req.source.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface-raised" />
             <div className="min-w-0 flex-1">
-              <p className="text-white font-bold text-[15px] leading-6 line-clamp-2">{req.source.name}</p>
-              <p className="text-[12px] text-zinc-500">
+              <p className="text-text-primary font-bold text-[15px] leading-6 line-clamp-2">{req.source.name}</p>
+              <p className="text-[12px] text-text-muted">
                 {req.scope === 'ams_only' ? L('AMS فقط', 'AMS only') : req.scope === 'printer_only' ? L('الطابعة فقط', 'Printer only') : L('الجهاز كاملاً', 'Whole device')}
                 {' · '}
                 {loc(FAMILY_LABELS[req.family].ar, FAMILY_LABELS[req.family].en)}
@@ -197,11 +197,11 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             </div>
           </div>
           {target ? (
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-800 text-[13px] text-zinc-300">
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle text-[13px] text-text-secondary">
               <Repeat className="w-4 h-4 text-gold shrink-0" aria-hidden />
               <span className="min-w-0 truncate">
-                {L('إلى', 'For')} <strong className="text-white">{loc(target.name_ar, target.name)}</strong>
-                {target.options?.length ? <span className="text-zinc-500"> · {target.options.map((o) => (loc(o.label_ar, o.label_en))).join(' · ')}</span> : null}
+                {L('إلى', 'For')} <strong className="text-text-primary">{loc(target.name_ar, target.name)}</strong>
+                {target.options?.length ? <span className="text-text-muted"> · {target.options.map((o) => (loc(o.label_ar, o.label_en))).join(' · ')}</span> : null}
               </span>
             </div>
           ) : null}
@@ -224,21 +224,21 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             />
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[12px] text-zinc-500">{L('التقدير الأولي', 'Estimate')}</p>
-                <p className="text-[15px] text-zinc-500 line-through">
+                <p className="text-[12px] text-text-muted">{L('التقدير الأولي', 'Estimate')}</p>
+                <p className="text-[15px] text-text-muted line-through">
                   <Money iqd={req.estimated_iqd} />
                 </p>
               </div>
               <div className="text-end">
-                <p className="text-[12px] text-zinc-400">{L('القيمة الجديدة', 'New value')}</p>
-                <p className="text-[26px] font-black text-white leading-8">
+                <p className="text-[12px] text-text-secondary">{L('القيمة الجديدة', 'New value')}</p>
+                <p className="text-[26px] font-black text-text-primary leading-8">
                   <Money iqd={req.offer.value_iqd} />
                 </p>
               </div>
             </div>
             {req.offer.reason ? (
-              <p className="mt-3 text-[13px] leading-6 text-zinc-300 rounded-xl bg-zinc-950/50 p-3">
-                <span className="text-zinc-500">{L('السبب: ', 'Reason: ')}</span>
+              <p className="mt-3 text-[13px] leading-6 text-text-secondary lv-well rounded-md p-3">
+                <span className="text-text-muted">{L('السبب: ', 'Reason: ')}</span>
                 {req.offer.reason}
               </p>
             ) : null}
@@ -270,7 +270,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
               </Note>
             ) : null}
             {req.credit_order ? (
-              <Link to={`/orders/${encodeURIComponent(req.credit_order.id)}`} className="mt-4 flex items-center justify-between gap-2 min-h-[44px] rounded-xl border border-zinc-800 px-3 text-[13px] text-zinc-200 hover:border-zinc-700">
+              <Link to={`/orders/${encodeURIComponent(req.credit_order.id)}`} className="mt-4 flex items-center justify-between gap-2 min-h-[44px] rounded-md border border-border-subtle px-3 text-[13px] text-text-primary hover:bg-surface-raised">
                 <span>{L('طلب الشراء', 'Your order')} <span dir="ltr" className="font-mono">{req.credit_order.id}</span></span>
                 <CreditCard className="w-4 h-4 text-gold" aria-hidden />
               </Link>
@@ -312,12 +312,12 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
           <Card>
             <button type="button" className="w-full flex items-center justify-between gap-2 min-h-[44px]" aria-expanded={showBreakdown} onClick={() => setShowBreakdown((v) => !v)}>
               <span className="text-start">
-                <span className="block text-[12px] text-zinc-500">{L('التقدير الأولي', 'Preliminary estimate')}</span>
-                <span className="block text-[18px] font-black text-white">
+                <span className="block text-[12px] text-text-muted">{L('التقدير الأولي', 'Preliminary estimate')}</span>
+                <span className="block text-[18px] font-black text-text-primary">
                   <Money iqd={req.estimated_iqd} />
                 </span>
               </span>
-              <ChevronDown className={`w-5 h-5 text-zinc-500 transition-transform ${showBreakdown ? 'rotate-180' : ''}`} aria-hidden />
+              <ChevronDown className={`w-5 h-5 text-text-muted transition-transform ${showBreakdown ? 'rotate-180' : ''}`} aria-hidden />
             </button>
             {showBreakdown ? (
               <div className="mt-2 space-y-4">
@@ -334,12 +334,12 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             <SectionTitle title={L('صورك', 'Your photos')} />
             {req.components.map((c) => (
               <div key={c.role} className="mb-3 last:mb-0">
-                {req.components.length > 1 ? <p className="text-[12px] text-zinc-500 mb-1.5">{c.role === 'ams' ? 'AMS' : L('الطابعة', 'Printer')}</p> : null}
+                {req.components.length > 1 ? <p className="text-[12px] text-text-muted mb-1.5">{c.role === 'ams' ? 'AMS' : L('الطابعة', 'Printer')}</p> : null}
                 <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
                   {c.photos.map((p) => {
                     const a = [...REQUIRED_PHOTOS[c.family], OPTIONAL_PHOTO].find((x) => x.id === p.angle);
                     return (
-                      <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="relative block aspect-square rounded-lg overflow-hidden bg-zinc-950" title={a ? (loc(a.label_ar, a.label_en)) : p.angle}>
+                      <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="relative block aspect-square rounded-lg overflow-hidden bg-surface-raised" title={a ? (loc(a.label_ar, a.label_en)) : p.angle}>
                         <img src={p.url} alt={a ? (loc(a.label_ar, a.label_en)) : ''} className="w-full h-full object-cover" loading="lazy" />
                       </a>
                     );
@@ -354,15 +354,15 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
       <aside className="space-y-4">
         <Card>
           <SectionTitle title={L('مراحل الطلب', 'Timeline')} />
-          <ol className="relative ms-2 border-s border-zinc-800">
+          <ol className="relative ms-2 border-s border-border-subtle">
             {req.events.map((e, i) => {
               const label = EVENT_LABELS[e.action] ?? [e.action, e.action];
               const v = typeof e.detail.value_iqd === 'number' ? (e.detail.value_iqd as number) : null;
               return (
                 <li key={`${e.action}-${i}`} className="ms-4 pb-4 last:pb-0">
-                  <span className={`absolute -start-[5px] mt-1.5 h-2.5 w-2.5 rounded-full ${i === req.events.length - 1 ? 'bg-gold' : 'bg-zinc-700'}`} aria-hidden />
-                  <p className="text-[13px] font-semibold text-zinc-200">{loc(label[0], label[1])}</p>
-                  <p className="text-[11.5px] text-zinc-500 tabular-nums">
+                  <span className={`absolute -start-[5px] mt-1.5 h-2.5 w-2.5 rounded-full ${i === req.events.length - 1 ? 'bg-gold' : 'bg-border-subtle'}`} aria-hidden />
+                  <p className="text-[13px] font-semibold text-text-primary">{loc(label[0], label[1])}</p>
+                  <p className="text-[11.5px] text-text-muted tabular-nums">
                     {dateText(e.created_at, lang)}
                     {v !== null ? (
                       <>
@@ -371,7 +371,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
                       </>
                     ) : null}
                   </p>
-                  {typeof e.detail.reason === 'string' && e.detail.reason ? <p className="text-[12px] text-zinc-400 mt-0.5">{e.detail.reason}</p> : null}
+                  {typeof e.detail.reason === 'string' && e.detail.reason ? <p className="text-[12px] text-text-secondary mt-0.5">{e.detail.reason}</p> : null}
                 </li>
               );
             })}

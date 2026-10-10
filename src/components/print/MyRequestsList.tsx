@@ -32,7 +32,8 @@ import { useMoney } from '../../CurrencyContext';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { asLang } from '../orders/format';
 import ConfirmSheet from './ConfirmSheet';
-import { requestStateLabel } from '../community/requests/requestStates';
+import { requestStateLabel, requestStateTone } from '../community/requests/requestStates';
+import { StatusChip } from '../ui/Badge';
 import { CommunityLoadError } from '../../pages/community/access';
 import { offersLabel } from '../community/hub/copy';
 
@@ -114,8 +115,8 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
   if (!rows.length) {
     return (
       <div className="py-14 text-center">
-        <PackageSearch className="w-9 h-9 text-zinc-600 mx-auto mb-3" />
-        <p className="text-zinc-400 text-[13px]">
+        <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
+        <p className="text-text-secondary text-[13px]">
           {loc('لم تنشئ أي طلب بعد', 'You have not created a request yet', 'هێشتا داواکاریت دروست نەکردووە')}
         </p>
       </div>
@@ -160,7 +161,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
           <div
             key={r.id}
             data-my-request={r.id}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden"
+            className="lv-surface overflow-hidden"
           >
             <button
               onClick={() => onOpen(r.id)}
@@ -171,23 +172,23 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                     preview object is private and reaching it needs the
                     authorised file route. An icon that says WHAT the request
                     carries is more honest than a broken <img>. */}
-                <div className="w-12 h-12 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-md lv-well flex items-center justify-center shrink-0">
                   {p?.source_kind === 'link' ? (
-                    <Link2 className="w-5 h-5 text-gold/70" />
+                    <Link2 className="w-5 h-5 text-text-secondary" />
                   ) : (
-                    <FileBox className="w-5 h-5 text-gold/70" />
+                    <FileBox className="w-5 h-5 text-text-secondary" />
                   )}
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-white font-semibold text-[14px] leading-snug truncate">{r.title}</h3>
-                    <span className="shrink-0 text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-white/15 bg-white/[0.04] text-zinc-300">
+                    <h3 className="text-text-primary font-semibold text-[14px] leading-snug truncate">{r.title}</h3>
+                    <StatusChip tone={requestStateTone(r.state)} className="shrink-0">
                       {requestStateLabel(r.state, loc)}
-                    </span>
+                    </StatusChip>
                   </div>
 
-                  <p className="text-[11px] text-zinc-500 mt-0.5" dir="ltr">
+                  <p className="text-[11px] text-text-muted mt-0.5" dir="ltr">
                     {r.created_at.slice(0, 10)}
                     {p?.primary_file_name ? ` · ${p.primary_file_name}` : ''}
                   </p>
@@ -196,14 +197,14 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                     <p className="mt-2 text-gold font-bold text-[13.5px]" dir="ltr" data-my-request-estimate>
                       {priceRange(p.estimate_low_iqd, p.estimate_high_iqd, money)}
                       {p.estimate_confidence && (
-                        <span className="ms-2 text-[10.5px] font-semibold text-zinc-400" dir="auto">
+                        <span className="ms-2 text-[10.5px] font-semibold text-text-secondary" dir="auto">
                           {loc(...CONFIDENCE_TEXT[p.estimate_confidence])}
                         </span>
                       )}
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-zinc-500 mt-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted mt-2">
                     {(p?.material_id || r.material) && (
                       <span className="uppercase">{p?.material_id || r.material}</span>
                     )}
@@ -253,10 +254,10 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
               </div>
             </button>
 
-            <div className="flex border-t border-white/[0.07]">
+            <div className="flex border-t border-border-subtle">
               <button
                 onClick={() => onOpen(r.id)}
-                className="flex-1 min-h-[42px] text-[12.5px] font-semibold text-zinc-300 flex items-center justify-center gap-1.5"
+                className="flex-1 min-h-[42px] text-[12.5px] font-semibold text-text-secondary flex items-center justify-center gap-1.5"
               >
                 {loc('فتح الطلب', 'Open request', 'کردنەوە')}
                 <ChevronLeft className="w-3.5 h-3.5 rotate-180 rtl:rotate-0" />
@@ -269,7 +270,7 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
                 }}
                 disabled={repeating === r.id}
                 data-my-request-repeat={r.id}
-                className="flex-1 min-h-[42px] border-s border-white/[0.07] text-[12.5px] font-semibold text-gold flex items-center justify-center gap-1.5 disabled:opacity-60"
+                className="flex-1 min-h-[42px] border-s border-border-subtle text-[12.5px] font-semibold text-gold flex items-center justify-center gap-1.5 disabled:opacity-60"
               >
                 {repeating === r.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />

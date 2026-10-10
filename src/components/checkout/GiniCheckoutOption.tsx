@@ -123,6 +123,7 @@ export default function GiniCheckoutOption({
               `type="number"`'s spinner and scroll-to-change.
             */}
             <input
+              className="lv-input w-full text-center font-mono text-[16px] tracking-[0.3em]"
               id="checkout-gini-order-no"
               type="text"
               dir="ltr"
@@ -134,7 +135,6 @@ export default function GiniCheckoutOption({
               onChange={(e) => onOrderNoChange(asciiDigits(e.target.value).replace(/[^0-9]/g, '').slice(0, 6))}
               aria-describedby="checkout-gini-help"
               data-gini-order-no
-              className="lv-input w-full text-center font-mono text-[16px] tracking-[0.3em]"
             />
             <p id="checkout-gini-help" className="mt-1.5 text-[11.5px] font-light text-zinc-500">
               {strings.help}

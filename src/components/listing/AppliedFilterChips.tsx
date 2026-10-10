@@ -37,7 +37,7 @@ export default function AppliedFilterChips({
           onClick={() => onChange(c.next)}
           className="group inline-flex min-h-11 shrink-0 items-center focus-visible:outline-none"
         >
-          <span className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-surface-selected pe-2 ps-3 text-[12.5px] font-bold text-text-primary transition-colors group-hover:bg-zinc-800 group-focus-visible:ring-2 group-focus-visible:ring-focus">
+          <span className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-surface-selected pe-2 ps-3 text-[12.5px] font-bold text-text-primary transition-colors group-hover:bg-surface-raised group-focus-visible:ring-2 group-focus-visible:ring-focus">
             <bdi>{c.label}</bdi>
             <X aria-hidden="true" className="size-3.5 text-text-muted" strokeWidth={2.4} />
           </span>

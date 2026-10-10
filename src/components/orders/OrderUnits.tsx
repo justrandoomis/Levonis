@@ -109,7 +109,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
       {units.map((u) => {
         const w = u.warranty;
         const coverage = u.traded_in_at
-          ? { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.tradedIn(formatDate(u.traded_in_at, lang), formatDate(w.end_at, lang)) }
+          ? { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-text-secondary', text: s.tradedIn(formatDate(u.traded_in_at, lang), formatDate(w.end_at, lang)) }
           : w.state === 'active'
             ? // The end of the cover the days were counted to (the used-sale period once it outlasts the original).
               { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden />, cls: 'text-emerald-300', text: `${s.coveredUntil(formatDate(w.cover_end_at ?? w.end_at, lang))}${w.remaining_days !== null ? ` · ${daysLeftLabel(w.remaining_days, lang)}` : ''}` }
@@ -118,25 +118,25 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
               : w.state === 'needs_config'
                 ? { icon: <ShieldAlert className="w-3.5 h-3.5" aria-hidden />, cls: 'text-amber-300', text: s.needsConfig }
                 : w.state === 'closed'
-                  ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.returned }
-                  : { icon: <Clock className="w-3.5 h-3.5" aria-hidden />, cls: 'text-zinc-400', text: s.notDelivered };
+                  ? { icon: <ShieldOff className="w-3.5 h-3.5" aria-hidden />, cls: 'text-text-secondary', text: s.returned }
+                  : { icon: <Clock className="w-3.5 h-3.5" aria-hidden />, cls: 'text-text-secondary', text: s.notDelivered };
         // A returned (0178) or traded-in (owner decision 3) device is the shop's again: nothing to register.
         const canRegister = u.linked === 'none' && !u.replaced && !u.returned && !u.traded_in_at && w.state !== 'closed' && !!u.delivered_at;
         const err = errors[u.unit_id];
         return (
-          <li key={u.unit_id} data-unit-id={u.unit_id} data-unit-linked={u.linked} className="rounded-xl border border-zinc-800 bg-black/30 p-3">
+          <li key={u.unit_id} data-unit-id={u.unit_id} data-unit-linked={u.linked} className="rounded-lg border border-border-subtle bg-surface-raised p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[12.5px] text-zinc-200 font-bold">
+                <p className="text-[12.5px] text-text-primary font-bold">
                   {s.unit(u.unit_index, total)}
                   {u.serial ? (
                     <>
                       {' · '}
                       <span className="sr-only">{s.serial}: </span>
-                      <span dir="ltr" className="font-mono font-normal text-zinc-400">{u.serial}</span>
+                      <span dir="ltr" className="font-mono font-normal text-text-secondary">{u.serial}</span>
                     </>
                   ) : (
-                    <span className="font-normal text-zinc-500"> · {s.noSerial}</span>
+                    <span className="font-normal text-text-muted"> · {s.noSerial}</span>
                   )}
                 </p>
                 <p className={`mt-0.5 text-[11.5px] inline-flex items-center gap-1.5 ${coverage.cls}`} data-warranty-state={u.traded_in_at ? 'traded_in' : w.state}>
@@ -152,7 +152,7 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
                   onClick={() => register(u)}
                   disabled={busyId !== null}
                   data-register-unit={u.unit_id}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-gold/40 text-gold text-[12px] font-bold hover:bg-gold/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+                  className="lv-button lv-button-accent lv-button-sm"
                 >
                   {busyId === u.unit_id ? <Spinner size="xs" delayMs={0} decorative /> : <Link2 className="w-3.5 h-3.5" aria-hidden />}
                   {busyId === u.unit_id ? s.registering : s.register}
@@ -165,19 +165,19 @@ export default function OrderUnits({ units, onLinked }: { units: OrderUnitPublic
                 </span>
               )}
               {u.linked === 'other' && (
-                <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-400">
+                <span className="inline-flex items-center gap-1.5 text-[12px] text-text-secondary">
                   <AlertTriangle className="w-3.5 h-3.5" aria-hidden />
                   {s.linkedOther}
                 </span>
               )}
-              {u.replaced && <span className="text-[12px] text-zinc-500">{s.replaced}</span>}
+              {u.replaced && <span className="text-[12px] text-text-muted">{s.replaced}</span>}
               {u.receipt_no && (
                 <Link
                   to={`/warranty/${encodeURIComponent(u.receipt_no)}`}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-zinc-800 text-zinc-300 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  className="lv-button lv-button-secondary lv-button-sm"
                 >
                   <FileText className="w-3.5 h-3.5" aria-hidden />
-                  {s.receipt} <span dir="ltr" className="font-mono font-normal text-zinc-500">{u.receipt_no}</span>
+                  {s.receipt} <span dir="ltr" className="font-mono font-normal text-text-muted">{u.receipt_no}</span>
                 </Link>
               )}
             </div>

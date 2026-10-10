@@ -5,7 +5,7 @@
  * THIS COMPONENT OWNS NO CALENDAR AND NO CLOCK. It is handed `days[]` —
  * `{ day, label, is_today, is_tomorrow }` straight out of `deliveryDateVerb`
  * — and it renders `label`. There is no date library here, no
- * `<input type="date">`, and no `new Date()`. Two failures, both of which have
+ * native date input (`type="date"`), and no `new Date()`. Two failures, both of which have
  * already happened to Iraqi users, are what that buys:
  *
  *  1. A NATIVE DATE INPUT OPENS IN THE DEVICE'S LOCALE, and on Iraqi Androids

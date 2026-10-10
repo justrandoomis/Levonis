@@ -378,17 +378,17 @@ export default function StockAlerts() {
   const liveCount = alerts.filter((a) => LIVE_STATES.has(a.state)).length;
 
   return (
-    <div className="w-full min-h-screen bg-canvas text-zinc-300 font-sans pb-24" data-stock-alerts-page>
+    <div className="w-full min-h-screen text-text-secondary font-sans pb-24" data-stock-alerts-page>
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
         <button
           type="button"
           onClick={goBack}
           aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-surface-raised text-white hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-surface-raised text-text-primary hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
         >
           <Back aria-hidden="true" className="w-5 h-5" />
         </button>
-        <h1 className="text-white font-bold text-lg leading-6 flex-1 min-w-0 truncate">
+        <h1 className="text-text-primary font-bold text-lg leading-6 flex-1 min-w-0 truncate">
           {loc('تنبيهاتي', 'My alerts', 'ئاگادارکردنەوەکانم')}
         </h1>
         {/* The cap is the server's (MAX_ARMED_PER_USER). Printing it here is
@@ -396,7 +396,7 @@ export default function StockAlerts() {
             into something the customer already understood. */}
         {!loading && !error && limit > 0 ? (
           <span
-            className="shrink-0 text-[12px] leading-4 text-zinc-500 tabular-nums"
+            className="shrink-0 text-[12px] leading-4 text-text-muted tabular-nums"
             dir="ltr"
             data-stock-alerts-count
           >
@@ -406,7 +406,7 @@ export default function StockAlerts() {
       </header>
 
       <div className="p-4 max-w-2xl mx-auto">
-        <p className="text-[12px] leading-5 text-zinc-500 mb-4">
+        <p className="text-[12px] leading-5 text-text-muted mb-4">
           {loc(
             'هنا كل شي طلبت نخبرك لما يرجع للمخزون. التنبيه الملغي يبيّن سببه.',
             'Everything you asked us to tell you about when it returns to stock. A cancelled alert says why.',
@@ -417,7 +417,7 @@ export default function StockAlerts() {
         {notice ? (
           <p
             role="status"
-            className="mb-3 rounded-xl border border-border-subtle bg-surface px-3 py-2 text-[12px] leading-5 text-zinc-300"
+            className="mb-3 rounded-xl border border-border-subtle bg-surface px-3 py-2 text-[12px] leading-5 text-text-secondary"
           >
             {notice}
           </p>
@@ -459,7 +459,7 @@ export default function StockAlerts() {
             action={
               <Link
                 to="/products"
-                className="mt-1 min-h-[44px] px-5 rounded-xl bg-surface-raised text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
+                className="mt-1 min-h-[44px] px-5 rounded-xl bg-surface-raised text-text-primary text-sm font-bold flex items-center justify-center gap-2 hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
               >
                 {loc('تصفّح المنتجات', 'Browse the catalogue', 'بەرهەمەکان ببینە')}
               </Link>
@@ -519,20 +519,20 @@ export default function StockAlerts() {
                       <Link
                         to={`/product/${a.slug}`}
                         dir="auto"
-                        className="block font-bold text-[14px] leading-5 text-white truncate hover:underline underline-offset-2 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-sm"
+                        className="block font-bold text-[14px] leading-5 text-text-primary truncate hover:underline underline-offset-2 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-sm"
                       >
                         {pick(a.name, l)}
                       </Link>
 
                       {target ? (
-                        <p dir="auto" className="mt-0.5 text-[12px] leading-5 text-zinc-400 truncate">
+                        <p dir="auto" className="mt-0.5 text-[12px] leading-5 text-text-secondary truncate">
                           {target}
                         </p>
                       ) : (
                         /* `kind: 'product'` — the customer asked about the
                            shelf, not one model, and saying so beats an empty
                            line that reads like a missing label. */
-                        <p className="mt-0.5 text-[12px] leading-5 text-zinc-500 truncate">
+                        <p className="mt-0.5 text-[12px] leading-5 text-text-muted truncate">
                           {loc('المنتج كامل', 'The whole product', 'هەموو بەرهەمەکە')}
                         </p>
                       )}
@@ -544,7 +544,7 @@ export default function StockAlerts() {
                               ? 'bg-danger/15 text-danger'
                               : a.state === 'notified'
                                 ? 'bg-success/15 text-success'
-                                : 'bg-surface-raised text-zinc-300'
+                                : 'bg-surface-raised text-text-secondary'
                           }`}
                         >
                           {dead ? (
@@ -559,7 +559,7 @@ export default function StockAlerts() {
                           {state[l]}
                         </span>
                         {a.state === 'notified' && a.notified_at ? (
-                          <span className="text-[11px] leading-4 text-zinc-500">
+                          <span className="text-[11px] leading-4 text-text-muted">
                             {/* «خبرناك بتاريخ» and not «خبرناك بـ»: the tatweel
                                 on «بـ» exists to show the bāʾ is a prefix still
                                 waiting for its word, so a space after it reads
@@ -570,7 +570,7 @@ export default function StockAlerts() {
                             <time dateTime={a.notified_at}>{formatDate(a.notified_at, l)}</time>
                           </span>
                         ) : a.armed_at ? (
-                          <span className="text-[11px] leading-4 text-zinc-500">
+                          <span className="text-[11px] leading-4 text-text-muted">
                             {loc('من', 'Since', 'هەر لە')}{' '}
                             <time dateTime={a.armed_at}>{formatDate(a.armed_at, l)}</time>
                           </span>
@@ -601,7 +601,7 @@ export default function StockAlerts() {
                         aria-busy={busy}
                         aria-label={loc('إلغاء التنبيه', 'Cancel this alert', 'هەڵوەشاندنەوەی ئاگادارکردنەوە')}
                         data-alert-cancel
-                        className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-zinc-400 hover:bg-surface-raised hover:text-white active:opacity-70 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
+                        className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-secondary hover:bg-surface-raised hover:text-text-primary active:opacity-70 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
                       >
                         <Trash2 aria-hidden="true" className="w-4 h-4" />
                       </button>
@@ -612,7 +612,7 @@ export default function StockAlerts() {
                   {reason ? (
                     <p
                       data-alert-dead={a.dead_reason || 'UNKNOWN'}
-                      className="mt-2.5 border-s-2 border-danger/55 ps-2.5 text-[12px] leading-5 text-zinc-200"
+                      className="mt-2.5 border-s-2 border-danger/55 ps-2.5 text-[12px] leading-5 text-text-primary"
                     >
                       {reason[l]}
                     </p>

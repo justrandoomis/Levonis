@@ -19,7 +19,8 @@ import SafeImage from '../ui/SafeImage';
 import OrderTracker from '../OrderTracker';
 import StatusHairline from './StatusHairline';
 import InlineCopy from './InlineCopy';
-import { asLang, countItems, formatDate, formatDateTime, itemCountLabel, orderStatusLabel, statusStyle } from './format';
+import { asLang, countItems, formatDate, formatDateTime, itemCountLabel, orderStatusLabel } from './format';
+import { StatusChip, type Tone } from '../ui/Badge';
 import { useMoney } from '../../CurrencyContext';
 
 const STRINGS = {
@@ -112,6 +113,16 @@ const STRINGS = {
 */
 const ACTION = 'lv-button lv-button-sm flex-1 basis-[calc(50%-0.25rem)] min-w-0';
 
+/** The order's state as the house status chip: word, dot and an opaque tint (AA on cream). */
+const STATUS_TONE: Record<string, Tone> = {
+  pending: 'warning',
+  confirmed: 'info',
+  processing: 'info',
+  shipped: 'info',
+  delivered: 'success',
+  cancelled: 'danger',
+};
+
 /**
  * What is still owed at the door. `due_on_delivery_iqd` is the checkout-time
  * cash-on-delivery figure and is never zeroed, so read alone it keeps
@@ -179,7 +190,7 @@ export default function OrderCard({
     <article
       data-order-id={order.id}
       data-order-status={order.status}
-      className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60"
+      className="lv-surface relative overflow-hidden"
     >
       <StatusHairline progress={order.progress} cancelled={order.status === 'cancelled'} />
       <div className="p-4">
@@ -192,31 +203,28 @@ export default function OrderCard({
                   src={it.image}
                   alt=""
                   aspect="square"
-                  className={`w-12 h-12 rounded-xl border border-zinc-800 ring-2 ring-zinc-950 ${i > 0 ? '-ms-3' : ''}`}
-                  bgClassName="bg-black"
+                  className={`w-12 h-12 rounded-md border border-border-subtle ring-2 ring-surface ${i > 0 ? '-ms-3' : ''}`}
+                  bgClassName="bg-surface-raised"
                   fallbackIconClassName="w-5 h-5"
                 />
               ))}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-0.5 min-w-0">
-                <span dir="ltr" className="text-white font-bold text-[14px] truncate">
+                <span dir="ltr" className="text-text-primary font-bold text-[14px] truncate">
                   {order.id}
                 </span>
                 <InlineCopy value={order.id} label={s.orderId} />
               </div>
-              <p className="text-[12px] text-zinc-500 truncate">
+              <p className="text-[12px] text-text-muted truncate">
                 <time dateTime={order.created_at}>{formatDate(order.created_at, lang)}</time>
                 {' · '}
                 {itemCountLabel(count, lang)}
               </p>
             </div>
           </div>
-          <span
-            data-order-pill
-            className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyle(order.status)}`}
-          >
-            {orderStatusLabel(lang, order)}
+          <span data-order-pill className="shrink-0">
+            <StatusChip tone={STATUS_TONE[order.status] ?? 'neutral'}>{orderStatusLabel(lang, order)}</StatusChip>
           </span>
         </header>
 
@@ -228,9 +236,9 @@ export default function OrderCard({
         )}
 
         {order.items[0] && (
-          <p className="mt-3 text-[13px] text-zinc-300 truncate">
+          <p className="mt-3 text-[13px] text-text-secondary truncate">
             {order.items[0].name}
-            {extraLines > 0 && <span className="text-zinc-500"> {s.more(extraLines)}</span>}
+            {extraLines > 0 && <span className="text-text-muted"> {s.more(extraLines)}</span>}
           </p>
         )}
         {/* §13: an ordinary order in every way; the label only says how it was placed. */}
@@ -250,10 +258,10 @@ export default function OrderCard({
 
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] text-zinc-500">{s.total}</p>
+            <p className="text-[11px] text-text-muted">{s.total}</p>
             <p className="text-gold font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
             {due > 0 && (
-              <p className="text-[11.5px] text-zinc-400 tabular-nums">
+              <p className="text-[11.5px] text-text-secondary tabular-nums">
                 {s.due}: {money(due)}
               </p>
             )}
@@ -265,7 +273,7 @@ export default function OrderCard({
           </div>
           {/* Only ever shown when the SERVER scheduled the next move. */}
           {order.next_stage_at && order.status !== 'cancelled' && order.status !== 'delivered' && (
-            <p className="text-[11px] text-zinc-500 text-end inline-flex items-center gap-1 shrink-0">
+            <p className="text-[11px] text-text-muted text-end inline-flex items-center gap-1 shrink-0">
               <Clock className="w-3 h-3" aria-hidden />
               <span>
                 {s.next}: <time dateTime={order.next_stage_at}>{formatDateTime(order.next_stage_at, lang)}</time>

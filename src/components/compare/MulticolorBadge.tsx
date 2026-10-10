@@ -111,7 +111,7 @@ export default function MulticolorBadge({
   return (
     <span
       data-multicolor={badge?.kind}
-      className={`inline-flex max-w-full items-start rounded-[10px] border ${tone} ${
+      className={`inline-flex max-w-full items-start rounded-sm border ${tone} ${
         size === 'xs'
           ? 'gap-1 px-1 py-0.5 text-[10.5px] leading-[13px]'
           : size === 'sm'

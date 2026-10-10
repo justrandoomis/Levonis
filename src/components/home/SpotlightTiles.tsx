@@ -116,7 +116,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
     <span className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 content-start min-w-0 min-h-4">
       <span
         className={`text-[11px] sm:text-[12px] leading-4 font-bold tabular-nums whitespace-nowrap ${
-          discounted ? 'text-gold' : 'text-white'
+          discounted ? 'text-gold' : 'text-text-primary'
         }`}
       >
         {money(display)}
@@ -126,7 +126,7 @@ function PricePlate({ p }: { p: ApiProduct }) {
           gold display price is what says "this is less than it was" — the same
           signal, in the space that exists. */}
       {discounted && (
-        <span className="hidden sm:inline text-[10px] leading-4 text-zinc-400 line-through tabular-nums whitespace-nowrap">
+        <span className="hidden sm:inline text-[10px] leading-4 text-text-secondary line-through tabular-nums whitespace-nowrap">
           {money(regular)}
         </span>
       )}
@@ -141,7 +141,7 @@ function Slot({ p }: { p: ApiProduct }) {
       data-spotlight-item={p.id}
       className="group flex flex-col gap-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg"
     >
-      <span className="block aspect-square overflow-hidden rounded-lg bg-black">
+      <span className="block aspect-square overflow-hidden rounded-lg bg-surface-raised">
         <SafeImage
           src={productPrimaryImage(p)}
           alt={p.name}
@@ -221,7 +221,7 @@ function Tile({
 
   return (
     <div
-      className="flex flex-col rounded-2xl border border-border-subtle bg-surface p-2.5 sm:p-3 min-w-0"
+      className="lv-surface flex flex-col p-2.5 sm:p-3 min-w-0"
       onPointerEnter={(e) => {
         if (e.pointerType === 'mouse') setPaused(true);
       }}
@@ -250,8 +250,8 @@ function Tile({
         {icon}
         {/* An h2, like every other shelf on this page. It was a plain span, so
             these two sections did not exist to heading navigation at all. */}
-        <h2 className="text-[12px] sm:text-[13px] font-bold text-white truncate">{title}</h2>
-        <Chevron aria-hidden className="w-4 h-4 shrink-0 ms-auto text-zinc-500" />
+        <h2 className="text-[12px] sm:text-[13px] font-bold text-text-primary truncate">{title}</h2>
+        <Chevron aria-hidden className="w-4 h-4 shrink-0 ms-auto text-text-muted" />
       </Link>
 
       {/* aria-live is off on purpose: an automatic rotation announcing itself
@@ -286,7 +286,7 @@ function Tile({
               <span
                 aria-hidden
                 className={`h-1.5 rounded-full transition-all motion-reduce:transition-none ${
-                  i === page ? 'w-4 bg-gold' : 'w-1.5 bg-zinc-700'
+                  i === page ? 'w-4 bg-gold' : 'w-1.5 bg-border-subtle'
                 }`}
               />
             </button>

@@ -98,7 +98,7 @@ export default function CategoryPage() {
   if (error) {
     const missing = error instanceof ApiError && error.status === 404;
     return (
-      <div className="min-h-full w-full bg-canvas pb-10 text-text-primary">
+      <div className="min-h-full w-full pb-10 text-text-primary">
         <PageTopBar title={loc('الفئة', 'Category')} fallback="/categories" />
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
           {missing ? (
@@ -147,7 +147,7 @@ export default function CategoryPage() {
 
   if (payload.layout === 'listing') {
     return (
-      <div data-page="category" data-layout="listing" className="min-h-full w-full bg-canvas pb-10 text-text-primary">
+      <div data-page="category" data-layout="listing" className="min-h-full w-full pb-10 text-text-primary">
         {topBar}
         <ListingView
           key={node.id}
@@ -169,7 +169,7 @@ export default function CategoryPage() {
 
   const brands = payload.brands;
   return (
-    <div data-page="category" data-layout="shelves" className="min-h-full w-full bg-canvas pb-10 text-text-primary">
+    <div data-page="category" data-layout="shelves" className="min-h-full w-full pb-10 text-text-primary">
       {topBar}
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="pt-1.5">
@@ -242,12 +242,12 @@ export default function CategoryPage() {
 /** The hero and two shelves, at their real sizes, so nothing moves when the page lands. */
 function CategorySkeleton() {
   return (
-    <div className="min-h-full w-full bg-canvas pb-10">
+    <div className="min-h-full w-full pb-10">
       <div className="flex h-14 items-center gap-2 px-4">
         <Skeleton className="size-10 rounded-full" />
       </div>
       <SkeletonGroup className="mx-auto w-full max-w-[1200px] px-4 pt-1.5 sm:px-6 lg:px-8">
-        <Skeleton className="h-[252px] rounded-[22px] lg:h-[320px] lg:rounded-[28px]" />
+        <Skeleton className="h-[252px] rounded-xl lg:h-[320px] lg:rounded-2xl" />
         <div className="mt-3 flex gap-1.5 py-1.5">
           <Skeleton className="h-8 w-28 rounded-full" />
           <Skeleton className="h-8 w-24 rounded-full" />

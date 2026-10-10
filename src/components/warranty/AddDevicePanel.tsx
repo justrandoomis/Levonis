@@ -184,10 +184,10 @@ export function AddDevicePanel({
   return (
     <section className={`${CARD} overflow-hidden`} aria-labelledby="warranty-add-title">
       <div className="px-4 pt-4">
-        <h2 id="warranty-add-title" className="text-white font-bold text-base">
+        <h2 id="warranty-add-title" className="text-text-primary font-bold text-base">
           {s.addTitle}
         </h2>
-        <p className="text-zinc-500 text-[12px] mt-0.5">{s.addIntro}</p>
+        <p className="text-text-muted text-[12px] mt-0.5">{s.addIntro}</p>
       </div>
       <TabStrip
         items={[
@@ -200,7 +200,7 @@ export function AddDevicePanel({
         group="warranty-add"
         label={s.addTitle}
         indicatorClassName="bg-gold"
-        className="mt-2 border-b border-zinc-800"
+        className="mt-2 border-b border-border-subtle"
       />
       <TabPanels value={tab} order={TAB_ORDER} className="p-4">
         {tab === 'serial' && (
@@ -212,7 +212,7 @@ export function AddDevicePanel({
             className="space-y-3"
           >
             <div>
-              <label htmlFor="warranty-serial" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">
+              <label htmlFor="warranty-serial" className="text-[12px] text-text-secondary mb-1.5 block font-medium">
                 {s.serialLabel}
               </label>
               <div className="flex gap-2">
@@ -240,16 +240,16 @@ export function AddDevicePanel({
               <ScanLine aria-hidden="true" className="w-4 h-4" />
               {s.scanBarcode}
             </button>
-            <p className="text-zinc-500 text-[11px] leading-relaxed">{s.inventoryHint}</p>
-            <p className="text-zinc-500 text-[11px]">{s.registerHint}</p>
+            <p className="text-text-muted text-[11px] leading-relaxed">{s.inventoryHint}</p>
+            <p className="text-text-muted text-[11px]">{s.registerHint}</p>
           </form>
         )}
 
         {tab === 'orders' && (
           <div className="space-y-3">
-            <p className="text-zinc-500 text-[12px]">{s.eligibleIntro}</p>
+            <p className="text-text-muted text-[12px]">{s.eligibleIntro}</p>
             {eligible === null && eligibleLoading && (
-              <SkeletonGroup className="divide-y divide-zinc-800/70">
+              <SkeletonGroup className="divide-y divide-border-subtle">
                 {[0, 1].map((i) => (
                   <div key={i} className="flex items-center gap-3 py-3" aria-hidden="true">
                     <Skeleton className="w-12 h-12 rounded-lg shrink-0" />
@@ -257,7 +257,7 @@ export function AddDevicePanel({
                       <Skeleton className="h-4 w-1/2" />
                       <Skeleton className="h-3 w-3/4" />
                     </div>
-                    <Skeleton className="h-10 w-16 rounded-xl" />
+                    <Skeleton className="h-10 w-16 rounded-md" />
                   </div>
                 ))}
               </SkeletonGroup>
@@ -272,17 +272,17 @@ export function AddDevicePanel({
               />
             )}
             {eligible && eligible.length > 0 && (
-              <ul className="divide-y divide-zinc-800/70">
+              <ul className="divide-y divide-border-subtle">
                 {eligible.map((u) => {
                   const disabled = u.linked_elsewhere || rowBusy === u.unit_id;
                   return (
                     <li key={u.unit_id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" data-unit-id={u.unit_id}>
-                      <SafeImage src={u.product.image} alt="" aspect="auto" className="w-12 h-12 rounded-lg border border-zinc-800 shrink-0" bgClassName="bg-zinc-950" />
+                      <SafeImage src={u.product.image} alt="" aspect="auto" className="w-12 h-12 rounded-md border border-border-subtle shrink-0" bgClassName="bg-surface-raised" />
                       <div className="min-w-0 flex-1">
-                        <div className={`text-[14px] font-bold truncate ${u.linked_elsewhere ? 'text-zinc-400' : 'text-white'}`}>
+                        <div className={`text-[14px] font-bold truncate ${u.linked_elsewhere ? 'text-text-secondary' : 'text-text-primary'}`}>
                           {productName(u.product, lang)}
                         </div>
-                        <div className="text-zinc-500 text-[11px] truncate tabular-nums">
+                        <div className="text-text-muted text-[11px] truncate tabular-nums">
                           {u.order_id && (
                             <>
                               <span dir="ltr" className="font-mono">{u.order_id}</span>
@@ -293,7 +293,7 @@ export function AddDevicePanel({
                           {' · '}
                           {s.deliveredAt} {fmtDate(u.delivered_at, lang)}
                         </div>
-                        {u.linked_elsewhere && <div className="text-zinc-500 text-[11px] mt-0.5 leading-snug">{s.linkedElsewhere}</div>}
+                        {u.linked_elsewhere && <div className="text-text-muted text-[11px] mt-0.5 leading-snug">{s.linkedElsewhere}</div>}
                         {!u.linked_elsewhere && rowErrors[u.unit_id] && (
                           <div role="alert" className="text-red-300 text-[11px] mt-0.5 leading-snug">
                             {rowErrors[u.unit_id]}
@@ -305,7 +305,7 @@ export function AddDevicePanel({
                         onClick={() => linkUnit(u)}
                         disabled={disabled}
                         aria-label={`${s.linkRow} — ${productName(u.product, lang)} · ${s.unitN(u.unit_index)}`}
-                        className={`${BTN_PRIMARY} shrink-0 min-h-[40px] px-3.5`}
+                        className={`${BTN_PRIMARY} lv-button-sm shrink-0 px-3.5`}
                       >
                         <Link2 aria-hidden="true" className="w-4 h-4" />
                         {rowBusy === u.unit_id ? s.linking : s.linkRow}
@@ -320,17 +320,17 @@ export function AddDevicePanel({
 
         {tab === 'scan' && (
           <div className="space-y-3">
-            <p className="text-zinc-400 text-[13px]">{s.scanIntro}</p>
+            <p className="text-text-secondary text-[13px]">{s.scanIntro}</p>
             <button ref={tab === 'scan' ? scanButton : undefined} type="button" onClick={openScanner} disabled={busy} className={BTN_PRIMARY}>
               <Camera aria-hidden="true" className="w-4 h-4" />
               {busy ? s.linking : s.scanCta}
             </button>
             {scanned && (
-              <p className="text-[12px] text-zinc-400 break-all">
-                <span dir="ltr" className="font-mono text-zinc-200">{scanned}</span>
+              <p className="text-[12px] text-text-secondary break-all">
+                <span dir="ltr" className="font-mono text-text-primary">{scanned}</span>
               </p>
             )}
-            <p className="text-zinc-500 text-[11px]">{s.registerHint}</p>
+            <p className="text-text-muted text-[11px]">{s.registerHint}</p>
           </div>
         )}
       </TabPanels>
@@ -347,7 +347,7 @@ export function AddDevicePanel({
                 <LifeBuoy aria-hidden="true" className="w-3.5 h-3.5" />
                 {s.requestReview}
               </Link>
-              <span className="text-zinc-500 text-[11px] leading-snug">{s.reviewHint}</span>
+              <span className="text-text-muted text-[11px] leading-snug">{s.reviewHint}</span>
             </div>
           )}
         </div>
@@ -363,7 +363,7 @@ export function AddDevicePanel({
         solid
         z={60}
         testId="warranty-scanner"
-        panelClassName="w-full max-w-md bg-zinc-950 border border-zinc-800 overflow-hidden"
+        panelClassName="w-full max-w-md bg-surface-raised border border-border-subtle overflow-hidden"
       >
         <Suspense
           fallback={

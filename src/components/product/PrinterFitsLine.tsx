@@ -27,13 +27,13 @@ export default function PrinterFitsLine({ printers }: { printers: readonly FitPr
   // OWNER: Sorani to be written by hand («يناسب»).
   return (
     <div data-product-fits className="mt-3 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
-      <span className="text-zinc-400 text-[12px] leading-normal">{loc('يناسب', 'Fits')}</span>
+      <span className="text-text-secondary text-[12px] leading-normal">{loc('يناسب', 'Fits')}</span>
       {printers.map((p) => (
         <Link
           key={p.id}
           to={`/product/${encodeURIComponent(p.slug)}`}
           data-fit-printer={p.slug}
-          className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="border border-border-subtle bg-surface-raised shadow-xs rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary transition-colors hover:text-text-primary active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <bdi>{nameOf(p)}</bdi>
         </Link>

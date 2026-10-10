@@ -128,17 +128,17 @@ export default function UsedPrinters() {
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="w-full min-h-screen bg-canvas text-zinc-300 font-sans pb-24" data-used-printers-page>
+    <div className="w-full min-h-screen text-text-secondary font-sans pb-24" data-used-printers-page>
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
         <button
           type="button"
           onClick={goBack}
           aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-surface-raised text-white hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-surface-raised text-text-primary hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
         >
           <Back aria-hidden="true" className="w-5 h-5" />
         </button>
-        <h1 className="text-white font-bold text-lg leading-6 flex-1 min-w-0 truncate">
+        <h1 className="text-text-primary font-bold text-lg leading-6 flex-1 min-w-0 truncate">
           {/* NOT «طابعات مستعملة». A condition document grades a PRODUCT and
               carries no product kind, and a card does not expose enough
               taxonomy to filter to printers without a second request — so a
@@ -157,7 +157,7 @@ export default function UsedPrinters() {
         {/* The scope of the page, in one sentence, before anything is shown.
             It names the window (newest arrivals) because the endpoint behind
             it is a shelf and not a search — see the header note. */}
-        <p className="text-[12px] leading-5 text-zinc-500 mb-4">
+        <p className="text-[12px] leading-5 text-text-muted mb-4">
           {/* WHAT THE CONDITION DOCUMENT CAN ACTUALLY PROVE, AND NOTHING MORE.
               This sentence used to promise three things the data does not
               carry, on the one page in the shop where a buyer leans hardest on
@@ -195,7 +195,7 @@ export default function UsedPrinters() {
               className="lv-choice px-3 py-2 text-[13px] leading-5 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {filterLabel(k)}
-              <span className="ms-1.5 text-[11px] leading-4 text-zinc-500 tabular-nums" dir="ltr">
+              <span className="ms-1.5 text-[11px] leading-4 text-text-muted tabular-nums" dir="ltr">
                 {countFor(k)}
               </span>
             </button>
@@ -261,7 +261,7 @@ export default function UsedPrinters() {
             </ul>
             {/* The shelf's limit, stated. A customer who counted twelve cards
                 and stopped looking is a customer we misled. */}
-            <p className="mt-5 text-[12px] leading-5 text-zinc-500">
+            <p className="mt-5 text-[12px] leading-5 text-text-muted">
               {loc(
                 'تُعرض هنا أحدث القطع المستعملة. لعرض المتجر كاملًا:',
                 'The newest graded units are shown here. For the whole shop:',
@@ -304,9 +304,9 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
       to={`/product/${p.slug || p.id}`}
       data-graded-card={p.id}
       data-condition-kind={condition?.kind ?? ''}
-      className="relative flex h-full flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus min-w-0"
+      className="relative flex h-full flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-sm transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus min-w-0"
     >
-      <div className="relative aspect-square overflow-hidden bg-black">
+      <div className="relative aspect-square overflow-hidden bg-surface-raised">
         <SafeImage src={productMainImage(p, theme)} alt={p.name} aspect="square" className="w-full h-full" />
         {condition ? (
           /* The ONE tinted element on the card, because the grade is the whole
@@ -321,12 +321,12 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
         {/* The product name is English in every language and never translated
             — the same rule the ordinary card follows. */}
-        <h2 dir="ltr" className="min-h-[2.2rem] text-[13px] font-medium leading-snug text-white line-clamp-2 text-start">
+        <h2 dir="ltr" className="min-h-[2.2rem] text-[13px] font-medium leading-snug text-text-primary line-clamp-2 text-start">
           {p.name}
         </h2>
 
         {condition ? (
-          <span className="text-[11px] leading-4 text-zinc-400">
+          <span className="text-[11px] leading-4 text-text-secondary">
             {conditionGradeLabel(condition.grade, lang)}
             {' · '}
             {/* THE HOURS ARE SAID EITHER WAY. Rendering them only when they are
@@ -365,9 +365,9 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
         ) : null}
 
         <span className="mt-auto flex flex-col pt-1">
-          <span className="text-[14px] leading-5 font-bold text-white tabular-nums">{money(price)}</span>
+          <span className="text-[14px] leading-5 font-bold text-text-primary tabular-nums">{money(price)}</span>
           {reference ? (
-            <span className="text-[11px] leading-4 text-zinc-500 line-through tabular-nums">
+            <span className="text-[11px] leading-4 text-text-muted line-through tabular-nums">
               {money(reference.reference_iqd)}
             </span>
           ) : null}

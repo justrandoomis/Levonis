@@ -25,7 +25,7 @@ export function DealsView({ initial, storeOpen }: { initial: ProductPage | undef
           type="button"
           onClick={() => void more()}
           disabled={busy}
-          className="w-full h-9 rounded-xl border border-zinc-800 text-[12px] text-zinc-300 hover:border-zinc-700 disabled:opacity-50"
+          className="w-full h-9 sf-row text-[12px] text-zinc-300 disabled:opacity-50"
         >
           {busy ? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…') : loc('عرض المزيد', 'Show more', 'زیاتر ببینە')}
         </button>

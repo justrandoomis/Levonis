@@ -35,6 +35,7 @@ import { Check, Link2 } from 'lucide-react';
 import { useMotion } from '../../lib/motion';
 import { parsePolicyLine, policyArticleHref } from '../../lib/policyReader';
 import { usePolicyStrings } from './policyStrings';
+import { IconButton } from '../ui/Button';
 
 /**
  * `**bold**` only. Split on the delimiter rather than matching it, so an
@@ -79,15 +80,14 @@ function CopyArticleLink({ href, label }: { href: string; label: string }) {
 
   return (
     <span className="relative inline-flex shrink-0 print:hidden">
-      <button
-        type="button"
-        onClick={copy}
-        aria-label={label}
+      <IconButton
+        onClick={() => {
+          void copy();
+        }}
+        label={label}
         data-policy-copy-link
-        className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] text-text-muted transition-colors hover:bg-white/5 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-      >
-        {state === 'copied' ? <Check aria-hidden="true" className="h-4 w-4 text-success" /> : <Link2 aria-hidden="true" className="h-4 w-4" />}
-      </button>
+        icon={state === 'copied' ? <Check aria-hidden="true" className="h-4 w-4 text-success" /> : <Link2 aria-hidden="true" className="h-4 w-4" />}
+      />
       {/* A polite live region rather than a tooltip: the confirmation has to
           reach a screen reader and a reader who tapped with a thumb over the
           icon, and neither of those sees a hover bubble. */}

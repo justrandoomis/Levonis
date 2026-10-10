@@ -76,7 +76,7 @@ export default function OrderTracker({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-zinc-400 text-xs py-4" role="status">
+      <div className="flex items-center gap-2 text-text-secondary text-xs py-4" role="status">
         <Loader2 className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> {s.loading}
       </div>
     );
@@ -85,17 +85,17 @@ export default function OrderTracker({
   // legacy status as if it were the tracker: half a truth about where a
   // parcel is is worse than saying we could not check.
   if (failed || !data) {
-    return <p className="text-zinc-500 text-xs py-3" role="status">{s.failed}</p>;
+    return <p className="text-text-muted text-xs py-3" role="status">{s.failed}</p>;
   }
 
   return (
-    <div data-order-tracker className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+    <div data-order-tracker className="mt-3 rounded-lg border border-border-subtle bg-surface-raised p-3">
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <h4 className="text-white text-[13px] font-bold flex items-center gap-1.5">
-          <Truck className="w-4 h-4 text-zinc-400" aria-hidden />
+        <h4 className="text-text-primary text-[13px] font-bold flex items-center gap-1.5">
+          <Truck className="w-4 h-4 text-text-secondary" aria-hidden />
           {s.title}
         </h4>
-        <span className="text-zinc-400 text-[11px]">{data.shipping_type_label}</span>
+        <span className="text-text-secondary text-[11px]">{data.shipping_type_label}</span>
       </div>
 
       <ol className="space-y-0">
@@ -110,19 +110,19 @@ export default function OrderTracker({
                       ? 'bg-gold border-gold text-accent-contrast'
                       : step.reached
                         ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-400'
-                        : 'bg-transparent border-zinc-700 text-zinc-700'
+                        : 'bg-transparent border-border-subtle text-text-muted'
                   }`}
                 >
                   {step.reached ? <Check className="w-3 h-3" aria-hidden /> : <Circle className="w-2 h-2" aria-hidden />}
                 </span>
                 {/* The rail stops at the last dot instead of hanging below it. */}
-                {!last && <span className={`w-px flex-1 min-h-[18px] ${step.reached ? 'bg-emerald-500/40' : 'bg-zinc-800'}`} />}
+                {!last && <span className={`w-px flex-1 min-h-[18px] ${step.reached ? 'bg-emerald-500/40' : 'bg-border-subtle'}`} />}
               </div>
               <div className={`pb-3 min-w-0 ${last ? 'pb-0' : ''}`}>
-                <p className={`text-[13px] leading-tight ${step.current ? 'text-white font-bold' : step.reached ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                <p className={`text-[13px] leading-tight ${step.current ? 'text-text-primary font-bold' : step.reached ? 'text-text-primary' : 'text-text-muted'}`}>
                   {step.label}
                 </p>
-                {step.at && <p className="text-zinc-500 text-[10.5px] mt-0.5">{formatDateTime(step.at, lang)}</p>}
+                {step.at && <p className="text-text-muted text-[10.5px] mt-0.5">{formatDateTime(step.at, lang)}</p>}
               </div>
             </li>
           );
@@ -130,14 +130,14 @@ export default function OrderTracker({
       </ol>
 
       {showTrackingNo && data.tracking_no && (
-        <p className="text-zinc-400 text-[11px] mt-2 pt-2 border-t border-zinc-800">
-          {s.tracking}: <span dir="ltr" className="text-zinc-200 font-mono">{data.tracking_no}</span>
+        <p className="text-text-secondary text-[11px] mt-2 pt-2 border-t border-border-subtle">
+          {s.tracking}: <span dir="ltr" className="text-text-primary font-mono">{data.tracking_no}</span>
         </p>
       )}
       {/* Only ever shown when the SERVER scheduled it — a stage waiting on a
           person or on the courier carries no time, and none is invented. */}
       {data.next_stage_at && (
-        <p className="text-zinc-500 text-[10.5px] mt-1">
+        <p className="text-text-muted text-[10.5px] mt-1">
           {s.expected}: {formatDateTime(data.next_stage_at, lang)}
         </p>
       )}

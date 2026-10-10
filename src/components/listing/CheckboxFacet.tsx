@@ -41,7 +41,7 @@ export default function CheckboxFacet({
               <span
                 aria-hidden="true"
                 className={`grid size-[22px] shrink-0 place-items-center rounded-md border-[1.5px] transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface-raised ${
-                  on ? 'border-text-primary bg-text-primary text-canvas' : 'border-zinc-700 bg-surface'
+                  on ? 'border-text-primary bg-text-primary text-canvas' : 'border-[var(--clay-field)] bg-surface'
                 }`}
               >
                 {on ? <Check className="size-3.5" strokeWidth={3} /> : null}

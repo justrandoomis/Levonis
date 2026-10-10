@@ -59,13 +59,13 @@ export default function ExclusionDisclosure({
   const summary = counts.map((x) => phrase(x.g, x.ids.length)).join(lang === 'en' ? ', ' : '، ');
 
   return (
-    <section className="rounded-[18px] border border-dashed border-border-subtle">
+    <section className="rounded-lg border border-dashed border-border-subtle">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-[18px]"
+        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg"
       >
         <span className="min-w-0 flex-1 text-[13px] leading-[20px] text-text-secondary">
           <b className="font-bold text-text-primary">{t.othersTitle(total)}</b>

@@ -301,8 +301,10 @@ test('the sticky bar can truncate a long section name without pushing the way ba
   const bar = src.slice(src.indexOf('sticky top-0'), src.indexOf('<div className="p-4">'));
   assert.match(bar, /min-w-0/, 'without min-w-0 on the flex child the row overflows instead of truncating');
   assert.match(bar, /truncate/);
-  assert.match(bar, /w-11 h-11/, 'and the back button is a real 44px target');
-  assert.match(bar, /aria-label=/, 'with a name, which it never had');
+  // The back button is the house IconButton: its 44px target and its
+  // accessible name (`label` becomes aria-label) are the primitive's own.
+  assert.match(bar, /<IconButton\b[\s\S]*?label=\{/, 'the back button is the house IconButton, with a name, which it never had');
+  assert.match(read('src/components/ui/Button.tsx'), /aria-label=\{label\}[\s\S]*?inline-flex h-11 w-11 shrink-0/, 'and a real 44px target');
 });
 
 // =========================================================================

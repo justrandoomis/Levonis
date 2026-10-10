@@ -43,8 +43,8 @@ export function VariantPicker({
         const chosen = g.values.find((v) => v.id === selection[g.id]);
         return (
           <fieldset key={g.id} className="min-w-0">
-            <legend className="mb-2 text-[12.5px] text-zinc-400">
-              <span className="font-semibold text-zinc-200">{name(g)}</span>
+            <legend className="mb-2 text-[12.5px] text-text-secondary">
+              <span className="font-semibold text-text-primary">{name(g)}</span>
               {chosen && <span className="ms-1.5">· {name(chosen)}</span>}
             </legend>
             <div className="flex flex-wrap gap-2">
@@ -57,10 +57,12 @@ export function VariantPicker({
                     key={v.id}
                     htmlFor={id}
                     data-state={state}
-                    className={`relative inline-flex min-h-[44px] items-center gap-2 rounded-xl border px-3.5 text-[13px] transition-colors ${
+                    data-selected={checked}
+                    // An option is the house choice: flush at rest; chosen, it is
+                    // pressed in with the gold start bar (src/index.css .lv-choice).
+                    className={`lv-choice inline-flex items-center gap-2 px-3.5 text-[13px] ${
                       state === 'unavailable' ? 'cursor-not-allowed opacity-35' : 'cursor-pointer'
-                    } ${checked ? 'border-gold bg-gold/10 text-white' : 'border-white/12 bg-white/[0.03] text-zinc-300'}
-                      has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-gold`}
+                    } has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus`}
                   >
                     <input
                       id={id}
@@ -72,7 +74,7 @@ export function VariantPicker({
                       onChange={() => onChange({ ...selection, [g.id]: v.id })}
                     />
                     {g.kind === 'color' && <span className="lv-swatch text-[18px]" data-swatch={v.swatch || undefined} aria-hidden="true" />}
-                    <span className={state === 'sold_out' ? 'line-through decoration-zinc-500' : ''}>{name(v)}</span>
+                    <span className={state === 'sold_out' ? 'line-through decoration-text-muted' : ''}>{name(v)}</span>
                     {state === 'sold_out' && <span className="sr-only">({soldOutLabel})</span>}
                   </label>
                 );

@@ -41,6 +41,7 @@ import {
 } from '../lib/merchant';
 import CheckoutDeliveryPanel, { governorateText } from '../components/merchant/delivery/CheckoutDeliveryPanel';
 import { Segmented } from '../components/ui/Segmented';
+import { IconButton } from '../components/ui/Button';
 import { GOVERNORATES } from '../lib/governorates';
 import { apiRefusal } from '../lib/refusalStrings';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
@@ -461,11 +462,15 @@ export default function StoreCheckout() {
   return (
     <div className="h-full min-h-0 bg-canvas text-text-secondary flex flex-col">
       <div className="lv-character-header shrink-0 bg-canvas border-b border-border-subtle/70 px-3 sm:px-4 py-2 flex items-center gap-3">
-        <button type="button" aria-label={loc('رجوع', 'Back', 'گەڕانەوە')} onClick={() => navigate(-1)} className="w-11 h-11 rounded-md flex items-center justify-center text-text-secondary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-          <ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
-        </button>
+        <IconButton
+          label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          onClick={() => {
+            navigate(-1);
+          }}
+          icon={<ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} />}
+        />
         <MotionCharacterHome busy={!summary && !quoteError} />
-        <h1 className="text-white font-bold text-[15px]">{loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')}</h1>
+        <h1 className="text-text-primary font-bold text-[15px]">{loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')}</h1>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain w-full">
@@ -708,6 +713,7 @@ export default function StoreCheckout() {
                   </label>
                   <div className="flex gap-2">
                   <input
+                    className="lv-input flex-1 min-w-0 text-[13px] font-mono"
                     id="store-coupon-code"
                     name="store-coupon-code"
                     autoComplete="off"
@@ -716,7 +722,6 @@ export default function StoreCheckout() {
                     onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                     dir="ltr"
                     placeholder={loc('الكود', 'Code', 'کۆد')}
-                    className="lv-input flex-1 min-w-0 text-[13px] font-mono"
                   />
                   <button
                     type="button"

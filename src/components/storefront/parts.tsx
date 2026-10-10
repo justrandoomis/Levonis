@@ -211,7 +211,7 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
           </span>
         )}
         {!sellable && (
-          <span className="sf-tile-flag absolute bottom-1 start-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/90 text-zinc-300">
+          <span className="sf-tile-flag absolute bottom-1 start-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded-full bg-onyx/80 text-snow">
             {loc('غير متوفر', 'Unavailable', 'بەردەست نییە')}
           </span>
         )}

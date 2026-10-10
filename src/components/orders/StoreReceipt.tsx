@@ -20,7 +20,7 @@ import { api } from '../../lib/api';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
-import Spinner from '../ui/Spinner';
+import { Button } from '../ui/Button';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { formatDate } from './format';
 
@@ -44,7 +44,7 @@ export default function StoreReceipt({
 
   if (receipt.confirmed_at) {
     return (
-      <p data-receipt-confirmed className="mt-3 flex items-center gap-2 text-[12px] text-zinc-400">
+      <p data-receipt-confirmed className="mt-3 flex items-center gap-2 text-[12px] text-text-secondary">
         <PackageCheck className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
         <span>
           {loc('أكّدتَ استلام هذا الطلب في', 'You confirmed receiving this order on')}{' '}
@@ -82,15 +82,15 @@ export default function StoreReceipt({
   const title = loc('تأكيد استلام الطلب', 'Confirm you received this order');
 
   return (
-    <div data-receipt-confirm className="mt-3 rounded-xl border border-zinc-700/70 bg-zinc-800/40 px-3 py-3">
-      <p className="text-[13px] font-bold text-white">{loc('هل وصلك طلبك؟', 'Did your order arrive?')}</p>
-      <p className="mt-1 text-[12px] leading-relaxed text-zinc-400">
+    <div data-receipt-confirm className="mt-3 rounded-lg border border-border-subtle bg-surface-raised px-3 py-3">
+      <p className="text-[13px] font-bold text-text-primary">{loc('هل وصلك طلبك؟', 'Did your order arrive?')}</p>
+      <p className="mt-1 text-[12px] leading-relaxed text-text-secondary">
         {loc('أكّد الاستلام ليصل المبلغ إلى المتجر.', 'Confirm receipt so the store gets paid.')}
         {receipt.auto_confirms_at && (
           <>
             {' '}
             {loc('إن لم تؤكّد ولم تفتح شكوى، يُعتبر مستلمًا تلقائيًا في', 'If you don’t and no complaint is open, it counts as received on')}{' '}
-            <time dateTime={receipt.auto_confirms_at} className="text-zinc-300">
+            <time dateTime={receipt.auto_confirms_at} className="text-text-primary">
               {formatDate(receipt.auto_confirms_at, lang)}
             </time>
             .
@@ -119,8 +119,8 @@ export default function StoreReceipt({
         testId="confirm-receipt"
       >
         <div className="px-5 pb-6 pt-2">
-          <h2 className="text-white font-bold text-[16px]">{title}</h2>
-          <p className="text-zinc-400 text-[13px] mt-2 leading-relaxed">
+          <h2 className="text-text-primary font-bold text-[16px]">{title}</h2>
+          <p className="text-text-secondary text-[13px] mt-2 leading-relaxed">
             {loc(
               'بعد التأكيد يُحوَّل المبلغ إلى المتجر ولا يمكن التراجع. إن كانت في الطلب مشكلة فتواصل مع الدعم بدل التأكيد.',
               'Once you confirm, the payment goes to the store and cannot be undone. If something is wrong with the order, contact support instead.'
@@ -130,24 +130,19 @@ export default function StoreReceipt({
             {error}
           </p>
           <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={close}
-              disabled={busy}
-              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
-            >
+            <Button variant="secondary" onClick={close} disabled={busy} className="flex-1">
               {loc('ليس الآن', 'Not now', 'ئێستا نا')}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               onClick={confirm}
-              disabled={busy}
+              loading={busy}
+              loadingLabel={loc('جارٍ التأكيد…', 'Confirming…')}
               data-confirm-receipt
-              className="flex-1 min-h-[44px] rounded-xl bg-olive text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              className="flex-1"
             >
-              {busy && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
-              {busy ? loc('جارٍ التأكيد…', 'Confirming…') : loc('نعم، استلمته', 'Yes, I received it')}
-            </button>
+              {loc('نعم، استلمته', 'Yes, I received it')}
+            </Button>
           </div>
         </div>
       </Sheet>

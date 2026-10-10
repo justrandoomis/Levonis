@@ -33,7 +33,7 @@ export default function ScopedSearch({ value, placeholder, onChange }: { value: 
         onChange(text.trim());
         (document.activeElement as HTMLElement | null)?.blur();
       }}
-      className="flex h-11 items-center gap-2 rounded-xl border border-border-subtle bg-surface px-3 focus-within:border-text-muted focus-within:ring-2 focus-within:ring-focus lg:h-12"
+      className="lv-well flex h-11 items-center gap-2 rounded-full border border-[var(--clay-field)] px-3 focus-within:border-focus focus-within:ring-2 focus-within:ring-focus lg:h-12"
     >
       <Search aria-hidden="true" className="size-[18px] shrink-0 text-text-muted" />
       <input

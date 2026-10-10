@@ -6,6 +6,8 @@ import {
 import type { Language } from '../../translations';
 import SafeImage from '../ui/SafeImage';
 import { Anchored } from '../ui/Overlay';
+import { IconButton } from '../ui/Button';
+import { StatusChip } from '../ui/Badge';
 import { CoverageBar } from './CoverageBar';
 import type { Device } from './types';
 import { productName, fmtInt, fmtDate } from './types';
@@ -22,14 +24,10 @@ import { BTN_SECONDARY, CARD, FOCUS, LINK_QUIET } from './ui';
 
 function Badge({ icon: Icon, tone = 'zinc', children }: { icon: React.ElementType; tone?: 'zinc' | 'gold'; children: React.ReactNode }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap ${
-        tone === 'gold' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-zinc-700 bg-zinc-800/60 text-zinc-300'
-      }`}
-    >
-      <Icon aria-hidden="true" className="w-3 h-3" />
+    // Information is flat clay: the house status chip, its icon in place of the dot.
+    <StatusChip tone={tone === 'gold' ? 'accent' : 'neutral'} icon={<Icon aria-hidden="true" className="w-3 h-3 shrink-0" />} className="whitespace-nowrap">
       {children}
-    </span>
+    </StatusChip>
   );
 }
 
@@ -68,24 +66,22 @@ export function DeviceCard({
           src={device.product.image}
           alt=""
           aspect="auto"
-          className="w-16 h-16 rounded-xl border border-zinc-800 shrink-0"
-          bgClassName="bg-zinc-950"
+          className="w-16 h-16 rounded-lg border border-border-subtle shrink-0"
+          bgClassName="bg-surface-raised"
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-white font-bold text-[15px] leading-tight truncate pt-0.5">{name}</h3>
+            <h3 className="text-text-primary font-bold text-[15px] leading-tight truncate pt-0.5">{name}</h3>
             <div className="relative shrink-0 -mt-1 -me-1">
-              <button
+              <IconButton
                 ref={menuAnchor}
-                type="button"
-                aria-label={s.more}
+                label={s.more}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 onClick={() => setMenuOpen((o) => !o)}
-                className={`p-2 rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors ${FOCUS}`}
-              >
-                <MoreHorizontal aria-hidden="true" className="w-4 h-4" />
-              </button>
+                icon={<MoreHorizontal aria-hidden="true" className="w-4 h-4" />}
+                className="-my-1.5"
+              />
               <Anchored open={menuOpen} onClose={() => setMenuOpen(false)} anchor={menuAnchor} label={s.more} className="min-w-[230px] p-1.5" z={40}>
                 <button
                   type="button"
@@ -94,7 +90,7 @@ export function DeviceCard({
                     setMenuOpen(false);
                     onRemove(device);
                   }}
-                  className={`w-full text-start flex items-center gap-2 px-3 min-h-[44px] rounded-xl text-[13px] font-bold text-red-300 hover:bg-red-500/10 transition-colors ${FOCUS}`}
+                  className={`w-full text-start flex items-center gap-2 px-3 min-h-[44px] rounded-sm text-[13px] font-bold text-danger hover:bg-danger/10 transition-colors ${FOCUS}`}
                 >
                   <Unlink aria-hidden="true" className="w-4 h-4" />
                   {s.removeFromAccount}
@@ -102,7 +98,7 @@ export function DeviceCard({
               </Anchored>
             </div>
           </div>
-          <p className="text-zinc-500 text-[12px] mt-0.5 flex items-center gap-1.5 min-w-0">
+          <p className="text-text-muted text-[12px] mt-0.5 flex items-center gap-1.5 min-w-0">
             <span dir="ltr" className="font-mono tracking-wider shrink-0">{serialLabel}</span>
             {device.order_id && (
               <>
@@ -139,14 +135,14 @@ export function DeviceCard({
           once there is more than the one delivery to tell. */}
       {(device.history?.length ?? 0) > 1 && (
         <div className="mt-3" data-device-history>
-          <p className="text-[11px] font-bold text-zinc-500">{s.historyTitle}</p>
+          <p className="text-[11px] font-bold text-text-muted">{s.historyTitle}</p>
           <ol className="mt-1 flex flex-col gap-0.5">
             {device.history!.map((h, i) => (
-              <li key={`${h.kind}-${i}`} className="flex items-baseline justify-between gap-3 text-[11px] text-zinc-400 tabular-nums" data-history-kind={h.kind}>
+              <li key={`${h.kind}-${i}`} className="flex items-baseline justify-between gap-3 text-[11px] text-text-secondary tabular-nums" data-history-kind={h.kind}>
                 <span className="truncate">
                   {h.kind === 'first' ? s.hFirst : h.kind === 'traded_in' ? s.hTradedIn : h.kind === 'returned' ? s.hReturned : s.hResold}
                 </span>
-                <span className="shrink-0 text-zinc-500">{fmtDate(h.at, lang)}</span>
+                <span className="shrink-0 text-text-muted">{fmtDate(h.at, lang)}</span>
               </li>
             ))}
           </ol>

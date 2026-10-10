@@ -302,7 +302,7 @@ export default function SpecTable({
               key={group.id}
               type="button"
               onClick={() => jump(group.id)}
-              className="lv-hit relative inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 text-[12px] font-bold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-hit relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border-subtle bg-surface-raised px-3 text-[12px] font-bold text-text-secondary shadow-xs transition-colors hover:text-text-primary active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {tri(group.label, l)}
               {diffs > 0 ? (
@@ -345,7 +345,7 @@ export default function SpecTable({
                 data-compare-group={group.id}
                 // The rail's jump lands the card below the sticky product strip.
                 style={{ scrollMarginTop: '6rem' }}
-                className="mt-4 overflow-hidden rounded-[18px] border border-border-subtle bg-surface-raised/40"
+                className="mt-4 overflow-hidden rounded-lg border border-border-subtle bg-surface-raised/40"
               >
                 <div role="row" className="flex">
                   <h3 role="columnheader" className="min-w-0 flex-1">

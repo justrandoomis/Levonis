@@ -10,7 +10,7 @@ import { api } from '../../lib/api';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
-import Spinner from '../ui/Spinner';
+import { Button } from '../ui/Button';
 import { asLang } from './format';
 import { apiRefusal } from '../../lib/refusalStrings';
 
@@ -95,30 +95,18 @@ export default function CancelOrderSheet({
       testId="cancel-order"
     >
       <div className="px-5 pb-6 pt-2">
-        <h2 className="text-white font-bold text-[16px]">{s.title}</h2>
-        {orderId && <p className="text-zinc-400 text-[13px] mt-2 leading-relaxed">{s.body(orderId)}</p>}
+        <h2 className="text-text-primary font-bold text-[16px]">{s.title}</h2>
+        {orderId && <p className="text-text-secondary text-[13px] mt-2 leading-relaxed">{s.body(orderId)}</p>}
         <p role="alert" aria-live="assertive" className="text-red-400 text-[12.5px] mt-3 min-h-[1.25em]">
           {error}
         </p>
         <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={close}
-            disabled={busy}
-            className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
-          >
+          <Button variant="secondary" onClick={close} disabled={busy} className="flex-1">
             {s.keep}
-          </button>
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={busy}
-            data-confirm-cancel
-            className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
-          >
-            {busy && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
-            {busy ? s.cancelling : s.confirm}
-          </button>
+          </Button>
+          <Button variant="danger" onClick={confirm} loading={busy} loadingLabel={s.cancelling} data-confirm-cancel className="flex-1">
+            {s.confirm}
+          </Button>
         </div>
       </div>
     </Sheet>

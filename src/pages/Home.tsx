@@ -250,7 +250,7 @@ export default function Home() {
      * `data-home-v2` marks the page for the browser harness
      * (scripts/e2e-home-v2-shots.mjs).
      */
-    <div data-home-v2 className="w-full overflow-x-clip bg-black text-zinc-300">
+    <div data-home-v2 className="w-full overflow-x-clip bg-black text-text-secondary">
       {/* A hidden hero still leaves the fixed header its clearance. */}
       {sectionVisible('hero') ? (
         <Hero banners={heroBanners} loading={initialLoading} />
@@ -260,13 +260,13 @@ export default function Home() {
 
       {/* The black cap over the hero: the ticker, flush with its top edge and
           running the whole width of the screen — unchanged. */}
-      <div className="relative z-30 -mt-7 rounded-t-[28px] bg-black">
+      <div className="relative z-30 -mt-7 rounded-t-2xl bg-black">
         {homeAds.length > 0 ? (
-          <div className="rounded-t-[28px] bg-zinc-900/40 overflow-hidden">
+          <div className="rounded-t-2xl bg-surface/40 overflow-hidden">
             <Marquee speed={42}>
               <div className="flex items-center whitespace-nowrap py-2.5">
                 {homeAds.map((ad) => (
-                  <span key={ad.id} className="flex items-center text-[13px] text-zinc-300 shrink-0">
+                  <span key={ad.id} className="flex items-center text-[13px] text-text-secondary shrink-0">
                     <span className="px-6">{ad.text}</span>
                     <span aria-hidden className="w-1 h-1 rounded-full bg-gold/60 shrink-0" />
                   </span>
@@ -290,7 +290,7 @@ export default function Home() {
             in the light theme, black in the dark one (src/index.css, THE TWO
             THEMES). Homepage v2 forced ivory here inside an otherwise black
             app; the owner asked for one theme everywhere instead. */}
-        <div className="rounded-t-[24px] bg-canvas pb-8 pt-5 text-text-primary lg:rounded-t-[32px] lg:pt-10">
+        <div className="rounded-t-2xl bg-canvas pb-8 pt-5 text-text-primary lg:rounded-t-3xl lg:pt-10">
           {/* WIDE SCREENS USE THE WIDTH (owner, 2026-09-26: «في الشاشات الكبيرة
               يظهر هنالك فراغ كبير … اجعل الفراغ قليل جدا»). The column was capped
               at 1200 px, which left 360 px of empty cream on each side of a
@@ -301,24 +301,20 @@ export default function Home() {
           <div className="mx-auto flex max-w-[1920px] flex-col gap-8 px-4 sm:px-6 lg:gap-14 lg:px-8">
             {initialLoading ? (
               <div aria-hidden="true" className="flex flex-col gap-8">
-                <div className="aspect-[2/1.1] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none sm:aspect-auto sm:h-[240px] lg:h-[380px] xl:h-[420px] 2xl:h-[480px]" />
-                <div className="h-[128px] rounded-2xl bg-zinc-800 animate-pulse motion-reduce:animate-none" />
+                <div className="aspect-[2/1.1] rounded-2xl bg-surface-selected animate-pulse motion-reduce:animate-none sm:aspect-auto sm:h-[240px] lg:h-[380px] xl:h-[420px] 2xl:h-[480px]" />
+                <div className="h-[128px] rounded-2xl bg-surface-selected animate-pulse motion-reduce:animate-none" />
               </div>
             ) : null}
 
             {!initialLoading && loadError != null ? (
-              <div className="rounded-2xl bg-surface">
-                <ErrorState error={loadError} onRetry={fetchHome} />
-              </div>
+              <ErrorState error={loadError} onRetry={fetchHome} />
             ) : null}
 
             {catalogueEmpty ? (
-              <div className="rounded-2xl bg-surface">
-                <EmptyState
-                  icon={<PackageSearch aria-hidden="true" className="w-6 h-6" />}
-                  title={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا هیچ بەرهەمێک نییە')}
-                />
-              </div>
+              <EmptyState
+                icon={<PackageSearch aria-hidden="true" className="w-6 h-6" />}
+                title={loc('لا توجد منتجات بعد', 'No products yet', 'هێشتا هیچ بەرهەمێک نییە')}
+              />
             ) : null}
 
             {layout.map((section) => {

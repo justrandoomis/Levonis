@@ -215,7 +215,7 @@ export default function FinderResults({
       ) : null}
 
       {error ? (
-        <div role="alert" className="rounded-[20px] border border-border-subtle bg-surface p-5 text-center">
+        <div role="alert" className="lv-surface p-5 text-center">
           {offline ? <WifiOff aria-hidden="true" className="mx-auto mb-2 size-6 text-text-muted" /> : null}
           <p className="text-[14px] font-bold text-text-primary">{offline ? t.offline : t.errorTitle}</p>
           <Button variant="secondary" className="mt-4" onClick={() => setAttempt((n) => n + 1)}>
@@ -226,7 +226,7 @@ export default function FinderResults({
 
       {none ? (
         <>
-          <div className="rounded-[20px] border border-border-subtle bg-surface p-5">
+          <div className="lv-surface p-5">
             <p className="text-[14px] leading-[22px] text-text-secondary">
               {data && data.tech_matches === 0 && answers.tech && answers.tech !== 'any'
                 ? t.noneTechBody(optionCopy(TECH_COPY, answers.tech, lang).title)
@@ -241,7 +241,7 @@ export default function FinderResults({
         // The technology asked for is not sold here: support comes FIRST, and
         // the printers below are shown only as the labelled alternatives.
         <div data-support-first className="flex flex-col gap-3">
-          <p className="rounded-[18px] border border-border-subtle bg-surface p-4 text-[14px] leading-[22px] text-text-secondary">
+          <p className="rounded-lg border border-border-subtle bg-surface p-4 text-[14px] leading-[22px] text-text-secondary">
             {t.noneTechBody(optionCopy(TECH_COPY, answers.tech, lang).title)}
           </p>
           {help}
@@ -283,7 +283,7 @@ export default function FinderResults({
             <button
               type="button"
               onClick={compareAll}
-              className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-[18px] border border-border-subtle bg-surface text-[15px] font-extrabold text-text-primary transition-[background-color,transform] duration-150 hover:bg-surface-raised active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none"
+              className="lv-button lv-button-secondary min-h-14 w-full text-[15px] font-extrabold"
             >
               <Scale aria-hidden="true" className="size-[18px]" />
               {t.compareAll(comparable.items.length)}

@@ -136,7 +136,7 @@ export default function CategoryListing() {
   };
   // Keyed by section: another section is another list, not a refinement of this one.
   return (
-    <div data-page="category-listing" className="min-h-full w-full bg-canvas pb-10 text-text-primary">
+    <div data-page="category-listing" className="min-h-full w-full pb-10 text-text-primary">
       <ListingView
         key={node.id}
         scope={scope}
@@ -152,7 +152,7 @@ export default function CategoryListing() {
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-full w-full bg-canvas pb-10 text-text-primary">
+    <div className="min-h-full w-full pb-10 text-text-primary">
       <PageTopBar title={title} fallback="/categories" />
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">{children}</div>
     </div>
@@ -162,7 +162,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 /** The listing's own shape while the section is resolved: bar, search, toolbar, grid. */
 function ListingSkeleton() {
   return (
-    <div className="min-h-full w-full bg-canvas pb-10" aria-busy="true">
+    <div className="min-h-full w-full pb-10" aria-busy="true">
       <div className="flex h-14 items-center gap-2 px-4">
         <Skeleton className="size-10 rounded-full" />
         <div className="flex flex-col gap-1.5">
@@ -174,8 +174,8 @@ function ListingSkeleton() {
         <Skeleton className="mt-1 h-3 w-4/5" />
         <Skeleton className="mt-4 h-11 w-full rounded-xl" />
         <div className="mt-2 flex gap-2 py-1.5">
-          <Skeleton className="h-[38px] w-24 rounded-[11px]" />
-          <Skeleton className="h-[38px] w-32 rounded-[11px]" />
+          <Skeleton className="h-[38px] w-24 rounded-sm" />
+          <Skeleton className="h-[38px] w-32 rounded-sm" />
         </div>
         <ProductGridSkeleton count={6} density="compact" className="mt-10 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5 lg:gap-4" />
       </div>

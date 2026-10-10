@@ -189,9 +189,9 @@ export default function Games() {
                 key={l.id}
                 to={l.to}
                 data-hub-link={l.id}
-                className={`${PANEL} flex items-center gap-3 px-4 py-3 min-h-[56px] hover:border-zinc-700 transition-colors press-scale ${FOCUS}`}
+                className={`${PANEL} flex items-center gap-3 px-4 py-3 min-h-[56px] hover:bg-surface transition-colors press-scale ${FOCUS}`}
               >
-                <span className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-gold shrink-0">
+                <span className="size-9 rounded-sm bg-surface-raised border border-border-subtle flex items-center justify-center text-gold shrink-0">
                   <l.icon aria-hidden="true" className="w-4.5 h-4.5" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -212,7 +212,7 @@ export default function Games() {
                 data-hub-link-unknown={shelved ? undefined : '1'}
                 className={`${PANEL} flex items-center gap-3 px-4 py-3 min-h-[56px] opacity-60`}
               >
-                <span className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
+                <span className="size-9 rounded-sm bg-surface-raised border border-border-subtle flex items-center justify-center text-text-muted shrink-0">
                   <l.icon aria-hidden="true" className="w-4.5 h-4.5" />
                 </span>
                 <span className="min-w-0 flex-1">

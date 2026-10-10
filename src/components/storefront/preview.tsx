@@ -52,12 +52,12 @@ function InertServiceDoors({ accepts }: { accepts: boolean }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {accepts && (
-        <span className="h-10 rounded-xl bg-olive text-white font-bold text-[12px] flex items-center justify-center gap-1.5">
+        <span className="lv-button lv-button-primary gap-1.5 text-[12px]">
           <Hammer className="w-3.5 h-3.5" aria-hidden="true" />
           {loc('اطلب عرض سعر', 'Request a quote', 'داوای نرخ بکە')}
         </span>
       )}
-      <span className={`h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 ${accepts ? '' : 'col-span-2'}`}>
+      <span className={`lv-button lv-button-secondary gap-1.5 text-[12px] ${accepts ? '' : 'col-span-2'}`}>
         <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
         {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
       </span>

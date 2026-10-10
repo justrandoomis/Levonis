@@ -321,11 +321,11 @@ export default function ProductPicker({
             className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]"
           />
           <input
+            className="lv-input ps-10"
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={s.pickSearch}
-            className="lv-input ps-10"
           />
         </label>
 

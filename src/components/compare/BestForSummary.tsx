@@ -33,7 +33,7 @@ export default function BestForSummary({
   const l = lang as CompareLang;
   if (!lenses.length) return null;
   return (
-    <section aria-labelledby="lv-compare-bestfor" className="overflow-hidden rounded-[20px] border border-border-subtle bg-surface">
+    <section aria-labelledby="lv-compare-bestfor" className="lv-surface overflow-hidden">
       <h2 id="lv-compare-bestfor" className="px-4 pb-2 pt-4 text-[15px] font-extrabold text-text-primary">
         {ls.summaryTitle}
       </h2>
@@ -57,7 +57,7 @@ export default function BestForSummary({
                 <span className={`text-[13px] font-bold ${on ? 'text-text-primary' : 'text-text-secondary'}`}>{ls.lensRow[lens.id]}</span>
                 {winner ? (
                   <span className="flex min-w-0 items-center gap-3">
-                    <SafeImage src={winner.image} alt="" aspect="square" fit="cover" className="w-10 shrink-0 overflow-hidden rounded-[10px]" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" />
+                    <SafeImage src={winner.image} alt="" aspect="square" fit="cover" className="w-10 shrink-0 overflow-hidden rounded-sm" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" />
                     <span className="min-w-0">
                       <bdi dir="ltr" className="block truncate text-[13.5px] font-extrabold text-text-primary">
                         {name}

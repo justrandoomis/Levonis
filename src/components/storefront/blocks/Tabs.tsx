@@ -62,6 +62,7 @@ export function ProductSearch({
       <div className="relative">
         <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" aria-hidden="true" />
         <input
+          className="lv-input min-h-11 rounded-full ps-9 pe-10 text-[13px]"
           type="search"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
@@ -71,7 +72,6 @@ export function ProductSearch({
           enterKeyHint="search"
           autoComplete="off"
           dir="auto"
-          className="w-full h-10 rounded-xl border border-white/10 bg-white/[0.05] ps-9 pe-10 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           data-store-search-input
         />
         {typed && (

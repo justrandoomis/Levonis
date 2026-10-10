@@ -352,7 +352,7 @@ export default function StorefrontProduct() {
 
           <Link
             to={storeHome}
-            className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.03] p-3 mb-4"
+            className="flex items-center gap-2.5 sf-card p-3 mb-4"
           >
             <div className="w-9 h-9 rounded-xl bg-olive/30 overflow-hidden flex items-center justify-center shrink-0">
               {store.logoUrl ? (
@@ -417,7 +417,7 @@ export default function StorefrontProduct() {
       </div>
 
       {/* Buy bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black px-4 sm:px-6 py-3">
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black shadow-dock px-4 sm:px-6 py-3">
         {/* The refusal sits beside the button that caused it: in the page body
             it could be scrolled away under this fixed bar and never seen. */}
         <p

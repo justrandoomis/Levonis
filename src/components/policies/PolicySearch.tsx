@@ -36,7 +36,7 @@ function Highlighted({ text, tokens }: { text: string; tokens: string[] }) {
     <>
       {policyHighlight(text, tokens).map((part, i) =>
         part.hit ? (
-          <mark key={i} className="rounded-[3px] bg-gold/25 px-0.5 text-text-primary">{part.text}</mark>
+          <mark key={i} className="rounded bg-gold/25 px-0.5 text-text-primary">{part.text}</mark>
         ) : (
           <span key={i}>{part.text}</span>
         )
@@ -63,6 +63,9 @@ export function PolicySearchField({ query, onQuery, loading, loaded, total }: Om
       <div className="relative">
         <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted start-3.5" />
         <input
+          // `ps-11`/`pe-12` rather than left/right padding: the magnifier sits
+          // at the start of the line in both writing directions.
+          className="lv-input ps-11 pe-12 text-[15px] leading-[1.6]"
           ref={input}
           type="search"
           value={query}
@@ -70,9 +73,6 @@ export function PolicySearchField({ query, onQuery, loading, loaded, total }: Om
           placeholder={s.searchPlaceholder}
           aria-label={s.searchLabel}
           data-policy-search
-          // `ps-11`/`pe-12` rather than left/right padding: the magnifier sits
-          // at the start of the line in both writing directions.
-          className="lv-input ps-11 pe-12 text-[15px] leading-[1.6]"
         />
         {query && (
           <button

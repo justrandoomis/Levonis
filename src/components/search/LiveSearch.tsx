@@ -16,7 +16,7 @@ import { acceptOnChange, acceptOnKey, ghostFor, ghostLayers, liveQuery, stepActi
  *
  * «يجب أن تكون هناك على الأقل نتائج تظهر من شريط البحث بشكل سلس … أما المنتجات
  * المقترحة عند الكتابة فإن شريط البحث يتوسع للأسفل يكون بشكل متوسع حاويا
- * بالمنتج». The header search was a bare `<input>` that did nothing until
+ * بالمنتج». The header search was a bare `input` element that did nothing until
  * Enter, and then threw the shopper onto a results page with no field on it.
  * This is the field, the panel that grows down out of it with the products it
  * found, and the grey word inside it (./ghost.ts) — one component, so the
@@ -507,7 +507,7 @@ export default function LiveSearch({
                   <button
                     type="button"
                     onClick={() => setAttempt((n) => n + 1)}
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-text-primary hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    className="lv-button lv-button-ghost lv-button-sm text-text-primary"
                   >
                     <RotateCcw className="h-4 w-4" aria-hidden="true" />
                     {t('retry')}

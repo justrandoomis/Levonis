@@ -29,10 +29,10 @@ export function ClaimProgress({ stage, s, className = '' }: { stage: string; s: 
   return (
     <ol className={`relative grid grid-cols-5 gap-1 ${className}`}>
       {/* the line, drawn behind the dots between the first and last centres */}
-      <span aria-hidden="true" className="absolute top-[5px] h-px bg-zinc-800" style={{ insetInlineStart: '10%', insetInlineEnd: '10%' }} />
+      <span aria-hidden="true" className="absolute top-[5px] h-px bg-border-subtle" style={{ insetInlineStart: '10%', insetInlineEnd: '10%' }} />
       <span
         aria-hidden="true"
-        className={`absolute top-[5px] h-px ${rejected ? 'bg-zinc-500' : 'bg-gold'}`}
+        className={`absolute top-[5px] h-px ${rejected ? 'bg-text-muted' : 'bg-gold'}`}
         style={{ insetInlineStart: '10%', width: fill }}
       />
       {labels.map((label, i) => {
@@ -46,18 +46,18 @@ export function ClaimProgress({ stage, s, className = '' }: { stage: string; s: 
               className={`w-[11px] h-[11px] rounded-full border-2 ${
                 isCurrent
                   ? rejected
-                    ? 'bg-zinc-400 border-zinc-400 ring-4 ring-zinc-400/15'
+                    ? 'bg-text-muted border-text-muted ring-4 ring-text-muted/15'
                     : 'bg-gold border-gold ring-4 ring-gold/20'
                   : done
                     ? rejected
-                      ? 'bg-zinc-500 border-zinc-500'
+                      ? 'bg-text-muted border-text-muted'
                       : 'bg-gold border-gold'
-                    : 'bg-zinc-900 border-zinc-700'
+                    : 'bg-surface border-border-subtle'
               }`}
             />
             <span
               className={`mt-1.5 text-[10px] leading-tight w-full truncate ${
-                isCurrent ? 'text-white font-bold' : done ? 'text-zinc-400' : dead ? 'text-zinc-700' : 'text-zinc-600'
+                isCurrent ? 'text-text-primary font-bold' : done ? 'text-text-secondary' : dead ? 'text-text-muted/60' : 'text-text-muted'
               }`}
             >
               {label}
@@ -106,7 +106,7 @@ export function ClaimCard({
     <button
       type="button"
       onClick={(e) => onOpen(claim, e.currentTarget)}
-      className={`w-full text-start ${CARD} p-4 hover:border-zinc-700 transition-colors ${FOCUS} ${
+      className={`w-full text-start ${CARD} p-4 hover:bg-surface-raised transition-colors ${FOCUS} ${
         unread ? 'border-gold/50' : ''
       }`}
       data-claim-id={claim.id}
@@ -115,8 +115,8 @@ export function ClaimCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="block text-white font-bold text-[15px] leading-tight truncate">{claim.subject}</span>
-          <span className="block text-zinc-500 text-[12px] mt-0.5 truncate">
+          <span className="block text-text-primary font-bold text-[15px] leading-tight truncate">{claim.subject}</span>
+          <span className="block text-text-muted text-[12px] mt-0.5 truncate">
             {claim.product_name}
             {claim.serial && (
               <>
@@ -128,7 +128,7 @@ export function ClaimCard({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {claim.priority && <PriorityBadge s={s} />}
-          <time dateTime={claim.created_at} className="text-zinc-600 text-[11px] tabular-nums whitespace-nowrap">
+          <time dateTime={claim.created_at} className="text-text-muted text-[11px] tabular-nums whitespace-nowrap">
             {fmtDate(claim.created_at, lang)}
           </time>
         </div>
@@ -136,18 +136,18 @@ export function ClaimCard({
 
       <ClaimProgress stage={claim.stage} s={s} className="mt-4" />
 
-      <p className="text-zinc-400 text-[13px] mt-3 line-clamp-2 whitespace-pre-wrap">{claim.description}</p>
+      <p className="text-text-secondary text-[13px] mt-3 line-clamp-2 whitespace-pre-wrap">{claim.description}</p>
       {claim.decision_reason && (
-        <p className="text-zinc-500 text-[12px] mt-2">
-          <span className="text-zinc-400 font-bold">{s.decisionReason}:</span> {claim.decision_reason}
+        <p className="text-text-muted text-[12px] mt-2">
+          <span className="text-text-secondary font-bold">{s.decisionReason}:</span> {claim.decision_reason}
         </p>
       )}
 
-      <span className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center gap-2 min-h-[28px]" data-claim-open-thread={claim.id}>
+      <span className="mt-3 pt-3 border-t border-border-subtle flex items-center gap-2 min-h-[28px]" data-claim-open-thread={claim.id}>
         <MessageSquare aria-hidden="true" className="w-4 h-4 text-gold shrink-0" />
         <span className="text-[13px] font-bold text-gold whitespace-nowrap">{s.openThread}</span>
         {claim.message_count !== undefined && (
-          <span className="text-[12px] text-zinc-500 tabular-nums truncate">· {s.messagesCount(count, fmtInt(count, lang))}</span>
+          <span className="text-[12px] text-text-muted tabular-nums truncate">· {s.messagesCount(count, fmtInt(count, lang))}</span>
         )}
         <span className="ms-auto flex items-center gap-2 shrink-0">
           {unread && (
@@ -159,7 +159,7 @@ export function ClaimCard({
               {s.newReply}
             </span>
           )}
-          <ChevronRight aria-hidden="true" className="w-4 h-4 text-zinc-600 rtl:rotate-180" />
+          <ChevronRight aria-hidden="true" className="w-4 h-4 text-text-muted rtl:rotate-180" />
         </span>
       </span>
     </button>

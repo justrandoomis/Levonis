@@ -106,18 +106,18 @@ export function ImagePicker({
   return (
     <div>
       {label && (
-        <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">{label}</label>
+        <label className="block text-text-secondary text-[12.5px] font-semibold mb-2">{label}</label>
       )}
 
       {/* A wide picture takes the whole row, so its buttons go under it —
           beside it they were squeezed to nothing and pushed off the screen. */}
       <div className={`flex gap-3 ${shape === 'wide' ? 'flex-col' : 'items-start'}`}>
-        <div className={`${box} rounded-2xl bg-black/40 border border-white/10 overflow-hidden shrink-0 relative`}>
+        <div className={`${box} rounded-lg lv-well overflow-hidden shrink-0 relative`}>
           {value ? (
             <img src={value} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <ImagePlus className="w-5 h-5 text-zinc-600" />
+              <ImagePlus className="w-5 h-5 text-text-muted" />
             </div>
           )}
           {busy && (
@@ -133,7 +133,7 @@ export function ImagePicker({
               type="button"
               onClick={() => input.current?.click()}
               disabled={busy || disabled}
-              className="relative lv-hit min-h-[36px] px-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-secondary lv-button-sm text-[12px]"
             >
               {value ? <RefreshCw className="w-3.5 h-3.5" /> : <ImagePlus className="w-3.5 h-3.5" />}
               {value
@@ -145,7 +145,7 @@ export function ImagePicker({
                 type="button"
                 onClick={() => { setError(''); onChange(null); }}
                 disabled={busy || disabled}
-                className="min-h-[36px] px-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-[12px] font-semibold flex items-center gap-1.5 disabled:opacity-40"
+                className="lv-button lv-button-danger lv-button-sm text-[12px]"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 {loc('إزالة', 'Remove', 'لابردن')}
@@ -234,12 +234,12 @@ export function ImageGallery({
   return (
     <div>
       {label && (
-        <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">{label}</label>
+        <label className="block text-text-secondary text-[12.5px] font-semibold mb-2">{label}</label>
       )}
 
       <div className="flex flex-wrap gap-2">
         {value.map((url, i) => (
-          <div key={url} className="relative w-20 h-20 rounded-2xl overflow-hidden bg-black/40 border border-white/10">
+          <div key={url} className="relative w-20 h-20 rounded-lg overflow-hidden lv-well">
             <img src={url} alt="" className="w-full h-full object-cover" />
             {i === 0 && (
               <span className="absolute top-1 start-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-black/70 text-gold">
@@ -274,9 +274,9 @@ export function ImageGallery({
             type="button"
             onClick={() => input.current?.click()}
             disabled={busy || disabled}
-            className="w-20 h-20 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] flex items-center justify-center disabled:opacity-40"
+            className="w-20 h-20 rounded-lg border border-dashed border-border-subtle bg-surface-raised hover:bg-surface-selected transition-colors flex items-center justify-center disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
-            {busy ? <Loader2 className="w-4 h-4 text-gold animate-spin" /> : <ImagePlus className="w-5 h-5 text-zinc-600" />}
+            {busy ? <Loader2 className="w-4 h-4 text-gold animate-spin" /> : <ImagePlus className="w-5 h-5 text-text-muted" />}
           </button>
         )}
       </div>

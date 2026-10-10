@@ -48,8 +48,10 @@ export default function PageTopBar({
   return (
     <header
       data-page-topbar
-      className={`sticky top-0 z-30 h-14 border-b bg-canvas transition-colors ${
-        scrolled ? 'border-border-subtle' : 'border-transparent'
+      // Clear at rest so the page's light runs under it; the canvas ground
+      // and the hairline arrive together once content scrolls beneath.
+      className={`sticky top-0 z-30 h-14 border-b transition-colors ${
+        scrolled ? 'border-border-subtle bg-canvas' : 'border-transparent'
       }`}
     >
       <div className="mx-auto flex h-full w-full max-w-[1200px] items-center gap-2 px-4 sm:px-6 lg:px-8">

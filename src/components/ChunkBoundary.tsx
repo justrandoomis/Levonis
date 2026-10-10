@@ -90,15 +90,15 @@ export default class ChunkBoundary extends React.Component<Props, State> {
       <div
         role="alert"
         data-chunk-boundary
-        className={`${this.props.compact ? 'py-6' : 'min-h-dvh'} bg-black grid place-items-center px-6 text-center`}
+        className={`${this.props.compact ? 'py-6' : 'min-h-dvh'} grid place-items-center px-6 text-center`}
       >
         <div className="max-w-sm">
-          <p className="text-white text-[15px] font-bold">{s.title}</p>
-          <p className="mt-2 text-zinc-400 text-[13px] leading-relaxed">{s.body}</p>
+          <p className="text-text-primary text-[15px] font-bold">{s.title}</p>
+          <p className="mt-2 text-text-secondary text-[13px] leading-relaxed">{s.body}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-5 min-h-[44px] px-5 rounded-xl bg-gold text-accent-contrast font-bold text-[14px]"
+            className="lv-button lv-button-primary mt-5 px-5"
           >
             {s.retry}
           </button>

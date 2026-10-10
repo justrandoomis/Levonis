@@ -72,6 +72,7 @@ import { toast } from '../../lib/toastStore';
 import { useMotion } from '../../lib/motion';
 import SafeImage from '../ui/SafeImage';
 import Spinner from '../ui/Spinner';
+import { IconButton } from '../ui/Button';
 import { QuantityInput } from '../ui/QuantityInput';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { addressLine, freeDeliveryLabel, quickBuyItemName, quickBuyItemVariant } from './format';
@@ -465,17 +466,14 @@ export default function QuickBuyOrderCard() {
                       onChange={(next, how) => change(item.id, next, how)}
                       data-testid={`quick-buy-qty-${item.id}`}
                     />
-                    <button
-                      type="button"
+                    <IconButton
                       onClick={() => void remove(item)}
                       disabled={!editable || !!removing}
-                      aria-label={t.removeAria(name)}
+                      label={t.removeAria(name)}
                       title={t.remove}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
                       data-quick-buy-remove={item.id}
-                    >
-                      {busyRow ? <Spinner size="sm" delayMs={0} decorative /> : <Trash2 aria-hidden="true" className="w-4 h-4" />}
-                    </button>
+                      icon={busyRow ? <Spinner size="sm" delayMs={0} decorative /> : <Trash2 aria-hidden="true" className="w-4 h-4" />}
+                    />
                   </div>
                 </div>
               </li>

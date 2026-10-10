@@ -49,8 +49,8 @@ export default function InlineCopy({ value, label, className = '' }: { value: st
         onClick={copy}
         aria-label={`${loc('نسخ', 'Copy', 'لەبەرگرتنەوە')} — ${label}`}
         data-copy-inline={label}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-          state === 'copied' ? 'text-emerald-400' : state === 'failed' ? 'text-amber-400' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+          state === 'copied' ? 'text-emerald-400' : state === 'failed' ? 'text-amber-400' : 'text-text-muted hover:text-text-primary hover:bg-surface-raised'
         }`}
       >
         {state === 'copied' ? <Check className="w-3.5 h-3.5" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}

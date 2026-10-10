@@ -68,9 +68,9 @@ export default function BundleContents({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
-        className="w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:border-zinc-600 flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="w-full min-h-[36px] px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-raised hover:bg-surface-selected flex items-center gap-2 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
-        <span className="min-w-0 flex-1 text-[12px] text-zinc-300">
+        <span className="min-w-0 flex-1 text-[12px] text-text-secondary">
           {/* The count is rendered HERE, from the list the payload carries —
               never frozen into the immutable snapshot as an English sentence. */}
           {loc(`${count} قطعة داخل الحزمة`, `${count} items in this bundle`, `${count} پارچە لەم پاکێجەدا`)}
@@ -81,7 +81,7 @@ export default function BundleContents({
           </span>
         )}
         <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-500 shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-text-muted shrink-0 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
       </button>
@@ -103,10 +103,10 @@ export default function BundleContents({
               transition={m.spring('quick')}
               className="overflow-hidden"
             >
-              <ul className="mt-1.5 rounded-xl border border-zinc-800 bg-black/30 p-2 flex flex-col gap-1.5">
+              <ul className="mt-1.5 lv-well rounded-md p-2 flex flex-col gap-1.5">
                 {shown.map((l) => (
                   <li key={l.key} className="flex items-start justify-between gap-3 text-[12px]">
-                    <span className="min-w-0 text-zinc-200">
+                    <span className="min-w-0 text-text-primary">
                       {/* §13.3: product, option and colour names STAY ENGLISH in
                           every language, and every other product name in the app
                           carries `dir="ltr"`. Without it a latin name and its
@@ -115,21 +115,21 @@ export default function BundleContents({
                           names the contract says are never translated. */}
                       <span dir="ltr" className="block truncate text-start">
                         {l.name}
-                        {l.qty > 1 && <span className="text-zinc-400 tabular-nums"> ×{l.qty}</span>}
+                        {l.qty > 1 && <span className="text-text-secondary tabular-nums"> ×{l.qty}</span>}
                       </span>
                       {l.variant && (
-                        <span dir="ltr" className="block text-[11px] text-zinc-500 truncate text-start">
+                        <span dir="ltr" className="block text-[11px] text-text-muted truncate text-start">
                           {l.variant}
                         </span>
                       )}
                     </span>
                     {typeof l.value_iqd === 'number' && l.value_iqd > 0 && (
-                      <span className="shrink-0 text-[11.5px] text-zinc-400 tabular-nums">{money(l.value_iqd)}</span>
+                      <span className="shrink-0 text-[11.5px] text-text-secondary tabular-nums">{money(l.value_iqd)}</span>
                     )}
                   </li>
                 ))}
                 {componentTotalIqd !== null && componentTotalIqd > 0 && (
-                  <li className="mt-0.5 pt-1.5 border-t border-zinc-800 flex items-center justify-between gap-3 text-[11.5px] text-zinc-400">
+                  <li className="mt-0.5 pt-1.5 border-t border-border-subtle flex items-center justify-between gap-3 text-[11.5px] text-text-secondary">
                     <span>{loc('قيمة القطع منفردة', 'Bought separately', 'بەجیا کڕدرا')}</span>
                     <span className="tabular-nums line-through">{money(componentTotalIqd)}</span>
                   </li>

@@ -85,7 +85,7 @@ export function CoverageBar({
   return (
     <div className={className}>
       <div className="flex items-baseline justify-between gap-3 min-w-0">
-        <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold min-w-0 ${active ? 'text-zinc-200' : 'text-zinc-400'}`}>
+        <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold min-w-0 ${active ? 'text-text-primary' : 'text-text-secondary'}`}>
           <Icon aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-gold' : ''}`} />
           <span className="truncate">{label}</span>
         </span>
@@ -100,21 +100,21 @@ export function CoverageBar({
           and below it carry the same facts for assistive technology. */}
       <div className="relative mt-4 h-3" aria-hidden="true">
         {notDelivered ? (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-zinc-700" />
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-dashed border-border-subtle" />
         ) : (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-zinc-800" />
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-border-subtle" />
         )}
         {(active || expired) && (
           <div
             className={`absolute start-0 top-1/2 -translate-y-1/2 h-[2px] rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none ${
-              active ? 'bg-gold' : 'bg-zinc-600'
+              active ? 'bg-gold' : 'bg-text-muted'
             }`}
             style={{ width: pct }}
           />
         )}
         {/* end caps */}
-        <span className={`absolute start-0 top-1/2 -translate-y-1/2 -ms-[3px] w-1.5 h-1.5 rounded-full ${notDelivered ? 'bg-zinc-700' : 'bg-zinc-500'}`} />
-        <span className={`absolute end-0 top-1/2 -translate-y-1/2 -me-[3px] w-1.5 h-1.5 rounded-full ${expired ? 'bg-zinc-500' : needsConfig || notDelivered ? 'bg-zinc-800 ring-1 ring-zinc-700' : 'bg-zinc-700'}`} />
+        <span className={`absolute start-0 top-1/2 -translate-y-1/2 -ms-[3px] w-1.5 h-1.5 rounded-full ${notDelivered ? 'bg-border-subtle' : 'bg-text-muted'}`} />
+        <span className={`absolute end-0 top-1/2 -translate-y-1/2 -me-[3px] w-1.5 h-1.5 rounded-full ${expired ? 'bg-text-muted' : needsConfig || notDelivered ? 'bg-surface-selected ring-1 ring-border-subtle' : 'bg-border-subtle'}`} />
         {/* today */}
         {active && (
           <>
@@ -134,17 +134,17 @@ export function CoverageBar({
         )}
       </div>
 
-      <div className="flex items-baseline justify-between gap-3 mt-1.5 text-[11px] text-zinc-500 tabular-nums min-w-0">
+      <div className="flex items-baseline justify-between gap-3 mt-1.5 text-[11px] text-text-muted tabular-nums min-w-0">
         <span className="truncate">
-          {s.deliveredAt} <span className="text-zinc-400">{fmtDate(deliveredAt, lang)}</span>
+          {s.deliveredAt} <span className="text-text-secondary">{fmtDate(deliveredAt, lang)}</span>
         </span>
         <span className="truncate text-end">
-          {s.warrantyEnd} <span className="text-zinc-400">{fmtDate(endIso, lang)}</span>
+          {s.warrantyEnd} <span className="text-text-secondary">{fmtDate(endIso, lang)}</span>
         </span>
       </div>
 
       {continuesFrom && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0" data-coverage-continues={continuesFrom}>
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-text-secondary tabular-nums min-w-0" data-coverage-continues={continuesFrom}>
           <History aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
           {/* When the line draws the used-sale period, the original warranty's
               own end is said here, so it is never lost from the card. */}
@@ -157,7 +157,7 @@ export function CoverageBar({
       )}
 
       {used && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0" data-coverage-used-sale={used.months}>
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-text-secondary tabular-nums min-w-0" data-coverage-used-sale={used.months}>
           <PackageCheck aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />
           <span className="truncate">{s.usedSale(used.months, fmtDate(used.end_at, lang), (n) => fmtInt(n, lang))}</span>
         </p>
@@ -165,7 +165,7 @@ export function CoverageBar({
 
       {showSplit && (
         <p
-          className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-400 tabular-nums min-w-0"
+          className="mt-1.5 flex items-center gap-1.5 text-[11px] text-text-secondary tabular-nums min-w-0"
           data-coverage-split={`${baseMonths}+${extMonths}`}
         >
           <ShieldPlus aria-hidden="true" className="w-3 h-3 shrink-0 text-gold" />

@@ -23,7 +23,7 @@ function Rail({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={rail.ref}
-      className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap sm:overflow-visible sm:gap-3"
+      className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x -my-2 pt-2 pb-3 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible sm:gap-3"
     >
       {children}
     </div>
@@ -34,7 +34,7 @@ function Rail({ children }: { children: React.ReactNode }) {
 function ItemCard({ item }: { item: HomeSectionItem }) {
   const body = (
     <>
-      <div className="aspect-[4/3] bg-zinc-950 overflow-hidden">
+      <div className="aspect-[4/3] bg-surface-raised overflow-hidden">
         {item.image ? (
           <SafeImage src={item.image} alt={item.title} aspect="auto" className="w-full h-full" />
         ) : (
@@ -42,13 +42,13 @@ function ItemCard({ item }: { item: HomeSectionItem }) {
         )}
       </div>
       <div className="p-3 min-w-0">
-        <h3 className="text-white font-bold text-[13px] leading-snug line-clamp-2">{item.title}</h3>
-        {item.subtitle && <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">{item.subtitle}</p>}
+        <h3 className="text-text-primary font-bold text-[13px] leading-snug line-clamp-2">{item.title}</h3>
+        {item.subtitle && <p className="text-xs text-text-secondary line-clamp-2 mt-0.5">{item.subtitle}</p>}
       </div>
     </>
   );
   const className =
-    'w-[180px] sm:w-[210px] shrink-0 snap-start rounded-2xl overflow-hidden bg-zinc-900/50 border border-zinc-800 hover:border-olive/50 transition-colors';
+    'lv-surface w-[180px] sm:w-[210px] shrink-0 snap-start overflow-hidden hover:bg-surface-raised transition-colors';
 
   if (item.link && item.link.startsWith('/')) {
     return (
@@ -253,7 +253,7 @@ function MarqueeMark({
    * the same reason.
    */
   const plate = entry.image
-    ? 'bg-zinc-900 border-zinc-800'
+    ? 'bg-surface border-border-subtle'
     : 'bg-gold/10 border-gold/30 text-gold font-black text-base';
 
   const body = logoOnly ? (
@@ -279,7 +279,7 @@ function MarqueeMark({
           monogramOf(entry.name)
         )}
       </span>
-      <span className="block w-full text-center text-[10px] font-semibold text-zinc-400 truncate group-hover:text-white transition-colors">
+      <span className="block w-full text-center text-[10px] font-semibold text-text-secondary truncate group-hover:text-text-primary transition-colors">
         {entry.name}
       </span>
     </>

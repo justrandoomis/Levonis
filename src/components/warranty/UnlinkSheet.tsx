@@ -53,15 +53,15 @@ export function UnlinkSheet({
     >
       <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-4">
         <div className="flex items-start gap-3">
-          <span className="w-10 h-10 rounded-full bg-red-500/10 text-red-300 flex items-center justify-center shrink-0">
+          <span className="size-10 rounded-full bg-danger/10 text-danger flex items-center justify-center shrink-0">
             <Unlink aria-hidden="true" className="w-5 h-5" />
           </span>
           <div className="min-w-0">
-            <h2 id="warranty-unlink-title" className="text-white font-bold text-base leading-snug">
+            <h2 id="warranty-unlink-title" className="text-text-primary font-bold text-base leading-snug">
               {s.unlinkTitle}
             </h2>
             {shown && (
-              <p className="text-zinc-400 text-[13px] mt-0.5 truncate">
+              <p className="text-text-secondary text-[13px] mt-0.5 truncate">
                 {productName(shown.product, lang)}
                 {' · '}
                 <span dir="ltr" className="font-mono">{shown.serial ?? s.unitN(shown.unit_index)}</span>
@@ -69,7 +69,7 @@ export function UnlinkSheet({
             )}
           </div>
         </div>
-        <p className="text-zinc-400 text-sm leading-relaxed">{s.unlinkBody}</p>
+        <p className="text-text-secondary text-sm leading-relaxed">{s.unlinkBody}</p>
         {error && (
           <div role="alert" className={ERROR_BOX}>
             {error}

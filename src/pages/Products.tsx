@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { ArrowRight, ArrowLeft, PackageSearch } from 'lucide-react';
 import { api, ApiProduct, ResolvedCategory, ProductsListResponse } from '../lib/api';
 import Spinner from '../components/ui/Spinner';
+import { IconButton } from '../components/ui/Button';
 import { Skeleton, ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { readPageCache, writePageCache } from '../lib/pageCache';
@@ -187,17 +188,18 @@ export default function Products() {
   // OWNER: Sorani to be written by hand (the two divider labels above).
 
   return (
-    <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-2.5 flex items-center gap-3">
+    <div className="w-full pb-24 text-text-secondary min-h-screen">
+      <div className="sticky top-0 z-40 bg-canvas border-b border-border-subtle px-4 py-2.5 flex items-center gap-3">
         {/* 44px, because a finger is expected here, and `shrink-0` because the
             heading beside it is the thing that gives way — never the way back. */}
-        <button
-          onClick={() => navigate(-1)}
-          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="shrink-0 w-11 h-11 inline-flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
-        </button>
+        <IconButton
+          variant="secondary"
+          onClick={() => {
+            navigate(-1);
+          }}
+          label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+        />
         {search ? (
           <>
             {/* The page still has a heading for a screen reader; the field IS
@@ -223,7 +225,7 @@ export default function Products() {
             overflows instead of truncating, and in RTL it is the back button
             that leaves the screen. */
         <div className="min-w-0 flex-1">
-          {kicker && <span className="block text-[11px] font-medium text-zinc-500 leading-tight truncate">{kicker}</span>}
+          {kicker && <span className="block text-[11px] font-medium text-text-muted leading-tight truncate">{kicker}</span>}
           {headingPending ? (
             // The name is one round trip away. A placeholder is the honest
             // stand-in; printing the id was the bug, and flashing a wrong word
@@ -231,7 +233,7 @@ export default function Products() {
             // prefers-reduced-motion by not animating.
             <Skeleton className="h-5 w-40 mt-0.5" />
           ) : (
-            <h1 className="text-white font-bold text-lg leading-tight truncate">{heading}</h1>
+            <h1 className="text-text-primary font-bold text-lg leading-tight truncate">{heading}</h1>
           )}
         </div>
         )}
@@ -258,7 +260,7 @@ export default function Products() {
                 dim it, and show a small delayed spinner — no full takeover. */}
             {loading && (
               <div className="absolute inset-x-0 top-8 z-10 flex justify-center pointer-events-none">
-                <Spinner size="md" className="bg-black/70 rounded-full p-2" />
+                <Spinner size="md" className="bg-surface-raised rounded-full p-2 shadow-lg" />
               </div>
             )}
           <div
@@ -290,7 +292,7 @@ export default function Products() {
                 onClick={loadMore}
                 disabled={more === 'loading'}
                 aria-busy={more === 'loading'}
-                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border-subtle bg-surface px-5 text-[13px] font-semibold text-text-primary transition-colors hover:bg-surface-raised disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="lv-button lv-button-secondary px-5 text-[13px]"
               >
                 {more === 'loading' && <Spinner size="sm" />}
                 {more === 'error' ? t('retry') : loc('عرض المزيد', 'Load more', 'زیاتر پیشان بدە')}

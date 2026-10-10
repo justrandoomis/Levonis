@@ -222,7 +222,7 @@ export function ReviewsView({
             else void more();
           }}
           disabled={busy}
-          className="w-full h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
+          className="w-full h-10 sf-row text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
           data-reviews-more
         >
           {busy ? s.reviews.loadingMore : s.reviews.more}

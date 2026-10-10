@@ -79,26 +79,26 @@ export default function MysteryReveal({
   if (picks.length === 0) {
     return (
       <div
-        className={`mt-2 rounded-xl border border-zinc-800/70 bg-zinc-900/50 p-3 ${className}`}
+        className={`mt-2 rounded-lg border border-border-subtle bg-surface-raised p-3 ${className}`}
         data-mystery-state="pending"
       >
         <div className="flex items-center gap-2">
           <Lock size={14} className="text-gold shrink-0" aria-hidden />
-          <span className="text-[12px] font-bold text-zinc-200">{s.pending}</span>
+          <span className="text-[12px] font-bold text-text-primary">{s.pending}</span>
         </div>
-        <p className="mt-1 text-[11px] text-zinc-400">{s.hidden}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-400">
+        <p className="mt-1 text-[11px] text-text-secondary">{s.hidden}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-secondary">
           <span>
-            {s.spools}: <bdi dir="ltr" className="tabular-nums text-zinc-200">{mystery.spools}</bdi>
+            {s.spools}: <bdi dir="ltr" className="tabular-nums text-text-primary">{mystery.spools}</bdi>
           </span>
           {mystery.reveal_stage_label && (
             <span>
-              {s.revealAt} <span className="text-zinc-200">{mystery.reveal_stage_label}</span>
+              {s.revealAt} <span className="text-text-primary">{mystery.reveal_stage_label}</span>
             </span>
           )}
         </div>
         {cover && (
-          <div className="mt-2 h-16 w-16 overflow-hidden rounded-lg bg-zinc-800" dir={dir}>
+          <div className="mt-2 h-16 w-16 overflow-hidden rounded-lg bg-surface-selected" dir={dir}>
             <SafeImage src={cover} alt="" className="h-full w-full object-cover" />
           </div>
         )}
@@ -117,7 +117,7 @@ export default function MysteryReveal({
         ) : (
           <Gift size={14} className="text-amber-300 shrink-0" aria-hidden />
         )}
-        <span className="text-[12px] font-bold text-zinc-100">{s.revealed}</span>
+        <span className="text-[12px] font-bold text-text-primary">{s.revealed}</span>
         {/* The admin chip §8.2 asks for, on the screen staff read when packing.
             It is driven by the SERVER's flag, so it cannot say "revealed" for
             a customer who has not been told. */}
@@ -130,18 +130,18 @@ export default function MysteryReveal({
       <ul className="mt-2 space-y-2">
         {picks.map((p) => (
           <li key={`${p.spool_index}-${p.product_id}`} className="flex items-center gap-2">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+            <div className="size-10 shrink-0 overflow-hidden rounded-sm bg-surface-selected">
               <SafeImage src={p.image} alt="" className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0">
               {/* Product names stay English in every language (§13.3), and
                   `dir="ltr"` keeps them from being bidi-reordered inside an
                   Arabic or Sorani paragraph. */}
-              <div className="truncate text-[12px] font-bold text-zinc-100" dir="ltr">
+              <div className="truncate text-[12px] font-bold text-text-primary" dir="ltr">
                 {p.name}
               </div>
               {p.variant && (
-                <div className="truncate text-[11px] text-zinc-400" dir="ltr">
+                <div className="truncate text-[11px] text-text-secondary" dir="ltr">
                   {p.variant}
                 </div>
               )}

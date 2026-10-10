@@ -230,7 +230,7 @@ export default function LegacyGiftCard({
           {needsSize && info && (
             <label className="block">
               <span className="block mb-1 text-[12px] font-bold text-text-secondary">{S.nozzleSize}</span>
-              <select value={size} onChange={(e) => setSize(e.target.value)} className="lv-input">
+              <select className="lv-input" value={size} onChange={(e) => setSize(e.target.value)}>
                 <option value="">{S.chooseSize}</option>
                 {info.nozzle_sizes.map((s) => (
                   <option key={s} value={s}>
@@ -243,7 +243,7 @@ export default function LegacyGiftCard({
           {level === 5 && info && info.plates.length > 0 && (
             <label className="block">
               <span className="block mb-1 text-[12px] font-bold text-text-secondary">{S.choosePlate}</span>
-              <select value={plate} onChange={(e) => setPlate(e.target.value)} className="lv-input">
+              <select className="lv-input" value={plate} onChange={(e) => setPlate(e.target.value)}>
                 <option value="">{S.choosePlate}</option>
                 {info.plates.map((p) => (
                   <option key={p.id} value={p.id}>

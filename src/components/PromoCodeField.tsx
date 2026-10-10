@@ -21,8 +21,9 @@
  * between is refused there.
  */
 import { useState } from 'react';
-import { Tag, Check, X, Loader2 } from 'lucide-react';
+import { Tag, Check, X } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
+import { Button, IconButton } from './ui/Button';
 import { mascot } from '../lib/mascot';
 import { useMoney } from '../CurrencyContext';
 
@@ -210,8 +211,8 @@ export default function PromoCodeField({
   return (
     <div data-promo-field>
       {showLabel && (
-        <p className="text-white font-bold mb-2 text-sm flex items-center gap-1.5">
-          <Tag className="w-4 h-4 text-zinc-400" aria-hidden />
+        <p className="text-text-primary font-bold mb-2 text-sm flex items-center gap-1.5">
+          <Tag className="w-4 h-4 text-text-secondary" aria-hidden />
           {s.label}
         </p>
       )}
@@ -223,23 +224,17 @@ export default function PromoCodeField({
               <span dir="ltr" className="truncate">{applied.code}</span>
             </div>
             {typeof applied.estimated_discount_iqd === 'number' && (
-              <p className="text-zinc-300 text-[11px] mt-0.5">
+              <p className="text-text-secondary text-[11px] mt-0.5">
                 {s.estimate}: <span dir="ltr">{money(applied.estimated_discount_iqd)}</span>
               </p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={remove}
-            className="shrink-0 text-zinc-400 hover:text-white p-2 rounded-lg hover:bg-white/5"
-            aria-label={s.remove}
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <IconButton onClick={remove} label={s.remove} icon={<X className="w-4 h-4" />} className="-my-2 -me-2" />
         </div>
       ) : (
         <div className="flex gap-2">
           <input
+            className="lv-input flex-1 text-sm"
             type="text"
             dir="ltr"
             value={input}
@@ -251,17 +246,18 @@ export default function PromoCodeField({
               }
             }}
             placeholder={s.placeholder}
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white outline-none focus:border-gold transition-colors text-sm"
           />
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => void apply()}
-            disabled={busy || !input.trim()}
+            loading={busy}
+            loadingLabel={s.checking}
+            disabled={!input.trim()}
             data-mascot="coupon"
-            className="bg-white text-black font-bold px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-200 transition-colors min-w-[88px]"
+            className="min-w-[88px]"
           >
-            {busy ? <Loader2 className="w-4 h-4 animate-spin mx-auto" aria-label={s.checking} /> : s.apply}
-          </button>
+            {s.apply}
+          </Button>
         </div>
       )}
       {error && (
@@ -269,7 +265,7 @@ export default function PromoCodeField({
           {error}
         </p>
       )}
-      {applied && <p className="text-zinc-500 text-[10px] mt-2 leading-snug">{s.finalAtCheckout}</p>}
+      {applied && <p className="text-text-muted text-[10px] mt-2 leading-snug">{s.finalAtCheckout}</p>}
     </div>
   );
 }

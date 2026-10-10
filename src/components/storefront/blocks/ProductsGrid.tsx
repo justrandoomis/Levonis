@@ -183,7 +183,7 @@ export function ProductsView({
           type="button"
           onClick={loadMore}
           disabled={more}
-          className="w-full h-10 mt-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
+          className="w-full h-10 mt-3 sf-row text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
         >
           {more ? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…') : loc('عرض المزيد', 'Show more', 'زیاتر')}
         </button>
@@ -264,7 +264,7 @@ export default function ProductsGridBlock({ block, store, data }: BlockProps<'pr
             if (!hidden) void more();
           }}
           disabled={busy}
-          className="w-full h-10 mt-3 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
+          className="w-full h-10 mt-3 sf-row text-zinc-300 text-[12.5px] font-medium disabled:opacity-50"
         >
           {busy ? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…') : loc('عرض المزيد', 'Show more', 'زیاتر')}
         </button>

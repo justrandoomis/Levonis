@@ -122,7 +122,7 @@ export default function CategoriesExplorer() {
   }
 
   return (
-    <div data-page="categories-explorer" className="min-h-full w-full bg-canvas pb-10 text-text-primary">
+    <div data-page="categories-explorer" className="min-h-full w-full pb-10 text-text-primary">
       <PageTopBar title={title} titleVisible={headingGone} actions={<TopBarSearch />} />
 
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">

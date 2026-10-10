@@ -67,7 +67,7 @@ export default function ChoiceRows<V extends string>({
             data-choice={o.value}
             tabIndex={single ? (o.value === tabbable ? 0 : -1) : 0}
             onClick={(e) => onChoose(o.value, fromPointer(e))}
-            className={`group flex min-h-[68px] w-full items-center gap-3.5 rounded-[18px] border bg-surface px-4 py-3 text-start transition-[border-color,box-shadow,transform,background-color] duration-150 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none motion-reduce:active:scale-100 ${
+            className={`group flex min-h-[68px] w-full items-center gap-3.5 rounded-lg border bg-surface px-4 py-3 text-start transition-[border-color,box-shadow,transform,background-color] duration-150 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none motion-reduce:active:scale-100 ${
               on
                 ? 'border-text-primary shadow-[0_0_0_1px_var(--color-text-primary),var(--clay-lift)]'
                 : 'border-border-subtle hover:border-text-muted/40 hover:bg-surface-raised'

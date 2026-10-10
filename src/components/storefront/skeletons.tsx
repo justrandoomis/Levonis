@@ -165,7 +165,7 @@ export function StoreProductPageSkeleton() {
             <p className="text-xl mb-4">
               <Line w="w-24" h="h-5" />
             </p>
-            <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[0.03] p-3 mb-4">
+            <div className="flex items-center gap-2.5 rounded-lg border border-border-subtle bg-surface p-3 mb-4">
               <Skeleton className="w-9 h-9 rounded-xl shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1 text-[13px]">
@@ -233,7 +233,7 @@ export function ProductFactsSkeleton({ rows }: { rows: number }) {
   return (
     <div
       aria-hidden="true"
-      className="mb-6 grid grid-cols-2 gap-x-4 gap-y-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-[12.5px]"
+      className="mb-6 grid grid-cols-2 gap-x-4 gap-y-2 sf-card p-3 text-[12.5px]"
     >
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="min-w-0">

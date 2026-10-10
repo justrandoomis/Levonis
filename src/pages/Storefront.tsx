@@ -388,11 +388,11 @@ export default function Storefront({
     return (
       <div className="min-h-screen bg-black flex items-center justify-center px-6">
         <div className="text-center max-w-sm">
-          <PackageX className="w-10 h-10 text-zinc-600 mx-auto mb-4" />
+          <PackageX className="w-10 h-10 text-text-muted mx-auto mb-4" />
           <h1 className="text-gold font-bold text-lg mb-2">
             {loc('لا يوجد متجر هنا', 'No store here', 'هیچ فرۆشگایەک لێرە نییە')}
           </h1>
-          <p className="text-zinc-500 text-[13px] mb-6">
+          <p className="text-text-muted text-[13px] mb-6">
             {loc(
               'قد يكون العنوان مكتوبًا بشكل خاطئ أو أن المتجر لم يعد موجودًا.',
               'The address may be mistyped, or the store no longer exists.',
@@ -402,7 +402,7 @@ export default function Storefront({
           <a
             href={MAIN_SITE ? `${MAIN_SITE}/` : '/'}
             translate="no"
-            className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-2xl bg-olive text-snow font-bold text-[13px]"
+            className="lv-button lv-button-primary px-5 text-[13px]"
           >
             LEVONIS
           </a>
@@ -527,7 +527,7 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
         {quotes && (
           <a
             href={requestsHref}
-            className="relative lv-hit h-10 rounded-xl bg-olive text-snow font-bold text-[12px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="lv-button lv-button-primary gap-1.5 text-[12px]"
           >
             <Hammer className="w-3.5 h-3.5" />
             {loc('اطلب عرض سعر', 'Request a quote', 'داوای نرخ بکە')}
@@ -535,7 +535,7 @@ function LiveServiceDoors({ accepts }: { accepts: boolean }) {
         )}
         <button
           onClick={openChat}
-          className={`relative lv-hit h-10 rounded-xl border border-white/10 bg-white/[0.03] text-zinc-200 font-bold text-[12px] flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${quotes ? '' : 'col-span-2'}`}
+          className={`lv-button lv-button-secondary gap-1.5 text-[12px] ${quotes ? '' : 'col-span-2'}`}
         >
           <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
           {loc('مراسلة المتجر', 'Message the store', 'نامە بۆ فرۆشگا')}
@@ -884,18 +884,18 @@ function StoreMenu({
       {open && (
         <>
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <div className="absolute top-[34px] right-0 z-30 w-44 rounded-xl border border-white/10 sf-menu shadow-2xl overflow-hidden">
-            <button onClick={share} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10">
+          <div className="absolute top-[34px] right-0 z-30 w-44 rounded-lg border border-white/10 sf-menu shadow-lg overflow-hidden">
+            <button onClick={share} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-text-primary active:bg-[var(--clay-well-bg)]">
               {loc('مشاركة المتجر', 'Share the store', 'هاوبەشکردنی فرۆشگا')}
             </button>
-            <button onClick={copy} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 border-t border-white/5">
+            <button onClick={copy} className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-text-primary active:bg-[var(--clay-well-bg)] border-t border-white/5">
               {copied ? loc('تم النسخ ✓', 'Copied ✓', 'کۆپی کرا ✓') : loc('نسخ الرابط', 'Copy the link', 'کۆپی بەستەر')}
             </button>
             <Suspense fallback={null}>
               <OwnerShareMenuItem
                 storeId={storeId}
                 onDone={() => setOpen(false)}
-                className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-zinc-200 active:bg-white/10 border-t border-white/5"
+                className="w-full text-start px-3.5 py-2.5 text-[12.5px] text-text-primary active:bg-[var(--clay-well-bg)] border-t border-white/5"
               />
             </Suspense>
           </div>
