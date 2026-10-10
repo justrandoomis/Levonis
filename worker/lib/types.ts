@@ -74,6 +74,14 @@ export interface Env {
    * click time.
    */
   TELEGRAM_ADMIN_USER_IDS?: string;
+  /**
+   * Comma-separated USER ids of the probe accounts the owner registered
+   * (push 1s, S7): a refusal heard by a request SIGNED IN as one of them is
+   * not written to `security_events` (worker/lib/securityEvents.ts). Never the
+   * owner's own id, never a guest, never matched by user agent or any other
+   * header — an anonymous probe is recorded like anyone. Unset = no exemption.
+   */
+  SECURITY_PROBE_USER_IDS?: string;
   /** Trusted absolute origin for links in emails (per environment). Never
    *  derive email links from the request Host header. */
   APP_ORIGIN?: string;

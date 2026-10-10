@@ -197,6 +197,26 @@ test('a later cost router, once it exists, carries its own door', () => {
   }
 });
 
+/**
+ * S8(6), push 1s: `requireOwner` is owner-by-address, so it is no cost door.
+ * It is verification-aware now (an unproven owner row hears
+ * OWNER_EMAIL_UNVERIFIED and never passes), and no cost router or cost route
+ * uses it: cost doors are `requireCostRead` / `assertCostRead`, the one rule
+ * that also knows the grants. Its only future caller is the owner's security
+ * console (LATER_ROUTERS), which reads no cost.
+ */
+test('S8: requireOwner is verification-aware and has no cost-route callers', () => {
+  const access = code('worker/lib/costAccess.ts');
+  const door = access.slice(access.indexOf('export const requireOwner'));
+  const body = door.slice(0, door.indexOf('};'));
+  assert.match(body, /if \(!user \|\| user\.role !== 'admin' \|\| !isOwner\(c\.env, user\)\) throw ownerOnly\(\);/);
+  assert.match(body, /if \(isUnverifiedOwner\(c\.env, user\)\) throw ownerEmailUnverified\(\);\s*await next\(\);/);
+  const callers = ALL.filter((f) => f !== 'worker/lib/costAccess.ts' && /\brequireOwner\b/.test(code(f)));
+  const allowed = new Set(LATER_ROUTERS.filter((r) => /requireOwner/.test(r.guard.source)).map((r) => r.file));
+  assert.deepEqual(callers.filter((f) => !allowed.has(f)), [], 'requireOwner guards no cost route');
+  for (const r of COST_ROUTERS) assert.doesNotMatch(code(r.file), /\brequireOwner\b/, `${r.file} uses the cost door, not requireOwner`);
+});
+
 test('the legacy investment register (/api/admin/invest/*) is behind the cost-read gate', () => {
   const src = code('worker/routes/admin.ts');
   assert.match(src, /adminRoutes\.use\('\/invest\/\*',\s*async \(c, next\) => \{\s*assertCostRead\(c\);/);

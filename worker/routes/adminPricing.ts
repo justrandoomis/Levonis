@@ -26,7 +26,10 @@
  * causes is the rate limiter's own counter (`rate_limits`,
  * worker/lib/ratelimit.ts), which every cost router pays
  * (tests/pricingPreviewNoWrite.test.ts records every statement and hashes
- * every other table before and after).
+ * every other table before and after). The other is outside this router:
+ * the security log's door on /api/admin/* (push 1s, worker/lib/securityEvents.ts)
+ * records a refusal, and the owner's request from a session, network or
+ * browser not seen in 30 days, in `security_events` — ids and codes only.
  *
  * FX-1 (FX programme plan §8) adds the central rates below — the owner's
  * reads and writes of the exchange rates and the central shipping rates:
@@ -134,6 +137,7 @@ import { mergedInputs } from '../lib/pricingEngine/fromPurchase';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { canonical } from '../lib/pricingEngine/procurementPreview';
 import { sha256Hex } from '../lib/crypto';
+import { FX_GUARD_CHANGED, recordSecurityEvent } from '../lib/securityEvents';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -282,6 +286,19 @@ async function commitAct(c: Context<AppContext>, planned: PlannedAct, rows: read
   );
   if (plan.displayRateChanged || usdSourceChanged) await purgeCatalogueFromJob(c.env, [], { settings: true, origin: originOf(c) });
   if (planned.attention.length) await notifyOwnerFx(c.env, planned.attention);
+  // Every FX guard-setting change is in the owner's security log too (push 1s, S7; critique F3):
+  // the act's code and the field NAMES, never a value.
+  if (planned.guard) {
+    const audit = planned.changes[0]?.audit;
+    const named = audit?.detail.fields;
+    const fields = Array.isArray(named) ? named.filter((f): f is string => typeof f === 'string') : undefined;
+    await recordSecurityEvent(c, {
+      kind: 'scope_changed',
+      code: FX_GUARD_CHANGED,
+      status: 200,
+      detail: { pair: planned.changes[0]?.pair, act: audit?.action, fields },
+    });
+  }
   // An effective rate moved (the derived IQD rates were rewritten): reprice what it left stale.
   if (plan.derived.length) await repriceAfterAct(c, plan.cost);
 }

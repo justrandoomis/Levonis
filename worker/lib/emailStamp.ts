@@ -125,6 +125,38 @@ export function signInStamp(db: D1Database, env: Env, userId: string, address: s
     .bind(new Date().toISOString(), userId, address, owner, owner);
 }
 
+/**
+ * THE ROW HAS NOT HAD ITS FIRST OWNER PROOF SINCE IT WAS READ — for a write
+ * that hands the row a credential on the strength of a check made BEFORE it
+ * (push 1s, S8: the reset link of POST /reset-password).
+ *
+ * Such a route reads the row and its token, spends the token, hashes the new
+ * password and only then writes it; the first proof of the owner's address
+ * (`ownerFirstProofPurge` above) can land in between. It spends every unused
+ * reset link and takes the password away, but a link this request has already
+ * spent is not "unused", so the password written after it would land on the
+ * row the proof just took back. This condition, put in that write's own WHERE
+ * (a `users` row in scope), holds only while the row still holds the address
+ * read with the token (`readEmail`, `IS` so a NULL compares), and — when that
+ * address is the owner's and was unproven at the read — still carries no
+ * stamp. Any other address, and an owner row already proven at the read
+ * (its stamp never changes, `STAMP_ONCE`), pass as before. Plain `?`
+ * placeholders, bound by `binds` in order.
+ */
+export function noOwnerProofSinceRead(
+  env: Env,
+  readEmail: string | null,
+  readStamp: unknown
+): { sql: string; binds: unknown[] } {
+  const owner = (env.INITIAL_ADMIN_EMAIL ?? '').trim().toLowerCase();
+  return {
+    sql: `email IS ?
+      AND NOT (? <> '' AND lower(trim(email)) = ? AND ? = 0
+               AND email_verified_at IS NOT NULL AND trim(email_verified_at) <> '')`,
+    binds: [readEmail, owner, owner, isStamped(readStamp) ? 1 : 0],
+  };
+}
+
 /** What a stamping statement is about to do to one account. */
 export interface StampTarget {
   userId: string;

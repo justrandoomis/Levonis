@@ -61,7 +61,25 @@ export async function rateLimit(
       .run();
   }
 
-  if (row && row.count > limit) throw tooMany();
+  if (row && row.count > limit) {
+    refusedBy.set(c.req.raw, bucket);
+    throw tooMany();
+  }
+}
+
+/**
+ * WHICH BUCKET REFUSED THIS REQUEST, for the security log (push 1s, S7: a 429
+ * on the pricing and FX buckets is recorded, worker/lib/securityEvents.ts).
+ * Keyed by the request object, like `charged` below, so the 429's body stays
+ * exactly what it was — the bucket never travels to the caller.
+ */
+const refusedBy = new WeakMap<Request, string>();
+export function rateLimitedBucket(c: Context<AppContext>): string | null {
+  try {
+    return refusedBy.get(c.req.raw) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**

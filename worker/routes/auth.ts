@@ -36,7 +36,15 @@ import { identifierKey, rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { isOwner, ownerOnly } from '../lib/costAccess';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
-import { isStamped, runStamp, signInStamp, STAMP_ONCE, type OwnerFirstProof, type StampTarget } from '../lib/emailStamp';
+import {
+  isStamped,
+  noOwnerProofSinceRead,
+  runStamp,
+  signInStamp,
+  STAMP_ONCE,
+  type OwnerFirstProof,
+  type StampTarget,
+} from '../lib/emailStamp';
 import { emitEvent, emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { UserCreatedV1 } from '@levonis/contracts/events/v1/UserCreated';
 import { ReferralUsedV1 } from '@levonis/contracts/events/v1/ReferralUsed';
@@ -953,29 +961,38 @@ export async function resolveGoogleIdentity(
       // the reverse. So linking requires the existing account to have proven
       // the address itself (email_verified_at), and the refusal names the
       // exact recovery path instead of merging.
-      if (!isStamped(byEmail.email_verified_at)) {
-        throw new HttpError(
+      const notProven = () =>
+        new HttpError(
           409,
           'يوجد حساب بهذا البريد لم يُوثَّق بريده بعد، ولن نربطه بحساب Google تلقائيًا. سجّل الدخول بكلمة المرور ووثّق بريدك، ثم سيُربط Google تلقائيًا. / ' +
             'An account with this email exists but its address was never verified, so it will not be linked to Google automatically. Sign in with your password and verify your email — Google then links automatically.',
           'EMAIL_NOT_VERIFIED'
         );
-      }
+      if (!isStamped(byEmail.email_verified_at)) throw notProven();
       // Conditional link: only claims an unclaimed google_sub, so two
-      // concurrent sign-ins can never overwrite an existing link.
+      // concurrent sign-ins can never overwrite an existing link — and only
+      // while the row STILL holds this address, proven (push 1s, S8). The
+      // checks above read the row before Google's keys and the link; an email
+      // change in between (POST /verify-email/confirm moves the row onto
+      // another address in one statement) would otherwise hand the row to the
+      // Google account of an address it no longer holds. The WHERE re-reads
+      // both, in the same write.
       const linked = await env.DB.prepare(
-        'UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL'
+        `UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL
+            AND email = ? AND email_verified_at IS NOT NULL AND trim(email_verified_at) <> ''`
       )
-        .bind(identity.sub, byEmail.id)
+        .bind(identity.sub, byEmail.id, identity.email)
         .run();
       if (linked.meta.changes === 0) {
         // Someone linked a Google identity to this account in between; only
         // the same sub may proceed (a different one is the conflict above).
+        // A row that no longer holds this address, proven, is not linked.
         const fresh = await env.DB.prepare('SELECT google_sub FROM users WHERE id = ?')
           .bind(byEmail.id)
           .first<{ google_sub: string | null }>();
         if (fresh?.google_sub !== identity.sub) {
-          throw conflict('This email is already linked to a different Google account');
+          if (fresh?.google_sub) throw conflict('This email is already linked to a different Google account');
+          throw notProven();
         }
       }
       await audit(env.DB, byEmail.id, 'auth.google_linked', byEmail.id, {});
@@ -1428,11 +1445,23 @@ authRoutes.post('/reset-password', async (c) => {
   checkPassword(next);
 
   const tokenHash = await sha256Hex(token);
+  // The row's address and stamp are read WITH the token, before it is spent:
+  // the password write below requires both unchanged where a first proof of
+  // the owner's address could have moved them (`noOwnerProofSinceRead`).
   const row = await c.env.DB.prepare(
-    'SELECT token_hash, user_id, expires_at, used FROM password_reset_tokens WHERE token_hash = ?'
+    `SELECT t.token_hash, t.user_id, t.expires_at, t.used, u.email AS user_email, u.email_verified_at AS user_stamp
+       FROM password_reset_tokens t LEFT JOIN users u ON u.id = t.user_id
+      WHERE t.token_hash = ?`
   )
     .bind(tokenHash)
-    .first<{ token_hash: string; user_id: string; expires_at: string; used: number }>();
+    .first<{
+      token_hash: string;
+      user_id: string;
+      expires_at: string;
+      used: number;
+      user_email: string | null;
+      user_stamp: string | null;
+    }>();
   // One generic-safe message for every failure; only the machine-readable
   // code differs so the UI can offer "request a new link" where it helps.
   const genericMsg = 'This reset link is invalid or has expired';
@@ -1450,11 +1479,35 @@ authRoutes.post('/reset-password', async (c) => {
     .run();
   if (consumed.meta.changes === 0) throw badRequest(genericMsg, 'TOKEN_USED');
 
+  /**
+   * THE PASSWORD LANDS ONLY ON THE ROW THE LINK WAS FOR, AS IT WAS (push 1s,
+   * S8). The token is spent above and the hash below takes a while; the first
+   * proof of the owner's address (worker/lib/emailStamp.ts) can land in
+   * between. It spends every UNUSED reset link and clears the password — but
+   * this link is already spent, so an unconditional write here would put a
+   * password the proof never saw back on the row it just took back. So the
+   * write re-reads, in its own WHERE: this spent token still names this row,
+   * and the row has had no first owner proof since it was read with the token
+   * (same address; the owner's address still unstamped if it was). When it
+   * does not land, nothing else does either — the sessions are ended only
+   * once the new hash is on the row, so the proving session survives — and
+   * the person hears the same generic answer as for a spent link.
+   */
   const hash = await hashPassword(next);
-  await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, row.user_id),
-    c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(row.user_id),
+  const unchanged = noOwnerProofSinceRead(c.env, row.user_email, row.user_stamp);
+  const wrote = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE users SET password_hash = ?
+        WHERE id = ?
+          AND EXISTS (SELECT 1 FROM password_reset_tokens t
+                       WHERE t.token_hash = ? AND t.user_id = users.id AND t.used = 1)
+          AND ${unchanged.sql}`
+    ).bind(hash, row.user_id, tokenHash, ...unchanged.binds),
+    c.env.DB.prepare(
+      'DELETE FROM sessions WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)'
+    ).bind(row.user_id, row.user_id, hash),
   ]);
+  if (Number(wrote[0]?.meta?.changes ?? 0) === 0) throw badRequest(genericMsg, 'TOKEN_USED');
   await audit(c.env.DB, row.user_id, 'auth.password_reset', row.user_id);
 
   // Best-effort security notice to the account owner, in their own locale.

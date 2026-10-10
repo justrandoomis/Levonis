@@ -182,7 +182,13 @@ export type NotificationKind =
    * It carries no figure (a test holds it to no digit at all), and it never
    * goes to an admin Telegram topic, which assistants read.
    */
-  | 'fx_attention';
+  | 'fx_attention'
+  /**
+   * «فُتحت بيانات التكلفة من مكان جديد» (push 1s, S7): to the VERIFIED OWNER
+   * only (worker/lib/securityEvents.ts) — a cost request from a session,
+   * network or browser not seen in 30 days. No figure, at most a few a day.
+   */
+  | 'security_alert';
 
 export interface NotificationInput {
   userId: string;

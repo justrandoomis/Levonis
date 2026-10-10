@@ -139,10 +139,23 @@ export const requireCostWrite: MiddlewareHandler<AppContext> = async (c, next) =
   await next();
 };
 
-/** Owner-only acts: the security console, grants, FIFO overrides, historical reconciliation. */
+/**
+ * Owner-only acts: the security console, grants, FIFO overrides, historical
+ * reconciliation.
+ *
+ * VERIFICATION-AWARE, LIKE EVERY COST DOOR (push 1s, S8). Owner status is the
+ * address, and an address is honoured only once it is proven (critique A10):
+ * an admin row holding INITIAL_ADMIN_EMAIL unverified may be whoever took the
+ * address while it was free. So that row hears OWNER_EMAIL_UNVERIFIED — the
+ * way to open it, as at the cost doors (`costRefusal`) — and never passes;
+ * everyone else who is not the owner hears OWNER_ONLY as before. No cost
+ * router uses this door (they use `requireCostRead`, which is the same rule
+ * plus the grants), and tests/costPredicateUsage.test.ts keeps it that way.
+ */
 export const requireOwner: MiddlewareHandler<AppContext> = async (c, next) => {
   const user = c.get('user');
   if (!user || user.role !== 'admin' || !isOwner(c.env, user)) throw ownerOnly();
+  if (isUnverifiedOwner(c.env, user)) throw ownerEmailUnverified();
   await next();
 };
 

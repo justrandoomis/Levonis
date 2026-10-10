@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
 import { noStoreUnlessSet } from './lib/edgePolicy';
+import { securityEventsDoor } from './lib/securityEvents';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser, sessionFreePublicGet } from './lib/session';
 import { isAnonymousPublicMediaKey } from './lib/mediaStorage';
@@ -344,6 +345,11 @@ app.use('/api/admin/*', requireMainHost);
 
 // No shared or stored copy of an admin or cart answer — see edgePolicy.ts.
 app.use('/api/admin/*', noStoreUnlessSet);
+
+// The owner's security log (push 1s, S7): cost-door refusals, 429s on the
+// pricing and FX buckets, freshness refusals, and an owner cost request from a
+// context not seen in 30 days. Reads the answer after the routers; changes nothing.
+app.use('/api/admin/*', securityEventsDoor);
 app.use('/api/cart', noStoreUnlessSet);
 app.use('/api/cart/*', noStoreUnlessSet);
 
