@@ -251,7 +251,7 @@ export default function AdminSecurity() {
                     {s('details')}
                   </button>
                   {b.active && (
-                    <button onClick={() => setConfirm({ block: b, whole: false })} className="min-h-[36px] rounded-lg bg-amber-500/90 px-3 text-sm text-black">
+                    <button onClick={() => setConfirm({ block: b, whole: false })} className="min-h-[36px] rounded-lg bg-amber-500 px-3 text-sm text-black">
                       {s('lift')}
                     </button>
                   )}
@@ -350,7 +350,7 @@ export default function AdminSecurity() {
                     {s(KIND_KEY[b.actor_kind])} · {actorText(b)} · {b.active ? `${s('until')} ${when(b.expires_at, lang)}` : b.lifted_at ? s('lifted') : s('expired')}
                   </span>
                   {b.active && (
-                    <button onClick={() => setConfirm({ block: b, whole: false })} className="rounded-lg bg-amber-500/90 px-2 py-1 text-xs text-black">
+                    <button onClick={() => setConfirm({ block: b, whole: false })} className="rounded-lg bg-amber-500 px-2 py-1 text-xs text-black">
                       {s('lift')}
                     </button>
                   )}
@@ -358,7 +358,7 @@ export default function AdminSecurity() {
               ))}
             </ul>
             {incident.blocks.some((b) => b.active) && (
-              <button onClick={() => setConfirm({ block: incident.blocks.find((b) => b.active)!, whole: true })} className="mt-2 w-full rounded-lg border border-amber-500/60 py-2 text-sm text-amber-200">
+              <button onClick={() => setConfirm({ block: incident.blocks.find((b) => b.active)!, whole: true })} className="mt-2 w-full rounded-lg border border-amber-500/40 py-2 text-sm text-amber-200">
                 {s('liftIncident')}
               </button>
             )}
@@ -403,7 +403,7 @@ export default function AdminSecurity() {
       )}
 
       {confirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4">
           <div role="alertdialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-4" dir={dir}>
             <p className="text-sm">{s('liftConfirm')}</p>
             <p className="mt-1 text-xs text-zinc-400">
