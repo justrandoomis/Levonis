@@ -214,16 +214,29 @@ test('a losing racer gets the units on the shelf, not a failure', async () => {
   const raw = freshDb();
   seed(raw);
   purchase(raw);
-  const a = app(raw);
+  const real = asD1(raw);
+  let queued = Promise.resolve();
+  // D1 serializes atomic batches. The local adapter awaits each statement;
+  // serialize just those transactions so racing route reads do not produce a
+  // SQLite-only nested BEGIN error before the actual idempotency guard runs.
+  const db = {
+    prepare: (sql: string) => real.prepare(sql),
+    batch(statements: D1PreparedStatement[]) {
+      const result = queued.then(() => real.batch(statements));
+      queued = result.then(() => undefined, () => undefined);
+      return result;
+    },
+  } as D1Database;
+  const a = stubApp(db, OWNER, (routes) => routes.route('/api/admin/inventory', adminInventoryRoutes));
   // Both presses read "no receipt yet" before either writes — the interleaving
   // the route's early return cannot catch. The batch's UNIQUE key does.
   const [first, second] = await Promise.all([
     post(a, '/api/admin/inventory/incoming/inc1/receive', { receipt_id: 'race', qty: 10 }),
     post(a, '/api/admin/inventory/incoming/inc1/receive', { receipt_id: 'race', qty: 10 }),
   ]);
-  assert.equal(first.status, 200);
-  assert.equal(second.status, 200);
   const bodies = [await json(first), await json(second)];
+  assert.equal(first.status, 200, JSON.stringify(bodies[0]));
+  assert.equal(second.status, 200, JSON.stringify(bodies[1]));
   assert.equal(bodies.filter((b) => b.already === true).length, 1, 'exactly one press is told it was a repeat');
   assert.equal(row<{ stock: number }>(raw, `SELECT stock FROM products WHERE id = 'p1'`)!.stock, 10);
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_lots'), 1);
@@ -515,8 +528,10 @@ test('the confirmation sheet is computed by the server, and matches the commit e
   const committed = await json(await post(a, '/api/admin/inventory/incoming/inc1/receive', { receipt_id: 'r1', qty: 7 }));
   assert.deepEqual(committed.cost, preview.cost);
   // 100,000 over 7 units is 14,285.71…: the remainder goes to the first units,
-  // and the lot's total is the shipment's total to the dinar.
-  assert.equal(row<{ total_cost_iqd: number }>(raw, 'SELECT total_cost_iqd FROM inventory_lots')!.total_cost_iqd, 7 * 300_000 + 100_000);
+  // and the uniform-cost lots total the shipment to the dinar.
+  assert.equal(count(raw, 'SELECT SUM(total_cost_iqd) n FROM inventory_lots'), 7 * 300_000 + 100_000);
+  assert.equal(count(raw, 'SELECT SUM(unit_cost_iqd*qty_received) n FROM inventory_lots'), preview.cost.totalCostIqd);
+  assert.equal(count(raw, 'SELECT SUM(qty_received) n FROM inventory_lots'), 7);
 });
 
 // =====================================================================

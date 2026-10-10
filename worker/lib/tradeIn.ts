@@ -26,7 +26,7 @@
  *                 customer actually paid for ONE unit of the line: the stored
  *                 unit price, less the extended-warranty fee folded into it
  *                 (the cover that is left is valued by its own factor, not
- *                 twice), less the line's own membership and coupon discounts
+ *                 twice), less line-applied membership and coupon discounts
  *                 per unit. Never a catalogue price.
  *
  *   THE AMS SPLIT «اذا كان … الـ AMS الذي أتى مع جهاز الكومبو … نتعامل مع سعر
@@ -89,6 +89,7 @@ import { applyRelations, capacityFrom, loadRelationsView, snapshotFrom } from '.
 import { isPrinterProduct, printerProductIds } from './printerIdentity';
 import { parseOpsPolicy } from './deviceOps';
 import { addMonths } from './membershipOps';
+import { membershipDiscountAtLine } from './orderMembership';
 import { effectiveBaseMonths } from './warrantyPlans';
 import { serialAssignmentsInstalled } from './serialPolicy';
 import { MAX_REPLACEMENT_HOPS, liveUnitOfSlot } from './deviceCustody';
@@ -454,6 +455,8 @@ interface LineRow {
   unit_price_iqd: number;
   warranty_snapshot: string | null;
   membership_discount_iqd: number | null;
+  membership_rule_id: string | null;
+  benefit_snapshot: string | null;
   coupon_discount_iqd: number | null;
   /** Set when the line is a gift ordered at 0 IQD (0175). */
   gift_entitlement_id: string | null;
@@ -472,8 +475,8 @@ interface LineRow {
 
 const LINE_SQL = `SELECT oi.id AS item_id, oi.order_id, oi.product_id, oi.name_snapshot, oi.image_snapshot, oi.option_snapshot,
          oi.option_id, oi.option_value_ids, oi.qty, oi.unit_price_iqd, oi.warranty_snapshot,
-         oi.membership_discount_iqd, oi.coupon_discount_iqd, oi.gift_entitlement_id,
-         o.status, o.created_at AS ordered_at, o.delivered_at AS order_delivered_at,
+         oi.membership_discount_iqd, oi.membership_rule_id, oi.coupon_discount_iqd, oi.gift_entitlement_id,
+         o.benefit_snapshot, o.status, o.created_at AS ordered_at, o.delivered_at AS order_delivered_at,
          p.slug, p.name, p.name_ar, p.template_family, p.category_id, p.sub_category_id, p.ops_policy, p.price_iqd
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
@@ -485,12 +488,14 @@ const LINE_SQL = `SELECT oi.id AS item_id, oi.order_id, oi.product_id, oi.name_s
      AND NOT EXISTS (SELECT 1 FROM order_items k WHERE k.bundle_parent_item_id = oi.id)`;
 
 /** Paid for ONE unit, per the header's definition. */
-export function paidPerUnit(line: Pick<LineRow, 'unit_price_iqd' | 'qty' | 'warranty_snapshot' | 'membership_discount_iqd' | 'coupon_discount_iqd'>): number {
+export function paidPerUnit(line: Pick<LineRow, 'unit_price_iqd' | 'qty' | 'warranty_snapshot' | 'membership_discount_iqd' | 'coupon_discount_iqd'>
+  & Partial<Pick<LineRow, 'product_id' | 'membership_rule_id' | 'benefit_snapshot'>>): number {
   const qty = Math.max(1, Number(line.qty) || 1);
   const unit = Math.max(0, Number(line.unit_price_iqd) || 0);
   const w = safeParse<{ fee_iqd?: unknown } | null>(line.warranty_snapshot, null);
   const fee = typeof w?.fee_iqd === 'number' && Number.isFinite(w.fee_iqd) ? Math.max(0, Math.min(Math.trunc(w.fee_iqd), unit)) : 0;
-  const discounts = Math.max(0, (Number(line.membership_discount_iqd) || 0) + (Number(line.coupon_discount_iqd) || 0));
+  const membership = membershipDiscountAtLine({ benefit_snapshot: line.benefit_snapshot }, { ...line });
+  const discounts = Math.max(0, (membership || 0) + (Number(line.coupon_discount_iqd) || 0));
   return Math.max(0, unit - fee - Math.floor(discounts / qty));
 }
 

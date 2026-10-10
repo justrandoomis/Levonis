@@ -146,6 +146,8 @@ import {
   loadEngineControl,
   loadStoredSkuCosts,
   priceImageOf,
+  RATES_FENCE_SQL,
+  rateFenceBinds,
   skuTableOf,
   skuReadFailed,
   refuseUnreadSkus,
@@ -1217,6 +1219,12 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
   if (writes.inputWrites.length || writes.ruleWrites.length) {
     const statements = [
       ...batchHead(db, stored, now),
+      // Rates are read before the pricing store. A rate committed between
+      // those reads can leave a fresh config version beside a stale IQD
+      // conversion, so bind both the confirmed rate and its snapshot version.
+      ...(writes.inputWrites.some((w) => w.iqd) ? fence(db,
+        `${RATES_FENCE_SQL} AND (SELECT effective_version FROM fx_rate_pairs WHERE pair = 'USD_IQD') = ?`,
+        [...rateFenceBinds(rates), rates.pair_versions.USD_IQD]) : []),
       ...inputStatements(db, pid, writes.inputWrites, actor, now),
       ...ruleStatements(db, pid, writes.ruleWrites, actor, now),
       ...pruneDirectPurchaseStatements(db, stored, writes.inputWrites, writes.ruleWrites, actor, now),

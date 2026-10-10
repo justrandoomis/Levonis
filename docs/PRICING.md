@@ -6,7 +6,10 @@ Unit tests pinning every rule: `tests/pricing.test.ts` (`npm run test:unit`).
 
 ## Currency model
 
-- **IQD is canonical** for every entered monetary value (integer dinars).
+- **IQD is canonical for final selling prices and accounting** (integer dinars).
+  Supplier pricing inputs retain their source currency; the engine converts
+  them through USD as described below. A supplier amount is not a recorded
+  purchase cost or an order's FIFO cost.
 - **The wallet's rate** is the admin setting `exchangeRate`, defined as
   **1 USD = X IQD** (1,400, DECISIONS row 6). It is the Levo Wallet's own
   rate — every wallet screen and operation — and nothing else. The
@@ -17,9 +20,12 @@ Unit tests pinning every rule: `tests/pricing.test.ts` (`npm run test:unit`).
   use `ceil(iqd × 100 / X)` (rounding up so the wallet never undercharges);
   cents→IQD displays use `floor(cents × X / 100)`. Formatting never changes
   stored values.
-- Changing the exchange rate changes **derived USD display only** — never
-  stored IQD prices and never existing orders (each order snapshots
-  `exchange_rate` at creation).
+- Changing the display currency changes presentation only. An approved **shop
+  market rate** also reprices adopted engine products for future sales; it does
+  not revalue existing orders, paid purchases or FIFO allocations. Each order
+  snapshots its wallet `exchange_rate` at creation. Changing the **wallet's
+  separate rate** affects subsequent wallet conversions and derived balance
+  displays, not stored cents or recorded transactions.
 
 ## Currency roles (FX programme, DECISIONS row 189)
 
@@ -30,7 +36,7 @@ currency one job. The wallet model above is unchanged.
 |---|---|---|
 | **USD** | The **pricing base**. A supplier cost entered in USD, EUR or CNY becomes one canonical current USD cost. | `packages/pricing/src/fxChain.ts` |
 | **EUR, CNY** | Supplier currencies only. Each stays in its source currency and is converted at today's rate whenever a price is computed. | `fx_rate_pairs` rows `EUR_USD`, `CNY_USD` |
-| **IQD** | The **accounting currency**: every price, order, lot, wallet figure and report. Inventory keeps the IQD actually paid and is never re-converted. | unchanged tables |
+| **IQD** | The **accounting currency**: final selling prices, orders, lots, earnings and reports. Inventory keeps the IQD actually paid and is never re-converted. Wallet balances retain their separate USD-cents storage described above. | unchanged tables |
 
 **The chain (the final rule, FX plan §36).** SOURCE (USD / EUR / CNY) →
 CANONICAL CURRENT USD → CURRENT IQD (× the effective USD/IQD) → final price

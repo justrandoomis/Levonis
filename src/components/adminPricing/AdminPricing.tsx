@@ -80,6 +80,9 @@ export default function AdminPricing() {
   const [list, setList] = useState<{ overview: PricingOverview; products: PricingProductSummary[]; truncated: boolean } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
+  // A successful rate act can reprice the catalogue within that request.
+  // Refresh both sibling views while keeping the current filter and scroll.
+  const refreshPrices = useCallback(() => setReload((n) => n + 1), []);
   const [productId, setProductId] = useState<string | null>(initialProduct);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
@@ -151,15 +154,14 @@ export default function AdminPricing() {
         <p className="max-w-[68ch] text-[14px] leading-relaxed text-text-muted">{s.subtitle}</p>
       </header>
 
-      {/* FX-1: the exchange and shipping rates come first — they are LIVE
-          (the shop's dollar rate, the calculator's rates); the preview banner
-          below speaks for the product prices, which nothing here changes. */}
-      {!productId && <RatesPanel lang={lang} dir={dir} />}
+      {/* Approved exchange and shipping rates refresh adopted product prices.
+          Manual products keep their prices until the owner applies a preview. */}
+      {!productId && <RatesPanel lang={lang} dir={dir} onChanged={refreshPrices} />}
 
       <PreviewBanner lang={lang} body={s.previewBody} />
 
       {/* Owner decision 8: the products whose new prices wait for one save (stale rates, complete but manual). */}
-      {!productId && <EngineSaveList lang={lang} />}
+      {!productId && <EngineSaveList lang={lang} reloadKey={reload} />}
 
       {productId ? (
         <ProductPricingSheet key={productId} id={productId} lang={lang} dir={dir} s={s} onBack={back} />

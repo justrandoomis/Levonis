@@ -112,13 +112,13 @@
  * ===========================================================================
  *
  * `Σ order_items.line_total_iqd = orders.subtotal_iqd` (worker/routes/orders
- * .ts:938) and that subtotal is GROSS: the order-level coupon, the points and
- * the membership saving are deducted after it, in their own columns. But
- * migrations 0074 and 0077 also froze, PER LINE, what the membership and the
- * coupon actually took off THAT line — precisely so a refund would not have to
- * prorate. This report uses those frozen per-line figures:
+ * .ts:938) and that subtotal precedes the order-level coupon, points and
+ * membership discounts applied at the LINE. A membership saving applied at
+ * the UNIT is already in the stored price. The per-line membership column
+ * records both kinds, so the frozen benefit snapshot's application site
+ * decides whether any further subtraction is due:
  *
- *   line revenue = line_total_iqd − coupon_discount_iqd − membership_discount_iqd
+ *   line revenue = line_total_iqd − coupon_discount_iqd − line-applied membership
  *
  * Accepted final-price changes (0140) are then allocated across the sale's
  * revenue-bearing lines in exact integer dinars. The product breakdown and
@@ -148,11 +148,12 @@
  *     EXPENSES the owner enters in the panel, so both sides meet in NET profit,
  *     never in a product's margin.
  *
- * THE MEMBERSHIP SAVING IS DIFFERENT, AND IS SUBTRACTED PER LINE. Checkout
+ * THE UNAPPLIED MEMBERSHIP SAVING IS SUBTRACTED PER LINE. Checkout
  * writes `order_items.membership_discount_iqd` from `benefits.byLine`, and
  * `orders.membership_discount_iqd` is the SUM of exactly those per-line values
- * — so subtracting both would take the same saving off twice. Only the line
- * column is read here.
+ * — so subtracting both would take the same saving off twice. The snapshot
+ * also prevents subtracting a unit-applied saving already in that line's
+ * price. Missing or ambiguous historical evidence keeps the legacy reading.
  *
  * ONLY LEVONIS'S OWN SALES. `orders.seller_type = 'levonis'` is part of the
  * recognition filter. A merchant-store order's goods are the MERCHANT's stock:
@@ -346,6 +347,7 @@ import { BAGHDAD_OFFSET_MS, addDays, dayOfWeek, dayParts, isDay } from './baghda
 // below. `financeLedger.ts` is a pure library of strings and validators, so
 // importing it keeps this module free of Hono and of `Env`.
 import { COST_BASIS, costConfidenceSql, costValueSql } from './financeLedger';
+import { membershipDiscountAtLineSql } from './orderMembership';
 
 // ---------------------------------------------------------------- constants
 
@@ -1009,11 +1011,12 @@ const isParentSql = (schema: SchemaFacts): string =>
 /**
  * The money one line is worth to the shop.
  *
- * `line_total_iqd` is GROSS of the order-level coupon, points and membership
+ * `line_total_iqd` is GROSS of the order-level coupon, points and line membership
  * (worker/routes/orders.ts:938 — `Σ line_total_iqd = orders.subtotal_iqd`), but
  * migrations 0074 and 0077 froze PER LINE what the membership and the coupon
- * actually took off THAT line, precisely so a refund would not have to prorate.
- * Subtracting those two frozen integers is exact — no division, no allocation —
+ * saved on THAT line. Unit-applied membership savings are already in its price;
+ * the frozen benefit snapshot distinguishes those from a remaining line discount.
+ * Subtracting the unapplied frozen integers is exact — no division, no allocation —
  * which is what lets the per-product column and the period total agree to the
  * dinar. `MAX(0, …)` because a discount larger than the line it sits on would
  * otherwise make revenue negative, and negative revenue on a sale is never the
@@ -1021,7 +1024,7 @@ const isParentSql = (schema: SchemaFacts): string =>
  */
 const NET_LINE_IQD = `MAX(0, COALESCE(i.line_total_iqd, 0)
                 - COALESCE(i.coupon_discount_iqd, 0)
-                - COALESCE(i.membership_discount_iqd, 0))`;
+                - (${membershipDiscountAtLineSql()}))`;
 
 /** SQLite promotes an overflowing integer product to REAL. Large legitimate
  * bulk orders must not lose dinars there. The common path uses integer SQL;
@@ -1109,7 +1112,7 @@ const adjustedNetLine = (schema: SchemaFacts): string => schema.hasPriceAdjustme
  */
 const NET_REFUND_IQD = `MAX(0, COALESCE(i.component_alloc_iqd, i.line_total_iqd, 0)
                   - COALESCE(i.coupon_discount_iqd, 0)
-                  - COALESCE(i.membership_discount_iqd, 0))`;
+                  - (${membershipDiscountAtLineSql()}))`;
 
 /** Legacy refunds have no frozen operational amount. Reverse the same adjusted
  * revenue they originally recognised, allocating a parent's change across its

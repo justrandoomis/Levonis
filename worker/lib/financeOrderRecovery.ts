@@ -2,6 +2,8 @@ import type { Env } from './types';
 import { baghdadDay, periodOpen } from './operations';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
 import { staffBasisFingerprintSql } from './financeParticipants';
+import { investorOrderProjectionStaleSql } from './investorFinance';
+import { membershipDiscountAtLineSql } from './orderMembership';
 
 // An internal checkpoint, deliberately absent from SETTING_KEYS and
 // PUBLIC_SETTING_KEYS. No customer or admin setting API exposes this value.
@@ -36,6 +38,10 @@ const candidate = `o.seller_type='levonis' AND o.status='delivered' AND o.delive
     OR (COALESCE((SELECT basis FROM finance_wage_targets t WHERE t.cost_id=c.id),CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.rule.basis') END) IN ('profit_percent','revenue_percent')
       AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')}))
       AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments a WHERE a.cost_id=c.id AND a.kind='manual'))))
+  OR (EXISTS(SELECT 1 FROM order_items mi WHERE mi.order_id=o.id AND mi.membership_discount_iqd>0
+    AND (${membershipDiscountAtLineSql('mi')})=0) AND (
+      NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')}))
+      OR ${investorOrderProjectionStaleSql('o.id')}))
   OR EXISTS(SELECT 1 FROM finance_posting_errors e WHERE e.order_id=o.id AND e.event_key IN (
     'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
 
@@ -62,8 +68,8 @@ export async function drainOrderFinanceRecovery(env: Env, opts: { maxOrders?: nu
   const report: OrderFinanceRecoveryReport = { schema_ready: false, locked: false, scanned: 0, completed: 0, pending: 0, failed: 0, errors: [] };
   const schema = await db.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN (
     'admin_settings','finance_order_costs','finance_wage_targets','finance_staff_basis','finance_cost_adjustments',
-    'finance_posting_errors','finance_wage_versions','lot_cost_adjustment_shares')`).first<{ n: number }>();
-  if (schema?.n !== 8) return report;
+    'finance_posting_errors','finance_wage_versions','lot_cost_adjustment_shares','investor_allocation_results')`).first<{ n: number }>();
+  if (schema?.n !== 9) return report;
   report.schema_ready = true;
   const initial: Checkpoint = { cursor: '', owner: null, lease_until: 0 };
   await db.prepare('INSERT INTO admin_settings(key,value) VALUES (?,?) ON CONFLICT(key) DO NOTHING').bind(CHECKPOINT, JSON.stringify(initial)).run();

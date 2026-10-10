@@ -57,6 +57,7 @@ import { restoreMovesForItem } from '../lib/orderInventory';
 import { planLotRestore } from '../lib/inventoryLots';
 import { operationsInstalled, baghdadDay } from '../lib/operations';
 import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
+import { calculateGoods, spread, type GoodsLine } from '../lib/orderProfit';
 import { validateInvestorReturnEvidence } from '../lib/investorFinance';
 import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
 import { mysteryRefusal } from '../lib/mystery/issues';
@@ -67,6 +68,7 @@ import { parseConditionDoc, returnRefusal } from '../lib/condition';
 import { channelOfLine } from '../lib/pricingEngine/orderBasis';
 import { claimBasis, engineCombosOf, engineObservations, takesUsdBaseRule, usdIqdInForceAt } from '../lib/pricingEngine/protectionBasis';
 import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/conditionProjection';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -640,15 +642,18 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       await returnedUnits(c.env.DB, kase, { serials: body.serials, unit_ids: body.unit_ids });
     }
   }
-  const flip = await c.env.DB.prepare(
+  const flipStatement = c.env.DB.prepare(
     `UPDATE return_cases SET state = ?, resolution = COALESCE(?, resolution),
         admin_note = CASE WHEN ? <> '' THEN ? ELSE admin_note END,
         decided_by = ?, decided_at = ?
       WHERE id = ? AND state = ?`
   )
-    .bind(to, resolution, reason, reason, admin.id, nowIso, id, from)
-    .run();
-  if (flip.meta.changes === 0) throw badRequest('This case changed while you were editing — reload and retry');
+    .bind(to, resolution, reason, reason, admin.id, nowIso, id, from);
+  const refundTransition = to === 'resolved' && resolution === 'refund';
+  if (!refundTransition) {
+    const flip = await flipStatement.run();
+    if (flip.meta.changes === 0) throw badRequest('This case changed while you were editing — reload and retry');
+  }
 
   let refundResult: Record<string, unknown> | null = null;
   let pointsResult: Record<string, unknown> | null = null;
@@ -658,19 +663,15 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   let restoredCost: number | null | undefined;
 
   if (to === 'resolved' && resolution === 'refund') {
-    const item = await c.env.DB.prepare(
-      `SELECT id, product_id, qty, unit_price_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot,
-              bundle_parent_item_id, component_value_iqd, component_alloc_iqd
-         FROM order_items WHERE id = ?`
-    )
-      .bind(kase.order_item_id)
-      .first<Record<string, unknown>>();
-    const order = await c.env.DB.prepare(
-      'SELECT id, user_id, subtotal_iqd, shipping_iqd, points_discount_iqd, coupon_snapshot, exchange_rate, gini_paid_iqd FROM orders WHERE id = ?'
-    )
-      .bind(kase.order_id)
-      .first<Record<string, unknown>>();
-    if (item && order) {
+    // Read immutable invoice rows, including bundle parents. The finance
+    // workspace's later cost/revenue edits never change customer refunds.
+    const { results: orderItems } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY id')
+      .bind(kase.order_id).all<GoodsLine>();
+    const item = orderItems.find((line) => line.id === kase.order_item_id);
+    const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id=?')
+      .bind(kase.order_id).first<Record<string, unknown>>();
+    if (!item || !order) throw notFound('Return invoice not found');
+    {
       // Refund the paid amount for the returned qty, net of this line's
       // proportional share of order-level discounts. Shipping is NOT
       // refunded (owner decision pending — row 8).
@@ -688,15 +689,71 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const storedAlloc = item.component_alloc_iqd === null || item.component_alloc_iqd === undefined
         ? null
         : Number(item.component_alloc_iqd) || 0;
-      const caseGross =
-        storedAlloc !== null
-          ? Math.floor((storedAlloc * kase.qty) / itemQty)
-          : (Number(item.unit_price_iqd) || 0) * kase.qty;
+      // Points reversal below retains its existing gross-merchandise basis.
+      const caseGross = storedAlloc !== null
+        ? Math.floor(storedAlloc * kase.qty / itemQty)
+        : (Number(item.unit_price_iqd) || 0) * kase.qty;
       const coupon = safeParse<{ discount_iqd?: number } | null>(order.coupon_snapshot as string | null, null);
       const discounts = (coupon ? Number(coupon.discount_iqd) || 0 : 0) + (Number(order.points_discount_iqd) || 0);
       const base = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
-      const alloc = base > 0 ? Math.floor((discounts * caseGross) / base) : 0;
-      const refundIqd = Math.max(0, caseGross - alloc);
+      // Unit-level savings are already inside the frozen price. The shared
+      // goods calculation subtracts only line-level membership savings and
+      // distributes a parent's savings over bundle components. Report-only
+      // finance adjustments never enter these immutable invoice rows.
+      const membershipBasis = calculateGoods({ ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 },
+        orderItems.map((line) => ({ ...line, coupon_discount_iqd: 0 })), []);
+      const acceptedBasis = calculateGoods(order, orderItems, []);
+      // Preserve the established coupon/points split including its shipping
+      // share, then apply the missing membership/accepted-price adjustments.
+      const fullRefunds = acceptedBasis.lines.map((line) => {
+        const gross = Number(line.component_alloc_iqd ?? (Number(line.unit_price_iqd) || 0) * line.qty);
+        const memberNet = membershipBasis.lines.find((v) => v.id === line.id)?.net_goods_iqd ?? gross;
+        const memberReduction = Math.max(0, gross - memberNet);
+        const discount = base > 0 ? Math.floor((discounts * gross) / base) : 0;
+        return Math.max(0, gross - discount - memberReduction + line.price_adjustment_iqd);
+      });
+      // A final-price cut can exhaust the goods and then reduce delivery.
+      // The old discount split must not resurrect goods that were fully cut,
+      // or refund more than the entire accepted invoice. Ordinary splits stay
+      // unchanged below this ceiling; any necessary cap is exact across lines.
+      const acceptedGoods = acceptedBasis.lines.reduce((sum, line) => sum + line.net_goods_iqd, 0);
+      const ceiling = acceptedGoods === 0 ? 0 : Math.max(0, Number(order.total_iqd) || 0);
+      const cappedRefunds = Number(order.price_adjustment_iqd) < 0 && fullRefunds.reduce((sum, value) => sum + value, 0) > ceiling
+        ? spread(ceiling, fullRefunds) : fullRefunds;
+      const fullRefund = cappedRefunds[acceptedBasis.lines.findIndex((line) => line.id === item.id)] ?? 0;
+      const ledgerDinars = await walletLedgerDinarsReady(c.env.DB);
+      const historicRate = Number(order.exchange_rate);
+      const oldCreditValue = Number.isSafeInteger(historicRate) && historicRate > 0
+        ? `CAST(w.amount * ${historicRate} / 100 AS INTEGER)` : 'NULL';
+      const priorAmount = `COALESCE(
+        (SELECT json_extract(a.detail,'$.refund.amount_iqd') FROM audit_log a
+          WHERE a.action='return.transition' AND a.target=r.id AND json_valid(a.detail)
+            AND json_extract(a.detail,'$.refund.amount_iqd') IS NOT NULL ORDER BY a.id DESC LIMIT 1),
+        (SELECT ${ledgerDinars ? `COALESCE(w.amount_iqd,${oldCreditValue})` : oldCreditValue}
+          FROM wallet_transactions w WHERE w.id='wtx_ret_'||r.id AND w.status='approved'))`;
+      const priorWhere = "r.order_item_id=? AND r.id<>? AND r.state='resolved' AND r.resolution='refund'";
+      const priorSql = `SELECT COALESCE(SUM(r.qty),0) qty,COALESCE(SUM(${priorAmount}),0) amount,COALESCE(SUM(CASE WHEN ${priorAmount} IS NULL THEN 1 ELSE 0 END),0) unknown
+        FROM return_cases r WHERE ${priorWhere}`;
+      const prior = (await c.env.DB.prepare(priorSql).bind(item.id, id).first<{ qty: number; amount: number; unknown: number }>())!;
+      if (prior.unknown > 0) throw badRequest(serverMessage('RETURN_REFUND_REVIEW_REQUIRED'), 'RETURN_REFUND_REVIEW_REQUIRED');
+      // Cumulative floors give the final returned unit the exact remainder.
+      // Existing recorded credits count towards the cap without being edited.
+      const endQty = Math.min(itemQty, prior.qty + kase.qty);
+      const refundIqd = Math.max(0, Math.min(fullRefund - prior.amount,
+        Math.floor(fullRefund * endQty / itemQty) - Math.floor(fullRefund * Math.min(itemQty, prior.qty) / itemQty)));
+      // Lots/returns predate ops_guards: the return table's own positive-qty
+      // CHECK supplies the transaction fence without a newer schema dependency.
+      // No row is inserted on success. A concurrent refund must replan while
+      // its case remains inspected, rather than spending this interval twice.
+      const refundFence = c.env.DB.prepare(`INSERT INTO return_cases
+        (id,order_id,order_item_id,user_id,qty,reason,state)
+        SELECT ?,?,?,?,-1,'defective','inspected' WHERE
+          NOT EXISTS(SELECT 1 FROM return_cases WHERE id=? AND state=?)
+          OR (SELECT qty FROM (${priorSql}))<>?
+          OR (SELECT amount FROM (${priorSql}))<>?
+          OR ?>?`)
+        .bind(newId('return_guard'), kase.order_id, item.id, kase.user_id, id, from,
+          item.id, id, prior.qty, item.id, id, prior.amount, prior.qty + kase.qty, itemQty);
 
       // WE MAY ONLY GIVE BACK MONEY WE ACTUALLY TOOK.
       //
@@ -730,45 +787,33 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       // the dinars are worth — and the dinars ride beside them at the rate
       // they were converted at, so the credit reads exactly `walletRefundIqd`.
       const cents = Math.floor((walletRefundIqd * 100) / rate);
+      // The wallet stores positive whole cents. Do not resolve a positive
+      // dinar refund that it cannot credit, or round it up into extra money.
+      if (walletRefundIqd > 0 && cents === 0) {
+        throw badRequest(serverMessage('RETURN_REFUND_REVIEW_REQUIRED'), 'RETURN_REFUND_REVIEW_REQUIRED');
+      }
 
-      let credited = false;
-      if (cents > 0) {
-        const ledgerDinars = await walletLedgerDinarsReady(c.env.DB);
-        try {
-          await walletCreditStatement(c.env.DB, ledgerDinars, {
-            id: `wtx_ret_${id}`,
-            userId: kase.user_id,
-            cents,
-            note: `Refund for approved return ${id} (order ${kase.order_id})`,
-            ref: kase.order_id,
-            nowIso,
-            amountIqd: walletRefundIqd,
-            rate,
-          }).run();
-          credited = true;
-          // `RefundCompleted` (03-EVENTS.md §3.11) — keyed on the same
-          // deterministic ledger id, so a redelivery is a replay everywhere.
-          if (eventsEnabled(c.env)) {
-            await emitFromRequest(
-              c,
-              RefundCompletedV1,
-              {
-                ref_type: 'return',
-                ref_id: id,
-                user_id: kase.user_id,
-                usd_cents: cents,
-                points: 0,
-                ledger_tx_ids: [`wtx_ret_${id}`],
-                event_key: `wtx_ret_${id}`,
-              },
-              { aggregateId: kase.user_id, actorId: admin.id }
-            );
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (!(msg.includes('UNIQUE') || msg.includes('PRIMARY KEY'))) throw e;
-          // already credited by a previous attempt — idempotent replay
+      const credit = cents > 0 ? walletCreditStatement(c.env.DB, ledgerDinars, {
+        id: `wtx_ret_${id}`, userId: kase.user_id, cents,
+        note: `Refund for approved return ${id} (order ${kase.order_id})`,
+        ref: kase.order_id, nowIso, amountIqd: walletRefundIqd, rate,
+      }) : null;
+      try {
+        await c.env.DB.batch([refundFence, flipStatement, ...(credit ? [credit] : [])]);
+      } catch (e) {
+        if (/CHECK constraint failed:\s*qty\s*>\s*0/.test(String(e))) {
+          throw badRequest(serverMessage('RETURN_RESOLUTION_RETRY'), 'RETURN_RESOLUTION_RETRY');
         }
+        throw e;
+      }
+      const credited = credit !== null;
+      // Stock, points and finance updates below retain their existing separate
+      // follow-up behavior. Only the case decision and wallet credit commit here.
+      if (credited && eventsEnabled(c.env)) {
+        await emitFromRequest(c, RefundCompletedV1, {
+          ref_type: 'return', ref_id: id, user_id: kase.user_id,
+          usd_cents: cents, points: 0, ledger_tx_ids: [`wtx_ret_${id}`], event_key: `wtx_ret_${id}`,
+        }, { aggregateId: kase.user_id, actorId: admin.id });
       }
       refundResult = {
         amount_iqd: refundIqd,

@@ -286,6 +286,16 @@ export const COST_REFUSALS = {
     en: 'This order cannot be re-opened: current stock does not cover its items. Update the stock or create a new order.',
     ckb: 'ناتوانرێت داواکارییەکە دووبارە بکرێتەوە: کۆگای ئێستا بەشی بەرهەمەکانی ناکات. کۆگا نوێ بکەرەوە یان داواکارییەکی نوێ دروست بکە.',
   },
+  RETURN_REFUND_REVIEW_REQUIRED: {
+    ar: 'يحتاج مبلغ الاسترداد إلى مراجعة مالية قبل تنفيذه. لم يُنفّذ أي استرداد جديد.',
+    en: 'This refund amount needs financial review before it can be applied. No new refund was made.',
+    ckb: 'ئەم بڕەی گەڕاندنەوەی پارە پێویستی بە پشکنینی دارایی هەیە پێش جێبەجێکردن. هیچ پارەیەکی نوێ نەگەڕێنرایەوە.',
+  },
+  MEMBERSHIP_SALE_REVIEW_REQUIRED: {
+    ar: 'قيد البيع القديم لا يطابق لقطة الطلب. راجعه قبل تسوية خصم العضوية.',
+    en: 'The original sale journal does not match the order snapshot. Review it before reconciling the membership discount.',
+    ckb: 'تۆماری فرۆشتنی کۆن لەگەڵ زانیارییە پاشەکەوتکراوەکانی داواکارییەکە ناگونجێت. پێش یەکلاکردنەوەی داشکاندنی ئەندامێتی بیپشکنە.',
+  },
   RETURN_RESOLUTION_RETRY: {
     ar: 'لم يُنفّذ أي جزء من الاسترداد. أعد المحاولة.',
     en: 'No part of the refund was applied. Try again.',
@@ -589,6 +599,11 @@ export const COST_REFUSALS = {
     ar: 'اسم الشراء أطول من 120 حرفًا.',
     en: 'The purchase name is longer than 120 characters.',
     ckb: 'ناوی کڕینەکە لە 120 پیت درێژترە.',
+  },
+  INCOMING_CHANGED: {
+    ar: 'تغيّر سجل الشراء أو الاستلام؛ حدّث الصفحة وراجع البيانات قبل إعادة المحاولة.',
+    en: 'The purchase or receipt changed; refresh the page and review it before trying again.',
+    ckb: 'تۆماری کڕین یان وەرگرتن گۆڕا؛ پەڕەکە نوێ بکەرەوە و پێش هەوڵدانەوە زانیارییەکان بپشکنە.',
   },
   PURCHASE_NAME_CHANGED: {
     ar: 'تغيّر اسم الشراء في مكان آخر؛ حدّث الصفحة وأعد المحاولة.',

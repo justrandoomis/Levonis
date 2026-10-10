@@ -69,7 +69,7 @@ test('FX-1: the exchange-rate panel is the tab’s first section, in its chunk; 
   assert.match(root, /import RatesPanel from '\.\/RatesPanel';/);
   const panel = root.indexOf('<RatesPanel');
   assert.ok(panel > 0 && panel < root.indexOf('<PreviewBanner') && panel < root.indexOf('<PricingProducts'), 'the rates panel is not the first section');
-  assert.match(root, /\{!productId && <RatesPanel lang=\{lang\} dir=\{dir\} \/>\}/);
+  assert.match(root, /\{!productId && <RatesPanel lang=\{lang\} dir=\{dir\}[^>]* \/>\}/);
   // Nothing outside the tab imports the panel or its cards.
   for (const file of srcFiles(join(ROOT, 'src'))) {
     if (file.startsWith(DIR)) continue;

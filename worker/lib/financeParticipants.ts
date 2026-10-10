@@ -3,6 +3,8 @@ import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { reconcileEffectiveWages } from './financeWageCalculation';
 import { investorProjectionStaleSql } from './investorFinance';
 import { getOrderProfitBase } from './orderProfit';
+import { withMembershipFinancialFingerprintSql } from './orderMembership';
+import { correctMembershipSale } from './membershipSaleCorrection';
 import { newId } from './crypto';
 import { badRequest, conflict, notFound } from './http';
 import { baghdadDay, fence, journalPlan, periodOpen } from './operations';
@@ -339,7 +341,8 @@ const wageBasisSql=`json_array(
  (SELECT json_group_array(json_array(id,employment_version,start_work_date)) FROM (SELECT DISTINCT s.id,s.employment_version,s.start_work_date FROM finance_staff s JOIN finance_order_costs ec ON ec.staff_id=s.id WHERE ec.order_id=? ORDER BY s.id)))`;
 export function staffBasisFingerprintSql(orderSql:string,includeLate=true) {
   const simple=wageBasisSql.replace(/\?/g,orderSql);
-  return includeLate?`json_array(${simple},(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=${orderSql}))`:simple;
+  const legacy=includeLate?`json_array(${simple},(SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=${orderSql}))`:simple;
+  return withMembershipFinancialFingerprintSql(legacy,orderSql);
 }
 /** Percentage wages and material costs follow corrected recognised revenue/COGS. Explicit per-order
  * staff amounts remain the owner's override; fixed service fees stay fixed. */
@@ -349,13 +352,22 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
   const hasLate=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lot_cost_adjustment_shares'").first();
   const basisSql=staffBasisFingerprintSql('?1',!!hasLate);
   const beforeBasis=(await db.prepare(`SELECT ${basisSql} AS value`).bind(orderId).first<{value:string}>())!.value;
+  if(beforeBasis.startsWith('["membership-unit-v1",'))await correctMembershipSale(db,orderId,opts.day??baghdadDay());
 
   const costs=(await db.prepare(`SELECT c.*,${effectiveStaffCostSql()} AS effective_iqd,${staffPaidSql()} AS paid_iqd,
     ${heldSourceSql("'staff'",'c.id')} AS held_iqd,
     EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id AND ca.kind='manual') AS manual_override
     FROM finance_order_costs c WHERE c.order_id=? AND c.state IN ('due','approved','pending_cost') ORDER BY c.order_item_id,c.id`)
     .bind(orderId).all<{id:string;order_item_id:string|null;rule_id:string;state:string;snapshot:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;manual_override:number;category_id:string;staff_id:string|null;rule_name:string;group_key:string;milestone:string}>()).results??[];
-  if(!costs.length)return {adjusted:temporal.adjusted};
+  if(!costs.length){
+    // An affected invoice without employees still needs one recovery pass for
+    // its native sale journal. Reuse the same financial-source checkpoint.
+    if(beforeBasis.startsWith('["membership-unit-v1",'))await db.batch([
+      ...fence(db,`${basisSql.replace(/\?1/g,'?2')}=?3`,[orderId,beforeBasis]),
+      db.prepare('INSERT INTO finance_staff_basis(order_id,basis_fingerprint,updated_at) VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET basis_fingerprint=excluded.basis_fingerprint,updated_at=excluded.updated_at WHERE basis_fingerprint<>excluded.basis_fingerprint').bind(orderId,beforeBasis,new Date().toISOString()),
+    ]);
+    return {adjusted:temporal.adjusted};
+  }
   const base=await getOrderProfitBase(db,orderId),day=opts.day??baghdadDay();
   const staffStarts=await employmentInstalled(db)?new Map(((await db.prepare('SELECT id,start_work_date FROM finance_staff').all<{id:string;start_work_date:string|null}>()).results??[]).map((s)=>[s.id,s])):new Map<string,{start_work_date:string|null}>();
   const frozen=await db.prepare('SELECT rules_json FROM finance_order_snapshots WHERE order_id=?').bind(orderId).first<{rules_json:string}>();

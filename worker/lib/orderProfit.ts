@@ -4,6 +4,7 @@ import { newId } from './crypto';
 import { describeOrderProfit, type ProfitCostReview } from './orderProfitReview';
 import type { OrderCostProjection, ProjectedOrderFinance } from './orderCostProjection';
 import { COST_BASIS, isConfirmedOrderCost, normalizeCostBasis } from './financeLedger';
+import { membershipDiscountAtLine } from './orderMembership';
 
 type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v ?? 0);
@@ -32,13 +33,13 @@ export function spread(total: number, weights: number[]): number[] {
 export function calculateGoods(order: Row, all: GoodsLine[], allocations: Allocation[]) {
   const parents = new Set(all.map((v) => v.bundle_parent_item_id).filter(Boolean));
   const items = all.filter((v) => !parents.has(v.id));
-  const net = items.map((v) => Math.max(0, n(v.component_alloc_iqd ?? v.line_total_iqd) - n(v.coupon_discount_iqd) - n(v.membership_discount_iqd)));
+  const net = items.map((v) => Math.max(0, n(v.component_alloc_iqd ?? v.line_total_iqd) - n(v.coupon_discount_iqd) - membershipDiscountAtLine(order, v)));
   for (const parentId of parents) {
     const parent = all.find((v) => v.id === parentId);
     if (!parent) continue;
     const indices = items.map((v, i) => v.bundle_parent_item_id === parentId ? i : -1).filter((i) => i >= 0);
     const total = indices.reduce((sum, i) => sum + net[i], 0);
-    const discount = Math.min(total, n(parent.coupon_discount_iqd) + n(parent.membership_discount_iqd));
+    const discount = Math.min(total, n(parent.coupon_discount_iqd) + membershipDiscountAtLine(order, parent));
     if (discount > 0 && indices.length) spread(discount, indices.map((i) => net[i])).forEach((v, j) => net[indices[j]] -= v);
   }
   const goods = net.reduce((a, b) => a + b, 0);
@@ -284,7 +285,8 @@ export async function profitSourceFingerprint(db:D1Database,orderId:string) {
   const present=(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('finance_cost_adjustments','lot_cost_adjustment_shares')").all<{name:string}>()).results??[];
   const has=new Set(present.map((r)=>r.name));
   const sql=`json_array(
-    (SELECT json_array(status,updated_at,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,due_on_delivery_iqd,gini_paid_iqd) FROM orders WHERE id=?1),
+    (SELECT json_array(status,updated_at,price_adjustment_iqd,shipping_iqd,cod_tax_iqd,due_on_delivery_iqd,gini_paid_iqd,points_discount_iqd,benefit_snapshot) FROM orders WHERE id=?1),
+    (SELECT json_group_array(json_array(id,product_id,qty,line_total_iqd,component_alloc_iqd,coupon_discount_iqd,membership_discount_iqd,membership_rule_id,cost_iqd,cost_basis)) FROM (SELECT * FROM order_items WHERE order_id=?1 ORDER BY id)),
     (SELECT json_group_array(json_array(id,qty,cogs_iqd,released_at)) FROM (SELECT * FROM order_item_inventory_allocations WHERE order_id=?1 ORDER BY id)),
     (SELECT json_group_array(json_array(case_id,refund_iqd,qty,disposition,cogs_iqd)) FROM (SELECT * FROM finance_refund_facts WHERE order_id=?1 ORDER BY case_id)),
     (SELECT json_group_array(json_array(r.id,r.state,r.resolution,r.qty,w.amount_iqd,(SELECT detail FROM audit_log a WHERE a.action='return.transition' AND a.target=r.id ORDER BY a.id DESC LIMIT 1))) FROM return_cases r LEFT JOIN wallet_transactions w ON w.id='wtx_ret_'||r.id WHERE r.order_id=?1),

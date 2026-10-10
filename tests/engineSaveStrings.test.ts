@@ -119,7 +119,7 @@ test('the purchase review: the prices an apply writes, the 15% tick, and no unse
 });
 
 test('the stale list sits on «التسعير والشحن» and in the rates panel; it previews before the bulk save', () => {
-  assert.match(src('src/components/adminPricing/AdminPricing.tsx'), /\{!productId && <EngineSaveList lang=\{lang\} \/>\}/);
+  assert.match(src('src/components/adminPricing/AdminPricing.tsx'), /\{!productId && <EngineSaveList lang=\{lang\}[^>]* \/>\}/);
   assert.match(src('src/components/adminPricing/RatesPanel.tsx'), /<EngineSaveList lang=\{lang\} compact reloadKey=\{ratesSeq\} \/>/);
   const list = src('src/components/adminPricing/EngineSaveList.tsx');
   assert.match(list, /previewSaveList\(firstBatch\(list\)\)/);

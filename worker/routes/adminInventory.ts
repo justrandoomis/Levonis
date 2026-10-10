@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
+import { requireAdmin, badRequest, conflict, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { audit } from '../lib/audit';
 import { projectForAdmin, canViewCost, canWriteCost, isUnverifiedOwner } from '../lib/adminScope';
 import { assertCostWrite, ownerEmailUnverified } from '../lib/costAccess';
@@ -498,9 +499,15 @@ adminInventoryRoutes.patch('/incoming/:id', async (c) => {
 
   if (sets.length === 0) return c.json({ success: true, changed: 0 });
   sets.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`);
-  await c.env.DB.prepare(`UPDATE incoming_inventory SET ${sets.join(', ')} WHERE id = ?`)
+  // A receipt may freeze the costs after the read above. The edit and its
+  // freeze check are one statement; paperwork-only edits remain permitted.
+  const mustBeUnreceived = ['qty_ordered', 'purchase_unit_iqd', 'shipping_total_iqd', 'internal_delivery_total_iqd']
+    .some(key => key in body) || body.status === 'cancelled';
+  const updated = await c.env.DB.prepare(`UPDATE incoming_inventory SET ${sets.join(', ')} WHERE id = ?${mustBeUnreceived ? ' AND qty_received = 0' : ''}`)
     .bind(...args, id)
     .run();
+  if (mustBeUnreceived && updated.meta.changes !== 1)
+    throw conflict(serverMessage('INCOMING_CHANGED'), 'INCOMING_CHANGED');
   await audit(c.env.DB, user.id, 'inventory.incoming_updated', id, { fields: sets.length - 1, frozen });
   return c.json({ success: true, changed: sets.length - 1 });
 });
@@ -578,15 +585,47 @@ adminInventoryRoutes.post('/incoming/:id/receive', async (c) => {
   // central snapshot exists for it. Without 0182 the lot INSERT is unchanged.
   const receivedAt = new Date().toISOString();
   const snapshots = await batchSnapshotInstalled(c.env.DB);
-  const plan = planReceive(c.env.DB, {
-    row,
-    qty,
-    receiptId,
+  // FIFO stores an integer unit cost. Split every component's remainder at
+  // its position in the full purchase, just as the procurement receipt does;
+  // rounding one average for the whole receipt loses or invents dinars when
+  // those units are sold. Partial receipts keep the same original positions.
+  const purchaseTotal = row.purchase_total_iqd ?? row.purchase_unit_iqd * row.qty_ordered;
+  const boundaries = [...new Set([
+    row.qty_received, row.qty_received + qty,
+    purchaseTotal % row.qty_ordered,
+    row.shipping_total_iqd! % row.qty_ordered,
+    row.internal_delivery_total_iqd! % row.qty_ordered,
+  ].filter(position => position >= row.qty_received && position <= row.qty_received + qty))].sort((a, b) => a - b);
+  const segments = boundaries.slice(0, -1).map((position, index) => planReceive(c.env.DB, {
+    row: { ...row, qty_received: position },
+    qty: boundaries[index + 1] - position,
+    // The first hard receipt INSERT anchors the entire atomic operation.
+    // Further segment IDs are independent of the caller's maximum-length ID.
+    receiptId: index === 0 ? receiptId : newId('irc'),
     lotId: newId('ilot'),
     actorUserId: user.id,
     receivedAt,
     snapshotOf: snapshots ? (cost) => legacyIncomingLotSnapshot(row, { unitCostIqd: cost.unitCostIqd, purchaseUnitIqd: cost.purchaseUnitIqd }, receivedAt) : null,
-  });
+  }));
+  // These fields define the historical cost and its remainder cursor. `IS`
+  // compares nullable source snapshots exactly. SELECT * also lets this work
+  // before optional purchase-total/snapshot columns have been installed.
+  const snapshotFields = [
+    'product_id', 'scope', 'scope_id', 'qty_ordered', 'qty_received', 'status',
+    'purchase_unit_iqd', 'purchase_total_iqd', 'shipping_total_iqd', 'internal_delivery_total_iqd',
+    'source_currency', 'source_unit_amount', 'exchange_rate_used', 'supplier_id', 'purchase_date',
+  ].filter(field => field in row) as (keyof IncomingRow)[];
+  const guard = c.env.DB.prepare(`UPDATE incoming_inventory SET qty_received = CASE WHEN
+    ${snapshotFields.map(field => `${field} IS ?`).join(' AND ')} THEN qty_received ELSE -1 END WHERE id = ?`)
+    .bind(...snapshotFields.map(field => row[field] ?? null), row.id);
+  const plan = {
+    // The existing nonnegative quantity CHECK is the atomic fence, including
+    // on old inventory schemas with no operations guard table.
+    statements: [guard, ...segments.flatMap(segment => segment.statements)],
+    lotId: segments[0].lotId,
+    cost: check.cost,
+    status: segments[segments.length - 1].status,
+  };
 
   /**
    * ONE BATCH. D1 runs it as a single transaction, so the lot, the receipt, the
@@ -612,6 +651,8 @@ adminInventoryRoutes.post('/incoming/:id/receive', async (c) => {
     if (landed) {
       return c.json({ success: true, already: true, message: 'تم استلام هذه الكمية بالفعل / Already received' });
     }
+    if (/CHECK constraint failed:\s*qty_received\s*>=\s*0\b/i.test(err instanceof Error ? err.message : String(err)))
+      throw conflict(serverMessage('INCOMING_CHANGED'), 'INCOMING_CHANGED');
     throw err;
   }
 

@@ -9,6 +9,7 @@ import { reconcileStaffOrderCosts } from './financeParticipants';
 import { recordFinancialFailure } from './financePostingErrors';
 import { wageVersions } from './financeWageTimeline';
 import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
+import { advanceCollectionsSql } from './membershipSaleCorrection';
 export { recordFinancialFailure } from './financePostingErrors';
 
 export interface CostRule {
@@ -72,11 +73,6 @@ export function costAmount(
   return value;
 }
 type RuleSnapshot = { line_id: string; product_id: string; rules: CostRule[] }[];
-// Classification is a journal fact, not the order's delivery status. A
-// delivered order may still be waiting for its sale journal to be posted.
-const advanceCollectionsSql = `SELECT COALESCE(SUM(l.credit_iqd-l.debit_iqd),0) FROM finance_collections c
-  JOIN accounting_entries e ON e.event_key='collection:'||c.id AND e.state='posted'
-  JOIN accounting_lines l ON l.entry_id=e.id AND l.account_code='2300' WHERE c.order_id=?`;
 export async function snapshotFor(
   db: D1Database,
   lines: Array<{ id: string; product_id: string | null }>,

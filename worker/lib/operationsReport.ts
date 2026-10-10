@@ -5,7 +5,17 @@ export async function operationsReport(db: D1Database, from: string, to: string)
   const days = (Date.parse(to) - Date.parse(from)) / 86400000;
   if (days < 0 || days > 365) throw badRequest('اختر فترة لا تتجاوز سنة');
   const workspace=await workspaceInstalled(db);
-  const costAdjustments=!!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments'").first();
+  // Keep one schema read while preserving the pre-0168 report. Supplier
+  // invoices round the complete quantity once; the display unit is not a
+  // reversible representation of that exact total.
+  const schema = await db.prepare(`SELECT
+    EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments') AS cost_adjustments,
+    EXISTS(SELECT 1 FROM pragma_table_info('incoming_inventory') WHERE name='purchase_total_iqd') AS exact_purchase_total`)
+    .first<{ cost_adjustments: number; exact_purchase_total: number }>();
+  const costAdjustments = !!schema?.cost_adjustments;
+  const purchaseTotal = schema?.exact_purchase_total
+    ? 'COALESCE(i.purchase_total_iqd,i.qty_ordered*i.purchase_unit_iqd)'
+    : 'i.qty_ordered*i.purchase_unit_iqd';
   const [orders, expenses, suppliers, wallets, centers, refunds] = await Promise.all([
     db
       .prepare(
@@ -48,7 +58,7 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       }>(),
     db
       .prepare(
-        `SELECT s.id,s.name,SUM(i.qty_ordered*i.purchase_unit_iqd+l.charges_iqd) AS ordered_total_iqd,SUM(i.qty_received) AS received_units,
+        `SELECT s.id,s.name,SUM(${purchaseTotal}+l.charges_iqd) AS ordered_total_iqd,SUM(i.qty_received) AS received_units,
       (SELECT COALESCE(SUM(pay.amount_iqd),0) FROM supplier_payments pay JOIN purchase_orders po ON po.id=pay.purchase_id WHERE po.supplier_id=s.id) AS paid_iqd,
       (SELECT COALESCE(SUM(al.credit_iqd-al.debit_iqd),0) FROM accounting_lines al JOIN accounting_entries ae ON ae.id=al.entry_id JOIN purchase_orders po ON po.id=ae.source_id WHERE ae.source_type='purchase' AND ae.state='posted' AND al.account_code='2000' AND po.supplier_id=s.id) AS payable_iqd,
       (SELECT COALESCE(SUM(al.debit_iqd-al.credit_iqd),0) FROM accounting_lines al JOIN accounting_entries ae ON ae.id=al.entry_id JOIN purchase_orders po ON po.id=ae.source_id WHERE ae.source_type='purchase' AND ae.state='posted' AND al.account_code='1300' AND po.supplier_id=s.id) AS prepaid_iqd

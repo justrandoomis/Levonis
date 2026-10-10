@@ -479,11 +479,9 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   const verification = codes.size ? { ok: false, mismatches: [], rows: [] } : verifyPlan(a.loaded, legacy, plan, a.ctx);
   if (!codes.size && !verification.ok) codes.add('RESOLVER_MISMATCH');
   const complete = codes.size === 0;
-  // A stock purchase can activate direct pricing before the ordinary preorder
-  // inputs are complete. Later rates still refresh that direct price without
-  // inventing or borrowing a preorder cost. A fully configured global save
-  // continues to preview and reprice all channels through the ordinary path.
-  if (!complete && !a.channel && mode === 'engine' && overlay) return evaluateEngineWrite({ ...a, channel: 'direct_sale' });
+  // The requested channel set is authoritative. Automatic stock repricing is
+  // scoped at entry above; an explicit all-channel owner review must report
+  // incomplete preorder inputs instead of silently saving a direct-only plan.
   const kind: EngineEvaluation['kind'] = mode === 'engine' ? 'reprice' : complete && a.allowAdopt !== false ? 'adopt' : null;
 
   // The six figures and the flags, per model × channel.

@@ -108,6 +108,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
   const managed=new Set(versions.map(v=>v.rule_id));if(!earningDay)return {adjusted:0,managed:new Set<string>()};
   const source=await profitSourceFingerprint(db,orderId);
   const statements:D1PreparedStatement[]=[],day=opts.day??baghdadDay(),now=new Date().toISOString();let adjusted=0;
+  const reservationTargets:Array<{cost_id:string;amount_iqd:number}>=[];
   for(const staff of employees){
     const targets=await planStaffWages(db,staff,base,versions.filter(v=>v.staff_id===staff.id));
     if(!targets.length)continue;
@@ -116,6 +117,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       const {cost,rule,amount}=target;
       const id=cost?.id??newId('oc'),liability='2100';
       if(cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)throw conflict('طلب سحب مفتوح يحتاج إعادة اعتماد قبل تخفيض الاستحقاق');
+      if(cost&&amount!==null)reservationTargets.push({cost_id:id,amount_iqd:amount});
       const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'retained_goods_less_verified_cogs'});
       if(!cost){
         const expense=amount!==null&&amount>0?newId('opex'):null;
@@ -146,9 +148,18 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
   }
   if(statements.length){
     if(adjusted)await periodOpen(db,day);
+    // A withdrawal can reserve a fixed wage after calculation, without changing
+    // the order fingerprint. Recheck every hold in this batch before any delta.
+    // Already-paid reductions remain valid debt when no withdrawal is open.
+    const reservationFence=reservationTargets.length?fence(db,`NOT EXISTS(SELECT 1 FROM (
+      SELECT json_extract(t.value,'$.amount_iqd') AS target,
+        (SELECT COALESCE(SUM(p.amount_iqd),0) FROM finance_payment_allocations p WHERE p.cost_id=json_extract(t.value,'$.cost_id')) AS paid,
+        (SELECT COALESCE(SUM(a.amount_iqd-a.paid_iqd),0) FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id
+          WHERE a.source_kind='staff' AND a.source_id=json_extract(t.value,'$.cost_id') AND w.state IN('requested','approved','part_paid')) AS held
+      FROM json_each(?) t) WHERE held>0 AND paid+held>target)`,[JSON.stringify(reservationTargets)]):[];
     // The fingerprint includes all financial inputs and previous adjustments.
     // A replay compares the already corrected amount and posts no second delta.
-    try{await db.batch([...fence(db,`${source.sql.replace(/\?1/g,'?2')}=?3`,[orderId,source.value]),...statements]);}
+    try{await db.batch([...fence(db,`${source.sql.replace(/\?1/g,'?2')}=?3`,[orderId,source.value]),...reservationFence,...statements]);}
     catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغيرت بيانات الأجر أثناء التسوية؛ أعد المحاولة');throw e;}
   }
   return {adjusted,managed};

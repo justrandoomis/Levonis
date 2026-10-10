@@ -417,7 +417,23 @@ export async function planLotConsumption(
       allocations.push(alloc);
 
       const idem = `alloc:${orderId}:${move.line_id}:${lot.id}`;
-      if(lot.cost_version!==undefined)statements.push(...fence(db,'COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',[lot.id,lot.cost_version]));
+      // Another order can consume this lot after planning while enough stock
+      // remains in a newer lot. A conditional no-op here would still let the
+      // stock deduction commit without its FIFO cost. Fail the whole batch so
+      // a retry reads the new queue; a shortfall already seen above stays valid.
+      if (lot.cost_version !== undefined) {
+        statements.push(...fence(db,
+          'EXISTS (SELECT 1 FROM inventory_lots WHERE id = ? AND qty_remaining >= ?) AND COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',
+          [lot.id, take, lot.id, lot.cost_version]));
+      } else {
+        // Lots predate ops_guards. Its own nonnegative-quantity CHECK is the
+        // transaction fence on that schema; this inserts nothing on success.
+        statements.push(db.prepare(`INSERT INTO inventory_lots
+          (id,scope,scope_id,qty_received,qty_remaining,cost_basis,received_at)
+          SELECT ?,'base','',1,-1,'opening_unpriced',''
+          WHERE NOT EXISTS (SELECT 1 FROM inventory_lots WHERE id=? AND qty_remaining>=?)`)
+          .bind(newId('lot_guard'), lot.id, take));
+      }
       statements.push(
         db
           .prepare(

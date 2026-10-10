@@ -1,4 +1,4 @@
-# Handoff — interrupted inventory and privacy work resumed (2026-10-10)
+# Handoff — inventory, privacy and connected financial systems (2026-10-11)
 
 Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
@@ -47,7 +47,46 @@ require a separate public selling-price policy.
 The prior USD pricing-save and product-data-file changes remain integrated
 (DECISIONS 212–214). `wip/*` branches are historical records, not work to land again.
 
-## Verification and release
+## Connected financial systems review
+
+The owner expanded the task to every connected price/cost field. DECISIONS 217
+and `FINANCIAL-INTEGRATION-AUDIT.md` map product inputs, FX/freight, procurement,
+FIFO, orders/refunds, finance, staff/investors, invoices and trade-in. The review
+also verifies the separate wallet, membership, print-quote and escrow boundaries.
+
+Confirmed fixes include all-channel refusal, IQD conversion rate/version fencing,
+FIFO concurrency, exact receipt remainders, receipt-versus-edit freezing, a
+withdrawal-versus-wage fence, shared frozen membership interpretation, correct
+refund/invoice/trade-in amounts, exact supplier totals and refreshed pricing lists.
+The two old-looking product fields were not removed: both retain active uses.
+
+Historical source rows, issued invoices and posted journals are not bulk rewritten.
+Corrected membership readings flow through ordinary append-only wage/investor
+reconciliation; unaffected persisted fingerprints stay unchanged. Refund decisions
+and wallet credits commit together; downstream stock/finance recovery retains its
+existing contract. Unknown prior refunds and positive refunds below one wallet
+cent require explicit review rather than a claimed credit that did not happen.
+Affected native sale journals also receive a single balanced correction when
+their original account vector proves the former double-discount calculation.
+The bounded recovery includes orders without employees or investors; unexplained
+old journals require review. Posted lines and actual collections remain intact.
+
+Workflow `38091210977` for `931ab683` was cancelled during check/unit tests while
+this broader review was completed. All live phases (steps 8–35) were skipped.
+No migration, deployment or other live write occurred in that cancelled run.
+
+Local release verification for this review passed: the complete `npm run check`,
+the frontend build (7/7 markers), 142 integration and affected finance/return
+compatibility tests (including all 50 new cross-system regressions), and 294
+privacy/bundle/theme/UI/refusal gates. The escaped-JSON native-journal regression
+also passed after independent review. Separate runs passed 160 wallet/membership/
+print/escrow boundary tests and 44 invoice-related tests. Migration replay passed
+179 files, 352 tables, zero foreign-key violations and zero new files on the
+second pass. All recorded final runs have zero unresolved failures. Workflow 7
+must still pass before claiming the site updated; its final release is recorded
+below after deployment.
+
+## Earlier implementation verification
 
 Implementation and independent adversarial review are complete. `npm run check`
 and `npm run build` pass. The final core run passed 289 tests (all cost suites,

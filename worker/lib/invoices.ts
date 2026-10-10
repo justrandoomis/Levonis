@@ -2,6 +2,7 @@ import type { Env } from './types';
 import { localeToApi, safeParse } from './types';
 import { newId } from './crypto';
 import { isStamped } from './emailStamp';
+import { membershipDiscountAtLine } from './orderMembership';
 import { enqueue, processOutbox } from './outbox';
 import {
   renderOrderInvoiceEmail,
@@ -49,6 +50,7 @@ interface OrderRow {
   cod_tax_exemption_iqd?: number | null;
   /** What the membership took off the merchandise on this order. */
   membership_discount_iqd?: number | null;
+  benefit_snapshot?: string | null;
   points_discount_iqd: number;
   /** Signed sum of customer-approved price adjustments (migration 0140). */
   price_adjustment_iqd?: number | null;
@@ -70,6 +72,8 @@ interface OrderRow {
 interface OrderItemRow {
   id: string;
   product_id: string | null;
+  membership_discount_iqd?: number | null;
+  membership_rule_id?: string | null;
   /** Set on a bundle COMPONENT row: the priced parent it belongs under. */
   bundle_parent_item_id?: string | null;
   name_snapshot: string;
@@ -270,7 +274,9 @@ async function loadOrderData(
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<OrderRow>();
   if (!order) return null;
   const { results: items } = await env.DB.prepare(
-    'SELECT id, product_id, name_snapshot, image_snapshot, option_snapshot, qty, unit_price_iqd, line_total_iqd, pricing_snapshot, warranty_snapshot, transport_snapshot, bundle_parent_item_id FROM order_items WHERE order_id = ?'
+    // Optional frozen benefit fields may be absent on an older schema. The
+    // snapshot builder below still projects only invoice data, never raw rows.
+    'SELECT * FROM order_items WHERE order_id = ?'
   )
     .bind(orderId)
     .all<OrderItemRow>();
@@ -285,6 +291,11 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
   const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
   const coupon = safeParse<{ code?: string; discount_iqd?: number } | null>(order.coupon_snapshot, null);
   const { paid, due, status } = paymentFacts(order);
+  // The displayed subtotal already contains unit-applied membership savings.
+  // Keep the recorded order saving intact; only unapplied line savings appear
+  // as another subtraction on a new invoice or an explicit invoice revision.
+  const embeddedSaving = items.reduce((sum, item) => sum + Math.max(0,
+    Number(item.membership_discount_iqd ?? 0) - membershipDiscountAtLine({ ...order }, { ...item })), 0);
   return {
     version: 1,
     order: {
@@ -309,7 +320,7 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
       cod_tax_iqd: Number(order.cod_tax_iqd) || 0,
       cod_tax_before_exemption_iqd: Number(order.cod_tax_before_exemption_iqd) || 0,
       cod_tax_exemption_iqd: Number(order.cod_tax_exemption_iqd) || 0,
-      membership_discount_iqd: Number(order.membership_discount_iqd) || 0,
+      membership_discount_iqd: Math.max(0, (Number(order.membership_discount_iqd) || 0) - embeddedSaving),
       delivery_waived: !!order.delivery_waived,
       coupon_code: coupon?.code || '',
       coupon_discount_iqd: coupon ? Number(coupon.discount_iqd) || 0 : 0,

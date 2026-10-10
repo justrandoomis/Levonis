@@ -236,3 +236,40 @@ while historical calculation is pending. It also refreshes on focus and browser
 history restoration, and retries after temporary read failures. Hidden tabs,
 in-flight reads, withdrawal forms and submissions pause refreshes. These are
 read-only balance requests; no new accrual or withdrawal is initiated by polling.
+
+### Frozen membership savings and financial revenue (2026-10-10)
+
+Checkout records the full membership saving in `membership_discount_iqd`.
+When the frozen `benefit_snapshot.lines` marks that saving as `applied_at:
+'unit'`, it is already included in the stored unit price and line total.
+Subtracting it again understates revenue. A saving marked `'line'` still
+needs one subtraction. The canonical goods calculation and the accounting
+report now share this distinction, using the frozen product/rule evidence.
+They retain the previous interpretation when that evidence is missing,
+malformed or contradictory; current membership rules never reprice an order.
+
+This corrects historical reads where the snapshot proves an embedded saving.
+It does not change stored orders, discount snapshots, already-issued invoices
+or existing journal entries, and it does not run a migration or bulk reposting.
+New invoices and explicit revisions display only the membership deduction
+that is not already embedded in their subtotal. A native
+sale journal already posted under the previous calculation remains part of
+the recorded history. If its entire receivable/advance/revenue/shipping vector
+exactly matches the former calculation, normal reconciliation appends one
+balanced `membership-sale:<order>` correction in the current open period.
+It neither collects cash nor rewrites the original journal. The existing bounded
+recovery also reaches affected orders without employees or investors. Unexplained
+old journals require review; concurrent corrections and replays cannot post twice.
+Ordinary later wage or investor reconciliation can use the corrected
+profit basis and append its usual adjustments in an open period, subject to
+the existing payment and withdrawal guards. Frozen membership evidence is
+included in the relevant source fingerprints so a concurrent change cannot
+commit a calculation made from a different source.
+
+`tests/financialIntegrationFinance.test.ts` covers the recorded IQD flow from
+sale and FIFO through collections, expenses, promotions, cost corrections and
+partial returns. It also checks embedded versus line membership savings,
+historical fallback, and that changes to current catalogue prices or exchange
+rates do not change recorded costs or post accounting entries.
+It also verifies native-journal parity, unchanged advances and collections,
+closed-period refusal, concurrent replay and subsequent actual refunds.

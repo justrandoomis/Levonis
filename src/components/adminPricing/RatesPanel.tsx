@@ -39,7 +39,7 @@ import { fxCount } from './format';
 import EngineSaveList from './EngineSaveList';
 import RatePreviewSheet, { type RateActRequest } from './RatePreview';
 
-export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' | 'ltr' }) {
+export default function RatesPanel({ lang, dir, onChanged }: { lang: Language; dir: 'rtl' | 'ltr'; onChanged?: () => void }) {
   const s = fxStrings(lang);
   const titleId = useId();
   const [data, setData] = useState<FxRatesAnswer | null>(null);
@@ -68,7 +68,8 @@ export default function RatesPanel({ lang, dir }: { lang: Language; dir: 'rtl' |
   const onAnswer = useCallback((answer: FxRatesAnswer) => {
     setData(answer);
     setRatesSeq((n) => n + 1);
-  }, []);
+    onChanged?.();
+  }, [onChanged]);
   const onStale = useCallback(() => setReload((n) => n + 1), []);
   const refresh = useFxAct({ lang, s, onAnswer, onStale });
 

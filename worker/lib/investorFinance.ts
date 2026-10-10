@@ -3,6 +3,7 @@ import { isConfirmedOrderCost } from './financeLedger';
 import { badRequest, conflict, notFound } from './http';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { getOrderProfitBase } from './orderProfit';
+import { withMembershipFinancialFingerprintSql } from './orderMembership';
 import { employmentInstalled, investorEmploymentPendingSql } from './financeEmployment';
 
 export type InvestmentContract = {
@@ -33,7 +34,7 @@ export async function planInvestorCapitalLoss(db:D1Database,contract:InvestmentC
   post.push(db.prepare('INSERT INTO investor_capital_losses(contract_id,amount_iqd,version) VALUES (?,?,?) ON CONFLICT(contract_id) DO UPDATE SET amount_iqd=excluded.amount_iqd,version=excluded.version').bind(contract.id,target,version));
   return{guards,post};
 }
-const fingerprintSql = `json_array(
+const legacyFingerprintSql = `json_array(
  (SELECT json_array(status,price_adjustment_iqd,due_on_delivery_iqd,gini_paid_iqd,shipping_iqd,cod_tax_iqd) FROM orders WHERE id=?1),
  (SELECT COALESCE(MAX(version),0) FROM finance_order_adjustments WHERE order_id=?1),
  (SELECT json_group_array(json_array(id,amount_iqd,state)) FROM (SELECT * FROM finance_order_costs WHERE order_id=?1 ORDER BY id)),
@@ -47,11 +48,17 @@ const fingerprintSql = `json_array(
  (SELECT json_group_array(json_array(id,field,delta_iqd)) FROM finance_workspace_postings WHERE order_id=?1),
  (SELECT json_group_array(json_array(s.adjustment_id,s.allocation_id,s.unit_delta_iqd)) FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=?1),
  (SELECT json_group_array(json_array(e.return_case_id,e.allocation_id,e.qty,r.state)) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE r.order_id=?1))`;
+const fingerprintSql = withMembershipFinancialFingerprintSql(legacyFingerprintSql,'?1');
 async function fingerprint(db: D1Database, orderId: string) { return (await db.prepare(`SELECT ${fingerprintSql} AS value`).bind(orderId).first<{ value: string }>())!.value; }
 /** Trusted SQL expressions only. Used inside payout's own transaction fence. */
 export function investorProjectionStaleSql(contractExpr='e.contract_id'){
   return `EXISTS(SELECT 1 FROM investor_allocation_results ip JOIN order_item_inventory_allocations ia ON ia.id=ip.allocation_id
     WHERE ip.contract_id=${contractExpr} AND (ip.pending=1 OR json_extract(ip.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g,'ia.order_id')})))`;
+}
+/** Order-scoped recovery must not replay other orders sharing a contract. */
+export function investorOrderProjectionStaleSql(orderExpr:string){
+  return `EXISTS(SELECT 1 FROM investor_allocation_results ip JOIN order_item_inventory_allocations ia ON ia.id=ip.allocation_id
+    WHERE ia.order_id=${orderExpr} AND (ip.pending=1 OR json_extract(ip.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g,'ia.order_id')})))`;
 }
 
 /** A mixed funded line needs evidence before money or stock can be refunded. */
