@@ -29,7 +29,7 @@ export interface EngineSaveProduct {
   adoption: EngineAdoption;
 }
 
-export default function EngineSaveSheet({ products, busy, error, onConfirm, onCancel, saveLabel, cancelLabel, note, extra }: {
+export default function EngineSaveSheet({ products, busy, error, onConfirm, onCancel, saveLabel, cancelLabel, intro, note, extra }: {
   products: readonly EngineSaveProduct[];
   busy: boolean;
   error: string;
@@ -39,6 +39,11 @@ export default function EngineSaveSheet({ products, busy, error, onConfirm, onCa
   saveLabel?: string;
   /** The cancel's words when cancelling loses nothing (the product form's data is already stored: «لاحقًا»). */
   cancelLabel?: string;
+  /**
+   * The sheet's first line in place of the held write's («this save completes the data … in the same
+   * step»): a caller whose data is ALREADY stored says so here, so the sheet never says both.
+   */
+  intro?: string;
   /** One line under the intro: what is already saved, and what the confirm adds. */
   note?: string;
   /** Beside the error line: the way out of it (a fresh sign-in). */
@@ -67,7 +72,7 @@ export default function EngineSaveSheet({ products, busy, error, onConfirm, onCa
       }
     >
       <div className="grid gap-3" data-engine-save-sheet>
-        <p className={`text-[13px] ${T.text2}`}>{adopting ? s.adoptIntro : s.repriceIntro}</p>
+        <p className={`text-[13px] ${T.text2}`} data-engine-save-intro>{intro ?? (adopting ? s.adoptIntro : s.repriceIntro)}</p>
         {note && <p className={`text-[13px] ${T.text2}`} data-engine-save-note>{note}</p>}
         {products.map((p) => {
           const notices = engineNotices(p.adoption, lang);

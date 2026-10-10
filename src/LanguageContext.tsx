@@ -213,3 +213,12 @@ export function useLanguage() {
   }
   return context;
 }
+
+/**
+ * The reader's language where a shared input may be drawn outside the provider
+ * (a test's static render, a widget mounted on its own): Arabic then, as the
+ * site's default — never a throw.
+ */
+export function useOptionalLanguage(): Language {
+  return useContext(LanguageContext)?.lang ?? 'ar';
+}

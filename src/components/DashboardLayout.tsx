@@ -32,6 +32,7 @@ import { useMotion } from '../lib/motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
+import { mayLeave } from '../lib/leaveGuard';
 import { useCommunityAccess } from '../pages/community/access';
 import { IconButton } from './ui/Button';
 
@@ -139,8 +140,14 @@ function readCollapsed(): boolean {
   }
 }
 
-export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTab, onTabChange, children, topbarSlot }: DashboardLayoutProps) {
+export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTab, onTabChange: changeTab, children, topbarSlot }: DashboardLayoutProps) {
   const { dir, lang } = useLanguage();
+  // Every way to another tab asks the open screen first when it holds unsaved work (lib/leaveGuard.ts):
+  // the sidebar, the phone drawer and the user menu alike.
+  const onTabChange = (id: string) => {
+    if (id !== activeTab && !mayLeave()) return;
+    changeTab(id);
+  };
   const t = STRINGS[lang] ?? STRINGS.ar;
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuth();
@@ -235,17 +242,22 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
    * (worker/lib/communityGate.ts): closing a browsing surface must not close
    * a business.
    */
+  // Leaving the dashboard altogether asks the open screen first too (lib/leaveGuard.ts).
+  const go = (to: string) => {
+    if (mayLeave()) navigate(to);
+  };
   const goToMyStore = () => {
     if (communityShut) {
-      navigate('/merchant');
+      go('/merchant');
     } else if (myStoreId) {
-      navigate(`/community/store/${myStoreId}`);
+      go(`/community/store/${myStoreId}`);
     } else {
-      navigate('/edit-profile');
+      go('/edit-profile');
     }
   };
 
   const handleLogout = async () => {
+    if (!mayLeave()) return;
     try {
       await logout();
     } finally {
@@ -280,7 +292,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
         <div className="px-3 py-4 flex items-center gap-2 min-w-0">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => go('/')}
             className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity text-start"
           >
             <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-snow">
@@ -423,7 +435,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                   out of the dashboard on one dropped request. */}
               {communityShut ? null : (
               <button
-                onClick={() => navigate('/community')}
+                onClick={() => go('/community')}
                 className="hover:text-text-primary transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 {dir === 'rtl' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
