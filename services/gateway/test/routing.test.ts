@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GONE_ROUTES, ROUTES, ROUTE_TARGETS, matchRoute, parseOverrides, phaseOf, resolve, targetFor } from '../src/routes';
-import { coreAllRoutes, coreMounts } from './_harness';
+import { coreAllRoutes, coreMounts, rootMountPaths } from './_harness';
 
 /**
  * The owner each mounted prefix ends up with. Written out per mount — not
@@ -119,13 +119,27 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/files': 'FILES',
   // 0180 (owner decision 2): serial format rules, the devices' own records.
   '/api/admin/serial-rules': 'DEVICES',
+  // DECISIONS row 206: «الأمان», the owner's security console, on the owner-only row the table already held for it.
+  '/api/admin/security': 'ADMIN',
 };
+
+/**
+ * The routers mounted at `/` (DECISIONS row 206: the deception layer's
+ * decoys). They claim no prefix, so each is named here and its paths are
+ * checked one by one (`rootMountPaths` reads them out of the core's registry):
+ * an `/api` path must reach the core at every phase, and every other path is
+ * §3.3's last row — never routed to the gateway, so no row may claim it.
+ */
+const ROOT_MOUNTS: readonly string[] = ['decoyRoutes'];
+const isApiPath = (path: string): boolean => path === '/api' || path.startsWith('/api/');
 
 test('every mount in worker/index.ts resolves to exactly one rule, with the owner this design records', () => {
   const mounts = coreMounts();
   assert.ok(mounts.length >= 45, `expected the core's full mount list, saw ${mounts.length}`);
   const unknown: string[] = [];
   for (const m of mounts) {
+    // A router at `/` claims no prefix: the test below checks each of its paths.
+    if (m.prefix === '/') continue;
     const rule = matchRoute(m.prefix, 'GET');
     assert.ok(rule, `${m.prefix} (${m.file}) resolves to no row in the routing table`);
     const expected = EXPECTED_OWNER[m.prefix];
@@ -140,9 +154,42 @@ test('every mount in worker/index.ts resolves to exactly one rule, with the owne
 
 test('at phase 1 every legacy mount is still served by CORE — the gateway is a transparent hop', () => {
   for (const m of coreMounts()) {
-    const r = resolve(m.prefix, 'GET', 1);
-    assert.ok(r, m.prefix);
-    assert.equal(r!.target, 'CORE', `${m.prefix} must still be CORE at phase 1`);
+    // A router at `/` reaches the gateway only through its /api paths.
+    for (const path of m.prefix === '/' ? rootMountPaths(m.router).filter(isApiPath) : [m.prefix]) {
+      const r = resolve(path, 'GET', 1);
+      assert.ok(r, path);
+      assert.equal(r!.target, 'CORE', `${path} must still be CORE at phase 1`);
+    }
+  }
+});
+
+test('a router mounted at / is checked path by path: its /api paths reach the core at every phase, open to all, and no row claims the rest', () => {
+  const roots = coreMounts().filter((m) => m.prefix === '/');
+  assert.deepEqual(
+    roots.map((m) => m.router).sort(),
+    [...ROOT_MOUNTS].sort(),
+    'a router mounted at / in worker/index.ts needs its registry in _harness.ts (rootMountPaths) and its name in ROOT_MOUNTS'
+  );
+  for (const m of roots) {
+    const paths = rootMountPaths(m.router);
+    assert.ok(paths.length >= 10, `${m.router} (${m.file}): its paths could not be read out of its registry (saw ${paths.length})`);
+    assert.ok(paths.some(isApiPath) && paths.some((p) => !isApiPath(p)), `${m.router}: expected both /api and site paths, saw ${paths.join(' ')}`);
+    for (const path of paths) {
+      for (const method of ['GET', 'HEAD', 'POST']) {
+        const rule = matchRoute(path, method);
+        if (!isApiPath(path)) {
+          // §3.3, last row: the gateway has no `/*` route, so a site path never reaches it.
+          assert.equal(rule, null, `${method} ${path} is a site path (01-TARGET.md §3.3, last row): no gateway row may claim it`);
+          continue;
+        }
+        assert.ok(rule, `${method} ${path} (${m.file}) resolves to no row in the routing table`);
+        // The decoy answers whoever asks: an edge refusal first would tell the asker it is not a real door.
+        assert.equal(rule!.requires, 'none', `${method} ${path}: the edge must not refuse it before the core answers`);
+        for (let phase = 1; phase <= 9; phase++) {
+          assert.equal(resolve(path, method, phase)!.target, 'CORE', `${method} ${path} must reach the core at phase ${phase}`);
+        }
+      }
+    }
   }
 });
 

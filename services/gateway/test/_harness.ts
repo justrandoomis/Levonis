@@ -40,6 +40,28 @@ export function coreMounts(src = readCore('worker/index.ts')): Mount[] {
   return out;
 }
 
+/**
+ * A router mounted at `/` claims no prefix: it answers a fixed list of paths
+ * that spans several (the deception layer's decoys, DECISIONS row 206 —
+ * `/.env`, `/.git/…`, `/api/internal/…`, `/api/v0/…`). Each such router is
+ * named here with the registry its paths are written in, and the paths are
+ * read out of that registry as text, like every other core fact this harness
+ * reads. A root-mounted router missing from this list reads as no path at all,
+ * which the parity test reports.
+ */
+const ROOT_MOUNT_REGISTRIES: Record<string, { file: string; block: RegExp }> = {
+  decoyRoutes: { file: 'worker/lib/deception/decoys.ts', block: /export const DECOYS\b[^=]*=\s*\{([\s\S]*?)\n\};/ },
+};
+
+/** Every path (an exact path, or a prefix ending in `/`) a router mounted at `/` answers; [] when it is not known here. */
+export function rootMountPaths(router: string): string[] {
+  const registry = ROOT_MOUNT_REGISTRIES[router];
+  if (!registry) return [];
+  const block = readCore(registry.file).match(registry.block);
+  if (!block) return [];
+  return [...block[1].matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
+}
+
 /** Every `app.all('<path>', …)` — the four permanent 410s. */
 export function coreAllRoutes(src = readCore('worker/index.ts')): string[] {
   return [...src.matchAll(/app\.all\(\s*'([^']+)'/g)].map((m) => m[1]);
