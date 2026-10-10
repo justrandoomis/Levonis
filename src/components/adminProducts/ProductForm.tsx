@@ -78,8 +78,11 @@ import {
 import PinnedPriceNotice from './PinnedPriceNotice';
 import DeliveryAvailabilityNotice from './DeliveryAvailabilityNotice';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
-// «تحديث البيانات» — its own lazy chunk too; only a saved product opens it.
-const SectionUpdateSheet = React.lazy(() => import('./form/SectionUpdateSheet'));
+// «تحديث البيانات» — the product data file, both ways (owner brief 2026-10-10):
+// its own lazy chunk too; only a saved product opens it. (The older
+// specs-only sheet, ./form/SectionUpdateSheet, stays for its routes' callers.)
+const DataFileSheet = React.lazy(() => import('./form/DataFileSheet'));
+import { DATA_FILE_STRINGS, pick as pickDataFileString } from './dataFileStrings';
 // Types only — no runtime import, so the sheet stays in its own lazy chunk.
 import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
@@ -2171,9 +2174,9 @@ export default function ProductForm({
               disabled={saving}
               onClick={() => setSectionUpdateOpen(true)}
               aria-haspopup="dialog"
-              title="تحديث المواصفات والمحتوى الإضافي من ملف"
+              title={pickDataFileString(DATA_FILE_STRINGS.updateDataTitle, lang)}
             >
-              <FileUp className="w-4 h-4" /> تحديث البيانات
+              <FileUp className="w-4 h-4" /> {pickDataFileString(DATA_FILE_STRINGS.title, lang)}
             </button>
           )}
           <button
@@ -2199,12 +2202,11 @@ export default function ProductForm({
 
       {sectionUpdateOpen && productId && (
         <React.Suspense fallback={null}>
-          <SectionUpdateSheet
+          <DataFileSheet
             productId={productId}
-            specs={tplGroups.flatMap((g) => g.fields.map((f) => ({ id: f.id, label_ar: f.label_ar, unit: f.unit })))}
             formDirty={dirty}
             onClose={() => setSectionUpdateOpen(false)}
-            onSaved={(note) => {
+            onApplied={(note) => {
               setFileUpdateNote(note);
               void reloadKeepingEdits(productId);
             }}

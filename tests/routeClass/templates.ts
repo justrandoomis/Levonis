@@ -49,6 +49,21 @@ export default {
             product_id: 'p_a1',
           }),
         },
+        // «ملف بيانات المنتج» (worker/routes/templateDataFile.ts): the owner's file carries the cost and
+        // the USD pricing block, every other admin's carries neither (tests/productDataFilePrivacy.test.ts).
+        'GET /data-export/:productId': 'op',
+        'GET /data-export': { cls: 'op', path: '/api/admin/template/data-export?ids=p_a1' },
+        'POST /data-preview': {
+          cls: 'op',
+          body: async (read: (p: string) => Promise<Record<string, unknown>>) => ({
+            product_id: 'p_a1',
+            text: (await read('/api/admin/template/data-export/p_a1')).text,
+          }),
+        },
+        'POST /data-apply': {
+          cls: 'op',
+          noBody: 'applies only the token a /data-preview of the same file returned (swept with a valid body above); the empty body is refused before a product is read, and tests/productDataFileRoundTrip.test.ts applies real files',
+        },
         'POST /parse-zip': {
           cls: 'op',
           noBody: 'a multipart ZIP upload, not JSON; the same parser as /parse (swept with a valid body above), refused here before the archive is read',

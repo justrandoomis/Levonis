@@ -50,6 +50,9 @@ const ImportPanel = React.lazy(() => import('./adminProducts/ImportPanel'));
 // The daily price change should never require opening the full product form,
 // so Quick Edit is one click from the row and loads only when it is asked for.
 const QuickPricePanel = React.lazy(() => import('./adminProducts/QuickPricePanel'));
+// «ملف بيانات المنتجات» — the page's products as one data file (25 a file),
+// attached back and compared field by field: only what changed is applied.
+const DataFileSheet = React.lazy(() => import('./adminProducts/form/DataFileSheet'));
 // The older TXT pipeline. Kept because it is genuinely used, demoted to a
 // second tab because §10 forbids it being the only option.
 
@@ -248,6 +251,7 @@ export default function AdminProducts() {
   });
   const [importOpen, setImportOpen] = useState(false);
   const [importDirty, setImportDirty] = useState(false);
+  const [dataFileOpen, setDataFileOpen] = useState(false);
   // Quick Edit: which product's price grid is open, and whether it holds cells
   // the admin has typed but not saved (the modal asks before discarding them).
   const [pricing, setPricing] = useState<{ id: string; name: string } | null>(null);
@@ -739,6 +743,11 @@ export default function AdminProducts() {
                     icon={<Download className="w-3.5 h-3.5" />}
                     label={loc('تصدير المنتجات (CSV)', 'Export products (CSV)', 'هەناردە (CSV)')}
                     onClick={() => { setHeaderMenu(false); setImportOpen(true); }}
+                  />
+                  <MenuItem
+                    icon={<FileDown className="w-3.5 h-3.5" />}
+                    label={loc('ملف بيانات المنتجات (تنزيل / إرفاق)', 'Products data file (download / attach)', 'فایلی زانیاریی بەرهەمەکان (داگرتن / هاوپێچ)')}
+                    onClick={() => { setHeaderMenu(false); setDataFileOpen(true); }}
                   />
                   <MenuItem
                     icon={<X className="w-3.5 h-3.5" />}
@@ -1271,6 +1280,16 @@ export default function AdminProducts() {
             )}
           </div>
         </Modal>
+      )}
+
+      {dataFileOpen && (
+        <Suspense fallback={null}>
+          <DataFileSheet
+            productIds={items.map((p) => p.id)}
+            onClose={() => setDataFileOpen(false)}
+            onApplied={() => reloadAll()}
+          />
+        </Suspense>
       )}
 
       {importOpen && (

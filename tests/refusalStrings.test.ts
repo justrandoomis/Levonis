@@ -226,6 +226,10 @@ test('every code the table translates is one the server can actually emit', () =
     // Owner decision 3 (row 193): a device that came back to Levonis cannot be
     // re-linked or claimed from its buyer's account (DEVICE_NOT_WITH_CUSTOMER).
     'worker/routes/devices.ts',
+    // «ملف بيانات المنتج» (row 204): the round trip's DATA_FILE_* refusals,
+    // rendered by code on the sheet (packages/contracts/src/dataFileRefusals.ts).
+    'worker/routes/templateDataFile.ts',
+    'worker/lib/productDataFile.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

@@ -734,6 +734,48 @@ const SCALAR_BY_KEY = new Map(SCALAR_FIELDS.map((s) => [s.key, s]));
 const GROUP_BY_NAME = new Map(GROUP_SPECS.map((g) => [g.name, g]));
 const HEADER_KEYS = new Set(['template_version', 'product_id', 'expected_updated_at', 'allow_slug_change', 'slug']);
 
+/** The spec family `spec.<id>`: free text, as the column stores it. */
+const SPEC_SHEET_FIELD: FieldSpec = { key: 'spec', type: 'text', required: false, nullable: true, group: 'specs', notes: '' };
+
+/**
+ * «ملف بيانات المنتج» (worker/lib/productDataFile.ts): the registry entry a
+ * FULL template key names — a scalar, `spec.<id>`, `group.N.field`,
+ * `spec_groups.N.rows.M.field`, `options.N.<cell>.field` or
+ * `options.N.<cell>.<list>.M.field` — or null for a key the format does not
+ * declare. Read-only over the registry; the parser keeps its own walk.
+ */
+export function fieldSpecAt(key: string): FieldSpec | null {
+  const scalar = SCALAR_BY_KEY.get(key);
+  if (scalar) return scalar;
+  if (/^spec\.[a-z0-9_]{1,80}$/.test(key)) return SPEC_SHEET_FIELD;
+  const gm = GROUP_KEY_RE.exec(key);
+  if (!gm) return null;
+  const g = GROUP_BY_NAME.get(gm[1]);
+  if (!g) return null;
+  const sub = gm[3];
+  const rm = ROW_KEY_RE.exec(sub);
+  if (rm && g.rowFields) return g.rowFields.find((r) => r.key === rm[2]) ?? null;
+  const cm = g.cellFields ? CELL_KEY_RE.exec(sub) : null;
+  const cell = cm ? g.cellFields?.[cm[1]] : undefined;
+  if (cm && cell) {
+    const lm = cell.list ? CELL_LIST_RE.exec(cm[2]) : null;
+    if (lm && cell.list && lm[1] === cell.list.name) return cell.list.fields.find((x) => x.key === lm[3]) ?? null;
+    return cell.fields.find((x) => x.key === cm[2]) ?? null;
+  }
+  return g.fields.find((x) => x.key === sub) ?? null;
+}
+
+/**
+ * One value checked exactly as the parser checks it (the same `coerce`), for
+ * a door that judges every field on its own: `null` when the value reads,
+ * else the parser's own sentence.
+ */
+export function checkFieldValue(spec: FieldSpec, raw: string, key: string): string | null {
+  const errors: TemplateError[] = [];
+  coerce(spec, raw, 0, key, errors);
+  return errors.length ? errors[0].message : null;
+}
+
 // ---------------------------------------------------------------- parse
 
 export interface TemplateError { line: number; key: string; message: string }
@@ -2041,7 +2083,7 @@ const iqd = (n: number): string => n.toLocaleString('en-US');
  * cannot disagree. Nothing is written to a value: these are comment lines the
  * parser skips, so annotating can never change what a re-import means.
  */
-function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> {
+export function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, string> {
   const out = new Map<string, string>();
   const money = opts.includeCost !== false;
   const options = orderedOptions(doc);
@@ -2492,6 +2534,20 @@ export interface ResolvedRefs {
  * round trip. Today that is the exact-combination table. */
 export interface TemplateMergeContext {
   variants?: LooseItem[];
+  /**
+   * «ملف بيانات المنتج» — PATCH MODE (worker/lib/productDataFile.ts). The
+   * text is a minimal patch the server wrote from the changed fields alone,
+   * not a file to re-import: a mentioned item keeps its stored position, an
+   * unmentioned one is untouched, a new one goes after the last, and only the
+   * ids named in `removals` are removed. Absent = the import semantics every
+   * other door has (merge by id, file order).
+   */
+  patch?: TemplatePatch;
+}
+
+export interface TemplatePatch {
+  /** group name → the merge keys (ids; methods for transports) to remove. */
+  removals?: Record<string, string[]>;
 }
 
 export interface ToDocResult {
@@ -2578,7 +2634,9 @@ function buildCells(
    *  (0075 / DECISION 1), because it is `options.N.stock` spelled differently
    *  and there is only one column. Optional so older callers still compile. */
   model?: LooseItem,
-  result?: ToDocResult
+  result?: ToDocResult,
+  /** Patch mode: a route the patch names is edited where it stands. */
+  patch = false
 ): LooseItem[] | undefined {
   if (!g.cellFields) return undefined;
   const parsedCells = it.cells;
@@ -2709,10 +2767,18 @@ function buildCells(
       // The unnamed routes, in the order they were stored, after the ones the
       // file spoke about — the same tail `buildRows` and `buildGroupItems`
       // give an item the template never mentioned.
-      for (const prev of prevList) {
-        if (!named.has(String(prev.method ?? ''))) out.push({ ...prev });
+      if (patch && !parsed.listCleared) {
+        // Patch mode: every route stays where it was stored; a new one goes last.
+        const edited = new Map(out.map((row) => [String(row.method ?? ''), row]));
+        const kept = storedList.map((prev) => edited.get(String(prev.method ?? '')) ?? { ...prev });
+        const fresh = out.filter((row) => !byMethod.has(String(row.method ?? '')));
+        cell[cellSpec.list.name] = [...kept, ...fresh];
+      } else {
+        for (const prev of prevList) {
+          if (!named.has(String(prev.method ?? ''))) out.push({ ...prev });
+        }
+        cell[cellSpec.list.name] = out;
       }
-      cell[cellSpec.list.name] = out;
       /**
        * AND THE PREVIEW SAYS SO. `cleared_fields` is the field that exists to
        * name what a file cleared, and a list clear left it empty — the one
@@ -2815,15 +2881,123 @@ function buildGroupItems(
   return templateItems.map((it, i) => buildFresh(it, i));
 }
 
+/**
+ * PATCH MODE (`TemplateMergeContext.patch`): the stored list, edited in place.
+ *
+ * `buildGroupItems` is an import's merge: it renumbers every mentioned item
+ * to its position in the FILE and moves the unmentioned ones after them, and a
+ * group whose items do not all carry ids replaces the whole group. A data-file
+ * patch names only the items whose fields changed, so that merge would reorder
+ * the product. Here each stored item keeps its place and its `order`, a named
+ * item takes only the fields the patch carries, a new item (the server gave it
+ * an id) goes after the last, and an item leaves only when its id is in
+ * `removals` — never because the patch did not mention it.
+ */
+function buildGroupItemsPatch(
+  g: GroupSpec,
+  templateItems: ParsedGroupItem[],
+  existingItems: LooseItem[],
+  result: ToDocResult,
+  patch: TemplatePatch
+): LooseItem[] {
+  const mk = g.mergeKey;
+  const keyOf = (it: ParsedGroupItem) => (typeof it.fields[mk]?.value === 'string' ? (it.fields[mk].value as string).trim() : '');
+  const removed = new Set(patch.removals?.[g.name] ?? []);
+  const named = new Map<string, ParsedGroupItem>();
+  for (const it of templateItems) {
+    const id = keyOf(it);
+    if (id) named.set(id, it);
+  }
+  const out: LooseItem[] = [];
+  const seen = new Set<string>();
+  let maxOrder = -1;
+  for (const ex of existingItems) {
+    if (typeof ex.order === 'number' && ex.order > maxOrder) maxOrder = ex.order;
+  }
+  for (const ex of existingItems) {
+    const id = String(ex[mk] ?? '');
+    if (removed.has(id)) {
+      result.cleared_fields.push(`${g.name}.${id}`);
+      continue;
+    }
+    const it = named.get(id);
+    if (!it) {
+      out.push(ex);
+      continue;
+    }
+    seen.add(id);
+    const item: LooseItem = { ...ex };
+    applyItemFields(item, g.fields, it.fields);
+    if (g.rowFields) item.rows = buildRows(g, it, (ex.rows as LooseItem[]) ?? [], result, true);
+    const cells = buildCells(g, it, (ex.fulfillments as LooseItem[]) ?? [], item, result, true);
+    if (cells) item.fulfillments = cells;
+    out.push(item);
+  }
+  for (const it of templateItems) {
+    const id = keyOf(it);
+    if (id && seen.has(id)) continue;
+    const item: LooseItem = { order: ++maxOrder };
+    applyItemFields(item, g.fields, it.fields);
+    if (g.idPrefix && (typeof item.id !== 'string' || !item.id)) item.id = newId(g.idPrefix);
+    for (const spec of g.fields) {
+      const sibling = spec.requiredUnless ? item[spec.requiredUnless] : undefined;
+      if (spec.requiredUnless && typeof sibling === 'string' && sibling.trim() !== '') continue;
+      const v = item[spec.key];
+      if (spec.required && (v === undefined || v === null || v === '')) {
+        result.needs_review.push({
+          key: `${g.name}.${it.index}.${spec.key}`, line: it.line, value: '',
+          message: `${spec.key} is required for every ${g.name} item`,
+        });
+      }
+    }
+    if (g.rowFields) item.rows = buildRows(g, it, null, result, true);
+    const cells = buildCells(g, it, null, item, result, true);
+    if (cells) item.fulfillments = cells;
+    out.push(item);
+  }
+  return out;
+}
+
 function buildRows(
   g: GroupSpec,
   templateItem: ParsedGroupItem,
   existingRows: LooseItem[] | null,
-  result: ToDocResult
+  result: ToDocResult,
+  /** Patch mode: stored rows keep their place; a new row (id given by the server) goes last. */
+  patch = false
 ): LooseItem[] {
   const rowSpecs = g.rowFields!;
   const tRows = templateItem.rows ?? [];
   if (tRows.length === 0) return existingRows ?? [];
+  if (patch) {
+    const byId = new Map(tRows.map((r) => [typeof r.fields.id?.value === 'string' ? (r.fields.id.value as string).trim() : '', r]));
+    const seen = new Set<string>();
+    let maxOrder = -1;
+    for (const ex of existingRows ?? []) if (typeof ex.order === 'number' && ex.order > maxOrder) maxOrder = ex.order;
+    const out: LooseItem[] = (existingRows ?? []).map((ex) => {
+      const r = byId.get(String(ex.id ?? ''));
+      if (!r) return ex;
+      seen.add(String(ex.id));
+      const row: LooseItem = { ...ex };
+      for (const spec of rowSpecs) {
+        const pf = r.fields[spec.key];
+        if (pf) applyItemField(row, spec, pf);
+      }
+      return row;
+    });
+    for (const r of tRows) {
+      const id = typeof r.fields.id?.value === 'string' ? (r.fields.id.value as string).trim() : '';
+      if (id && seen.has(id)) continue;
+      const row: LooseItem = { order: ++maxOrder };
+      for (const spec of rowSpecs) {
+        const pf = r.fields[spec.key];
+        if (pf) applyItemField(row, spec, pf);
+      }
+      if (typeof row.id !== 'string' || !row.id) row.id = newId('sr');
+      out.push(row);
+    }
+    return out;
+  }
 
   const buildFreshRow = (r: ParsedGroupItem, orderIndex: number): LooseItem => {
     const row: LooseItem = { order: orderIndex };
@@ -3379,12 +3553,21 @@ export function toDocBody(
       }
       continue;
     }
-    if (templateItems.length === 0) {
+    const patch = context.patch;
+    const removals = patch?.removals?.[g.name] ?? [];
+    if (templateItems.length === 0 && removals.length === 0) {
       if (existing) result.preserved_fields.push(g.name);
       continue;
     }
     const existingItems = existing ? (nested ? guideOf(body).steps : ((body[g.bodyKey] as LooseItem[]) ?? [])) : [];
-    const items = buildGroupItems(g, templateItems, existingItems, result);
+    const items = patch
+      ? buildGroupItemsPatch(g, templateItems, existingItems, result, patch)
+      : buildGroupItems(g, templateItems, existingItems, result);
+    if (patch) {
+      writeItems(items);
+      result.applied_fields.push(g.name);
+      continue;
+    }
     if (g.name === 'options') {
       templateItems.forEach((it, i) => {
         const built = items[i];

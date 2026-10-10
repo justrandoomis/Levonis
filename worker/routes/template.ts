@@ -93,6 +93,7 @@ import {
   type TemplateError,
   type ToDocResult,
   type TemplateMediaFetchIntent,
+  type TemplatePatch,
 } from '../lib/template';
 import { normalizeCheapestBase } from '../lib/cheapestBase';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
@@ -139,6 +140,7 @@ import {
   type RowIssue,
 } from '../lib/importCsv';
 import { csvToTemplateText, isSectionKey, sectionOnlyDoc, sectionTemplate, templateTextToCsv } from '../lib/sectionUpdate';
+import { registerDataFileRoutes } from './templateDataFile';
 
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
@@ -1388,7 +1390,7 @@ async function specSheetReport(db: D1Database, doc: ProductDoc, parsed: ParsedTe
   return report;
 }
 
-interface Analysis {
+export interface Analysis {
   parsed: ParsedTemplate;
   refs: ResolvedRefs;
   existing: ProductDoc | null;
@@ -1542,6 +1544,13 @@ async function analyzeTemplate(
     money: boolean;
     /** False for every admin but the owner: §29 is judged (`serializedWriteVerdict`). Absent = not judged. */
     owner?: boolean;
+    /**
+     * «ملف بيانات المنتج»: the text is the server's own minimal patch
+     * (worker/lib/productDataFile.ts) — merged in place (`TemplatePatch`) and
+     * never re-expressed as increases over the cheapest base: a patch writes
+     * the fields it names and nothing else.
+     */
+    patch?: TemplatePatch;
   } = { money: true }
 ): Promise<Analysis> {
   // §18 — the membership keys are lifted out FIRST, so the product parser
@@ -1577,6 +1586,7 @@ async function analyzeTemplate(
 
   const merge = toDocBody(parsed, a.existing, a.refs, {
     variants: a.existingView ? templateVariantsFromView(a.existingView) : [],
+    ...(opts.patch ? { patch: opts.patch } : {}),
   });
   a.merge = merge;
   const body = { ...merge.body };
@@ -1626,7 +1636,7 @@ async function analyzeTemplate(
      * document it refuses is not stored — the file is applied as written and
      * the preview says so.
      */
-    if (touchesPricingStructure(parsed)) {
+    if (!opts.patch && touchesPricingStructure(parsed)) {
       const norm = normalizeCheapestBase(validated, { money: opts.money });
       if (norm.changed.length > 0) {
         try {
@@ -3635,4 +3645,20 @@ templateRoutes.post('/parse-zip', async (c) => {
       limit: MAX_ZIP_FILES,
     },
   });
+});
+
+/**
+ * «ملف بيانات المنتج» — the round trip's doors (`/data-export`, `/data-preview`,
+ * `/data-apply`), registered here so they sit behind this router's
+ * `requireAdmin` and use its own internals by reference (./templateDataFile.ts).
+ */
+registerDataFileRoutes(templateRoutes, {
+  loadProductDocWithView,
+  exportOptsFor,
+  analyzeTemplate,
+  loadMembershipRules,
+  planTemplateMembership,
+  reattachTemplateMediaMetadata,
+  attachment,
+  contentDisposition,
 });
