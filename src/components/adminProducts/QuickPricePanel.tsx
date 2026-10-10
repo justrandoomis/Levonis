@@ -781,7 +781,7 @@ export default function QuickPricePanel({
 
   return (
     <div className="min-w-0" data-qp="panel" data-qp-store={data.product.store} onKeyDown={onKeyDown}>
-      <div className="mb-4 flex w-full items-center gap-1 rounded-xl border border-[var(--ap-border)] bg-[var(--ap-surface-2)] p-1 sm:w-fit" role="tablist" aria-label={t.title}>
+      <div className="mb-4 flex w-full items-center gap-1 rounded-xl border border-[var(--ap-border)] lv-well p-1 sm:w-fit" role="tablist" aria-label={t.title}>
         {TABS.map((x) => (
           <button
             key={x.id}
@@ -1432,12 +1432,13 @@ function CellEditor({
   return (
     <div className="min-w-0" data-qp-cell={key} data-qp-mode={mode} data-qp-dirty-cell={dirty ? '1' : '0'}>
       <div
-        className={`flex items-center h-8 rounded-[var(--ap-radius-md)] border bg-[var(--ap-surface-2)] transition-colors duration-150 focus-within:border-[var(--ap-accent)] focus-within:shadow-[0_0_0_3px_var(--ap-accent-soft)] ${
+        // A price cell is a well (clay): sunk behind the 3:1 field line.
+        className={`flex items-center h-8 rounded-[var(--ap-radius-md)] border lv-well transition-colors duration-150 focus-within:border-[var(--ap-accent)] focus-within:shadow-[0_0_0_3px_var(--ap-accent-soft)] ${
           bad
             ? 'border-[var(--ap-danger)]'
             : dirty
               ? 'border-[var(--ap-accent-border,var(--ap-border-hover))]'
-              : 'border-[var(--ap-border)]'
+              : 'border-[var(--clay-field)]'
         }`}
       >
         {canAdjust && (

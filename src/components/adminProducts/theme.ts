@@ -38,8 +38,9 @@ export const text1 = 'text-[var(--ap-text-1)]';
 export const text2 = 'text-[var(--ap-text-2)]';
 export const text3 = 'text-[var(--ap-text-3)]';
 
+/** Resting clay (`--clay-1` of the theme, through `--ap-shadow-1`), dented while pressed. */
 export const btnPrimary =
-  `${btnBase} ${btnText} h-9 px-3.5 text-white bg-[var(--ap-accent)] enabled:hover:bg-[var(--ap-accent-hover)] enabled:active:bg-[var(--ap-accent-active)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.14),0_1px_2px_rgb(0_0_0_/_0.35)]`;
+  `${btnBase} ${btnText} h-9 px-3.5 text-white bg-[var(--ap-accent)] enabled:hover:bg-[var(--ap-accent-hover)] enabled:active:bg-[var(--ap-accent-active)] shadow-[var(--ap-shadow-1)] active:shadow-press`;
 export const btnSecondary =
   `${btnBase} ${btnText} h-9 px-3 text-[var(--ap-text-1)] bg-[var(--ap-surface-2)] border border-[var(--ap-border-strong)] enabled:hover:bg-[var(--ap-surface-3)] enabled:hover:border-[var(--ap-border-hover)] enabled:active:bg-[var(--ap-surface-4)]`;
 const ghostColours =
@@ -69,8 +70,10 @@ export const chip =
 export const btnFilter =
   `${btnBase} ${btnText} h-10 px-3 text-[var(--ap-text-2)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:border-[var(--ap-border-hover)] enabled:active:bg-[var(--ap-surface-3)] aria-pressed:text-[var(--ap-accent-text)] aria-pressed:bg-[var(--ap-accent-soft)] aria-pressed:border-[var(--ap-accent-border)]`;
 
+/** A FIELD IS A WELL (clay): sunk into its card (`lv-well`) behind the 3:1
+    field line; no hover change. While focused, the accent line and halo say so. */
 const control =
-  'h-10 min-w-0 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)] text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors duration-150 hover:border-[var(--ap-border-hover)] focus:outline-none focus:border-[var(--ap-accent)] focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]';
+  'h-10 min-w-0 rounded-[var(--ap-radius-md)] lv-well border border-[var(--clay-field)] text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors duration-150 focus:outline-none focus:border-[var(--ap-accent)] focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]';
 export const input = `${control} text-[13px] px-3`;
 export const select = `${control} text-[13px] ap-select`;
 export const selectSm = `${control} text-[12px] ap-select`;
@@ -136,7 +139,7 @@ export const stickyActionsColumn = [
 ].join(' ');
 
 export const menuBox =
-  'w-56 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-3)] shadow-[var(--ap-shadow-menu)] overflow-hidden py-1';
+  'w-56 rounded-[var(--ap-radius-lg)] bg-[var(--ap-surface-3)] shadow-[var(--ap-shadow-menu)] overflow-hidden py-1';
 export const menu = `fixed z-[140] ${menuBox}`;
 /** Anchored under a trigger that sits at the inline-END of its row, so the
     panel grows back over the page instead of off the clipped content column. */
@@ -148,10 +151,11 @@ export const menuItem =
 export const menuItemDanger =
   `${menuItemBase} text-[var(--ap-danger)] enabled:hover:bg-[var(--ap-danger-bg)] enabled:active:bg-[var(--ap-danger-bg-hover)] focus-visible:bg-[var(--ap-danger-bg)]`;
 
-/** 36px track holding 32px segments, so it lines up with the selects' row. */
+/** 36px track holding 32px segments, so it lines up with the selects' row.
+    Clay: the track is a well, the chosen segment a lifted thumb (`shadow-1`). */
 export const segmented = {
-  base: 'inline-flex items-center h-9 p-0.5 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)]',
-  item: `inline-flex items-center justify-center h-8 w-8 rounded-[7px] text-[var(--ap-text-3)] transition-colors duration-150 enabled:hover:text-[var(--ap-text-2)] aria-pressed:text-[var(--ap-text-1)] aria-pressed:bg-[var(--ap-surface-4)] aria-pressed:shadow-[0_1px_2px_rgb(0_0_0_/_0.35)] ${focusInset}`,
+  base: 'inline-flex items-center h-9 p-0.5 rounded-[var(--ap-radius-md)] lv-well border border-[var(--ap-border)]',
+  item: `inline-flex items-center justify-center h-8 w-8 rounded-[var(--ap-radius-sm)] text-[var(--ap-text-3)] transition-colors duration-150 enabled:hover:text-[var(--ap-text-2)] aria-pressed:text-[var(--ap-text-1)] aria-pressed:bg-[var(--ap-surface-4)] aria-pressed:shadow-1 ${focusInset}`,
 };
 
 /** Page number (aria-current="page" lights the current one). */

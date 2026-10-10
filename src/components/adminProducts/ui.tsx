@@ -14,19 +14,25 @@ import type { TransStatus } from './types';
 
 export const ACCENT = '#6B46FF';
 
-export const inputCls =
-  'w-full min-h-10 bg-zinc-800/30 border border-zinc-700 rounded-lg px-2.5 py-2 text-[13px] text-white focus:border-iris focus:ring-1 focus:ring-iris/50 focus:outline-none transition-all';
+// A FIELD IS A WELL (clay, docs/DECISIONS.md row 207): the `lv-input` of the
+// app (well, 3:1 field line, the focus ring that keeps the well) at the 40px
+// admin floor and 13px text.
+const inputSize = 'w-full min-h-10 px-2.5 py-2 text-[13px]';
+export const inputCls = `lv-input ${inputSize}`;
 
 // Admin density: the owner reviewed the 44px scale on an iPad and asked for
 // smaller buttons and smaller text across the panel. Inputs keep the 40px
 // floor (the §12 suite asserts every input/select >= 40px); buttons drop to
-// 36px, which is still a comfortable tap target.
+// 36px, which is still a comfortable tap target. They are the clay buttons
+// of the app (`lv-button`: resting clay, a dent while pressed, the focus
+// ring, disabled and busy states) at that admin height; the primary keeps
+// the violet admin fill on the rim and base of a primary.
 export const btnPrimary =
-  'inline-flex items-center justify-center gap-1.5 min-h-9 bg-[#6B46FF] hover:bg-iris-deep text-snow text-[13px] px-3 py-1.5 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'lv-button lv-button-primary min-h-9 gap-1.5 px-3 py-1.5 text-[13px] bg-[#6B46FF] hover:bg-iris-deep text-snow';
 export const btnSecondary =
-  'inline-flex items-center justify-center gap-1.5 min-h-9 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[13px] px-3 py-1.5 rounded-lg font-bold transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed';
+  'lv-button lv-button-secondary min-h-9 gap-1.5 px-3 py-1.5 text-[13px]';
 export const btnGhostDanger =
-  'p-2 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors';
+  'p-2 text-text-muted hover:text-danger hover:bg-danger/10 active:bg-[var(--clay-well-bg)] active:shadow-press rounded-md transition-colors';
 
 /** Arabic-first field label with a small English secondary. */
 /**
@@ -89,19 +95,20 @@ export function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl overflow-hidden mb-3 shadow-lg">
+    // One clay card per section; its header row is flat (a divider, no fill of its own).
+    <div className="lv-surface overflow-hidden mb-3">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-2.5 sm:px-3 py-2 bg-zinc-800/20 border-b border-zinc-800/50 flex items-center justify-between gap-3 text-start min-h-10"
+        className={`w-full px-2.5 sm:px-3 py-2 flex items-center justify-between gap-3 text-start min-h-10 hover:bg-white/[0.04] transition-colors ${open ? 'border-b border-border-subtle' : ''}`}
       >
-        <span className="font-bold text-white text-[13px] min-w-0">
-          {ar} <span className="text-[10px] font-medium text-zinc-500 mx-1">{en}</span>
+        <span className="font-bold text-text-primary text-[13px] min-w-0">
+          {ar} <span className="text-[10px] font-medium text-text-muted mx-1">{en}</span>
         </span>
         <span className="flex items-center gap-2 shrink-0">
           {badge}
-          {open ? <ChevronUp className="w-5 h-5 text-zinc-400" /> : <ChevronDown className="w-5 h-5 text-zinc-400" />}
+          {open ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
         </span>
       </button>
       {open && <div className="p-3 sm:p-4">{children}</div>}
@@ -132,6 +139,7 @@ export function SignedIqd({
 }) {
   return (
     <input
+      className={`lv-input ${inputSize} disabled:opacity-50`}
       type="number"
       inputMode="numeric"
       step={1}
@@ -144,7 +152,6 @@ export function SignedIqd({
         const n = Math.trunc(Number(raw));
         if (Number.isFinite(n)) onChange(n);
       }}
-      className={inputCls + ' disabled:opacity-50'}
       dir="ltr"
     />
   );
@@ -163,6 +170,7 @@ export function NullableIqd({
 }) {
   return (
     <input
+      className={`lv-input ${inputSize} disabled:opacity-50`}
       type="number"
       inputMode="numeric"
       min={0}
@@ -176,7 +184,6 @@ export function NullableIqd({
         const n = Math.floor(Number(raw));
         if (Number.isFinite(n) && n >= 0) onChange(n);
       }}
-      className={inputCls + ' disabled:opacity-50'}
       dir="ltr"
     />
   );
@@ -192,6 +199,7 @@ export function RequiredIqd({
 }) {
   return (
     <input
+      className={`lv-input ${inputSize}`}
       type="number"
       inputMode="numeric"
       min={0}
@@ -201,7 +209,6 @@ export function RequiredIqd({
         const n = Math.floor(Number(e.target.value));
         onChange(Number.isFinite(n) && n >= 0 ? n : 0);
       }}
-      className={inputCls}
       dir="ltr"
     />
   );
@@ -247,11 +254,12 @@ export function TriText({
   );
 }
 
+// Status is information: a flat, opaque chip (`lv-chip`, AA on any ground) — the StatusChip tones.
 const TRANS_STATUS_STYLE: Record<TransStatus, string> = {
-  approved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-  imported: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-  stale: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-  missing: 'bg-zinc-700/30 text-zinc-500 border-zinc-600/40',
+  approved: 'lv-chip [--chip:var(--color-success)]',
+  imported: 'lv-chip [--chip:var(--color-info)]',
+  stale: 'lv-chip [--chip:var(--color-warning)]',
+  missing: 'bg-white/[0.06] text-text-secondary',
 };
 const TRANS_STATUS_AR: Record<TransStatus, string> = {
   approved: 'معتمدة',
@@ -263,7 +271,7 @@ const TRANS_STATUS_AR: Record<TransStatus, string> = {
 /** Translation status chip (from translation_meta). */
 export function TransChip({ status }: { status: TransStatus }) {
   return (
-    <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${TRANS_STATUS_STYLE[status]}`}>
+    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${TRANS_STATUS_STYLE[status]}`}>
       {TRANS_STATUS_AR[status]} · {status}
     </span>
   );
@@ -272,13 +280,13 @@ export function TransChip({ status }: { status: TransStatus }) {
 /** Product status chip (list + editor). */
 export function StatusChip({ status }: { status: string }) {
   const map: Record<string, { ar: string; cls: string }> = {
-    active: { ar: 'نشط', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-    hidden: { ar: 'مخفي', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-    draft: { ar: 'مسودة', cls: 'bg-zinc-700/40 text-zinc-400 border-zinc-600/40' },
+    active: { ar: 'نشط', cls: 'lv-chip [--chip:var(--color-success)]' },
+    hidden: { ar: 'مخفي', cls: 'lv-chip [--chip:var(--color-warning)]' },
+    draft: { ar: 'مسودة', cls: 'bg-white/[0.06] text-text-secondary' },
   };
   const m = map[status] ?? map.draft;
   return (
-    <span className={`inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${m.cls}`}>
+    <span className={`inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${m.cls}`}>
       {m.ar} · {status}
     </span>
   );
@@ -294,11 +302,11 @@ export function RowControls({
   return (
     <div className="flex items-center gap-1 shrink-0">
       <button type="button" disabled={upDisabled} onClick={onUp}
-        className="p-2.5 text-zinc-400 hover:text-white disabled:opacity-30 hover:bg-zinc-800 rounded-lg transition-colors" title="Move up / تحريك لأعلى">
+        className="p-2.5 text-text-secondary hover:text-text-primary disabled:opacity-30 hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press rounded-md transition-colors" title="Move up / تحريك لأعلى">
         <ChevronUp className="w-5 h-5" />
       </button>
       <button type="button" disabled={downDisabled} onClick={onDown}
-        className="p-2.5 text-zinc-400 hover:text-white disabled:opacity-30 hover:bg-zinc-800 rounded-lg transition-colors" title="Move down / تحريك لأسفل">
+        className="p-2.5 text-text-secondary hover:text-text-primary disabled:opacity-30 hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press rounded-md transition-colors" title="Move down / تحريك لأسفل">
         <ChevronDown className="w-5 h-5" />
       </button>
       <button type="button" onClick={onRemove} className={btnGhostDanger} title="Remove / حذف">
@@ -318,8 +326,8 @@ export function ActiveToggle({ value, onChange, arOn = 'مفعّل', arOff = 'م
       onClick={() => onChange(!value)}
       className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
         value
-          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-          : 'bg-zinc-800 text-zinc-500 border-zinc-700'
+          ? 'lv-chip [--chip:var(--color-success)] border-transparent'
+          : 'bg-surface-raised text-text-muted border-border-subtle'
       }`}
     >
       {value ? `${arOn} · on` : `${arOff} · off`}
@@ -546,7 +554,7 @@ export function Modal({
         // on-screen keyboard; min-w-0 keeps wide tables from pushing the panel.
         style={{ maxHeight: Math.max(240, viewport.height - 24) }}
         className={`${workspace ? 'ap-quick-workspace sm:max-w-[1180px]' : wide ? 'sm:max-w-5xl' : 'sm:max-w-2xl'}
-          bg-[var(--ap-surface-1)] border border-[var(--ap-border-strong)] rounded-t-[24px] sm:rounded-[24px]
+          bg-[var(--ap-surface-1)] border border-[var(--ap-border-strong)] rounded-t-3xl sm:rounded-2xl
           w-full min-w-0 overflow-hidden flex flex-col shadow-2xl outline-none`}
       >
         <div className="px-4 sm:px-5 py-3.5 border-b border-[var(--ap-hairline)] flex items-center justify-between gap-3 shrink-0 bg-[var(--ap-surface-1)]">
@@ -588,7 +596,8 @@ export function Modal({
 
         {footer && (
           <div
-            className="shrink-0 border-t border-zinc-800 bg-zinc-900 px-3 sm:px-4 py-3"
+            // Flat, on the material of the dialog: a slab carries one shadow, so its footer is a divider.
+            className="shrink-0 border-t border-[var(--ap-hairline)] bg-[var(--ap-surface-1)] px-3 sm:px-4 py-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
             {footer}
@@ -606,7 +615,7 @@ export function Modal({
 export function ErrorBanner({ text }: { text: string | null }) {
   if (!text) return null;
   return (
-    <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 mb-4 text-sm font-medium">
+    <div className="lv-alert lv-alert-danger text-danger mb-4 text-sm font-medium">
       {text}
     </div>
   );

@@ -33,6 +33,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
 import { useCommunityAccess } from '../pages/community/access';
+import { IconButton } from './ui/Button';
 
 interface SidebarItem {
   id: string;
@@ -266,10 +267,13 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
     // h-dvh (not h-screen): on iPad Safari the browser chrome makes 100vh
     // taller than the visible area, which is what pushed the bottom of the
     // content column — and any footer inside it — off screen.
-    <div className="flex h-dvh w-full bg-zinc-900 overflow-hidden font-sans" dir={dir}>
+    // No fill of its own: the canvas of the shell and its workbench light
+    // (`.lv-canvas`, App.tsx) show through, so a clay card reads one step up.
+    <div className="flex h-dvh w-full overflow-hidden font-sans" dir={dir}>
       {/* ------------------------------------------------ desktop sidebar */}
+      {/* Lifted clay (shadow-lg is --clay-2: y-only, the same in RTL and LTR). */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 bg-black text-zinc-300 shadow-lg z-20 border-e border-zinc-800 transition-[width] duration-200 ${
+        className={`hidden lg:flex flex-col shrink-0 bg-surface text-text-secondary shadow-lg z-20 border-e border-border-subtle transition-[width] duration-200 ${
           collapsed ? 'w-[4.5rem]' : 'w-[13.5rem] xl:w-[15.5rem]'
         }`}
       >
@@ -279,11 +283,11 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             onClick={() => navigate('/')}
             className="flex items-center gap-2 min-w-0 flex-1 hover:opacity-80 transition-opacity text-start"
           >
-            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-snow shadow-lg">
+            <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-snow">
               L
             </span>
             {!collapsed && (
-              <span className="font-bold text-xs tracking-widest uppercase border border-zinc-700 px-2 py-1 rounded-lg text-white truncate">
+              <span className="font-bold text-xs tracking-widest uppercase border border-border-subtle px-2 py-1 rounded-full text-text-primary truncate">
                 {title}
               </span>
             )}
@@ -293,23 +297,23 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             onClick={toggleCollapsed}
             title={collapsed ? t.expand : t.collapse}
             aria-label={collapsed ? t.expand : t.collapse}
-            className="shrink-0 p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="shrink-0 p-2 rounded-full text-text-muted hover:text-text-primary hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press transition-colors"
           >
             <CollapseIcon className="w-4 h-4" />
           </button>
         </div>
 
         {!collapsed && (
-          <div className="px-4 pb-1 text-[10px] font-bold text-zinc-500 tracking-widest uppercase">
+          <div className="px-4 pb-1 text-[10px] font-bold text-text-muted tracking-widest uppercase">
             {t.mainMenu}
           </div>
         )}
 
         <nav className="flex-1 min-h-0 px-2 py-2 space-y-3 overflow-y-auto">
           {navSections.map((section, sectionIndex) => (
-            <div key={section.id} className={sectionIndex > 0 && collapsed ? 'border-t border-zinc-800/70 pt-3' : ''}>
+            <div key={section.id} className={sectionIndex > 0 && collapsed ? 'border-t border-border-subtle pt-3' : ''}>
               {!collapsed && section.label && (
-                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600">
+                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-text-muted">
                   {section.label}
                 </p>
               )}
@@ -321,23 +325,33 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                     onClick={() => onTabChange(item.id)}
                     title={collapsed ? item.label : undefined}
                     aria-current={activeTab === item.id ? 'page' : undefined}
-                    className={`w-full flex items-center gap-3 min-h-11 rounded-xl transition-colors font-medium text-start ${
+                    // CLAY (docs/DECISIONS.md row 209): the current item is a
+                    // DIMPLE pressed into the sidebar — the well fill and the
+                    // press shadow — and the gold start bar is its one
+                    // secondary cue. No weight swap (a Sorani label would
+                    // reflow). `data-clay-dimple` lets forced colours, which
+                    // drop every shadow, outline it instead.
+                    data-clay-dimple={activeTab === item.id || undefined}
+                    className={`relative w-full flex items-center gap-3 min-h-11 rounded-lg transition-colors font-medium text-start ${
                       collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
                     } ${
                       activeTab === item.id
-                        ? 'bg-[#708238] text-snow'
-                        : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                        ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary'
+                        : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
                     }`}
                   >
+                    {activeTab === item.id && (
+                      <span aria-hidden="true" className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-gold" />
+                    )}
                     <span className="relative shrink-0">
                       <item.icon className="w-5 h-5 shrink-0" />
                       {collapsed && !!item.badge && (
-                        <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-zinc-900" aria-hidden="true" />
+                        <span className="absolute -top-1 -end-1 h-2.5 w-2.5 rounded-full bg-sky-400 ring-2 ring-surface" aria-hidden="true" />
                       )}
                     </span>
                     {!collapsed && <span className="text-[13px] truncate min-w-0">{item.label}</span>}
                     {!!item.badge && (
-                      <span className={`${collapsed ? 'sr-only' : 'ms-auto shrink-0 min-w-5 rounded-full bg-sky-500/20 px-1.5 text-center text-[11px] font-bold tabular-nums text-sky-300'}`}>
+                      <span className={`${collapsed ? 'sr-only' : 'ms-auto shrink-0 min-w-5 rounded-full lv-chip [--chip:var(--color-info)] px-1.5 text-center text-[11px] font-bold tabular-nums'}`}>
                         {item.badge}
                       </span>
                     )}
@@ -353,13 +367,14 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
             type="button"
             onClick={goToMyStore}
             title={myStoreId ? t.viewPage : t.setupPage}
-            className={`w-full rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 shadow-lg flex flex-col items-center justify-center group hover:border-gilt transition-all ${
+            // A clay button you can press (resting, a dent while held), not a gradient tile.
+            className={`w-full lv-button lv-button-secondary flex-col h-auto ${
               collapsed ? 'p-2.5' : 'p-4'
             }`}
           >
-            <User className={`text-gilt group-hover:scale-110 transition-transform ${collapsed ? 'w-5 h-5' : 'w-8 h-8 mb-2'}`} />
+            <User className={`text-gilt ${collapsed ? 'w-5 h-5' : 'w-8 h-8 mb-2'}`} />
             {!collapsed && (
-              <span className="text-[11px] font-bold text-white text-center leading-snug">
+              <span className="text-[11px] font-bold text-text-primary text-center leading-snug">
                 {myStoreId ? t.viewPage : t.setupPage}
               </span>
             )}
@@ -383,16 +398,17 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
       {/* ---------------------------------------------------- content column */}
       {/* `relative` with NO z-index: a z-index here would open a stacking
           context and trap every dialog rendered inside the page. */}
-      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative bg-zinc-900">
-        {/* Topbar — above the sidebar so its dropdowns are never clipped by it. */}
-        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-zinc-900 border-b border-zinc-800/50">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative">
+        {/* Topbar — above the sidebar so its dropdowns are never clipped by it.
+            Flat on the canvas: a hairline under it, no fill of its own. */}
+        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full border-b border-border-subtle">
           <button
             ref={drawerButtonRef}
             data-action="open-sidebar"
             onClick={() => setShowMobileSidebar(true)}
             aria-label={t.openMenu}
             aria-expanded={showMobileSidebar}
-            className="lg:hidden p-2 min-h-11 min-w-11 flex items-center justify-center bg-zinc-800 rounded-xl text-zinc-300 hover:text-white transition-colors shrink-0"
+            className="lg:hidden lv-button lv-button-secondary min-w-11 px-0 rounded-full shrink-0"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -400,7 +416,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           {topbarSlot ? (
             <div id="dash-topbar-slot" className="flex-1 min-w-0 flex items-center gap-3 sm:gap-5" />
           ) : (
-            <div className="hidden lg:flex items-center gap-6 text-[13px] font-semibold text-zinc-400 min-w-0">
+            <div className="hidden lg:flex items-center gap-6 text-[13px] font-semibold text-text-secondary min-w-0">
               {/* Dropped while the server says Levo Community is shut
                   (worker/lib/communityGate.ts). Presentation only; an unknown
                   or failed answer keeps the link rather than removing a way
@@ -408,19 +424,19 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
               {communityShut ? null : (
               <button
                 onClick={() => navigate('/community')}
-                className="hover:text-white transition-colors flex items-center gap-2 whitespace-nowrap"
+                className="hover:text-text-primary transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 {dir === 'rtl' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
                 {t.community}
               </button>
               )}
-              <span className="text-white font-bold border-b-2 border-gilt py-1 whitespace-nowrap">
+              <span className="text-text-primary font-bold border-b-2 border-gilt py-1 whitespace-nowrap">
                 {t.dashboard}
               </span>
             </div>
           )}
 
-          <div className="flex items-center gap-2 sm:gap-4 ms-auto text-zinc-400 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 ms-auto text-text-secondary shrink-0">
             {/* «اللغة والمظهر» — the same globe and sheet as the home header
                 (src/components/LangThemeSheet.tsx). */}
             <LangThemeButton variant="dash" />
@@ -431,14 +447,14 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowNotifications(!showNotifications)}
                 aria-label={t.notifications}
                 aria-expanded={showNotifications}
-                className="hover:text-gilt transition-colors min-h-11 px-1 flex items-center"
+                className="hover:text-text-primary transition-colors min-h-11 px-1 flex items-center"
               >
                 <Bell className="w-5 h-5 stroke-[2]" />
               </button>
               {showNotifications && (
-                <div className="absolute top-11 end-0 w-64 max-w-[80vw] bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-1.5 z-50">
-                  <div className="px-3 py-2 border-b border-zinc-800 font-bold text-white text-sm">{t.notifications}</div>
-                  <div className="px-3 py-5 text-center text-sm text-zinc-500">{t.noNotifications}</div>
+                <div className="absolute top-11 end-0 w-64 max-w-[80vw] bg-surface-raised border border-border-subtle rounded-lg shadow-lg py-1.5 z-50">
+                  <div className="px-3 py-2 border-b border-border-subtle font-bold text-text-primary text-sm">{t.notifications}</div>
+                  <div className="px-3 py-5 text-center text-sm text-text-muted">{t.noNotifications}</div>
                 </div>
               )}
             </div>
@@ -449,22 +465,22 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 aria-label={t.myStore}
                 aria-expanded={showUserMenu}
-                className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden shadow-sm border border-zinc-600 hover:border-gilt transition-colors"
+                className="w-9 h-9 rounded-full bg-surface flex items-center justify-center overflow-hidden shadow-xs border border-border-subtle active:shadow-press transition-colors"
               >
-                <User className="w-5 h-5 text-zinc-400" />
+                <User className="w-5 h-5 text-text-secondary" />
               </button>
               {showUserMenu && (
-                <div className="absolute top-11 end-0 w-48 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl py-1.5 z-50">
-                  <button onClick={() => { setShowUserMenu(false); goToMyStore(); }} className="w-full text-start px-3 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
+                <div className="absolute top-11 end-0 w-48 bg-surface-raised border border-border-subtle rounded-lg shadow-lg py-1.5 z-50">
+                  <button onClick={() => { setShowUserMenu(false); goToMyStore(); }} className="w-full text-start px-3 py-2.5 text-sm hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] text-text-secondary flex items-center gap-2">
                     <User className="w-4 h-4" /> {t.myStore}
                   </button>
                   {settingsTabId && (
-                    <button onClick={() => { setShowUserMenu(false); onTabChange(settingsTabId); }} className="w-full text-start px-3 py-2.5 text-sm hover:bg-zinc-800 text-zinc-300 flex items-center gap-2">
+                    <button onClick={() => { setShowUserMenu(false); onTabChange(settingsTabId); }} className="w-full text-start px-3 py-2.5 text-sm hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] text-text-secondary flex items-center gap-2">
                       <SettingsIcon className="w-4 h-4" /> {t.settings}
                     </button>
                   )}
-                  <div className="h-px bg-zinc-800 my-1" />
-                  <button onClick={handleLogout} className="w-full text-start px-3 py-2.5 text-sm hover:bg-zinc-800 text-red-400 flex items-center gap-2">
+                  <div className="h-px bg-border-subtle my-1" />
+                  <button onClick={handleLogout} className="w-full text-start px-3 py-2.5 text-sm hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] text-red-400 flex items-center gap-2">
                     <LogOut className="w-4 h-4" /> {t.logout}
                   </button>
                 </div>
@@ -585,7 +601,7 @@ function MobileDrawer({
         animate={{ x: 0 }}
         exit={{ x: m.travel(m.inline(-288)) }}
         transition={m.spring('sheet')}
-        className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-black text-zinc-300 flex flex-col border-e border-zinc-800 shadow-2xl p-4"
+        className="absolute inset-y-0 start-0 w-72 max-w-[85%] bg-surface-raised text-text-secondary flex flex-col border-e border-border-subtle shadow-2xl p-4"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-between gap-2 mb-4 shrink-0">
@@ -593,22 +609,16 @@ function MobileDrawer({
             <span className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-[#708238] to-[#9fae63] flex items-center justify-center font-bold text-base text-snow">
               L
             </span>
-            <span className="font-bold text-sm uppercase text-white truncate">{title}</span>
+            <span className="font-bold text-sm uppercase text-text-primary truncate">{title}</span>
           </div>
-          <button
-            onClick={onClose}
-            aria-label={closeLabel}
-            className="p-2 min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <IconButton label={closeLabel} icon={<X className="w-5 h-5" />} onClick={onClose} />
         </div>
 
         <nav className="flex-1 min-h-0 space-y-4 overflow-y-auto">
           {sidebarSections(items).map((section) => (
             <div key={section.id}>
               {section.label && (
-                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-600">
+                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-text-muted">
                   {section.label}
                 </p>
               )}
@@ -619,14 +629,21 @@ function MobileDrawer({
                     data-tab={item.id}
                     onClick={() => onSelect(item.id)}
                     aria-current={activeTab === item.id ? 'page' : undefined}
-                    className={`w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-xl font-medium transition-colors text-start ${
-                      activeTab === item.id ? 'bg-[#708238] text-snow' : 'text-zinc-400 hover:bg-zinc-800'
+                    // The same dimple as the desktop sidebar.
+                    data-clay-dimple={activeTab === item.id || undefined}
+                    className={`relative w-full flex items-center gap-3 min-h-11 px-3 py-2.5 rounded-lg font-medium transition-colors text-start ${
+                      activeTab === item.id
+                        ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary'
+                        : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
                     }`}
                   >
+                    {activeTab === item.id && (
+                      <span aria-hidden="true" className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-gold" />
+                    )}
                     <item.icon className="w-5 h-5 shrink-0" />
                     <span className="text-sm truncate min-w-0">{item.label}</span>
                     {!!item.badge && (
-                      <span className="ms-auto shrink-0 min-w-5 rounded-full bg-sky-500/20 px-1.5 text-center text-[11px] font-bold tabular-nums text-sky-300">
+                      <span className="ms-auto shrink-0 min-w-5 rounded-full lv-chip [--chip:var(--color-info)] px-1.5 text-center text-[11px] font-bold tabular-nums">
                         {item.badge}
                       </span>
                     )}

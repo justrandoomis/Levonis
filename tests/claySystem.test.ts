@@ -323,28 +323,25 @@ test('solid clay, not glass: no backdrop blur, no filter glow, no hand-written s
   // A backdrop filter re-filters every frame anything beneath it moves — on the
   // mid-range Android phones most customers use, the most expensive pixel on screen.
   assert.deepEqual(hits(/backdrop-blur[\w[\]/.-]*|backdropFilter/g), [], 'a surface still blurs what is behind it');
-  // The stylesheets a customer downloads carry none either. The three operations
-  // sheets (admin-only, outside the public budget) are their own phase.
-  const operations = ['src/components/financeWorkspace/finance-workspace.css', 'src/components/financePeople/people.css', 'src/components/adminInventory/inventory-workspace.css'];
+  // The stylesheets a customer downloads carry none either — and, since the
+  // admin push (Phase 3.5a), neither do the three operations sheets.
   const sheets = (readdirSync(join(ROOT, 'src'), { recursive: true }) as string[])
     .filter((f) => f.endsWith('.css'))
-    .map((f) => `src/${f.split('\\').join('/')}`)
-    .filter((f) => !operations.includes(f));
+    .map((f) => `src/${f.split('\\').join('/')}`);
   assert.ok(sheets.includes('src/index.css') && sheets.includes('src/components/storefront/theme.css'), 'the stylesheet walk missed the main sheets');
+  assert.ok(sheets.includes('src/components/financeWorkspace/finance-workspace.css'), 'the stylesheet walk missed the operations sheets');
   for (const f of sheets) assert.doesNotMatch(stripCssComments(read(f)), /backdrop-filter/, `${f} still blurs what is behind a surface`);
   // A glow is a radial gradient (a background or a mask), never a filter raster.
   assert.deepEqual(hits(/\bblur-\[[^\]]*\]/g), [], 'a filter glow (blur-[…]) is back');
   // A shadow colour belongs to the theme's clay primitives (warm ink on cream,
   // black in dark), never to a class: a hand-written rgb() is black on cream.
   // `drop-shadow-[…]` is a filter on a glyph, not an elevation, and is not counted.
-  // The named keepers are not elevations either (build plan §6, Funding A):
-  //  - the scanner's viewfinder surround, a 200vmax scrim over a camera feed;
-  //  - the `.ap` controls' hairline and pressed drop, which the admin push
-  //    (Phase 3.5) moves onto `--ap-shadow-*`. Any new site fails here.
+  // The named keeper is not an elevation either (build plan §6, Funding A):
+  // the scanner's viewfinder surround, a 200vmax scrim over a camera feed.
+  // (The `.ap` controls' hairline and pressed drop moved onto `--ap-shadow-1`
+  // and `shadow-1` in the admin push, Phase 3.5a.) Any new site fails here.
   const keepers = new Set([
     'src/components/scanner/BarcodeScanner.tsx: shadow-[0_0_0_200vmax_rgb(0_0_0_/_0.42)]',
-    'src/components/adminProducts/theme.ts: shadow-[inset_0_1px_0_rgb(255_255_255_/_0.14),0_1px_2px_rgb(0_0_0_/_0.35)]',
-    'src/components/adminProducts/theme.ts: shadow-[0_1px_2px_rgb(0_0_0_/_0.35)]',
   ]);
   const rgbShadows = hits(/(?<![\w-])shadow-\[[^\]\s'"`]*rgba?\([^\]\s'"`]*\]/g);
   assert.deepEqual(rgbShadows.filter((h) => !keepers.has(h)), [], 'a shadow colour is hard-coded in a class');

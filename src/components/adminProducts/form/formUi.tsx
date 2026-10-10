@@ -25,28 +25,35 @@ import SafeImage from '../../ui/SafeImage';
 import { MissingNote, useMissing, useMissingId } from '../completeness';
 import type { CompletenessItemCode } from '../../../../packages/contracts/src/productCompleteness';
 
-/** 40px control (the §12 floor), 13px text, never wider than its track. */
-export const field =
-  'w-full min-w-0 h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white ' +
-  'placeholder:text-zinc-600 focus:border-iris focus:ring-1 focus:ring-iris/50 focus:outline-none ' +
-  'transition-colors disabled:opacity-50';
+/**
+ * 40px control (the §12 floor), 13px text, never wider than its track.
+ *
+ * A FIELD IS A WELL (clay, docs/DECISIONS.md row 207): the `lv-input` of the app —
+ * sunk into its section behind the 3:1 field line, the focus ring that keeps
+ * the well, a danger line on `aria-invalid` — at the density of the admin. The
+ * geometry is kept apart so each control below names `lv-input` itself.
+ */
+const fieldSize = 'w-full min-w-0 h-10 min-h-10 px-2.5 text-[13px] disabled:opacity-50';
+export const field = `lv-input ${fieldSize}`;
 
 /** Same, for a multi-line value that must not grow without bound. */
-export const area =
-  'w-full min-w-0 min-h-[88px] max-h-[240px] overflow-y-auto bg-zinc-800/40 border border-zinc-700 rounded-lg ' +
-  'px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-zinc-600 focus:border-iris ' +
-  'focus:ring-1 focus:ring-iris/50 focus:outline-none transition-colors resize-y';
+const areaSize =
+  'w-full min-w-0 min-h-[88px] max-h-[240px] overflow-y-auto px-2.5 py-2 text-[13px] leading-relaxed resize-y';
+export const area = `lv-input ${areaSize}`;
 
-export const btn =
-  'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-bold transition-colors ' +
-  'disabled:opacity-50 disabled:cursor-not-allowed shrink-0';
-export const btnPrimary = `${btn} bg-[#6B46FF] hover:bg-iris-deep text-snow`;
-export const btnGhost = `${btn} bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700`;
-export const btnDanger = `${btn} bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30`;
-/** A small square icon button, matched to the 36px button row. */
+/**
+ * The clay buttons of the app (`lv-button`: resting clay, a dent while pressed,
+ * the focus ring, the disabled and busy states) at the 36px admin height.
+ * The primary keeps the violet admin fill on the rim and base of a primary.
+ */
+export const btn = 'lv-button min-h-0 h-9 gap-1.5 px-3 text-[13px] shrink-0';
+export const btnPrimary = `${btn} lv-button-primary bg-[#6B46FF] hover:bg-iris-deep text-snow`;
+export const btnGhost = `${btn} lv-button-secondary`;
+export const btnDanger = `${btn} lv-button-danger`;
+/** A small round icon button, matched to the 36px button row: flat, dimpled while pressed. */
 export const iconBtn =
-  'inline-flex items-center justify-center w-9 h-9 rounded-lg text-zinc-400 hover:text-white ' +
-  'hover:bg-zinc-800 transition-colors shrink-0';
+  'inline-flex items-center justify-center w-9 h-9 rounded-full text-text-secondary hover:text-text-primary ' +
+  'hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press transition-colors shrink-0';
 
 /**
  * Responsive field grid. One column on a phone, two on a tablet, and — only
@@ -117,18 +124,18 @@ export function Field({
       data-missing-field={missing ? need : undefined}
     >
       <div className="flex items-center gap-1.5 mb-1 min-w-0">
-        <label htmlFor={id} className="text-[12px] font-bold text-zinc-300 truncate">
-          {ar} <span className="text-[10px] font-medium text-zinc-500">{en}</span>
+        <label htmlFor={id} className="text-[12px] font-bold text-text-secondary truncate">
+          {ar} <span className="text-[10px] font-medium text-text-muted">{en}</span>
           {required && <span className="text-red-400 ms-1">*</span>}
         </label>
         {tip && (
           <span className="group relative shrink-0">
-            <Info className="w-3.5 h-3.5 text-zinc-600" aria-hidden="true" />
+            <Info className="w-3.5 h-3.5 text-text-muted" aria-hidden="true" />
             <span className="sr-only">{tip}</span>
             <span
               role="tooltip"
               className="pointer-events-none absolute z-20 start-0 top-5 hidden group-hover:block group-focus-within:block
-                         w-56 max-w-[70vw] rounded-lg bg-zinc-950 border border-zinc-700 p-2 text-[11px] leading-snug text-zinc-300 shadow-xl"
+                         w-56 max-w-[70vw] rounded-lg bg-surface-raised border border-border-subtle p-2 text-[11px] leading-snug text-text-secondary shadow-lg"
             >
               {tip}
             </span>
@@ -141,7 +148,7 @@ export function Field({
             missing ? { id, 'aria-invalid': true, 'aria-describedby': missingId } : { id }
           )
         : children}
-      {hint && !error && !missing && <p className="mt-1 text-[11px] text-zinc-500 truncate">{hint}</p>}
+      {hint && !error && !missing && <p className="mt-1 text-[11px] text-text-muted truncate">{hint}</p>}
       {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
       {need && <MissingNote id={missingId} code={need} optionId={needOption ?? ''} />}
     </div>
@@ -195,13 +202,13 @@ export function MirrorNote({
         : `محسوب من «${where}» — للقراءة فقط هنا`;
   return (
     <p
-      className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-zinc-500"
+      className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-text-muted"
       data-mirror={kind}
     >
-      <Link2 className="w-3 h-3 mt-[3px] shrink-0 text-zinc-600" aria-hidden="true" />
+      <Link2 className="w-3 h-3 mt-[3px] shrink-0 text-text-muted" aria-hidden="true" />
       <span className="min-w-0">
         {lead}
-        {detail ? <span className="text-zinc-600">{` · ${detail}`}</span> : null}
+        {detail ? <span className="text-text-muted">{` · ${detail}`}</span> : null}
       </span>
     </p>
   );
@@ -424,26 +431,26 @@ export function TierPriceDisclosure({
         aria-controls={panelId}
         data-tier-price-toggle={scope}
         className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-h-9 max-w-full min-w-0 py-1 rounded
-                   text-[11px] leading-snug font-medium text-zinc-400 text-start
-                   underline-offset-4 hover:text-zinc-200 hover:underline transition-colors
+                   text-[11px] leading-snug font-medium text-text-secondary text-start
+                   underline-offset-4 hover:text-text-primary hover:underline transition-colors
                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris"
       >
         {/* A ChevronDown that only ever rotates 180° — vertical, so it is
             direction-neutral and cannot point the wrong way in RTL the way a
             rotated ChevronRight does. */}
         <ChevronDown
-          className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 shrink-0 text-text-muted transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
         <span className="min-w-0">
           سعر خاص لهذا {noun}{' '}
-          <span className="text-[10px] leading-snug font-medium text-zinc-600">PRIME / PRO</span>
+          <span className="text-[10px] leading-snug font-medium text-text-muted">PRIME / PRO</span>
         </span>
         {/* THE HONEST COLLAPSED LINE. Only while folded, because open the two
             boxes state it better — but folded, this is the only thing standing
             between the admin and an override they cannot see. */}
         {!open && marks.length > 0 && (
-          <span className="min-w-0 text-zinc-300 tabular-nums" data-tier-price-set>
+          <span className="min-w-0 text-text-primary tabular-nums" data-tier-price-set>
             {tierPriceSummary(marks)}
           </span>
         )}
@@ -462,9 +469,9 @@ export function TierPriceDisclosure({
             open ? 'visible' : 'invisible'
           }`}
         >
-          <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+          <p className="mb-2 text-[11px] leading-snug text-text-muted">
             {rule}
-            <span className="text-zinc-600"> {ruleEn}</span>
+            <span className="text-text-muted"> {ruleEn}</span>
           </p>
           {children}
         </div>
@@ -475,18 +482,18 @@ export function TierPriceDisclosure({
 
 /** English text input — always LTR, per §1/§3. */
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input dir="ltr" {...props} className={`${field} ${props.className ?? ''}`} />;
+  return <input dir="ltr" {...props} className={`lv-input ${fieldSize} ${props.className ?? ''}`} />;
 }
 
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea dir="ltr" rows={4} {...props} className={`${area} ${props.className ?? ''}`} />;
+  return <textarea dir="ltr" rows={4} {...props} className={`lv-input ${areaSize} ${props.className ?? ''}`} />;
 }
 
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <div className="relative min-w-0">
-      <select {...props} className={`${field} appearance-none pe-9 ${props.className ?? ''}`} />
-      <ChevronDown className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+      <select {...props} className={`lv-input ${fieldSize} appearance-none pe-9 ${props.className ?? ''}`} />
+      <ChevronDown className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
     </div>
   );
 }
@@ -523,7 +530,7 @@ export function Money({
       dir="ltr"
       inputMode="numeric"
       disabled={disabled}
-      className={field}
+      className={`lv-input ${fieldSize}`}
       placeholder={placeholder ?? (required ? '0' : 'يرث / inherit')}
       value={text}
       onChange={(e) => {
@@ -569,7 +576,7 @@ export function Percent({
         dir="ltr"
         inputMode="decimal"
         disabled={disabled}
-        className={`${field} pe-8`}
+        className={`lv-input ${fieldSize} pe-8`}
         placeholder={placeholder ?? '7.5'}
         value={text}
         onChange={(e) => {
@@ -586,7 +593,7 @@ export function Percent({
           if (text.endsWith('.')) setText(text.slice(0, -1));
         }}
       />
-      <span aria-hidden="true" className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[12px] text-zinc-500">
+      <span aria-hidden="true" className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[12px] text-text-muted">
         %
       </span>
     </div>
@@ -631,19 +638,22 @@ export function Toggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border text-[13px] text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-        checked ? 'bg-iris/10 border-iris/50 text-white' : 'bg-zinc-800/40 border-zinc-700 text-zinc-300'
-      }`}
+      // A row that holds a switch is flush clay (the rim alone, on the fill of its
+      // parent): the switch is
+      // the state, so the row does not tint or outline itself a second time.
+      className="flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-md border border-border-subtle shadow-xs text-[13px] text-text-primary text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span className="min-w-0 truncate">
         {label}
-        {sub && <span className="text-[11px] text-zinc-500 ms-1.5">{sub}</span>}
+        {sub && <span className="text-[11px] text-text-muted ms-1.5">{sub}</span>}
       </span>
+      {/* The platform switch: a well track with a lifted knob when off, the
+          violet admin track when on. */}
       <span
-        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${checked ? 'bg-[#6B46FF]' : 'bg-zinc-600'}`}
+        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${checked ? 'bg-[#6B46FF]' : 'lv-well'}`}
       >
         <span
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-snow shadow-1 transition-all ${checked ? 'start-[18px]' : 'start-0.5'}`}
+          className={`absolute top-0.5 w-4 h-4 rounded-full shadow-1 transition-all ${checked ? 'start-[18px] bg-snow' : 'start-0.5 bg-text-secondary'}`}
         />
       </span>
     </button>
@@ -673,29 +683,26 @@ export function CheckCard({
       aria-disabled={disabled || undefined}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`min-w-0 text-start rounded-lg border p-2.5 transition-colors ${
-        disabled ? 'opacity-70 cursor-default' : ''
-      } ${
-        checked
-          ? 'bg-iris/10 border-iris/60'
-          : `bg-zinc-800/30 border-zinc-700 ${disabled ? '' : 'hover:border-zinc-600'}`
-      }`}
+      // An option: flush clay at rest; checked is the press with the gold
+      // start bar (lv-choice, aria-checked), and the box below keeps
+      // its tick — no violet fill or outline on top.
+      className={`lv-choice min-w-0 text-start p-2.5 ${disabled ? 'opacity-70 cursor-default' : ''}`}
     >
       <span className="flex items-center gap-2 min-w-0">
         <span
           className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${
-            checked ? 'bg-[#6B46FF] border-iris' : 'border-zinc-600'
+            checked ? 'bg-text-primary border-text-primary' : 'border-[var(--clay-field)]'
           }`}
         >
           {checked && (
-            <svg viewBox="0 0 12 12" className="w-3 h-3 text-white" aria-hidden="true">
+            <svg viewBox="0 0 12 12" className="w-3 h-3 text-canvas" aria-hidden="true">
               <path d="M2 6.5l2.5 2.5L10 3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           )}
         </span>
-        <span className="text-[13px] font-bold text-white truncate">{title}</span>
+        <span className="text-[13px] font-bold text-text-primary truncate">{title}</span>
       </span>
-      {sub && <span className="block mt-0.5 text-[10px] text-zinc-500 truncate">{sub}</span>}
+      {sub && <span className="block mt-0.5 text-[10px] text-text-muted truncate">{sub}</span>}
     </button>
   );
 }
@@ -739,8 +746,10 @@ export function SectionCard({
       // particular. The accordion opens one heavy section at a time, so
       // "click every header" cannot reach a specific panel.
       data-section={n}
-      className={`min-w-0 rounded-xl border overflow-hidden mb-2.5 ${
-        error || (missing ?? 0) > 0 ? 'border-red-500/50 bg-red-500/[0.03]' : 'border-zinc-800 bg-zinc-900/40'
+      // One clay card per section (resting, level 1); a section the saved
+      // product leaves incomplete keeps its red edge on top of the clay.
+      className={`lv-surface min-w-0 overflow-hidden mb-2.5 ${
+        error || (missing ?? 0) > 0 ? 'border-red-500/50 bg-red-500/[0.03]' : ''
       }`}
     >
       <button
@@ -748,24 +757,24 @@ export function SectionCard({
         data-section-toggle={n}
         aria-expanded={open}
         onClick={onToggle}
-        className="w-full min-w-0 flex items-center gap-2 px-2.5 h-10 text-start hover:bg-zinc-800/30 transition-colors"
+        className="w-full min-w-0 flex items-center gap-2 px-2.5 h-10 text-start hover:bg-white/[0.04] transition-colors"
       >
         <span
           className={`shrink-0 w-5 h-5 rounded-md grid place-items-center text-[10px] font-black ${
-            open ? 'bg-[#6B46FF] text-snow' : 'bg-zinc-800 text-zinc-400'
+            open ? 'bg-[#6B46FF] text-snow' : 'bg-surface-selected text-text-secondary'
           }`}
         >
           {n}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[12px] font-bold text-white truncate">
+          <span className="block text-[12px] font-bold text-text-primary truncate">
             {ar}
             {/* The English secondary is dropped on a phone: at 360-390px it
                 pushed the Arabic title into an ellipsis, and the number plus
                 the Arabic title already identify the section. */}
-            <span className="hidden sm:inline text-[10px] font-medium text-zinc-500"> {en}</span>
+            <span className="hidden sm:inline text-[10px] font-medium text-text-muted"> {en}</span>
           </span>
-          {!open && summary && <span className="block text-[10px] text-zinc-500 truncate">{summary}</span>}
+          {!open && summary && <span className="block text-[10px] text-text-muted truncate">{summary}</span>}
         </span>
         {(missing ?? 0) > 0 && (
           <span
@@ -776,16 +785,16 @@ export function SectionCard({
           </span>
         )}
         {count !== undefined && count > 0 && (
-          <span className="shrink-0 min-w-6 h-5 px-1.5 rounded-full bg-zinc-800 text-[11px] font-bold text-zinc-300 grid place-items-center">
+          <span className="shrink-0 min-w-6 h-5 px-1.5 rounded-full bg-surface-selected text-[11px] font-bold text-text-secondary grid place-items-center">
             {count}
           </span>
         )}
         <ChevronDown
-          className={`shrink-0 w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`shrink-0 w-4 h-4 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
       </button>
-      {open && <div className="p-3 border-t border-zinc-800/70 min-w-0">{children}</div>}
+      {open && <div className="p-3 border-t border-border-subtle min-w-0">{children}</div>}
     </section>
   );
 }
@@ -807,13 +816,13 @@ export function Repeater({
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-        <h4 className="text-[12px] font-bold text-zinc-300 truncate">{title}</h4>
+        <h4 className="text-[12px] font-bold text-text-secondary truncate">{title}</h4>
         <button type="button" onClick={onAdd} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
           + {addLabel}
         </button>
       </div>
       {React.Children.count(children) === 0 && empty ? (
-        <p className="text-[12px] text-zinc-500 py-2">{empty}</p>
+        <p className="text-[12px] text-text-muted py-2">{empty}</p>
       ) : (
         <div className="space-y-2 min-w-0">{children}</div>
       )}
@@ -822,14 +831,16 @@ export function Repeater({
 }
 
 export function Banner({ kind, children }: { kind: 'error' | 'warn' | 'ok'; children: ReactNode }) {
+  // A note is information, so it is flat: the alert of the app (a 3px start
+  // bar over a 10% tint), at the density of the form.
   const cls =
     kind === 'error'
-      ? 'bg-red-500/10 border-red-500/40 text-red-200'
+      ? 'lv-alert-danger text-red-200'
       : kind === 'warn'
-        ? 'bg-amber-500/10 border-amber-500/40 text-amber-100'
-        : 'bg-emerald-500/10 border-emerald-500/40 text-emerald-100';
+        ? 'lv-alert-warning text-amber-100'
+        : 'lv-alert-success text-emerald-100';
   return (
-    <div className={`min-w-0 rounded-lg border px-3 py-2 text-[12px] leading-snug mb-2.5 ${cls}`}>{children}</div>
+    <div className={`lv-alert min-w-0 px-3 py-2 text-[12px] leading-snug mb-2.5 ${cls}`}>{children}</div>
   );
 }
 
@@ -908,15 +919,15 @@ export function ImgSlot({
             alt={label}
             aspect="auto"
             fit="cover"
-            className="w-10 h-10 rounded-lg border border-zinc-700"
-            bgClassName="bg-zinc-900"
+            className="w-10 h-10 rounded-sm border border-border-subtle"
+            bgClassName="bg-surface"
             fallbackIconClassName="w-3.5 h-3.5"
           />
           <button
             type="button"
             aria-label={`\u0625\u0632\u0627\u0644\u0629 ${label}`}
             onClick={() => onChange(null)}
-            className="absolute -top-1.5 -end-1.5 w-4 h-4 rounded-full bg-zinc-900 border border-zinc-600 text-zinc-300 hover:text-red-400 grid place-items-center"
+            className="absolute -top-1.5 -end-1.5 w-4 h-4 rounded-full bg-surface-raised border border-border-subtle text-text-secondary hover:text-danger grid place-items-center"
           >
             <X className="w-2.5 h-2.5" />
           </button>
@@ -928,10 +939,10 @@ export function ImgSlot({
           disabled={busy}
           onClick={() => fileRef.current?.click()}
           title={err ?? label}
-          className={`w-10 h-10 shrink-0 rounded-lg border grid place-items-center transition-colors disabled:opacity-60 ${
+          className={`w-10 h-10 shrink-0 rounded-sm border grid place-items-center transition-colors disabled:opacity-60 ${
             err
               ? 'border-red-500/50 text-red-400'
-              : 'border-dashed border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500'
+              : 'border-dashed border-[var(--clay-field)] text-text-muted hover:text-text-secondary'
           }`}
         >
           {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
