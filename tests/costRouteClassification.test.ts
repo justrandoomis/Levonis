@@ -121,7 +121,12 @@ async function routerNamed(name: string): Promise<unknown> {
  * the router, not a shrug. Everything else in worker/index.ts must be in
  * tests/fixtures/roleMatrix.ts BASE_MOUNTS.
  */
-const EXEMPT: Readonly<Record<string, string>> = {};
+const EXEMPT: Readonly<Record<string, string>> = {
+  // The deception layer's decoys (DECISIONS row 206): its fake `cost` keys
+  // would rightly trip the sweeps, which is why it is exempted, not swept.
+  '/ decoyRoutes':
+    'synthetic decoy answers generated in memory; reads no table and carries no real figure (tests/deceptionDecoys.test.ts proves no stored value appears)',
+};
 
 const key = (m: { prefix: string; name: string }) => `${m.prefix} ${m.name}`;
 

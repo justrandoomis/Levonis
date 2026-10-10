@@ -14,3 +14,9 @@
 # USD/IQD pair stays NOT_CONFIGURED; nothing else needs it. Never commit a
 # real value; on the live Worker it is a dashboard SECRET.
 IRAQ_PARALLEL_FX_API_KEY=
+
+# Optional: the deception layer's HMAC key (worker/lib/deception/canary.ts) for
+# the canary tokens in decoy answers and the signed device tag. Without it a
+# built-in pepper is used. Never commit a real value; on the live Worker it is
+# a dashboard SECRET that no workflow puts or deletes.
+SECURITY_CANARY_KEY=

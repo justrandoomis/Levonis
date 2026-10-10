@@ -119,6 +119,17 @@ export interface RequestOptions {
  */
 export const DEFAULT_TIMEOUT_MS = 20000;
 
+/** The event the access-blocked notice listens for, with the reference to quote. */
+export const ACCESS_BLOCKED_EVENT = 'levonis:access-blocked';
+function noteAccessBlocked(details: Record<string, unknown> | undefined): void {
+  try {
+    const reference = typeof details?.reference === 'string' ? details.reference : '';
+    window.dispatchEvent(new CustomEvent(ACCESS_BLOCKED_EVENT, { detail: { reference } }));
+  } catch {
+    /* no window (a test): nothing to show */
+  }
+}
+
 async function requestRaw<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
   const init: RequestInit = { method, credentials: 'same-origin', headers: { ...opts?.headers } };
   if (body !== undefined && !(body instanceof FormData)) {
@@ -177,6 +188,10 @@ async function requestRaw<T>(method: string, path: string, body?: unknown, opts?
       throw new ApiError(res.status, res.ok ? 'Invalid server response' : `Server error (${res.status})`);
     }
     if (!res.ok || data.success === false) {
+      // BLOCKED BY THE DECEPTION LAYER (DECISIONS row 206): every screen hears
+      // it at once, and the full-screen notice (components/security/
+      // AccessBlockedGate.tsx, downloaded only now) takes over the page.
+      if (data.code === 'ACCESS_BLOCKED') noteAccessBlocked(data.details);
       throw new ApiError(
         res.status,
         data.error || `Server error (${res.status})`,

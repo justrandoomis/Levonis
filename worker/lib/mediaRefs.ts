@@ -707,6 +707,12 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   // 0184 — product completeness: what a product misses, by code; never a value, never media.
   'product_completeness.missing_json': 'a JSON list of completeness codes and model ids (PRICE, COST, IMAGE…); no media',
   'product_completeness.facts_key': 'a SHA-256 hex digest of the facts a verdict was computed from; no media',
+  // 0185 — the deception layer (DECISIONS row 206): hashed actor keys, allowlisted codes; no media.
+  'security_blocks.actor_key': 'a user id, a 16-hex device tag id or a 32-hex network day hash; no media',
+  'security_blocks.evidence': 'allowlisted codes and 16-hex fingerprints of a detection; no media',
+  'security_canaries.issued_to': 'actor keys (user id, tag id, network day hash) a decoy answer went to; no media',
+  'security_scores.actor_key': "an actor key ('u:' user id, 'd:' tag id, 'n:' network day hash); no media",
+  'security_scores.signals': 'signal codes and their counts; no media',
   'pricing_audit.entity_key': 'the id or code of what a pricing change touched; no media',
   'pricing_audit.idempotency_key': 'a pricing write de-duplication token; no media',
   'pricing_audit.pricing_before_json': 'private pricing values before a change (amounts, rates, ids); no media',

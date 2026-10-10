@@ -117,3 +117,74 @@ risks. Verification evidence is in `docs/TEST_RESULTS.md`.
 - Source scan for embedded secrets found **no real credentials** in the
   archive (only placeholder `.env.example` values and the hardcoded JWT
   fallback string, both now removed).
+
+## 5. The deception layer — decoys, trap data and blocks (DECISIONS row 206)
+
+Owner brief 2026-10-10: «للذين يحاولون اختراق الموقع او الاحتيال او سرقه بيانات او
+التلاعب يتم اكتشافهم عن طريق ملفات وهمية ويتم حظرهم مباشرة — نظام ذكي يوهم المخترق بانه
+حصل على المعلومات لكن يكتشف بانه تم حظره». Defensive only: the site answers the
+people who ask it; nothing reaches out to anyone. Code: `worker/lib/deception/`,
+`worker/routes/decoys.ts`, `worker/routes/adminSecurity.ts`; migration
+`0185_security_deception.sql`.
+
+**The decoys.** `/.env` (and `.local`, `.production`, `.backup`), `/.git/*`,
+`/config.json`, `/backup.sql`, `/database.sql`, `/admin/export/*`,
+`/api/internal/*`, `/api/v0/*`, WordPress (`/wp-login.php`, `/wp-admin/*`,
+`/xmlrpc.php`) and `/phpmyadmin/*` answer realistic, entirely invented data —
+built in memory from a random batch id, never from the database — carrying
+trap tokens (an API key, an admin e-mail and passwords, a session, product
+ids shaped like real ones). Every decoy answer is `no-store` and `noindex`,
+carries its own script-free policy, and the sensitive ones are `Disallow` in
+robots.txt. Each decoy path is in `run_worker_first` in all three
+environments, or the asset layer would answer it with the app shell.
+
+**Deceive, then block.** The decoy request itself gets the fake data; in the
+same step an incident is written (blocks, the trap batch, a signed device tag
+on that answer, the owner's bell with no figure). From the next request the
+API answers `403 ACCESS_BLOCKED` with a reference, the Worker's documents
+show the block page and the app shows a full-screen notice — in Arabic,
+English and Sorani, never saying why, for how long, or what kind of block.
+Trap data presented anywhere (a header, the query, the session cookie, the
+sign-in door, a cart body) blocks at once.
+
+**Signals and scores.** Each account, device tag and network has a score that
+halves every six hours; 100 blocks. Price or cost fields sent to the cart or
+checkout (50; the server keeps its own price), injection shapes (25), tamper
+switches (20), sign-in brute force (15), guessing admin routes (10), probing
+other people's records (5), admin refusals (3). Only DELIBERATE requests
+count (`Sec-Fetch-*`): an image, a cross-site request or a navigation without
+a click is recorded and never scored, so an `<img src="/.env">` in a post
+cannot get anyone blocked.
+
+**Who is never blocked.** The verified owner (the table refuses an owner row);
+other admins only by a confirmed trap token; registered probe accounts;
+crawlers and link-preview bots (a plain 404 from a decoy, never a network
+block on an allowed path). Network blocks apply to anonymous requests only,
+use the exact IPv4 address or IPv6 /64 hashed per day (never an address,
+never a /24), last 24 hours (1 hour by score alone), and never apply to the
+Telegram and Studio server doors. Sign-in stays reachable under a device or
+network block. Account and device blocks last 30 days.
+
+**Speed.** Account and network blocks live in a per-isolate snapshot refreshed
+in the background every 30 seconds; device tags need no database. An ordinary
+request issues no extra D1 statement; static paths are never checked; any
+error lets the request through.
+
+**The owner's console «الأمان»** (Admin → الإدارة, verified owner only,
+`/api/admin/security`): the tiles, the blocks, the whole security log, the
+scores, an incident with «ما الذي أُعطي له» (the fake answer regenerated from
+its batch), and «رفع الحظر» / «رفع كل حظر هذه الحادثة» with an audit row.
+
+**The optional secret.** `SECURITY_CANARY_KEY` (a Worker secret) keys the trap
+tokens and the device tag; without it a built-in pepper is used, and a forged
+token or tag can only get its own sender blocked. No workflow puts or deletes it.
+
+**Known limits.** A cookie-less scanner may get ordinary public answers from
+another isolate for up to 30 seconds after its block. If a GitHub runner's
+address was network-blocked in the last 24 hours (shared with someone else's
+scanner), workflow 7's anonymous verify step reads `ACCESS_BLOCKED`: re-run it
+(a new runner) or lift the block in «الأمان».
+
+**Drill.** `scripts/local-deception-drill.mjs` plays a scanner against a LOCAL
+Worker only (`wrangler dev --local`); it refuses any base that is not
+`http://localhost` or `http://127.0.0.1`.

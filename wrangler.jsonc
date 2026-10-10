@@ -128,7 +128,25 @@
       // card into it (worker/lib/socialPreview.ts). The apex gets opening
       // API hints and its public host identity, with no database read.
       "/store-icon/*",
-      "/"
+      "/",
+      // THE DECOYS (worker/lib/deception/decoys.ts, DECISIONS row 206): exact
+      // documents and narrow prefixes no SPA route uses, so the Worker can
+      // answer them with fake data and open an incident. Unlisted, the asset
+      // layer answers each with the app shell at 200 and the decoy never runs.
+      // The internal and v0 API decoys are already under the API prefix.
+      "/.env",
+      "/.env.local",
+      "/.env.production",
+      "/.env.backup",
+      "/.git/*",
+      "/config.json",
+      "/backup.sql",
+      "/database.sql",
+      "/admin/export/*",
+      "/wp-login.php",
+      "/wp-admin/*",
+      "/xmlrpc.php",
+      "/phpmyadmin/*"
     ]
   },
 
@@ -262,7 +280,21 @@
           // The per-host store icons and the store's home card — see the
           // top-level block. Repeated for the same reason as the two above.
           "/store-icon/*",
-          "/"
+          "/",
+          // The decoys — see the top-level block. Repeated: not inherited.
+          "/.env",
+          "/.env.local",
+          "/.env.production",
+          "/.env.backup",
+          "/.git/*",
+          "/config.json",
+          "/backup.sql",
+          "/database.sql",
+          "/admin/export/*",
+          "/wp-login.php",
+          "/wp-admin/*",
+          "/xmlrpc.php",
+          "/phpmyadmin/*"
         ]
       },
       "d1_databases": [
@@ -349,7 +381,21 @@
           // The per-host store icons and the store's home card — see the
           // top-level block. Repeated for the same reason as the two above.
           "/store-icon/*",
-          "/"
+          "/",
+          // The decoys — see the top-level block. Repeated: not inherited.
+          "/.env",
+          "/.env.local",
+          "/.env.production",
+          "/.env.backup",
+          "/.git/*",
+          "/config.json",
+          "/backup.sql",
+          "/database.sql",
+          "/admin/export/*",
+          "/wp-login.php",
+          "/wp-admin/*",
+          "/xmlrpc.php",
+          "/phpmyadmin/*"
         ]
       },
       "workers_dev": false,

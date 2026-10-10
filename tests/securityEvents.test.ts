@@ -471,6 +471,15 @@ test('the pure parts: networks, targets, the detail allow-list, the refusal clas
     cleanDetail({ bucket: 'pricing-read', pair: '1660.5', fields: ['anomaly_threshold_pct', '37.25', 'x y'], new: ['ip', 'ip'], s: 'abc', ...({ rate: '1660' } as object) }),
     JSON.stringify({ bucket: 'pricing-read', fields: ['anomaly_threshold_pct'], new: ['ip'] })
   );
+  // The deception layer's keys (DECISIONS row 206): codes, a reference, a 10-hex batch and a 16-hex tag — never a figure, an address or a token.
+  assert.equal(
+    cleanDetail({ decoy: 'env', sig: 'DECOY_HIT', ex: 'owner', intent: 'tool', ref: 'LV-081NKX90', cc: 'IQ', asn: 'AS50710', batch: '602d0f176a', d: '020359f52088dc83' }),
+    JSON.stringify({ decoy: 'env', sig: 'DECOY_HIT', ex: 'owner', intent: 'tool', ref: 'LV-081NKX90', cc: 'IQ', asn: 'AS50710', d: '020359f52088dc83', batch: '602d0f176a' })
+  );
+  assert.equal(
+    cleanDetail({ decoy: '9.9.9.9', sig: 'lvk_live_602d0f176a8b52e5a098d76a847b26ac', ex: 'Lv-602d0f176a-c4bb93e0be', ref: 'lvk_live_602d0f176a8b52e5a098d76a847b26ac', batch: 'ZZ', d: 'Lv-602d0f176a-c4bb93e0be', cc: '203.0.113.7', asn: '1660' }),
+    '{}'
+  );
   const cls = (path: string, status: number, code: string | undefined, ownerSession = false, bucket: string | null = null) => classifyRefusal({ path, status, code, ownerSession, bucket });
   assert.equal(cls(`${BASE}/rates`, 401, 'UNAUTHORIZED')?.kind, 'cost_denied');
   assert.equal(cls(`${BASE}/rates`, 403, 'FORBIDDEN')?.kind, 'cost_denied');

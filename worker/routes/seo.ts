@@ -28,6 +28,7 @@
 import { listing } from '../lib/listing';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
+import { DECOY_DISALLOW } from '../lib/deception/decoys';
 
 
 /**
@@ -74,6 +75,18 @@ const DISALLOWED: readonly string[] = [
   '/orders',
   '/auth',
 ];
+
+/**
+ * Whether robots.txt lets a crawler fetch this path on this kind of host —
+ * the same rules `robotsRoute` writes (the longer `Allow` wins). The deception
+ * gate asks it so a crawler on an allowed path is never scored and never meets
+ * a network block (worker/lib/deception/gate.ts).
+ */
+export function robotsAllows(path: string, hostKind: string): boolean {
+  if (hostKind !== 'main' && hostKind !== 'merchant') return false;
+  if (hostKind === 'main' && path.startsWith('/api/public/v1/')) return true;
+  return ![...DISALLOWED, ...DECOY_DISALLOW].some((p) => path.startsWith(p));
+}
 
 /**
  * The public, indexable surfaces OF THE PLATFORM — the apex only.
@@ -183,6 +196,10 @@ export function robotsRoute(c: Context<AppContext>): Response {
   // only: a store's host does not serve it.
   if (host.kind === 'main') lines.push('Allow: /api/public/v1/');
   for (const path of DISALLOWED) lines.push(`Disallow: ${path}`);
+  // The decoys (worker/lib/deception/decoys.ts): no well-behaved crawler asks
+  // for them, so anything that does is not one. Most are covered by `/api/`
+  // and `/admin` already; each is still named, so the list says what it means.
+  for (const path of DECOY_DISALLOW) lines.push(`Disallow: ${path}`);
   // Crawl-delay is deliberately absent: Google ignores it, and the shops that
   // honour it are the ones whose traffic this site wants.
   if (origin) {

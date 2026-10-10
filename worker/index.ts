@@ -159,6 +159,11 @@ import { cronJobs } from './lib/cronSchedules';
 import { safeErrorCode } from './lib/membershipBenefits';
 import { engineDbRefusal } from './lib/pricingDbRefusals';
 import { gatewayAssertion } from './entrypoints/gatewayAssertion';
+// The deception layer (owner brief 2026-10-10, DECISIONS row 206): the gate,
+// the decoys it stands in front of, and the owner's «الأمان» console.
+import { deceptionGate } from './lib/deception/gate';
+import { decoyRoutes } from './routes/decoys';
+import { adminSecurityRoutes } from './routes/adminSecurity';
 
 const app = new Hono<AppContext>();
 
@@ -320,6 +325,22 @@ app.use('*', async (c, next) => {
   await next();
 });
 
+// THE DECEPTION GATE (worker/lib/deception/gate.ts), right after the session
+// is known and before every route: trap data presented anywhere is answered
+// with the block at once; a blocked device, account or (anonymous) network
+// meets the block page or ACCESS_BLOCKED; after the answer it watches for
+// manipulation (price fields sent to the cart, injection shapes, admin
+// probing). In memory on an ordinary request, no D1 statement; the static
+// paths are skipped; every failure lets the request through unchanged.
+app.use('*', deceptionGate);
+
+// THE DECOYS, immediately after it: realistic fake answers on paths no
+// customer asks for (/.env, /.git, /backup.sql, /admin/export, the internal
+// and v0 APIs, WordPress, phpMyAdmin). They overlap no real route; each one
+// is also named in run_worker_first in all three environments, or the asset
+// layer would answer it with the app shell (worker/lib/deception/decoys.ts).
+app.route('/', decoyRoutes);
+
 /**
  * GLOBAL ADMIN IS APEX-ONLY. This is the guard that makes wildcard merchant
  * subdomains survivable.
@@ -443,6 +464,10 @@ app.route('/api/admin', adminRoutes);
 // host guard above covers it, and the generic settings PUT refuses its key so
 // this normalising, versioned, audited route is the only way to change it.
 app.route('/api/admin/farm', farmAdminRoutes);
+// «الأمان» (DECISIONS row 206): the owner's console of decoy hits, canary uses,
+// blocks and scores, and the lift. Owner only at its own door (requireOwner),
+// behind the apex-only host guard and the no-store layer above.
+app.route('/api/admin/security', adminSecurityRoutes);
 // The owner's competitor-price queue. Under /api/admin/* so the apex-only host
 // guard above covers it, and it carries its own requireAdmin as well — that
 // function is where the host rule lives, so neither guard depends on a mount

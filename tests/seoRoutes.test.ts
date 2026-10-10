@@ -28,7 +28,8 @@ import { Hono } from 'hono';
 import { APEX, asD1, ctx, freshDb } from './fixtures/app';
 import type { AppContext } from '../worker/lib/types';
 import { classifyHost } from '../worker/lib/hosts';
-import { robotsRoute, sitemapRoute } from '../worker/routes/seo';
+import { robotsAllows, robotsRoute, sitemapRoute } from '../worker/routes/seo';
+import { DECOY_DISALLOW, DECOY_WORKER_FIRST } from '../worker/lib/deception/decoys';
 import { injectSocialPreview } from '../worker/lib/socialPreview';
 
 const ORIGIN = `https://${APEX}`;
@@ -82,6 +83,26 @@ test('robots keeps crawlers off the surfaces that would only answer 401', () => 
       assert.match(body, new RegExp(`^Disallow: ${path.replace('/', '\\/')}`, 'm'), `${path} must be disallowed`);
     }
   });
+});
+
+/**
+ * THE DECOYS ARE DISALLOWED BY NAME (DECISIONS row 206): no well-behaved
+ * crawler ever asks for them, so whatever does is not one — and a crawler on
+ * any other path is never scored or blocked by the deception layer.
+ */
+test('robots names every sensitive-looking decoy as Disallow, on the apex and on a store', async () => {
+  for (const host of [APEX, `ali3d.${APEX}`]) {
+    const { body } = await fetchText(app(asD1(freshDb()), host), '/robots.txt', host);
+    for (const path of DECOY_DISALLOW) {
+      assert.ok(body.split('\n').includes(`Disallow: ${path}`), `${host}: Disallow ${path}`);
+    }
+  }
+  assert.equal(robotsAllows('/.env', 'main'), false);
+  assert.equal(robotsAllows('/api/v0/admin/products', 'main'), false);
+  assert.equal(robotsAllows('/product/bambu-a1', 'main'), true);
+  assert.equal(robotsAllows('/api/public/v1/products', 'main'), true);
+  assert.equal(robotsAllows('/api/public/v1/products', 'merchant'), false);
+  assert.equal(robotsAllows('/', 'foreign'), false);
 });
 
 /**
@@ -192,7 +213,7 @@ test('every environment routes these two files through the Worker, or they are d
   const blocks = wrangler.match(/"run_worker_first"\s*:\s*\[[^\]]*\]/g) ?? [];
   assert.equal(blocks.length, 3, 'top-level, staging and production each declare it');
   for (const [i, block] of blocks.entries()) {
-    for (const path of ['/robots.txt', '/sitemap.xml']) {
+    for (const path of ['/robots.txt', '/sitemap.xml', ...DECOY_WORKER_FIRST]) {
       assert.ok(
         block.includes(`"${path}"`),
         `block ${i} does not route ${path} through the Worker — the asset layer will answer it with index.html`

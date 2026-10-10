@@ -37,6 +37,7 @@ import {
 import { renderWarrantyDoc, type WarrantyDocData } from '../worker/lib/warrantyDoc';
 import { renderPurchaseReceipt, type PurchaseReceiptData } from '../worker/lib/receipts';
 import { DEFAULT_WARRANTY_CONFIG } from '../worker/lib/warrantyConfig';
+import { DECOY_WORKER_FIRST } from '../worker/lib/deception/decoys';
 
 /** The source list of one directive, or null when the policy does not set it. */
 function directive(csp: string, name: string): string[] | null {
@@ -430,6 +431,19 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
     // assetWithPreview retains the asset response headers, including this
     // CSP, and inserts no prices or session data. All remaining SPA routes
     // and built assets still use the asset layer directly.
+    //
+    // REVISITED FOR THE DECOYS (owner brief 2026-10-10, DECISIONS row 206).
+    // The deception layer answers bait paths no customer and no well-behaved
+    // crawler asks for — `/.env` and its three siblings, `/config.json`,
+    // `/backup.sql`, `/database.sql`, `/wp-login.php`, `/xmlrpc.php` (exact
+    // documents) and `/.git/*`, `/admin/export/*`, `/wp-admin/*`,
+    // `/phpmyadmin/*` (narrow prefixes) — with fake data and an incident
+    // (worker/lib/deception/decoys.ts DECOY_WORKER_FIRST). Unlisted, the asset
+    // layer answers each with index.html at 200 and the decoy is dead code.
+    // None of them is an SPA route: `/admin` and `/admin?tab=…` still come from
+    // the asset layer with dist/_headers' policy, and every decoy answer carries
+    // its own policy (no script at all), `no-store` and `noindex`. The property
+    // this test protects is unchanged: the SPA is not moved behind the Worker.
     for (const route of routes) {
       assert.ok(
         [
@@ -445,6 +459,7 @@ test('THE PAGE: the asset layer serves index.html, so the same policy is written
           '/store-icon/*',
           '/',
           '/products',
+          ...DECOY_WORKER_FIRST,
         ].includes(route),
         `${route} was added to run_worker_first without revisiting this test`
       );

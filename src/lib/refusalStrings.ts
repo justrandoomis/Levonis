@@ -1637,6 +1637,14 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The sale type set for this gift is not available right now. Contact support.',
     ckb: 'جۆری فرۆشتنی دیاریکراو بۆ ئەم دیارییە ئێستا بەردەست نییە. پەیوەندی بە پشتگیرییەوە بکە.',
   },
+  // ---- the deception layer (DECISIONS row 206) ----------------------------
+  // worker/lib/deception/strings.ts sends the same three sentences; the block
+  // never says why, for how long, or what kind of block it is.
+  ACCESS_BLOCKED: {
+    ar: 'تم رصد نشاط مشبوه وحظر هذا الوصول. إن كنت ترى أن هذا خطأ، تواصل معنا واذكر الرقم المرجعي.',
+    en: 'Suspicious activity was detected and this access has been blocked. If you believe this is a mistake, contact us and quote the reference.',
+    ckb: 'چالاکییەکی گوماناوی دەستنیشان کرا و ئەم دەستگەیشتنە قەدەغە کرا. ئەگەر پێت وایە ئەمە هەڵەیە، پەیوەندیمان پێوە بکە و ژمارەی ئاماژەکە بنێرە.',
+  },
   // ---- the pricing programme's refusal contract (S1, master plan §6.1) -----
   ...COST_REFUSALS,
   // ---- «ملف بيانات المنتج», the product data file's round trip (2026-10-10) --

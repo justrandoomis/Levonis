@@ -309,7 +309,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
   ...owned('invoices', ['invoices']),
   ...owned('policies', ['policy_documents', 'policy_acceptances']),
   ...owned('support', ['support_tickets', 'support_ticket_messages']),
-  ...owned('risk', ['restriction_cases', 'risk_signals', 'risk_scores', 'risk_rules']),
+  // 0185 — the deception layer (DECISIONS row 206): blocks, canary batches and
+  // actor scores. The planned `risk_scores` / `risk_signals` belong to the
+  // future risk service's own D1 and are not these.
+  ...owned('risk', ['restriction_cases', 'risk_signals', 'risk_scores', 'risk_rules', 'security_blocks', 'security_canaries', 'security_scores']),
   ...owned('invest', ['investments', 'investment_items', 'investor_messages']),
   ...owned('farm', [
     'farm_profiles', 'farm_ledger', 'farm_printers', 'farm_spools', 'farm_jobs', 'farm_assignments', 'farm_events', 'farm_daily',

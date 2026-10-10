@@ -234,6 +234,8 @@ test('every code the table translates is one the server can actually emit', () =
     // recount's refusals (packages/contracts/src/productCompleteness.ts).
     'worker/routes/adminCompleteness.ts',
     'worker/routes/admin.ts',
+    // The deception layer (row 206): a blocked browser's every API answer (ACCESS_BLOCKED).
+    'worker/lib/deception/strings.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

@@ -45,6 +45,9 @@ import UpdateReadyToast from './components/pwa/UpdateReadyToast';
  * exists to swallow. It draws nothing until something takes a hold.
  */
 import AppBusy from './components/ui/AppBusy';
+// The deception layer's block notice: renders nothing until an API answer says
+// ACCESS_BLOCKED, then downloads its screen (DECISIONS row 206).
+import AccessBlockedGate from './components/security/AccessBlockedGate';
 import HostAppleIdentity from './components/pwa/HostAppleIdentity';
 /**
  * SPLIT OUT ON PURPOSE. The viewer is the only screen in the application that
@@ -1085,6 +1088,7 @@ export default function App() {
               <UpdateReadyToast />
               <AppBusy />
               <AppContent />
+              <AccessBlockedGate />
             </StoreProvider>
           </NavigationRouter>
           </CurrencyProvider>

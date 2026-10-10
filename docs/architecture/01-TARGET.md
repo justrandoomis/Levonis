@@ -124,7 +124,7 @@ Intermediate rename artefacts inside rebuild migrations belong to the owner of t
 | Invoices | `invoices` |
 | Policies | `policy_documents`, `policy_acceptances` |
 | Support | `support_tickets`, `support_ticket_messages` |
-| Risk | `restriction_cases`, `risk_signals`, `risk_scores`, `risk_rules` (new) |
+| Risk | `restriction_cases`, `risk_signals`, `risk_scores`, `risk_rules` (new), `security_blocks`, `security_canaries`, `security_scores` (0185 — the deception layer's blocks, canary batches and actor scores, DECISIONS row 206; in the shared D1) |
 | Invest | `investments`, `investment_items`, `investor_messages` |
 | Farm | `farm_profiles`, `farm_ledger`, `farm_printers`, `farm_spools`, `farm_jobs`, `farm_assignments`, `farm_events`, `farm_daily`, `farm_achievements`, `farm_requests`, `farm_config` (new) |
 | Config | `admin_settings`, `feature_flags`, `config_versions` (new) |

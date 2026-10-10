@@ -67,6 +67,7 @@ import { adminPriceGridRoutes } from '../../worker/routes/adminPriceGrid';
 import { adminOrderPriceRoutes, orderPriceRoutes } from '../../worker/routes/orderPriceAdjust';
 import { adminOrderSerialRoutes } from '../../worker/routes/adminOrderSerials';
 import { adminSerialRulesRoutes } from '../../worker/routes/adminSerialRules';
+import { adminSecurityRoutes } from '../../worker/routes/adminSecurity';
 import { adminMembershipBenefitRoutes } from '../../worker/routes/adminMembershipBenefits';
 import { adminFinanceOperationsRoutes } from '../../worker/routes/adminFinanceOperations';
 import { adminFinanceWorkspaceRoutes } from '../../worker/routes/adminFinanceWorkspace';
@@ -192,6 +193,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api', miscRoutes as Router],
   ['/api/admin', adminRoutes as Router],
   ['/api/admin/farm', farmAdminRoutes as Router],
+  ['/api/admin/security', adminSecurityRoutes as Router],
   ['/api/print-quote', printQuoteRoutes as Router],
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],
   ['/api/price-reports', priceReportRoutes as Router],

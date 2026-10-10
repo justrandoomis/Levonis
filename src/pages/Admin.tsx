@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../LanguageContext';
 
-import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator } from 'lucide-react';
+import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
 import { useAuth } from '../AuthContext';
@@ -115,6 +115,8 @@ const AdminFarmConfig = React.lazy(() => import('../components/adminFarm/AdminFa
  * this page needs.
  */
 const AdminTradeIn = React.lazy(() => import('../components/adminTradeIn/AdminTradeIn'));
+// «الأمان» (DECISIONS row 206): decoys, blocks and the security log — the verified owner's alone.
+const AdminSecurity = React.lazy(() => import('../components/adminSecurity/AdminSecurity'));
 
 /**
  * What a tab shows while its chunk arrives. Deliberately the panel's own empty
@@ -163,7 +165,8 @@ type AdminTab =
   | 'coupons'
   | 'delivery'
   | 'community'
-  | 'printer_farm';
+  | 'printer_farm'
+  | 'security';
 
 
 /**
@@ -175,7 +178,7 @@ type AdminTab =
  * `?tab=products&edit=<id>` opens one product's editor — the link from
  * «صيغ الأرقام التسلسلية» (owner decision 2) to a product with no brand.
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings', 'pricing', 'products'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'security'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -232,6 +235,13 @@ export default function Admin() {
    */
   const canSeePricing = user?.can_write_cost === true;
   const pricingMustVerify = !canSeePricing && user?.owner_email_unverified === true;
+  /**
+   * «الأمان» — THE VERIFIED OWNER ONLY (DECISIONS row 206): `is_owner === true`
+   * and the address proven, both compared strictly like every S1 hint. The
+   * server refuses everyone else (requireOwner) regardless; the bell's
+   * `/admin?tab=security` opens it.
+   */
+  const canSeeSecurity = user?.is_owner === true && user?.owner_email_unverified !== true;
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
@@ -297,6 +307,9 @@ export default function Admin() {
     { id: 'delivery', icon: Truck, label: loc('التوصيل المحلي', 'Local delivery'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'community', icon: Store, label: loc('مجتمع ليفو', 'Levo Community'), ...section('administration', 'الإدارة', 'Administration') },
     { id: 'printer_farm', icon: Factory, label: loc('مزرعة الطابعات', 'Printer Farm', 'کێڵگەی چاپکەر'), ...section('administration', 'الإدارة', 'Administration') },
+    ...(canSeeSecurity
+      ? [{ id: 'security', icon: ShieldAlert, label: loc('الأمان', 'Security', 'ئاسایش'), ...section('administration', 'الإدارة', 'Administration', 'بەڕێوەبەرایەتی') }]
+      : []),
     { id: 'home_settings', icon: LayoutList, label: loc('إعدادات الرئيسية', 'Home settings'), ...section('settings', 'الإعدادات', 'Settings', 'ڕێکخستنەکان') },
     { id: 'wallet_settings', icon: Wallet, label: loc('إعدادات المحفظة', 'Wallet settings'), ...section('settings', 'الإعدادات', 'Settings') },
     { id: 'store_settings', icon: Settings, label: loc('إعدادات المتجر', 'Store settings'), ...section('settings', 'الإعدادات', 'Settings') },
@@ -412,6 +425,8 @@ export default function Admin() {
         )}
 
         {activeTab === 'price_reports' && <PriceReportsPanel />}
+
+        {activeTab === 'security' && canSeeSecurity && <AdminSecurity />}
 
         {activeTab === 'membership_benefits' && <AdminBenefits />}
 

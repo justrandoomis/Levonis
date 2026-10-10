@@ -59,6 +59,7 @@ import { rateLimitedBucket } from './ratelimit';
 import { baghdadDay } from './baghdadTime';
 import { newId, sha256Hex } from './crypto';
 import { notify } from './notifications';
+import { isDecoyCode } from './deception/decoys';
 
 /** The kinds the 0177 CHECK allows. */
 export const SECURITY_EVENT_KINDS = [
@@ -131,6 +132,15 @@ export const PRUNE_PER_WRITE = 8;
  *   fields   field NAMES an FX guard change touched
  *   new      which of session / ip / ua was not seen ('session' | 'ip' | 'ua')
  *   s, i, u  16-hex fingerprints of the session, the network and the browser
+ * and, for the deception layer (worker/lib/deception/, DECISIONS row 206):
+ *   decoy    the decoy's code ('env', 'sql_dump', …)
+ *   sig      the signal code that scored or blocked
+ *   ex       why nothing was blocked ('owner', 'admin', 'crawler', 'clicked', …)
+ *   intent   the request's fetch intent ('tool', 'script', 'typed', …)
+ *   ref      the incident's reference ('LV-XXXXXXXX')
+ *   cc, asn  the request's country and network operator, as Cloudflare names them
+ *   batch    a canary batch id (10 hex)
+ *   d        a device tag id (16 hex)
  */
 export interface SecurityDetail {
   bucket?: string;
@@ -141,6 +151,15 @@ export interface SecurityDetail {
   s?: string;
   i?: string;
   u?: string;
+  decoy?: string;
+  sig?: string;
+  ex?: string;
+  intent?: string;
+  ref?: string;
+  cc?: string;
+  asn?: string;
+  batch?: string;
+  d?: string;
 }
 
 /** A code or a name: starts with a letter, so no figure ever passes as one. */
@@ -155,6 +174,17 @@ export function cleanDetail(d: SecurityDetail | undefined): string {
       const v = d[k];
       if (typeof v === 'string' && CODE_LIKE.test(v)) out[k] = v;
     }
+    // The deception layer's codes: letters and underscores only — no token,
+    // which always carries hex digits, can pass as one.
+    if (isDecoyCode(d.decoy)) out.decoy = d.decoy;
+    for (const k of ['sig', 'ex', 'intent'] as const) {
+      const v = d[k];
+      if (typeof v === 'string' && /^[A-Za-z_]{1,40}$/.test(v)) out[k] = v;
+    }
+    // Shapes of their own, so nothing else can pass as one (a token is code-like).
+    if (typeof d.ref === 'string' && /^LV-[0-9A-Z]{8}$/.test(d.ref)) out.ref = d.ref;
+    if (typeof d.cc === 'string' && /^[A-Z]{2}$/.test(d.cc)) out.cc = d.cc;
+    if (typeof d.asn === 'string' && /^AS\d{1,10}$/.test(d.asn)) out.asn = d.asn;
     if (Array.isArray(d.fields)) {
       const f = d.fields.filter((x) => typeof x === 'string' && CODE_LIKE.test(x)).slice(0, 12);
       if (f.length) out.fields = f;
@@ -163,10 +193,11 @@ export function cleanDetail(d: SecurityDetail | undefined): string {
       const n = d.new.filter((x) => x === 'session' || x === 'ip' || x === 'ua');
       out.new = [...new Set(n)];
     }
-    for (const k of ['s', 'i', 'u'] as const) {
+    for (const k of ['s', 'i', 'u', 'd'] as const) {
       const v = d[k];
       if (typeof v === 'string' && HEX16.test(v)) out[k] = v;
     }
+    if (typeof d.batch === 'string' && /^[0-9a-f]{10}$/.test(d.batch)) out.batch = d.batch;
   }
   const text = JSON.stringify(out);
   return text.length <= 1000 ? text : '{}';

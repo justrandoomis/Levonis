@@ -82,6 +82,14 @@ export interface Env {
    * header — an anonymous probe is recorded like anyone. Unset = no exemption.
    */
   SECURITY_PROBE_USER_IDS?: string;
+  /**
+   * The deception layer's HMAC key (worker/lib/deception/canary.ts): canary
+   * tokens in decoy answers and the signed device tag. OPTIONAL — without it a
+   * built-in pepper is used, and a forged canary or tag can only get its own
+   * sender blocked. A Worker SECRET when set; never logged, never stored,
+   * never sent anywhere.
+   */
+  SECURITY_CANARY_KEY?: string;
   /** Trusted absolute origin for links in emails (per environment). Never
    *  derive email links from the request Host header. */
   APP_ORIGIN?: string;
