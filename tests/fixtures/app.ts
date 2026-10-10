@@ -88,6 +88,16 @@ export function dbThrough(through: string | null): DatabaseSync {
     if (through !== null && f.slice(0, 4) > through) break;
     raw.exec(readFileSync(join(dir, f), 'utf8'));
   }
+  // Migration 0184 ships the owner's «إخفاء المنتجات الناقصة عن الزبائن» switch ON (owner decision
+  // 2026-10-10). Test catalogues are deliberately minimal (no cost, no box), so with the switch on
+  // every fixture product would be held from customers and every unrelated storefront test would
+  // read 404. Tests start from OFF — today's listing — and the switch has its own tests
+  // (catalogHideIncomplete*.test.ts, which turn it on through the owner's route or read the seed).
+  try {
+    raw.exec("DELETE FROM admin_settings WHERE key = 'catalogHideIncomplete'");
+  } catch {
+    /* through a migration before admin_settings existed */
+  }
   return raw;
 }
 

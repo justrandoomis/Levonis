@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { dbThrough, freshDb } from './fixtures/app';
+import { dbThrough, type freshDb } from './fixtures/app';
 import { normalizeCatalogHideIncomplete } from '../worker/lib/settings';
 
 const MIGRATION = readdirSync('migrations').find((f) => /^\d{4}_product_completeness\.sql$/.test(f))!;
@@ -14,8 +14,10 @@ const MIGRATION = readdirSync('migrations').find((f) => /^\d{4}_product_complete
 const stored = (raw: ReturnType<typeof freshDb>) =>
   (raw.prepare("SELECT value FROM admin_settings WHERE key = 'catalogHideIncomplete'").get() as { value?: string } | undefined)?.value;
 
-test('a fresh database has the switch ON after the completeness migration', () => {
-  const raw = freshDb();
+test('a database at 0183 has the switch ON once the completeness migration runs', () => {
+  // dbThrough/freshDb clear the seed so unrelated tests list as today; apply 0184 by hand here.
+  const raw = dbThrough('0183');
+  raw.exec(readFileSync(`migrations/${MIGRATION}`, 'utf8'));
   const v = stored(raw);
   assert.ok(v, 'the switch row exists');
   assert.equal(normalizeCatalogHideIncomplete(JSON.parse(v!)).enabled, true);

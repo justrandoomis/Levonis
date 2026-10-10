@@ -27,10 +27,21 @@ const DYNAMIC_LIMITS: Record<string, string> = {
     'the limit is admin_settings.printerFarmConfig.limits.mutations_per_hour — a PER-HOUR budget, so any per-minute gateway class is looser by construction; /api/farm is the `user` class at 5/s',
 };
 
+/**
+ * Route files that are never mounted themselves: they register their handlers
+ * INTO another router, so they answer under that router's prefixes and their
+ * buckets are checked against the same gateway rows.
+ */
+const REGISTERED_INTO: Record<string, string> = {
+  // «تحديث البيانات» — the product data file routes live on the template router (/api/admin/template).
+  'routes/templateDataFile.ts': 'routes/template.ts',
+};
+
 /** Every prefix a route file is mounted under. */
 function prefixesFor(file: string): string[] {
+  const host = REGISTERED_INTO[file] ?? file;
   return coreMounts()
-    .filter((m) => m.file === `worker/${file}`)
+    .filter((m) => m.file === `worker/${host}`)
     .map((m) => m.prefix);
 }
 
