@@ -41,9 +41,15 @@ export const scopeIdsOf = (ids: ReadonlySet<string> | PricingScopeIds): PricingS
   ids instanceof Set ? { option: ids } : (ids as PricingScopeIds);
 
 /** Parse `PUT /products/:id/rules` → the rule writes (absent targets are untouched). */
-export function parseRuleWrites(body: Record<string, unknown>, productId: string, scopeIds: ReadonlySet<string> | PricingScopeIds, stored: ProductPricingData): RuleWrite[] {
+export function parseRuleWrites(
+  body: Record<string, unknown>,
+  productId: string,
+  scopeIds: ReadonlySet<string> | PricingScopeIds,
+  stored: ProductPricingData,
+  opts: { max?: number } = {}
+): RuleWrite[] {
   const list = body.rules;
-  if (!Array.isArray(list) || list.length < 1 || list.length > MAX_RULES_PER_WRITE) throw inputInvalid('rules');
+  if (!Array.isArray(list) || list.length < 1 || list.length > (opts.max ?? MAX_RULES_PER_WRITE)) throw inputInvalid('rules');
   const ids = scopeIdsOf(scopeIds);
   const seen = new Set<string>();
   return list.map((raw, i) => {

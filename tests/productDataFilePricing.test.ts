@@ -17,10 +17,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { all, asD1, count, row, stubApp } from './fixtures/app';
+import { all, asD1, count, put, row, stubApp } from './fixtures/app';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
 import { templateRoutes } from '../worker/routes/template';
 import { apply, download, edit, preview, OWNER } from './fixtures/dataFile';
+import { SHIPPING5, bigWorld, fillPricing, scopePrefixes, setLines } from './fixtures/dataFileLarge';
+import { judgePricing, loadPricingLive } from '../worker/lib/productDataFilePricing';
+import { normalizeEntries, splitDataFile } from '../worker/lib/productDataFile';
 
 function world() {
   const w = pricingWorld();
@@ -123,4 +126,50 @@ test('an invalid pricing value is refused on its own line; a scope the product d
   assert.equal(st['pricing.base.shipping_profile'], 'INVALID_VALUE');
   assert.equal(st['pricing.base.additional_cost_iqd'], 'change');
   assert.equal(st['pricing.options.9.supplier_cost_amount'], 'PRICING_SCOPE_UNKNOWN');
+});
+
+// ------------------------------------------------------------------ more scopes than the form's page (row 207)
+
+test('an 80-model product with the shipping fill on every scope: the comparison renders and the apply passes as one batch', async () => {
+  // Before row 207 the whole-save parse refused more than 61 scopes and the WHOLE preview answered 400.
+  const w = await bigWorld({ opts: 80, slug: 'eighty' });
+  const scopes = scopePrefixes(w.text);
+  assert.ok(scopes.length > 61, `${scopes.length} scopes listed`);
+  const edits = fillPricing(w.text, SHIPPING5);
+  const text = setLines(w.text, edits);
+  const app = stubApp(asD1(w.raw), OWNER, (a) => a.route('/api/admin/template', templateRoutes));
+  const [p] = await preview(app, text, w.id);
+  assert.equal(p.counts.refused, 0, JSON.stringify(p.fields.filter((f) => f.status !== 'change').slice(0, 3)));
+  assert.equal(p.counts.changes, scopes.length * 5);
+  assert.equal(p.pricing?.kind, 'data');
+  const res = await apply(app, text, p, p.pricing?.preview_hash ? { pricing_hash: p.pricing.preview_hash } : {});
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_inputs WHERE product_id = ? AND origin = 'MANUAL_OVERRIDE'", w.id), scopes.length);
+});
+
+test('a refusal of the whole pricing save is a verdict on every pricing line, never a whole-preview 400', async () => {
+  const { raw } = world();
+  const db = asD1(raw);
+  const live = (await loadPricingLive(db, AMS))!;
+  const text = edit(edit(await download(stubApp(db, OWNER, (a) => a.route('/api/admin/template', templateRoutes)), AMS), 'pricing.base.shipping_weight_g', '2500'), 'pricing.options.1.shipping_weight_g', '2600');
+  const block = splitDataFile(text).blocks[0];
+  const file = normalizeEntries(block.entries).list;
+  const changes = file.filter((n) => n.head === 'pricing' && !n.meta && (n.key === 'pricing.base.shipping_weight_g' || n.key === 'pricing.options.1.shipping_weight_g'));
+  assert.equal(changes.length, 2);
+  // A product whose scope sets read empty: each line passes alone, the whole save (2 scopes > 1) is refused.
+  const shrunk = { ...live, scopes: { option: new Set<string>(), color: new Set<string>(), sku: new Set<string>() } };
+  const j = await judgePricing(db, shrunk, changes, file, normalizeEntries(live.entries).list, { otherChanges: false, now: new Date().toISOString() });
+  assert.deepEqual(j.accepted, []);
+  assert.deepEqual([...j.refusals.values()].map((r) => r.status), ['INVALID_VALUE', 'INVALID_VALUE']);
+  assert.equal(j.kind, 'none');
+});
+
+test('the form\'s own save still takes at most 61 scopes: the data file\'s limits are its own', async () => {
+  const w = pricingWorld();
+  const inputs = Array.from({ length: 62 }, (_, i) => ({ scope: 'option', scope_id: `x${i}`, shipping_weight_g: 100 }));
+  const res = await put(w.app, `/api/admin/pricing/products/${AMS}/inputs`, { inputs_seq: 0, inputs });
+  assert.equal(res.status, 400);
+  const body = (await res.json()) as { code: string; details?: { field?: string } };
+  assert.equal(body.code, 'PRICING_INPUT_INVALID');
+  assert.equal(body.details?.field, 'inputs');
 });

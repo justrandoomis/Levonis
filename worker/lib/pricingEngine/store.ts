@@ -299,8 +299,41 @@ export function inputWriteIsNoop(w: InputWrite): boolean {
 
 const IQD_COLUMNS = 'original_input_amount, original_input_currency, conversion_rate_snapshot, conversion_fx_version, canonical_supplier_cost_usd, converted_at';
 
-export function inputStatements(db: D1Database, productId: string, writes: readonly InputWrite[], actor: string, now: string): D1PreparedStatement[] {
+/** D1 binds at most 100 parameters per statement; packed rows stop at 90 (the house margin: mediaRefs.ts DETACH_ROWS_PER_STATEMENT). */
+export const PACKED_PARAMS_MAX = 90;
+
+/**
+ * Rows of ONE shape as multi-row INSERTs: the same values, bound in the same
+ * order, as one statement per row would bind — at most PACKED_PARAMS_MAX bound
+ * parameters a statement. Per-row triggers fire per row, exactly as before.
+ */
+export function packRows(db: D1Database, head: string, row: string, rows: readonly unknown[][]): D1PreparedStatement[] {
+  if (!rows.length) return [];
+  const width = rows[0].length;
+  const marks = (row.match(/\?/g) ?? []).length;
+  if (marks !== width || rows.some((r) => r.length !== width)) throw new Error(`packRows: ${marks} placeholders for rows of ${width}`);
+  const per = Math.max(1, Math.floor(PACKED_PARAMS_MAX / width));
   const out: D1PreparedStatement[] = [];
+  for (let i = 0; i < rows.length; i += per) {
+    const chunk = rows.slice(i, i + per);
+    out.push(db.prepare(`${head} VALUES ${chunk.map(() => row).join(', ')}`).bind(...chunk.flat()));
+  }
+  return out;
+}
+
+/** How a writer lays its new rows out: one statement each (the default) or packed (`packRows`). */
+export interface PackOptions {
+  pack?: boolean;
+}
+
+const INPUT_INSERT_HEAD = (iqd: boolean) =>
+  `INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, ${INPUT_FIELD_NAMES.join(', ')}, supplier_input_mode${iqd ? `, ${IQD_COLUMNS}` : ''}, source_ref, version, updated_by, updated_at)`;
+const INPUT_INSERT_ROW = (iqd: boolean) => `(?, ?, ?, 'MANUAL_OVERRIDE', ${INPUT_FIELD_NAMES.map(() => '?').join(', ')}, ?${iqd ? ", ?, 'IQD', ?, ?, ?, ?" : ''}, ?, 1, ?, ?)`;
+
+export function inputStatements(db: D1Database, productId: string, writes: readonly InputWrite[], actor: string, now: string, opts: PackOptions = {}): D1PreparedStatement[] {
+  const out: D1PreparedStatement[] = [];
+  const plain: unknown[][] = [];
+  const converted: unknown[][] = [];
   for (const w of writes) {
     if (inputWriteIsNoop(w)) continue;
     const next = nextInputRow(w);
@@ -310,14 +343,9 @@ export function inputStatements(db: D1Database, productId: string, writes: reado
     const iqd = next.iqd;
     const iqdValues = iqd ? [iqd.original_input_amount, iqd.conversion_rate_snapshot, iqd.conversion_fx_version, next.supplier_cost_amount, iqd.converted_at] : [];
     if (!w.existing) {
-      out.push(
-        db
-          .prepare(
-            `INSERT INTO pricing_inputs (product_id, scope, scope_id, origin, ${INPUT_FIELD_NAMES.join(', ')}, supplier_input_mode${iqd ? `, ${IQD_COLUMNS}` : ''}, source_ref, version, updated_by, updated_at)
-             VALUES (?, ?, ?, 'MANUAL_OVERRIDE', ${INPUT_FIELD_NAMES.map(() => '?').join(', ')}, ?${iqd ? ", ?, 'IQD', ?, ?, ?, ?" : ''}, ?, 1, ?, ?)`
-          )
-          .bind(productId, w.scope, scopeId, ...values, next.supplier_input_mode, ...iqdValues, w.source_ref, actor, now)
-      );
+      const bound = [productId, w.scope, scopeId, ...values, next.supplier_input_mode, ...iqdValues, w.source_ref, actor, now];
+      if (opts.pack) (iqd ? converted : plain).push(bound);
+      else out.push(db.prepare(`${INPUT_INSERT_HEAD(!!iqd)}\n             VALUES ${INPUT_INSERT_ROW(!!iqd)}`).bind(...bound));
       continue;
     }
     const snapshot = iqd
@@ -335,7 +363,7 @@ export function inputStatements(db: D1Database, productId: string, writes: reado
         .bind(...values, next.supplier_input_mode, ...iqdValues, w.source_ref, actor, now, productId, w.scope, scopeId, w.existing.version)
     );
   }
-  return out;
+  return [...out, ...packRows(db, INPUT_INSERT_HEAD(false), INPUT_INSERT_ROW(false), plain), ...packRows(db, INPUT_INSERT_HEAD(true), INPUT_INSERT_ROW(true), converted)];
 }
 
 /** One rule write: the row a (kind, scope, scope_id) target is left with. */
@@ -370,20 +398,20 @@ export function ruleWriteIsNoop(w: RuleWrite): boolean {
   );
 }
 
-export function ruleStatements(db: D1Database, productId: string, writes: readonly RuleWrite[], actor: string, now: string): D1PreparedStatement[] {
+const RULE_INSERT_HEAD =
+  'INSERT INTO pricing_rules (id, kind, scope, catalog_id, product_id, scope_id, state, amount_usd, amount_iqd, source, legacy_result_id, version, updated_by, updated_at)';
+const RULE_INSERT_ROW = '(?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)';
+
+export function ruleStatements(db: D1Database, productId: string, writes: readonly RuleWrite[], actor: string, now: string, opts: PackOptions = {}): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [];
+  const fresh: unknown[][] = [];
   for (const w of writes) {
     if (ruleWriteIsNoop(w)) continue;
     const scopeId = w.scope === 'product' ? '' : w.scope_id;
     if (!w.existing) {
-      out.push(
-        db
-          .prepare(
-            `INSERT INTO pricing_rules (id, kind, scope, catalog_id, product_id, scope_id, state, amount_usd, amount_iqd, source, legacy_result_id, version, updated_by, updated_at)
-             VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
-          )
-          .bind(w.new_id ?? newId('prule'), w.kind, w.scope, productId, scopeId, w.next.state, w.next.amount_usd, w.next.amount_iqd, w.next.source, w.next.legacy_result_id, actor, now)
-      );
+      const bound = [w.new_id ?? newId('prule'), w.kind, w.scope, productId, scopeId, w.next.state, w.next.amount_usd, w.next.amount_iqd, w.next.source, w.next.legacy_result_id, actor, now];
+      if (opts.pack) fresh.push(bound);
+      else out.push(db.prepare(`${RULE_INSERT_HEAD}\n             VALUES ${RULE_INSERT_ROW}`).bind(...bound));
       continue;
     }
     // A converted legacy figure belongs to its migrated row only (0181 CHECK); an owner row drops it.
@@ -399,7 +427,7 @@ export function ruleStatements(db: D1Database, productId: string, writes: readon
         .bind(w.next.state, w.next.amount_usd, w.next.amount_iqd, w.next.source, w.next.legacy_result_id, w.next.source, w.next.source, actor, now, w.existing.id, w.existing.version)
     );
   }
-  return out;
+  return [...out, ...packRows(db, RULE_INSERT_HEAD, RULE_INSERT_ROW, fresh)];
 }
 
 /** The existing row of a rule target, or null. */
@@ -427,53 +455,62 @@ export function batchTail(db: D1Database, productId: string): D1PreparedStatemen
   return [db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`pricing-input-owner:${productId}`)];
 }
 
+/** One `pricing_audit` row as a writer hands it over (the values live HERE, never in audit_log). */
+export interface PricingAuditRow {
+  /** Set when another row of the batch names this one (product_pricing_state.activation_audit_id). */
+  id?: string;
+  /** 'run': one automatic repricing run (FX-5), product_id null, counts only. */
+  entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode' | 'run';
+  entity_key: string;
+  product_id: string | null;
+  action:
+    | 'input_from_purchase'
+    | 'rule_set'
+    | 'legacy_accept'
+    | 'update'
+    | 'engine_entry'
+    | 'reprice_owner'
+    | 'rule_convert'
+    | 'engine_exit'
+    | 'reprice_auto'
+    | 'run_finished';
+  before?: unknown;
+  after?: unknown;
+  summary?: Record<string, unknown>;
+  idempotency_key?: string | null;
+  actor: string;
+  now: string;
+}
+
+const AUDIT_INSERT =
+  'INSERT INTO pricing_audit (id, entity, entity_key, product_id, action, pricing_before_json, pricing_after_json, summary_json, idempotency_key, actor_id, created_at)';
+const AUDIT_ROW = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+
+/** The eleven values one `pricing_audit` row binds, in column order. */
+export function auditValues(row: PricingAuditRow): unknown[] {
+  return [
+    row.id ?? newId('paud'),
+    row.entity,
+    row.entity_key,
+    row.product_id,
+    row.action,
+    row.before === undefined ? null : JSON.stringify(row.before),
+    row.after === undefined ? null : JSON.stringify(row.after),
+    JSON.stringify(row.summary ?? {}),
+    row.idempotency_key ?? null,
+    row.actor,
+    row.now,
+  ];
+}
+
 /** One `pricing_audit` row (the values live HERE, never in audit_log). */
-export function pricingAuditStatement(
-  db: D1Database,
-  row: {
-    /** Set when another row of the batch names this one (product_pricing_state.activation_audit_id). */
-    id?: string;
-    /** 'run': one automatic repricing run (FX-5), product_id null, counts only. */
-    entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode' | 'run';
-    entity_key: string;
-    product_id: string | null;
-    action:
-      | 'input_from_purchase'
-      | 'rule_set'
-      | 'legacy_accept'
-      | 'update'
-      | 'engine_entry'
-      | 'reprice_owner'
-      | 'rule_convert'
-      | 'engine_exit'
-      | 'reprice_auto'
-      | 'run_finished';
-    before?: unknown;
-    after?: unknown;
-    summary?: Record<string, unknown>;
-    idempotency_key?: string | null;
-    actor: string;
-    now: string;
-  }
-): D1PreparedStatement {
-  return db
-    .prepare(
-      `INSERT INTO pricing_audit (id, entity, entity_key, product_id, action, pricing_before_json, pricing_after_json, summary_json, idempotency_key, actor_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .bind(
-      row.id ?? newId('paud'),
-      row.entity,
-      row.entity_key,
-      row.product_id,
-      row.action,
-      row.before === undefined ? null : JSON.stringify(row.before),
-      row.after === undefined ? null : JSON.stringify(row.after),
-      JSON.stringify(row.summary ?? {}),
-      row.idempotency_key ?? null,
-      row.actor,
-      row.now
-    );
+export function pricingAuditStatement(db: D1Database, row: PricingAuditRow): D1PreparedStatement {
+  return db.prepare(`${AUDIT_INSERT}\n       VALUES ${AUDIT_ROW}`).bind(...auditValues(row));
+}
+
+/** Many `pricing_audit` rows, packed (8 a statement): the same rows, the same values, as one statement each would write. */
+export function pricingAuditStatements(db: D1Database, rows: readonly PricingAuditRow[]): D1PreparedStatement[] {
+  return packRows(db, AUDIT_INSERT, AUDIT_ROW, rows.map(auditValues));
 }
 
 /** The stored values of an input row, for the audit (owner-only table), with an IQD conversion's snapshot. */

@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { all, row } from './fixtures/app';
+import { all, get, post, row } from './fixtures/app';
 import { splitDataFile } from '../worker/lib/productDataFile';
 import { addImages, apply, create, download, edit, preview, setup, VARIANT_PRODUCT, type PreviewProduct } from './fixtures/dataFile';
 
@@ -320,4 +320,52 @@ test('combinations: an unedited file is zero changes; one combination\'s stock w
   assert.equal(row(raw, "SELECT id FROM product_variants WHERE id = 'pv_black'"), undefined);
   assert.equal(row(raw, "SELECT id FROM product_colors WHERE id = 'col_black'"), undefined);
   assert.ok(row(raw, "SELECT id FROM product_variants WHERE id = 'pv_white'"));
+});
+
+// ------------------------------------------------------------------ row 207: the rounds' leftover, and the preview's product filter
+
+test('lines left when the refusal rounds run out are said (never silently dropped): the count of changes is the rows shown', async () => {
+  const { raw, app } = setup();
+  const id = await create(app);
+  for (let i = 1; i <= 9; i++) {
+    raw.exec(`INSERT INTO product_images (id, product_id, url, r2_key, content_type, bytes, width, height, sort_order, is_primary, alt_en, alt_ar)
+              VALUES ('img_r${i}', '${id}', '/files/products/r${i}.webp', 'products/r${i}.webp', 'image/webp', 1234, 800, 600, ${i}, ${i === 1 ? 1 : 0}, 'P${i}', 'ص${i}')`);
+  }
+  let text = await download(app, id);
+  const pictures = [...text.matchAll(/^images\.(\d+)\.id=img_r\d$/gm)].map((m) => m[1]);
+  assert.equal(pictures.length, 9);
+  // Nine pictures bound to a colour the product does not have: the planner names ONE a round (eight rounds).
+  for (const n of pictures) text = edit(text, `images.${n}.color_id`, 'col_nope');
+  text = edit(text, 'display_order', '9');
+  const [p] = await preview(app, text, id);
+  const st = (k: string) => p.fields.find((f) => f.key === k)!;
+  const exhausted = p.fields.filter((f) => /too many of this product's lines were refused/.test(f.message ?? ''));
+  assert.deepEqual(exhausted.map((f) => f.key).sort(), ['display_order', `images.${pictures[8]}.color_id`].sort());
+  assert.match(st('display_order').message!, /رُفضت أسطر كثيرة/);
+  assert.match(st('display_order').message!, /ڕەتکرانەوە/);
+  assert.equal(p.counts.changes, p.fields.filter((f) => f.status === 'change').length);
+  assert.equal(p.counts.changes, 0);
+  assert.equal(p.token, null);
+});
+
+test('the preview takes `product_ids`: a few blocks of a bulk file at a time, each one a block of the file', async () => {
+  const { app } = setup();
+  const a = await create(app);
+  const b = await create(app, VARIANT_PRODUCT);
+  const res = await get(app, `/api/admin/template/data-export?ids=${a},${b}`);
+  const text = await res.text();
+  const one = await post(app, '/api/admin/template/data-preview', { text, product_ids: [b] });
+  assert.equal(one.status, 200);
+  const body = (await one.json()) as { products: PreviewProduct[] };
+  assert.deepEqual(body.products.map((x) => x.product_id), [b]);
+  const both = (await (await post(app, '/api/admin/template/data-preview', { text, product_ids: [b, a] })).json()) as { products: PreviewProduct[] };
+  assert.deepEqual(both.products.map((x) => x.product_id), [a, b], 'in the file\'s order');
+  const unknown = await post(app, '/api/admin/template/data-preview', { text, product_ids: ['prd_not_in_file'] });
+  assert.equal(unknown.status, 400);
+  assert.equal(((await unknown.json()) as { code: string }).code, 'DATA_FILE_WRONG_PRODUCT');
+  const many = await post(app, '/api/admin/template/data-preview', { text, product_ids: Array.from({ length: 26 }, (_, i) => `p${i}`) });
+  assert.equal(many.status, 400);
+  assert.equal(((await many.json()) as { code: string }).code, 'DATA_FILE_NO_PRODUCT');
+  const malformed = await post(app, '/api/admin/template/data-preview', { text, product_ids: ['bad id!'] });
+  assert.equal(malformed.status, 400);
 });

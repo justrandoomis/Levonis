@@ -741,6 +741,8 @@ export interface EngineWriteOptions {
   extraAudits?: D1PreparedStatement[];
   auditDetail?: Record<string, unknown>;
   auto?: AutoWrite;
+  /** New input and rule rows as multi-row INSERTs (store.ts `packRows`): the same rows, fewer statements. */
+  pack?: boolean;
 }
 
 export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation, inputWrites: readonly InputWrite[], ruleWrites: readonly RuleWrite[], o: EngineWriteOptions): Promise<D1PreparedStatement[]> {
@@ -777,8 +779,8 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
     ...fence(db, RATES_FENCE_SQL, rateFenceBinds(ev.rates)),
     db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`engine-price:${pid}`),
     ...(adopt ? [db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`pricing-mode:${pid}`)] : []),
-    ...inputStatements(db, pid, inputWrites, o.actor, o.now),
-    ...ruleStatements(db, pid, ruleWrites, o.actor, o.now),
+    ...inputStatements(db, pid, inputWrites, o.actor, o.now, { pack: o.pack }),
+    ...ruleStatements(db, pid, ruleWrites, o.actor, o.now, { pack: o.pack }),
     ...ev.conversions.map((c) =>
       db
         .prepare(

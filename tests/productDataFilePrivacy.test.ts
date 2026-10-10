@@ -92,3 +92,20 @@ test('the owner\'s file in a non-owner\'s hands: every cost line is refused by n
   const text = JSON.stringify(p);
   assert.doesNotMatch(text, /700000|650000/, 'the preview never echoes a private value');
 });
+
+test('the names a comparison sends (row 207): a non-owner is never sent a pricing scope\'s name, the owner is', async () => {
+  const raw = freshDb();
+  const owner = setup(OWNER, raw);
+  const id = await create(owner.app, PRODUCT);
+  const ownersFile = await download(owner.app, id);
+  const optionAt = /^options\.(\d+)\.id=opt_std$/m.exec(ownersFile)![1];
+  const edited = edit(ownersFile, `options.${optionAt}.name_en`, 'Standard plus');
+  // The owner's file — its pricing block included — in a non-owner's hands.
+  const staff = setup(ASSISTANT, raw);
+  const [p] = await preview(staff.app, edited, id);
+  const labels = (p as unknown as { labels: { items: Record<string, unknown>; spec: Record<string, unknown> } }).labels;
+  assert.ok(p.fields.some((f) => f.key.startsWith('pricing.') && f.status === 'COST_OWNER_ONLY'), 'the pricing lines are refused by name');
+  assert.deepEqual(Object.keys(labels.items).filter((k) => k.startsWith('pricing.')), [], 'no pricing scope is named to staff');
+  assert.ok(labels.items['options:opt_std'], 'the model a staff line belongs to is named');
+  assert.doesNotMatch(JSON.stringify(labels), /700000|650000/);
+});

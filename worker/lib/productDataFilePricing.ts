@@ -320,7 +320,20 @@ export async function judgePricing(
   out.accepted = changes.filter((n) => !out.refusals.has(n.nkey));
   if (!inputs.length && !rules.length) return out;
 
-  const draft = parseProductInputs({ inputs, rules }, live.loaded, live.stored, cx);
+  // The whole save, as one draft. The file may name every scope the product has (the form's 61 scopes and
+  // 60 rules are the form's own page size): each entry still names one of them once, and the apply's
+  // statement allowance bounds the batch. A refusal of the whole draft is a verdict on every line, never a
+  // whole-preview 400.
+  const total = 1 + live.scopes.option.size + live.scopes.color.size + live.scopes.sku.size;
+  let draft: ProductInputsDraft;
+  try {
+    draft = parseProductInputs({ inputs, rules }, live.loaded, live.stored, cx, { scopes: total, rules: 2 * total });
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+    for (const n of out.accepted) refuse(n, refusalText(e));
+    out.accepted = [];
+    return out;
+  }
   const writes = effectiveWrites(draft);
   out.draft = draft;
   out.writes = writes;

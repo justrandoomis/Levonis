@@ -5,13 +5,25 @@
  *
  *   GET  /data-export/:productId[?format=csv]  one product's data file, as it is now
  *   GET  /data-export?ids=a,b,…                up to 25 products in one file
- *   POST /data-preview {text, format?, product_id?}
+ *   POST /data-preview {text, format?, product_id?, product_ids?}
  *        the comparison, key by key and item by item, per product: what will be
  *        written, what is refused and why, what the save derives — WRITES NOTHING
- *   POST /data-apply {text, format?, product_id, token, pricing_hash?, confirm_large_change?}
+ *        (`product_ids`: only those blocks of a bulk file, so the sheet compares
+ *        a 25-product file a few products a call)
+ *   POST /data-apply {text, format?, product_id, token, part?, pricing_hash?, confirm_large_change?}
  *        ONE product: the preview recomputed from the text (never trusted from
  *        the client) and held to the token the owner read; then one fenced,
  *        idempotent, audited batch that writes the changed fields alone.
+ *
+ * THE BATCH'S SIZE (docs/DECISIONS.md row 207). D1 allows 1,000 queries per
+ * Worker invocation, a batch counting each statement. The apply counts every
+ * query it runs before the batch (`countingD1`) and sends the batch when it
+ * fits what is left: `1000 − 50 (reserve) − 60 (after the batch) − spent`.
+ * When it does not, the refusal names the two parts — the product part and
+ * the owner's pricing part — with a token each (`part` is inside the hash):
+ * the sheet applies the product part, compares again, and applies the
+ * pricing part — two batches, each fenced, idempotent and audited on what its
+ * own evaluation read.
  *
  * The format and the comparison are worker/lib/productDataFile.ts; the owner's
  * pricing block is worker/lib/productDataFilePricing.ts. The writes go through
@@ -54,11 +66,16 @@ import {
   inputImage,
   inputStatements,
   nextInputRow,
-  pricingAuditStatement,
+  pricingAuditStatements,
   ruleImage,
   ruleStatements,
   storedIqdOf,
+  type PricingAuditRow,
 } from '../lib/pricingEngine/store';
+import { unitNamesOf } from '../lib/pricingEngine/legacy';
+import { D1_INVOCATION_STATEMENT_LIMIT } from '../lib/quarterHourBudget';
+import { countingD1 } from '../lib/d1Count';
+import { SPEC_FIELD_LABEL_CKB } from '../lib/specFieldLabelsCkb';
 import { engineWriteStatements } from '../lib/pricingEngine/engineWrite';
 import {
   MAX_DATA_FILE_PRODUCTS,
@@ -119,8 +136,26 @@ export interface DataFileAnalysis {
 }
 
 const MAX_TEXT = 1_500_000;
-/** One apply = one batch, bounded (D1). */
-const STATEMENT_CAP = 200;
+/**
+ * Kept free under D1's 1,000 for the queries the handler's counter cannot see
+ * (the session ≤ 1, private grants ≤ 1, the deception gate ≤ 2, the rate limit
+ * ≤ 2) and any future middleware: the house reserve (quarterHourBudget.ts).
+ */
+export const DATA_APPLY_RESERVE = 50;
+/**
+ * After the batch, in the same invocation: the read-back `liveState` ≈ 29, the
+ * relations audit 1, the picture-detach queue ≤ 3, `completenessAfterWrite`
+ * ≈ 19 (inline after `next()`). Measured ≤ 52; tests/productDataFileBudget.test.ts
+ * holds it at or below this.
+ */
+export const DATA_APPLY_AFTER_BATCH = 60;
+/** The statements one apply's batch may hold once the handler has spent `spent` queries. */
+export const dataApplyAllowance = (spent: number): number =>
+  D1_INVOCATION_STATEMENT_LIMIT - DATA_APPLY_RESERVE - DATA_APPLY_AFTER_BATCH - Math.max(0, spent);
+/** Blocks one preview call may name with `product_ids`. */
+const PREVIEW_IDS_MAX = 25;
+/** Which lines one apply writes: all of them, the product part, or the owner's pricing part. */
+type ApplyPart = 'all' | 'document' | 'pricing';
 const STRUCTURE_GROUPS = new Set(['options', 'colors', 'variants', 'images']);
 /** Keys the planner writes from what the patch says (the save's own derivation, never a side effect). */
 const DERIVED_SCALARS = new Set(['selling_type', 'inventory_mode', 'serialized', 'warranty_base_months']);
@@ -351,8 +386,11 @@ async function planSave(
   });
 }
 
-async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: ParsedBlock, viewer: Viewer): Promise<BlockEval> {
-  const db = c.env.DB;
+/** A line left over when the refusal rounds ran out: it is said, never silently dropped. */
+const ROUNDS_EXHAUSTED =
+  'رُفضت أسطر كثيرة من هذا المنتج في مقارنة واحدة — صحّح الأسطر المرفوضة ثم أرفق الملف مرة أخرى / too many of this product\'s lines were refused in one comparison — fix the refused lines, then attach the file again / هێڵی زۆری ئەم بەرهەمە لە یەک بەراوردکردندا ڕەتکرانەوە — هێڵە ڕەتکراوەکان چاک بکە، پاشان فایلەکە دووبارە هاوپێچ بکە';
+
+async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: ParsedBlock, viewer: Viewer, db: D1Database = c.env.DB): Promise<BlockEval> {
   const out: BlockEval = {
     productId: block.productId,
     live: null,
@@ -453,6 +491,8 @@ async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: 
     out.analysis = a;
     break;
   }
+  // The rounds ran out with lines still standing: each gets a verdict (the count of changes is what is shown).
+  if (!out.analysis && accepted.length) for (const n of accepted) setStatus(n.key, 'INVALID_VALUE', ROUNDS_EXHAUSTED);
   if (!out.analysis) accepted = [];
 
   // ---- the safety net: the planned save changes the accepted fields and what they derive, nothing else
@@ -523,26 +563,40 @@ async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: 
   }
 
   // ---- the token: what the apply must find unchanged
-  if (out.accepted.length || out.pricingAccepted.length) {
-    out.token = (
-      await sha256Hex(
-        canonicalJson({
-          v: 1,
-          actor: viewer.id,
-          product: state.productId,
-          updated_at: state.updatedAt,
-          fps: [...state.fps.entries()].sort(),
-          accepted: out.accepted.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
-          new_ids: out.patch?.newIds ?? {},
-          derived: out.derived.map((d) => [d.nkey, d.after]).sort(),
-          pricing: out.pricingAccepted.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
-          pricing_kind: out.pricing?.kind ?? 'none',
-          pricing_hash: out.pricing?.hash ?? null,
-        })
-      )
-    ).slice(0, 32);
-  }
+  out.token = await tokenOf(out, viewer, 'all');
   return out;
+}
+
+/**
+ * The token of what one apply writes: everything (`all`, the preview's own —
+ * byte for byte the hash it always was), the product part alone, or the
+ * owner's pricing part alone. The part is inside the hash, so a part's token
+ * is never the whole's nor the other part's.
+ */
+async function tokenOf(ev: BlockEval, viewer: Viewer, part: ApplyPart): Promise<string | null> {
+  const s = ev.live;
+  if (!s) return null;
+  const doc = part === 'pricing' ? [] : ev.accepted;
+  const pr = part === 'document' ? [] : ev.pricingAccepted;
+  if (!doc.length && !pr.length) return null;
+  return (
+    await sha256Hex(
+      canonicalJson({
+        v: 1,
+        ...(part === 'all' ? {} : { part }),
+        actor: viewer.id,
+        product: s.productId,
+        updated_at: s.updatedAt,
+        fps: [...s.fps.entries()].sort(),
+        accepted: doc.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
+        new_ids: part === 'pricing' ? {} : ev.patch?.newIds ?? {},
+        derived: part === 'pricing' ? [] : ev.derived.map((d) => [d.nkey, d.after]).sort(),
+        pricing: pr.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
+        pricing_kind: part === 'document' ? 'none' : ev.pricing?.kind ?? 'none',
+        pricing_hash: part === 'document' ? null : ev.pricing?.hash ?? null,
+      })
+    )
+  ).slice(0, 32);
 }
 
 /** One required-field item as the sheet reads it: the code, the model, the form section. */
@@ -583,6 +637,95 @@ async function completenessPreview(db: D1Database, ev: BlockEval, seesPrivate: b
   }
 }
 
+interface Tri {
+  ar: string;
+  en: string;
+  ckb: string;
+}
+
+/** `options[opt_x].name_en` / `pricing.skus[o:a|c:b].manual_cbm` → the item it names; null for a scalar. */
+const itemOfNkey = (nkey: string): { group: string; id: string } | null => {
+  const m = /^((?:pricing\.)?[a-z_]+)\[([^\]]+)\]/.exec(nkey);
+  return m ? { group: m[1], id: m[2] } : null;
+};
+
+/**
+ * The names the sheet titles its rows with (requirement 5 of the fix): each
+ * item a row belongs to (the model, the colour, the combination, the pricing
+ * scope, the spec group) and each spec field's label — built from what the
+ * comparison already loaded (no query), for the rows shown only. Names are
+ * the product's own data, never a value; a `pricing.*` item exists only in
+ * the owner's comparison (no other viewer has a pricing row).
+ */
+function labelsOf(b: BlockEval, viewer: Viewer): { items: Record<string, Tri>; spec: Record<string, Tri> } {
+  const items: Record<string, Tri> = {};
+  const spec: Record<string, Tri> = {};
+  const s = b.live;
+  if (!s) return { items, spec };
+  const doc = s.doc;
+  const tri = (x: { name_ar?: string; name_en?: string; name_ckb?: string }): Tri => ({ ar: x.name_ar ?? '', en: x.name_en ?? '', ckb: x.name_ckb ?? '' });
+  const nameIn = (x: { name_ar?: string | null; name_en?: string | null; name_ckb?: string | null } | undefined): Tri | null => {
+    if (!x) return null;
+    const ar = x.name_ar || x.name_en || '';
+    const en = x.name_en || x.name_ar || '';
+    const ckb = x.name_ckb || x.name_ar || x.name_en || '';
+    return ar || en || ckb ? { ar, en, ckb } : null;
+  };
+  const comboNames = (combo: string): Tri | null => {
+    const parts = combo.split('|');
+    const optionIds = parts.filter((x) => x.startsWith('o:')).map((x) => x.slice(2));
+    const colourId = parts.find((x) => x.startsWith('c:'))?.slice(2) ?? null;
+    const names = tri(unitNamesOf(doc, optionIds, doc.colors.find((c) => c.id === colourId) ?? null));
+    return names.ar || names.en || names.ckb ? names : null;
+  };
+  const named = (group: string, id: string): Tri | null => {
+    switch (group) {
+      case 'options':
+      case 'pricing.options':
+        return nameIn(doc.options.find((o) => o.id === id));
+      case 'colors':
+      case 'pricing.colors':
+        return nameIn(doc.colors.find((c) => c.id === id));
+      case 'variants': {
+        const v = s.view.variants.find((x) => x.id === id);
+        return v ? comboNames(v.combo_key) : null;
+      }
+      case 'pricing.skus':
+        return comboNames(id);
+      case 'spec_groups': {
+        const g = doc.spec_groups.find((x) => x.id === id);
+        return g ? nameIn({ name_ar: g.title_ar, name_en: g.title_en, name_ckb: g.title_ckb }) : null;
+      }
+      case 'labels': {
+        const l = doc.labels.find((x) => x.id === id);
+        return l ? nameIn({ name_ar: l.text_ar, name_en: l.text_en, name_ckb: l.text_ckb }) : null;
+      }
+      default:
+        return null;
+    }
+  };
+  const specFields = new Map(s.opts.specFields.map((f) => [f.id, f]));
+  const seen = (key: string, nkey: string) => {
+    if (key.startsWith('spec.')) {
+      const id = key.slice(5);
+      const f = specFields.get(id);
+      if (f && !spec[id]) spec[id] = { ar: f.label_ar, en: f.label_en, ckb: SPEC_FIELD_LABEL_CKB[id] ?? f.label_en };
+      return;
+    }
+    const it = itemOfNkey(nkey);
+    if (!it) return;
+    // A pricing scope is named to the owner alone (a non-owner's refused pricing line stays unnamed).
+    if (it.group.startsWith('pricing.') && !viewer.view) return;
+    const k = `${it.group}:${it.id}`;
+    if (k in items) return;
+    const n = named(it.group, it.id);
+    if (n) items[k] = n;
+  };
+  for (const f of b.fields) seen(f.key, f.nkey);
+  for (const d of b.derived) seen(d.key, d.nkey);
+  return { items, spec };
+}
+
 /** The comparison as the sheet reads it (no internal state; private fields only for the owner). */
 function blockDto(b: BlockEval, viewer: Viewer) {
   const s = b.live;
@@ -617,6 +760,7 @@ function blockDto(b: BlockEval, viewer: Viewer) {
       viewer.view && b.pricing && b.pricingAccepted.length
         ? { kind: b.pricing.kind, preview_hash: b.pricing.hash, large_change: b.pricing.large_change, adoption: b.pricing.adoption }
         : null,
+    labels: labelsOf(b, viewer),
     token: b.token,
   };
 }
@@ -633,6 +777,13 @@ function sourceText(body: Record<string, unknown>): string {
 
 const fileError = (status: 400 | 409, code: DataFileRefusalCode, errors: FileError[] = []) =>
   new HttpError(status, dataFileMessage(code), code, { errors });
+
+/** The part an apply writes: absent or empty is everything; anything but the three names is refused. */
+function partOf(raw: unknown): ApplyPart {
+  if (raw === undefined || raw === null || raw === '') return 'all';
+  if (raw === 'all' || raw === 'document' || raw === 'pricing') return raw;
+  throw badRequest('part must be all, document or pricing');
+}
 
 async function previousApply(db: D1Database, productId: string, token: string): Promise<boolean> {
   if (!/^[0-9a-f]{32}$/.test(token)) return false;
@@ -694,10 +845,21 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     if (parsed.blocks.length > MAX_DATA_FILE_PRODUCTS) throw fileError(400, 'DATA_FILE_TOO_MANY');
     const only = typeof body.product_id === 'string' && body.product_id ? body.product_id : null;
     if (only && (parsed.blocks.length !== 1 || parsed.blocks[0].productId !== only)) throw fileError(400, 'DATA_FILE_WRONG_PRODUCT');
+    // A few blocks of a bulk file at a time (the sheet's chunks): each must be a block of this file.
+    let blocks = parsed.blocks;
+    if (body.product_ids !== undefined) {
+      const ids = body.product_ids;
+      if (!Array.isArray(ids) || ids.length < 1 || ids.length > PREVIEW_IDS_MAX || ids.some((id) => typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(id))) {
+        throw fileError(400, 'DATA_FILE_NO_PRODUCT');
+      }
+      const wanted = new Set(ids as string[]);
+      if ([...wanted].some((id) => !parsed.blocks.some((b) => b.productId === id))) throw fileError(400, 'DATA_FILE_WRONG_PRODUCT');
+      blocks = parsed.blocks.filter((b) => wanted.has(b.productId));
+    }
     const viewer = viewerOf(c);
     const seesPrivate = canViewCost(c.env, c.get('user'));
     const products = [];
-    for (const block of parsed.blocks) {
+    for (const block of blocks) {
       const ev = await evaluateBlock(c, deps, block, viewer);
       if (ev.live) ev.completeness = await completenessPreview(c.env.DB, ev, seesPrivate);
       products.push(blockDto(ev, viewer));
@@ -708,38 +870,46 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
         viewer: viewer.view ? 'owner' : 'staff',
         file_viewer: parsed.viewer,
         errors: parsed.errors,
-        malformed: parsed.blocks.flatMap((b) => b.malformed),
+        malformed: blocks.flatMap((b) => b.malformed),
         products,
       })
     );
   });
 
-  // ---- the write: one product, one batch
+  // ---- the write: one product, one batch (past D1's budget: one part a batch)
   routes.post('/data-apply', async (c) => {
     await rateLimit(c, 'tpl_apply', 120, 3600);
-    const db = c.env.DB;
+    // From here on every query is counted: the batch may hold what D1's 1,000 leave (row 207).
+    const counted = countingD1(c.env.DB);
+    const start = counted.executed;
+    const db = counted.db;
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
     const productId = str(body.product_id, 'product_id', { min: 1, max: 80 });
     const token = str(body.token, 'token', { min: 32, max: 32 });
+    const part = partOf(body.part);
     if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw badRequest('confirm_large_change must be true or false');
     const parsed = splitDataFile(sourceText(body));
     if (parsed.errors.some((e) => e.code === 'DATA_FILE_VERSION')) throw fileError(400, 'DATA_FILE_VERSION', parsed.errors);
     const block = parsed.blocks.find((b) => b.productId === productId);
     if (!block) throw fileError(400, 'DATA_FILE_WRONG_PRODUCT');
     const viewer = viewerOf(c);
+    const echoPart = part === 'all' ? {} : { part };
 
-    // A replay of an apply that landed answers as it did — before anything is recomputed.
-    if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId });
+    // A replay of an apply that landed answers as it did — before anything is recomputed (a part's token too).
+    if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId, ...echoPart });
 
-    const ev = await evaluateBlock(c, deps, block, viewer);
+    const ev = await evaluateBlock(c, deps, block, viewer, db);
     const fresh = () => projectForAdmin(c.env, c.get('user'), blockDto(ev, viewer));
     if (ev.error) throw new HttpError(400, ev.error.message, ev.error.code);
-    if (!ev.token) throw new HttpError(400, dataFileMessage('DATA_FILE_NOTHING_TO_APPLY'), 'DATA_FILE_NOTHING_TO_APPLY', { preview: fresh() });
-    if (ev.token !== token) throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED', { preview: fresh() });
+    const expected = await tokenOf(ev, viewer, part);
+    if (!expected) throw new HttpError(400, dataFileMessage('DATA_FILE_NOTHING_TO_APPLY'), 'DATA_FILE_NOTHING_TO_APPLY', { preview: fresh() });
+    if (expected !== token) throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED', { preview: fresh() });
     const state = ev.live!;
 
-    // ---- the pricing door's own gates
-    const pricing = ev.pricingAccepted.length ? ev.pricing : null;
+    // ---- the pricing door's own gates (only when this call writes the pricing part)
+    const pricing = part !== 'document' && ev.pricingAccepted.length ? ev.pricing : null;
+    // A part is only ever offered for data: a price write rides with product lines never (STRUCTURE_WITH_ADOPTION).
+    if (part !== 'all' && pricing?.kind === 'price') throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED', { preview: fresh() });
     if (pricing?.rates?.derived_stale) throw new HttpError(409, serverMessage('FX_DERIVED_STALE'), 'FX_DERIVED_STALE');
     if (pricing?.kind === 'price') {
       const sent = typeof body.pricing_hash === 'string' ? body.pricing_hash : '';
@@ -757,13 +927,14 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
 
     // ---- ONE batch: fence, product, membership, pricing, audit
     const now = new Date().toISOString();
-    const statements: D1PreparedStatement[] = [
-      // Written against the product the comparison read: anything saved since refuses the whole batch.
-      ...fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [productId, state.updatedAt]),
-    ];
+    // Written against the product the comparison read: anything saved since refuses the whole batch.
+    const head = fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [productId, state.updatedAt]);
+    const writesDoc = part !== 'pricing';
+    const docLines = writesDoc ? ev.accepted : [];
+    const docStmts: D1PreparedStatement[] = [];
     let plan: ProductSavePlan | null = null;
     const a = ev.analysis;
-    const docAccepted = ev.accepted.filter((n) => n.head !== 'membership');
+    const docAccepted = docLines.filter((n) => n.head !== 'membership');
     if (a && a.doc && docAccepted.length) {
       plan = await planSave(db, a, docAccepted, ev.patch?.removals ?? {}, productId, state.slug, viewer, false);
       let ps = plan.statements;
@@ -772,19 +943,21 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
         const guard = await serialAnswerFence(db, { productId });
         if (guard) ps = guard.around(ps);
       }
-      statements.push(...ps);
+      docStmts.push(...ps);
     }
-    if (a && a.membership.length) {
+    if (writesDoc && a && a.membership.length) {
       const mp = await deps.planTemplateMembership(db, viewer.id, productId, a.membership);
-      if (mp) statements.push(...mp.statements);
+      if (mp) docStmts.push(...mp.statements);
     }
-    let pricedKey: string | null = null;
+    const pricingLines = pricing ? ev.pricingAccepted : [];
+    const pricingStmts: D1PreparedStatement[] = [];
     if (pricing && pricing.writes && (pricing.writes.inputWrites.length || pricing.writes.ruleWrites.length)) {
       const p = state.pricing!;
       const w = pricing.writes;
-      const audits = [
-        ...w.inputWrites.map((iw) =>
-          pricingAuditStatement(db, {
+      // The values, owner-only, in pricing_audit — the same rows as before, eight to a statement.
+      const auditRows: PricingAuditRow[] = [
+        ...w.inputWrites.map(
+          (iw): PricingAuditRow => ({
             entity: 'input',
             entity_key: `${iw.scope}:${iw.scope_id}`,
             product_id: productId,
@@ -796,40 +969,72 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
             now,
           })
         ),
-        ...w.ruleWrites.map((rw) =>
-          pricingAuditStatement(db, { entity: 'rule', entity_key: `${rw.kind}:${rw.scope}:${rw.scope_id}`, product_id: productId, action: 'rule_set', before: ruleImage(rw.existing), after: ruleImage(rw.next), summary: { source: 'data_file' }, actor: viewer.id, now })
+        ...w.ruleWrites.map(
+          (rw): PricingAuditRow => ({
+            entity: 'rule',
+            entity_key: `${rw.kind}:${rw.scope}:${rw.scope_id}`,
+            product_id: productId,
+            action: 'rule_set',
+            before: ruleImage(rw.existing),
+            after: ruleImage(rw.next),
+            summary: { source: 'data_file' },
+            actor: viewer.id,
+            now,
+          })
         ),
       ];
       if (pricing.kind === 'price' && pricing.ev) {
-        pricedKey = `price:${productId}:${pricing.ev.hash}`;
-        statements.push(
+        pricingStmts.push(
           ...(await engineWriteStatements(db, pricing.ev, w.inputWrites, w.ruleWrites, {
             actor: viewer.id,
             now,
             source: 'data_file',
-            idempotencyKey: pricedKey,
-            extraAudits: audits,
+            idempotencyKey: `price:${productId}:${pricing.ev.hash}`,
+            extraAudits: pricingAuditStatements(db, auditRows),
             auditDetail: { inputs_changed: w.inputWrites.length, rules_changed: w.ruleWrites.length, via: 'data_file' },
+            pack: true,
           }))
         );
       } else {
-        statements.push(...batchHead(db, p.stored, now), ...inputStatements(db, productId, w.inputWrites, viewer.id, now), ...ruleStatements(db, productId, w.ruleWrites, viewer.id, now), ...audits, ...batchTail(db, productId));
+        pricingStmts.push(
+          ...batchHead(db, p.stored, now),
+          ...inputStatements(db, productId, w.inputWrites, viewer.id, now, { pack: true }),
+          ...ruleStatements(db, productId, w.ruleWrites, viewer.id, now, { pack: true }),
+          ...pricingAuditStatements(db, auditRows),
+          ...batchTail(db, productId)
+        );
       }
     }
     // The trail: which keys, how many — never a value (values live in pricing_audit / price_history).
-    const appliedKeys = [...ev.accepted, ...ev.pricingAccepted].map((n) => n.key);
+    const written = [...docLines, ...pricingLines];
+    const appliedKeys = written.map((n) => n.key);
     const detail = {
       token,
+      ...echoPart,
       keys: appliedKeys.slice(0, 80),
       changed: appliedKeys.length,
-      private_changed: [...ev.accepted, ...ev.pricingAccepted].filter((n) => isPrivateEntry(n)).length,
-      prices_changed: ev.accepted.filter((n) => isPriceEntry(n)).length,
-      derived: ev.derived.length,
+      private_changed: written.filter((n) => isPrivateEntry(n)).length,
+      prices_changed: docLines.filter((n) => isPriceEntry(n)).length,
+      derived: writesDoc ? ev.derived.length : 0,
       pricing: pricing?.kind ?? 'none',
       refused: ev.fields.filter((f) => f.status !== 'change' && f.status !== 'STALE_IN_FILE').length,
     };
-    statements.push(...(await auditStatements(db, viewer.id, 'product.data_file.applied', productId, detail)).statements);
-    if (statements.length > STATEMENT_CAP) throw new HttpError(409, dataFileMessage('DATA_FILE_TOO_LARGE'), 'DATA_FILE_TOO_LARGE');
+    const auditStmts = (await auditStatements(db, viewer.id, 'product.data_file.applied', productId, detail)).statements;
+    const statements: D1PreparedStatement[] = [...head, ...docStmts, ...pricingStmts, ...auditStmts];
+
+    // ---- what D1's 1,000 leave for this batch, counted
+    const spent = counted.executed - start;
+    const allowance = dataApplyAllowance(spent);
+    if (statements.length > allowance) {
+      const docSize = docStmts.length ? head.length + docStmts.length + auditStmts.length : 0;
+      const prSize = pricingStmts.length ? head.length + pricingStmts.length + auditStmts.length : 0;
+      const partDto = async (p: 'document' | 'pricing', size: number) => (size ? { token: await tokenOf(ev, viewer, p), statements: size, fits: size <= allowance } : undefined);
+      // Counts and hashes only — never a value.
+      const details = { needed: statements.length, allowance, spent, parts: { document: await partDto('document', docSize), pricing: await partDto('pricing', prSize) } };
+      if (part === 'all' && docSize && prSize && docSize <= allowance) throw new HttpError(409, dataFileMessage('DATA_FILE_TOO_LARGE'), 'DATA_FILE_TOO_LARGE', details);
+      if (docSize > allowance) throw new HttpError(409, dataFileMessage('DATA_FILE_PRODUCT_TOO_LARGE'), 'DATA_FILE_PRODUCT_TOO_LARGE', details);
+      throw new HttpError(409, dataFileMessage('DATA_FILE_PRICING_TOO_LARGE'), 'DATA_FILE_PRICING_TOO_LARGE', details);
+    }
 
     try {
       if (plan) await saveProductAtomic(db, { ...plan, statements });
@@ -837,10 +1042,10 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(msg)) {
-        if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId });
+        if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId, ...echoPart });
         throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED');
       }
-      if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return c.json({ success: true, already: true, product_id: productId });
+      if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return c.json({ success: true, already: true, product_id: productId, ...echoPart });
       if (/ENGINE_MANAGED/.test(msg)) throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
       if (msg.includes('UNIQUE') && msg.includes('products.sku')) throw new HttpError(400, 'sku: already used by another product / رمز المنتج مستخدم في منتج آخر', 'SKU_TAKEN');
       const refusal = engineDbRefusal(e);
@@ -850,12 +1055,12 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     await afterCatalogueWrite(c, [state.slug]);
     c.set('completenessIds', [productId]);
 
-    // Read back: every accepted line now reads as the file wrote it.
+    // Read back: every product line this call wrote now reads as the file wrote it.
     const after = await liveState(db, deps, productId, viewer);
     const notPersisted: string[] = [];
     if (typeof after !== 'string') {
       const now2 = new Map(after.list.map((n) => [n.nkey, n]));
-      for (const n of ev.accepted) {
+      for (const n of docLines) {
         if (n.meta || n.item?.isNew || n.head === 'spec') continue;
         if (/^[+-]\d+$/.test((n.value ?? '').trim())) continue; // an increase is stored as its adjustment
         const stored = now2.get(n.nkey);
@@ -868,8 +1073,9 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
         success: true,
         already: false,
         product_id: productId,
+        ...echoPart,
         applied: appliedKeys,
-        derived: ev.derived.map((d) => d.key),
+        derived: writesDoc ? ev.derived.map((d) => d.key) : [],
         priced: pricing?.kind === 'price',
         not_persisted: notPersisted,
         updated_at: typeof after === 'string' ? null : after.updatedAt,

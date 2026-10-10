@@ -226,11 +226,22 @@ export interface ProductInputsDraft {
   iqd: IqdEntry[];
 }
 
+/**
+ * How many entries one parse takes. The form's own doors pass nothing (61
+ * scopes, 60 rules); the data file passes the product's own scope count — each
+ * entry still names one of its scopes exactly once, and the apply's statement
+ * allowance bounds the batch (worker/routes/templateDataFile.ts).
+ */
+export interface ParseLimits {
+  scopes?: number;
+  rules?: number;
+}
+
 /** Parse the form's `{inputs, rules}` (PUT and the preview alike). */
-export function parseProductInputs(body: Record<string, unknown>, loaded: LoadedProduct, stored: ProductPricingData, cx: FormParseContext): ProductInputsDraft {
+export function parseProductInputs(body: Record<string, unknown>, loaded: LoadedProduct, stored: ProductPricingData, cx: FormParseContext, limits: ParseLimits = {}): ProductInputsDraft {
   const ids = formScopeIds(loaded);
   const rawInputs = body.inputs ?? [];
-  if (!Array.isArray(rawInputs) || rawInputs.length > MAX_SCOPES) throw inputInvalid('inputs');
+  if (!Array.isArray(rawInputs) || rawInputs.length > (limits.scopes ?? MAX_SCOPES)) throw inputInvalid('inputs');
   const seen = new Set<string>();
   const iqd: IqdEntry[] = [];
   const inputs = rawInputs.map((raw, i) => {
@@ -244,7 +255,7 @@ export function parseProductInputs(body: Record<string, unknown>, loaded: Loaded
   });
   const rawRules = body.rules ?? [];
   if (!Array.isArray(rawRules)) throw inputInvalid('rules');
-  const rules = rawRules.length ? parseRuleWrites({ rules: rawRules }, loaded.id, ids, stored) : [];
+  const rules = rawRules.length ? parseRuleWrites({ rules: rawRules }, loaded.id, ids, stored, { max: limits.rules }) : [];
   return { inputs, rules, iqd };
 }
 
