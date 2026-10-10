@@ -125,6 +125,25 @@ export interface UsdPricingFormStrings {
   notSavedAlone: Fill;
   boxLabel: string;
   converted: Fill3;
+  // ---- after the verifiers' round (2026-10-10) ----
+  /** The product form's own chrome (the bar and section ٨'s summary): saved. */
+  savedShort: string;
+  /** An engine product's held save after «نشر»/«مسودة»: the product's own edits were saved a moment ago. */
+  sheetProductSaved: string;
+  /** A ready review's confirm refused: the data is stored, the price was not adopted. */
+  adoptNotDone: Fill;
+  /** After adoption: the store price follows this data (instead of «pricesLater»). */
+  pricesEngine: string;
+  /** Under the dinar field before the preview's conversion is in: the rate a save converts at. */
+  iqdAtRate: Fill;
+  /** Dinars not converted at a rate the owner had not seen (FX plan §12): the new conversion, and save again. */
+  rateUnseen: Fill3;
+  /** The rest of a save was stored; the typed dinars were not (their reason follows). */
+  restSavedWithheld: Fill;
+  /** The box or weight a pricing save carried is stored for pricing; the product's own measures wait for «نشر». */
+  measuresForPricingOnly: string;
+  /** Leaving with package measures not saved with the product. */
+  leaveMeasures: string;
 }
 
 const ar: UsdPricingFormStrings = {
@@ -207,7 +226,7 @@ const ar: UsdPricingFormStrings = {
   currencyNeeded: 'اختر عملة المورد لهذا المبلغ',
   iqdNeedsRate: 'لا يوجد سعر دولار معتمد بعد، فلا يمكن تحويل الدينار. اعتمد سعر الصرف من «التسعير والشحن»، أو أدخل التكلفة بعملة المورد (USD أو EUR أو CNY).',
   currencyIqdNoRate: 'دينار — يحتاج سعر دولار معتمد',
-  ratesNoUsd: 'لا يوجد سعر دولار معتمد بعد: تُحفظ بيانات التسعير هنا كما تكتبها، ولا يُحسب سعر جديد حتى تعتمد أسعار الصرف في «التسعير والشحن».',
+  ratesNoUsd: 'لا يوجد سعر دولار معتمد بعد: ما تكتبه هنا يُحفظ بزر «حفظ التسعير بالدولار» أو «نشر» أو «مسودة»، ولا يُحسب سعر جديد حتى تعتمد أسعار الصرف في «التسعير والشحن».',
   ratesDerivedStale: 'أسعار الصرف المشتقة تحتاج تحديثًا في «التسعير والشحن»؛ لا يُحفظ التسعير قبل ذلك.',
   centralMissing: (l) => `ينقص من الإعدادات المركزية: ${l}`,
   openPricingTab: 'افتح «التسعير والشحن»',
@@ -220,7 +239,7 @@ const ar: UsdPricingFormStrings = {
   heldCancelled: 'لم يُحفظ التسعير: أُلغيت مراجعة الأسعار الجديدة، وما كتبته باقٍ في الحقول',
   savedLater: 'بيانات التسعير محفوظة؛ يبقى سعر المتجر كما هو حتى تعتمد السعر الجديد',
   later: 'لاحقًا — البيانات محفوظة',
-  sheetDataSaved: 'بيانات التسعير محفوظة. لا يتغير سعر المتجر إلا إذا اعتمدت الأسعار أدناه.',
+  sheetDataSaved: 'بيانات التسعير محفوظة مسبقًا. الحفظ هنا لا يحفظها من جديد: يكتب الأسعار أدناه في المتجر فقط، و«لاحقًا» يُبقي سعر المتجر كما هو.',
   sheetNothingSaved: 'لم يُحفظ شيء بعد: هذا المنتج مسعّر تلقائيًا، فتُحفظ تغييراتك مع أسعاره الجديدة معًا.',
   signInAgain: 'سجّل الدخول مجددًا (البيانات محفوظة)',
   pricingUnsaved: 'تغييرات تسعير غير محفوظة',
@@ -230,6 +249,15 @@ const ar: UsdPricingFormStrings = {
   notSavedAlone: (m) => `لم يُحفظ التسعير بالدولار: ${m}`,
   boxLabel: 'أبعاد الصندوق',
   converted: (a, u, r) => `حُوِّل ${a} د.ع إلى $${u} بسعر ${r}`,
+  savedShort: 'محفوظ',
+  sheetProductSaved: 'حُفظ المنتج نفسه، أما تغييرات التسعير فلم تُحفظ بعد: هذا المنتج مسعّر تلقائيًا، فتُحفظ مع أسعاره الجديدة معًا عند التأكيد أدناه.',
+  adoptNotDone: (m) => `بيانات التسعير محفوظة، ولم يُعتمد السعر الجديد: ${m}`,
+  pricesEngine: 'هذا المنتج مسعّر تلقائيًا: يُكتب سعر المتجر من هذه البيانات، وتُعرض عليك الأسعار الجديدة قبل كل حفظ.',
+  iqdAtRate: (rate) => `يُحوَّل عند الحفظ بسعر الدولار المعتمد: ${rate} د.ع للدولار`,
+  rateUnseen: (a, u, r) => `سعر الدولار المعتمد الآن ${r} د.ع: ${a} د.ع تصبح $${u}. لم تُحفظ تكلفة المورد بالدينار لأنك لم ترَ هذا السعر قبل الحفظ؛ احفظ مرة أخرى لتُحفظ به.`,
+  restSavedWithheld: (m) => `حُفظت بقية بيانات التسعير، ولم تُحفظ تكلفة المورد بالدينار: ${m}`,
+  measuresForPricingOnly: 'حُفظ قياس الصندوق أو الوزن للتسعير؛ أما قياسات المنتج نفسه في «الأبعاد والوزن» فتُحفظ بزر «نشر» أو «مسودة».',
+  leaveMeasures: 'قياسات الصندوق أو الوزن التي عدّلتها لم تُحفظ مع المنتج بعد، وستضيع إن خرجت الآن. هل تخرج؟',
 };
 
 const en: UsdPricingFormStrings = {
@@ -312,7 +340,7 @@ const en: UsdPricingFormStrings = {
   currencyNeeded: 'Choose the supplier currency for this amount',
   iqdNeedsRate: 'There is no approved dollar rate yet, so dinars cannot be converted. Approve the rate in «Pricing & shipping», or enter the cost in the supplier’s currency (USD, EUR or CNY).',
   currencyIqdNoRate: 'IQD — needs an approved dollar rate',
-  ratesNoUsd: 'No approved dollar rate yet: the pricing data is saved here as you type it, and no new price is computed until you approve the exchange rates in «Pricing & shipping».',
+  ratesNoUsd: 'No approved dollar rate yet: what you enter here is saved with «Save USD pricing», «Publish» or «Draft», and no new price is computed until you approve the exchange rates in «Pricing & shipping».',
   ratesDerivedStale: 'The derived exchange rates need refreshing in «Pricing & shipping»; pricing cannot be saved until then.',
   centralMissing: (l) => `Missing from the central settings: ${l}`,
   openPricingTab: 'Open «Pricing & shipping»',
@@ -325,7 +353,7 @@ const en: UsdPricingFormStrings = {
   heldCancelled: 'Pricing not saved: the price review was cancelled; what you typed is still in the fields',
   savedLater: 'The pricing data is saved; the store price stays as it is until you adopt the new price',
   later: 'Later — the data is saved',
-  sheetDataSaved: 'The pricing data is saved. The store price changes only if you adopt the prices below.',
+  sheetDataSaved: 'The pricing data is already saved. Saving here does not save it again: it only writes the prices below to the store, and «Later» keeps the store price as it is.',
   sheetNothingSaved: 'Nothing is saved yet: this product is priced automatically, so your changes are saved together with its new prices.',
   signInAgain: 'Sign in again (the data is saved)',
   pricingUnsaved: 'Unsaved pricing changes',
@@ -335,6 +363,15 @@ const en: UsdPricingFormStrings = {
   notSavedAlone: (m) => `USD pricing not saved: ${m}`,
   boxLabel: 'Box dimensions',
   converted: (a, u, r) => `${a} IQD converted to $${u} at ${r}`,
+  savedShort: 'Saved',
+  sheetProductSaved: 'The product itself is saved, but the pricing changes are not saved yet: this product is priced automatically, so they are saved together with its new prices when you confirm below.',
+  adoptNotDone: (m) => `The pricing data is saved, but the new price was not adopted: ${m}`,
+  pricesEngine: 'This product is priced automatically: its store price is written from this data, and the new prices are shown to you before every save.',
+  iqdAtRate: (rate) => `Converted when saved at the approved dollar rate: ${rate} IQD per dollar`,
+  rateUnseen: (a, u, r) => `The approved dollar rate is now ${r} IQD: ${a} IQD becomes $${u}. The supplier cost in dinars was not saved because you had not seen this rate before saving; save again to store it at this rate.`,
+  restSavedWithheld: (m) => `The rest of the pricing data is saved; the supplier cost in dinars is not: ${m}`,
+  measuresForPricingOnly: 'The box or weight is saved for pricing; the product’s own measurements in “Dimensions & weight” are saved with “Publish” or “Draft”.',
+  leaveMeasures: 'The box or weight you changed is not saved with the product yet and will be lost if you leave now. Leave anyway?',
 };
 
 const ckb: UsdPricingFormStrings = {
@@ -417,8 +454,8 @@ const ckb: UsdPricingFormStrings = {
   currencyNeeded: 'دراوی دابینکەر بۆ ئەم بڕە هەڵبژێرە',
   iqdNeedsRate: 'هێشتا نرخێکی پەسەندکراوی دۆلار نییە، بۆیە دینار ناگۆڕدرێت. نرخی ئاڵوگۆڕ لە «نرخدانان و ناردنی بەرهەم» پەسەند بکە، یان تێچووەکە بە دراوی دابینکەر بنووسە (USD یان EUR یان CNY).',
   currencyIqdNoRate: 'دینار — نرخێکی پەسەندکراوی دۆلاری دەوێت',
-  ratesNoUsd: 'هێشتا نرخێکی پەسەندکراوی دۆلار نییە: زانیارییەکانی نرخدانان وەک خۆی لێرە پاشەکەوت دەکرێن، و هیچ نرخێکی نوێ هەژمار ناکرێت تا نرخەکانی ئاڵوگۆڕ لە «نرخدانان و ناردنی بەرهەم» پەسەند دەکەیت.',
-  ratesDerivedStale: 'نرخە داڕێژراوەکانی ئاڵوگۆڕ پێویستیان بە نوێکردنەوە هەیە لە «نرخدانان و ناردنی بەرهەم»؛ تا ئەو کاتە نرخدانان پاشەکەوت ناکرێت.',
+  ratesNoUsd: 'هێشتا نرخێکی پەسەندکراوی دۆلار نییە: ئەوەی لێرە دەینووسیت بە دوگمەی «پاشەکەوتکردنی نرخدانان بە دۆلار» یان «بڵاوکردنەوە» یان «ڕەشنووس» پاشەکەوت دەکرێت، و هیچ نرخێکی نوێ هەژمار ناکرێت تا نرخەکانی ئاڵوگۆڕ لە «نرخدانان و ناردنی بەرهەم» پەسەند دەکەیت.',
+  ratesDerivedStale: 'نرخە دەرهێنراوەکانی ئاڵوگۆڕ پێویستیان بە نوێکردنەوە هەیە لە «نرخدانان و ناردنی بەرهەم»؛ تا ئەو کاتە نرخدانان پاشەکەوت ناکرێت.',
   centralMissing: (l) => `لە ڕێکخستنە ناوەندییەکاندا کەمە: ${l}`,
   openPricingTab: '«نرخدانان و ناردنی بەرهەم» بکەرەوە',
   routeFirst: 'سەرەتا «ڕێگای بنەڕەتیی ناردن» هەڵبژێرە بۆ ئەوەی خانەکانی کێش یان پێوانەی سندوق دەربکەون',
@@ -430,7 +467,7 @@ const ckb: UsdPricingFormStrings = {
   heldCancelled: 'نرخدانان پاشەکەوت نەکرا: پێداچوونەوەی نرخە نوێیەکان هەڵوەشێنرایەوە؛ ئەوەی نووسیوتە هێشتا لە خانەکاندایە',
   savedLater: 'زانیارییەکانی نرخدانان پاشەکەوت کراون؛ نرخی فرۆشگا وەک خۆی دەمێنێتەوە تا نرخە نوێیەکە پەسەند دەکەیت',
   later: 'دواتر — زانیارییەکان پاشەکەوت کراون',
-  sheetDataSaved: 'زانیارییەکانی نرخدانان پاشەکەوت کراون. نرخی فرۆشگا تەنها ئەو کاتە دەگۆڕێت کە نرخەکانی خوارەوە پەسەند بکەیت.',
+  sheetDataSaved: 'زانیارییەکانی نرخدانان پێشتر پاشەکەوت کراون. پاشەکەوتکردن لێرەدا دووبارە پاشەکەوتیان ناکاتەوە: تەنها نرخەکانی خوارەوە لە فرۆشگادا دەنووسێت، و «دواتر» نرخی فرۆشگا وەک خۆی دەهێڵێتەوە.',
   sheetNothingSaved: 'هێشتا هیچ پاشەکەوت نەکراوە: ئەم بەرهەمە بە خۆکاری نرخی بۆ دادەنرێت، بۆیە گۆڕانکارییەکانت لەگەڵ نرخە نوێیەکانیدا پێکەوە پاشەکەوت دەکرێن.',
   signInAgain: 'دووبارە بچۆ ژوورەوە (زانیارییەکان پاشەکەوت کراون)',
   pricingUnsaved: 'گۆڕانکاریی نرخدانانی پاشەکەوتنەکراو',
@@ -440,6 +477,15 @@ const ckb: UsdPricingFormStrings = {
   notSavedAlone: (m) => `نرخدانان بە دۆلار پاشەکەوت نەکرا: ${m}`,
   boxLabel: 'پێوانەکانی سندوق',
   converted: (a, u, r) => `${a} د.ع گۆڕدرا بۆ $${u} بە نرخی ${r}`,
+  savedShort: 'پاشەکەوت کراوە',
+  sheetProductSaved: 'بەرهەمەکە خۆی پاشەکەوت کرا، بەڵام گۆڕانکارییەکانی نرخدانان هێشتا پاشەکەوت نەکراون: ئەم بەرهەمە بە خۆکاری نرخی بۆ دادەنرێت، بۆیە لەگەڵ نرخە نوێیەکانیدا پێکەوە پاشەکەوت دەکرێن کاتێک لە خوارەوە پشتڕاستی دەکەیتەوە.',
+  adoptNotDone: (m) => `زانیارییەکانی نرخدانان پاشەکەوت کراون، بەڵام نرخە نوێیەکە پەسەند نەکرا: ${m}`,
+  pricesEngine: 'ئەم بەرهەمە بە خۆکاری نرخی بۆ دادەنرێت: نرخی فرۆشگا لەم زانیارییانەوە دەنووسرێت، و نرخە نوێیەکان پێش هەر پاشەکەوتکردنێک پیشانت دەدرێن.',
+  iqdAtRate: (rate) => `لە کاتی پاشەکەوتکردندا بە نرخی پەسەندکراوی دۆلار دەگۆڕدرێت: ${rate} د.ع بۆ هەر دۆلارێک`,
+  rateUnseen: (a, u, r) => `نرخی پەسەندکراوی دۆلار ئێستا ${r} د.ع یە: ${a} د.ع دەبێتە $${u}. تێچووی دابینکەر بە دینار پاشەکەوت نەکرا چونکە پێش پاشەکەوتکردن ئەم نرخەت نەبینیبوو؛ دووبارە پاشەکەوت بکە بۆ ئەوەی بەم نرخە پاشەکەوت بکرێت.`,
+  restSavedWithheld: (m) => `باقی زانیارییەکانی نرخدانان پاشەکەوت کران، بەڵام تێچووی دابینکەر بە دینار پاشەکەوت نەکرا: ${m}`,
+  measuresForPricingOnly: 'پێوانەی سندوق یان کێش بۆ نرخدانان پاشەکەوت کرا؛ بەڵام پێوانەکانی خودی بەرهەمەکە لە «پێوانەکان و کێش» بە دوگمەی «بڵاوکردنەوە» یان «ڕەشنووس» پاشەکەوت دەکرێن.',
+  leaveMeasures: 'ئەو پێوانەی سندوق یان کێشەی گۆڕیوتە هێشتا لەگەڵ بەرهەمەکە پاشەکەوت نەکراوە، و ئەگەر ئێستا دەربچیت لەدەست دەچێت. هەر دەردەچیت؟',
 };
 
 export const USD_PRICING_FORM_STRINGS: Readonly<Record<Language, UsdPricingFormStrings>> = { ar, en, ckb };

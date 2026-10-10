@@ -221,11 +221,12 @@ test('the product form: every mount point is the owner’s, the document never c
 
   const section = codeOf('src/components/adminProducts/form/UsdPricingSection.tsx');
   // Every request of the section goes to the pricing door: the save path's `io` (a product's inputs and
-  // preview, nothing else), the live read and preview, the sheet's confirm and «رجوع إلى التسعير اليدوي».
+  // preview, nothing else), the live read and preview, the sheet's confirm and «رجوع إلى التسعير اليدوي» —
+  // and, for a NEW product, the central rates' read (is a dollar rate approved? verifier F2).
   const calls = [...section.matchAll(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\s*<[^>]*>\(\s*([^,\n]+?)\s*,/g)].map((m) => m[1]);
-  assert.equal(calls.length, 7, String(calls));
-  assert.equal((section.match(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\b/g) ?? []).length, 7, 'no request outside the seven above');
-  for (const p of calls) assert.match(p!, /^(?:p|inputsPath\([^)]*\)|previewPath\([^)]*\)|`\$\{PRICING\}\/products\/[^`]*`)$/, p);
+  assert.equal(calls.length, 8, String(calls));
+  assert.equal((section.match(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\b/g) ?? []).length, 8, 'no request outside the eight above');
+  for (const p of calls) assert.match(p!, /^(?:p|inputsPath\([^)]*\)|previewPath\([^)]*\)|`\$\{PRICING\}\/products\/[^`]*`|`\$\{PRICING\}\/rates`)$/, p);
   assert.match(section, /export const inputsPath = \(pid: string\) => `\$\{PRICING\}\/products\/\$\{encodeURIComponent\(pid\)\}\/inputs`;/);
   assert.match(section, /export const previewPath = \(pid: string\) => `\$\{PRICING\}\/products\/\$\{encodeURIComponent\(pid\)\}\/preview`;/);
   // The `io` the save path is handed reads, previews and writes exactly those two paths.
@@ -304,16 +305,21 @@ test('the form: the sheet at its root, leaving asks while pricing is unsaved, th
   assert.equal((form.match(/onClick=\{leave\}/g) ?? []).length, 2);
   assert.doesNotMatch(form, /onClick=\{onBack\}/);
   assert.match(form, /const pricingAtRisk = canSeeCost && \(pricing\.touched \|\| \(!!pricing\.review && !pricing\.review\.stored\)\);/);
-  assert.match(form, /window\.confirm\(us\.leaveUnsaved\)/);
+  // Unsaved pricing first, then package measures not saved with the product (verifier F4).
+  assert.match(form, /const leaveWarning = pricingAtRisk \? us\.leaveUnsaved : measuresUnsaved \? us\.leaveMeasures : null;/);
+  assert.match(form, /if \(leaveWarning && !window\.confirm\(leaveWarning\)\) return;/);
   assert.match(form, /addEventListener\('beforeunload', warn\)/);
+  // The dashboard's sidebar asks the same question (verifier F3).
+  assert.match(form, /const release = setLeaveGuard\(\(\) => window\.confirm\(leaveWarning\)\);/);
   assert.ok(form.indexOf("addEventListener('beforeunload'") < form.indexOf('if (loading) {'), 'a hook like the others, above the early returns');
   assert.match(form, /data-pricing-status=\{pricing\.outcome\.kind\}/);
   assert.match(form, /onClick=\{\(\) => showPricing\(pricing\.outcome\?\.section \?\? 3\)\}/);
   assert.match(form, /data-pricing-status="product-error"/);
-  assert.match(form, /summary=\{dirty \|\| \(canSeeCost && pricing\.touched\) \? 'تغييرات غير محفوظة' : 'محفوظ'\}/);
+  assert.match(form, /summary=\{dirty \|\| \(canSeeCost && pricing\.touched\) \? us\.unsaved : us\.savedShort\}/);
   const section = codeOf('src/components/adminProducts/form/UsdPricingSection.tsx');
   assert.match(section, /cancelLabel=\{review\.stored \? s\.later : undefined\}/);
-  assert.match(section, /note=\{review\.stored \? s\.sheetDataSaved : s\.sheetNothingSaved\}/);
+  assert.match(section, /intro=\{review\.stored \? s\.sheetDataSaved : undefined\}/);
+  assert.match(section, /note=\{review\.stored \? undefined : review\.withProduct \? s\.sheetProductSaved : s\.sheetNothingSaved\}/);
   assert.match(section, /data_only: true/);
   assert.match(codeOf('src/components/adminOperations/EngineSaveSheet.tsx'), /\{cancelLabel \?\? s\.cancel\}/);
 });

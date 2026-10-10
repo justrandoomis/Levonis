@@ -8,6 +8,7 @@ import {
 } from '../../../lib/productTypes';
 import { Field, Grid, btnGhost } from './formUi';
 import { toAsciiDigits } from '../../../lib/localeNumber';
+import { useOptionalLanguage } from '../../../LanguageContext';
 
 
 /** Format a canonical integer without floating-point arithmetic. */
@@ -25,8 +26,10 @@ export function formatScaledInteger(value: number | null, scale: 10 | 1000): str
  */
 export function parseScaledInteger(text: string, scale: 10 | 1000): number | null {
   // Arabic-Indic digits and the Arabic decimal separator are read as typed (owner report 2026-10-10:
-  // «٦٠» in a box field was dropped key by key and the box never reached pricing).
-  const clean = toAsciiDigits(text).trim().replace(/\u066b/g, '.');
+  // «٦٠» in a box field was dropped key by key and the box never reached pricing) — and a DECIMAL comma
+  // too, as the cost and the CBM read it (typedDecimalText): «60,5» is 60.5; «1,500» stays unreadable
+  // (a thousands separator or a decimal comma? never guessed).
+  const clean = toAsciiDigits(text).trim().replace(/\u066b/g, '.').replace(/^(\d+),(\d{0,2})$/, '$1.$2');
   if (clean === '') return null;
   const precision = String(scale).length - 1;
   const match = clean.match(new RegExp(`^(\\d+)(?:\\.(\\d{0,${precision}}))?$`));
@@ -58,6 +61,13 @@ export function inheritedMeasurementPlaceholder(
   return `Inherited / من الأعلى · ${formatted} ${unit}`;
 }
 
+/** Under a measurement whose text cannot be read: never a silent drop (the value stays the last one read). */
+const UNREADABLE: Readonly<Record<'ar' | 'en' | 'ckb', (example: string) => string>> = {
+  ar: (ex) => `رقم غير مقروء، فلن يُحفظ؛ اكتبه مثل ${ex}`,
+  en: (ex) => `This number cannot be read, so it will not be saved; write it like ${ex}`,
+  ckb: (ex) => `ئەم ژمارەیە ناخوێندرێتەوە، بۆیە پاشەکەوت ناکرێت؛ وەک ${ex} بینووسە`,
+};
+
 export function MeasurementInput({
   value,
   inherited,
@@ -76,8 +86,11 @@ export function MeasurementInput({
     if (!focused) setText(formatScaledInteger(value, scale));
   }, [value, focused, scale]);
 
+  const lang = useOptionalLanguage();
   const inheritedText = inheritedMeasurementPlaceholder(inherited, scale);
+  const unreadable = focused && text.trim() !== '' && parseScaledInteger(text, scale) === null;
   return (
+    <>
     <input
       className="lv-input text-sm"
       dir="ltr"
@@ -101,7 +114,14 @@ export function MeasurementInput({
         // that will really be saved rather than implying otherwise.
         setText(formatScaledInteger(value, scale));
       }}
+      aria-invalid={unreadable || undefined}
     />
+    {unreadable && (
+      <p className="mt-1 text-[11px] text-red-300" role="status" data-measure-unreadable>
+        {(UNREADABLE[lang === 'en' || lang === 'ckb' ? lang : 'ar'])(scale === 10 ? '60.5' : '1.25')}
+      </p>
+    )}
+    </>
   );
 }
 

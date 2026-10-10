@@ -131,6 +131,10 @@ import PrinterFitsSection from './form/PrinterFitsSection';
 import { ImagesSection } from './form/ImagesSection';
 import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
+import { setLeaveGuard } from '../../lib/leaveGuard';
+
+/** The package measurements pricing reads (the box and the packed weight): their unsaved edits are guarded on leaving. */
+const PACKAGE_MEASURE_KEYS = ['package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm'] as const;
 
 interface TemplateField {
   id: string;
@@ -780,22 +784,38 @@ export default function ProductForm({
   const us = usdPricingFormStrings(lang);
   const usEn = USD_PRICING_FORM_STRINGS.en;
   // THE OWNER'S PRICING NEVER LEAVES SILENTLY (owner report 2026-10-10): typed values that are not saved —
-  // or a held engine save waiting in its sheet — live only in this page, so leaving it asks first. The
-  // product's own unsaved edits are not guarded here (as before).
+  // or a held engine save waiting in its sheet — live only in this page, so leaving it asks first. So do
+  // the package measurements pricing reads (the box and weight), once edited and not saved with the
+  // product: «حفظ التسعير بالدولار» stores them for pricing only (verifier F4). Every way out asks — «رجوع»,
+  // the browser, and the dashboard's sidebar, drawer and menus (lib/leaveGuard.ts; verifier F3). The
+  // product's other unsaved edits are not guarded here (as before).
   const pricingAtRisk = canSeeCost && (pricing.touched || (!!pricing.review && !pricing.review.stored));
+  const measuresUnsaved = useMemo(() => {
+    if (!canSeeCost || baseline === '') return false;
+    const same = (a: ProductDimensionsV2 | null | undefined, b: ProductDimensionsV2 | null | undefined) =>
+      PACKAGE_MEASURE_KEYS.every((k) => (a?.[k] ?? null) === (b?.[k] ?? null));
+    const differs = (now: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>, saved: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>) =>
+      Object.entries(now).some(([id, d]) => !same(d, saved[id]));
+    return !same(doc.dimensions, savedMeasures.base) || differs(optionDimensions, savedMeasures.options) || differs(colourDimensions, savedMeasures.colours) || differs(skuDimensions, savedMeasures.skus);
+  }, [canSeeCost, baseline, doc.dimensions, savedMeasures, optionDimensions, colourDimensions, skuDimensions]);
+  const leaveWarning = pricingAtRisk ? us.leaveUnsaved : measuresUnsaved ? us.leaveMeasures : null;
   const leave = () => {
-    if (pricingAtRisk && !window.confirm(us.leaveUnsaved)) return;
+    if (leaveWarning && !window.confirm(leaveWarning)) return;
     onBack();
   };
   useEffect(() => {
-    if (!pricingAtRisk) return;
+    if (!leaveWarning) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [pricingAtRisk]);
+    const release = setLeaveGuard(() => window.confirm(leaveWarning));
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+      release();
+    };
+  }, [leaveWarning]);
   /** «اعرض»: the section the pricing outcome names, opened and scrolled to (٣ the product, ٥ its models). */
   const showPricing = (n: 3 | 5) => {
     setOpen(n);
@@ -2163,7 +2183,7 @@ export default function ProductForm({
         n={8}
         ar="المعاينة والحفظ"
         en="Preview & save"
-        summary={dirty || (canSeeCost && pricing.touched) ? 'تغييرات غير محفوظة' : 'محفوظ'}
+        summary={dirty || (canSeeCost && pricing.touched) ? us.unsaved : us.savedShort}
         {...section(8)}
       >
         <div className="space-y-2 text-[12px] text-text-secondary min-w-0">
@@ -2231,9 +2251,9 @@ export default function ProductForm({
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 {saveErr}
               </span>
-            ) : canSeeCost && pricing.outcome && (pricing.outcome.kind === 'refused' || pricing.outcome.kind === 'invalid') ? (
+            ) : canSeeCost && pricing.outcome && (pricing.outcome.kind === 'refused' || pricing.outcome.kind === 'invalid' || pricing.outcome.kind === 'partial') ? (
               // EVERY PRICING OUTCOME IS SAID WHERE «نشر» IS PRESSED (owner report 2026-10-10: «محفوظ ✓» over a lost save).
-              <span className="text-red-400 flex min-w-0 items-center gap-1" title={pricing.outcome.text} data-pricing-status={pricing.outcome.kind}>
+              <span className={`${pricing.outcome.kind === 'partial' ? 'text-amber-300' : 'text-red-400'} flex min-w-0 items-center gap-1`} title={pricing.outcome.text} data-pricing-status={pricing.outcome.kind}>
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 <span className="min-w-0 truncate">{pricing.outcome.text}</span>
                 <button type="button" className="underline ms-1 shrink-0" onClick={() => showPricing(pricing.outcome?.section ?? 3)}>
@@ -2245,7 +2265,7 @@ export default function ProductForm({
                 {pricing.review.stored ? us.readyWaiting : us.heldNotSaved}
               </span>
             ) : dirty ? (
-              <span className="text-amber-300">تغييرات غير محفوظة</span>
+              <span className="text-amber-300">{us.unsaved}</span>
             ) : canSeeCost && pricing.touched ? (
               <span className="text-amber-300" title={us.pricingUnsaved} data-pricing-status="unsaved">
                 {us.pricingUnsaved}
@@ -2261,7 +2281,7 @@ export default function ProductForm({
               </span>
             ) : (
               <span className="text-emerald-300 inline-flex items-center gap-1" data-pricing-status={canSeeCost && pricing.outcome?.kind === 'saved' ? 'saved' : undefined}>
-                <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? 'محفوظ'}
+                <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? us.savedShort}
               </span>
             )}
           </span>

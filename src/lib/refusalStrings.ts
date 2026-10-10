@@ -1898,24 +1898,27 @@ export function refusalText(code: string | null | undefined, lang: Lang, fallbac
  * It duck-types the error rather than importing `ApiError`, so this module
  * stays dependency-free and cannot introduce an import cycle with `api.ts`.
  */
-export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
-  const e = err as { code?: unknown; message?: unknown } | null;
-  const code = e && typeof e.code === 'string' ? e.code : '';
-  const message = e && typeof e.message === 'string' && e.message ? e.message : fallback;
-  const counted = stockRefusal(err, lang);
-  if (counted) return counted;
-  return refusalText(code, lang, message || fallback);
-}
-
-/** The site's language as this table's key — Arabic unless English or Sorani. */
-export const refusalLang = (lang: string | null | undefined): Lang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');
-
 /** «{field}» with no name the screen can give: the refusal still reads as a sentence. */
 const FIELD_GENERIC: Record<Lang, string> = {
   ar: 'قيمة غير صالحة في أحد الحقول.',
   en: 'One of the fields holds an invalid value.',
   ckb: 'یەکێک لە خانەکان بەهایەکی نادروستی تێدایە.',
 };
+
+export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
+  const e = err as { code?: unknown; message?: unknown } | null;
+  const code = e && typeof e.code === 'string' ? e.code : '';
+  const message = e && typeof e.message === 'string' && e.message ? e.message : fallback;
+  const counted = stockRefusal(err, lang);
+  if (counted) return counted;
+  const text = refusalText(code, lang, message || fallback);
+  // A sentence written for a named field never reaches a screen with «{field}» in it (the FX panel
+  // answers PRICING_INPUT_INVALID {field:'rate'} through here): the sentence without a name instead.
+  return text.includes('{field}') ? FIELD_GENERIC[lang] : text;
+}
+
+/** The site's language as this table's key — Arabic unless English or Sorani. */
+export const refusalLang = (lang: string | null | undefined): Lang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');
 
 /**
  * ADMIN SCREENS: THE PROGRAMME CONTRACT'S REFUSALS, BY CODE (serial landing

@@ -161,7 +161,19 @@ export interface UsdPricingAnswer {
   conversion_hash?: string | null;
   /** What saving these drafts does to the product's prices (owner decision 8): adopt, reprice or data only. */
   adoption?: EngineAdoption | null;
+  /**
+   * CLIENT ONLY: a NEW product's answer whose `rates` were read from the central rates (GET …/rates) — the
+   * form then knows whether a dollar rate is approved before the first save (verifier F2, 2026-10-10).
+   */
+  rates_known?: boolean;
 }
+
+/**
+ * The approved dollar rate as the form knows it: a saved product's answer says it, and so does a new
+ * product's once the central rates were read. undefined = not known (the server answers at the save).
+ */
+export const knownUsdRate = (answer: UsdPricingAnswer | null): string | null | undefined =>
+  answer && (answer.product_id || answer.rates_known) ? answer.rates.usd_iqd_rate : undefined;
 
 // ------------------------------------------------------------------ the form's measures
 
@@ -597,9 +609,29 @@ const NEW_PRODUCT_ANSWER: UsdPricingAnswer = {
 
 /** The drafts at the moment the product's save starts, with the preview that showed them (its conversion hash). */
 export interface PricingSnapshot {
+  /** The drafts as they would be saved (typed + the measures the form carries). */
   drafts: Record<string, ScopeDraft>;
+  /** What the owner typed (or adopted), without the measures the form derives. */
+  typed: Record<string, ScopeDraft>;
   invalid: boolean;
   preview: { wire: string; answer: UsdPricingAnswer } | null;
+  /** The dollar rates the panel had shown the owner (typed dinars convert only at one of them). */
+  seenRates: string[];
+}
+
+/**
+ * The drafts a product save leaves behind (verifier F1, 2026-10-10): what was typed — and, where the
+ * form carried a measure to pricing, the owner's act itself (`adopt_measure`), never the value frozen at
+ * that moment. A box corrected after a refused or invalid «نشر» is then the box the next save sends.
+ */
+export function draftsAfterProductSave(typed: Readonly<Record<string, ScopeDraft>>, effective: Readonly<Record<string, ScopeDraft>>): Record<string, ScopeDraft> {
+  const out: Record<string, ScopeDraft> = {};
+  for (const [key, eff] of Object.entries(effective)) {
+    const own = typed[key] ?? {};
+    const carried = (eff.box !== undefined && own.box === undefined) || (eff.shipping_weight_g !== undefined && own.shipping_weight_g === undefined);
+    out[key] = carried ? { ...own, adopt_measure: true } : { ...own };
+  }
+  return out;
 }
 
 /**
@@ -615,6 +647,8 @@ export interface PricingReview {
   adoption: EngineAdoption;
   error: string;
   stored: boolean;
+  /** Held after «نشر» / «مسودة»: the product's own save succeeded a moment ago (the sheet and a refusal say so). */
+  withProduct?: boolean;
 }
 
 const REVIEW_CODES = new Set(['PRICING_PREVIEW_REQUIRED', 'PRICING_PREVIEW_STALE', 'PRICING_LARGE_CHANGE_CONFIRM']);
@@ -669,33 +703,111 @@ export function refusalTarget(e: unknown, drafts: Readonly<Record<string, ScopeD
   return { key, field: named, section: !key || key === 'base' ? 3 : 5 };
 }
 
+/**
+ * Typed dinars a save did NOT send (FX plan §12; verifiers F2 and money, 2026-10-10): no approved dollar
+ * rate (the server's PRICING_FX_RATE_MISSING), or a rate the owner had not been shown. Everything else of
+ * a manual product's save is stored without them; the dinars stay typed in their field, with the reason.
+ */
+export interface Withheld {
+  reason: 'fx_missing' | 'rate_unseen';
+  /** The scopes whose dinars stay as drafts. */
+  keys: string[];
+  /** The server's refusal (fx_missing). */
+  error?: unknown;
+  /** The conversion at the current rate, for the owner to see first (rate_unseen): amount, USD, rate. */
+  conversions: Array<[string, string, string]>;
+  target: RefusalTarget;
+}
+
 export type CommitResult =
   | { kind: 'nothing'; answer: UsdPricingAnswer; ready: PricingReview | null }
-  | { kind: 'saved'; answer: UsdPricingAnswer; ready: PricingReview | null; converted: string[] }
+  | { kind: 'saved'; answer: UsdPricingAnswer; ready: PricingReview | null; converted: string[]; withheld?: Withheld | null }
   | { kind: 'held'; answer: UsdPricingAnswer; review: PricingReview }
+  /** Nothing was sent or stored: the typed dinars could not go, and nothing else could go without them. */
+  | { kind: 'withheld'; answer: UsdPricingAnswer; withheld: Withheld }
   | { kind: 'refused'; error: unknown; target: RefusalTarget };
 
 const isStaleHash = (e: unknown) =>
   e instanceof ApiError && (e.code === 'PRICING_PREVIEW_STALE' || (e.code === 'PRICING_INPUT_INVALID' && (e.details as { field?: string } | undefined)?.field === 'preview_hash'));
+const isFxMissing = (e: unknown) => e instanceof ApiError && e.code === 'PRICING_FX_RATE_MISSING';
 const refusesDataOnly = (e: unknown) =>
   e instanceof ApiError && e.code === 'UNKNOWN_FIELD' && Array.isArray((e.details as { fields?: unknown } | undefined)?.fields) && ((e.details as { fields: unknown[] }).fields.includes('data_only'));
 
 type WireBody = ReturnType<typeof draftWire>;
 
+/** The body without its typed dinars (an entry left with nothing but its scope goes too). */
+export function withoutDinars(body: WireBody): WireBody {
+  const inputs: Array<Record<string, unknown>> = [];
+  for (const e of body.inputs) {
+    if (e.supplier_cost_iqd === undefined) {
+      inputs.push(e);
+      continue;
+    }
+    const rest = { ...e };
+    delete rest.supplier_cost_iqd;
+    delete rest.reconvert;
+    if (Object.keys(rest).length > (rest.scope !== 'base' ? 2 : 1)) inputs.push(rest);
+  }
+  return { inputs, rules: body.rules };
+}
+
+const dinarKeys = (body: WireBody) =>
+  body.inputs.filter((e) => e.supplier_cost_iqd !== undefined).map((e) => keyOf(e.scope as PricingScope, typeof e.scope_id === 'string' ? e.scope_id : ''));
+
+/** The typed dinars a preview converts — [amount, USD, rate] per scope (the same stored dinars convert nothing). */
+export function conversionsOf(shown: UsdPricingAnswer, body: WireBody): Array<[string, string, string]> {
+  const out: Array<[string, string, string]> = [];
+  for (const e of body.inputs) {
+    if (typeof e.supplier_cost_iqd !== 'number') continue;
+    const sc = scopeOf(shown, e.scope as PricingScope, typeof e.scope_id === 'string' ? e.scope_id : '');
+    const p = sc?.pricing_inputs;
+    if (p?.supplier_input_mode === 'IQD_CONVERTED' && p.original_input_amount === String(e.supplier_cost_iqd) && p.supplier_cost_amount && p.conversion_rate_snapshot)
+      out.push([e.supplier_cost_iqd.toLocaleString('en-US'), p.supplier_cost_amount, p.conversion_rate_snapshot]);
+  }
+  return out;
+}
+
+/** Typed dinars that convert now (new dinars, or «أعد التحويل»): the same stored dinars convert nothing. */
+const convertsNow = (body: WireBody, current: UsdPricingAnswer) =>
+  body.inputs.some((e) => {
+    if (typeof e.supplier_cost_iqd !== 'number') return false;
+    const stored = scopeOf(current, e.scope as PricingScope, typeof e.scope_id === 'string' ? e.scope_id : '')?.pricing_inputs;
+    return e.reconvert === true || stored?.supplier_input_mode !== 'IQD_CONVERTED' || stored.original_input_amount !== String(e.supplier_cost_iqd);
+  });
+
+/** One rate, however it is written ('1600' and '1600.00' are one rate the owner saw). */
+const sameRateText = (a: string, b: string) => a === b || (Number.isFinite(Number(a)) && Number(a) === Number(b));
+
 /**
  * ONE SAVE PATH for «حفظ التسعير بالدولار», «نشر» and «مسودة» (owner report 2026-10-10). The drafts go
  * against the answer the server holds now (`base`, else a fresh GET), as data first (`data_only`): a
  * manual product's data is stored even when it completes the product, and the answer then carries the
- * review its new prices need (`ready`). Typed dinars carry the conversion hash of a preview that showed
- * them (the cached one, else a fresh look; one more fresh look when the rate moved in between). An engine
- * product — or an older server that refuses `data_only` (retried once without it) — holds the save for
- * the sheet. Pure: every request goes through `io`; nothing is stored in the browser.
+ * review its new prices need (`ready`). An engine product — or an older server that refuses `data_only`
+ * (retried once without it) — holds the save for the sheet.
+ *
+ * TYPED DINARS CONVERT ONLY AT A RATE THE OWNER WAS SHOWN (FX plan §12; verifier, 2026-10-10). They carry
+ * the conversion hash of the preview that showed them (the cached one); without one, a fresh look whose
+ * rate is one of `seenRates` (the panel's rate, the preview's, a rate a previous outcome said). A rate the
+ * owner had not seen — a fresh look at another rate, or a cached look gone stale because the rate moved —
+ * is never used silently: the dinars are WITHHELD with the new conversion to show, and saved by the next
+ * press. With no approved rate at all (PRICING_FX_RATE_MISSING) they are withheld too. Either way the
+ * rest of a manual product's entry (route, box, extras, minimum profit, Direct Sale Extra…) is stored
+ * without them — one field never costs the whole batch (verifier F2). Pure: every request goes through
+ * `io`; nothing is stored in the browser.
  */
 export async function commitPricing(
   io: PricingIo,
   pid: string,
   drafts: Readonly<Record<string, ScopeDraft>>,
-  opts: { base?: UsdPricingAnswer | null; preview?: { wire: string; answer: UsdPricingAnswer } | null; describe?: (shown: UsdPricingAnswer, body: WireBody) => string[] } = {}
+  opts: {
+    base?: UsdPricingAnswer | null;
+    preview?: { wire: string; answer: UsdPricingAnswer } | null;
+    describe?: (shown: UsdPricingAnswer, body: WireBody) => string[];
+    /** The dollar rates the owner was shown; default: the rates of the answer and the preview in hand. */
+    seenRates?: ReadonlyArray<string | null | undefined>;
+    /** After «نشر» / «مسودة»: the product's own save just succeeded (a held review says so). */
+    withProduct?: boolean;
+  } = {}
 ): Promise<CommitResult> {
   const refused = (e: unknown): CommitResult => ({ kind: 'refused', error: e, target: refusalTarget(e, drafts) });
   let current: UsdPricingAnswer;
@@ -708,43 +820,106 @@ export async function commitPricing(
   if (!body.inputs.length && !body.rules.length) return { kind: 'nothing', answer: current, ready: readyReview(pid, current) };
   const wire = JSON.stringify(body);
   const typedIqd = wireHasIqd(body);
-  const conversion = async (fresh: boolean) => {
-    if (!typedIqd) return { hash: null as string | null, converted: [] as string[] };
-    const shown = !fresh && opts.preview && opts.preview.wire === wire ? opts.preview.answer : await io.post(previewPath(pid), { draft: body });
-    return { hash: shown.conversion_hash ?? legacyConversionHash({ wire, answer: shown }, wire), converted: opts.describe?.(shown, body) ?? [] };
+  const converting = typedIqd && convertsNow(body, current);
+  const seen = (opts.seenRates ?? [current.rates.usd_iqd_rate, opts.preview?.answer.rates.usd_iqd_rate]).filter((r): r is string => typeof r === 'string' && r !== '');
+  const rateSeen = (shown: UsdPricingAnswer) => {
+    if (!converting) return true;
+    const rates = conversionsOf(shown, body).map((c) => c[2]);
+    const used = rates.length ? rates : [shown.rates.usd_iqd_rate ?? ''];
+    return used.every((r) => seen.some((x) => sameRateText(x, r)));
   };
-  let conv: { hash: string | null; converted: string[] };
-  try {
-    conv = await conversion(false);
-  } catch (e) {
-    return refused(e);
+  const keys = dinarKeys(body);
+  const fxTarget = (e: unknown): RefusalTarget => {
+    const t = refusalTarget(e, drafts);
+    return t.key ? t : { key: keys[0] ?? null, field: 'supplier_cost_iqd', section: !keys[0] || keys[0] === 'base' ? 3 : 5 };
+  };
+  const withhold = (reason: Withheld['reason'], e: unknown, shown: UsdPricingAnswer | null): Withheld => ({
+    reason,
+    keys,
+    ...(e !== undefined ? { error: e } : {}),
+    conversions: shown ? conversionsOf(shown, body) : [],
+    target: reason === 'fx_missing' ? fxTarget(e) : { key: keys[0] ?? null, field: 'supplier_cost_iqd', section: !keys[0] || keys[0] === 'base' ? 3 : 5 },
+  });
+
+  let hash: string | null = null;
+  let converted: string[] = [];
+  let withheld: Withheld | null = null;
+  const take = (shown: UsdPricingAnswer) => {
+    hash = shown.conversion_hash ?? legacyConversionHash({ wire, answer: shown }, wire);
+    converted = opts.describe?.(shown, body) ?? [];
+  };
+  if (typedIqd) {
+    const cached = opts.preview && opts.preview.wire === wire ? opts.preview.answer : null;
+    if (cached) take(cached);
+    else {
+      try {
+        const shown = await io.post(previewPath(pid), { draft: body });
+        if (rateSeen(shown)) take(shown);
+        else withheld = withhold('rate_unseen', undefined, shown);
+      } catch (e) {
+        if (!isFxMissing(e)) return refused(e);
+        withheld = withhold('fx_missing', e, null);
+      }
+    }
   }
+  let sendBody = withheld ? withoutDinars(body) : body;
+  // Nothing else to send, or an engine product (its save is one write with its preview): nothing is sent.
+  const sendsNothing = () => current.mode === 'engine' || (!sendBody.inputs.length && !sendBody.rules.length);
+  if (withheld && sendsNothing()) return { kind: 'withheld', answer: current, withheld };
+
   let dataOnly = true;
   let reread = false;
   for (;;) {
     try {
-      const r = await io.put(inputsPath(pid), { inputs_seq: current.inputs_seq, ...body, ...(dataOnly ? { data_only: true } : {}), ...(conv.hash ? { preview_hash: conv.hash } : {}) });
-      return { kind: 'saved', answer: r, ready: readyReview(pid, r), converted: conv.converted };
+      const r = await io.put(inputsPath(pid), {
+        inputs_seq: current.inputs_seq,
+        ...sendBody,
+        ...(dataOnly ? { data_only: true } : {}),
+        ...(hash && !withheld ? { preview_hash: hash } : {}),
+      });
+      return { kind: 'saved', answer: r, ready: readyReview(pid, r), converted: withheld ? [] : converted, withheld };
     } catch (e) {
       // Owner decision 8 for an engine product (or an older server): held, with the preview of its new prices.
       const held = heldPreview(e);
       if (held) {
+        // Without its dinars nothing is held for the sheet: the whole entry waits, typed, with the reason.
+        if (withheld) return { kind: 'withheld', answer: current, withheld };
         // The body without `data_only`: the sheet's «حفظ» is the one write, with the preview's hash.
-        const review: PricingReview = { pid, body: { inputs_seq: current.inputs_seq, inputs: body.inputs, rules: body.rules }, hash: held.preview_hash, adoption: held.adoption!, error: '', stored: false };
+        const review: PricingReview = {
+          pid,
+          body: { inputs_seq: current.inputs_seq, inputs: body.inputs, rules: body.rules },
+          hash: held.preview_hash,
+          adoption: held.adoption!,
+          error: '',
+          stored: false,
+          ...(opts.withProduct ? { withProduct: true } : {}),
+        };
         return { kind: 'held', answer: current, review };
       }
       if (dataOnly && refusesDataOnly(e)) {
         dataOnly = false;
         continue;
       }
-      if (typedIqd && !reread && isStaleHash(e)) {
-        // The rate moved since the conversion the owner was shown: one fresh look, then the save again.
-        reread = true;
-        try {
-          conv = await conversion(true);
-        } catch (e2) {
-          return refused(e2);
+      if (typedIqd && !withheld && (isFxMissing(e) || (!reread && isStaleHash(e)))) {
+        if (isFxMissing(e)) withheld = withhold('fx_missing', e, null);
+        else {
+          // The rate moved since the conversion the owner was shown: a fresh look — saved with only when its
+          // rate is one the owner saw; otherwise the dinars wait, with the new conversion to see.
+          reread = true;
+          try {
+            const fresh = await io.post(previewPath(pid), { draft: body });
+            if (rateSeen(fresh)) {
+              take(fresh);
+              continue;
+            }
+            withheld = withhold('rate_unseen', undefined, fresh);
+          } catch (e2) {
+            if (!isFxMissing(e2)) return refused(e2);
+            withheld = withhold('fx_missing', e2, null);
+          }
         }
+        sendBody = withoutDinars(body);
+        if (sendsNothing()) return { kind: 'withheld', answer: current, withheld };
         continue;
       }
       return refused(e);
@@ -754,15 +929,7 @@ export async function commitPricing(
 
 /** «حُوِّل X د.ع إلى $Y بسعر Z» for every scope whose typed dinars the shown preview converts. */
 export function convertedLines(shown: UsdPricingAnswer, body: WireBody, fill: (amount: string, usd: string, rate: string) => string): string[] {
-  const out: string[] = [];
-  for (const e of body.inputs) {
-    if (typeof e.supplier_cost_iqd !== 'number') continue;
-    const sc = scopeOf(shown, e.scope as PricingScope, typeof e.scope_id === 'string' ? e.scope_id : '');
-    const p = sc?.pricing_inputs;
-    if (p?.supplier_input_mode === 'IQD_CONVERTED' && p.original_input_amount === String(e.supplier_cost_iqd) && p.supplier_cost_amount && p.conversion_rate_snapshot)
-      out.push(fill(e.supplier_cost_iqd.toLocaleString('en-US'), p.supplier_cost_amount, p.conversion_rate_snapshot));
-  }
-  return out;
+  return conversionsOf(shown, body).map(([a, u, r]) => fill(a, u, r));
 }
 
 /** The name of a scope as the owner reads it (the product level, a model, a colour, a variant). */
@@ -785,7 +952,7 @@ export function invalidWhere(
 ): { text: string; section: 3 | 5 } {
   const s = usdPricingFormStrings(lang);
   const ps = procurementPricingStrings(lang);
-  const usdIqdRate = answer?.product_id ? answer.rates.usd_iqd_rate : undefined;
+  const usdIqdRate = knownUsdRate(answer);
   const parts: string[] = [];
   let section: 3 | 5 | null = null;
   for (const key of Object.keys(effective).sort(baseFirst)) {
@@ -802,7 +969,8 @@ export function invalidWhere(
 
 /** A pricing save's outcome, said in the panel and the form's bar until the owner types again (a preview never wipes it). */
 export interface PricingOutcome {
-  kind: 'saved' | 'ready' | 'held' | 'refused' | 'invalid';
+  /** 'partial': stored, except the typed dinars (their reason follows; they stay in their field). */
+  kind: 'saved' | 'ready' | 'held' | 'refused' | 'invalid' | 'partial';
   tone: 'ok' | 'warn' | 'error';
   text: string;
   /** Where the field it names lives: section ٣ (the product) or ٥ (a model, a colour, a variant). */
@@ -893,6 +1061,10 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
   const dismissed = useRef(new Set<string>());
   const [tick, setTick] = useState(0);
   const [previewTick, setPreviewTick] = useState(0);
+  // A NEW product's central dollar rate (verifier F2): read once, so «دينار» is offered only when it converts.
+  const [newRate, setNewRate] = useState<{ usd: string | null } | null>(null);
+  // Dollar rates an outcome has shown the owner (a withheld conversion says its rate): the next save may use them.
+  const seenRef = useRef(new Set<string>());
   const live = enabled && !!productId;
   // A refusal in the reader's language, naming the panel's own field («{field}» is never printed).
   const message = useCallback((e: unknown) => contractRefusal(e, refusalLang(lang), e instanceof Error ? e.message : String(e), (f) => fieldLabelOf(f, s)), [lang, s]);
@@ -915,9 +1087,26 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       setOutcome(null);
       setServerField(null);
       dismissed.current.clear();
+      seenRef.current.clear();
     }
     previousId.current = productId;
   }, [productId]);
+
+  useEffect(() => {
+    if (!enabled || productId) return;
+    const ctrl = new AbortController();
+    api
+      .get<CentralRatesAnswer>(`${PRICING}/rates`, { signal: ctrl.signal, mascot: 'silent' })
+      .then((r) => {
+        const usd = (r.pairs ?? []).find((x) => x.pair === 'USD_IQD');
+        // What the server's dinar conversion needs (productInputs.ts): an effective rate with a version.
+        setNewRate({ usd: usd && usd.effective_rate && (usd.effective_version ?? 0) > 0 ? usd.effective_rate : null });
+      })
+      .catch(() => {
+        /* not known: the save's own answer says it */
+      });
+    return () => ctrl.abort();
+  }, [enabled, productId]);
 
   useEffect(() => {
     if (!live) return;
@@ -941,12 +1130,16 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     return () => ctrl.abort();
   }, [live, productId, tick, message]);
 
-  const answer = enabled ? (productId ? stored : NEW_PRODUCT_ANSWER) : null;
+  const newAnswer = useMemo<UsdPricingAnswer>(
+    () => (newRate ? { ...NEW_PRODUCT_ANSWER, rates: { ...NEW_PRODUCT_ANSWER.rates, usd_iqd_rate: newRate.usd }, rates_known: true } : NEW_PRODUCT_ANSWER),
+    [newRate]
+  );
+  const answer = enabled ? (productId ? stored : newAnswer) : null;
   const effective = useMemo(() => (answer ? effectiveDrafts(drafts, answer, form) : {}), [drafts, answer, form]);
   const dirty = Object.keys(effective).length > 0;
   // What the owner typed or adopted (the measures the form derives do not count: opening a product never nags).
   const touched = Object.values(drafts).some((d) => (Object.keys(d) as Array<keyof ScopeDraft>).some((k) => (k === 'adopt_measure' ? d[k] === true : d[k] !== undefined)));
-  const rateKnownMissing = !!answer?.product_id && answer.rates.usd_iqd_rate === null;
+  const rateKnownMissing = knownUsdRate(answer) === null;
   const where = useMemo(() => invalidWhere(effective, answer, form, lang), [effective, answer, form, lang]);
   const invalid = where.text !== '';
   const wireObject = useMemo(() => (answer && productId && dirty && !invalid ? draftWire(effective, answer) : null), [answer, productId, dirty, invalid, effective]);
@@ -979,6 +1172,11 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
   }, [live, productId, wire, previewTick, message]);
 
   const shown = wire ? (preview?.answer ?? answer) : answer;
+  /** The dollar rates the panel shows the owner now: under the dinar field (the answer's, or the preview's conversion) and in a withheld outcome. */
+  const seenRates = useCallback(
+    (): string[] => [knownUsdRate(answer), preview?.answer.rates.usd_iqd_rate, ...seenRef.current].filter((r): r is string => typeof r === 'string' && r !== ''),
+    [answer, preview]
+  );
 
   const setDraft = useCallback((scope: PricingScope, id: string, patch: ScopeDraft) => {
     const key = keyOf(scope, id);
@@ -996,12 +1194,14 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     setServerField(null);
   }, []);
 
-  /** Drafts for models the server does not know yet (unsaved) stay; the rest were saved. */
-  const keepUnsent = useCallback((all: Record<string, ScopeDraft>, after: UsdPricingAnswer) => {
+  /** Drafts for models the server does not know yet (unsaved) stay, and so do withheld dinars; the rest were saved. */
+  const keepUnsent = useCallback((all: Record<string, ScopeDraft>, after: UsdPricingAnswer, withheld: readonly string[] = []) => {
     const out: Record<string, ScopeDraft> = {};
     for (const [k, d] of Object.entries(all)) {
       const { scope, id } = parseKey(k);
       if (!scopeOf(after, scope, id)) out[k] = d;
+      else if (withheld.includes(k) && isIqdDraft(d) && d.supplier_cost_iqd != null)
+        out[k] = { supplier_cost_currency: 'IQD', supplier_cost_iqd: d.supplier_cost_iqd, ...(d.reconvert ? { reconvert: true } : {}) };
     }
     return out;
   }, []);
@@ -1012,7 +1212,15 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       const stale = isStaleHash(e);
       // An engine product never loses its price: a save that would leave it incomplete is refused, naming what is missing.
       const missing = e instanceof ApiError && e.code === 'PRICING_ENGINE_INCOMPLETE' ? ((e.details as { missing_codes?: string[] } | undefined)?.missing_codes ?? []) : [];
-      const text = stale ? `${message(e)} — ${s.reviewConversion}` : missing.length ? `${message(e)} — ${missing.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')}` : message(e);
+      // The derived rates out of step is not a moment to «try again»: they need refreshing first (the panel's banner says where).
+      const derived = e instanceof ApiError && e.code === 'FX_DERIVED_STALE';
+      const text = derived
+        ? s.ratesDerivedStale
+        : stale
+          ? `${message(e)} — ${s.reviewConversion}`
+          : missing.length
+            ? `${message(e)} — ${missing.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')}`
+            : message(e);
       if (stale) setPreviewTick((t) => t + 1);
       // Someone else saved first (a purchase applied, another tab): show the fresh values, keep the typed ones.
       if (e instanceof ApiError && e.code === 'PRICING_CHANGED') {
@@ -1024,19 +1232,37 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       }
       return text;
     },
-    [message, s.reviewConversion, lang, io]
+    [message, s.reviewConversion, s.ratesDerivedStale, lang, io]
   );
 
   const describe = useCallback((shownAnswer: UsdPricingAnswer, body: WireBody) => convertedLines(shownAnswer, body, s.converted), [s]);
 
+  /** Why typed dinars were withheld, in the reader's language (the new conversion to see, or the missing rate). */
+  const withheldText = useCallback(
+    (w: Withheld) => {
+      if (w.reason === 'fx_missing' || !w.conversions.length) return w.reason === 'fx_missing' ? s.iqdNeedsRate : s.reviewConversion;
+      // The outcome shows the new rate: the owner has now seen it, and the next save may use it.
+      for (const [, , rate] of w.conversions) seenRef.current.add(rate);
+      return w.conversions.map(([a, u, r]) => s.rateUnseen(a, u, r)).join(' · ');
+    },
+    [s]
+  );
+
   /** One save's result → the store, the drafts, the sheet and the outcome (never silent). */
   const apply = useCallback(
-    async (res: CommitResult, pid: string, alone: boolean): Promise<PricingOutcome | null> => {
+    async (res: CommitResult, pid: string, alone: boolean, extra: { measures?: boolean } = {}): Promise<PricingOutcome | null> => {
       let out: PricingOutcome | null;
       if (res.kind === 'refused') {
         const m = await failed(res.error, pid);
         out = { kind: 'refused', tone: 'error', text: alone ? s.notSavedAlone(m) : s.pricingNotSaved(m), section: res.target.section };
         if (res.target.key && res.target.field) setServerField({ key: res.target.key, field: res.target.field, text: m });
+      } else if (res.kind === 'withheld') {
+        // Nothing sent: every value stays typed; the dinar field says why (and the next press saves it all).
+        const m = withheldText(res.withheld);
+        setStored(res.answer);
+        if (res.withheld.target.key) setServerField({ key: res.withheld.target.key, field: 'supplier_cost_iqd', text: m });
+        if (res.withheld.reason === 'rate_unseen') setPreviewTick((t) => t + 1);
+        out = { kind: 'refused', tone: 'error', text: alone ? s.notSavedAlone(m) : s.pricingNotSaved(m), section: res.withheld.target.section };
       } else if (res.kind === 'held') {
         // The new prices wait for the owner's look (the sheet); nothing is stored, the drafts stay.
         setStored(res.answer);
@@ -1045,17 +1271,27 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       } else {
         setStored(res.answer);
         setServerField(null);
+        const w = res.kind === 'saved' ? (res.withheld ?? null) : null;
         if (res.kind === 'saved') {
           setPreview(null);
-          setDrafts((all) => keepUnsent(all, res.answer));
+          setDrafts((all) => keepUnsent(all, res.answer, w?.keys ?? []));
         }
         const ready = res.ready && !dismissed.current.has(res.ready.hash) ? res.ready : null;
-        if (ready) {
+        if (w) {
+          // Stored without the typed dinars: they stay in their field with the reason (verifiers F2 / money).
+          const m = withheldText(w);
+          if (w.target.key) setServerField({ key: w.target.key, field: 'supplier_cost_iqd', text: m });
+          if (w.reason === 'rate_unseen') setPreviewTick((t) => t + 1);
+          if (ready) setReview(ready);
+          out = { kind: 'partial', tone: 'warn', text: s.restSavedWithheld(m), section: w.target.section };
+        } else if (ready) {
           // Stored, and complete: the new price is the owner's to adopt («لاحقًا» loses nothing).
           setReview(ready);
-          out = { kind: 'ready', tone: 'warn', text: res.kind === 'saved' ? s.savedDataReady : s.readyWaiting };
+          const converted = res.kind === 'saved' ? res.converted : [];
+          out = { kind: 'ready', tone: 'warn', text: [res.kind === 'saved' ? s.savedDataReady : s.readyWaiting, ...converted].join(' · ') };
         } else if (res.kind === 'saved') {
-          const text = [alone ? s.saved : s.savedWithProduct, ...res.converted].join(' · ');
+          const text = [alone ? s.saved : s.savedWithProduct, ...res.converted, ...(extra.measures ? [s.measuresForPricingOnly] : [])].join(' · ');
+          // Said once, beside the button that saved it (the panel's banner is for what still needs the owner).
           setNotice(text);
           out = { kind: 'saved', tone: 'ok', text };
         } else out = null;
@@ -1063,7 +1299,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       setOutcome(out);
       return out;
     },
-    [failed, s, keepUnsent]
+    [failed, s, keepUnsent, withheldText]
   );
 
   const saveRef = useRef(false);
@@ -1077,23 +1313,33 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     saveRef.current = true;
     setSaving(true);
     setError('');
+    // The box or weight this save carries from the form is stored for pricing; the product's own copy waits for «نشر» (verifier F4).
+    const measures = Object.entries(effective).some(([k, d]) => (d.box !== undefined && drafts[k]?.box === undefined) || (d.shipping_weight_g !== undefined && drafts[k]?.shipping_weight_g === undefined));
     try {
-      await apply(await commitPricing(io, productId, effective, { base: stored, preview, describe }), productId, true);
+      await apply(await commitPricing(io, productId, effective, { base: stored, preview, describe, seenRates: seenRates() }), productId, true, { measures });
     } finally {
       saveRef.current = false;
       setSaving(false);
     }
-  }, [stored, productId, dirty, invalid, s, where, apply, io, effective, preview, describe]);
+  }, [stored, productId, dirty, invalid, s, where, apply, io, effective, preview, describe, seenRates, drafts]);
 
   const snapshot = useCallback((): PricingSnapshot | null => {
     if (!enabled || !dirty) return null;
-    return { drafts: JSON.parse(JSON.stringify(effective)) as Record<string, ScopeDraft>, invalid, preview: preview && preview.wire === wire ? preview : null };
-  }, [enabled, dirty, effective, invalid, preview, wire]);
+    return {
+      drafts: JSON.parse(JSON.stringify(effective)) as Record<string, ScopeDraft>,
+      typed: JSON.parse(JSON.stringify(drafts)) as Record<string, ScopeDraft>,
+      invalid,
+      preview: preview && preview.wire === wire ? preview : null,
+      seenRates: seenRates(),
+    };
+  }, [enabled, dirty, effective, drafts, invalid, preview, wire, seenRates]);
 
   const saveAfterProduct = useCallback(
     async (pid: string, snap: PricingSnapshot) => {
-      // The typed values become explicit drafts, so a refusal never loses them (the form's measures are saved by now).
-      setDrafts(snap.drafts);
+      // The typed values become explicit drafts, so a refusal never loses them. A measure the form carried stays
+      // the owner's act (adopt_measure), not the value of this moment: the product's save made it the saved
+      // measure, and a box corrected after a refusal is the box the next save sends (verifier F1).
+      setDrafts(draftsAfterProductSave(snap.typed, snap.drafts));
       if (snap.invalid) {
         const why = invalidWhere(snap.drafts, answer, form, lang);
         const out: PricingOutcome = { kind: 'invalid', tone: 'error', text: s.pricingNotSaved(why.text), section: why.section };
@@ -1103,7 +1349,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       setSaving(true);
       setError('');
       try {
-        const res = await commitPricing(io, pid, snap.drafts, { preview: snap.preview, describe });
+        const res = await commitPricing(io, pid, snap.drafts, { preview: snap.preview, describe, seenRates: snap.seenRates, withProduct: true });
         const out = await apply(res, pid, false);
         // The product's save moved its models and channels: read the answer again.
         setTick((t) => t + 1);
@@ -1173,7 +1419,9 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
         } else {
           setReview(null);
           const m = await failed(e, held.pid);
-          setOutcome({ kind: 'refused', tone: 'error', text: held.stored ? m : s.pricingNotSaved(m) });
+          // What is true now: the data stored and the price not adopted; or nothing stored — after the
+          // product's own save («نشر»), or with no product save at all («حفظ التسعير بالدولار»).
+          setOutcome({ kind: 'refused', tone: 'error', text: held.stored ? s.adoptNotDone(m) : held.withProduct ? s.pricingNotSaved(m) : s.notSavedAlone(m) });
         }
       } finally {
         reviewRef.current = false;
@@ -1248,6 +1496,11 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     openReview,
     exitEngine,
   };
+}
+
+/** The central rates' answer (GET …/rates), as far as a new product's form reads it: the dollar pair's effective rate. */
+interface CentralRatesAnswer {
+  pairs?: Array<{ pair?: string; effective_rate?: string | null; effective_version?: number }>;
 }
 
 const Ctx = createContext<UsdPricingState | null>(null);
@@ -1372,7 +1625,8 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
   const inherited = inheritedOf('supplier_cost_amount') ?? base?.pricing_inputs ?? null;
   // Exactly what the server would refuse, said under the field before anything is sent (a refusal the
   // server named for this scope's field takes its place until the owner types again).
-  const problems = draftProblems(d, stored, { usdIqdRate: st.answer?.product_id ? st.answer.rates.usd_iqd_rate : undefined });
+  const usdRate = knownUsdRate(st.answer);
+  const problems = draftProblems(d, stored, { usdIqdRate: usdRate });
   const errorOf = (field: keyof ScopeDraft) =>
     st.serverField?.key === keyOf(scope.scope, scope.scope_id) && st.serverField.field === field ? st.serverField.text : problems[field] ? problemText(field, problems[field]!, s, ps) : null;
   const label = (ar: string, english: string) => ({ ar, en: lang === 'en' ? '' : english });
@@ -1443,8 +1697,12 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
       {(iqd || storedIqd) && (
         <div className="min-w-0 text-[11px] leading-relaxed text-text-secondary md:col-span-2 xl:col-span-3" data-usd-iqd={keyOf(scope.scope, scope.scope_id)}>
           {/* What the save stores: the server's conversion of the typed dinars (the preview), or the stored snapshot. */}
-          {d.supplier_cost_iqd != null && shownInputs?.supplier_input_mode === 'IQD_CONVERTED' && shownInputs.supplier_cost_amount && shownInputs.conversion_rate_snapshot && (
+          {d.supplier_cost_iqd != null && shownInputs?.supplier_input_mode === 'IQD_CONVERTED' && shownInputs.supplier_cost_amount && shownInputs.conversion_rate_snapshot ? (
             <p dir="auto">{s.iqdWillConvert(shownInputs.supplier_cost_amount, shownInputs.conversion_rate_snapshot)}</p>
+          ) : (
+            // Before the preview's conversion is in (or on a new product): the rate the save converts at —
+            // the owner sees it before pressing, and a save at any other rate waits for a second look.
+            d.supplier_cost_iqd != null && typeof usdRate === 'string' && <p dir="auto" data-usd-iqd-rate>{s.iqdAtRate(usdRate)}</p>
           )}
           {storedIqd && d.supplier_cost_iqd === undefined && d.supplier_cost_currency === undefined && stored?.original_input_amount && stored.conversion_rate_snapshot && (
             <p dir="auto">
@@ -1519,7 +1777,7 @@ function SaveRow() {
           {engineSaveStrings(lang).exit}
         </button>
       )}
-      {st.notice && <span role="status" className="text-[12px] text-emerald-400">{st.notice}</span>}
+      {st.notice && <span role="status" className="text-[12px] text-emerald-400" data-pricing-notice>{st.notice}</span>}
     </div>
   );
 }
@@ -1574,8 +1832,9 @@ function Status() {
           {s.ratesDerivedStale} <OpenPricing />
         </Banner>
       )}
-      {/* The last save's outcome: no preview or read wipes it, only the owner's next keystroke. */}
-      {o && (
+      {/* The last save's outcome: no preview or read wipes it, only the owner's next keystroke. A plain
+          «saved» is said once, beside the button that saved it (the save row), never twice. */}
+      {o && o.kind !== 'saved' && (
         <div data-pricing-outcome={o.kind} role={o.tone === 'error' ? 'alert' : 'status'}>
           <Banner kind={o.tone}>
             {o.text}
@@ -1642,7 +1901,7 @@ export function UsdPricingProductPanel() {
             models.length > 0 && <p className="mt-3 text-[12px] text-text-secondary">{s.modelsSummary(String(ok), String(models.length))}</p>
           )}
           <WhereToFix />
-          <p className="mt-2 text-[11px] text-text-muted">{s.pricesLater}</p>
+          <p className="mt-2 text-[11px] text-text-muted" data-pricing-prices-note>{st.engine ? s.pricesEngine : s.pricesLater}</p>
           {/* «التكلفة القديمة» and the store price beside this panel do not move with a data save. */}
           <p className="mt-1 text-[11px] text-text-muted" data-pricing-legacy-cost>{s.legacyCostStays}</p>
           <SaveRow />
@@ -1847,7 +2106,11 @@ export function UsdPricingSaveSheet() {
       onConfirm={(confirmLarge) => void st.confirmReview(confirmLarge)}
       onCancel={st.cancelReview}
       cancelLabel={review.stored ? s.later : undefined}
-      note={review.stored ? s.sheetDataSaved : s.sheetNothingSaved}
+      // Stored data: the sheet's own first line says so (never the held write's «saved in the same step»).
+      // A held engine save: the held write's intro, and what is saved so far — the product itself after
+      // «نشر» / «مسودة», nothing after «حفظ التسعير بالدولار».
+      intro={review.stored ? s.sheetDataSaved : undefined}
+      note={review.stored ? undefined : review.withProduct ? s.sheetProductSaved : s.sheetNothingSaved}
       extra={
         review.stored && review.error === engineSaveStrings(lang).reauth ? (
           <button type="button" className="justify-self-start text-[13px] underline" onClick={() => void signInAgain()} data-pricing-sign-in>

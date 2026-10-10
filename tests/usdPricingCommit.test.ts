@@ -157,14 +157,36 @@ test('NORMAL: dinars with no cached preview — the save previews them itself, c
   assert.equal(res.answer.mode, 'manual');
 });
 
-test('LIVE-LIKE: dinars with no approved rate are refused AT their field — the target is the product level’s «تكلفة المورد بالدينار», section ٣; nothing stored', async () => {
+test('LIVE-LIKE: dinars with no approved rate are withheld AT their field — the rest of the entry (route, box, extras, minimum profit, DSE) is stored without them (verifier F2)', async () => {
   const w = liveLikeWorld();
-  const res = await commitPricing(ioOf(w), SNAP, IQD_DRAFTS(), { describe });
-  assert.equal(res.kind, 'refused');
-  if (res.kind !== 'refused') return;
-  assert.equal((res.error as ApiError).code, 'PRICING_FX_RATE_MISSING');
-  assert.deepEqual(res.target, { key: 'base', field: 'supplier_cost_iqd', section: 3 });
-  assert.equal(readBack((await w.getInputs(SNAP)).body, 'base')!.supplier_cost_amount, null);
+  const log: Call[] = [];
+  const res = await commitPricing(ioOf(w, log), SNAP, IQD_DRAFTS(), { describe });
+  assert.equal(res.kind, 'saved', JSON.stringify(res));
+  if (res.kind !== 'saved') return;
+  assert.equal(res.withheld?.reason, 'fx_missing');
+  assert.equal((res.withheld?.error as ApiError).code, 'PRICING_FX_RATE_MISSING');
+  assert.deepEqual(res.withheld?.keys, ['base']);
+  assert.deepEqual(res.withheld?.target, { key: 'base', field: 'supplier_cost_iqd', section: 3 });
+  // The preview refused the dinars; the save went without them (no hash, no dinars), data first.
+  assert.deepEqual(log.map((c) => `${c.method} ${c.status}${c.code ? ` ${c.code}` : ''}`), ['GET 200', 'POST 409 PRICING_FX_RATE_MISSING', 'PUT 200']);
+  const put = log[2]!.body!;
+  assert.equal(put.data_only, true);
+  assert.equal(put.preview_hash, undefined);
+  assert.ok(!(put.inputs as Array<Record<string, unknown>>).some((e) => 'supplier_cost_iqd' in e));
+  const back = readBack((await w.getInputs(SNAP)).body, 'base')!;
+  assert.deepEqual(
+    [back.supplier_cost_amount, back.shipping_profile, back.box, back.additional_cost_iqd, back.minimum_target_profit_usd, back.direct_sale_extra_iqd],
+    [null, 'CHINA_SEA', [600, 520, 480], 15000, '120', 25000]
+  );
+});
+
+test('LIVE-LIKE: dinars alone with no approved rate — nothing is sent, the dinars stay typed with their reason', async () => {
+  const w = liveLikeWorld();
+  const log: Call[] = [];
+  const res = await commitPricing(ioOf(w, log), SNAP, { base: { supplier_cost_currency: 'IQD', supplier_cost_iqd: 1_450_000 } }, {});
+  assert.equal(res.kind, 'withheld', JSON.stringify(res));
+  if (res.kind === 'withheld') assert.equal(res.withheld.reason, 'fx_missing');
+  assert.ok(!log.some((c) => c.method === 'PUT'), 'nothing sent');
 });
 
 test('ENGINE product: the save is held for the sheet (nothing stored, review.stored false) and the sheet’s body never carries data_only', async () => {

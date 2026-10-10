@@ -37,6 +37,15 @@
  *   N2 (same product) «راجع السعر الجديد واعتمده» → «حفظ»: the engine prices it; the old cost stays
  *   N3 «حفظ التسعير بالدولار» opens the review at once (section ٣ open, ٨ closed)
  *   P1 L1 at 390 px: same read-back, the bar's status readable
+ *   — after the verifiers' round (2026-10-10) —
+ *   L3 also: the box went to pricing only, and the panel and the reload's warning say the product's own
+ *      box is not saved yet (F4)
+ *   L6 a box corrected after an invalid «نشر» is the box pricing stores (F1)
+ *   L7 the sidebar with unsaved pricing asks first: dismiss stays (value kept), accept leaves (F3)
+ *   L8 «منتج جديد» knows no dollar rate is approved: «دينار» disabled and the banner shown (F2)
+ *   N1 also: the review sheet's first line says the data is already saved, never the held write's intro
+ *   N4 «منتج جديد» with «دينار»: the line under it says the rate the save converts at; «نشر» creates the
+ *      product and stores the dinars converted at that rate with the rest (F2 / FX plan §12)
  *
  * LOCAL ONLY. BASE must be http://127.0.0.1:<port>; every request to any other
  * host is aborted and counted, and the run fails unless that count is 0 and no
@@ -86,7 +95,10 @@ const AR = {
   currencyIqdNoRate: 'دينار — يحتاج سعر دولار معتمد',
   leaveUnsaved: 'في «التسعير بالدولار والشحن» تغييرات لم تُحفظ',
   later: 'لاحقًا — البيانات محفوظة',
-  sheetDataSaved: 'بيانات التسعير محفوظة. لا يتغير سعر المتجر إلا إذا اعتمدت الأسعار أدناه.',
+  sheetDataSaved: 'بيانات التسعير محفوظة مسبقًا. الحفظ هنا لا يحفظها من جديد: يكتب الأسعار أدناه في المتجر فقط، و«لاحقًا» يُبقي سعر المتجر كما هو.',
+  adoptIntro: 'هذا الحفظ يُكمل بيانات تسعير المنتج',
+  measuresForPricingOnly: 'حُفظ قياس الصندوق أو الوزن للتسعير',
+  iqdAtRate: 'يُحوَّل عند الحفظ بسعر الدولار المعتمد: 1600 د.ع للدولار',
   savedAdopted: 'حُفظ واعتُمد التسعير التلقائي وكُتبت الأسعار الجديدة',
   legacyCostStays: '«التكلفة القديمة» لا يغيّرها هذا القسم',
   routeFirst: 'اختر «مسار الشحن الأساسي» أولًا',
@@ -298,6 +310,22 @@ async function openEditForm(page, pid) {
   await page.waitForFunction(() => /تكلفة المورد/.test(document.querySelector('[data-form="usd-pricing"]')?.textContent || ''), null, { timeout: 20000 });
   await settle(page, 1000);
 }
+/** «منتج جديد» → section ٣, its pricing panel drawn. */
+async function openNewForm(page) {
+  await page.goto(`${BASE}/admin`, { waitUntil: 'domcontentloaded' });
+  await settle(page, 800);
+  if ((await page.locator('[data-tab="products"]:visible').count()) === 0) {
+    await page.locator('[data-action="open-sidebar"]').first().click();
+    await page.waitForTimeout(400);
+  }
+  await page.locator('[data-tab="products"]:visible').first().click({ timeout: 20000 });
+  await settle(page, 800);
+  await page.getByRole('button', { name: 'منتج جديد' }).first().click();
+  await bar(page).waitFor({ timeout: 20000 });
+  await openSection(page, 3);
+  await panel(page).waitFor({ timeout: 20000 });
+  await settle(page, 1000);
+}
 async function openSection(page, n) {
   const t = page.locator(`[data-section-toggle="${n}"]`).first();
   if ((await t.getAttribute('aria-expanded')) !== 'true') await t.click();
@@ -305,14 +333,16 @@ async function openSection(page, n) {
 }
 const sectionOpen = async (page, n) => (await page.locator(`[data-section-toggle="${n}"]`).first().getAttribute('aria-expanded')) === 'true';
 
-/** The control a panel label names (a Field's label points at it, or at the Field's own root). */
-async function control(page, label) {
-  const tag = `c${Buffer.from(label).toString('hex').slice(0, 24)}`;
+/** The control a panel label names (a Field's label points at it, or at the Field's own root); `root` another part of the form. */
+async function control(page, label, rootSelector = '[data-form="usd-pricing"]') {
+  const tag = `c${Buffer.from(label).toString('hex').slice(0, 48)}-${Buffer.from(rootSelector).toString('hex').slice(-12)}`;
   for (let i = 0; i < 25; i++) {
     const ok = await page.evaluate(
-      ([text, t]) => {
-        const root = document.querySelector('[data-form="usd-pricing"]');
-        const l = root && Array.from(root.querySelectorAll('label')).find((x) => (x.textContent || '').trim().startsWith(text));
+      ([text, t, r]) => {
+        const root = document.querySelector(r);
+        const labels = root ? Array.from(root.querySelectorAll('label')) : [];
+        // The label's own words first (an exact name), then a label that starts with them.
+        const l = labels.find((x) => (x.childNodes[0]?.textContent || '').trim() === text) ?? labels.find((x) => (x.textContent || '').trim().startsWith(text));
         if (!l) return false;
         const id = l.getAttribute('for');
         let el = id ? document.getElementById(id) : null;
@@ -322,15 +352,15 @@ async function control(page, label) {
         el.setAttribute('data-e2e', t);
         return true;
       },
-      [label, tag]
+      [label, tag, rootSelector]
     );
     if (ok) return page.locator(`[data-e2e="${tag}"]`).first();
     await page.waitForTimeout(200);
   }
   throw new Error(`no control for «${label}»`);
 }
-async function typeInto(page, label, value) {
-  const el = await control(page, label);
+async function typeInto(page, label, value, rootSelector) {
+  const el = await control(page, label, rootSelector);
   await el.click();
   await el.fill('');
   await el.pressSequentially(value, { delay: 25 });
@@ -491,10 +521,18 @@ async function saveAndReadBack(c, out, { action, width = 1280, world }) {
       check(c, 'at 390 px the bar’s status is on screen and readable', !!box && box.width >= 30 && box.x >= 0 && box.x + box.width <= width + 1, JSON.stringify(box));
       check(c, 'no sideways scroll at 390 px', await s.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
     }
+    if (action === 'pricing-save') {
+      // F4: the box went to pricing only; the product's own copy waits for «نشر», and the panel says so.
+      const notice = await panel(s.page).locator('[data-pricing-notice]').first().innerText().catch(() => '');
+      check(c, 'the panel says the box is saved for pricing and the product’s own box waits for «نشر»', notice.includes(AR.measuresForPricingOnly), notice);
+    }
     const before = s.dialogs.length;
     const back = await readBack(s.page, pid);
     out.readBack = back;
-    check(c, 'leaving after the save needs no warning (nothing unsaved)', s.dialogs.length === before, JSON.stringify(s.dialogs));
+    if (action === 'pricing-save') {
+      // …and leaving before «نشر» warns (the product's box would be lost), as every way out does.
+      check(c, 'the reload warns: the product’s own box is not saved yet (F4)', s.dialogs.slice(before).some((d) => d.type === 'beforeunload'), JSON.stringify(s.dialogs));
+    } else check(c, 'leaving after the save needs no warning (nothing unsaved)', s.dialogs.length === before, JSON.stringify(s.dialogs));
     checkStored(c, back, { boxOn: action === 'pricing-save' ? 'line' : 'fields' });
     if (action === 'save-draft') check(c, '«مسودة» left the product a draft', back.db.status === 'draft', back.db.status);
     out.shots.push(await shot(s.page, c, '4-after-reload', panel(s.page)));
@@ -585,6 +623,76 @@ try {
     }
   });
 
+  // F1: the box the second «نشر» stores is the box the fields show (never the one frozen by the first, invalid «نشر»).
+  await runCase('L6', async (out) => {
+    const c = 'L6';
+    const s = await newSession(c);
+    try {
+      const pid = await createTwin(s.page, 'l6');
+      out.product = pid;
+      await openEditForm(s.page, pid);
+      await fillEntry(s.page, { cost: '1,250' });
+      await press(s.page, 'save');
+      check(c, 'first «نشر»: the pricing is not sent (invalid)', (await statusNow(s.page)) === 'invalid', String(await statusNow(s.page)));
+      await openSection(s.page, 3);
+      await typeInto(s.page, 'عرض الصندوق', toArabic(70));
+      await typeInto(s.page, 'تكلفة المورد للقطعة', '1250');
+      await s.page.waitForTimeout(900);
+      await settle(s.page, 1200);
+      out.shots.push(await shot(s.page, c, '1-corrected', panel(s.page)));
+      await press(s.page, 'save');
+      const box = rows(`SELECT i.shipping_width_mm AS w, p.package_width_mm AS pw FROM pricing_inputs i JOIN products p ON p.id = i.product_id WHERE i.product_id = '${pid}' AND i.origin = 'MANUAL_OVERRIDE' AND i.scope = 'base'`)[0] ?? null;
+      out.box = box;
+      check(c, 'pricing stores the corrected box (70 cm), the box the product and its fields hold', box?.w === 700 && box?.pw === 700, JSON.stringify(box));
+      check(c, 'and the cost', stored(pid).input?.supplier_cost_amount === '1250', JSON.stringify(stored(pid)));
+      out.network = s.net;
+    } finally {
+      await s.ctx.close();
+    }
+  });
+
+  // F3: the dashboard's sidebar asks before closing a form that holds unsaved pricing.
+  await runCase('L7', async (out) => {
+    const c = 'L7';
+    const s = await newSession(c);
+    try {
+      const pid = await createTwin(s.page, 'l7');
+      out.product = pid;
+      await openEditForm(s.page, pid);
+      await typeInto(s.page, 'الحد الأدنى للربح', ENTRY.minProfit);
+      await s.page.waitForTimeout(500);
+      s.setDialog((d) => d.dismiss());
+      const before = s.dialogs.length;
+      await s.page.locator('[data-tab="overview"]:visible').first().click();
+      await s.page.waitForTimeout(700);
+      check(c, 'the sidebar asks first, in the owner’s words', s.dialogs.slice(before).some((d) => d.type === 'confirm' && d.message.includes(AR.leaveUnsaved)), JSON.stringify(s.dialogs));
+      check(c, 'dismissed: still on the form, the value still there', (await bar(s.page).count()) === 1 && (await readFields(s.page))['الحد الأدنى للربح (USD)'] === ENTRY.minProfit);
+      out.shots.push(await shot(s.page, c, '1-still-on-form'));
+      s.setDialog((d) => d.accept());
+      await s.page.locator('[data-tab="overview"]:visible').first().click();
+      await s.page.waitForTimeout(1000);
+      check(c, 'accepted: the other tab opens', (await bar(s.page).count()) === 0);
+      out.dialogs = s.dialogs;
+    } finally {
+      await s.ctx.close();
+    }
+  });
+
+  // F2: a NEW product knows, before its first save, that no dollar rate is approved.
+  await runCase('L8', async (out) => {
+    const c = 'L8';
+    const s = await newSession(c);
+    try {
+      await openNewForm(s.page);
+      const text = await panel(s.page).innerText();
+      check(c, '«منتج جديد»: the panel names the missing dollar rate', text.includes(AR.ratesNoUsd), text.slice(0, 400));
+      check(c, '«منتج جديد»: «دينار» is offered disabled and says why', await s.page.evaluate((t) => Array.from(document.querySelectorAll('[data-form="usd-pricing"] option[value="IQD"]')).every((o) => o.disabled && o.textContent === t), AR.currencyIqdNoRate));
+      out.shots.push(await shot(s.page, c, '1-new-product-panel', panel(s.page)));
+    } finally {
+      await s.ctx.close();
+    }
+  });
+
   // ---------------------------------------------------------------- world B
   if (!ONLY.length || ONLY.some((n) => /^[BN]/.test(n))) seed('rates-liveB.sql');
   await runCase('B1', async (out) => {
@@ -631,7 +739,9 @@ try {
       check(c, 'the data went in one PUT with data_only, answered 200', puts.length === 1 && puts[0].status === 200 && puts[0].data_only === true, JSON.stringify(puts));
       const sheet = s.page.locator('[data-engine-save-sheet]').first();
       check(c, 'the review is open at the form’s root, section ٨ closed', (await sheet.isVisible().catch(() => false)) && !(await sectionOpen(s.page, 8)));
-      check(c, 'the review says the data is already saved', (await sheet.innerText().catch(() => '')).includes(AR.sheetDataSaved));
+      const sheetText = await sheet.innerText().catch(() => '');
+      check(c, 'the review says the data is already saved', sheetText.includes(AR.sheetDataSaved), sheetText);
+      check(c, 'and never the held write’s «this save completes the data … in the same step»', !sheetText.includes(AR.adoptIntro), sheetText);
       out.shots.push(await shot(s.page, c, '1-review-sheet'));
       check(c, 'the store price has not moved yet', stored(pid).price_iqd === STORE_PRICE);
       const cancel = s.page.locator('[data-engine-save-cancel]').first();
@@ -674,8 +784,10 @@ try {
       check(c, 'the engine priced it (mode engine)', after.mode === 'engine', after.mode);
       check(c, 'the store price is the engine’s, not the manual one', typeof after.price_iqd === 'number' && after.price_iqd !== STORE_PRICE && after.price_iqd % 1000 === 0, String(after.price_iqd));
       check(c, '«التكلفة القديمة» is unchanged', after.product_cost_iqd === LEGACY_COST, String(after.product_cost_iqd));
-      const outcome = await panel(s.page).locator('[data-pricing-outcome="saved"]').first().innerText().catch(() => '');
+      // Said once, beside the save button (never twice in the panel).
+      const outcome = await panel(s.page).locator('[data-pricing-notice]').first().innerText().catch(() => '');
       check(c, 'the panel says it was adopted', outcome.includes(AR.savedAdopted), outcome);
+      check(c, 'once', (await panel(s.page).innerText()).split(AR.savedAdopted).length - 1 === 1);
       check(c, 'the bar says saved', (await statusNow(s.page)) === 'saved', String(await statusNow(s.page)));
       out.shots.push(await shot(s.page, c, '2-after-adopt', panel(s.page)));
       out.network = s.net;
@@ -699,6 +811,52 @@ try {
       const db = stored(pid);
       check(c, 'the data is already stored, the price not yet', db.input?.supplier_cost_amount === '899.5' && db.mode === 'manual' && db.price_iqd === STORE_PRICE, JSON.stringify(db));
       await s.page.locator('[data-engine-save-cancel]').first().click();
+      out.network = s.net;
+    } finally {
+      await s.ctx.close();
+    }
+  });
+
+  // F2 / FX plan §12: a NEW product's dinars, at the rate the panel says, saved with «نشر» with the rest.
+  await runCase('N4', async (out) => {
+    const c = 'N4';
+    const s = await newSession(c);
+    try {
+      await openNewForm(s.page);
+      const name = `USD Pricing New ${Date.now() % 100000}`;
+      out.name = name;
+      await openSection(s.page, 1);
+      const cat = s.page.locator('#pf-category');
+      await cat.selectOption(await cat.evaluate((el) => Array.from(el.options).map((o) => o.value).find((v) => v && /printer/i.test(v)) || Array.from(el.options).map((o) => o.value).find(Boolean)));
+      await openSection(s.page, 2);
+      await typeInto(s.page, 'الاسم', name, 'body');
+      await openSection(s.page, 3);
+      await typeInto(s.page, 'السعر', String(STORE_PRICE), 'body');
+      check(c, '«دينار» is offered (a dollar rate is approved)', await s.page.evaluate(() => Array.from(document.querySelectorAll('[data-form="usd-pricing"] option[value="IQD"]')).every((o) => !o.disabled)));
+      await pick(s.page, 'عملة المورد', 'IQD');
+      await typeInto(s.page, 'تكلفة المورد بالدينار', toArabic(1450000));
+      await pick(s.page, 'مسار الشحن الأساسي', 'CHINA_SEA');
+      await typeInto(s.page, 'عرض الصندوق', ENTRY.box.width);
+      await typeInto(s.page, 'عمق الصندوق', ENTRY.box.depth);
+      await typeInto(s.page, 'ارتفاع الصندوق', ENTRY.box.height);
+      await typeInto(s.page, 'الحد الأدنى للربح', ENTRY.minProfit);
+      await s.page.waitForTimeout(600);
+      const line = await panel(s.page).locator('[data-usd-iqd-rate]').first().innerText().catch(() => '');
+      check(c, 'the line under the dinars says the rate the save converts at', line.includes(AR.iqdAtRate), line);
+      out.shots.push(await shot(s.page, c, '1-filled', panel(s.page)));
+      await press(s.page, 'save');
+      const sheet = s.page.locator('[data-engine-save-sheet]').first();
+      if (await sheet.isVisible().catch(() => false)) await s.page.locator('[data-engine-save-cancel]').first().click();
+      await s.page.waitForTimeout(600);
+      const pid = rows(`SELECT id FROM products WHERE name = '${name}'`)[0]?.id ?? null;
+      out.product = pid;
+      check(c, 'the product was created', !!pid);
+      const puts = s.net.filter((n) => n.method === 'PUT' && /\/inputs$/.test(n.path));
+      check(c, 'the pricing went in one PUT (data_only, the conversion hash), answered 200', puts.length === 1 && puts[0].status === 200 && puts[0].data_only === true && puts[0].has_hash, JSON.stringify(puts));
+      const input = pid ? rows(`SELECT supplier_input_mode, original_input_amount, conversion_rate_snapshot, shipping_profile, shipping_width_mm FROM pricing_inputs WHERE product_id = '${pid}' AND origin = 'MANUAL_OVERRIDE' AND scope = 'base'`)[0] : null;
+      out.input = input;
+      check(c, 'the dinars are stored converted at the rate shown, with the rest', input?.supplier_input_mode === 'IQD_CONVERTED' && input?.original_input_amount === '1450000' && Number(input?.conversion_rate_snapshot) === 1600 && input?.shipping_profile === 'CHINA_SEA' && input?.shipping_width_mm === 600, JSON.stringify(input));
+      check(c, 'the store price is the one typed (manual)', pid ? stored(pid).price_iqd === STORE_PRICE && stored(pid).mode === 'manual' : false, JSON.stringify(pid && stored(pid)));
       out.network = s.net;
     } finally {
       await s.ctx.close();
