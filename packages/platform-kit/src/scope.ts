@@ -330,6 +330,8 @@ export const FINANCIAL_FIELDS = [
   'change_pct',
   'change_ppm',
   'preview_hash',
+  // the product form's dinar conversion, hashed with the dinars and the rate (an oracle, like preview_hash)
+  'conversion_hash',
   'supplier_cost_view',
   'current_usd',
   'current_iqd',

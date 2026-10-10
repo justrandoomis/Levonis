@@ -48,6 +48,7 @@
 import { MAX_ADDITIONAL_COST_IQD, MAX_BOX_MM, MAX_WEIGHT_G, SUPPLIER_CURRENCIES, type SupplierCurrency } from '@levonis/pricing/costToPrice';
 import { SHIPPING_PROFILES, type ShippingProfile } from '@levonis/pricing/skuChannel';
 import { iqdToCanonicalUsd } from '@levonis/pricing/fxChain';
+import { typedDecimalText } from '@levonis/contracts/procurementCost';
 import type { PricingContext } from '../../routes/cart';
 import { sha256Hex } from '../crypto';
 import { fxRefusal, positiveDecimal, strictBody } from '../fx/ownerActs';
@@ -158,7 +159,8 @@ function parseInputEntry(raw: unknown, i: number, ids: PricingScopeIds, stored: 
   const has = (k: FormField) => Object.prototype.hasOwnProperty.call(r, k) && r[k] !== undefined;
   if (has('supplier_cost_amount')) {
     const v = r.supplier_cost_amount;
-    set.supplier_cost_amount = v === null || v === '' ? null : positiveDecimal(v, 'supplier_cost_amount', 12, 6);
+    // Read as typed (owner report 2026-10-10): «٨٩٩٫٥» and '899,5' are 899.5, as the minimum profit already reads them.
+    set.supplier_cost_amount = v === null || v === '' ? null : positiveDecimal(typeof v === 'string' ? typedDecimalText(v) : v, 'supplier_cost_amount', 12, 6);
   }
   if (has('supplier_cost_currency')) {
     const v = r.supplier_cost_currency;
@@ -181,7 +183,7 @@ function parseInputEntry(raw: unknown, i: number, ids: PricingScopeIds, stored: 
   }
   if (has('manual_cbm')) {
     const v = r.manual_cbm;
-    const cbm = v === null || v === '' ? null : positiveDecimal(v, 'manual_cbm', 3, 9);
+    const cbm = v === null || v === '' ? null : positiveDecimal(typeof v === 'string' ? typedDecimalText(v) : v, 'manual_cbm', 3, 9);
     if (cbm !== null && cbm.length > 12) throw inputInvalid('manual_cbm');
     set.manual_cbm = cbm;
   }
@@ -202,7 +204,8 @@ function parseInputEntry(raw: unknown, i: number, ids: PricingScopeIds, stored: 
     if (!same || reconvert) {
       const u = cx.rates?.usd_iqd ?? null;
       const version = cx.rates?.pair_versions.USD_IQD ?? 0;
-      if (!u || version <= 0) throw fxRefusal(409, 'PRICING_FX_RATE_MISSING');
+      // The field and the scope it was typed at (ids only, never the amount): the form says it under that field.
+      if (!u || version <= 0) throw fxRefusal(409, 'PRICING_FX_RATE_MISSING', { field: 'supplier_cost_iqd', scope, scope_id: scopeId });
       set.supplier_cost_amount = iqdToCanonicalUsd(v, u);
       set.supplier_cost_currency = 'USD';
       snapshot = { original_input_amount: String(v), conversion_rate_snapshot: u, conversion_fx_version: version, converted_at: cx.now };
@@ -513,5 +516,8 @@ export async function productInputsAnswer(
     // What the save carries: the engine write's hash when the save writes prices, else the hash of
     // the typed dinars' conversion (the rate it was shown at).
     preview_hash: evaluation?.kind && evaluation.complete && evaluation.hash ? evaluation.hash : await formPreviewHash(pid, draft.iqd, rates),
+    // The typed dinars' conversion hash on its own, even when `preview_hash` is the engine's (the drafts complete
+    // the product): the product form's data-only save carries it (owner report 2026-10-10). Null without dinars.
+    conversion_hash: draft.iqd.length ? await formPreviewHash(pid, draft.iqd, rates) : null,
   };
 }

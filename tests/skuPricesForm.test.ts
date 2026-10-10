@@ -117,10 +117,11 @@ const formOf = (over: Partial<UsdPricingFormContext> = {}): UsdPricingFormContex
   ...over,
 });
 const stateOf = (answer: UsdPricingAnswer, over: Partial<UsdPricingState> = {}): UsdPricingState => ({
-  enabled: true, productId: 'p1', form: formOf(), answer, shown: answer, drafts: {}, effective: {}, dirty: false, invalid: false, busy: false,
-  saving: false, notInstalled: false, error: '', notice: '', engine: true, setDraft: () => {}, discard: () => {}, save: async () => {},
-  reload: () => {}, snapshot: () => null, saveAfterProduct: async () => ({ ok: true, message: '' }),
-  afterProductSaved: async () => {}, review: null, reviewBusy: false, confirmReview: async () => {}, cancelReview: () => {}, exitEngine: async () => {}, ...over,
+  enabled: true, productId: 'p1', form: formOf(), answer, shown: answer, drafts: {}, effective: {}, dirty: false, touched: false, invalid: false,
+  invalidWhere: '', busy: false, saving: false, notInstalled: false, error: '', notice: '', outcome: null, serverField: null, rateKnownMissing: false,
+  engine: true, setDraft: () => {}, discard: () => {}, save: async () => {}, reload: () => {}, snapshot: () => null,
+  saveAfterProduct: async () => ({ ok: true, message: '' }), afterProductSaved: async () => {}, review: null, reviewBusy: false,
+  confirmReview: async () => {}, cancelReview: () => {}, openReview: () => {}, exitEngine: async () => {}, ...over,
 });
 const withState = (state: UsdPricingState, el: Parameters<typeof renderToStaticMarkup>[0]) => render(createElement(UsdPricingProvider, { value: state, children: el }));
 

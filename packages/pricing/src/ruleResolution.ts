@@ -48,6 +48,7 @@ import {
   mulProcurementExact,
   procurementExact,
   procurementExactText,
+  typedDecimalText,
   type ProcurementExact,
 } from '@levonis/contracts/procurementCost';
 import { skuComboKey } from './skuChannel';
@@ -86,21 +87,6 @@ export function parseUsdRuleAmount(raw: unknown): ProcurementExact | null {
 }
 
 /**
- * Arabic-Indic and Eastern Arabic-Indic digits to ASCII; the Arabic decimal
- * separator to '.'; a plain comma to '.' only as a DECIMAL comma (one or two
- * digits after it, at the end) — '1,200' stays unparseable rather than
- * silently becoming 1.2.
- */
-function asciiDecimal(text: string): string {
-  return text
-    .trim()
-    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
-    .replace(/\u066b/g, '.')
-    .replace(/^([0-9]+),([0-9]{1,2})$/, '$1.$2');
-}
-
-/**
  * The canonical text of a minimum profit the owner typed (USD design §4.1):
  * Arabic-Indic digits and a decimal comma are normalised, leading zeros and
  * trailing fraction zeros dropped ('120.50' → '120.5', '٠٧٫٥' → '7.5'), and
@@ -112,7 +98,7 @@ export function canonicalUsdRuleAmount(raw: unknown): string | null {
   if (typeof raw === 'number') {
     if (!Number.isFinite(raw)) return null;
     text = String(raw);
-  } else if (typeof raw === 'string') text = asciiDecimal(raw);
+  } else if (typeof raw === 'string') text = typedDecimalText(raw);
   else return null;
   const m = /^0*([0-9]+)(?:\.([0-9]*?)0*)?$/.exec(text);
   if (!m || text.endsWith('.') || text.startsWith('.')) return null;
