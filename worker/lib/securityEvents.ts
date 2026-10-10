@@ -33,6 +33,12 @@
  * is stored. At most `DAILY_ROW_CAP` rows are active in any 24 hours; past
  * that, everything else of the day lands in ONE overflow row per kind. The
  * owner's context rows are one per (session, network, browser) triple.
+ * BOUNDED IN TIME TOO: a row untouched for `RETENTION_DAYS` is dropped, at
+ * most `PRUNE_PER_WRITE` of them with every write that may add one — more
+ * than a write adds, so the table never holds much more than
+ * RETENTION_DAYS × (DAILY_ROW_CAP + one overflow row per kind) rows, however
+ * long a flood lasts. The window is longer than the 30-day context memory,
+ * so a context still remembered is never dropped.
  *
  * WHO IS NOT RECORDED. Only the authenticated probe accounts the owner
  * registered (`SECURITY_PROBE_USER_IDS`, comma-separated user ids — never the
@@ -109,6 +115,10 @@ export const DAILY_ROW_CAP = 2000;
 export const CONTEXT_WINDOW_DAYS = 30;
 /** At most this many security bells a Baghdad day; the rows are written regardless. */
 export const DAILY_BELL_CAP = 5;
+/** A row not touched for this many days is dropped (longer than CONTEXT_WINDOW_DAYS). */
+export const RETENTION_DAYS = 90;
+/** At most this many expired rows go with each write — more than the one row a write may add. */
+export const PRUNE_PER_WRITE = 8;
 
 // ------------------------------------------------------------- detail
 
@@ -330,7 +340,10 @@ async function writeRow(db: D1Database, r: EventRow, now: Date): Promise<'writte
         DAILY_ROW_CAP
       )
       .run();
-    if (Number(res.meta?.changes ?? 0) > 0) return 'written';
+    if (Number(res.meta?.changes ?? 0) > 0) {
+      await pruneExpired(db, now);
+      return 'written';
+    }
     await db
       .prepare(
         `INSERT INTO security_events
@@ -340,10 +353,29 @@ async function writeRow(db: D1Database, r: EventRow, now: Date): Promise<'writte
       )
       .bind(newId('sev'), `overflow|${r.kind}|${baghdadDay(now.getTime())}`, r.kind, r.method, r.status, at)
       .run();
+    await pruneExpired(db, now);
     return 'overflow';
   } catch (e) {
     if (!isMissingTable(e)) console.error('security event not written:', e instanceof Error ? e.name : 'unknown');
     return 'skipped';
+  }
+}
+
+/**
+ * THE RETENTION (see the header): up to PRUNE_PER_WRITE rows untouched for
+ * RETENTION_DAYS, oldest first, through the `last_at` index — one statement,
+ * nothing to delete on an ordinary day. Never throws; a failed prune leaves
+ * the event it follows written.
+ */
+async function pruneExpired(db: D1Database, now: Date): Promise<void> {
+  try {
+    const cutoff = new Date(now.getTime() - RETENTION_DAYS * 86_400_000).toISOString();
+    await db
+      .prepare('DELETE FROM security_events WHERE id IN (SELECT id FROM security_events WHERE last_at < ? ORDER BY last_at LIMIT ?)')
+      .bind(cutoff, PRUNE_PER_WRITE)
+      .run();
+  } catch {
+    /* never in the way */
   }
 }
 

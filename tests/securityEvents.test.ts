@@ -12,7 +12,8 @@
  *                seen in 30 days: a row and one bell with no figure; the same
  *                context again is silent; bounded bells
  *   bounded      one row per (actor, route, hour), `count` for the repeats;
- *                past DAILY_ROW_CAP, one overflow row per kind
+ *                past DAILY_ROW_CAP, one overflow row per kind; a row untouched
+ *                for RETENTION_DAYS goes, PRUNE_PER_WRITE at most per write
  *   probes       only a SIGNED-IN registered probe account is exempt — a forged
  *                probe user agent still records the event
  *   privacy      ids and codes only: no address, no user agent, no session id,
@@ -32,11 +33,14 @@ import { requireCostRead } from '../worker/lib/costAccess';
 import { rateLimitKey } from '../worker/lib/ratelimit';
 import { baghdadDay } from '../worker/lib/baghdadTime';
 import {
+  CONTEXT_WINDOW_DAYS,
   COST_PATH_PREFIXES,
   DAILY_BELL_CAP,
   DAILY_ROW_CAP,
   FX_GUARD_CHANGED,
   OWNER_COST_NEW_CONTEXT,
+  PRUNE_PER_WRITE,
+  RETENTION_DAYS,
   SECURITY_ALERT_NOTICE,
   SECURITY_EVENT_KINDS,
   classifyRefusal,
@@ -243,6 +247,39 @@ test(`bounded: past ${DAILY_ROW_CAP} rows in 24 hours a new event lands in ONE o
   assert.equal(overflow.bucket, `overflow|cost_denied|${baghdadDay(Date.now())}`);
   assert.equal(overflow.count, 2);
   assert.equal(overflow.actor_id, null);
+});
+
+test(`bounded in time: a row untouched for ${RETENTION_DAYS} days goes, at most ${PRUNE_PER_WRITE} with each write — a remembered owner context and a recent row stay`, async () => {
+  const { raw, app } = world({ user: ASSISTANT });
+  const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+  raw.exec('BEGIN');
+  const st = raw.prepare(
+    "INSERT INTO security_events (id, bucket, kind, code, actor_class, method, route, status, first_at, last_at) VALUES (?, ?, 'cost_denied', 'X', 'guest', 'GET', '/x', 403, ?, ?)"
+  );
+  const expired = PRUNE_PER_WRITE + 4;
+  for (let i = 0; i < expired; i++) st.run(`sev_old${i}`, `old|${i}`, ago(RETENTION_DAYS + 1 + i), ago(RETENTION_DAYS + 1 + i));
+  st.run('sev_recent', 'recent|1', ago(RETENTION_DAYS - 1), ago(RETENTION_DAYS - 1));
+  raw.exec('COMMIT');
+  raw
+    .prepare(
+      "INSERT INTO security_events (id, bucket, kind, code, actor_id, actor_class, method, route, status, first_at, last_at) VALUES ('sev_ctx', 'ctx|1', 'enumeration_suspected', ?, 'usr_owner', 'owner', 'GET', '/y', 200, ?, ?)"
+    )
+    .run(OWNER_COST_NEW_CONTEXT, ago(CONTEXT_WINDOW_DAYS - 1), ago(CONTEXT_WINDOW_DAYS - 1));
+  const left = () => all<{ id: string }>(raw, "SELECT id FROM security_events WHERE id LIKE 'sev_old%' ORDER BY last_at").map((r) => r.id);
+
+  await get(app, `${BASE}/rates`);
+  await drain();
+  assert.equal(left().length, expired - PRUNE_PER_WRITE, 'one write drops at most PRUNE_PER_WRITE expired rows');
+  assert.ok(left().every((id) => Number(id.slice('sev_old'.length)) < expired - PRUNE_PER_WRITE), 'the oldest go first');
+
+  await get(app, `${BASE}/overview`);
+  await drain();
+  assert.equal(left().length, 0, 'the next write takes the rest');
+  assert.ok(row(raw, "SELECT 1 AS x FROM security_events WHERE id = 'sev_recent'"), `a row touched within ${RETENTION_DAYS} days stays`);
+  assert.ok(row(raw, "SELECT 1 AS x FROM security_events WHERE id = 'sev_ctx'"), 'a remembered owner context stays');
+  assert.equal(events(raw).filter((e) => e.route.startsWith(BASE)).length, 2, 'the events themselves are written');
+  assert.ok(RETENTION_DAYS > CONTEXT_WINDOW_DAYS, 'the retention outlives the context memory');
+  assert.ok(PRUNE_PER_WRITE > 1, 'a write drops more than it adds');
 });
 
 test('a 429 on the pricing bucket: rate_limited with the bucket NAME, the 429 body unchanged; the FX refresh bucket too', async () => {
