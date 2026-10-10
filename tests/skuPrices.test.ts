@@ -44,6 +44,8 @@ import { verifyPlan, type PricePlan } from '../worker/lib/pricingEngine/writer';
 import { engineBasisOf } from '../worker/lib/pricingEngine/orderBasis';
 import { engineCombosOf, engineObservations } from '../worker/lib/pricingEngine/protectionBasis';
 import { resolveCartLine } from '../worker/routes/cart';
+import { compositionSelect, resolveCompositionLines } from '../worker/lib/bundleRead';
+import { priceTarget } from '../worker/lib/tradeIn';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import type { Env } from '../worker/lib/types';
 import type { DatabaseSync } from 'node:sqlite';
@@ -279,6 +281,56 @@ test('a two-group product prices every combination, and the cart charges each on
     }
   }
   assert.equal(Object.keys(skuRows(w, A1)).length, 2 * 2 * 2, 'every model × size × channel');
+});
+
+test('a two-group SKU inside a bundle and as a trade-in target is priced at its own SKU price, never its model’s highest', async () => {
+  const w = pricingWorld();
+  addSizeGroup(w.raw);
+  const land = (usd: number, target: number) => ceil1000(usd * 1600 + 1 * 3200 + target * 1600);
+  await save(w, A1, {
+    inputs: [
+      { scope: 'base', supplier_cost_amount: '10', supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 },
+      { scope: 'option', scope_id: `${A1}_l`, supplier_cost_amount: '15', supplier_cost_currency: 'USD' },
+    ],
+    rules: [
+      { kind: 'target_profit', scope: 'product', amount_usd: '3' },
+      { kind: 'target_profit', scope: 'option', scope_id: `${A1}_l`, amount_usd: '6' },
+      { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 5000 },
+    ],
+  });
+  const small = [`${A1}_o0`, `${A1}_s`];
+  const smallDirect = land(10, 3) + 5000;
+  assert.equal(await charge(w, A1, small, null, ''), smallDirect, 'the cart charges the small SKU its own price');
+  assert.ok(land(15, 6) + 5000 > smallDirect, 'the model’s highest (its large SKU) is dearer — what a model-only read would charge');
+
+  // A derived-price bundle (0058) whose one component is pinned to that SKU, read as a cart line
+  // reads it (the complete choice set): the component is priced exactly as the cart prices it.
+  w.raw.exec(`
+    INSERT INTO products (id, slug, name, name_ar, name_ku, price_iqd, status, stock, options, colors, selling_type, sale_types, preorder_transports, images, inventory_mode, composition)
+    VALUES ('bx_sku_test', 'bx-sku-test', 'SKU bundle', 'حزمة', 'پاکێج', 1000, 'active', 0, '[]', '[]', 'bundle', '["bundle"]', '[]', '[]', 'BASE', 'bundle');
+    INSERT INTO bundle_config (product_id, price_mode, discount_iqd, min_price_iqd) VALUES ('bx_sku_test', 'discount_iqd', 1000, 1);
+    INSERT INTO bundle_components (id, bundle_product_id, member_product_id, qty, optional, option_value_ids, color_id)
+    VALUES ('bc_sku_test', 'bx_sku_test', '${A1}', 1, 0, '${JSON.stringify([...small].sort())}', '');
+  `);
+  const ctx = await loadPreviewContext(w.db);
+  const rows = await compositionSelect(w.db, (cols, from) => `SELECT ${cols} ${from} WHERE p.id = ?`, ['bx_sku_test']);
+  const choices = new Map([['bc_sku_test', { option_value_ids: [...small].sort(), color_id: null, included: true }]]);
+  const bundles = await resolveCompositionLines(w.db, rows.map((r) => ({ key: String(r.id), row: r, choices })), {
+    tier: 'free',
+    tierActive: false,
+    proPolicy: ctx.proPolicy,
+    transportDefaults: ctx.transportDefaults,
+    status: null,
+    nowMs: Date.now(),
+  });
+  const component = bundles.get('bx_sku_test')!.components[0]!;
+  assert.equal(component.shipping_type, 'direct');
+  assert.equal(component.unit.regular_iqd, smallDirect, 'the bundle component carries the SKU’s own price');
+
+  // The trade-in target: the direct price the customer pays for exactly that SKU (an FDM printer).
+  w.raw.exec(`UPDATE products SET category_id = 'cat_printers', sub_category_id = 'cat_printers_fdm' WHERE id = '${A1}'`);
+  const target = await priceTarget({ DB: w.db } as unknown as Env, 'usr_trade_in', { product_id: A1, option_value_ids: small, color_id: null });
+  assert.equal(target.price_iqd, smallDirect, 'the trade-in target is the SKU’s own direct price');
 });
 
 // ------------------------------------------------------------- the exact check

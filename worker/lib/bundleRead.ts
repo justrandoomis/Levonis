@@ -715,6 +715,8 @@ function resolveComponent(
     resolveUnitPrice({
       product: doc,
       optionId: selection.option_value_ids[0] ?? null,
+      // The whole selection names the exact SKU whose stored engine price (0183, FX-7) applies.
+      optionValueIds: selection.option_value_ids,
       colorId: selection.color_id,
       transportMethod: shipping === 'direct' ? null : transportOf(shipping),
       tier: viewer.tier,

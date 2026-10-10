@@ -1230,6 +1230,8 @@ export async function resolveComposition(
     const unit = resolveUnitPrice({
       product: m.doc,
       optionId: sel.option_value_ids[0] || null,
+      // The whole selection names the exact SKU whose stored engine price (0183, FX-7) applies.
+      optionValueIds: sel.option_value_ids,
       colorId: sel.color_id,
       transportMethod: method || null,
       tier: input.ctx.tier,

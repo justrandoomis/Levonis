@@ -995,6 +995,8 @@ export async function priceTarget(env: Env, userId: string, sel: TargetSelection
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: optionValueIds[0] ?? null,
+    // The whole selection names the exact SKU whose stored engine price (0183, FX-7) applies.
+    optionValueIds,
     colorId: color?.id ?? null,
     transportMethod: null,
     fulfillmentType: 'direct_sale',
