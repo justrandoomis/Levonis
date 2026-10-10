@@ -1320,7 +1320,7 @@ export default function Cart() {
           <span
             aria-hidden="true"
             className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
-              selected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
+              selected ? 'bg-surface-selected border-white/30' : 'border-[var(--clay-field)]'
             }`}
           >
             {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
@@ -1329,15 +1329,15 @@ export default function Cart() {
 
         <div
           data-cart-item-image
-          className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-zinc-900 cursor-pointer"
+          className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-surface-raised cursor-pointer"
           onClick={() => navigate(`/product/${item.slug}`)}
         >
-          <SafeImage src={item.image} alt={itemName(item)} aspect="auto" className="w-full h-full" bgClassName="bg-zinc-900" fallbackClassName="text-zinc-600" />
+          <SafeImage src={item.image} alt={itemName(item)} aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
         </div>
 
         <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
           <div>
-            <h3 data-cart-item-title className="text-zinc-200 text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+            <h3 data-cart-item-title className="text-text-primary text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
             <div className="flex flex-wrap gap-1.5 mb-1.5">
               <span data-cart-gift-badge className="inline-flex items-center gap-1 rounded px-2 py-1 w-max bg-gold/10 text-gold text-[12px] font-bold">
                 <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
@@ -1346,31 +1346,31 @@ export default function Cart() {
                   : loc('هدية', 'Gift', 'دیاری')}
               </span>
               {item.variantLabel && (
-                <span className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 w-max text-[12px] text-zinc-300">
+                <span className="bg-surface-raised border border-border-subtle rounded px-2 py-1 w-max text-[12px] text-text-secondary">
                   <bdi>{item.variantLabel}</bdi>
                 </span>
               )}
               <span
                 data-cart-shipping-type={typeForTransport(item.transport_method)}
-                className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-zinc-300"
+                className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-text-secondary"
               >
                 {shippingLabel(item)}
               </span>
               {item.qty > 1 && (
-                <span className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 w-max text-[12px] text-zinc-300 tabular-nums">× {item.qty}</span>
+                <span className="bg-surface-raised border border-border-subtle rounded px-2 py-1 w-max text-[12px] text-text-secondary tabular-nums">× {item.qty}</span>
               )}
             </div>
           </div>
 
           <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
-            <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(0)}</span>
+            <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(0)}</span>
             {gift.value_iqd > 0 && (
-              <span className="text-zinc-500 text-[12px] tabular-nums" data-cart-gift-value={item.id}>
+              <span className="text-text-muted text-[12px] tabular-nums" data-cart-gift-value={item.id}>
                 {loc(`قيمتها ${money(gift.value_iqd)}`, `Worth ${money(gift.value_iqd)}`, `بەهاکەی ${money(gift.value_iqd)}`)}
               </span>
             )}
           </div>
-          <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-zinc-500">
+          <p className="-mt-1 mb-2 text-[11.5px] leading-relaxed text-text-muted">
             {loc(
               'سطر هدية ثابت: لا تتغير كميته ولا خياراته.',
               'A gift line is fixed: its quantity and options cannot change.',
@@ -1384,7 +1384,7 @@ export default function Cart() {
                 {apiRefusal({ code: refusalCode || 'GIFT_NOT_ORDERABLE' }, lang as 'ar' | 'en' | 'ckb')}
               </span>
             ) : (
-              <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-zinc-500">
+              <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-text-muted">
                 {loc(
                   'إن حذفتها من السلة تعود إلى «هداياي» وتبقى لك.',
                   'If you remove it, it goes back to My gifts and stays yours.',
@@ -1417,7 +1417,7 @@ export default function Cart() {
     // short page. The bottom padding clears the summary bar (≈76px) and the
     // safe area, and nothing more — `pb-48` (192px) was reserving room for a
     // nav that is no longer on this route.
-    <div className="w-full max-w-full overflow-x-clip pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh bg-canvas flex flex-col font-sans">
+    <div className="w-full max-w-full overflow-x-clip pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh flex flex-col font-sans">
       {/* Header */}
       {/* Solid clay, not glass (docs/DECISIONS.md row 208): an opaque bar like
           every other one, so no frame re-blurs what scrolls under it. */}
@@ -1425,13 +1425,13 @@ export default function Cart() {
         <button type="button" onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>
-        <h1 className="text-white font-bold text-[17px]">
+        <h1 className="text-text-primary font-bold text-[17px]">
           {t('cart' as any) || loc('السلة', 'Cart', 'سەبەتە')}
         </h1>
         <button
           type="button"
           onClick={() => navigate('/profile')}
-          className="text-[15px] text-zinc-300 hover:text-white font-medium"
+          className="text-[15px] text-text-secondary hover:text-text-primary font-medium"
         >
           {loc('المفضلة', 'Favorites', 'دڵخوازەکان')}
         </button>
@@ -1446,7 +1446,7 @@ export default function Cart() {
         {error && (
           <div className="lv-alert lv-alert-danger mx-4 mt-3 flex items-center justify-between gap-3 text-sm text-red-300">
             <span>{error}</span>
-            <button type="button" onClick={() => setError('')} className="shrink-0 p-1 hover:text-white"><X className="w-4 h-4" /></button>
+            <button type="button" onClick={() => setError('')} className="shrink-0 p-1 hover:text-text-primary"><X className="w-4 h-4" /></button>
           </div>
         )}
 
@@ -1464,7 +1464,7 @@ export default function Cart() {
           </div>
         ) : items.length === 0 ? (
           <div className="lv-surface mx-4 mt-6 flex flex-col items-center gap-4 py-14 text-center text-text-muted">
-            <ShoppingCart className="w-10 h-10 text-zinc-700" />
+            <ShoppingCart className="w-10 h-10 text-text-muted" />
             <p>{loc('سلتك فارغة', 'Your cart is empty.', 'سەبەتەکەت بەتاڵە.')}</p>
             <button
               type="button"
@@ -1479,7 +1479,7 @@ export default function Cart() {
         <div className="bg-surface pb-3 sm:mx-4 sm:mt-4 sm:rounded-xl">
           {/* Group Header */}
           <div className="px-4 py-3 flex items-center gap-2">
-            <span className="text-zinc-300 text-[15px] font-medium">
+            <span className="text-text-secondary text-[15px] font-medium">
               {loc('شحن بواسطة ليفو', 'Shipped by Levo', 'گەیاندن لەلایەن لیڤۆ')}
             </span>
           </div>
@@ -1535,7 +1535,7 @@ export default function Cart() {
                   <span
                     aria-hidden="true"
                     className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
-                      selected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
+                      selected ? 'bg-surface-selected border-white/30' : 'border-[var(--clay-field)]'
                     }`}
                   >
                     {selected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
@@ -1545,7 +1545,7 @@ export default function Cart() {
                 {/* Product Image */}
                 <div
                   data-cart-item-image
-                  className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-zinc-900 cursor-pointer"
+                  className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-surface-raised cursor-pointer"
                   onClick={() => navigate(`/product/${item.slug}`)}
                 >
                   <SafeImage
@@ -1559,15 +1559,15 @@ export default function Cart() {
                        product cutouts against it. A neutral dark plate needs
                        neither, and it is what every other image surface in the
                        app already uses. */
-                    bgClassName="bg-zinc-900"
-                    fallbackClassName="text-zinc-600"
+                    bgClassName="bg-surface-raised"
+                    fallbackClassName="text-text-muted"
                   />
                 </div>
 
                 {/* Product Details */}
                 <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 data-cart-item-title className="text-zinc-200 text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
+                    <h3 data-cart-item-title className="text-text-primary text-[13px] sm:text-[14px] font-medium leading-snug line-clamp-2 mb-1">{itemName(item)}</h3>
 
                     <div className="flex flex-wrap gap-1.5 mb-1.5">
                       {hasVariants && (
@@ -1576,15 +1576,15 @@ export default function Cart() {
                           onClick={() => openVariantModal(item)}
                           aria-invalid={incomplete || undefined}
                           className={`rounded px-2 py-1 flex items-center gap-1 w-max border ${
-                            incomplete ? 'bg-amber-500/10 border-amber-500/50' : 'bg-zinc-900 border-zinc-800'
+                            incomplete ? 'bg-amber-500/10 border-amber-500/50' : 'bg-surface-raised border-border-subtle'
                           }`}
                         >
-                          <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-zinc-300'}`}>
+                          <span className={`text-[12px] ${incomplete ? 'text-amber-200' : 'text-text-secondary'}`}>
                             {incomplete
                               ? loc('اختر الخيار أولًا', 'Choose an option first', 'سەرەتا هەڵبژاردەیەک هەڵبژێرە')
                               : item.variantLabel || loc('اختر الخيارات', 'Choose options', 'هەڵبژاردنەکان دیاری بکە')}
                           </span>
-                          <ChevronRight className="w-3 h-3 text-zinc-500" />
+                          <ChevronRight className="w-3 h-3 text-text-muted" />
                         </button>
                       )}
 
@@ -1596,15 +1596,15 @@ export default function Cart() {
                         <button
                           type="button"
                           onClick={() => openShippingModal(item)}
-                          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max"
+                          className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max"
                         >
-                          <span className="text-[12px] text-zinc-300">{shippingLabel(item)}</span>
-                          <ChevronRight className="w-3 h-3 text-zinc-500" />
+                          <span className="text-[12px] text-text-secondary">{shippingLabel(item)}</span>
+                          <ChevronRight className="w-3 h-3 text-text-muted" />
                         </button>
                       ) : (
                         <span
                           data-cart-shipping-type={typeForTransport(item.transport_method)}
-                          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-zinc-300"
+                          className="bg-surface-raised border border-border-subtle rounded px-2 py-1 flex items-center gap-1 w-max text-[12px] text-text-secondary"
                         >
                           {shippingLabel(item)}
                         </span>
@@ -1613,10 +1613,10 @@ export default function Cart() {
                   </div>
 
                   <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
-                    <span className="max-w-full text-white font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
+                    <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd)}</span>
                     {hasSale && (
                       <>
-                        <span className="text-zinc-500 text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
+                        <span className="text-text-muted text-[12px] line-through">{(regularUnit as number).toLocaleString()}</span>
                         <span className="text-gold text-[12px] font-bold tabular-nums">−{discountPct}%</span>
                       </>
                     )}
@@ -1636,7 +1636,7 @@ export default function Cart() {
                         )}
                       </span>
                       {memberLine && memberLine.capped_by !== 'none' && (
-                        <span className="text-zinc-500"> · {cappedPhrase(memberLine)}</span>
+                        <span className="text-text-muted"> · {cappedPhrase(memberLine)}</span>
                       )}
                     </p>
                   )}
@@ -1652,7 +1652,7 @@ export default function Cart() {
                       say is how many, and when. */}
                   {item.composition?.mystery && (
                     <p
-                      className="mb-2 flex items-center gap-1.5 text-[11.5px] text-zinc-400"
+                      className="mb-2 flex items-center gap-1.5 text-[11.5px] text-text-secondary"
                       data-cart-mystery={item.id}
                     >
                       <Sparkles className="w-3 h-3 shrink-0 text-gold" aria-hidden="true" />
@@ -1697,7 +1697,7 @@ export default function Cart() {
                       chosen extension, so this names the part of it that is
                       warranty — the resolver's dinar, never re-computed. */}
                   {item.breakdown?.warranty && (
-                    <p className="-mt-1.5 mb-2 text-[11.5px] text-zinc-400 tabular-nums flex items-center gap-1.5" data-cart-warranty-fee={item.id}>
+                    <p className="-mt-1.5 mb-2 text-[11.5px] text-text-secondary tabular-nums flex items-center gap-1.5" data-cart-warranty-fee={item.id}>
                       <ShieldCheck className="w-3 h-3 text-gold shrink-0" aria-hidden="true" />
                       <span className="truncate">
                         {ew.includes} · +{money(item.breakdown.warranty.fee_iqd)}
@@ -1716,14 +1716,14 @@ export default function Cart() {
                           className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                           data-selected={!!current}
                         >
-                          <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-zinc-400'}`} aria-hidden="true" />
+                          <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${current ? 'text-gold' : 'text-text-secondary'}`} aria-hidden="true" />
                           <span className="min-w-0 flex-1">
-                            <span className="block text-[12px] font-bold text-zinc-200 leading-tight">{ew.title}</span>
-                            <span className={`block text-[11px] leading-tight truncate tabular-nums ${current ? 'text-gold/90' : 'text-zinc-500'}`}>
+                            <span className="block text-[12px] font-bold text-text-primary leading-tight">{ew.title}</span>
+                            <span className={`block text-[11px] leading-tight truncate tabular-nums ${current ? 'text-gold/90' : 'text-text-muted'}`}>
                               {current ? `${warrantyPlanLabel(current)} · +${money(current.fee_iqd)}` : ew.none}
                             </span>
                           </span>
-                          <ChevronRight className={`w-3.5 h-3.5 text-zinc-500 shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
+                          <ChevronRight className={`w-3.5 h-3.5 text-text-muted shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
                         </button>
                       </div>
                     );
@@ -1732,7 +1732,7 @@ export default function Cart() {
                   {/* A pre-order line whose price would change under cash on
                       delivery: the server's `cod_reprices`, never inferred. */}
                   {item.cod_reprices === true && (
-                    <p className="-mt-1 mb-2 text-[11px] text-zinc-500 leading-relaxed" data-cart-cod-hint={item.id}>
+                    <p className="-mt-1 mb-2 text-[11px] text-text-muted leading-relaxed" data-cart-cod-hint={item.id}>
                       {codHint}
                     </p>
                   )}
@@ -1967,22 +1967,22 @@ export default function Cart() {
 
         {/* Deals Row */}
         <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
-          <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-zinc-900/30 transition-colors">
+          <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-surface-selected transition-colors">
             <div className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
-              <span className="text-zinc-200 text-[15px] font-bold">{loc('العروض والخصومات', 'Deals & Discounts', 'ئۆفەر و داشکاندن')}</span>
+              <span className="text-text-primary text-[15px] font-bold">{loc('العروض والخصومات', 'Deals & Discounts', 'ئۆفەر و داشکاندن')}</span>
               {(usePoints && pointsDiscount > 0) && (
                 <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded">{loc('تم التطبيق', 'Applied', 'جێبەجێ کرا')}</span>
               )}
             </div>
-            <ChevronRight className={`w-4 h-4 text-zinc-500 transition-transform ${dealsExpanded ? 'rotate-90' : ''}`} />
+            <ChevronRight className={`w-4 h-4 text-text-muted transition-transform ${dealsExpanded ? 'rotate-90' : ''}`} />
           </div>
 
           {dealsExpanded && (
             <div className="px-4 pb-4 pt-1 animate-in slide-in-from-top-2 fade-in duration-200">
-              <p className="text-zinc-400 text-sm mb-3">{loc('استخدم نقاطك للحصول على خصم', 'Use your points for a discount', 'خاڵەکانت بۆ داشکاندن بەکاربهێنە')}</p>
+              <p className="text-text-secondary text-sm mb-3">{loc('استخدم نقاطك للحصول على خصم', 'Use your points for a discount', 'خاڵەکانت بۆ داشکاندن بەکاربهێنە')}</p>
               {/*
                 POINTS — a switch, not a lit-up card.
 
@@ -1999,17 +1999,15 @@ export default function Cart() {
               */}
               <div className="mb-4">
                 <label
-                  className={`flex items-center justify-between gap-3 min-h-[56px] px-3 rounded-xl border transition-colors ${
-                    pointBalance === 0
-                      ? 'border-zinc-800/60 bg-zinc-900/30 opacity-60'
-                      : 'border-zinc-800 bg-zinc-900/50 cursor-pointer hover:border-zinc-600'
+                  className={`flex items-center justify-between gap-3 min-h-[56px] px-3 rounded-lg border border-border-subtle bg-surface-raised transition-colors ${
+                    pointBalance === 0 ? 'opacity-60' : 'cursor-pointer'
                   }`}
                 >
                   <span className="min-w-0">
-                    <span className="block font-bold text-zinc-200 text-[14px]">
+                    <span className="block font-bold text-text-primary text-[14px]">
                       {loc('استخدام النقاط', 'Use Points', 'بەکارهێنانی خاڵ')}
                     </span>
-                    <span className="block text-xs text-zinc-400 tabular-nums">
+                    <span className="block text-xs text-text-secondary tabular-nums">
                       {loc(`رصيدك: ${pointBalance.toLocaleString()} نقطة = ${pointBalance.toLocaleString()} د.ع`, `Balance: ${pointBalance.toLocaleString()} pts = ${pointBalance.toLocaleString()} IQD`, `باڵانست: ${pointBalance.toLocaleString()} خاڵ = ${pointBalance.toLocaleString()} د.ع`)}
                     </span>
                   </span>
@@ -2033,7 +2031,7 @@ export default function Cart() {
                   */}
                   <span
                     aria-hidden="true"
-                    className="relative shrink-0 w-[46px] h-[28px] rounded-full bg-zinc-700 transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black"
+                    className="relative shrink-0 w-[46px] h-[28px] rounded-full lv-well transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black"
                   >
                     <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-snow shadow-1 transition-[inset-inline-start] duration-200 ease-out" />
                   </span>
@@ -2058,11 +2056,11 @@ export default function Cart() {
             onClick={() => setSupportOpen((v) => !v)}
             aria-expanded={supportOpen}
             aria-controls="support-code-panel"
-            className="px-4 py-3 flex items-center justify-between text-start hover:bg-zinc-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="px-4 py-3 flex items-center justify-between text-start hover:bg-surface-selected transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <HeartHandshake className="w-5 h-5 text-zinc-400 shrink-0" aria-hidden="true" />
-              <span className="text-zinc-200 text-[15px] font-bold">{sc.title}</span>
+              <HeartHandshake className="w-5 h-5 text-text-secondary shrink-0" aria-hidden="true" />
+              <span className="text-text-primary text-[15px] font-bold">{sc.title}</span>
               {activeSupportRef && currentInfo && (
                 <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
                   @{currentInfo.username || activeSupportRef}
@@ -2074,18 +2072,18 @@ export default function Cart() {
                 </span>
               )}
             </div>
-            <ChevronRight className={`w-4 h-4 text-zinc-500 transition-transform shrink-0 ${supportOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+            <ChevronRight className={`w-4 h-4 text-text-muted transition-transform shrink-0 ${supportOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
           </button>
 
           <div id="support-code-panel" hidden={!supportOpen} className="px-4 pb-4 pt-1">
-            <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3 flex items-start gap-1.5">
+            <p className="text-[12.5px] text-text-secondary leading-relaxed mb-3 flex items-start gap-1.5">
               <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
               <span>{sc.explain}</span>
             </p>
 
             {/* Two different links arrived — the user picks, nothing is swapped. */}
             {conflictRef && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 mb-3">
+              <div className="lv-alert lv-alert-warning mb-3">
                 <p className="text-[13px] font-bold text-amber-300 mb-2">{sc.chooseTitle}</p>
                 <div className="flex flex-col gap-2">
                   {[currentRef, conflictRef].filter(Boolean).map((ref) => {
@@ -2097,10 +2095,10 @@ export default function Cart() {
                         type="button"
                         onClick={() => pickSupportRef(ref)}
                         disabled={!!err}
-                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-zinc-700 bg-zinc-900/60 text-start text-zinc-200 hover:border-zinc-500 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-border-subtle bg-surface text-start text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                       >
                         <span dir="ltr" className="font-mono text-[13px] truncate">@{info?.username || ref}</span>
-                        <span className="text-[11px] text-zinc-500 truncate">
+                        <span className="text-[11px] text-text-muted truncate">
                           {err ? sc.errors[err] ?? sc.errors.unknown : info?.display_name || ''}
                         </span>
                       </button>
@@ -2112,36 +2110,36 @@ export default function Cart() {
 
             {/* The active code. */}
             {currentRef ? (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 mb-3">
+              <div className="lv-well rounded-md p-3 mb-3">
                 {currentInfo ? (
                   <>
-                    <p className="text-[13px] text-zinc-200 leading-relaxed">
+                    <p className="text-[13px] text-text-primary leading-relaxed">
                       {sc.supportsPrefix}
-                      <span dir="ltr" className="font-mono font-bold text-white mx-1">@{currentInfo.username || currentRef}</span>
+                      <span dir="ltr" className="font-mono font-bold text-text-primary mx-1">@{currentInfo.username || currentRef}</span>
                       {sc.supportsSuffix}
                     </p>
                     {currentInfo.display_name && (
-                      <p className="text-[11.5px] text-zinc-500 mt-0.5">{currentInfo.display_name}</p>
+                      <p className="text-[11.5px] text-text-muted mt-0.5">{currentInfo.display_name}</p>
                     )}
                   </>
                 ) : currentError ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-[13px] text-amber-400 flex-1 min-w-0">
                       {sc.errors[currentError] ?? sc.errors.unknown}
-                      <span dir="ltr" className="font-mono text-zinc-400 ms-1">@{currentRef}</span>
+                      <span dir="ltr" className="font-mono text-text-secondary ms-1">@{currentRef}</span>
                     </p>
                     {currentError === 'network' && (
                       <button
                         type="button"
                         onClick={() => retrySupportRef(currentRef)}
-                        className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="lv-button lv-button-secondary lv-button-sm"
                       >
                         {sc.retry}
                       </button>
                     )}
                   </div>
                 ) : (
-                  <p className="text-[13px] text-zinc-400 flex items-center gap-2">
+                  <p className="text-[13px] text-text-secondary flex items-center gap-2">
                     <Spinner size="xs" delayMs={0} decorative />
                     {sc.resolving}
                   </p>
@@ -2150,36 +2148,37 @@ export default function Cart() {
                     multi-product cart is never re-attributed wholesale to the
                     last link the buyer happened to open. */}
                 {supportState.current?.product && (
-                  <p className="text-[11.5px] text-zinc-500 mt-1.5">
+                  <p className="text-[11.5px] text-text-muted mt-1.5">
                     {sc.fromProduct} <span dir="ltr" className="font-mono">{supportState.current.product}</span>
                   </p>
                 )}
                 {currentInfo && hasEligibleSelectedLine && (
-                  <p className="text-[11.5px] text-zinc-500 mt-1.5">{sc.eligibleLine}</p>
+                  <p className="text-[11.5px] text-text-muted mt-1.5">{sc.eligibleLine}</p>
                 )}
                 <div className="flex items-center justify-between gap-2 mt-2">
-                  <span className="text-[11.5px] text-zinc-400">{sc.noPriceEffect}</span>
+                  <span className="text-[11.5px] text-text-secondary">{sc.noPriceEffect}</span>
                   <button
                     type="button"
                     onClick={dropSupportRef}
-                    className="min-h-[36px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[12px] font-bold hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                    className="lv-button lv-button-ghost lv-button-sm"
                   >
                     {sc.remove}
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="text-[12.5px] text-zinc-500 mb-3">
+              <p className="text-[12.5px] text-text-muted mb-3">
                 {supportState.dismissed.length > 0 ? sc.removedNote : sc.none}
               </p>
             )}
 
             {/* Manual entry — always available (§3.3: never mandatory). */}
-            <label htmlFor="support-code-input" className="block text-[12.5px] text-zinc-300 font-bold mb-1.5">
+            <label htmlFor="support-code-input" className="block text-[12.5px] text-text-secondary font-bold mb-1.5">
               {sc.manualLabel}
             </label>
             <div className="flex gap-2">
               <input
+                className="lv-input flex-1 min-w-0 px-3 text-sm font-mono text-start"
                 id="support-code-input"
                 type="text"
                 dir="ltr"
@@ -2191,13 +2190,12 @@ export default function Cart() {
                 placeholder={sc.manualPlaceholder}
                 aria-invalid={!!manualError}
                 aria-describedby={manualError ? 'support-code-error' : undefined}
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-lg px-3 min-h-[44px] text-white outline-none focus:border-gold transition-colors text-sm font-mono text-start"
               />
               <button
                 type="button"
                 onClick={applyManualRef}
                 disabled={supportResolving}
-                className="bg-zinc-800 border border-zinc-700 text-zinc-100 font-bold px-4 min-h-[44px] rounded-lg text-sm hover:bg-zinc-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                className="lv-button lv-button-secondary px-4"
               >
                 {sc.apply}
               </button>
@@ -2212,11 +2210,11 @@ export default function Cart() {
 
         {/* Summary Details */}
         <div className="mt-2 bg-surface p-4 mb-4 flex flex-col gap-3 sm:mx-4 sm:rounded-xl">
-          <h3 className="text-white font-bold text-[16px] mb-1">{loc('ملخص الطلب', 'Order Summary', 'کورتەی داواکاری')}</h3>
+          <h3 className="text-text-primary font-bold text-[16px] mb-1">{loc('ملخص الطلب', 'Order Summary', 'کورتەی داواکاری')}</h3>
 
           <div className="flex justify-between items-center">
-            <span className="text-zinc-400 text-[14px]">{loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشی')}</span>
-            <span className="text-zinc-200 text-[14px] font-medium">{money(totalOriginalPrice)}</span>
+            <span className="text-text-secondary text-[14px]">{loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشی')}</span>
+            <span className="text-text-primary text-[14px] font-medium">{money(totalOriginalPrice)}</span>
           </div>
 
           {otherDiscounts > 0 && (
@@ -2259,10 +2257,10 @@ export default function Cart() {
           )}
 
           <div className="flex justify-between items-center">
-            <span className="text-zinc-400 text-[14px]">
+            <span className="text-text-secondary text-[14px]">
               {loc('التوصيل (يُحدد عند الدفع)', 'Shipping (final at checkout)', 'گەیاندن (لە کاتی پارەدان دیاری دەکرێت)')}
             </span>
-            <span className="text-zinc-200 text-[14px] font-medium">
+            <span className="text-text-primary text-[14px] font-medium">
               {shipping === 0 ? (
                 <span className="text-gold">{loc('مجاني', 'Free', 'بەخۆڕایی')}</span>
               ) : (
@@ -2336,11 +2334,11 @@ export default function Cart() {
             </p>
           )}
 
-          <div className="h-[1px] w-full bg-zinc-800/50 my-1"></div>
+          <div className="h-[1px] w-full bg-border-subtle my-1"></div>
 
           <div className="flex justify-between items-center">
-            <span className="text-white font-bold text-[15px]">{loc('المجموع الكلي', 'Total', 'کۆی گشتی')}</span>
-            <span className="text-white font-bold text-[17px]">{money(total)}</span>
+            <span className="text-text-primary font-bold text-[15px]">{loc('المجموع الكلي', 'Total', 'کۆی گشتی')}</span>
+            <span className="text-text-primary font-bold text-[17px]">{money(total)}</span>
           </div>
         </div>
         </>
@@ -2389,18 +2387,18 @@ export default function Cart() {
               <span
                 aria-hidden="true"
                 className={`w-[22px] h-[22px] rounded-md border flex items-center justify-center transition-colors ${
-                  allSelected ? 'bg-surface-selected border-white/30' : 'border-zinc-600'
+                  allSelected ? 'bg-surface-selected border-white/30' : 'border-[var(--clay-field)]'
                 }`}
               >
                 {allSelected && <Check className="w-3.5 h-3.5 text-gold" strokeWidth={3} />}
               </span>
-              <span className="text-zinc-300 text-[14px] whitespace-nowrap">
+              <span className="text-text-secondary text-[14px] whitespace-nowrap">
                 {loc('الكل', 'All', 'هەموو')}
               </span>
             </button>
 
             <div className="flex flex-col items-end flex-1 min-w-0 pe-1">
-              <span className="text-white font-bold text-[17px] tabular-nums truncate w-full text-end">
+              <span className="text-text-primary font-bold text-[17px] tabular-nums truncate w-full text-end">
                 {money(total)}
               </span>
               {/* Always present, only sometimes visible — the row cannot
@@ -2600,10 +2598,10 @@ export default function Cart() {
                 {variantView.image ? (
                   <img referrerPolicy="no-referrer" src={variantView.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-snow" />
                 ) : (
-                  <div className="w-20 h-20 rounded-lg bg-zinc-800" />
+                  <div className="w-20 h-20 rounded-lg bg-surface-selected" />
                 )}
                 <div>
-                  <p className="text-white font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd)}</p>
+                  <p className="text-text-primary font-bold text-lg tabular-nums">{money(variantView.unit_price_iqd)}</p>
                   {(() => {
                     // The SHELF for this exact selection — `availability.stock`,
                     // never the legacy `stock` (the base row, a different number
@@ -2611,19 +2609,19 @@ export default function Cart() {
                     // is not served from a shelf, so it prints no stock at all.
                     const shelf = sheetShelf(variantView);
                     return shelf === null ? null : (
-                      <p className="text-sm text-zinc-400" data-variant-sheet-stock>{loc('المخزون', 'Stock', 'کۆگا')}: {shelf}</p>
+                      <p className="text-sm text-text-secondary" data-variant-sheet-stock>{loc('المخزون', 'Stock', 'کۆگا')}: {shelf}</p>
                     );
                   })()}
                 </div>
               </div>
-              <button type="button" onClick={() => setVariantModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setVariantModalOpen(false)} className="p-2 bg-surface-selected rounded-full hover:bg-border-subtle text-text-secondary">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {(variantView.colors ?? []).length > 0 && (
               <div>
-                <p className="text-white font-bold mb-2">{loc('اللون', 'Color', 'ڕەنگ')}</p>
+                <p className="text-text-primary font-bold mb-2">{loc('اللون', 'Color', 'ڕەنگ')}</p>
                 <div className="flex gap-2 flex-wrap">
                   {(variantView.colors ?? []).map((c) => {
                     // §7: colour and option names are English only.
@@ -2638,7 +2636,7 @@ export default function Cart() {
                         className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
                       >
                         <span
-                          className="w-3.5 h-3.5 rounded-full border border-zinc-600 inline-block"
+                          className="w-3.5 h-3.5 rounded-full border border-border-subtle inline-block"
                           style={c.gradient ? { background: c.gradient } : { backgroundColor: c.hex || '#333' }}
                         ></span>
                         <span>{cName}</span>
@@ -2652,7 +2650,7 @@ export default function Cart() {
 
             {(variantView.options ?? []).length > 0 && (
               <div>
-                <p className="text-white font-bold mb-2">{loc('الخيارات', 'Options', 'هەڵبژاردنەکان')}</p>
+                <p className="text-text-primary font-bold mb-2">{loc('الخيارات', 'Options', 'هەڵبژاردنەکان')}</p>
                 <div className="flex gap-2 flex-wrap">
                   {(variantView.options ?? []).map((o) => {
                     const oName = o.name || o.id;
@@ -2724,10 +2722,10 @@ export default function Cart() {
           <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex flex-col gap-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 id="cart-shipping-sheet-title" className="text-white font-bold text-[17px]">{loc('طريقة الشحن', 'Shipping Method', 'شێوازی گەیاندن')}</h3>
-                <p className="text-zinc-400 text-sm mt-1">{loc('اختر طريقة الشحن المفضلة لهذا المنتج', 'Choose your preferred shipping method for this item', 'شێوازی گەیاندنی دڵخوازت بۆ ئەم بەرهەمە دیاری بکە')}</p>
+                <h3 id="cart-shipping-sheet-title" className="text-text-primary font-bold text-[17px]">{loc('طريقة الشحن', 'Shipping Method', 'شێوازی گەیاندن')}</h3>
+                <p className="text-text-secondary text-sm mt-1">{loc('اختر طريقة الشحن المفضلة لهذا المنتج', 'Choose your preferred shipping method for this item', 'شێوازی گەیاندنی دڵخوازت بۆ ئەم بەرهەمە دیاری بکە')}</p>
               </div>
-              <button type="button" onClick={() => setShippingModalOpen(false)} className="p-2 bg-zinc-800 rounded-full hover:bg-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setShippingModalOpen(false)} className="p-2 bg-surface-selected rounded-full hover:bg-border-subtle text-text-secondary">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2764,7 +2762,7 @@ export default function Cart() {
                         {title}
                       </p>
                       {desc && (
-                        <p className="text-zinc-500 text-xs mt-1">{desc}</p>
+                        <p className="text-text-muted text-xs mt-1">{desc}</p>
                       )}
                       {typeof sm.price_iqd === 'number' && sm.price_iqd > 0 && (
                         <p className="text-[13px] mt-1.5 font-bold text-text-secondary">

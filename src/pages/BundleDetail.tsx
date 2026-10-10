@@ -14,6 +14,7 @@ import BundleSavingLine from '../components/bundles/BundleSavingLine';
 import { BundleDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState } from '../components/ui/AsyncStates';
 import Note from '../components/ui/Note';
+import { IconButton } from '../components/ui/Button';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { quantityLimit } from '../../packages/pricing/src/quantity';
 import { tierLabel } from '../components/subscription/tierMeta';
@@ -423,16 +424,18 @@ export default function BundleDetail() {
   }, [bundle, qty, isMystery, familyId, mysteryMode, transportMethod, bundleChoicesBody, isAuthenticated, navigate, slug, lang, s.added, s.addFailed, load]);
 
   const header = (
-    <div className="lv-character-header sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-      <button
-        onClick={() => navigate(-1)}
-        aria-label={s.back}
-        className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
-      >
-        {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
-      </button>
+    <div className="lv-character-header sticky top-0 z-40 bg-canvas border-b border-border-subtle px-4 py-3 flex items-center gap-3">
+      <IconButton
+        variant="secondary"
+        label={s.back}
+        onClick={() => {
+          navigate(-1);
+        }}
+        icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+        className="-m-1"
+      />
       <MotionCharacterHome busy={loading && !bundle} />
-      <h1 dir="ltr" className="text-white font-bold text-[15px] truncate text-start">
+      <h1 dir="ltr" className="text-text-primary font-bold text-[15px] truncate text-start">
         {bundle?.name ?? ''}
       </h1>
     </div>
@@ -440,7 +443,7 @@ export default function BundleDetail() {
 
   if (loading && !bundle) {
     return (
-      <div className="w-full pb-24 text-zinc-300 min-h-screen">
+      <div className="w-full pb-24 text-text-secondary min-h-screen">
         {header}
         <BundleDetailSkeleton />
       </div>
@@ -451,7 +454,7 @@ export default function BundleDetail() {
   // toast and never "no bundles" (tests/asyncStates.test.ts).
   if (error != null || !bundle) {
     return (
-      <div className="w-full pb-24 text-zinc-300 min-h-screen">
+      <div className="w-full pb-24 text-text-secondary min-h-screen">
         {header}
         <div className="p-4">
           <ErrorState error={error} onRetry={load} next={`/bundles/${slug}`} />
@@ -481,11 +484,9 @@ export default function BundleDetail() {
       ...prev,
       [componentId]: { optionValueIds: [], colorId: '', included: true, ...(prev[componentId] ?? {}), ...patch },
     }));
-  const selectClass =
-    'min-h-11 w-full rounded-lg bg-zinc-950 border border-zinc-700 px-3 text-[13px] text-white focus:outline-none focus:border-gold';
 
   return (
-    <div className="w-full pb-28 text-zinc-300 min-h-screen">
+    <div className="w-full pb-28 text-text-secondary min-h-screen">
       {header}
 
       <div className="relative bg-black">
@@ -507,7 +508,7 @@ export default function BundleDetail() {
 
       <div className="p-4 space-y-5">
         <div>
-          <h2 dir="ltr" className="text-white font-bold text-[19px] leading-snug text-start">
+          <h2 dir="ltr" className="text-text-primary font-bold text-[19px] leading-snug text-start">
             {bundle.name}
           </h2>
           {bundle.availability_state === 'upcoming' && (
@@ -520,29 +521,29 @@ export default function BundleDetail() {
 
         {/* ---- the price block ------------------------------------------- */}
         {bundle.locked ? (
-          <div className="bg-zinc-900/50 border border-gold/25 rounded-2xl p-5 text-center">
-            <span className="mx-auto mb-3 w-11 h-11 rounded-2xl bg-gold/10 border border-gold/30 grid place-items-center">
+          <div className="lv-surface p-5 text-center">
+            <span className="mx-auto mb-3 w-11 h-11 rounded-full lv-well grid place-items-center">
               <Sparkles className="w-5 h-5 text-gold" />
             </span>
-            <h3 className="text-white font-bold text-[15px] mb-1">{s.locked}</h3>
-            <p className="text-[13px] text-zinc-400 mb-4">{s.lockedBody}</p>
+            <h3 className="text-text-primary font-bold text-[15px] mb-1">{s.locked}</h3>
+            <p className="text-[13px] text-text-secondary mb-4">{s.lockedBody}</p>
             {typeof bundle.display_regular_iqd === 'number' && (
-              <p className="text-zinc-300 font-bold tabular-nums mb-4">{money(bundle.display_regular_iqd)}</p>
+              <p className="text-text-secondary font-bold tabular-nums mb-4">{money(bundle.display_regular_iqd)}</p>
             )}
             <Link
               to={bundle.viewer_tier?.tier ? '/subscription' : '/auth?next=/bundles'}
-              className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl bg-gold text-accent-contrast text-sm font-black hover:brightness-110 transition-all"
+              className="lv-button lv-button-primary px-5"
             >
               {bundle.viewer_tier?.tier && bundle.viewer_tier.tier !== 'free' ? s.lockedCta : s.signIn}
             </Link>
           </div>
         ) : (
-          <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 space-y-2">
+          <div className="lv-surface p-4 space-y-2">
             <CardPrice p={bundle as ApiProduct} />
             {comp && (
               <>
                 <BundleSavingLine componentTotalIqd={comp.component_total_iqd} savingPercent={comp.saving_percent} />
-                <p className="text-[11px] text-zinc-500">
+                <p className="text-[11px] text-text-muted">
                   {s.total}: <span className="tabular-nums">{money(comp.component_total_iqd)}</span>
                 </p>
               </>
@@ -551,7 +552,7 @@ export default function BundleDetail() {
         )}
 
         {bundle.description && (
-          <p dir="ltr" className="text-[13px] text-zinc-400 leading-relaxed text-start whitespace-pre-line">
+          <p dir="ltr" className="text-[13px] text-text-secondary leading-relaxed text-start whitespace-pre-line">
             {bundle.description}
           </p>
         )}
@@ -559,24 +560,21 @@ export default function BundleDetail() {
         {/* ---- what is inside -------------------------------------------- */}
         {comp && comp.components.length > 0 && (
           <section>
-            <h3 className="text-white font-bold text-[15px] mb-3">{s.inside}</h3>
-            <div className="space-y-2">
+            <h3 className="text-text-primary font-bold text-[15px] mb-3">{s.inside}</h3>
+            <div className="lv-surface divide-y divide-border-subtle">
               {comp.components.map((c) => (
-                <div
-                  key={c.component_id}
-                  className="flex items-start gap-3 bg-zinc-900/40 border border-zinc-800/50 rounded-xl p-3"
-                >
+                <div key={c.component_id} className="flex items-start gap-3 p-3">
                   <Link
                     to={`/product/${c.slug || c.product_id}`}
-                    className="relative w-12 h-12 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800 shrink-0"
+                    className="relative w-12 h-12 rounded-md overflow-hidden bg-surface-raised border border-border-subtle shrink-0"
                   >
                     {c.image ? (
                       <SafeImage src={c.image} alt={c.name} aspect="auto" className="w-full h-full" />
                     ) : (
-                      <Package aria-hidden className="w-4 h-4 text-zinc-700 m-auto" />
+                      <Package aria-hidden className="w-4 h-4 text-text-muted m-auto" />
                     )}
                     {c.qty_per_bundle > 1 && (
-                      <span className="absolute bottom-0 end-0 bg-zinc-950/90 text-zinc-200 text-[9px] font-bold px-1 rounded-tl rtl:rounded-tl-none rtl:rounded-tr">
+                      <span className="absolute bottom-0 end-0 bg-onyx/80 text-snow text-[9px] font-bold px-1 rounded-tl rtl:rounded-tl-none rtl:rounded-tr">
                         ×{c.qty_per_bundle}
                       </span>
                     )}
@@ -584,18 +582,18 @@ export default function BundleDetail() {
                   <div className="min-w-0 flex-1">
                     {/* §13.3: product, option and colour names stay English in
                         every language and are never translated. */}
-                    <p dir="ltr" className="text-white font-medium text-[13px] leading-snug text-start">
+                    <p dir="ltr" className="text-text-primary font-medium text-[13px] leading-snug text-start">
                       {c.name}
                     </p>
                     {c.variant_label && (
-                      <p dir="ltr" className="text-[11px] text-zinc-500 text-start">
+                      <p dir="ltr" className="text-[11px] text-text-muted text-start">
                         {c.variant_label}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <StateChip state={c.state} />
                       {c.optional && (
-                        <span className="inline-flex items-center rounded-md border border-zinc-700 bg-zinc-800/50 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                        <span className="inline-flex items-center rounded-md border border-border-subtle bg-surface-raised px-2 py-0.5 text-[10px] font-bold text-text-secondary">
                           {s.optional}
                         </span>
                       )}
@@ -617,7 +615,7 @@ export default function BundleDetail() {
                             <select
                               dir="ltr"
                               aria-label={`${s.chooseOption} — ${c.name}`}
-                              className={selectClass}
+                              className="lv-input px-3 text-[13px]"
                               value={choices[c.component_id]?.optionValueIds[0] ?? ''}
                               onChange={(e) => setChoice(c.component_id, { optionValueIds: e.target.value ? [e.target.value] : [] })}
                             >
@@ -637,7 +635,7 @@ export default function BundleDetail() {
                             <select
                               dir="ltr"
                               aria-label={`${s.chooseColor} — ${c.name}`}
-                              className={selectClass}
+                              className="lv-input px-3 text-[13px]"
                               value={choices[c.component_id]?.colorId ?? ''}
                               onChange={(e) => setChoice(c.component_id, { colorId: e.target.value })}
                             >
@@ -654,7 +652,7 @@ export default function BundleDetail() {
                       </div>
                     ) : (
                       c.choices.length > 0 && (
-                        <p dir="ltr" className="text-[11px] text-zinc-500 mt-1.5 text-start">
+                        <p dir="ltr" className="text-[11px] text-text-muted mt-1.5 text-start">
                           {s.choices}: {c.choices.map((ch) => ch.name).join(' · ')}
                         </p>
                       )
@@ -665,7 +663,7 @@ export default function BundleDetail() {
                         refused by name (`BUNDLE_OPTIONAL_UNAVAILABLE`), never
                         silently dropped (§2.2). */}
                     {canBuy && c.optional && (
-                      <label className="mt-2 inline-flex items-center gap-2 text-[12px] text-zinc-300">
+                      <label className="mt-2 inline-flex items-center gap-2 text-[12px] text-text-secondary">
                         <input
                           type="checkbox"
                           className="w-4 h-4 accent-gold"
@@ -684,26 +682,26 @@ export default function BundleDetail() {
 
         {/* ---- the mystery selectors ------------------------------------- */}
         {!bundle.locked && mystery && (
-          <section className="bg-zinc-900/40 border border-zinc-800/50 rounded-xl p-4 space-y-3">
-            <p className="text-[13px] text-zinc-300">
-              {s.spools}: <span className="tabular-nums font-bold text-white">{mystery.spool_qty}</span>
+          <section className="lv-surface p-4 space-y-3">
+            <p className="text-[13px] text-text-secondary">
+              {s.spools}: <span className="tabular-nums font-bold text-text-primary">{mystery.spool_qty}</span>
             </p>
-            <p className="text-[12px] text-zinc-500">
-              {s.revealAt}: <span className="text-zinc-300">{mystery.reveal_stage}</span>
+            <p className="text-[12px] text-text-muted">
+              {s.revealAt}: <span className="text-text-secondary">{mystery.reveal_stage}</span>
             </p>
             {/* The odds are AGGREGATED BY FAMILY and appear only when the admin
                 switched disclosure on — they name no product, no colour and no
                 pool entry (§7.3). */}
             {mystery.odds && mystery.odds.length > 0 && (
-              <p dir="ltr" className="text-[12px] text-zinc-400 text-start">
+              <p dir="ltr" className="text-[12px] text-text-secondary text-start">
                 {s.odds}: {mystery.odds.map((o) => `${o.family_id || '—'} ${o.percent}%`).join(' · ')}
               </p>
             )}
             {mystery.customer_picks_family && familyList.length > 0 && (
               <label className="block">
-                <span className="block text-[12px] text-zinc-400 mb-1">{s.family}</span>
+                <span className="block text-[12px] text-text-secondary mb-1">{s.family}</span>
                 <select
-                  className={selectClass}
+                  className="lv-input px-3 text-[13px]"
                   aria-label={s.family}
                   value={familyId}
                   onChange={(e) => setFamilyId(e.target.value)}
@@ -719,9 +717,9 @@ export default function BundleDetail() {
             )}
             {mystery.modes.length > 1 && (
               <label className="block">
-                <span className="block text-[12px] text-zinc-400 mb-1">{s.mode}</span>
+                <span className="block text-[12px] text-text-secondary mb-1">{s.mode}</span>
                 <select
-                  className={selectClass}
+                  className="lv-input px-3 text-[13px]"
                   aria-label={s.mode}
                   value={mysteryMode}
                   onChange={(e) => setMysteryMode(e.target.value)}
@@ -740,9 +738,9 @@ export default function BundleDetail() {
         {/* ---- the pre-order transport, one method EVERY component offers -- */}
         {!bundle.locked && bundle.availability?.mode === 'preorder' && (bundle.pricing_modes?.preorder?.length ?? 0) > 0 && (
           <label className="block">
-            <span className="block text-[12px] text-zinc-400 mb-1">{s.transport}</span>
+            <span className="block text-[12px] text-text-secondary mb-1">{s.transport}</span>
             <select
-              className={selectClass}
+              className="lv-input px-3 text-[13px]"
               aria-label={s.transport}
               value={transportMethod}
               onChange={(e) => setTransportMethod(e.target.value)}
@@ -764,7 +762,7 @@ export default function BundleDetail() {
             {canBuy ? (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="text-[12px] text-zinc-400">{s.qty}</span>
+                  <span className="text-[12px] text-text-secondary">{s.qty}</span>
                   {/* §10: the composition availability exposes `max_qty`, so
                       + disables AT the limit and a typed figure above it
                       becomes it, rather than the door refusing a tap that
@@ -778,15 +776,15 @@ export default function BundleDetail() {
                     onChange={(next) => setQty(next)}
                   />
                   {qty >= maxQty && (
-                    <span className="text-[11px] text-zinc-500">
+                    <span className="text-[11px] text-text-muted">
                       {s.maxReached}: <span className="tabular-nums">{maxQty}</span>
                     </span>
                   )}
                 </div>
 
                 {quote && (
-                  <p className="text-[13px] text-zinc-300">
-                    <span className="tabular-nums font-bold text-white">{money(quote.line_total_iqd)}</span>
+                  <p className="text-[13px] text-text-secondary">
+                    <span className="tabular-nums font-bold text-text-primary">{money(quote.line_total_iqd)}</span>
                   </p>
                 )}
 
@@ -808,13 +806,13 @@ export default function BundleDetail() {
                   type="button"
                   onClick={addToCart}
                   disabled={adding || quoting}
-                  className="w-full min-h-12 rounded-xl bg-gold text-accent-contrast text-sm font-black hover:brightness-110 transition-all disabled:opacity-60"
+                  className="lv-button lv-button-primary w-full min-h-12"
                 >
                   {adding ? s.adding : isAuthenticated ? s.add : s.signInToBuy}
                 </button>
               </>
             ) : (
-              <p className="text-center text-[12px] text-zinc-500 border border-zinc-800/60 rounded-xl py-3">
+              <p className="text-center text-[12px] text-text-muted border border-border-subtle rounded-xl py-3">
                 {s.notYet}
               </p>
             )}
@@ -822,7 +820,7 @@ export default function BundleDetail() {
         )}
 
         <p className="text-center">
-          <Link to="/bundles" className="text-[13px] text-zinc-400 hover:text-white transition-colors">
+          <Link to="/bundles" className="text-[13px] text-text-secondary hover:text-text-primary transition-colors">
             {loc('كل الباقات', 'All bundles', 'هەموو پاکێجەکان')}
           </Link>
         </p>

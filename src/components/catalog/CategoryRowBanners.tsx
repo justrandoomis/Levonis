@@ -44,7 +44,7 @@ import { bannerCta, type BannerPhoto, type BannerRow } from '../../lib/catalog/e
  * the global light-theme rules stay untouched.
  */
 export const ROW_BANNER_SIZE =
-  'aspect-[15/4] min-h-[88px] max-h-[96px] rounded-2xl sm:aspect-[7/1] sm:min-h-[104px] sm:max-h-[140px] lg:aspect-[8/1] lg:min-h-[120px] lg:max-h-[144px] lg:rounded-[20px]';
+  'aspect-[15/4] min-h-[88px] max-h-[96px] rounded-2xl sm:aspect-[7/1] sm:min-h-[104px] sm:max-h-[140px] lg:aspect-[8/1] lg:min-h-[120px] lg:max-h-[144px]';
 
 /** The words on the photograph: light ink in both themes (see above). */
 const ON_PHOTO_INK = '[--color-ivory:#f3efe6] [--color-white:#f3efe6]';
@@ -77,7 +77,7 @@ export function CategoryRowBanner({
       data-category-row={rowKey}
       data-row-photo={photo ? (cover ? 'cover' : 'product') : 'none'}
       {...prefetchProps(to)}
-      className={`group relative isolate flex w-full overflow-hidden lv-row-banner-ground transition-transform duration-150 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted ${ROW_BANNER_SIZE}`}
+      className={`group relative isolate flex w-full overflow-hidden shadow-sm lv-row-banner-ground transition-transform duration-150 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted ${ROW_BANNER_SIZE}`}
     >
       {photo ? (
         <CropPhoto

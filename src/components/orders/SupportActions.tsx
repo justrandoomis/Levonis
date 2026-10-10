@@ -65,7 +65,7 @@ const STRINGS = {
 } as const;
 
 const ROW =
-  'w-full flex items-center gap-3 min-h-[56px] px-4 py-2 text-start rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60';
+  'w-full flex items-center gap-3 min-h-[56px] px-4 py-2 text-start hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:opacity-60';
 
 export default function SupportActions({
   order,
@@ -97,60 +97,60 @@ export default function SupportActions({
   const canCancel = order.can_cancel ?? order.status === 'pending';
 
   return (
-    <div className="flex flex-col gap-2" data-support-actions>
+    <div className="lv-surface overflow-hidden divide-y divide-border-subtle" data-support-actions>
       <button type="button" onClick={openChat} disabled={opening} className={ROW} data-open-order-chat>
-        <span className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-gold">
+        <span className="w-10 h-10 rounded-sm lv-well flex items-center justify-center shrink-0 text-gold">
           {opening ? <Spinner size="sm" delayMs={0} decorative /> : <MessageCircle className="w-5 h-5" aria-hidden />}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-white text-[13.5px] font-bold">{opening ? s.opening : s.chat}</span>
+          <span className="block text-text-primary text-[13.5px] font-bold">{opening ? s.opening : s.chat}</span>
           {/* A store order's thread is with its SELLER, who is a participant
               and is notified (audit 04 #4) — not with the Levonis team. */}
-          <span className="block text-zinc-500 text-[11.5px] truncate">{order.receipt != null ? s.chatDescStore : s.chatDesc}</span>
+          <span className="block text-text-muted text-[11.5px] truncate">{order.receipt != null ? s.chatDescStore : s.chatDesc}</span>
         </span>
-        <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+        <ChevronRight className="w-4 h-4 text-text-muted rtl:rotate-180 shrink-0" aria-hidden />
       </button>
-      <p role="alert" aria-live="assertive" className={`text-red-400 text-[12px] px-1 ${chatError ? '' : 'sr-only'}`}>
+      <p role="alert" aria-live="assertive" className={`text-red-400 text-[12px] px-4 py-2 ${chatError ? '' : 'sr-only'}`}>
         {chatError}
       </p>
 
       <button type="button" onClick={() => toSupport(s.ticketSubject(order.id))} className={ROW} data-open-ticket>
-        <span className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-zinc-300">
+        <span className="w-10 h-10 rounded-sm lv-well flex items-center justify-center shrink-0 text-text-secondary">
           <LifeBuoy className="w-5 h-5" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-white text-[13.5px] font-bold">{s.ticket}</span>
-          <span className="block text-zinc-500 text-[11.5px] truncate">{s.ticketDesc}</span>
+          <span className="block text-text-primary text-[13.5px] font-bold">{s.ticket}</span>
+          <span className="block text-text-muted text-[11.5px] truncate">{s.ticketDesc}</span>
         </span>
-        <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+        <ChevronRight className="w-4 h-4 text-text-muted rtl:rotate-180 shrink-0" aria-hidden />
       </button>
 
       <button type="button" onClick={() => toSupport(s.deliverySubject(order.id))} className={ROW} data-report-delivery>
-        <span className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-zinc-300">
+        <span className="w-10 h-10 rounded-sm lv-well flex items-center justify-center shrink-0 text-text-secondary">
           <PackageX className="w-5 h-5" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-white text-[13.5px] font-bold">{s.delivery}</span>
-          <span className="block text-zinc-500 text-[11.5px] truncate">{s.deliveryDesc}</span>
+          <span className="block text-text-primary text-[13.5px] font-bold">{s.delivery}</span>
+          <span className="block text-text-muted text-[11.5px] truncate">{s.deliveryDesc}</span>
         </span>
-        <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+        <ChevronRight className="w-4 h-4 text-text-muted rtl:rotate-180 shrink-0" aria-hidden />
       </button>
 
       {canCancel && (
         <button
           type="button"
           onClick={(e) => onCancelRequest(e.currentTarget)}
-          className={`${ROW} border-red-500/30 hover:bg-red-500/10 focus-visible:ring-red-400`}
+          className={`${ROW} hover:bg-red-500/10 focus-visible:ring-red-400`}
           data-cancel-order={order.id}
         >
-          <span className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0 text-red-300">
+          <span className="w-10 h-10 rounded-sm lv-well flex items-center justify-center shrink-0 text-red-300">
             <XCircle className="w-5 h-5" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-red-200 text-[13.5px] font-bold">{s.cancel}</span>
-            <span className="block text-zinc-500 text-[11.5px] truncate">{s.cancelDesc}</span>
+            <span className="block text-text-muted text-[11.5px] truncate">{s.cancelDesc}</span>
           </span>
-          <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+          <ChevronRight className="w-4 h-4 text-text-muted rtl:rotate-180 shrink-0" aria-hidden />
         </button>
       )}
     </div>

@@ -33,6 +33,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Loader2, Plus, Scale, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { IconButton } from '../ui/Button';
+import { StatusChip } from '../ui/Badge';
 import { failureText } from '../../lib/api';
 import { quoteByGrams, type GramsQuoteResponse } from './gramsQuoteApi';
 import AccessoryPicker, {
@@ -319,15 +321,16 @@ export default function GramsQuotePanel({
 
   return (
     <div className="space-y-5" data-grams-quote>
-      <p className="text-zinc-400 text-[13px] leading-relaxed">{t.lead}</p>
+      <p className="text-text-secondary text-[13px] leading-relaxed">{t.lead}</p>
 
       {/* ------------------------------------------------------ the machine */}
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-950 divide-y divide-zinc-800/70">
+      <section className="lv-surface divide-y divide-border-subtle">
         <div className="px-4 py-3 flex items-center justify-between gap-3 min-h-[3.25rem]">
-          <label htmlFor="grams-printer" className="text-zinc-400 text-[13px] leading-snug shrink-0">
+          <label htmlFor="grams-printer" className="text-text-secondary text-[13px] leading-snug shrink-0">
             {t.printer}
           </label>
           <select
+            className="lv-input w-auto max-w-[16rem] min-h-10 py-2 text-[13px] leading-snug disabled:opacity-40 truncate"
             id="grams-printer"
             value={printer?.id ?? ''}
             disabled={busy || !printers.length}
@@ -340,7 +343,6 @@ export default function GramsQuotePanel({
                 setAutoRecalc(true);
               }
             }}
-            className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-gold disabled:opacity-40 transition-colors truncate"
           >
             {printers.map((p) => (
               <option key={p.id} value={p.id}>
@@ -356,7 +358,7 @@ export default function GramsQuotePanel({
             looking for a difference that is not there — and only when it is
             true of every printer offered. */}
         {printerCannotMovePrice && (
-          <p className="px-4 py-2.5 text-[11px] leading-relaxed text-zinc-500" data-grams-printer-untimed>
+          <p className="px-4 py-2.5 text-[11px] leading-relaxed text-text-muted" data-grams-printer-untimed>
             {loc(
               'بدون زمن الطباعة لا تغيّر الطابعة هذا السعر: يُحسب ثمن المادة والتجهيز فقط. اذكر زمن الطباعة ليدخل وقت الطابعة في الحساب.',
               'Without a print time the printer does not change this price: only the material and handling are priced. Give the print time to have machine time counted.'
@@ -366,26 +368,26 @@ export default function GramsQuotePanel({
       </section>
 
       {/* -------------------------------------------- the rows: «بلون واحد أو أكثر» */}
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden">
-        <h3 className="px-4 py-3 text-[11px] leading-snug font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-800/70 flex items-center gap-2">
+      <section className="lv-surface overflow-hidden">
+        <h3 className="px-4 py-3 text-[11px] leading-snug font-semibold uppercase tracking-wider text-text-muted border-b border-border-subtle flex items-center gap-2">
           <Scale className="w-3.5 h-3.5" aria-hidden />
           {t.filaments}
         </h3>
 
-        <ul className="divide-y divide-zinc-800/70">
+        <ul className="divide-y divide-border-subtle">
           {effectiveRows.map((r, index) => (
             <li key={r.key} className="p-4 space-y-3">
               <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1">
-                  <label htmlFor={`grams-material-${r.key}`} className="block text-zinc-500 text-[11px] leading-snug mb-1">
+                  <label htmlFor={`grams-material-${r.key}`} className="block text-text-muted text-[11px] leading-snug mb-1">
                     {t.material}
                   </label>
                   <select
+                    className="lv-input py-2 text-[13px] leading-snug disabled:opacity-40 truncate"
                     id={`grams-material-${r.key}`}
                     value={r.materialId}
                     disabled={busy}
                     onChange={(e) => patchRow(r.key, { materialId: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] leading-snug focus:outline-none focus:border-gold disabled:opacity-40 transition-colors truncate"
                   >
                     {usable.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -401,7 +403,7 @@ export default function GramsQuotePanel({
                 </div>
 
                 <div className="shrink-0">
-                  <label htmlFor={`grams-colour-${r.key}`} className="block text-zinc-500 text-[11px] leading-snug mb-1">
+                  <label htmlFor={`grams-colour-${r.key}`} className="block text-text-muted text-[11px] leading-snug mb-1">
                     {t.colour}
                   </label>
                   <input
@@ -410,29 +412,22 @@ export default function GramsQuotePanel({
                     value={r.colorHex}
                     disabled={busy}
                     onChange={(e) => patchRow(r.key, { colorHex: e.target.value })}
-                    className="h-[42px] w-12 rounded-xl bg-zinc-900 border border-zinc-800 p-1 disabled:opacity-40 cursor-pointer"
+                    className="h-[46px] w-12 rounded-md lv-well border border-[var(--clay-field)] p-1 disabled:opacity-40 cursor-pointer"
                   />
                 </div>
 
                 {effectiveRows.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeRow(r.key)}
-                    disabled={busy}
-                    aria-label={t.remove}
-                    className="h-[42px] w-11 shrink-0 grid place-items-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-blush hover:border-crimson/40 disabled:opacity-30 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" aria-hidden />
-                  </button>
+                  <IconButton label={t.remove} onClick={() => removeRow(r.key)} disabled={busy} icon={<Trash2 className="w-4 h-4" aria-hidden />} />
                 )}
               </div>
 
               <div>
-                <label htmlFor={`grams-weight-${r.key}`} className="block text-zinc-500 text-[11px] leading-snug mb-1">
+                <label htmlFor={`grams-weight-${r.key}`} className="block text-text-muted text-[11px] leading-snug mb-1">
                   {t.grams}
                 </label>
                 <div className="relative">
                   <input
+                    className="lv-input py-2 pe-12 text-[14px] leading-snug tabular-nums disabled:opacity-40"
                     id={`grams-weight-${r.key}`}
                     type="number"
                     inputMode="decimal"
@@ -444,9 +439,8 @@ export default function GramsQuotePanel({
                     value={r.grams}
                     disabled={busy}
                     onChange={(e) => patchRow(r.key, { grams: e.target.value })}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 pe-12 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-gold disabled:opacity-40 transition-colors"
                   />
-                  <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-zinc-500 text-[12px] leading-snug">
+                  <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-text-muted text-[12px] leading-snug">
                     g
                   </span>
                 </div>
@@ -460,7 +454,7 @@ export default function GramsQuotePanel({
             type="button"
             onClick={addRow}
             disabled={busy}
-            className="w-full px-4 py-3 border-t border-zinc-800/70 text-[13px] leading-snug text-gold flex items-center justify-center gap-2 hover:bg-zinc-900/60 disabled:opacity-40 transition-colors"
+            className="w-full px-4 py-3 border-t border-border-subtle text-[13px] leading-snug text-gold flex items-center justify-center gap-2 hover:bg-surface-selected disabled:opacity-40 transition-colors"
           >
             <Plus className="w-4 h-4" aria-hidden />
             {t.addColour}
@@ -469,9 +463,9 @@ export default function GramsQuotePanel({
       </section>
 
       {/* ------------------------------- the one thing a weight cannot tell us */}
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
-        <p className="text-zinc-300 text-[13px] leading-relaxed">{t.timeQuestion}</p>
-        <div role="group" className="inline-flex bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 gap-0.5">
+      <section className="lv-surface p-4 space-y-3">
+        <p className="text-text-secondary text-[13px] leading-relaxed">{t.timeQuestion}</p>
+        <div role="group" className="inline-flex rounded-full lv-well border border-border-subtle p-0.5 gap-0.5">
           {[
             { value: true, label: t.timeYes },
             { value: false, label: t.timeNo },
@@ -485,8 +479,8 @@ export default function GramsQuotePanel({
                 setKnowsTime(o.value);
                 invalidate();
               }}
-              className={`px-3 py-1.5 rounded-[0.6rem] text-[12px] leading-snug transition-colors disabled:opacity-40 ${
-                knowsTime === o.value ? 'bg-zinc-800 text-white font-medium shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+              className={`px-3 py-1.5 rounded-full border text-[12px] leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${
+                knowsTime === o.value ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
               {o.label}
@@ -497,10 +491,11 @@ export default function GramsQuotePanel({
         {knowsTime && (
           <div className="flex items-end gap-2" dir="ltr">
             <div className="flex-1">
-              <label htmlFor="grams-hours" className="block text-zinc-500 text-[11px] leading-snug mb-1">
+              <label htmlFor="grams-hours" className="block text-text-muted text-[11px] leading-snug mb-1">
                 {t.hours}
               </label>
               <input
+                className="lv-input py-2 text-[14px] leading-snug tabular-nums disabled:opacity-40"
                 id="grams-hours"
                 type="number"
                 inputMode="numeric"
@@ -514,14 +509,14 @@ export default function GramsQuotePanel({
                   setHours(e.target.value);
                   invalidate();
                 }}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-gold disabled:opacity-40 transition-colors"
               />
             </div>
             <div className="flex-1">
-              <label htmlFor="grams-minutes" className="block text-zinc-500 text-[11px] leading-snug mb-1">
+              <label htmlFor="grams-minutes" className="block text-text-muted text-[11px] leading-snug mb-1">
                 {t.minutesLabel}
               </label>
               <input
+                className="lv-input py-2 text-[14px] leading-snug tabular-nums disabled:opacity-40"
                 id="grams-minutes"
                 type="number"
                 inputMode="numeric"
@@ -536,13 +531,12 @@ export default function GramsQuotePanel({
                   setMinutes(e.target.value);
                   invalidate();
                 }}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[14px] leading-snug tabular-nums focus:outline-none focus:border-gold disabled:opacity-40 transition-colors"
               />
             </div>
           </div>
         )}
 
-        <p className="text-zinc-500 text-[11px] leading-relaxed">{t.timeWhy}</p>
+        <p className="text-text-muted text-[11px] leading-relaxed">{t.timeWhy}</p>
       </section>
 
       {/* AFTER the weight and the time, before the button. The hardware is an
@@ -562,7 +556,7 @@ export default function GramsQuotePanel({
       />
 
       {error && (
-        <p role="alert" className="text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 text-blush bg-crimson/10 border-crimson/40">
+        <p role="alert" className="lv-alert lv-alert-danger text-[12px] leading-relaxed text-text-primary flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
           <span>{error}</span>
         </p>
@@ -572,7 +566,7 @@ export default function GramsQuotePanel({
         type="button"
         onClick={() => void submit()}
         disabled={!canSubmit}
-        className="w-full h-12 rounded-2xl bg-gold text-accent-contrast font-semibold text-[15px] leading-snug flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
+        className="lv-button lv-button-primary w-full h-12 text-[15px] leading-snug"
       >
         {busy ? (
           <>
@@ -589,25 +583,25 @@ export default function GramsQuotePanel({
 
       {/* ------------------------------------------------------- the answer */}
       {result && result.quote.confidence === 'insufficient' && (
-        <p role="alert" className="text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 text-amber-300/90 bg-amber-500/10 border-amber-500/25">
+        <p role="alert" className="lv-alert lv-alert-warning text-[12px] leading-relaxed text-text-primary flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
           <span>{t.insufficient}</span>
         </p>
       )}
 
       {result && result.quote.confidence !== 'insufficient' && (
-        <section className="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/[0.07] to-transparent p-5">
-          <p className="text-[11px] leading-snug font-semibold uppercase tracking-wider text-zinc-500">{t.price}</p>
-          <p className="text-white font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-grams-price>
+        <section className="lv-surface-raised p-5">
+          <p className="text-[11px] leading-snug font-semibold uppercase tracking-wider text-text-muted">{t.price}</p>
+          <p className="text-text-primary font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-grams-price>
             {money(result.quote.price_iqd)}
           </p>
           {result.quote.range_iqd.high > result.quote.range_iqd.low && (
-            <p className="text-zinc-400 text-[12px] leading-snug mt-1 tabular-nums" dir="ltr">
+            <p className="text-text-secondary text-[12px] leading-snug mt-1 tabular-nums" dir="ltr">
               {t.range}: {money(result.quote.range_iqd.low)} – {money(result.quote.range_iqd.high)}
             </p>
           )}
           {comparison && comparison.job === pricedJob(result) && (
-            <p className="text-zinc-400 text-[12px] leading-snug mt-2" dir="auto" data-grams-price-comparison>
+            <p className="text-text-secondary text-[12px] leading-snug mt-2" dir="auto" data-grams-price-comparison>
               {comparison.price === result.quote.price_iqd
                 ? loc(`السعر نفسه مع ${comparison.name}.`, `The same price as on ${comparison.name}.`, `${comparison.name}: ${money(comparison.price)}`)
                 : loc(`مع ${comparison.name}: ${money(comparison.price)}`, `On ${comparison.name}: ${money(comparison.price)}`, `${comparison.name}: ${money(comparison.price)}`)}
@@ -622,21 +616,22 @@ export default function GramsQuotePanel({
             unknown={result.accessories_unknown ?? []}
           />
 
-          <p className="inline-flex items-center gap-1.5 mt-3 text-[11px] leading-snug rounded-full px-2.5 py-1 border text-amber-300 border-amber-500/30 bg-amber-500/10">
-            <AlertCircle className="w-3 h-3" aria-hidden />
-            {t.badge}
+          <p className="mt-3">
+            <StatusChip tone="warning" icon={<AlertCircle className="w-3 h-3" aria-hidden />}>
+              {t.badge}
+            </StatusChip>
           </p>
 
-          <dl className="grid grid-cols-2 gap-px bg-zinc-800/70 rounded-xl overflow-hidden mt-4">
-            <div className="bg-zinc-950 px-4 py-3">
-              <dt className="text-zinc-500 text-[10px] leading-snug uppercase tracking-wider">{t.totalWeight}</dt>
-              <dd className="text-white text-[13px] leading-snug font-medium mt-0.5 tabular-nums" dir="ltr">
+          <dl className="grid grid-cols-2 gap-px bg-border-subtle rounded-md overflow-hidden mt-4">
+            <div className="bg-surface px-4 py-3">
+              <dt className="text-text-muted text-[10px] leading-snug uppercase tracking-wider">{t.totalWeight}</dt>
+              <dd className="text-text-primary text-[13px] leading-snug font-medium mt-0.5 tabular-nums" dir="ltr">
                 {result.grams_total} g
               </dd>
             </div>
-            <div className="bg-zinc-950 px-4 py-3">
-              <dt className="text-zinc-500 text-[10px] leading-snug uppercase tracking-wider">{t.machineHours}</dt>
-              <dd className="text-white text-[13px] leading-snug font-medium mt-0.5 tabular-nums" dir="ltr">
+            <div className="bg-surface px-4 py-3">
+              <dt className="text-text-muted text-[10px] leading-snug uppercase tracking-wider">{t.machineHours}</dt>
+              <dd className="text-text-primary text-[13px] leading-snug font-medium mt-0.5 tabular-nums" dir="ltr">
                 {result.covers.material_only ? '—' : result.quote.machine_hours}
               </dd>
             </div>
@@ -650,7 +645,7 @@ export default function GramsQuotePanel({
             them, because it is the part that changes what the number means.
           */}
           {result.covers.material_only && (
-            <p className="mt-4 text-[12px] leading-relaxed text-amber-200/90 bg-amber-500/10 border border-amber-500/25 rounded-xl p-3">
+            <p className="lv-alert lv-alert-warning mt-4 text-[12px] leading-relaxed text-text-primary">
               {t.materialOnly}
             </p>
           )}
@@ -698,14 +693,14 @@ function CoverList({ title, tone, codes }: { title: string; tone: 'in' | 'out'; 
     }
   };
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
-      <p className="text-zinc-500 text-[10px] leading-snug uppercase tracking-wider mb-2">{title}</p>
+    <div className="rounded-lg border border-border-subtle p-3">
+      <p className="text-text-muted text-[10px] leading-snug uppercase tracking-wider mb-2">{title}</p>
       <ul className="space-y-1">
         {codes.map((code) => (
           <li
             key={code}
             className={`text-[12px] leading-relaxed flex items-start gap-1.5 ${
-              tone === 'in' ? 'text-zinc-300' : 'text-zinc-500'
+              tone === 'in' ? 'text-text-secondary' : 'text-text-muted'
             }`}
           >
             <span aria-hidden className="mt-px shrink-0">

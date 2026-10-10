@@ -85,7 +85,7 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
     <article
       aria-labelledby={headingId}
       data-finder-rank={result.rank}
-      className="overflow-hidden rounded-[22px] border border-border-subtle bg-surface shadow-2"
+      className="lv-surface overflow-hidden shadow-2"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-charcoal">
         <SafeImage
@@ -98,7 +98,7 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
           fallbackClassName="text-snow/35"
           imgClassName="object-[50%_18%]"
         />
-        <span className="absolute end-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-gold-fill px-3 py-1.5 text-[12.5px] font-extrabold text-ink shadow-sm">
+        <span className="absolute end-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-gold-fill px-3 py-1.5 text-[12.5px] font-extrabold text-ink">
           <Star aria-hidden="true" className="size-3.5 fill-ink" strokeWidth={0} />
           {t.bestBadge}
         </span>
@@ -157,10 +157,10 @@ export function ResultRow({ result, lang, saved, saveBusy, onSave }: ResultCardP
     <article
       aria-labelledby={headingId}
       data-finder-rank={result.rank}
-      className="rounded-[20px] border border-border-subtle bg-surface p-3.5"
+      className="lv-surface p-3.5"
     >
       <div className="flex gap-3.5">
-        <div className="relative size-[92px] shrink-0 overflow-hidden rounded-[14px] bg-charcoal">
+        <div className="relative size-[92px] shrink-0 overflow-hidden rounded-md bg-charcoal">
           <SafeImage src={image} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_10%]" />
           <span
             aria-hidden="true"
@@ -214,7 +214,7 @@ function VariantLine({ label, others, lang, dense = false }: { label: string; ot
 
 export function ResultSkeleton({ hero = false }: { hero?: boolean }) {
   return (
-    <div aria-hidden="true" className={`overflow-hidden rounded-[20px] border border-border-subtle bg-surface ${hero ? '' : 'p-3.5'}`}>
+    <div aria-hidden="true" className={`lv-surface overflow-hidden ${hero ? '' : 'p-3.5'}`}>
       {hero ? (
         <>
           <div className="aspect-[16/10] animate-pulse bg-surface-selected motion-reduce:animate-none" />
@@ -227,7 +227,7 @@ export function ResultSkeleton({ hero = false }: { hero?: boolean }) {
         </>
       ) : (
         <div className="flex gap-3.5">
-          <div className="size-[92px] animate-pulse rounded-[14px] bg-surface-selected motion-reduce:animate-none" />
+          <div className="size-[92px] animate-pulse rounded-md bg-surface-selected motion-reduce:animate-none" />
           <div className="flex-1 space-y-2.5 pt-1">
             <div className="h-4 w-3/4 rounded-md bg-surface-selected" />
             <div className="h-4 w-1/3 rounded-md bg-surface-selected" />

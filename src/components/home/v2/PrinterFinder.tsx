@@ -36,7 +36,7 @@ export default function PrinterFinder() {
       data-home-section="printer_finder"
       data-feature=""
       aria-labelledby="home-finder-title"
-      className="lv-finder-texture relative overflow-hidden rounded-2xl bg-charcoal px-3 py-4 ring-1 ring-inset ring-white/[0.05] lg:flex lg:items-center lg:justify-between lg:gap-10 lg:rounded-[20px] lg:px-10 lg:py-8"
+      className="lv-finder-texture relative overflow-hidden rounded-2xl shadow-sm bg-charcoal px-3 py-4 ring-1 ring-inset ring-white/[0.05] lg:flex lg:items-center lg:justify-between lg:gap-10 lg:px-10 lg:py-8"
     >
       <div className="text-center lg:text-start">
         {/* OWNER: Sorani to be written by hand (this section's three strings and three labels). */}

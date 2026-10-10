@@ -307,7 +307,7 @@ export default function ReviewSheet({
   };
 
   const rowBase =
-    'flex items-center gap-3 rounded-xl border px-3 py-2.5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold';
+    'lv-choice flex items-center gap-3 rounded-lg px-3 py-2.5 text-start';
 
   return (
     <Sheet
@@ -321,9 +321,9 @@ export default function ReviewSheet({
     >
       <div className="px-4 sm:px-5 pb-6 pt-2">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
-          <h2 className="text-white font-bold text-[16px] min-w-0">{s.title}</h2>
+          <h2 className="text-text-primary font-bold text-[16px] min-w-0">{s.title}</h2>
           {load === 'ready' && lines.length > 0 && (
-            <span data-review-progress className="text-[11.5px] text-zinc-500 tabular-nums shrink-0">
+            <span data-review-progress className="text-[11.5px] text-text-muted tabular-nums shrink-0">
               {s.progress(ratedCount, lines.length)}
             </span>
           )}
@@ -333,14 +333,14 @@ export default function ReviewSheet({
             without pretending to know what may be rated. */}
         {load === 'loading' && (
           <>
-            <p role="status" aria-live="polite" className="mt-3 inline-flex items-center gap-2 text-zinc-400 text-[12.5px]">
+            <p role="status" aria-live="polite" className="mt-3 inline-flex items-center gap-2 text-text-secondary text-[12.5px]">
               <Spinner size="xs" delayMs={0} decorative /> {s.loading}
             </p>
             <ul className="mt-3 flex flex-col gap-1.5" aria-hidden="true">
               {placeholder.map((p) => (
-                <li key={p.id} className={`${rowBase} border-zinc-800/70 opacity-50`}>
-                  <SafeImage src={p.image} alt="" aspect="square" className="w-10 h-10 rounded-lg shrink-0" bgClassName="bg-black" fallbackIconClassName="w-4 h-4" />
-                  <span className="min-w-0 flex-1 text-[13px] text-zinc-300 truncate">{p.name}</span>
+                <li key={p.id} className={`${rowBase} opacity-50`}>
+                  <SafeImage src={p.image} alt="" aspect="square" className="w-10 h-10 rounded-sm shrink-0" bgClassName="bg-black" fallbackIconClassName="w-4 h-4" />
+                  <span className="min-w-0 flex-1 text-[13px] text-text-secondary truncate">{p.name}</span>
                   {p.reviewed && <CheckCircle2 className="w-4 h-4 text-emerald-400/60 shrink-0" />}
                 </li>
               ))}
@@ -358,7 +358,7 @@ export default function ReviewSheet({
               type="button"
               onClick={() => void fetchOrder(initialItemId)}
               data-review-retry
-              className="mt-3 min-h-[44px] px-4 inline-flex items-center gap-2 rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-secondary mt-3 px-4"
             >
               <RotateCw className="w-4 h-4" aria-hidden />
               {s.retry}
@@ -375,27 +375,27 @@ export default function ReviewSheet({
                 role="status"
                 aria-live="polite"
                 data-review-done
-                className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 flex items-start gap-2"
+                className="lv-alert lv-alert-success mt-3 flex items-start gap-2"
               >
                 <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400 shrink-0 mt-px" aria-hidden />
-                <p className="text-emerald-200 text-[12.5px] min-w-0">
+                <p className="text-text-primary text-[12.5px] min-w-0">
                   {s.done(justDone)}
-                  {openCount > 0 && <span className="text-emerald-300/70"> {s.nextUp}</span>}
+                  {openCount > 0 && <span className="text-text-secondary"> {s.nextUp}</span>}
                 </p>
               </div>
             )}
 
             {/* Nothing to offer — and it says which kind of nothing. */}
             {lines.length === 0 ? (
-              <p className="text-zinc-400 text-[13px] mt-4">{s.noItems}</p>
+              <p className="text-text-secondary text-[13px] mt-4">{s.noItems}</p>
             ) : !data?.delivered ? (
-              <p data-review-empty className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-zinc-400 text-[13px]">
+              <p data-review-empty className="mt-4 rounded-xl border border-border-subtle bg-surface p-3 text-text-secondary text-[13px]">
                 {s.notDelivered}
               </p>
             ) : openCount === 0 && !justDone ? (
-              <div data-review-empty className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 flex items-start gap-2.5">
+              <div data-review-empty className="mt-4 rounded-xl border border-border-subtle bg-surface p-4 flex items-start gap-2.5">
                 <PackageOpen className="w-5 h-5 text-gold shrink-0" aria-hidden />
-                <p className="text-zinc-300 text-[13px]">{s.allReviewed}</p>
+                <p className="text-text-secondary text-[13px]">{s.allReviewed}</p>
               </div>
             ) : null}
 
@@ -420,25 +420,19 @@ export default function ReviewSheet({
                       {...choice}
                       data-review-line={l.product_id}
                       data-review-state={l.state}
-                      className={`${rowBase} ${
-                        selected
-                          ? 'border-gold/60 bg-gold/10'
-                          : isOpen(l)
-                            ? 'border-zinc-800 hover:bg-zinc-800/60'
-                            : 'border-zinc-800/60 opacity-70'
-                      }`}
+                      className={`${rowBase} ${!selected && !isOpen(l) ? 'opacity-70' : ''}`}
                     >
                       <SafeImage
                         src={l.image}
                         alt=""
                         aspect="square"
-                        className="w-10 h-10 rounded-lg shrink-0"
+                        className="w-10 h-10 rounded-sm shrink-0"
                         bgClassName="bg-black"
                         fallbackIconClassName="w-4 h-4"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] text-zinc-200 truncate">{l.name}</span>
-                        {l.variant && <span className="block text-[11.5px] text-zinc-500 truncate">{l.variant}</span>}
+                        <span className="block text-[13px] text-text-primary truncate">{l.name}</span>
+                        {l.variant && <span className="block text-[11.5px] text-text-muted truncate">{l.variant}</span>}
                         {rated && l.existing_review && (
                           <span className="block text-[11px] text-emerald-300/85 truncate">
                             {s.reviewed(formatDate(l.existing_review.created_at, lang))}{' '}
@@ -471,22 +465,22 @@ export default function ReviewSheet({
             {/* The form for the product now selected. */}
             {active && isOpen(active) && (
               <>
-                <div className="mt-4 h-px bg-zinc-800" />
+                <div className="mt-4 h-px bg-border-subtle" />
 
                 {/* What this rating may earn — the server's answer, never a guess. */}
                 <p className="mt-3 text-[12.5px] min-h-[1.25em]">
                   {active.is_printer ? (
-                    <span className="inline-flex items-start gap-1.5 text-zinc-300">
+                    <span className="inline-flex items-start gap-1.5 text-text-secondary">
                       <Gift className="w-4 h-4 text-gold shrink-0 mt-px" aria-hidden /> {s.giftHint}
                     </span>
                   ) : typeof data?.review_points === 'number' && data.review_points > 0 ? (
-                    <span className="text-zinc-300">{s.pointsHint(data.review_points)}</span>
+                    <span className="text-text-secondary">{s.pointsHint(data.review_points)}</span>
                   ) : null}
                 </p>
 
                 <fieldset className="mt-3">
-                  <legend className="text-[12px] text-zinc-400 mb-1.5">
-                    {s.stars} — <span className="text-zinc-300">{active.name}</span>
+                  <legend className="text-[12px] text-text-secondary mb-1.5">
+                    {s.stars} — <span className="text-text-secondary">{active.name}</span>
                   </legend>
                   <div role="radiogroup" aria-label={`${s.stars} — ${active.name}`} className="flex items-center gap-0.5">
                     {[1, 2, 3, 4, 5].map((n) => (
@@ -502,7 +496,7 @@ export default function ReviewSheet({
                         className="w-11 h-11 inline-flex items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
                       >
                         <Star
-                          className={`w-7 h-7 transition-colors ${n <= stars ? 'text-gold' : 'text-zinc-700'}`}
+                          className={`w-7 h-7 transition-colors ${n <= stars ? 'text-gold' : 'text-text-muted'}`}
                           fill={n <= stars ? 'currentColor' : 'none'}
                           aria-hidden
                         />
@@ -512,8 +506,9 @@ export default function ReviewSheet({
                 </fieldset>
 
                 <label className="block mt-3">
-                  <span className="text-[12px] text-zinc-400 block mb-1">{s.bodyLabel}</span>
+                  <span className="text-[12px] text-text-secondary block mb-1">{s.bodyLabel}</span>
                   <textarea
+                    className="lv-input px-3 py-2.5 text-[13px] leading-relaxed resize-y disabled:opacity-60"
                     value={body}
                     // Bounded here as well as on the server, so the counter
                     // below can never promise room the server would refuse.
@@ -523,13 +518,12 @@ export default function ReviewSheet({
                     maxLength={MAX_BODY}
                     disabled={busy}
                     data-review-body
-                    className="w-full bg-black/60 border border-zinc-800 rounded-xl px-3 py-2.5 text-[13px] text-white placeholder:text-zinc-600 resize-y focus:outline-none focus:border-gold/60 disabled:opacity-60"
                   />
-                  <span className="block text-end text-[10.5px] text-zinc-600 tabular-nums mt-0.5">
+                  <span className="block text-end text-[10.5px] text-text-muted tabular-nums mt-0.5">
                     {body.length}/{MAX_BODY}
                   </span>
                 </label>
-                <p className="text-[11px] text-zinc-500">{s.moderation}</p>
+                <p className="text-[11px] text-text-muted">{s.moderation}</p>
 
                 <p role="alert" aria-live="assertive" className="text-red-400 text-[12.5px] mt-2 min-h-[1.25em]">
                   {error}
@@ -540,7 +534,7 @@ export default function ReviewSheet({
                     type="button"
                     onClick={close}
                     disabled={busy}
-                    className="min-h-[44px] px-4 rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+                    className="lv-button lv-button-secondary px-4"
                   >
                     {s.close}
                   </button>
@@ -552,9 +546,9 @@ export default function ReviewSheet({
                     title={stars < 1 ? s.starsRequired : undefined}
                     data-submit-review
                     data-mascot="review"
-                    className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                    className="lv-button lv-button-primary flex-1"
                   >
-                    {busy && <Spinner size="sm" delayMs={0} decorative className="text-white" />}
+                    {busy && <Spinner size="sm" delayMs={0} decorative />}
                     {busy ? s.submitting : s.submit}
                   </button>
                 </div>
@@ -568,7 +562,7 @@ export default function ReviewSheet({
               <button
                 type="button"
                 onClick={close}
-                className="mt-4 w-full min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                className="lv-button lv-button-secondary mt-4 w-full"
               >
                 {s.close}
               </button>

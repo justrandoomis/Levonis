@@ -91,14 +91,14 @@ export default function ShippingConflictDialog({
     >
       <div data-shipping-conflict dir={dir} className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
-          <span className="shrink-0 w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+          <span className="shrink-0 w-11 h-11 rounded-full lv-well flex items-center justify-center">
             <AlertTriangle className="w-5 h-5 text-amber-400" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 id="shipping-conflict-title" className="text-white font-bold text-base sm:text-lg">
+            <h2 id="shipping-conflict-title" className="text-text-primary font-bold text-base sm:text-lg">
               {s.title}
             </h2>
-            <p className="text-zinc-300 text-sm mt-1.5 leading-relaxed">{s.body}</p>
+            <p className="text-text-secondary text-sm mt-1.5 leading-relaxed">{s.body}</p>
           </div>
         </div>
 
@@ -106,17 +106,17 @@ export default function ShippingConflictDialog({
             older worker build would omit details, and an empty row reading
             "Cart shipping type: —" tells the customer nothing. */}
         {(currentLabel || incomingLabel) && (
-          <dl className="mt-4 rounded-2xl bg-zinc-900/70 border border-zinc-800 divide-y divide-zinc-800 text-sm">
+          <dl className="mt-4 lv-well rounded-md divide-y divide-border-subtle text-sm">
             {currentLabel && (
               <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <dt className="text-zinc-400">{s.current}</dt>
-                <dd className="text-white font-semibold">{currentLabel}</dd>
+                <dt className="text-text-secondary">{s.current}</dt>
+                <dd className="text-text-primary font-semibold">{currentLabel}</dd>
               </div>
             )}
             {incomingLabel && (
               <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <dt className="text-zinc-400">{s.incoming}</dt>
-                <dd className="text-white font-semibold">{incomingLabel}</dd>
+                <dt className="text-text-secondary">{s.incoming}</dt>
+                <dd className="text-text-primary font-semibold">{incomingLabel}</dd>
               </div>
             )}
           </dl>
@@ -128,7 +128,7 @@ export default function ShippingConflictDialog({
             data-shipping-conflict-cancel
             onClick={onCancel}
             disabled={busy}
-            className="flex-1 min-h-[48px] rounded-2xl border border-zinc-700 text-zinc-200 font-semibold hover:bg-zinc-900 disabled:opacity-50 transition-colors"
+            className="lv-button lv-button-secondary flex-1 min-h-[48px]"
           >
             {s.cancel}
           </button>
@@ -137,7 +137,7 @@ export default function ShippingConflictDialog({
             data-shipping-conflict-confirm
             onClick={onConfirm}
             disabled={busy}
-            className="flex-1 min-h-[48px] rounded-2xl bg-white text-black font-bold hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+            className="lv-button lv-button-primary flex-1 min-h-[48px]"
           >
             {busy ? s.working : s.confirm}
           </button>

@@ -46,7 +46,7 @@ export default function RelatedCategories({ nodes }: { nodes: CatalogTreeNode[] 
   }, [nodes]);
 
   return (
-    <ul className="-mx-4 -my-1 flex snap-x gap-2 overflow-x-auto overscroll-x-contain px-4 py-1 hide-scrollbar sm:-mx-6 sm:grid sm:grid-cols-3 sm:px-6 lg:mx-0 lg:grid-cols-4 lg:gap-4 lg:px-0">
+    <ul className="-mx-4 -my-2 flex snap-x gap-2 overflow-x-auto overscroll-x-contain px-4 py-2 hide-scrollbar sm:-mx-6 sm:grid sm:grid-cols-3 sm:px-6 lg:mx-0 lg:grid-cols-4 lg:gap-4 lg:px-0">
       {nodes.map((n) => {
         const photo = photos[n.id];
         return (
@@ -56,7 +56,7 @@ export default function RelatedCategories({ nodes }: { nodes: CatalogTreeNode[] 
               {...prefetchProps(n.path)}
               data-feature=""
               data-related={n.slug}
-              className="group relative isolate block h-[118px] overflow-hidden rounded-[14px] bg-charcoal text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:h-[168px] lg:rounded-[18px]"
+              className="group relative isolate block h-[118px] overflow-hidden rounded-2xl shadow-sm bg-charcoal text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-muted lg:h-[168px]"
             >
               {photo ? <CropPhoto src={photo.src} lightSrc={photo.lightSrc} mobileSrc={photo.mobileSrc} lightMobileSrc={photo.lightMobileSrc} crop={photo.productPhoto} size={240} className="lv-fade-top inset-x-0 bottom-0 top-[30%]" /> : null}
               <span className="relative block p-2.5 text-[12px] font-extrabold leading-[17px] lg:p-4 lg:text-[15px] lg:leading-6">{nodeName(n, lang)}</span>

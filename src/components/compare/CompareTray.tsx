@@ -152,7 +152,7 @@ export default function CompareTray() {
                 onClick={unfold}
                 aria-label={`${title}. ${loc('عرض المقارنة', 'Show comparison')}`}
                 aria-expanded={false}
-                className="pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full border border-border-subtle bg-surface-raised ps-1.5 pe-3.5 text-[13px] font-extrabold text-text-primary shadow-2 transition-transform active:scale-[0.97] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="lv-button lv-button-secondary pointer-events-auto rounded-full ps-1.5 pe-3.5 text-[13px] font-extrabold shadow-lg"
               >
                 <span className="flex -space-x-2 rtl:space-x-reverse" aria-hidden="true">
                   {state.items.slice(0, 3).map((it) => (
@@ -179,7 +179,7 @@ export default function CompareTray() {
                     arm();
                   }
                 }}
-                className="pointer-events-auto mx-auto flex w-full max-w-[560px] items-center gap-2 rounded-[18px] sm:gap-2.5 border border-border-subtle bg-surface-raised p-2.5 shadow-dock"
+                className="pointer-events-auto mx-auto flex w-full max-w-[560px] items-center gap-2 rounded-lg sm:gap-2.5 border border-border-subtle bg-surface-raised p-2.5 shadow-dock"
               >
                 <ul className="flex shrink-0 gap-1.5" aria-label={title}>
                   {state.items.map((it) => (
@@ -189,7 +189,7 @@ export default function CompareTray() {
                   ))}
                   {count < COMPARE_TRAY_MAX && (
                     <li aria-hidden="true" className="hidden min-[420px]:block">
-                      <span className="grid size-10 place-items-center rounded-[10px] border-[1.5px] border-dashed border-zinc-700 text-text-muted">
+                      <span className="grid size-10 place-items-center rounded-sm border-[1.5px] border-dashed border-border-subtle text-text-muted">
                         <Plus className="size-4" />
                       </span>
                     </li>
@@ -203,7 +203,7 @@ export default function CompareTray() {
                   <Link
                     to={compareHref(state)}
                     data-compare-tray-go
-                    className="lv-button lv-button-primary lv-button-sm shrink-0 rounded-xl !px-3.5 font-extrabold"
+                    className="lv-button lv-button-primary lv-button-sm shrink-0 !px-3.5 font-extrabold"
                   >
                     {loc('قارن', 'Compare', 'بەراورد')}
                   </Link>
@@ -211,7 +211,7 @@ export default function CompareTray() {
                   <button
                     type="button"
                     disabled
-                    className="lv-button lv-button-primary lv-button-sm shrink-0 rounded-xl !px-3.5 font-extrabold opacity-40"
+                    className="lv-button lv-button-primary lv-button-sm shrink-0 !px-3.5 font-extrabold opacity-40"
                   >
                     {loc('قارن', 'Compare', 'بەراورد')}
                   </button>
@@ -238,7 +238,7 @@ export default function CompareTray() {
 
 /** A product's photograph, cropped to the machine (the band under the lettered name). */
 function Thumb({ item, size }: { item: TrayItem; size: 'sm' | 'md' }) {
-  const box = size === 'md' ? 'size-10 rounded-[10px]' : 'size-8 rounded-full ring-2 ring-surface-raised';
+  const box = size === 'md' ? 'size-10 rounded-sm' : 'size-8 rounded-full ring-2 ring-surface-raised';
   return (
     <span className={`relative block shrink-0 overflow-hidden bg-charcoal ${box}`} title={size === 'md' ? item.name : undefined}>
       {item.image ? (

@@ -134,8 +134,8 @@ export function feeKindsOf(items: ApiOrderItem[] | undefined): FeeKind[] {
 function Row({ label, value, strong = false, muted = false, negative = false }: { label: string; value: string; strong?: boolean; muted?: boolean; negative?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <dt className={`text-[13px] min-w-0 ${strong ? 'text-white font-bold' : muted ? 'text-zinc-500' : 'text-zinc-400'}`}>{label}</dt>
-      <dd className={`text-[13px] tabular-nums shrink-0 ${strong ? 'text-gold font-bold text-[15px]' : negative ? 'text-emerald-300' : 'text-zinc-200'}`}>
+      <dt className={`text-[13px] min-w-0 ${strong ? 'text-text-primary font-bold' : muted ? 'text-text-muted' : 'text-text-secondary'}`}>{label}</dt>
+      <dd className={`text-[13px] tabular-nums shrink-0 ${strong ? 'text-gold font-bold text-[15px]' : negative ? 'text-emerald-300' : 'text-text-primary'}`}>
         {negative ? '- ' : ''}
         {value}
       </dd>
@@ -157,7 +157,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
         ? 'bg-crimson/15 text-petal border-crimson/35'
       : f.payment_state === 'partial'
         ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-        : 'bg-zinc-800 text-zinc-300 border-zinc-700';
+        : 'bg-surface-selected text-text-secondary border-border-subtle';
   const points = f.points ?? null;
   const showEarned = !!points && points.state !== 'none' && (points.pending > 0 || points.released > 0 || points.state === 'cancelled');
   // Name the fees when the line snapshots say which ones were charged; a
@@ -166,15 +166,15 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
   const feesLabel = feeKinds.length > 0 ? s.feesOf(feeKinds.map((k) => s.feeKinds[k]).join(' · ')) : s.fees;
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4" aria-labelledby="payment-title">
+    <section className="lv-surface p-4" aria-labelledby="payment-title">
       <div className="flex items-center justify-between gap-3">
-        <h3 id="payment-title" className="text-white font-bold text-[14px]">{s.title}</h3>
+        <h3 id="payment-title" className="text-text-primary font-bold text-[14px]">{s.title}</h3>
         <span data-payment-state={f.payment_state} className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold ${stateStyle}`}>
           {s.state[f.payment_state] ?? f.payment_state}
         </span>
       </div>
 
-      <dl className="mt-3 divide-y divide-zinc-800/60">
+      <dl className="mt-3 divide-y divide-border-subtle">
         <Row label={s.merchandise} value={money(f.merchandise_iqd)} />
         {f.fees_iqd > 0 && <Row label={feesLabel} value={money(f.fees_iqd)} />}
         {f.coupon_discount_iqd > 0 && <Row label={`${s.coupon}${couponCode}`} value={money(f.coupon_discount_iqd)} negative />}
@@ -195,8 +195,8 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
         <Row label={s.total} value={moneyBoth(f.total_iqd)} strong />
       </dl>
 
-      <dl className="mt-3 pt-3 border-t border-zinc-800 divide-y divide-zinc-800/60">
-        <div className="pb-1 text-[11px] font-bold text-zinc-500">{s.payment}</div>
+      <dl className="mt-3 pt-3 border-t border-border-subtle divide-y divide-border-subtle">
+        <div className="pb-1 text-[11px] font-bold text-text-muted">{s.payment}</div>
         {/* WHERE THE REST OF THE MONEY WENT. Without this row a Gini order
             reads as a 30,000 total with 5,000 outstanding and no account of
             the other 25,000 — the admin's receipt sheet has carried the line
@@ -221,37 +221,37 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
       )}
 
       {f.support && f.support.referrer_username && (
-        <p className="mt-3 text-[11.5px] text-zinc-500">{s.support(f.support.referrer_username)}</p>
+        <p className="mt-3 text-[11.5px] text-text-muted">{s.support(f.support.referrer_username)}</p>
       )}
 
       {showEarned && points && (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-black/30 p-3" data-points-state={points.state}>
-          <p className="text-[12px] font-bold text-zinc-300 inline-flex items-center gap-1.5">
+        <div className="mt-4 lv-well rounded-md p-3" data-points-state={points.state}>
+          <p className="text-[12px] font-bold text-text-secondary inline-flex items-center gap-1.5">
             <Coins className="w-4 h-4 text-gold" aria-hidden />
             {s.earned}
           </p>
           <div className="mt-1.5 flex flex-col gap-1 text-[12.5px]">
             {points.pending > 0 && (
-              <p className="text-zinc-200 inline-flex items-center gap-1.5 tabular-nums">
+              <p className="text-text-primary inline-flex items-center gap-1.5 tabular-nums">
                 <Clock className="w-3.5 h-3.5 text-amber-300" aria-hidden />
                 {s.pending(points.pending)}
-                {points.available_at && <span className="text-zinc-500">· {s.availableAt(formatDate(points.available_at, lang))}</span>}
+                {points.available_at && <span className="text-text-muted">· {s.availableAt(formatDate(points.available_at, lang))}</span>}
               </p>
             )}
             {points.released > 0 && (
-              <p className="text-zinc-200 inline-flex items-center gap-1.5 tabular-nums">
+              <p className="text-text-primary inline-flex items-center gap-1.5 tabular-nums">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden />
                 {s.released(points.released)}
               </p>
             )}
             {points.state === 'cancelled' && (
-              <p className="text-zinc-400 inline-flex items-center gap-1.5">
+              <p className="text-text-secondary inline-flex items-center gap-1.5">
                 <Ban className="w-3.5 h-3.5" aria-hidden />
                 {s.cancelledPoints}
               </p>
             )}
           </div>
-          {points.state === 'pending' && <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed">{s.holdNote}</p>}
+          {points.state === 'pending' && <p className="mt-2 text-[11px] text-text-muted leading-relaxed">{s.holdNote}</p>}
         </div>
       )}
     </section>

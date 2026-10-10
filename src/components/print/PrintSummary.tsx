@@ -54,7 +54,7 @@ const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
 const CONFIDENCE_CLASS: Record<Confidence, string> = {
   high: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   medium: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  low: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+  low: 'bg-zinc-500/15 text-text-secondary border-zinc-500/30',
 };
 
 export default function PrintSummary({
@@ -124,7 +124,7 @@ export default function PrintSummary({
 
   if (state === 'loading') {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4 flex justify-center">
+      <div className="lv-surface p-4 mb-4 flex justify-center">
         <Loader2 className="w-4 h-4 text-gold animate-spin" />
       </div>
     );
@@ -137,7 +137,7 @@ export default function PrintSummary({
 
   return (
     <div
-      className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-4"
+      className="lv-surface p-4 mb-4"
       data-print-summary={requestId}
     >
       <h2 className="text-gold font-bold text-[13px] mb-3 flex items-center gap-1.5">
@@ -146,8 +146,8 @@ export default function PrintSummary({
       </h2>
 
       {(facts.estimate_low_iqd !== null || facts.estimate_high_iqd !== null) && (
-        <div className="rounded-xl border border-gold/25 bg-gold/[0.06] px-3.5 py-3 mb-3" data-print-summary-estimate>
-          <p className="text-[11px] text-zinc-400 mb-0.5">
+        <div className="lv-well rounded-md px-3.5 py-3 mb-3" data-print-summary-estimate>
+          <p className="text-[11px] text-text-secondary mb-0.5">
             {loc('تقدير Levonis', 'Levonis estimate', 'خەمڵاندنی Levonis')}
           </p>
           <p className="text-gold font-bold text-[16px]" dir="ltr">
@@ -159,7 +159,7 @@ export default function PrintSummary({
                 {loc(...CONFIDENCE_TEXT[conf])}
               </span>
             )}
-            <span className="text-[11px] text-zinc-500">
+            <span className="text-[11px] text-text-muted">
               {loc(
                 'تقدير وليس عرضًا نهائيًا — عروض التجار قد تختلف.',
                 'An estimate, not a final offer — merchant offers may differ.',
@@ -210,7 +210,7 @@ export default function PrintSummary({
           />
         </div>
       ) : (
-        <p className="text-zinc-400 text-[12.5px] leading-relaxed mb-3">
+        <p className="text-text-secondary text-[12.5px] leading-relaxed mb-3">
           {loc(
             'هذا الطلب لا يحمل ملفًا يمكن قياسه، فالتقدير مبني على ما وصفه صاحب الطلب.',
             'This request carries no measurable file, so the estimate is based on what the customer described.',
@@ -227,7 +227,7 @@ export default function PrintSummary({
               <li
                 key={w.code}
                 className={`flex items-start gap-1.5 text-[11.5px] leading-relaxed ${
-                  w.severity === 'info' ? 'text-zinc-400' : 'text-amber-300'
+                  w.severity === 'info' ? 'text-text-secondary' : 'text-amber-300'
                 }`}
               >
                 <TriangleAlert className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -266,12 +266,12 @@ export default function PrintSummary({
 
 function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2">
-      <p className="text-[10.5px] text-zinc-500 flex items-center gap-1 mb-0.5">
+    <div className="lv-well rounded-md px-3 py-2">
+      <p className="text-[10.5px] text-text-muted flex items-center gap-1 mb-0.5">
         {icon}
         {label}
       </p>
-      <p className="text-white text-[13px] font-semibold" dir="ltr">
+      <p className="text-text-primary text-[13px] font-semibold" dir="ltr">
         {value}
       </p>
     </div>

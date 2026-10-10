@@ -61,6 +61,7 @@ import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { quantityLimit } from '../../packages/pricing/src/quantity';
 import { Overlay, Sheet } from '../components/ui/Overlay';
+import { IconButton } from '../components/ui/Button';
 import ChunkBoundary from '../components/ChunkBoundary';
 import { ProductDetailSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, NotFoundState } from '../components/ui/AsyncStates';
@@ -761,18 +762,18 @@ function Section({
 }: { title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-zinc-800/70 rounded-2xl bg-zinc-900/40 overflow-hidden">
+    <div className="lv-surface overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full p-4 min-h-[44px] flex justify-between items-center text-white font-bold gap-3 hover:bg-white/5 transition-colors"
+        className="w-full p-4 min-h-[44px] flex justify-between items-center text-text-primary font-bold gap-3 hover:bg-white/5 transition-colors"
       >
         <span className="flex items-center gap-2 text-start">
           {icon}
           <span>{title}</span>
         </span>
-        <ChevronDown aria-hidden="true" className={`w-5 h-5 text-zinc-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown aria-hidden="true" className={`w-5 h-5 text-text-secondary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open ? <div className="px-4 pb-4">{children}</div> : null}
     </div>
@@ -2023,16 +2024,16 @@ export default function Product() {
 
   if (loading || !product) {
     return (
-      <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
+      <div className="w-full min-h-[100dvh] text-text-secondary font-sans" dir={dir}>
         <div className="lv-character-header sticky top-0 z-30 bg-black px-4 pb-1.5 flex items-center">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label={s.back}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
-          >
-            {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
-          </button>
+          <IconButton
+            variant="secondary"
+            onClick={() => {
+              navigate(-1);
+            }}
+            label={s.back}
+            icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+          />
           <MotionCharacterHome busy={loading} />
           <span aria-hidden="true" />
         </div>
@@ -2674,7 +2675,7 @@ export default function Product() {
             <span
               aria-busy={priceIsPending || undefined}
               data-pro-price={appliedMemberTier === 'pro' || undefined}
-              className={`${appliedMemberTier === 'pro' ? 'text-coral' : 'text-white'} font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
+              className={`${appliedMemberTier === 'pro' ? 'text-coral' : 'text-text-primary'} font-black text-2xl sm:text-3xl tabular-nums transition-opacity duration-200 ${
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
@@ -2698,7 +2699,7 @@ export default function Product() {
                 {s.appliedPriceOf(appliedMemberLabel)}
               </span>
             ) : (
-              <span className="text-zinc-400 text-[12px] font-bold">{s.regularPrice}</span>
+              <span className="text-text-secondary text-[12px] font-bold">{s.regularPrice}</span>
             )}
           </div>
           {/* §4: no compare-at. The regular price is struck through only when
@@ -2708,7 +2709,7 @@ export default function Product() {
               numbers or to discover the benefit at checkout. */}
           {shownPrice.applied < shownPrice.regular ? (
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-zinc-500/80 text-[12px] line-through tabular-nums">{money(shownPrice.regular)}</span>
+              <span className="text-text-muted text-[12px] line-through tabular-nums">{money(shownPrice.regular)}</span>
               {memberSavingIqd !== null ? (
                 <span
                   data-testid="product-member-saving"
@@ -2721,8 +2722,8 @@ export default function Product() {
           ) : null}
           {isPro && viewerTier?.pro_benefits_context === false ? <ProAddressNotice className="mt-2.5" /> : null}
           {qty > 1 ? (
-            <div className="text-zinc-400 text-[13px] mt-2">
-              {s.lineTotal}: <span className="text-white font-bold tabular-nums">{money(lineTotal!)}</span>
+            <div className="text-text-secondary text-[13px] mt-2">
+              {s.lineTotal}: <span className="text-text-primary font-bold tabular-nums">{money(lineTotal!)}</span>
             </div>
           ) : null}
         </>
@@ -2738,13 +2739,13 @@ export default function Product() {
           */}
           <div className="flex items-baseline gap-2 flex-wrap">
             {product.display_from && !optionId && !colorId ? (
-              <span className="text-zinc-400 text-[12px] font-bold">{s.from}</span>
+              <span className="text-text-secondary text-[12px] font-bold">{s.from}</span>
             ) : null}
-            <span className="text-white font-bold text-xl tabular-nums opacity-80">
+            <span className="text-text-primary font-bold text-xl tabular-nums opacity-80">
               {money(product.display_price_iqd ?? product.price_iqd)}
             </span>
           </div>
-          <p className="text-zinc-400 text-[13px] mt-2">{quoteLoading ? s.updatingPrice : s.priceUnavailable}</p>
+          <p className="text-text-secondary text-[13px] mt-2">{quoteLoading ? s.updatingPrice : s.priceUnavailable}</p>
         </>
       )}
 
@@ -2779,15 +2780,15 @@ export default function Product() {
           remains itemised; item price and fulfilment increases are deliberately
           not repeated as notes beneath that final figure. */}
       {priceIsAuthoritative && quote!.warranty ? (
-        <dl className="mt-3 pt-3 border-t border-zinc-800/70 space-y-1.5 text-[13px]">
+        <dl className="mt-3 pt-3 border-t border-border-subtle space-y-1.5 text-[13px]">
           <div className="flex justify-between gap-3" data-warranty-fee-row>
-            <dt className="text-zinc-400">
+            <dt className="text-text-secondary">
               {s.warranty}
               {quote!.warranty.duration_kind === 'extension'
                 ? ` · ${s.extendedPlan(monthsLabel(quote!.warranty.duration_months, lang))}`
                 : ''}
             </dt>
-            <dd className="text-zinc-200 tabular-nums">{money(quote!.warranty.fee_iqd)}</dd>
+            <dd className="text-text-primary tabular-nums">{money(quote!.warranty.fee_iqd)}</dd>
           </div>
         </dl>
       ) : null}
@@ -2856,7 +2857,7 @@ export default function Product() {
    */
   const Chosen = ({ value }: { value: string | null | undefined }) =>
     value ? (
-      <span className="ms-2 font-medium text-[12px] text-zinc-400" data-chosen>
+      <span className="ms-2 font-medium text-[12px] text-text-secondary" data-chosen>
         · {value}
       </span>
     ) : null;
@@ -2884,8 +2885,8 @@ export default function Product() {
       */}
       {offersBoth && !routeAskedPerVersion ? (
         <fieldset className="lv-section" data-fulfilment-chooser>
-          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
-            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+          <legend className="px-1 text-text-primary font-bold text-[14px] flex items-center gap-2">
+            <Truck aria-hidden="true" className="w-4 h-4 text-text-secondary" />
             {s.fulfilment}
             <Chosen value={effectivePreorder ? s.preorderMode : directUsable ? s.directSale : null} />
           </legend>
@@ -2906,7 +2907,7 @@ export default function Product() {
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{s.directSale}</span>
-                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilDirectSub}</span>
+                <span className="block text-[11px] text-text-secondary font-medium leading-snug">{s.fulfilDirectSub}</span>
                 {directUsable && directFinal !== null ? (
                   <span className="block tabular-nums text-[14px] font-bold mt-1" data-direct-final>{money(directFinal)}</span>
                 ) : null}
@@ -2934,10 +2935,10 @@ export default function Product() {
             >
               <span className="min-w-0 flex-1">
                 <span className="block">{s.preorderMode}</span>
-                <span className="block text-[11px] text-zinc-400 font-medium leading-snug">{s.fulfilPreorderSub}</span>
+                <span className="block text-[11px] text-text-secondary font-medium leading-snug">{s.fulfilPreorderSub}</span>
                 {preUsable && preorderFromFinal !== null ? (
                   <span className="block tabular-nums text-[14px] font-bold mt-1">
-                    <span className="text-[10px] font-medium text-zinc-400 me-1">{s.from}</span>
+                    <span className="text-[10px] font-medium text-text-secondary me-1">{s.from}</span>
                     {money(preorderFromFinal)}
                   </span>
                 ) : null}
@@ -2955,7 +2956,7 @@ export default function Product() {
               mandate) — said here so the number never surprises later, and
               ONLY when the server says the number would actually move. */}
           {codReprices ? (
-            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
+            <p className="mt-2 text-[11px] text-text-muted leading-relaxed" data-preorder-cod-hint>
               {s.preorderCodHint}
             </p>
           ) : null}
@@ -2991,8 +2992,8 @@ export default function Product() {
 
       {showTransports ? (
         <fieldset className="lv-section">
-          <legend className="px-1 text-white font-bold text-[14px] flex items-center gap-2">
-            <Truck aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+          <legend className="px-1 text-text-primary font-bold text-[14px] flex items-center gap-2">
+            <Truck aria-hidden="true" className="w-4 h-4 text-text-secondary" />
             {s.transport}
             <Chosen value={effectiveTransport ? transportLabel(s, effectiveTransport) : null} />
             {/* THE PANEL SAYS IT IS REQUIRED, beside the choice itself — the
@@ -3054,7 +3055,7 @@ export default function Product() {
               and only when cash on delivery would change the price (a
               product with no direct premium keeps its commission either way). */}
           {!offersBoth && codReprices ? (
-            <p className="mt-2 text-[11px] text-zinc-500 leading-relaxed" data-preorder-cod-hint>
+            <p className="mt-2 text-[11px] text-text-muted leading-relaxed" data-preorder-cod-hint>
               {s.preorderCodHint}
             </p>
           ) : null}
@@ -3067,7 +3068,7 @@ export default function Product() {
             const groupSelected = group.values.find((value) => optionValueIds.includes(value.id))?.id ?? '';
             return (
               <fieldset key={group.id} className="lv-section" data-option-group={group.id}>
-                <legend className="px-1 text-white font-bold text-[14px]">
+                <legend className="px-1 text-text-primary font-bold text-[14px]">
                   {group.name_en}
                   <Chosen
                     value={(() => {
@@ -3159,7 +3160,7 @@ export default function Product() {
         </div>
       ) : models ? (
         <fieldset className="lv-section" data-variant-chooser>
-          <legend className="px-1 text-white font-bold text-[14px]">
+          <legend className="px-1 text-text-primary font-bold text-[14px]">
             {tr('اختر النسخة', 'Choose the version', 'وەشان هەڵبژێرە')}
             <Chosen value={activeModel?.label} />
             {!modelKey ? <span className="ms-2 text-amber-300 font-medium text-[12px]">{s.chooseOption}</span> : null}
@@ -3209,7 +3210,7 @@ export default function Product() {
 
           {activeModel && activeModel.options.length > 1 ? (
             <div className="mt-4 border-t border-border-subtle pt-3" data-availability-chooser>
-              <p className="text-white font-bold text-[13px] mb-2">
+              <p className="text-text-primary font-bold text-[13px] mb-2">
                 {tr('طريقة التوفر', 'How to get it', 'چۆنیەتی بەردەستبوون')}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -3281,7 +3282,7 @@ export default function Product() {
         </fieldset>
       ) : options.length > 0 ? (
         <fieldset className="lv-section">
-          <legend className="px-1 text-white font-bold text-[14px]">
+          <legend className="px-1 text-text-primary font-bold text-[14px]">
             {s.options}
             <Chosen
               value={(() => {
@@ -3342,7 +3343,7 @@ export default function Product() {
 
       {orderedColors.length > 0 ? (
         <fieldset className="lv-section">
-          <legend className="px-1 text-white font-bold text-[14px]">
+          <legend className="px-1 text-text-primary font-bold text-[14px]">
             {s.colors}
             <Chosen
               value={(() => {
@@ -3395,7 +3396,7 @@ export default function Product() {
                   ) : (
                     <span
                       aria-hidden="true"
-                      className="w-5 h-5 rounded-full border border-zinc-600 shrink-0"
+                      className="w-5 h-5 rounded-full border border-border-subtle shrink-0"
                       style={{ backgroundColor: col.hex || '#3f3f46' }}
                     />
                   )}
@@ -3444,7 +3445,7 @@ export default function Product() {
             <span className="min-w-0 flex items-center gap-2">
               <ShieldCheck aria-hidden="true" className="w-4 h-4 text-text-muted shrink-0" />
               <span className="min-w-0">
-                <span className="block text-white font-semibold text-[13.5px]">{s.warranty}</span>
+                <span className="block text-text-primary font-semibold text-[13.5px]">{s.warranty}</span>
                 <span className={`block text-[11.5px] truncate ${warrantyPlanId ? 'text-text-secondary' : 'text-text-muted'}`}>
                   {warrantySummary}
                 </span>
@@ -3452,12 +3453,12 @@ export default function Product() {
             </span>
             <ChevronDown
               aria-hidden="true"
-              className={`w-5 h-5 text-zinc-400 shrink-0 transition-transform duration-200 ${warrantyOpen ? 'rotate-180' : ''}`}
+              className={`w-5 h-5 text-text-secondary shrink-0 transition-transform duration-200 ${warrantyOpen ? 'rotate-180' : ''}`}
             />
           </button>
           {warrantyOpen ? (
             <div className="px-4 pb-4">
-              <p className="text-[12px] text-zinc-400 leading-relaxed">
+              <p className="text-[12px] text-text-secondary leading-relaxed">
                 {warrantyBase !== null ? s.warrantyIntro(monthsLabel(warrantyBase, lang)) : s.warrantyIntroNoBase}
               </p>
               <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label={s.warranty}>
@@ -3503,7 +3504,7 @@ export default function Product() {
                           ) : null}
                         </span>
                         {!extension ? (
-                          <span className="block text-[12px] text-zinc-400">
+                          <span className="block text-[12px] text-text-secondary">
                             {monthsLabel(w.duration_months, lang)} · {s.total}
                           </span>
                         ) : null}
@@ -3548,7 +3549,7 @@ export default function Product() {
     inCartQty > 0 ? (
       <div
         data-in-cart-note
-        className="mb-2 flex items-center justify-between gap-3 text-[12px] text-zinc-400"
+        className="mb-2 flex items-center justify-between gap-3 text-[12px] text-text-secondary"
       >
         <span className="tabular-nums">{s.inCart(inCartQty)}</span>
         <Link
@@ -3585,7 +3586,7 @@ export default function Product() {
     <div>
       {inCartNote}
     <div className="flex items-center justify-between gap-3">
-      <span className="text-zinc-300 text-sm font-bold">{s.qty}</span>
+      <span className="text-text-secondary text-sm font-bold">{s.qty}</span>
       {qtyInput('md', 'start')}
     </div>
     </div>
@@ -3733,44 +3734,34 @@ export default function Product() {
 
   // ------------------------------------------------------------------ render
   return (
-    <div ref={pageRef} className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
+    <div ref={pageRef} className="w-full min-h-[100dvh] text-text-secondary font-sans" dir={dir}>
       {/* Sticky page chrome inside the app scroll container — never a fixed
           overlay that could land in the middle of the content. */}
       <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black px-4 pb-1.5 flex items-center justify-between gap-2">
-        <button
-          type="button"
+        <IconButton
+          variant="secondary"
           onClick={goBack}
-          aria-label={s.back}
-          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-zinc-900/60 rounded-full hover:bg-zinc-800 transition-colors"
-        >
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
-        </button>
+          label={s.back}
+          icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+        />
         <MotionCharacterHome />
         <div className="flex items-center gap-2">
           {/* The compare tray, as a top-bar badge: the floating tray is not
               drawn here, where it would cover the purchase bar (owner Q8).
               Nothing is drawn while the tray is empty. */}
-          <CompareBadge className="bg-zinc-900/60 text-zinc-300 hover:text-white hover:bg-zinc-800" />
-          <button
-            type="button"
-            onClick={handleShare}
-            aria-label={s.share}
-            className="w-11 h-11 rounded-full bg-zinc-900/60 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
-          >
-            <Share2 aria-hidden="true" className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleFavorite}
+          <CompareBadge className="bg-surface-raised border border-border-subtle shadow-1 text-text-primary active:shadow-press" />
+          <IconButton variant="secondary" onClick={handleShare} label={s.share} icon={<Share2 aria-hidden="true" className="w-5 h-5" />} />
+          <IconButton
+            variant="secondary"
+            onClick={() => {
+              void toggleFavorite();
+            }}
             disabled={source !== 'catalog'}
-            aria-label={favorite ? s.unfavorite : s.favorite}
+            label={favorite ? s.unfavorite : s.favorite}
             aria-pressed={favorite}
-            className={`w-11 h-11 rounded-full bg-zinc-900/60 flex items-center justify-center transition-colors ${
-              favorite ? 'text-rose-400' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
-            } ${source !== 'catalog' ? 'opacity-40 cursor-not-allowed' : ''}`}
-          >
-            <Heart aria-hidden="true" className={`w-5 h-5 ${favorite ? 'fill-rose-400' : ''}`} />
-          </button>
+            className={source !== 'catalog' ? 'cursor-not-allowed' : ''}
+            icon={<Heart aria-hidden="true" className={`w-5 h-5 ${favorite ? 'text-rose-400 fill-rose-400' : ''}`} />}
+          />
         </div>
       </div>
 
@@ -3791,7 +3782,7 @@ export default function Product() {
           {/* -------------------------------------------------- left column */}
           <div className="min-w-0">
             <section aria-label={s.gallery}>
-              <div className="relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] rounded-2xl border border-zinc-800/70 bg-zinc-950 overflow-hidden">
+              <div className="lv-surface relative w-full h-[min(78vw,340px)] sm:h-[420px] lg:h-[520px] xl:h-[560px] overflow-hidden">
                 <SafeImage
                   key={activeMedia?.url || 'empty'}
                   src={activeMedia?.url}
@@ -3803,10 +3794,10 @@ export default function Product() {
                   eager={galleryIndex === 0}
                   sizes={PRODUCT_GALLERY_SIZES}
                   className="w-full h-full"
-                  bgClassName="bg-zinc-950"
+                  bgClassName="bg-surface"
                   imgClassName="p-3"
                   fallbackIconClassName="w-10 h-10"
-                  fallbackClassName="text-zinc-600"
+                  fallbackClassName="text-text-muted"
                 />
                 {activeMedia?.url ? (
                   <button
@@ -3816,7 +3807,7 @@ export default function Product() {
                     }}
                     onClick={() => setLightbox(true)}
                     aria-label={s.zoom}
-                    className="absolute bottom-2 end-2 w-11 h-11 rounded-full bg-black/70 border border-zinc-700 flex items-center justify-center text-zinc-200 hover:text-white transition-colors"
+                    className="absolute bottom-2 end-2 w-11 h-11 rounded-full bg-onyx/80 flex items-center justify-center text-snow transition-colors"
                   >
                     <ZoomIn aria-hidden="true" className="w-5 h-5" />
                   </button>
@@ -3832,8 +3823,8 @@ export default function Product() {
                       aria-pressed={i === galleryIndex}
                       aria-label={s.imageOf.replace('{n}', String(i + 1)).replace('{total}', String(gallery.length))}
                       onClick={() => setGalleryIndex(i)}
-                      className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border transition-colors ${
-                        i === galleryIndex ? 'border-white/30 bg-surface-selected' : 'border-border-subtle hover:border-zinc-600'
+                      className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border transition-colors ${
+                        i === galleryIndex ? 'border-white/30 bg-surface-selected' : 'border-border-subtle'
                       }`}
                     >
                       <SafeImage
@@ -3842,7 +3833,7 @@ export default function Product() {
                         aspect="square"
                         fit="contain"
                         className="w-full h-full"
-                        bgClassName="bg-zinc-900"
+                        bgClassName="bg-surface-raised"
                         fallbackIconClassName="w-4 h-4"
                         sizes="64px"
                       />
@@ -3852,7 +3843,7 @@ export default function Product() {
               ) : null}
 
               {gallery.length === 0 ? (
-                <p className="mt-3 text-zinc-500 text-[13px] flex items-center gap-2">
+                <p className="mt-3 text-text-muted text-[13px] flex items-center gap-2">
                   <ImageIcon aria-hidden="true" className="w-4 h-4" />
                   {s.noImages}
                 </p>
@@ -3861,8 +3852,8 @@ export default function Product() {
 
             {/* Title + store, shown once (the panel repeats no heading). */}
             <div className="mt-5">
-              <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">{name}</h1>
-              <p className="mt-2 text-[12px] text-zinc-500 flex items-center gap-1.5">
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-snug">{name}</h1>
+              <p className="mt-2 text-[12px] text-text-muted flex items-center gap-1.5">
                 <Store aria-hidden="true" className="w-3.5 h-3.5" />
                 {source === 'community' && product.merchant ? (
                   <>
@@ -3917,13 +3908,13 @@ export default function Product() {
                   <span
                     data-product-rating
                     aria-label={s.ratingAria(rating.average.toFixed(1), rating.count)}
-                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300"
+                    className="inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary"
                   >
                     <Star aria-hidden="true" className="w-3.5 h-3.5 text-gold" fill="currentColor" strokeWidth={0} />
                     {/* Tabular figures so a 4.0 and a 4.8 occupy the same
                         width and the row does not shift as products change. */}
                     <span className="font-bold tabular-nums" dir="ltr">{rating.average.toFixed(1)}</span>
-                    <span className="text-zinc-500 tabular-nums">
+                    <span className="text-text-muted tabular-nums">
                       ({rating.count.toLocaleString('en-US')} {s.reviewsCount(rating.count)})
                     </span>
                   </span>
@@ -3933,14 +3924,14 @@ export default function Product() {
                   <span
                     data-product-sales={salesBadge}
                     aria-label={s.salesAria(salesBadge.toLocaleString('en-US'))}
-                    className="inline-flex items-center gap-1.5 border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300"
+                    className="inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary"
                   >
-                    <TrendingUp aria-hidden="true" className="w-3.5 h-3.5 text-zinc-400" />
+                    <TrendingUp aria-hidden="true" className="w-3.5 h-3.5 text-text-secondary" />
                     {/* `dir="ltr"` on the figure alone: «+200 مبيعات» has an
                         LTR number inside an RTL sentence, and without the
                         isolate the plus sign jumps to the wrong side of it. */}
                     <span className="font-bold tabular-nums" dir="ltr">+{salesBadge.toLocaleString('en-US')}</span>
-                    <span className="text-zinc-500">{s.salesSold}</span>
+                    <span className="text-text-muted">{s.salesSold}</span>
                   </span>
                 ) : null}
 
@@ -3957,9 +3948,9 @@ export default function Product() {
                   </span>
                 ) : null}
                 {product.brand ? (
-                  <span className="border border-zinc-700 rounded-full px-2.5 py-1 text-[11px] leading-normal text-zinc-300">{product.brand}</span>
+                  <span className="border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary">{product.brand}</span>
                 ) : null}
-                {stockNote ? <span className="text-zinc-400 text-[12px] leading-normal">{stockNote}</span> : null}
+                {stockNote ? <span className="text-text-secondary text-[12px] leading-normal">{stockNote}</span> : null}
               </div>
               {/* «يناسب» — the printers this part fits, each one tap away. */}
               <PrinterFitsLine printers={fitsPrinters} />
@@ -3977,7 +3968,7 @@ export default function Product() {
               (availability.stock.scope === 'product' || availability.stock.scope === 'base') &&
               invMode === 'BASE' &&
               (options.length > 0 || (product.colors ?? []).length > 0) ? (
-                <p className="mt-1 text-[12px] text-zinc-500">{s.stockProductScope}</p>
+                <p className="mt-1 text-[12px] text-text-muted">{s.stockProductScope}</p>
               ) : null}
             </div>
 
@@ -4007,19 +3998,19 @@ export default function Product() {
             {/* A reading measure, independent of the gallery: 68 characters
                 is a comfortable line, and the sections below are prose. */}
             <div className="mt-6 space-y-3 max-w-[68ch]">
-              <Section title={s.description} icon={<FileText aria-hidden="true" className="w-5 h-5 text-zinc-400" />} defaultOpen>
+              <Section title={s.description} icon={<FileText aria-hidden="true" className="w-5 h-5 text-text-secondary" />} defaultOpen>
                 {description ? (
-                  <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{description}</p>
+                  <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">{description}</p>
                 ) : (
-                  <p className="text-sm text-zinc-500">{s.noDescription}</p>
+                  <p className="text-sm text-text-muted">{s.noDescription}</p>
                 )}
               </Section>
 
               {boxItems.length > 0 ? (
-                <Section title={s.inTheBox} icon={<Box aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
+                <Section title={s.inTheBox} icon={<Box aria-hidden="true" className="w-5 h-5 text-text-secondary" />}>
                   <ul className="space-y-1.5">
                     {boxItems.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-zinc-300 leading-relaxed">
+                      <li key={i} className="flex items-start gap-2 text-sm text-text-secondary leading-relaxed">
                         <span aria-hidden="true" className="mt-2 w-1.5 h-1.5 rounded-full bg-gold shrink-0" />
                         <span dir="auto" className="min-w-0">{item}</span>
                       </li>
@@ -4029,7 +4020,7 @@ export default function Product() {
               ) : null}
 
               {guideSteps.length > 0 || howToUse ? (
-                <Section title={s.howToUse} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
+                <Section title={s.howToUse} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-text-secondary" />}>
                   {officialUrl ? (
                     <a
                       href={officialUrl}
@@ -4045,21 +4036,21 @@ export default function Product() {
                     <div className="space-y-4">
                       {[
                         { steps: setupSteps, title: s.setupTitle, icon: <Wrench aria-hidden="true" className="w-4 h-4 text-amber-300" /> },
-                        { steps: usageSteps, title: s.howToUse, icon: <Settings2 aria-hidden="true" className="w-4 h-4 text-zinc-400" /> },
+                        { steps: usageSteps, title: s.howToUse, icon: <Settings2 aria-hidden="true" className="w-4 h-4 text-text-secondary" /> },
                       ]
                         .filter((grp) => grp.steps.length > 0)
                         .map((grp) => (
                           <div key={grp.title} className="min-w-0">
                             {/* One kind alone skips the redundant sub-heading. */}
                             {setupSteps.length > 0 && usageSteps.length > 0 ? (
-                              <h4 className="flex items-center gap-1.5 text-[13px] font-bold text-white mb-2">
+                              <h4 className="flex items-center gap-1.5 text-[13px] font-bold text-text-primary mb-2">
                                 {grp.icon}
                                 {grp.title}
                               </h4>
                             ) : null}
                             <ol className="space-y-2.5">
                               {grp.steps.map((st, i) => (
-                                <li key={st.id || i} className="rounded-xl border border-zinc-800/70 bg-zinc-900/50 p-3 min-w-0">
+                                <li key={st.id || i} className="rounded-lg bg-surface-raised p-3 min-w-0">
                                   <div className="flex items-start gap-2.5 min-w-0">
                                     <span
                                       aria-hidden="true"
@@ -4069,12 +4060,12 @@ export default function Product() {
                                     </span>
                                     <div className="min-w-0 flex-1">
                                       {pick(lang as Lang, st.title_ar, st.title, st.title_ckb) ? (
-                                        <h5 dir="auto" className="text-[13px] font-bold text-white leading-snug">
+                                        <h5 dir="auto" className="text-[13px] font-bold text-text-primary leading-snug">
                                           {pick(lang as Lang, st.title_ar, st.title, st.title_ckb)}
                                         </h5>
                                       ) : null}
                                       {pick(lang as Lang, st.body_ar, st.body, st.body_ckb) ? (
-                                        <p dir="auto" className="mt-1 text-[13px] text-zinc-300 leading-relaxed whitespace-pre-line">
+                                        <p dir="auto" className="mt-1 text-[13px] text-text-secondary leading-relaxed whitespace-pre-line">
                                           {pick(lang as Lang, st.body_ar, st.body, st.body_ckb)}
                                         </p>
                                       ) : null}
@@ -4089,14 +4080,14 @@ export default function Product() {
                                           alt={pick(lang as Lang, st.title_ar, st.title, st.title_ckb)}
                                           aspect="square"
                                           fit="cover"
-                                          className="rounded-lg border border-zinc-800"
-                                          bgClassName="bg-zinc-900"
+                                          className="rounded-lg border border-border-subtle"
+                                          bgClassName="bg-surface-raised"
                                         />
                                       ))}
                                     </div>
                                   ) : null}
                                   {st.video_url && isDirectVideo(st.video_url) ? (
-                                    <div className="mt-2.5 aspect-video rounded-lg overflow-hidden bg-black border border-zinc-800">
+                                    <div className="mt-2.5 aspect-video rounded-lg overflow-hidden bg-black border border-border-subtle">
                                       <video src={st.video_url} controls preload="none" className="w-full h-full object-contain" />
                                     </div>
                                   ) : null}
@@ -4107,7 +4098,7 @@ export default function Product() {
                                           href={st.video_url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-200 text-[12px] font-bold hover:border-zinc-500 transition-colors"
+                                          className="lv-button lv-button-secondary lv-button-sm"
                                         >
                                           <PlayCircle aria-hidden="true" className="w-3.5 h-3.5" />
                                           {s.watchVideo}
@@ -4118,7 +4109,7 @@ export default function Product() {
                                           href={st.link_url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-800/50 text-zinc-200 text-[12px] font-bold hover:border-zinc-500 transition-colors"
+                                          className="lv-button lv-button-secondary lv-button-sm"
                                         >
                                           <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
                                           {s.stepDoc}
@@ -4133,7 +4124,7 @@ export default function Product() {
                         ))}
                     </div>
                   ) : (
-                    <p dir="auto" className="text-sm text-zinc-300 leading-relaxed whitespace-pre-line">{howToUse}</p>
+                    <p dir="auto" className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">{howToUse}</p>
                   )}
                 </Section>
               ) : null}
@@ -4141,7 +4132,7 @@ export default function Product() {
               {showPhysicalDimensions ? (
                 <Section
                   title={tr('الأبعاد والوزن', 'Dimensions & weight', 'ڕەهەندەکان و کێش')}
-                  icon={<PackageOpen aria-hidden="true" className="w-5 h-5 text-zinc-400" />}
+                  icon={<PackageOpen aria-hidden="true" className="w-5 h-5 text-text-secondary" />}
                   defaultOpen
                 >
                   <div
@@ -4150,19 +4141,19 @@ export default function Product() {
                     data-variant-id={selectedVariantId ?? ''}
                   >
                     {dimensionGroups.map((group) => (
-                      <div key={group.id} className="rounded-xl border border-zinc-800/70 bg-black/20 p-3">
-                        <h4 className="mb-1 text-[12px] font-bold text-zinc-300">{group.title}</h4>
+                      <div key={group.id} className="rounded-lg bg-surface-raised p-3">
+                        <h4 className="mb-1 text-[12px] font-bold text-text-secondary">{group.title}</h4>
                         <dl className="text-[12px]">
                           {group.rows.map((row) => {
                             const value = physicalDimensions[row.key];
                             return (
                               <div
                                 key={row.key}
-                                className="flex items-baseline justify-between gap-3 border-b border-zinc-800/60 py-1.5 last:border-0"
+                                className="flex items-baseline justify-between gap-3 border-b border-border-subtle py-1.5 last:border-0"
                                 data-dimension-field={row.key}
                               >
-                                <dt className="text-zinc-500">{row.label}</dt>
-                                <dd className="tabular-nums text-zinc-200" dir="ltr">
+                                <dt className="text-text-muted">{row.label}</dt>
+                                <dd className="tabular-nums text-text-primary" dir="ltr">
                                   {formatPhysicalMeasurement(value, row.kind)}
                                 </dd>
                               </div>
@@ -4176,21 +4167,21 @@ export default function Product() {
               ) : null}
 
               {specGroups.length > 0 || legacySpecs.length > 0 ? (
-                <Section title={s.specs} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
+                <Section title={s.specs} icon={<Settings2 aria-hidden="true" className="w-5 h-5 text-text-secondary" />}>
                   {specGroups.length > 0 ? (
                     <div className="space-y-4">
                       {specGroups.map((g, gi) => (
                         <div key={g.id || gi}>
                           {pick(lang as Lang, g.title_ar, g.title_en, g.title_ckb) ? (
-                            <h4 className="text-white font-bold text-[13px] mb-2">
+                            <h4 className="text-text-primary font-bold text-[13px] mb-2">
                               {pick(lang as Lang, g.title_ar, g.title_en, g.title_ckb)}
                             </h4>
                           ) : null}
                           <dl className="text-sm">
                             {(g.rows ?? []).map((r, ri) => (
-                              <div key={r.id || ri} className="flex justify-between gap-3 py-2 border-b border-zinc-800/70 last:border-0">
-                                <dt className="text-zinc-500">{pick(lang as Lang, r.label_ar, r.label_en, r.label_ckb)}</dt>
-                                <dd className="text-zinc-200 text-end">
+                              <div key={r.id || ri} className="flex justify-between gap-3 py-2 border-b border-border-subtle last:border-0">
+                                <dt className="text-text-muted">{pick(lang as Lang, r.label_ar, r.label_en, r.label_ckb)}</dt>
+                                <dd className="text-text-primary text-end">
                                   {pick(lang as Lang, r.value_ar, r.value_en, r.value_ckb)}
                                   {r.unit ? ` ${r.unit}` : ''}
                                 </dd>
@@ -4203,9 +4194,9 @@ export default function Product() {
                   ) : (
                     <dl className="text-sm">
                       {legacySpecs.map((spec, i) => (
-                        <div key={i} className="flex justify-between gap-3 py-2 border-b border-zinc-800/70 last:border-0">
-                          <dt className="text-zinc-500">{spec.key}</dt>
-                          <dd className="text-zinc-200 text-end">{spec.value}</dd>
+                        <div key={i} className="flex justify-between gap-3 py-2 border-b border-border-subtle last:border-0">
+                          <dt className="text-text-muted">{spec.key}</dt>
+                          <dd className="text-text-primary text-end">{spec.value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -4214,7 +4205,7 @@ export default function Product() {
               ) : null}
 
               {descriptionImages.length > 0 || descriptionVideos.length > 0 ? (
-                <Section title={s.media} icon={<ImageIcon aria-hidden="true" className="w-5 h-5 text-zinc-400" />}>
+                <Section title={s.media} icon={<ImageIcon aria-hidden="true" className="w-5 h-5 text-text-secondary" />}>
                   {descriptionImages.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                       {descriptionImages.map((img, i) => (
@@ -4224,14 +4215,14 @@ export default function Product() {
                           alt=""
                           aspect="square"
                           fit="contain"
-                          className="rounded-xl border border-zinc-800"
-                          bgClassName="bg-zinc-900"
+                          className="rounded-xl border border-border-subtle"
+                          bgClassName="bg-surface-raised"
                         />
                       ))}
                     </div>
                   ) : null}
                   {descriptionVideos.map((video, i) => (
-                    <div key={i} className="aspect-video rounded-xl overflow-hidden bg-black border border-zinc-800 mb-2 last:mb-0">
+                    <div key={i} className="aspect-video rounded-xl overflow-hidden bg-black border border-border-subtle mb-2 last:mb-0">
                       <video src={video} controls preload="none" className="w-full h-full object-contain" />
                     </div>
                   ))}
@@ -4318,7 +4309,7 @@ export default function Product() {
                     onFocus={() => void loadGiniSheet().catch(() => undefined)}
                     onClick={() => { setGiniStarted(true); setGiniOpen(true); }}
                     data-product-gini
-                    className="inline-flex min-h-[40px] items-center -mx-1 rounded-sm px-1 text-[12.5px] font-light text-zinc-500 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    className="inline-flex min-h-[40px] items-center -mx-1 rounded-sm px-1 text-[12.5px] font-light text-text-muted underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     {s.giniCta}
                   </button>
@@ -4374,7 +4365,7 @@ export default function Product() {
             <div className="lv-surface space-y-3 p-4">
               {qtyControl}
               {buyButton}
-              <p className="text-[11px] text-zinc-500 leading-relaxed">{s.serverChecks}</p>
+              <p className="text-[11px] text-text-muted leading-relaxed">{s.serverChecks}</p>
             </div>
             {statusMessages}
           </aside>
@@ -4422,10 +4413,10 @@ export default function Product() {
             shrank on every quote. Reserving the space keeps the bar still.
           */}
           <div className="min-w-0 sm:basis-[7.5rem] sm:shrink-0">
-            <div className="text-[11px] text-zinc-500">{s.price}</div>
+            <div className="text-[11px] text-text-muted">{s.price}</div>
             <div
               aria-busy={priceIsPending || undefined}
-              className={`text-white font-black text-[15px] tabular-nums truncate transition-opacity duration-200 ${
+              className={`text-text-primary font-black text-[15px] tabular-nums truncate transition-opacity duration-200 ${
                 priceIsPending ? 'opacity-55' : 'opacity-100'
               }`}
             >
@@ -4481,7 +4472,7 @@ export default function Product() {
           type="button"
           onClick={() => setLightbox(false)}
           aria-label={s.close}
-          className="absolute top-4 end-4 z-10 w-11 h-11 rounded-full bg-zinc-900 border border-zinc-700 flex items-center justify-center text-white"
+          className="absolute top-4 end-4 z-10 w-11 h-11 rounded-full bg-surface-raised border border-border-subtle flex items-center justify-center text-text-primary"
         >
           <X aria-hidden="true" className="w-5 h-5" />
         </button>

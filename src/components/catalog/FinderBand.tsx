@@ -16,7 +16,7 @@ export default function FinderBand() {
     <Link
       to="/printer-finder"
       data-finder-band
-      className="group flex items-center gap-3 rounded-[18px] border border-border-subtle bg-surface p-3.5 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:gap-5 lg:p-6"
+      className="group flex items-center gap-3 rounded-2xl border border-border-subtle bg-surface shadow-sm p-3.5 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:gap-5 lg:p-6"
     >
       {/* The finder's wand on its own tile: charcoal and gold on the dark
           theme, a quiet cream-on-cream chip with a charcoal wand on the light

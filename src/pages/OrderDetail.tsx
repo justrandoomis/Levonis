@@ -12,6 +12,7 @@ import { TabStrip, TabPanels } from '../components/ui/Tabs';
 import { classifyError, ErrorState, NotFoundState } from '../components/ui/AsyncStates';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import SafeImage from '../components/ui/SafeImage';
+import { IconButton } from '../components/ui/Button';
 import CopyField from '../components/adminOrders/CopyField';
 import OrderTracker from '../components/OrderTracker';
 import ReturnsSection from '../components/returns/ReturnsSection';
@@ -215,7 +216,7 @@ function OrderStoreStrip({ store, label, cta }: { store: NonNullable<ApiOrder['s
 function DetailSkeleton() {
   return (
     <SkeletonGroup className="flex flex-col gap-4">
-      <div aria-hidden="true" className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+      <div aria-hidden="true" className="lv-surface p-4">
         <div className="flex items-center justify-between">
           <Skeleton className="h-6 w-24 rounded-full" />
           <Skeleton className="h-3 w-28" />
@@ -226,13 +227,13 @@ function DetailSkeleton() {
           <Skeleton className="h-3 w-16" />
         </div>
       </div>
-      <div aria-hidden="true" className="flex gap-2 border-b border-zinc-800 pb-2">
+      <div aria-hidden="true" className="flex gap-2 border-b border-border-subtle pb-2">
         <Skeleton className="h-6 flex-1" />
         <Skeleton className="h-6 flex-1" />
         <Skeleton className="h-6 flex-1" />
         <Skeleton className="h-6 flex-1" />
       </div>
-      <div aria-hidden="true" className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 flex flex-col gap-3">
+      <div aria-hidden="true" className="lv-surface p-4 flex flex-col gap-3">
         <Skeleton className="h-4 w-40" />
         <Skeleton className="h-4 w-52" />
         <Skeleton className="h-4 w-36" />
@@ -243,7 +244,7 @@ function DetailSkeleton() {
 }
 
 const TILE =
-  'flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 min-h-[52px] hover:bg-zinc-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold';
+  'lv-surface flex items-center gap-3 px-4 min-h-[52px] hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
 
 export default function OrderDetail() {
   const { money } = useMoney();
@@ -455,20 +456,18 @@ export default function OrderDetail() {
   const notFound = orderError !== null && classifyError(orderError) === 'not-found';
 
   return (
-    <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black border-b border-zinc-800/60">
+    <div className="w-full pb-24 text-text-secondary min-h-screen">
+      <div className="sticky top-0 z-40 bg-canvas border-b border-border-subtle">
         <div className="px-4 py-2 flex items-center gap-3">
-          <button
-            type="button"
+          <IconButton
+            variant="secondary"
             onClick={goBack}
-            aria-label={s.back}
-            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
-          >
-            {dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
-          </button>
+            label={s.back}
+            icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
+          />
           <div className="min-w-0 flex-1">
-            <h1 className="text-white font-bold text-lg truncate">{s.title}</h1>
-            <p dir="ltr" className="text-[11.5px] text-zinc-500 truncate text-start">
+            <h1 className="text-text-primary font-bold text-lg truncate">{s.title}</h1>
+            <p dir="ltr" className="text-[11.5px] text-text-muted truncate text-start">
               {id}
             </p>
           </div>
@@ -479,7 +478,7 @@ export default function OrderDetail() {
         <p
           role="status"
           aria-live="polite"
-          className={notice ? 'rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[12.5px] text-emerald-200' : 'sr-only'}
+          className={notice ? 'lv-alert lv-alert-success text-[12.5px] text-text-primary' : 'sr-only'}
         >
           {notice}
         </p>
@@ -507,7 +506,7 @@ export default function OrderDetail() {
             {/* Summary */}
             <section
               data-order-summary={order.id}
-              className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4"
+              className="lv-surface relative overflow-hidden p-4"
             >
               <StatusHairline progress={order.progress} cancelled={order.status === 'cancelled'} />
               <div className="flex items-center justify-between gap-3">
@@ -517,7 +516,7 @@ export default function OrderDetail() {
                 >
                   {pillLabel}
                 </span>
-                <p className="text-[12px] text-zinc-500 truncate">
+                <p className="text-[12px] text-text-muted truncate">
                   {s.placed}: <time dateTime={order.created_at}>{formatDate(order.created_at, lang)}</time>
                 </p>
               </div>
@@ -533,12 +532,12 @@ export default function OrderDetail() {
               </div>
               <div className="mt-3 flex items-end justify-between gap-3">
                 <div>
-                  <p className="text-[11px] text-zinc-500">{s.total}</p>
+                  <p className="text-[11px] text-text-muted">{s.total}</p>
                   <p className="text-gold font-bold text-[17px] tabular-nums">{money(order.total_iqd)}</p>
                 </div>
-                <p className="text-[12px] text-zinc-500 text-end">
+                <p className="text-[12px] text-text-muted text-end">
                   {itemCountLabel(countItems(order.items, order.item_count), lang)}
-                  {tracking?.shipping_type_label && <span className="block text-zinc-600">{tracking.shipping_type_label}</span>}
+                  {tracking?.shipping_type_label && <span className="block text-text-muted">{tracking.shipping_type_label}</span>}
                 </p>
               </div>
               {/*
@@ -572,17 +571,17 @@ export default function OrderDetail() {
                 exactly as before.
               */}
               {order.status !== 'cancelled' && order.gini && order.gini.state === 'awaiting_receipt' && (
-                <div data-gini-awaiting className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+                <div data-gini-awaiting className="lv-alert lv-alert-warning mt-3 flex items-start gap-2 text-[12px] text-text-primary">
                   <Landmark className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>
                     <span className="font-bold">{s.giniAwaiting}</span>
                     {order.gini.hold_until && (
-                      <span className="mt-0.5 block font-normal text-amber-200/80">
+                      <span className="mt-0.5 block font-normal text-text-secondary">
                         {s.giniHold(formatDate(order.gini.hold_until, lang))}
                       </span>
                     )}
                     {order.gini.order_no && (
-                      <span className="mt-0.5 block font-normal text-amber-200/70">
+                      <span className="mt-0.5 block font-normal text-text-secondary">
                         {s.giniNo}: <span dir="ltr" className="font-mono">{order.gini.order_no}</span>
                       </span>
                     )}
@@ -590,7 +589,7 @@ export default function OrderDetail() {
                 </div>
               )}
               {order.gini && order.gini.state === 'expired' && (
-                <div data-gini-expired className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-[12px] text-zinc-300">
+                <div data-gini-expired className="lv-alert mt-3 flex items-start gap-2 text-[12px] text-text-secondary">
                   <Landmark className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>{s.giniExpired}</span>
                 </div>
@@ -622,9 +621,9 @@ export default function OrderDetail() {
               group="order-detail"
               indicatorClassName="bg-gold"
               activeClassName="text-gold font-bold"
-              idleClassName="text-zinc-400 hover:text-zinc-200"
+              idleClassName="text-text-secondary hover:text-text-primary"
               label={s.tabsLabel}
-              className="border-b border-zinc-800"
+              className="border-b border-border-subtle"
             />
 
             <TabPanels value={tab} order={TABS}>
@@ -662,7 +661,7 @@ export default function OrderDetail() {
 
               {tab === 'items' && (
                 <div className="flex flex-col gap-3">
-                  <ul className="flex flex-col gap-3" data-order-items>
+                  <ul className="lv-surface divide-y divide-border-subtle" data-order-items>
                     {order.items.map((it) => {
                       const itemUnits = unitsByItem.get(it.id) ?? [];
                       const reviewedThis = !!it.product_id && !!reviewed?.has(it.product_id);
@@ -702,22 +701,22 @@ export default function OrderDetail() {
                         order.status !== 'delivered' &&
                         order.status !== 'cancelled';
                       return (
-                        <li key={it.id} data-order-item={it.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3">
+                        <li key={it.id} data-order-item={it.id} className="p-3">
                           <div className="flex gap-3">
-                            <SafeImage src={it.image} alt="" aspect="square" className="w-16 h-16 rounded-xl shrink-0" bgClassName="bg-black" />
+                            <SafeImage src={it.image} alt="" aspect="square" className="w-16 h-16 rounded-md shrink-0" bgClassName="bg-black" />
                             <div className="min-w-0 flex-1">
                               {it.product_slug ? (
                                 <Link
                                   to={`/product/${encodeURIComponent(it.product_slug)}`}
-                                  className="text-white text-[13.5px] font-bold line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                                  className="text-text-primary text-[13.5px] font-bold line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                                 >
                                   {it.name}
                                 </Link>
                               ) : (
-                                <p className="text-white text-[13.5px] font-bold line-clamp-2">{it.name}</p>
+                                <p className="text-text-primary text-[13.5px] font-bold line-clamp-2">{it.name}</p>
                               )}
-                              {it.variant && <p className="text-[12px] text-zinc-500 truncate">{it.variant}</p>}
-                              <p className="text-[12px] text-zinc-400 tabular-nums mt-0.5">
+                              {it.variant && <p className="text-[12px] text-text-muted truncate">{it.variant}</p>}
+                              <p className="text-[12px] text-text-secondary tabular-nums mt-0.5">
                                 × {it.qty} · {money(Number(unitPrice) || 0)}
                               </p>
                               {/* A GIFT LINE (0175): given, not bought — «هدية — 0 د.ع» with its value. */}
@@ -728,15 +727,15 @@ export default function OrderDetail() {
                                     {loc('هدية', 'Gift', 'دیاری')} — {money(0)}
                                   </span>
                                   {(it.pricing?.gift?.value_iqd ?? 0) > 0 && (
-                                    <span className="text-[11.5px] text-zinc-500 tabular-nums">
+                                    <span className="text-[11.5px] text-text-muted tabular-nums">
                                       {loc('قيمتها', 'Worth', 'بەهاکەی')} {money(it.pricing?.gift?.value_iqd ?? 0)}
                                     </span>
                                   )}
                                 </p>
                               )}
-                              {extras.length > 0 && <p className="text-[11px] text-zinc-500 truncate">{extras.join(' · ')}</p>}
+                              {extras.length > 0 && <p className="text-[11px] text-text-muted truncate">{extras.join(' · ')}</p>}
                             </div>
-                            <p className="text-[13.5px] text-white font-bold tabular-nums shrink-0">{money(it.line_total_iqd)}</p>
+                            <p className="text-[13.5px] text-text-primary font-bold tabular-nums shrink-0">{money(it.line_total_iqd)}</p>
                           </div>
 
                           {/* A bundle is ONE item here too, with its parts
@@ -788,7 +787,7 @@ export default function OrderDetail() {
                                     setReviewItem(it.id);
                                     setReviewOpen(true);
                                   }}
-                                  className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-gold/40 text-gold text-[12.5px] font-bold hover:bg-gold/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                                  className="lv-button lv-button-accent lv-button-sm"
                                 >
                                   <Star className="w-3.5 h-3.5" aria-hidden />
                                   {s.rate}
@@ -801,7 +800,7 @@ export default function OrderDetail() {
                             <Link
                               to={`/trade-in?item=${encodeURIComponent(it.id)}&unit=${tradeable.get(it.id)}`}
                               data-trade-in-item={it.id}
-                              className="mt-2 inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-zinc-700 text-zinc-200 text-[12.5px] font-bold hover:border-zinc-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                              className="lv-button lv-button-secondary lv-button-sm mt-2"
                             >
                               <Repeat className="w-3.5 h-3.5" aria-hidden />
                               {/* OWNER: Sorani to be written by hand. */}
@@ -828,22 +827,22 @@ export default function OrderDetail() {
                       data-order-claim={cl.id}
                     >
                       <MessageSquare className="w-4 h-4 text-gold shrink-0" aria-hidden />
-                      <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">
-                        {s.claimThread}: <span className="text-white">{cl.subject}</span>
+                      <span className="flex-1 min-w-0 text-[13px] text-text-secondary truncate">
+                        {s.claimThread}: <span className="text-text-primary">{cl.subject}</span>
                       </span>
                       {cl.unread && (
                         <span className="shrink-0 px-2 py-0.5 rounded-full bg-gold text-accent-contrast text-[11px] font-bold whitespace-nowrap">
                           {s.claimNewReply}
                         </span>
                       )}
-                      <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+                      <ChevronRight className="w-4 h-4 text-text-muted rtl:rotate-180 shrink-0" aria-hidden />
                     </Link>
                   ))}
                   {units && units.length > 0 && (
                     <Link to="/warranty" className={TILE} data-warranty-centre>
                       <ShieldCheck className="w-4 h-4 text-gold shrink-0" aria-hidden />
-                      <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">{s.warrantyCentre}</span>
-                      <ChevronRight className="w-4 h-4 text-zinc-600 rtl:rotate-180 shrink-0" aria-hidden />
+                      <span className="flex-1 min-w-0 text-[13px] text-text-secondary truncate">{s.warrantyCentre}</span>
+                      <ChevronRight className="w-4 h-4 text-text-muted rtl:rotate-180 shrink-0" aria-hidden />
                     </Link>
                   )}
                   {/* A gift line is given, not bought: «إعادة الشراء» buys the
@@ -881,7 +880,7 @@ export default function OrderDetail() {
                   {order.financial ? (
                     <PaymentBreakdown order={order} financial={order.financial} />
                   ) : (
-                    <p className="text-zinc-500 text-[12.5px]">{s.financialUnavailable}</p>
+                    <p className="text-text-muted text-[12.5px]">{s.financialUnavailable}</p>
                   )}
                   {order.invoice && (
                     <a
@@ -892,10 +891,10 @@ export default function OrderDetail() {
                       data-view-invoice={order.invoice.invoice_no}
                     >
                       <FileText className="w-4 h-4 text-gold shrink-0" aria-hidden />
-                      <span className="flex-1 min-w-0 text-[13px] text-zinc-300 truncate">
-                        {s.invoice} <span dir="ltr" className="font-mono text-zinc-500">{order.invoice.invoice_no}</span>
+                      <span className="flex-1 min-w-0 text-[13px] text-text-secondary truncate">
+                        {s.invoice} <span dir="ltr" className="font-mono text-text-muted">{order.invoice.invoice_no}</span>
                       </span>
-                      <ExternalLink className="w-4 h-4 text-zinc-600 shrink-0" aria-hidden />
+                      <ExternalLink className="w-4 h-4 text-text-muted shrink-0" aria-hidden />
                     </a>
                   )}
                   <PriceProtection order={order} />

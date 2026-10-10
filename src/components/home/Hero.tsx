@@ -108,7 +108,7 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
             type="button"
             onClick={dir === 'rtl' ? next : prev}
             aria-label={loc('السابق', 'Previous', 'پێشوو')}
-            className="w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/70 transition-colors shrink-0"
+            className="size-11 rounded-full bg-onyx/80 text-snow flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {dir === 'rtl' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
           </button>
@@ -141,7 +141,7 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
             type="button"
             onClick={dir === 'rtl' ? prev : next}
             aria-label={loc('التالي', 'Next', 'دواتر')}
-            className="w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/70 transition-colors shrink-0"
+            className="size-11 rounded-full bg-onyx/80 text-snow flex items-center justify-center transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {dir === 'rtl' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
           </button>
@@ -291,7 +291,7 @@ function DefaultHero({ loading = false }: { loading?: boolean }) {
           background still runs full-bleed to the top; only the text moves. */}
       <div className="relative max-w-[1920px] mx-auto px-5 sm:px-6 lg:px-8 pt-[132px] pb-14 sm:pt-[150px] sm:pb-20 md:pb-24">
         <div className="max-w-2xl min-w-0">
-          <span className="inline-block text-olive-light bg-black/40 border border-white/15 rounded-full px-3 py-1 text-[11px] sm:text-xs font-bold tracking-widest mb-4">
+          <span className="inline-block text-sage bg-black/40 border border-white/15 rounded-full px-3 py-1 text-[11px] sm:text-xs font-bold tracking-widest mb-4">
             LEVONIS
           </span>
           <h1
@@ -305,7 +305,7 @@ function DefaultHero({ loading = false }: { loading?: boolean }) {
             <Link
               to="/products"
               data-hero-cta="shop"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-white text-black text-sm sm:text-base font-bold hover:bg-zinc-200 transition-colors shadow-xl"
+              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-white text-black text-sm sm:text-base font-bold hover:bg-zinc-200 transition-colors shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <ShoppingBag aria-hidden="true" className="w-4 h-4" />
               {t('heroShop')}
@@ -319,7 +319,7 @@ function DefaultHero({ loading = false }: { loading?: boolean }) {
               target="_blank"
               rel="noopener noreferrer"
               data-hero-cta="studio"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-black/55 border border-white/25 text-white text-sm sm:text-base font-bold hover:bg-black/65 transition-colors"
+              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-black/55 border border-white/25 text-white text-sm sm:text-base font-bold hover:bg-black/65 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Layers aria-hidden="true" className="w-4 h-4" />
               {t('heroStudio')}

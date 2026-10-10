@@ -777,7 +777,7 @@ export default function ModelViewer() {
 
   const btn =
     'inline-flex items-center justify-center min-h-11 min-w-11 rounded-xl border border-white/10 ' +
-    'bg-zinc-950/85 text-zinc-300 hover:text-white hover:border-white/25 transition-colors';
+    'bg-surface text-text-secondary hover:text-white hover:border-white/25 transition-colors';
   const btnOn = 'border-gold/50 bg-gold/15 text-gold hover:text-gold';
 
   return (
@@ -797,20 +797,20 @@ export default function ModelViewer() {
       {showLoader && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black">
           <Loader2 className="h-7 w-7 animate-spin text-gold" aria-hidden />
-          <p className="text-sm text-zinc-400">{t.loading}</p>
+          <p className="text-sm text-text-secondary">{t.loading}</p>
         </div>
       )}
 
       {fatal && (
         <div className="absolute inset-0 flex items-center justify-center px-6">
-          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
+          <div className="lv-surface-raised w-full max-w-sm p-6 text-center">
             {fatal === 'gone' ? (
-              <Link2Off className="mx-auto mb-3 h-8 w-8 text-zinc-500" aria-hidden />
+              <Link2Off className="mx-auto mb-3 h-8 w-8 text-text-muted" aria-hidden />
             ) : (
-              <TriangleAlert className="mx-auto mb-3 h-8 w-8 text-zinc-500" aria-hidden />
+              <TriangleAlert className="mx-auto mb-3 h-8 w-8 text-text-muted" aria-hidden />
             )}
             <p className="text-lg font-black leading-tight">{fatal === 'gone' ? t.gone : t.failed}</p>
-            <p className="mt-2 text-sm text-zinc-400">{fatal === 'gone' ? t.goneHint : t.failedHint}</p>
+            <p className="mt-2 text-sm text-text-secondary">{fatal === 'gone' ? t.goneHint : t.failedHint}</p>
           </div>
         </div>
       )}
@@ -820,7 +820,7 @@ export default function ModelViewer() {
           {/* Top bar: what this is, and the controls. Both float over the
               canvas so the model keeps the whole viewport. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-2 p-3">
-            <div className="pointer-events-auto min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950/85 px-3 py-2">
+            <div className="pointer-events-auto min-w-0 flex-1 rounded-xl border border-white/10 bg-surface px-3 py-2">
               <div className="flex min-w-0 items-center gap-2">
                 <p className="truncate text-sm font-bold">{t.title}</p>
                 {/* The board's merchant is sent a coarse mesh, never the file:
@@ -838,7 +838,7 @@ export default function ModelViewer() {
               </div>
               {meta?.format && (
                 <p
-                  className="text-[11px] uppercase tracking-wide text-zinc-400"
+                  className="text-[11px] uppercase tracking-wide text-text-secondary"
                   dir="ltr"
                   aria-label={t.format}
                 >
@@ -912,32 +912,32 @@ export default function ModelViewer() {
             <div className="flex items-end justify-between gap-3">
               <dl
                 data-viewer="info"
-                className="pointer-events-auto w-full max-w-[17rem] rounded-2xl border border-white/10 bg-zinc-950/85 p-3 text-[13px]"
+                className="lv-surface pointer-events-auto w-full max-w-[17rem] p-3 text-[13px]"
               >
                 <div className="flex items-center gap-2 py-1">
-                  <Ruler className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-                  <dt className="shrink-0 text-zinc-400">{t.dims}</dt>
+                  <Ruler className="h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+                  <dt className="shrink-0 text-text-secondary">{t.dims}</dt>
                   <dd className="ms-auto font-bold" dir="ltr" data-viewer-field="dimensions">
                     {dims ? `${dec(dims.x, 1)} × ${dec(dims.y, 1)} × ${dec(dims.z, 1)} ${t.mm}` : '—'}
                   </dd>
                 </div>
                 <div className="flex items-center gap-2 py-1">
-                  <Cuboid className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-                  <dt className="shrink-0 text-zinc-400">{t.volume}</dt>
+                  <Cuboid className="h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+                  <dt className="shrink-0 text-text-secondary">{t.volume}</dt>
                   <dd className="ms-auto font-bold" dir="ltr" data-viewer-field="volume">
                     {meta?.volume_mm3 != null ? `${dec(meta.volume_mm3 / 1000, 1)} ${t.cm3}` : '—'}
                   </dd>
                 </div>
                 <div className="flex items-center gap-2 py-1">
-                  <Triangle className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-                  <dt className="shrink-0 text-zinc-400">{t.triangles}</dt>
+                  <Triangle className="h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+                  <dt className="shrink-0 text-text-secondary">{t.triangles}</dt>
                   <dd className="ms-auto font-bold" dir="ltr" data-viewer-field="triangles">
                     {triangles != null ? int(triangles) : '—'}
                   </dd>
                 </div>
                 <div className="flex items-center gap-2 py-1">
-                  <Boxes className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-                  <dt className="shrink-0 text-zinc-400">{t.parts}</dt>
+                  <Boxes className="h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+                  <dt className="shrink-0 text-text-secondary">{t.parts}</dt>
                   <dd className="ms-auto font-bold" dir="ltr" data-viewer-field="parts">
                     {meta?.shell_count != null ? int(meta.shell_count) : '—'}
                   </dd>
@@ -945,7 +945,7 @@ export default function ModelViewer() {
               </dl>
 
               {showCanvas && ready && !arActive && (
-                <p className="hidden shrink-0 items-center gap-1.5 pb-1 text-[12px] text-zinc-500 sm:flex">
+                <p className="hidden shrink-0 items-center gap-1.5 pb-1 text-[12px] text-text-muted sm:flex">
                   <Rotate3d className="h-3.5 w-3.5" aria-hidden />
                   {t.hint}
                 </p>

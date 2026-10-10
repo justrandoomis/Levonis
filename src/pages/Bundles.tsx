@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, PackageSearch, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, PackageSearch, Search, Sparkles } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, type HomeTaxon } from '../lib/api';
 import { useFreshOnReturn } from '../lib/useFreshOnReturn';
@@ -9,6 +9,7 @@ import SectionHeader from '../components/home/SectionHeader';
 import BundleTile, { type BundleCard } from '../components/bundles/BundleTile';
 import { BundleGridSkeleton } from '../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
+import { IconButton } from '../components/ui/Button';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 
 /**
@@ -102,8 +103,11 @@ export type { BundleCard };
 
 const CHIP =
   'shrink-0 min-h-[36px] px-3 rounded-full border text-[12px] font-bold transition-colors inline-flex items-center';
-const CHIP_ON = 'bg-olive text-snow border-olive';
-const CHIP_OFF = 'bg-zinc-900/60 text-zinc-300 border-zinc-800 hover:border-zinc-600';
+// The filter-chip recipe (build plan §5): flush at rest, PRESSED into a well
+// when on, with a leading check as the one secondary cue — not an ink fill.
+const CHIP_ON = 'border-border-subtle bg-[var(--clay-well-bg)] shadow-press text-text-primary';
+const CHIP_OFF = 'border-border-subtle bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary';
+const chipMark = (on: boolean) => (on ? <Check aria-hidden className="w-3.5 h-3.5 me-1 shrink-0" /> : null);
 
 export default function Bundles() {
   const { dir, lang, loc } = useLanguage();
@@ -256,16 +260,18 @@ export default function Bundles() {
   const featured = useMemo(() => shown.filter((b) => b.is_featured), [shown]);
 
   return (
-    <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors"
-        >
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
-        </button>
-        <h1 className="text-white font-bold text-lg">{s.title}</h1>
+    <div className="w-full pb-24 text-text-secondary min-h-screen">
+      <div className="sticky top-0 z-40 bg-canvas border-b border-border-subtle px-4 py-3 flex items-center gap-3">
+        <IconButton
+          variant="secondary"
+          onClick={() => {
+            navigate(-1);
+          }}
+          label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+          className="-m-1"
+        />
+        <h1 className="text-text-primary font-bold text-lg">{s.title}</h1>
       </div>
 
       <div className="p-4 space-y-4">
@@ -276,33 +282,37 @@ export default function Bundles() {
           }}
           className="relative"
         >
-          <Search aria-hidden className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-zinc-500" />
+          <Search aria-hidden className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-text-muted" />
           <input
+            className="lv-input rounded-full ps-9 pe-3 text-[14px]"
             type="search"
             value={searchDraft}
             onChange={(e) => setSearchDraft(e.target.value)}
             placeholder={s.search}
             aria-label={s.search}
-            className="w-full min-h-11 ps-9 pe-3 rounded-xl bg-zinc-900/60 border border-zinc-800 text-[14px] text-white placeholder:text-zinc-500 focus:border-olive focus:outline-none"
           />
         </form>
 
         <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
           <button className={`${CHIP} ${!kind ? CHIP_ON : CHIP_OFF}`} onClick={() => setParam('kind', '')}>
+            {chipMark(!kind)}
             {s.all}
           </button>
           <button className={`${CHIP} ${kind === 'bundle' ? CHIP_ON : CHIP_OFF}`} onClick={() => setParam('kind', 'bundle')}>
+            {chipMark(kind === 'bundle')}
             {s.bundles}
           </button>
           <button className={`${CHIP} ${kind === 'mystery' ? CHIP_ON : CHIP_OFF}`} onClick={() => setParam('kind', 'mystery')}>
+            {chipMark(kind === 'mystery')}
             {s.mystery}
           </button>
-          <span aria-hidden className="w-px bg-zinc-800 shrink-0 my-1" />
+          <span aria-hidden className="w-px bg-border-subtle shrink-0 my-1" />
           <button
             aria-pressed={onlyAvailable}
             className={`${CHIP} ${onlyAvailable ? CHIP_ON : CHIP_OFF}`}
             onClick={() => setParam('available', onlyAvailable ? '' : '1')}
           >
+            {chipMark(onlyAvailable)}
             {s.available}
           </button>
           <button
@@ -310,6 +320,7 @@ export default function Bundles() {
             className={`${CHIP} ${onlyMembers ? CHIP_ON : CHIP_OFF}`}
             onClick={() => setParam('members', onlyMembers ? '' : '1')}
           >
+            {chipMark(onlyMembers)}
             {s.members}
           </button>
         </div>
@@ -317,6 +328,7 @@ export default function Bundles() {
         {categories.length > 0 && (
           <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
             <button className={`${CHIP} ${!category ? CHIP_ON : CHIP_OFF}`} onClick={() => setParam('category_id', '')}>
+              {chipMark(!category)}
               {s.allCategories}
             </button>
             {categories.map((cat) => (
@@ -325,6 +337,7 @@ export default function Bundles() {
                 className={`${CHIP} ${category === cat.id ? CHIP_ON : CHIP_OFF}`}
                 onClick={() => setParam('category_id', category === cat.id ? '' : cat.id)}
               >
+                {chipMark(category === cat.id)}
                 {lang === 'en' ? cat.name_en || cat.name_ar : lang === 'ckb' ? cat.name_ckb || cat.name_ar : cat.name_ar}
               </button>
             ))}
@@ -379,7 +392,7 @@ export default function Bundles() {
                   type="button"
                   onClick={() => void loadMore()}
                   disabled={loadingMore}
-                  className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl border border-zinc-700 bg-zinc-900 text-[13px] font-bold text-zinc-200 hover:border-zinc-500 transition-colors disabled:opacity-60"
+                  className="lv-button lv-button-secondary px-5"
                 >
                   {loadingMore
                     ? loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')
@@ -394,11 +407,11 @@ export default function Bundles() {
             free viewer — but it is now an INVITATION beside a browsable page,
             not the whole page. */}
         {data && !data.entitled && all.some((b) => b.locked) && (
-          <div className="max-w-md mx-auto text-center py-8 px-6 bg-zinc-900/50 rounded-2xl border border-zinc-800/50">
-            <span className="mx-auto mb-3 w-11 h-11 rounded-2xl bg-gold/10 border border-gold/30 grid place-items-center">
+          <div className="lv-surface max-w-md mx-auto text-center py-8 px-6">
+            <span className="mx-auto mb-3 w-11 h-11 rounded-full lv-well grid place-items-center">
               <Sparkles className="w-5 h-5 text-gold" />
             </span>
-            <p className="text-[13px] text-zinc-400 mb-4 leading-relaxed">
+            <p className="text-[13px] text-text-secondary mb-4 leading-relaxed">
               {loc(
                 'بعض العروض هنا حصرية للمشتركين — الباقي متاح للجميع.',
                 'Some offers here are members-only — the rest are open to everyone.',
@@ -407,7 +420,7 @@ export default function Bundles() {
             </p>
             <Link
               to={data.signed_in ? '/subscription' : '/auth?next=/bundles'}
-              className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl bg-gold text-accent-contrast text-sm font-black hover:brightness-110 transition-all"
+              className="lv-button lv-button-primary px-5"
             >
               {data.signed_in ? s.lockedCta : s.signIn}
             </Link>

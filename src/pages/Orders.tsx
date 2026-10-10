@@ -8,6 +8,7 @@ import type { ApiOrder } from '../lib/api';
 import { TabStrip } from '../components/ui/Tabs';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import Spinner from '../components/ui/Spinner';
+import { IconButton } from '../components/ui/Button';
 import OrderCard from '../components/orders/OrderCard';
 import OrderCardSkeleton from '../components/orders/OrderCardSkeleton';
 import CancelOrderSheet from '../components/orders/CancelOrderSheet';
@@ -479,7 +480,7 @@ export default function Orders() {
       label: s.filters[f],
       badge:
         n != null && n > 0 ? (
-          <span className="text-[10px] font-bold tabular-nums text-zinc-500" data-count={n}>
+          <span className="text-[10px] font-bold tabular-nums text-text-muted" data-count={n}>
             {n}
           </span>
         ) : undefined,
@@ -487,25 +488,23 @@ export default function Orders() {
   });
 
   return (
-    <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black border-b border-zinc-800/60">
+    <div className="w-full pb-24 text-text-secondary min-h-screen">
+      <div className="sticky top-0 z-40 bg-canvas border-b border-border-subtle">
         <div className="px-4 py-2 flex items-center gap-3">
-          <button
-            type="button"
+          <IconButton
+            variant="secondary"
             onClick={goBack}
-            aria-label={s.back}
-            className="w-11 h-11 shrink-0 flex items-center justify-center bg-zinc-900 rounded-full hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
-          >
-            {dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
-          </button>
-          <h1 className="text-white font-bold text-lg min-w-0 truncate flex-1">{s.title}</h1>
+            label={s.back}
+            icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" aria-hidden="true" /> : <ArrowLeft className="w-5 h-5" aria-hidden="true" />}
+          />
+          <h1 className="text-text-primary font-bold text-lg min-w-0 truncate flex-1">{s.title}</h1>
           {/* «الاستبدال» — a delivered LEVONIS device can be traded against a
               new one; its requests and its wizard live at /trade-in.
               OWNER: Sorani to be written by hand. */}
           <Link
             to="/trade-in"
             data-orders-trade-in
-            className="shrink-0 inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-full bg-zinc-900 text-zinc-200 text-[12.5px] font-bold hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+            className="lv-button lv-button-secondary lv-button-sm shrink-0"
           >
             <Repeat className="w-4 h-4" aria-hidden="true" />
             {loc('الاستبدال', 'Trade-in')}
@@ -515,25 +514,23 @@ export default function Orders() {
         <div className="px-4 pb-2">
           <label className="relative block">
             <span className="sr-only">{s.search}</span>
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" aria-hidden="true" />
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" aria-hidden="true" />
             <input
+              className="lv-input rounded-full ps-9 pe-11 text-[13px]"
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={s.searchPlaceholder}
               autoComplete="off"
               data-orders-search
-              className="w-full min-h-[40px] bg-zinc-900 border border-zinc-800 rounded-xl ps-9 pe-10 text-[13px] text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold/60 focus-visible:ring-2 focus-visible:ring-gold"
             />
             {search && (
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setSearch('')}
-                aria-label={s.clearSearch}
-                className="absolute end-1 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-              >
-                <X className="w-4 h-4" aria-hidden="true" />
-              </button>
+                label={s.clearSearch}
+                icon={<X className="w-4 h-4" aria-hidden="true" />}
+                className="absolute end-0 top-1/2 -translate-y-1/2"
+              />
             )}
           </label>
         </div>
@@ -547,8 +544,8 @@ export default function Orders() {
             group="orders-status"
             fill={false}
             indicatorClassName="bg-gold"
-            activeClassName="text-gold font-bold"
-            idleClassName="text-zinc-400 hover:text-zinc-200"
+            activeClassName="text-text-primary font-semibold"
+            idleClassName="text-text-secondary hover:text-text-primary"
             label={s.filterLabel}
             className="min-w-max"
           />
@@ -559,7 +556,7 @@ export default function Orders() {
         <p
           role="status"
           aria-live="polite"
-          className={notice ? 'mb-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[12.5px] text-emerald-200' : 'sr-only'}
+          className={notice ? 'lv-alert lv-alert-success mb-3 text-[12.5px] text-text-primary' : 'sr-only'}
         >
           {notice}
         </p>
@@ -581,7 +578,7 @@ export default function Orders() {
             missing orders. Held back until the reviewed set has answered:
             before that nothing is hidden, so there is nothing to announce. */}
         {needsReview && reviewed !== null && !loading && !error && !nothingLeftToReview && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 mb-4 text-xs text-zinc-400">
+          <div className="lv-alert lv-alert-info flex flex-wrap items-center gap-x-2 gap-y-1 mb-4 text-xs text-text-secondary">
             <p className="min-w-0">{s.needsReviewNote}</p>
             <button
               type="button"
@@ -600,7 +597,7 @@ export default function Orders() {
 
         {/* Honest explanation of the returns view: it IS the delivered list. */}
         {filter === 'returns' && !loading && !error && (
-          <div className="flex items-start gap-2 bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-3 mb-4 text-xs text-zinc-400 leading-relaxed">
+          <div className="lv-alert lv-alert-info flex items-start gap-2 mb-4 text-xs text-text-secondary leading-relaxed">
             <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden="true" />
             <p>{s.returnsNote}</p>
           </div>
@@ -632,7 +629,7 @@ export default function Orders() {
                     onClick={loadMore}
                     disabled={loadingMore}
                     data-load-more
-                    className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                    className="lv-button lv-button-secondary px-4"
                   >
                     {loadingMore && <Spinner size="sm" delayMs={0} decorative />}
                     {loadingMore ? s.loadingMore : s.loadMore}
@@ -642,7 +639,7 @@ export default function Orders() {
                   type="button"
                   onClick={showAllDelivered}
                   data-show-all-delivered
-                  className="min-h-[44px] px-4 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  className="lv-button lv-button-secondary px-4"
                 >
                   {s.showAllDelivered}
                 </button>
@@ -674,14 +671,14 @@ export default function Orders() {
                 />
               </div>
             ))}
-            {search && nextBefore && <p className="text-[11.5px] text-zinc-500 text-center">{s.searchHint}</p>}
+            {search && nextBefore && <p className="text-[11.5px] text-text-muted text-center">{s.searchHint}</p>}
             {nextBefore && (
               <button
                 type="button"
                 onClick={loadMore}
                 disabled={loadingMore}
                 data-load-more
-                className="min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                className="lv-button lv-button-secondary"
               >
                 {loadingMore && <Spinner size="sm" delayMs={0} decorative />}
                 {loadingMore ? s.loadingMore : s.loadMore}

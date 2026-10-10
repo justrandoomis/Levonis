@@ -45,7 +45,7 @@ import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api, failureText } from '../lib/api';
-import { Button } from '../components/ui/Button';
+import { Button, IconButton } from '../components/ui/Button';
 import { Money } from '../components/ui/Money';
 import Note from '../components/ui/Note';
 import SafeImage from '../components/ui/SafeImage';
@@ -129,17 +129,10 @@ export default function TradeIn() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-canvas text-zinc-300 font-sans pb-28" data-trade-in-page>
+    <div className="w-full min-h-screen text-text-secondary font-sans pb-28" data-trade-in-page>
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={goBack}
-          aria-label={L('رجوع', 'Back')}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-surface-raised text-white hover:bg-surface-selected active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
-        >
-          <Back aria-hidden="true" className="w-5 h-5" />
-        </button>
-        <h1 className="text-white font-bold text-lg leading-6 flex-1 min-w-0 truncate">
+        <IconButton variant="secondary" onClick={goBack} label={L('رجوع', 'Back')} icon={<Back aria-hidden="true" className="w-5 h-5" />} />
+        <h1 className="text-text-primary font-bold text-lg leading-6 flex-1 min-w-0 truncate">
           {mode.kind === 'request' ? L('طلب الاستبدال', 'Trade-in request') : L('استبدل جهازك بجديد', 'Trade in your device')}
         </h1>
       </header>
@@ -158,12 +151,12 @@ export default function TradeIn() {
         ) : (
           <div className="space-y-5 lg:max-w-2xl lg:mx-auto">
             {/* WHAT THIS IS, in four steps a customer can hold in their head. */}
-            <section className="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-5" data-trade-in-intro>
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gold/10 text-gold">
+            <section className="lv-surface p-5" data-trade-in-intro>
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full lv-well text-gold">
                 <Repeat className="w-5 h-5" aria-hidden />
               </span>
-              <h2 className="text-white text-[22px] font-black leading-8 mt-3">{L('جهازك من LEVONIS يصبح رصيداً لجهاز جديد', 'Your LEVONIS device becomes credit for a new one')}</h2>
-              <p className="text-[13.5px] leading-6 text-zinc-400 mt-1">
+              <h2 className="text-text-primary text-[22px] font-black leading-8 mt-3">{L('جهازك من LEVONIS يصبح رصيداً لجهاز جديد', 'Your LEVONIS device becomes credit for a new one')}</h2>
+              <p className="text-[13.5px] leading-6 text-text-secondary mt-1">
                 {L(
                   'للطابعات (FDM و Resin) وأجهزة الليزر وأنظمة الكومبو ووحدات AMS المشتراة من LEVONIS فقط. لا نقبل أجهزة من خارج المتجر.',
                   'For printers (FDM and Resin), lasers, Combo systems and AMS units bought from LEVONIS only. We do not accept devices bought elsewhere.'
@@ -177,28 +170,28 @@ export default function TradeIn() {
                   { icon: ShieldCheck, t: L('نفحصه ونثبّت القيمة، وتدفع الفرق', 'We inspect, fix the value, you pay the difference'), d: L('إن تغيّرت القيمة نطلب موافقتك أولاً.', 'If the value changes, we ask you first.') },
                 ].map((s, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <span className="h-9 w-9 shrink-0 rounded-xl bg-zinc-800 text-zinc-200 flex items-center justify-center">
+                    <span className="h-9 w-9 shrink-0 rounded-sm lv-well text-text-primary flex items-center justify-center">
                       <s.icon className="w-4 h-4" aria-hidden />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-white text-[14px] font-bold leading-5">{s.t}</span>
-                      <span className="block text-[12.5px] text-zinc-500 leading-5">{s.d}</span>
+                      <span className="block text-text-primary text-[14px] font-bold leading-5">{s.t}</span>
+                      <span className="block text-[12.5px] text-text-muted leading-5">{s.d}</span>
                     </span>
                   </li>
                 ))}
               </ol>
-              <Button variant="accent" block className="mt-5" onClick={start} data-trade-in-start>
+              <Button variant="primary" block className="mt-5" onClick={start} data-trade-in-start>
                 {isAuthenticated ? L('ابدأ الاستبدال', 'Start a trade-in') : L('سجّل الدخول للبدء', 'Sign in to start')}
               </Button>
             </section>
 
             {isAuthenticated ? (
               <section aria-labelledby="ti-mine">
-                <h2 id="ti-mine" className="text-white text-[17px] font-bold mb-2">
+                <h2 id="ti-mine" className="text-text-primary text-[17px] font-bold mb-2">
                   {L('طلباتي للاستبدال', 'My trade-ins')}
                 </h2>
                 {mineError ? (
-                  <div className="rounded-2xl border border-zinc-800 p-4">
+                  <div className="rounded-2xl border border-border-subtle p-4">
                     <p className="text-[13px] text-rose-300">{mineError}</p>
                     <Button variant="secondary" className="mt-2" onClick={loadMine}>
                       {L('إعادة المحاولة', 'Try again')}
@@ -209,11 +202,11 @@ export default function TradeIn() {
                     <Spinner />
                   </div>
                 ) : mine.length === 0 ? (
-                  <p className="text-[13px] text-zinc-500 rounded-2xl border border-dashed border-zinc-800 p-4">
+                  <p className="text-[13px] text-text-muted rounded-2xl border border-dashed border-border-subtle p-4">
                     {L('لا توجد طلبات استبدال بعد.', 'No trade-in requests yet.')}
                   </p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="lv-surface overflow-hidden divide-y divide-border-subtle">
                     {mine.map((r) => {
                       const value = r.final_value_iqd ?? r.admin_value_iqd ?? r.estimated_iqd;
                       const waiting = r.status === 'value_changed' || r.status === 'awaiting_payment' || r.status === 'draft';
@@ -223,22 +216,22 @@ export default function TradeIn() {
                             type="button"
                             onClick={() => openRequest(r.id)}
                             data-request={r.id}
-                            className="w-full text-start flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 hover:border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                            className="w-full text-start flex items-center gap-3 p-3 transition-colors hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                           >
-                            <SafeImage src={r.image} alt="" aspect="square" className="w-12 h-12 rounded-xl shrink-0" bgClassName="bg-zinc-950" />
+                            <SafeImage src={r.image} alt="" aspect="square" className="w-12 h-12 rounded-md shrink-0" bgClassName="bg-surface" />
                             <span className="min-w-0 flex-1">
-                              <span className="block text-white text-[14px] font-bold leading-5 truncate">{r.name}</span>
-                              <span className={`block text-[12px] font-semibold ${waiting ? 'text-gold' : 'text-zinc-500'}`}>
+                              <span className="block text-text-primary text-[14px] font-bold leading-5 truncate">{r.name}</span>
+                              <span className={`block text-[12px] font-semibold ${waiting ? 'text-gold' : 'text-text-muted'}`}>
                                 {loc(r.status_label.ar, r.status_label.en)}
                               </span>
-                              <span className="block text-[11.5px] text-zinc-500">{dateText(r.created_at, lang)}</span>
+                              <span className="block text-[11.5px] text-text-muted">{dateText(r.created_at, lang)}</span>
                             </span>
                             {value !== null ? (
-                              <span className="text-[13px] font-bold text-white shrink-0">
+                              <span className="text-[13px] font-bold text-text-primary shrink-0">
                                 <Money iqd={value} />
                               </span>
                             ) : null}
-                            <Chevron className="w-4 h-4 text-zinc-600 shrink-0" aria-hidden />
+                            <Chevron className="w-4 h-4 text-text-muted shrink-0" aria-hidden />
                           </button>
                         </li>
                       );

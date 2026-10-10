@@ -9,7 +9,7 @@ import { ClaimProgress, PriorityBadge } from './ClaimCard';
 import type { ClaimDetail, ClaimMessage } from './types';
 import { fmtDate, fmtDateTime, isVideoUrl } from './types';
 import type { WarrantyStrings } from './strings';
-import { ERROR_BOX, FOCUS, INPUT } from './ui';
+import { ERROR_BOX, FOCUS } from './ui';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
 
@@ -149,16 +149,16 @@ export function ClaimThreadOverlay({
       testId="warranty-claim-thread"
       panelClassName="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
     >
-      <div className="p-5 border-b border-zinc-800/70 flex items-start justify-between gap-3">
+      <div className="p-5 border-b border-border-subtle flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h2 id="warranty-thread-title" className="text-white text-base font-bold truncate">
+            <h2 id="warranty-thread-title" className="text-text-primary text-base font-bold truncate">
               {detail?.claim.subject ?? s.thread}
             </h2>
             {detail?.claim.priority && <PriorityBadge s={s} />}
           </div>
           {facts && (
-            <p className="text-zinc-500 text-[11px] mt-1 tabular-nums">
+            <p className="text-text-muted text-[11px] mt-1 tabular-nums">
               {facts.order_id && (
                 <>
                   {s.orderRef}: <span dir="ltr" className="font-mono">{facts.order_id}</span>
@@ -181,7 +181,7 @@ export function ClaimThreadOverlay({
         <button
           type="button"
           onClick={onClose}
-          className={`p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors shrink-0 ${FOCUS}`}
+          className={`p-2 text-text-muted hover:text-text-primary bg-surface-raised rounded-full transition-colors shrink-0 ${FOCUS}`}
           aria-label={s.close}
         >
           <X aria-hidden="true" className="w-4 h-4" />
@@ -209,11 +209,11 @@ export function ClaimThreadOverlay({
         )}
         {detail && (
           <>
-            <p className="text-zinc-500 text-[12px] leading-relaxed" data-claim-thread-intro>
+            <p className="text-text-muted text-[12px] leading-relaxed" data-claim-thread-intro>
               {s.threadIntro}
             </p>
             <ClaimProgress stage={detail.claim.stage} s={s} className="mb-4" />
-            <div className="bg-zinc-900/70 rounded-xl px-3 py-2 text-sm text-zinc-300 whitespace-pre-wrap">{detail.claim.description}</div>
+            <div className="bg-surface-raised rounded-lg px-3 py-2 text-sm text-text-secondary whitespace-pre-wrap">{detail.claim.description}</div>
             {detail.claim.evidence.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {detail.claim.evidence.map((ev) => (
@@ -222,10 +222,10 @@ export function ClaimThreadOverlay({
                     href={ev.url}
                     target="_blank"
                     rel="noreferrer"
-                    className={`block w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 ${FOCUS}`}
+                    className={`block w-16 h-16 rounded-md overflow-hidden border border-border-subtle bg-surface-raised ${FOCUS}`}
                   >
                     {isVideoUrl(ev.key) || isVideoUrl(ev.url) ? (
-                      <span className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400">MP4</span>
+                      <span className="w-full h-full flex items-center justify-center text-[9px] text-text-secondary">MP4</span>
                     ) : (
                       <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
                     )}
@@ -234,20 +234,20 @@ export function ClaimThreadOverlay({
               </div>
             )}
             {detail.claim.decision_reason && (
-              <p className="text-zinc-400 text-[12px]">
-                <span className="text-zinc-300 font-bold">{s.decisionReason}:</span> {detail.claim.decision_reason}
+              <p className="text-text-secondary text-[12px]">
+                <span className="text-text-secondary font-bold">{s.decisionReason}:</span> {detail.claim.decision_reason}
               </p>
             )}
             {detail.claim.admin_note && (
-              <p className="text-zinc-400 text-[12px]">
-                <span className="text-zinc-300 font-bold">{s.adminNote}:</span> {detail.claim.admin_note}
+              <p className="text-text-secondary text-[12px]">
+                <span className="text-text-secondary font-bold">{s.adminNote}:</span> {detail.claim.admin_note}
               </p>
             )}
             {detail.messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                  msg.mine ? 'bg-gold/15 border border-gold/20 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'
+                  msg.mine ? 'bg-gold/15 border border-gold/20 text-text-primary ms-auto' : 'bg-surface-selected text-text-primary'
                 }`}
               >
                 {msg.body && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
@@ -260,7 +260,7 @@ export function ClaimThreadOverlay({
                     )}
                   </a>
                 )}
-                <time dateTime={msg.created_at} className="block text-[10px] text-zinc-500 mt-1 tabular-nums">
+                <time dateTime={msg.created_at} className="block text-[10px] text-text-muted mt-1 tabular-nums">
                   {fmtDateTime(msg.created_at, lang)}
                 </time>
               </div>
@@ -269,7 +269,7 @@ export function ClaimThreadOverlay({
         )}
       </div>
 
-      <div className="p-4 border-t border-zinc-800/70">
+      <div className="p-4 border-t border-border-subtle">
         {replyError && (
           <div role="alert" className={`${ERROR_BOX} mb-2`}>
             {replyError}
@@ -278,7 +278,7 @@ export function ClaimThreadOverlay({
         <div className="flex items-center gap-2">
           <label
             htmlFor="warranty-thread-file"
-            className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white cursor-pointer transition-colors shrink-0 focus-within:ring-2 focus-within:ring-gold ${
+            className={`lv-button lv-button-secondary w-11 px-0 shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-gold ${
               replyBusy ? 'opacity-50 pointer-events-none' : ''
             }`}
           >
@@ -297,12 +297,12 @@ export function ClaimThreadOverlay({
             />
           </label>
           <input
+            className="lv-input min-w-0 py-2.5 text-sm"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder={s.reply}
             aria-label={s.reply}
             maxLength={3000}
-            className={INPUT}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -314,7 +314,7 @@ export function ClaimThreadOverlay({
             type="button"
             onClick={send}
             disabled={replyBusy || !replyText.trim()}
-            className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-gold/15 text-gold border border-gold/30 rounded-xl hover:bg-gold/25 disabled:opacity-40 transition-colors shrink-0 ${FOCUS}`}
+            className="lv-button lv-button-accent w-11 px-0 shrink-0"
             aria-label={s.send}
           >
             <Send aria-hidden="true" className={`w-4 h-4 ${lang === 'en' ? '' : '-scale-x-100'}`} />

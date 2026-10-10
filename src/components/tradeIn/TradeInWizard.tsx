@@ -391,13 +391,13 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         <div>
           <div className="flex gap-1" aria-hidden>
             {steps.map((s, i) => (
-              <span key={s} className={`h-1 flex-1 rounded-full transition-colors ${i <= index ? 'bg-gold' : 'bg-zinc-700'}`} />
+              <span key={s} className={`h-1 flex-1 rounded-full transition-colors ${i <= index ? 'bg-gold' : 'bg-border-subtle'}`} />
             ))}
           </div>
-          <p className="mt-2 text-[12px] text-zinc-500 tabular-nums">
+          <p className="mt-2 text-[12px] text-text-muted tabular-nums">
             {loc(`الخطوة ${index + 1} من ${steps.length}`, `Step ${index + 1} of ${steps.length}`)}
           </p>
-          <h2 className="text-white text-[22px] font-black leading-8 mt-0.5">{titles[step]}</h2>
+          <h2 className="text-text-primary text-[22px] font-black leading-8 mt-0.5">{titles[step]}</h2>
         </div>
 
         {step === 'device' && (
@@ -410,10 +410,10 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         {step === 'summary' && source && facts && (
           <Card data-trade-in-summary>
             <div className="flex gap-3 items-center mb-3">
-              <SafeImage src={source.image} alt="" aspect="square" className="w-16 h-16 rounded-xl shrink-0" bgClassName="bg-zinc-950" />
+              <SafeImage src={source.image} alt="" aspect="square" className="w-16 h-16 rounded-md shrink-0" bgClassName="bg-surface" />
               <div className="min-w-0">
-                <p className="text-white font-bold text-[15px] leading-6 line-clamp-2">{source.name}</p>
-                {source.variant ? <p className="text-[12.5px] text-zinc-500">{source.variant}</p> : null}
+                <p className="text-text-primary font-bold text-[15px] leading-6 line-clamp-2">{source.name}</p>
+                {source.variant ? <p className="text-[12.5px] text-text-muted">{source.variant}</p> : null}
                 {unit ? <p className="text-[12px] text-gold mt-0.5">{loc(FAMILY_LABELS[unit.family].ar, FAMILY_LABELS[unit.family].en)}</p> : null}
               </div>
             </div>
@@ -436,7 +436,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
                 strong
               />
             </dl>
-            <p className="mt-3 text-[12px] leading-5 text-zinc-500">
+            <p className="mt-3 text-[12px] leading-5 text-text-muted">
               {L('هذه البيانات من طلبك في LEVONIS ولا تحتاج إدخالها.', 'These come from your LEVONIS order — nothing to type.')}
             </p>
           </Card>
@@ -461,8 +461,8 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         {step === 'review' && req && (
           <div className="space-y-4" data-trade-in-review>
             <Note tone="gold" animate={false} icon={<AlertTriangle className="w-4 h-4" />}>
-              <p className="font-bold text-white">{L('تقدير أولي — القيمة النهائية بعد الفحص', 'Preliminary estimate — the final value follows the inspection')}</p>
-              <p className="text-zinc-400 text-[12.5px] mt-0.5">
+              <p className="font-bold text-text-primary">{L('تقدير أولي — القيمة النهائية بعد الفحص', 'Preliminary estimate — the final value follows the inspection')}</p>
+              <p className="text-text-secondary text-[12.5px] mt-0.5">
                 {L(
                   'نحسب هذا الرقم بقواعد التقييم المعلنة. بعد الإرسال يفحص فريق LEVONIS الجهاز، وإن تغيّرت القيمة نرسلها لك لتقبلها أو ترفضها.',
                   'We compute this with the published valuation rules. After you send it, the LEVONIS team inspects the device; if the value changes we send it to you to accept or decline.'
@@ -502,14 +502,14 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
 
         {/* THE ACTION BAR — sticky on the phone, above the tab bar. */}
         <div className="sticky bottom-[calc(var(--nav-stack,0px)+8px)] z-20 lg:static">
-          <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-canvas p-2 shadow-2 lg:shadow-none lg:bg-transparent lg:border-0 lg:p-0">
+          <div className="flex items-center gap-2 rounded-2xl border border-border-subtle bg-surface-raised p-2 shadow-dock lg:shadow-none lg:bg-transparent lg:border-0 lg:p-0">
             <Button variant="secondary" onClick={onPrev} icon={<Back className="w-4 h-4" aria-hidden />} aria-label={L('رجوع', 'Back')}>
               <span className="hidden sm:inline">{L('رجوع', 'Back')}</span>
             </Button>
             {live && step !== 'device' && step !== 'summary' && step !== 'scope' ? (
               <div className="flex-1 min-w-0 px-1 lg:hidden" aria-live="polite">
-                <p className="text-[11px] text-zinc-500 leading-4">{L('تقدير أولي', 'Estimate')}</p>
-                <p className="text-[15px] font-black text-white leading-5">
+                <p className="text-[11px] text-text-muted leading-4">{L('تقدير أولي', 'Estimate')}</p>
+                <p className="text-[15px] font-black text-text-primary leading-5">
                   <Money iqd={live.total} />
                 </p>
               </div>
@@ -533,11 +533,11 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
       {/* THE ESTIMATE PANEL — beside the form on a wide screen. */}
       <aside className="hidden lg:block sticky top-20 space-y-3" aria-label={L('التقدير الأولي', 'Preliminary estimate')}>
         <Card>
-          <p className="text-[12px] text-zinc-500">{L('تقدير أولي', 'Preliminary estimate')}</p>
-          <p className="text-[28px] font-black text-white leading-9 mt-0.5">{live ? <Money iqd={live.total} /> : '—'}</p>
-          <p className="text-[12px] text-zinc-500 mt-1">{L('القيمة النهائية بعد الفحص', 'Final value after inspection')}</p>
+          <p className="text-[12px] text-text-muted">{L('تقدير أولي', 'Preliminary estimate')}</p>
+          <p className="text-[28px] font-black text-text-primary leading-9 mt-0.5">{live ? <Money iqd={live.total} /> : '—'}</p>
+          <p className="text-[12px] text-text-muted mt-1">{L('القيمة النهائية بعد الفحص', 'Final value after inspection')}</p>
           {live?.settlement ? (
-            <div className="mt-3 pt-3 border-t border-zinc-800">
+            <div className="mt-3 pt-3 border-t border-border-subtle">
               <SettlementRows s={live.settlement} />
             </div>
           ) : null}
@@ -602,9 +602,9 @@ function DeviceStep({
   if (units.length === 0) {
     return (
       <Card data-trade-in-empty>
-        <Package className="w-6 h-6 text-zinc-500" aria-hidden />
-        <p className="text-white font-bold mt-2">{L('لا توجد أجهزة مؤهلة في طلباتك', 'No eligible devices in your orders')}</p>
-        <p className="text-[13px] leading-6 text-zinc-400 mt-1">
+        <Package className="w-6 h-6 text-text-muted" aria-hidden />
+        <p className="text-text-primary font-bold mt-2">{L('لا توجد أجهزة مؤهلة في طلباتك', 'No eligible devices in your orders')}</p>
+        <p className="text-[13px] leading-6 text-text-secondary mt-1">
           {L(
             'الاستبدال مخصص للطابعات وأجهزة الليزر وملحقات AMS المشتراة من LEVONIS وبعد استلامها. لا نقبل أجهزة من خارج المتجر.',
             'Trade-in is for printers, lasers and AMS units bought from LEVONIS, once delivered. We do not accept devices bought elsewhere.'
@@ -636,7 +636,7 @@ function DeviceStep({
   };
   return (
     <div className="space-y-2" role="radiogroup" aria-label={L('طلباتك السابقة', 'Your past orders')}>
-      <p className="text-[12.5px] text-zinc-500">{L('من طلباتك السابقة في LEVONIS فقط', 'Only from your past LEVONIS orders')}</p>
+      <p className="text-[12.5px] text-text-muted">{L('من طلباتك السابقة في LEVONIS فقط', 'Only from your past LEVONIS orders')}</p>
       {units.map((u) => {
         const on = selected?.key === u.key;
         return (
@@ -648,23 +648,21 @@ function DeviceStep({
             disabled={!u.available}
             onClick={() => onSelect(u)}
             data-unit={u.key}
-            className={`w-full text-start flex gap-3 items-center rounded-2xl border p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-55 ${
-              on ? 'border-gold bg-gold/[0.06]' : 'border-zinc-800 bg-zinc-900/60 enabled:hover:border-zinc-700'
-            }`}
+            className="lv-choice w-full text-start flex gap-3 items-center rounded-lg p-3 disabled:opacity-55"
           >
-            <SafeImage src={u.image} alt="" aspect="square" className="w-14 h-14 rounded-xl shrink-0" bgClassName="bg-zinc-950" />
+            <SafeImage src={u.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface" />
             <span className="min-w-0 flex-1">
-              <span className="block text-white text-[14px] font-bold leading-5 line-clamp-2">{u.name}</span>
-              <span className="block text-[12px] text-zinc-500 truncate">
+              <span className="block text-text-primary text-[14px] font-bold leading-5 line-clamp-2">{u.name}</span>
+              <span className="block text-[12px] text-text-muted truncate">
                 {[u.variant, loc(FAMILY_LABELS[u.family].ar, FAMILY_LABELS[u.family].en)].filter(Boolean).join(' · ')}
               </span>
-              <span className="block text-[11.5px] text-zinc-500 tabular-nums">
+              <span className="block text-[11.5px] text-text-muted tabular-nums">
                 {u.order_id} · {dateText(u.delivered_at, lang)}
               </span>
               {!u.available ? <span className="mt-1 inline-block text-[11.5px] font-semibold text-amber-300">{reasonText(u)}</span> : null}
             </span>
             {u.available ? (
-              on ? <CheckCircle2 className="w-5 h-5 text-gold shrink-0" aria-hidden /> : <Circle className="w-5 h-5 text-zinc-700 shrink-0" aria-hidden />
+              on ? <CheckCircle2 className="w-5 h-5 text-gold shrink-0" aria-hidden /> : <Circle className="w-5 h-5 text-text-muted shrink-0" aria-hidden />
             ) : null}
           </button>
         );
@@ -700,22 +698,20 @@ function ScopeStep({ unit, scope, onScope }: { unit: EligibleUnit; scope: TradeI
             disabled={!s.available}
             onClick={() => onScope(s.scope)}
             data-scope={s.scope}
-            className={`w-full text-start rounded-2xl border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50 ${
-              on ? 'border-gold bg-gold/[0.06]' : 'border-zinc-800 bg-zinc-900/60 enabled:hover:border-zinc-700'
-            }`}
+            className="lv-choice w-full text-start rounded-lg p-4 disabled:opacity-50"
           >
             <span className="flex items-center justify-between gap-3">
-              <span className="text-white font-bold text-[15px]">{label[s.scope].title}</span>
-              <span className="text-[13px] text-zinc-300">
+              <span className="text-text-primary font-bold text-[15px]">{label[s.scope].title}</span>
+              <span className="text-[13px] text-text-secondary">
                 <Money iqd={base} />
               </span>
             </span>
-            <span className="block text-[12.5px] leading-5 text-zinc-500 mt-1">{label[s.scope].hint}</span>
+            <span className="block text-[12.5px] leading-5 text-text-muted mt-1">{label[s.scope].hint}</span>
             {!s.available ? <span className="block text-[12px] text-amber-300 mt-1">{L('غير متاح لهذا الجهاز', 'Not available for this device')}</span> : null}
           </button>
         );
       })}
-      <p className="text-[12px] leading-5 text-zinc-500 pt-1">
+      <p className="text-[12px] leading-5 text-text-muted pt-1">
         {L(
           'سعر AMS يُحسب من فرق سعر خيار الكومبو عن الخيار العادي، كنسبة مما دفعته فعلاً.',
           'The AMS price is the gap between the Combo option and the plain one, as a share of what you actually paid.'
@@ -760,7 +756,7 @@ function RoleTabs({ req, role, onRole }: { req: RequestView; role: ComponentRole
   const { loc } = useLanguage();
   if (req.components.length < 2) return null;
   return (
-    <div role="tablist" aria-label={loc('أجزاء الجهاز', 'Parts')} className="grid grid-cols-2 gap-1 rounded-2xl bg-zinc-950/40 p-1 border border-zinc-800">
+    <div role="tablist" aria-label={loc('أجزاء الجهاز', 'Parts')} className="grid grid-cols-2 gap-1 rounded-lg lv-well p-1 border border-border-subtle">
       {req.components.map((c) => (
         <button
           key={c.role}
@@ -768,8 +764,8 @@ function RoleTabs({ req, role, onRole }: { req: RequestView; role: ComponentRole
           role="tab"
           aria-selected={c.role === role}
           onClick={() => onRole(c.role)}
-          className={`min-h-[44px] rounded-xl px-2 text-[13px] font-bold truncate transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-            c.role === role ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-zinc-200'
+          className={`min-h-[44px] rounded-md border px-2 text-[13px] font-bold truncate transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+            c.role === role ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
           {c.role === 'ams' ? 'AMS' : loc('الطابعة', 'Printer')}
@@ -808,7 +804,7 @@ function ConditionStep({
   return (
     <div className="space-y-4" data-condition={comp.role}>
       <RoleTabs req={req} role={comp.role} onRole={onRole} />
-      <p className="text-[12.5px] text-zinc-500">
+      <p className="text-[12.5px] text-text-muted">
         {loc(comp.label_ar, comp.label_en)} · {loc(FAMILY_LABELS[comp.family].ar, FAMILY_LABELS[comp.family].en)}
       </p>
       {familyCountsHours(comp.family) && value.hours !== null ? (
@@ -861,7 +857,7 @@ function ConditionStep({
         <TextArea name="notes" label={L('ملاحظات إضافية (اختياري)', 'Anything else (optional)')} value={value.notes} onChange={(v) => set({ notes: v })} />
       </Card>
       {req.components.length > 1 && comp.role === req.components[0].role ? (
-        <button type="button" onClick={() => onRole(req.components[1].role)} className="w-full min-h-[44px] rounded-2xl border border-dashed border-zinc-700 text-[13px] font-bold text-zinc-300 hover:text-white">
+        <button type="button" onClick={() => onRole(req.components[1].role)} className="w-full min-h-[44px] rounded-2xl border border-dashed border-border-subtle text-[13px] font-bold text-text-secondary hover:text-text-primary">
           {L('التالي: حالة AMS', 'Next: the AMS condition')}
         </button>
       ) : null}
@@ -894,54 +890,54 @@ function PhotoStep({
     <div className="space-y-3" data-photos={comp.role}>
       <RoleTabs req={req} role={comp.role} onRole={onRole} />
       <div className="flex items-center justify-between">
-        <p className="text-[13px] text-zinc-400">{L('صور إلزامية من عدة زوايا', 'Required photos from several angles')}</p>
-        <p className="text-[13px] font-bold text-white tabular-nums">
+        <p className="text-[13px] text-text-secondary">{L('صور إلزامية من عدة زوايا', 'Required photos from several angles')}</p>
+        <p className="text-[13px] font-bold text-text-primary tabular-nums">
           {done}/{REQUIRED_PHOTOS[comp.family].length}
         </p>
       </div>
-      <ul className="space-y-2">
+      <ul className="lv-surface overflow-hidden divide-y divide-border-subtle">
         {angles.map((a) => {
           const mine = comp.photos.filter((p) => p.angle === a.id);
           const busy = Object.entries(uploads).filter(([k]) => k.startsWith(`${comp.role}:${a.id}:`));
           const required = a.id !== OPTIONAL_PHOTO.id;
           const ok = mine.length > 0;
           return (
-            <li key={a.id} className={`rounded-2xl border p-3 ${ok ? 'border-emerald-900/60 bg-emerald-950/10' : 'border-zinc-800 bg-zinc-900/60'}`} data-angle={a.id}>
+            <li key={a.id} className={`p-3 ${ok ? 'bg-emerald-950/10' : ''}`} data-angle={a.id}>
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 shrink-0">
-                  {ok ? <CheckCircle2 className="w-5 h-5 text-emerald-400" aria-hidden /> : <Camera className={`w-5 h-5 ${required ? 'text-zinc-400' : 'text-zinc-600'}`} aria-hidden />}
+                  {ok ? <CheckCircle2 className="w-5 h-5 text-emerald-400" aria-hidden /> : <Camera className={`w-5 h-5 ${required ? 'text-text-secondary' : 'text-text-muted'}`} aria-hidden />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-white text-[14px] font-bold leading-5">
+                  <p className="text-text-primary text-[14px] font-bold leading-5">
                     {loc(a.label_ar, a.label_en)}
                     {required ? <span className="text-rose-300 ms-1" aria-label={L('مطلوبة', 'required')}>*</span> : null}
                   </p>
-                  <p className="text-[12px] leading-5 text-zinc-500">{loc(a.hint_ar, a.hint_en)}</p>
+                  <p className="text-[12px] leading-5 text-text-muted">{loc(a.hint_ar, a.hint_en)}</p>
                   {mine.length > 0 || busy.length > 0 ? (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {mine.map((p) => (
-                        <div key={p.id} className="relative w-16 h-16 rounded-xl overflow-hidden bg-zinc-950">
+                        <div key={p.id} className="relative w-16 h-16 rounded-md overflow-hidden bg-surface-raised">
                           <img src={p.url} alt="" className="w-full h-full object-cover" loading="lazy" />
                           <button
                             type="button"
                             onClick={() => onRemove(p)}
                             aria-label={L('حذف الصورة', 'Remove photo')}
-                            className="absolute top-0.5 end-0.5 h-7 w-7 rounded-full bg-black/70 text-white flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                            className="absolute top-0.5 end-0.5 h-7 w-7 rounded-full bg-onyx/80 text-snow flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                           >
                             <Trash2 className="w-3.5 h-3.5" aria-hidden />
                           </button>
                         </div>
                       ))}
                       {busy.map(([k, f]) => (
-                        <div key={k} className="w-16 h-16 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col items-center justify-center gap-1">
+                        <div key={k} className="w-16 h-16 rounded-md lv-well flex flex-col items-center justify-center gap-1">
                           <Loader2 className="w-4 h-4 text-gold animate-spin" aria-hidden />
-                          <span className="text-[10.5px] text-zinc-400 tabular-nums">{Math.round(f * 100)}%</span>
+                          <span className="text-[10.5px] text-text-secondary tabular-nums">{Math.round(f * 100)}%</span>
                         </div>
                       ))}
                     </div>
                   ) : null}
                 </div>
-                <label className="shrink-0 inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl bg-zinc-800 text-white text-[12.5px] font-bold cursor-pointer hover:bg-zinc-700 focus-within:ring-2 focus-within:ring-focus">
+                <label className="lv-button lv-button-secondary lv-button-sm shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-focus">
                   <ImagePlus className="w-4 h-4" aria-hidden />
                   <span>{ok ? L('إضافة', 'Add') : L('تصوير', 'Photo')}</span>
                   <input
@@ -960,7 +956,7 @@ function PhotoStep({
           );
         })}
       </ul>
-      <p className="text-[12px] leading-5 text-zinc-500 flex items-start gap-1.5">
+      <p className="text-[12px] leading-5 text-text-muted flex items-start gap-1.5">
         <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden />
         {L('الصور خاصة: تراها أنت وفريق الفحص في LEVONIS فقط.', 'Photos are private: only you and the LEVONIS inspection team can see them.')}
       </p>
@@ -994,14 +990,14 @@ function TargetStep({
   }
   const chosen = picked ? targets.find((t) => t.product_id === picked.product_id) ?? null : null;
   const chip = (on: boolean) =>
-    `min-h-[40px] px-3.5 rounded-full border text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-      on ? 'border-gold bg-gold/10 text-gold' : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
+    `min-h-[40px] px-3.5 rounded-full border border-border-subtle text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+      on ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
     }`;
   return (
     <div className="space-y-3" data-targets>
       {current && !picked ? (
         <Note tone="zinc" compact animate={false}>
-          {L('اخترت سابقاً:', 'You chose:')} <strong className="text-white">{loc(current.name_ar, current.name)}</strong>
+          {L('اخترت سابقاً:', 'You chose:')} <strong className="text-text-primary">{loc(current.name_ar, current.name)}</strong>
         </Note>
       ) : null}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1021,13 +1017,11 @@ function TargetStep({
                 })
               }
               data-target={t.product_id}
-              className={`text-start rounded-2xl border p-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                on ? 'border-gold bg-gold/[0.06]' : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
-              }`}
+              className="lv-choice text-start rounded-lg p-2.5"
             >
-              <SafeImage src={t.image} alt="" aspect="square" className="w-full rounded-xl" bgClassName="bg-zinc-950" />
-              <span className="block mt-2 text-white text-[13px] font-bold leading-5 line-clamp-2">{loc(t.name_ar, t.name)}</span>
-              <span className="block text-[11.5px] text-zinc-500">{loc(FAMILY_LABELS[t.family].ar, FAMILY_LABELS[t.family].en)}</span>
+              <SafeImage src={t.image} alt="" aspect="square" className="w-full rounded-sm" bgClassName="bg-surface" />
+              <span className="block mt-2 text-text-primary text-[13px] font-bold leading-5 line-clamp-2">{loc(t.name_ar, t.name)}</span>
+              <span className="block text-[11.5px] text-text-muted">{loc(FAMILY_LABELS[t.family].ar, FAMILY_LABELS[t.family].en)}</span>
             </button>
           );
         })}
@@ -1036,7 +1030,7 @@ function TargetStep({
         <Card className="space-y-4">
           {chosen.groups.filter((g) => g.values.length > 1).map((g) => (
             <fieldset key={g.id}>
-              <legend className="text-[13.5px] font-semibold text-zinc-200 mb-2">{g.name || L('الموديل', 'Model')}</legend>
+              <legend className="text-[13.5px] font-semibold text-text-primary mb-2">{g.name || L('الموديل', 'Model')}</legend>
               <div className="flex flex-wrap gap-2">
                 {g.values.map((v) => (
                   <button
@@ -1054,11 +1048,11 @@ function TargetStep({
           ))}
           {chosen.colors.length > 1 ? (
             <fieldset>
-              <legend className="text-[13.5px] font-semibold text-zinc-200 mb-2">{L('اللون', 'Colour')}</legend>
+              <legend className="text-[13.5px] font-semibold text-text-primary mb-2">{L('اللون', 'Colour')}</legend>
               <div className="flex flex-wrap gap-2">
                 {chosen.colors.map((c) => (
                   <button key={c.id} type="button" aria-pressed={picked?.color_id === c.id} className={chip(picked?.color_id === c.id)} onClick={() => picked && onPick({ ...picked, color_id: c.id })}>
-                    <span className="inline-block w-3 h-3 rounded-full border border-zinc-600 me-1.5 align-middle" style={{ background: c.hex }} aria-hidden />
+                    <span className="inline-block w-3 h-3 rounded-full border border-border-subtle me-1.5 align-middle" style={{ background: c.hex }} aria-hidden />
                     {loc(c.label_ar, c.label_en)}
                   </button>
                 ))}
@@ -1066,14 +1060,14 @@ function TargetStep({
             </fieldset>
           ) : null}
           <div className="flex items-center justify-between gap-3 pt-1" aria-live="polite">
-            <span className="text-[13px] text-zinc-400">{L('سعر البيع المباشر', 'Direct-sale price')}</span>
-            <span className="text-[17px] font-black text-white">
+            <span className="text-[13px] text-text-secondary">{L('سعر البيع المباشر', 'Direct-sale price')}</span>
+            <span className="text-[17px] font-black text-text-primary">
               {busy ? <Spinner size="sm" /> : quote && quote.product_id === chosen.product_id ? <Money iqd={quote.price_iqd} /> : L('اختر الخيارات', 'Choose the options')}
             </span>
           </div>
         </Card>
       ) : null}
-      <p className="text-[12px] leading-5 text-zinc-500 flex items-center gap-1.5">
+      <p className="text-[12px] leading-5 text-text-muted flex items-center gap-1.5">
         <Receipt className="w-3.5 h-3.5" aria-hidden />
         {L('السعر من الخادم، بسعر البيع المباشر بعد العمولة، ويُعاد التحقق منه عند الاعتماد.', 'The price comes from the server — the direct-sale price after commission — and is checked again when the value is fixed.')}
       </p>

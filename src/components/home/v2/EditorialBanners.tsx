@@ -95,7 +95,7 @@ function Banner({ card, columns }: { card: EditorialCard; columns: number }) {
   );
 
   const cls =
-    'group relative isolate block aspect-[16/10] min-w-0 overflow-hidden rounded-2xl lv-bleed-ground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:aspect-[16/9] lg:aspect-[12/5] lg:rounded-[20px]';
+    'group relative isolate block aspect-[16/10] min-w-0 overflow-hidden rounded-2xl shadow-sm lv-bleed-ground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:aspect-[16/9] lg:aspect-[12/5]';
   if (card.to.startsWith('/')) {
     return (
       <Link to={card.to} data-editorial={card.key} data-feature="" className={cls}>

@@ -1,25 +1,31 @@
 /**
  * Shared class strings for the warranty surface, so every button in the
  * section presses, focuses and disables the same way.
+ *
+ * CLAY (build plan §6 Phase 3): the buttons are the house `lv-button`
+ * variants (raised clay that dents while held, its own focus ring and busy
+ * and disabled states), a field is the `lv-input` well, a card is
+ * `lv-surface` and the notes are flat `lv-alert`s — information is never
+ * raised.
  */
 
 export const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold';
 
-/** The house secondary action: quiet zinc, full height, icon + label. */
-export const BTN_SECONDARY = `inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-xl border border-zinc-700/70 bg-zinc-800/70 hover:bg-zinc-800 text-zinc-100 text-[13px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+/** The house secondary action: quiet raised clay, full height, icon + label. */
+export const BTN_SECONDARY = 'lv-button lv-button-secondary text-[13px]';
 
-/** The one gold action per card/panel. */
-export const BTN_PRIMARY = `inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-xl bg-gold text-accent-contrast text-[13px] font-bold hover:brightness-110 transition-[filter,opacity] disabled:opacity-40 disabled:cursor-not-allowed ${FOCUS}`;
+/** The one primary action per card/panel. */
+export const BTN_PRIMARY = 'lv-button lv-button-primary text-[13px]';
 
 /** Destructive confirmation only — never on a card face. */
-export const BTN_DANGER = `inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-xl bg-[#ef233c] text-snow text-[13px] font-bold hover:brightness-110 transition-[filter,opacity] disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+export const BTN_DANGER = 'lv-button lv-button-danger text-[13px]';
 
 /** Inline text action / navigation link inside a card. */
-export const LINK_QUIET = `inline-flex items-center gap-1 min-h-[32px] text-[12px] font-medium text-zinc-400 hover:text-white underline-offset-2 hover:underline rounded transition-colors ${FOCUS}`;
+export const LINK_QUIET = `inline-flex items-center gap-1 min-h-[32px] text-[12px] font-medium text-text-secondary hover:text-text-primary underline-offset-2 hover:underline rounded transition-colors ${FOCUS}`;
 
-export const INPUT = `w-full min-w-0 bg-zinc-950/70 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm placeholder:text-zinc-600 outline-none focus:border-gold/50 transition-colors ${FOCUS}`;
+export const INPUT = 'lv-input min-w-0 py-2.5 text-sm';
 
-export const CARD = 'rounded-2xl border border-zinc-800 bg-zinc-900/60';
+export const CARD = 'lv-surface';
 
-export const ERROR_BOX = 'bg-red-500/10 border border-red-500/30 text-red-300 text-[13px] font-medium rounded-xl p-3';
-export const OK_BOX = 'bg-gold/10 border border-gold/30 text-gold text-[13px] font-medium rounded-xl p-3';
+export const ERROR_BOX = 'lv-alert lv-alert-danger text-[13px] font-medium text-text-primary';
+export const OK_BOX = 'lv-alert lv-alert-success text-[13px] font-medium text-text-primary';

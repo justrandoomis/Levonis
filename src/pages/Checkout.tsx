@@ -1741,8 +1741,8 @@ export default function Checkout() {
 
   const consentBlock =
     requiredPolicies.length > 0 ? (
-      <div className="mt-4 mb-4 p-4 rounded-xl bg-black border border-white/10 space-y-3">
-        <div className="text-xs uppercase tracking-widest text-zinc-500">{S.policyTitle}</div>
+      <div className="mt-4 mb-4 p-4 rounded-lg border border-border-subtle space-y-3">
+        <div className="text-xs uppercase tracking-widest text-text-muted">{S.policyTitle}</div>
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -1753,20 +1753,20 @@ export default function Checkout() {
             }}
             className="mt-0.5 w-4 h-4 shrink-0 accent-white"
           />
-          <span className="text-xs text-zinc-300 font-light leading-relaxed">
+          <span className="text-xs text-text-secondary font-light leading-relaxed">
             {S.policyAgree}{' '}
             {requiredPolicies.map((p, i) => (
               <React.Fragment key={p.key}>
-                {i > 0 && <span className="text-zinc-500"> · </span>}
+                {i > 0 && <span className="text-text-muted"> · </span>}
                 <a
                   href={`/policies/${encodeURIComponent(p.key)}?version=${p.version}&lang=${lang}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="underline text-white hover:text-zinc-300"
+                  className="underline text-text-primary hover:text-text-secondary"
                 >
                   {S.policyNames[p.key] ?? p.key}
                 </a>
-                <span className="text-zinc-500 text-[10px]"> ({S.version} {p.version})</span>
+                <span className="text-text-muted text-[10px]"> ({S.version} {p.version})</span>
               </React.Fragment>
             ))}
           </span>
@@ -1778,14 +1778,14 @@ export default function Checkout() {
           </p>
         )}
         {!policyAccepted && !consentResetNote && (
-          <p className="text-[11px] text-zinc-500 font-light">{S.policyRequired}</p>
+          <p className="text-[11px] text-text-muted font-light">{S.policyRequired}</p>
         )}
       </div>
     ) : null;
 
   if (placedOrder) {
     return (
-      <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col font-sans selection:bg-white/20">
+      <div className="h-full min-h-0 w-full overflow-y-auto text-text-primary flex flex-col font-sans selection:bg-white/20">
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           {/*
             THE CHARACTER APPEARS; NOTHING FLIES DOWN THE PAGE.
@@ -1849,7 +1849,7 @@ export default function Checkout() {
           </motion.h2>
 
           <motion.p
-            className="text-zinc-500 max-w-md mx-auto mb-10 text-base font-light"
+            className="text-text-muted max-w-md mx-auto mb-10 text-base font-light"
             initial={{ opacity: 0, y: m.travel(12) }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.06 }}
@@ -1860,17 +1860,17 @@ export default function Checkout() {
           </motion.p>
 
           <motion.div
-            className="bg-black border border-white/5 rounded-xl p-6 max-w-xs w-full mb-10 shadow-xl"
+            className="lv-surface-raised p-6 max-w-xs w-full mb-10"
             initial={{ opacity: 0, y: m.travel(12) }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.12 }}
           >
-            <div className="text-xs text-zinc-500 mb-1 font-light">{dir === 'rtl' ? 'رقم الطلب' : 'Order Number'}</div>
-            <div className="text-lg font-mono tracking-widest text-white">{placedOrder.id}</div>
+            <div className="text-xs text-text-muted mb-1 font-light">{dir === 'rtl' ? 'رقم الطلب' : 'Order Number'}</div>
+            <div className="text-lg font-mono tracking-widest text-text-primary">{placedOrder.id}</div>
             {placedInvoiceNo && (
-              <div className="mt-4 pt-4 border-t border-white/5">
-                <div className="text-xs text-zinc-500 mb-1 font-light">{S.invoiceNo}</div>
-                <div className="text-sm font-mono tracking-wider text-white">{placedInvoiceNo}</div>
+              <div className="mt-4 pt-4 border-t border-border-subtle">
+                <div className="text-xs text-text-muted mb-1 font-light">{S.invoiceNo}</div>
+                <div className="text-sm font-mono tracking-wider text-text-primary">{placedInvoiceNo}</div>
               </div>
             )}
           </motion.div>
@@ -1894,19 +1894,19 @@ export default function Checkout() {
           {placedOrder.gini?.state === 'awaiting_receipt' ? (
             <div
               data-gini-pending
-              className="mb-10 w-full max-w-sm rounded-xl border border-warning/25 bg-warning/[0.06] p-4 text-start"
+              className="lv-alert lv-alert-warning mb-10 w-full max-w-sm p-4 text-start"
             >
               <p className="flex items-start gap-2 text-[13px] font-medium text-warning">
                 <AlertCircle aria-hidden="true" className="mt-px w-4 h-4 shrink-0" strokeWidth={1.5} />
                 {S.giniPlacedTitle}
               </p>
-              <p className="mt-2 text-[12px] font-light leading-relaxed text-zinc-400">
+              <p className="mt-2 text-[12px] font-light leading-relaxed text-text-secondary">
                 {S.giniWarning(String(giniHoldHours))}
               </p>
               {placedOrder.gini.order_no ? (
-                <p className="mt-2 text-[12px] text-zinc-500">
+                <p className="mt-2 text-[12px] text-text-muted">
                   {S.giniOrderNoLabel}:{' '}
-                  <span dir="ltr" className="font-mono tracking-widest text-zinc-300">
+                  <span dir="ltr" className="font-mono tracking-widest text-text-secondary">
                     {placedOrder.gini.order_no}
                   </span>
                 </p>
@@ -1922,13 +1922,13 @@ export default function Checkout() {
           >
             <button
               onClick={() => navigate('/orders')}
-              className="bg-white/10 text-white hover:bg-white/20 font-normal py-3 px-8 rounded-xl transition-all border border-white/10"
+              className="lv-button lv-button-secondary px-8"
             >
               {dir === 'rtl' ? 'طلباتي' : 'My Orders'}
             </button>
             <button
               onClick={() => navigate('/')}
-              className="bg-white text-black hover:bg-zinc-200 font-normal py-3 px-8 rounded-xl transition-all shadow-lg"
+              className="lv-button lv-button-primary px-8"
             >
               {dir === 'rtl' ? 'العودة للرئيسية' : 'Back to Home'}
             </button>
@@ -1960,7 +1960,7 @@ export default function Checkout() {
   if (loading) {
     return (
       <div
-        className="grid h-full min-h-0 w-full flex-1 place-items-center bg-canvas text-text-primary"
+        className="grid h-full min-h-0 w-full flex-1 place-items-center text-text-primary"
         data-testid="checkout-loading"
         aria-live="polite"
         aria-busy="true"
@@ -1977,14 +1977,14 @@ export default function Checkout() {
 
   if (!loading && items.length === 0) {
     return (
-      <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="h-full min-h-0 w-full overflow-y-auto text-text-primary flex flex-col items-center justify-center p-6 text-center font-sans">
         <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-          <ShoppingCart className="w-7 h-7 text-zinc-500" strokeWidth={1.5} />
+          <ShoppingCart className="w-7 h-7 text-text-muted" strokeWidth={1.5} />
         </div>
         <h2 className="text-xl font-normal mb-2 tracking-tight">
           {dir === 'rtl' ? 'لا توجد منتجات لإتمام الطلب' : 'Nothing to check out'}
         </h2>
-        <p className="text-zinc-500 max-w-sm mx-auto mb-8 text-sm font-light">
+        <p className="text-text-muted max-w-sm mx-auto mb-8 text-sm font-light">
           {loadError
             ? loadError
             : dir === 'rtl'
@@ -1993,7 +1993,7 @@ export default function Checkout() {
         </p>
         <button
           onClick={() => navigate('/cart')}
-          className="bg-white text-black hover:bg-zinc-200 font-normal py-3 px-8 rounded-xl transition-all shadow-lg"
+          className="lv-button lv-button-primary px-8"
         >
           {dir === 'rtl' ? 'العودة إلى السلة' : 'Back to Cart'}
         </button>
@@ -2002,7 +2002,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="h-full min-h-0 w-full overflow-y-auto bg-canvas text-text-primary font-sans selection:bg-white/20 flex flex-col lg:flex-row lg:overflow-hidden" data-checkout-viewport>
+    <div className="h-full min-h-0 w-full overflow-y-auto text-text-primary font-sans selection:bg-white/20 flex flex-col lg:flex-row lg:overflow-hidden" data-checkout-viewport>
 
       {/* Left Form Area */}
       <div className="relative z-10 flex min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
@@ -2011,7 +2011,7 @@ export default function Checkout() {
             onClick={handleBack}
             className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
-            {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" strokeWidth={1.5} /> : <ArrowLeft className="w-5 h-5 text-white" strokeWidth={1.5} />}
+            {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-text-primary" strokeWidth={1.5} /> : <ArrowLeft className="w-5 h-5 text-text-primary" strokeWidth={1.5} />}
           </button>
           <MotionCharacterHome />
           <div className="flex items-center gap-2 text-text-secondary px-2 py-2">
@@ -2028,14 +2028,14 @@ export default function Checkout() {
             <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight mb-2">
               {dir === 'rtl' ? 'إتمام الطلب' : 'Checkout'}
             </h1>
-            <p className="text-sm text-zinc-500 font-light">
+            <p className="text-sm text-text-muted font-light">
               {dir === 'rtl' ? 'يرجى مراجعة وتأكيد تفاصيل طلبك أدناه.' : 'Please review and confirm your order details below.'}
             </p>
           </div>
 
           {/* Section: Address */}
           <section>
-            <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
+            <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">1</span>
               {dir === 'rtl' ? 'عنوان التوصيل' : 'Shipping Address'}
             </h2>
@@ -2046,11 +2046,11 @@ export default function Checkout() {
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-text-muted" strokeWidth={1.5} />
-                      <span className="font-normal text-white text-base">{addr.label}</span>
+                      <span className="font-normal text-text-primary text-base">{addr.label}</span>
                     </div>
                     <span className="lv-choice-mark"><Check className="h-3 w-3" aria-hidden="true" /></span>
                   </div>
-                  <p className="text-xs text-zinc-500 leading-relaxed pl-1 font-light">
+                  <p className="text-xs text-text-muted leading-relaxed pl-1 font-light">
                     {addr.name} — {addr.phone}
                     <br />
                     {addr.address}
@@ -2101,7 +2101,7 @@ export default function Checkout() {
 
           {/* Section: Delivery Method */}
           <section>
-            <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
+            <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">2</span>
               {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
             </h2>
@@ -2111,7 +2111,7 @@ export default function Checkout() {
               <ProAddressNotice className="mb-3" />
             ) : null}
             {containsPrinter && availableDeliveryMethods.some((method) => method.id === 'personal') && !quotedDeliveryFees?.some((fee) => fee.id === 'personal' && !fee.available) && (
-              <p className="mb-3 text-sm text-zinc-300" data-printer-delivery-default>
+              <p className="mb-3 text-sm text-text-secondary" data-printer-delivery-default>
                 {loc('نختار التوصيل الشخصي افتراضيًا لطلبات الطابعات عندما يكون متاحًا. يمكنك اختيار التوصيل العادي أدناه بعد قراءة تحذير النقل.', 'Personal delivery is the initial choice for printer orders when available. You can choose standard delivery below after reading the transport warning.')}
               </p>
             )}
@@ -2156,14 +2156,14 @@ export default function Checkout() {
                   <input type="radio" name="delivery" className="sr-only" checked={selected} disabled={unavailable} onChange={() => { deliveryPickedRef.current = true; setPrinterStandardAcceptedContext(null); customerQuote.mark(); setDeliveryMethod(method.id); }} />
                   <div className="flex-1 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm lv-well text-text-secondary">
                         {getMethodIcon(method.icon || '', "w-5 h-5")}
                       </div>
                       <div className="min-w-0">
-                        <h3 className={`font-normal text-base ${selected ? 'text-white' : 'text-zinc-300'}`}>
+                        <h3 className={`font-normal text-base ${selected ? 'text-text-primary' : 'text-text-secondary'}`}>
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                         </h3>
-                        <p className="text-xs text-zinc-500 mt-0.5 font-light">{dir === 'rtl' ? method.descAr : method.descEn}</p>
+                        <p className="text-xs text-text-muted mt-0.5 font-light">{dir === 'rtl' ? method.descAr : method.descEn}</p>
                         {/*
                           «بدل عرض كلمة محسوب حسب القطع بالكمية اجعل هناك
                            ملاحظة يظهر فيها عرض مكان المخزن على الخريطة».
@@ -2202,7 +2202,7 @@ export default function Checkout() {
                         ) : selectedQuote && !isPickupMethod ? (
                           <p
                             data-wallet-free-delivery={walletWaiver ? '' : undefined}
-                            className={`mt-1 text-[11px] font-medium ${memberWaiver || walletWaiver ? 'text-emerald-400' : 'text-zinc-400'}`}
+                            className={`mt-1 text-[11px] font-medium ${memberWaiver || walletWaiver ? 'text-emerald-400' : 'text-text-secondary'}`}
                           >
                             {walletWaiver
                               ? loc('توصيل عادي مجاني — للدفع الكامل من محفظة Levo', 'Free standard delivery — paid in full from Levo Wallet', 'گەیاندنی ئاسایی بەخۆڕایی — بۆ پارەدانی تەواو لە جزدانی Levo')
@@ -2220,7 +2220,7 @@ export default function Checkout() {
                         defect this card is fixing. */}
                     <span
                       className={`font-medium text-sm shrink-0 tabular-nums ${
-                        unavailable ? 'text-zinc-600' : displayedPrice === 0 ? 'text-emerald-400' : 'text-white'
+                        unavailable ? 'text-text-muted' : displayedPrice === 0 ? 'text-emerald-400' : 'text-text-primary'
                       }`}
                       data-delivery-fee={method.id}
                     >
@@ -2276,7 +2276,7 @@ export default function Checkout() {
                   <p className="text-sm font-semibold text-wheat">
                     {loc('توصيل أولوية PRO خلال 12 ساعة', 'PRO priority delivery within 12 hours', 'گەیاندنی پێشینەیی PRO لە ١٢ کاتژمێردا')}
                   </p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="text-xs text-text-secondary mt-0.5">
                     {loc('تم التحقق من العنوان وطريقة التوصيل لهذا الطلب.', 'Address and delivery method are eligible for this order.', 'ناونیشان و شێوازی گەیاندن بۆ ئەم داواکارییە شیاون.')}
                   </p>
                 </div>
@@ -2286,7 +2286,7 @@ export default function Checkout() {
 
           {/* Section: Payment Method */}
           <section>
-            <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-5">
+            <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">3</span>
               {dir === 'rtl' ? 'طريقة الدفع' : 'Payment Method'}
             </h2>
@@ -2311,15 +2311,15 @@ export default function Checkout() {
                     }}
                   />
                   <div className="flex-1 flex items-center gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/35 text-text-secondary">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm lv-well text-text-secondary">
                       {getMethodIcon(method.icon || '', 'w-5 h-5')}
                     </div>
                     <div className="min-w-0">
-                      <h3 className={`font-normal text-base ${paymentMethod === method.id ? 'text-white' : 'text-zinc-300'}`}>
+                      <h3 className={`font-normal text-base ${paymentMethod === method.id ? 'text-text-primary' : 'text-text-secondary'}`}>
                           {dir === 'rtl' ? method.titleAr : method.titleEn}
                       </h3>
                       {S.paymentHint[method.id] && (
-                        <p className="text-xs text-zinc-500 mt-0.5 font-light">{S.paymentHint[method.id]}</p>
+                        <p className="text-xs text-text-muted mt-0.5 font-light">{S.paymentHint[method.id]}</p>
                       )}
                       {/*
                         «يجب توضيح هذا الفرق قبل أن يختار» — the difference, on
@@ -2413,7 +2413,7 @@ export default function Checkout() {
 
       {/* Right Summary Area. The phone's fixed action bar overlaps THIS column
           (it is last in the flow below `lg`), so the clearance belongs here. */}
-      <div className="relative z-20 flex w-full shrink-0 flex-col bg-surface pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:h-full lg:min-h-0 lg:w-[460px] lg:border-s lg:border-border-subtle">
+      <div className="relative z-20 flex w-full shrink-0 flex-col bg-surface-raised shadow-lg pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-0 lg:h-full lg:min-h-0 lg:w-[460px] lg:border-s lg:border-border-subtle">
         {/*
           THE SUMMARY COLUMN SCROLLS AS A WHOLE.
 
@@ -2441,8 +2441,8 @@ export default function Checkout() {
         */}
         <div className="flex min-h-0 flex-col p-4 sm:p-6 lg:h-full lg:overflow-y-auto lg:p-10 custom-scrollbar">
 
-          <h2 className="text-xl font-normal text-white flex items-center gap-3 mb-6">
-            <Receipt className="w-5 h-5 text-zinc-400" strokeWidth={1.5} />
+          <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-6">
+            <Receipt className="w-5 h-5 text-text-secondary" strokeWidth={1.5} />
             {dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}
           </h2>
 
@@ -2456,16 +2456,16 @@ export default function Checkout() {
                     {line.image ? (
                       <img referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full bg-zinc-900" />
+                      <div className="w-full h-full bg-surface-raised" />
                     )}
                     <span className="absolute top-1 end-1 w-5 h-5 bg-white text-black rounded flex items-center justify-center text-[10px] font-medium shadow-md">{line.qty}</span>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <h4 className="text-sm font-normal text-white line-clamp-1 mb-0.5">{line.name}</h4>
+                    <h4 className="text-sm font-normal text-text-primary line-clamp-1 mb-0.5">{line.name}</h4>
                     {line.variant && (
-                      <p className="text-xs text-zinc-500 mb-1.5 font-light">{line.variant}</p>
+                      <p className="text-xs text-text-muted mb-1.5 font-light">{line.variant}</p>
                     )}
-                    <span className="text-sm font-medium text-white tabular-nums">{money(line.lineTotal)}</span>
+                    <span className="text-sm font-medium text-text-primary tabular-nums">{money(line.lineTotal)}</span>
                     {line.gift && (
                       <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
                         <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
@@ -2473,14 +2473,14 @@ export default function Checkout() {
                           {loc('هدية', 'Gift', 'دیاری')}
                         </span>
                         {line.gift.value_iqd > 0 && (
-                          <span className="text-[11.5px] text-zinc-500 tabular-nums">
+                          <span className="text-[11.5px] text-text-muted tabular-nums">
                             {loc(`قيمتها ${money(line.gift.value_iqd)}`, `Worth ${money(line.gift.value_iqd)}`, `بەهاکەی ${money(line.gift.value_iqd)}`)}
                           </span>
                         )}
                       </span>
                     )}
                     {line.mysterySpools ? (
-                      <p className="mt-1 text-[11.5px] text-zinc-400">
+                      <p className="mt-1 text-[11.5px] text-text-secondary">
                         {loc(
                           `${line.mysterySpools} قطعة عشوائية — يُكشف المحتوى لاحقًا`,
                           `${line.mysterySpools} random item(s) — revealed later`,
@@ -2551,9 +2551,9 @@ export default function Checkout() {
               Kurdish is invented here; the store writes its own.
             */}
 
-            <div className="flex justify-between items-center text-zinc-400">
+            <div className="flex justify-between items-center text-text-secondary">
               <span className="font-light">{loc('المجموع الفرعي', 'Subtotal')}</span>
-              <span className="text-white font-normal tabular-nums">{money(total)}</span>
+              <span className="text-text-primary font-normal tabular-nums">{money(total)}</span>
             </div>
 
             {/*
@@ -2612,7 +2612,7 @@ export default function Checkout() {
               <div className="flex justify-between items-center text-emerald-400">
                 <span className="font-light">
                   {loc('خصم الكود', 'Promo discount')}{' '}
-                  <span dir="ltr" className="text-zinc-500 text-xs">{quote.coupon.code}</span>
+                  <span dir="ltr" className="text-text-muted text-xs">{quote.coupon.code}</span>
                 </span>
                 <span className="font-normal">-{money(Number(quote.coupon.discount_iqd))}</span>
               </div>
@@ -2635,7 +2635,7 @@ export default function Checkout() {
                 className="flex justify-between items-center gap-3 text-[13px] text-sky-300"
               >
                 <span className="font-light truncate">{S.supportLine(quote.support.referrer_username || quote.support.ref)}</span>
-                <span className="font-normal shrink-0 text-zinc-400">{S.supportZero}</span>
+                <span className="font-normal shrink-0 text-text-secondary">{S.supportZero}</span>
               </div>
             )}
 
@@ -2660,18 +2660,18 @@ export default function Checkout() {
               question={loc('كيف حُسبت تكلفة التوصيل؟', 'How is the delivery cost calculated?')}
               value={
                 quoteLoading ? (
-                  <span className="text-zinc-500 font-light text-xs">{S.quoteLoading}</span>
+                  <span className="text-text-muted font-light text-xs">{S.quoteLoading}</span>
                 ) : shippingIqd === 0 ? (
                   <span className="text-emerald-400 font-normal">
                     {shippingWaived && quote && quote.shipping.total_before_waiver_iqd > 0 && (
-                      <span className="text-zinc-500 line-through font-light mx-2 text-xs">
+                      <span className="text-text-muted line-through font-light mx-2 text-xs">
                         {money(quote.shipping.total_before_waiver_iqd)}
                       </span>
                     )}
                     {S.freeShipping}
                   </span>
                 ) : (
-                  <span className="text-white font-normal tabular-nums">{money(shippingIqd)}</span>
+                  <span className="text-text-primary font-normal tabular-nums">{money(shippingIqd)}</span>
                 )
               }
               note={
@@ -2740,11 +2740,11 @@ export default function Checkout() {
                       : names[component.kind] ?? [component.kind, component.kind];
                     return (
                       <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3">
-                        <span className="text-zinc-500">
+                        <span className="text-text-muted">
                           {loc(name[0], name[1])}
                           {component.units > 1 ? ` × ${component.units}` : ''}
                         </span>
-                        <span className={`tabular-nums ${component.waived ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                        <span className={`tabular-nums ${component.waived ? 'text-emerald-400' : 'text-text-secondary'}`}>
                           {component.waived ? S.freeShipping : money(component.fee_iqd)}
                         </span>
                       </div>
@@ -2756,7 +2756,7 @@ export default function Checkout() {
               {/* Server quote transparency: WHY a fee/waiver applies (§6.3). */}
               {quote && quote.shipping.reasons.length > 0 && (
                 <div className="border-t border-white/5 pt-2 space-y-1">
-                  <div className="text-[11px] uppercase tracking-widest text-zinc-500">{S.whyTitle}</div>
+                  <div className="text-[11px] uppercase tracking-widest text-text-muted">{S.whyTitle}</div>
                   {quote.shipping.reasons.map((r, i) => (
                     <p key={i} className="leading-relaxed">{r}</p>
                   ))}
@@ -2782,18 +2782,18 @@ export default function Checkout() {
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-white font-normal">{S.protectedTitle}</span>
+                    <span className="text-text-primary font-normal">{S.protectedTitle}</span>
                     <span className="text-xs font-normal shrink-0">
                       {quote.protected_delivery.waived ? (
                         <span className="text-emerald-400">{S.protectedFree}</span>
                       ) : (
-                        <span className="text-zinc-300">
+                        <span className="text-text-secondary">
                           + {money(quote.protected_delivery.fee_iqd ?? 0)}
                         </span>
                       )}
                     </span>
                   </span>
-                  <span className="block text-xs text-zinc-400 font-light mt-0.5">{S.protectedDesc}</span>
+                  <span className="block text-xs text-text-secondary font-light mt-0.5">{S.protectedDesc}</span>
                 </span>
               </label>
             )}
@@ -2818,7 +2818,7 @@ export default function Checkout() {
                 testId="cod-tax"
                 label={S.codTax}
                 question={loc('لماذا توجد ضريبة على التوصيل؟', 'Why is there a delivery tax?')}
-                value={<span className="text-white font-normal tabular-nums">{money(codTaxRowIqd)}</span>}
+                value={<span className="text-text-primary font-normal tabular-nums">{money(codTaxRowIqd)}</span>}
               >
                 <p>{loc(
                   'شركة التوصيل تأخذ ضريبة على الطلبات ذات المبلغ العالي المدفوع عند الاستلام — وهي ليست من المتجر.',
@@ -2922,7 +2922,7 @@ export default function Checkout() {
                 only when cash on delivery would change the number at all. */}
             {pricingBasisLine && quote && (
               <p
-                className="text-[11.5px] text-zinc-500 font-light leading-relaxed"
+                className="text-[11.5px] text-text-muted font-light leading-relaxed"
                 data-checkout-pricing-basis={quote.pricing_basis}
               >
                 {pricingBasisLine}
@@ -2996,7 +2996,7 @@ export default function Checkout() {
                 computed. The constant stays as the fallback for a failure with
                 no sentence of its own (a dropped connection). */}
             {quoteError && !quoteLoading && (
-              <p className="text-xs text-zinc-500 font-light flex items-start gap-2">
+              <p className="text-xs text-text-muted font-light flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 {typeof quoteError === 'string' && quoteError.trim() ? quoteError : S.quoteError}
               </p>
@@ -3048,7 +3048,7 @@ export default function Checkout() {
                   aria-expanded={false}
                   aria-controls="checkout-promo-field"
                   data-checkout-promo-toggle
-                  className="inline-flex items-center gap-2 text-[13px] font-light text-zinc-500 hover:text-zinc-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  className="inline-flex items-center gap-2 text-[13px] font-light text-text-muted hover:text-text-secondary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                 >
                   <Tag className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
                   {loc('استخدام كود خاص', 'Use a special code')}
@@ -3094,18 +3094,18 @@ export default function Checkout() {
             <div data-checkout-wallet className="mt-4 pt-4 border-t border-white/5 transition-all">
                 <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${walletSwitchOn ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${walletSwitchOn ? 'bg-white text-black' : 'bg-surface-raised text-text-secondary'}`}>
                             <Wallet className="w-4 h-4" strokeWidth={1.5} />
                         </div>
                         <div className="min-w-0">
-                            <span id="checkout-wallet-label" className="font-normal text-white block text-sm">
+                            <span id="checkout-wallet-label" className="font-normal text-text-primary block text-sm">
                                 {loc(
                                   `استخدام رصيد المحفظة (${walletMoney(walletBalanceShown)})`,
                                   `Use wallet balance (${walletMoney(walletBalanceShown)})`,
                                   `بەکارهێنانی باڵانسی جزدان (${walletMoney(walletBalanceShown)})`
                                 )}
                             </span>
-                            <span className="text-xs text-zinc-500 font-light block">
+                            <span className="text-xs text-text-muted font-light block">
                                 {loc(
                                   'يُخصم من إجمالي الطلب، والباقي بطريقة الدفع التي اخترتها',
                                   'Deducted from the order total; the rest is paid by the method you chose',
@@ -3127,7 +3127,7 @@ export default function Checkout() {
                             setUseWalletBalance(!useWalletBalance);
                         }}
                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                            walletSwitchOn ? 'bg-white' : 'bg-zinc-800'
+                            walletSwitchOn ? 'bg-white' : 'lv-well'
                         } ${walletSwitchLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
@@ -3138,7 +3138,7 @@ export default function Checkout() {
 
                 {/* Why the switch cannot be moved — said beside the switch. */}
                 {walletLockReason && (
-                    <p data-checkout-wallet-locked className="mt-2 text-xs leading-relaxed font-light text-zinc-500 flex items-start gap-2">
+                    <p data-checkout-wallet-locked className="mt-2 text-xs leading-relaxed font-light text-text-muted flex items-start gap-2">
                         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" strokeWidth={1.5} aria-hidden="true" />
                         <span>{walletLockReason}</span>
                     </p>
@@ -3172,7 +3172,7 @@ export default function Checkout() {
                                         setUseWalletBalance(true);
                                         setPaymentMethod(partialWalletMethodId);
                                     }}
-                                    className="mt-2 inline-flex items-center rounded-md border border-red-400/40 px-2.5 py-1 font-medium text-red-300 hover:text-white hover:border-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                                    className="mt-2 inline-flex items-center rounded-md border border-red-400/40 px-2.5 py-1 font-medium text-red-300 hover:text-text-primary hover:border-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                                 >
                                     {loc(
                                       `استخدم ${walletMoney(walletBalanceShown)} من الرصيد وادفع الباقي عند الاستلام`,
@@ -3198,7 +3198,7 @@ export default function Checkout() {
                             <dt>{loc('يُخصم من المحفظة', 'Deducted from your wallet', 'لە جزدانەکەت دەبڕدرێت')}</dt>
                             <dd data-testid="checkout-wallet-applied" className="tabular-nums font-medium">−{walletMoney(quote.wallet.applied_iqd)}</dd>
                         </div>
-                        <div className="flex justify-between items-center gap-3 text-white">
+                        <div className="flex justify-between items-center gap-3 text-text-primary">
                             <dt>
                                 {walletRemainderIqd === 0
                                   ? loc('المتبقي — مدفوع بالكامل من المحفظة', 'Remaining — paid in full from your wallet', 'ماوە — بە تەواوی لە جزدانەکەتەوە دراوە')
@@ -3234,10 +3234,10 @@ export default function Checkout() {
               <div className="pt-1">
                 <label className="flex items-center justify-between gap-3 cursor-pointer">
                   <span className="min-w-0">
-                    <span className="block text-[13px] font-light text-zinc-300">
+                    <span className="block text-[13px] font-light text-text-secondary">
                       {loc('استخدام النقاط', 'Use points', 'بەکارهێنانی خاڵ')}
                     </span>
-                    <span className="block text-[11.5px] text-zinc-500 tabular-nums">
+                    <span className="block text-[11.5px] text-text-muted tabular-nums">
                       {loc('الرصيد', 'Balance', 'باڵانس')}: {walletCharge(quote?.points.balance ?? pointBalance)}
                       {quote?.points.eligible_merchandise_iqd != null
                         ? ` · ${loc('الحد الأقصى لهذا الطلب', 'Max for this order', 'زۆرترین بۆ ئەم داواکارییە')} ${walletCharge(quote.points.eligible_merchandise_iqd)}`
@@ -3261,13 +3261,13 @@ export default function Checkout() {
                       reads correctly in Arabic and Kurdish with one rule. */}
                   <span
                     aria-hidden="true"
-                    className="relative shrink-0 w-11 h-6 rounded-full bg-zinc-800 transition-colors duration-200 peer-checked:bg-white peer-checked:[&>span]:start-[22px] peer-checked:[&>span]:bg-black peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-canvas"
+                    className="relative shrink-0 w-11 h-6 rounded-full bg-surface-selected transition-colors duration-200 peer-checked:bg-white peer-checked:[&>span]:start-[22px] peer-checked:[&>span]:bg-black peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-canvas"
                   >
                     <span className="absolute top-1 start-1 w-4 h-4 rounded-full bg-zinc-400 transition-[inset-inline-start] duration-200 ease-out" />
                   </span>
                 </label>
                 {quote?.points.earn_pending ? (
-                  <p className="mt-2 text-[11.5px] text-zinc-500 tabular-nums">
+                  <p className="mt-2 text-[11.5px] text-text-muted tabular-nums">
                     {loc('ستكسب', 'You will earn', 'دەستت دەکەوێت')} {quote.points.earn_pending.toLocaleString()}{' '}
                     {loc('نقطة من هذا الطلب', 'points from this order', 'خاڵ لەم داواکارییە')}
                   </p>
@@ -3448,7 +3448,7 @@ export default function Checkout() {
         the total, so the figure being agreed to is on screen at the moment of
         agreeing. The summary column reserves its height below.
       */}
-      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-canvas px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised shadow-dock px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-[640px] space-y-2">
           {/* THE REASON TRAVELS WITH THE BUTTON. On a phone this bar is fixed
               and outside the document order, so a message left in the flow

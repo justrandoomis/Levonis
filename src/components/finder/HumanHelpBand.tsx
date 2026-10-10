@@ -10,7 +10,7 @@ import { Headphones } from 'lucide-react';
  */
 export default function HumanHelpBand({ title, body, cta, to }: { title: string; body: string; cta: string; to: string }) {
   return (
-    <section data-feature="" className="flex flex-wrap items-center gap-4 rounded-[22px] border border-border-subtle bg-charcoal px-5 py-5">
+    <section data-feature="" className="flex flex-wrap items-center gap-4 rounded-2xl border border-border-subtle bg-charcoal shadow-sm px-5 py-5">
       <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-raised text-gold">
         <Headphones className="size-5" strokeWidth={2} />
       </span>

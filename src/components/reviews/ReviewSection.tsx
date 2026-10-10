@@ -3,6 +3,7 @@ import { Star, Camera, Video, Instagram, X, ShieldCheck, BadgeCheck, Gift, Penci
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
+import { StatusChip } from '../ui/Badge';
 
 /**
  * Product-page review section (mandate §5): submit + public list.
@@ -233,7 +234,7 @@ function Stars({ value, onChange, size = 'w-5 h-5' }: { value: number; onChange?
           aria-label={`${n} / 5`}
           className={onChange ? 'p-0.5' : 'pointer-events-none'}
         >
-          <Star className={`${size} ${n <= value ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-600'}`} />
+          <Star className={`${size} ${n <= value ? 'text-yellow-400 fill-yellow-400' : 'text-text-muted'}`} />
         </button>
       ))}
     </div>
@@ -402,19 +403,19 @@ export default function ReviewSection({ productId }: { productId: string }) {
     <section dir={dir} className="mt-8 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-black text-white">{S.title}</h2>
+          <h2 className="text-lg font-black text-text-primary">{S.title}</h2>
           {avg !== null && (
-            <span className="flex items-center gap-1.5 text-sm text-zinc-300">
+            <span className="flex items-center gap-1.5 text-sm text-text-secondary">
               <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
               <b>{avg}</b>
-              <span className="text-zinc-500 text-xs">{S.reviewsCount(total)}</span>
+              <span className="text-text-muted text-xs">{S.reviewsCount(total)}</span>
             </span>
           )}
         </div>
         {isAuthenticated && (canCreate || canEdit) && (
           <button
             onClick={openForm}
-            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow text-sm font-bold px-4 py-2 rounded-full transition-colors"
+            className="lv-button lv-button-secondary lv-button-sm"
           >
             {canEdit ? <Pencil className="w-4 h-4" /> : <Star className="w-4 h-4" />}
             {canEdit ? S.edit : S.write}
@@ -422,12 +423,12 @@ export default function ReviewSection({ productId }: { productId: string }) {
         )}
       </div>
 
-      <p className="text-[11px] text-zinc-500">{S.disclosure}</p>
-      {isAuthenticated && (canCreate || canEdit) && <p className="text-[11px] text-zinc-400">{S.publishedImmediately}</p>}
+      <p className="text-[11px] text-text-muted">{S.disclosure}</p>
+      {isAuthenticated && (canCreate || canEdit) && <p className="text-[11px] text-text-secondary">{S.publishedImmediately}</p>}
 
       {/* Program notice — honest states, no invented values */}
       {eligibility && (canCreate || canEdit) && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 text-[12px] text-zinc-400 flex gap-2">
+        <div className="lv-alert lv-alert-info text-[12px] text-text-secondary flex gap-2">
           <Gift className="w-4 h-4 text-iris shrink-0 mt-0.5" />
           <span>
             {eligibility.is_printer
@@ -439,69 +440,61 @@ export default function ReviewSection({ productId }: { productId: string }) {
         </div>
       )}
       {isAuthenticated && eligibility && !existing && eligibility.eligible_orders.length === 0 && (
-        <div className="text-[12px] text-zinc-500">{S.notEligible}</div>
+        <div className="text-[12px] text-text-muted">{S.notEligible}</div>
       )}
-      {!isAuthenticated && <div className="text-[12px] text-zinc-500">{S.signInToReview}</div>}
+      {!isAuthenticated && <div className="text-[12px] text-text-muted">{S.signInToReview}</div>}
 
       {/* My review status card */}
       {existing && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
+        <div className="lv-surface p-4 space-y-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-sm font-bold text-white">{S.myReview}</span>
-            <span
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
-                existing.status === 'published'
-                  ? 'bg-green-500/10 text-green-400 border-green-500/30'
-                  : existing.status === 'rejected'
-                    ? 'bg-red-500/10 text-red-400 border-red-500/30'
-                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
-              }`}
-            >
+            <span className="text-sm font-bold text-text-primary">{S.myReview}</span>
+            <StatusChip tone={existing.status === 'published' ? 'success' : existing.status === 'rejected' ? 'danger' : 'warning'}>
               {statusLabel(existing.status)}
-            </span>
+            </StatusChip>
           </div>
           <Stars value={existing.stars} size="w-4 h-4" />
           {existing.system_generated ? (
-            <p className="text-[12px] text-zinc-400">{S.systemGenerated}</p>
+            <p className="text-[12px] text-text-secondary">{S.systemGenerated}</p>
           ) : (
-            <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">{existing.body}</p>
+            <p className="text-[13px] text-text-secondary whitespace-pre-wrap break-words">{existing.body}</p>
           )}
           {existing.moderation_note && (
             <p className="text-[12px] text-amber-400">
               {S.moderationNote}: {existing.moderation_note}
             </p>
           )}
-          {existing.reward && <div className="text-[12px] text-zinc-400 flex flex-wrap items-center gap-2">
+          {existing.reward && <div className="text-[12px] text-text-secondary flex flex-wrap items-center gap-2">
             <span>
-              {S.rewardState}: <b className="text-zinc-200">{rewardLabel(existing.reward.state)}</b>
+              {S.rewardState}: <b className="text-text-primary">{rewardLabel(existing.reward.state)}</b>
             </span>
             {existing.reward.quality_score !== null && (
               <span>
-                {S.qualityScore}: <b className="text-zinc-200">{existing.reward.quality_score}/5</b>
+                {S.qualityScore}: <b className="text-text-primary">{existing.reward.quality_score}/5</b>
               </span>
             )}
           </div>}
           {existing.reward?.reason && (
-            <p className="text-[12px] text-zinc-500">
+            <p className="text-[12px] text-text-muted">
               {S.rewardReason}: {existing.reward.reason}
             </p>
           )}
           {!existing.reward && !existing.system_generated && (
-            <p className="text-[11.5px] text-zinc-500">{S.noTierReward}</p>
+            <p className="text-[11.5px] text-text-muted">{S.noTierReward}</p>
           )}
         </div>
       )}
 
       {/* Submission form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="lv-surface p-4 space-y-4">
           {(eligibility?.eligible_orders.length ?? 0) > 1 && !existing && (
             <div>
-              <label className="block text-[12px] font-bold text-zinc-400 mb-1">{S.order}</label>
+              <label className="block text-[12px] font-bold text-text-secondary mb-1">{S.order}</label>
               <select
+                className="lv-input px-3 py-2 text-sm"
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none"
               >
                 {eligibility!.eligible_orders.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -513,39 +506,39 @@ export default function ReviewSection({ productId }: { productId: string }) {
           )}
 
           <div>
-            <label className="block text-[12px] font-bold text-zinc-400 mb-1">{S.stars}</label>
+            <label className="block text-[12px] font-bold text-text-secondary mb-1">{S.stars}</label>
             <Stars value={stars} onChange={setStars} size="w-7 h-7" />
           </div>
 
           <div>
-            <label className="block text-[12px] font-bold text-zinc-400 mb-1">{S.bodyLabel}</label>
+            <label className="block text-[12px] font-bold text-text-secondary mb-1">{S.bodyLabel}</label>
             <textarea
+              className="lv-input px-3 py-2 text-sm leading-relaxed resize-y"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
               maxLength={4000}
               placeholder={S.bodyPlaceholder}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none resize-y"
               required
             />
           </div>
 
           <div>
-            <label className="block text-[12px] font-bold text-zinc-400 mb-1">{S.photos}</label>
+            <label className="block text-[12px] font-bold text-text-secondary mb-1">{S.photos}</label>
             {existing && existing.media.length > 0 && photos.length === 0 && !video && (
-              <p className="text-[11px] text-zinc-500 mb-2">{S.keptNote}</p>
+              <p className="text-[11px] text-text-muted mb-2">{S.keptNote}</p>
             )}
             <div className="flex flex-wrap gap-2">
               {photos.map((p) => (
                 <div key={p.key} className="relative">
-                  <img src={p.url} alt="" className="w-16 h-16 object-cover rounded-lg border border-zinc-700" />
+                  <img src={p.url} alt="" className="w-16 h-16 object-cover rounded-lg border border-border-subtle" />
                   <button
                     type="button"
                     aria-label={S.remove}
                     onClick={() => setPhotos((ps) => ps.filter((x) => x.key !== p.key))}
-                    className="absolute -top-1.5 -right-1.5 bg-zinc-800 border border-zinc-600 rounded-full p-0.5"
+                    className="absolute -top-1.5 -end-1.5 bg-surface-raised border border-border-subtle rounded-full p-0.5 shadow-1"
                   >
-                    <X className="w-3 h-3 text-zinc-300" />
+                    <X className="w-3 h-3 text-text-secondary" />
                   </button>
                 </div>
               ))}
@@ -554,7 +547,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
                   type="button"
                   disabled={uploadingWhat !== ''}
                   onClick={() => photoInput.current?.click()}
-                  className="w-16 h-16 rounded-lg border border-dashed border-zinc-600 flex flex-col items-center justify-center text-zinc-500 hover:text-zinc-300 hover:border-zinc-400 transition-colors disabled:opacity-50"
+                  className="w-16 h-16 rounded-lg border border-dashed border-border-subtle flex flex-col items-center justify-center text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50"
                 >
                   <Camera className="w-5 h-5" />
                   <span className="text-[9px] mt-0.5">{uploadingWhat === 'photo' ? S.uploading : S.addPhoto}</span>
@@ -574,9 +567,9 @@ export default function ReviewSection({ productId }: { productId: string }) {
           </div>
 
           <div>
-            <label className="block text-[12px] font-bold text-zinc-400 mb-1">{S.videoLabel}</label>
+            <label className="block text-[12px] font-bold text-text-secondary mb-1">{S.videoLabel}</label>
             {video ? (
-              <div className="flex items-center gap-2 text-[12px] text-zinc-300">
+              <div className="flex items-center gap-2 text-[12px] text-text-secondary">
                 <Video className="w-4 h-4 text-iris" />
                 <span className="truncate max-w-[200px]">{video.key.split('/').pop()}</span>
                 <button type="button" onClick={() => setVideo(null)} className="text-red-400 text-[11px] font-bold">
@@ -588,7 +581,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
                 type="button"
                 disabled={uploadingWhat !== ''}
                 onClick={() => videoInput.current?.click()}
-                className="flex items-center gap-2 text-[12px] font-bold text-zinc-400 border border-dashed border-zinc-600 rounded-lg px-3 py-2 hover:text-zinc-200 hover:border-zinc-400 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 text-[12px] font-bold text-text-secondary border border-dashed border-border-subtle rounded-lg px-3 py-2 hover:text-text-primary transition-colors disabled:opacity-50"
               >
                 <Video className="w-4 h-4" /> {uploadingWhat === 'video' ? S.uploading : S.addVideo}
               </button>
@@ -606,23 +599,23 @@ export default function ReviewSection({ productId }: { productId: string }) {
           </div>
 
           {eligibility?.is_printer && (
-            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-2">
-              <div className="flex items-center gap-2 text-[12px] font-bold text-zinc-300">
+            <div className="rounded-lg border border-border-subtle p-3 space-y-2">
+              <div className="flex items-center gap-2 text-[12px] font-bold text-text-secondary">
                 <Instagram className="w-4 h-4 text-pink-400" /> {S.igTitle}
               </div>
-              <p className="text-[11px] text-zinc-500">{S.igPrivacy}</p>
+              <p className="text-[11px] text-text-muted">{S.igPrivacy}</p>
               <input
+                className="lv-input px-3 py-2 text-sm"
                 type="url"
                 value={igLink}
                 onChange={(e) => setIgLink(e.target.value)}
                 placeholder={S.igLink}
                 dir="ltr"
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-iris outline-none"
               />
               <div className="flex items-center gap-2">
                 {igShot ? (
-                  <div className="flex items-center gap-2 text-[12px] text-zinc-300">
-                    <img src={igShot.url} alt="" className="w-10 h-10 object-cover rounded border border-zinc-700" />
+                  <div className="flex items-center gap-2 text-[12px] text-text-secondary">
+                    <img src={igShot.url} alt="" className="w-10 h-10 object-cover rounded border border-border-subtle" />
                     <button type="button" onClick={() => setIgShot(null)} className="text-red-400 text-[11px] font-bold">
                       {S.remove}
                     </button>
@@ -632,7 +625,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
                     type="button"
                     disabled={uploadingWhat !== ''}
                     onClick={() => shotInput.current?.click()}
-                    className="text-[12px] font-bold text-zinc-400 border border-dashed border-zinc-600 rounded-lg px-3 py-1.5 hover:text-zinc-200 transition-colors disabled:opacity-50"
+                    className="text-[12px] font-bold text-text-secondary border border-dashed border-border-subtle rounded-lg px-3 py-1.5 hover:text-text-primary transition-colors disabled:opacity-50"
                   >
                     {uploadingWhat === 'evidence' ? S.uploading : `${S.addShot} (${S.igShot})`}
                   </button>
@@ -652,7 +645,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
           )}
 
           {formError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[12px] font-medium rounded-xl p-3">
+            <div className="lv-alert lv-alert-danger text-[12px] font-medium text-text-primary">
               {formError}
             </div>
           )}
@@ -661,14 +654,14 @@ export default function ReviewSection({ productId }: { productId: string }) {
             <button
               type="submit"
               disabled={submitting || uploadingWhat !== '' || stars < 1 || !body.trim() || !orderId}
-              className="flex-1 bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-50 text-snow text-sm font-bold py-2.5 rounded-full transition-colors"
+              className="lv-button lv-button-primary flex-1"
             >
               {submitting ? S.submitting : canEdit ? S.saveEdit : S.submit}
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-bold py-2.5 rounded-full transition-colors"
+              className="lv-button lv-button-secondary px-5"
             >
               {S.cancel}
             </button>
@@ -678,34 +671,34 @@ export default function ReviewSection({ productId }: { productId: string }) {
 
       {/* Public list */}
       {listError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[12px] font-medium rounded-xl p-3">
+        <div className="lv-alert lv-alert-danger text-[12px] font-medium text-text-primary">
           {listError}
         </div>
       )}
       {!listError && reviews.length === 0 && !listLoading && (
-        <div className="text-[13px] text-zinc-500 text-center py-6">{S.empty}</div>
+        <div className="text-[13px] text-text-muted text-center py-6">{S.empty}</div>
       )}
       <div className="space-y-3">
         {reviews.map((r) => (
-          <article key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
+          <article key={r.id} className="lv-surface p-4 space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">{r.reviewer}</span>
+                <span className="text-sm font-bold text-text-primary">{r.reviewer}</span>
                 {r.verified_purchase && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/30 px-2 py-0.5 rounded-full">
-                    <BadgeCheck className="w-3 h-3" /> {S.verified}
-                  </span>
+                  <StatusChip tone="success" icon={<BadgeCheck className="w-3 h-3" />}>
+                    {S.verified}
+                  </StatusChip>
                 )}
                 {r.incentivized && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-violet-400 bg-iris/10 border border-iris/30 px-2 py-0.5 rounded-full">
-                    <ShieldCheck className="w-3 h-3" /> {S.incentivized}
-                  </span>
+                  <StatusChip icon={<ShieldCheck className="w-3 h-3" />}>
+                    {S.incentivized}
+                  </StatusChip>
                 )}
               </div>
-              <span className="text-[11px] text-zinc-500">{new Date(r.created_at).toLocaleDateString()}</span>
+              <span className="text-[11px] text-text-muted">{new Date(r.created_at).toLocaleDateString()}</span>
             </div>
             <Stars value={r.stars} size="w-4 h-4" />
-            <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">
+            <p className="text-[13px] text-text-secondary whitespace-pre-wrap break-words">
               {r.system_generated ? S.systemGenerated : r.body}
             </p>
             {r.media.length > 0 && (
@@ -717,11 +710,11 @@ export default function ReviewSection({ productId }: { productId: string }) {
                       src={m.url}
                       controls
                       preload="none"
-                      className="h-24 rounded-lg border border-zinc-700 shrink-0"
+                      className="h-24 rounded-lg border border-border-subtle shrink-0"
                     />
                   ) : (
                     <a key={m.url} href={m.url} target="_blank" rel="noreferrer" className="shrink-0">
-                      <img src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-zinc-700" />
+                      <img src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-border-subtle" />
                     </a>
                   )
                 )}
@@ -731,11 +724,11 @@ export default function ReviewSection({ productId }: { productId: string }) {
         ))}
       </div>
 
-      {listLoading && <div className="text-center text-zinc-500 text-[13px] py-4">{S.loading}</div>}
+      {listLoading && <div className="text-center text-text-muted text-[13px] py-4">{S.loading}</div>}
       {!listLoading && reviews.length < total && (
         <button
           onClick={() => loadPage(page + 1, false)}
-          className="w-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-sm font-bold py-2.5 rounded-full transition-colors"
+          className="lv-button lv-button-secondary w-full"
         >
           {S.loadMore}
         </button>

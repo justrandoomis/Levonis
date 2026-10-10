@@ -120,7 +120,7 @@ export default function StickyColumns({
         <div
           aria-hidden={!collapsed}
           data-compare-strip={collapsed ? 'shown' : 'hidden'}
-          className={`absolute inset-x-0 top-0 rounded-b-[16px] border-b border-border-subtle bg-canvas transition-[opacity,transform] duration-200 motion-reduce:transition-none ${
+          className={`absolute inset-x-0 top-0 rounded-b-lg border-b border-border-subtle bg-surface-raised shadow-lg transition-[opacity,transform] duration-200 motion-reduce:transition-none ${
             collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0 motion-reduce:translate-y-0'
           }`}
         >
@@ -160,8 +160,8 @@ export default function StickyColumns({
           const variantName = p.option ? tri(p.option.label, l) : '';
           const choices = p.options ?? [];
           return (
-            <div key={p.id} data-compare-column={i} className={`relative flex min-w-0 flex-col rounded-[16px] border border-border-subtle bg-surface pb-1 ${dense ? 'p-1' : 'p-1.5'}`}>
-              <div className="relative overflow-hidden rounded-[12px] bg-charcoal">
+            <div key={p.id} data-compare-column={i} className={`lv-surface relative flex min-w-0 flex-col pb-1 ${dense ? 'p-1' : 'p-1.5'}`}>
+              <div className="relative overflow-hidden rounded-lg bg-charcoal">
                 <Link to={`/product/${p.slug}`} tabIndex={-1} aria-hidden="true" className="block aspect-[6/5]">
                   <SafeImage src={imageOf(p)} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_8%]" />
                 </Link>
@@ -211,7 +211,7 @@ export default function StickyColumns({
                   <MulticolorBadge badge={p.multicolor.badge} lang={l} size={dense ? 'xs' : 'sm'} className="mt-1.5" />
                 ) : null}
                 {p.laser_module_w ? (
-                  <span data-laser-chip className="mt-1 inline-flex w-fit items-center gap-1 rounded-[8px] border border-border-subtle px-1.5 py-0.5 text-[10.5px] font-bold leading-[13px] text-text-secondary">
+                  <span data-laser-chip className="mt-1 inline-flex w-fit items-center gap-1 rounded-sm border border-border-subtle px-1.5 py-0.5 text-[10.5px] font-bold leading-[13px] text-text-secondary">
                     <Zap aria-hidden="true" className="size-3 shrink-0 text-warning" strokeWidth={2.2} />
                     {ls.laser(p.laser_module_w)}
                   </span>
@@ -282,7 +282,7 @@ function VariantSwitch({
     // and the screen reader all get the real control.
     <label
       htmlFor={id}
-      className="relative mt-1.5 flex min-h-9 min-w-0 items-center gap-1 rounded-[10px] border border-border-subtle bg-surface-raised py-1 ps-1.5 pe-1 transition-colors focus-within:ring-2 focus-within:ring-focus hover:border-text-muted/40"
+      className="relative mt-1.5 flex min-h-9 min-w-0 items-center gap-1 rounded-sm lv-well border border-[var(--clay-field)] py-1 ps-1.5 pe-1 transition-colors focus-within:ring-2 focus-within:ring-focus"
     >
       <span dir="ltr" aria-hidden="true" className="line-clamp-2 min-w-0 flex-1 text-start text-[10.5px] font-bold leading-[13px] text-text-primary [overflow-wrap:break-word] rtl:text-right">
         {current || ls.variant}

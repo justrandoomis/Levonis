@@ -219,7 +219,7 @@ test('every choice panel shows its own answer, so the column reads as a summary'
   // One quiet cue, in the house's secondary type — never a second accent
   // competing with the price.
   assert.match(PRODUCT, /const Chosen = \(\{ value \}: \{ value: string \| null \| undefined \}\) =>/);
-  assert.match(PRODUCT, /className="ms-2 font-medium text-\[12px\] text-zinc-400" data-chosen/);
+  assert.match(PRODUCT, /className="ms-2 font-medium text-\[12px\] text-text-secondary" data-chosen/);
   // The two the owner named by hand read the value IN FORCE, not the raw
   // press: a header quoting a press the server has closed would contradict the
   // tick in the panel underneath it.

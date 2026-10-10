@@ -18,6 +18,7 @@ import Spinner from '../ui/Spinner';
 import { asLang, daysLeftLabel, formatDate } from './format';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { useMoney } from '../../CurrencyContext';
+import { StatusChip } from '../ui/Badge';
 
 interface Claim {
   id: string;
@@ -141,20 +142,20 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
   if (!windowOpen && (claims === null || claims.length === 0) && loadState !== 'loading') return null;
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4" aria-labelledby="pp-title" data-price-protection>
-      <h3 id="pp-title" className="text-white font-bold text-[14px] inline-flex items-center gap-1.5">
+    <section className="lv-surface p-4" aria-labelledby="pp-title" data-price-protection>
+      <h3 id="pp-title" className="text-text-primary font-bold text-[14px] inline-flex items-center gap-1.5">
         <ShieldCheck className="w-4 h-4 text-gold" aria-hidden />
         {s.title}
       </h3>
-      <p className="text-zinc-500 text-[12px] mt-1 leading-relaxed">{s.intro}</p>
-      <p className={`mt-2 text-[12px] inline-flex items-center gap-1.5 ${windowOpen ? 'text-emerald-300' : 'text-zinc-500'}`}>
+      <p className="text-text-muted text-[12px] mt-1 leading-relaxed">{s.intro}</p>
+      <p className={`mt-2 text-[12px] inline-flex items-center gap-1.5 ${windowOpen ? 'text-emerald-300' : 'text-text-muted'}`}>
         <Clock className="w-3.5 h-3.5" aria-hidden />
         {windowOpen && daysLeft !== null ? daysLeftLabel(daysLeft, lang) : s.closed}
       </p>
 
       <div role="status" aria-live="polite" className="mt-3">
         {loadState === 'loading' && claims === null && (
-          <p className="text-zinc-500 text-[12px] inline-flex items-center gap-2">
+          <p className="text-text-muted text-[12px] inline-flex items-center gap-2">
             <Spinner size="xs" delayMs={0} decorative /> {s.loading}
           </p>
         )}
@@ -169,24 +170,19 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
         {claims && claims.length > 0 && (
           <ul className="flex flex-col gap-2">
             {claims.map((c) => (
-              <li key={c.id} data-pp-claim={c.state} className="rounded-xl border border-zinc-800 bg-black/30 p-3">
+              <li key={c.id} data-pp-claim={c.state} className="rounded-lg bg-surface-raised p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[12.5px] text-zinc-200 truncate min-w-0">
+                  <p className="text-[12.5px] text-text-primary truncate min-w-0">
                     {c.item?.name ?? c.order_item_id} × {c.qty}
                   </p>
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${
-                      c.state === 'rejected'
-                        ? 'bg-red-500/10 text-red-300 border-red-500/20'
-                        : c.state === 'credited' || c.state === 'approved'
-                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-                          : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                    }`}
+                  <StatusChip
+                    className="shrink-0"
+                    tone={c.state === 'rejected' ? 'danger' : c.state === 'credited' || c.state === 'approved' ? 'success' : 'neutral'}
                   >
                     {s.states[c.state] ?? c.state}
-                  </span>
+                  </StatusChip>
                 </div>
-                <p className="mt-1 text-[11.5px] text-zinc-500 tabular-nums">
+                <p className="mt-1 text-[11.5px] text-text-muted tabular-nums">
                   {s.paid} {money(c.original_unit_iqd)} · {s.observed} {money(c.observed_unit_iqd)}
                   {c.credited_iqd > 0 && ` · ${s.credited} ${walletMoney(c.credited_iqd)}`}
                   {' · '}
@@ -211,16 +207,16 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
             const err = errors[it.id];
             return (
               <li key={it.id} className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[12.5px] text-zinc-300 truncate min-w-0">{it.name}</p>
+                <p className="text-[12.5px] text-text-secondary truncate min-w-0">{it.name}</p>
                 {pending ? (
-                  <span className="shrink-0 text-[11.5px] text-zinc-500">{s.pending}</span>
+                  <span className="shrink-0 text-[11.5px] text-text-muted">{s.pending}</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => claimFor(it.id)}
                     disabled={busyItem !== null || !it.product_id}
                     data-pp-claim-item={it.id}
-                    className="shrink-0 inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-zinc-700 text-zinc-200 text-[12px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+                    className="lv-button lv-button-secondary lv-button-sm shrink-0"
                   >
                     {busyItem === it.id && <Spinner size="xs" delayMs={0} decorative />}
                     {busyItem === it.id ? s.claiming : s.claim}

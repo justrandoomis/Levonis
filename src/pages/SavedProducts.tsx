@@ -92,9 +92,9 @@ export default function SavedProducts() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-black text-white font-sans">
-      <div className="sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
+    <div className="w-full min-h-screen text-text-primary font-sans">
+      <div className="sticky top-0 z-40 bg-canvas border-b border-border-subtle px-4 py-3 flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="p-2 bg-surface-raised border border-border-subtle shadow-1 rounded-full transition-colors active:shadow-press">
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
         </button>
         <h1 className="font-bold text-lg">{loc('منتجات محفوظة', 'Saved products', 'بەرهەمە پاشەکەوتکراوەکان')}</h1>
@@ -106,58 +106,60 @@ export default function SavedProducts() {
             <div className="w-6 h-6 border-2 border-olive border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : loadError ? (
-          <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
+          <div className="flex flex-col items-center justify-center py-20 text-text-muted">
             <ShoppingBag className="w-16 h-16 mb-4 opacity-50" />
             <p>{loadError}</p>
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-zinc-500 text-center px-6">
+          <div className="flex flex-col items-center justify-center py-20 text-text-muted text-center px-6">
             <Heart className="w-16 h-16 mb-4 opacity-50" />
             <p>{loc('لا توجد منتجات محفوظة بعد', 'Nothing saved yet', 'هیچ پاشەکەوت نەکراوە')}</p>
-            <p className="text-[12px] text-zinc-600 mt-1.5">
+            <p className="text-[12px] text-text-muted mt-1.5">
               {loc('اضغط القلب على أي منتج — في المتجر أو داخل متجر تاجر — لحفظه هنا.', 'Tap the heart on any product, here or in a merchant store, to keep it here.', 'قڵبەکە دابگرە بۆ پاشەکەوتکردن.')}
             </p>
           </div>
         ) : (
-          items.map((p) => (
+          <div className="lv-surface overflow-hidden divide-y divide-border-subtle">
+          {items.map((p) => (
             <div
               key={`${p.source}:${p.product_id}`}
               onClick={() => openProduct(p)}
-              className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 flex items-center gap-3.5 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+              className="p-3 flex items-center gap-3.5 cursor-pointer hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors"
             >
-              <div className="w-14 h-14 rounded-lg overflow-hidden bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+              <div className="w-14 h-14 rounded-md overflow-hidden bg-surface-raised border border-border-subtle flex items-center justify-center shrink-0">
                 {p.image ? (
                   <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                 ) : (
-                  <ShoppingBag className="w-5 h-5 text-zinc-500" />
+                  <ShoppingBag className="w-5 h-5 text-text-muted" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-[13.5px] truncate" dir="auto">
                   {dir === 'rtl' && p.name_ar ? p.name_ar : p.name}
                 </h3>
-                <div className="text-[12px] text-zinc-400 truncate">
+                <div className="text-[12px] text-text-secondary truncate">
                   {p.store_name || loc('متجر Levonis', 'Levonis store', 'فرۆشگای Levonis')}
                 </div>
-                <div className="text-[12px] text-zinc-300 mt-0.5" dir="ltr">
+                <div className="text-[12px] text-text-secondary mt-0.5" dir="ltr">
                   {Number(p.price_iqd).toLocaleString('en-US')} IQD
                   {/* `false`, not `null`: unknown says nothing rather than
                       guessing. See the comment on `in_stock` in the route. */}
                   {p.in_stock === false && (
-                    <span className="text-zinc-500"> · {loc('غير متوفر', 'Unavailable', 'بەردەست نییە')}</span>
+                    <span className="text-text-muted"> · {loc('غير متوفر', 'Unavailable', 'بەردەست نییە')}</span>
                   )}
                 </div>
               </div>
               <button
                 onClick={(e) => remove(e, p)}
                 disabled={busyId === p.product_id}
-                className="w-9 h-9 rounded-full border border-zinc-700 flex items-center justify-center shrink-0 disabled:opacity-50"
+                className="w-9 h-9 rounded-full border border-border-subtle flex items-center justify-center shrink-0 disabled:opacity-50"
                 aria-label={loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن')}
               >
                 <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
               </button>
             </div>
-          ))
+          ))}
+          </div>
         )}
       </div>
     </div>

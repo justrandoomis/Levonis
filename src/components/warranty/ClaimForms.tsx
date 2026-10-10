@@ -7,7 +7,7 @@ import { Overlay } from '../ui/Overlay';
 import type { Attachment, Device } from './types';
 import { productName } from './types';
 import type { WarrantyStrings } from './strings';
-import { BTN_PRIMARY, ERROR_BOX, FOCUS, INPUT } from './ui';
+import { BTN_PRIMARY, ERROR_BOX, FOCUS } from './ui';
 
 /**
  * The claim form. `Overlay`, not `Sheet`: a drag-to-dismiss gesture over a
@@ -36,7 +36,7 @@ function CloseX({ onClick, label }: { onClick: () => void; label: string }) {
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors ${FOCUS}`}
+      className={`absolute top-4 end-4 p-2 text-text-muted hover:text-text-primary bg-surface-raised border border-border-subtle shadow-1 rounded-full transition-colors active:shadow-press ${FOCUS}`}
     >
       <X aria-hidden="true" className="w-4 h-4" />
     </button>
@@ -46,7 +46,7 @@ function CloseX({ onClick, label }: { onClick: () => void; label: string }) {
 function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="text-[12px] text-zinc-400 mb-1.5 block font-medium">
+      <label htmlFor={id} className="text-[12px] text-text-secondary mb-1.5 block font-medium">
         {label}
         <span className="text-red-400" aria-hidden="true">
           *
@@ -209,10 +209,10 @@ export function DeviceClaimOverlay({
     >
       <div className="p-6">
         <CloseX onClick={onClose} label={s.close} />
-        <h2 id="warranty-device-claim-title" className="text-white text-lg font-bold mb-1 pe-10">
+        <h2 id="warranty-device-claim-title" className="text-text-primary text-lg font-bold mb-1 pe-10">
           {s.newClaimTitle}
         </h2>
-        <p className="text-zinc-500 text-sm mb-4 truncate">
+        <p className="text-text-muted text-sm mb-4 truncate">
           {shown && productName(shown.product, lang)}
           {shown?.serial && (
             <>
@@ -229,6 +229,7 @@ export function DeviceClaimOverlay({
           )}
           <Field id="warranty-claim-subject" label={s.subject}>
             <input
+              className="lv-input min-w-0 py-2.5 text-sm"
               id="warranty-claim-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -237,11 +238,11 @@ export function DeviceClaimOverlay({
               required
               autoComplete="off"
               placeholder={s.subjectPh}
-              className={INPUT}
             />
           </Field>
           <Field id="warranty-claim-description" label={s.description}>
             <textarea
+              className="lv-input min-w-0 py-2.5 text-sm leading-relaxed resize-none"
               id="warranty-claim-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -250,17 +251,16 @@ export function DeviceClaimOverlay({
               required
               rows={4}
               placeholder={s.descriptionPh}
-              className={`${INPUT} resize-none`}
             />
           </Field>
           <div>
-            <span id="warranty-claim-attachments-label" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">
+            <span id="warranty-claim-attachments-label" className="text-[12px] text-text-secondary mb-1.5 block font-medium">
               {s.attachments}
             </span>
             <label
               htmlFor="warranty-claim-files"
               aria-describedby="warranty-claim-attachments-label"
-              className={`inline-flex items-center gap-2 min-h-[44px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-zinc-300 text-sm cursor-pointer hover:border-zinc-700 transition-colors focus-within:ring-2 focus-within:ring-gold ${
+              className={`lv-button lv-button-secondary cursor-pointer focus-within:ring-2 focus-within:ring-gold ${
                 uploadBusy || attachments.length >= MAX_ATTACHMENTS ? 'opacity-60 pointer-events-none' : ''
               }`}
             >
@@ -282,16 +282,16 @@ export function DeviceClaimOverlay({
             {attachments.length > 0 && (
               <ul className="flex gap-2 mt-2 flex-wrap">
                 {attachments.map((a) => (
-                  <li key={a.key} className="relative w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
+                  <li key={a.key} className="relative w-16 h-16 rounded-md overflow-hidden border border-border-subtle bg-surface-raised">
                     {a.video ? (
-                      <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-400 px-1 text-center break-all">{a.name}</div>
+                      <div className="w-full h-full flex items-center justify-center text-[9px] text-text-secondary px-1 text-center break-all">{a.name}</div>
                     ) : (
                       <img src={a.url} alt="" className="w-full h-full object-cover" />
                     )}
                     <button
                       type="button"
                       onClick={() => setAttachments((arr) => arr.filter((x) => x.key !== a.key))}
-                      className={`absolute top-0.5 end-0.5 bg-black/70 rounded-full p-1 text-zinc-300 hover:text-white ${FOCUS}`}
+                      className={`absolute top-0.5 end-0.5 bg-onyx/80 rounded-full p-1 text-snow ${FOCUS}`}
                       aria-label={s.removeAttachment}
                     >
                       <X aria-hidden="true" className="w-3 h-3" />

@@ -85,6 +85,8 @@ import {
 import GramsQuotePanel from '../components/tools/GramsQuotePanel';
 import { providerName, quoteByLink, type LinkQuoteResponse } from '../components/tools/linkQuoteApi';
 import { useMoney } from '../CurrencyContext';
+import { IconButton } from '../components/ui/Button';
+import { StatusChip } from '../components/ui/Badge';
 
 type Lang = 'ar' | 'en' | 'ckb';
 type Quality = 'draft' | 'standard' | 'fine';
@@ -596,16 +598,10 @@ export default function Tools() {
   const totalMinutes = analysis ? analysis.plate_count * (analysis.print_minutes_per_plate + analysis.preparation_minutes) : 0;
 
   return (
-    <div className="w-full pb-28 text-zinc-300 bg-black min-h-screen" dir={dir}>
-      <header className="sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label={s.back}
-          className="p-2 -m-2 text-zinc-400 hover:text-white transition-colors"
-        >
-          <Back className="w-5 h-5" />
-        </button>
-        <h1 className="text-white font-semibold text-[17px] tracking-tight">{s.title}</h1>
+    <div className="w-full pb-28 text-text-secondary min-h-screen" dir={dir}>
+      <header className="sticky top-0 z-40 bg-canvas border-b border-border-subtle px-4 py-3 flex items-center gap-3">
+        <IconButton label={s.back} onClick={() => { navigate(-1); }} icon={<Back className="w-5 h-5" />} className="-m-2" />
+        <h1 className="text-text-primary font-semibold text-[17px] tracking-tight">{s.title}</h1>
       </header>
 
       <div className="px-4 pt-5 max-w-2xl mx-auto space-y-5">
@@ -615,7 +611,7 @@ export default function Tools() {
           holds a file are both ordinary, and hiding either question behind the
           other is how one of them decides the calculator is not for them.
         */}
-        <div role="group" aria-label={s.title} className="grid grid-cols-2 gap-0.5 bg-zinc-900 border border-zinc-800 rounded-2xl p-0.5">
+        <div role="group" aria-label={s.title} className="grid grid-cols-2 gap-0.5 rounded-full lv-well border border-border-subtle p-0.5">
           {([
             { value: 'file' as const, label: s.modeFile, Icon: FileUp },
             { value: 'grams' as const, label: s.modeGrams, Icon: Scale },
@@ -625,8 +621,8 @@ export default function Tools() {
               type="button"
               aria-pressed={mode === o.value}
               onClick={() => setMode(o.value)}
-              className={`h-10 rounded-[0.9rem] text-[13px] leading-snug flex items-center justify-center gap-2 transition-colors ${
-                mode === o.value ? 'bg-zinc-800 text-white font-medium shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+              className={`h-10 rounded-full border text-[13px] leading-snug flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                mode === o.value ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
               <o.Icon className="w-4 h-4" aria-hidden />
@@ -643,7 +639,7 @@ export default function Tools() {
           <GramsQuotePanel printers={printers} materials={materials} />
         ) : (
           <>
-        <p className="text-zinc-400 text-[13px] leading-relaxed">{s.lead}</p>
+        <p className="text-text-secondary text-[13px] leading-relaxed">{s.lead}</p>
 
         {/* ---------------------------------------------------------- 1. file */}
         <section
@@ -662,12 +658,8 @@ export default function Tools() {
             const dropped = e.dataTransfer.files?.[0];
             if (dropped) void pickFile(dropped);
           }}
-          className={`rounded-2xl border transition-colors duration-300 motion-reduce:transition-none ${
-            dragging
-              ? 'border-gold bg-gold/5'
-              : justAccepted
-                ? 'border-emerald-500/60 bg-emerald-500/[0.04]'
-                : 'border-zinc-800 bg-zinc-950'
+          className={`lv-surface transition-colors duration-300 motion-reduce:transition-none ${
+            dragging ? 'border-gold bg-gold/5' : justAccepted ? 'border-emerald-500/60 bg-emerald-500/[0.04]' : ''
           }`}
         >
           <input
@@ -686,12 +678,12 @@ export default function Tools() {
               {/* The tile carries the state, because it is the one thing on the
                   row big enough to notice out of the corner of an eye. */}
               <span
-                className={`w-10 h-10 rounded-xl border grid place-items-center shrink-0 transition-colors duration-300 motion-reduce:transition-none ${
+                className={`w-10 h-10 rounded-sm border grid place-items-center shrink-0 transition-colors duration-300 motion-reduce:transition-none ${
                   uploading
                     ? 'bg-gold/10 border-gold/40'
                     : analysisId
                       ? 'bg-emerald-500/10 border-emerald-500/40'
-                      : 'bg-zinc-900 border-zinc-800'
+                      : 'bg-surface-raised border-border-subtle'
                 }`}
               >
                 {uploading ? (
@@ -708,7 +700,7 @@ export default function Tools() {
                 )}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-white text-[13px] font-medium truncate">{file.name}</p>
+                <p className="text-text-primary text-[13px] font-medium truncate">{file.name}</p>
                 {/* WHAT IT SAYS WHILE IT IS WORKING. `s.uploading` already
                     exists in all three languages — this screen showed it only
                     on the Calculate button, which is not rendered yet while the
@@ -716,7 +708,7 @@ export default function Tools() {
                 {uploading ? (
                   <p className="text-gold text-[11px]">{s.uploading}</p>
                 ) : (
-                  <p className="text-zinc-500 text-[11px] tabular-nums" dir="ltr">
+                  <p className="text-text-muted text-[11px] tabular-nums" dir="ltr">
                     {(file.size / 1024 / 1024).toFixed(1)} MB
                   </p>
                 )}
@@ -725,7 +717,7 @@ export default function Tools() {
                 type="button"
                 onClick={() => fileInput.current?.click()}
                 disabled={busy}
-                className="text-[12px] text-zinc-400 hover:text-white px-3 py-2 rounded-lg hover:bg-zinc-900 transition-colors disabled:opacity-40"
+                className="lv-button lv-button-ghost lv-button-sm"
               >
                 {s.change}
               </button>
@@ -737,12 +729,12 @@ export default function Tools() {
               disabled={busy}
               className="w-full p-8 flex flex-col items-center gap-2 text-center disabled:opacity-50"
             >
-              <span className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 grid place-items-center">
+              <span className="w-12 h-12 rounded-full lv-well grid place-items-center">
                 <FileUp className="w-5 h-5 text-gold" aria-hidden />
               </span>
-              <span className="text-white text-[14px] font-medium mt-1">{s.pick}</span>
-              <span className="text-zinc-500 text-[11px]">{s.formats}</span>
-              <span className="text-zinc-600 text-[11px] hidden sm:block">{s.drop}</span>
+              <span className="text-text-primary text-[14px] font-medium mt-1">{s.pick}</span>
+              <span className="text-text-muted text-[11px]">{s.formats}</span>
+              <span className="text-text-muted text-[11px] hidden sm:block">{s.drop}</span>
             </button>
           )}
         </section>
@@ -756,13 +748,14 @@ export default function Tools() {
             offers the two real ways on: download it and upload it here, or
             send it to merchants as a print request (only while that is open). */}
         {!file && (
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3" data-link-door>
-            <label htmlFor="tools-link" className="flex items-center gap-2 text-[13px] text-zinc-300">
+          <section className="lv-surface p-4 space-y-3" data-link-door>
+            <label htmlFor="tools-link" className="flex items-center gap-2 text-[13px] text-text-secondary">
               <Link2 className="w-4 h-4 text-gold" aria-hidden />
               {s.linkLabel}
             </label>
             <div className="flex gap-2">
               <input
+                className="lv-input min-w-0 flex-1 text-[13px]"
                 id="tools-link"
                 type="url"
                 inputMode="url"
@@ -781,25 +774,24 @@ export default function Tools() {
                   }
                 }}
                 placeholder="https://makerworld.com/…"
-                className="min-w-0 flex-1 h-11 bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-white text-[13px] focus:outline-none focus:border-gold transition-colors"
               />
               <button
                 type="button"
                 onClick={() => void checkLink()}
                 disabled={linkBusy || !linkUrl.trim()}
-                className="shrink-0 h-11 px-4 rounded-xl bg-gold text-accent-contrast text-[13px] font-semibold flex items-center gap-1.5 disabled:opacity-40 active:scale-[0.98] transition-transform"
+                className="lv-button lv-button-primary shrink-0"
               >
                 {linkBusy ? <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
                 {linkBusy ? s.pricing : s.calculate}
               </button>
             </div>
-            <p className="text-zinc-600 text-[11px]" dir="ltr">{s.linkHint}</p>
+            <p className="text-text-muted text-[11px]" dir="ltr">{s.linkHint}</p>
 
             {linkError && <Notice tone="error">{linkError}</Notice>}
 
             {linkResult && linkResult.quote === null && (
               <div className="space-y-3" data-link-unresolved>
-                <p className="text-zinc-300 text-[12.5px] leading-relaxed">
+                <p className="text-text-secondary text-[12.5px] leading-relaxed">
                   {s.linkUnresolved(providerName(linkResult.link.provider, linkResult.link.host), linkResult.link.external_id)}
                 </p>
                 <div className="grid gap-2">
@@ -807,7 +799,7 @@ export default function Tools() {
                     href={linkResult.link.canonical_url}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
-                    className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                    className="lv-button lv-button-secondary"
                   >
                     <ExternalLink className="w-4 h-4 text-gold" aria-hidden />
                     {s.linkDownload}
@@ -815,7 +807,7 @@ export default function Tools() {
                   <button
                     type="button"
                     onClick={() => fileInput.current?.click()}
-                    className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                    className="lv-button lv-button-secondary"
                   >
                     <FileUp className="w-4 h-4 text-gold" aria-hidden />
                     {s.linkThenUpload}
@@ -824,7 +816,7 @@ export default function Tools() {
                     <button
                       type="button"
                       onClick={() => sendLinkAsRequest(linkResult.link.canonical_url)}
-                      className="h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[13px] font-medium flex items-center justify-center gap-2 transition-colors"
+                      className="lv-button lv-button-secondary"
                       data-link-as-request
                     >
                       <Users className="w-4 h-4 text-gold" aria-hidden />
@@ -837,8 +829,8 @@ export default function Tools() {
 
             {linkResult && linkResult.quote !== null && (
               <div className="space-y-3" data-link-priced>
-                {linkResult.info.name && <p className="text-white text-[13px] font-medium truncate">{linkResult.info.name}</p>}
-                <div className="-mx-4 divide-y divide-zinc-800/70 border-y border-zinc-800/70">
+                {linkResult.info.name && <p className="text-text-primary text-[13px] font-medium truncate">{linkResult.info.name}</p>}
+                <div className="-mx-4 divide-y divide-border-subtle border-y border-border-subtle">
                 <Field label={s.printer}>
                   <Select
                     value={printerId}
@@ -859,17 +851,17 @@ export default function Tools() {
                 {linkResult.quote.confidence === 'insufficient' ? (
                   <Notice tone="warn">{s.insufficient}</Notice>
                 ) : (
-                  <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-4">
-                    <p className="text-[11px] text-zinc-500">
-                      {s.linkFromSite}: <span dir="ltr" className="tabular-nums text-zinc-300">{formatGrams(linkResult.grams_total ?? 0)}</span>
+                  <div className="lv-well rounded-md p-4">
+                    <p className="text-[11px] text-text-muted">
+                      {s.linkFromSite}: <span dir="ltr" className="tabular-nums text-text-secondary">{formatGrams(linkResult.grams_total ?? 0)}</span>
                     </p>
-                    <p className="text-white font-bold text-[26px] leading-tight mt-1 tabular-nums" dir="ltr" data-link-price>
+                    <p className="text-text-primary font-bold text-[26px] leading-tight mt-1 tabular-nums" dir="ltr" data-link-price>
                       {money(linkResult.quote.price_iqd)}
                     </p>
                     {linkResult.covers?.material_only && (
                       <p className="text-amber-300/90 text-[11px] leading-relaxed mt-2">{s.linkMaterialOnly}</p>
                     )}
-                    <p className="text-zinc-500 text-[11px] leading-relaxed mt-2">{s.estimateBadge}</p>
+                    <p className="text-text-muted text-[11px] leading-relaxed mt-2">{s.estimateBadge}</p>
                   </div>
                 )}
                 {linkResult.pricedFor !== `${printerId}|${materialId}` && (
@@ -877,7 +869,7 @@ export default function Tools() {
                     type="button"
                     onClick={() => void checkLink()}
                     disabled={linkBusy}
-                    className="w-full h-11 rounded-xl bg-gold text-accent-contrast text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                    className="lv-button lv-button-secondary w-full"
                   >
                     <RefreshCw className="w-4 h-4" aria-hidden />
                     {s.recalc}
@@ -890,8 +882,8 @@ export default function Tools() {
 
         {/* ------------------------------------------------------ 2. settings */}
         {analysisId && (
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-950 divide-y divide-zinc-800/70">
-            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{s.settings}</h2>
+          <section className="lv-surface divide-y divide-border-subtle">
+            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{s.settings}</h2>
 
             <Field label={s.printer}>
               <Select
@@ -914,7 +906,7 @@ export default function Tools() {
               />
             </Field>
             {printerHonesty && (
-              <p className="px-4 pb-3 -mt-1 text-[11px] leading-relaxed text-zinc-500" data-printer-honesty>
+              <p className="px-4 pb-3 -mt-1 text-[11px] leading-relaxed text-text-muted" data-printer-honesty>
                 {printerHonesty}
               </p>
             )}
@@ -995,7 +987,7 @@ export default function Tools() {
             </Field>
 
             <Field label={s.quantity}>
-              <div className="flex items-center gap-1" dir="ltr">
+              <div className="inline-flex items-center gap-1 rounded-md lv-well border border-[var(--clay-field)] p-1" dir="ltr">
                 <Stepper
                   sign="−"
                   disabled={busy || quantity <= 1}
@@ -1004,7 +996,7 @@ export default function Tools() {
                     invalidate();
                   }}
                 />
-                <span className="w-10 text-center text-white text-[14px] font-medium tabular-nums">{quantity}</span>
+                <span className="w-10 text-center text-text-primary text-[14px] font-medium tabular-nums">{quantity}</span>
                 <Stepper
                   sign="+"
                   disabled={busy || quantity >= 200}
@@ -1025,7 +1017,7 @@ export default function Tools() {
             type="button"
             onClick={() => void calculate()}
             disabled={busy || !printerId || !materialId}
-            className="w-full h-12 rounded-2xl bg-gold text-accent-contrast font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99] transition-transform"
+            className="lv-button lv-button-primary w-full h-12 text-[15px]"
           >
             {busy ? (
               <>
@@ -1043,12 +1035,12 @@ export default function Tools() {
 
         {/* --------------------------------------------- 3. what the file says */}
         {geometry && (
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden">
-            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-800/70 flex items-center gap-2">
+          <section className="lv-surface overflow-hidden">
+            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted border-b border-border-subtle flex items-center gap-2">
               <Ruler className="w-3.5 h-3.5" aria-hidden />
               {s.fromFile}
             </h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-zinc-800/70">
+            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-border-subtle">
               <Fact label={s.size}>
                 {formatMm(geometry.dimensions_mm.x)} × {formatMm(geometry.dimensions_mm.y)} ×{' '}
                 {formatMm(geometry.dimensions_mm.z)} mm
@@ -1069,16 +1061,16 @@ export default function Tools() {
 
         {/* -------------------------------------------------- 4. the estimate */}
         {analysis && (
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden">
-            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 border-b border-zinc-800/70 flex items-center gap-2">
+          <section className="lv-surface overflow-hidden">
+            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted border-b border-border-subtle flex items-center gap-2">
               <Layers className="w-3.5 h-3.5" aria-hidden />
               {s.estimated}
             </h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-zinc-800/70">
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border-subtle">
               <Fact label={s.weight}>{formatGrams(totalGrams)}</Fact>
               <Fact label={s.time}>
                 <span className="inline-flex items-center gap-1">
-                  <Timer className="w-3 h-3 text-zinc-500" aria-hidden />
+                  <Timer className="w-3 h-3 text-text-muted" aria-hidden />
                   {formatDuration(totalMinutes, L)}
                 </span>
               </Fact>
@@ -1086,16 +1078,16 @@ export default function Tools() {
               <Fact label={s.layers}>{analysis.layer_count.toLocaleString('en-US')}</Fact>
             </dl>
             {wasteGrams > 0.05 && (
-              <p className="px-4 py-2.5 text-[11px] text-zinc-500 border-t border-zinc-800/70">
-                {s.waste}: <span className="text-zinc-300 tabular-nums" dir="ltr">{formatGrams(wasteGrams)}</span>
+              <p className="px-4 py-2.5 text-[11px] text-text-muted border-t border-border-subtle">
+                {s.waste}: <span className="text-text-secondary tabular-nums" dir="ltr">{formatGrams(wasteGrams)}</span>
               </p>
             )}
             {analysis.unmeasured.length > 0 && (
-              <div className="px-4 py-3 border-t border-zinc-800/70">
-                <p className="text-[11px] text-zinc-500 mb-1.5">{s.unmeasured}</p>
+              <div className="px-4 py-3 border-t border-border-subtle">
+                <p className="text-[11px] text-text-muted mb-1.5">{s.unmeasured}</p>
                 <ul className="flex flex-wrap gap-1.5">
                   {analysis.unmeasured.map((u) => (
-                    <li key={u} className="text-[11px] text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-full px-2.5 py-1">
+                    <li key={u} className="text-[11px] text-text-secondary bg-surface-raised border border-border-subtle rounded-full px-2.5 py-1">
                       {(s as unknown as Record<string, string>)[u] ?? u}
                     </li>
                   ))}
@@ -1109,28 +1101,23 @@ export default function Tools() {
         {quote && quote.confidence === 'insufficient' && <Notice tone="warn">{s.insufficient}</Notice>}
 
         {quote && quote.confidence !== 'insufficient' && (
-          <section className="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/[0.07] to-transparent p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">{s.price}</p>
-            <p className="text-white font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-quote-price>
+          <section className="lv-surface-raised p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{s.price}</p>
+            <p className="text-text-primary font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-quote-price>
               {money(quote.price_iqd)}
             </p>
             {quote.range_iqd.high > quote.range_iqd.low && (
-              <p className="text-zinc-400 text-[12px] mt-1 tabular-nums" dir="ltr">
+              <p className="text-text-secondary text-[12px] mt-1 tabular-nums" dir="ltr">
                 {s.rangeNote}: {money(quote.range_iqd.low)} – {money(quote.range_iqd.high)}
               </p>
             )}
-            <p
-              className={`inline-flex items-center gap-1.5 mt-3 text-[11px] rounded-full px-2.5 py-1 border ${
-                quote.confidence === 'exact'
-                  ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
-                  : 'text-amber-300 border-amber-500/30 bg-amber-500/10'
-              }`}
-            >
-              <AlertCircle className="w-3 h-3" aria-hidden />
-              {quote.confidence === 'exact' ? s.exactBadge : s.estimateBadge}
+            <p className="mt-3">
+              <StatusChip tone={quote.confidence === 'exact' ? 'success' : 'warning'} icon={<AlertCircle className="w-3 h-3" aria-hidden />}>
+                {quote.confidence === 'exact' ? s.exactBadge : s.estimateBadge}
+              </StatusChip>
             </p>
             {comparison && comparison.jobKey === jobKey && printer && (
-              <p className="text-zinc-400 text-[12px] mt-2" data-price-comparison>
+              <p className="text-text-secondary text-[12px] mt-2" data-price-comparison>
                 {comparison.price === quote.price_iqd ? (
                   s.priceSame(comparison.name)
                 ) : (
@@ -1139,7 +1126,7 @@ export default function Tools() {
               </p>
             )}
             {quote.confidence !== 'exact' && (
-              <p className="text-zinc-500 text-[11px] leading-relaxed mt-3">{s.why}</p>
+              <p className="text-text-muted text-[11px] leading-relaxed mt-3">{s.why}</p>
             )}
           </section>
         )}
@@ -1149,16 +1136,16 @@ export default function Tools() {
             with it; while it is shut to this viewer the way there is not
             offered at all, rather than leading to a maintenance card. */}
         {quote && !requestsClosed && (
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+          <section className="lv-surface p-4">
             <button
               type="button"
               onClick={() => navigate('/requests')}
-              className="w-full h-11 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-white text-[14px] font-medium flex items-center justify-center gap-2 transition-colors"
+              className="lv-button lv-button-secondary w-full"
             >
               <Users className="w-4 h-4 text-gold" aria-hidden />
               {s.sendRequest}
             </button>
-            <p className="text-zinc-500 text-[11px] leading-relaxed mt-2.5 text-center">{s.sendNote}</p>
+            <p className="text-text-muted text-[11px] leading-relaxed mt-2.5 text-center">{s.sendNote}</p>
           </section>
         )}
           </>
@@ -1173,7 +1160,7 @@ export default function Tools() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="px-4 py-3 flex items-center justify-between gap-3 min-h-[3.25rem]">
-      <span className="text-zinc-400 text-[13px] shrink-0">{label}</span>
+      <span className="text-text-secondary text-[13px] shrink-0">{label}</span>
       <div className="min-w-0 flex justify-end">{children}</div>
     </div>
   );
@@ -1181,9 +1168,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-zinc-950 px-4 py-3">
-      <dt className="text-zinc-500 text-[10px] uppercase tracking-wider">{label}</dt>
-      <dd className="text-white text-[13px] font-medium mt-0.5 tabular-nums" dir="ltr">
+    <div className="bg-surface px-4 py-3">
+      <dt className="text-text-muted text-[10px] uppercase tracking-wider">{label}</dt>
+      <dd className="text-text-primary text-[13px] font-medium mt-0.5 tabular-nums" dir="ltr">
         {children}
       </dd>
     </div>
@@ -1203,10 +1190,10 @@ function Select({
 }) {
   return (
     <select
+      className="lv-input w-auto max-w-[16rem] min-h-10 py-2 text-[13px] disabled:opacity-40 truncate"
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className="max-w-[16rem] bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-[13px] focus:outline-none focus:border-gold disabled:opacity-40 transition-colors truncate"
     >
       {options.map((o) => (
         <option key={String(o.value)} value={o.value}>
@@ -1234,7 +1221,7 @@ function Segmented<T extends string | boolean>({
   disabled?: boolean;
 }) {
   return (
-    <div role="group" className="inline-flex bg-zinc-900 border border-zinc-800 rounded-xl p-0.5 gap-0.5">
+    <div role="group" className="inline-flex rounded-full lv-well border border-border-subtle p-0.5 gap-0.5">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -1244,8 +1231,8 @@ function Segmented<T extends string | boolean>({
             disabled={disabled}
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`px-3 py-1.5 rounded-[0.6rem] text-[12px] transition-colors disabled:opacity-40 ${
-              active ? 'bg-zinc-800 text-white font-medium shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
+            className={`px-3 py-1.5 rounded-full border text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${
+              active ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
           >
             {o.label}
@@ -1263,7 +1250,7 @@ function Stepper({ sign, onClick, disabled }: { sign: string; onClick: () => voi
       onClick={onClick}
       disabled={disabled}
       aria-label={sign === '+' ? 'increase' : 'decrease'}
-      className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-[15px] grid place-items-center disabled:opacity-30 hover:border-zinc-700 transition-colors"
+      className="relative lv-hit w-9 h-9 rounded-sm bg-surface-raised text-text-secondary text-[15px] grid place-items-center shadow-1 no-press hover:text-text-primary active:shadow-press disabled:opacity-35 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       {sign}
     </button>
@@ -1273,10 +1260,10 @@ function Stepper({ sign, onClick, disabled }: { sign: string; onClick: () => voi
 function Notice({ tone, children }: { tone: 'error' | 'warn'; children: React.ReactNode }) {
   const styles =
     tone === 'error'
-      ? 'text-blush bg-crimson/10 border-crimson/40'
-      : 'text-amber-300/90 bg-amber-500/10 border-amber-500/25';
+      ? 'lv-alert-danger'
+      : 'lv-alert-warning';
   return (
-    <p role="alert" className={`text-[12px] leading-relaxed rounded-2xl p-3.5 border flex items-start gap-2 ${styles}`}>
+    <p role="alert" className={`lv-alert text-[12px] leading-relaxed text-text-primary flex items-start gap-2 ${styles}`}>
       <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
       <span>{children}</span>
     </p>
@@ -1285,7 +1272,7 @@ function Notice({ tone, children }: { tone: 'error' | 'warn'; children: React.Re
 
 function Hint({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] leading-relaxed text-zinc-400 flex items-start gap-2">
+    <p className="text-[11px] leading-relaxed text-text-secondary flex items-start gap-2">
       <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px text-amber-400/80" aria-hidden />
       <span>{children}</span>
     </p>

@@ -41,6 +41,7 @@ import { useGoBack } from '../lib/useGoBack';
 import { parsePolicyVersion, policyOutline } from '../lib/policyReader';
 import { ErrorState } from '../components/ui/AsyncStates';
 import Spinner from '../components/ui/Spinner';
+import { IconButton } from '../components/ui/Button';
 import { Segmented } from '../components/ui/Segmented';
 import PolicyLibrary from '../components/policies/PolicyLibrary';
 import PolicyOutline from '../components/policies/PolicyOutline';
@@ -200,7 +201,7 @@ export default function Policies() {
     const isArchived = doc !== null && (current !== null ? doc.version !== current : doc.status === 'archived');
 
     return (
-      <div data-policy-print-root className="flex min-h-screen w-full flex-col bg-canvas font-sans">
+      <div data-policy-print-root className="flex min-h-screen w-full flex-col font-sans">
         <PolicyPrintStyles />
 
         <header
@@ -211,27 +212,15 @@ export default function Policies() {
             <Link
               to="/policies"
               aria-label={s.toLibrary}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="group inline-flex size-11 shrink-0 items-center justify-center rounded-full text-text-secondary no-press hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              <ChevronLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-180" />
+              <span aria-hidden="true" className="flex size-9 items-center justify-center rounded-full transition-colors group-hover:bg-white/[0.06] group-active:bg-[var(--clay-well-bg)] group-active:shadow-press">
+                <ChevronLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-180" />
+              </span>
             </Link>
             <p className="min-w-0 flex-1 truncate text-[15px] font-bold leading-[1.5] text-text-primary">{title}</p>
-            <button
-              type="button"
-              onClick={copyDocumentLink}
-              aria-label={s.copyLink}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <Link2 aria-hidden="true" className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              aria-label={s.print}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <Printer aria-hidden="true" className="h-4 w-4" />
-            </button>
+            <IconButton onClick={() => void copyDocumentLink()} label={s.copyLink} icon={<Link2 aria-hidden="true" className="h-4 w-4" />} />
+            <IconButton onClick={() => window.print()} label={s.print} icon={<Printer aria-hidden="true" className="h-4 w-4" />} />
           </div>
           <p role="status" aria-live="polite" className="sr-only">{copiedDoc ? s.copied : ''}</p>
         </header>
@@ -343,17 +332,10 @@ export default function Policies() {
   // --------------------------------------------------------- the library index
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-canvas font-sans" dir={dir}>
+    <div className="flex min-h-screen w-full flex-col font-sans" dir={dir}>
       <header className="sticky top-0 z-10 border-b border-border-subtle bg-canvas">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-4 py-2">
-          <button
-            type="button"
-            onClick={goBack}
-            aria-label={s.back}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <ChevronLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-180" />
-          </button>
+          <IconButton onClick={goBack} label={s.back} icon={<ChevronLeft aria-hidden="true" className="h-5 w-5 rtl:rotate-180" />} />
           <h1 className="min-w-0 flex-1 truncate text-[16px] font-bold leading-[1.5] text-text-primary">
             {s.libraryTitle}
           </h1>

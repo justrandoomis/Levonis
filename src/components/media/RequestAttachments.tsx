@@ -134,16 +134,13 @@ export function AttachmentDraft({
 
   return (
     <div>
-      <div className="space-y-2">
+      <div className="lv-well rounded-lg divide-y divide-border-subtle empty:hidden">
         {files.map((f, i) => (
-          <div
-            key={`${f.name}-${i}`}
-            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2.5"
-          >
-            <KindIcon kind={isImage(f) ? 'reference' : 'model'} className="w-4 h-4 text-zinc-500 shrink-0" />
+          <div key={`${f.name}-${i}`} className="flex items-center gap-3 px-3 py-2.5">
+            <KindIcon kind={isImage(f) ? 'reference' : 'model'} className="w-4 h-4 text-text-muted shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-zinc-200 text-[12.5px] truncate">{f.name}</p>
-              <p className="text-zinc-600 text-[11px]" dir="ltr">{formatBytes(f.size)}</p>
+              <p className="text-text-primary text-[12.5px] truncate">{f.name}</p>
+              <p className="text-text-muted text-[11px]" dir="ltr">{formatBytes(f.size)}</p>
             </div>
             <button
               type="button"
@@ -161,14 +158,14 @@ export function AttachmentDraft({
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="w-full min-h-[46px] mt-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] text-zinc-400 text-[12.5px] font-semibold flex items-center justify-center gap-2"
+          className="w-full min-h-[46px] mt-2 rounded-lg border border-dashed border-border-subtle text-text-secondary text-[12.5px] font-semibold flex items-center justify-center gap-2 transition-colors hover:text-text-primary"
         >
           <Paperclip className="w-4 h-4" />
           {loc('أرفق صورة أو ملف ثلاثي الأبعاد', 'Attach a photo or a 3D file', 'وێنە یان فایلی سێ ڕەهەندی هاوپێچ بکە')}
         </button>
       )}
 
-      <p className="text-zinc-600 text-[11px] mt-2">
+      <p className="text-text-muted text-[11px] mt-2">
         {loc(
           'صور، PDF، أو ملفات STL / 3MF / OBJ. حتى 6 ملفات. الملفات تُرفع بعد نشر الطلب.',
           'Images, PDF, or STL / 3MF / OBJ models. Up to 6 files. They upload once the request is posted.',
@@ -259,22 +256,19 @@ export function AttachmentList({
         {loc('المرفقات', 'Attachments', 'هاوپێچەکان')}
       </h3>
 
-      <div className="space-y-2">
+      <div className="lv-well rounded-lg divide-y divide-border-subtle empty:hidden">
         {files.map((f) => (
-          <div
-            key={f.id}
-            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/30 px-3 py-2.5"
-          >
+          <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
             {f.inline && f.url ? (
-              <img src={f.url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-black/40" />
+              <img src={f.url} alt="" className="w-10 h-10 rounded-sm object-cover shrink-0 bg-black/40" />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-black/40 flex items-center justify-center shrink-0">
-                <KindIcon kind={f.kind} className="w-4 h-4 text-zinc-500" />
+              <div className="w-10 h-10 rounded-sm bg-surface-raised flex items-center justify-center shrink-0">
+                <KindIcon kind={f.kind} className="w-4 h-4 text-text-muted" />
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-zinc-200 text-[12.5px] truncate">{f.file_name}</p>
-              <p className="text-zinc-600 text-[11px]" dir="ltr">
+              <p className="text-text-primary text-[12.5px] truncate">{f.file_name}</p>
+              <p className="text-text-muted text-[11px]" dir="ltr">
                 {f.kind} · {formatBytes(f.size_bytes)}
               </p>
             </div>
@@ -283,7 +277,7 @@ export function AttachmentList({
                 href={f.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-zinc-400 shrink-0"
+                className="text-text-secondary shrink-0"
                 aria-label={loc('فتح', 'Open', 'کردنەوە')}
               >
                 <Download className="w-4 h-4" />
@@ -309,7 +303,7 @@ export function AttachmentList({
           type="button"
           onClick={() => input.current?.click()}
           disabled={busy === 'add'}
-          className="w-full min-h-[42px] mt-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] text-zinc-400 text-[12.5px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+          className="w-full min-h-[42px] mt-2 rounded-lg border border-dashed border-border-subtle text-text-secondary text-[12.5px] font-semibold flex items-center justify-center gap-2 transition-colors hover:text-text-primary disabled:opacity-40"
         >
           {busy === 'add' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
           {loc('أضف ملفًا', 'Add a file', 'فایلێک زیاد بکە')}
