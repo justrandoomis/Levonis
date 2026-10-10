@@ -45,8 +45,14 @@ import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import {
+  UsdPricingColourRow,
   UsdPricingModelRow,
   UsdPricingOptionsFooter,
+  UsdPricingSkuRow,
+  pricingSkuKey,
+  type FormColour,
+  type FormSku,
+  type PricingScope,
   UsdPricingPreview,
   UsdPricingProductPanel,
   UsdPricingProvider,
@@ -658,12 +664,16 @@ export default function ProductForm({
   // second copy (form/UsdPricingSection.tsx). Inert for everyone but the owner.
   const savedMeasures = useMemo(() => {
     const options: Record<string, ProductDimensionsV2 | undefined> = {};
+    const colours: Record<string, ProductDimensionsV2 | undefined> = {};
+    const skus: Record<string, ProductDimensionsV2 | undefined> = {};
     try {
       const b = baseline ? (JSON.parse(baseline) as { d: EditorDoc; rs: RelationsState }) : null;
       for (const g of b?.rs.groups ?? []) for (const v of g.values) options[v.id] = v.dimensions;
-      return { base: b?.d.dimensions ?? null, options };
+      for (const c of b?.rs.colors ?? []) colours[c.id] = c.dimensions;
+      for (const v of b?.rs.variants ?? []) skus[pricingSkuKey(v.option_value_ids, v.color_id)] = v.dimensions;
+      return { base: b?.d.dimensions ?? null, options, colours, skus };
     } catch {
-      return { base: null, options };
+      return { base: null, options, colours, skus };
     }
   }, [baseline]);
   const pricingModels = useMemo<FormModel[]>(
@@ -685,9 +695,32 @@ export default function ProductForm({
     () => Object.fromEntries(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v.dimensions] as const))),
     [rel.groups]
   );
-  const setPricingMeasure = useCallback((scope: 'base' | 'option', id: string, patch: Partial<ProductDimensionsV2>) => {
+  // FX-7: each colour and each variant row prices at its own level too (empty = its model's).
+  const pricingColours = useMemo<FormColour[]>(
+    () => rel.colors.filter((c) => c.active !== false).map((c) => ({ id: c.id, name_en: c.name_en, name_ar: c.name_ar, name_ckb: c.name_ckb, option_ids: c.option_value_ids })),
+    [rel.colors]
+  );
+  const pricingSkus = useMemo<FormSku[]>(
+    () => rel.variants.map((v) => ({ combo_key: pricingSkuKey(v.option_value_ids, v.color_id), option_value_ids: v.option_value_ids, color_id: v.color_id })),
+    [rel.variants]
+  );
+  const colourDimensions = useMemo(() => Object.fromEntries(rel.colors.map((c) => [c.id, c.dimensions] as const)), [rel.colors]);
+  const skuDimensions = useMemo(() => Object.fromEntries(rel.variants.map((v) => [pricingSkuKey(v.option_value_ids, v.color_id), v.dimensions] as const)), [rel.variants]);
+  const setPricingMeasure = useCallback((scope: PricingScope, id: string, patch: Partial<ProductDimensionsV2>) => {
     if (scope === 'base') {
       setDoc((d) => ({ ...d, dimensions: { ...(d.dimensions ?? emptyDimensions()), ...patch } }));
+      return;
+    }
+    if (scope === 'color') {
+      setRel((r) => ({ ...r, colors: r.colors.map((c) => (c.id === id ? { ...c, dimensions: { ...(c.dimensions ?? emptyDimensions()), ...patch } } : c)) }));
+      return;
+    }
+    if (scope === 'sku') {
+      // Only a variant row the form already holds (its measure fields show only then).
+      setRel((r) => ({
+        ...r,
+        variants: r.variants.map((v) => (pricingSkuKey(v.option_value_ids, v.color_id) === id ? { ...v, dimensions: { ...(v.dimensions ?? emptyDimensions()), ...patch } } : v)),
+      }));
       return;
     }
     setRel((r) => ({
@@ -706,9 +739,15 @@ export default function ProductForm({
       savedOptionDimensions: savedMeasures.options,
       models: pricingModels,
       productSellsDirect: doc.sale_types.includes('direct_sale' as SaleType),
+      colours: pricingColours,
+      skus: pricingSkus,
+      colourDimensions,
+      savedColourDimensions: savedMeasures.colours,
+      skuDimensions,
+      savedSkuDimensions: savedMeasures.skus,
       setMeasure: setPricingMeasure,
     }),
-    [doc.dimensions, optionDimensions, savedMeasures, pricingModels, doc.sale_types, setPricingMeasure]
+    [doc.dimensions, optionDimensions, savedMeasures, pricingModels, doc.sale_types, pricingColours, pricingSkus, colourDimensions, skuDimensions, setPricingMeasure]
   );
   const pricing = useUsdPricingState({
     productId: doc.id || null,
@@ -1830,6 +1869,17 @@ export default function ProductForm({
                 }
               : undefined
           }
+          // FX-7: each colour's own USD pricing (empty = its model's) and its computed
+          // customer price per model; each variant row's, inside the colour's card.
+          colorExtra={
+            canSeeCost
+              ? (c) => {
+                  const colour = pricingColours.find((x) => x.id === c.id);
+                  return colour ? <UsdPricingColourRow colour={colour} /> : null;
+                }
+              : undefined
+          }
+          comboExtra={canSeeCost ? (combo) => <UsdPricingSkuRow comboKey={pricingSkuKey(combo.option_value_ids, combo.color_id)} /> : undefined}
         />
         {canSeeCost && <UsdPricingOptionsFooter />}
       </SectionCard>

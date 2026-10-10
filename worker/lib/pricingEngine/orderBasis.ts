@@ -4,8 +4,9 @@
  *
  * One query per checkout over the engine's private results. A line gets the
  * snapshot only when its product is engine-priced AND the regular price the
- * resolver charged it is exactly the stored engine price of its model ×
- * channel; every other line keeps the exact INSERT it always had (all six
+ * resolver charged it is exactly the stored engine price of its SKU × channel
+ * (its exact selection when the product is priced per colour or variant —
+ * FX-7 — else its model); every other line keeps the exact INSERT it always had (all six
  * columns NULL, migration 0181's shape trigger). The snapshot is written once,
  * with the line, and frozen by 0181's trigger; accounting never reads it.
  *
@@ -31,6 +32,9 @@ export interface LineForBasis {
   product_id: string;
   /** The model (the option value the line was priced from); '' = the product itself. */
   option_id: string;
+  /** FX-7: the line's whole selection (every option value) and its colour — the SKU a per-SKU price (0183) is stored under. */
+  option_value_ids?: readonly string[];
+  color_id?: string | null;
   /** 'direct' when the line was priced from the direct ladder, else 'preorder'. */
   pricing_basis: 'direct' | 'preorder';
   /** The pre-order route the line travels, when priced as a pre-order. */
@@ -84,8 +88,14 @@ export async function engineBasisOf(db: D1Database, lines: readonly LineForBasis
   }
   for (const l of wanted) {
     const channel = channelOfLine(l)!;
-    const combo = skuComboKey({ option_value_ids: l.option_id ? [l.option_id] : [], color_id: null });
-    const r = rows.find((x) => x.product_id === l.product_id && x.combo_key === combo && x.channel === channel);
+    // The exact SKU first (a product priced per colour or variant, FX-7), then the model (priced per model).
+    const ids = l.option_value_ids && l.option_value_ids.length ? l.option_value_ids : l.option_id ? [l.option_id] : [];
+    const candidates = [...new Set([skuComboKey({ option_value_ids: ids, color_id: l.color_id || null }), skuComboKey({ option_value_ids: l.option_id ? [l.option_id] : [], color_id: null })])];
+    const found = candidates
+      .map((combo) => ({ combo, r: rows.find((x) => x.product_id === l.product_id && x.combo_key === combo && x.channel === channel) }))
+      .find((x) => !!x.r);
+    const r = found?.r;
+    const combo = found?.combo ?? '';
     if (!r || Number(r.computed_price_iqd) !== l.regular_iqd) continue;
     out.set(l.key, {
       price_basis: 'engine',

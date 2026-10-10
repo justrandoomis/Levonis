@@ -79,6 +79,8 @@ export function OptionsSection({
   canSeeCost,
   errors,
   valueExtra,
+  colorExtra,
+  comboExtra,
   pricesLocked = false,
 }: {
   rel: RelationsState;
@@ -93,6 +95,10 @@ export function OptionsSection({
   errors: Record<string, string>;
   /** Rendered at the end of each model's card (the owner's USD pricing of that model); absent for everyone else. */
   valueExtra?: (value: FormValue) => React.ReactNode;
+  /** FX-7: rendered in each colour's card (the owner's USD pricing of that colour); absent for everyone else. */
+  colorExtra?: (color: FormColor) => React.ReactNode;
+  /** FX-7: rendered in each variant row of a colour's card (the owner's USD pricing of that SKU). */
+  comboExtra?: (combo: { option_value_ids: string[]; color_id: string | null }) => React.ReactNode;
   /**
    * The engine prices this product (owner decision 8): every price cell —
    * each model's, each colour's, the direct-sale increase and the route
@@ -721,6 +727,7 @@ export function OptionsSection({
               label={`أبعاد ${c.name_en || 'اللون'} / Colour dimensions`}
               onChange={(dimensions) => patchColor(c.id, { dimensions })}
             />
+            {colorExtra?.(c)}
 
             {/* ----------------------------------------------- link matrix */}
             {rel.groups.some((g) => g.values.length > 0) && (
@@ -817,6 +824,7 @@ export function OptionsSection({
                             label={`أبعاد ${label || 'التركيبة'} / Variant dimensions`}
                             onChange={(dimensions) => patchCombination(combo, { dimensions })}
                           />
+                          {comboExtra?.(combo)}
                         </div>
                       );
                     })}

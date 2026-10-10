@@ -702,6 +702,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'pricing_inputs.conversion_rate_snapshot': 'the USD/IQD an IQD supplier entry was converted at, a decimal; no media',
   'pricing_sku_costs.combo_key': 'an SKU combination key (option and colour ids); no media',
   'pricing_sku_costs.shipping_profile': 'a shipping profile name; no media',
+  // 0183 — FX-7: the per-SKU price rung; its key names option and colour ids, no media.
+  'product_sku_prices.combo_key': 'an SKU combination key (option and colour ids); no media',
   'pricing_audit.entity_key': 'the id or code of what a pricing change touched; no media',
   'pricing_audit.idempotency_key': 'a pricing write de-duplication token; no media',
   'pricing_audit.pricing_before_json': 'private pricing values before a change (amounts, rates, ids); no media',

@@ -90,9 +90,9 @@ export const AUTO_REPRICE_SOURCE = 'fx_auto';
 export const BLOCK_RETRY_MS = 24 * 3_600_000;
 /** The owner writer's own cap on one product's batch. */
 export const AUTO_REPRICE_STATEMENT_CAP = 200;
-/** loadProducts reads in chunks of 50: one product read and eight relation reads per chunk. */
+/** loadProducts reads in chunks of 50: one product read and nine relation reads per chunk (the ninth: the SKU rung, FX-7). */
 const PRODUCT_CHUNK = 50;
-const READS_PER_CHUNK = 9;
+const READS_PER_CHUNK = 10;
 /** The system actor of an automatic write the cron starts. */
 export const SYSTEM_ACTOR = 'system:fx';
 

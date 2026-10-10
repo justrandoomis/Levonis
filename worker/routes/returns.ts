@@ -65,7 +65,7 @@ import { pumpAfter, waitUntilFrom } from '../lib/eventBus';
 import { announceAfterResponse, orderTopic } from '../lib/adminTopicRouting';
 import { parseConditionDoc, returnRefusal } from '../lib/condition';
 import { channelOfLine } from '../lib/pricingEngine/orderBasis';
-import { claimBasis, engineObservations, takesUsdBaseRule, usdIqdInForceAt } from '../lib/pricingEngine/protectionBasis';
+import { claimBasis, engineCombosOf, engineObservations, takesUsdBaseRule, usdIqdInForceAt } from '../lib/pricingEngine/protectionBasis';
 import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/conditionProjection';
 
 const WINDOW_MS = 7 * 86_400_000;
@@ -1167,9 +1167,13 @@ priceProtectionRoutes.post('/claims', async (c) => {
   // nobody is charged, and refuse or grant money on it.
   const relations = await loadRelationsView(c.env.DB, String(productRow.id), productRow.inventory_mode);
   const doc = relations ? applyRelations(parseProductRow(productRow), relations) : parseProductRow(productRow);
+  // The line's whole selection (0018), so a per-SKU engine price (0183) is the one compared.
+  const storedValueIds = safeParse<unknown[]>(String(item.option_value_ids ?? '[]'), []).filter((x): x is string => typeof x === 'string' && x !== '');
+  const optionValueIds = storedValueIds.length ? storedValueIds : optionId ? [optionId] : [];
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: optionId || null,
+    optionValueIds,
     colorId: colorId || null,
     transportMethod: null,
     warrantyPlanId: null,
@@ -1221,8 +1225,15 @@ priceProtectionRoutes.post('/claims', async (c) => {
   const lineChannel =
     (engineSnapshot && typeof item.engine_channel === 'string' ? item.engine_channel : null) ??
     channelOfLine({ pricing_basis: (pricing as { pricing_basis?: string } | null)?.pricing_basis === 'preorder' ? 'preorder' : 'direct', route: typeof transportMethod === 'string' ? transportMethod : null });
+  // The line's SKU (0183: a product priced per colour or variant) and its model (priced per model).
+  const lineCombos = engineCombosOf({
+    snapshot: typeof item.engine_combo_key === 'string' ? item.engine_combo_key : null,
+    optionId,
+    optionValueIds,
+    colorId: colorId || null,
+  });
   const observations = lineChannel
-    ? await engineObservations(c.env.DB, String(item.product_id), optionId, lineChannel as Parameters<typeof engineObservations>[3], { from: windowFrom, to: windowTo })
+    ? await engineObservations(c.env.DB, String(item.product_id), lineCombos, lineChannel as Parameters<typeof engineObservations>[3], { from: windowFrom, to: windowTo })
     : { history: [], today: null };
   const v5 = takesUsdBaseRule(item.order_created_at as string | null);
   const decision = claimBasis({

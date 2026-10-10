@@ -100,6 +100,9 @@ export function previewRowsDto(models: readonly PricedModel[]) {
         const price = m.result?.channels.find((x) => x.channel === c.channel) ?? null;
         return {
           option_id: m.option_id,
+          // FX-7: the unit's key and colour (a model's own key, no colour, when priced per model).
+          combo_key: m.combo_key,
+          color_id: m.color_id,
           ...m.names,
           channel: c.channel,
           today_prepaid_iqd: c.prepaid_iqd,

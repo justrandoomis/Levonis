@@ -34,6 +34,7 @@ import type {
   OptionFulfillment,
   OptionV2,
   PhysicalDimensionOverrides,
+  SkuPriceRow,
 } from './pricing';
 import { parsePhysicalDimensions } from './physicalDimensions';
 import {
@@ -142,6 +143,13 @@ export interface ProductRelationsView {
   /** 0073. The (model x order type) and (model x route) cells. */
   fulfillments: OptionFulfillmentRow[];
   transports: OptionTransportRow[];
+  /**
+   * 0183 (FX-7). The engine's final regular price per exact SKU × channel —
+   * the resolver's last rung (`SkuPriceRow`). `null` (or absent, on a view
+   * built before this field existed) = the table is not on this database;
+   * `[]` = present, and this product has no per-SKU price.
+   */
+  sku_prices?: SkuPriceRow[] | null;
 }
 
 export const EMPTY_RELATIONS: ProductRelationsView = {
@@ -156,6 +164,7 @@ export const EMPTY_RELATIONS: ProductRelationsView = {
   images: [],
   fulfillments: [],
   transports: [],
+  sku_prices: null,
 };
 
 /**
@@ -198,13 +207,38 @@ export function isMissingRelationTable(e: unknown): boolean {
   return /no such table/i.test(msg);
 }
 
+interface SkuPriceDbRow extends SkuPriceRow {
+  product_id: string;
+}
+
+/**
+ * THE SKU RUNG'S ROWS (0183, FX-7), read QUIETLY: a database without the table
+ * answers null — the resolver then walks the ladder exactly as before — and
+ * that window (a deploy ahead of its migration) is expected, so it is not
+ * logged as a fault on every product read. Any other failure is logged once,
+ * like every relation read, and also degrades to "no SKU row".
+ */
+async function skuPriceRows(run: () => Promise<{ results: SkuPriceDbRow[] }>): Promise<SkuPriceDbRow[] | null> {
+  try {
+    const rows = (await run()).results ?? [];
+    return rows
+      .map((r) => ({ product_id: String(r.product_id), combo_key: String(r.combo_key), channel: String(r.channel), regular_price_iqd: Number(r.regular_price_iqd) }))
+      .filter((r) => Number.isSafeInteger(r.regular_price_iqd) && r.regular_price_iqd > 0);
+  } catch (e) {
+    if (!isMissingRelationTable(e)) console.error(`product relations unavailable (sku prices): ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
+
+const SKU_PRICE_COLUMNS = 'product_id, combo_key, channel, regular_price_iqd';
+
 /** Loads everything relational for one product in four batched reads. */
 export async function loadRelationsView(
   db: D1Database,
   productId: string,
   inventoryMode: unknown
 ): Promise<ProductRelationsView> {
-  const [rel, variants, images] = await Promise.all([
+  const [rel, variants, images, skuPrices] = await Promise.all([
     loadProductRelations(db, productId).catch((e) => {
       console.error(
         `product relations unavailable (one product ${productId}): ${e instanceof Error ? e.message : String(e)}`
@@ -222,6 +256,9 @@ export async function loadRelationsView(
         .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order, id')
         .bind(productId)
         .all<ImageRow>()
+    ),
+    skuPriceRows(() =>
+      db.prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id = ? ORDER BY combo_key, channel`).bind(productId).all<SkuPriceDbRow>()
     ),
   ]);
   const activeImages = images.filter(isActiveProductImageRow);
@@ -241,6 +278,7 @@ export async function loadRelationsView(
     images: activeImages,
     fulfillments: rel.fulfillments,
     transports: rel.transports,
+    sku_prices: skuPrices === null ? null : skuPrices.map(({ combo_key, channel, regular_price_iqd }) => ({ combo_key, channel, regular_price_iqd })),
   };
 }
 
@@ -254,7 +292,7 @@ export async function loadRelationsViews(
   const ids = rows.map((r) => r.id);
   // One bound parameter for the list (json_each): the live D1 refuses > 100 (review F1).
 
-  const [groups, values, colors, links, variants, images, fulfillments, optionTransports] = await Promise.all([
+  const [groups, values, colors, links, variants, images, fulfillments, optionTransports, skuPrices] = await Promise.all([
     softAll<OptionGroupRow>('groups', () =>
       db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, name_en`).bind(JSON.stringify(ids)).all<OptionGroupRow>()
     ),
@@ -303,6 +341,12 @@ export async function loadRelationsViews(
         .bind(JSON.stringify(ids))
         .all<OptionTransportRow>()
     ),
+    skuPriceRows(() =>
+      db
+        .prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY product_id, combo_key, channel`)
+        .bind(JSON.stringify(ids))
+        .all<SkuPriceDbRow>()
+    ),
   ]);
 
   const bucket = <T extends { product_id: string }>(list: T[]) => {
@@ -322,6 +366,7 @@ export async function loadRelationsViews(
   const im = bucket(images);
   const fl = bucket(fulfillments);
   const ot = bucket(optionTransports);
+  const sp = skuPrices === null ? null : bucket(skuPrices);
 
   for (const row of rows) {
     const gs = g.get(row.id) ?? [];
@@ -345,6 +390,7 @@ export async function loadRelationsViews(
       images: ims,
       fulfillments: fl.get(row.id) ?? [],
       transports: ot.get(row.id) ?? [],
+      sku_prices: sp === null ? null : (sp.get(row.id) ?? []).map(({ combo_key, channel, regular_price_iqd }) => ({ combo_key, channel, regular_price_iqd })),
     });
   }
   return out;
@@ -619,7 +665,11 @@ export function applyRelations(
         }))
       : doc.media;
 
-  return { ...doc, options, colors, media: canonicalProductMedia(mediaCandidates) };
+  // 0183 (FX-7): the SKU rung rides on the customer's document only — the
+  // admin projections (includeInactive) edit the ladder and never carry it —
+  // and only when the product has rows, so every other document is unchanged.
+  const skuPrices = !showAll && view.sku_prices && view.sku_prices.length ? view.sku_prices : null;
+  return { ...doc, options, colors, media: canonicalProductMedia(mediaCandidates), ...(skuPrices ? { sku_prices: skuPrices } : {}) };
 }
 
 /** The snapshot the inventory engine needs, from an already-loaded view. */

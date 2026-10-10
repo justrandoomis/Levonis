@@ -80,6 +80,14 @@ export interface UsdPricingFormStrings {
   directPrice: Fill;
   modelBlocked: string;
   coloursFollow: string;
+  /** FX-7 (with the SKU rung): each colour's own pricing lives in its card. */
+  coloursOwn: string;
+  colourTitle: string;
+  colourInherits: string;
+  colourSavedLater: string;
+  skuTitle: string;
+  skuInherits: string;
+  perSkuNote: string;
   modelSavedLater: string;
   previewTitle: string;
   previewNote: string;
@@ -150,6 +158,13 @@ const ar: UsdPricingFormStrings = {
   directPrice: (p) => `البيع المباشر: ${p}`,
   modelBlocked: 'لم يُحسب السعر بعد — افتح «تعديل»',
   coloursFollow: 'ألوان هذا الموديل تتبع تسعيره حتى يتوفر تسعير كل لون على حدة',
+  coloursOwn: 'لكل لون تسعيره في بطاقته ضمن «الألوان» — الحقل الفارغ هناك يرث قيمة هذا الموديل',
+  colourTitle: 'التسعير بالدولار لهذا اللون',
+  colourInherits: 'فارغ = يرث من موديله ثم من المنتج؛ أي قيمة هنا تخص هذا اللون وحده',
+  colourSavedLater: 'لون جديد: يُحفظ تسعيره بعد حفظ المنتج، ويظهر سعره بعدها',
+  skuTitle: 'التسعير بالدولار لهذه النسخة',
+  skuInherits: 'فارغ = يرث من لونه ثم موديله ثم المنتج',
+  perSkuNote: 'يُسعَّر هذا المنتج لكل لون ونسخة: صف لكل نسخة وطريقة بيع',
   modelSavedLater: 'موديل جديد: يُحفظ تسعيره بعد حفظ المنتج، ويظهر ملخصه بعدها',
   previewTitle: 'الأسعار الجديدة لكل موديل وطريقة بيع',
   previewNote: 'معاينة فقط: لا تُكتب أسعار الزبون في هذه المرحلة، ويبقى سعر المتجر كما هو',
@@ -220,6 +235,13 @@ const en: UsdPricingFormStrings = {
   directPrice: (p) => `Direct sale: ${p}`,
   modelBlocked: 'Not priced yet — open “Edit”',
   coloursFollow: 'This model’s colours follow its pricing until per-colour pricing is available',
+  coloursOwn: 'Each colour has its own pricing in its card under “Colours” — an empty field there takes this model’s value',
+  colourTitle: 'USD pricing for this colour',
+  colourInherits: 'Empty = its model’s value, then the product’s; a value here is this colour’s alone',
+  colourSavedLater: 'A new colour: its pricing is saved after the product is saved, and its price appears then',
+  skuTitle: 'USD pricing for this variant',
+  skuInherits: 'Empty = its colour’s value, then its model’s, then the product’s',
+  perSkuNote: 'This product is priced per colour and variant: one row per variant and sale channel',
   modelSavedLater: 'A new model: its pricing is saved after the product is saved, and its summary appears then',
   previewTitle: 'New prices per model and sale channel',
   previewNote: 'Preview only: customer prices are not written at this stage, and the store price stays as it is',
@@ -290,6 +312,13 @@ const ckb: UsdPricingFormStrings = {
   directPrice: (p) => `فرۆشتنی ڕاستەوخۆ: ${p}`,
   modelBlocked: 'هێشتا نرخ هەژمار نەکراوە — «دەستکاری» بکەرەوە',
   coloursFollow: 'ڕەنگەکانی ئەم مۆدێلە نرخدانانەکەی پەیڕەو دەکەن تا نرخدانانی هەر ڕەنگێک بە جیا بەردەست دەبێت',
+  coloursOwn: 'هەر ڕەنگێک نرخدانانی خۆی لە کارتەکەیدا لە ژێر «ڕەنگەکان» هەیە — خانەی بەتاڵ لەوێ بەهای ئەم مۆدێلە وەردەگرێت',
+  colourTitle: 'نرخدانان بە دۆلار بۆ ئەم ڕەنگە',
+  colourInherits: 'بەتاڵ = بەهای مۆدێلەکەی، پاشان بەهای بەرهەمەکە؛ هەر بەهایەک لێرە تەنها هی ئەم ڕەنگەیە',
+  colourSavedLater: 'ڕەنگی نوێ: نرخدانانەکەی دوای پاشەکەوتکردنی بەرهەمەکە پاشەکەوت دەکرێت و نرخەکەی ئەو کاتە دەردەکەوێت',
+  skuTitle: 'نرخدانان بە دۆلار بۆ ئەم جۆرە',
+  skuInherits: 'بەتاڵ = بەهای ڕەنگەکەی، پاشان مۆدێلەکەی، پاشان بەرهەمەکە',
+  perSkuNote: 'ئەم بەرهەمە بۆ هەر ڕەنگ و جۆرێک نرخی بۆ دادەنرێت: ڕیزێک بۆ هەر جۆر و ڕێگایەکی فرۆشتن',
   modelSavedLater: 'مۆدێلی نوێ: نرخدانانەکەی دوای پاشەکەوتکردنی بەرهەمەکە پاشەکەوت دەکرێت و پوختەکەی ئەو کاتە دەردەکەوێت',
   previewTitle: 'نرخە نوێیەکان بۆ هەر مۆدێل و ڕێگایەکی فرۆشتن',
   previewNote: 'تەنها پێشبینین: لەم قۆناغەدا نرخی کڕیار نانووسرێت و نرخی فرۆشگا وەک خۆی دەمێنێتەوە',

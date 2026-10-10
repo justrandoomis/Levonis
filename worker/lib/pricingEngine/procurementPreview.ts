@@ -27,17 +27,17 @@
  * mismatch is PRICING_PREVIEW_STALE.
  */
 import { priceSku, resolveSkuInputs, type ChannelPrice, type PricingIssue } from '@levonis/pricing/costToPrice';
-import { resolveRuleAt, type PricingRuleRow } from '@levonis/pricing/ruleResolution';
+import { resolveRuleAt, type PricingRuleRow, type RuleTarget } from '@levonis/pricing/ruleResolution';
 import { channelOfRoute, ROUTE_PROFILE, PREORDER_ROUTES, type PreorderRoute, type ShippingProfile, type SkuChannel } from '@levonis/pricing/skuChannel';
 import { procurementExact, quotientProcurementExact, ceilProcurementExact, type ProcurementExact } from '@levonis/contracts/procurementCost';
 import { sameRate } from '@levonis/pricing/fxChain';
 import { sha256Hex } from '../crypto';
 import type { PricingContext } from '../../routes/cart';
-import { evaluateLegacy, type ModelToday } from './legacy';
+import { evaluateLegacy, unitColorId, unitComboKey, unitOptionIds, type ModelToday } from './legacy';
 import { ruleTargetOf } from './compute';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
-import { chainOf, INPUT_FIELD_NAMES, type InputFields, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+import { chainOf, chainOfUnit, INPUT_FIELD_NAMES, type InputFields, type InputScope, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
 import {
   deriveProductEntries,
   lineFeeds,
@@ -199,7 +199,16 @@ export interface ProductPreview {
   derived_hash: string;
   derived: DerivedProduct;
   rule_writes: RuleWrite[];
-  models: Array<{ option_id: string; names: { name_ar: string; name_en: string; name_ckb: string }; channels: ModelToday['channels']; result: ReturnType<typeof priceSku> | null }>;
+  models: Array<{
+    option_id: string;
+    names: { name_ar: string; name_en: string; name_ckb: string };
+    channels: ModelToday['channels'];
+    result: ReturnType<typeof priceSku> | null;
+    /** FX-7: the unit's key, whole selection and colour (a model: its own key, `[option_id]`, null). */
+    combo_key: string;
+    option_value_ids: string[];
+    color_id: string | null;
+  }>;
   missing_codes: string[];
   cod_as_direct: boolean;
 }
@@ -301,17 +310,26 @@ export function priceModels(
   const u = rates?.usd_iqd ?? null;
   return models.map((m) => {
     const channels = m.channels.filter((c) => c.ok).map((c) => c.channel);
-    if (!rates || !channels.length) return { option_id: m.option_id, names: namesOf(m.option), channels: m.channels, result: null };
-    const at = ruleTargetOf(productId, m.option_id);
+    const unit = { combo_key: unitComboKey(m), option_value_ids: unitOptionIds(m), color_id: unitColorId(m) };
+    const names = m.names ?? namesOf(m.option);
+    if (!rates || !channels.length) return { option_id: m.option_id, names, channels: m.channels, result: null, ...unit };
+    // A SKU (FX-7) resolves over every level of its selection; a model over the product and itself.
+    const isSku = m.combo_key !== undefined;
+    const at = isSku ? unitRuleTarget(productId, unit) : ruleTargetOf(productId, m.option_id);
     const result = priceSku({
-      chain: chainOf(inputs, m.option_id),
+      chain: isSku ? chainOfUnit(inputs, unit) : chainOf(inputs, m.option_id),
       rates: rates.central,
       channels,
       target: resolveRuleAt(rules, 'target_profit', at, { usdIqdRate: u }),
       extra: channels.includes('direct_sale') ? resolveRuleAt(rules, 'direct_sale_extra', at) : null,
     });
-    return { option_id: m.option_id, names: namesOf(m.option), channels: m.channels, result };
+    return { option_id: m.option_id, names, channels: m.channels, result, ...unit };
   });
+}
+
+/** Where a SKU's rules are resolved (FX-7): its whole selection and its colour — product → option → colour → SKU. */
+export function unitRuleTarget(productId: string, unit: { option_value_ids: readonly string[]; color_id: string | null }): RuleTarget {
+  return { product_id: productId, option_value_ids: [...unit.option_value_ids], color_id: unit.color_id, ancestry: [] };
 }
 
 function namesOf(option: { name_ar?: string; name_en?: string; name_ckb?: string } | null) {
@@ -355,7 +373,7 @@ export function lineSummary(p: PurchaseForPricing, line: PurchaseLineForPricing,
 /** What one model's bar is computed from: the product's inputs and rules (drafts laid over), the rates. */
 export interface ModelSummaryInput {
   productId: string;
-  model: Pick<ProductPreview['models'][number], 'option_id' | 'channels'> | null;
+  model: (Pick<ProductPreview['models'][number], 'option_id' | 'channels'> & Partial<Pick<ProductPreview['models'][number], 'combo_key' | 'option_value_ids' | 'color_id'>> & { sku?: boolean }) | null;
   /** The store as it would be after the drafts (owner rows replaced or added). */
   inputs: ReadonlyArray<Partial<StoredInputRow>>;
   rules: readonly PricingRuleRow[];
@@ -366,7 +384,7 @@ export interface ModelSummaryInput {
   /** Profiles proposed by a purchase (the bar says «مقترح»). */
   proposals: ReadonlyArray<{ scope: string; scope_id: string; shipping_profile: ShippingProfile }>;
   /** A draft replaces the supplier cost at this level (its IQD provenance no longer applies). */
-  supplierReplacedAt: (level: 'base' | 'option') => boolean;
+  supplierReplacedAt: (level: InputScope) => boolean;
   storePrice: number | null;
   excludedCharges: string[];
   documentRate: string | null;
@@ -393,10 +411,14 @@ export function modelSummary(a: ModelSummaryInput): LineSummary {
     return out;
   }
   out.option_id = model.option_id;
-  const chain = chainOf(a.inputs, model.option_id);
+  // A SKU (FX-7: a colour or a variant) resolves over every level of its selection; a model over the product and itself.
+  const unit = model.sku
+    ? { option_value_ids: model.option_value_ids ?? (model.option_id ? [model.option_id] : []), color_id: model.color_id ?? null, combo_key: model.combo_key ?? null }
+    : null;
+  const chain = unit ? chainOfUnit(a.inputs, unit) : chainOf(a.inputs, model.option_id);
   const resolved = resolveSkuInputs(chain).inputs;
   const u = rates.usd_iqd;
-  const at = ruleTargetOf(a.productId, model.option_id);
+  const at = unit ? unitRuleTarget(a.productId, unit) : ruleTargetOf(a.productId, model.option_id);
   const targetRule = resolveRuleAt(a.rules, 'target_profit', at, { usdIqdRate: u });
   if (targetRule.status === 'active') {
     out.rule_level = targetRule.rule.scope;
@@ -424,8 +446,9 @@ export function modelSummary(a: ModelSummaryInput): LineSummary {
     out.supplier_original_amount = resolved.supplier.amount;
     out.supplier_original_currency = resolved.supplier.currency;
     out.cross_rate = resolved.supplier.currency === 'EUR' ? rates.eur_usd : resolved.supplier.currency === 'CNY' ? rates.cny_usd : null;
-    const level = resolved.supplier.amount_level === 'option' ? 'option' : 'base';
-    const row = a.stored.inputs.find((r) => r.scope === level && r.origin === 'MANUAL_OVERRIDE' && r.supplier_input_mode === 'IQD_CONVERTED' && (level === 'base' || r.scope_id === model.option_id));
+    const level: InputScope = resolved.supplier.amount_level;
+    const ids = level === 'base' ? [''] : level === 'option' ? (unit ? unit.option_value_ids : [model.option_id]) : level === 'color' ? [unit?.color_id ?? ''] : [unit?.combo_key ?? ''];
+    const row = a.stored.inputs.find((r) => r.scope === level && r.origin === 'MANUAL_OVERRIDE' && r.supplier_input_mode === 'IQD_CONVERTED' && ids.includes(r.scope_id));
     if (row && !a.supplierReplacedAt(level) && row.original_input_amount && row.conversion_rate_snapshot)
       out.iqd_converted = { original_input_amount: row.original_input_amount, conversion_rate_snapshot: row.conversion_rate_snapshot, converted_at: row.converted_at };
   }

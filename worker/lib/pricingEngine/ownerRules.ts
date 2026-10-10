@@ -9,7 +9,9 @@
  *     never a dinar amount (a dinar minimum exists only as a migrated row);
  *   - Direct Sale Extra: whole dinars ≥ 0 on the 1,000 step, never USD;
  *     empty = INHERIT;
- *   - levels: product and option (colour and variant arrive with FX-7); global
+ *   - levels: product, option, and — on a database with the SKU rung (0183,
+ *     FX-7) — colour and SKU (an exact combination of the product's values and
+ *     colour); empty = inherit, walking SKU → colour → option → product. Global
  *     and category are refused — there is no invented default.
  * Refusals name the FIELD, never the value (UNKNOWN_FIELD,
  * PRICING_INPUT_INVALID, DIRECT_SALE_EXTRA_NOT_ON_STEP).
@@ -20,23 +22,39 @@ import { canonicalUsdRuleAmount, type PricingRuleRow } from '@levonis/pricing/ru
 import { ROUNDING_STEP_IQD } from '@levonis/pricing/costToPrice';
 import { strictBody } from '../fx/ownerActs';
 import { inputInvalid } from './whatIf';
-import { ruleAt, type ProductPricingData, type RuleWrite } from './store';
+import { ruleAt, type ProductPricingData, type ProductRuleScope, type RuleWrite } from './store';
 
 const MAX_RULES_PER_WRITE = 60;
 
+/**
+ * The ids each level may name for one product: its active models, and — only
+ * with the SKU rung (0183) — its colours and its colour/variant SKUs. Absent
+ * colour and SKU sets refuse those levels exactly as before FX-7.
+ */
+export interface PricingScopeIds {
+  option: ReadonlySet<string>;
+  color?: ReadonlySet<string>;
+  sku?: ReadonlySet<string>;
+}
+
+export const scopeIdsOf = (ids: ReadonlySet<string> | PricingScopeIds): PricingScopeIds =>
+  ids instanceof Set ? { option: ids } : (ids as PricingScopeIds);
+
 /** Parse `PUT /products/:id/rules` → the rule writes (absent targets are untouched). */
-export function parseRuleWrites(body: Record<string, unknown>, productId: string, optionIds: ReadonlySet<string>, stored: ProductPricingData): RuleWrite[] {
+export function parseRuleWrites(body: Record<string, unknown>, productId: string, scopeIds: ReadonlySet<string> | PricingScopeIds, stored: ProductPricingData): RuleWrite[] {
   const list = body.rules;
   if (!Array.isArray(list) || list.length < 1 || list.length > MAX_RULES_PER_WRITE) throw inputInvalid('rules');
+  const ids = scopeIdsOf(scopeIds);
   const seen = new Set<string>();
   return list.map((raw, i) => {
     const r = strictBody(raw, ['kind', 'scope', 'scope_id', 'amount_usd', 'amount_iqd']);
     const kind = r.kind;
     if (kind !== 'target_profit' && kind !== 'direct_sale_extra') throw inputInvalid(`rules[${i}].kind`);
-    const scope = r.scope;
-    if (scope !== 'product' && scope !== 'option') throw inputInvalid(`rules[${i}].scope`);
+    const scope = r.scope as ProductRuleScope;
+    const levels: Record<string, ReadonlySet<string> | undefined> = { option: ids.option, color: ids.color, sku: ids.sku };
+    if (scope !== 'product' && !levels[scope]) throw inputInvalid(`rules[${i}].scope`);
     const scopeId = scope === 'product' ? '' : typeof r.scope_id === 'string' ? r.scope_id : '';
-    if (scope === 'option' && !optionIds.has(scopeId)) throw inputInvalid(`rules[${i}].scope_id`);
+    if (scope !== 'product' && !levels[scope]!.has(scopeId)) throw inputInvalid(`rules[${i}].scope_id`);
     if (scope === 'product' && r.scope_id !== undefined && r.scope_id !== null && r.scope_id !== '') throw inputInvalid(`rules[${i}].scope_id`);
     const key = `${kind}:${scope}:${scopeId}`;
     if (seen.has(key)) throw inputInvalid(`rules[${i}]`);

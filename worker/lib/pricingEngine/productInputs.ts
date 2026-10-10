@@ -6,12 +6,15 @@
  * added or edited — its prices section and its options' prices — not only in
  * the procurement card).
  *
- * Per scope (the product itself = `base`, each model = `option`): the supplier
- * cost in its own currency (USD / EUR / CNY), the base shipping route, the
- * packed weight (grams) or the packed volume (CBM), the additional cost per
- * piece in IQD, and the two owner rules — the minimum profit in USD and the
- * Direct Sale Extra in whole dinars on the 1,000 step. A colour or a variant
- * is priced at its model's level until FX-7 (owner question Q4's default).
+ * Per scope (the product itself = `base`, each model = `option`, and — with
+ * the SKU rung, migration 0183, FX-7 — each colour = `color` and each colour or
+ * variant SKU = `sku`): the supplier cost in its own currency (USD / EUR /
+ * CNY), the base shipping route, the packed weight (grams) or the packed
+ * volume (CBM), the additional cost per piece in IQD, and the two owner rules —
+ * the minimum profit in USD and the Direct Sale Extra in whole dinars on the
+ * 1,000 step. An empty field inherits: SKU → colour → model → product (E1's
+ * walk, owner question Q4). On a database without 0183 a colour or a variant
+ * is priced at its model's level, as before (its scope is refused).
  *
  * Writes inputs and rules only — never a price (the engine's writer adopts and
  * prices a product at the owner's completing save, decision 8). The answer
@@ -48,21 +51,36 @@ import { iqdToCanonicalUsd } from '@levonis/pricing/fxChain';
 import type { PricingContext } from '../../routes/cart';
 import { sha256Hex } from '../crypto';
 import { fxRefusal, positiveDecimal, strictBody } from '../fx/ownerActs';
-import { evaluateLegacy } from './legacy';
+import { evaluateLegacy, modelsOf, sellableSkus, unitNamesOf } from './legacy';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
 import { inputInvalid } from './whatIf';
-import { parseRuleWrites } from './ownerRules';
+import { parseRuleWrites, type PricingScopeIds } from './ownerRules';
 import { mergedRules } from './fromPurchase';
 import { canonical, modelSummary, priceModels } from './procurementPreview';
 import { previewRowsDto, ratesHeadDto, summaryDto } from './procurementDto';
-import { inputWriteIsNoop, nextInputRow, ownerRow, ruleAt, ruleWriteIsNoop, type InputFields, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+import {
+  inputWriteIsNoop,
+  nextInputRow,
+  ownerRow,
+  ruleAt,
+  ruleWriteIsNoop,
+  type InputFields,
+  type InputScope,
+  type InputWrite,
+  type ProductPricingData,
+  type ProductRuleScope,
+  type RuleWrite,
+  type StoredInputRow,
+} from './store';
 import {
   engineEvaluationDto,
   evaluateEngineWrite,
   loadEngineControl,
   loadStoredSkuCosts,
+  needsSkuPricing,
   priceImageOf,
+  skuTableOf,
   withRuleIds,
   type EngineControl,
   type EngineEvaluation,
@@ -96,7 +114,7 @@ export interface FormParseContext {
 
 /** One entry's typed dinars (the preview hash covers them with the rate they convert at). */
 export interface IqdEntry {
-  scope: 'base' | 'option';
+  scope: InputScope;
   scope_id: string;
   amount: string;
   reconvert: boolean;
@@ -105,6 +123,24 @@ export interface IqdEntry {
 export const formOptionIds = (loaded: LoadedProduct): Set<string> =>
   new Set(loaded.doc.options.filter((o) => o.active !== false && !o.merged_into).map((o) => o.id));
 
+/** A SKU worth its own level: a colour, or more than one option value (one value alone is the model's level). */
+const skuOwnLevel = (combo: string) => combo.includes('c:') || combo.split('|').length > 1;
+
+/**
+ * The ids each level may name (FX-7): the active models, and — with the SKU
+ * rung (0183) only — every colour of the product and its colour or variant
+ * SKUs (the sellable ones, and the variant rows the form lists).
+ */
+export function formScopeIds(loaded: LoadedProduct): PricingScopeIds {
+  const option = formOptionIds(loaded);
+  if (!skuTableOf(loaded)) return { option };
+  const color = new Set((loaded.view?.colors ?? []).map((c) => c.id));
+  const sku = new Set<string>();
+  for (const k of sellableSkus(loaded.doc, loaded.view).skus) if (skuOwnLevel(k.combo_key)) sku.add(k.combo_key);
+  for (const v of loaded.view?.variants ?? []) if (v.active !== 0 && skuOwnLevel(v.combo_key)) sku.add(v.combo_key);
+  return { option, color, sku };
+}
+
 function wholeOrNull(raw: unknown, field: string, min: number, max: number): number | null {
   if (raw === null) return null;
   if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw < min || raw > max) throw inputInvalid(field);
@@ -112,12 +148,13 @@ function wholeOrNull(raw: unknown, field: string, min: number, max: number): num
 }
 
 /** One scope's entry of the form → an input write (absent keys untouched, null clears). */
-function parseInputEntry(raw: unknown, i: number, optionIds: ReadonlySet<string>, stored: ProductPricingData, cx: FormParseContext): { write: InputWrite; iqd: IqdEntry | null } {
+function parseInputEntry(raw: unknown, i: number, ids: PricingScopeIds, stored: ProductPricingData, cx: FormParseContext): { write: InputWrite; iqd: IqdEntry | null } {
   const r = strictBody(raw, ['scope', 'scope_id', ...FORM_INPUT_FIELDS, 'supplier_cost_iqd', 'reconvert']);
-  const scope = r.scope;
-  if (scope !== 'base' && scope !== 'option') throw inputInvalid(`inputs[${i}].scope`);
+  const scope = r.scope as InputScope;
+  const levels: Record<string, ReadonlySet<string> | undefined> = { option: ids.option, color: ids.color, sku: ids.sku };
+  if (scope !== 'base' && !levels[scope]) throw inputInvalid(`inputs[${i}].scope`);
   const scopeId = scope === 'base' ? '' : typeof r.scope_id === 'string' ? r.scope_id : '';
-  if (scope === 'option' && !optionIds.has(scopeId)) throw inputInvalid(`inputs[${i}].scope_id`);
+  if (scope !== 'base' && !levels[scope]!.has(scopeId)) throw inputInvalid(`inputs[${i}].scope_id`);
   if (scope === 'base' && r.scope_id !== undefined && r.scope_id !== null && r.scope_id !== '') throw inputInvalid(`inputs[${i}].scope_id`);
   const existing = ownerRow(stored.inputs, scope, scopeId);
   const set: Partial<InputFields> = {};
@@ -194,13 +231,13 @@ export interface ProductInputsDraft {
 
 /** Parse the form's `{inputs, rules}` (PUT and the preview alike). */
 export function parseProductInputs(body: Record<string, unknown>, loaded: LoadedProduct, stored: ProductPricingData, cx: FormParseContext): ProductInputsDraft {
-  const optionIds = formOptionIds(loaded);
+  const ids = formScopeIds(loaded);
   const rawInputs = body.inputs ?? [];
   if (!Array.isArray(rawInputs) || rawInputs.length > MAX_SCOPES) throw inputInvalid('inputs');
   const seen = new Set<string>();
   const iqd: IqdEntry[] = [];
   const inputs = rawInputs.map((raw, i) => {
-    const parsed = parseInputEntry(raw, i, optionIds, stored, cx);
+    const parsed = parseInputEntry(raw, i, ids, stored, cx);
     const w = parsed.write;
     const key = `${w.scope}:${w.scope_id}`;
     if (seen.has(key)) throw inputInvalid(`inputs[${i}]`);
@@ -210,7 +247,7 @@ export function parseProductInputs(body: Record<string, unknown>, loaded: Loaded
   });
   const rawRules = body.rules ?? [];
   if (!Array.isArray(rawRules)) throw inputInvalid('rules');
-  const rules = rawRules.length ? parseRuleWrites({ rules: rawRules }, loaded.id, optionIds, stored) : [];
+  const rules = rawRules.length ? parseRuleWrites({ rules: rawRules }, loaded.id, ids, stored) : [];
   return { inputs, rules, iqd };
 }
 
@@ -347,17 +384,21 @@ export async function productInputsAnswer(
   // «تفاصيل» reads an IQD conversion's provenance from the rows as they would be after the drafts.
   const drafted: ProductPricingData = { ...stored, inputs: inputs as StoredInputRow[] };
   const rules = mergedRules(stored, draft.rules);
-  const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx);
+  // FX-7: priced per SKU (a colour or SKU level holds a value, or a second option group) — the
+  // same decision the save makes; the colour and SKU levels are offered only with the SKU rung (0183).
+  const skuLevels = skuTableOf(loaded);
+  const perSku = skuLevels && needsSkuPricing(loaded, inputs, rules, modelsOf(loaded.doc, loaded.view).groups);
+  const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx, { perSku });
   const engine = stored.state?.mode === 'engine';
   const names = (o: { name_ar?: string; name_en?: string; name_ckb?: string } | null | undefined) => ({
     name_ar: o?.name_ar ?? '',
     name_en: o?.name_en ?? '',
     name_ckb: o?.name_ckb ?? '',
   });
-  const rowAt = (scope: 'base' | 'option', scopeId: string) =>
+  const rowAt = (scope: InputScope, scopeId: string) =>
     inputs.find((r) => r.scope === scope && (r.scope_id ?? '') === (scope === 'base' ? '' : scopeId) && r.origin === 'MANUAL_OVERRIDE') ?? null;
-  const scopeDto = (scope: 'base' | 'option', scopeId: string, label: ReturnType<typeof names>) => {
-    const ruleScope = scope === 'base' ? 'product' : 'option';
+  const scopeDto = (scope: InputScope, scopeId: string, label: ReturnType<typeof names>) => {
+    const ruleScope: ProductRuleScope = scope === 'base' ? 'product' : scope;
     const target = ruleAt(rules, pid, 'target_profit', ruleScope, scopeId);
     const extra = ruleAt(rules, pid, 'direct_sale_extra', ruleScope, scopeId);
     return {
@@ -397,6 +438,46 @@ export async function productInputsAnswer(
       pricing_summary: summaryDto(summary),
     };
   });
+  // FX-7: every colour and every colour or variant SKU, its own inputs (empty = its model's) and its
+  // computed customer price — shown in each colour's card of «الخيارات والألوان».
+  const ids = skuLevels ? formScopeIds(loaded) : { option: new Set<string>() };
+  const colours = skuLevels ? loaded.doc.colors.filter((c) => c.active !== false) : [];
+  const grid = skuLevels && (colours.length > 0 || legacy.option_groups > 1) ? sellableSkus(loaded.doc, loaded.view) : { skus: [], overflow: false };
+  const skuUnits = grid.skus.length ? (perSku ? legacy.units : evaluateLegacy(pid, loaded.doc, loaded.view, ctx, { perSku: true }).units) : [];
+  const skuScopes = [...(ids.sku ?? [])]
+    .sort()
+    .map((combo) => {
+      const sku = grid.skus.find((k) => k.combo_key === combo);
+      const ids2 = sku ? sku.option_value_ids : combo.split('|').filter((x) => x.startsWith('o:')).map((x) => x.slice(2));
+      const colourId = sku ? (sku.color?.id ?? null) : (combo.split('|').find((x) => x.startsWith('c:'))?.slice(2) ?? null);
+      return scopeDto('sku', combo, unitNamesOf(loaded.doc, ids2, loaded.doc.colors.find((c) => c.id === colourId) ?? null));
+    });
+  const skus = skuUnits.map((u) => {
+    const direct = u.channels.find((c) => c.ok && c.channel === 'direct_sale');
+    const summary = modelSummary({
+      productId: pid,
+      model: { option_id: u.option_id, channels: u.channels, combo_key: u.combo_key, option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, sku: true },
+      inputs,
+      rules,
+      stored: drafted,
+      rates,
+      engine,
+      proposals: [],
+      supplierReplacedAt: () => false,
+      storePrice: (direct ?? u.channels.find((c) => c.ok))?.prepaid_iqd ?? null,
+      excludedCharges: [],
+      documentRate: null,
+    });
+    return {
+      combo_key: u.combo_key ?? '',
+      option_id: u.option_id,
+      option_value_ids: u.option_value_ids ?? [],
+      color_id: u.color?.id ?? null,
+      ...(u.names ?? names(u.option)),
+      sells_direct: !!direct,
+      pricing_summary: summaryDto(summary),
+    };
+  });
   return {
     success: true as const,
     product_id: pid,
@@ -405,10 +486,20 @@ export async function productInputsAnswer(
     // The price writes' counter: «رجوع إلى التسعير اليدوي» is fenced on it.
     write_seq: stored.state?.write_seq ?? 0,
     rates: ratesHeadDto(rates),
-    scopes: [scopeDto('base', '', names(null)), ...options.map((o) => scopeDto('option', o.id, names(o)))],
+    // FX-7: the colour and SKU levels are offered (the database has the SKU rung), and whether the
+    // product is priced per SKU (its rows below are then one per SKU × channel).
+    sku_levels: skuLevels,
+    per_sku: perSku,
+    scopes: [
+      scopeDto('base', '', names(null)),
+      ...options.map((o) => scopeDto('option', o.id, names(o))),
+      ...colours.map((c) => scopeDto('color', c.id, names(c))),
+      ...skuScopes,
+    ],
     models,
-    // Owner decision 8's six figures per model × channel, priced as the drafts would leave the store.
-    rows: previewRowsDto(priceModels(pid, legacy.models, inputs, rules, rates)),
+    skus,
+    // Owner decision 8's six figures per model (or SKU) × channel, priced as the drafts would leave the store.
+    rows: previewRowsDto(priceModels(pid, legacy.units, inputs, rules, rates)),
     // The save's own preview (owner decision 8): adopt / reprice / data only, the six figures, the flags.
     adoption: evaluation ? engineEvaluationDto(evaluation) : null,
     // What the save carries: the engine write's hash when the save writes prices, else the hash of

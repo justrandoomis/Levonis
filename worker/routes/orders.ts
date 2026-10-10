@@ -4697,6 +4697,8 @@ export async function placeOrder(
         key: it.id,
         product_id: it.product_id,
         option_id: it.option_id,
+        option_value_ids: it.option_value_ids,
+        color_id: it.color_id || null,
         pricing_basis: it.pricing_basis,
         route: (safeParse<{ method?: unknown } | null>(it.transport_snapshot, null)?.method as string | undefined) ?? null,
         regular_iqd: it.benefit!.regular_unit_iqd,

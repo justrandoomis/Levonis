@@ -139,7 +139,9 @@ export default function EngineSaveList({ lang, compact = false, reloadKey = 0 }:
   if (!list && !error) return null;
   if (list && total === 0 && !outcome.length && !autoWorthShowing(auto)) return null;
 
-  const reasonText = (i: SaveListItem) => s.reasons(i.reasons.map((r) => (PROFILES.has(r) ? profileName(r, lang) : r)).join(lang === 'en' ? ', ' : '، '));
+  // FX-7: `SKUS` — a colour or variant added since the product was priced per SKU.
+  const reasonText = (i: SaveListItem) =>
+    s.reasons(i.reasons.map((r) => (r === 'SKUS' ? s.reasonSkus : PROFILES.has(r) ? profileName(r, lang) : r)).join(lang === 'en' ? ', ' : '، '));
 
   return (
     <section data-engine-save-list={compact ? 'compact' : 'full'} className={compact ? 'mt-4 rounded-xl border border-border-subtle p-3' : 'lv-surface min-w-0 p-4'}>

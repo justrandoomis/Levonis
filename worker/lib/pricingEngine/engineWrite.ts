@@ -53,7 +53,7 @@ import type { PricingContext } from '../../routes/cart';
 import { newId, sha256Hex } from '../crypto';
 import { fence } from '../operations';
 import { auditStatements } from '../audit';
-import { evaluateLegacy, type LegacyEvaluation } from './legacy';
+import { evaluateLegacy, modelsOf, unitComboKey, type LegacyEvaluation } from './legacy';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
 import { canonical, priceModels, type PricedModel } from './procurementPreview';
@@ -63,6 +63,7 @@ import {
   batchHead,
   batchTail,
   chainOf,
+  chainOfUnit,
   inputStatements,
   pricingAuditStatement,
   ruleStatements,
@@ -267,9 +268,12 @@ const applyConversions = (rules: readonly StoredRuleRow[], conversions: readonly
 
 // ------------------------------------------------------------ the evaluation
 
-/** One model × channel of the owner's preview (owner decision 8's six figures and the flags). */
+/** One model (or, priced per SKU, one SKU) × channel of the owner's preview (owner decision 8's six figures and the flags). */
 export interface EngineRow {
   option_id: string;
+  /** FX-7: the unit's key — the model's own, or the exact SKU's — and its colour. */
+  combo_key: string;
+  color_id: string | null;
   name_ar: string;
   name_en: string;
   name_ckb: string;
@@ -344,6 +348,33 @@ export interface EngineEvaluationInput {
   allowAdopt?: boolean;
 }
 
+const hasValue = (r: Partial<StoredInputRow>) => INPUT_FIELD_NAMES.some((k) => r[k] !== null && r[k] !== undefined);
+
+/**
+ * PRICED PER SKU OR PER MODEL (FX-7). Per SKU when the product's prices can
+ * differ below its models: a colour or SKU level that holds an input or a rule
+ * (empty = inherit, so a cleared row does not count), a second option group, or
+ * an active colour that still states a price of its own (the preview then
+ * shows each colour's old price → new). Every other product is priced per
+ * model, exactly as before FX-7.
+ */
+export function needsSkuPricing(
+  loaded: LoadedProduct,
+  inputs: ReadonlyArray<Partial<StoredInputRow>>,
+  rules: ReadonlyArray<Pick<StoredRuleRow, 'product_id' | 'scope' | 'state'>>,
+  optionGroups: number
+): boolean {
+  if (optionGroups > 1) return true;
+  if (inputs.some((r) => (r.scope === 'color' || r.scope === 'sku') && hasValue(r))) return true;
+  if (rules.some((r) => r.product_id === loaded.id && (r.scope === 'color' || r.scope === 'sku') && r.state !== 'INHERIT')) return true;
+  return (loaded.view?.colors ?? []).some(
+    (c) => c.active !== 0 && c.active !== false && [c.regular_price_iqd, c.prime_price_iqd, c.pro_price_iqd, c.regular_adjust_iqd, c.prime_adjust_iqd, c.pro_adjust_iqd].some((v) => v !== null && v !== undefined)
+  );
+}
+
+/** Is the SKU rung (0183) on this database? The overlay read it: a list, or null when the table is absent. */
+export const skuTableOf = (loaded: LoadedProduct): boolean => Array.isArray(loaded.view?.sku_prices);
+
 const setImage = (set: Partial<InputFields>) => Object.fromEntries(INPUT_FIELD_NAMES.filter((k) => k in set).map((k) => [k, set[k] ?? null]));
 
 const pctText = (oldIqd: number, newIqd: number): string => {
@@ -365,8 +396,15 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   const drafted = mergedRules(a.stored, a.ruleWrites) as StoredRuleRow[];
   const conversions = legacyConversions(pid, drafted, u);
   const rules = applyConversions(drafted, conversions);
-  const legacy = evaluateLegacy(pid, a.loaded.doc, a.loaded.view, a.ctx);
-  const models = priceModels(pid, legacy.models, a.inputs, rules, rates);
+  const groups = modelsOf(a.loaded.doc, a.loaded.view).groups;
+  const skuTable = skuTableOf(a.loaded);
+  // Without the SKU rung (a database before 0183) every product is priced per model, exactly as
+  // before FX-7: a shape that needs a price per SKU is refused (PRICE_SHAPE_UNSUPPORTED).
+  const wantsSku = needsSkuPricing(a.loaded, a.inputs, rules, groups);
+  const perSku = wantsSku && skuTable;
+  // Priced per SKU (FX-7) every sellable SKU is a unit; per model, every model — exactly as before.
+  const legacy = evaluateLegacy(pid, a.loaded.doc, a.loaded.view, a.ctx, { perSku });
+  const models = priceModels(pid, legacy.units, a.inputs, rules, rates);
   const codes = new Set<string>();
   if (!rates || !u) codes.add('FX_RATE_MISSING');
   if (rates?.derived_stale) codes.add('FX_DERIVED_STALE');
@@ -375,8 +413,9 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
     const sold = m.channels.filter((c) => c.ok).map((c) => c.channel);
     for (const i of m.result?.issues ?? []) if (i.severity === 'error' && (!i.channel || sold.includes(i.channel))) codes.add(i.code);
   }
-  const plan = planWrites(a.loaded, legacy, models);
+  const plan = planWrites(a.loaded, legacy, models, { skuTable });
   for (const c of plan.codes) codes.add(c);
+  if (wantsSku && !skuTable) codes.add('PRICE_SHAPE_UNSUPPORTED');
   const verification = codes.size ? { ok: false, mismatches: [], rows: [] } : verifyPlan(a.loaded, legacy, plan, a.ctx);
   if (!codes.size && !verification.ok) codes.add('RESOLVER_MISMATCH');
   const complete = codes.size === 0;
@@ -386,16 +425,18 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   const rows: EngineRow[] = [];
   if (complete) {
     for (const p of plan.prices) {
-      const model = legacy.models.find((m) => m.option_id === p.option_id)!;
+      const model = legacy.units.find((m) => unitComboKey(m) === p.combo_key)!;
       const today = model.channels.find((c) => c.channel === p.channel) ?? null;
       const oldIqd = today?.ok ? today.prepaid_iqd : null;
       const newIqd = p.price.computed_price_iqd;
-      const tiers = verification.rows.find((r) => r.option_id === p.option_id && r.channel === p.channel) ?? null;
+      const tiers = verification.rows.find((r) => r.combo_key === p.combo_key && r.channel === p.channel) ?? null;
       rows.push({
         option_id: p.option_id,
-        name_ar: model.option?.name_ar ?? '',
-        name_en: model.option?.name_en ?? '',
-        name_ckb: model.option?.name_ckb ?? '',
+        combo_key: p.combo_key,
+        color_id: p.color_id,
+        name_ar: model.names?.name_ar ?? model.option?.name_ar ?? '',
+        name_en: model.names?.name_en ?? model.option?.name_en ?? '',
+        name_ckb: model.names?.name_ckb ?? model.option?.name_ckb ?? '',
         channel: p.channel,
         old_iqd: oldIqd,
         new_iqd: newIqd,
@@ -421,9 +462,9 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
   // A migrated minimum that rounds up a price step is flagged (L4).
   let legacyStep = false;
   if (complete && conversions.length) {
-    const before = priceModels(pid, legacy.models, a.inputs, drafted, rates);
+    const before = priceModels(pid, legacy.units, a.inputs, drafted, rates);
     legacyStep = plan.prices.some((p) => {
-      const m = before.find((x) => x.option_id === p.option_id);
+      const m = before.find((x) => x.combo_key === p.combo_key);
       const c = m?.result?.channels.find((x) => x.channel === p.channel);
       return !!c && c.computed_price_iqd !== p.price.computed_price_iqd;
     });
@@ -461,7 +502,9 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
             conversions: conversions.map((c) => [c.rule.id, c.amount_usd]),
             rates: rates ? { u: rates.usd_iqd, fx: rates.fx_versions, shipping: rates.shipping_versions, pairs: rates.pair_versions } : null,
             image: a.image,
-            prices: plan.prices.map((p) => [p.option_id, p.channel, p.price.computed_price_iqd]),
+            // A product priced per model hashes exactly as before FX-7; per SKU, each row is its SKU's.
+            prices: plan.prices.map((p) => [plan.per_sku ? p.combo_key : p.option_id, p.channel, p.price.computed_price_iqd]),
+            ...(plan.per_sku ? { per_sku: true } : {}),
           })
         )
       : null;
@@ -476,7 +519,7 @@ export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<Eng
     large_change: rows.some((r) => r.large),
     drop_flag: rows.some((r) => r.drop_flag),
     legacy_step: legacyStep,
-    cod_priced_as_direct: legacy.models.some((m) => m.channels.some((c) => c.ok && c.cod_as_direct)),
+    cod_priced_as_direct: legacy.units.some((m) => m.channels.some((c) => c.ok && c.cod_as_direct)),
     review_pending: rates ? Object.values(rates.review_pending).some(Boolean) : false,
     needs_write: needsWrite,
     hash,
@@ -508,8 +551,12 @@ export function engineEvaluationDto(ev: EngineEvaluation) {
     cod_priced_as_direct: ev.cod_priced_as_direct,
     review_pending: ev.review_pending,
     usd_iqd_rate: ev.rates?.usd_iqd ?? null,
+    // FX-7: priced per SKU, a row is one SKU (its key and colour; its names are its values' and colour's).
+    per_sku: ev.plan.per_sku,
     rows: ev.rows.map((r) => ({
       option_id: r.option_id,
+      combo_key: r.combo_key,
+      color_id: r.color_id,
       name_ar: r.name_ar,
       name_en: r.name_en,
       name_ckb: r.name_ckb,
@@ -537,17 +584,19 @@ export function engineEvaluationDto(ev: EngineEvaluation) {
 
 // ------------------------------------------------------------ the batch
 
-/** The level a channel's supplier cost came from, and how it was entered there. */
-function supplierModeOf(inputs: ReadonlyArray<Partial<StoredInputRow>>, optionId: string): 'SOURCE_CURRENCY' | 'IQD_CONVERTED' {
-  const resolved = resolveSkuInputs(chainOf(inputs, optionId)).inputs.supplier;
+/** The level a channel's supplier cost came from, and how it was entered there (a model's chain, or a SKU's — FX-7). */
+function supplierModeOf(inputs: ReadonlyArray<Partial<StoredInputRow>>, p: { option_id: string; combo_key: string; option_value_ids: readonly string[]; color_id: string | null }, perSku: boolean): 'SOURCE_CURRENCY' | 'IQD_CONVERTED' {
+  const unit = { option_value_ids: p.option_value_ids, color_id: p.color_id, combo_key: p.combo_key };
+  const resolved = resolveSkuInputs(perSku ? chainOfUnit(inputs, unit) : chainOf(inputs, p.option_id)).inputs.supplier;
   if (!resolved) return 'SOURCE_CURRENCY';
-  const level = resolved.amount_level === 'option' ? 'option' : 'base';
-  const row = inputs.find((r) => r.scope === level && r.origin === 'MANUAL_OVERRIDE' && (level === 'base' || r.scope_id === optionId));
+  const level = resolved.amount_level;
+  const ids = level === 'base' ? [''] : level === 'option' ? (perSku ? [...p.option_value_ids] : [p.option_id]) : level === 'color' ? [p.color_id ?? ''] : [p.combo_key];
+  const row = inputs.find((r) => r.scope === level && r.origin === 'MANUAL_OVERRIDE' && ids.includes(r.scope_id ?? '') && r.supplier_cost_amount != null);
   return row?.supplier_input_mode === 'IQD_CONVERTED' ? 'IQD_CONVERTED' : 'SOURCE_CURRENCY';
 }
 
 /** One `pricing_sku_costs` row of a planned price (0181 §6; the USD figures display and audit only). */
-function skuCostRow(ev: EngineEvaluation, p: { option_id: string; combo_key: string; channel: SkuChannel; price: ChannelPrice }, now: string) {
+function skuCostRow(ev: EngineEvaluation, p: { option_id: string; combo_key: string; channel: SkuChannel; price: ChannelPrice; option_value_ids: readonly string[]; color_id: string | null }, now: string) {
   const rates = ev.rates!;
   const c = p.price;
   const currency = c.supplier_currency;
@@ -560,7 +609,7 @@ function skuCostRow(ev: EngineEvaluation, p: { option_id: string; combo_key: str
     shipping_profile: c.shipping_profile,
     supplier_amount: c.supplier_amount,
     supplier_currency: currency,
-    supplier_input_mode: supplierModeOf(ev.inputs, p.option_id),
+    supplier_input_mode: supplierModeOf(ev.inputs, p, ev.plan.per_sku),
     current_supplier_cost_usd_exact: currentUsdCost({ amount: c.supplier_amount, currency }, rates.eur_usd, rates.cny_usd),
     usd_iqd_rate: rates.usd_iqd,
     usd_fx_version: rates.pair_versions.USD_IQD,
@@ -611,6 +660,8 @@ const SKU_COST_COLUMNS = [
 ] as const;
 
 const MEMBER_NULLS = 'prime_price_iqd = NULL, pro_price_iqd = NULL, regular_adjust_iqd = NULL, prime_adjust_iqd = NULL, pro_adjust_iqd = NULL';
+/** pricing_sku_costs rows per INSERT (each row is about a kilobyte of bound JSON). */
+const SKU_COST_CHUNK = 60;
 const priceFrom = (table: string) => `(SELECT json_extract(j.value, '$.p') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = ${table}.id)`;
 
 /**
@@ -658,13 +709,18 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
   const batchId = `${auto ? 'fx' : 'pe'}_${newId()}`;
   const plan = ev.plan;
   const json = (list: ReadonlyArray<{ id: string; price: number }>) => JSON.stringify(list.map((x) => ({ id: x.id, p: x.price })));
-  const today = (optionId: string, channel: SkuChannel) => ev.rows.find((r) => r.option_id === optionId && r.channel === channel)?.old_iqd ?? null;
+  const today = (comboKey: string, channel: SkuChannel) => ev.rows.find((r) => r.combo_key === comboKey && r.channel === channel)?.old_iqd ?? null;
   const history = writePrices
     ? plan.prices
-        .filter((p) => adopt || today(p.option_id, p.channel) !== p.price.computed_price_iqd)
-        .map((p) => ({ k: skuPriceHistoryKey(p.combo_key, p.channel), o: today(p.option_id, p.channel), n: p.price.computed_price_iqd }))
+        .filter((p) => adopt || today(p.combo_key, p.channel) !== p.price.computed_price_iqd)
+        .map((p) => ({ k: skuPriceHistoryKey(p.combo_key, p.channel), o: today(p.combo_key, p.channel), n: p.price.computed_price_iqd }))
     : [];
   const skuRows = plan.prices.map((p) => skuCostRow(ev, p, o.now));
+  // The private figures in chunks, so one bound JSON never nears D1's value cap (a SKU grid of 240 × 4 rows).
+  const costChunks: Array<typeof skuRows> = [];
+  for (let i = 0; i < skuRows.length; i += SKU_COST_CHUNK) costChunks.push(skuRows.slice(i, i + SKU_COST_CHUNK));
+  const skuJson = JSON.stringify(plan.skus.map((k) => ({ k: k.combo_key, c: k.channel, p: k.price })));
+  const variantJson = JSON.stringify(plan.variants.map((v) => ({ id: v.id, p: v.price })));
   const auditActor = o.auditActor === undefined ? o.actor : o.auditActor;
   const statements: D1PreparedStatement[] = [
     ...batchHead(db, ev.stored, o.now),
@@ -704,6 +760,39 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
     ...(writePrices && plan.routes.length
       ? [db.prepare(`UPDATE product_option_transports SET regular_price_iqd = ${priceFrom('product_option_transports')}, surcharge_iqd = 0, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.routes), pid, json(plan.routes))]
       : []),
+    // FX-7 (0183): a colour's own price is cleared — its SKUs carry theirs — and a variant mirrors its SKU's
+    // direct price; the SKU rows are replaced (none when the product is priced per model).
+    ...(writePrices && plan.colors.length
+      ? [
+          db
+            .prepare(`UPDATE product_colors SET regular_price_iqd = NULL, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT value FROM json_each(?))`)
+            .bind(pid, JSON.stringify(plan.colors)),
+        ]
+      : []),
+    ...(writePrices && plan.variants.length
+      ? [
+          db
+            .prepare(
+              `UPDATE product_variants SET regular_price_iqd = (SELECT json_extract(j.value, '$.p') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = product_variants.id),
+                      prime_price_iqd = NULL, pro_price_iqd = NULL
+                WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`
+            )
+            .bind(variantJson, pid, variantJson),
+        ]
+      : []),
+    ...(writePrices && plan.sku_table && (plan.skus.length || plan.had_skus) ? [db.prepare('DELETE FROM product_sku_prices WHERE product_id = ?').bind(pid)] : []),
+    ...(writePrices && plan.sku_table && plan.skus.length
+      ? [
+          db
+            .prepare(
+              `INSERT INTO product_sku_prices (product_id, combo_key, channel, regular_price_iqd, source, write_seq, updated_at)
+               SELECT ?, json_extract(value, '$.k'), json_extract(value, '$.c'), json_extract(value, '$.p'), 'ENGINE',
+                      COALESCE((SELECT write_seq FROM product_pricing_state WHERE product_id = ?), 0) + 1, ?
+                 FROM json_each(?)`
+            )
+            .bind(pid, pid, o.now, skuJson),
+        ]
+      : []),
     // Owner decision 6's observations: the engine price and the U it was computed at
     // (`engine_fx` for an automatic repricing that only exchange rates moved).
     ...(history.length
@@ -717,14 +806,16 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
         ]
       : []),
     db.prepare('DELETE FROM pricing_sku_costs WHERE product_id = ?').bind(pid),
-    db
-      .prepare(
-        `INSERT INTO pricing_sku_costs (${SKU_COST_COLUMNS.join(', ')}, inputs_seq)
-         SELECT ${SKU_COST_COLUMNS.map((k) => `json_extract(value, '$.${k}')`).join(', ')},
-                (SELECT inputs_seq FROM product_pricing_state WHERE product_id = ?)
-           FROM json_each(?)`
-      )
-      .bind(pid, JSON.stringify(skuRows)),
+    ...costChunks.map((chunk) =>
+      db
+        .prepare(
+          `INSERT INTO pricing_sku_costs (${SKU_COST_COLUMNS.join(', ')}, inputs_seq)
+           SELECT ${SKU_COST_COLUMNS.map((k) => `json_extract(value, '$.${k}')`).join(', ')},
+                  (SELECT inputs_seq FROM product_pricing_state WHERE product_id = ?)
+             FROM json_each(?)`
+        )
+        .bind(pid, JSON.stringify(chunk))
+    ),
     db
       .prepare(
         `UPDATE product_pricing_state
@@ -755,9 +846,10 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
       entity_key: pid,
       product_id: pid,
       action: auto ? 'reprice_auto' : adopt ? 'engine_entry' : 'reprice_owner',
-      before: ev.rows.map((r) => ({ option_id: r.option_id, channel: r.channel, price_iqd: r.old_iqd })),
+      before: ev.rows.map((r) => ({ option_id: r.option_id, ...(plan.per_sku ? { combo_key: r.combo_key } : {}), channel: r.channel, price_iqd: r.old_iqd })),
       after: plan.prices.map((p) => ({
         option_id: p.option_id,
+        ...(plan.per_sku ? { combo_key: p.combo_key } : {}),
         channel: p.channel,
         price_iqd: p.price.computed_price_iqd,
         final_price_usd: p.price.final_price_usd,
@@ -767,6 +859,7 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
         kind: ev.kind,
         source: o.source,
         rows: plan.prices.length,
+        ...(plan.per_sku ? { per_sku: true, sku_rows: plan.skus.length } : {}),
         history_batch: batchId,
         conversions: ev.conversions.length,
         ...(auto ? { trigger: auto.trigger, reasons: [...auto.reasons], prices_unchanged: auto.pricesUnchanged } : {}),

@@ -29,7 +29,8 @@ import type { ShippingProfile } from '@levonis/pricing/skuChannel';
 import { fence } from '../operations';
 import { newId } from '../crypto';
 
-export type InputScope = 'base' | 'option';
+/** The four input levels (FX-7 adds colour and SKU): product → option → colour → SKU, the most specific wins. */
+export type InputScope = 'base' | 'option' | 'color' | 'sku';
 
 /** A `pricing_inputs` row (0181), as stored. Decimals are canonical TEXT. */
 export interface StoredInputRow {
@@ -170,11 +171,34 @@ const rowAt = (inputs: readonly Partial<StoredInputRow>[], scope: string, scopeI
 
 /** The input chain of one model (its option value, or the product itself): base, then the model's option. */
 export function chainOf(inputs: readonly Partial<StoredInputRow>[], optionId: string): SkuInputChain {
+  return chainOfUnit(inputs, { option_value_ids: optionId ? [optionId] : [], color_id: null, combo_key: null });
+}
+
+/** What one priced unit is: a model (its option value) or a SKU (its whole selection, its colour, its key). */
+export interface UnitSelection {
+  option_value_ids: readonly string[];
+  color_id: string | null;
+  /** The SKU's own key — null for a model, whose SKU level is its option level. */
+  combo_key: string | null;
+}
+
+const scopeInputs = (inputs: readonly Partial<StoredInputRow>[], scope: string, scopeId: string) => ({
+  scope_id: scopeId,
+  source: e1Row(rowAt(inputs, scope, scopeId, 'SOURCE')),
+  override: e1Row(rowAt(inputs, scope, scopeId, 'MANUAL_OVERRIDE')),
+});
+
+/**
+ * The input chain of one unit (FX-7, E1's levels): the product, every selected
+ * option value (one per group), the colour, and the exact SKU — empty levels
+ * inherit, the most specific value wins (a supplier difference adds up).
+ */
+export function chainOfUnit(inputs: readonly Partial<StoredInputRow>[], unit: UnitSelection): SkuInputChain {
   return {
     base: { source: e1Row(rowAt(inputs, 'base', '', 'SOURCE')), override: e1Row(rowAt(inputs, 'base', '', 'MANUAL_OVERRIDE')) },
-    options: optionId
-      ? [{ scope_id: optionId, source: e1Row(rowAt(inputs, 'option', optionId, 'SOURCE')), override: e1Row(rowAt(inputs, 'option', optionId, 'MANUAL_OVERRIDE')) }]
-      : [],
+    options: unit.option_value_ids.filter(Boolean).map((id) => scopeInputs(inputs, 'option', id)),
+    ...(unit.color_id ? { color: scopeInputs(inputs, 'color', unit.color_id) } : {}),
+    ...(unit.combo_key ? { sku: scopeInputs(inputs, 'sku', unit.combo_key) } : {}),
   };
 }
 
@@ -315,9 +339,12 @@ export function inputStatements(db: D1Database, productId: string, writes: reado
 }
 
 /** One rule write: the row a (kind, scope, scope_id) target is left with. */
+/** The rule levels the owner writes per product (FX-7 adds colour and SKU); global and category are refused. */
+export type ProductRuleScope = Extract<PricingRuleScope, 'product' | 'option' | 'color' | 'sku'>;
+
 export interface RuleWrite {
   kind: PricingRuleKind;
-  scope: Extract<PricingRuleScope, 'product' | 'option'>;
+  scope: ProductRuleScope;
   scope_id: string;
   existing: StoredRuleRow | null;
   /** The id a NEW row takes (assigned up front so the engine's stored results can name it); absent = minted at write. */
@@ -376,7 +403,7 @@ export function ruleStatements(db: D1Database, productId: string, writes: readon
 }
 
 /** The existing row of a rule target, or null. */
-export const ruleAt = (rules: readonly StoredRuleRow[], productId: string, kind: PricingRuleKind, scope: 'product' | 'option', scopeId: string): StoredRuleRow | null =>
+export const ruleAt = (rules: readonly StoredRuleRow[], productId: string, kind: PricingRuleKind, scope: ProductRuleScope, scopeId: string): StoredRuleRow | null =>
   rules.find((r) => r.product_id === productId && r.kind === kind && r.scope === scope && r.scope_id === (scope === 'product' ? '' : scopeId)) ?? null;
 
 /**

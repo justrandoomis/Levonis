@@ -61,6 +61,7 @@ import { effectiveAvailability } from './availability';
 import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
+import { skuComboKey } from './skuChannel';
 
 export type { PhysicalDimensionOverrides, PhysicalDimensions } from './physicalDimensions';
 
@@ -120,10 +121,12 @@ export const ADJUST_KEYS: readonly AdjustKey[] = Object.values(ADJUST_OF);
  * fulfilment beats model beats product) is satisfied by the three rungs in the
  * middle; colour is not in that list because it is a different axis.
  */
-type PriceSource = 'color' | 'transport' | 'fulfillment' | 'option' | 'base';
+type PriceSource = 'sku' | 'color' | 'transport' | 'fulfillment' | 'option' | 'base';
 
-/** The walk order. `base` is the seed, so it is not a step. */
-const RUNGS: Array<Exclude<PriceSource, 'base'>> = ['option', 'fulfillment', 'transport', 'color'];
+/** The walk order. `base` is the seed, so it is not a step; `sku` is applied
+ *  after the walk, and only when the selection has a stored SKU price
+ *  (`skuRung` below), so a product without one walks exactly as before. */
+const RUNGS: Array<Exclude<PriceSource, 'base' | 'sku'>> = ['option', 'fulfillment', 'transport', 'color'];
 
 /** The rows for each step, in walk order. */
 interface LadderRows {
@@ -447,6 +450,13 @@ export interface PricingProduct {
    * null — honest, never assumed.
    */
   warranty_base_months?: number | null;
+  /**
+   * THE SKU RUNG (0183, FX-7): the engine's final regular price per exact SKU
+   * × channel, from `product_sku_prices` — absent (or empty) on every product
+   * the engine prices per model and on a database without 0183. See
+   * `SkuPriceRow`.
+   */
+  sku_prices?: readonly SkuPriceRow[];
 }
 
 /**
@@ -755,6 +765,7 @@ function pickMember(
     fulfillment: base,
     transport: base,
     color: base,
+    sku: base,
   };
   let value = base;
   let source: PriceSource = 'base';
@@ -775,6 +786,7 @@ function pickMember(
     at[rung] = value;
     regularBeneath = regularHere;
   }
+  at.sku = value;
   return { value: value ?? null, source, at };
 }
 
@@ -792,6 +804,7 @@ function pick(
     fulfillment: base,
     transport: base,
     color: base,
+    sku: base,
   };
   for (const rung of RUNGS) {
     const row = rows[rung];
@@ -813,12 +826,52 @@ function pick(
     }
     at[rung] = value;
   }
+  at.sku = value;
   return { value: value ?? null, source, at };
 }
+
+/**
+ * THE SKU RUNG (migration 0183, FX-7; owner decision 1, DECISIONS row 184 (1):
+ * product → option → colour → SKU, the SKU the most specific).
+ *
+ * The pricing engine stores the final REGULAR price of every SKU it prices per
+ * colour or variant, per sale channel (`product_sku_prices`, carried on the
+ * document as `sku_prices` by the relational overlay). A selection whose exact
+ * combination (`skuComboKey` of its option values and colour) has a row on the
+ * channel the line is priced on is charged exactly that price; the member
+ * layers, the warranty and the payment rule stay read-time (owner decision 6).
+ * No row — a product priced per model, a database without 0183, a caller that
+ * does not know the full selection — and the ladder answers exactly as before.
+ *
+ * The channel is the one the money reads: a line priced from the direct ladder
+ * (a direct sale, or a pre-order paid cash on delivery from an enabled direct
+ * cell) is `direct_sale`; a prepaid pre-order is `pre_order_<route>`.
+ */
+export interface SkuPriceRow {
+  combo_key: string;
+  channel: string;
+  regular_price_iqd: number;
+}
+
+function skuRegularOf(rows: readonly SkuPriceRow[] | null | undefined, comboKey: string, channel: string | null): number | null {
+  if (!rows || !rows.length || !channel || !comboKey) return null;
+  const row = rows.find((r) => r.combo_key === comboKey && r.channel === channel);
+  const p = row?.regular_price_iqd;
+  return typeof p === 'number' && Number.isSafeInteger(p) && p > 0 ? p : null;
+}
+
+const SKU_ROUTES: ReadonlySet<string> = new Set(['air', 'sea', 'land']);
 
 export function resolveUnitPrice(input: {
   product: PricingProduct;
   optionId?: string | null;
+  /**
+   * THE FULL SELECTION (FX-7): every chosen option value, one per group. Only
+   * the SKU rung reads it — to name the exact combination whose stored price
+   * applies; the ladder still prices from `optionId`. Absent = `[optionId]`,
+   * which is the whole selection of a product with one option group.
+   */
+  optionValueIds?: readonly string[] | null;
   colorId?: string | null;
   transportMethod?: string | null; // '' | air | sea | land
   /**
@@ -996,13 +1049,35 @@ export function resolveUnitPrice(input: {
 
   // Per-field independent inheritance. Regular is resolved first because the
   // member fields may need to anchor an adjustment on it.
-  const regular = pick('regular_price_iqd', priceRows, product.price_iqd);
+  const ladder = pick('regular_price_iqd', priceRows, product.price_iqd);
   // PRIME and PRO carry every surcharge the regular ladder added (see
   // memberAtRung); cost does not — a surcharge says nothing about what the
   // extra costs the store, and inventing a cost would make §12 profit wrong.
-  const proExplicit = pickMember('pro_price_iqd', priceRows, product.pro_price_iqd, regular.at);
-  const primeExplicit = pickMember('prime_price_iqd', priceRows, product.prime_price_iqd, regular.at);
+  const proLadder = pickMember('pro_price_iqd', priceRows, product.pro_price_iqd, ladder.at);
+  const primeLadder = pickMember('prime_price_iqd', priceRows, product.prime_price_iqd, ladder.at);
   const cost = pick('cost_iqd', priceRows, product.product_cost_iqd);
+
+  // THE SKU RUNG (see `SkuPriceRow`): after the colour, only when a row exists.
+  const skuChannel =
+    pricingType === 'direct_sale' ? 'direct_sale' : SKU_ROUTES.has(method) ? `pre_order_${method}` : null;
+  const skuOptionIds = input.optionValueIds && input.optionValueIds.length ? input.optionValueIds : option ? [option.id] : [];
+  const skuRegular = skuRegularOf(product.sku_prices, skuComboKey({ option_value_ids: skuOptionIds, color_id: color?.id ?? null }), skuChannel);
+  let regular = ladder;
+  let proExplicit = proLadder;
+  let primeExplicit = primeLadder;
+  if (skuRegular !== null) {
+    // A fixed regular price at the last rung: what it adds over the ladder is
+    // a surcharge every tier pays, exactly as a colour's would (memberAtRung).
+    const beneath = ladder.value ?? product.price_iqd;
+    const delta = skuRegular - beneath;
+    regular = { value: skuRegular, source: 'sku', at: { ...ladder.at, sku: skuRegular } };
+    const carry = (t: LadderTrace): LadderTrace => {
+      const value = memberAtRung({ inherited: t.value, regularDelta: delta, regularHere: skuRegular, row: null, field: 'pro_price_iqd' });
+      return { value, source: 'sku', at: { ...t.at, sku: value } };
+    };
+    proExplicit = carry(proLadder);
+    primeExplicit = carry(primeLadder);
+  }
 
   const regularIqd = regular.value ?? product.price_iqd;
   if (!Number.isInteger(regularIqd) || regularIqd < 0) errors.push('REGULAR_PRICE_INVALID');

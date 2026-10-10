@@ -63,6 +63,10 @@ const INPUTS_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   drop_flag: 'yes/no: a price falls more than 30%',
   legacy_step: 'yes/no: the migrated minimum, rounded up to the cent, moves a price one step',
   route_fee_removed: 'yes/no: the old route fee is folded into the engine price',
+  // FX-7 (migration 0183): the colour and SKU levels.
+  sku_levels: 'yes/no: the database has the per-SKU price rung, so the colour and variant levels are offered',
+  per_sku: 'yes/no: the product is priced per colour or variant (its preview rows are one per SKU)',
+  skus: 'a container: each SKU with its names, keys and bar under pricing_summary (FINANCIAL_FIELDS)',
 };
 
 function workerCorpus(): string {

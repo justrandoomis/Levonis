@@ -78,6 +78,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // append-only pricing audit. Catalogue owns them for the reason above:
     // the writer is the act of pricing a catalogue product.
     'pricing_engine_control', 'product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_audit',
+    // 0183 (FX plan §4.4, FX-7) — the per-SKU final price rung the cart's
+    // resolver reads after the colour: written only by the engine's writer.
+    'product_sku_prices',
     'lot_cost_adjustments', 'lot_cost_adjustment_shares', 'inventory_lot_cost_versions', 'lot_count_events',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment

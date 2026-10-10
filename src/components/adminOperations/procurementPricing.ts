@@ -61,6 +61,9 @@ export interface PricingLine {
 
 export interface PricingPreviewRow {
   option_id: string;
+  /** FX-7: priced per colour or variant, the row's SKU key and colour (absent on a model's row). */
+  combo_key?: string;
+  color_id?: string | null;
   name_ar: string;
   name_en: string;
   name_ckb: string;
@@ -81,6 +84,9 @@ export interface PricingPreviewRow {
 /** One model × channel of the writer's preview (owner decision 8): the six figures and the flags. */
 export interface EngineAdoptionRow {
   option_id: string;
+  /** FX-7: the row's SKU key and colour (a model's own key when priced per model). */
+  combo_key?: string;
+  color_id?: string | null;
   name_ar: string;
   name_en: string;
   name_ckb: string;
@@ -134,7 +140,7 @@ export const writesPrices = (a: EngineAdoption | null | undefined): a is EngineA
  */
 export function samePrices(a: EngineAdoption | null | undefined, b: EngineAdoption | null | undefined): boolean {
   const key = (x: EngineAdoption | null | undefined) =>
-    writesPrices(x) ? x.rows.map((r) => `${r.option_id}|${r.channel}|${r.computed_price_iqd}`).sort().join(',') : '';
+    writesPrices(x) ? x.rows.map((r) => `${r.combo_key ?? r.option_id}|${r.channel}|${r.computed_price_iqd}`).sort().join(',') : '';
   return key(a) === key(b);
 }
 

@@ -22,7 +22,7 @@ import { safeLink } from './homeContent';
 import { badRequest } from './http';
 import { newId } from './crypto';
 import { dedupeHashtags, normalizeHashtag } from './hashtags';
-import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields, LadderRungs } from './pricing';
+import type { OptionV2, ColorV2, TransportOffer, WarrantyPlanV2, PriceFields, LadderRungs, SkuPriceRow } from './pricing';
 import { derivedRung } from './pricing';
 import {
   deriveSaleTypes,
@@ -298,6 +298,13 @@ export interface ProductDoc {
    */
   warranty_base_months: number | null;
   serialized: boolean | null;
+  /**
+   * 0183 (FX-7): the engine's final regular price per exact SKU × channel, set
+   * by the relational overlay on a CUSTOMER document only, and only when the
+   * product has rows (worker/lib/productOverlay.ts). Never parsed from a row,
+   * never validated, never written back — the engine's writer alone writes it.
+   */
+  sku_prices?: readonly SkuPriceRow[];
   /**
    * Per-product last-mile rules stored canonically at
    * `ops_policy.delivery_options`. null means a pre-feature product and keeps

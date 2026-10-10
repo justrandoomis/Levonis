@@ -65,7 +65,8 @@ function world() {
 
 /** The ceilings (guest warm / guest cold / member warm), the prepare ceiling, and where. */
 const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold: number, member: number]; prepares: number }> = [
-  { path: '/api/home', waves: [3, 3, 6], prepares: 22 },
+  // FX-7: the SKU rung (product_sku_prices) is read beside the relations, in the same wave — one statement, no wave.
+  { path: '/api/home', waves: [3, 3, 6], prepares: 23 },
   { path: '/api/home/sections', waves: [4, 4, 6], prepares: 22 },
   { path: '/api/products', waves: [2, 2, 5], prepares: 17 },
   { path: `/api/products/${LIVE_PRODUCTS[0].slug}`, waves: [2, 2, 5], prepares: 23 },

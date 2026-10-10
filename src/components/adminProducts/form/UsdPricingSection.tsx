@@ -13,8 +13,11 @@
  *     Sale Extra — with the 4-cell bar and «تفاصيل»;
  *   - section ٥ «الخيارات والألوان»: the same fields in each model's card, every
  *     empty field inheriting the product's value, each model with its computed
- *     customer price (and direct price) and its bar; a colour follows its model
- *     (said on screen) until per-colour pricing exists (FX-7);
+ *     customer price (and direct price) and its bar; and — with the SKU rung
+ *     (migration 0183, FX-7) — in each colour's card and each variant row, the
+ *     same fields again, empty = inherited from the variant's colour, its model
+ *     and the product, with the computed customer price of every SKU it makes
+ *     (on a database without 0183 a colour follows its model, said on screen);
  *   - section ٨ «المعاينة والحفظ»: owner decision 8's six figures per model ×
  *     channel.
  *
@@ -84,8 +87,11 @@ interface StoredInputs {
   source_ref: string;
 }
 
+/** The four pricing levels (FX-7 adds the colour and the exact SKU): product → model → colour → SKU. */
+export type PricingScope = 'base' | 'option' | 'color' | 'sku';
+
 export interface ScopeAnswer {
-  scope: 'base' | 'option';
+  scope: PricingScope;
   scope_id: string;
   name_ar: string;
   name_en: string;
@@ -107,10 +113,29 @@ interface ModelAnswer {
   pricing_summary: PricingSummary;
 }
 
+/** One SKU of a product (FX-7): its key, its selection and colour, and its computed customer price. */
+export interface SkuAnswer {
+  combo_key: string;
+  option_id: string;
+  option_value_ids: string[];
+  color_id: string | null;
+  name_ar: string;
+  name_en: string;
+  name_ckb: string;
+  sells_direct: boolean;
+  pricing_summary: PricingSummary;
+}
+
 export interface UsdPricingAnswer {
   product_id: string;
   mode: 'manual' | 'engine';
   inputs_seq: number;
+  /** FX-7: the database has the SKU rung (0183) — the colour and variant levels are offered. */
+  sku_levels?: boolean;
+  /** FX-7: the product (with the drafts) is priced per SKU — its preview rows are one per SKU × channel. */
+  per_sku?: boolean;
+  /** FX-7: every sellable SKU's computed price (colour cards and variant rows). */
+  skus?: SkuAnswer[];
   /** The price writes' counter (an engine product's way back to manual is fenced on it). */
   write_seq?: number;
   rates: { usd_iqd_rate: string | null; review_pending: boolean; derived_stale: boolean };
@@ -163,16 +188,48 @@ export interface FormModel {
   sells_direct: boolean;
 }
 
+/** A colour as the form holds it (unsaved ones included), with the models it is linked to (none = every model). */
+export interface FormColour {
+  id: string;
+  name_en: string;
+  name_ar?: string;
+  name_ckb?: string;
+  option_ids: readonly string[];
+}
+
+/** A variant row of the form (an exact combination): its key, its values and its colour. */
+export interface FormSku {
+  combo_key: string;
+  option_value_ids: readonly string[];
+  color_id: string | null;
+}
+
+type DimensionsById = Readonly<Record<string, ProductDimensionsV2 | null | undefined>>;
+
 /** What the pricing reads from the rest of the form, and how it edits the form's own measurements. */
 export interface UsdPricingFormContext {
   baseDimensions: ProductDimensionsV2 | null | undefined;
-  optionDimensions: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>;
+  optionDimensions: DimensionsById;
   /** The measurements as last loaded or saved (an edit since then is the owner's act on pricing too). */
   savedBaseDimensions: ProductDimensionsV2 | null | undefined;
-  savedOptionDimensions: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>;
+  savedOptionDimensions: DimensionsById;
   models: readonly FormModel[];
   productSellsDirect: boolean;
-  setMeasure: (scope: 'base' | 'option', id: string, patch: Partial<ProductDimensionsV2>) => void;
+  /** FX-7: the colours and the variant rows of the form, each with its own measurements. */
+  colours?: readonly FormColour[];
+  skus?: readonly FormSku[];
+  colourDimensions?: DimensionsById;
+  savedColourDimensions?: DimensionsById;
+  skuDimensions?: DimensionsById;
+  savedSkuDimensions?: DimensionsById;
+  setMeasure: (scope: PricingScope, id: string, patch: Partial<ProductDimensionsV2>) => void;
+}
+
+/** The form's own measurements of one scope (or as last loaded/saved). */
+function dimensionsOf(f: UsdPricingFormContext, scope: PricingScope, id: string, saved = false): ProductDimensionsV2 | null | undefined {
+  if (scope === 'base') return saved ? f.savedBaseDimensions : f.baseDimensions;
+  const table = scope === 'option' ? (saved ? f.savedOptionDimensions : f.optionDimensions) : scope === 'color' ? (saved ? f.savedColourDimensions : f.colourDimensions) : saved ? f.savedSkuDimensions : f.skuDimensions;
+  return table?.[id];
 }
 
 // ------------------------------------------------------------------ drafts
@@ -195,8 +252,46 @@ export interface ScopeDraft {
   adopt_measure?: boolean;
 }
 
-export const keyOf = (scope: 'base' | 'option', id: string) => (scope === 'base' ? 'base' : `option:${id}`);
-const parseKey = (key: string): { scope: 'base' | 'option'; id: string } => (key === 'base' ? { scope: 'base', id: '' } : { scope: 'option', id: key.slice(7) });
+export const keyOf = (scope: PricingScope, id: string) => (scope === 'base' ? 'base' : `${scope}:${id}`);
+const parseKey = (key: string): { scope: PricingScope; id: string } => {
+  if (key === 'base') return { scope: 'base', id: '' };
+  const at = key.indexOf(':');
+  return { scope: key.slice(0, at) as PricingScope, id: key.slice(at + 1) };
+};
+
+/**
+ * A SKU's key exactly as the server writes it (packages/pricing skuComboKey,
+ * worker/lib/inventory comboKey): the option value ids sorted, each `o:<id>`,
+ * then `c:<colour id>`, joined by '|'.
+ */
+export function pricingSkuKey(optionValueIds: readonly string[], colorId: string | null | undefined): string {
+  const parts = [...optionValueIds].filter(Boolean).sort().map((id) => `o:${id}`);
+  if (colorId) parts.push(`c:${colorId}`);
+  return parts.join('|');
+}
+
+/** The option values and colour a SKU key names (`o:<id>|…|c:<id>`). */
+const skuParts = (combo: string) => {
+  const parts = combo.split('|');
+  return { options: parts.filter((x) => x.startsWith('o:')).map((x) => x.slice(2)), color: parts.find((x) => x.startsWith('c:'))?.slice(2) ?? null };
+};
+
+/**
+ * Where an empty field takes its value from, nearest first (E1's walk): a SKU
+ * from its colour, its models and the product; a colour from its one linked
+ * model (a colour shared by several models inherits each one's, so the
+ * product's is shown) and the product; a model from the product.
+ */
+function ancestorsOf(form: UsdPricingFormContext | null, scope: PricingScope, id: string): Array<[PricingScope, string]> {
+  if (scope === 'base') return [];
+  if (scope === 'option') return [['base', '']];
+  if (scope === 'color') {
+    const linked = form?.colours?.find((c) => c.id === id)?.option_ids ?? [];
+    return [...(linked.length === 1 ? ([['option', linked[0]!]] as Array<[PricingScope, string]>) : []), ['base', '']];
+  }
+  const { options, color } = skuParts(id);
+  return [...(color ? ([['color', color]] as Array<[PricingScope, string]>) : []), ...options.map((o) => ['option', o] as [PricingScope, string]), ['base', '']];
+}
 
 const DECIMAL = /^[0-9٠-٩۰-۹]+(?:[.,٫][0-9٠-٩۰-۹]+)?$/;
 const USD_TEXT = /^[0-9٠-٩۰-۹]+(?:[.,٫][0-9٠-٩۰-۹]{1,2})?$/;
@@ -221,7 +316,7 @@ export function draftProblems(d: ScopeDraft, stored: StoredInputs | null = null)
   return out;
 }
 
-const scopeOf = (answer: UsdPricingAnswer | null, scope: 'base' | 'option', id: string) =>
+const scopeOf = (answer: UsdPricingAnswer | null, scope: PricingScope, id: string) =>
   answer?.scopes.find((s) => s.scope === scope && (scope === 'base' || s.scope_id === id)) ?? null;
 
 /**
@@ -239,13 +334,17 @@ export function measureDraftOf(form: PackageMeasure, saved: PackageMeasure, row:
   return out;
 }
 
-/** The route a scope prices on: its own (typed, then stored), else the product's. */
-export function routeOf(drafts: Readonly<Record<string, ScopeDraft>>, answer: UsdPricingAnswer | null, scope: 'base' | 'option', id: string): string {
-  const own = (s: 'base' | 'option', i: string) => {
+/** The route a scope prices on: its own (typed, then stored), else the nearest level above that has one. */
+export function routeOf(drafts: Readonly<Record<string, ScopeDraft>>, answer: UsdPricingAnswer | null, scope: PricingScope, id: string, form: UsdPricingFormContext | null = null): string {
+  const own = (s: PricingScope, i: string) => {
     const typed = drafts[keyOf(s, i)]?.shipping_profile;
     return typed !== undefined ? typed : (scopeOf(answer, s, i)?.pricing_inputs?.shipping_profile ?? '');
   };
-  return (scope === 'option' ? own('option', id) : '') || own('base', '');
+  for (const [s, i] of [[scope, id] as [PricingScope, string], ...ancestorsOf(form, scope, id)]) {
+    const r = own(s, i);
+    if (r) return r;
+  }
+  return '';
 }
 
 const hasContent = (d: ScopeDraft) => (Object.keys(d) as Array<keyof ScopeDraft>).some((k) => k !== 'adopt_measure' && d[k] !== undefined);
@@ -256,20 +355,24 @@ export function effectiveDrafts(drafts: Readonly<Record<string, ScopeDraft>>, an
   const keys = new Set<string>([
     'base',
     ...Object.keys(drafts),
-    ...(answer?.scopes ?? []).filter((s) => s.scope === 'option').map((s) => keyOf('option', s.scope_id)),
+    ...(answer?.scopes ?? []).filter((s) => s.scope !== 'base').map((s) => keyOf(s.scope, s.scope_id)),
     ...form.models.map((m) => keyOf('option', m.id)),
+    // FX-7: the colours (the variant rows come from the server's scopes) — only with the SKU rung.
+    ...(answer?.sku_levels ? (form.colours ?? []).map((c) => keyOf('color', c.id)) : []),
   ]);
   for (const key of keys) {
     const { scope, id } = parseKey(key);
-    // A model removed from the form (and unknown to the server) takes its drafts with it.
+    // A model, colour or variant removed from the form (and unknown to the server) takes its drafts with it.
     if (scope === 'option' && !scopeOf(answer, 'option', id) && !form.models.some((m) => m.id === id)) continue;
+    if (scope === 'color' && !scopeOf(answer, 'color', id) && !(form.colours ?? []).some((c) => c.id === id)) continue;
+    if (scope === 'sku' && !scopeOf(answer, 'sku', id) && !(form.skus ?? []).some((k) => k.combo_key === id)) continue;
     const typed = drafts[key] ?? {};
-    const route = routeOf(drafts, answer, scope, id);
+    const route = routeOf(drafts, answer, scope, id, form);
     let derived: Pick<ScopeDraft, 'shipping_weight_g' | 'box'> = {};
     if (route) {
       const m = measureDraftOf(
-        packageMeasureOf(scope === 'base' ? form.baseDimensions : form.optionDimensions[id]),
-        packageMeasureOf(scope === 'base' ? form.savedBaseDimensions : form.savedOptionDimensions[id]),
+        packageMeasureOf(dimensionsOf(form, scope, id)),
+        packageMeasureOf(dimensionsOf(form, scope, id, true)),
         scopeOf(answer, scope, id)?.pricing_inputs ?? null,
         typed.adopt_measure === true
       );
@@ -291,7 +394,7 @@ export function draftWire(drafts: Readonly<Record<string, ScopeDraft>>, answer: 
   for (const s of answer.scopes) {
     const d = drafts[keyOf(s.scope, s.scope_id)];
     if (!d) continue;
-    const entry: Record<string, unknown> = { scope: s.scope, ...(s.scope === 'option' ? { scope_id: s.scope_id } : {}) };
+    const entry: Record<string, unknown> = { scope: s.scope, ...(s.scope !== 'base' ? { scope_id: s.scope_id } : {}) };
     if (isIqdDraft(d)) {
       // The convenience input: whole dinars; the server converts them once (the client never sends USD or a rate).
       if (d.supplier_cost_iqd != null) {
@@ -316,9 +419,9 @@ export function draftWire(drafts: Readonly<Record<string, ScopeDraft>>, answer: 
     }
     if (d.manual_cbm !== undefined) entry.manual_cbm = blank(d.manual_cbm);
     if (d.additional_cost_iqd !== undefined) entry.additional_cost_iqd = d.additional_cost_iqd;
-    if (Object.keys(entry).length > (s.scope === 'option' ? 2 : 1)) inputs.push(entry);
-    const ruleScope = s.scope === 'base' ? 'product' : 'option';
-    const at = s.scope === 'option' ? { scope_id: s.scope_id } : {};
+    if (Object.keys(entry).length > (s.scope !== 'base' ? 2 : 1)) inputs.push(entry);
+    const ruleScope = s.scope === 'base' ? 'product' : s.scope;
+    const at = s.scope !== 'base' ? { scope_id: s.scope_id } : {};
     if (d.minimum_target_profit_usd !== undefined) rules.push({ kind: 'target_profit', scope: ruleScope, ...at, amount_usd: blank(d.minimum_target_profit_usd) });
     if (d.direct_sale_extra_iqd !== undefined) rules.push({ kind: 'direct_sale_extra', scope: ruleScope, ...at, amount_iqd: d.direct_sale_extra_iqd });
   }
@@ -395,7 +498,7 @@ export interface UsdPricingState {
   notice: string;
   /** The engine prices this product (its store price is then read-only in the form). */
   engine: boolean;
-  setDraft: (scope: 'base' | 'option', id: string, patch: ScopeDraft) => void;
+  setDraft: (scope: PricingScope, id: string, patch: ScopeDraft) => void;
   discard: () => void;
   save: () => Promise<void>;
   reload: () => void;
@@ -515,7 +618,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
    */
   const hashFor = useCallback((w: string) => (preview && preview.wire === w && !preview.answer.adoption?.kind ? preview.answer.preview_hash : null), [preview]);
 
-  const setDraft = useCallback((scope: 'base' | 'option', id: string, patch: ScopeDraft) => {
+  const setDraft = useCallback((scope: PricingScope, id: string, patch: ScopeDraft) => {
     setNotice('');
     setDrafts((all) => ({ ...all, [keyOf(scope, id)]: { ...all[keyOf(scope, id)], ...patch } }));
   }, []);
@@ -767,14 +870,15 @@ const boxText = (b: Box | null) => (b ? `${formatScaledInteger(b[0], 10)}×${for
 // ------------------------------------------------------------------ fields
 
 /** The measure a scope's route needs, bound to the form's own package measurements. */
-function MeasureFields({ scope, id, route, summary }: { scope: 'base' | 'option'; id: string; route: string; summary: PricingSummary | null }) {
+function MeasureFields({ scope, id, route, summary }: { scope: PricingScope; id: string; route: string; summary: PricingSummary | null }) {
   const { lang } = useLanguage();
   const s = usdPricingFormStrings(lang);
   const en = USD_PRICING_FORM_STRINGS.en;
   const st = useUsdPricing()!;
   const f = st.form;
-  const dims = (scope === 'base' ? f.baseDimensions : f.optionDimensions[id]) ?? null;
-  const inherited = scope === 'option' ? (f.baseDimensions ?? null) : null;
+  const dims = dimensionsOf(f, scope, id) ?? null;
+  // A level below the product shows the nearest measurement above it as its "inherits" value.
+  const inherited = scope === 'base' ? null : (ancestorsOf(f, scope, id).map(([s2, i2]) => dimensionsOf(f, s2, i2)).find((d) => !!d) ?? null);
   const row = scopeOf(st.answer, scope, id)?.pricing_inputs ?? null;
   const d = st.drafts[keyOf(scope, id)] ?? {};
   const eff = st.effective[keyOf(scope, id)] ?? {};
@@ -801,14 +905,14 @@ function MeasureFields({ scope, id, route, summary }: { scope: 'base' | 'option'
     else if (pricing && form.box && sameBox(pricing, form.box)) status = adopted;
     else if (pricing && form.box) status = <>{s.measureDiffers(boxText(pricing), boxText(form.box))} {adopt}</>;
     else if (pricing) status = s.measurePricingOnly(boxText(pricing));
-    else if (scope === 'option' && !form.box) status = s.measureInherits;
+    else if (scope !== 'base' && !form.box) status = s.measureInherits;
   } else {
     const pricing = row?.shipping_weight_g ?? null;
     if (eff.shipping_weight_g !== undefined) status = <span className="text-amber-300">{s.measureWillAdopt}</span>;
     else if (pricing !== null && form.weight_g === pricing) status = adopted;
     else if (pricing !== null && form.weight_g !== null) status = <>{s.measureDiffers(kg(pricing), kg(form.weight_g))} {adopt}</>;
     else if (pricing !== null) status = s.measurePricingOnly(kg(pricing));
-    else if (scope === 'option' && form.weight_g === null) status = s.measureInherits;
+    else if (scope !== 'base' && form.weight_g === null) status = s.measureInherits;
   }
 
   return (
@@ -843,28 +947,39 @@ function MeasureFields({ scope, id, route, summary }: { scope: 'base' | 'option'
   );
 }
 
-/** The fields of one scope; a model shows the product's values as its "inherits" placeholders. */
+/**
+ * The fields of one scope; a level below the product shows, as its "inherits"
+ * placeholders, the nearest value above it (a SKU: its colour's, its model's,
+ * the product's — E1's walk).
+ */
 function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sellsDirect: boolean; summary: PricingSummary | null }) {
   const { lang } = useLanguage();
   const s = usdPricingFormStrings(lang);
   const ps = procurementPricingStrings(lang);
   const en = USD_PRICING_FORM_STRINGS.en;
   const st = useUsdPricing()!;
-  const base = scope.scope === 'option' ? scopeOf(st.answer, 'base', '') : null;
+  const above = ancestorsOf(st.form, scope.scope, scope.scope_id)
+    .map(([s2, i2]) => scopeOf(st.answer, s2, i2))
+    .filter((x): x is ScopeAnswer => !!x);
+  const base = above.length ? above[above.length - 1]! : null;
   const d = st.drafts[keyOf(scope.scope, scope.scope_id)] ?? {};
   const stored = scope.pricing_inputs;
-  const inherited = base?.pricing_inputs ?? null;
+  // The nearest level above that holds a value, per field.
+  const inheritedOf = <K extends keyof StoredInputs>(k: K): StoredInputs | null => above.find((a) => a.pricing_inputs?.[k] != null)?.pricing_inputs ?? null;
+  const inherited = inheritedOf('supplier_cost_amount') ?? base?.pricing_inputs ?? null;
   const problems = draftProblems(d, stored);
   const label = (ar: string, english: string) => ({ ar, en: lang === 'en' ? '' : english });
-  const ph = (v: string | null | undefined) => (scope.scope === 'option' && v ? s.inheritPlaceholder(v) : undefined);
+  const ph = (v: string | null | undefined) => (scope.scope !== 'base' && v ? s.inheritPlaceholder(v) : undefined);
   const set = (patch: ScopeDraft) => st.setDraft(scope.scope, scope.scope_id, patch);
   const storedIqd = stored?.supplier_input_mode === 'IQD_CONVERTED';
   const storedCurrency = storedIqd ? 'IQD' : (stored?.supplier_cost_currency ?? '');
   const currency = d.supplier_cost_currency ?? storedCurrency;
   const iqd = currency === 'IQD';
-  const route = routeOf(st.drafts, st.answer, scope.scope, scope.scope_id);
+  const route = routeOf(st.drafts, st.answer, scope.scope, scope.scope_id, st.form);
   const minProfit = d.minimum_target_profit_usd ?? scope.minimum_target_profit_usd ?? '';
-  const baseMin = base?.minimum_target_profit_usd ? `$${base.minimum_target_profit_usd}` : null;
+  const aboveMin = above.find((a) => a.minimum_target_profit_usd)?.minimum_target_profit_usd ?? null;
+  const baseMin = aboveMin ? `$${aboveMin}` : null;
+  const aboveExtra = above.find((a) => a.direct_sale_extra_iqd != null)?.direct_sale_extra_iqd ?? null;
   const extraStored = scope.direct_sale_extra_iqd;
   const shownInputs = scopeOf(st.shown, scope.scope, scope.scope_id)?.pricing_inputs ?? null;
   const rate = st.shown?.rates.usd_iqd_rate ?? null;
@@ -875,6 +990,8 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
         ? `${inherited.supplier_cost_amount} ${inherited.supplier_cost_currency ?? ''}`
         : null
     : null;
+  const inheritedRoute = inheritedOf('shipping_profile')?.shipping_profile ?? null;
+  const inheritedAdditional = inheritedOf('additional_cost_iqd')?.additional_cost_iqd ?? null;
   const pickCurrency = (next: string) => {
     // Entering or leaving the dinar input starts its amount afresh: a number never changes currency silently.
     if (next === 'IQD') set({ supplier_cost_currency: 'IQD', supplier_cost_iqd: undefined, supplier_cost_amount: undefined, reconvert: undefined });
@@ -902,14 +1019,14 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
       )}
       <Field {...label(s.supplierCurrency, en.supplierCurrency)}>
         <Select value={currency} onChange={(e) => pickCurrency(e.target.value)}>
-          <option value="">{scope.scope === 'option' ? s.inheritPlaceholder(inherited?.supplier_input_mode === 'IQD_CONVERTED' ? 'IQD' : (inherited?.supplier_cost_currency ?? '—')) : '—'}</option>
+          <option value="">{scope.scope !== 'base' ? s.inheritPlaceholder(inherited?.supplier_input_mode === 'IQD_CONVERTED' ? 'IQD' : (inherited?.supplier_cost_currency ?? '—')) : '—'}</option>
           {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
           <option value="IQD">{s.currencyIqd}</option>
         </Select>
       </Field>
       <Field {...label(s.route, en.route)}>
         <Select value={d.shipping_profile ?? stored?.shipping_profile ?? ''} onChange={(e) => set({ shipping_profile: e.target.value })}>
-          <option value="">{scope.scope === 'option' && inherited?.shipping_profile ? s.inheritPlaceholder(profileName(inherited.shipping_profile, lang)) : s.routeNone}</option>
+          <option value="">{scope.scope !== 'base' && inheritedRoute ? s.inheritPlaceholder(profileName(inheritedRoute, lang)) : s.routeNone}</option>
           {ROUTES.map((r) => <option key={r} value={r}>{profileName(r, lang)}</option>)}
         </Select>
       </Field>
@@ -935,16 +1052,19 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
           )}
         </div>
       )}
-      {route && <MeasureFields scope={scope.scope} id={scope.scope_id} route={route} summary={summary} />}
+      {/* A variant row's measure is its own row's (only when the form holds one); otherwise it inherits. */}
+      {route && (scope.scope !== 'sku' || (st.form.skus ?? []).some((k) => k.combo_key === scope.scope_id)) && (
+        <MeasureFields scope={scope.scope} id={scope.scope_id} route={route} summary={summary} />
+      )}
       <Field {...label(s.additional, en.additional)}>
-        <Money value={d.additional_cost_iqd !== undefined ? d.additional_cost_iqd : (stored?.additional_cost_iqd ?? null)} placeholder={ph(inherited?.additional_cost_iqd != null ? String(inherited.additional_cost_iqd) : null)} onChange={(v) => set({ additional_cost_iqd: v })} />
+        <Money value={d.additional_cost_iqd !== undefined ? d.additional_cost_iqd : (stored?.additional_cost_iqd ?? null)} placeholder={ph(inheritedAdditional != null ? String(inheritedAdditional) : null)} onChange={(v) => set({ additional_cost_iqd: v })} />
       </Field>
       <Field {...label(s.minProfit, en.minProfit)} error={problems.minimum_target_profit_usd ? ps.invalid : null} hint={s.minProfitHint}>
         <TextInput inputMode="decimal" value={minProfit} placeholder={ph(baseMin) ?? (scope.target_profit_iqd != null ? `${scope.target_profit_iqd.toLocaleString('en-US')} IQD` : undefined)} onChange={(e) => set({ minimum_target_profit_usd: e.target.value })} />
       </Field>
       {(sellsDirect || extraStored != null || d.direct_sale_extra_iqd != null) && (
         <Field {...label(s.extra, en.extra)} error={problems.direct_sale_extra_iqd ? s.extraInvalid : null} hint={s.extraHint}>
-          <Money value={d.direct_sale_extra_iqd !== undefined ? d.direct_sale_extra_iqd : extraStored} placeholder={ph(base?.direct_sale_extra_iqd != null ? String(base.direct_sale_extra_iqd) : null)} onChange={(v) => set({ direct_sale_extra_iqd: v })} />
+          <Money value={d.direct_sale_extra_iqd !== undefined ? d.direct_sale_extra_iqd : extraStored} placeholder={ph(aboveExtra != null ? String(aboveExtra) : null)} onChange={(v) => set({ direct_sale_extra_iqd: v })} />
         </Field>
       )}
     </Grid>
@@ -972,7 +1092,7 @@ function SaveRow() {
           className={btnGhost}
           disabled={st.saving}
           onClick={() => {
-            if (window.confirm(engineSaveStrings(lang).exitConfirm)) void st.exitEngine();
+            if (window.confirm(st.answer?.per_sku ? engineSaveStrings(lang).exitConfirmPerSku : engineSaveStrings(lang).exitConfirm)) void st.exitEngine();
           }}
           data-engine-exit
         >
@@ -1087,7 +1207,7 @@ export function UsdPricingModelRow({ model }: { model: FormModel }) {
           </span>
         )}
       </div>
-      <p className="mt-1 text-[11px] text-zinc-500">{saved ? s.coloursFollow : s.modelSavedLater}</p>
+      <p className="mt-1 text-[11px] text-zinc-500">{saved ? (st.answer.sku_levels ? s.coloursOwn : s.coloursFollow) : s.modelSavedLater}</p>
       <details className="mt-1.5" open={touched || undefined}>
         <summary className="cursor-pointer text-[12px] text-zinc-400">{s.edit}</summary>
         <div className="mt-3">
@@ -1095,6 +1215,109 @@ export function UsdPricingModelRow({ model }: { model: FormModel }) {
         </div>
       </details>
       {saved && summary && <PricingSummaryBar summary={summary} label={name} busy={st.busy && touched} />}
+    </div>
+  );
+}
+
+/** The computed customer price of each SKU (pre-order base, and direct when it sells direct), one line each. */
+function SkuPrices({ skus, busy }: { skus: readonly SkuAnswer[]; busy: boolean }) {
+  const { lang } = useLanguage();
+  const s = usdPricingFormStrings(lang);
+  if (!skus.length) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-[12px] tabular-nums text-zinc-200" data-usd-sku-prices>
+      {skus.map((k) => {
+        const sum = k.pricing_summary;
+        const ok = sum.state === 'ok';
+        return (
+          <li key={k.combo_key} className="flex flex-wrap gap-x-3" data-usd-sku={k.combo_key}>
+            <span className="text-zinc-400" dir="auto">{nameOf(k, lang)}</span>
+            {ok ? (
+              <>
+                <span>{s.customerPrice(money(sum.preorder_base_iqd))}</span>
+                {sum.direct_sale_price_iqd != null && <span>{s.directPrice(money(sum.direct_sale_price_iqd))}</span>}
+              </>
+            ) : (
+              <span className="text-zinc-500">{busy ? '…' : s.modelBlocked}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+const emptyScope = (scope: PricingScope, id: string, names: { name_ar?: string; name_en: string; name_ckb?: string }): ScopeAnswer => ({
+  scope,
+  scope_id: id,
+  name_ar: names.name_ar ?? '',
+  name_en: names.name_en,
+  name_ckb: names.name_ckb ?? '',
+  pricing_inputs: null,
+  minimum_target_profit_usd: null,
+  target_profit_iqd: null,
+  target_profit_state: null,
+  direct_sale_extra_iqd: null,
+  direct_sale_extra_state: null,
+});
+
+/**
+ * Section ٥, inside one colour's card (FX-7, with the SKU rung): the computed
+ * customer price of every SKU the colour makes (one per model it is sold
+ * with), and its own values — empty = its model's, then the product's.
+ */
+export function UsdPricingColourRow({ colour }: { colour: FormColour }) {
+  const { lang } = useLanguage();
+  const s = usdPricingFormStrings(lang);
+  const st = useUsdPricing();
+  if (!st || !st.enabled || st.notInstalled || !st.answer || !st.answer.sku_levels) return null;
+  const saved = scopeOf(st.answer, 'color', colour.id);
+  const scope = saved ?? emptyScope('color', colour.id, colour);
+  const skus = (st.shown?.skus ?? []).filter((k) => k.color_id === colour.id);
+  const touched = !!st.effective[keyOf('color', colour.id)];
+  const sellsDirect = skus.some((k) => k.sells_direct) || st.form.models.some((m) => m.sells_direct) || st.form.productSellsDirect;
+  return (
+    <div className="ap mt-2.5 min-w-0 rounded-lg border border-zinc-700/70 bg-zinc-950/25 px-2.5 py-2" data-usd-colour={colour.id}>
+      <span className="text-[12px] font-bold text-zinc-300">{s.colourTitle}</span>
+      {saved && st.productId && <SkuPrices skus={skus} busy={st.busy && touched} />}
+      <p className="mt-1 text-[11px] text-zinc-500">{saved ? s.colourInherits : s.colourSavedLater}</p>
+      <details className="mt-1.5" open={touched || undefined}>
+        <summary className="cursor-pointer text-[12px] text-zinc-400">{s.edit}</summary>
+        <div className="mt-3">
+          <ScopeFields scope={scope} sellsDirect={sellsDirect} summary={skus.length === 1 ? skus[0]!.pricing_summary : null} />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/**
+ * Section ٥, inside one variant row of a colour's card (FX-7, with the SKU
+ * rung): the variant's computed customer price and its own values — empty =
+ * its colour's, its model's, then the product's.
+ */
+export function UsdPricingSkuRow({ comboKey }: { comboKey: string }) {
+  const { lang } = useLanguage();
+  const s = usdPricingFormStrings(lang);
+  const st = useUsdPricing();
+  if (!st || !st.enabled || st.notInstalled || !st.answer || !st.answer.sku_levels) return null;
+  const saved = scopeOf(st.answer, 'sku', comboKey);
+  const sku = (st.shown?.skus ?? []).find((k) => k.combo_key === comboKey) ?? null;
+  // A variant row the server does not price as its own level (a model alone) is the model's card's.
+  if (!saved && !sku) return null;
+  const scope = saved ?? emptyScope('sku', comboKey, sku ?? { name_en: comboKey });
+  const touched = !!st.effective[keyOf('sku', comboKey)];
+  return (
+    <div className="ap mt-2 min-w-0 rounded-md border border-zinc-800/80 bg-zinc-950/20 px-2 py-1.5" data-usd-variant={comboKey}>
+      <span className="text-[11px] font-bold text-zinc-300">{s.skuTitle}</span>
+      {sku && st.productId && <SkuPrices skus={[sku]} busy={st.busy && touched} />}
+      <details className="mt-1" open={touched || undefined}>
+        <summary className="cursor-pointer text-[11px] text-zinc-400">{s.edit}</summary>
+        <p className="mt-1 text-[11px] text-zinc-500">{s.skuInherits}</p>
+        <div className="mt-2">
+          <ScopeFields scope={scope} sellsDirect={sku?.sells_direct ?? false} summary={sku?.pricing_summary ?? null} />
+        </div>
+      </details>
     </div>
   );
 }
@@ -1140,6 +1363,7 @@ export function UsdPricingPreview() {
       <Head text={s.previewTitle} english={USD_PRICING_FORM_STRINGS.en.previewTitle} />
       <p className="mt-1 text-[11px] text-zinc-500">
         {s.previewNote}
+        {st.shown.per_sku && <span className="block">{s.perSkuNote}</span>}
         {st.dirty && <span className="block text-amber-300">{s.previewIncludesDrafts}</span>}
       </p>
       {rows.length ? <PricingRowsTable rows={rows} /> : <p className="mt-2 text-[12px] text-zinc-500">{s.previewEmpty}</p>}

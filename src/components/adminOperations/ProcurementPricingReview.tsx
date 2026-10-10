@@ -126,7 +126,7 @@ export function PricingRowsTable({ rows }: { rows: readonly PricingPreviewRow[] 
             const direct = r.channel === 'direct_sale';
             const fig = (v: React.ReactNode) => <bdi dir="ltr" className="whitespace-nowrap">{v}</bdi>;
             return (
-              <tr key={`${r.option_id}:${r.channel}`} className="border-b border-[var(--ap-border)] align-top">
+              <tr key={`${r.combo_key ?? r.option_id}:${r.channel}`} className="border-b border-[var(--ap-border)] align-top">
                 <td className="px-2 py-1.5">{modelName(r)}</td>
                 <td className="px-2 py-1.5">{channelName(r.channel, lang)}</td>
                 <td className="px-2 py-1.5">{fig(money(r.replacement_cost_iqd))}</td>

@@ -236,9 +236,79 @@ engine** and writes its prices in that same batch.
   `ENGINE_MANAGED` (the product's price, the option price cells, the quick
   price grid and its undo, the selection price, the CSV import); the
   database's value-compared lock is the enforcement. Cost stays editable.
-- **Not yet**: colour / SKU-level prices (FX-7; a product priced per colour or
-  variant, or with more than one option group, is refused
-  `PRICE_SHAPE_UNSUPPORTED` and stays manual).
+- **Colour and variant prices** are the SKU rung below (FX-7). On a database
+  without migration 0183 a product priced per colour or variant, or with more
+  than one option group, is still refused `PRICE_SHAPE_UNSUPPORTED` and stays
+  manual, exactly as before.
+
+## Colour and variant prices — the SKU rung (FX-7, DECISIONS row 200)
+
+Owner decision 1 of 2026-10-07 (DECISIONS row 184 (1)): «SKU آخر درجة وأكثرها
+تحديدًا في السُّلّم (منتج ← خيار ← لون ← SKU)». Migration
+`0183_product_sku_prices.sql`.
+
+- **The levels.** Engine inputs (`pricing_product_inputs`) and minimum-profit
+  rules (`pricing_rules`) take two more scopes: `color` (a colour of the
+  product) and `sku` (one SKU, by its `combo_key`: the option value ids
+  sorted, each `o:<id>`, then `c:<colour id>`, joined by `|` — the identity
+  `product_variants.combo_key` already uses). Each value inherits product →
+  option → colour → SKU; an empty field inherits, a rule left at INHERIT
+  inherits. Owner only, audited, bounded like the product and option levels;
+  a colour or SKU the product does not sell is refused (`…scope_id`), and
+  both levels are refused (`…scope`) on a database without 0183.
+- **When a product is priced per SKU.** When a colour or a SKU carries its own
+  input or a rule that is not INHERIT, when it has more than one option group,
+  or when an active colour still carries a dinar price of its own — and only
+  on a database with 0183. Otherwise it is priced per model, byte for byte as
+  before FX-7 (same plan, same batch, same preview hash).
+- **What is written.** Every sellable SKU (every option value × colour the
+  storefront offers; with several groups, every combination — at most 240,
+  `SKU_GRID_TOO_LARGE` beyond) × channel gets its own engine price in
+  `product_sku_prices` (public final regular price; the private figures stay in
+  `pricing_sku_costs`, one row per SKU × channel). The resolver
+  (`packages/pricing/src/pricing.ts`) reads it as the last rung after the
+  colour: the selection's SKU row on the line's channel (`direct_sale`, or
+  `pre_order_<route>`) is the regular price; member layers, warranty and the
+  payment rule stay read-time (owner decision 6). The cart, the quote, the
+  product page's first price, the membership and pricing-mode previews and
+  price-protection claims pass the selected option values.
+- **Rollback safety.** Underneath, each model's route rows, order-type cells
+  and option row hold the HIGHEST price of its SKUs, the colour rows' price
+  fields are cleared, and `products.price_iqd` is the lowest written price (the
+  highest when the product has no option group and only colours, since the
+  product price is then the ladder every colour falls back to). A Worker that
+  ignores the table (an older commit) therefore never charges a SKU less than
+  its engine price. The variant rows mirror the SKU's direct price (the
+  purchase screens read them; the cart never does).
+- **Checked before anything is written.** `verifyPlan` re-runs the cart's own
+  resolver on the document as it would be after the write, for every SKU ×
+  channel, prepaid and cash on delivery: any figure that is not the engine's
+  is `RESOLVER_MISMATCH`; the same resolver without the SKU rung must never
+  charge less (`:rollback`). Then the same fenced, idempotent, audited batch
+  (now also replacing the product's SKU rows, with `write_seq` the pricing
+  state's next sequence).
+- **The database guards it.** Inserts and updates need the engine's token
+  (`engine-price:<product>`) or the repricing token (`pricing-rates-apply`);
+  deleting an engine product's rows needs it too. Every refusal is
+  `ENGINE_MANAGED`. A product being deleted takes its rows with it.
+- **Everything per SKU**: the six-figure preview (one row per SKU × channel),
+  the FX-5 automatic repricing and the stale list (a per-SKU product missing a
+  row for a sellable SKU is listed with reason `SKUS`), and the decision-6
+  order snapshot (`order_items.engine_combo_key` is the SKU's key; a claim
+  looks the SKU up first, then its model).
+- **Back to manual** (`POST …/products/:id/manual`) keeps the ladder as it is
+  (each model at its highest SKU) and deletes the SKU rows in the same batch.
+- **The product form** («الخيارات والألوان»): each colour, and each variant row
+  with a colour or two option values, gets the same inputs and minimum-profit
+  rule as its model, empty = inherited (the placeholder shows the inherited
+  value), with its computed customer price per channel. The model card no
+  longer says its colours follow it. Shown only when the database has 0183;
+  owner only.
+- **Not covered by the rung**: bundles, trade-in, gifts, compare and the
+  product page's price levels read an option and a colour only, so a SKU of a
+  multi-group product falls back there to its model's highest price (never
+  lower). Purchase lines entered per colour or variant still feed the model's
+  or the product's cost.
 
 ## Automatic repricing when a confirmed rate changes (FX-5)
 
@@ -547,6 +617,9 @@ is clamped at zero and rounded to whole dinars.
 takes an option and a colour and never reads a variant price, so a variant
 adjustment would be a field an admin could set that no customer could be charged
 from.
+Since FX-7 the resolver also takes the selected option values, but only to
+read the engine's own per-SKU row (`product_sku_prices`, written by the writer
+alone); a variant still has no price field an admin can set.
 
 ## Quick Edit — the whole price table of one product
 

@@ -50,6 +50,10 @@ export interface EngineSaveStrings {
   nothing: string;
   exit: string;
   exitConfirm: string;
+  /** FX-7: a product priced per colour or variant — its SKUs return to their model's price. */
+  exitConfirmPerSku: string;
+  /** FX-7: the stale list's reason for a colour or variant added since the last save. */
+  reasonSkus: string;
   // FX-5: the automatic repricing's status line, on «التسعير والشحن» and in the rates panel.
   autoTitle: string;
   autoActive: Fill;
@@ -93,6 +97,8 @@ const ar: EngineSaveStrings = {
   nothing: 'لا شيء ينتظر الحفظ',
   exit: 'رجوع إلى التسعير اليدوي',
   exitConfirm: 'تبقى الأسعار كما هي الآن، ويعود تعديلها يدويًا. متابعة؟',
+  exitConfirmPerSku: 'هذا المنتج مسعَّر لكل لون ونسخة، والتسعير اليدوي لا يحمل سعرًا لكل لون: يعود كل لون ونسخة إلى سعر موديله (أعلى أسعار ألوانه، لا أقل)، وتبقى أسعار الموديلات كما هي. متابعة؟',
+  reasonSkus: 'لون أو نسخة جديدة لم تُسعَّر بعد',
   autoTitle: 'يُعاد التسعير تلقائياً',
   autoActive: (n) => `تُحدَّث أسعار ${n} من المنتجات بالسعر المعتمد الجديد خلال 15 دقيقة، الأبعد عن التكلفة أولاً`,
   autoIdle: 'كل الأسعار التلقائية محسوبة بآخر سعر صرف وشحن معتمد',
@@ -135,6 +141,8 @@ const en: EngineSaveStrings = {
   nothing: 'Nothing is waiting to be saved',
   exit: 'Back to manual pricing',
   exitConfirm: 'Prices stay exactly as they are now and are edited by hand again. Continue?',
+  exitConfirmPerSku: 'This product is priced per colour and variant, and manual pricing cannot hold a price per colour: every colour and variant returns to its model’s price (the highest of its colours, never lower), and the models’ prices stay as they are. Continue?',
+  reasonSkus: 'a new colour or variant not priced yet',
   autoTitle: 'Repriced automatically',
   autoActive: (n) => `${n} products get their new price at the approved rate within 15 minutes, the furthest below cost first`,
   autoIdle: 'Every automatic price is computed at the latest approved exchange and shipping rates',
@@ -177,6 +185,8 @@ const ckb: EngineSaveStrings = {
   nothing: 'هیچ شتێک چاوەڕێی پاشەکەوتکردن نییە',
   exit: 'گەڕانەوە بۆ نرخدانانی دەستی',
   exitConfirm: 'نرخەکان وەک ئێستا دەمێننەوە و دووبارە بە دەست دەستکاری دەکرێن. بەردەوام دەبیت؟',
+  exitConfirmPerSku: 'ئەم بەرهەمە بۆ هەر ڕەنگ و جۆرێک نرخی بۆ دانراوە، و نرخدانانی دەستی ناتوانێت نرخ بۆ هەر ڕەنگێک هەڵبگرێت: هەموو ڕەنگ و جۆرێک دەگەڕێتەوە بۆ نرخی مۆدێلەکەی (بەرزترین نرخی ڕەنگەکانی، هەرگیز کەمتر نا)، و نرخی مۆدێلەکان وەک خۆیان دەمێننەوە. بەردەوام دەبیت؟',
+  reasonSkus: 'ڕەنگ یان جۆرێکی نوێ کە هێشتا نرخی بۆ دانەنراوە',
   autoTitle: 'نرخەکان بە خۆکاری نوێ دەکرێنەوە',
   autoActive: (n) => `نرخی ${n} بەرهەم لە ماوەی 15 خولەکدا بە نرخی پەسەندکراوی نوێ نوێ دەکرێتەوە؛ ئەوانەی زۆرترین دووری لە تێچوویان هەیە یەکەم`,
   autoIdle: 'هەموو نرخە خۆکارییەکان بە دوایین نرخی پەسەندکراوی ئاڵوگۆڕ و ناردن هەژمار کراون',

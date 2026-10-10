@@ -68,37 +68,58 @@ export async function usdIqdInForceAt(db: D1Database, iso: string): Promise<stri
 }
 
 /**
- * The engine's observations of one model × channel in the window (its `sku:`
+ * The engine keys a line's price may have been observed under, most specific
+ * first (FX-7): the SKU its snapshot names, its exact selection (a product
+ * priced per colour or variant, 0183), then its model (a product priced per
+ * model — every product before FX-7). A product moved from one shape to the
+ * other inside the window is observed under both.
+ */
+export function engineCombosOf(line: { snapshot?: string | null; optionId: string; optionValueIds?: readonly string[]; colorId?: string | null }): string[] {
+  const ids = line.optionValueIds && line.optionValueIds.length ? line.optionValueIds : line.optionId ? [line.optionId] : [];
+  const out = [
+    ...(line.snapshot ? [line.snapshot] : []),
+    skuComboKey({ option_value_ids: ids, color_id: line.colorId ?? null }),
+    skuComboKey({ option_value_ids: line.optionId ? [line.optionId] : [], color_id: null }),
+  ];
+  return [...new Set(out)];
+}
+
+/**
+ * The engine's observations of one SKU × channel in the window (its `sku:`
  * history rows, with the U each was computed at) and, when the product is
- * engine-priced now, today's engine price and U.
+ * engine-priced now, today's engine price and U. `combos` is
+ * `engineCombosOf`'s list (or one model's id, the pre-FX-7 call): the history
+ * of every key, today's price from the most specific key that has one.
  */
 export async function engineObservations(
   db: D1Database,
   productId: string,
-  optionId: string,
+  combos: readonly string[] | string,
   channel: SkuChannel,
   window: { from: string; to: string }
 ): Promise<{ history: EngineObservation[]; today: EngineToday | null }> {
-  const combo = skuComboKey({ option_value_ids: optionId ? [optionId] : [], color_id: null });
+  const keys = typeof combos === 'string' ? [skuComboKey({ option_value_ids: combos ? [combos] : [], color_id: null })] : [...new Set(combos)];
+  if (!keys.length) return { history: [], today: null };
   try {
     const [hist, today] = await db.batch([
       db
         .prepare(
           `SELECT new_iqd, usd_iqd_rate, price_source FROM price_history
-            WHERE product_id = ? AND variant_key = ? AND field = 'regular' AND new_iqd IS NOT NULL
+            WHERE product_id = ? AND variant_key IN (SELECT value FROM json_each(?)) AND field = 'regular' AND new_iqd IS NOT NULL
               AND changed_at >= ? AND changed_at <= ?`
         )
-        .bind(productId, skuPriceHistoryKey(combo, channel), window.from, window.to),
+        .bind(productId, JSON.stringify(keys.map((k) => skuPriceHistoryKey(k, channel))), window.from, window.to),
       db
         .prepare(
-          `SELECT c.computed_price_iqd, c.usd_iqd_rate FROM pricing_sku_costs c
+          `SELECT c.combo_key, c.computed_price_iqd, c.usd_iqd_rate FROM pricing_sku_costs c
              JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
-            WHERE c.product_id = ? AND c.combo_key = ? AND c.channel = ?`
+            WHERE c.product_id = ? AND c.combo_key IN (SELECT value FROM json_each(?)) AND c.channel = ?`
         )
-        .bind(productId, combo, channel),
+        .bind(productId, JSON.stringify(keys), channel),
     ]);
     const rows = ((hist as D1Result<{ new_iqd: number; usd_iqd_rate: string | null; price_source: string }>).results ?? []) as Array<{ new_iqd: number; usd_iqd_rate: string | null; price_source: string }>;
-    const t = (((today as D1Result<{ computed_price_iqd: number; usd_iqd_rate: string }>).results ?? []) as Array<{ computed_price_iqd: number; usd_iqd_rate: string }>)[0] ?? null;
+    const todays = ((today as D1Result<{ combo_key: string; computed_price_iqd: number; usd_iqd_rate: string }>).results ?? []) as Array<{ combo_key: string; computed_price_iqd: number; usd_iqd_rate: string }>;
+    const t = keys.map((k) => todays.find((r) => r.combo_key === k)).find((r) => !!r) ?? null;
     return {
       history: rows
         .filter((r) => Number.isSafeInteger(Number(r.new_iqd)) && Number(r.new_iqd) >= 0)

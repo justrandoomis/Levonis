@@ -124,13 +124,14 @@ import { MinimumProfitError, parseMinimumProfit, purchaseIneligibility, type Min
 import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
 import { lineDto, productPreviewDto, ratesHeadDto, storedRulesDto } from '../lib/pricingEngine/procurementDto';
 import { legacyAcceptWrites, parseRuleWrites } from '../lib/pricingEngine/ownerRules';
-import { evaluateLegacy } from '../lib/pricingEngine/legacy';
+import { evaluateLegacy, sellableSkus } from '../lib/pricingEngine/legacy';
 import { legacyHashOf } from '../lib/pricingEngine/legacyHash';
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { committedPurchaseForPricing, draftForPricing } from '../lib/pricingEngine/purchaseRead';
 import {
   effectiveWrites,
   formPreviewHash,
+  formScopeIds,
   loadEngineReads,
   parseProductInputs,
   productEngineEvaluation,
@@ -143,6 +144,7 @@ import {
   loadEngineControl,
   loadStoredSkuCosts,
   priceImageOf,
+  skuTableOf,
   staleReasons,
   withRuleIds,
   type EngineEvaluation,
@@ -981,7 +983,7 @@ adminPricingRoutes.put('/products/:id/rules', async (c) => {
     if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
     if (body.inputs_seq !== (data.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
   }
-  const writes = parseRuleWrites(body, pid, optionIdsOf(loaded), data).filter((w) => !ruleWriteIsNoop(w));
+  const writes = parseRuleWrites(body, pid, formScopeIds(loaded), data).filter((w) => !ruleWriteIsNoop(w));
   if (writes.length) await commitRuleWrites(c, data, writes, 'rule_set', 'pricing.rule.updated');
   const after = await loadProductPricing(db, pid);
   return c.json(storedRulesDto(pid, after.rules, after.state?.inputs_seq ?? 0));
@@ -1219,7 +1221,14 @@ adminPricingRoutes.get('/save-list', async (c) => {
     const product = loaded.get(st.product_id);
     if (!product) continue;
     if (st.mode === 'engine') {
-      const reasons = staleReasons(costs.filter((r) => r.product_id === st.product_id), rates);
+      const own = costs.filter((r) => r.product_id === st.product_id);
+      const reasons = staleReasons(own, rates);
+      // FX-7: priced per SKU, a SKU added since (a new colour) sells at its model's highest price until
+      // the product is saved again — listed as `SKUS` (codes only).
+      if (own.some((r) => r.combo_key.includes('c:') || r.combo_key.includes('|'))) {
+        const stored = new Set(own.map((r) => r.combo_key));
+        if (sellableSkus(product.doc, product.view).skus.some((k) => !stored.has(k.combo_key))) reasons.push('SKUS');
+      }
       // `blocked_code`: the automatic repricing could not reach it (a code, never a figure).
       if (reasons.length) stale.push({ product_id: st.product_id, ...productNames(product), reasons, blocked_code: st.reprice_blocked_code ?? null });
       continue;
@@ -1327,6 +1336,8 @@ adminPricingRoutes.post('/products/:id/manual', async (c) => {
   if (typeof body.write_seq !== 'number' || body.write_seq !== stored.state.write_seq) throw fxRefusal(409, 'PRICING_CHANGED');
   const actor = c.get('user')!.id;
   const now = new Date().toISOString();
+  // How many per-SKU prices the product carries (0 on a database without 0183, or priced per model).
+  const skuRows = skuTableOf(loaded) ? (loaded.view?.sku_prices?.length ?? 0) : 0;
   try {
     await db.batch([
       ...fence(db, "EXISTS(SELECT 1 FROM product_pricing_state WHERE product_id = ? AND mode = 'engine' AND write_seq = ?)", [pid, stored.state.write_seq]),
@@ -1335,7 +1346,21 @@ adminPricingRoutes.post('/products/:id/manual', async (c) => {
         .prepare("UPDATE product_pricing_state SET mode = 'manual', write_seq = write_seq + 1, opted_out_at = ?, opted_out_by = ?, updated_at = ? WHERE product_id = ?")
         .bind(now, actor, now, pid),
       db.prepare('DELETE FROM pricing_sku_costs WHERE product_id = ?').bind(pid),
-      pricingAuditStatement(db, { entity: 'engine_mode', entity_key: pid, product_id: pid, action: 'engine_exit', before: { mode: 'engine' }, after: { mode: 'manual' }, actor, now }),
+      // FX-7 (0183): a SKU's own price cannot live in the manual fields; it returns to its model's —
+      // the highest of the model's SKUs, never lower (the confirmation said so). After the mode flip,
+      // so the rows' engine guard lets them go.
+      ...(skuRows ? [db.prepare('DELETE FROM product_sku_prices WHERE product_id = ?').bind(pid)] : []),
+      pricingAuditStatement(db, {
+        entity: 'engine_mode',
+        entity_key: pid,
+        product_id: pid,
+        action: 'engine_exit',
+        before: { mode: 'engine' },
+        after: { mode: 'manual' },
+        ...(skuRows ? { summary: { sku_rows_removed: skuRows } } : {}),
+        actor,
+        now,
+      }),
       ...(await auditStatements(db, actor, 'pricing.engine.exited', pid, { product_id: pid })).statements,
       db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`pricing-mode:${pid}`),
     ]);

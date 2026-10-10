@@ -1996,7 +1996,7 @@ function previewStatus(tier: 'prime' | 'pro'): TierStatus {
 export function membershipPreview(
   ctx: PricingCtx,
   doc: ProductDoc,
-  sel: { optionId: string | null; colorId: string | null; transportMethod?: string | null },
+  sel: { optionId: string | null; colorId: string | null; transportMethod?: string | null; optionValueIds?: readonly string[] },
   isPrinter: boolean
 ): { prime: MembershipPreviewTier | null; pro: MembershipPreviewTier | null } {
   const target = {
@@ -2009,6 +2009,7 @@ export function membershipPreview(
     const r = resolveUnitPrice({
       product: doc,
       optionId: sel.optionId,
+      optionValueIds: sel.optionValueIds,
       colorId: sel.colorId,
       transportMethod: sel.transportMethod ?? null,
       tier,
@@ -2067,13 +2068,14 @@ export interface PricingModes {
 export function pricingModes(
   doc: ProductDoc,
   ctx: PricingCtx,
-  sel: { optionId: string | null; colorId: string | null },
+  sel: { optionId: string | null; colorId: string | null; optionValueIds?: readonly string[] },
   isPrinter: boolean
 ): PricingModes {
   const resolve = (transportMethod: string | null, preorderPricing: 'prepaid' | 'cod') =>
     resolveUnitPrice({
       product: doc,
       optionId: sel.optionId,
+      optionValueIds: sel.optionValueIds,
       colorId: sel.colorId,
       transportMethod,
       tier: ctx.tier,
@@ -3737,6 +3739,7 @@ export async function catalogProductDetail(
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: initialOptionId,
+    optionValueIds: initialOptionValueIds,
     colorId: initialColorId,
     fulfillmentType: initialSelection ? 'direct_sale' : undefined,
     tier: ctx.tier,
@@ -3824,7 +3827,7 @@ export async function catalogProductDetail(
     membership_preview: membershipPreview(
       ctx,
       doc,
-      { optionId: initialOptionId, colorId: initialColorId },
+      { optionId: initialOptionId, colorId: initialColorId, optionValueIds: initialOptionValueIds },
       isPrinter
     ),
     // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
@@ -3837,7 +3840,7 @@ export async function catalogProductDetail(
     pricing_modes: pricingModes(
       doc,
       ctx,
-      { optionId: initialOptionId, colorId: initialColorId },
+      { optionId: initialOptionId, colorId: initialColorId, optionValueIds: initialOptionValueIds },
       isPrinter
     ),
     // §7.2 — the sale mode the page may DEFAULT to, derived from the real
@@ -4125,6 +4128,8 @@ productRoutes.post('/:slug/quote', async (c) => {
   const resolved = resolveUnitPrice({
     product: doc,
     optionId,
+    // The whole selection names the exact SKU whose stored price (0183) applies.
+    optionValueIds,
     colorId,
     transportMethod,
     fulfillmentType,
@@ -4153,11 +4158,11 @@ productRoutes.post('/:slug/quote', async (c) => {
     // §8/§9: what PREMIUM and PRO pay for THIS selection, from the live rules.
     // The page shows the viewer's own line as a price, and the other tier's as
     // the one-line invitation §9 asks for — never a gold advertisement.
-    membership_preview: membershipPreview(ctx, doc, { optionId, colorId, transportMethod }, isPrinter),
+    membership_preview: membershipPreview(ctx, doc, { optionId, colorId, transportMethod, optionValueIds }, isPrinter),
     // The final price of every way to get THIS selection — direct, and each
     // pre-order journey paid in advance or cash on delivery — so the page's
     // pills show the server's numbers and never their own arithmetic.
-    pricing_modes: pricingModes(doc, ctx, { optionId, colorId }, isPrinter),
+    pricing_modes: pricingModes(doc, ctx, { optionId, colorId, optionValueIds }, isPrinter),
     // Every extended-warranty option priced for THIS selection's regular price
     // (an option surcharge moves a percent fee), so the chooser can show the
     // exact dinar of each plan before one is picked.

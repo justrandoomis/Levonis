@@ -48,6 +48,23 @@ export async function engineCoreInstalled(db: D1Database): Promise<boolean> {
   }
 }
 
+/**
+ * The per-SKU price rung (0183, FX-7). Without it the engine prices per model
+ * exactly as before: a colour or variant level, or a second option group, is
+ * refused as it always was (PRICE_SHAPE_UNSUPPORTED), and the cart's resolver
+ * reads no SKU row (the overlay's read of the table answers "absent").
+ */
+export async function skuPricesInstalled(db: D1Database): Promise<boolean> {
+  if (remembered(db, 'sku_prices')) return true;
+  try {
+    await db.prepare('SELECT 1 AS x FROM product_sku_prices LIMIT 1').first<{ x: number }>();
+    remember(db, 'sku_prices');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The columns 0181 adds to live tables, the only ones this helper answers for. */
 export const ENGINE_CORE_COLUMNS = {
   purchase_charges: ['pricing_role'],

@@ -150,6 +150,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   { table: 'pricing_inputs', by: { column: 'product_id' } },
   { table: 'pricing_rules', by: { column: 'product_id' } },
   { table: 'pricing_sku_costs', by: { column: 'product_id' } },
+  // 0183 (FX-7): the engine's per-SKU final prices — public figures (a price
+  // a guest is charged), the product's own configuration, worthless without
+  // it. Deleted after the state row, so its engine guard is already off.
+  { table: 'product_sku_prices', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
   // clear — and clearing it would be wrong even if it were possible: the row's

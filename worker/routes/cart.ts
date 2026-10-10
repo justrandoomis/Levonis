@@ -401,6 +401,8 @@ export function resolveCartLine(
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: valueIds[0] || null,
+    // The full selection names the exact SKU whose stored price (0183) applies.
+    optionValueIds: valueIds,
     colorId: sel.colorId || null,
     transportMethod: sel.transportMethod || null,
     fulfillmentType:
