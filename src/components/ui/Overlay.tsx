@@ -2,7 +2,7 @@
  * OVERLAYS — one primitive for every window in the app.
  *
  * WHAT WAS WRONG. Twenty-four files opened an overlay, and almost all of them
- * did it the same way: render `fixed inset-0 bg-black/80 backdrop-blur-sm` when
+ * did it the same way: render a blurred `fixed inset-0 bg-black/80` scrim when
  * a boolean flips, and unmount it when the boolean flips back. That means the
  * window has no enter animation and — worse — no exit at all: it vanishes. A
  * thing that appears from nowhere and disappears to nowhere gives a person
@@ -189,7 +189,7 @@ function Scrim({ onClose, label, visible }: { onClose?: () => void; label: strin
       tabIndex={-1}
       onClick={onClose}
       data-overlay-scrim
-      className="no-press lv-scrim absolute inset-0 backdrop-blur-[3px] cursor-default"
+      className="no-press lv-scrim absolute inset-0 cursor-default"
       initial={atRest ? false : { opacity: 0 }}
       animate={{ opacity: visible ? 1 : 0 }}
       exit={{ opacity: 0 }}

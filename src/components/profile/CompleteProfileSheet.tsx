@@ -156,7 +156,7 @@ export default function CompleteProfileSheet() {
      same object so they cannot drift apart.
 
      MODAL (the primitive's default) is right, and it is a preservation: the
-     old backdrop was `bg-black/70 backdrop-blur-[2px]`, so this window already
+     old backdrop was a 2px-blurred `bg-black/70`, so this window already
      dimmed and pushed the page back. `dismissOnScrim` stays at its default
      TRUE because that backdrop was a real `<button>` wired to `dismiss` —
      tapping outside has always closed this, and removing it would be as much

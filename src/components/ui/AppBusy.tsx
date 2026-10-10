@@ -267,7 +267,7 @@ export default function AppBusy() {
           onClick={swallow}
           onContextMenu={swallow}
           onTouchStart={swallow}
-          // NO BACKDROP BLUR. A full-viewport `backdrop-filter` is re-filtered
+          // NO BACKDROP BLUR. A full-viewport backdrop filter is re-filtered
           // on every frame anything beneath it changes — and beneath it, a
           // page is loading or the character is moving — which on a weak phone
           // is the most expensive pixel in the app spent on a wait. The 70%

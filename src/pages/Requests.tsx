@@ -174,7 +174,7 @@ export default function Requests() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-300 pb-28">
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 [mask-image:radial-gradient(closest-side,#000,transparent)] pointer-events-none z-0" />
 
       <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
         <h1 className="text-gold font-bold text-lg mb-1">

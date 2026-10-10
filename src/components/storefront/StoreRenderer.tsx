@@ -186,12 +186,15 @@ function OnGround({ wrap, children, pad = true }: { wrap: boolean; children: Rea
   );
 }
 
+/** The classic ground's accent haze: the accent's own tint, faded to nothing
+ *  by a radial mask (docs/DECISIONS.md row 208). It used to be a 120px blur
+ *  filter, re-rastered under scrolling; the mask draws the same haze once. */
 function Glow() {
   const { accent } = useStoreTheme();
   return (
     <div
       aria-hidden="true"
-      className={`sf-glow fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] ${accent.glow} rounded-full blur-[120px] pointer-events-none z-0`}
+      className={`sf-glow fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] ${accent.glow} [mask-image:radial-gradient(closest-side,#000,transparent)] pointer-events-none z-0`}
     />
   );
 }

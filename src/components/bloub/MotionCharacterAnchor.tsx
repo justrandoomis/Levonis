@@ -56,7 +56,7 @@ export function MotionCharacterRouteHeader({ busy, reloadDocument }: {
   busy?: boolean; reloadDocument?: boolean;
 }) {
   return (
-    <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center">
+    <div className="lv-character-header sticky top-0 z-30 bg-black px-4 pb-1.5 flex items-center">
       <span aria-hidden="true" />
       <MotionCharacterHome busy={busy} reloadDocument={reloadDocument} />
       <span aria-hidden="true" />

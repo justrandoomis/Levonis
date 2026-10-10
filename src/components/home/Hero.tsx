@@ -108,12 +108,12 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
             type="button"
             onClick={dir === 'rtl' ? next : prev}
             aria-label={loc('السابق', 'Previous', 'پێشوو')}
-            className="w-11 h-11 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center hover:bg-black/70 transition-colors shrink-0"
+            className="w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/70 transition-colors shrink-0"
           >
             {dir === 'rtl' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
           </button>
 
-          <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur px-3 py-2 rounded-full min-h-[44px]">
+          <div className="flex items-center gap-1.5 bg-black/60 px-3 py-2 rounded-full min-h-[44px]">
             {banners.map((b, i) => (
               <button
                 key={b.id}
@@ -141,7 +141,7 @@ export default function Hero({ banners, loading }: { banners: HomeBanner[]; load
             type="button"
             onClick={dir === 'rtl' ? prev : next}
             aria-label={loc('التالي', 'Next', 'دواتر')}
-            className="w-11 h-11 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center hover:bg-black/70 transition-colors shrink-0"
+            className="w-11 h-11 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/70 transition-colors shrink-0"
           >
             {dir === 'rtl' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
           </button>
@@ -319,7 +319,7 @@ function DefaultHero({ loading = false }: { loading?: boolean }) {
               target="_blank"
               rel="noopener noreferrer"
               data-hero-cta="studio"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-black/45 backdrop-blur border border-white/25 text-white text-sm sm:text-base font-bold hover:bg-black/65 transition-colors"
+              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-black/55 border border-white/25 text-white text-sm sm:text-base font-bold hover:bg-black/65 transition-colors"
             >
               <Layers aria-hidden="true" className="w-4 h-4" />
               {t('heroStudio')}

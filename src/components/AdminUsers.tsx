@@ -402,7 +402,7 @@ export default function AdminUsers() {
       {/*
         THE EDIT-USER WINDOW.
 
-        It used to be a hand-rolled `fixed inset-0 bg-black/60 backdrop-blur-sm`
+        It used to be a hand-rolled, blurred `fixed inset-0 bg-black/60`
         that was mounted the instant a row's pencil was pressed and torn out of
         the DOM the instant it was dismissed: no arrival, and — the part that
         actually hurts — no departure. The admin's eye had nothing to follow

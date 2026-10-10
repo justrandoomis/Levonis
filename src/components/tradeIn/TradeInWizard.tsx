@@ -502,7 +502,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
 
         {/* THE ACTION BAR — sticky on the phone, above the tab bar. */}
         <div className="sticky bottom-[calc(var(--nav-stack,0px)+8px)] z-20 lg:static">
-          <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-canvas/95 backdrop-blur-md p-2 shadow-2 lg:shadow-none lg:bg-transparent lg:border-0 lg:p-0">
+          <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-canvas p-2 shadow-2 lg:shadow-none lg:bg-transparent lg:border-0 lg:p-0">
             <Button variant="secondary" onClick={onPrev} icon={<Back className="w-4 h-4" aria-hidden />} aria-label={L('رجوع', 'Back')}>
               <span className="hidden sm:inline">{L('رجوع', 'Back')}</span>
             </Button>

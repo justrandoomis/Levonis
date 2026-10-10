@@ -289,8 +289,7 @@ export default function PixelCard({ variant = 'default', gap, speed, colors, noF
           position: 'absolute',
           inset: 0,
           zIndex: 50,
-          backgroundColor: 'rgba(0,0,0,0.85)',
-          backdropFilter: 'blur(4px)'
+          backgroundColor: 'rgba(0,0,0,0.95)'
         }} 
       />
     </div>

@@ -85,7 +85,7 @@ export default function ShelfJumpChips({ chips, label }: { chips: JumpChip[]; la
     <nav
       aria-label={label}
       data-jump-chips
-      className="sticky top-14 z-20 -mx-4 bg-canvas/[0.92] py-1 backdrop-blur-lg sm:-mx-6 lg:-mx-8"
+      className="sticky top-14 z-20 -mx-4 bg-canvas py-1 sm:-mx-6 lg:-mx-8"
     >
       <ul ref={rowRef} className="relative flex gap-1.5 overflow-x-auto overscroll-x-contain px-4 hide-scrollbar sm:px-6 lg:px-8">
         {chips.map((c) => {

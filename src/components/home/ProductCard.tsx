@@ -130,7 +130,7 @@ function CompactCard({
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
         {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
-          <span className="absolute bottom-1.5 start-1.5 rounded-md bg-onyx/70 px-1.5 py-0.5 backdrop-blur-sm">
+          <span className="absolute bottom-1.5 start-1.5 rounded-md bg-onyx/80 px-1.5 py-0.5">
             <Countdown
               target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
               kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}
@@ -141,7 +141,7 @@ function CompactCard({
         {/* Graded stock says so on the card, on the photograph so the
             card's height does not change. */}
         {condition && (
-          <span className="absolute bottom-1.5 end-1.5 rounded-md bg-onyx/70 px-1.5 py-0.5 text-[10px] font-bold leading-4 text-snow backdrop-blur-sm">
+          <span className="absolute bottom-1.5 end-1.5 rounded-md bg-onyx/80 px-1.5 py-0.5 text-[10px] font-bold leading-4 text-snow">
             {condition}
           </span>
         )}
@@ -202,7 +202,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
           <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>
         )}
         {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
-          <span className="absolute bottom-2 start-2 rounded-md bg-onyx/70 px-1.5 py-0.5 backdrop-blur-sm">
+          <span className="absolute bottom-2 start-2 rounded-md bg-onyx/80 px-1.5 py-0.5">
             <Countdown
               target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
               kind={p.offer.schedule_state === 'upcoming' ? 'opens' : 'ends'}

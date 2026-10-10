@@ -1032,7 +1032,7 @@ export default function AdminProducts() {
                     <ImageOff className="w-6 h-6 text-[var(--ap-text-3)]" />
                   )}
                   {p.is_featured && (
-                    <span className="absolute top-2 start-2 w-6 h-6 rounded-full bg-[rgba(10,11,15,0.7)] backdrop-blur flex items-center justify-center">
+                    <span className="absolute top-2 start-2 w-6 h-6 rounded-full bg-onyx/80 flex items-center justify-center">
                       <Star className="w-3 h-3 text-[var(--ap-accent-text)] fill-current" />
                     </span>
                   )}

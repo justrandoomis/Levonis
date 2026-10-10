@@ -745,7 +745,8 @@ test('the support screen owns its character slot, so the shell stops adding a ba
   assert.match(page, /<span className="flex-1" aria-hidden="true" \/>/);
 
   // And exactly ONE bar: the page must not have grown a second header row.
-  assert.equal((page.match(/border-b border-border-subtle bg-canvas\/96/g) ?? []).length, 1);
+  // (The bar is the opaque page fill since the glass sweep, docs/DECISIONS.md row 208.)
+  assert.equal((page.match(/border-b border-border-subtle bg-canvas(?![\w/-])/g) ?? []).length, 1);
 });
 
 test('the shell’s fallback strip is still what yields — the rule is not copied', () => {

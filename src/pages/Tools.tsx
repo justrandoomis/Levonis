@@ -597,7 +597,7 @@ export default function Tools() {
 
   return (
     <div className="w-full pb-28 text-zinc-300 bg-black min-h-screen" dir={dir}>
-      <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
           aria-label={s.back}

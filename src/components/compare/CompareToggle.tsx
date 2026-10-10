@@ -64,8 +64,8 @@ export default function CompareToggle({
       title={label}
       data-compare-toggle={item.id}
       onClick={onClick}
-      className={`lv-hit grid size-[30px] place-items-center rounded-full border backdrop-blur-md transition-[background-color,color,transform] duration-150 active:scale-[0.94] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 ${
-        on ? 'border-ivory bg-ivory text-ink' : 'border-snow/15 bg-onyx/55 text-snow hover:bg-onyx/70'
+      className={`lv-hit grid size-[30px] place-items-center rounded-full border transition-[background-color,color,transform] duration-150 active:scale-[0.94] motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 ${
+        on ? 'border-ivory bg-ivory text-ink' : 'border-snow/15 bg-onyx/65 text-snow hover:bg-onyx/80'
       } ${className}`}
     >
       {on ? <Check aria-hidden="true" className="size-4" strokeWidth={2.6} /> : <Scale aria-hidden="true" className="size-[15px]" strokeWidth={2} />}

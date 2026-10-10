@@ -188,7 +188,7 @@ export default function Products() {
 
   return (
     <div className="w-full pb-24 text-zinc-300 min-h-screen">
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center gap-3">
+      <div className="sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-2.5 flex items-center gap-3">
         {/* 44px, because a finger is expected here, and `shrink-0` because the
             heading beside it is the thing that gives way — never the way back. */}
         <button

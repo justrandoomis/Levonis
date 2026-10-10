@@ -2006,7 +2006,7 @@ export default function Checkout() {
 
       {/* Left Form Area */}
       <div className="relative z-10 flex min-w-0 flex-col lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-y-auto custom-scrollbar">
-        <header className="lv-character-header sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg sm:px-6 lg:px-12 lg:py-6">
+        <header className="lv-character-header sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas px-4 py-3 sm:px-6 lg:px-12 lg:py-6">
           <button
             onClick={handleBack}
             className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
@@ -3448,7 +3448,7 @@ export default function Checkout() {
         the total, so the figure being agreed to is on screen at the moment of
         agreeing. The summary column reserves its height below.
       */}
-      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-canvas/95 backdrop-blur-xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-canvas px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-[640px] space-y-2">
           {/* THE REASON TRAVELS WITH THE BUTTON. On a phone this bar is fixed
               and outside the document order, so a message left in the flow

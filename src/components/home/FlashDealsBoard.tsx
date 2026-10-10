@@ -67,7 +67,7 @@ export default function FlashDealsBoard({ products }: { products: ApiProduct[] }
               {/* Only an offer that actually has an end time gets a clock. An
                   open-ended window is still a deal; it is just not a race. */}
               {p.offer?.ends_at && (
-                <span className="absolute bottom-2 start-2 inline-flex items-center gap-1 rounded-md bg-black/75 px-1.5 py-0.5 backdrop-blur-sm">
+                <span className="absolute bottom-2 start-2 inline-flex items-center gap-1 rounded-md bg-black/85 px-1.5 py-0.5">
                   <span className="text-[10px] text-zinc-400">{t('homeEndsIn')}</span>
                   <Countdown target={p.offer.ends_at} kind="ends" className="text-[10px] font-bold text-white" />
                 </span>

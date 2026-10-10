@@ -875,7 +875,7 @@ function StoreMenu({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative lv-hit w-[30px] h-[30px] rounded-full border border-white/20 bg-white/5 backdrop-blur flex items-center justify-center text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="relative lv-hit w-[30px] h-[30px] rounded-full border border-white/20 bg-onyx/55 flex items-center justify-center text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         aria-label={loc('خيارات المتجر', 'Store options', 'هەڵبژاردەکان')}
         aria-expanded={open}
       >

@@ -869,7 +869,7 @@ export default function QuickPricePanel({
       {/* --------------------------------------------------- the action bar */}
       {tab === 'grid' && (
         <div
-          className="sticky bottom-0 z-10 -mx-3 mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--ap-hairline)] bg-[var(--ap-surface-1)] px-3 pb-1 pt-3 backdrop-blur-xl sm:-mx-5 sm:px-5"
+          className="sticky bottom-0 z-10 -mx-3 mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--ap-hairline)] bg-[var(--ap-surface-1)] px-3 pb-1 pt-3 sm:-mx-5 sm:px-5"
           data-qp="actions"
         >
           {guards.length > 0 && (

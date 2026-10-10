@@ -80,7 +80,7 @@ export default function QrCodeModal({
      reduced-motion cross-fade) is unchanged by that.
 
      WHAT IT USED TO BE. Its own `fixed inset-0 z-[200]` with a
-     `bg-black/70 backdrop-blur-sm` backdrop, mounted when `qrOpen` flipped and
+     blurred `bg-black/70` backdrop, mounted when `qrOpen` flipped and
      unmounted when it flipped back: no arrival, and no exit at all — the code
      was on the screen and then it was not. That is the worst case of the
      disappearing-window problem for a QR in particular, because the other

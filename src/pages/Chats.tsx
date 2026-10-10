@@ -419,7 +419,7 @@ export default function Chats() {
       dir={dir}
     >
       {/* Header */}
-      <div className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b bg-canvas/95 backdrop-blur border-border-subtle/60">
+      <div className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b bg-canvas border-border-subtle/60">
         <h1 className="font-bold text-2xl text-white">{t('webCenter') || s.title}</h1>
         <button
           onClick={() => {

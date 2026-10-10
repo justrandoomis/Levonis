@@ -179,7 +179,7 @@ export function SectionPanel({
             </p>
           )}
 
-          <div className="sticky bottom-0 -mx-3 -mb-3 mt-3 px-3 py-2.5 bg-zinc-950/90 backdrop-blur-sm border-t border-zinc-800/70 flex flex-wrap items-center gap-2">
+          <div className="sticky bottom-0 -mx-3 -mb-3 mt-3 px-3 py-2.5 bg-zinc-950 border-t border-zinc-800/70 flex flex-wrap items-center gap-2">
             <button type="button" data-farm-save={section} onClick={onSave} disabled={!dirty || saving || !savable} className={btnGold}>
               {saving ? s.saving : dirty ? s.save : s.noChanges}
             </button>

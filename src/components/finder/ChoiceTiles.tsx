@@ -53,7 +53,7 @@ export default function ChoiceTiles<V extends string>({
             onClick={(e) => onChoose(o.value, fromPointer(e))}
             className={`group relative flex rounded-[18px] border bg-surface p-4 text-start transition-[border-color,box-shadow,transform,background-color] duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none motion-reduce:active:scale-100 ${
               on
-                ? 'border-text-primary shadow-[0_0_0_1px_var(--color-text-primary),var(--shadow-2)]'
+                ? 'border-text-primary shadow-[0_0_0_1px_var(--color-text-primary),var(--clay-2)]'
                 : 'border-border-subtle hover:border-text-muted/40 hover:bg-surface-raised'
             } ${o.wide ? 'col-span-2 min-h-[76px] flex-row items-center gap-3.5 sm:col-span-3' : 'min-h-[120px] flex-col'}`}
           >

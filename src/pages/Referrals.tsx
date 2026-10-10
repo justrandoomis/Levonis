@@ -295,7 +295,7 @@ export default function Referrals() {
 
   return (
     <div className="w-full min-h-screen bg-black text-zinc-200 font-sans pb-24">
-      <div className="sticky top-0 z-30 bg-black/95 backdrop-blur border-b border-zinc-900 px-4 py-3 flex items-center gap-2">
+      <div className="sticky top-0 z-30 bg-black border-b border-zinc-900 px-4 py-3 flex items-center gap-2">
         <button
           type="button"
           onClick={() => navigate(-1)}

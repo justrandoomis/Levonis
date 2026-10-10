@@ -532,7 +532,7 @@ export function Modal({
       // document.body — no ancestor stacking context can trap it.
       // Bound to the VISUAL viewport, not inset-0, so the on-screen keyboard
       // shrinks the dialog instead of hiding its footer.
-      className="ap fixed inset-x-0 z-[1000] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4"
+      className="ap fixed inset-x-0 z-[1000] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4"
       style={{ top: viewport.offsetTop, height: viewport.height }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose(); }}
     >
@@ -588,7 +588,7 @@ export function Modal({
 
         {footer && (
           <div
-            className="shrink-0 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur px-3 sm:px-4 py-3"
+            className="shrink-0 border-t border-zinc-800 bg-zinc-900 px-3 sm:px-4 py-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
             {footer}

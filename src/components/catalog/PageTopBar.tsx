@@ -48,7 +48,7 @@ export default function PageTopBar({
   return (
     <header
       data-page-topbar
-      className={`sticky top-0 z-30 h-14 border-b bg-canvas/[0.88] backdrop-blur-xl backdrop-saturate-150 transition-colors ${
+      className={`sticky top-0 z-30 h-14 border-b bg-canvas transition-colors ${
         scrolled ? 'border-border-subtle' : 'border-transparent'
       }`}
     >

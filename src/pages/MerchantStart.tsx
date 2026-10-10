@@ -212,7 +212,7 @@ export default function MerchantStart() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-300 pb-32">
-      <div className="fixed top-[15%] left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] bg-olive/15 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="fixed top-[15%] left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] bg-olive/15 [mask-image:radial-gradient(closest-side,#000,transparent)] pointer-events-none z-0" />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}

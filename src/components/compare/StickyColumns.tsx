@@ -120,7 +120,7 @@ export default function StickyColumns({
         <div
           aria-hidden={!collapsed}
           data-compare-strip={collapsed ? 'shown' : 'hidden'}
-          className={`absolute inset-x-0 top-0 rounded-b-[16px] border-b border-border-subtle bg-canvas/92 backdrop-blur-md transition-[opacity,transform] duration-200 motion-reduce:transition-none ${
+          className={`absolute inset-x-0 top-0 rounded-b-[16px] border-b border-border-subtle bg-canvas transition-[opacity,transform] duration-200 motion-reduce:transition-none ${
             collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0 motion-reduce:translate-y-0'
           }`}
         >
@@ -170,7 +170,7 @@ export default function StickyColumns({
                   onClick={() => onRemove(i)}
                   aria-label={ls.remove(short)}
                   title={ls.remove(short)}
-                  className="lv-hit absolute start-1.5 top-1.5 grid size-6 place-items-center rounded-full border border-snow/15 bg-onyx/60 text-snow backdrop-blur-md transition-colors hover:bg-onyx/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="lv-hit absolute start-1.5 top-1.5 grid size-6 place-items-center rounded-full border border-snow/15 bg-onyx/70 text-snow transition-colors hover:bg-onyx/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <X aria-hidden="true" className="size-3.5" strokeWidth={2.4} />
                 </button>

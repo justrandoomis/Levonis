@@ -570,13 +570,13 @@ export default function BarcodeScanner({
             onClick={toggleTorch}
             aria-pressed={torch.on}
             aria-label={torch.on ? s.torchOff : s.torchOn}
-            className="absolute top-3 end-3 inline-flex items-center justify-center w-11 h-11 rounded-full bg-onyx/60 text-snow backdrop-blur-sm hover:bg-onyx/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold aria-pressed:bg-gold aria-pressed:text-accent-contrast"
+            className="absolute top-3 end-3 inline-flex items-center justify-center w-11 h-11 rounded-full bg-onyx/70 text-snow hover:bg-onyx/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold aria-pressed:bg-gold aria-pressed:text-accent-contrast"
           >
             {torch.on ? <FlashlightOff aria-hidden="true" className="w-5 h-5" /> : <Flashlight aria-hidden="true" className="w-5 h-5" />}
           </button>
         )}
         {live && (
-          <p className="absolute bottom-3 inset-x-3 mx-auto w-fit max-w-[calc(100%-1.5rem)] rounded-full bg-onyx/65 px-3 py-1.5 text-center text-[12px] leading-snug text-snow backdrop-blur-sm pointer-events-none">
+          <p className="absolute bottom-3 inset-x-3 mx-auto w-fit max-w-[calc(100%-1.5rem)] rounded-full bg-onyx/75 px-3 py-1.5 text-center text-[12px] leading-snug text-snow pointer-events-none">
             {status}
           </p>
         )}

@@ -953,7 +953,7 @@ export default function Settings() {
 
   return (
     <div className="w-full flex-1 h-full overflow-y-auto bg-canvas text-text-primary font-sans" dir={dir}>
-      <div className="sticky top-0 z-20 bg-canvas/96 backdrop-blur px-3 sm:px-4 py-2 flex items-center gap-3 border-b border-border-subtle/70">
+      <div className="sticky top-0 z-20 bg-canvas px-3 sm:px-4 py-2 flex items-center gap-3 border-b border-border-subtle/70">
         <button
           type="button"
           onClick={() => navigate(-1)}

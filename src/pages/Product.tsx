@@ -2024,7 +2024,7 @@ export default function Product() {
   if (loading || !product) {
     return (
       <div className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
-        <div className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center">
+        <div className="lv-character-header sticky top-0 z-30 bg-black px-4 pb-1.5 flex items-center">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -3736,7 +3736,7 @@ export default function Product() {
     <div ref={pageRef} className="w-full min-h-[100dvh] bg-black text-zinc-300 font-sans" dir={dir}>
       {/* Sticky page chrome inside the app scroll container — never a fixed
           overlay that could land in the middle of the content. */}
-      <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-4 pb-1.5 flex items-center justify-between gap-2">
+      <div ref={pageHeaderRef} className="lv-character-header sticky top-0 z-30 bg-black px-4 pb-1.5 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={goBack}

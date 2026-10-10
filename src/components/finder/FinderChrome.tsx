@@ -27,7 +27,7 @@ export default function FinderChrome({
   wide?: boolean;
 }) {
   return (
-    <div className="sticky top-0 z-10 bg-canvas/90 pt-[max(8px,env(safe-area-inset-top))] backdrop-blur-md supports-[backdrop-filter]:bg-canvas/80">
+    <div className="sticky top-0 z-10 bg-canvas pt-[max(8px,env(safe-area-inset-top))]">
       <div className={`mx-auto w-full px-4 ${wide ? 'max-w-[960px]' : 'max-w-[640px]'}`}>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5">
           <div className="flex justify-start">

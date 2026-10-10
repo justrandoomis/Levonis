@@ -205,7 +205,7 @@ export default function Policies() {
 
         <header
           data-policy-screen-only
-          className="sticky top-0 z-10 border-b border-border-subtle bg-canvas/92 backdrop-blur-md"
+          className="sticky top-0 z-10 border-b border-border-subtle bg-canvas"
         >
           <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2">
             <Link
@@ -344,7 +344,7 @@ export default function Policies() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-canvas font-sans" dir={dir}>
-      <header className="sticky top-0 z-10 border-b border-border-subtle bg-canvas/92 backdrop-blur-md">
+      <header className="sticky top-0 z-10 border-b border-border-subtle bg-canvas">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-4 py-2">
           <button
             type="button"

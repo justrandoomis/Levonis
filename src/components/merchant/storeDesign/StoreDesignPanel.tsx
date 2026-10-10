@@ -338,7 +338,7 @@ function Builder({ ed, layout }: { ed: LayoutEditor; layout: StoreLayout }) {
   // ------------------------------------------------------------ pieces
 
   const toolbar = (
-    <div className="sticky top-0 z-20 -mx-4 mb-4 flex flex-wrap items-center gap-2 border-b border-border-subtle bg-canvas/90 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" data-sd-toolbar>
+    <div className="sticky top-0 z-20 -mx-4 mb-4 flex flex-wrap items-center gap-2 border-b border-border-subtle bg-canvas px-4 py-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" data-sd-toolbar>
       <SaveState status={status} onRetry={() => void ed.flush()} />
       <span className={`hidden text-[12px] sm:inline ${nothingToPublish ? 'text-text-muted' : 'text-warning'}`} data-sd-publish-state>
         {nothingToPublish ? loc('· منشور كما هو', '· Live as is') : loc('· تغييرات غير منشورة', '· Unpublished changes')}

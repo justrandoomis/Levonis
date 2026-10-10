@@ -1419,10 +1419,9 @@ export default function Cart() {
     // nav that is no longer on this route.
     <div className="w-full max-w-full overflow-x-clip pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh bg-canvas flex flex-col font-sans">
       {/* Header */}
-      {/* `backdrop-blur-xl` behind a fully opaque `bg-black` was a compositing
-          layer blurring nothing. Translucent, like the product page's bar, so
-          content passing underneath actually frosts. */}
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg">
+      {/* Solid clay, not glass (docs/DECISIONS.md row 208): an opaque bar like
+          every other one, so no frame re-blurs what scrolls under it. */}
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle bg-canvas px-4 py-3">
         <button type="button" onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>

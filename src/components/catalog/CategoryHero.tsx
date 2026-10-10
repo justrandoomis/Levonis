@@ -54,7 +54,7 @@ const CategoryHero = forwardRef<HTMLElement, {
   // OWNER: Sorani to be written by hand (every loc() in this file without a third argument).
   const door =
     'lv-hit relative inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3.5 text-[12.5px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none lg:h-11 lg:px-5 lg:text-[14px]';
-  const ghost = `${door} border border-border-subtle bg-surface/70 text-text-primary backdrop-blur-sm hover:border-text-muted`;
+  const ghost = `${door} border border-border-subtle bg-surface/86 text-text-primary hover:border-text-muted`;
 
   return (
     <section

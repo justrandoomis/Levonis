@@ -21,13 +21,16 @@
  *  3. the Tier-1 surfaces write their shadow into `--tw-shadow`, so a ring
  *     utility on the same element composes with it instead of erasing it;
  *  4. the contrast of the final set (build plan §3.9), recomputed here with
- *     the generator's own contrast(): 4.5:1 for text, 3:1 for boundaries.
+ *     the generator's own contrast(): 4.5:1 for text, 3:1 for boundaries;
+ *  5. solid clay, not glass (row 208): nothing blurs what is behind it, no
+ *     filter glow, and no shadow colour or shadow token is hand-written into
+ *     a class string, where it would bypass the per-theme clay primitives.
  *
  * Run: node --import tsx --test tests/claySystem.test.ts
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBlock, contrast, parseColor, rgbToOklch, SEMANTIC, FIXED, IVORY, PAPER } from '../scripts/theme-tokens.mjs';
@@ -287,4 +290,49 @@ test('the contrast of the final set (plan §3.9): 4.5:1 for text, 3:1 for bounda
   need('light --clay-field on IVORY', ratio(V.light['clay-field'], IVORY), 3);
   need('light --clay-field on PAPER', ratio(V.light['clay-field'], PAPER), 3);
   assert.deepEqual(failures, [], `contrast under the floor:\n${failures.join('\n')}`);
+});
+
+// ---------------------------------------------------------------------- 5
+/** Every TypeScript source under src/, with its text — comments included: Tailwind
+ *  reads class candidates out of comments too, so a utility named in one is shipped. */
+const sources: [string, string][] = (readdirSync(join(ROOT, 'src'), { recursive: true }) as string[])
+  .filter((f) => /\.tsx?$/.test(f))
+  .map((f) => [`src/${f.split('\\').join('/')}`, read(`src/${f}`)]);
+
+test('solid clay, not glass: no backdrop blur, no filter glow, no hand-written shadow colour or shadow token in a class', () => {
+  assert.ok(sources.length > 500, 'the walk over src/ found too few sources to prove anything');
+  const hits = (re: RegExp) => sources.flatMap(([f, c]) => [...c.matchAll(re)].map((m) => `${f}: ${m[0]}`));
+  // A backdrop filter re-filters every frame anything beneath it moves — on the
+  // mid-range Android phones most customers use, the most expensive pixel on screen.
+  assert.deepEqual(hits(/backdrop-blur[\w[\]/.-]*|backdropFilter/g), [], 'a surface still blurs what is behind it');
+  // The stylesheets a customer downloads carry none either. The three operations
+  // sheets (admin-only, outside the public budget) are their own phase.
+  const operations = ['src/components/financeWorkspace/finance-workspace.css', 'src/components/financePeople/people.css', 'src/components/adminInventory/inventory-workspace.css'];
+  const sheets = (readdirSync(join(ROOT, 'src'), { recursive: true }) as string[])
+    .filter((f) => f.endsWith('.css'))
+    .map((f) => `src/${f.split('\\').join('/')}`)
+    .filter((f) => !operations.includes(f));
+  assert.ok(sheets.includes('src/index.css') && sheets.includes('src/components/storefront/theme.css'), 'the stylesheet walk missed the main sheets');
+  for (const f of sheets) assert.doesNotMatch(stripCssComments(read(f)), /backdrop-filter/, `${f} still blurs what is behind a surface`);
+  // A glow is a radial gradient (a background or a mask), never a filter raster.
+  assert.deepEqual(hits(/\bblur-\[[^\]]*\]/g), [], 'a filter glow (blur-[…]) is back');
+  // A shadow colour belongs to the theme's clay primitives (warm ink on cream,
+  // black in dark), never to a class: a hand-written rgb() is black on cream.
+  // `drop-shadow-[…]` is a filter on a glyph, not an elevation, and is not counted.
+  // The named keepers are not elevations either (build plan §6, Funding A):
+  //  - the scanner's viewfinder surround, a 200vmax scrim over a camera feed;
+  //  - the `.ap` controls' hairline and pressed drop, which the admin push
+  //    (Phase 3.5) moves onto `--ap-shadow-*`. Any new site fails here.
+  const keepers = new Set([
+    'src/components/scanner/BarcodeScanner.tsx: shadow-[0_0_0_200vmax_rgb(0_0_0_/_0.42)]',
+    'src/components/adminProducts/theme.ts: shadow-[inset_0_1px_0_rgb(255_255_255_/_0.14),0_1px_2px_rgb(0_0_0_/_0.35)]',
+    'src/components/adminProducts/theme.ts: shadow-[0_1px_2px_rgb(0_0_0_/_0.35)]',
+  ]);
+  const rgbShadows = hits(/(?<![\w-])shadow-\[[^\]\s'"`]*rgba?\([^\]\s'"`]*\]/g);
+  assert.deepEqual(rgbShadows.filter((h) => !keepers.has(h)), [], 'a shadow colour is hard-coded in a class');
+  // Every keeper is still where it was named, so the list cannot rot into a blanket pass.
+  for (const k of keepers) assert.ok(rgbShadows.includes(k), `the keeper is gone, drop it from the list: ${k}`);
+  // A shadow token read inside a class string resolves on the element that names
+  // it, skipping the clay composites a dark island re-resolves; use var(--clay-*).
+  assert.deepEqual(hits(/\[[^\]\s'"`]*var\(--shadow-[^\]\s'"`]*\]/g), [], 'a class reads var(--shadow-*) instead of a clay composite');
 });

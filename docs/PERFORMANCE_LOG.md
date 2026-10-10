@@ -1591,3 +1591,38 @@ own `@supports (color: color-mix(…))` so the fallback on an old WebView is the
 Paint: every backdrop filter in `src/index.css` is gone (the 89 `backdrop-blur*` call sites in pages go in
 push 1.2); a resting card paints one blurred layer (12 px), a lifted one two, held by
 `tests/claySystem.test.ts`. The scroll trace on a ×4-throttled 360 × 800 phone (plan §8) is still owed.
+
+## 2026-10-10 — clay Phase 1, push 1.2: the glass sweep, Funding B (DECISIONS row 208)
+
+The build plan's Phase 1, push 1.2: no surface in the pages blurs what is behind it any more. All 85
+`backdrop-blur*`/`backdropFilter` call sites in 59 files are gone, with 5 mentions in old comments
+(Tailwind reads class candidates out of comments, so a utility named in one ships), the
+`backdrop-saturate-150` and `supports-[backdrop-filter]:` variants, and the backticked `backdrop-filter`
+in an `AppBusy` comment that was emitting a `.backdrop-filter` utility. Bars and panels are opaque fills
+of their own family (page fill, `zinc-900`, `surface`, `surface-raised`); over photographs the backing
+rose one alpha step (`onyx/70 → 80`, `black/50 → 60` …), and the open-box grade chip on a photo is an
+opaque `lv-chip`. The three `blur-[120px]` glows are the same tint under a `radial-gradient(closest-side)`
+mask: no filter raster. Nothing was measured in the lab; these are the gate's figures.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (push 1.1, `799be624`, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 48,308 B (337,421 B raw) | **47,762 B** (328,012 B raw) | — |
+| CSS, public files (8) | 61,205 B | **60,659 B (−546 B)**; local headroom 781 B (≈ 771 B on CI, which builds ≈ 10 B larger) | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,216 B | 7,216 B (untouched) | 7.5 KB |
+| entry chunk / initial payload | 63.8 KB / 180.5 KB | 63.8 KB / 180.4 KB over 4 files | 72 KB / 200 KB |
+
+Where the bytes went: the eight `backdrop-blur*` rules (each a nine-variable `-webkit-backdrop-filter`
+and `backdrop-filter` pair), `.backdrop-saturate-150`, `.backdrop-filter`, the nine
+`@property --tw-backdrop-*` registrations and their nine `initial` slots in the properties layer, and
+`.blur-[120px]`; plus the translucent fills nothing names any more (`bg-canvas/96`, `/92`, `/90`,
+`/85`, `/[0.92]`, `/[0.88]`, the `supports-[backdrop-filter]:bg-canvas/80` variant, each with its
+`color-mix` fallback, and the arbitrary `bg-[rgb(11_12_15/0.45)]` and `bg-[rgba(10,11,15,0.7)]`).
+Added: the shared glow mask (with its `-webkit-` twin) and `[--chip:var(--color-info)]`. The plan's model counted −222 B for this push because it removed
+only the `backdrop-blur` rules; the opaque fills and the comment candidates are the other −324 B.
+
+Paint: no element in `src/` has a backdrop filter or a filter glow any more (held by
+`tests/claySystem.test.ts`, item 5, over every TypeScript source and every public stylesheet; the
+operations sheet's `fw-sheet::backdrop` waits for Phase 3.5a). The scroll trace on a ×4-throttled
+360 × 800 phone (plan §8) is still owed.

@@ -189,7 +189,7 @@ export function StoreProductPageSkeleton() {
           </div>
         </div>
       </SkeletonGroup>
-      <div aria-hidden="true" className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+      <div aria-hidden="true" className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black px-4 sm:px-6 py-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <Skeleton className="h-11 w-28 rounded-xl shrink-0" />
           <Skeleton className="flex-1 min-h-[48px] rounded-2xl" />

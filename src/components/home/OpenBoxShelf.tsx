@@ -65,7 +65,7 @@ function OpenBoxCard({ p, lang }: { p: ApiProduct; lang: string }) {
       <div className="relative aspect-square overflow-hidden bg-black">
         <SafeImage src={productPrimaryImage(p)} alt={p.name} aspect="square" className="w-full h-full" />
         {condition ? (
-          <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-full bg-info/15 px-2 py-1 text-[10px] font-bold text-info backdrop-blur-sm">
+          <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-full lv-chip [--chip:var(--color-info)] px-2 py-1 text-[10px] font-bold">
             <PackageOpen aria-hidden="true" className="w-3 h-3" />
             {conditionKindLabel(condition.kind, lang)}
           </span>

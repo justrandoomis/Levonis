@@ -188,7 +188,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
   ) => (
     <div
       onClick={onClick}
-      className={`bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-3 shadow-sm flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
+      className={`bg-zinc-900 border border-white/5 rounded-xl p-3 shadow-sm flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
     >
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
       <div className="min-w-0">
@@ -202,7 +202,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
     <div className="space-y-4 text-white pb-10 font-sans" dir={dir}>
 
       {/* Top Bar */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-3 bg-zinc-900/90 border border-zinc-800 p-3 rounded-2xl shadow-xl backdrop-blur-xl">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 p-3 rounded-2xl shadow-xl">
         <div className="flex items-center gap-3 w-full lg:w-auto">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#c5a059] via-[#e6c27a] to-[#708238] flex items-center justify-center shadow-lg shadow-gold/30 shrink-0 font-black text-sm text-snow">
             L
@@ -341,7 +341,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
         {/* Pending wallet requests — real list with working actions */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-sm">
+        <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests'}
@@ -448,7 +448,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         </div>
 
         {/* Recent orders — real list */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-sm">
+        <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'أحدث الطلبات' : 'Recent Orders'}

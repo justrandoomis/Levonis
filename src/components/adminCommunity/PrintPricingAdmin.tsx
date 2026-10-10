@@ -1513,7 +1513,7 @@ function ProvidersPanel({
 function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProps & { errors: string[] }) {
   const blocked = errors.length > 0;
   return (
-    <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-900/95 backdrop-blur-sm">
+    <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-900">
       {blocked && (
         <ul className="mb-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-3 py-2 space-y-0.5 max-h-40 overflow-y-auto">
           {errors.map((e, i) => (

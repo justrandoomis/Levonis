@@ -423,7 +423,7 @@ export default function BundleDetail() {
   }, [bundle, qty, isMystery, familyId, mysteryMode, transportMethod, bundleChoicesBody, isAuthenticated, navigate, slug, lang, s.added, s.addFailed, load]);
 
   const header = (
-    <div className="lv-character-header sticky top-0 z-40 bg-black/80 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
+    <div className="lv-character-header sticky top-0 z-40 bg-black border-b border-zinc-800/60 px-4 py-3 flex items-center gap-3">
       <button
         onClick={() => navigate(-1)}
         aria-label={s.back}

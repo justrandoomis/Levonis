@@ -385,7 +385,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           context and trap every dialog rendered inside the page. */}
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden relative bg-zinc-900">
         {/* Topbar — above the sidebar so its dropdowns are never clipped by it. */}
-        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-zinc-900/95 backdrop-blur-md border-b border-zinc-800/50">
+        <header className="h-14 sm:h-16 flex items-center gap-3 px-3 sm:px-5 shrink-0 z-30 w-full bg-zinc-900 border-b border-zinc-800/50">
           <button
             ref={drawerButtonRef}
             data-action="open-sidebar"
@@ -575,7 +575,7 @@ function MobileDrawer({
       exit={{ opacity: 0 }}
       transition={m.spring('quick')}
     >
-      <div className="lv-scrim absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
+      <div className="lv-scrim absolute inset-0" aria-hidden="true" />
       <motion.div
         ref={panelRef}
         role="dialog"

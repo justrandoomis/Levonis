@@ -111,7 +111,7 @@ export function CategoryRowBanner({
       >
         <h3 className="line-clamp-1 text-[16px] font-bold leading-[22px] text-ivory [text-shadow:0_1px_2px_rgb(0_0_0/0.35)] sm:text-[19px] sm:leading-7 lg:text-[23px] lg:leading-8">{title}</h3>
         <p className="line-clamp-1 text-[11.5px] font-semibold leading-4 tabular-nums text-ivory/[0.78] sm:text-[13px] sm:leading-5 lg:text-[14px]">{line}</p>
-        <span className="mt-0.5 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full border border-white/25 bg-[rgb(11_12_15/0.45)] px-3 text-[12px] font-bold text-ivory backdrop-blur-sm transition-colors group-hover:border-white/50 motion-reduce:transition-none sm:h-8 sm:px-3.5 sm:text-[13px] lg:h-9 lg:px-4 lg:text-[14px]">
+        <span className="mt-0.5 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full border border-white/25 bg-onyx/55 px-3 text-[12px] font-bold text-ivory transition-colors group-hover:border-white/50 motion-reduce:transition-none sm:h-8 sm:px-3.5 sm:text-[13px] lg:h-9 lg:px-4 lg:text-[14px]">
           {cta}
           <ArrowGlyph className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5 motion-reduce:transition-none" />
         </span>

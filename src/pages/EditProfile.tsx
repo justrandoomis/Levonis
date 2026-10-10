@@ -218,7 +218,7 @@ export default function EditProfile() {
           The character anchor is what stops the shell printing a SECOND strip
           above this bar: MotionCharacterFallbackHeader suppresses itself as
           soon as a page registers an anchor of its own. */}
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-black/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800/50">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-black sticky top-0 z-10 border-b border-zinc-800/50">
         <button
           onClick={() => navigate(-1)}
           aria-label="Back"
@@ -280,7 +280,7 @@ export default function EditProfile() {
             <h3 className="text-gold text-[13px] font-bold">Username</h3>
             <span className="text-zinc-500 text-[11px] font-medium">Change once per 14 days</span>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4 flex items-center justify-between cursor-pointer active:bg-zinc-800">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4 flex items-center justify-between cursor-pointer active:bg-zinc-800">
             <input
               type="text"
               value={username}
@@ -299,7 +299,7 @@ export default function EditProfile() {
           <div className="flex justify-between items-end mb-2 ml-1">
             <h3 className="text-gold text-[13px] font-bold">Country</h3>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4">
             <select
               value={country}
               onChange={(e) => setCountry(e.target.value)}
@@ -321,7 +321,7 @@ export default function EditProfile() {
           <div className="flex justify-between items-end mb-2 ml-1">
             <h3 className="text-gold text-[13px] font-bold">Full name</h3>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4">
             <input
               type="text"
               value={fullName}
@@ -338,7 +338,7 @@ export default function EditProfile() {
             <h3 className="text-gold text-[13px] font-bold">Bio</h3>
             <span className="text-zinc-300 text-[13px] font-medium">{bio.length}/68</span>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4 min-h-[100px]">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4 min-h-[100px]">
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
@@ -354,7 +354,7 @@ export default function EditProfile() {
           <div className="flex justify-between items-end mb-2 ml-1">
             <h3 className="text-gold text-[13px] font-bold">Website</h3>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4">
             <input
               type="text"
               value={website}
@@ -397,7 +397,7 @@ export default function EditProfile() {
           <div className="flex justify-between items-end mb-2 ml-1">
             <h3 className="text-gold text-[13px] font-bold">{projectStrings.creatorPage}</h3>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
             <div className="p-4 border-b border-zinc-800">
               <Switch
                 checked={creatorPublic}
@@ -452,7 +452,7 @@ export default function EditProfile() {
             <h3 className="text-gold text-[13px] font-bold">Socials</h3>
             <span className="text-zinc-300 text-[13px] font-medium">Add up to 4 socials</span>
           </div>
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
             <div className="flex items-center p-4 border-b border-zinc-800">
               <InstagramIcon className="w-6 h-6 text-white mr-4 shrink-0" />
               <input

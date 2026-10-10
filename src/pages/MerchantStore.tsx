@@ -172,7 +172,7 @@ export default function MerchantStore() {
   return (
     <div className="w-full min-h-screen bg-black text-white font-sans">
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-md px-4 py-3 flex items-center justify-between">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-black px-4 py-3 flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors">
           {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-white" /> : <ArrowLeft className="w-5 h-5 text-white" />}
         </button>

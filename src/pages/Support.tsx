@@ -1501,7 +1501,7 @@ export default function Support() {
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-canvas text-text-secondary" data-support-layout>
       {/* header */}
-      <div className="z-40 flex shrink-0 items-center gap-3 border-b border-border-subtle bg-canvas/96 px-4 py-3 backdrop-blur-lg">
+      <div className="z-40 flex shrink-0 items-center gap-3 border-b border-border-subtle bg-canvas px-4 py-3">
         <button
           type="button"
           onClick={() => navigate(-1)}

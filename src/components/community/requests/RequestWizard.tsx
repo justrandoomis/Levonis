@@ -1032,7 +1032,7 @@ export default function RequestWizard({
       )}
 
       {/* The actions stay under the thumb, clear of the home indicator. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.06] bg-canvas/95 px-4 pt-3 backdrop-blur pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.06] bg-canvas px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <Button variant="secondary" className="whitespace-nowrap" onClick={() => (step === 1 ? onCancel() : setStep((x) => (x - 1) as Step))} disabled={!!busy && busy !== 'load'}>
             {step === 1 ? loc('إلغاء', 'Cancel') : loc('رجوع', 'Back')}

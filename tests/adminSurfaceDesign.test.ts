@@ -117,7 +117,11 @@ test('Quick Price exposes one clear hierarchy, segmented tabs and a persistent a
   assert.match(quick, /aria-selected=\{tab === x\.id\}/);
   assert.match(quick, /min-h-10/);
   assert.match(quick, /sticky bottom-0/);
-  assert.match(quick, /backdrop-blur-xl/);
+  // Solid clay, not glass (owner decision D2, docs/DECISIONS.md row 208): the
+  // action bar is an opaque surface, and nothing in the panel blurs what
+  // scrolls beneath it.
+  assert.doesNotMatch(quick, /backdrop-blur/);
+  assert.match(quick, /"sticky bottom-0 [^"]*\bbg-\[var\(--ap-surface-1\)\][^"]*"/);
 
   // Model, sale type and route are distinct surface levels, without the old
   // standalone duplicate fulfilment panel.

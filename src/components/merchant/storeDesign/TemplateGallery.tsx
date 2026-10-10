@@ -146,7 +146,7 @@ export default function TemplateGallery({
                   aria-label={loc(`معاينة «${say(loc, THEME_COPY[theme].name)}»`, `Preview «${say(loc, THEME_COPY[theme].name)}»`)}
                   data-sd-starter-preview={theme}
                 >
-                  <span className="inline-flex items-center gap-1 rounded-full bg-canvas/85 px-2.5 py-1 text-[11.5px] font-semibold text-text-primary shadow-1 backdrop-blur">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-canvas/95 px-2.5 py-1 text-[11.5px] font-semibold text-text-primary shadow-1">
                     <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                     {loc('معاينة', 'Preview')}
                   </span>

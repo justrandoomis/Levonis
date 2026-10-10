@@ -351,7 +351,7 @@ export default function Profile() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[180px] bg-gradient-to-b from-gold/10 to-transparent" />
 
       {/* Sticky Header */}
-      <div className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-300 flex items-center justify-between ${scrolled ? 'shadow-md py-1 px-3 opacity-100 pointer-events-auto bg-surface-raised/95 backdrop-blur-md' : 'bg-transparent py-3 px-3 opacity-0 pointer-events-none'}`}>
+      <div className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-300 flex items-center justify-between ${scrolled ? 'shadow-md py-1 px-3 opacity-100 pointer-events-auto bg-surface-raised' : 'bg-transparent py-3 px-3 opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-2 min-w-0">
            <div className="w-7 h-7 rounded-full bg-white overflow-hidden border border-black/10 shrink-0 flex items-center justify-center">
              {avatarUrl ? (

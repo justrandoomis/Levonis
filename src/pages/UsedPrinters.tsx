@@ -311,7 +311,7 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
         {condition ? (
           /* The ONE tinted element on the card, because the grade is the whole
              reason this row is not an ordinary listing. */
-          <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-full bg-info/15 px-2 py-1 text-[10px] leading-4 font-bold text-info backdrop-blur-sm">
+          <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-full lv-chip [--chip:var(--color-info)] px-2 py-1 text-[10px] leading-4 font-bold">
             <PackageOpen aria-hidden="true" className="w-3 h-3" />
             {conditionKindLabel(condition.kind, lang)}
           </span>

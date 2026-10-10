@@ -777,7 +777,7 @@ export default function ModelViewer() {
 
   const btn =
     'inline-flex items-center justify-center min-h-11 min-w-11 rounded-xl border border-white/10 ' +
-    'bg-zinc-950/70 backdrop-blur-md text-zinc-300 hover:text-white hover:border-white/25 transition-colors';
+    'bg-zinc-950/85 text-zinc-300 hover:text-white hover:border-white/25 transition-colors';
   const btnOn = 'border-gold/50 bg-gold/15 text-gold hover:text-gold';
 
   return (
@@ -820,7 +820,7 @@ export default function ModelViewer() {
           {/* Top bar: what this is, and the controls. Both float over the
               canvas so the model keeps the whole viewport. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start gap-2 p-3">
-            <div className="pointer-events-auto min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950/70 px-3 py-2 backdrop-blur-md">
+            <div className="pointer-events-auto min-w-0 flex-1 rounded-xl border border-white/10 bg-zinc-950/85 px-3 py-2">
               <div className="flex min-w-0 items-center gap-2">
                 <p className="truncate text-sm font-bold">{t.title}</p>
                 {/* The board's merchant is sent a coarse mesh, never the file:
@@ -912,7 +912,7 @@ export default function ModelViewer() {
             <div className="flex items-end justify-between gap-3">
               <dl
                 data-viewer="info"
-                className="pointer-events-auto w-full max-w-[17rem] rounded-2xl border border-white/10 bg-zinc-950/70 p-3 text-[13px] backdrop-blur-md"
+                className="pointer-events-auto w-full max-w-[17rem] rounded-2xl border border-white/10 bg-zinc-950/85 p-3 text-[13px]"
               >
                 <div className="flex items-center gap-2 py-1">
                   <Ruler className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />

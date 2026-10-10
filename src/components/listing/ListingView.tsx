@@ -235,7 +235,7 @@ export default function ListingView({
           <ScopedSearch value={state.q} placeholder={placeholder} onChange={(q) => commit({ ...state, q })} />
         </div>
 
-        <div className="sticky top-14 z-20 -mx-4 bg-canvas/[0.92] px-4 py-1 backdrop-blur-lg sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="sticky top-14 z-20 -mx-4 bg-canvas px-4 py-1 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <ListingToolbar
             ref={filterButton}
             activeCount={activeFilterCount(state)}

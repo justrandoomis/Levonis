@@ -155,7 +155,7 @@ export default function MerchantCartView() {
 
   return (
     <div className="min-h-screen bg-black text-zinc-300 pb-36">
-      <div className="sticky top-0 z-30 bg-black/95 backdrop-blur border-b border-white/5 px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-30 bg-black border-b border-white/5 px-4 py-3 flex items-center gap-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -253,7 +253,7 @@ export default function MerchantCartView() {
       </div>
 
       {cart.items.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black px-4 sm:px-6 py-3">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <div className="min-w-0">
               <p className="text-zinc-500 text-[10.5px]">{loc('المجموع', 'Subtotal', 'کۆ')}</p>

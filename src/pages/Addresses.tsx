@@ -196,7 +196,7 @@ export default function Addresses() {
 
   return (
     <div className="min-h-dvh bg-canvas text-text-primary w-full font-sans flex flex-col">
-      <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 bg-canvas/96 backdrop-blur-lg z-10 border-b border-border-subtle">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 bg-canvas z-10 border-b border-border-subtle">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -541,7 +541,7 @@ export default function Addresses() {
         testId="address-editor"
         panelClassName="w-full sm:max-w-lg h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-canvas"
       >
-        <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-canvas/96 backdrop-blur-lg z-10 border-b border-border-subtle">
+        <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-canvas z-10 border-b border-border-subtle">
           <button
             type="button"
             onClick={() => setEditorOpen(false)}

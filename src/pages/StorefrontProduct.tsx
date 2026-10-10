@@ -417,7 +417,7 @@ export default function StorefrontProduct() {
       </div>
 
       {/* Buy bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black/95 backdrop-blur-xl px-4 sm:px-6 py-3">
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black px-4 sm:px-6 py-3">
         {/* The refusal sits beside the button that caused it: in the page body
             it could be scrolled away under this fixed bar and never seen. */}
         <p

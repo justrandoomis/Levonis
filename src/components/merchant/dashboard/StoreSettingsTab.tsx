@@ -739,7 +739,7 @@ export function StoreSettingsTab({
           is something to save or to say; a clean form keeps it at the end,
           so it does not sit over a phone's last 90px for nothing. */}
       <div
-        className={`${dirty || saving || error ? 'sticky bottom-0 z-10 shadow-2' : ''} -mx-1 rounded-2xl border border-border-subtle bg-canvas/95 p-2.5 backdrop-blur`}
+        className={`${dirty || saving || error ? 'sticky bottom-0 z-10 shadow-2' : ''} -mx-1 rounded-2xl border border-border-subtle bg-canvas p-2.5`}
         data-settings-savebar
         data-dirty={dirty ? 'true' : 'false'}
       >
