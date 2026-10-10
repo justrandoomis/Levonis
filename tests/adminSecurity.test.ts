@@ -9,7 +9,8 @@
  *                  password, token or query string; «ما الذي أُعطي له» is the
  *                  decoy answer regenerated from its batch, byte for byte
  *   lift           one block or the whole incident: the next request passes,
- *                  the scores reset, an audit row is written
+ *                  the scores reset, an audit row is written; lifting an
+ *                  account lifts the tags its block answers set
  *   words          every string in Arabic, English and real Sorani — never a
  *                  copy of the Arabic, never an Arabic-only letter
  *
@@ -18,12 +19,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { json } from './fixtures/app';
-import { ATTACKER_IP, OTHER_IP, SCRIPT, TYPED, blocks, deceptionWorld, setCookieValue, type Who } from './fixtures/deception';
+import { ATTACKER_IP, OTHER_IP, SCRIPT, TOOL, TYPED, blocks, deceptionWorld, setCookieValue, type Who, type World } from './fixtures/deception';
 import { sourceOf } from './fixtures/source';
 import { SECURITY_STRINGS, EVENT_CODE_TEXT } from '../src/components/adminSecurity/strings';
 import { ACCESS_BLOCKED_TEXT } from '../src/components/security/AccessBlockedScreen';
 import { BLOCK_STRINGS, DECEPTION_BELL } from '../worker/lib/deception/strings';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
+
+/** A browser that used trap data where no link puts it: its block answer carries the device tag. */
+async function tagged(w: World, ip = ATTACKER_IP): Promise<string> {
+  const cfg = JSON.parse(await (await w.call('/config.json', { ip: '192.0.2.9', headers: TYPED })).text()) as { api: { key: string } };
+  const res = await w.call('/api/products', { ip, headers: { ...SCRIPT, 'X-API-Key': cfg.api.key } });
+  return setCookieValue(res, 'lv_pref')!;
+}
 
 const ROUTES: Array<[string, string]> = [
   ['GET', '/api/admin/security/summary'],
@@ -36,7 +44,7 @@ const ROUTES: Array<[string, string]> = [
 
 test('OWNER ONLY: every other admin, the unverified owner, a customer and a guest are refused — one body for a real and an invented id', async () => {
   const w = await deceptionWorld();
-  await w.call('/.env', { ip: ATTACKER_IP });
+  await w.call('/.env', { ip: ATTACKER_IP, headers: TOOL });
   const b = blocks(w.raw)[0]!;
   const real = { ':id': '' };
   const callers: Array<[string, Who | null, number, string | undefined]> = [
@@ -75,12 +83,15 @@ test('THE CONSOLE: summary, blocks, the log, scores and an incident — ids, cod
   const served = await decoy.text();
   const cfg = JSON.parse(served) as { api: { key: string }; admin: { password: string; session: string } };
   await w.call(`/api/products?key=${cfg.api.key}&note=secret-query-marker`, { ip: OTHER_IP, headers: { 'User-Agent': 'curl/8 (other-ua-marker)' } });
-  await w.call('/backup.sql', { as: 'customer', ip: '192.0.2.77' });
+  await w.call('/backup.sql', { as: 'customer', ip: '192.0.2.77', headers: TOOL });
   const out: string[] = [];
   const summary = await json(await w.call('/api/admin/security/summary', { as: 'owner', headers: SCRIPT }));
   out.push(JSON.stringify(summary));
   assert.equal(summary.summary.installed, true);
-  assert.ok(summary.summary.active_blocks.device >= 3);
+  assert.equal(summary.summary.canaries, true, 'the trap data is armed');
+  assert.ok(summary.summary.active_blocks.device >= 1);
+  assert.ok(summary.summary.active_blocks.network >= 2);
+  assert.ok(summary.summary.active_blocks.account >= 1);
   assert.ok(summary.summary.decoy_hits_7d >= 2);
   assert.ok(summary.summary.canary_uses_7d >= 1);
   assert.ok(summary.summary.incidents_7d >= 3);
@@ -118,44 +129,55 @@ test('THE CONSOLE: summary, blocks, the log, scores and an incident — ids, cod
 
 test('LIFT: one block, then the whole incident — the next request passes, the scores reset, an audit row is written', async () => {
   const w = await deceptionWorld();
-  const res = await w.call('/.env', { as: 'customer', ip: ATTACKER_IP });
+  // A customer's tool used trap data: the account and the device.
+  const cfg = JSON.parse(await (await w.call('/config.json', { ip: '192.0.2.9', headers: TYPED })).text()) as { api: { key: string } };
+  const res = await w.call('/api/cart', { as: 'customer', ip: ATTACKER_IP, headers: { 'X-API-Key': cfg.api.key } });
   const tag = setCookieValue(res, 'lv_pref')!;
+  assert.ok(tag);
   assert.equal((await w.call('/api/cart', { as: 'customer', cookies: { lv_pref: tag }, headers: SCRIPT })).status, 403);
   const account = blocks(w.raw).find((b) => b.actor_kind === 'account')!;
-  // One block: the account. The tagged browser stays blocked; a fresh one of that account passes.
-  const one = await w.call(`/api/admin/security/blocks/${account.id}/lift`, { as: 'owner', body: {}, headers: SCRIPT });
+  // One block: the device. The account stays blocked from any browser.
+  const device = blocks(w.raw).find((b) => b.actor_kind === 'device')!;
+  const one = await w.call(`/api/admin/security/blocks/${device.id}/lift`, { as: 'owner', body: {}, headers: SCRIPT });
   assert.equal(one.status, 200, await one.clone().text());
   assert.equal((await json(one)).lifted, 1);
-  assert.equal((await w.call('/api/cart', { as: 'customer', ip: OTHER_IP, headers: SCRIPT })).status, 200);
-  assert.equal((await w.call('/api/cart', { as: 'customer', cookies: { lv_pref: tag }, headers: SCRIPT })).status, 403);
-  assert.equal((await w.call(`/api/admin/security/blocks/${account.id}/lift`, { as: 'owner', body: {}, headers: SCRIPT })).status, 409);
-  // The whole incident: the device too.
-  const device = blocks(w.raw).find((b) => b.actor_kind === 'device' && !b.lifted_at)!;
-  const all = await w.call(`/api/admin/security/blocks/${device.id}/lift`, { as: 'owner', body: { incident: true, note: 'my own test' }, headers: SCRIPT });
+  assert.equal((await w.call('/api/products', { ip: OTHER_IP, cookies: { lv_pref: tag }, headers: SCRIPT })).status, 200, 'the device alone passes');
+  assert.equal((await w.call('/api/cart', { as: 'customer', ip: OTHER_IP, headers: SCRIPT })).status, 403, 'the account is still blocked');
+  assert.equal((await w.call(`/api/admin/security/blocks/${device.id}/lift`, { as: 'owner', body: {}, headers: SCRIPT })).status, 409);
+  // The whole incident: the account too.
+  const all = await w.call(`/api/admin/security/blocks/${account.id}/lift`, { as: 'owner', body: { incident: true, note: 'my own test' }, headers: SCRIPT });
   assert.equal(all.status, 200);
-  const after = await w.call('/api/cart', { as: 'customer', cookies: { lv_pref: tag }, headers: SCRIPT });
-  assert.equal(after.status, 200);
-  assert.equal(setCookieValue(after, 'lv_pref'), '', 'the lifted tag is deleted');
-  assert.ok(blocks(w.raw).every((b) => b.lifted_at && b.lifted_by === 'usr_owner'));
+  assert.equal((await w.call('/api/cart', { as: 'customer', ip: OTHER_IP, headers: SCRIPT })).status, 200);
+  assert.ok(blocks(w.raw).filter((b) => b.reason === 'canary_used' && b.actor_kind !== 'network').every((b) => b.lifted_at && b.lifted_by === 'usr_owner'));
   const audits = w.raw.prepare("SELECT actor_id, action, target, detail FROM audit_log WHERE action = 'security.block_lifted' ORDER BY rowid").all() as Array<{ actor_id: string; detail: string }>;
   assert.equal(audits.length, 2);
   assert.equal(audits[0]!.actor_id, 'usr_owner');
   assert.match(audits[1]!.detail, /my own test/);
   const s = w.raw.prepare("SELECT score FROM security_scores WHERE actor_key = 'u:usr_cust'").get() as { score: number } | undefined;
   assert.equal(s?.score ?? 0, 0);
+  // An account blocked by a decoy: its block answers tag every browser it reaches — lifting the account lifts those tags too.
+  const w3 = await deceptionWorld();
+  await w3.call('/.env', { as: 'customer', ip: ATTACKER_IP, headers: TOOL });
+  const t3 = setCookieValue(await w3.call('/api/cart', { as: 'customer', ip: OTHER_IP, headers: SCRIPT }), 'lv_pref')!;
+  assert.ok(t3, 'the account-blocked answer tags the browser');
+  const acc3 = blocks(w3.raw).find((b) => b.actor_kind === 'account')!;
+  assert.equal((await w3.call(`/api/admin/security/blocks/${acc3.id}/lift`, { as: 'owner', body: {}, headers: SCRIPT })).status, 200);
+  const after = await w3.call('/api/products', { ip: OTHER_IP, cookies: { lv_pref: t3 }, headers: SCRIPT });
+  assert.equal(after.status, 200, 'the tag of a lifted account blocks nothing');
+  assert.equal(setCookieValue(after, 'lv_pref'), '', 'and is deleted');
   // An anonymous decoy hit: lifting the incident frees the network too.
   const w2 = await deceptionWorld();
-  await w2.call('/.env', { ip: ATTACKER_IP });
-  assert.equal((await w2.call('/api/products', { ip: ATTACKER_IP, headers: SCRIPT })).status, 403);
+  await w2.call('/.env', { ip: ATTACKER_IP, headers: TOOL });
+  assert.equal((await w2.call('/api/products', { ip: ATTACKER_IP, headers: TOOL })).status, 403);
   const net = blocks(w2.raw).find((b) => b.actor_kind === 'network')!;
   assert.equal((await w2.call(`/api/admin/security/blocks/${net.id}/lift`, { as: 'owner', body: { incident: true }, headers: SCRIPT })).status, 200);
-  assert.equal((await w2.call('/api/products', { ip: ATTACKER_IP, headers: SCRIPT })).status, 200);
+  assert.equal((await w2.call('/api/products', { ip: ATTACKER_IP, headers: TOOL })).status, 200);
   assert.equal((await w2.call('/api/admin/security/blocks/sbk_nosuchblock00/lift', { as: 'owner', body: {}, headers: SCRIPT })).status, 404);
 });
 
 test('the owner\'s bell links «الأمان», carries no figure, and is bounded', async () => {
   const w = await deceptionWorld();
-  for (let i = 0; i < 12; i++) await w.call('/.env', { ip: `198.51.100.${100 + i}` });
+  for (let i = 0; i < 12; i++) await w.call('/.env', { ip: `198.51.100.${100 + i}`, headers: TOOL });
   const bells = w.raw.prepare("SELECT title_ar, title_en, body_ar, link, meta, event_key FROM user_notifications WHERE user_id = 'usr_owner' AND kind = 'security_alert'").all() as Array<{ link: string; meta: string; event_key: string; body_ar: string }>;
   assert.equal(bells.length, 10, 'DECEPTION_BELL_CAP a day');
   for (const b of bells) {
@@ -164,7 +186,7 @@ test('the owner\'s bell links «الأمان», carries no figure, and is bounde
     assert.ok(JSON.parse(b.meta).title_ckb);
     assert.doesNotMatch(b.body_ar, /\d{3,}/, 'no figure in the bell');
   }
-  assert.equal(blocks(w.raw).filter((b) => b.actor_kind === 'device').length, 12, 'every incident is still recorded');
+  assert.equal(blocks(w.raw).filter((b) => b.actor_kind === 'network').length, 12, 'every incident is still recorded');
   // The deep link opens the tab.
   assert.match(sourceOf('src/pages/Admin.tsx'), /DEEP_LINK_TABS[^;]*'security'/);
 });
@@ -206,7 +228,7 @@ test('THE APP: the tab is the verified owner\'s; the notice is its own chunk, ra
 
 test('a document from a blocked browser, typed in the address bar, is the block page with a sign-in link for a visitor', async () => {
   const w = await deceptionWorld();
-  const tag = setCookieValue(await w.call('/.env'), 'lv_pref')!;
+  const tag = await tagged(w);
   const page = await (await w.call('/products', { cookies: { lv_pref: tag }, headers: TYPED })).text();
   assert.match(page, /href="\/auth"/);
   assert.match(page, /بچۆ ژوورەوە/);

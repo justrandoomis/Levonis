@@ -64,6 +64,11 @@ export const SECURITY_STRINGS = {
     'The block tables are not on this database yet (migration 0185).',
     'خشتەکانی قەدەغەکردن هێشتا لەسەر ئەم بنکەدراوەیە دروست نەکراون (گواستنەوەی 0185).'
   ),
+  canariesOff: t(
+    'بيانات الفخ متوقفة: لا يوجد مفتاح أمان في بيئة العامل. اضبط السر SECURITY_CANARY_KEY لتعمل الفخاخ والوسوم.',
+    'Trap data is off: the Worker has no security key. Set the SECURITY_CANARY_KEY secret for the traps and device tags to work.',
+    'زانیاریی تەڵە ڕاگیراوە: کلیلی ئاسایش لە ژینگەی وۆرکەردا نییە. نهێنیی SECURITY_CANARY_KEY دابنێ بۆ ئەوەی تەڵەکان و نیشانەکانی ئامێر کار بکەن.'
+  ),
   failed: t('تعذّر التحميل. حاول مجدداً.', 'Could not load. Try again.', 'بارکردن سەرکەوتوو نەبوو. دووبارە هەوڵ بدەوە.'),
   retry: t('إعادة المحاولة', 'Retry', 'هەوڵدانەوە'),
   score: t('النقاط', 'Score', 'خاڵ'),
@@ -85,6 +90,7 @@ export const EVENT_CODE_TEXT: Record<string, T> = {
   DECOY_INDUCED: t('طلب ملف وهمي بلا قصد (صورة أو رابط خارجي)', 'Decoy requested without intent (an image or an outside link)', 'داواکردنی پەڕگەی ساختە بەبێ مەبەست (وێنە یان بەستەری دەرەکی)'),
   CANARY_USED: t('استُعملت بيانات فخّ', 'Trap data used', 'زانیاریی تەڵە بەکارهات'),
   CANARY_INDUCED: t('بيانات فخّ في رابط بلا قصد', 'Trap data in a link, without intent', 'زانیاریی تەڵە لە بەستەرێکدا بەبێ مەبەست'),
+  CANARY_FLOOD: t('نصوص كثيرة تشبه بيانات الفخ لإخفاء واحدة منها', 'Many strings shaped like trap data, to hide one', 'زۆر دەقی وەک زانیاریی تەڵە، بۆ شاردنەوەی یەکێکیان'),
   CANARY_UNCONFIRMED: t('معرّف يشبه بيانات الفخ دون تأكيد', 'An id shaped like trap data, unconfirmed', 'ناسنامەیەک وەک زانیاریی تەڵە، پشتڕاستنەکراوە'),
   ACTOR_BLOCKED: t('حُظر الوصول', 'Access blocked', 'دەستگەیشتن قەدەغە کرا'),
   CLIENT_PRICE_FIELDS: t('أُرسلت حقول سعر أو تكلفة من المتصفح', 'Price or cost fields sent by the browser', 'خانەی نرخ یان تێچوو لە وێبگەڕەوە نێردرا'),

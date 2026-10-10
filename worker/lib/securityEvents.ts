@@ -225,12 +225,21 @@ export function routePatternOf(c: Context<AppContext>): string {
   return '(unmatched)';
 }
 
-/** The `:param` the pattern names in this path — the first one, a code-like id of ≤ 80 characters, or null. */
+/** A `:param` whose value is a capability or a secret, never a record id: it is never stored. */
+const SECRET_PARAM = /(token|key|secret|code|password|hash|signature|otp|nonce)$/i;
+
+/**
+ * The `:param` the pattern names in this path — the first one, a code-like id
+ * of ≤ 80 characters, or null. Null as well when that parameter is named like
+ * a capability (`:token`, `:key`, `:code`…): a viewer token or a reset code in
+ * a path is a secret, and the log never holds one.
+ */
 export function targetOf(pattern: string, path: string): string | null {
   const ps = pattern.split('/');
   const xs = path.split('/');
   for (let i = 0; i < ps.length && i < xs.length; i++) {
     if (ps[i]!.startsWith(':')) {
+      if (SECRET_PARAM.test(ps[i]!.slice(1))) return null;
       let v = xs[i]!;
       try {
         v = decodeURIComponent(v);
@@ -426,7 +435,8 @@ async function rowFor(
   c: Context<AppContext>,
   ev: { kind: SecurityEventKind; code: string; status: number; detail?: SecurityDetail },
   now: Date,
-  bucketOverride?: string
+  bucketOverride?: string,
+  withTarget = true
 ): Promise<EventRow | null> {
   const method = c.req.method.toUpperCase();
   if (!METHODS.has(method)) return null;
@@ -444,7 +454,7 @@ async function rowFor(
     ipHash,
     method,
     route,
-    targetId: targetOf(route, c.req.path),
+    targetId: withTarget ? targetOf(route, c.req.path) : null,
     status: ev.status,
     detail: cleanDetail(ev.detail),
   };
@@ -453,16 +463,19 @@ async function rowFor(
 /**
  * Records one event for this request's actor. For a route's own events (an FX
  * guard change); the refusals are recorded by `securityEventsDoor`. Awaits the
- * write (or hands it to waitUntil); never throws.
+ * write (or hands it to waitUntil); never throws. `target: false` stores no
+ * target id — the deception layer's events, whose path may hold the very trap
+ * value that set them off (a canary password where an order id goes).
  */
 export async function recordSecurityEvent(
   c: Context<AppContext>,
-  ev: { kind: SecurityEventKind; code: string; status: number; detail?: SecurityDetail }
+  ev: { kind: SecurityEventKind; code: string; status: number; detail?: SecurityDetail },
+  opts: { target?: boolean } = {}
 ): Promise<void> {
   try {
     if (probeExempt(c.env, c.get('user'))) return;
     const now = new Date();
-    const row = await rowFor(c, ev, now);
+    const row = await rowFor(c, ev, now, undefined, opts.target !== false);
     if (!row) return;
     await settle(c, () => writeRow(c.env.DB, row, now));
   } catch {

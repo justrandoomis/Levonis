@@ -467,6 +467,11 @@ test('the pure parts: networks, targets, the detail allow-list, the refusal clas
   assert.equal(targetOf('/api/admin/pricing/products/:id', '/api/admin/pricing/products/prd_9'), 'prd_9');
   assert.equal(targetOf('/api/admin/pricing/products/:id', '/api/admin/pricing/products/%3Cscript%3E'), null);
   assert.equal(targetOf('/api/admin/pricing/rates', '/api/admin/pricing/rates'), null);
+  // A capability in the path is a secret, never a target (deception fix round m3).
+  assert.equal(targetOf('/api/marketplace/print/viewer/:token', '/api/marketplace/print/viewer/abc123'), null);
+  assert.equal(targetOf('/api/warranty/verify/:key', '/api/warranty/verify/K-1'), null);
+  assert.equal(targetOf('/api/x/:resetCode', '/api/x/123456'), null);
+  assert.equal(targetOf('/api/designs/:designId', '/api/designs/dsn_1'), 'dsn_1', 'a name that merely contains the letters is still an id');
   assert.equal(
     cleanDetail({ bucket: 'pricing-read', pair: '1660.5', fields: ['anomaly_threshold_pct', '37.25', 'x y'], new: ['ip', 'ip'], s: 'abc', ...({ rate: '1660' } as object) }),
     JSON.stringify({ bucket: 'pricing-read', fields: ['anomaly_threshold_pct'], new: ['ip'] })

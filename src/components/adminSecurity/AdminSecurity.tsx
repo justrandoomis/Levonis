@@ -55,6 +55,8 @@ interface ScoreDto {
 }
 interface Summary {
   installed: boolean;
+  /** False when the Worker has no key: decoys answer, but carry no trap data and no tag is set. */
+  canaries?: boolean;
   active_blocks: Record<BlockKind, number>;
   detections_24h: number;
   decoy_hits_7d: number;
@@ -189,6 +191,7 @@ export default function AdminSecurity() {
       </header>
 
       {summary && !summary.installed && <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">{s('notInstalled')}</p>}
+      {summary && summary.canaries === false && <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">{s('canariesOff')}</p>}
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {tiles.map(([k, v]) => (

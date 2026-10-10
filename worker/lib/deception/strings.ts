@@ -51,6 +51,18 @@ export const DECEPTION_BELL = {
       ckb: 'هەژمارەکەت قەدەغە نەکرا. ئەگەر تۆ نەبوویت، لە «ڕێکخستنەکان» دانیشتنەکانی تر کۆتایی پێبهێنە و وشەی نهێنییەکەت بگۆڕە.',
     },
   },
+  adminDecoy: {
+    title: {
+      ar: 'فتح حساب موظف ملفاً وهمياً',
+      en: 'A staff account opened a decoy file',
+      ckb: 'هەژمارێکی کارمەند پەڕگەیەکی ساختەی کردەوە',
+    },
+    body: {
+      ar: 'أُعطي بيانات مزيّفة تحمل بيانات فخّ، ولم يُحظر الحساب. إن لم يكن ذلك متوقعاً، فراجع الحساب من «الأمان» وأنهِ جلساته.',
+      en: 'It was served fake data carrying trap data, and the account was not blocked. If this was not expected, review the account in Security and end its sessions.',
+      ckb: 'زانیاریی ساختەی هەڵگری زانیاریی تەڵەی پێدرا و هەژمارەکە قەدەغە نەکرا. ئەگەر چاوەڕوان نەکرابوو، لە «ئاسایش» هەژمارەکە بپشکنە و دانیشتنەکانی کۆتایی پێبهێنە.',
+    },
+  },
   ownDecoy: {
     title: {
       ar: 'فُتح ملف وهمي من حسابك',

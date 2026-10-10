@@ -133,37 +133,68 @@ people who ask it; nothing reaches out to anyone. Code: `worker/lib/deception/`,
 `/xmlrpc.php`) and `/phpmyadmin/*` answer realistic, entirely invented data —
 built in memory from a random batch id, never from the database — carrying
 trap tokens (an API key, an admin e-mail and passwords, a session, product
-ids shaped like real ones). Every decoy answer is `no-store` and `noindex`,
-carries its own script-free policy, and the sensitive ones are `Disallow` in
-robots.txt. Each decoy path is in `run_worker_first` in all three
-environments, or the asset layer would answer it with the app shell.
+ids shaped like real ones). ONE ANSWER FOR EVERYONE who is answered at all: a
+tool, a browser, an image tag, a user agent claiming to be Googlebot, a forged
+`Sec-Fetch-*` header and a staff account get the same body with the same
+headers a file would carry (no cookie, no `no-store`, no robots header, no
+wait for a database write) — comparing requests tells an attacker nothing. A
+path a real exposed server would not have (a git object, an unknown internal
+API path) answers 404. The decoys are NOT in robots.txt (that would hand out
+the list of traps). Each decoy path, bare directory names included, is in
+`run_worker_first` in all three environments.
 
-**Deceive, then block.** The decoy request itself gets the fake data; in the
-same step an incident is written (blocks, the trap batch, a signed device tag
-on that answer, the owner's bell with no figure). From the next request the
-API answers `403 ACCESS_BLOCKED` with a reference, the Worker's documents
-show the block page and the app shows a full-screen notice — in Arabic,
-English and Sorani, never saying why, for how long, or what kind of block.
-Trap data presented anywhere (a header, the query, the session cookie, the
-sign-in door, a cart body) blocks at once.
+**The anti-framing rule.** Evidence counts in full only where nobody else
+could have put it: a request with NO `Sec-Fetch-*` header at all (a tool —
+every current browser sends them; a partial or unknown set is a tool's too),
+or trap data in a header, a cookie or the sign-in body (whatever its type or
+size). Anything a link can carry — a decoy opened by a navigation, trap data
+in a URL the app echoed into its own fetch, an injection-shaped query, a
+claimed crawler following links — is LINKABLE: recorded and scored, but a
+linkable score stops at 99, one short of a block. An image, a frame, a
+cross-site fetch or a navigation without a click is recorded only. So an
+attacker who posts a link, sends one on WhatsApp or prints a QR code cannot
+get anyone blocked, customer or staff.
+
+**Deceive, then block.** A tool's decoy request gets the fake data; this
+isolate knows the block at once and the rows are written after the answer:
+the account (signed in) or the address (anonymous), the trap batch, the
+owner's bell with no figure. From its next request: `403 ACCESS_BLOCKED` with
+a reference, the block page for documents, a full-screen notice in the app —
+in Arabic, English and Sorani, never saying why, for how long, or what kind of
+block. A browser's visitor is deceived the same way and is blocked the moment
+he USES the trap data where no link puts it (the admin e-mail and password at
+the sign-in form, the key in a header or a tool): that block answer carries
+the device tag. Canary-shaped junk to hide a real token is itself a probe.
 
 **Signals and scores.** Each account, device tag and network has a score that
 halves every six hours; 100 blocks. Price or cost fields sent to the cart or
 checkout (50; the server keeps its own price), injection shapes (25), tamper
-switches (20), sign-in brute force (15), guessing admin routes (10), probing
-other people's records (5), admin refusals (3). Only DELIBERATE requests
-count (`Sec-Fetch-*`): an image, a cross-site request or a navigation without
-a click is recorded and never scored, so an `<img src="/.env">` in a post
-cannot get anyone blocked.
+switches (20), sign-in brute force (15, never on a shared address), guessing
+admin routes (10), probing other people's records (5), admin refusals (3).
+The admin refusals and the sign-in 429s are always linkable (workflow 7's
+probes from a reused runner, through any number of isolates, stop at 99).
 
-**Who is never blocked.** The verified owner (the table refuses an owner row);
-other admins only by a confirmed trap token; registered probe accounts;
-crawlers and link-preview bots (a plain 404 from a decoy, never a network
-block on an allowed path). Network blocks apply to anonymous requests only,
-use the exact IPv4 address or IPv6 /64 hashed per day (never an address,
-never a /24), last 24 hours (1 hour by score alone), and never apply to the
-Telegram and Studio server doors. Sign-in stays reachable under a device or
-network block. Account and device blocks last 30 days.
+**Who is never blocked.** The verified owner (the table refuses an owner
+row); other admins only by a confirmed trap token (a staff account opening a
+decoy is deceived, its batch issued to it, and the owner's bell rings);
+registered probe accounts; crawlers Cloudflare VERIFIED (a plain 404 from a
+decoy — a user-agent claim is no exemption). Network blocks are for TOOLS
+only: a carrier's shared address is never blocked for the browsers behind it,
+a signed-in tool passes unless its account was made after the block (signing
+up does not escape it), and a session cookie no session backs is no account.
+They use the exact IPv4 address or IPv6 /64, keyed by the deception secret
+per day (no database reader can enumerate an address back), last 24 hours (1
+hour by score alone) and never apply to the Telegram and Studio server doors.
+`/api/auth/*` stays reachable under every block: signing in, proving an
+address (an unverified owner blocked by her own test proves it and is exempt
+at once), resetting a password, signing out. Account and device blocks last
+30 days; lifting an account lifts the tags its block answers set.
+
+**Budgets.** Anonymous decoy and score incidents may fill 2,000 of the 3,000
+block rows a day; the rest is kept for trap-data uses and accounts. One IPv4
+/24 or IPv6 /48 writes at most 16 anonymous incidents before its addresses
+stop getting rows of their own — an IPv6 /48 rotating its /64s is then
+blocked whole. A decoy writes at most one trap batch per actor a minute.
 
 **Speed.** Account and network blocks live in a per-isolate snapshot refreshed
 in the background every 30 seconds; device tags need no database. An ordinary
@@ -173,17 +204,31 @@ error lets the request through.
 **The owner's console «الأمان»** (Admin → الإدارة, verified owner only,
 `/api/admin/security`): the tiles, the blocks, the whole security log, the
 scores, an incident with «ما الذي أُعطي له» (the fake answer regenerated from
-its batch), and «رفع الحظر» / «رفع كل حظر هذه الحادثة» with an audit row.
+its batch), and «رفع الحظر» / «رفع كل حظر هذه الحادثة» with an audit row. The
+log never stores a target id the trap value could be, nor any path parameter
+named like a capability (`:token`, `:key`, `:code`…).
 
-**The optional secret.** `SECURITY_CANARY_KEY` (a Worker secret) keys the trap
-tokens and the device tag; without it a built-in pepper is used, and a forged
-token or tag can only get its own sender blocked. No workflow puts or deletes it.
+**The key.** `SECURITY_CANARY_KEY` (a Worker secret) keys the trap tokens, the
+device tag and the network keys; when it is unset a key is DERIVED from
+`TELEGRAM_WEBHOOK_SECRET` (else `STUDIO_HANDOFF_SECRET`, else
+`TELEGRAM_ADMIN_WEBHOOK_SECRET`). With none of them the layer fails closed:
+decoys still answer their fake data, but carry no trap data and no tag is
+minted — there is no built-in key. The console says when it is off. No
+workflow puts or deletes it; rotating the source secret ends the tags and trap
+data already handed out.
 
 **Known limits.** A cookie-less scanner may get ordinary public answers from
-another isolate for up to 30 seconds after its block. If a GitHub runner's
-address was network-blocked in the last 24 hours (shared with someone else's
-scanner), workflow 7's anonymous verify step reads `ACCESS_BLOCKED`: re-run it
-(a new runner) or lift the block in «الأمان».
+another isolate for up to 30 seconds after its block. A tool that forges a
+browser's `Sec-Fetch-*` headers passes network blocks and its decoy and URL
+evidence counts as linkable — it is still deceived, recorded and scored, and
+blocked the moment it uses trap data where no link puts it. An old browser
+that sends no `Sec-Fetch-*` (Safari before 16.4) behind an address a scanner
+got blocked meets that block for up to 24 hours. A workflow 7 runner whose
+address a scanner on the same cloud got blocked reads `ACCESS_BLOCKED`:
+re-run it (a new runner) or lift the block in «الأمان». The live Worker also
+answers on its `workers.dev` address, where the device-tag cookie of
+levonis-iq.com is not sent (`workers_dev: false` is the owner's call: it
+changes the deploy).
 
 **Drill.** `scripts/local-deception-drill.mjs` plays a scanner against a LOCAL
 Worker only (`wrangler dev --local`); it refuses any base that is not

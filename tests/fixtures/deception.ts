@@ -14,12 +14,16 @@ export const ATTACKER_IP = '203.0.113.7';
 export const NEIGHBOUR_IP = ATTACKER_IP;
 export const OTHER_IP = '198.51.100.20';
 
+/** The deception key every test world runs with (the layer fails closed without one: no trap data, no tags). */
+export const TEST_KEY = 'test-deception-key-0001';
+export const KEYED = { SECURITY_CANARY_KEY: TEST_KEY } as const;
+
 export const USERS = {
   owner: { id: 'usr_owner', email: 'boss@x.co', role: 'admin', verified: true },
   full: { id: 'usr_full', email: 'full@x.co', role: 'admin', verified: true },
   assistant: { id: 'usr_asst', email: 'asst@x.co', role: 'admin', verified: true, scope: 'assistant' },
   customer: { id: 'usr_cust', email: 'cust@x.co', role: 'customer', verified: true },
-  neighbour: { id: 'usr_nb', email: 'nb@x.co', role: 'customer', verified: true },
+  neighbour: { id: 'usr_neighbour', email: 'nb@x.co', role: 'customer', verified: true },
   probe: { id: 'usr_probe', email: 'probe@x.co', role: 'customer', verified: true },
 } as const;
 export type Who = keyof typeof USERS;
@@ -41,6 +45,10 @@ export interface CallOpts {
   host?: string;
   /** Use the fixture's ExecutionContext (default true). */
   withCtx?: boolean;
+  /** Cloudflare's request properties (a verified bot, the country). */
+  cf?: Record<string, unknown>;
+  /** A raw body sent as is (with `headers['content-type']`), instead of JSON. */
+  rawBody?: string;
 }
 
 export interface World {
@@ -78,6 +86,7 @@ export async function deceptionWorld(opts: { through?: string | null; env?: Reco
     STORE_ROOT_DOMAIN: APEX,
     APP_ORIGIN: `https://${APEX}`,
     INITIAL_ADMIN_EMAIL: 'boss@x.co',
+    SECURITY_CANARY_KEY: TEST_KEY,
     EXTRA_ALLOWED_ORIGINS: '',
     SECURITY_PROBE_USER_IDS: USERS.probe.id,
     ASSETS: {
@@ -92,9 +101,11 @@ export async function deceptionWorld(opts: { through?: string | null; env?: Reco
     if (o.as) cookies.levonis_session = tokenOf(o.as);
     const jar = Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ');
     if (jar) headers.Cookie = jar;
-    const method = o.method ?? (o.body === undefined ? 'GET' : 'POST');
-    if (o.body !== undefined) headers['content-type'] = 'application/json';
-    const req = new Request(`https://${host}${path}`, { method, headers, body: o.body === undefined ? undefined : JSON.stringify(o.body) });
+    const method = o.method ?? (o.body === undefined && o.rawBody === undefined ? 'GET' : 'POST');
+    if (o.body !== undefined && !Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) headers['content-type'] = 'application/json';
+    const payload = o.rawBody !== undefined ? o.rawBody : o.body === undefined ? undefined : JSON.stringify(o.body);
+    const req = new Request(`https://${host}${path}`, { method, headers, body: payload });
+    if (o.cf) Object.defineProperty(req, 'cf', { value: o.cf });
     const res = await worker.fetch(req, env as never, (o.withCtx === false ? undefined : ctx) as never);
     await drain();
     return res;
@@ -112,14 +123,20 @@ export const deceptionEvents = (raw: DatabaseSync, code?: string) =>
 export const ownerBells = (raw: DatabaseSync) =>
   (raw.prepare("SELECT * FROM user_notifications WHERE user_id = 'usr_owner' AND kind = 'security_alert' ORDER BY created_at").all() as Record<string, unknown>[]).map((r) => ({ ...r }));
 
+/** A tool: no Sec-Fetch-* header at all (curl, a scanner, a script) — what an incident is made of. */
+export const TOOL: Record<string, string> = {};
 /** A browser's deliberate requests: typed in the address bar, or the page's own fetch. */
 export const TYPED = { 'Sec-Fetch-Site': 'none', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-User': '?1' };
 export const SCRIPT = { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' };
 export const CLICKED = { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-User': '?1' };
-/** Requests a page can make a visitor's browser send without the visitor meaning to. */
+/** A link on another site or app, clicked: LINKABLE (anyone can post one) — scored, never a block on its own. */
+export const OPENED = { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-User': '?1' };
+/** Requests a page can make a visitor's browser send without the visitor meaning to: recorded only. */
 export const INDUCED: ReadonlyArray<Record<string, string>> = [
   { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'no-cors', 'Sec-Fetch-Dest': 'image' },
-  { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-User': '?1' },
+  { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' },
+  { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors', 'Sec-Fetch-Dest': 'empty' },
+  { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' },
   { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' },
   { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'iframe' },
 ];

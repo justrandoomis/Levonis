@@ -10,13 +10,18 @@
  *   injection      SQL / script / traversal shapes in the URL score; Arabic
  *   and tamper     and Sorani search text never does; role / admin / debug /
  *                  cost-revealing switches on a customer API route score
- *   others' data   repeated refusals on other people's orders reach the
- *                  threshold; one refusal writes no event
- *   brute force    a 429 on a sign-in bucket scores
+ *   linkable       whatever a link can carry — from a browser — stops at 99:
+ *                  an innocent behind a carrier address an attacker primed is
+ *                  never tagged for it (fix round CGNAT carry-over)
+ *   others' data   repeated refusals on other people's orders: a tool reaches
+ *                  the threshold, a browser stops at 99; one refusal writes no
+ *                  event
+ *   brute force    a 429 on a sign-in bucket is recorded and never scores the
+ *                  shared address (a carrier's subscribers share that bucket)
  *   decay          one halving per six hours, the SQL upsert agreeing with
- *                  the TypeScript model
- *   live probes    workflow 7's own anonymous probes, replayed twice from one
- *                  address, keep their statuses and never block
+ *                  the TypeScript model; the linkable cap in the same upsert
+ *   live probes    workflow 7's own anonymous probes, replayed from one address
+ *                  through many isolates, keep their statuses and never block
  *
  * Local only. Run: node --import tsx --test tests/deceptionSignals.test.ts
  */
@@ -27,8 +32,9 @@ import { ROOT } from './fixtures/d1';
 import { json } from './fixtures/app';
 import { seedCostlyProduct } from './fixtures/costlyProduct';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
-import { OTHER_IP, SCRIPT, blocks, deceptionEvents, deceptionWorld, setCookieValue, type World } from './fixtures/deception';
-import { THRESHOLD, WEIGHTS, bumpScore, decayed, injectionIn, priceFieldsIn, tamperParams } from '../worker/lib/deception/signals';
+import { asD1 } from './fixtures/app';
+import { OTHER_IP, SCRIPT, TOOL, blocks, deceptionEvents, deceptionWorld, setCookieValue, type World } from './fixtures/deception';
+import { LINKABLE_CAP, THRESHOLD, WEIGHTS, bumpScore, decayed, injectionIn, priceFieldsIn, tamperParams } from '../worker/lib/deception/signals';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
 const { fillPath, loadProbeFiles, pick } = probesScript;
@@ -125,26 +131,52 @@ test('INJECTION and TAMPER on public routes score; Arabic and Sorani search does
   assert.equal(score(w, 'u:usr_cust'), WEIGHTS.TAMPER_PARAMS);
   assert.deepEqual(JSON.parse(String(deceptionEvents(w.raw, 'TAMPER_PARAMS')[0]!.detail)).fields.sort(), ['include', 'role']);
   let last: Response | null = null;
-  for (let i = 0; i < 4; i++) last = await w.call(`/api/products?search=${encodeURIComponent(`x' UNION SELECT ${i} FROM users--`)}`);
+  for (let i = 0; i < 4; i++) last = await w.call(`/api/products?search=${encodeURIComponent(`x' UNION SELECT ${i} FROM users--`)}`, { headers: TOOL });
   assert.ok(setCookieValue(last!, 'lv_pref'));
   const net = blocks(w.raw).find((b) => b.actor_kind === 'network')!;
   const hours = (Date.parse(String(net.expires_at)) - Date.parse(String(net.created_at))) / 3_600_000;
   assert.ok(hours > 0.99 && hours < 1.01, `a score-only network block lasts one hour: ${hours}`);
-  assert.equal((await w.call('/api/products')).status, 403);
-  assert.equal((await w.call('/api/products', { as: 'neighbour' })).status, 200, 'the signed-in neighbour is untouched');
+  assert.equal((await w.call('/api/products', { headers: TOOL })).status, 403);
+  assert.equal((await w.call('/api/products', { as: 'neighbour', headers: TOOL })).status, 200, 'the signed-in neighbour is untouched');
+  assert.equal((await w.call('/api/products', { headers: SCRIPT })).status, 200, 'and so is every browser on the address');
 });
 
-test('OTHERS\' RECORDS: one refusal writes no event; repeated refusals reach the threshold', async () => {
+test('LINKABLE STOPS AT 99: an injection-shaped link opened in a browser never blocks; an attacker priming a shared address never gets the innocent behind it tagged (fix round CGNAT carry-over)', async () => {
+  const w = await deceptionWorld();
+  const CGNAT = '100.64.10.20';
+  // A victim opens links with injection shapes and admin paths, over and over.
+  for (let i = 0; i < 8; i++) await w.call(`/api/products?search=${encodeURIComponent(`x' UNION SELECT ${i} FROM users--`)}`, { ip: CGNAT, headers: SCRIPT });
+  assert.equal(blocks(w.raw).length, 0);
+  const n = w.raw.prepare("SELECT score FROM security_scores WHERE actor_key LIKE 'n:%'").get() as { score: number };
+  assert.equal(n.score, LINKABLE_CAP);
+  // An attacker's tool on the same address primes it just short of the threshold…
+  for (let i = 0; i < 3; i++) await w.call(`/api/home?q=${encodeURIComponent(`<script>${i}`)}`, { ip: CGNAT, headers: TOOL });
+  // …then the innocent behind it mistypes her password until the shared sign-in bucket refuses.
+  let tagged = false;
+  for (let i = 0; i < 24; i++) {
+    const r = await w.call('/api/auth/login', { ip: CGNAT, headers: SCRIPT, body: { identifier: 'nb@x.co', password: `wrong-${i}` } });
+    if (setCookieValue(r, 'lv_pref')) tagged = true;
+  }
+  assert.equal(tagged, false, 'the innocent browser is never tagged');
+  assert.equal((await w.call('/api/home', { ip: CGNAT, headers: SCRIPT })).status, 200, 'and browses on');
+  // The attacker's tool, whose own request crossed the line, is the one blocked.
+  assert.equal((await w.call('/api/home', { ip: CGNAT, headers: TOOL })).status, 403);
+});
+
+test('OTHERS\' RECORDS: one refusal writes no event; a tool walking ids reaches the threshold, a browser (a link to someone\'s order) stops at 99', async () => {
   const w = await deceptionWorld();
   await w.call('/api/orders/ORD-NOTYOURS1', { as: 'customer', headers: SCRIPT });
   assert.equal(deceptionEvents(w.raw).length, 0, 'an ordinary 404 is not a log row');
   assert.equal(score(w, 'u:usr_cust'), WEIGHTS.IDOR_PROBE);
-  for (let i = 0; i < 25 && blocks(w.raw).length === 0; i++) await w.call(`/api/orders/ORD-GUESS${i}`, { as: 'customer', headers: SCRIPT });
+  for (let i = 0; i < 30; i++) await w.call(`/api/orders/ORD-LINK${i}`, { as: 'customer', headers: SCRIPT });
+  assert.equal(blocks(w.raw).length, 0);
+  assert.equal(score(w, 'u:usr_cust'), LINKABLE_CAP);
+  for (let i = 0; i < 25 && blocks(w.raw).length === 0; i++) await w.call(`/api/orders/ORD-GUESS${i}`, { as: 'neighbour', headers: TOOL });
   assert.ok(deceptionEvents(w.raw, 'IDOR_PROBE').length >= 1, 'recorded once the score passes 50');
-  assert.ok(blocks(w.raw).some((b) => b.actor_key === 'usr_cust' && b.signal === 'IDOR_PROBE'));
+  assert.ok(blocks(w.raw).some((b) => b.actor_key === 'usr_neighbour' && b.signal === 'IDOR_PROBE'));
 });
 
-test('BRUTE FORCE: a 429 on the sign-in bucket scores AUTH_BRUTE_FORCE', async () => {
+test('BRUTE FORCE: a 429 on the sign-in bucket is recorded — and never scores the shared address', async () => {
   const w = await deceptionWorld();
   let saw429 = false;
   for (let i = 0; i < 24; i++) {
@@ -156,8 +188,7 @@ test('BRUTE FORCE: a 429 on the sign-in bucket scores AUTH_BRUTE_FORCE', async (
   assert.ok(ev.length >= 1);
   assert.equal(ev[0]!.kind, 'rate_limited');
   assert.equal(JSON.parse(String(ev[0]!.detail)).bucket, 'login');
-  const n = w.raw.prepare("SELECT score FROM security_scores WHERE actor_key LIKE 'n:%'").get() as { score: number };
-  assert.ok(n.score >= WEIGHTS.AUTH_BRUTE_FORCE);
+  assert.equal((w.raw.prepare("SELECT COUNT(*) AS n FROM security_scores WHERE actor_key LIKE 'n:%'").get() as { n: number }).n, 0, 'a carrier\'s subscribers share the sign-in bucket');
 });
 
 test('DECAY: one halving per six hours — the SQL upsert agrees with the model', async () => {
@@ -173,12 +204,19 @@ test('DECAY: one halving per six hours — the SQL upsert agrees with the model'
     assert.equal(sql, Math.floor(80 / 2 ** expectSteps), `${hours} h`);
   }
   assert.equal(decayed(200, t0, t0 + 10 * 86_400_000), 0, 'thirty halvings at most, never negative');
+  // The linkable cap: a linkable signal raises a score to 99 at most and never lowers one above it.
+  assert.equal(await bumpScore(db, 'u:cap', 'TEST', 80, new Date(t0), LINKABLE_CAP), 80);
+  assert.equal(await bumpScore(db, 'u:cap', 'TEST', 60, new Date(t0), LINKABLE_CAP), LINKABLE_CAP);
+  assert.equal(await bumpScore(db, 'u:cap', 'TEST', 60, new Date(t0), LINKABLE_CAP), LINKABLE_CAP);
+  assert.equal(await bumpScore(db, 'u:cap', 'TEST', 30, new Date(t0)), 129, 'hard evidence carries it over');
+  assert.equal(await bumpScore(db, 'u:cap', 'TEST', 60, new Date(t0), LINKABLE_CAP), 129, 'and a linkable signal never lowers it');
+  assert.equal(await bumpScore(db, 'u:cap2', 'TEST', 500, new Date(t0), LINKABLE_CAP), LINKABLE_CAP, 'a first linkable signal starts capped');
   const sig = JSON.parse(String((w.raw.prepare("SELECT signals FROM security_scores WHERE actor_key = 'u:x'").get() as { signals: string }).signals));
   assert.equal(sig.TEST, 5);
   assert.equal(THRESHOLD, 100);
 });
 
-test('THE LIVE PROBES NEVER BLOCK: workflow 7\'s anonymous probes and verify paths, twice from one address, keep their statuses', async () => {
+test('THE LIVE PROBES NEVER BLOCK: workflow 7\'s anonymous probes and verify paths, from one address through many isolates and deploys, keep their statuses', async () => {
   const w = await deceptionWorld();
   w.raw.exec('PRAGMA foreign_keys = OFF;');
   seedCostlyProduct(w.raw);
@@ -187,7 +225,9 @@ test('THE LIVE PROBES NEVER BLOCK: workflow 7\'s anonymous probes and verify pat
   const ua = { 'User-Agent': 'levonis-live-cost-probes/1 (read-only)', accept: 'application/json' };
   const ip = '140.82.112.3';
   const verify: Array<[string, number]> = [['/api/health', 200], ['/api/home', 200], ['/api/products?limit=3', 200], ['/api/memberships/plans', 200]];
-  for (let round = 0; round < 2; round++) {
+  for (let round = 0; round < 6; round++) {
+    // Each round a fresh isolate: the per-isolate quiet windows start over (fix round MINOR multi-isolate).
+    w.env.DB = asD1(w.raw);
     for (const [path, want] of verify) {
       const res = await w.call(path, { ip, headers: ua });
       assert.equal(res.status, want, `round ${round}: ${path}`);
@@ -203,5 +243,5 @@ test('THE LIVE PROBES NEVER BLOCK: workflow 7\'s anonymous probes and verify pat
   }
   assert.deepEqual(blocks(w.raw), [], 'the deploy\'s own probes never block its runner');
   const top = w.raw.prepare('SELECT MAX(score) AS m FROM security_scores').get() as { m: number | null };
-  assert.ok((top.m ?? 0) < THRESHOLD / 2, `the probes scored ${top.m}`);
+  assert.ok((top.m ?? 0) < THRESHOLD, `the probes scored ${top.m}`);
 });

@@ -13,12 +13,20 @@
  * network, and no error reaches anyone.
  *
  * AN INCIDENT is one detection: its blocks (account 30 days when signed in;
- * device 30 days, the tag set on that very answer; network 24 hours — 1 hour
- * when reached by score alone — only for an ANONYMOUS, deliberate, non-crawler
- * request), the canary batch of a decoy answer, one ACTOR_BLOCKED event and
- * the owner's bell. Written in one batch the decoy answer awaits (bounded), so
- * the attacker's NEXT request meets the block in every isolate that has
- * refreshed, and at once in this one.
+ * device 30 days, the tag set on the BLOCK answer — never on a decoy's
+ * deceiving one; network 24 hours — 1 hour when reached by score alone — only
+ * for an ANONYMOUS request, and enforced against tools only: ./gate.ts), the
+ * canary batch of a decoy answer, one ACTOR_BLOCKED event and the owner's
+ * bell. This isolate knows the blocks at once; the rows are written in one
+ * batch — after the answer for a decoy (no timing tell), awaited (bounded) for
+ * a block answer — and every other isolate reads them within 30 seconds.
+ *
+ * WRITES ARE BUDGETED so nobody can fill the table on purpose: anonymous
+ * decoy and score incidents may use DECOY_ROW_CAP of the DAILY_BLOCK_ROW_CAP,
+ * leaving the rest to canary uses and account blocks; and one prefix (an IPv4
+ * /24, an IPv6 /48) writes at most PREFIX_INCIDENT_BUDGET anonymous incidents
+ * before its addresses stop getting rows of their own — an IPv6 /48 that
+ * rotates through its /64s gets one block on the whole /48 instead.
  *
  * THE OWNER IS NEVER BLOCKED: the gate never asks, and the table refuses an
  * owner row (`actor_class` has no 'owner').
@@ -30,16 +38,21 @@ import { baghdadDay } from '../baghdadTime';
 import { newId } from '../crypto';
 import { notify } from '../notifications';
 import { contextOf, recordSecurityEvent, type SecurityDetail } from '../securityEvents';
-import { cfOf, mintTag, newReferenceHex, referenceOf, type DeviceTag, type FetchIntent } from './actors';
+import { cfOf, exactNetwork, keyForNet, mintTag, newReferenceHex, prefixNetwork, referenceHex, referenceOf, type DeviceTag, type FetchIntent } from './actors';
 import type { DecoyCode } from './decoys';
+import { bumpScore } from './signals';
 import { DECEPTION_BELL } from './strings';
 
 export const ACCOUNT_BLOCK_DAYS = 30;
 export const DEVICE_BLOCK_DAYS = 30;
 export const NETWORK_BLOCK_HOURS = 24;
 export const NETWORK_SCORE_BLOCK_HOURS = 1;
-/** Block rows created in any 24 hours before incidents stop writing rows (about 1,000 incidents). */
+/** Block rows created in any 24 hours before incidents stop writing rows. */
 export const DAILY_BLOCK_ROW_CAP = 3000;
+/** The share anonymous decoy and score incidents may fill; the rest is kept for canary uses and account blocks. */
+export const DECOY_ROW_CAP = 2000;
+/** Anonymous incidents one IPv4 /24 or IPv6 /48 may write (a score that halves every six hours) before it stops getting rows of its own. */
+export const PREFIX_INCIDENT_BUDGET = 16;
 /** Canary batch rows in any 24 hours; past it the decoy still answers with valid canaries. */
 export const DAILY_CANARY_CAP = 1000;
 /** Deception bells a Baghdad day; the console shows every incident regardless. */
@@ -69,6 +82,8 @@ export interface BlockRef {
   incidentId: string;
   reference: string;
   expiresMs: number;
+  /** When the block was placed: an account created after a network block is that network's (./gate.ts). */
+  createdMs: number;
 }
 
 export interface Snapshot {
@@ -81,6 +96,12 @@ export interface Snapshot {
   networks: Map<string, BlockRef>;
   /** Device tags the owner lifted — a lifted tag blocks nothing and its cookie goes. */
   lifted: Set<string>;
+  /**
+   * The references (10 hex) of incidents whose ACCOUNT block the owner lifted:
+   * every tag of that incident is lifted with it, the tags an account-blocked
+   * answer minted for the account's other browsers included (they have no row).
+   */
+  liftedRefs: Set<string>;
   loading: Promise<void> | null;
   /** Blocked requests answered, per live block (kind|key), flushed at most once a minute each. */
   hits: Map<string, { kind: BlockKind; key: string; n: number; last: string; flushedAt: number }>;
@@ -102,6 +123,7 @@ export function snapshotFor(db: unknown): Snapshot | null {
       accounts: new Map(),
       networks: new Map(),
       lifted: new Set(),
+      liftedRefs: new Set(),
       loading: null,
       hits: new Map(),
     };
@@ -119,32 +141,45 @@ interface BlockRow {
   expires_at: string;
   lifted_at: string | null;
   updated_at: string;
+  created_at: string;
 }
+
+const refOf = (r: BlockRow): BlockRef => ({
+  id: r.id,
+  incidentId: r.incident_id,
+  reference: r.reference,
+  expiresMs: Date.parse(r.expires_at),
+  createdMs: Date.parse(r.created_at) || 0,
+});
 
 function apply(s: Snapshot, r: BlockRow, nowMs: number): void {
   if (r.actor_kind === 'device') {
     if (r.lifted_at) s.lifted.add(r.actor_key);
     return;
   }
+  if (r.actor_kind === 'account' && r.lifted_at) {
+    const hex = referenceHex(r.reference);
+    if (hex) s.liftedRefs.add(hex);
+  }
   const map = r.actor_kind === 'account' ? s.accounts : s.networks;
-  const expiresMs = Date.parse(r.expires_at);
-  if (r.lifted_at || !(expiresMs > nowMs)) {
+  const ref = refOf(r);
+  if (r.lifted_at || !(ref.expiresMs > nowMs)) {
     // Only the block this row IS: a newer block of the same actor stays.
     const cur = map.get(r.actor_key);
     if (cur && (cur.id === r.id || cur.incidentId === r.incident_id)) map.delete(r.actor_key);
     return;
   }
-  map.set(r.actor_key, { id: r.id, incidentId: r.incident_id, reference: r.reference, expiresMs });
+  map.set(r.actor_key, ref);
 }
 
-const COLUMNS = 'id, incident_id, actor_kind, actor_key, reference, expires_at, lifted_at, updated_at';
+const COLUMNS = 'id, incident_id, actor_kind, actor_key, reference, expires_at, lifted_at, updated_at, created_at';
 
 async function loadFull(db: D1Database, s: Snapshot, nowMs: number): Promise<void> {
   const res = await db
     .prepare(
       `SELECT ${COLUMNS} FROM security_blocks
         WHERE (lifted_at IS NULL AND expires_at > ?1 AND actor_kind IN ('account','network'))
-           OR (actor_kind = 'device' AND lifted_at > ?2)
+           OR (actor_kind IN ('device','account') AND lifted_at > ?2)
         ORDER BY created_at DESC LIMIT 3000`
     )
     .bind(new Date(nowMs).toISOString(), new Date(nowMs - (DEVICE_BLOCK_DAYS + 1) * DAY).toISOString())
@@ -152,19 +187,23 @@ async function loadFull(db: D1Database, s: Snapshot, nowMs: number): Promise<voi
   const accounts = new Map<string, BlockRef>();
   const networks = new Map<string, BlockRef>();
   const lifted = new Set<string>();
+  const liftedRefs = new Set<string>();
   let since = '';
   for (const r of res.results ?? []) {
     if (r.updated_at > since) since = r.updated_at;
-    if (r.actor_kind === 'device') {
-      if (r.lifted_at) lifted.add(r.actor_key);
+    if (r.lifted_at) {
+      if (r.actor_kind === 'device') lifted.add(r.actor_key);
+      const hex = r.actor_kind === 'account' ? referenceHex(r.reference) : null;
+      if (hex) liftedRefs.add(hex);
       continue;
     }
     const map = r.actor_kind === 'account' ? accounts : networks;
-    if (!map.has(r.actor_key)) map.set(r.actor_key, { id: r.id, incidentId: r.incident_id, reference: r.reference, expiresMs: Date.parse(r.expires_at) });
+    if (!map.has(r.actor_key)) map.set(r.actor_key, refOf(r));
   }
   s.accounts = accounts;
   s.networks = networks;
   s.lifted = lifted;
+  s.liftedRefs = liftedRefs;
   s.since = since || new Date(nowMs).toISOString();
   s.status = 'ready';
   s.loadedAt = nowMs;
@@ -273,23 +312,24 @@ export interface IncidentInput {
   user: SessionUser | null;
   /** Place an account block (signed in, and not an exempt admin). */
   account: boolean;
-  /** Place a network block: the network key (today's), and how long. */
-  network: { key: string; hours: number } | null;
+  /** Place a network block on this address (anonymous only), and for how long. */
+  network: { ip: string; hours: number } | null;
   intent: FetchIntent;
   decoy?: DecoyCode;
   /** The canary batch this decoy answer carries — its row is written with the incident. */
   batch?: { id: string; issuedTo: Record<string, string> };
-  /** An existing incident's reference to reuse (an account-blocked answer tagging a new browser). */
-  reuse?: { incidentId: string; referenceHex: string };
-  /** Only the device tag (the account-blocked answer's new browser). */
-  deviceOnly?: boolean;
+  /** Mint a device tag (and its row): false for a decoy's deceiving answer, which carries none. */
+  tag?: boolean;
+  /** Write after the answer (a decoy: no timing tell); otherwise the write is awaited, bounded. */
+  background?: boolean;
 }
 
 export interface Incident {
   incidentId: string;
   reference: string;
-  tag: DeviceTag & { value: string };
-  /** False when nothing could be written (a database behind 0185, a failure, the cap). */
+  /** The tag for the block answer, or null (none asked for, or no key to sign one). */
+  tag: (DeviceTag & { value: string }) | null;
+  /** False when nothing could be written (a database behind 0185, a failure, the cap) — or not yet known (background). */
   written: boolean;
 }
 
@@ -322,21 +362,22 @@ export function actorClassFor(env: Env, user: SessionUser | null): string {
 function blockStatement(
   db: D1Database,
   b: { incidentId: string; reference: string; kind: BlockKind; key: string; actorClass: string; reason: BlockReason; signal: string; nowIso: string; expiresIso: string; evidence: string },
-  sinceIso: string
+  sinceIso: string,
+  cap: number
 ): D1PreparedStatement {
   return db
     .prepare(
       `INSERT INTO security_blocks
          (id, incident_id, reference, actor_kind, actor_key, actor_class, reason, signal, created_at, expires_at, updated_at, evidence)
        SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?9, ?11
-        WHERE (SELECT COUNT(*) FROM (SELECT 1 FROM security_blocks WHERE created_at >= ?12 LIMIT ${DAILY_BLOCK_ROW_CAP})) < ${DAILY_BLOCK_ROW_CAP}
+        WHERE (SELECT COUNT(*) FROM (SELECT 1 FROM security_blocks WHERE created_at >= ?12 LIMIT ${DAILY_BLOCK_ROW_CAP})) < ?13
        ON CONFLICT(actor_kind, actor_key) WHERE lifted_at IS NULL DO UPDATE SET
          incident_id = excluded.incident_id, reference = excluded.reference, actor_class = excluded.actor_class,
          reason = excluded.reason, signal = excluded.signal, created_at = excluded.created_at,
          expires_at = MAX(security_blocks.expires_at, excluded.expires_at), updated_at = excluded.updated_at,
          evidence = excluded.evidence`
     )
-    .bind(newId('sbk'), b.incidentId, b.reference, b.kind, b.key, b.actorClass, b.reason, b.signal.slice(0, 64), b.nowIso, b.expiresIso, b.evidence, sinceIso);
+    .bind(newId('sbk'), b.incidentId, b.reference, b.kind, b.key, b.actorClass, b.reason, b.signal.slice(0, 64), b.nowIso, b.expiresIso, b.evidence, sinceIso, cap);
 }
 
 function pruneStatements(db: D1Database, nowMs: number): D1PreparedStatement[] {
@@ -393,68 +434,96 @@ export async function settle(c: Context<AppContext>, work: () => Promise<unknown
 }
 
 /**
- * Opens an incident: mints the device tag (the caller sets its cookie), writes
- * the blocks, the canary batch and prunes in ONE batch (awaited at most
- * INCIDENT_WAIT_MS), updates this isolate's snapshot when the write landed,
- * then records ACTOR_BLOCKED and rings the owner after the response. Never
- * throws: a failed write leaves the stateless tag doing its work.
+ * Where an anonymous incident's network block goes: the address's own
+ * network, unless its prefix (IPv4 /24, IPv6 /48) has used up its budget —
+ * then no row of its own, and for IPv6 one block on the whole /48. One score
+ * upsert, on anonymous incidents only.
+ */
+async function networkTarget(c: Context<AppContext>, db: D1Database, ip: string, nowMs: number): Promise<{ key: string; wide: boolean } | null> {
+  const exact = exactNetwork(ip);
+  if (!exact) return null;
+  const key = await keyForNet(c.env, exact, nowMs);
+  const prefix = prefixNetwork(ip);
+  if (!prefix) return { key, wide: false };
+  const prefixKey = await keyForNet(c.env, prefix, nowMs);
+  const used = await bumpScore(db, `x:${prefixKey}`, 'INCIDENT', 1, new Date(nowMs));
+  if (used === null || used <= PREFIX_INCIDENT_BUDGET) return { key, wide: false };
+  return exact.includes(':') ? { key: prefixKey, wide: true } : null;
+}
+
+/**
+ * Opens an incident: mints the device tag when one is asked for (the caller
+ * sets its cookie on the BLOCK answer), tells this isolate's snapshot at once,
+ * then writes the blocks, the canary batch and prunes in ONE batch — after the
+ * answer when `background`, else awaited at most INCIDENT_WAIT_MS — and
+ * records ACTOR_BLOCKED and rings the owner once it landed. Never throws: a
+ * failed write leaves the stateless tag and this isolate's memory doing their
+ * work.
  */
 export async function openIncident(c: Context<AppContext>, input: IncidentInput): Promise<Incident> {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  const refHex = input.reuse?.referenceHex ?? newReferenceHex();
+  const refHex = newReferenceHex();
   const reference = referenceOf(refHex);
-  const incidentId = input.reuse?.incidentId ?? `sin_${newId()}`;
-  const tag = await mintTag(c.env, refHex, nowMs);
+  const incidentId = `sin_${newId()}`;
+  const tag = input.tag === false ? null : await mintTag(c.env, refHex, nowMs).catch(() => null);
   const out: Incident = { incidentId, reference, tag, written: false };
   const db = c.env?.DB;
   if (!db) return out;
-  try {
+  const actorClass = actorClassFor(c.env, input.user);
+  if (actorClass === 'owner') return out;
+  const accountKey = input.account && input.user ? input.user.id : null;
+  const s = snapshotFor(db);
+  const live = s && s.status !== 'absent';
+  if (live && accountKey) s.accounts.set(accountKey, { id: '', incidentId, reference, expiresMs: nowMs + ACCOUNT_BLOCK_DAYS * DAY, createdMs: nowMs });
+  const netExpiresMs = nowMs + (input.network?.hours ?? 0) * 3_600_000;
+  const anonNet = input.network && !input.user ? input.network : null;
+  if (anonNet && live) {
+    // This isolate blocks the address at once, whatever the write budget decides for its row.
+    const key = await keyForNet(c.env, exactNetwork(anonNet.ip), nowMs).catch(() => '');
+    if (key) s.networks.set(key, { id: '', incidentId, reference, expiresMs: netExpiresMs, createdMs: nowMs });
+  }
+  const work = async (): Promise<boolean> => {
     const fp = await contextOf(c).catch(() => ({ s: '', i: '', u: '' }));
     const evidence = evidenceOf(c, input, fp);
-    const actorClass = actorClassFor(c.env, input.user);
-    if (actorClass === 'owner') return out;
     const since = new Date(nowMs - DAY).toISOString();
+    // Canary uses and account blocks may use the whole cap; anonymous decoy and score incidents only their share.
+    const cap = input.reason === 'canary_used' || accountKey ? DAILY_BLOCK_ROW_CAP : DECOY_ROW_CAP;
     const base = { incidentId, reference, actorClass, reason: input.reason, signal: input.signal, nowIso, evidence };
+    const net = anonNet ? await networkTarget(c, db, anonNet.ip, nowMs).catch(() => null) : null;
+    if (net?.wide && live) s.networks.set(net.key, { id: '', incidentId, reference, expiresMs: netExpiresMs, createdMs: nowMs });
     const stmts: D1PreparedStatement[] = [];
     if (input.batch && input.decoy) stmts.push(canaryStatement(db, input.batch.id, input.decoy, incidentId, input.batch.issuedTo, nowMs));
-    stmts.push(
-      blockStatement(db, { ...base, kind: 'device', key: tag.tagId, expiresIso: new Date(tag.exp * 1000).toISOString() }, since)
-    );
-    const accountKey = input.account && input.user && !input.deviceOnly ? input.user.id : null;
-    if (accountKey) {
-      stmts.push(blockStatement(db, { ...base, kind: 'account', key: accountKey, expiresIso: new Date(nowMs + ACCOUNT_BLOCK_DAYS * DAY).toISOString() }, since));
-    }
-    const net = input.network && !input.deviceOnly ? input.network : null;
-    if (net?.key) {
-      stmts.push(blockStatement(db, { ...base, kind: 'network', key: net.key, expiresIso: new Date(nowMs + net.hours * 3_600_000).toISOString() }, since));
-    }
+    const firstBlock = stmts.length;
+    if (tag) stmts.push(blockStatement(db, { ...base, kind: 'device', key: tag.tagId, expiresIso: new Date(tag.exp * 1000).toISOString() }, since, cap));
+    if (accountKey) stmts.push(blockStatement(db, { ...base, kind: 'account', key: accountKey, expiresIso: new Date(nowMs + ACCOUNT_BLOCK_DAYS * DAY).toISOString() }, since, cap));
+    if (net) stmts.push(blockStatement(db, { ...base, kind: 'network', key: net.key, expiresIso: new Date(netExpiresMs).toISOString() }, since, cap));
+    const blockCount = stmts.length - firstBlock;
     stmts.push(...pruneStatements(db, nowMs));
-    const res = await bounded(
-      db.batch(stmts).then(
-        (r) => r,
-        (e: unknown) => {
-          if (!isMissingTable(e)) console.error('security incident not written:', e instanceof Error ? e.name : 'unknown');
-          return null;
-        }
-      ),
-      INCIDENT_WAIT_MS
+    const res = await db.batch(stmts).then(
+      (r) => r,
+      (e: unknown) => {
+        if (!isMissingTable(e)) console.error('security incident not written:', e instanceof Error ? e.name : 'unknown');
+        return null;
+      }
     );
-    if (!res) return out;
-    const blockResults = res.slice(input.batch && input.decoy ? 1 : 0, (input.batch && input.decoy ? 1 : 0) + 1 + (accountKey ? 1 : 0) + (net?.key ? 1 : 0));
-    out.written = blockResults.some((r) => Number((r as { meta?: { changes?: number } }).meta?.changes ?? 0) > 0);
-    const s = snapshotFor(db);
-    if (s && s.status !== 'absent') {
-      if (out.written && accountKey) s.accounts.set(accountKey, { id: '', incidentId, reference, expiresMs: nowMs + ACCOUNT_BLOCK_DAYS * DAY });
-      // Past the daily cap nothing is written, but this isolate still blocks the network.
-      if (net?.key) s.networks.set(net.key, { id: '', incidentId, reference, expiresMs: nowMs + net.hours * 3_600_000 });
-    }
-    if (out.written && !input.deviceOnly) {
-      const detail: SecurityDetail = { sig: input.signal, ref: reference, intent: input.intent, d: tag.tagId };
+    if (!res) return false;
+    const written = res.slice(firstBlock, firstBlock + blockCount).some((r) => Number((r as { meta?: { changes?: number } }).meta?.changes ?? 0) > 0);
+    if (written) {
+      const detail: SecurityDetail = { sig: input.signal, ref: reference, intent: input.intent };
+      if (tag) detail.d = tag.tagId;
       if (input.decoy) detail.decoy = input.decoy;
       if (input.batch) detail.batch = input.batch.id;
-      await recordSecurityEvent(c, { kind: 'enumeration_suspected', code: 'ACTOR_BLOCKED', status: 403, detail });
+      await recordSecurityEvent(c, { kind: 'enumeration_suspected', code: 'ACTOR_BLOCKED', status: 403, detail }, { target: false });
       await settle(c, () => ringOwnerDeception(c.env, db, 'blocked', incidentId, reference, nowMs));
+    }
+    return written;
+  };
+  try {
+    if (input.background) {
+      await settle(c, work);
+    } else {
+      out.written = (await bounded(work().catch(() => false), INCIDENT_WAIT_MS)) ?? false;
     }
   } catch {
     /* never in the way */
@@ -485,7 +554,7 @@ export async function ownerUserId(env: Env, db: D1Database): Promise<string | nu
 export async function ringOwnerDeception(
   env: Env,
   db: D1Database,
-  which: 'blocked' | 'ownCanary' | 'ownDecoy',
+  which: 'blocked' | 'ownCanary' | 'ownDecoy' | 'adminDecoy',
   incidentId: string,
   reference: string,
   nowMs: number
@@ -508,7 +577,7 @@ export async function ringOwnerDeception(
       body_ar: text.body.ar,
       body_en: text.body.en,
       link: '/admin?tab=security',
-      meta: { title_ckb: text.title.ckb, body_ckb: text.body.ckb, reason: which === 'blocked' ? 'deception_block' : `deception_${which}`, reference },
+      meta: { title_ckb: text.title.ckb, body_ckb: text.body.ckb, reason: which === 'blocked' ? 'deception_block' : `deception_${which}`, ...(reference ? { reference } : {}) },
       eventKey: `security_deception:${day}:${incidentId}`,
     });
   } catch {
@@ -558,6 +627,9 @@ export async function liftBlocks(db: D1Database, blockId: string, wholeIncident:
     for (const r of rows) {
       if (r.actor_kind === 'device') s.lifted.add(r.actor_key);
       else (r.actor_kind === 'account' ? s.accounts : s.networks).delete(r.actor_key);
+      // An account lifted: every tag of its incident goes with it (./gate.ts).
+      const hex = r.actor_kind === 'account' ? referenceHex(r.reference) : null;
+      if (hex) s.liftedRefs.add(hex);
     }
   }
   return { lifted: rows.length, blocks: rows };

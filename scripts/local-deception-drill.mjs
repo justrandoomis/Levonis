@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * THE LOCAL DECEPTION DRILL (DECISIONS row 206) — plays a scanner against a
- * LOCAL Worker and checks that it is deceived, then blocked, while a customer
- * from another address is untouched.
+ * THE LOCAL DECEPTION DRILL (DECISIONS row 206) — plays a scanner (a tool:
+ * no browser Sec-Fetch-* headers) against a LOCAL Worker and checks that it is
+ * deceived, then blocked, while a browser on the same address and a customer
+ * from another address are untouched.
  *
  *   npx wrangler d1 migrations apply levonis-db --local
+ *   SECURITY_CANARY_KEY=<anything> in .dev.vars (without a key there is no trap data)
  *   npx wrangler dev --local            (in another terminal)
  *   node scripts/local-deception-drill.mjs http://127.0.0.1:8787
  *
@@ -53,22 +55,21 @@ function check(ok, what) {
 }
 
 const robots = await call('/robots.txt');
-const disallowed = [...robots.text.matchAll(/^Disallow: (\/\.env|\/\.git\/|\/config\.json|\/backup\.sql)$/gm)].map((m) => m[1]);
-check(disallowed.length >= 3, `robots.txt names the decoys (${disallowed.join(', ')})`);
+check(!/\.env|\.git|config\.json|backup\.sql|phpmyadmin|wp-admin/.test(robots.text), 'robots.txt does not hand out the list of traps');
 
 const env = await call('/.env');
 check(env.status === 200 && /LEVONIS_API_KEY=lvk_live_/.test(env.text), 'the scanner is DECEIVED: /.env answers fake keys');
-check(jar.has('lv_pref'), 'and its browser is tagged on that very answer');
+check(!jar.has('lv_pref'), 'and the deceiving answer carries nothing a real file would not');
 const key = /LEVONIS_API_KEY=(\S+)/.exec(env.text)?.[1] ?? '';
 
 const next = await call('/api/products');
 check(next.status === 403 && /ACCESS_BLOCKED/.test(next.text), 'its NEXT request is blocked (ACCESS_BLOCKED)');
 
-jar.clear();
-const noTag = await call('/api/products');
-check(noTag.status === 403, 'without the tag, the same address is still blocked (anonymous network block)');
+const browser = await call('/api/products', { headers: { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty' } });
+check(browser.status === 200, 'a browser behind the same (carrier) address is not blocked for it');
 
 const reuse = await call('/api/products', { ip: '192.0.2.200', headers: { 'X-API-Key': key } });
+if (reuse.status !== 403) console.log('note: no SECURITY_CANARY_KEY in .dev.vars — the decoys answer, but carry no trap data');
 check(reuse.status === 403, 'the stolen key used from another address blocks at once');
 
 const customer = await call('/api/products', { ip: CUSTOMER });

@@ -15,8 +15,11 @@
 # real value; on the live Worker it is a dashboard SECRET.
 IRAQ_PARALLEL_FX_API_KEY=
 
-# Optional: the deception layer's HMAC key (worker/lib/deception/canary.ts) for
-# the canary tokens in decoy answers and the signed device tag. Without it a
-# built-in pepper is used. Never commit a real value; on the live Worker it is
-# a dashboard SECRET that no workflow puts or deletes.
+# The deception layer's HMAC key (worker/lib/deception/canary.ts) for the
+# canary tokens in decoy answers, the signed device tag and the network keys.
+# Without it a key is derived from TELEGRAM_WEBHOOK_SECRET (or
+# STUDIO_HANDOFF_SECRET / TELEGRAM_ADMIN_WEBHOOK_SECRET); with none of them the
+# decoys answer WITHOUT trap data and no tag is minted (there is no built-in
+# key). Any value works locally. Never commit a real value; on the live Worker
+# it is a dashboard SECRET that no workflow puts or deletes.
 SECURITY_CANARY_KEY=

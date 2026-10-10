@@ -31,7 +31,7 @@ import { requireOwner } from '../lib/costAccess';
 import { limitByMethod } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { rootDomainFrom } from '../lib/hosts';
-import { isBatchId, mintBatch } from '../lib/deception/canary';
+import { isBatchId, keySource, mintBatch } from '../lib/deception/canary';
 import { batchShape, isDecoyCode, renderDecoy } from '../lib/deception/decoys';
 import { liftBlocks, type BlockKind } from '../lib/deception/blocks';
 import { decayed, resetScores } from '../lib/deception/signals';
@@ -52,6 +52,7 @@ const DETECTION_CODES = [
   'CANARY_USED',
   'CANARY_INDUCED',
   'CANARY_UNCONFIRMED',
+  'CANARY_FLOOD',
   'ACTOR_BLOCKED',
   'CLIENT_PRICE_FIELDS',
   'INJECTION_PATTERN',
@@ -167,6 +168,8 @@ adminSecurityRoutes.get('/summary', async (c) => {
   const week = new Date(nowMs - 7 * DAY).toISOString();
   const out = {
     installed: true,
+    // The trap data and the device tags need a key (worker/lib/deception/canary.ts); without one they are off.
+    canaries: keySource(c.env) !== null,
     active_blocks: { account: 0, device: 0, network: 0 },
     detections_24h: 0,
     decoy_hits_7d: 0,
@@ -350,8 +353,10 @@ adminSecurityRoutes.get('/scores', async (c) => {
       (
         await db
           .prepare(
+            // 'x:' rows are the per-prefix write budgets (worker/lib/deception/blocks.ts), not actors.
             `SELECT s.actor_key, s.score, s.updated_at, s.signals, u.name AS user_name
                FROM security_scores s LEFT JOIN users u ON s.actor_key = 'u:' || u.id
+              WHERE s.actor_key NOT LIKE 'x:%'
               ORDER BY s.updated_at DESC LIMIT 500`
           )
           .all<{ actor_key: string; score: number; updated_at: string; signals: string; user_name: string | null }>()

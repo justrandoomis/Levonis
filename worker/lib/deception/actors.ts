@@ -1,25 +1,30 @@
 /**
- * WHO IS ASKING, AND DID THEY MEAN TO (design §3.1, §3.2, §4.2).
+ * WHO IS ASKING, AND COULD SOMEONE ELSE HAVE MADE THEIR BROWSER ASK
+ * (design §3.1, §3.2, §4.2 and §F1).
  *
  *   account  u:<user id>, when the session is loaded
  *   device   d:<tag id> — the `lv_pref` cookie (an innocuous name on purpose;
  *            documented here as the device tag): `<tagId 16 hex>.<exp
  *            epoch-seconds base36>.<mac 16 hex>`, HMAC-signed, carrying its
- *            own expiry, so enforcing it needs no database. It is set ONLY
- *            when an incident tags the actor — never on ordinary traffic, so
- *            the edge-cache rules and storefront speed are untouched — and
- *            never on a network-only block answer (a CGNAT neighbour would
- *            otherwise inherit a 30-day block). Its first 10 hex are the
- *            incident's reference, so a device-blocked answer can name the
- *            reference with no read.
- *   network  n:<sha256("lv-net|" + net + "|" + Baghdad day)[0:32]> — the exact
- *            IPv4 address or the IPv6 /64, salted by day like security_events'
- *            own hash; never an address, never a /24.
+ *            own expiry, so enforcing it needs no database. It is set ONLY on
+ *            a block answer (an incident, or an account-blocked answer to a
+ *            new browser) — never on ordinary traffic and never on a decoy's
+ *            deceiving answer. Its first 10 hex are the incident's reference.
+ *   network  n:<HMAC(K, "lv-net|" + net + "|" + Baghdad day)[0:32]> — the
+ *            exact IPv4 address or the IPv6 /64 (and, for an IPv6 /48 that
+ *            exhausted its budget, the /48), keyed by the deception secret so a
+ *            database reader cannot enumerate it back to an address.
  *
- * THE ANTI-FRAMING RULE (`fetchIntent`). Only a deliberate request counts.
- * Without it an `<img src="/.env">` in a community post would get every
- * viewer blocked. A subresource, a cross-site request or a navigation without
- * user activation is INDUCED: recorded, never scored.
+ * THE ANTI-FRAMING RULE. Evidence counts at full weight only where nobody
+ * else could have put it: a REQUEST WITHOUT ANY Sec-Fetch-* HEADER (a tool —
+ * every current browser sends them), or a canary in a header, a cookie or the
+ * sign-in body. Anything a link can carry — a decoy opened by a navigation,
+ * a canary in a URL the app echoed into its own fetch, an injection-shaped
+ * query — is LINKABLE: it scores, but a linkable score alone never reaches
+ * the threshold (./signals.ts LINKABLE_CAP). A subresource, a frame, a
+ * cross-site fetch or a navigation without a click is INDUCED: recorded only.
+ * Forged or partial Sec-Fetch-* headers are a tool's: a browser always sends
+ * Site, Mode and Dest together, with values it knows.
  */
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
@@ -29,36 +34,68 @@ import { baghdadDay } from '../baghdadTime';
 import { sha256Hex } from '../crypto';
 import { rootDomainFrom, sessionCookieDomain } from '../hosts';
 import { probeExempt } from '../securityEvents';
-import { hmacHex, randomHex } from './canary';
+import { hmacHex, keySource, randomHex, type KeyEnv } from './canary';
 
 // ------------------------------------------------------------- intent
 
 export type FetchIntent = 'tool' | 'script' | 'typed' | 'clicked' | 'induced';
 
-/** From the browser's Sec-Fetch-* headers (design §3.2). */
-export function fetchIntent(headers: { get(name: string): string | null | undefined }): FetchIntent {
+const SITES = new Set(['none', 'same-origin', 'same-site', 'cross-site']);
+const MODES = new Set(['cors', 'navigate', 'no-cors', 'same-origin', 'websocket', 'nested-navigate']);
+const DESTS = new Set([
+  'audio', 'audioworklet', 'document', 'embed', 'empty', 'font', 'frame', 'iframe', 'image', 'json', 'manifest', 'object',
+  'paintworklet', 'report', 'script', 'serviceworker', 'sharedworker', 'style', 'track', 'video', 'webidentity', 'worker', 'xslt',
+]);
+
+/**
+ * From the browser's Sec-Fetch-* headers (design §3.2, §F1):
+ *   tool     none of them, or a set no browser sends (partial, unknown values,
+ *            a user flag off a navigation, a cross-site JSON write)
+ *   typed    a top-level navigation the browser started itself (address bar,
+ *            bookmark, a link opened from another app)
+ *   clicked  a top-level navigation the visitor clicked, from any site
+ *   script   this site's own fetch
+ *   induced  a subresource, a frame, a cross-site fetch, or a navigation
+ *            without a click — what a page can make a visitor's browser send
+ */
+export function fetchIntent(headers: { get(name: string): string | null | undefined }, method = 'GET'): FetchIntent {
   const site = (headers.get('Sec-Fetch-Site') ?? '').toLowerCase();
   const mode = (headers.get('Sec-Fetch-Mode') ?? '').toLowerCase();
   const dest = (headers.get('Sec-Fetch-Dest') ?? '').toLowerCase();
   const user = headers.get('Sec-Fetch-User') ?? '';
-  if (!site && !mode && !dest) return 'tool';
-  if (site === 'cross-site') return 'induced';
-  if (mode === 'navigate') {
+  if (!site && !mode && !dest && !user) return 'tool';
+  if (!SITES.has(site) || !MODES.has(mode) || !DESTS.has(dest)) return 'tool';
+  if (user && (user !== '?1' || (mode !== 'navigate' && mode !== 'nested-navigate'))) return 'tool';
+  if (mode === 'navigate' || mode === 'nested-navigate') {
+    if (dest !== 'document' || mode === 'nested-navigate') return 'induced';
     if (site === 'none') return 'typed';
-    if ((site === 'same-origin' || site === 'same-site') && user === '?1') return 'clicked';
+    return user === '?1' ? 'clicked' : 'induced';
+  }
+  if (site === 'same-origin' || site === 'none') {
+    if ((mode === 'cors' || mode === 'same-origin' || mode === 'websocket') && dest === 'empty') return 'script';
     return 'induced';
   }
-  if (dest === 'empty' && (site === 'same-origin' || site === 'none' || site === '')) return 'script';
+  // Cross-site or same-site and not a navigation: a page elsewhere made it,
+  // unless it is a write no page can send without a preflight this site never grants.
+  const m = method.toUpperCase();
+  const type = (headers.get('Content-Type') ?? '').toLowerCase();
+  if (!['GET', 'HEAD', 'POST'].includes(m) || (m === 'POST' && type && !/^(text\/plain|application\/x-www-form-urlencoded|multipart\/form-data)\b/.test(type))) return 'tool';
   return 'induced';
 }
 
-/** Full weight, partial weight, or none. */
-export const intentWeight = (i: FetchIntent): 'full' | 'partial' | 'none' =>
-  i === 'induced' ? 'none' : i === 'clicked' ? 'partial' : 'full';
+/** How much a piece of evidence weighs (design §F1). */
+export type EvidenceClass = 'hard' | 'linkable' | 'induced';
+
+/** Evidence carried by the URL (a decoy path, a query canary, an injection or tamper shape, an id). */
+export function urlEvidence(intent: FetchIntent, claimsCrawler: boolean): EvidenceClass {
+  if (intent === 'induced') return 'induced';
+  // A crawler follows links anyone can plant; a browser opens them.
+  return intent === 'tool' && !claimsCrawler ? 'hard' : 'linkable';
+}
 
 // ------------------------------------------------------------- crawlers
 
-/** Search crawlers and link-preview bots by user agent (a CLAIM: anyone can send it). */
+/** Search crawlers and link-preview bots by user agent — a CLAIM anyone can send: never an exemption. */
 const CRAWLER_UA =
   /googlebot|bingbot|duckduckbot|yandex(?:bot)?|baiduspider|applebot|facebookexternalhit|twitterbot|telegrambot|whatsapp|linkedinbot|slackbot|discordbot|petalbot|ahrefsbot|semrushbot/i;
 
@@ -75,11 +112,14 @@ export function cfOf(c: Context<AppContext>): CfBits {
   }
 }
 
-/** A crawler by user agent or by Cloudflare's verified-bot signal. */
-export function isCrawler(c: Context<AppContext>): boolean {
+/** A crawler Cloudflare verified — the only kind that is exempt (a user agent alone is a claim). */
+export function verifiedCrawler(c: Context<AppContext>): boolean {
   const cf = cfOf(c);
-  return crawlerClaim(c.req.header('User-Agent')) || !!cf.verifiedBotCategory || cf.botManagement?.verifiedBot === true;
+  return !!cf.verifiedBotCategory || cf.botManagement?.verifiedBot === true;
 }
+
+/** The user agent claims a crawler or a preview bot (Cloudflare did not verify it). */
+export const claimsCrawler = (c: Context<AppContext>) => !verifiedCrawler(c) && crawlerClaim(c.req.header('User-Agent'));
 
 // ------------------------------------------------------------- network
 
@@ -87,28 +127,51 @@ export function isCrawler(c: Context<AppContext>): boolean {
 export function exactNetwork(ip: string): string {
   const v = ip.trim().toLowerCase();
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(v)) return v;
+  return v6Prefix(v, 4);
+}
+
+/** The prefix whose incidents share one write budget: the IPv4 /24, the IPv6 /48. */
+export function prefixNetwork(ip: string): string {
+  const v = ip.trim().toLowerCase();
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(v);
+  if (m) return `${m[1]}.${m[2]}.${m[3]}.0/24`;
+  return v6Prefix(v, 3);
+}
+
+function v6Prefix(v: string, groups: 3 | 4): string {
   if (!v.includes(':')) return '';
   const [head = '', tail] = v.split('::');
   const h = head ? head.split(':') : [];
   const t = tail ? tail.split(':') : [];
   const fill = tail === undefined ? [] : Array(Math.max(0, 8 - h.length - t.length)).fill('0');
   const full = [...h, ...fill, ...t];
-  if (full.length < 4 || full.slice(0, 4).some((x) => !/^[0-9a-f]{1,4}$/.test(x))) return '';
-  return `${full.slice(0, 4).map((x) => x.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+  if (full.length < groups || full.slice(0, groups).some((x) => !/^[0-9a-f]{1,4}$/.test(x))) return '';
+  return `${full.slice(0, groups).map((x) => x.replace(/^0+(?=.)/, '')).join(':')}::/${groups * 16}`;
 }
 
-/** The network's actor key for one Baghdad day (32 hex). */
-export async function networkKeyFor(ip: string, nowMs: number, offsetDays = 0): Promise<string> {
-  const net = exactNetwork(ip);
+/** A network's actor key for one Baghdad day (32 hex): keyed by the deception secret when there is one. */
+export async function keyForNet(env: KeyEnv | undefined, net: string, nowMs: number, offsetDays = 0): Promise<string> {
   if (!net) return '';
-  return (await sha256Hex(`lv-net|${net}|${baghdadDay(nowMs, offsetDays)}`)).slice(0, 32);
+  const msg = `lv-net|${net}|${baghdadDay(nowMs, offsetDays)}`;
+  const mac = await hmacHex(env, msg);
+  return (mac ?? (await sha256Hex(msg))).slice(0, 32);
 }
 
-/** Today's and yesterday's keys — a 24-hour block survives midnight. */
-export async function networkKeys(ip: string, nowMs: number): Promise<string[]> {
-  const today = await networkKeyFor(ip, nowMs);
-  if (!today) return [];
-  return [today, await networkKeyFor(ip, nowMs, -1)];
+/** The address's own network key (exact IPv4, IPv6 /64) for one Baghdad day. */
+export async function networkKeyFor(env: KeyEnv | undefined, ip: string, nowMs: number, offsetDays = 0): Promise<string> {
+  return keyForNet(env, exactNetwork(ip), nowMs, offsetDays);
+}
+
+/** Every key a block on this address may sit under: its network today and yesterday, and for IPv6 its /48 too. */
+export async function networkKeys(env: KeyEnv | undefined, ip: string, nowMs: number): Promise<string[]> {
+  const exact = exactNetwork(ip);
+  if (!exact) return [];
+  const out = [await keyForNet(env, exact, nowMs), await keyForNet(env, exact, nowMs, -1)];
+  if (exact.includes(':')) {
+    const wide = prefixNetwork(ip);
+    if (wide) out.push(await keyForNet(env, wide, nowMs), await keyForNet(env, wide, nowMs, -1));
+  }
+  return out;
 }
 
 export const clientIp = (c: Context<AppContext>) => c.req.header('CF-Connecting-IP') ?? '';
@@ -150,15 +213,20 @@ export interface DeviceTag {
   exp: number;
 }
 
-const tagMac = async (env: Pick<Env, 'SECURITY_CANARY_KEY'>, tagId: string, exp36: string) =>
-  (await hmacHex(env, `lv-tag|${tagId}|${exp36}`)).slice(0, 16);
+const tagMac = async (env: KeyEnv | undefined, tagId: string, exp36: string) => (await hmacHex(env, `lv-tag|${tagId}|${exp36}`))?.slice(0, 16) ?? null;
 
-/** A new tag for an incident whose reference is `refHex` (the tag's first 10 hex). */
-export async function mintTag(env: Pick<Env, 'SECURITY_CANARY_KEY'>, refHex: string, nowMs: number): Promise<DeviceTag & { value: string }> {
+/**
+ * A new tag for an incident whose reference is `refHex` (the tag's first 10
+ * hex), expiring after TAG_DAYS or at `expSec` (an account block's own end).
+ * Null without a key: no tag can be minted that anyone could not forge.
+ */
+export async function mintTag(env: KeyEnv | undefined, refHex: string, nowMs: number, expSec?: number): Promise<(DeviceTag & { value: string }) | null> {
+  if (!keySource(env)) return null;
   const tagId = `${refHex.slice(0, 10)}${randomHex(3)}`;
-  const exp = Math.floor(nowMs / 1000) + TAG_DAYS * 86_400;
+  const exp = expSec ?? Math.floor(nowMs / 1000) + TAG_DAYS * 86_400;
   const exp36 = exp.toString(36);
-  return { tagId, exp, value: `${tagId}.${exp36}.${await tagMac(env, tagId, exp36)}` };
+  const mac = await tagMac(env, tagId, exp36);
+  return mac ? { tagId, exp, value: `${tagId}.${exp36}.${mac}` } : null;
 }
 
 /** The request's tag when it is well-formed, signed and unexpired; null otherwise (a forged or expired tag is no tag). */
@@ -170,7 +238,8 @@ export async function readTag(c: Context<AppContext>, nowMs: number): Promise<De
     if (!m) return null;
     const exp = parseInt(m[2]!, 36);
     if (!Number.isFinite(exp) || exp * 1000 <= nowMs) return null;
-    if ((await tagMac(c.env, m[1]!, m[2]!)) !== m[3]) return null;
+    const mac = await tagMac(c.env, m[1]!, m[2]!);
+    if (!mac || mac !== m[3]) return null;
     return { tagId: m[1]!, exp };
   } catch {
     return null;
@@ -205,7 +274,11 @@ export type Exemption = 'owner' | 'admin' | 'probe' | null;
 /**
  * The verified owner is never blocked (and the database refuses an owner row);
  * any other admin — the unverified owner row included — is blocked only by a
- * confirmed canary; a registered probe account is exempt.
+ * confirmed canary in a place no link reaches; a registered probe account is
+ * exempt. The unverified owner row stays an admin here on purpose: the address
+ * alone is not the owner (an admin row can carry it before it is proven), and
+ * a block never shuts the way out — /api/auth/* (the e-mail proof among it)
+ * stays open under every block, and the proven owner is exempt at once.
  */
 export function exemptionOf(env: Env, user: SessionUser | null | undefined): Exemption {
   if (!user) return null;

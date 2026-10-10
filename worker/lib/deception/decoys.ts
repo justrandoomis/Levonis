@@ -73,34 +73,31 @@ export const DECOY_ROUTE_PATTERNS: readonly string[] = Object.values(DECOYS).fla
 /**
  * The `run_worker_first` entries of wrangler.jsonc (all three blocks): without
  * them the asset layer answers these paths with the SPA shell at 200 and the
- * Worker never sees them. tests/deceptionDecoys.test.ts holds the file to this.
+ * Worker never sees them — the bare directory names too, which a `/x/*`
+ * pattern does not cover. tests/deceptionDecoys.test.ts holds the file to
+ * this. (/api/internal and /api/v0 ride on `/api/*`.)
+ *
+ * NOT IN robots.txt: a Disallow line would hand a careful attacker the list of
+ * traps. A crawler Cloudflare verified is answered a plain 404 instead.
  */
 export const DECOY_WORKER_FIRST: readonly string[] = [
   '/.env',
   '/.env.local',
   '/.env.production',
   '/.env.backup',
+  '/.git',
   '/.git/*',
   '/config.json',
   '/backup.sql',
   '/database.sql',
+  '/admin/export',
   '/admin/export/*',
   '/wp-login.php',
+  '/wp-admin',
   '/wp-admin/*',
   '/xmlrpc.php',
+  '/phpmyadmin',
   '/phpmyadmin/*',
-];
-
-/** The robots.txt `Disallow` lines for the sensitive-looking decoys. */
-export const DECOY_DISALLOW: readonly string[] = [
-  '/.env',
-  '/.git/',
-  '/config.json',
-  '/backup.sql',
-  '/database.sql',
-  '/admin/export/',
-  '/api/internal/',
-  '/api/v0/',
 ];
 
 /** Which decoy this path is, or null. */
@@ -133,6 +130,19 @@ export function batchShape(batch: string): { productCount: number; keyNoise: str
   let keyNoise = '';
   for (let i = 0; i < 8; i++) keyNoise += Math.floor(r() * 16).toString(16);
   return { productCount, keyNoise };
+}
+
+/**
+ * How many of the batch's product rows this answer shows — the rest need not
+ * be minted (each costs a few HMACs). Rows are a deterministic stream, so the
+ * first n of a shorter list are the first n of the full one: the console,
+ * which mints them all, regenerates the same bytes.
+ */
+export function productsShown(code: DecoyCode, method: string, productCount: number): number {
+  if (code === 'config_json') return Math.min(3, productCount);
+  if (code === 'phpmyadmin') return method === 'POST' ? Math.min(6, productCount) : 0;
+  if (code === 'sql_dump' || code === 'costs_export' || code === 'internal_costs' || code === 'v0_admin') return productCount;
+  return 0;
 }
 
 /** Invented brands and parts for a 3D-printing shop. None is a real brand. */
@@ -195,12 +205,14 @@ export interface DecoyContext {
   host: string;
   /** The configured root domain, for the e-mail canary and the internal names. */
   rootDomain: string;
-  /** The request's method and path. */
+  /** The request's method, path and query string ('' or '?…'). */
   method: string;
   path: string;
+  search?: string;
 }
 
 export interface DecoyAnswer {
+  /** 200 for the bait; 404 where a real exposed server would have nothing (an unknown /api/v0 path, a git object). */
   status: number;
   contentType: string;
   body: string;
@@ -220,6 +232,26 @@ function htmlPage(title: string, inner: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive"><title>${htmlEscape(title)}</title><style>body{font-family:sans-serif;background:#f1f1f1;color:#222;margin:40px}form,.box{background:#fff;padding:24px;max-width:420px;border:1px solid #ddd}label{display:block;margin:12px 0 4px}input{width:100%;padding:6px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px;font-size:12px}</style></head><body>${inner}</body></html>`;
 }
 
+const TEXT = 'text/plain; charset=utf-8';
+const JSON_TYPE = 'application/json';
+const notFoundText: DecoyAnswer = { status: 404, contentType: TEXT, body: 'Not Found' };
+const notFoundJson: DecoyAnswer = { status: 404, contentType: JSON_TYPE, body: JSON.stringify({ success: false, error: 'Not found' }) };
+
+/** The `page` a decoy API was asked for (1 when absent or odd). */
+function pageOf(search: string | undefined): number {
+  const m = /[?&]page=(\d{1,3})(?:&|$)/.exec(search ?? '');
+  const n = m ? Number(m[1]) : 1;
+  return n >= 1 && n <= 999 ? n : 1;
+}
+
+/** What a fake internal API path serves: the cost rows, the users, or nothing. */
+function apiKind(rest: string): 'rows' | 'users' | null {
+  const p = rest.toLowerCase();
+  if (p === '' || p === '/' || /(product|cost|price|pricing|export|catalog|inventory|supplier)/.test(p)) return 'rows';
+  if (/(^|\/)(users?|admins?|accounts?|staff)(\/|$|\.json)/.test(p)) return 'users';
+  return null;
+}
+
 /**
  * The answer a decoy gives, from the batch's tokens alone. PURE: the same
  * (code, tokens, context) always renders the same bytes.
@@ -230,6 +262,7 @@ export function renderDecoy(code: DecoyCode, tokens: CanaryBatch, ctx: DecoyCont
   const base = `https://${ctx.host}`;
   const internal = 'levonis.internal';
   const nextPage = `${base}/api/internal/pricing/costs?page=2&key=${tokens.apiKey}`;
+  const userId = `usr_${noise(prng(`${tokens.batch}u`), 20).replace(/[g-z]/g, (ch) => (ch.charCodeAt(0) % 16).toString(16))}`;
   switch (code) {
     case 'env':
       return {
@@ -253,8 +286,12 @@ export function renderDecoy(code: DecoyCode, tokens: CanaryBatch, ctx: DecoyCont
           '',
         ].join('\n'),
       };
-    case 'git_config':
-      if (ctx.path === '/.git/HEAD') return { status: 200, contentType: 'text/plain; charset=utf-8', body: 'ref: refs/heads/main\n' };
+    case 'git_config': {
+      const sha = noise(prng(`${tokens.batch}git`), 40).replace(/[g-z]/g, (ch) => (ch.charCodeAt(0) % 16).toString(16));
+      if (ctx.path === '/.git/HEAD') return { status: 200, contentType: TEXT, body: 'ref: refs/heads/main\n' };
+      if (ctx.path === '/.git/refs/heads/main' || ctx.path === '/.git/ORIG_HEAD') return { status: 200, contentType: TEXT, body: `${sha}\n` };
+      if (ctx.path === '/.git/description') return { status: 200, contentType: TEXT, body: "Unnamed repository; edit this file 'description' to name the repository.\n" };
+      if (ctx.path !== '/.git' && ctx.path !== '/.git/' && ctx.path !== '/.git/config') return notFoundText;
       return {
         status: 200,
         contentType: 'text/plain; charset=utf-8',
@@ -275,10 +312,11 @@ export function renderDecoy(code: DecoyCode, tokens: CanaryBatch, ctx: DecoyCont
           '',
         ].join('\n'),
       };
+    }
     case 'config_json':
       return {
         status: 200,
-        contentType: 'application/json; charset=utf-8',
+        contentType: JSON_TYPE,
         body: JSON.stringify(
           {
             env: 'production',
@@ -301,7 +339,7 @@ export function renderDecoy(code: DecoyCode, tokens: CanaryBatch, ctx: DecoyCont
             `INSERT INTO product_costs VALUES ('${x.product_id}','${x.sku}','${x.name.replace(/'/g, "''")}','${x.supplier_code}',${x.unit_cost_usd},${x.landed_cost_iqd},${x.price_iqd},${x.margin_pct});`
         ),
         'CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, role TEXT, password_hash TEXT);',
-        `INSERT INTO users VALUES ('usr_${tokens.batch}01','${tokens.email}','admin','$2b$12$${noise(r, 53)}');`,
+        `INSERT INTO users VALUES ('${userId}','${tokens.email}','admin','$2b$12$${noise(r, 53)}');`,
         '',
       ];
       return { status: 200, contentType: 'application/sql; charset=utf-8', body: lines.join('\n') };
@@ -317,12 +355,21 @@ export function renderDecoy(code: DecoyCode, tokens: CanaryBatch, ctx: DecoyCont
       return { status: 200, contentType: 'text/csv; charset=utf-8', body };
     }
     case 'internal_costs':
-    case 'v0_admin':
+    case 'v0_admin': {
+      const rest = ctx.path.replace(/^\/api\/(?:internal|v0)/, '');
+      const kind = apiKind(rest);
+      if (!kind) return notFoundJson;
+      const page = pageOf(ctx.search);
+      if (kind === 'users') {
+        const users = page === 1 ? [{ id: userId, email: tokens.email, role: 'admin', password_hash: `$2b$12$${noise(r, 53)}`, api_key: tokens.apiKey }] : [];
+        return { status: 200, contentType: JSON_TYPE, body: JSON.stringify({ success: true, page, users, next: null }) };
+      }
       return {
         status: 200,
-        contentType: 'application/json; charset=utf-8',
-        body: JSON.stringify({ success: true, page: 1, products: rows, next: nextPage }),
+        contentType: JSON_TYPE,
+        body: JSON.stringify(page === 1 ? { success: true, page, products: rows, next: nextPage } : { success: true, page, products: [], next: null }),
       };
+    }
     case 'wp_login': {
       if (ctx.path === '/xmlrpc.php') {
         return {
@@ -379,6 +426,3 @@ export function renderDecoy(code: DecoyCode, tokens: CanaryBatch, ctx: DecoyCont
     }
   }
 }
-
-/** The decoy's own policy: no script anywhere, forms post only to this site. */
-export const DECOY_CSP = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";

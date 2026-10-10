@@ -29,7 +29,7 @@ import { APEX, asD1, ctx, freshDb } from './fixtures/app';
 import type { AppContext } from '../worker/lib/types';
 import { classifyHost } from '../worker/lib/hosts';
 import { robotsAllows, robotsRoute, sitemapRoute } from '../worker/routes/seo';
-import { DECOY_DISALLOW, DECOY_WORKER_FIRST } from '../worker/lib/deception/decoys';
+import { DECOY_WORKER_FIRST } from '../worker/lib/deception/decoys';
 import { injectSocialPreview } from '../worker/lib/socialPreview';
 
 const ORIGIN = `https://${APEX}`;
@@ -86,22 +86,22 @@ test('robots keeps crawlers off the surfaces that would only answer 401', () => 
 });
 
 /**
- * THE DECOYS ARE DISALLOWED BY NAME (DECISIONS row 206): no well-behaved
- * crawler ever asks for them, so whatever does is not one — and a crawler on
- * any other path is never scored or blocked by the deception layer.
+ * THE DECOYS ARE NOT IN robots.txt (DECISIONS row 206, fix round): a Disallow
+ * line would hand a careful attacker the list of traps. A crawler Cloudflare
+ * verified is answered a plain 404 by the decoys instead; on every other path
+ * robotsAllows still says what robots.txt says.
  */
-test('robots names every sensitive-looking decoy as Disallow, on the apex and on a store', async () => {
+test('robots names no decoy, on the apex and on a store', async () => {
   for (const host of [APEX, `ali3d.${APEX}`]) {
     const { body } = await fetchText(app(asD1(freshDb()), host), '/robots.txt', host);
-    for (const path of DECOY_DISALLOW) {
-      assert.ok(body.split('\n').includes(`Disallow: ${path}`), `${host}: Disallow ${path}`);
+    for (const path of ['/.env', '/.git', '/config.json', '/backup.sql', '/database.sql', '/admin/export', '/api/internal', '/api/v0', '/wp-admin', '/phpmyadmin', '/xmlrpc.php']) {
+      assert.ok(!body.includes(path), `${host}: robots.txt names the decoy ${path}`);
     }
   }
-  assert.equal(robotsAllows('/.env', 'main'), false);
-  assert.equal(robotsAllows('/api/v0/admin/products', 'main'), false);
   assert.equal(robotsAllows('/product/bambu-a1', 'main'), true);
   assert.equal(robotsAllows('/api/public/v1/products', 'main'), true);
   assert.equal(robotsAllows('/api/public/v1/products', 'merchant'), false);
+  assert.equal(robotsAllows('/api/products', 'main'), false, '/api/ is still disallowed as a whole');
   assert.equal(robotsAllows('/', 'foreign'), false);
 });
 
