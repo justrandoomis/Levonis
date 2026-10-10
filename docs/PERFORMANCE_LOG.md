@@ -1698,3 +1698,44 @@ was already in the sheet.
 Paint: unchanged in kind — a nested card loses its blurred cast (one fewer blurred layer per nested card), the
 admin wrapper loses its `--clay-2` cast, and the four photo tiles lose an inset ring layer. The scroll trace on a
 ×4-throttled 360 × 800 phone (plan §8) is still owed.
+
+## 2026-10-10 — clay Phase 3: the page families, swept by hand (DECISIONS row 211)
+
+The build plan's Phase 3, integrated as nine family commits on top of the foundation (`4b5fc125`): auth (D4),
+the admin kits and operations sheets (3.5a), the 27 heaviest admin screens (3.5b), the rest of admin (3.5c),
+the merchant workspace (3.4), community (3.3), account (3.2), the storefront's «Do first» screens with the
+feature surfaces (3.1), and the rest of the shop with the merchant stores and the two games exceptions (3.1).
+Hand-drawn zinc cards became `lv-surface`, read-outs wells, raw fields `lv-input`, ad-hoc buttons
+`lv-button`/`IconButton`, tone pills `lv-chip`/`StatusChip`, arbitrary radii the role tokens, and zinc
+utilities semantic tokens. Nothing was measured in the lab; these are the gate's figures.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (foundation `4b5fc125`, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 47,773 B (327,964 B raw) | **42,969 B** (278,872 B raw) | — |
+| `Auth-*.css` | 8,123 B (40,057 B raw) | **7,787 B** (39,013 B raw) | — |
+| CSS, public files (8) | 60,588 B | **55,445 B (−5,143 B)**; local headroom 5,995 B (≈ 5,985 B on CI, which builds ≈ 10 B larger) | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,216 B | **7,258 B (+42 B)**; headroom 422 B | 7.5 KB = 7,680 B, **not raised** |
+| entry chunk / initial payload | 63.7 KB / 180.3 KB (row 210) | 63.9 KB / 180.5 KB over 4 files | 72 KB / 200 KB |
+| merchant workspace shell closure | 32,733 B (Phase 2) | **32,743 B**; headroom 25 B | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: the sweep deleted far more utilities than it added. Every legacy card (`rounded-* border
+border-zinc-* bg-zinc-*/NN`), every hand-drawn button and field, the `bg-<tone>/10` pills and almost all zinc
+utilities (2,024 → 42 census hits) left the source, so their rules — each tinted variant with its
+`color-mix` fallback — left the sheet; the replacements are the component classes the foundation already
+shipped (`lv-surface`, `lv-well`, `lv-input`, `lv-button-*`, `lv-chip`, `lv-alert-*`) plus a few new
+utilities (`rounded-b-3xl`, `sm:rounded-lg`, `text-danger-ink`). Auth's
+sheet shrank by its own bare `.lv-alert` rule (now `.lv-notice`) and the light ground literals (D4).
+The operations sheets grew by the two-theme `--fw-shadow` card cast (+42 B) after the `.fw` backdrop blur
+was removed. The workspace closure grew 10 B (the shell's class strings) and is 25 B under its gate:
+the next merchant-shell change needs funding first.
+
+Census (`node scripts/clay-census.mjs`), before → after: legacy cards 422 → 0, ad-hoc buttons 159 → 14,
+raw inputs 461 → 172, arbitrary radii 100 → 2 (the ratchet ceilings in `tests/claySystem.test.ts` are now
+0 / 14 / 172 / 2), canvas wrappers 42 → 8, zinc utilities 2,024 → 42, files with a finding 340 → 101.
+
+Paint: nothing in kind — no element blurs what is behind it (the operations sheet's backdrop blur was the
+last, held by `tests/claySystem.test.ts` item 5 now walking the three operations sheets), a card nested in a
+card, a dialog or a sheet stays flush, and the admin orders board is one tray per day with flat rows instead of
+a card per order. The scroll trace on a ×4-throttled 360 × 800 phone (plan §8) is still owed.

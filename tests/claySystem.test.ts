@@ -413,10 +413,12 @@ test('the product card is clay a scrolling list can afford, and content-visibili
  * that moves a quote can shift one by one — lower the ceiling, never raise it.
  */
 const CEILING: Record<RatchetKey, number> = {
-  legacy: 422,
-  btn: 159,
-  rawIn: 461,
-  arbR: 100,
+  // Phase 3 (docs/DECISIONS.md row 211): the nine page families swept —
+  // 422 / 159 / 461 / 100 at the foundation, these after.
+  legacy: 0,
+  btn: 14,
+  rawIn: 172,
+  arbR: 2,
 };
 
 test('the ratchet: hand-drawn styling the clay tokens cannot reach never grows', () => {
