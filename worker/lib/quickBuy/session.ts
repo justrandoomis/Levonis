@@ -23,6 +23,7 @@
  * The hold always equals the session total (D11): a change replaces it, so a
  * smaller total is a partial release and a larger one is a larger hold.
  */
+import { listing } from '../listing';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../types';
 import { HttpError, badRequest, conflict, int, str } from '../http';
@@ -546,7 +547,9 @@ export async function applyQuickBuyChange(
     const a = change.add;
     product =
       (await db.prepare('SELECT * FROM products WHERE id = ?').bind(a.productId).first<Record<string, unknown>>()) ?? undefined;
-    if (!product || product.status !== 'active') {
+    // Listed to customers (worker/lib/listing.ts): a product the owner's «hide incomplete» switch holds is not available here either.
+    const L = await listing(db);
+    if (!product || !L.isListedRow(product, await L.heldIds([a.productId]))) {
       throw conflict('هذا المنتج غير متاح حالياً / This product is not available', 'QUICK_BUY_UNSUPPORTED_PRODUCT');
     }
     if (String(product.composition ?? '') !== '') throw directOnly();

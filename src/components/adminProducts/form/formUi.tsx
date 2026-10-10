@@ -22,6 +22,8 @@ import React, { useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ImagePlus, Info, Link2, RefreshCw, X } from 'lucide-react';
 import { uploadFile, failureText, formatIqd } from '../../../lib/api';
 import SafeImage from '../../ui/SafeImage';
+import { MissingNote, useMissing, useMissingId } from '../completeness';
+import type { CompletenessItemCode } from '../../../../packages/contracts/src/productCompleteness';
 
 /** 40px control (the §12 floor), 13px text, never wider than its track. */
 export const field =
@@ -75,6 +77,8 @@ export function Field({
   children,
   span,
   htmlFor,
+  need,
+  needOption,
 }: {
   ar: string;
   en: string;
@@ -83,6 +87,15 @@ export function Field({
   required?: boolean;
   error?: string | null;
   children: ReactNode;
+  /**
+   * The central required-field code this field fills (owner brief
+   * 2026-10-10). When the SAVED product misses it (the server's verdict, read
+   * through CompletenessProvider), the field is outlined in red and a red line
+   * under it says so — announced to a screen reader through aria-describedby.
+   */
+  need?: CompletenessItemCode;
+  /** The model the code is missing on ('' = the product itself). */
+  needOption?: string;
   /** Make the field take the full row in a multi-column grid. */
   span?: boolean;
   /**
@@ -96,8 +109,13 @@ export function Field({
 }) {
   const auto = useId();
   const id = htmlFor ?? auto;
+  const missing = useMissing(need, need ? (needOption ?? '') : undefined);
+  const missingId = useMissingId();
   return (
-    <div className={`min-w-0 ${span ? 'md:col-span-2 xl:col-span-3' : ''}`}>
+    <div
+      className={`min-w-0 ${span ? 'md:col-span-2 xl:col-span-3' : ''} ${missing ? 'rounded-lg border border-red-400/60 p-1 -m-1' : ''}`}
+      data-missing-field={missing ? need : undefined}
+    >
       <div className="flex items-center gap-1.5 mb-1 min-w-0">
         <label htmlFor={id} className="text-[12px] font-bold text-zinc-300 truncate">
           {ar} <span className="text-[10px] font-medium text-zinc-500">{en}</span>
@@ -118,10 +136,14 @@ export function Field({
         )}
       </div>
       {React.isValidElement(children) && !htmlFor
-        ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
+        ? React.cloneElement(
+            children as React.ReactElement<{ id?: string; 'aria-invalid'?: boolean; 'aria-describedby'?: string }>,
+            missing ? { id, 'aria-invalid': true, 'aria-describedby': missingId } : { id }
+          )
         : children}
-      {hint && !error && <p className="mt-1 text-[11px] text-zinc-500 truncate">{hint}</p>}
+      {hint && !error && !missing && <p className="mt-1 text-[11px] text-zinc-500 truncate">{hint}</p>}
       {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
+      {need && <MissingNote id={missingId} code={need} optionId={needOption ?? ''} />}
     </div>
   );
 }
@@ -693,6 +715,8 @@ export function SectionCard({
   onToggle,
   error,
   children,
+  missing,
+  missingLabel,
 }: {
   n: number;
   ar: string;
@@ -703,6 +727,10 @@ export function SectionCard({
   onToggle: () => void;
   error?: boolean;
   children: ReactNode;
+  /** Required fields the saved product misses in this section (a red count on the header). */
+  missing?: number;
+  /** The count's words, in the viewer's language («2 ناقص»). */
+  missingLabel?: string;
 }) {
   return (
     <section
@@ -712,7 +740,7 @@ export function SectionCard({
       // "click every header" cannot reach a specific panel.
       data-section={n}
       className={`min-w-0 rounded-xl border overflow-hidden mb-2.5 ${
-        error ? 'border-red-500/50 bg-red-500/[0.03]' : 'border-zinc-800 bg-zinc-900/40'
+        error || (missing ?? 0) > 0 ? 'border-red-500/50 bg-red-500/[0.03]' : 'border-zinc-800 bg-zinc-900/40'
       }`}
     >
       <button
@@ -739,6 +767,14 @@ export function SectionCard({
           </span>
           {!open && summary && <span className="block text-[10px] text-zinc-500 truncate">{summary}</span>}
         </span>
+        {(missing ?? 0) > 0 && (
+          <span
+            className="shrink-0 h-5 px-1.5 rounded-full border border-red-500/60 bg-red-500/15 text-[11px] font-bold text-red-200 grid place-items-center"
+            data-section-missing={missing}
+          >
+            {missingLabel ?? missing}
+          </span>
+        )}
         {count !== undefined && count > 0 && (
           <span className="shrink-0 min-w-6 h-5 px-1.5 rounded-full bg-zinc-800 text-[11px] font-bold text-zinc-300 grid place-items-center">
             {count}

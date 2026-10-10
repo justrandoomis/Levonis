@@ -213,6 +213,10 @@ test('S8: requireOwner is verification-aware and has no cost-route callers', () 
   assert.match(body, /if \(isUnverifiedOwner\(c\.env, user\)\) throw ownerEmailUnverified\(\);\s*await next\(\);/);
   const callers = ALL.filter((f) => f !== 'worker/lib/costAccess.ts' && /\brequireOwner\b/.test(code(f)));
   const allowed = new Set(LATER_ROUTERS.filter((r) => /requireOwner/.test(r.guard.source)).map((r) => r.file));
+  // Owner ACTS that read no cost: the catalogue switch «إخفاء المنتجات الناقصة عن الزبائن»
+  // (DECISIONS row 205) — counts and product names only; the per-product flags stay behind
+  // canViewCost's projection, never this door.
+  for (const f of ['worker/routes/adminCompleteness.ts']) allowed.add(f);
   assert.deepEqual(callers.filter((f) => !allowed.has(f)), [], 'requireOwner guards no cost route');
   for (const r of COST_ROUTERS) assert.doesNotMatch(code(r.file), /\brequireOwner\b/, `${r.file} uses the cost door, not requireOwner`);
 });

@@ -29,7 +29,7 @@ import {
   Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
   AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
   Copy, ChevronRight, ChevronLeft, Package, PackageX, ShoppingBag, Check, Pencil,
-  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag, FileDown,
+  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag, FileDown, AlertTriangle,
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
@@ -39,6 +39,9 @@ import { Spark } from './ui/statCards';
 import { downloadAdminFile, DownloadError } from './adminProducts/download';
 import * as T from './adminProducts/theme';
 import './adminProducts/theme.css';
+import { useAuth } from '../AuthContext';
+import { COMPLETENESS_UI, tri } from './adminProducts/completeness';
+import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncompleteCard';
 
 // The rebuilt eight-section form (product-form mandate §1). The previous
 // ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
@@ -199,6 +202,7 @@ function stockState(p: ListingItem): StockState {
 
 export default function AdminProducts() {
   const { dir, lang, loc } = useLanguage();
+  const { user } = useAuth();
   const t = STRINGS[lang] ?? STRINGS.ar;
 
   const [items, setItems] = useState<ListingItem[]>([]);
@@ -220,6 +224,8 @@ export default function AdminProducts() {
   const [priceMaxQ, setPriceMaxQ] = useState('');
   const [days, setDays] = useState('');
   const [featuredOnly, setFeaturedOnly] = useState(false);
+  /** «الناقصة فقط»: the products the central required-field list finds incomplete. */
+  const [incompleteOnly, setIncompleteOnly] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [sort, setSort] = useState('updated');
   const [page, setPage] = useState(1);
@@ -347,6 +353,7 @@ export default function AdminProducts() {
       if (pMax !== undefined) params.set('price_max', String(pMax));
       if (days) params.set('days', days);
       if (featuredOnly) params.set('featured', '1');
+      if (incompleteOnly) params.set('incomplete', '1');
       if (sort !== 'updated') params.set('sort', sort);
       const data = await api.get<ListingResponse>(`/api/admin/products-v2?${params.toString()}`);
       if (seq !== seqRef.current) return;
@@ -365,7 +372,7 @@ export default function AdminProducts() {
       if (seq === seqRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, sort, page, limit]);
+  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, sort, page, limit]);
 
   useEffect(() => {
     load();
@@ -500,10 +507,10 @@ export default function AdminProducts() {
   const resetFilters = () => {
     setSearch(''); setQuery(''); setStatus(''); setBrand(''); setCatalog('');
     setStockF(''); setPriceBand(''); setPriceMin(''); setPriceMax(''); setPriceMinQ(''); setPriceMaxQ('');
-    setDays(''); setFeaturedOnly(false); setPage(1);
+    setDays(''); setFeaturedOnly(false); setIncompleteOnly(false); setPage(1);
   };
 
-  const anyFilter = !!(query || status || brand || catalog || stockF || days || featuredOnly || pMin !== undefined || pMax !== undefined);
+  const anyFilter = !!(query || status || brand || catalog || stockF || days || featuredOnly || incompleteOnly || pMin !== undefined || pMax !== undefined);
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
   const pages = Math.max(1, Math.ceil(total / limit));
@@ -761,6 +768,17 @@ export default function AdminProducts() {
         </div>
       </div>
 
+      {/* «إخفاء المنتجات الناقصة عن الزبائن» — the verified owner's switch (owner
+          brief 2026-10-10). The server decides who may read or move it; for
+          anyone else the card answers 403 and does not draw. */}
+      {user?.is_owner && (
+        <HideIncompleteCard
+          lang={lang}
+          onShowIncomplete={() => { setIncompleteOnly(true); setAdvanced(true); setPage(1); }}
+          onChanged={() => void load()}
+        />
+      )}
+
       {/* ------------------------------------------------------- stat cards */}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5 [&>:nth-child(5)]:col-span-2 lg:[&>:nth-child(5)]:col-span-1">
@@ -879,6 +897,15 @@ export default function AdminProducts() {
             >
               <Star className={`w-3 h-3 ${featuredOnly ? 'fill-current' : ''}`} />
               {loc('مميز فقط', 'Featured only', 'تەنیا تایبەت')}
+            </button>
+            <button
+              onClick={() => { setIncompleteOnly((v) => !v); setPage(1); }}
+              className={T.chip}
+              aria-pressed={incompleteOnly}
+              data-filter-incomplete
+            >
+              <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+              {tri(COMPLETENESS_UI.filterIncomplete, lang)}
             </button>
             {brands.length > 0 && (
               <select value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }} className={T.select}>
@@ -1010,6 +1037,9 @@ export default function AdminProducts() {
                     </span>
                   )}
                   <span className={`absolute top-2 end-2 ${T.badgeBed}`}><Badge status={p.status} /></span>
+                  {((p.missing_count ?? 0) > 0 || p.held) && (
+                    <span className={`absolute bottom-2 end-2 ${T.badgeBed}`}><ListMissingBadge n={p.missing_count} held={p.held} lang={lang} /></span>
+                  )}
                 </div>
                 <div className="p-3">
                   <p className="text-[13px] font-semibold truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</p>
@@ -1045,6 +1075,7 @@ export default function AdminProducts() {
                   {s.available === null ? '—' : <span dir="ltr">{s.available}</span>}
                 </span>
                 <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
+                <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
                 <Badge status={p.status} />
                 {rowActions(p, true)}
               </div>
@@ -1116,7 +1147,12 @@ export default function AdminProducts() {
                         {stockLabel(s)}
                       </p>
                     </td>
-                    <td className="px-3 py-3"><Badge status={p.status} /></td>
+                    <td className="px-3 py-3">
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        <Badge status={p.status} />
+                        <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
+                      </span>
+                    </td>
                     <td className="px-3 py-3">
                       <p className="text-[13.5px] font-bold text-[var(--ap-text-1)]"><span dir="ltr">{p.sold ?? 0}</span></p>
                       <p className="text-[11px] text-[var(--ap-text-3)] mt-0.5">{loc('مبيع', 'sold', 'فرۆشراو')}</p>

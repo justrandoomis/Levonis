@@ -54,6 +54,7 @@
  * specifications, when what is actually missing is the sheet itself.
  */
 
+import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -505,7 +506,10 @@ compareRoutes.get('/', async (c) => {
   // two columns.
   const rows = slots.map((slot) => byId.get(slot.productId)!);
 
-  const hidden = rows.filter((r) => r.status !== 'active');
+  // A product the owner's «hide incomplete» switch holds is «not on display» exactly like a hidden one.
+  const L = await listing(c.env.DB);
+  const held = await L.heldIds(ids);
+  const hidden = rows.filter((r) => !L.isListedRow(r, held));
   if (hidden.length) {
     throw badRequest(
       `«${label(hidden[0])}» مو معروض حالياً، فما نكدر نقارنه. / “${hidden[0].name || hidden[0].slug}” is not on display right now, so it cannot be compared.`,
@@ -809,7 +813,7 @@ export async function rankCompareCandidates(
 
   const { results } = await db.prepare(
     `SELECT ${PRODUCT_COLUMNS} FROM products
-      WHERE status = 'active' AND id <> ?1 AND spec_fields <> '{}' AND spec_fields <> ''
+      WHERE ${(await listing(db)).listed('products')} AND id <> ?1 AND spec_fields <> '{}' AND spec_fields <> ''
       ${textClause}
       ORDER BY (COALESCE(sub_category_id,'') = ?2) DESC,
                (COALESCE(category_id,'') = ?3) DESC,
@@ -958,7 +962,7 @@ export async function browseCompareCandidates(
 
   const { results } = await db.prepare(
     `SELECT ${PRODUCT_COLUMNS} FROM products
-      WHERE status = 'active' AND spec_fields <> '{}' AND spec_fields <> ''
+      WHERE ${(await listing(db)).listed('products')} AND spec_fields <> '{}' AND spec_fields <> ''
       ${textClause}
       ORDER BY created_at DESC
       LIMIT ${CANDIDATE_POOL}`
@@ -1026,7 +1030,7 @@ compareRoutes.get('/candidates', async (c) => {
   }
 
   const anchor = await c.env.DB
-    .prepare(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ? AND status = 'active'`)
+    .prepare(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`)
     .bind(anchorId)
     .first<ProductRow>();
   if (!anchor) throw notFound('Product not found');

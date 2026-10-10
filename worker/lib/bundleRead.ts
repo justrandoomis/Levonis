@@ -451,7 +451,8 @@ export async function resolveCompositionLines(
     [
       ...parentRows.map((row) => row.id),
       ...[...byBundle.values()].flat().map((c) => c.member_product_id),
-    ]
+    ],
+    { customer: true }
   );
 
   for (const line of lines) {

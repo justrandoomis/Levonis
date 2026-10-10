@@ -15,6 +15,7 @@
  * refuses — which is the defect the price-change round was about.
  */
 
+import { optimisticListed, runListed } from './listing';
 import { SOLD_STATES_SQL } from './soldStates';
 
 /** How many cards a shelf carries. A rail, not a catalogue. */
@@ -61,19 +62,19 @@ export async function bestSellerIds(
     params.push(opts.catalogId);
   }
   params.push(limit);
-  const { results } = await db
-    .prepare(
-      `SELECT oi.product_id AS id, SUM(oi.qty) AS units
-         FROM order_items oi
-         JOIN orders o ON o.id = oi.order_id AND o.status IN ${SOLD_STATES_SQL}
-         JOIN products p ON p.id = oi.product_id
-        WHERE p.status = 'active' AND p.composition = ''${scope}
-        GROUP BY oi.product_id
-        ORDER BY units DESC, oi.product_id
-        LIMIT ?`
-    )
-    .bind(...params)
-    .all<{ id: string; units: number }>();
+  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const { results } = await runListed(
+    db,
+    `SELECT oi.product_id AS id, SUM(oi.qty) AS units
+           FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id AND o.status IN ${SOLD_STATES_SQL}
+           JOIN products p ON p.id = oi.product_id
+          WHERE ${L.listed('p')} AND p.composition = ''${scope}
+          GROUP BY oi.product_id
+          ORDER BY units DESC, oi.product_id
+          LIMIT ?`,
+    (q) => db.prepare(q).bind(...params).all<{ id: string; units: number }>()
+  );
   return (results ?? []).map((r) => String(r.id));
 }
 
@@ -99,22 +100,22 @@ export async function flashDealIds(
   nowIso: string,
   limit = SHELF_LIMIT
 ): Promise<string[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT w.subject_id AS id
-         FROM offer_windows w
-         JOIN products p ON p.id = w.subject_id
-        WHERE w.subject_type = 'product'
-          AND w.active = 1
-          AND w.offer_price_mode <> ''
-          AND p.status = 'active' AND p.composition = ''
-          AND (w.starts_at IS NULL OR w.starts_at <= ?)
-          AND (w.ends_at IS NULL OR w.ends_at > ?)
-        ORDER BY (w.ends_at IS NULL), w.ends_at ASC, w.subject_id
-        LIMIT ?`
-    )
-    .bind(nowIso, nowIso, limit)
-    .all<{ id: string }>();
+  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const { results } = await runListed(
+    db,
+    `SELECT w.subject_id AS id
+           FROM offer_windows w
+           JOIN products p ON p.id = w.subject_id
+          WHERE w.subject_type = 'product'
+            AND w.active = 1
+            AND w.offer_price_mode <> ''
+            AND ${L.listed('p')} AND p.composition = ''
+            AND (w.starts_at IS NULL OR w.starts_at <= ?)
+            AND (w.ends_at IS NULL OR w.ends_at > ?)
+          ORDER BY (w.ends_at IS NULL), w.ends_at ASC, w.subject_id
+          LIMIT ?`,
+    (q) => db.prepare(q).bind(nowIso, nowIso, limit).all<{ id: string }>()
+  );
   return (results ?? []).map((r) => String(r.id));
 }
 
@@ -133,26 +134,26 @@ export async function flashDealIds(
  * over a few hundred strings at most.
  */
 export async function filamentCandidateIds(db: D1Database, rootCatalogId: string): Promise<string[]> {
-  const { results } = await db
-    .prepare(
-      `WITH RECURSIVE subtree(id) AS (
-         SELECT ?
-         UNION
-         SELECT c.id FROM catalogs c JOIN subtree s ON c.parent_id = s.id
-       )
-       SELECT DISTINCT p.id
-         FROM products p
-        WHERE p.status = 'active' AND p.composition = ''
-          AND (
-            p.category_id IN (SELECT id FROM subtree)
-            OR p.sub_category_id IN (SELECT id FROM subtree)
-            OR p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id IN (SELECT id FROM subtree))
-          )
-        ORDER BY p.id
-        LIMIT 300`
-    )
-    .bind(rootCatalogId)
-    .all<{ id: string }>();
+  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const { results } = await runListed(
+    db,
+    `WITH RECURSIVE subtree(id) AS (
+           SELECT ?
+           UNION
+           SELECT c.id FROM catalogs c JOIN subtree s ON c.parent_id = s.id
+         )
+         SELECT DISTINCT p.id
+           FROM products p
+          WHERE ${L.listed('p')} AND p.composition = ''
+            AND (
+              p.category_id IN (SELECT id FROM subtree)
+              OR p.sub_category_id IN (SELECT id FROM subtree)
+              OR p.id IN (SELECT pc.product_id FROM product_catalogs pc WHERE pc.catalog_id IN (SELECT id FROM subtree))
+            )
+          ORDER BY p.id
+          LIMIT 300`,
+    (q) => db.prepare(q).bind(rootCatalogId).all<{ id: string }>()
+  );
   return (results ?? []).map((r) => String(r.id));
 }
 
@@ -200,14 +201,14 @@ export const shuffleSeed = (nowMs: number): number => Math.floor(nowMs / SHUFFLE
  * a second ordering column nobody would maintain.
  */
 export async function featuredIds(db: D1Database, limit = SHELF_LIMIT): Promise<string[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT id FROM products
-        WHERE status = 'active' AND composition = '' AND is_featured = 1
-        ORDER BY created_at DESC, id
-        LIMIT ?`
-    )
-    .bind(limit)
-    .all<{ id: string }>();
+  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
+  const { results } = await runListed(
+    db,
+    `SELECT id FROM products
+          WHERE ${L.listed('products')} AND composition = '' AND is_featured = 1
+          ORDER BY created_at DESC, id
+          LIMIT ?`,
+    (q) => db.prepare(q).bind(limit).all<{ id: string }>()
+  );
   return (results ?? []).map((r) => String(r.id));
 }

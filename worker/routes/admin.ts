@@ -1,4 +1,5 @@
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { afterProductsChanged } from '../lib/completenessHooks';
 import { announceStoreOrder } from '../lib/chatCards';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
@@ -18,6 +19,7 @@ import { newId, sha256Hex } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
+import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
 import { normalizeText } from '../lib/search/normalize';
@@ -1212,6 +1214,7 @@ adminRoutes.post('/products', async (c) => {
   await audit(c.env.DB, adminUser.id, 'product.save', id, { name: p.name, price_iqd: p.price_iqd, status: p.status });
   const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
   await afterCatalogueWrite(c, [String(row?.slug ?? p.slug ?? '')]); // the guests' listing, home and this product page (P2 review)
+  await afterProductsChanged(c, [id]); // the required-field verdict (owner brief 2026-10-10)
   const [product] = await legacyAdminProductProjection(c.env.DB, [row!]);
   return c.json({ success: true, product: projectForAdmin(c.env, adminUser, product) });
 });
@@ -4110,6 +4113,12 @@ adminRoutes.put('/settings/:key', async (c) => {
       'صور الصفحة الرئيسية تُرفع من مسارها الخاص / Use POST /api/admin/site-media/:slot to upload main page media',
       'SITE_MEDIA_ROUTE'
     );
+  }
+  // «إخفاء المنتجات الناقصة عن الزبائن» flips every product's `held` in the
+  // same batch as the switch and is the owner's alone; a raw write here would
+  // move the switch without the rows (and without the owner check).
+  if (key === 'catalogHideIncomplete') {
+    throw badRequest(completenessMessage('HIDE_SWITCH_ROUTE'), 'HIDE_SWITCH_ROUTE');
   }
   const body = await c.req.json().catch(() => ({}));
   let value = body.value as unknown;

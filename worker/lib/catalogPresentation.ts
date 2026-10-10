@@ -18,7 +18,8 @@
  * absent from the tree; a smart shelf needs at least 3 items and must say
  * something a child shelf does not already say.
  */
-import { MEMBERSHIP_CTE } from './catalogMembership';
+import { membershipCte } from './catalogMembership';
+import { listedWithoutHeld, runListed } from './listing';
 import { catalogImageUrl } from './siteMedia';
 import { isSchemaMissing } from './membershipBenefits';
 import { isTemplateFamily, productTypeForBranch, type SectionRef } from './templateFamilies';
@@ -103,14 +104,15 @@ export async function loadCatalogRecords(db: D1Database): Promise<CatalogRecord[
  * terms (the CTE), far under D1's five.
  */
 export async function loadMemberships(db: D1Database): Promise<Array<{ product_id: string; catalog_id: string }>> {
-  const { results } = await db
-    .prepare(
-      `WITH ${MEMBERSHIP_CTE}
+  const membership = membershipCte(!listedWithoutHeld(db));
+  const { results } = await runListed(
+    db,
+    `WITH ${membership}
        SELECT m.product_id, m.catalog_id
          FROM membership m
-         JOIN products p ON p.id = m.product_id AND p.composition = ''`
-    )
-    .all<{ product_id: string; catalog_id: string }>();
+         JOIN products p ON p.id = m.product_id AND p.composition = ''`,
+    (q) => db.prepare(q).all<{ product_id: string; catalog_id: string }>()
+  );
   return results ?? [];
 }
 

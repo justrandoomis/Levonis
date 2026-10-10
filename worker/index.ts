@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
-import { noStoreUnlessSet } from './lib/edgePolicy';
+import { noStoreUnlessSet, purgeCatalogueFromJob } from './lib/edgePolicy';
 import { securityEventsDoor } from './lib/securityEvents';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
 import { loadSessionUser, sessionFreePublicGet } from './lib/session';
@@ -35,7 +35,8 @@ import { runFxScheduler } from './lib/fx/scheduler';
 import { quarterHourSweepBudget, sweepStaleEnginePrices } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
-import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourSearchBudget } from './lib/quarterHourBudget';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget } from './lib/quarterHourBudget';
+import { sweepCompleteness } from './lib/productCompleteness';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -1226,6 +1227,14 @@ export default {
         .then(() => sweepStaleEnginePrices(tickEnv, { trigger: 'sweep', budget: statementBudget(quarterHourSweepBudget(used())) }))
         .catch((error) => {
           console.error('scheduled engine repricing rejected:', error instanceof Error ? error.name : 'unknown');
+        })
+        // LAST: products whose required-field verdict is missing or stale
+        // (owner brief 2026-10-10), within what the engine sweep left; a product
+        // whose customer visibility flipped has its cached pages dropped.
+        .then(() => sweepCompleteness(tickEnv.DB, statementBudget(quarterHourCompletenessBudget(used()))))
+        .then((report) => (report && report.flipped.length ? purgeCatalogueFromJob(env, report.flipped) : undefined))
+        .catch((error) => {
+          console.error('scheduled completeness sweep rejected:', error instanceof Error ? error.name : 'unknown');
         })
     );
   },

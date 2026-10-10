@@ -70,6 +70,7 @@
  *                 notification. Two admins, or an admin and a Telegram press,
  *                 cannot both win.
  */
+import { listing } from './listing';
 import type { Env } from './types';
 import { safeParse } from './types';
 import { newId, randomToken } from './crypto';
@@ -974,7 +975,7 @@ const coverOf = (doc: ReturnType<typeof parseProductRow>): string => {
  */
 export async function priceTarget(env: Env, userId: string, sel: TargetSelection): Promise<PricedTarget> {
   const db = env.DB;
-  const row = await db.prepare("SELECT * FROM products WHERE id = ? AND status = 'active'").bind(sel.product_id).first<Record<string, unknown>>();
+  const row = await db.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).listed('products')}`).bind(sel.product_id).first<Record<string, unknown>>();
   if (!row) throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'not_found' });
   const parsed = parseProductRow(row);
   if (parsed.composition !== '') throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'composition' });
@@ -1058,7 +1059,7 @@ export async function listTargets(env: Env) {
   const db = env.DB;
   const { results } = await db
     .prepare(
-      `SELECT * FROM products WHERE status = 'active' AND COALESCE(composition, '') = ''
+      `SELECT * FROM products WHERE ${(await listing(db)).listed('products')} AND COALESCE(composition, '') = ''
         ORDER BY is_featured DESC, display_order, created_at DESC LIMIT 400`
     )
     .all<Record<string, unknown>>();

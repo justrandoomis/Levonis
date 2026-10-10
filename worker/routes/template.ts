@@ -33,6 +33,7 @@
  * timed-out response, the same file twice in one ZIP) resolves to ONE write.
  */
 
+import { completenessAfterWrite } from '../lib/completenessHooks';
 import { fetchPageImages, pickPageImage, type PageImages } from '../lib/productPageImages';
 import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
@@ -144,6 +145,10 @@ import { registerDataFileRoutes } from './templateDataFile';
 
 export const templateRoutes = new Hono<AppContext>();
 templateRoutes.use('*', requireAdmin);
+// Owner brief 2026-10-10: a product the TXT apply or the data file wrote is
+// re-evaluated against the required-field list once the write has answered
+// (the handler names it: `c.set('completenessIds', …)`).
+templateRoutes.use('*', completenessAfterWrite);
 
 const MAX_TEMPLATE_CHARS = 1_500_000;
 const MAX_ZIP_BYTES = 15 * 1024 * 1024;
@@ -3491,6 +3496,7 @@ templateRoutes.post('/apply', async (c) => {
     console.error('template apply verified marker failed', error);
   });
 
+  c.set('completenessIds', [doc.id]);
   // §11: the same gate as the export and /parse — the applied product is the
   // whole document, cost included, and an assistant admin must not read it.
   return c.json(projectForAdmin(c.env, adminUser, {

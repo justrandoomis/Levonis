@@ -32,8 +32,7 @@ import { rateLimit } from '../lib/ratelimit';
 import { canViewCost, canWriteCost, isOwner, projectForAdmin } from '../lib/adminScope';
 import { sha256Hex } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
-import { fence } from '../lib/operations';
-import { isFenceMiss } from '../lib/fx/commit';
+import { fence, isFenceMiss } from '../lib/operations';
 import { afterCatalogueWrite } from '../lib/edgePolicy';
 import { requireFreshSession } from '../lib/costAccess';
 import { productEngineManaged } from '../lib/engineInstalled';
@@ -82,6 +81,8 @@ import {
   type ParsedBlock,
   type PatchOutput,
 } from '../lib/productDataFile';
+import { evaluateDraft, projectItems } from '../lib/productCompleteness';
+import { COMPLETENESS_ENTRIES, type CompletenessItem } from '@levonis/contracts/productCompleteness';
 import { judgePricing, loadPricingLive, type PricingJudgement, type PricingLive } from '../lib/productDataFilePricing';
 
 /** What the template router lends this module (its own internals, by reference). */
@@ -261,6 +262,13 @@ interface BlockEval {
   pricingAccepted: NEntry[];
   goneItems: string[];
   token: string | null;
+  /**
+   * The central required-field list (worker/lib/productCompleteness.ts) on the
+   * product as it is and as the accepted changes would leave it — codes only,
+   * projected for the viewer (a non-owner reads one OWNER_DATA item for every
+   * private field). Null on the apply path, which does not show it.
+   */
+  completeness: { before: CompletenessItem[]; after: CompletenessItem[] } | null;
 }
 
 /** The refusals of a planned patch, as file keys (null = a refusal no line of the file explains). */
@@ -358,6 +366,7 @@ async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: 
     pricingAccepted: [],
     goneItems: [],
     token: null,
+    completeness: null,
   };
   const state = await liveState(db, deps, block.productId, viewer);
   if (state === 'missing') {
@@ -536,6 +545,44 @@ async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: 
   return out;
 }
 
+/** One required-field item as the sheet reads it: the code, the model, the form section. */
+const completenessItemDto = (i: CompletenessItem) => ({
+  code: i.code,
+  option_id: i.option_id,
+  section: COMPLETENESS_ENTRIES[i.code].section,
+  private: COMPLETENESS_ENTRIES[i.code].private,
+});
+
+/**
+ * WHAT WOULD STILL BE MISSING AFTER THE APPLY (owner brief 2026-10-10): the
+ * list on the live product and on the product as the accepted lines leave it —
+ * the merged document the save would write, the owner's pricing drafts laid
+ * over the stored inputs and rules, and the engine's adoption when the save
+ * adopts. Never fails the preview: an error reads as «no verdict».
+ */
+async function completenessPreview(db: D1Database, ev: BlockEval, seesPrivate: boolean): Promise<BlockEval['completeness']> {
+  const state = ev.live;
+  if (!state) return null;
+  try {
+    const mode: 'manual' | 'engine' = state.engine ? 'engine' : 'manual';
+    const before = await evaluateDraft(db, { id: state.productId, doc: state.doc, view: state.view, mode });
+    const j = ev.pricingAccepted.length ? ev.pricing : null;
+    const afterMode: 'manual' | 'engine' = j?.kind === 'price' && j.ev?.kind === 'adopt' ? 'engine' : mode;
+    const doc = ev.accepted.length && ev.analysis?.doc ? ev.analysis.doc : state.doc;
+    const after = await evaluateDraft(db, {
+      id: state.productId,
+      doc,
+      view: state.view,
+      mode: afterMode,
+      ...(j?.ev ? { inputs: j.ev.inputs, rules: j.ev.rules } : {}),
+    });
+    return { before: projectItems(before, seesPrivate), after: projectItems(after, seesPrivate) };
+  } catch (error) {
+    console.error('data file completeness preview failed:', error instanceof Error ? error.name : 'unknown');
+    return null;
+  }
+}
+
 /** The comparison as the sheet reads it (no internal state; private fields only for the owner). */
 function blockDto(b: BlockEval, viewer: Viewer) {
   const s = b.live;
@@ -560,6 +607,12 @@ function blockDto(b: BlockEval, viewer: Viewer) {
     })),
     derived: b.derived,
     gone_items: b.goneItems,
+    completeness: b.completeness
+      ? {
+          before: b.completeness.before.map(completenessItemDto),
+          after: b.completeness.after.map(completenessItemDto),
+        }
+      : null,
     pricing:
       viewer.view && b.pricing && b.pricingAccepted.length
         ? { kind: b.pricing.kind, preview_hash: b.pricing.hash, large_change: b.pricing.large_change, adoption: b.pricing.adoption }
@@ -642,8 +695,13 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     const only = typeof body.product_id === 'string' && body.product_id ? body.product_id : null;
     if (only && (parsed.blocks.length !== 1 || parsed.blocks[0].productId !== only)) throw fileError(400, 'DATA_FILE_WRONG_PRODUCT');
     const viewer = viewerOf(c);
+    const seesPrivate = canViewCost(c.env, c.get('user'));
     const products = [];
-    for (const block of parsed.blocks) products.push(blockDto(await evaluateBlock(c, deps, block, viewer), viewer));
+    for (const block of parsed.blocks) {
+      const ev = await evaluateBlock(c, deps, block, viewer);
+      if (ev.live) ev.completeness = await completenessPreview(c.env.DB, ev, seesPrivate);
+      products.push(blockDto(ev, viewer));
+    }
     return c.json(
       projectForAdmin(c.env, c.get('user'), {
         success: true,
@@ -790,6 +848,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
       throw e;
     }
     await afterCatalogueWrite(c, [state.slug]);
+    c.set('completenessIds', [productId]);
 
     // Read back: every accepted line now reads as the file wrote it.
     const after = await liveState(db, deps, productId, viewer);

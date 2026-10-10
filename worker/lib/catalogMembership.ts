@@ -63,26 +63,32 @@
  * `UNION ALL`) because a product classified under a catalog it is also
  * explicitly placed in is one membership, not two.
  *
- * Every branch filters on `status = 'active'` here rather than at the caller,
- * so a draft product can never inflate a shelf count.
+ * Every branch filters on «listed to customers» (active, and not held by the
+ * owner's «hide incomplete» switch — worker/lib/listing.ts) here rather than
+ * at the caller, so a draft or held product can never inflate a shelf count.
+ * `heldInstalled`: include the held clause (callers run the statement through `runListed`, worker/lib/listing.ts).
  */
-export const MEMBERSHIP_CTE = `
+export function membershipCte(heldInstalled: boolean): string {
+  const listed = listedSql('p', heldInstalled);
+  return `
   membership(product_id, catalog_id) AS (
     SELECT pc.product_id, pc.catalog_id
       FROM product_catalogs pc
       JOIN products p ON p.id = pc.product_id
-     WHERE p.status = 'active'
+     WHERE ${listed}
     UNION
     SELECT p.id, p.category_id
       FROM products p
-     WHERE p.status = 'active' AND p.category_id IS NOT NULL AND p.category_id <> ''
+     WHERE ${listed} AND p.category_id IS NOT NULL AND p.category_id <> ''
     UNION
     SELECT p.id, p.sub_category_id
       FROM products p
-     WHERE p.status = 'active' AND p.sub_category_id IS NOT NULL AND p.sub_category_id <> ''
+     WHERE ${listed} AND p.sub_category_id IS NOT NULL AND p.sub_category_id <> ''
   )`;
+}
 
 import { catalogImageUrl } from './siteMedia';
+import { listedSql, listedWithoutHeld, runListed } from './listing';
 import { isSchemaMissing } from './membershipBenefits';
 
 /**
@@ -174,8 +180,8 @@ const ALL_COVERS = CARD_PICTURES.map((p) => `COALESCE(c.${p.column}, '')`);
  * 0100 (or 0149) yet — see `catalogTreeWithCounts` below. `covers` is one SQL
  * expression per entry of CARD_PICTURES, in its order.
  */
-const treeSql = (covers: readonly string[]) => `WITH RECURSIVE ${ANCESTORS_CTE},
-       ${MEMBERSHIP_CTE},
+const treeSql = (covers: readonly string[], heldInstalled: boolean) => `WITH RECURSIVE ${ANCESTORS_CTE},
+       ${membershipCte(heldInstalled)},
        counted AS (
          SELECT a.ancestor_id AS id, COUNT(DISTINCT m.product_id) AS n
            FROM membership m
@@ -252,7 +258,10 @@ async function missingCardPictureColumns(db: D1Database, e: unknown): Promise<Se
  */
 export async function catalogTreeWithCounts(db: D1Database): Promise<CatalogCountRow[]> {
   type Row = Omit<CatalogCountRow, (typeof CARD_PICTURES)[number]['url']> & Partial<Record<CardPictureColumn, unknown>>;
-  const read = async (covers: readonly string[]) => (await db.prepare(treeSql(covers)).all<Row>()).results ?? [];
+  // Optimistic on the held clause (worker/lib/listing.ts `runListed`): no probe before the first screen's wave.
+  const heldInstalled = !listedWithoutHeld(db);
+  const read = async (covers: readonly string[]) =>
+    (await runListed(db, treeSql(covers, heldInstalled), (q) => db.prepare(q).all<Row>())).results ?? [];
 
   let rows: Row[];
   try {

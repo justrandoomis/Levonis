@@ -264,6 +264,14 @@ export interface ListingItem {
    *  products always carry a numeric stock (zero means sold out); null is
    *  reserved for products that are pre-order-only. */
   has_direct_sale?: boolean;
+  /**
+   * «ناقص N» (owner brief 2026-10-10): required fields the saved product
+   * misses, counted for THIS viewer (a non-owner counts every private field
+   * as one «owner data» item). null = not checked yet, or no migration 0184.
+   */
+  missing_count?: number | null;
+  /** Hidden from customers by the owner's «hide incomplete» switch. */
+  held?: boolean;
 }
 
 export interface ListingResponse {

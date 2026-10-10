@@ -49,6 +49,7 @@
  * No invented text either. A product with an empty description keeps the
  * shop's default line rather than getting a sentence written for it here.
  */
+import { listing } from './listing';
 import { canonicalProductMediaUrl, primaryMedia, upgradeMedia } from './productModel';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
 import { productImageFromRelations } from './productSelectionImage';
@@ -356,7 +357,7 @@ export async function resolveProductPreview(
   // (tests/storeShareCards.test.ts).
   const product = await db
     .prepare(
-      "SELECT id, name, name_ar, description, description_ar, light_image FROM products WHERE slug = ? AND status = 'active'"
+      `SELECT id, name, name_ar, description, description_ar, light_image FROM products WHERE slug = ? AND ${(await listing(db)).listed('products')}`
     )
     .bind(slug)
     .first<PreviewRow>();

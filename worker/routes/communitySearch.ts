@@ -52,6 +52,7 @@
  * `{ rows: [], total: null, error: true }` and is logged, so one bad column
  * on a fresh deploy does not blank the whole overlay.
  */
+import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -369,18 +370,19 @@ async function indexHits(db: D1Database, raw: string, limit: number): Promise<st
 
 async function searchMaterials({ db, raw, like, limit }: SearchInput) {
   const subtree = catalogSubtreeFilter(MATERIALS_CATALOG, 'products');
+  const listed = (await listing(db)).listed('products');
   const hits = await indexHits(db, raw, COUNT_BOUND);
   if (hits) {
     if (hits.length === 0) return { rows: [], total: 0 };
     const { results } = await db.prepare(
       `SELECT id, slug, name, name_ar, images FROM products
-        WHERE status = 'active' AND id IN (SELECT value FROM json_each(?)) AND ${subtree.sql}`
+        WHERE ${listed} AND id IN (SELECT value FROM json_each(?)) AND ${subtree.sql}`
     ).bind(JSON.stringify(hits), ...subtree.params).all<Record<string, unknown>>();
     const rank = new Map(hits.map((id, i) => [id, i]));
     results.sort((a, b) => (rank.get(String(a.id)) ?? 0) - (rank.get(String(b.id)) ?? 0));
     return { rows: results.slice(0, limit).map(catalogueRow), total: Math.min(results.length, COUNT_BOUND) };
   }
-  const where = `status = 'active' AND (${sqlLikeClause(CATALOGUE_LIKE)}) AND ${subtree.sql}`;
+  const where = `${listed} AND (${sqlLikeClause(CATALOGUE_LIKE)}) AND ${subtree.sql}`;
   const likes = CATALOGUE_LIKE.map(() => like);
   const [{ results }, total] = await Promise.all([
     db.prepare(`SELECT id, slug, name, name_ar, images FROM products WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT ?`)
@@ -553,18 +555,19 @@ async function suggestions(db: D1Database, raw: string, viewer: string): Promise
 /** Catalogue product names: the index's top hits where it answers, the LIKE fallback otherwise. */
 async function catalogueSuggestions(db: D1Database, raw: string, like: string, prefix: string): Promise<Suggestion[]> {
   const hits = await indexHits(db, raw, SUGGEST_MAX);
+  const listed = (await listing(db)).listed('products');
   let rows: Array<{ id: string; slug: string; name: string; name_ar: string }>;
   if (hits) {
     if (hits.length === 0) return [];
     const { results } = await db.prepare(
-      `SELECT id, slug, name, name_ar FROM products WHERE status = 'active' AND id IN (SELECT value FROM json_each(?))`
+      `SELECT id, slug, name, name_ar FROM products WHERE ${listed} AND id IN (SELECT value FROM json_each(?))`
     ).bind(JSON.stringify(hits)).all<{ id: string; slug: string; name: string; name_ar: string }>();
     const rank = new Map(hits.map((id, i) => [id, i]));
     rows = results.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
   } else {
     const { results } = await db.prepare(
       `SELECT id, slug, name, name_ar FROM products
-        WHERE status = 'active' AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\')
+        WHERE ${listed} AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\')
         ORDER BY (name LIKE ?2 ESCAPE '\\' OR name_ar LIKE ?2 ESCAPE '\\') DESC, created_at DESC, id DESC LIMIT ${SUGGEST_MAX}`
     ).bind(like, prefix).all<{ id: string; slug: string; name: string; name_ar: string }>();
     rows = results;

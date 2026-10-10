@@ -15,11 +15,14 @@
  *      Every statement it sends is charged before it is sent, and a product
  *      whose index rows do not fit waits, stale and untouched, for the next
  *      tick (worker/lib/search/store.ts `backfillSearchIndex`).
- *   3. LAST, FX-5's engine sweep: its own 200, cut to what is left
+ *   3. FX-5's engine sweep: its own 200, cut to what is left
  *      (`quarterHourSweepBudget`, worker/lib/fx/reprice.ts).
+ *   4. LAST, the product-completeness catch-up (owner brief 2026-10-10,
+ *      worker/lib/productCompleteness.ts): its own 60, cut to what is left
+ *      after the engine sweep (`quarterHourCompletenessBudget`).
  *
  * So the invocation's total is at most max(step 1, `QUARTER_HOUR_TICK_LIMIT`):
- * steps 2 and 3 never take it over the limit, and step 1 is bounded by its
+ * steps 2, 3 and 4 never take it over the limit, and step 1 is bounded by its
  * jobs' own bounds — measured at those bounds, together with steps 2 and 3,
  * by tests/fxSweepBudget.test.ts on the real `scheduled()`.
  *
@@ -58,4 +61,16 @@ export const QUARTER_HOUR_TICK_LIMIT = D1_INVOCATION_STATEMENT_LIMIT - QUARTER_H
  */
 export function quarterHourSearchBudget(usedByJobs: number): number {
   return Math.max(0, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedByJobs)));
+}
+
+/** The completeness catch-up's own sub-budget: about 25 products a tick. */
+export const COMPLETENESS_TICK_BUDGET = 60;
+
+/**
+ * THE COMPLETENESS CATCH-UP'S SHARE: its own 60, cut to what everything before
+ * it (the jobs, the search catch-up, the engine sweep) left of
+ * `QUARTER_HOUR_TICK_LIMIT`, never below zero. It runs last.
+ */
+export function quarterHourCompletenessBudget(usedBefore: number): number {
+  return Math.max(0, Math.min(COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
 }

@@ -4,6 +4,7 @@
  * (./registry.ts), so none of the three can describe an endpoint that does
  * not exist or miss one that does.
  */
+import { listing } from '../listing';
 import { readCommunityGate, communityMayEnter } from '../communityGate';
 import { POLICY_DOCUMENTS } from '../policies';
 import { PLATFORM_NAME } from '../webManifest';
@@ -150,12 +151,13 @@ const CONTEXT_SCHEMA: JsonSchema = { type: 'object', description: 'A plain descr
 
 async function contextDocument(routes: readonly PublicRoute[], req: PublicRequest) {
   const { db, urls } = req;
+  const L = await listing(db);
   const [counts, gate] = await Promise.all([
     db
       .prepare(
         `SELECT
-           (SELECT COUNT(*) FROM products WHERE status = 'active' AND composition = '') AS products,
-           (SELECT COUNT(*) FROM products WHERE status = 'active' AND composition <> '') AS bundles,
+           (SELECT COUNT(*) FROM products WHERE ${L.listed('products')} AND composition = '') AS products,
+           (SELECT COUNT(*) FROM products WHERE ${L.listed('products')} AND composition <> '') AS bundles,
            (SELECT COUNT(*) FROM catalogs WHERE active = 1) AS sections,
            (SELECT COUNT(*) FROM brands WHERE active = 1) AS brands`
       )

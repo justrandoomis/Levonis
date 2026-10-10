@@ -88,7 +88,10 @@ test('no customer chunk names a provider endpoint, the key or a private FX field
     // chunk they share (the one that speaks to /api/admin/pricing). Property
     // names survive minification, so the panel's chunk carries the field
     // NAMES it reads — never a value.
-    if (/^(AdminPricing|OwnerRatesCard)-/.test(f) || code.includes('/api/admin/pricing')) {
+    // The product data file's field table (DECISIONS row 204) names the owner pricing block's TXT
+    // keys — the words the owner types in «تحديث البيانات» — and only the admin product form and
+    // its data-file sheet import it.
+    if (/^(AdminPricing|OwnerRatesCard|dataFileStrings)-/.test(f) || code.includes('/api/admin/pricing')) {
       owner++;
       // Even the owner's chunks never hold a provider endpoint or the key: the browser never calls a provider.
       for (const name of ['iraqsm.com/api', 'eurofxref', 'IRAQ_PARALLEL_FX_API_KEY', 'X-API-Key']) assert.ok(!code.includes(name), `${f} carries «${name}»`);

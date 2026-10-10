@@ -62,6 +62,7 @@
  * purchase and labelled so, or known only in IQD (worker/lib/batchSnapshot.ts).
  * A read: nothing written.
  */
+import { completenessAfterWrite } from '../lib/completenessHooks';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, jsonObject, notFound, requireAdmin } from '../lib/http';
@@ -171,6 +172,9 @@ adminPricingRoutes.use('*', requireAdmin);
 // THE DOOR (owner decision 2): the limit first, so a refused caller still
 // spends budget, then the owner-only cost guard.
 adminPricingRoutes.use('*', limitByMethod(['pricing-read', 1200], ['pricing-write', 600]), requireCostRead);
+// Owner brief 2026-10-10: saved supplier costs, rules or an adopted engine price
+// re-evaluate the product against the required-field list (completenessHooks.ts).
+adminPricingRoutes.use('*', completenessAfterWrite);
 
 /** The product page's subject: an ordinary product (a bundle or mystery offer is never engine-priced). */
 async function loadOne(db: D1Database, id: string): Promise<LoadedProduct> {
@@ -1319,6 +1323,7 @@ adminPricingRoutes.post('/products/save-bulk', async (c) => {
       throw e;
     }
   }
+  c.set('completenessIds', results.filter((r) => r.status !== 'unchanged' && r.status !== 'refused').map((r) => r.product_id));
   return c.json({ success: true, results });
 });
 

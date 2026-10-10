@@ -7,6 +7,7 @@
  * are the active brands that have published products; their logos are the
  * site-media slots the home page draws (worker/lib/siteMedia.ts BRAND_SLOTS).
  */
+import { listing } from '../../listing';
 import { notFound } from '../../http';
 import { catalogIndexFor } from '../../catalogPresentation';
 import { getSetting } from '../../settings';
@@ -148,11 +149,12 @@ const BRAND_SCHEMA = object(
 const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 async function brandRows(db: D1Database, slug?: string) {
+  const listedP = (await listing(db)).listed('p');
   const { results } = await db
     .prepare(
       `SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb, COUNT(p.id) AS n
          FROM brands b
-         JOIN products p ON p.brand_id = b.id AND p.status = 'active' AND p.composition = ''
+         JOIN products p ON p.brand_id = b.id AND ${listedP} AND p.composition = ''
         WHERE b.active = 1 ${slug ? 'AND b.slug = ?' : ''}
         GROUP BY b.id
         ORDER BY n DESC, b.name_en`

@@ -13,6 +13,7 @@
  * visitor — and a box whose offer the owner switched off is not listed at
  * all (`listBundles`).
  */
+import { listing } from '../../listing';
 import { notFound } from '../../http';
 import { catalogIndexFor } from '../../catalogPresentation';
 import { getSettings } from '../../settings';
@@ -67,7 +68,7 @@ async function cardsForIds(db: D1Database, ids: string[], urls: PublicUrls, ctx:
   if (ids.length === 0) return [];
   const { results } = await db
     .prepare(
-      "SELECT * FROM products WHERE status = 'active' AND composition = '' AND id IN (SELECT value FROM json_each(?))"
+      `SELECT * FROM products WHERE ${(await listing(db)).listed('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
     )
     .bind(JSON.stringify(ids))
     .all<Rec>();

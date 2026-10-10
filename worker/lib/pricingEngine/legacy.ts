@@ -174,6 +174,21 @@ function costWalk(doc: ProductDoc, option: OptionV2 | null, type: 'direct_sale' 
   return { value, rung };
 }
 
+/**
+ * THE LEGACY COST ONE MODEL REACHES (owner brief 2026-10-10, product
+ * completeness): `costWalk` on every channel the model can carry — direct,
+ * pre-order, and each of its pre-order routes — and the highest value any of
+ * them reaches, or null when none reaches one. Owner-only data: the caller
+ * stores a CODE from it, never the number.
+ */
+export function legacyCostOf(doc: ProductDoc, option: OptionV2 | null): number | null {
+  const methods = (findFulfillment(option, 'pre_order')?.transports ?? []).map((t) => t.method);
+  const walks = [costWalk(doc, option, 'direct_sale', null), costWalk(doc, option, 'pre_order', null), ...methods.map((m) => costWalk(doc, option, 'pre_order', m))];
+  let best: number | null = null;
+  for (const w of walks) if (w.value !== null && (best === null || w.value > best)) best = w.value;
+  return best;
+}
+
 /** A SKU's selection beyond its model: every option value (relation order) and its colour. */
 export interface SkuSelectionOf {
   optionValueIds: readonly string[];

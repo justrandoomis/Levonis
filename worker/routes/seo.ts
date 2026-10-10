@@ -25,6 +25,7 @@
  * argument the manifest route makes about installability, with a sharper edge:
  * getting this wrong de-indexes the shop.
  */
+import { listing } from '../lib/listing';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 
@@ -293,7 +294,7 @@ export async function sitemapRoute(c: Context<AppContext>): Promise<Response> {
     } else {
       const { results } = await c.env.DB.prepare(
         `SELECT slug, updated_at FROM products
-          WHERE status = 'active' AND slug <> ''
+          WHERE ${(await listing(c.env.DB)).listed('products')} AND slug <> ''
           ORDER BY updated_at DESC
           LIMIT ${MAX_SITEMAP_URLS}`
       ).all<SitemapRow>();

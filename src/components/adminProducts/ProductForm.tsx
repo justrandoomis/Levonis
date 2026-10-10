@@ -83,6 +83,7 @@ const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 // specs-only sheet, ./form/SectionUpdateSheet, stays for its routes' callers.)
 const DataFileSheet = React.lazy(() => import('./form/DataFileSheet'));
 import { DATA_FILE_STRINGS, pick as pickDataFileString } from './dataFileStrings';
+import { COMPLETENESS_UI, CompletenessBanner, CompletenessProvider, MissingBlock, fill, tri, useProductCompleteness } from './completeness';
 // Types only — no runtime import, so the sheet stays in its own lazy chunk.
 import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
 import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
@@ -570,6 +571,23 @@ export default function ProductForm({
 
   const dirty = baseline !== '' && JSON.stringify({ d: doc, rs: rel }) !== baseline;
   /**
+   * «ناقص» (owner brief 2026-10-10): the SAVED product's verdict against the
+   * central required-field list, read again after every load and save (the
+   * product's clock). The red flags below describe it; a private field (cost,
+   * USD pricing data) is named for the owner alone.
+   */
+  const completeness = useProductCompleteness(doc.id || productId || null, loadedUpdatedAt);
+  const missingItems = completeness?.installed && completeness.evaluated ? (completeness.items ?? []) : [];
+  const optionNameOf = useCallback(
+    (id: string) => {
+      for (const g of rel.groups) for (const v of g.values) if (v.id === id) return v.name_en || v.name_ar || id;
+      return id;
+    },
+    [rel.groups]
+  );
+  const sectionMissing = (n: number) => missingItems.filter((i) => i.section === n).length;
+  const sectionMissingLabel = (n: number) => fill(tri(COMPLETENESS_UI.sectionMissing, lang), { n: sectionMissing(n) });
+  /**
    * Cost opened while this form was open (the owner verified the address in
    * another tab): an untouched form simply re-reads the product, once per
    * product, so the cost inputs appear filled with the stored values. A form
@@ -1047,6 +1065,7 @@ export default function ProductForm({
     // own bottom edge (see the effect above and the save bar below).
     // «التسعير بالدولار والشحن»: one state for its mount points (sections ٣, ٥ and ٨).
     <UsdPricingProvider value={pricing}>
+    <CompletenessProvider items={missingItems} lang={lang} optionName={optionNameOf}>
     <div ref={columnRef} className="min-w-0 w-full max-w-[880px] mx-auto px-3">
       <div className="flex items-center gap-2 py-3 min-w-0">
         <button type="button" onClick={onBack} className={`${btnGhost} h-10 px-2.5`} aria-label="رجوع">
@@ -1070,6 +1089,7 @@ export default function ProductForm({
       </div>
 
       {saveErr && <Banner kind="error">{saveErr}</Banner>}
+      <CompletenessBanner read={completeness} lang={lang} dirty={dirty} status={doc.status} />
       {staleSave && (
         <div data-form="stale-edit">
           <Banner kind="warn">
@@ -1165,6 +1185,8 @@ export default function ProductForm({
           the relations writer preserves what the payload does not mention. */}
       <SectionCard
         n={1}
+        missing={sectionMissing(1)}
+        missingLabel={sectionMissingLabel(1)}
         ar="التصنيف: القسم والعلامة والهاشتاقات"
         en="Classification"
         summary={summarize([
@@ -1176,7 +1198,7 @@ export default function ProductForm({
         {...section(1)}
       >
         <Grid cols={2}>
-          <Field ar="١· القسم الرئيسي" en="Main section" required error={err('category_id')} htmlFor="pf-category">
+          <Field ar="١· القسم الرئيسي" en="Main section" required need="CATEGORY" error={err('category_id')} htmlFor="pf-category">
             <div className="flex gap-1.5 min-w-0">
               <div className="flex-1 min-w-0">
                 <Select
@@ -1393,12 +1415,17 @@ export default function ProductForm({
       {/* 2 ────────────────────────────────────────────────── basic details */}
       <SectionCard
         n={2}
+        missing={sectionMissing(2)}
+        missingLabel={sectionMissingLabel(2)}
         ar="المعلومات الأساسية"
         en="Basics"
         summary={doc.name_en || 'بلا اسم'}
         error={showErrors && !!errors.name_en}
         {...section(2)}
       >
+        {/* The Arabic name has no input of its own here (it is translated on
+            save, or written in the translations sheet): the flag says so. */}
+        <MissingBlock codes={['NAME_AR']} />
         <Grid cols={2}>
           <Field
             ar="الاسم"
@@ -1473,6 +1500,8 @@ export default function ProductForm({
       {/* 3 ──────────────────────────────────────────── prices, memberships */}
       <SectionCard
         n={3}
+        missing={sectionMissing(3)}
+        missingLabel={sectionMissingLabel(3)}
         ar={proPaused ? 'الأسعار' : 'الأسعار والعضويات'}
         en={proPaused ? 'Prices' : 'Prices & memberships'}
         summary={summarize([
@@ -1483,6 +1512,10 @@ export default function ProductForm({
         {...section(3)}
       >
         {showErrors && errors.prices && <Banner kind="error">{errors.prices}</Banner>}
+        {/* «ناقص» (owner brief 2026-10-10): what has no single input here — the
+            USD pricing data of an engine product, the private data another admin
+            is told about without its name, and a cost no visible box carries. */}
+        <MissingBlock codes={costShown ? ['ENGINE_INPUTS', 'OWNER_DATA'] : ['ENGINE_INPUTS', 'OWNER_DATA', 'COST']} />
         <Grid cols={3}>
           {/* An engine-priced product's price is the engine's (the owner sees it
               as «سعر المتجر الحالي», read only); every other product — and every
@@ -1496,6 +1529,7 @@ export default function ProductForm({
             ar="السعر"
             en="Price"
             required
+            need="PRICE"
             error={err('price_iqd')}
             hint={canSeeCost && pricing.answer && doc.id ? us.storePriceManual : undefined}
             tip="الخيار أو اللون الذي له سعر خاص يستبدل هذا السعر ولا يُضاف إليه. إن غيّرت هذا الرقم وكانت هناك أسعار خاصة، ستُسأل عمّا تفعل بها."
@@ -1550,7 +1584,7 @@ export default function ProductForm({
           {/* The owner's old dinar cost, shown as what it is now: the legacy cost
               profit falls back to; the USD pricing below never reads it. */}
           {costShown && (
-            <Field ar={us.legacyCost} en={lang === 'en' ? '' : usEn.legacyCost} tip={us.legacyCostTip}>
+            <Field ar={us.legacyCost} en={lang === 'en' ? '' : usEn.legacyCost} tip={us.legacyCostTip} need="COST">
               <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />
             </Field>
           )}
@@ -1634,6 +1668,8 @@ export default function ProductForm({
       {/* 4 ───────────────────────────────────── delivery and warranty only */}
       <SectionCard
         n={4}
+        missing={sectionMissing(4)}
+        missingLabel={sectionMissingLabel(4)}
         ar="خيارات التوصيل والضمان"
         en="Delivery & warranty"
         summary={summarize([
@@ -1824,6 +1860,7 @@ export default function ProductForm({
           <DimensionsSection
             dimensions={doc.dimensions ?? emptyDimensions()}
             onChange={(next) => setDoc((d) => ({ ...d, dimensions: next }))}
+            flags
           />
         </div>
 
@@ -1832,6 +1869,8 @@ export default function ProductForm({
       {/* 5 ────────────────────────────────────────── options and colours */}
       <SectionCard
         n={5}
+        missing={sectionMissing(5)}
+        missingLabel={sectionMissingLabel(5)}
         ar="الخيارات والألوان"
         en="Options & colours"
         count={valueCount + rel.colors.length}
@@ -1890,6 +1929,8 @@ export default function ProductForm({
       {/* 6 ───────────────────────────────────────────────────────── images */}
       <SectionCard
         n={6}
+        missing={sectionMissing(6)}
+        missingLabel={sectionMissingLabel(6)}
         ar="الصور"
         en="Images"
         count={rel.images.length}
@@ -1897,6 +1938,7 @@ export default function ProductForm({
         error={showErrors && !!errors.images}
         {...section(6)}
       >
+        <MissingBlock codes={['IMAGE']} />
         <MainImagesPair
           darkUrl={(rel.images.find((i) => i.is_primary) ?? rel.images[0])?.url ?? ''}
           lightUrl={doc.light_image ?? ''}
@@ -1910,6 +1952,8 @@ export default function ProductForm({
              an accessory its own) + the structured usage/setup guide. */}
       <SectionCard
         n={7}
+        missing={sectionMissing(7)}
+        missingLabel={sectionMissingLabel(7)}
         ar="المواصفات والمحتوى الإضافي"
         en="Specifications & extras"
         count={Object.keys(doc.spec_fields ?? {}).length + doc.usage_guide.steps.length}
@@ -2214,6 +2258,7 @@ export default function ProductForm({
         </React.Suspense>
       )}
     </div>
+    </CompletenessProvider>
     </UsdPricingProvider>
   );
 }

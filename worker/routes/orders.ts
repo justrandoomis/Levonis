@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { listing } from '../lib/listing';
 import { PRINTER_STANDARD_DELIVERY_POLICY, isPrinterStandardAcceptance, requiresPrinterStandardAcceptance } from '@levonis/shipping/printerDeliveryPolicy';
 import { announceStoreOrder } from '../lib/chatCards';
 import { notifyOrderCreditAvailable } from '../lib/merchantNotify';
@@ -2203,6 +2204,11 @@ export async function computeCheckout(
     options.source?.lines?.params ?? params
   );
   if (rows.length === 0) throw badRequest('Your cart is empty');
+  // Listed to customers (worker/lib/listing.ts): a line whose product the
+  // owner's «hide incomplete» switch holds is refused below exactly like a
+  // hidden product's. A granted gift's line is honoured as granted.
+  const listingNow = await listing(c.env.DB);
+  const heldLines = await listingNow.heldIds(rows.map((r) => String(r.id ?? '')));
 
   // §1: the cart rule guarantees one shipping type across the lines, so the
   // first line speaks for the cart — the same derivation POST / freezes onto
@@ -2410,7 +2416,7 @@ export async function computeCheckout(
      * awaiting is still allowed (`priceLines` is synchronous and runs up to
      * three times).
      */
-    loadCompositionMembers(c.env.DB, memberIds),
+    loadCompositionMembers(c.env.DB, memberIds, { customer: true }),
     /**
      * THE GIFT LINES (0175), verified in ONE read and re-verified here at the
      * door whatever the cart said a minute ago: the gift is this buyer's,
@@ -2615,7 +2621,7 @@ export async function computeCheckout(
         continue;
       }
 
-      if (row.status !== 'active') throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
+      if (!listingNow.isListedRow(row, heldLines)) throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
       const view = views.get(String(row.id));
       const sel = selectionFromCartRow(row);
       const isPrinter = printerIds.has(String(row.id));

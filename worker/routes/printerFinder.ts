@@ -24,6 +24,7 @@
  * 60 s (the key is the URL, so it only helps repeat answers — which a shared
  * results link is).
  */
+import { listing } from '../lib/listing';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
@@ -52,13 +53,14 @@ interface Loaded {
 
 async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
   const db = c.env.DB;
+  const L = await listing(db);
   const [idx, ctx, rows] = await Promise.all([
     catalogIndexFor(db),
     pricingCtx(c),
     db
       .prepare(
         `SELECT * FROM products
-          WHERE status = 'active' AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
+          WHERE ${L.listed('products')} AND composition = '' AND spec_fields <> '{}' AND spec_fields <> ''
           ORDER BY is_featured DESC, display_order ASC, created_at DESC
           LIMIT ?`
       )

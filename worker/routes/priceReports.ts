@@ -53,6 +53,7 @@
  * the shop's IP.
  */
 
+import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, int, notFound, oneOf, requireAdmin, requireAuth, str } from '../lib/http';
@@ -164,7 +165,7 @@ priceReportRoutes.post('/', async (c) => {
    * confirm to a stranger that an unpublished product id is real.
    */
   const product = await c.env.DB.prepare(
-    "SELECT id, name, name_ar, price_iqd FROM products WHERE id = ? AND status = 'active'"
+    `SELECT id, name, name_ar, price_iqd FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`
   )
     .bind(productId)
     .first<{ id: string; name: string; name_ar: string; price_iqd: number }>();

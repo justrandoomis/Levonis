@@ -360,6 +360,19 @@ export const SETTING_DEFAULTS = {
    * (PUT /api/admin/settings/serialPrepGate).
    */
   serialPrepGate: { enabled: false, since: null } as SerialPrepGate,
+  /**
+   * «إخفاء المنتجات الناقصة عن الزبائن» (owner brief 2026-10-10, migration
+   * 0184). When on, every customer surface leaves out an ordinary product that
+   * misses a field of the central list (worker/lib/productCompleteness.ts) —
+   * the listing, search, home, sections, the product page, the public API, the
+   * sitemap, the cart and checkout — exactly as if it were hidden, until it is
+   * completed. SHIPS OFF: the owner reads how many products it hides before
+   * turning it on. NOT PUBLIC, and NOT writable through the generic settings
+   * PUT: the owner's own route (PUT /api/admin/products-v2/completeness/hide)
+   * is the only writer, because it flips every product's `held` in the same
+   * batch and audits the count.
+   */
+  catalogHideIncomplete: { enabled: false, since: null, by: null } as CatalogHideIncomplete,
   cartShippingMethods: [
     { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days' },
     { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days' },
@@ -741,6 +754,23 @@ export interface SerialPrepGate {
   since: string | null;
 }
 
+/** The owner's «hide incomplete products» switch, as stored. */
+export interface CatalogHideIncomplete {
+  enabled: boolean;
+  /** ISO timestamp of the last switch-on; null while it was never on. */
+  since: string | null;
+  /** The admin id that last moved it (or null). */
+  by: string | null;
+}
+
+/** Any stored shape → a well-formed switch. Unknown or broken input reads as OFF. */
+export function normalizeCatalogHideIncomplete(value: unknown): CatalogHideIncomplete {
+  const o = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const since = typeof o.since === 'string' && Number.isFinite(Date.parse(o.since)) ? new Date(Date.parse(o.since)).toISOString() : null;
+  const by = typeof o.by === 'string' && o.by.trim() ? o.by.trim().slice(0, 64) : null;
+  return { enabled: o.enabled === true, since, by };
+}
+
 /** Any stored shape → a well-formed gate. Unknown or broken input reads as OFF. */
 export function normalizeSerialPrepGate(value: unknown): SerialPrepGate {
   const o = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -751,6 +781,9 @@ export function normalizeSerialPrepGate(value: unknown): SerialPrepGate {
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
   if (key === 'serialPrepGate') {
     return normalizeSerialPrepGate(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'catalogHideIncomplete') {
+    return normalizeCatalogHideIncomplete(value) as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'homeBento') {
     return normalizeHomeBento(value) as (typeof SETTING_DEFAULTS)[K];

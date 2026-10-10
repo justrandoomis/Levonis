@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { listing } from '../lib/listing';
 import { cartShippingType, typeForTransport, type ShippingType } from '../lib/shippingType';
 import {
   cartSellerScope,
@@ -727,6 +728,13 @@ async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
   const { tier, active: tierActive, status, ctx } = await cartPricing(c);
   const results = await cartLineRows(c.env.DB, user.id);
+  // A line whose product the owner's «hide incomplete» switch holds is read
+  // exactly as a hidden product's (worker/lib/listing.ts) — it drops out of the
+  // view below. In memory only; no row is touched. A granted gift's line is
+  // honoured as granted and keeps its own status.
+  const L = await listing(c.env.DB);
+  const heldInCart = await L.heldIds(results.map((r) => String(r.id ?? '')));
+  for (const r of results) if (heldInCart.has(String(r.id ?? '')) && !giftEntitlementIdOf(r)) r.status = 'hidden';
 
   // Display-only: which lines carry the explicit support-gift eligibility
   // flag. One extra query for the whole cart, never per line, and it feeds
@@ -2017,7 +2025,8 @@ cartRoutes.post('/items', async (c) => {
   const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
 
-  const product = await c.env.DB.prepare("SELECT * FROM products WHERE id = ? AND status = 'active'")
+  // Listed to customers (worker/lib/listing.ts): a held product answers as a hidden one.
+  const product = await c.env.DB.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`)
     .bind(productId)
     .first<Record<string, unknown>>();
   if (!product) throw notFound('Product not found or unavailable');

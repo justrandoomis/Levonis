@@ -28,6 +28,7 @@
  * support access.
  */
 
+import { listing } from '../lib/listing';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { deliversToHome, getSetting, getSettings, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
 import { allowedPaymentMethods } from '../lib/paymentPolicy';
@@ -1350,9 +1351,10 @@ async function handleProductSearch(c: Context<AppContext>, params: Record<string
   const q = str(params.q, 'q', { max: 100, required: false }) || freeText.trim();
   if (q.length < 2) return { intent: 'product_search', text: tr(loc, 'search_empty') };
   const like = likePattern(q);
+  const L = await listing(c.env.DB);
   const { results } = await c.env.DB.prepare(
     `SELECT * FROM products
-      WHERE status = 'active'
+      WHERE ${L.listed('products')}
         AND (name LIKE ?1 ESCAPE '\\' OR name_ar LIKE ?1 ESCAPE '\\' OR name_ku LIKE ?1 ESCAPE '\\' OR brand LIKE ?1 ESCAPE '\\')
       ORDER BY is_featured DESC, created_at DESC
       LIMIT 5`
@@ -1449,9 +1451,10 @@ const compareName = (p: Placed, loc: Locale): string => cardOf(p).name[loc];
 async function findComparable(db: D1Database, q: string, tax: ReturnType<typeof taxonomy>, limit: number): Promise<Placed[]> {
   const like = likePattern(q);
   if (!like) return [];
+  const L = await listing(db);
   const { results } = await db.prepare(
     `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
-      WHERE status = 'active' AND spec_fields <> '{}' AND spec_fields <> ''
+      WHERE ${L.listed('products')} AND spec_fields <> '{}' AND spec_fields <> ''
         AND (${sqlLikeClause(['name', 'name_ar', 'name_ku'], '?1')})
       ORDER BY is_featured DESC, created_at DESC
       LIMIT ${limit}`
@@ -1491,7 +1494,7 @@ async function handlePowerUsage(
   let target: Placed | null = null;
   if (ids.length) {
     const row = await db
-      .prepare(`SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products WHERE id = ? AND status = 'active'`)
+      .prepare(`SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products WHERE id = ? AND ${(await listing(db)).listed('products')}`)
       .bind(ids[0])
       .first<CompareProductRow>();
     if (row) target = place(row, tax);
@@ -1570,9 +1573,10 @@ async function handleCompareProducts(
 
   let placed: Placed[] = [];
   if (ids.length) {
+    const L = await listing(db);
     const { results } = await db.prepare(
       `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
-        WHERE id IN (${ids.map(() => '?').join(',')}) AND status = 'active'`
+        WHERE id IN (${ids.map(() => '?').join(',')}) AND ${L.listed('products')}`
     )
       .bind(...ids)
       .all<CompareProductRow>();
@@ -1841,9 +1845,10 @@ const STUDIO_ORIGIN = 'https://studio.levonis-iq.com';
 async function handleChoosePrinter(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
   const db = c.env.DB;
   const tax = taxonomy(await loadCatalogs(db));
+  const L = await listing(db);
   const { results } = await db.prepare(
     `SELECT ${COMPARE_PRODUCT_COLUMNS} FROM products
-      WHERE status = 'active' AND spec_fields <> '{}' AND spec_fields <> ''
+      WHERE ${L.listed('products')} AND spec_fields <> '{}' AND spec_fields <> ''
       ORDER BY is_featured DESC, created_at DESC
       LIMIT 40`
   ).all<CompareProductRow>();

@@ -81,6 +81,11 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0183 (FX plan §4.4, FX-7) — the per-SKU final price rung the cart's
     // resolver reads after the colour: written only by the engine's writer.
     'product_sku_prices',
+    // 0184 (owner brief 2026-10-10) — each catalogue product's verdict against
+    // the one central list of required fields, and the owner's «hide
+    // incomplete» hold. Derived from the product row and its pricing data, and
+    // written only after a catalogue write or by the catalogue's own sweep.
+    'product_completeness',
     'lot_cost_adjustments', 'lot_cost_adjustment_shares', 'inventory_lot_cost_versions', 'lot_count_events',
     // 0093 — «لكيتها بمكان أرخص». A customer's report that a competitor sells
     // this product for less, with OUR price frozen into the row at the moment

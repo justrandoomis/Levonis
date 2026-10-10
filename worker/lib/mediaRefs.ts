@@ -704,6 +704,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'pricing_sku_costs.shipping_profile': 'a shipping profile name; no media',
   // 0183 — FX-7: the per-SKU price rung; its key names option and colour ids, no media.
   'product_sku_prices.combo_key': 'an SKU combination key (option and colour ids); no media',
+  // 0184 — product completeness: what a product misses, by code; never a value, never media.
+  'product_completeness.missing_json': 'a JSON list of completeness codes and model ids (PRICE, COST, IMAGE…); no media',
+  'product_completeness.facts_key': 'a SHA-256 hex digest of the facts a verdict was computed from; no media',
   'pricing_audit.entity_key': 'the id or code of what a pricing change touched; no media',
   'pricing_audit.idempotency_key': 'a pricing write de-duplication token; no media',
   'pricing_audit.pricing_before_json': 'private pricing values before a change (amounts, rates, ids); no media',

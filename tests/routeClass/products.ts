@@ -42,6 +42,14 @@ export default {
         'POST /catalogs/:catalogId/reorder': 'op',
         'GET /': 'op',
         'GET /stats': 'op',
+        // «ناقص» / «إخفاء المنتجات الناقصة عن الزبائن» (owner brief 2026-10-10,
+        // worker/routes/adminCompleteness.ts): every admin reads a product's
+        // missing fields (a non-owner reads one OWNER_DATA item for the private
+        // ones); the count, the recount and the switch are the verified owner's.
+        'GET /completeness/summary': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' } },
+        'POST /completeness/refresh': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' } },
+        'PUT /completeness/hide': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' } },
+        'GET /:id/completeness': 'op',
         'GET /maintenance/orphans': 'op',
         'POST /maintenance/orphans/cleanup': { cls: 'op', noBody: NB.MEDIA },
         'POST /maintenance/media-cleanup/retry': { cls: 'op', noBody: NB.MEDIA },

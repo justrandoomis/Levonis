@@ -20,6 +20,7 @@
  * NO COMPOUND-SELECT LADDERS, ≤ 100 PARAMETERS. Every list of ids is ONE
  * `json_each(?)` parameter; the membership CTE is three terms.
  */
+import { listing } from '../lib/listing';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, str } from '../lib/http';
@@ -121,7 +122,7 @@ async function availableProductIds(
   if (ids.length === 0) return new Set();
   if (ids.length > TREE_AVAILABILITY_CAP) return null;
   const { results } = await db.prepare(
-    `SELECT * FROM products WHERE status = 'active' AND composition = '' AND id IN (SELECT value FROM json_each(?))`
+    `SELECT * FROM products WHERE ${(await listing(db)).listed('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))`
   )
     .bind(JSON.stringify(ids))
     .all<Record<string, unknown>>();
@@ -192,9 +193,10 @@ catalogRoutes.get('/:slug', async (c) => {
     // not check `active` either, and a dead link over a full shelf is worse.
     if (memberIds.length === 0) throw notFoundCategory();
 
+    const L = await listing(c.env.DB);
     const { results } = await c.env.DB.prepare(
       `SELECT * FROM products
-        WHERE status = 'active' AND composition = '' AND id IN (SELECT value FROM json_each(?))
+        WHERE ${L.listed('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
         ORDER BY display_order ASC, created_at DESC
         LIMIT ?`
     )

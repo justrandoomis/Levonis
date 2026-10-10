@@ -230,6 +230,10 @@ test('every code the table translates is one the server can actually emit', () =
     // rendered by code on the sheet (packages/contracts/src/dataFileRefusals.ts).
     'worker/routes/templateDataFile.ts',
     'worker/lib/productDataFile.ts',
+    // «ناقص» / «إخفاء المنتجات الناقصة عن الزبائن» (0184): the switch's and the
+    // recount's refusals (packages/contracts/src/productCompleteness.ts).
+    'worker/routes/adminCompleteness.ts',
+    'worker/routes/admin.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

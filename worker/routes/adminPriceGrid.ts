@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { completenessAfterWrite } from '../lib/completenessHooks';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
@@ -65,6 +66,9 @@ import {
 
 export const adminPriceGridRoutes = new Hono<AppContext>();
 adminPriceGridRoutes.use('*', requireAdmin);
+// Owner brief 2026-10-10: a saved model, colour, cell or price re-evaluates the
+// product against the required-field list (worker/lib/completenessHooks.ts).
+adminPriceGridRoutes.use('*', completenessAfterWrite);
 
 // ------------------------------------------------------------------ loading
 

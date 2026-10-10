@@ -23,6 +23,10 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, int, str, pickFrom, HttpError } from '../lib/http';
 import { audit } from '../lib/audit';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
+import { completenessAfterWrite } from '../lib/completenessHooks';
+import { registerCompletenessRoutes } from './adminCompleteness';
+import { completenessInstalled } from '../lib/listing';
+import { parseMissing, projectItems } from '../lib/productCompleteness';
 import { newId } from '../lib/crypto';
 import {
   DIMENSION_FIELDS,
@@ -115,6 +119,10 @@ adminProductsRoutes.use('*', requireAdmin);
 // listing, home shelves and (when the slug is known) the product page from
 // this colo's cache (worker/lib/edgePolicy.ts) instead of ageing out.
 adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
+// Owner brief 2026-10-10: after the purge middleware so it runs FIRST on the way
+// out — the product is re-evaluated against the required-field list (and a
+// product whose customer visibility flipped is purged) before the listing goes.
+adminProductsRoutes.use('*', completenessAfterWrite);
 
 // Pricing a selection from its purchase writes a price derived from cost: the owner's (decision 2).
 adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costRefusal(c.env,user);await refuseEngineManaged(c.env.DB,c.req.param('id'));const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
@@ -698,7 +706,20 @@ adminProductsRoutes.get('/', async (c) => {
     params.push(new Date(Date.now() - int(q.days, 'days', { min: 1, max: 3650 }) * 86_400_000).toISOString());
   }
   if (q.featured === '1') clauses.push('is_featured = 1');
+  // «ناقص» (owner brief 2026-10-10, migration 0184): the products the central
+  // required-field list finds incomplete. Without 0184 there is nothing to
+  // filter by and the column reads null.
+  const completeness = await completenessInstalled(c.env.DB);
+  if (q.incomplete === '1' && completeness) {
+    clauses.push('EXISTS (SELECT 1 FROM product_completeness pcf WHERE pcf.product_id = products.id AND pcf.complete = 0)');
+  }
   const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
+  const completenessCols = completeness
+    ? `,
+              (SELECT pcl.missing_json FROM product_completeness pcl WHERE pcl.product_id = products.id) AS completeness_missing,
+              (SELECT pcl.held FROM product_completeness pcl WHERE pcl.product_id = products.id) AS completeness_held`
+    : '';
+  const seesPrivate = canViewCost(c.env, c.get('user'));
 
   const ORDERS: Record<string, string> = {
     updated: 'updated_at DESC',
@@ -723,7 +744,7 @@ adminProductsRoutes.get('/', async (c) => {
               composition,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
-                        WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold
+                        WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold${completenessCols}
          FROM products${where}
         ORDER BY ${orderBy} LIMIT ? OFFSET ?`
     )
@@ -765,6 +786,15 @@ adminProductsRoutes.get('/', async (c) => {
         // row, so the grid BADGES it and sends the admin to the bundles panel
         // instead of opening an editor that will refuse (COMPOSITION_PRODUCT).
         composition: String(r.composition ?? ''),
+        // The required-field verdict, projected for this viewer (a non-owner
+        // counts the private fields as ONE «owner data» item): null = not
+        // evaluated yet (or no 0184). `held`: hidden from customers by the
+        // owner's switch.
+        missing_count:
+          r.completeness_missing === null || r.completeness_missing === undefined
+            ? null
+            : projectItems(parseMissing(r.completeness_missing), seesPrivate).length,
+        held: Number(r.completeness_held ?? 0) === 1,
         brand_id: (r.brand_id as string | null) ?? null,
         image: images.get(String(r.id)) ?? '',
         created_at: (r.created_at as string | null) ?? null,
@@ -848,6 +878,16 @@ adminProductsRoutes.get('/stats', async (c) => {
     return { day, orders: Number(r?.orders ?? 0), units: Number(r?.units ?? 0) };
   });
 
+  // «ناقص» / «مخفي عن الزبائن» counts (owner brief 2026-10-10), ordinary products only.
+  const completenessTotals = (await completenessInstalled(db))
+    ? await db
+        .prepare(
+          `SELECT TOTAL(pc.complete = 0) AS incomplete, TOTAL(pc.held = 1) AS held
+             FROM product_completeness pc JOIN products p ON p.id = pc.product_id
+            WHERE COALESCE(p.composition, '') = ''`
+        )
+        .first<{ incomplete: number; held: number }>()
+    : null;
   // Revenue is a MONEY figure, not a cost (owner decision 2 keeps it with
   // full-scope admins).
   const financial = canMoveMoney(c.env, c.get('user'));
@@ -860,6 +900,8 @@ adminProductsRoutes.get('/stats', async (c) => {
       hidden: totals?.hidden ?? 0,
       out_of_stock: totals?.out_of_stock ?? 0,
       featured: totals?.featured ?? 0,
+      incomplete: completenessTotals ? Number(completenessTotals.incomplete ?? 0) : null,
+      held: completenessTotals ? Number(completenessTotals.held ?? 0) : null,
     },
     weekly: weeks,
     sales_30d: {
@@ -870,6 +912,10 @@ adminProductsRoutes.get('/stats', async (c) => {
     sales_daily: days,
   });
 });
+
+// «ناقص» and «إخفاء المنتجات الناقصة عن الزبائن» (owner brief 2026-10-10):
+// before every `/:id` route so `/completeness/*` is never read as a product id.
+registerCompletenessRoutes(adminProductsRoutes);
 
 /**
  * THE RESIDUE FROM EVERY DELETE THAT CAME BEFORE THIS ONE.

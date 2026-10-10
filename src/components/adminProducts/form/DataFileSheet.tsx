@@ -20,6 +20,7 @@
  * server's; this only lays it out. Every word is ar / en / ckb
  * (../dataFileStrings.ts); a refusal by code is rendered from the contract.
  */
+import { COMPLETENESS_UI, completenessLabel, tri, type CompletenessItemDto } from '../completeness';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, Download, FileUp, RefreshCw } from 'lucide-react';
 import { Modal } from '../ui';
@@ -64,6 +65,8 @@ interface ProductCard {
   gone_items: string[];
   pricing: { kind: 'data' | 'price' | 'none'; preview_hash: string | null; large_change: boolean; adoption: { kind: string | null; rows: PricingRow[] } | null } | null;
   token: string | null;
+  /** The central required-field list on the product now and after this apply (codes only; owner-projected). */
+  completeness?: { before: CompletenessItemDto[]; after: CompletenessItemDto[] } | null;
 }
 
 interface Preview {
@@ -497,6 +500,33 @@ function ProductBlock({
       )}
 
       {card.gone_items.length > 0 && <p className="text-[11px] text-zinc-500 break-words">{fill(t(S.gone), { list: card.gone_items.join(', ') })}</p>}
+
+      {/* The missing flags (owner brief 2026-10-10): which required fields the product
+          would still miss once these changes are applied. */}
+      {card.completeness && (card.completeness.before.length > 0 || card.completeness.after.length > 0) && (
+        card.completeness.after.length === 0 ? (
+          <p className="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-2 py-1.5 text-[11px] text-emerald-200" data-data-file-complete>
+            {tri(COMPLETENESS_UI.afterApplyComplete, lang)}
+          </p>
+        ) : (
+          <div className="rounded-md border border-red-500/50 bg-red-500/5 px-2 py-1.5 min-w-0" data-data-file-missing={card.completeness.after.length}>
+            <p className="flex items-center gap-1.5 text-[11px] font-bold text-red-300">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" aria-hidden="true" />
+              {fill(tri(COMPLETENESS_UI.afterApplyMissing, lang), { n: card.completeness.after.length })}
+            </p>
+            <ul className="mt-1 flex flex-wrap gap-1.5">
+              {[...new Map(card.completeness.after.map((i) => [i.code, i])).values()].map((i) => (
+                <li key={i.code} className="rounded border border-red-500/40 px-1.5 py-0.5 text-[11px] text-red-200" data-missing={i.code}>
+                  {completenessLabel(i.code, lang)}
+                </li>
+              ))}
+            </ul>
+            {card.completeness.before.length !== card.completeness.after.length && (
+              <p className="mt-1 text-[10px] text-zinc-500">{fill(tri(COMPLETENESS_UI.nowMissing, lang), { n: card.completeness.before.length })}</p>
+            )}
+          </div>
+        )
+      )}
 
       {card.pricing && card.pricing.kind !== 'none' && (
         <div className="rounded-md border border-sky-500/30 bg-sky-500/5 px-2 py-1.5 space-y-1 min-w-0" data-data-file-pricing={card.pricing.kind}>

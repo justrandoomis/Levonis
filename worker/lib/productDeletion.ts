@@ -154,6 +154,11 @@ export const OWNED_TABLES: OwnedTable[] = [
   // a guest is charged), the product's own configuration, worthless without
   // it. Deleted after the state row, so its engine guard is already off.
   { table: 'product_sku_prices', by: { column: 'product_id' } },
+  // 0184: the product's verdict against the required-field list and its
+  // «hide incomplete» hold — derived from the product alone, codes only,
+  // worthless without it (the FK cascades too; listed so the registry stays
+  // the whole truth).
+  { table: 'product_completeness', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
   // clear — and clearing it would be wrong even if it were possible: the row's

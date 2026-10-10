@@ -110,6 +110,7 @@ export function DimensionsSection({
   inherited,
   collapsible = false,
   label,
+  flags = false,
 }: {
   dimensions: ProductDimensionsV2;
   onChange: (next: ProductDimensionsV2) => void;
@@ -117,6 +118,12 @@ export function DimensionsSection({
   inherited?: ProductDimensionsV2;
   collapsible?: boolean;
   label?: string;
+  /**
+   * The PRODUCT's own measures (not a model's override): the packaged weight
+   * and the box sides carry the central required-field flags («ناقص», owner
+   * brief 2026-10-10).
+   */
+  flags?: boolean;
 }) {
   const customCount = DIMENSION_KEYS.filter((key) => dimensions[key] !== null).length;
   // Selection-level editors stay compact on first render even when they
@@ -169,17 +176,17 @@ export function DimensionsSection({
           </p>
         )}
         <Grid cols={2}>
-          <Field ar="الوزن مع التغليف" en="Packaged weight" hint="كيلوغرام / kg" error={impossible ? 'الصندوق أخف من محتواه — راجع أحد الرقمين' : null}>
+          <Field ar="الوزن مع التغليف" en="Packaged weight" hint="كيلوغرام / kg" need={flags ? 'PACKAGE_WEIGHT' : undefined} error={impossible ? 'الصندوق أخف من محتواه — راجع أحد الرقمين' : null}>
             <MeasurementInput value={dimensions.package_weight_g} inherited={inherited?.package_weight_g} scale={1000} onChange={(value) => set('package_weight_g', value)} />
           </Field>
           <div />
-          <Field ar="عرض الصندوق" en="Box width" hint="سنتيمتر / cm">
+          <Field ar="عرض الصندوق" en="Box width" hint="سنتيمتر / cm" need={flags && !dimensions.package_width_mm ? 'PACKAGE_BOX' : undefined}>
             <MeasurementInput value={dimensions.package_width_mm} inherited={inherited?.package_width_mm} scale={10} onChange={(value) => set('package_width_mm', value)} />
           </Field>
-          <Field ar="عمق الصندوق" en="Box depth" hint="سنتيمتر / cm">
+          <Field ar="عمق الصندوق" en="Box depth" hint="سنتيمتر / cm" need={flags && !dimensions.package_depth_mm ? 'PACKAGE_BOX' : undefined}>
             <MeasurementInput value={dimensions.package_depth_mm} inherited={inherited?.package_depth_mm} scale={10} onChange={(value) => set('package_depth_mm', value)} />
           </Field>
-          <Field ar="ارتفاع الصندوق" en="Box height" hint="سنتيمتر / cm">
+          <Field ar="ارتفاع الصندوق" en="Box height" hint="سنتيمتر / cm" need={flags && !dimensions.package_height_mm ? 'PACKAGE_BOX' : undefined}>
             <MeasurementInput value={dimensions.package_height_mm} inherited={inherited?.package_height_mm} scale={10} onChange={(value) => set('package_height_mm', value)} />
           </Field>
         </Grid>

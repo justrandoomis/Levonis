@@ -29,6 +29,7 @@
  */
 import { COST_REFUSALS, isCostRefusalCode } from '../../packages/contracts/src/costRefusals';
 import { DATA_FILE_REFUSALS, isDataFileRefusalCode } from '../../packages/contracts/src/dataFileRefusals';
+import { COMPLETENESS_REFUSALS, isCompletenessRefusalCode } from '../../packages/contracts/src/productCompleteness';
 
 export interface RefusalStrings {
   ar: string;
@@ -1640,6 +1641,8 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   ...COST_REFUSALS,
   // ---- «ملف بيانات المنتج», the product data file's round trip (2026-10-10) --
   ...DATA_FILE_REFUSALS,
+  // ---- «ناقص» and «إخفاء المنتجات الناقصة عن الزبائن» (2026-10-10, 0184) ----
+  ...COMPLETENESS_REFUSALS,
   // ---- Serials at order preparation (0178; owner brief 2026-10-07) ---------
   // Admin screens: the order's «Scan Serial» slots, the camera sheet, the
   // §19 gate and the serial page. The Arabic is the brief's own (§31, §19);
@@ -1917,7 +1920,9 @@ export const refusalLang = (lang: string | null | undefined): Lang => (lang === 
 export function contractRefusal(err: unknown, lang: Lang, shown?: string): string {
   const e = err as { code?: unknown; message?: unknown } | null;
   const said = shown ?? (e && typeof e.message === 'string' ? e.message : '');
-  if (e && (isCostRefusalCode(e.code) || (typeof e.code === 'string' && isDataFileRefusalCode(e.code)))) return refusalText(e.code as string, lang, said);
+  if (e && (isCostRefusalCode(e.code) || (typeof e.code === 'string' && (isDataFileRefusalCode(e.code) || isCompletenessRefusalCode(e.code))))) {
+    return refusalText(e.code as string, lang, said);
+  }
   return said;
 }
 

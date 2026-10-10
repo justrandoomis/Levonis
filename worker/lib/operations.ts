@@ -117,6 +117,9 @@ export function fence(db: D1Database, sqlCondition: string, args: unknown[] = []
     db.prepare('DELETE FROM ops_guards WHERE id=?').bind(id),
   ];
 }
+/** `fence` refused its batch (ops_guards' CHECK ok=1): someone wrote between the read and the write. */
+export const isFenceMiss = (e: unknown): boolean =>
+  /CHECK constraint failed:\s*ok\s*=\s*1\b/i.test(e instanceof Error ? e.message : String(e));
 /** Integer largest remainder. Money never disappears into rounded unit prices. */
 export function allocateExact(total: number, weights: number[]): number[] {
   whole(total, 'total');

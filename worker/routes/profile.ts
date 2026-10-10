@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { listing } from '../lib/listing';
 import type { AppContext } from '../lib/types';
 import { publicUser, localeToDb } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, oneOf, username, displayName } from '../lib/http';
@@ -328,7 +329,7 @@ profileRoutes.get('/favorites', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT p.id, p.slug, p.name, p.name_ar, p.price_iqd
        FROM favorites f JOIN products p ON p.id = f.product_id
-      WHERE f.user_id = ? AND p.status = 'active' ORDER BY f.created_at DESC LIMIT 100`
+      WHERE f.user_id = ? AND ${(await listing(c.env.DB)).listed('p')} ORDER BY f.created_at DESC LIMIT 100`
   )
     .bind(user.id)
     .all<Record<string, unknown>>();
@@ -352,7 +353,7 @@ profileRoutes.get('/favorites', async (c) => {
 profileRoutes.put('/favorites/:productId', async (c) => {
   const user = c.get('user')!;
   const productId = c.req.param('productId');
-  const product = await c.env.DB.prepare("SELECT id FROM products WHERE id = ? AND status = 'active'")
+  const product = await c.env.DB.prepare(`SELECT id FROM products WHERE id = ? AND ${(await listing(c.env.DB)).listed('products')}`)
     .bind(productId)
     .first();
   if (!product) throw notFound('Product not found');

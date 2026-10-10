@@ -322,5 +322,14 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     const src = files.find((x) => x.f === helper)!.src;
     assert.doesNotMatch(src, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview)['"]/, helper);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6)), []);
+  // The owner's product tools — admin routes and the cron, never a customer path: the product data
+  // file's pricing block reads and writes inputs and rules through the engine's own modules (DECISIONS
+  // row 204), and «ناقص» asks the engine's resolvers whether a cost or a minimum profit EXISTS; it
+  // computes no price (row 205). None of them is reachable from a customer route.
+  const OWNER_TOOLS = ['worker/lib/productDataFilePricing.ts', 'worker/routes/templateDataFile.ts', 'worker/lib/productCompleteness.ts'];
+  const TOOL_IMPORT = /from\s+['"][^'"]*\/(?:productDataFilePricing|templateDataFile|productCompleteness|completenessHooks)['"]/;
+  for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
+    assert.doesNotMatch(files.find((x) => x.f === f)!.src, TOOL_IMPORT, `${f} reaches no owner tool`);
+  }
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !OWNER_TOOLS.includes(f)), []);
 });

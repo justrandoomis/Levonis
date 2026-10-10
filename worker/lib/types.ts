@@ -242,6 +242,12 @@ export type AppContext = {
     merchantStore?: { id: string; slug: string };
     /** A product slug an admin catalogue write names, for `purgeCatalogueAfterWrite`. */
     catalogueSlug?: string;
+    /**
+     * Products a catalogue write changed, for the completeness recompute
+     * (worker/lib/completenessHooks.ts `completenessAfterWrite`), when the
+     * path does not name the product (a create, an import, a bulk save).
+     */
+    completenessIds?: string[];
   };
 };
 

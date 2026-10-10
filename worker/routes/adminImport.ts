@@ -34,6 +34,7 @@
  * the file still applies.
  */
 
+import { completenessAfterWrite } from '../lib/completenessHooks';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { Hono } from 'hono';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
@@ -134,6 +135,7 @@ import { isActiveProductImageRow } from '../lib/productOverlay';
 
 export const adminImportRoutes = new Hono<AppContext>();
 adminImportRoutes.use('*', requireAdmin);
+adminImportRoutes.use('*', completenessAfterWrite);
 
 const MAX_CSV_BYTES = 4 * 1024 * 1024;
 const MAX_ZIP_BYTES = 40 * 1024 * 1024;
@@ -2192,6 +2194,9 @@ adminImportRoutes.post('/confirm', async (c) => {
       brands_created: brandsCreated.filter((b) => b.created).map((b) => b.id),
     });
 
+    // Owner brief 2026-10-10: the products this import wrote are re-evaluated against the
+    // required-field list once it has answered (the first few here; the sweep catches the rest).
+    c.set('completenessIds', report.filter((r) => (r.action === 'created' || r.action === 'updated') && r.product_id).map((r) => String(r.product_id)));
     return c.json({
       success: true,
       import_id: importId,

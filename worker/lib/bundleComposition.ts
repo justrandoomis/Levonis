@@ -38,6 +38,7 @@
  *    stored rows and a server clock; the client classifies nothing.
  */
 
+import { listing } from './listing';
 import {
   isCapacityScope,
   isLowStock,
@@ -992,7 +993,19 @@ export interface MemberRow {
  * loads the members of EVERY bundle on the page in one call, then resolves
  * each bundle against the same map with no further reads.
  */
-export async function loadCompositionMembers(db: D1Database, ids: string[]): Promise<Map<string, MemberRow>> {
+export async function loadCompositionMembers(
+  db: D1Database,
+  ids: string[],
+  opts: {
+    /**
+     * A CUSTOMER read (the composition pages, the cart, the checkout door): a
+     * member the owner's «hide incomplete» switch holds (worker/lib/listing.ts)
+     * is read as a hidden one, in memory only, so the bundle is unavailable
+     * through the same path as a hidden member. The admin panels leave it out.
+     */
+    customer?: boolean;
+  } = {}
+): Promise<Map<string, MemberRow>> {
   const out = new Map<string, MemberRow>();
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return out;
@@ -1009,8 +1022,10 @@ export async function loadCompositionMembers(db: D1Database, ids: string[]): Pro
     db,
     rows.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))
   );
+  const held = opts.customer ? await (await listing(db)).heldIds(rows.map((r) => String(r.id))) : new Set<string>();
   for (const r of rows) {
     const id = String(r.id);
+    if (held.has(id)) r.status = 'hidden';
     const view = views.get(id) ?? EMPTY_RELATIONS;
     out.set(id, { row: r, doc: applyRelations(parseProductRow(r), view, { includeInactive: false }), view });
   }

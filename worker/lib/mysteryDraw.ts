@@ -62,6 +62,7 @@
  * leaked admin payload would let anyone precompute every future draw.
  */
 
+import { listing } from './listing';
 import { seedFrom, sequence, weightedIndex, randomSeedHex } from './farm/rng';
 import { sha256Hex } from './crypto';
 import { resolveForOrderType, type OrderType, type StockResolution, type StockTarget } from './inventory';
@@ -370,7 +371,7 @@ interface EntryJoinRow {
 /** §7.2's query, verbatim in shape. The `preview` variant keeps the excluded
  *  rows so the admin can be TOLD why an entry can never be drawn — a customer
  *  path never asks for it. */
-const CANDIDATE_SQL = (preview: boolean) => `
+const CANDIDATE_SQL = (preview: boolean, listedP: string) => `
   SELECT e.id AS entry_id, e.product_id, e.option_value_ids, e.color_id, e.family_id, e.weight,
          e.active AS entry_active,
          p.inventory_mode, p.stock, p.stock_reserved, p.low_stock_threshold,
@@ -382,7 +383,7 @@ const CANDIDATE_SQL = (preview: boolean) => `
     JOIN products p ON p.id = e.product_id
    WHERE e.pool_id = ?1
      ${preview ? '' : 'AND e.active = 1 AND e.weight > 0'}
-     ${preview ? '' : "AND p.status = 'active'"}
+     ${preview ? '' : `AND ${listedP}`}
      ${preview ? '' : "AND p.composition = ''"}
      AND (?2 = '' OR e.family_id = ?2)
    ORDER BY e.id`;
@@ -478,10 +479,15 @@ export async function loadCandidates(
    * its own will spend. It is never read on a direct pool.
    */
   const transportMethod = (opts.transportMethod ?? '').trim();
+  // Listed to customers (worker/lib/listing.ts): a product the owner's «hide
+  // incomplete» switch holds is never drawn, and the admin preview names it
+  // PRODUCT_INACTIVE like a hidden one.
+  const L = await listing(db);
   const { results } = await db
-    .prepare(CANDIDATE_SQL(preview))
+    .prepare(CANDIDATE_SQL(preview, L.listed('p')))
     .bind(pool.id, family)
     .all<EntryJoinRow>();
+  const heldEntries = await L.heldIds(results.map((r) => String(r.product_id)));
 
   const modeById = new Map(results.map((r) => [r.product_id, r.inventory_mode]));
   const productIds = [...modeById.keys()];
@@ -522,7 +528,7 @@ export async function loadCandidates(
       drop('ZERO_WEIGHT');
       continue;
     }
-    if (r.status !== 'active') {
+    if (!L.isListedRow({ id: r.product_id, status: r.status }, heldEntries)) {
       drop('PRODUCT_INACTIVE');
       continue;
     }

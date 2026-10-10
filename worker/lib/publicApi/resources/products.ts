@@ -12,6 +12,7 @@
  * SKU parts, supplier source URLs and benefit-rule ids a visitor never sees
  * on the page.
  */
+import { listing } from '../../listing';
 import { HttpError, notFound } from '../../http';
 import { catalogIndexFor } from '../../catalogPresentation';
 import { parseProductRow } from '../../productModel';
@@ -509,7 +510,7 @@ function productDetailDto(
 
 async function activeProductRow(db: D1Database, slug: string): Promise<Rec> {
   const row = await db
-    .prepare("SELECT * FROM products WHERE slug = ? AND status = 'active'")
+    .prepare(`SELECT * FROM products WHERE slug = ? AND ${(await listing(db)).listed('products')}`)
     .bind(slug)
     .first<Rec>();
   if (!row) throw notFound('Product not found');
@@ -574,7 +575,7 @@ async function productReviews(req: PublicRequest) {
   const { db, urls, query } = req;
   const slug = req.path.slug;
   const product = await db
-    .prepare("SELECT id, slug FROM products WHERE slug = ? AND status = 'active'")
+    .prepare(`SELECT id, slug FROM products WHERE slug = ? AND ${(await listing(db)).listed('products')}`)
     .bind(slug)
     .first<{ id: string; slug: string }>();
   if (!product) throw notFound('Product not found');

@@ -11,6 +11,7 @@
  * carrying their session across.
  */
 
+import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, notFound } from '../lib/http';
@@ -74,13 +75,14 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
    * product the shop has since retired drops off both, and it drops off
    * QUIETLY — a list of things that can no longer be bought is not a feature.
    */
+  const listedP = (await listing(db)).listed('p');
   const catalogue = await db
     .prepare(
       `SELECT f.product_id, f.created_at AS saved_at,
               p.slug, p.name, p.name_ar, p.price_iqd, p.original_price_iqd
          FROM favorites f
          JOIN products p ON p.id = f.product_id
-        WHERE f.user_id = ? AND p.status = 'active'
+        WHERE f.user_id = ? AND ${listedP}
         ORDER BY f.created_at DESC
         LIMIT 100`
     )

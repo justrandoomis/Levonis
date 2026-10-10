@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { completenessAfterWrite } from '../lib/completenessHooks';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
@@ -65,6 +66,9 @@ import {
 
 export const adminProductRelationsRoutes = new Hono<AppContext>();
 adminProductRelationsRoutes.use('*', requireAdmin);
+// Owner brief 2026-10-10: a saved model, colour, cell or price re-evaluates the
+// product against the required-field list (worker/lib/completenessHooks.ts).
+adminProductRelationsRoutes.use('*', completenessAfterWrite);
 
 /** Replace caller-claimed metadata with facts proved from the stored bytes. */
 async function normalizeVerifiedRelationMedia(

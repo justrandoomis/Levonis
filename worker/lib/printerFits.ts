@@ -29,6 +29,7 @@
  * actually asks for a link, naming the migration, so an owner can still
  * correct a price in that window.
  */
+import { listing } from './listing';
 import { badRequest, unavailable } from './http';
 import { isMissingTable } from './membershipBenefits';
 import { printerProductIds } from './printerIdentity';
@@ -239,13 +240,14 @@ export async function activeFitsFor(db: D1Database, productIds: readonly string[
   const out = new Map<string, FitPrinter[]>();
   const wanted = [...new Set(productIds.filter(Boolean))];
   if (!wanted.length) return out;
+  const L = await listing(db);
   const rows = await orNone(async () => {
     const { results } = await db
       .prepare(
         `SELECT f.product_id AS part_id, pr.id, pr.slug, pr.name, pr.name_ar, pr.name_ku, pr.status,
                 pr.category_id, pr.sub_category_id
            FROM product_printer_fits f
-           JOIN products pr ON pr.id = f.printer_id AND pr.status = 'active'
+           JOIN products pr ON pr.id = f.printer_id AND ${L.listed('pr')}
           WHERE f.product_id IN (SELECT value FROM json_each(?))
           ORDER BY f.product_id, f.position, f.printer_id`
       )
@@ -273,6 +275,7 @@ export async function maintenancePartCounts(db: D1Database, printerIds: readonly
   const out = new Map<string, number>();
   const wanted = [...new Set(printerIds.filter(Boolean))];
   if (!wanted.length) return out;
+  const L = await listing(db);
   const results = await orNone(async () => (await db
     .prepare(
       `WITH RECURSIVE maint(id) AS (
@@ -281,7 +284,7 @@ export async function maintenancePartCounts(db: D1Database, printerIds: readonly
        )
        SELECT f.printer_id, COUNT(DISTINCT f.product_id) AS n
          FROM product_printer_fits f
-         JOIN products p ON p.id = f.product_id AND p.status = 'active' AND p.composition = ''
+         JOIN products p ON p.id = f.product_id AND ${L.listed('p')} AND p.composition = ''
         WHERE f.printer_id IN (SELECT value FROM json_each(?))
           AND (p.category_id IN (SELECT id FROM maint)
                OR p.sub_category_id IN (SELECT id FROM maint)
@@ -327,7 +330,7 @@ export async function maintenanceFor(db: D1Database, productIds: readonly string
   const { results: rows } = await db
     .prepare(
       `SELECT id, slug, name, name_ar, name_ku, status, category_id, sub_category_id
-         FROM products WHERE status = 'active' AND id IN (SELECT value FROM json_each(?))`
+         FROM products WHERE ${(await listing(db)).listed('products')} AND id IN (SELECT value FROM json_each(?))`
     )
     .bind(JSON.stringify(withParts))
     .all<PrinterRow>();

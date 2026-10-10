@@ -20,6 +20,7 @@
  * admin — and the server refuses to write it either way (§11).
  */
 
+import { MissingNote } from '../completeness';
 import React, { useId } from 'react';
 import { Trash2, GripVertical } from 'lucide-react';
 import {
@@ -597,6 +598,11 @@ export function OptionsSection({
                         locked={pricesLocked}
                         onChange={(patch) => patchValue(g.id, v.id, patch)}
                       />
+                      {/* «ناقص» (owner brief 2026-10-10): this model reaches no cost —
+                          neither a dinar cost here nor a supplier cost in its USD pricing. */}
+                      <div className="col-span-full -mt-1">
+                        <MissingNote code="COST" optionId={v.id} withLabel />
+                      </div>
                       <Field ar="مفعّل" en="Active">
                         <Toggle
                           checked={v.active}

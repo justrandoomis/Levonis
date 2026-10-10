@@ -46,7 +46,7 @@ import { listPricedProducts } from '../worker/lib/pricingEngine/load';
 import { AUTO_REPRICE_SWEEP_BUDGET, D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE, quarterHourSweepBudget, sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { countingD1, d1Base } from '../worker/lib/d1Count';
-import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourSearchBudget } from '../worker/lib/quarterHourBudget';
+import { COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget } from '../worker/lib/quarterHourBudget';
 import { drainStaffReconciliations } from '../worker/lib/financeStaffAccrual';
 import { INDEX_FAILED_MARK, INDEX_STAMP, backfillSearchIndex } from '../worker/lib/search/store';
 import { resetEventBus } from '../worker/lib/eventBus';
@@ -58,6 +58,11 @@ import type { Env } from '../worker/lib/types';
 const SWEEP_FIRST = /FROM product_pricing_state s JOIN products p ON p\.id = s\.product_id\s+WHERE s\.mode = 'engine'/;
 /** The search-index catch-up's first statement (jobs.ts `catchUpSearchIndex`): no other quarter-hour job runs it. */
 const CATCH_UP_FIRST = 'PRAGMA table_info("search_tokens")';
+/**
+ * The completeness catch-up's first statement (productCompleteness.ts `sweepCompleteness`, after the engine
+ * sweep): its presence probe on the tick's counted binding, or its facts read once the table is known.
+ */
+const COMPLETENESS_FIRST = /^SELECT 1 AS x FROM product_completeness LIMIT 1$|^SELECT p\.id AS id, p\.slug AS slug, p\.status AS status/;
 
 class CountStmt {
   constructor(
@@ -124,13 +129,16 @@ async function tick(raw: DatabaseSync) {
   } finally {
     console.error = original;
   }
-  const first = d1.log.findIndex((sql) => SWEEP_FIRST.test(sql));
-  const jobs = first === -1 ? d1.log.length : first;
+  // The completeness catch-up runs last of all (worker/index.ts), on what the engine sweep left.
+  const last = d1.log.findIndex((sql) => COMPLETENESS_FIRST.test(sql));
+  const end = last === -1 ? d1.log.length : last;
+  const first = d1.log.slice(0, end).findIndex((sql) => SWEEP_FIRST.test(sql));
+  const jobs = first === -1 ? end : first;
   // The tick's own jobs end where the catch-up's probe begins (it runs once, after them, or not at all).
   const probes = d1.log.flatMap((sql, i) => (sql === CATCH_UP_FIRST ? [i] : []));
   assert.ok(probes.length <= 1, 'the catch-up probe runs once a tick, and no other job runs it');
   const own = probes.length === 1 && probes[0] < jobs ? probes[0] : jobs;
-  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: d1.log.length - jobs, log: d1.log, errors };
+  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: end - jobs, completeness: d1.log.length - end, log: d1.log, errors };
 }
 
 // ------------------------------------------------------------- the world, every job at its bound
@@ -294,7 +302,12 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   assert.ok(without.sweep <= 4, `nothing stale: one indexed read and the rates (${without.sweep})`);
   // The sweep's first statement comes after every job's last: it ran LAST.
   assert.ok(withSweep.log.slice(withSweep.jobs).every((sql) => !/upload_sessions|finance_staff_reconciliations|FROM outbox|search_tokens/.test(sql)));
-  console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
+  // The completeness catch-up (0184) after the sweep, within its own share of what the sweep left.
+  const completenessShare = quarterHourCompletenessBudget(withSweep.jobs + withSweep.sweep);
+  assert.ok(withSweep.completeness <= completenessShare && completenessShare <= COMPLETENESS_TICK_BUDGET, `the completeness catch-up spent ${withSweep.completeness} of its ${completenessShare}`);
+  const lateSweep = withSweep.log.slice(withSweep.jobs + withSweep.sweep).filter((sql) => /(?:INSERT INTO|UPDATE) pricing_sku_costs|upload_sessions|FROM outbox|search_tokens/.test(sql));
+  assert.deepEqual(lateSweep, [], 'nothing of the sweep or the jobs after the completeness catch-up began');
+  console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), completeness ${withSweep.completeness} (share ${completenessShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 
 /** Active products whose index rows are missing or stale — the catch-up's work. */

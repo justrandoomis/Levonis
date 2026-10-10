@@ -10,6 +10,7 @@
  * is always recomputed at checkout.
  */
 
+import { listing as listingOf, listedProductBySlug, optimisticListed, runListed } from '../lib/listing';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -3083,10 +3084,11 @@ export { cover as compositionCover };
  * published yet, rather than quietly quoting material-only as a total.
  */
 productRoutes.get('/print-calculator', async (c) => {
+  const L = await listingOf(c.env.DB);
   const { results } = await c.env.DB.prepare(
     `SELECT id, slug, name, name_ar, name_ku, price_iqd, spec_fields, images, template_family
        FROM products
-      WHERE status = 'active' AND template_family = 'materials' AND price_iqd > 0
+      WHERE ${L.listed('products')} AND template_family = 'materials' AND price_iqd > 0
       ORDER BY price_iqd
       LIMIT 200`
   ).all<Record<string, unknown>>();
@@ -3290,7 +3292,10 @@ export async function listCatalogProducts(
    */
   const categoryField = category ? { category: categoryRef } : {};
 
-  let sql = "SELECT * FROM products WHERE status = 'active'";
+  // Listed to customers: active, and not held by the owner's «hide incomplete»
+  // switch (worker/lib/listing.ts) — optimistic, no probe: the first screen's
+  // wave count stands. The count below rewrites this prefix.
+  let sql = `SELECT * FROM products WHERE ${optimisticListed(db)}`;
   const params: unknown[] = [];
   /**
    * THE SEARCH THAT COULD NOT FIND THIS SHOP'S OWN FLAGSHIP.
@@ -3458,7 +3463,7 @@ export async function listCatalogProducts(
     }
     sql +=
       ' AND id IN (SELECT f.product_id FROM product_printer_fits f JOIN products pr ON pr.id = f.printer_id' +
-      " WHERE pr.status = 'active' AND pr.slug IN (SELECT value FROM json_each(?)))";
+      ` WHERE ${optimisticListed(db, 'pr')} AND pr.slug IN (SELECT value FROM json_each(?)))`;
     params.push(JSON.stringify(listingState.fits));
   }
   /**
@@ -3488,10 +3493,10 @@ export async function listCatalogProducts(
   else params.push(limit, offset);
 
   const [{ results: fetched }, ctx, idx, counted] = await Promise.all([
-    db.prepare(sql).bind(...params).all<Record<string, unknown>>(),
+    runListed(db, sql, (q) => db.prepare(q).bind(...params).all<Record<string, unknown>>()),
     ctxPromise,
     idxPromise.catch(() => null),
-    countSql ? db.prepare(countSql).bind(...countParams).first<{ n: number }>() : Promise.resolve(null),
+    countSql ? runListed(db, countSql, (q) => db.prepare(q).bind(...countParams).first<{ n: number }>()) : Promise.resolve(null),
   ]);
   const truncated = listing && fetched.length > LISTING_CANDIDATE_CAP;
   const results = truncated ? fetched.slice(0, LISTING_CANDIDATE_CAP) : fetched;
@@ -3730,11 +3735,10 @@ export async function catalogProductDetail(
    */
   let conditionReference: { reference_iqd: number; saving_iqd: number } | null = null;
   if (parsed.condition?.new_product_id) {
-    const ref = await db.prepare(
-      "SELECT price_iqd FROM products WHERE id = ? AND status = 'active'"
-    )
-      .bind(parsed.condition.new_product_id)
-      .first<{ price_iqd: number }>();
+    const newId = parsed.condition.new_product_id;
+    const ref = await runListed(db, `SELECT price_iqd FROM products WHERE id = ? AND ${optimisticListed(db)}`, (q) =>
+      db.prepare(q).bind(newId).first<{ price_iqd: number }>()
+    );
     conditionReference = conditionSaving(Number(parsed.price_iqd) || 0, ref ? Number(ref.price_iqd) : null);
   }
   const ratingCount = Number(ratingRow?.n) || 0;
@@ -3910,9 +3914,8 @@ productRoutes.get('/:slug', (c) => anonymousCached(c, { perViewer: true }, () =>
 
 async function productDetail(c: Context<AppContext>): Promise<Response> {
   const slug = c.req.param('slug') ?? '';
-  const row = await c.env.DB.prepare("SELECT * FROM products WHERE slug = ? AND status = 'active'")
-    .bind(slug)
-    .first<Record<string, unknown>>();
+  // A product the owner's «hide incomplete» switch holds answers exactly as a hidden one: 404.
+  const row = await listedProductBySlug(c.env.DB, slug);
   if (row) {
     const user = c.get('user');
     const parsed = parseProductRow(row);
@@ -4021,9 +4024,7 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
 productRoutes.post('/:slug/quote', async (c) => {
   await rateLimit(c, 'product_quote', 120, 60);
   const slug = c.req.param('slug');
-  const row = await c.env.DB.prepare("SELECT * FROM products WHERE slug = ? AND status = 'active'")
-    .bind(slug)
-    .first<Record<string, unknown>>();
+  const row = await listedProductBySlug(c.env.DB, slug);
   if (!row) throw notFound('Product not found');
 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -4251,9 +4252,9 @@ productRoutes.post('/:slug/quote', async (c) => {
  */
 async function openBoxShelf(db: D1Database): Promise<Record<string, unknown>[]> {
   try {
-    const r = await db
-      .prepare("SELECT * FROM products WHERE status = 'active' AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12")
-      .all<Record<string, unknown>>();
+    const r = await runListed(db, `SELECT * FROM products WHERE ${optimisticListed(db)} AND condition_doc <> '{}' ORDER BY created_at DESC LIMIT 12`, (q) =>
+      db.prepare(q).all<Record<string, unknown>>()
+    );
     return r.results ?? [];
   } catch (e) {
     if (await isConditionColumnMissing(db, e)) return [];
@@ -4306,6 +4307,9 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
    */
   const ctxPromise = pricingCtx(c);
   const settingsPromise = getSettings(c.env.DB, PUBLIC_SETTING_KEYS);
+  // Listed to customers (worker/lib/listing.ts): optimistic, no probe before the first wave.
+  const db = c.env.DB;
+  const L = { listed: (alias?: string) => optimisticListed(db, alias) };
   // The display currency's rate (FX plan §8): the one public FX figure, in the first wave.
   const displayRatePromise = getPublicDisplayRate(c.env.DB);
   const [settings, discounted, latest, openBoxRows, categories, brands, ctx, display] = await Promise.all([
@@ -4336,18 +4340,18 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
      */
     ctxPromise.then((ready) => {
       const reach = discountedWhere(ready);
-      return c.env.DB.prepare(
+      return runListed(
+        db,
         `SELECT * FROM products
-          WHERE status = 'active' AND composition = ''
+          WHERE ${L.listed('products')} AND composition = ''
             AND ${reach.sql}
-          ORDER BY created_at DESC LIMIT 10`
-      )
-        .bind(...reach.params)
-        .all<Record<string, unknown>>();
+          ORDER BY created_at DESC LIMIT 10`,
+        (q) => db.prepare(q).bind(...reach.params).all<Record<string, unknown>>()
+      );
     }),
-    c.env.DB.prepare("SELECT * FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT 20").all<
-      Record<string, unknown>
-    >(),
+    runListed(db, `SELECT * FROM products WHERE ${L.listed('products')} ORDER BY created_at DESC LIMIT 20`, (q) =>
+      db.prepare(q).all<Record<string, unknown>>()
+    ),
     // OPEN BOX / USED / REFURBISHED, newest first.
     //
     // `condition_doc <> '{}'` is the same predicate migration 0085's PARTIAL
@@ -4379,11 +4383,12 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
         keep: new Set(Object.values(normalizeHomeBento((s as Record<string, unknown>).homeBento)).map((a) => a!.category)),
       })
     ),
-    c.env.DB.prepare(
+    runListed(
+      db,
       `WITH counted AS (
          SELECT b.id, b.slug, b.name_ar, b.name_en, b.name_ckb,
                 (SELECT COUNT(*) FROM products p
-                  WHERE p.brand_id = b.id AND p.status = 'active') AS n
+                  WHERE p.brand_id = b.id AND ${L.listed('p')}) AS n
            FROM brands b
           WHERE b.active = 1
        )
@@ -4395,8 +4400,9 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
                         = COALESCE(NULLIF(counted.name_en,''), counted.name_ar))
         GROUP BY COALESCE(NULLIF(name_en,''), name_ar)
         ORDER BY product_count DESC, name_en
-        LIMIT 12`
-    ).all<Record<string, unknown>>(),
+        LIMIT 12`,
+      (q) => db.prepare(q).all<Record<string, unknown>>()
+    ),
     ctxPromise,
     displayRatePromise,
   ]);
@@ -4469,11 +4475,11 @@ async function homePage(c: Context<AppContext>): Promise<Response> {
   ];
   const referencePrices = new Map<string, number>();
   if (referenceIds.length > 0) {
-    const { results: refRows } = await c.env.DB.prepare(
-      `SELECT id, price_iqd FROM products WHERE status = 'active' AND id IN (${referenceIds.map(() => '?').join(',')})`
-    )
-      .bind(...referenceIds)
-      .all<{ id: string; price_iqd: number }>();
+    const { results: refRows } = await runListed(
+      db,
+      `SELECT id, price_iqd FROM products WHERE ${L.listed('products')} AND id IN (${referenceIds.map(() => '?').join(',')})`,
+      (q) => db.prepare(q).bind(...referenceIds).all<{ id: string; price_iqd: number }>()
+    );
     for (const r of refRows ?? []) referencePrices.set(String(r.id), Number(r.price_iqd) || 0);
   }
   const openBoxCards = openBoxRows.map((p) => {
