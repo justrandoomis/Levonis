@@ -10,6 +10,8 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Plus, Search, X } from 'lucide-react';
+import { IconButton } from '../../components/ui/Button';
+import FilterChip from '../../components/community/FilterChip';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { useGoBack } from '../../lib/useGoBack';
@@ -70,17 +72,15 @@ export default function ProjectsPage() {
   const newLink = isAuthenticated ? { to: '/community/projects/new' } : { to: '/auth', state: { from: '/community/projects/new' } };
 
   return (
-    <div className="min-h-screen bg-canvas pb-28 text-text-primary">
+    <div className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-16 px-4">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-3">
-          <button
-            type="button"
-            aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          <IconButton
+            label={loc('رجوع', 'Back', 'گەڕانەوە')}
             onClick={goBack}
-            className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Back className="h-5 w-5" />
-          </button>
+            className="-ms-2"
+            icon={<Back className="h-5 w-5" />}
+          />
           <form
             ref={box.barRef}
             role="search"
@@ -100,12 +100,12 @@ export default function ProjectsPage() {
               enterKeyHint="search"
               autoComplete="off"
               dir="auto"
+              className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
               value={draft}
               maxLength={60}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={loc('ابحث في المشاريع', 'Search projects', 'لە پڕۆژەکان بگەڕێ')}
               data-projects-search
-              className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
               {...box.inputProps}
             />
             {draft && (
@@ -152,19 +152,19 @@ export default function ProjectsPage() {
 
         {/* kind chips; the chosen tag shows as a removable chip */}
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 hide-scrollbar" role="group" aria-label={s.kind}>
-          <button type="button" className="lv-choice shrink-0" aria-pressed={kind === ''} onClick={() => setParam('kind', '')}>
+          <FilterChip on={kind === ''} aria-pressed={kind === ''} onClick={() => setParam('kind', '')}>
             {s.seeAll}
-          </button>
+          </FilterChip>
           {POST_KINDS.map((k) => (
-            <button key={k} type="button" className="lv-choice shrink-0" aria-pressed={kind === k} onClick={() => setParam('kind', kind === k ? '' : k)}>
+            <FilterChip key={k} on={kind === k} aria-pressed={kind === k} onClick={() => setParam('kind', kind === k ? '' : k)}>
               {s.kinds[k]}
-            </button>
+            </FilterChip>
           ))}
           {tag && (
-            <button type="button" className="lv-choice shrink-0 gap-1" aria-pressed onClick={() => setParam('tag', '')} aria-label={`${s.tags}: ${tag}`}>
+            <FilterChip on check={false} aria-pressed onClick={() => setParam('tag', '')} aria-label={`${s.tags}: ${tag}`}>
               #{tag}
               <X aria-hidden="true" className="h-3.5 w-3.5" />
-            </button>
+            </FilterChip>
           )}
         </div>
 

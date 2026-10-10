@@ -24,7 +24,7 @@ import { productName } from '../../lib/productText';
 import { ErrorState } from '../../components/ui/AsyncStates';
 import { useConfirm } from '../../components/ui/ConfirmDialog';
 import { toast } from '../../components/ui/Toast';
-import { Button } from '../../components/ui/Button';
+import { Button, IconButton } from '../../components/ui/Button';
 import { StoreMark } from '../../components/community/hub/parts';
 import { timeAgo } from '../../components/community/hub/copy';
 import MediaStrip from '../../components/community/projects/MediaStrip';
@@ -115,7 +115,7 @@ export default function ProjectPage() {
     <>
       <SpecList post={post} />
       {(post.store || post.product || post.material.product) && (
-        <section aria-label={loc('روابط المشروع', 'Where this leads', 'بەستەرەکانی پڕۆژە')} className="flex flex-col divide-y divide-border-subtle/60 overflow-hidden rounded-2xl border border-border-subtle/60 bg-surface">
+        <section aria-label={loc('روابط المشروع', 'Where this leads', 'بەستەرەکانی پڕۆژە')} className="lv-surface flex flex-col divide-y divide-border-subtle/60 overflow-hidden">
           {post.store && <Door href={post.store.url} icon={<StoreMark src={post.store.logoUrl} />} kicker={s.fromWorkshop} title={post.store.name} />}
           {post.product && (
             <Door
@@ -140,17 +140,15 @@ export default function ProjectPage() {
   ) : null;
 
   return (
-    <div className="min-h-screen bg-canvas pb-8 text-text-primary">
+    <div className="min-h-screen pb-8 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-3xl items-center gap-2">
-          <button
-            type="button"
-            aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          <IconButton
+            label={loc('رجوع', 'Back', 'گەڕانەوە')}
             onClick={goBack}
-            className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Back className="h-5 w-5" />
-          </button>
+            className="-ms-2"
+            icon={<Back className="h-5 w-5" />}
+          />
           <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{s.project}</span>
         </div>
       </div>
@@ -189,7 +187,7 @@ export default function ProjectPage() {
             )}
             {/* the customer being asked */}
             {post.viewer.consent && (
-              <section aria-labelledby="consent-title" data-project-consent className="rounded-2xl border border-gold/40 bg-surface p-4">
+              <section aria-labelledby="consent-title" data-project-consent className="lv-surface-raised p-4">
                 <h2 id="consent-title" className="text-[14.5px] font-bold">
                   {s.askedTitle}
                 </h2>
@@ -264,7 +262,7 @@ export default function ProjectPage() {
                       <li key={t}>
                         <Link
                           to={`/community/projects?tag=${encodeURIComponent(t)}`}
-                          className="lv-hit relative inline-flex min-h-8 items-center rounded-full bg-surface px-3 text-[12.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          className="lv-hit relative inline-flex min-h-9 items-center rounded-full border border-border-subtle bg-surface-raised px-3 text-[12.5px] text-text-secondary shadow-xs transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           #{t}
                         </Link>
@@ -354,9 +352,7 @@ function Banner({ tone, icon, children }: { tone: 'info' | 'danger'; icon: React
   return (
     <div
       role="status"
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-[13px] ${
-        tone === 'danger' ? 'border-danger/30 bg-danger/10 text-text-primary' : 'border-border-subtle/60 bg-surface text-text-secondary'
-      }`}
+      className={`lv-alert flex items-center gap-3 text-[13px] ${tone === 'danger' ? 'lv-alert-danger text-text-primary' : 'lv-alert-info text-text-secondary'}`}
     >
       <span aria-hidden="true" className="shrink-0 text-text-muted">
         {icon}
@@ -383,7 +379,7 @@ function Door({ href, icon, kicker, title, trail }: { href: string; icon: React.
       <Chevron aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
     </>
   );
-  const cls = 'flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus';
+  const cls = 'flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-raised active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus';
   return external ? (
     <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
       {body}
@@ -402,7 +398,7 @@ function ProjectSkeleton() {
       <div className="h-3 w-16 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
       <div className="h-6 w-3/4 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
       <div className="h-9 w-40 animate-pulse rounded-full bg-surface-selected motion-reduce:animate-none" />
-      <div className="h-24 w-full animate-pulse rounded-2xl bg-surface-selected motion-reduce:animate-none" />
+      <div className="h-24 w-full animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
     </div>
   );
 }

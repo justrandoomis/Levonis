@@ -171,7 +171,7 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
       {/* The quick comparison (§9.5 «comparison»): which offer wins on each of
           the three things a customer weighs — only when there is a choice. */}
       {liveCount >= 2 && (
-        <section aria-labelledby="offer-compare-title" className="mt-4 overflow-hidden rounded-2xl border border-border-subtle bg-surface" data-request-section="compare" data-offer-compare-table>
+        <section aria-labelledby="offer-compare-title" className="lv-surface mt-4 overflow-hidden" data-request-section="compare" data-offer-compare-table>
           <h3 id="offer-compare-title" className="px-4 pt-3 text-[13px] font-bold text-text-primary">
             {s.compare}
           </h3>
@@ -247,7 +247,7 @@ export function OfferFiles({ files, label }: { files: OfferFileV2[]; label: stri
             href={f.url!}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-border-subtle bg-surface-raised pe-3 ps-1.5 text-[12px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="lv-button lv-button-secondary lv-button-sm max-w-full justify-start pe-3 ps-1.5 text-[12px] font-medium text-text-secondary hover:text-text-primary"
             data-offer-file={f.kind}
           >
             {f.kind === 'image' ? <img src={f.url!} alt="" loading="lazy" decoding="async" className="size-8 shrink-0 rounded-lg object-cover" /> : <FileGlyph kind={f.kind} />}
@@ -368,7 +368,7 @@ function OfferColumn({
         <Row k={s.validUntil}>{until || s.openEnded}</Row>
       </dl>
       {o.message && (
-        <p className="mt-2 whitespace-pre-line rounded-xl bg-surface-raised px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">
+        <p className="mt-2 whitespace-pre-line rounded-lg bg-surface-raised px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">
           {o.message}
         </p>
       )}
@@ -584,7 +584,7 @@ function AcceptSheet({ offer, onClose, onAccepted, onRefresh }: { offer: OfferV2
               </Button>
             </div>
           )}
-          <div className="rounded-xl bg-surface-raised px-3.5 py-3">
+          <div className="rounded-lg bg-surface-raised px-3.5 py-3">
             <div className="flex items-center justify-between gap-3">
               <bdi className="truncate font-semibold text-text-primary">{name}</bdi>
               <span className="shrink-0 text-[16px] font-bold text-text-primary" data-accept="total" data-accept-total={o.total_iqd ?? ''}>

@@ -188,19 +188,19 @@ export function ProjectMediaPicker({
     <div>
       <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label={loc('صور المشروع', 'Project pictures', 'وێنەکانی پڕۆژە')}>
         {value.map((m, i) => (
-          <li key={m.key} className="group relative aspect-square overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+          <li key={m.key} className="group relative aspect-square overflow-hidden rounded-lg border border-border-subtle bg-surface-selected">
             {m.kind === 'video' ? (
               <video src={m.url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
             ) : (
               <img src={m.url} alt="" className="h-full w-full object-cover" />
             )}
             {m.kind === 'video' && (
-              <span aria-hidden="true" className="absolute start-1.5 top-1.5 rounded-full bg-black/70 p-1 text-white">
+              <span aria-hidden="true" className="absolute start-1.5 top-1.5 rounded-full bg-onyx/70 p-1 text-snow">
                 <Film className="h-3 w-3" />
               </span>
             )}
             {i === 0 && (
-              <span className="absolute bottom-1.5 start-1.5 rounded-full bg-black/70 px-2 py-0.5 text-[10.5px] font-semibold text-white">
+              <span className="absolute bottom-1.5 start-1.5 rounded-full bg-onyx/70 px-2 py-0.5 text-[10.5px] font-semibold text-snow">
                 {loc('الغلاف', 'Cover', 'بەرگ')}
               </span>
             )}
@@ -211,7 +211,7 @@ export function ProjectMediaPicker({
                   disabled={disabled}
                   onClick={() => makeCover(m.key)}
                   aria-label={loc('اجعلها الغلاف', 'Make this the cover', 'بیکە بە بەرگ')}
-                  className="rounded-full bg-black/70 p-1.5 text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="rounded-full bg-onyx/70 p-1.5 text-snow transition-colors hover:bg-onyx/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <Star className="h-3.5 w-3.5" />
                 </button>
@@ -221,7 +221,7 @@ export function ProjectMediaPicker({
                 disabled={disabled}
                 onClick={() => remove(m.key)}
                 aria-label={loc('إزالة', 'Remove', 'لابردن')}
-                className="rounded-full bg-black/70 p-1.5 text-white transition-colors hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="rounded-full bg-onyx/70 p-1.5 text-snow transition-colors hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -229,7 +229,7 @@ export function ProjectMediaPicker({
           </li>
         ))}
         {busy > 0 && (
-          <li aria-live="polite" className="flex aspect-square items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900">
+          <li aria-live="polite" className="lv-well flex aspect-square items-center justify-center rounded-lg">
             <Loader2 className="h-5 w-5 animate-spin text-gold" />
             <span className="sr-only">{loc('جارٍ الرفع', 'Uploading', 'باردەکرێت')}</span>
           </li>
@@ -241,7 +241,7 @@ export function ProjectMediaPicker({
               disabled={disabled}
               onClick={() => input.current?.click()}
               data-project-media-add
-              className="press-scale flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/40 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
+              className="flex aspect-square w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--clay-field)] text-text-secondary transition-colors hover:text-text-primary active:bg-[var(--clay-well-bg)] active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40"
             >
               <ImagePlus aria-hidden="true" className="h-5 w-5" />
               <span className="text-[11.5px] font-semibold">{value.length === 0 ? loc('أضف صورًا', 'Add pictures', 'وێنە زیاد بکە') : loc('أضف', 'Add', 'زیادکردن')}</span>
@@ -285,7 +285,7 @@ export function ProjectMediaPicker({
         </p>
       )}
       {(error || saveError) && (
-        <p className="mt-1.5 text-[11.5px] text-red-400" role="alert">
+        <p className="mt-1.5 text-[11.5px] text-error-ink" role="alert">
           {error || saveError}
         </p>
       )}

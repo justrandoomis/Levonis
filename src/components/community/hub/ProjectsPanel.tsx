@@ -7,6 +7,7 @@
  */
 import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
+import FilterChip from '../FilterChip';
 import { ProjectsGrid } from '../../../pages/community/Projects';
 import { POST_KINDS, type PostKind } from '../projects/api';
 import { useProjectStrings } from '../projects/strings';
@@ -39,19 +40,19 @@ export default function ProjectsPanel({ q }: { q: string }) {
   return (
     <div data-community-panel="projects" className="flex flex-col gap-4">
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 hide-scrollbar" role="group" aria-label={s.kind}>
-        <button type="button" className="lv-choice shrink-0 px-3" aria-pressed={kind === ''} onClick={() => setParam('kind', '')}>
+        <FilterChip on={kind === ''} aria-pressed={kind === ''} onClick={() => setParam('kind', '')}>
           {s.all}
-        </button>
+        </FilterChip>
         {POST_KINDS.map((k) => (
-          <button key={k} type="button" className="lv-choice shrink-0 px-3" aria-pressed={kind === k} onClick={() => setParam('kind', kind === k ? '' : k)}>
+          <FilterChip key={k} on={kind === k} aria-pressed={kind === k} onClick={() => setParam('kind', kind === k ? '' : k)}>
             {ps.kinds[k]}
-          </button>
+          </FilterChip>
         ))}
         {tag && (
-          <button type="button" className="lv-choice shrink-0 gap-1 px-3" aria-pressed onClick={() => setParam('tag', '')} aria-label={`${s.tags}: ${tag}`}>
+          <FilterChip on check={false} aria-pressed onClick={() => setParam('tag', '')} aria-label={`${s.tags}: ${tag}`}>
             #{tag}
             <X aria-hidden="true" className="h-3.5 w-3.5" />
-          </button>
+          </FilterChip>
         )}
         {(kind || tag) && (
           <button type="button" className="lv-button lv-button-ghost lv-button-sm shrink-0" onClick={clear}>

@@ -71,7 +71,7 @@ export default function PendingStoreReviews({ kind, refreshKey = 0 }: { kind: 's
         <StoreReviewCard key={keyOf(r)} item={r} onDone={() => setDone((d) => [...d, keyOf(r)])} />
       ))}
       {done.length > 0 && (
-        <p className="flex items-center gap-1.5 text-[12.5px] text-emerald-300" role="status">
+        <p className="flex items-center gap-1.5 text-[12.5px] text-success" role="status">
           <Check aria-hidden="true" className="h-4 w-4" />
           {loc('شكرًا — تقييمك يظهر في صفحة المتجر.', 'Thank you — your rating shows on the store’s page.')}
         </p>
@@ -155,9 +155,9 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
   ];
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5" data-store-review-card={keyOf(item)}>
+    <div className="lv-surface p-3.5" data-store-review-card={keyOf(item)}>
       <div className="flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-[13px] text-white">
+        <p className="min-w-0 flex-1 text-[13px] text-text-primary">
           {loc('كيف كانت تجربتك مع ', 'How was your experience with ')}
           <bdi className="font-semibold">{item.merchant_name}</bdi>
           {loc('؟', '?')}
@@ -166,7 +166,7 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-11 shrink-0 rounded-xl bg-olive px-4 text-[12.5px] font-semibold text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="lv-button lv-button-primary lv-button-sm shrink-0"
             data-store-review-open
           >
             {loc('قيّم', 'Rate')}
@@ -188,35 +188,35 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
                 className="flex h-11 w-11 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 data-store-review-star={n}
               >
-                <Star aria-hidden="true" className={`h-7 w-7 ${n <= rating ? 'fill-gold text-gold' : 'text-zinc-600'}`} />
+                <Star aria-hidden="true" className={`h-7 w-7 ${n <= rating ? 'fill-gold text-gold' : 'text-text-muted'}`} />
               </button>
             ))}
-            <span className="ms-2 text-[12.5px] text-zinc-300" dir="auto" aria-hidden="true">
+            <span className="ms-2 text-[12.5px] text-text-secondary" dir="auto" aria-hidden="true">
               {rating ? names[rating - 1] : ''}
             </span>
           </div>
           <label className="block">
-            <span className="mb-1 block text-[12px] font-semibold text-zinc-400">{loc('كلمة عن تجربتك (اختياري)', 'A word about it (optional)')}</span>
+            <span className="mb-1 block text-[12px] font-semibold text-text-secondary">{loc('كلمة عن تجربتك (اختياري)', 'A word about it (optional)')}</span>
             <textarea
+              className="lv-input resize-y py-2 text-[13px]"
               value={body}
               onChange={(e) => setBody(e.target.value.slice(0, MAX_BODY))}
               rows={3}
               maxLength={MAX_BODY}
               dir="auto"
-              className="w-full resize-y rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-white outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
             />
           </label>
           <div data-store-review-photos={photos.length}>
-            <span className="mb-1 block text-[12px] font-semibold text-zinc-400">{rs.photos}</span>
+            <span className="mb-1 block text-[12px] font-semibold text-text-secondary">{rs.photos}</span>
             <div className="flex flex-wrap items-center gap-2">
               {photos.map((src, i) => (
-                <span key={src} className="relative h-14 w-14 overflow-hidden rounded-xl border border-white/10">
+                <span key={src} className="relative h-14 w-14 overflow-hidden rounded-sm border border-border-subtle">
                   <img src={src} alt={rs.photoAlt(i + 1)} className="h-full w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => setPhotos((p) => p.filter((x) => x !== src))}
                     aria-label={rs.removePhoto(i + 1)}
-                    className="absolute end-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    className="absolute end-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-onyx/80 text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
@@ -229,7 +229,7 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
                   disabled={uploading || busy}
                   aria-label={uploading ? rs.uploading : rs.addPhoto}
                   aria-busy={uploading}
-                  className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-white/15 text-zinc-400 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="flex h-14 w-14 items-center justify-center rounded-sm border border-dashed border-[var(--clay-field)] text-text-secondary hover:text-text-primary active:bg-[var(--clay-well-bg)] active:shadow-press disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   data-store-review-add-photo
                 >
                   {uploading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Camera className="h-5 w-5" aria-hidden="true" />}
@@ -246,15 +246,15 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
                 onChange={(e) => void addPhotos(e.target.files)}
               />
             </div>
-            <p className="mt-1 text-[11.5px] text-zinc-500">{rs.photosHint(MAX_PHOTOS)}</p>
+            <p className="mt-1 text-[11.5px] text-text-muted">{rs.photosHint(MAX_PHOTOS)}</p>
             {photoError && (
-              <p className="mt-1 text-[12px] text-red-300" role="alert">
+              <p className="mt-1 text-[12px] text-error-ink" role="alert">
                 {photoError}
               </p>
             )}
           </div>
           {error && (
-            <p className="text-[12px] text-red-300" role="alert">
+            <p className="text-[12px] text-error-ink" role="alert">
               {error}
             </p>
           )}
@@ -263,7 +263,7 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
               type="button"
               onClick={send}
               disabled={!rating || busy}
-              className="min-h-11 flex-1 rounded-xl bg-olive text-[13px] font-bold text-snow disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-primary flex-1"
               data-store-review-send
             >
               {busy ? loc('جارٍ الإرسال…', 'Sending…') : loc('أرسل التقييم', 'Send the rating')}
@@ -271,12 +271,12 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="min-h-11 rounded-xl border border-white/10 px-4 text-[13px] text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-ghost"
             >
               {loc('لاحقًا', 'Later')}
             </button>
           </div>
-          <p className="text-[11.5px] text-zinc-500">
+          <p className="text-[11.5px] text-text-muted">
             {/* The name as the store page masks it (worker/routes/storefront.ts `maskName`): «Ahmed K.». */}
             {loc('يظهر تقييمك في صفحة المتجر باسمك المختصر.', 'Your rating shows on the store’s page under your short name.')}
           </p>

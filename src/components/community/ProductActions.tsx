@@ -15,6 +15,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Check, Heart, Link2 } from 'lucide-react';
+import { IconButton } from '../ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { communityFavoritesApi } from '../../lib/storefrontApi';
@@ -73,34 +74,30 @@ export default function ProductActions({ productId, name }: { productId: string;
     }
   }
 
-  const round =
-    'flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-200 transition-colors hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
   return (
     <div className="flex shrink-0 items-center gap-2" data-product-actions>
-      <button
-        type="button"
+      <IconButton
+        variant="secondary"
         onClick={toggle}
         aria-pressed={saved}
-        aria-label={saved ? loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن') : loc('حفظ المنتج', 'Save product', 'پاشەکەوتکردن')}
-        className={round}
+        label={saved ? loc('إزالة من المحفوظات', 'Remove from saved', 'لابردن') : loc('حفظ المنتج', 'Save product', 'پاشەکەوتکردن')}
         data-product-save={saved ? 'on' : 'off'}
-      >
-        <Heart aria-hidden="true" className={`h-[18px] w-[18px] ${saved ? 'fill-rose-500 text-rose-500' : ''}`} strokeWidth={1.75} />
-      </button>
-      <button
-        type="button"
-        onClick={share}
+        icon={<Heart aria-hidden="true" className={`h-[18px] w-[18px] ${saved ? 'fill-rose-500 text-rose-500' : ''}`} strokeWidth={1.75} />}
+      />
+      <IconButton
+        variant="secondary"
+        onClick={() => void share()}
         // OWNER: Sorani to be written by hand.
-        aria-label={copied ? loc('نُسخ الرابط', 'Link copied') : loc('مشاركة المنتج', 'Share the product')}
-        className={round}
+        label={copied ? loc('نُسخ الرابط', 'Link copied') : loc('مشاركة المنتج', 'Share the product')}
         data-product-share
-      >
-        {copied ? (
-          <Check aria-hidden="true" className="h-[18px] w-[18px] text-emerald-400" strokeWidth={1.75} />
-        ) : (
-          <Link2 aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.75} />
-        )}
-      </button>
+        icon={
+          copied ? (
+            <Check aria-hidden="true" className="h-[18px] w-[18px] text-success" strokeWidth={1.75} />
+          ) : (
+            <Link2 aria-hidden="true" className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          )
+        }
+      />
       <span className="sr-only" role="status" aria-live="polite">
         {copied ? loc('نُسخ الرابط', 'Link copied') : ''}
       </span>

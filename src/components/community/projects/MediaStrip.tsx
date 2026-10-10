@@ -88,7 +88,7 @@ export default function MediaStrip({ media, title }: { media: PostMedia[]; title
         <>
           {/* the dots: one moving indicator over fixed slots */}
           <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
-            <div className="relative flex gap-1.5 rounded-full bg-black/40 px-2 py-1.5">
+            <div className="relative flex gap-1.5 rounded-full bg-onyx/55 px-2 py-1.5">
               {media.map((item, i) => (
                 <span key={item.id} className="relative h-[5px] w-[5px] rounded-full bg-white/40">
                   {i === active && (
@@ -107,7 +107,7 @@ export default function MediaStrip({ media, title }: { media: PostMedia[]; title
             type="button"
             aria-label={loc('السابقة', 'Previous', 'پێشوو')}
             onClick={() => rail.page(-1)}
-            className="absolute start-2 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-snow transition-colors hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex"
+            className="absolute start-2 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-onyx/55 text-snow transition-colors hover:bg-onyx/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex"
           >
             <Prev aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -115,7 +115,7 @@ export default function MediaStrip({ media, title }: { media: PostMedia[]; title
             type="button"
             aria-label={loc('التالية', 'Next', 'دواتر')}
             onClick={() => rail.page(1)}
-            className="absolute end-2 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-snow transition-colors hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex"
+            className="absolute end-2 top-1/2 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full bg-onyx/55 text-snow transition-colors hover:bg-onyx/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex"
           >
             <Next aria-hidden="true" className="h-5 w-5" />
           </button>
@@ -156,7 +156,7 @@ function Video({ src, visible }: { src: string; visible: boolean }) {
           onClick={() => void ref.current?.play()}
           className="press-scale absolute inset-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
         >
-          <span className="flex size-14 items-center justify-center rounded-full bg-black/60 text-snow">
+          <span className="flex size-14 items-center justify-center rounded-full bg-onyx/65 text-snow">
             <Play aria-hidden="true" className="h-6 w-6 fill-current" />
           </span>
         </button>

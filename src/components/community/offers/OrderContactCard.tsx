@@ -50,14 +50,14 @@ export default function OrderContactCard({ orderId, compact = false }: { orderId
   }
 
   if (failed) return null;
-  if (!data) return <div className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" aria-busy="true" />;
+  if (!data) return <div className="h-16 animate-pulse rounded-lg bg-surface-selected motion-reduce:animate-none" aria-busy="true" />;
   const c = data.contact;
   const gov = GOVERNORATES.find((g) => g.id === c?.governorate);
   const govName = gov ? (lang === 'en' ? gov.en : gov.ar) : c?.governorate ?? '';
   const place = [govName, c?.area, c?.address, c?.landmark].filter(Boolean).join(' · ');
 
   return (
-    <div className={`rounded-2xl bg-white/[0.03] ${compact ? 'p-3' : 'p-4'}`} data-order-contact={orderId} data-order-contact-role={data.role}>
+    <div className={`rounded-lg bg-surface-raised ${compact ? 'p-3' : 'p-4'}`} data-order-contact={orderId} data-order-contact-role={data.role}>
       <p className="text-[12px] font-semibold text-text-muted">
         {data.role === 'merchant' ? loc('الزبون — للتواصل والتسليم', 'The customer — contact and delivery') : loc('التاجر — للتواصل', 'The merchant — contact')}
       </p>

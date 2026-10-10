@@ -159,18 +159,18 @@ export function CommunityClosedCard({ onRecheck }: { onRecheck?: () => void } = 
   const next = `${location.pathname}${location.search}`;
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4" data-community-closed>
-      <div className="max-w-sm w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 text-center space-y-3">
+      <div className="lv-surface max-w-sm w-full p-6 text-center space-y-3">
         <Wrench className="w-8 h-8 text-gold mx-auto" aria-hidden="true" />
-        <h1 className="text-[15px] font-bold text-white">
+        <h1 className="text-[15px] font-bold text-text-primary">
           {loc('ليفو كوميونيتي تحت الصيانة', 'Levo Community is under maintenance', `${t('community')} — ${t('maintenanceMain')}`)}
         </h1>
-        <p className="text-[13px] text-zinc-400">{t('comingSoon')}</p>
+        <p className="text-[13px] text-text-secondary">{t('comingSoon')}</p>
         <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
           {isLoaded && !user && (
             <button
               type="button"
               onClick={() => navigate(`/auth?next=${encodeURIComponent(next)}`)}
-              className="min-h-[44px] rounded-full bg-gold px-5 text-[13px] font-bold text-accent-contrast active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-primary px-5"
               data-community-closed-signin
             >
               {t('signIn')}
@@ -180,7 +180,7 @@ export function CommunityClosedCard({ onRecheck }: { onRecheck?: () => void } = 
             <button
               type="button"
               onClick={onRecheck}
-              className="min-h-[44px] rounded-full border border-white/15 px-5 text-[13px] font-medium text-zinc-200 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-secondary px-5"
               data-community-closed-recheck
             >
               {t('retry')}

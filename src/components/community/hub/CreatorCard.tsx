@@ -36,11 +36,11 @@ export default function CreatorCard({ creator: c, variant = 'row', follow = true
     return (
       <article
         data-community-creator={c.id}
-        className="relative flex w-[132px] shrink-0 snap-start flex-col items-center gap-2 rounded-2xl border border-border-subtle/60 bg-surface p-3 text-center has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
+        className="relative flex w-[132px] shrink-0 snap-start flex-col items-center gap-2 lv-surface p-3 text-center has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
       >
         <Avatar src={c.avatarUrl} className="h-16 w-16" />
         <h3 className="flex w-full min-w-0 items-center justify-center gap-1 text-[13px] font-bold leading-snug text-text-primary">
-          <Link to={href} className="min-w-0 truncate after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none">
+          <Link to={href} className="min-w-0 truncate after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none">
             <bdi>{c.name}</bdi>
           </Link>
           {badges}
@@ -56,12 +56,12 @@ export default function CreatorCard({ creator: c, variant = 'row', follow = true
   return (
     <article
       data-community-creator={c.id}
-      className="relative flex min-w-0 items-start gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
+      className="relative flex min-w-0 items-start gap-3 lv-surface p-4 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
     >
       <Avatar src={c.avatarUrl} className="h-12 w-12" />
       <div className="min-w-0 flex-1">
         <h3 className="flex min-w-0 items-center gap-1.5">
-          <Link to={href} className="line-clamp-2 break-words text-[14.5px] font-bold leading-snug text-text-primary after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none">
+          <Link to={href} className="line-clamp-2 break-words text-[14.5px] font-bold leading-snug text-text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none">
             <bdi>{c.name}</bdi>
           </Link>
           {badges}

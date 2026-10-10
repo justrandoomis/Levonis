@@ -140,7 +140,7 @@ export function BoardSkeleton() {
     <SkeletonGroup className="-mx-4 flex gap-3 overflow-hidden px-4 pb-1">
       {[0, 1].map((i) => (
         // The rail card's own height (hub/RequestCard.tsx in the rail), inline: no new utility in the shared stylesheet.
-        <div key={i} aria-hidden="true" style={{ minHeight: 168 }} className="w-72 shrink-0 space-y-2.5 rounded-2xl border border-border-subtle/60 bg-surface p-4">
+        <div key={i} aria-hidden="true" style={{ minHeight: 168 }} className="w-72 shrink-0 space-y-2.5 rounded-xl border border-border-subtle/60 bg-surface p-4">
           <Skeleton className="h-4 w-3/5" />
           <Skeleton className="h-3 w-full" />
           <Skeleton className="h-3 w-4/5" />

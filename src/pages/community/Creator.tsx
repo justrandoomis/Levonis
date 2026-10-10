@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, BadgeCheck, Ban, Flag, Globe, MoreHorizontal, Pencil, Plus, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { IconButton } from '../../components/ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { useGoBack } from '../../lib/useGoBack';
@@ -149,17 +150,15 @@ export default function CreatorPage() {
   const notFound = error instanceof ApiError && error.status === 404;
 
   return (
-    <div className="min-h-screen bg-canvas pb-28 text-text-primary">
+    <div className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-3xl items-center gap-2">
-          <button
-            type="button"
-            aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          <IconButton
+            label={loc('رجوع', 'Back', 'گەڕانەوە')}
             onClick={goBack}
-            className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Back className="h-5 w-5" />
-          </button>
+            className="-ms-2"
+            icon={<Back className="h-5 w-5" />}
+          />
           <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted" dir="ltr">
             {creator ? `@${creator.username}` : ''}
           </span>
@@ -174,15 +173,7 @@ export default function CreatorPage() {
               label={ss.options}
               items={personItems(creator)}
               trigger={(props) => (
-                <button
-                  type="button"
-                  {...props}
-                  aria-label={ss.options}
-                  data-creator-menu
-                  className="press-scale -me-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                  <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
-                </button>
+                <IconButton {...props} label={ss.options} data-creator-menu className="-me-2" icon={<MoreHorizontal className="h-5 w-5" aria-hidden="true" />} />
               )}
             />
           )}
@@ -482,7 +473,7 @@ function AboutTab({
             return (
               <li key={k}>
                 {href ? (
-                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="lv-hit relative inline-flex min-h-9 items-center rounded-full border border-border-subtle/60 bg-surface px-3 text-[12.5px] font-semibold text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                  <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="lv-hit relative inline-flex min-h-9 items-center rounded-full border border-border-subtle bg-surface-raised px-3 text-[12.5px] font-semibold text-text-secondary shadow-xs hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                     {label}
                   </a>
                 ) : (

@@ -157,7 +157,7 @@ export function Reveal({
 export function Rail({ children, className = '', ...rest }: { children: React.ReactNode; className?: string } & Record<`data-${string}`, string | undefined>) {
   const rail = useRail();
   return (
-    <div ref={rail.ref} className={`-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-1 hide-scrollbar ${className}`} {...rest}>
+    <div ref={rail.ref} className={`-mx-4 -my-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pt-2 pb-3 hide-scrollbar ${className}`} {...rest}>
       {children}
     </div>
   );
@@ -170,7 +170,7 @@ export function StoreListSkeleton({ count = 4 }: { count?: number }) {
   return (
     <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} aria-hidden="true" className="flex items-start gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4">
+        <div key={i} aria-hidden="true" className="flex items-start gap-3 rounded-xl border border-border-subtle/60 bg-surface p-4">
           <Skeleton className="h-12 w-12 rounded-full" />
           <div className="flex-1 space-y-2 pt-1">
             <Skeleton className="h-4 w-1/2" />
@@ -189,7 +189,7 @@ export function RequestListSkeleton({ count = 4 }: { count?: number }) {
   return (
     <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} aria-hidden="true" className="space-y-2.5 rounded-2xl border border-border-subtle/60 bg-surface p-4">
+        <div key={i} aria-hidden="true" className="space-y-2.5 rounded-xl border border-border-subtle/60 bg-surface p-4">
           <Skeleton className="h-4 w-3/5" />
           <Skeleton className="h-3 w-full" />
           <Skeleton className="h-3 w-4/5" />
@@ -210,7 +210,7 @@ export function ProjectRailSkeleton({ count = 4 }: { count?: number }) {
     <SkeletonGroup className="-mx-4 flex gap-3 overflow-hidden px-4 pb-1">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} aria-hidden="true" className="flex w-[148px] shrink-0 flex-col gap-2 sm:w-[168px]">
-          <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
+          <Skeleton className="aspect-[4/5] w-full rounded-xl" />
           <Skeleton className="h-3.5 w-4/5" />
           <Skeleton className="h-3 w-1/2" />
         </div>
@@ -247,7 +247,7 @@ export function CreatorRailSkeleton({ count = 4 }: { count?: number }) {
   return (
     <SkeletonGroup className="-mx-4 flex gap-3 overflow-hidden px-4 pb-1">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} aria-hidden="true" className="flex w-[132px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border-subtle/60 bg-surface p-3">
+        <div key={i} aria-hidden="true" className="flex w-[132px] shrink-0 flex-col items-center gap-2 rounded-xl border border-border-subtle/60 bg-surface p-3">
           <Skeleton className="h-16 w-16 rounded-full" />
           <Skeleton className="h-3.5 w-3/5" />
           <Skeleton className="h-3 w-1/2" />

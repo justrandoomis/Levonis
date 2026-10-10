@@ -233,7 +233,9 @@ test('the file rows and the composer use tokens only: no hex, no dark:, no physi
     assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/, `${rel}: a hex colour`);
     assert.doesNotMatch(src, /\bdark:/, `${rel}: a dark: variant`);
     assert.doesNotMatch(src, /className="[^"]*\b(?:pl|pr|ml|mr|left|right|text-left|text-right)-/, `${rel}: a physical utility`);
-    for (const cls of ['bg-surface', 'text-text-muted', 'border-border-subtle']) assert.match(src, new RegExp(cls), `${rel}: ${cls} in use`);
+    // The rows' tray is the clay card class (`lv-surface`: the surface fill and
+    // the subtle border, as tokens) — the hand-drawn pair before the clay sweep.
+    for (const cls of ['bg-surface|lv-surface', 'text-text-muted', 'border-border-subtle|lv-surface']) assert.match(src, new RegExp(cls), `${rel}: ${cls} in use`);
   }
   assert.match(code('src/components/community/projects/FileRows.tsx'), /text-text-primary/, 'the reader\'s file name is primary text');
 });

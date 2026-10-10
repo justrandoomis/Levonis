@@ -72,7 +72,7 @@ import {
   type RequestLang,
   type RequestStrings,
 } from '../../components/community/requests/strings';
-import { Button } from '../../components/ui/Button';
+import { Button, IconButton } from '../../components/ui/Button';
 import { StatusChip } from '../../components/ui/Badge';
 import { Money } from '../../components/ui/Money';
 import { Sheet } from '../../components/ui/Sheet';
@@ -205,7 +205,7 @@ export default function RequestPage() {
   return (
     <>
       {editing ? (
-        <div className="min-h-screen bg-canvas pb-28 text-text-primary" data-request-editing={id}>
+        <div className="min-h-screen pb-28 text-text-primary" data-request-editing={id}>
           <TopBar onBack={() => setEditing(false)} kicker={s.editRequest} />
           <div className="mx-auto max-w-2xl px-4 pt-4">
             <Suspense fallback={<PageSkeleton />}>
@@ -247,15 +247,13 @@ function TopBar({ onBack, kicker }: { onBack: () => void; kicker: string }) {
   return (
     <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
       <div className="mx-auto flex h-full max-w-2xl items-center gap-2">
-        <button
-          type="button"
-          aria-label={s.back}
+        <IconButton
+          label={s.back}
           onClick={onBack}
-          className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="-ms-2"
           data-request-back
-        >
-          <Back aria-hidden="true" className="h-5 w-5" />
-        </button>
+          icon={<Back aria-hidden="true" className="h-5 w-5" />}
+        />
         <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{kicker}</span>
       </div>
     </div>
@@ -501,7 +499,7 @@ export function RequestDetail({
   }
 
   const frame = (body: ReactNode) => (
-    <div className="min-h-screen bg-canvas pb-28 text-text-primary" data-request-page={request.id}>
+    <div className="min-h-screen pb-28 text-text-primary" data-request-page={request.id}>
       <TopBar onBack={onBack} kicker={s.kicker} />
       <div className="mx-auto max-w-2xl px-4">{body}</div>
     </div>
@@ -669,7 +667,7 @@ export function RequestDetail({
             )}
           </dl>
           {current.customer_notes && (
-            <div className="mt-3 rounded-xl bg-surface-raised px-3 py-2.5" data-request="customer-notes">
+            <div className="lv-well mt-3 rounded-md px-3 py-2.5" data-request="customer-notes">
               <p className="mb-0.5 text-[11.5px] text-text-muted">{s.notesForMerchants}</p>
               <p dir="auto" className="whitespace-pre-wrap break-words text-start text-[13px] leading-relaxed text-text-secondary">
                 {current.customer_notes}
@@ -1014,7 +1012,7 @@ function AcceptedOffer({
         ))}
       </dl>
       {o.message && (
-        <p className="mt-2 whitespace-pre-line rounded-xl bg-surface-raised px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">
+        <p className="mt-2 whitespace-pre-line rounded-lg bg-surface-raised px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">
           {o.message}
         </p>
       )}

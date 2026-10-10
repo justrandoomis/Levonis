@@ -1,7 +1,9 @@
 /**
  * THE COMMUNITY'S FOUR VERBS — real links, so a keyboard, a screen reader and
  * a long press all know where each goes. «طلب طباعة» is the page's one primary
- * action and carries the sage disc; «شارك مشروعًا» opens the composer. A guest
+ * action and carries the primary fill (the strongest contrast on the
+ * screen, never an accent tint); the other three are resting clay keys that
+ * dent while held; «شارك مشروعًا» opens the composer. A guest
  * goes through sign-in first and comes back to the door they chose.
  */
 import React from 'react';
@@ -44,16 +46,16 @@ function Door({
       to={to}
       state={state}
       data-testid={testId}
-      className="press-scale group flex min-w-0 flex-col items-center gap-2 rounded-2xl py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className="group flex min-w-0 flex-col items-center gap-2 rounded-xl py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       <span
-        className={`flex h-12 w-12 items-center justify-center rounded-2xl border transition-colors ${
-          primary ? 'border-sage/40 bg-sage/10' : 'border-border-subtle/60 bg-surface group-hover:border-border-subtle'
+        className={`flex h-12 w-12 items-center justify-center rounded-md border shadow-sm transition-colors group-active:shadow-press ${
+          primary ? 'border-transparent bg-primary-fill' : 'border-border-subtle bg-surface-raised'
         }`}
       >
-        <Icon aria-hidden="true" className={`h-5 w-5 ${primary ? 'text-sage' : 'text-text-secondary group-hover:text-text-primary'}`} />
+        <Icon aria-hidden="true" className={`h-5 w-5 ${primary ? 'text-canvas' : 'text-text-secondary group-hover:text-text-primary'}`} />
       </span>
-      <span className={`line-clamp-2 w-full text-balance text-center text-[11px] font-medium leading-tight ${primary ? 'text-sage' : 'text-text-secondary'}`}>{label}</span>
+      <span className={`line-clamp-2 w-full text-balance text-center text-[11px] font-medium leading-tight ${primary ? 'text-text-primary' : 'text-text-secondary'}`}>{label}</span>
     </Link>
   );
 }

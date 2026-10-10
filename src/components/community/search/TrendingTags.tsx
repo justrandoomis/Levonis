@@ -8,7 +8,10 @@
  * there are no tags: an empty row is not a feature.
  *
  * A chip is an `.lv-choice`, whose own `:focus-visible` outline is the
- * keyboard's ring — nothing here switches it off.
+ * keyboard's ring — nothing here switches it off — drawn as the clay filter
+ * chip at rest (build plan §5): a 36px pill, flush on the raised fill, its
+ * 44px target from `.lv-hit` (the row's `py-1` keeps that target and is
+ * not clipped by the sideways scroll).
  */
 import { Link } from 'react-router-dom';
 import { Hash } from 'lucide-react';
@@ -20,13 +23,13 @@ export default function TrendingTags({ tags, limit = 12 }: { tags: TrendingTag[]
   const rows = tags?.slice(0, limit) ?? [];
   if (rows.length === 0) return null;
   return (
-    <nav aria-label={s.trendingTags} data-community-trending-tags="" className="-mx-4 flex snap-x items-center gap-2 overflow-x-auto px-4 pb-1 hide-scrollbar">
+    <nav aria-label={s.trendingTags} data-community-trending-tags="" className="-mx-4 flex snap-x items-center gap-2 overflow-x-auto px-4 py-1 hide-scrollbar">
       <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-text-muted">
         <Hash aria-hidden="true" className="h-3.5 w-3.5" />
         {s.trendingTags}
       </span>
       {rows.map((t) => (
-        <Link key={t.tag} to={`/community/projects?tag=${encodeURIComponent(t.tag)}`} className="lv-choice inline-flex shrink-0 snap-start items-center gap-1.5 px-3 text-[12.5px]">
+        <Link key={t.tag} to={`/community/projects?tag=${encodeURIComponent(t.tag)}`} className="lv-choice lv-hit inline-flex min-h-9 shrink-0 snap-start items-center gap-1.5 rounded-full bg-surface-raised px-3 text-[12.5px]">
           <span dir="auto">#{t.tag}</span>
           {t.count > 0 && <span className="tabular-nums text-text-muted">{t.count}</span>}
         </Link>

@@ -211,7 +211,7 @@ export default function MerchantOfferPanel({
       </p>
 
       {stale && (
-        <div className="mt-3 rounded-xl bg-warning/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-warning" data-offer-note="superseded">
+        <div className="lv-alert lv-alert-warning mt-3 text-[12.5px] leading-relaxed text-warning" data-offer-note="superseded">
           <p className="flex items-start gap-2 font-semibold">
             <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
             {loc('عدّل الزبون الطلب بعد عرضك، فلا يمكن قبوله حتى تؤكده أو تعدّله.', 'The customer changed the request after your offer; it cannot be accepted until you re-confirm or edit it.')}

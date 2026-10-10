@@ -34,7 +34,7 @@ import MyRequestsList from '../components/print/MyRequestsList';
  */
 import RequestWizard from '../components/community/requests/RequestWizard';
 import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
-import { REQUEST_STATE_TONE, requestPath, requestRedirect, requestStateLabel } from '../components/community/requests/requestStates';
+import { requestPath, requestRedirect, requestStateLabel, requestStateTone } from '../components/community/requests/requestStates';
 import { CommunityLoadError } from './community/access';
 import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import OrderContactCard from '../components/community/offers/OrderContactCard';
@@ -45,6 +45,8 @@ import OrderContactCard from '../components/community/offers/OrderContactCard';
  */
 import RequestBoard from '../components/merchant/workshop/RequestBoard';
 import { Segmented } from '../components/ui/Segmented';
+import { StatusChip } from '../components/ui/Badge';
+import FilterChip from '../components/community/FilterChip';
 import { merchantHref } from '../lib/merchantRoutes';
 import ConfirmSheet from '../components/print/ConfirmSheet';
 import { apiRefusal } from '../lib/refusalStrings';
@@ -173,11 +175,9 @@ export default function Requests() {
   if (deepLinked) return null;
 
   return (
-    <div className="min-h-screen bg-black text-zinc-300 pb-28">
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[380px] bg-olive/15 [mask-image:radial-gradient(closest-side,#000,transparent)] pointer-events-none z-0" />
-
-      <div className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 pt-6">
-        <h1 className="text-gold font-bold text-lg mb-1">
+    <div className="min-h-screen text-text-secondary pb-28">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6">
+        <h1 className="text-text-primary font-bold text-lg mb-1">
           {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
         </h1>
         <p className="text-text-muted text-[12.5px] mb-5">
@@ -188,25 +188,22 @@ export default function Requests() {
           )}
         </p>
 
-        <div className="flex gap-1.5 mb-5 overflow-x-auto hide-scrollbar">
+        {/* The sections are filter chips (pressed when chosen, never an ink
+            fill); «طلب جديد» is the page's one primary. The row scrolls
+            sideways, so it pads the button's cast in rather than cutting it. */}
+        <div className="flex items-center gap-1.5 mb-3 -mt-2 py-2 overflow-x-auto hide-scrollbar">
           {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
              ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
              ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
             ] as Array<[View, string]>).map(([v, label]) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`shrink-0 px-4 min-h-11 rounded-2xl text-[12.5px] font-semibold border transition-colors ${
-                view === v ? 'bg-olive text-snow border-olive' : 'bg-white/[0.03] text-zinc-400 border-white/10'
-              }`}
-            >
+            <FilterChip key={v} on={view === v} onClick={() => setView(v)}>
               {label}
-            </button>
+            </FilterChip>
           ))}
           {(
             <button
               onClick={() => (user ? setView('new') : signIn())}
-              className="ms-auto shrink-0 px-4 min-h-[40px] rounded-2xl bg-olive text-snow text-[12.5px] font-semibold flex items-center gap-1.5"
+              className="lv-button lv-button-primary lv-button-sm ms-auto shrink-0 gap-1.5"
             >
               <Plus className="w-4 h-4" />
               {loc('طلب جديد', 'New', 'نوێ')}
@@ -373,25 +370,25 @@ function AllRequests({
       <label htmlFor="requests-search" className="sr-only">
         {loc('ابحث في طلبات الطباعة', 'Search print requests')}
       </label>
-      <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+      <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
       <input
         id="requests-search"
         type="search"
         enterKeyHint="search"
         autoComplete="off"
+        className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
         value={draft}
         maxLength={60}
         onChange={(e) => setDraft(e.target.value)}
         placeholder={loc('ابحث في طلبات الطباعة', 'Search print requests')}
         data-requests-search
-        className="w-full min-h-11 rounded-full border border-zinc-800 bg-zinc-900 py-2 ps-10 pe-11 text-sm text-white placeholder:text-zinc-500 focus:border-olive/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus [&::-webkit-search-cancel-button]:appearance-none"
       />
       {draft && (
         <button
           type="button"
           onClick={() => setDraft('')}
           aria-label={loc('مسح البحث', 'Clear search')}
-          className="absolute end-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="absolute end-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -414,7 +411,7 @@ function AllRequests({
     body = (
       <div className="py-14 text-center" data-requests-empty={q ? 'search' : 'board'}>
         <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
-        <p className="text-zinc-400 text-[13px]">
+        <p className="text-text-secondary text-[13px]">
           {q ? (
             <bdi>{loc(`لا نتائج لـ «${q}»`, `No results for “${q}”`)}</bdi>
           ) : (
@@ -433,13 +430,13 @@ function AllRequests({
         <button
           key={r.id}
           onClick={() => onOpen(r)}
-          className="w-full text-start rounded-2xl border border-white/10 bg-white/[0.03] p-4 active:scale-[0.99] transition-transform"
+          className="lv-surface w-full text-start p-4 active:shadow-press"
         >
           <div className="flex items-start justify-between gap-3 mb-1.5">
-            <h3 className="text-white font-semibold text-[14px] leading-snug">{r.title}</h3>
+            <h3 className="text-text-primary font-semibold text-[14px] leading-snug">{r.title}</h3>
             <StateChip state={r.state} />
           </div>
-          <p className="text-zinc-400 text-[12.5px] line-clamp-2 leading-relaxed mb-2.5">{r.description}</p>
+          <p className="text-text-secondary text-[12.5px] line-clamp-2 leading-relaxed mb-2.5">{r.description}</p>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted">
             {r.budget_iqd !== null && (
@@ -455,7 +452,7 @@ function AllRequests({
                 {GOVERNORATE_LABELS[r.governorate]?.[lang === 'ckb' ? 'ckb' : lang] ?? r.governorate}
               </span>
             )}
-            <span className="ms-auto text-gold/80 font-semibold">
+            <span className="ms-auto text-text-secondary font-semibold">
               {/* «عرضان», «5 عروض», «12 عرضًا» — not «5 عرض». */}
               {offersLabel(r.offer_count, lang)}
             </span>
@@ -468,7 +465,7 @@ function AllRequests({
           onClick={loadMore}
           disabled={more}
           data-requests-more
-          className="w-full min-h-[44px] rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-300 text-[13px] font-semibold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          className="lv-button lv-button-secondary w-full"
         >
           {more
             ? loc('جارٍ التحميل…', 'Loading…')
@@ -494,9 +491,9 @@ function AllRequests({
 function StateChip({ state }: { state: string }) {
   const { loc } = useLanguage();
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${REQUEST_STATE_TONE[state] ?? REQUEST_STATE_TONE.open}`}>
+    <StatusChip tone={requestStateTone(state)} className="shrink-0">
       {requestStateLabel(state, loc)}
-    </span>
+    </StatusChip>
   );
 }
 
@@ -578,7 +575,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         <div className="text-start">
           <PendingStoreReviews kind="custom" refreshKey={reviewsKey} />
         </div>
-        <p className="text-zinc-400 text-[13px]">
+        <p className="text-text-secondary text-[13px]">
           {loc('لا توجد طلبات قيد التنفيذ', 'No custom orders in progress', 'هیچ داواکاریەکی تایبەت نییە')}
         </p>
         <p className="text-text-muted text-[11.5px] mt-1.5">
@@ -620,20 +617,18 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
       {/* Completed work waiting for the customer's rating of the workshop. */}
       <PendingStoreReviews kind="custom" refreshKey={reviewsKey} />
       {orders.map((o) => (
-        <div key={o.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5" data-community-order={o.id}>
+        <div key={o.id} className="lv-surface p-3.5" data-community-order={o.id}>
           {/* The state can be a long phrase ("Delivered — awaiting your
               confirmation"); rather than squeeze the title to an ellipsis it
               moves under the title when both do not fit. */}
           <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1 mb-1.5">
-            <p className="text-white text-[13px] font-semibold flex-1 basis-32 min-w-0 line-clamp-2 break-words">
+            <p className="text-text-primary text-[13px] font-semibold flex-1 basis-32 min-w-0 line-clamp-2 break-words">
               <bdi>{o.request_title}</bdi>
             </p>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10 bg-white/[0.04] text-zinc-300 shrink-0">
-              {stateLabel(o.state)}
-            </span>
+            <StatusChip className="shrink-0">{stateLabel(o.state)}</StatusChip>
           </div>
           <p className="text-text-muted text-[11.5px] mb-2">
-            {o.merchant_name} · <span className="text-white font-semibold tabular-nums" dir="ltr">{iqd(o.price_iqd)}</span>
+            {o.merchant_name} · <span className="text-text-primary font-semibold tabular-nums" dir="ltr">{iqd(o.price_iqd)}</span>
             {/* Held only while the work runs or is disputed: a completed order's
                 money went to the merchant, a cancelled one's came back — the
                 state chip says which. */}
@@ -646,7 +641,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
               request's conversation (W5-A, §4.7). */}
           {HELD_STATES.includes(o.state) && (
             <details className="mb-2 group" data-community-order-contact={o.id}>
-              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+              <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                 {loc('التواصل مع التاجر', 'Contact the merchant')}
               </summary>
               <OrderContactCard orderId={o.id} compact />
@@ -658,7 +653,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
             type="button"
             onClick={() => setTimelineFor(o)}
             data-community-order-timeline={o.id}
-            className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-[12.5px] font-semibold text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="mb-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-[12.5px] font-semibold text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {ts.open}
           </button>
@@ -669,7 +664,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
                 type="button"
                 onClick={() => begin('confirm', o)}
                 data-community-order-confirm={o.id}
-                className="w-full min-h-[44px] rounded-xl bg-olive text-snow font-bold text-[13px] hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                className="lv-button lv-button-primary w-full"
               >
                 {loc('استلمت العمل — حوّل المبلغ للتاجر', 'I received it — release the funds', 'وەرمگرت — پارەکە بدە')}
               </button>
@@ -688,7 +683,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
                 <button
                   type="button"
                   onClick={() => begin('cancel', o)}
-                  className="flex-1 min-h-[40px] rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-[11.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+                  className="lv-button lv-button-danger lv-button-sm flex-1"
                 >
                   {loc('إلغاء واسترجاع', 'Cancel & refund', 'هەڵوەشاندنەوە')}
                 </button>
@@ -696,7 +691,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
               <button
                 type="button"
                 onClick={() => begin('dispute', o)}
-                className="flex-1 min-h-[40px] rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+                className="lv-button lv-button-secondary lv-button-sm flex-1"
               >
                 {loc('فتح نزاع', 'Open a dispute', 'ناکۆکی تۆمار بکە')}
               </button>
@@ -766,12 +761,12 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         <textarea
           id="community-dispute-description"
           name="dispute-description"
+          className="lv-input mt-2 py-3 text-[14px] leading-relaxed resize-none"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
           maxLength={4000}
           autoComplete="off"
-          className="mt-2 w-full rounded-xl bg-black/40 border border-white/10 px-3.5 py-3 text-white text-[14px] leading-relaxed outline-none focus-visible:border-gold/40 focus-visible:ring-2 focus-visible:ring-gold/40 resize-none"
         />
         <p className="mt-1 text-text-muted text-[11px] tabular-nums" dir="ltr" aria-live="polite">
           {description.trim().length} / 10+
@@ -883,10 +878,10 @@ function PendingOffersWhileClosed() {
           key={r.id}
           type="button"
           onClick={() => setOpen(r)}
-          className="w-full text-start rounded-2xl border border-white/10 bg-white/[0.03] p-4 min-h-[44px] active:scale-[0.99] transition-transform"
+          className="lv-surface w-full text-start p-4 min-h-[44px] active:shadow-press"
         >
           <div className="flex items-start justify-between gap-3">
-            <h3 className="text-white font-semibold text-[14px] leading-snug">{r.title}</h3>
+            <h3 className="text-text-primary font-semibold text-[14px] leading-snug">{r.title}</h3>
             <span className="shrink-0 text-gold/80 font-semibold text-[11.5px]">
               {offersLabel(r.offer_count, lang)}
             </span>

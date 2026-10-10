@@ -20,7 +20,8 @@ import { api, ApiError, type ApiProduct } from '../../lib/api';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { merchantApi, type MerchantMe, type MerchantProduct } from '../../lib/merchant';
 import { productName } from '../../lib/productText';
-import { Button } from '../../components/ui/Button';
+import { Button, IconButton } from '../../components/ui/Button';
+import { StatusChip } from '../../components/ui/Badge';
 import { Field, Input, Textarea, focusFirstInvalid } from '../../components/ui/Field';
 import { Segmented } from '../../components/ui/Segmented';
 import { Switch } from '../../components/ui/Switch';
@@ -275,17 +276,15 @@ export default function ProjectComposer() {
   const canLinkStore = !!me?.store;
 
   return (
-    <div className="min-h-screen bg-canvas pb-28 text-text-primary">
+    <div className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-2xl items-center gap-2">
-          <button
-            type="button"
-            aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          <IconButton
+            label={loc('رجوع', 'Back', 'گەڕانەوە')}
             onClick={goBack}
-            className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Back className="h-5 w-5" />
-          </button>
+            className="-ms-2"
+            icon={<Back className="h-5 w-5" />}
+          />
           <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold">{editing ? s.editProject : s.shareWhatYouPrinted}</h1>
         </div>
       </div>
@@ -297,7 +296,7 @@ export default function ProjectComposer() {
           <div aria-hidden="true" className="flex flex-col gap-4">
             <div className="grid grid-cols-3 gap-2">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="aspect-square animate-pulse rounded-2xl bg-surface-selected motion-reduce:animate-none" />
+                <div key={i} className="aspect-square animate-pulse rounded-lg bg-surface-selected motion-reduce:animate-none" />
               ))}
             </div>
             <div className="h-12 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
@@ -342,7 +341,7 @@ export default function ProjectComposer() {
             </section>
 
             {/* THE FACTS */}
-            <section aria-labelledby="c-facts" className="flex flex-col gap-4 rounded-2xl border border-border-subtle/60 bg-surface p-4">
+            <section aria-labelledby="c-facts" className="lv-surface flex flex-col gap-4 p-4">
               <h2 id="c-facts" className="text-[13px] font-semibold text-text-secondary">
                 {s.settings}
               </h2>
@@ -397,7 +396,7 @@ export default function ProjectComposer() {
 
             {/* THE DOORS — only for a store owner */}
             {canLinkStore && me?.store && (
-              <section className="flex flex-col gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4">
+              <section className="lv-surface flex flex-col gap-3 p-4">
                 <Switch
                   checked={!!draft.store_id}
                   onChange={(on) => set('store_id', on ? me.store!.id : null)}
@@ -452,7 +451,7 @@ export default function ProjectComposer() {
       </div>
 
       {loaded && !loadError && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle/60 bg-canvas px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-surface-raised shadow-dock px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto flex max-w-2xl items-center gap-2">
             <Button variant="secondary" onClick={goBack} disabled={!!busy}>
               {loc('إلغاء', 'Cancel', 'پاشگەزبوونەوە')}
@@ -536,12 +535,12 @@ function CataloguePick({
   if (value.id) {
     return (
       <Field label={label} optional>
-        <div className="flex items-center gap-2 rounded-xl border border-border-subtle/60 bg-surface-raised px-3 py-2">
+        <div className="lv-well flex items-center gap-2 rounded-md border border-[var(--clay-field)] px-3 py-2">
           {picked?.images?.[0] && <img src={picked.images[0]} alt="" className="size-8 rounded-lg object-cover" />}
           <span className="min-w-0 flex-1 truncate text-[13.5px]" dir="auto">
             {picked ? productName(picked, lang) : value.id}
           </span>
-          <span className="rounded-full bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold">{s.fromCatalogue}</span>
+          <StatusChip tone="accent" className="shrink-0">{s.fromCatalogue}</StatusChip>
           <button
             type="button"
             aria-label={`${s.typeName}`}
@@ -578,7 +577,7 @@ function CataloguePick({
           aria-autocomplete="list"
         />
         {open && hits.length > 0 && (
-          <ul role="listbox" style={{ maxHeight: '16rem' }} className="material material-thick absolute inset-x-0 top-full z-20 mt-1 overflow-y-auto rounded-xl border border-border-subtle/60 py-1 shadow-lg">
+          <ul role="listbox" style={{ maxHeight: '16rem' }} className="absolute inset-x-0 top-full z-20 mt-1 overflow-y-auto rounded-lg border border-border-subtle bg-surface-raised py-1 shadow-lg">
             {hits.map((h) => (
               <li key={h.id} role="option" aria-selected={false}>
                 <button
@@ -590,7 +589,7 @@ function CataloguePick({
                     setQ('');
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13.5px] hover:bg-surface-raised focus-visible:outline-none focus-visible:bg-surface-raised"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-[13.5px] outline-none hover:bg-white/[0.04] focus:bg-white/[0.07] active:bg-[var(--clay-well-bg)]"
                 >
                   <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-text-muted" />
                   <span className="min-w-0 flex-1 truncate" dir="auto">

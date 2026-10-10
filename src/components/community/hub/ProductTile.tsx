@@ -27,7 +27,7 @@ export default function ProductTile({ product: p, eager = false }: { product: Co
     <HubLink
       href={p.url || `/product/${encodeURIComponent(p.slug)}`}
       data-community-product={p.id}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border-subtle/60 bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className="lv-surface group flex min-w-0 flex-col overflow-hidden active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       <div className="relative">
         <SafeImage
@@ -38,12 +38,11 @@ export default function ProductTile({ product: p, eager = false }: { product: Co
           // The hub grid: 2 across on a phone, 3 from 640 px, 6 from 1024 px.
           sizes="(min-width: 1024px) 16vw, (min-width: 640px) 33vw, 50vw"
           bgClassName="bg-surface-selected"
-          imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
         />
         {soldOut && (
           <>
             <span aria-hidden="true" className="absolute inset-0 bg-black/35" />
-            <span className="absolute start-2 top-2 rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-snow">
+            <span className="absolute start-2 top-2 rounded-full bg-onyx/80 px-2 py-0.5 text-[11px] font-semibold text-snow">
               {loc('نفد', 'Sold out', 'تەواو بوو')}
             </span>
           </>

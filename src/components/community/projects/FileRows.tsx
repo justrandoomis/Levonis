@@ -87,7 +87,7 @@ export function FileRows({ postId, files, signedIn, className = '' }: { postId: 
       <h2 id="project-files" className="mb-2 text-[13px] font-semibold text-text-secondary">
         {s.files}
       </h2>
-      <ul className="flex flex-col divide-y divide-border-subtle/60 overflow-hidden rounded-2xl border border-border-subtle/60 bg-surface">
+      <ul className="lv-surface flex flex-col divide-y divide-border-subtle/60 overflow-hidden">
         {files.map((f) => (
           <FileRow key={f.id} postId={postId} file={f} signedIn={signedIn} />
         ))}

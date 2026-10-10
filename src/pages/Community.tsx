@@ -30,6 +30,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useGoBack } from '../lib/useGoBack';
 import { ArrowLeft, ArrowRight, Box, Calculator, ChevronLeft, ChevronRight, ClipboardList, Plus, Search, Store, X } from 'lucide-react';
+import { IconButton } from '../components/ui/Button';
 import { useLanguage } from '../LanguageContext';
 import { STUDIO_URL } from '../translations';
 import { useAuth } from '../AuthContext';
@@ -271,21 +272,19 @@ export default function Community() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-canvas pb-28 text-text-primary">
+    <div className="w-full min-h-screen pb-28 text-text-primary">
       {/* The search bar is FLOATING CHROME: content passes under it, and a
           short gradient says so where the overlap is real (`.scroll-edge`).
           Its height is fixed (h-16) so the tab strip can stick exactly
           beneath it. */}
       <div className="material scroll-edge sticky top-0 z-40 h-16 px-4">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-3">
-          <button
-            type="button"
-            aria-label={s.back}
+          <IconButton
+            label={s.back}
             onClick={goBack}
-            className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            {dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
-          </button>
+            className="-ms-2"
+            icon={dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
+          />
           <form
             ref={box.barRef}
             role="search"
@@ -306,12 +305,12 @@ export default function Community() {
               autoComplete="off"
               // Latin runs left to right in an Arabic page, and stays put when the overlay closes.
               dir="auto"
+              className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
               value={draft}
               maxLength={60}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={placeholder}
               data-community-search
-              className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
               {...box.inputProps}
             />
             {draft && (
@@ -406,16 +405,18 @@ function panelKey(tab: CommunityTab, list: 'products' | null, q: string): string
 function ToolsSection() {
   const { t } = useLanguage();
   const s = useHubStrings();
-  const tile = 'relative flex h-24 w-[200px] shrink-0 snap-start flex-col justify-center overflow-hidden rounded-2xl border bg-surface p-4 text-start';
+  // Link cards on the canvas: resting clay (22px, `--clay-1`) that dents while
+  // held; the rail pads their cast in, since a sideways scroller clips it.
+  const tile = 'lv-surface relative flex h-24 w-[200px] shrink-0 snap-start flex-col justify-center overflow-hidden p-4 text-start';
   return (
-    <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 hide-scrollbar">
+    <div className="-mx-4 -my-2 flex snap-x gap-3 overflow-x-auto px-4 pt-2 pb-3 hide-scrollbar">
       <a
         href={STUDIO_URL}
         target="_blank"
         data-testid="community-studio-link"
         rel="noopener noreferrer"
         aria-label={`${t('studioCardTitle')} — ${t('studioOpen')}`}
-        className={`${tile} border-sage/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+        className={`${tile} active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
       >
         <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-35">
           <Box aria-hidden="true" className="h-20 w-20 text-sage" />
@@ -425,7 +426,7 @@ function ToolsSection() {
       </a>
       <Link
         to="/tools"
-        className={`${tile} border-border-subtle/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+        className={`${tile} active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
       >
         <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-35">
           <Calculator className="h-20 w-20" />
@@ -433,7 +434,7 @@ function ToolsSection() {
         <h3 className="mb-1 text-sm font-bold text-text-primary">{s.calculator}</h3>
         <p className="text-xs text-text-secondary">{s.openCalculator}</p>
       </Link>
-      <div className={`${tile} border-border-subtle/60 opacity-70`} aria-disabled="true">
+      <div className={`${tile} opacity-70 shadow-none`} aria-disabled="true">
         <div aria-hidden="true" className="absolute bottom-0 end-2 opacity-35">
           <Box className="h-20 w-20" />
         </div>
@@ -552,13 +553,13 @@ function YourStore({ me }: { me: MerchantMe | null }) {
     <Link
       to={to}
       data-community-your-store={me.store ? 'manage' : 'create'}
-      className="mb-4 flex items-center gap-3 rounded-2xl border border-border-subtle/60 bg-surface px-4 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className="lv-surface mb-4 flex items-center gap-3 px-4 py-3 active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       {me.store ? (
         <StoreMark src={me.store.logoUrl} />
       ) : (
-        <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-sage/40 bg-sage/10">
-          <Plus className="h-5 w-5 text-sage" />
+        <span aria-hidden="true" className="lv-well flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
+          <Plus className="h-5 w-5 text-text-secondary" />
         </span>
       )}
       <span className="min-w-0 flex-1">

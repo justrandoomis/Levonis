@@ -39,11 +39,11 @@ export default function WorksRail() {
 
   return (
     <section aria-labelledby="community-works-title" data-community-works className="mb-6">
-      <h2 id="community-works-title" className="mb-3 text-[15px] font-bold text-white">
+      <h2 id="community-works-title" className="mb-3 text-[15px] font-bold text-text-primary">
         {/* OWNER: Sorani to be written by hand. */}
         {loc('من أعمال الورش', 'From the workshops')}
       </h2>
-      <div ref={rail.ref} className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 hide-scrollbar">
+      <div ref={rail.ref} className="-mx-4 -my-2 flex snap-x gap-3 overflow-x-auto px-4 pt-2 pb-3 hide-scrollbar">
         {works.map((w) => (
           <HubLink
             key={w.id}
@@ -55,13 +55,12 @@ export default function WorksRail() {
               src={w.imageUrl}
               alt=""
               aspect="auto"
-              className="aspect-[4/5] w-full overflow-hidden rounded-2xl border border-zinc-800/60 group-focus-visible:ring-2 group-focus-visible:ring-focus"
-              imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
+              className="aspect-[4/5] w-full overflow-hidden rounded-xl border border-border-subtle/60 shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-focus"
             />
-            <span dir="auto" className="mt-2 block truncate text-start text-[12.5px] font-medium text-white">
+            <span dir="auto" className="mt-2 block truncate text-start text-[12.5px] font-medium text-text-primary">
               {w.title}
             </span>
-            <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400">
+            <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-text-muted">
               <StoreMark src={w.store.logoUrl} size="xs" />
               <bdi className="truncate">{w.store.name}</bdi>
             </span>

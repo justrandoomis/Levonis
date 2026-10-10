@@ -82,9 +82,10 @@ export function requestStepIndex(state: string): number {
 }
 
 /**
- * The state chip's tone on the request page (StatusChip: theme tokens, one
- * word + one dot + one tint), beside REQUEST_STATE_TONE's legacy classes for
- * the board's own chip.
+ * The state chip's tone (StatusChip: theme tokens, one word + one dot + one
+ * flat tint) — on the request page and, since the clay sweep, on the board's
+ * own chip too. REQUEST_STATE_TONE's legacy classes stay exported for the
+ * every-state check in tests/communityP1.test.ts; no screen draws them now.
  */
 export function requestStateTone(state: string): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
   switch (state) {

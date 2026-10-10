@@ -31,9 +31,9 @@ export default function ProjectCard({
   return (
     <article
       data-project-card={p.id}
-      className={`group relative flex flex-col gap-2 ${width} has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus rounded-2xl`}
+      className={`group relative flex flex-col gap-2 ${width} has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus rounded-xl`}
     >
-      <div className="relative overflow-hidden rounded-2xl border border-border-subtle/60">
+      <div className="relative overflow-hidden rounded-xl border border-border-subtle/60 shadow-sm">
         <SafeImage
           src={p.cover?.url ?? null}
           alt=""
@@ -41,15 +41,14 @@ export default function ProjectCard({
           eager={eager}
           className="aspect-[4/5] w-full"
           bgClassName="bg-surface-selected"
-          imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none"
         />
         {p.cover?.kind === 'video' && (
-          <span aria-hidden="true" className="absolute start-2 top-2 flex size-6 items-center justify-center rounded-full bg-black/60 text-snow">
+          <span aria-hidden="true" className="absolute start-2 top-2 flex size-6 items-center justify-center rounded-full bg-onyx/80 text-snow">
             <Play className="h-3 w-3 fill-current" />
           </span>
         )}
         {p.print_time_minutes ? (
-          <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-snow">
+          <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 rounded-full bg-onyx/80 px-2 py-0.5 text-[11px] font-medium tabular-nums text-snow">
             <Clock aria-hidden="true" className="h-3 w-3" />
             {printTimeLabel(p.print_time_minutes, s)}
           </span>
@@ -57,7 +56,7 @@ export default function ProjectCard({
       </div>
       <div className="min-w-0 px-0.5">
         <h3 dir="auto" className="line-clamp-2 text-start text-[13.5px] font-semibold leading-snug text-text-primary">
-          <Link to={p.url} className="after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none">
+          <Link to={p.url} className="after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none">
             {p.title}
           </Link>
         </h3>
@@ -90,7 +89,7 @@ export function ProjectCardSkeleton({ variant = 'grid' }: { variant?: 'rail' | '
   const width = variant === 'rail' ? 'w-[148px] sm:w-[168px] shrink-0 snap-start' : 'min-w-0';
   return (
     <div aria-hidden="true" className={`flex flex-col gap-2 ${width}`}>
-      <div className="aspect-[4/5] w-full animate-pulse rounded-2xl bg-surface-selected motion-reduce:animate-none" />
+      <div className="aspect-[4/5] w-full animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
       <div className="h-3.5 w-4/5 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
       <div className="h-3 w-1/2 animate-pulse rounded bg-surface-selected motion-reduce:animate-none" />
     </div>

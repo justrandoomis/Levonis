@@ -211,7 +211,7 @@ function OfferColumn({
         )}
       </p>
 
-      <dl className="mt-2 divide-y divide-white/[0.06]">
+      <dl className="mt-2 divide-y divide-border-subtle/60">
         <Row k={loc('التنفيذ', 'Completion')}>{o.completion_days ? loc(`${o.completion_days} يوم`, `${o.completion_days} days`) : '—'}</Row>
         <Row k={loc('التسليم', 'Handover')}>{deliveryLabel(o.delivery_method, loc)}</Row>
         <Row k={loc('المواد', 'Materials')}>{o.material_ids?.length ? o.material_ids.map(matName).join('، ') : o.materials || '—'}</Row>
@@ -219,7 +219,7 @@ function OfferColumn({
         <Row k={loc('الضمان', 'Warranty')}>{o.warranty_terms || '—'}</Row>
         <Row k={loc('صالح حتى', 'Valid until')}>{until ?? loc('مفتوح', 'Open-ended')}</Row>
       </dl>
-      {o.message && <p className="mt-2 rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">{o.message}</p>}
+      {o.message && <p className="mt-2 rounded-lg bg-surface-raised px-3 py-2 text-[12.5px] leading-relaxed text-text-secondary" dir="auto">{o.message}</p>}
 
       {o.stale && o.state !== 'accepted' && (
         <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning">
@@ -365,7 +365,7 @@ function AcceptSheet({ offer, onClose, onAccepted }: { offer: OfferV2 | null; on
               {loc('غيّر التاجر هذا العرض بعد أن فتحته — هذه شروطه الآن.', 'The merchant changed this offer after you opened it — these are its terms now.')}
             </p>
           )}
-          <div className="rounded-xl bg-white/[0.03] px-3.5 py-3">
+          <div className="rounded-lg bg-surface-raised px-3.5 py-3">
             <div className="flex items-center justify-between gap-3">
               <bdi className="truncate font-semibold text-text-primary">{o.merchant?.name ?? '—'}</bdi>
               <span className="shrink-0 text-[16px] font-bold text-text-primary" data-accept="price"><Money iqd={o.price_iqd} /></span>
@@ -381,7 +381,7 @@ function AcceptSheet({ offer, onClose, onAccepted }: { offer: OfferV2 | null; on
             <div>
               <label htmlFor="accept-address" className="mb-1.5 block text-[12.5px] font-semibold text-text-secondary">{loc('عنوان التسليم', 'Delivery address')}</label>
               {addresses === null ? (
-                <div className="h-11 animate-pulse rounded-xl bg-white/[0.04]" />
+                <div className="h-11 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
               ) : addresses.length ? (
                 <select id="accept-address" className="lv-input w-full" value={addressId} onChange={(e) => setAddressId(e.target.value)}>
                   {addresses.map((a) => (

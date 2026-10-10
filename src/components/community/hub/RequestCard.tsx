@@ -93,7 +93,7 @@ export default function RequestCard({ request: r, compact = false }: { request: 
       <Link
         to={`/requests/${encodeURIComponent(r.id)}`}
         data-community-request={r.id}
-        className="lv-section flex min-w-0 flex-col gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="lv-section flex min-w-0 flex-col gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <h3 dir="auto" className="line-clamp-1 break-words text-start text-[14.5px] font-semibold leading-snug text-text-primary">{r.title}</h3>
         <div className="flex flex-wrap gap-1.5 text-[11.5px] text-text-secondary">{chips}</div>
@@ -106,7 +106,7 @@ export default function RequestCard({ request: r, compact = false }: { request: 
     <Link
       to={`/requests/${encodeURIComponent(r.id)}`}
       data-community-request={r.id}
-      className="flex min-w-0 flex-col gap-2 rounded-2xl border border-border-subtle/60 bg-surface p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      className="lv-surface flex min-w-0 flex-col gap-2 p-4 active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       {/* The customer's own words, in whichever script they wrote them —
           `dir="auto"` lays an English title out left-to-right inside the

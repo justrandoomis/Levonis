@@ -95,7 +95,7 @@ export default function BoardRail({ viewer, me }: { viewer: string; me: Merchant
       {memo === null ? (
         <BoardSkeleton />
       ) : memo.rows.length === 0 ? (
-        <div className="rounded-2xl border border-border-subtle/60 bg-surface px-4 py-3" data-community-board-empty>
+        <div className="rounded-xl border border-border-subtle/60 bg-surface px-4 py-3" data-community-board-empty>
           <p className="text-[13px] leading-relaxed text-text-secondary">{s.board.empty}</p>
           <Link
             to={BOARD_PREFS_PATH}

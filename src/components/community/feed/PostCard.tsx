@@ -64,7 +64,7 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
   const printLink = isAuthenticated ? { to: printPath } : { to: '/auth', state: { from: printPath } };
 
   return (
-    <article data-post-card={p.id} data-post-kind={p.kind} className="lv-section relative flex flex-col gap-3 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus rounded-lg">
+    <article data-post-card={p.id} data-post-kind={p.kind} className="lv-section relative flex flex-col gap-3 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus">
       <header className="flex items-center gap-2.5">
         <Avatar src={p.author.avatarUrl} className="h-9 w-9" />
         <div className="min-w-0 flex-1">
@@ -93,7 +93,7 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
         <div className={`relative -mx-4 overflow-hidden sm:mx-0 sm:rounded-xl ${portrait ? 'aspect-[4/5]' : 'aspect-[4/3]'}`}>
           <SafeImage src={p.cover.url} alt="" aspect="auto" eager={eager} className="h-full w-full" bgClassName="bg-surface-selected" />
           {p.cover.kind === 'video' && (
-            <span className="absolute start-3 top-3 flex size-8 items-center justify-center rounded-full bg-black/60 text-snow">
+            <span className="absolute start-3 top-3 flex size-8 items-center justify-center rounded-full bg-onyx/80 text-snow">
               <Play aria-hidden="true" className="h-3.5 w-3.5 fill-current" />
               <span className="sr-only">{s.video}</span>
             </span>

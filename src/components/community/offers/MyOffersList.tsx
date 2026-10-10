@@ -73,14 +73,14 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
         </p>
       ) : rows === null ? (
         <div className="space-y-2" aria-busy="true">
-          {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />)}
+          {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />)}
         </div>
       ) : !rows.length ? (
         <p className="py-6 text-center text-[13px] text-text-muted">
           {filter ? loc('لا عروض هنا.', 'No offers here.') : loc('لم تقدّم عروضًا بعد. الطلبات التي تناسب ورشتك على لوحة الطلبات.', 'You have not made offers yet. Requests that fit your workshop are on the board.')}
         </p>
       ) : (
-        <ul className="lv-surface divide-y divide-white/[0.06]">
+        <ul className="lv-surface overflow-hidden divide-y divide-border-subtle/60">
           {rows.map((o) => {
             const st = offerStateLabel(o, loc);
             const until = validUntil(o.expires_at, lang);
@@ -91,7 +91,7 @@ export default function MyOffersList({ requestHref }: { requestHref: (requestId:
                   href={requestHref(req.id)}
                   data-my-offer={o.id}
                   data-my-offer-state={o.state}
-                  className="flex min-h-[64px] items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+                  className="flex min-h-[64px] items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold text-text-primary" dir="auto">{req.title || req.id}</span>

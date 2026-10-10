@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Bookmark } from 'lucide-react';
+import { IconButton } from '../../components/ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { useGoBack } from '../../lib/useGoBack';
@@ -60,17 +61,15 @@ export default function SavedPage() {
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   return (
-    <div className="min-h-screen bg-canvas pb-28 text-text-primary">
+    <div className="min-h-screen pb-28 text-text-primary">
       <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-2">
-          <button
-            type="button"
-            aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          <IconButton
+            label={loc('رجوع', 'Back', 'گەڕانەوە')}
             onClick={goBack}
-            className="press-scale -ms-2 flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Back className="h-5 w-5" />
-          </button>
+            className="-ms-2"
+            icon={<Back className="h-5 w-5" />}
+          />
           <h1 className="min-w-0 flex-1 truncate text-[15px] font-bold">{s.savedTitle}</h1>
         </div>
       </div>

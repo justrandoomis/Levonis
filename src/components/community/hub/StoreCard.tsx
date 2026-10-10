@@ -59,7 +59,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
       aria-busy={busy || undefined}
       data-community-follow={m.following ? 'on' : 'off'}
       className={`relative z-10 inline-flex min-h-11 items-center gap-1 rounded-full border px-3.5 text-[12.5px] font-semibold transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-        m.following ? 'border-border-subtle bg-surface text-text-secondary hover:text-text-primary' : 'border-sage/40 bg-sage/10 text-sage hover:bg-sage/20'
+        m.following ? 'border-transparent bg-[var(--clay-well-bg)] text-text-secondary shadow-press hover:text-text-primary' : 'border-border-subtle bg-surface-raised text-text-primary shadow-sm'
       }`}
     >
       {m.following && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -72,7 +72,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
     return (
       <article
         data-community-store={m.id}
-        className="relative flex w-[200px] shrink-0 snap-start flex-col gap-2.5 rounded-2xl border border-border-subtle/60 bg-surface p-3 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
+        className="lv-surface relative flex w-[200px] shrink-0 snap-start flex-col gap-2.5 p-3 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
       >
         <div className="flex min-w-0 items-center gap-2">
           <StoreMark src={m.logoUrl ?? m.avatarUrl} />
@@ -80,7 +80,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
             <HubLink
               href={storeHref(m.store_url, m.id)}
               dir="auto"
-              className="line-clamp-2 break-words text-start text-[13.5px] font-bold leading-snug text-text-primary after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none"
+              className="line-clamp-2 break-words text-start text-[13.5px] font-bold leading-snug text-text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none"
             >
               {name}
             </HubLink>
@@ -112,7 +112,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
   return (
     <article
       data-community-store={m.id}
-      className="relative flex min-w-0 items-start gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
+      className="relative flex min-w-0 items-start gap-3 lv-surface p-4 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus"
     >
       <StoreMark src={m.logoUrl ?? m.avatarUrl} />
       <div className="min-w-0 flex-1">
@@ -123,7 +123,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
           <HubLink
             href={storeHref(m.store_url, m.id)}
             dir="auto"
-            className="line-clamp-2 break-words text-[14.5px] font-bold leading-snug text-text-primary after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none"
+            className="line-clamp-2 break-words text-[14.5px] font-bold leading-snug text-text-primary after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none"
           >
             {name}
           </HubLink>

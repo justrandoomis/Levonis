@@ -585,15 +585,15 @@ export default function RequestWizard({
         <h2 className="mt-1 text-[18px] font-bold leading-snug text-text-primary">{stepTitles[step]}</h2>
         <div className="mt-3 grid grid-cols-4 gap-1.5" aria-hidden="true">
           {[1, 2, 3, 4].map((i) => (
-            <span key={i} className={`h-1 rounded-full transition-colors ${i <= step ? 'bg-gold' : 'bg-white/10'}`} />
+            <span key={i} className={`h-1 rounded-full transition-colors ${i <= step ? 'bg-gold' : 'bg-border-subtle'}`} />
           ))}
         </div>
       </div>
 
       {busy === 'load' ? (
         <div className="space-y-3" aria-busy="true">
-          <div className="h-24 animate-pulse rounded-2xl bg-white/[0.04]" />
-          <div className="h-12 animate-pulse rounded-2xl bg-white/[0.04]" />
+          <div className="h-24 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
+          <div className="h-12 animate-pulse rounded-xl bg-surface-selected motion-reduce:animate-none" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -649,7 +649,7 @@ export default function RequestWizard({
                     type="button"
                     onClick={() => fileInput.current?.click()}
                     data-wizard="pick-files"
-                    className="flex min-h-[88px] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-4 text-center transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    className="flex min-h-[88px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--clay-field)] px-4 py-4 text-center transition-colors hover:bg-surface active:bg-[var(--clay-well-bg)] active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     <Upload aria-hidden="true" className="h-5 w-5 text-text-muted" />
                     <span className="text-[13.5px] font-semibold text-text-primary">
@@ -677,7 +677,7 @@ export default function RequestWizard({
                   {(files.length > 0 || pending.length > 0 || tiles.length > 0) && (
                     <ul className="mt-3 space-y-1.5" aria-label={loc('الملفات', 'Files')}>
                       {files.map((f) => (
-                        <li key={f.id} className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px]">
+                        <li key={f.id} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-[12.5px]">
                           <span className="min-w-0 flex-1 truncate text-text-primary" dir="ltr">{f.file_name}</span>
                           {f.analysis?.measured && (
                             <span className="shrink-0 text-text-muted tabular-nums" dir="ltr">
@@ -695,7 +695,7 @@ export default function RequestWizard({
                         </li>
                       ))}
                       {pending.map((f, i) => (
-                        <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-[12.5px]">
+                        <li key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-[12.5px]">
                           <span className="min-w-0 flex-1 truncate text-text-primary" dir="ltr">{f.name}</span>
                           <span className="shrink-0 text-text-muted tabular-nums" dir="ltr">{formatBytes(f.size)}</span>
                           <button
@@ -751,7 +751,7 @@ export default function RequestWizard({
               )}
 
               {s.source_type === 'description' && (
-                <p className="rounded-xl bg-white/[0.03] px-3.5 py-3 text-[12.5px] leading-relaxed text-text-secondary">
+                <p className="rounded-lg bg-surface px-3.5 py-3 text-[12.5px] leading-relaxed text-text-secondary">
                   {loc(
                     'لا بأس بلا ملف. صف الشكل والمقاس والاستعمال، وسيسألك التجار عمّا يحتاجونه قبل تسعيره.',
                     'No file is fine. Describe the shape, the size and what it is for — merchants will ask what they need before pricing it.'
@@ -868,7 +868,7 @@ export default function RequestWizard({
               </div>
 
               {measured && primary?.analysis ? (
-                <p className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-3.5 py-3 text-[12.5px] text-text-secondary">
+                <p className="lv-well flex items-center gap-2 rounded-md px-3.5 py-3 text-[12.5px] text-text-secondary">
                   <Ruler aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
                   {loc('المقاس من ملفك:', 'Size from your file:')}
                   <span className="font-semibold text-text-primary tabular-nums" dir="ltr">
@@ -947,7 +947,7 @@ export default function RequestWizard({
 
           {step === 4 && (
             <>
-              <dl className="lv-surface divide-y divide-white/[0.06]">
+              <dl className="lv-surface divide-y divide-border-subtle/60">
                 {(
                   [
                     [loc('المصدر', 'Source'), sourceLabel[s.source_type] + (s.source_type === 'model' || s.source_type === 'images' ? ` · ${files.length}` : ''), 1],
@@ -1032,7 +1032,7 @@ export default function RequestWizard({
       )}
 
       {/* The actions stay under the thumb, clear of the home indicator. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.06] bg-canvas px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-surface-raised shadow-dock px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           <Button variant="secondary" className="whitespace-nowrap" onClick={() => (step === 1 ? onCancel() : setStep((x) => (x - 1) as Step))} disabled={!!busy && busy !== 'load'}>
             {step === 1 ? loc('إلغاء', 'Cancel') : loc('رجوع', 'Back')}

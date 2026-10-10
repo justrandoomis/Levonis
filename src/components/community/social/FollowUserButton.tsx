@@ -92,7 +92,7 @@ export default function FollowUserButton({ userId, following: followingProp = fa
       data-on={following ? 'true' : 'false'}
       className={`relative z-10 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
         size === 'sm' ? 'px-3 text-[12.5px]' : 'px-4 text-[13px]'
-      } ${following ? 'border-border-subtle bg-surface text-text-secondary hover:text-text-primary' : 'border-sage/40 bg-sage/10 text-sage hover:bg-sage/20'} ${className}`}
+      } ${following ? 'border-transparent bg-[var(--clay-well-bg)] text-text-secondary shadow-press hover:text-text-primary' : 'border-border-subtle bg-surface-raised text-text-primary shadow-sm'} ${className}`}
     >
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
