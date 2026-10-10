@@ -179,7 +179,7 @@ export default function MerchantInbox({ focusThreadId }: { focusThreadId?: strin
               const path = `/chat/${encodeURIComponent(t.id)}`;
               const inner = (
                 <>
-                  <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/[0.06] text-[14px] font-bold text-text-secondary">
+                  <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full lv-well text-[14px] font-bold text-text-secondary">
                     {name.trim().slice(0, 1).toUpperCase()}
                   </span>
                   <span className="min-w-0 flex-1">

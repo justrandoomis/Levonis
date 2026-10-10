@@ -29,6 +29,7 @@ import { GOVERNORATES } from '../../../lib/governorates';
 import type { Loc } from './ui';
 import { Button, IconButton } from '../../ui/Button';
 import { Card } from '../../ui/Card';
+import { StatusChip, type Tone } from '../../ui/Badge';
 import { Field, Input } from '../../ui/Field';
 import { Switch } from '../../ui/Switch';
 import Note from '../../ui/Note';
@@ -363,14 +364,15 @@ function Chip({ label, active, onClick, disabled }: { label: React.ReactNode; ac
       onClick={onClick}
       disabled={disabled}
       aria-pressed={active}
-      className="group inline-flex min-h-11 items-center rounded-xl focus-visible:outline-none disabled:opacity-40"
+      className="group inline-flex min-h-11 items-center rounded-full focus-visible:outline-none disabled:opacity-40"
     >
+      {/* The clay filter chip: flush at rest, PRESSED when chosen, plus the check. */}
       <span
-        className={`inline-flex h-8 items-center gap-1 rounded-xl border px-3 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
-          active ? 'border-gold/50 bg-gold/10 text-text-primary' : 'border-border-subtle bg-white/[0.03] text-text-secondary'
+        className={`inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[12.5px] font-semibold transition-colors group-focus-visible:ring-2 group-focus-visible:ring-focus ${
+          active ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs'
         }`}
       >
-        {active && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gold" />}
+        {active && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
         {label}
       </span>
     </button>
@@ -755,10 +757,10 @@ function PrintersSection() {
   );
 }
 
-const AVAILABILITY_STYLE: Record<string, string> = {
-  available: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  busy: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  offline: 'bg-white/[0.05] text-text-muted border-white/10',
+const AVAILABILITY_TONE: Record<string, Tone> = {
+  available: 'success',
+  busy: 'warning',
+  offline: 'neutral',
 };
 
 function PrinterRow({
@@ -781,22 +783,20 @@ function PrinterRow({
   };
 
   return (
-    <div data-printer={p.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+    <div data-printer={p.id} className="rounded-lg border border-border-subtle bg-surface-raised p-3">
       {/* The name wraps rather than truncates: two 44px actions beside a
           one-line name left «Bam…» at 320px (W6). The state sits under it. */}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0">
-          <p className="text-white text-[13px] font-semibold break-words">{p.name}</p>
-          <p className="text-zinc-400 text-[11.5px] break-words">
+          <p className="text-text-primary text-[13px] font-semibold break-words">{p.name}</p>
+          <p className="text-text-secondary text-[11.5px] break-words">
             {techLabel(p.technology, loc)}
             {(p.brand || p.model) && ` · ${[p.brand, p.model].filter(Boolean).join(' ')}`}
             {` · ${qualityLabel(p.quality_max, loc)}`}
           </p>
-          <span
-            className={`mt-1 inline-block text-[10.5px] font-bold px-2 py-0.5 rounded-full border ${AVAILABILITY_STYLE[p.availability] ?? AVAILABILITY_STYLE.offline}`}
-          >
+          <StatusChip tone={AVAILABILITY_TONE[p.availability] ?? AVAILABILITY_TONE.offline} dot={false} className="mt-1">
             {availabilityLabel(p.availability, loc)}
-          </span>
+          </StatusChip>
         </div>
         <div className="flex items-center shrink-0">
           <IconButton
@@ -815,9 +815,9 @@ function PrinterRow({
         </div>
       </div>
 
-      <p className="text-zinc-400 text-[11.5px]">
+      <p className="text-text-secondary text-[11.5px]">
         {loc('مساحة الطباعة', 'Build volume', 'قەبارەی چاپ')}:{' '}
-        <span className="text-white font-semibold" dir="ltr">
+        <span className="text-text-primary font-semibold" dir="ltr">
           {p.build_x_mm} × {p.build_y_mm} × {p.build_z_mm}
         </span>{' '}
         {loc('مم', 'mm', 'مم')}
@@ -838,7 +838,7 @@ function PrinterRow({
           {p.materials.map((id) => (
             <span
               key={id}
-              className="h-6 px-2 inline-flex items-center rounded-lg bg-white/[0.05] border border-white/10 text-zinc-300 text-[11px]"
+              className="h-6 px-2 inline-flex items-center rounded-full border border-border-subtle text-text-secondary text-[11px]"
             >
               {name(id)}
             </span>
@@ -860,9 +860,9 @@ function PrinterRow({
           {p.enclosed && <Tagline text={loc('حجرة مغلقة', 'Enclosed', 'داخراو')} />}
           {p.hardened_nozzle && <Tagline text={loc('فوهة مقوّاة', 'Hardened nozzle', 'لوولەی بەهێز')} />}
           {!p.active && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/20">
+            <StatusChip tone="warning" dot={false}>
               {loc('غير مفعّلة', 'Inactive', 'ناچالاک')}
-            </span>
+            </StatusChip>
           )}
         </div>
       )}
@@ -872,7 +872,7 @@ function PrinterRow({
 
 function Tagline({ text }: { text: string }) {
   return (
-    <span className="text-[10.5px] text-zinc-400 px-2 py-0.5 rounded-full border border-white/10">{text}</span>
+    <span className="text-[10.5px] text-text-secondary px-2 py-0.5 rounded-full border border-border-subtle">{text}</span>
   );
 }
 
@@ -1047,7 +1047,7 @@ function PrinterForm({
               aria-label={loc(c.ar, c.en)}
               aria-pressed={d.colors.includes(c.hex)}
               className={`relative w-9 h-9 rounded-full border-2 transition-transform before:absolute before:-inset-[5px] before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                d.colors.includes(c.hex) ? 'border-gold scale-110' : 'border-white/15'
+                d.colors.includes(c.hex) ? 'border-text-primary shadow-press' : 'border-white/15'
               }`}
               style={{ backgroundColor: c.hex }}
             />
@@ -1055,7 +1055,7 @@ function PrinterForm({
           {/* A native colour well, because a hex field is a keyboard task and
               this is a phone. */}
           <label className="w-11 h-11 rounded-full border-2 border-dashed border-white/25 flex items-center justify-center cursor-pointer relative overflow-hidden focus-within:ring-2 focus-within:ring-focus">
-            <Palette className="w-4 h-4 text-zinc-400" />
+            <Palette className="w-4 h-4 text-text-secondary" />
             <input
               type="color"
               value="#808080"
@@ -1073,7 +1073,7 @@ function PrinterForm({
                 type="button"
                 onClick={() => onChange({ ...d, colors: d.colors.filter((x) => x !== hex) })}
                 aria-label={`${loc('إزالة', 'Remove')} ${hex}`}
-                className="relative inline-flex items-center gap-1.5 h-8 ps-2 pe-2 rounded-lg bg-white/[0.05] border border-white/10 text-zinc-300 text-[12px] before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="relative inline-flex items-center gap-1.5 h-8 ps-2 pe-2 rounded-full bg-surface-raised border border-border-subtle text-text-primary text-[12px] before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: hex }} />
                 <span dir="ltr">{hex}</span>
@@ -1150,8 +1150,8 @@ function PrinterForm({
         )}
       />
 
-      <details className="rounded-xl border border-white/10 bg-white/[0.02] px-3" data-printer-economics>
-        <summary className="min-h-11 flex items-center cursor-pointer text-zinc-300 text-[12.5px] font-semibold">
+      <details className="rounded-lg border border-border-subtle bg-surface-raised px-3" data-printer-economics>
+        <summary className="min-h-11 flex items-center cursor-pointer text-text-primary text-[12.5px] font-semibold">
           {loc('اقتصاديات الطابعة — لحساب التكلفة', 'Machine economics — for costing')}
         </summary>
         <p className="text-text-muted text-[11px] mb-2">
@@ -1371,19 +1371,20 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
           data-prefs="paused"
           aria-pressed={f.paused}
           onClick={() => set({ paused: !f.paused })}
-          className={`w-full flex items-center gap-3 rounded-2xl border p-3 text-start transition-colors ${
-            f.paused ? 'border-amber-500/40 bg-amber-500/10' : 'border-white/10 bg-white/[0.03]'
+          // Paused is the switch ON: the control is pressed in, its track amber.
+          className={`w-full flex items-center gap-3 rounded-lg border p-3 text-start transition-colors ${
+            f.paused ? 'border-transparent bg-[var(--clay-well-bg)] shadow-press' : 'border-border-subtle bg-surface-raised shadow-xs'
           }`}
         >
           <span
-            className={`w-11 h-[26px] rounded-full shrink-0 relative transition-colors ${f.paused ? 'bg-amber-500' : 'bg-white/10'}`}
+            className={`w-11 h-[26px] rounded-full shrink-0 relative transition-colors ${f.paused ? 'bg-amber-500' : 'lv-well'}`}
           >
             <span
               className={`absolute top-[3px] w-5 h-5 rounded-full bg-snow shadow-1 transition-all ${f.paused ? 'start-[23px]' : 'start-[3px]'}`}
             />
           </span>
           <span className="min-w-0">
-            <span className={`block text-[13px] font-bold ${f.paused ? 'text-amber-300' : 'text-white'}`}>
+            <span className={`block text-[13px] font-bold ${f.paused ? 'text-warning' : 'text-text-primary'}`}>
               {f.paused
                 ? loc('استقبال الطلبات موقوف', 'Request notifications paused', 'ڕاگیراوە')
                 : loc('أوقِف استقبال الطلبات مؤقتًا', 'Pause request notifications', 'ڕایبگرە')}
@@ -1464,7 +1465,7 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
                 aria-label={loc(c.ar, c.en)}
                 aria-pressed={f.colors.includes(c.hex)}
                 className={`relative w-9 h-9 rounded-full border-2 transition-transform before:absolute before:-inset-[5px] before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                  f.colors.includes(c.hex) ? 'border-gold scale-110' : 'border-white/15'
+                  f.colors.includes(c.hex) ? 'border-text-primary shadow-press' : 'border-white/15'
                 }`}
                 style={{ backgroundColor: c.hex }}
               />
@@ -1562,9 +1563,8 @@ function RequestPrefsSection({ canSell }: { canSell: boolean }) {
                 type="button"
                 onClick={() => set({ workload: w })}
                 aria-pressed={f.workload === w}
-                className={`min-h-11 min-w-0 rounded-xl px-1 text-[12px] font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                  f.workload === w ? 'border-gold/50 bg-gold/10 text-text-primary' : 'border-border-subtle bg-white/[0.03] text-text-secondary'
-                }`}
+                // A choice (lv-choice): the chosen one is a press plus the gold start bar.
+                className="lv-choice min-w-0 px-1 text-[12px] font-semibold"
               >
                 {workloadLabel(w, loc)}
               </button>
@@ -1658,26 +1658,20 @@ function MatchesPanel() {
               {rows.map((m) => (
                 <div
                   key={`${m.request_id}-${m.created_at}`}
-                  className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5"
+                  className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <a
                       href={`/requests/${encodeURIComponent(m.request_id)}`}
-                      className="text-zinc-200 text-[12px] font-semibold truncate underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      className="text-text-primary text-[12px] font-semibold truncate underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                     >
                       {m.title}
                     </a>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
-                        m.notified
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-white/[0.05] text-text-muted border-white/10'
-                      }`}
-                    >
+                    <StatusChip tone={m.notified ? 'success' : 'neutral'} dot={false} className="shrink-0">
                       {m.notified
                         ? loc('وصلك إشعار', 'Notified', 'ئاگادارکرایت')
                         : loc('لم يصلك', 'Not notified', 'ئاگادار نەکرایت')}
-                    </span>
+                    </StatusChip>
                   </div>
                   <p className="text-text-muted text-[11px] leading-relaxed">
                     {m.eligible

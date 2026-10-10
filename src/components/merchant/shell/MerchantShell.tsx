@@ -273,7 +273,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
 
   return (
     <WorkspaceContext.Provider value={ws}>
-      <div className="flex h-[100dvh] w-full min-w-0 flex-1 overflow-hidden bg-canvas text-text-primary" data-merchant-shell data-section={section ?? ''}>
+      <div className="flex h-[100dvh] w-full min-w-0 flex-1 overflow-hidden text-text-primary" data-merchant-shell data-section={section ?? ''}>
         <a
           href="#ws-content"
           className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-[300] focus:rounded-md focus:bg-surface-raised focus:px-3 focus:py-2 focus:text-[13px]"
@@ -311,7 +311,7 @@ export default function MerchantShell({ me, reloadMe, onStoreHost, mainOrigin }:
                 <p
                   role="note"
                   data-selling-off={status.key}
-                  className="mb-5 rounded-e-2xl border-s-2 border-s-warning/70 bg-warning/[0.06] py-2.5 pe-4 ps-3.5 text-[13px] leading-relaxed text-text-secondary"
+                  className="lv-alert lv-alert-warning mb-5 text-[13px] leading-relaxed text-text-secondary"
                 >
                   {status.reason(loc)}{' '}
                   {/* The data is never what stops: said once, under the reason. */}
@@ -402,8 +402,13 @@ function NavLink({ entry, base, active, count, labelClass, compactBadge }: { ent
       aria-label={count ? `${label} (${count})` : undefined}
       title={label}
       data-nav={entry.id}
+      // CLAY (build plan §6 Phase 3.4): the current section is a DIMPLE
+      // pressed into the canvas — the well fill and the press — with the gold
+      // seam as its one secondary cue. No weight swap, so a Sorani label does
+      // not reflow; `data-clay-dimple` lets forced colours outline it.
+      data-clay-dimple={active || undefined}
       className={`relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-[14px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-        active ? 'bg-surface-selected font-semibold text-text-primary' : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
+        active ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'text-text-secondary hover:bg-white/[0.04] hover:text-text-primary'
       }`}
     >
       {active && (
@@ -457,7 +462,7 @@ function SideNav({
   return (
     <aside
       data-sidebar={collapsed ? 'collapsed' : 'expanded'}
-      className={`hidden shrink-0 flex-col border-e border-border-subtle bg-surface sm:flex sm:w-[72px] ${collapsed ? '' : 'lg:w-64'}`}
+      className={`hidden shrink-0 flex-col border-e border-border-subtle sm:flex sm:w-[72px] ${collapsed ? '' : 'lg:w-64'}`}
     >
       <div className={`flex h-16 shrink-0 items-center gap-2.5 border-b border-border-subtle px-[18px] ${collapsed ? '' : 'lg:px-4'}`}>
         <StoreMark store={store} />
@@ -554,7 +559,7 @@ function TopBar({
   // Identity sits here whenever the sidebar is not showing it: phone, tablet, and a collapsed desktop.
   const identity = collapsed ? '' : 'lg:hidden';
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border-subtle bg-canvas px-2 sm:gap-3 sm:px-4 lg:px-6" data-workspace-topbar>
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border-subtle px-2 sm:gap-3 sm:px-4 lg:px-6" data-workspace-topbar>
       <div className={`flex min-w-0 items-center gap-2.5 ps-1 sm:flex-none ${identity} max-sm:flex-1`}>
         <span className="relative shrink-0">
           <StoreMark store={store} size="sm" />
@@ -581,7 +586,7 @@ function TopBar({
         aria-haspopup="dialog"
         aria-keyshortcuts="Control+K Meta+K"
         data-workspace-search
-        className="hidden min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-border-subtle bg-surface px-3 text-start text-[13.5px] text-text-muted transition-colors hover:border-text-muted/40 hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex sm:max-w-md"
+        className="hidden min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full lv-well border border-[var(--clay-field)] px-4 text-start text-[13.5px] text-text-muted transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:flex sm:max-w-md"
       >
         <Search aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{say(loc, W.searchPlaceholder)}</span>
@@ -658,7 +663,7 @@ function BottomTabs({ base, current, attention, onMore }: { base: string; curren
   const moreCount = moreEntries().some((e) => (badgeCount(e.badge, attention) ?? 0) > 0);
   const tabClass = (active: boolean) =>
     `relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-      active ? 'text-text-primary' : 'text-text-muted'
+      active ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'text-text-muted'
     }`;
   return (
     <nav
@@ -674,7 +679,7 @@ function BottomTabs({ base, current, attention, onMore }: { base: string; curren
         const count = t.tab === 'orders' ? badgeCount('orders', attention) : t.tab === 'products' ? badgeCount('stock', attention) : null;
         const label = say(loc, t.label);
         return (
-          <Link key={t.tab} to={sectionPath(t.section, base)} aria-current={active ? 'page' : undefined} aria-label={count ? `${label} (${count})` : undefined} data-tab={t.tab} className={tabClass(active)}>
+          <Link key={t.tab} to={sectionPath(t.section, base)} aria-current={active ? 'page' : undefined} aria-label={count ? `${label} (${count})` : undefined} data-tab={t.tab} data-clay-dimple={active || undefined} className={tabClass(active)}>
             <span className="relative">
               {t.tab === 'store' ? <Store aria-hidden="true" className="h-5 w-5" /> : <Icon aria-hidden="true" className="h-5 w-5" />}
               {count ? <span aria-hidden="true" className="absolute -end-1.5 -top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-surface" /> : null}

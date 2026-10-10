@@ -38,7 +38,7 @@ import { useContext } from 'react';
 import { Card as SurfaceCard } from '../../ui/Card';
 import { Field, Textarea } from '../../ui/Field';
 import { NumberInput } from '../../ui/NumberInput';
-import { Button } from '../../ui/Button';
+import { Button, IconButton } from '../../ui/Button';
 import { ErrorState } from '../../ui/AsyncStates';
 import { refusalText } from '../../../lib/refusalStrings';
 import { merchantHref } from '../../../lib/merchantRoutes';
@@ -161,22 +161,9 @@ function settingsRefusal(e: unknown, loc: Loc): string {
   }
 }
 
-/** A small, 44px-hit icon button with a spoken name — the rows' ×, ↑ and ↓. */
+/** A 44px icon button with a spoken name — the rows' ×, ↑ and ↓ (the shared IconButton). */
 function RowButton({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      className={`relative h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center after:absolute after:-inset-1 after:content-[''] disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-        danger ? 'border-red-500/30 text-red-300 hover:bg-red-500/10' : 'border-white/10 text-zinc-400 hover:text-zinc-200'
-      }`}
-    >
-      {children}
-    </button>
-  );
+  return <IconButton label={label} icon={children} onClick={onClick} disabled={disabled} variant={danger ? 'danger' : 'ghost'} />;
 }
 
 const rowError = (errors: FieldError[], field: string, index: number) => errors.find((e) => e.field === field && e.index === index);
@@ -334,7 +321,7 @@ export function StoreSettingsTab({
             error={err('banner_key')}
           />
           <div role="radiogroup" aria-label={loc('لون المتجر', 'Store colour', 'ڕەنگی فرۆشگا')}>
-            <p className="block text-zinc-400 text-[12px] font-semibold mb-1.5">{loc('لون المتجر', 'Store colour', 'ڕەنگی فرۆشگا')}</p>
+            <p className="block text-text-secondary text-[12px] font-semibold mb-1.5">{loc('لون المتجر', 'Store colour', 'ڕەنگی فرۆشگا')}</p>
             <div className="flex gap-x-1.5 gap-y-2 flex-wrap">
               {ACCENT_NAMES.map((a) => (
                 <button
@@ -344,13 +331,12 @@ export function StoreSettingsTab({
                   aria-checked={f.accent === a.id}
                   data-accent={a.id}
                   onClick={() => edit({ accent: a.id })}
-                  className={`relative lv-hit min-h-11 ps-1.5 pe-3 rounded-xl border text-[12px] font-semibold inline-flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                    f.accent === a.id ? 'border-gold/60 bg-white/[0.06] text-text-primary' : 'border-white/10 bg-white/[0.02] text-zinc-400'
-                  }`}
+                  // A choice (lv-choice): chosen is a press plus the gold start bar.
+                  className="lv-choice lv-hit ps-1.5 pe-3 text-[12px] font-semibold inline-flex items-center gap-2"
                 >
                   <AccentSample accent={a.id} />
                   {loc(a.ar, a.en)}
-                  {f.accent === a.id && <Check aria-hidden="true" className="h-3.5 w-3.5 text-gold" />}
+                  {f.accent === a.id && <Check aria-hidden="true" className="h-3.5 w-3.5" />}
                 </button>
               ))}
             </div>
@@ -387,14 +373,14 @@ export function StoreSettingsTab({
         {/* OWNER: Sorani to be written by hand. */}
         <div className="space-y-3">
           <div>
-            <label htmlFor="store-governorate" className="block text-zinc-400 text-[12px] font-semibold mb-1.5">
+            <label htmlFor="store-governorate" className="block text-text-secondary text-[12px] font-semibold mb-1.5">
               {loc('المحافظة', 'Governorate', 'پارێزگا')}
             </label>
             <select
+              className="lv-input text-[13px]"
               id="store-governorate"
               value={f.governorate}
               onChange={(e) => edit({ governorate: e.target.value })}
-              className="w-full h-11 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
             >
               <option value="">{loc('— اختر —', '— choose —', '—')}</option>
               {/* A store saved before the closed list (audit 02 B27) holds free
@@ -482,12 +468,13 @@ export function StoreSettingsTab({
               edit({ business_hours: next });
             };
             return (
-              <div key={i} className="rounded-xl border border-white/5 bg-black/25 p-2 space-y-2" data-hours-row>
+              <div key={i} className="rounded-lg border border-border-subtle bg-surface-raised p-2 space-y-2" data-hours-row>
                 {/* The day, whether it is open, and its ×, on one line; its
                     hours on the next — two time fields beside the switch did
                     not fit a phone and wrapped one of them alone. */}
                 <div className="flex gap-1.5 items-center">
                   <input
+                    className="lv-input flex-1 min-w-0 text-[13px]"
                     list="day-presets"
                     value={h.day}
                     maxLength={LIMITS.day}
@@ -495,7 +482,6 @@ export function StoreSettingsTab({
                     aria-label={loc('اليوم', 'Day', 'ڕۆژ')}
                     aria-invalid={rowErr ? true : undefined}
                     placeholder={loc('اليوم', 'Day', 'ڕۆژ')}
-                    className="flex-1 min-w-0 h-11 rounded-xl bg-black/40 border border-white/10 px-3 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
                   />
                   <button
                     type="button"
@@ -504,8 +490,9 @@ export function StoreSettingsTab({
                     aria-label={loc(`مغلق — ${h.day || 'اليوم'}`, `Closed — ${h.day || 'this day'}`)}
                     onClick={() => setRow({ closed: !h.closed })}
                     data-hours-closed={h.closed ? 'true' : 'false'}
-                    className={`shrink-0 min-h-11 px-3 rounded-xl border text-[12.5px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                      h.closed ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-white/10 text-zinc-400'
+                    // Closed is the switch ON: pressed in (the well and the press), its word in the warning ink.
+                    className={`shrink-0 min-h-11 px-3 rounded-md border text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                      h.closed ? 'border-transparent bg-[var(--clay-well-bg)] shadow-press text-warning' : 'border-border-subtle bg-surface-raised shadow-xs text-text-secondary'
                     }`}
                   >
                     {/* OWNER: Sorani to be written by hand. */}
@@ -522,19 +509,19 @@ export function StoreSettingsTab({
                 {!h.closed && (
                   <div className="flex gap-1.5 items-center" dir="ltr">
                     <input
+                      className="lv-input min-w-0 flex-1 px-2 text-[13px]"
                       type="time"
                       value={h.open}
                       onChange={(e) => setRow({ open: e.target.value })}
                       aria-label={loc('يفتح', 'Opens')}
-                      className="min-w-0 flex-1 h-11 rounded-xl bg-black/40 border border-white/10 px-2 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
                     />
                     <span aria-hidden="true" className="text-text-muted">–</span>
                     <input
+                      className="lv-input min-w-0 flex-1 px-2 text-[13px]"
                       type="time"
                       value={h.close}
                       onChange={(e) => setRow({ close: e.target.value })}
                       aria-label={loc('يغلق', 'Closes')}
-                      className="min-w-0 flex-1 h-11 rounded-xl bg-black/40 border border-white/10 px-2 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
                     />
                   </div>
                 )}
@@ -582,9 +569,10 @@ export function StoreSettingsTab({
           {f.policies.map(([k, v], i) => {
             const rowErr = rowError(shown, 'policies', i);
             return (
-              <div key={i} className="rounded-xl bg-black/30 border border-white/5 p-2.5 space-y-1.5" data-policy-row>
+              <div key={i} className="rounded-lg bg-surface-raised border border-border-subtle p-2.5 space-y-1.5" data-policy-row>
                 <div className="flex gap-1.5 items-center">
                   <input
+                    className="lv-input flex-1 min-w-0 px-2.5 text-[13px] font-semibold"
                     value={k}
                     maxLength={LIMITS.policyTitle}
                     onChange={(e) => {
@@ -595,13 +583,13 @@ export function StoreSettingsTab({
                     aria-label={loc('عنوان السياسة', 'Policy title', 'ناونیشان')}
                     aria-invalid={rowErr ? true : undefined}
                     placeholder={loc('عنوان السياسة', 'Policy title', 'ناونیشان')}
-                    className="flex-1 min-w-0 h-11 rounded-lg bg-black/40 border border-white/10 px-2.5 text-white text-[13px] font-semibold outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
                   />
                   <RowButton label={loc('حذف هذه السياسة', 'Remove this policy')} danger onClick={() => edit({ policies: f.policies.filter((_, j) => j !== i) })}>
                     <Trash2 aria-hidden="true" className="h-4 w-4" />
                   </RowButton>
                 </div>
                 <textarea
+                  className="lv-input px-2.5 py-2 text-[13px] leading-relaxed resize-y"
                   value={v}
                   rows={3}
                   maxLength={LIMITS.policyText}
@@ -612,7 +600,6 @@ export function StoreSettingsTab({
                   }}
                   aria-label={loc('نص السياسة', 'Policy text')}
                   placeholder={loc('نص السياسة كما يقرؤه الزبون', 'The policy as customers read it', 'دەق')}
-                  className="w-full rounded-lg bg-black/40 border border-white/10 px-2.5 py-2 text-white text-[13px] outline-none focus:border-gold/40 resize-y focus-visible:ring-2 focus-visible:ring-focus"
                 />
                 {rowErr && <p className="text-red-400 text-[11.5px]" role="alert">{fieldErrorText(rowErr, loc)}</p>}
               </div>
@@ -642,6 +629,7 @@ export function StoreSettingsTab({
               <div key={i} className="space-y-1" data-social-row>
                 <div className="flex gap-1.5 items-center">
                   <input
+                    className="lv-input w-28 shrink-0 px-2.5 text-[13px]"
                     value={k}
                     maxLength={LIMITS.socialKey}
                     onChange={(e) => {
@@ -651,9 +639,9 @@ export function StoreSettingsTab({
                     }}
                     aria-label={loc('المنصة', 'Platform', 'پلاتفۆرم')}
                     placeholder={loc('المنصة', 'Platform', 'پلاتفۆرم')}
-                    className="w-28 h-11 rounded-xl bg-black/40 border border-white/10 px-2.5 text-white text-[13px] outline-none focus:border-gold/40 shrink-0 focus-visible:ring-2 focus-visible:ring-focus"
                   />
                   <input
+                    className="lv-input flex-1 min-w-0 px-2.5 text-[13px]"
                     value={v}
                     dir="ltr"
                     inputMode="url"
@@ -665,7 +653,6 @@ export function StoreSettingsTab({
                     aria-label={loc('رابط', 'Link') + (k ? ` — ${k}` : '')}
                     aria-invalid={rowErr ? true : undefined}
                     placeholder="instagram.com/…"
-                    className={`flex-1 min-w-0 h-11 rounded-xl bg-black/40 border px-2.5 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus ${rowErr ? 'border-red-400/60' : 'border-white/10'}`}
                   />
                   <RowButton label={loc('حذف هذا الرابط', 'Remove this link')} danger onClick={() => edit({ social_links: f.social_links.filter((_, j) => j !== i) })}>
                     <Trash2 aria-hidden="true" className="h-4 w-4" />
@@ -739,7 +726,8 @@ export function StoreSettingsTab({
           is something to save or to say; a clean form keeps it at the end,
           so it does not sit over a phone's last 90px for nothing. */}
       <div
-        className={`${dirty || saving || error ? 'sticky bottom-0 z-10 shadow-2' : ''} -mx-1 rounded-2xl border border-border-subtle bg-canvas p-2.5`}
+        // Stuck, it is a dock (opaque, the dock cast); at rest it sits flat on the canvas.
+        className={`${dirty || saving || error ? 'sticky bottom-0 z-10 bg-surface-raised shadow-dock' : ''} -mx-1 rounded-2xl border border-border-subtle p-2.5`}
         data-settings-savebar
         data-dirty={dirty ? 'true' : 'false'}
       >
@@ -812,20 +800,20 @@ function WidgetGroupEditor({
 
   return (
     <div>
-      <p className="text-zinc-400 text-[12px] font-semibold mb-2">{label}</p>
+      <p className="text-text-secondary text-[12px] font-semibold mb-2">{label}</p>
       <div className="space-y-2">
         {items.map((w, i) => {
           const rowErr = errors.find((e) => e.index === i);
           return (
-            <div key={i} className={`rounded-xl border p-2 space-y-1.5 ${w.visible === false ? 'border-white/5 opacity-70' : 'border-white/10'} bg-black/25`} data-widget-row={kind}>
+            <div key={i} className={`rounded-lg border border-border-subtle bg-surface-raised p-2 space-y-1.5 ${w.visible === false ? 'opacity-70' : ''}`} data-widget-row={kind}>
               <div className="flex items-center gap-1.5">
-                <div className="w-9 h-9 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center shrink-0" aria-hidden="true">
-                  <WidgetIcon name={w.icon} className="w-4 h-4 text-zinc-300" />
+                <div className="w-9 h-9 rounded-sm lv-well flex items-center justify-center shrink-0" aria-hidden="true">
+                  <WidgetIcon name={w.icon} className="w-4 h-4 text-text-secondary" />
                 </div>
                 <select
+                  className="lv-input w-28 shrink-0 px-1.5 text-[12px]"
                   value={w.icon}
                   onChange={(e) => set(i, { icon: e.target.value })}
-                  className="w-28 h-11 rounded-lg bg-black/40 border border-white/10 px-1.5 text-zinc-300 text-[12px] outline-none focus:border-gold/40 shrink-0 focus-visible:ring-2 focus-visible:ring-focus"
                   aria-label={loc('الأيقونة', 'Icon', 'ئایکۆن')}
                 >
                   {WIDGET_ICONS.map((ic) => (
@@ -835,17 +823,18 @@ function WidgetGroupEditor({
                   ))}
                 </select>
                 <input
+                  className="lv-input flex-1 min-w-0 px-2 text-[13px]"
                   value={w.title}
                   onChange={(e) => set(i, { title: e.target.value })}
                   aria-label={loc('العنوان', 'Title', 'ناونیشان')}
                   aria-invalid={rowErr?.kind === 'untitled' || rowErr?.kind === 'long' ? true : undefined}
                   placeholder={loc('العنوان', 'Title', 'ناونیشان')}
                   maxLength={LIMITS.widgetTitle}
-                  className="flex-1 min-w-0 h-11 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
                 />
               </div>
               {kind === 'link' ? (
                 <input
+                  className="lv-input px-2 text-[13px]"
                   value={w.url ?? ''}
                   onChange={(e) => set(i, { url: e.target.value })}
                   dir="ltr"
@@ -853,16 +842,15 @@ function WidgetGroupEditor({
                   aria-label={loc('الرابط', 'Link')}
                   aria-invalid={rowErr?.kind === 'invalid_url' ? true : undefined}
                   placeholder="instagram.com/…"
-                  className={`w-full h-11 rounded-lg bg-black/40 border px-2 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus ${rowErr?.kind === 'invalid_url' ? 'border-red-400/60' : 'border-white/10'}`}
                 />
               ) : (
                 <input
+                  className="lv-input px-2 text-[13px]"
                   value={w.subtitle ?? ''}
                   onChange={(e) => set(i, { subtitle: e.target.value })}
                   aria-label={loc('النص الثانوي', 'Secondary text', 'دەقی لاوەکی')}
                   placeholder={loc('النص الثانوي', 'Secondary text', 'دەقی لاوەکی')}
                   maxLength={LIMITS.widgetSubtitle}
-                  className="w-full h-11 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[13px] outline-none focus:border-gold/40 focus-visible:ring-2 focus-visible:ring-focus"
                 />
               )}
               {rowErr && <p className="text-red-400 text-[11.5px]" role="alert">{fieldErrorText(rowErr, loc)}</p>}
@@ -878,8 +866,9 @@ function WidgetGroupEditor({
                   role="switch"
                   aria-checked={w.visible !== false}
                   onClick={() => set(i, { visible: w.visible === false })}
-                  className={`h-9 px-2.5 rounded-lg border text-[12px] font-semibold inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                    w.visible === false ? 'border-amber-500/30 text-amber-400' : 'border-white/10 text-zinc-400'
+                  // Shown is the switch ON: pressed in. Hidden sits flush, its word in the warning ink.
+                  className={`h-9 px-2.5 rounded-md border text-[12px] font-semibold inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                    w.visible === false ? 'border-border-subtle bg-surface-raised shadow-xs text-warning' : 'border-transparent bg-[var(--clay-well-bg)] shadow-press text-text-secondary'
                   }`}
                 >
                   {w.visible === false ? <EyeOff aria-hidden="true" className="h-3.5 w-3.5" /> : <Eye aria-hidden="true" className="h-3.5 w-3.5" />}
@@ -905,7 +894,7 @@ function WidgetGroupEditor({
                 : { icon: items.length === 0 ? 'map-pin' : items.length === 1 ? 'clock' : 'truck', title: '', subtitle: '', visible: true },
             ])
           }
-          className="relative lv-hit mt-2 min-h-11 px-3 rounded-lg border border-dashed border-white/15 text-zinc-400 text-[12.5px] font-semibold inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="relative lv-hit mt-2 min-h-11 px-3 rounded-md border border-dashed border-border-subtle text-text-secondary text-[12.5px] font-semibold inline-flex items-center gap-1 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Plus aria-hidden="true" className="h-3.5 w-3.5" />
           {loc('إضافة عنصر', 'Add item', 'زیادکردن')} ({items.length}/{LIMITS.widgets})
@@ -1185,7 +1174,7 @@ export function WorkshopProfileForm({
       </Field>
 
       {/* WHAT THE PRINTERS SAY — read-only: no field, no control, only the doors. */}
-      <div className="rounded-xl border border-border-subtle bg-surface-raised p-3" data-workshop-derived>
+      <div className="rounded-lg border border-border-subtle bg-surface-raised p-3" data-workshop-derived>
         <p className="text-[13px] font-semibold text-text-primary">{s.fromPrinters}</p>
         <p className="mt-0.5 text-[12px] leading-relaxed text-text-muted">{s.fromPrintersHint}</p>
         <dl className="mt-2 space-y-1.5 text-[12.5px]">

@@ -213,7 +213,7 @@ export default function RequestBoard({
                   data-board-request={r.id}
                   className="lv-surface flex w-full items-start gap-3 p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus active:scale-[0.995] motion-reduce:active:scale-100"
                 >
-                  <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.04]">
+                  <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-raised">
                     {r.thumb_url ? (
                       <img src={r.thumb_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : (

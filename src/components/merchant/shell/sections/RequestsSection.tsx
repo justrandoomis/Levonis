@@ -38,7 +38,7 @@ export default function RequestsSection() {
               data-matching-requests={matching}
               className="lv-surface flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-text-secondary">
+              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full lv-well text-text-secondary">
                 <Inbox className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1 text-[14px] font-medium text-text-primary">

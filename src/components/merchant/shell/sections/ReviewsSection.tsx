@@ -74,31 +74,31 @@ export default function ReviewsSection() {
       {reviews.map((r) => {
         const id = String(r.id);
         return (
-          <div key={id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <div key={id} className="lv-surface p-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-white text-[12.5px] font-semibold">{String(r.customer_name)}</span>
+              <span className="text-text-primary text-[12.5px] font-semibold">{String(r.customer_name)}</span>
               <div className="flex gap-0.5" role="img" aria-label={`${Number(r.rating)}/5`}>
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} aria-hidden="true" className={`w-3.5 h-3.5 ${n <= Number(r.rating) ? 'text-gold fill-gold' : 'text-zinc-700'}`} />
+                  <Star key={n} aria-hidden="true" className={`w-3.5 h-3.5 ${n <= Number(r.rating) ? 'text-gold fill-gold' : 'text-text-muted/60'}`} />
                 ))}
               </div>
             </div>
-            {!!r.body && <p className="text-zinc-300 text-[12.5px] leading-relaxed mb-2">{String(r.body)}</p>}
+            {!!r.body && <p className="text-text-secondary text-[12.5px] leading-relaxed mb-2">{String(r.body)}</p>}
 
             {r.merchant_reply ? (
               <div className="ps-3 border-s-2 border-gold/30">
                 <p className="text-gold/80 text-[11px] font-semibold mb-0.5">{loc('ردك', 'Your reply', 'وەڵامەکەت')}</p>
-                <p className="text-zinc-400 text-[12px]">{String(r.merchant_reply)}</p>
+                <p className="text-text-secondary text-[12px]">{String(r.merchant_reply)}</p>
               </div>
             ) : replying === id ? (
               <div className="space-y-2">
                 <textarea
+                  className="lv-input px-3 py-2 text-[13px] leading-relaxed resize-none"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   rows={3}
                   maxLength={1500}
                   aria-label={loc('ردك', 'Your reply', 'وەڵامەکەت')}
-                  className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-white text-[13px] outline-none focus:border-gold/40 resize-none"
                 />
                 <div className="flex gap-2">
                   <Btn small disabled={sending || !text.trim()} onClick={() => void send(id)}>

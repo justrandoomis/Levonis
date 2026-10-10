@@ -193,7 +193,7 @@ export function MediaLibraryGrid({
               aria-disabled={heavy || undefined}
               aria-label={[place, size, use, heavy ? t.library.tooHeavyShort : ''].filter(Boolean).join(' · ')}
               onClick={() => (heavy ? onHeavy(m) : onPick(m.key))}
-              className={`relative block aspect-square w-full overflow-hidden rounded-xl border bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${on ? 'border-gold' : 'border-border-subtle'} ${heavy ? 'opacity-60' : ''}`}
+              className={`relative block aspect-square w-full overflow-hidden rounded-xl border bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${on ? 'border-text-primary' : 'border-border-subtle'} ${heavy ? 'opacity-60' : ''}`}
             >
               <MediaThumb value={m.key} kind={kind} className="h-full w-full" />
               {on && (

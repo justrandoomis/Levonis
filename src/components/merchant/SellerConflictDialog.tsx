@@ -72,15 +72,15 @@ export default function SellerConflictDialog({
       panelClassName="w-full max-w-sm"
     >
         <div className="p-5">
-          <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4">
-            <AlertTriangle className="w-5 h-5 text-amber-400" />
+          <div className="w-11 h-11 rounded-md lv-well flex items-center justify-center mb-4">
+            <AlertTriangle className="w-5 h-5 text-warning" />
           </div>
 
-          <h2 className="text-white font-bold text-[16px] mb-2">
+          <h2 className="text-text-primary font-bold text-[16px] mb-2">
             {loc('سلتك تخص متجرًا آخر', 'Your cart belongs to another store', 'سەبەتەکەت هی فرۆشگایەکی ترە')}
           </h2>
 
-          <p className="text-zinc-400 text-[13px] leading-relaxed mb-5">
+          <p className="text-text-secondary text-[13px] leading-relaxed mb-5">
             {loc(
               `سلتك تحتوي على منتجات من ${current}. للشراء من ${incoming}، أكمل طلبك الحالي أو أفرغ السلة.`,
               `Your cart currently contains items from ${current}. To shop from ${incoming}, complete the current order or clear the cart first.`,
@@ -92,7 +92,7 @@ export default function SellerConflictDialog({
             {/* The safe option first, and visually primary. */}
             <Link
               to="/cart"
-              className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              className="lv-button lv-button-primary w-full min-h-[48px]"
             >
               <ShoppingBag className="w-4 h-4" />
               {loc('العودة إلى السلة الحالية', 'Back to my current cart', 'گەڕانەوە بۆ سەبەتەکەم')}
@@ -102,7 +102,7 @@ export default function SellerConflictDialog({
             <button
               onClick={onReplace}
               disabled={busy}
-              className="w-full min-h-[48px] rounded-2xl border border-red-500/30 bg-red-500/10 text-red-300 font-semibold text-[13.5px] active:scale-[0.98] transition-transform disabled:opacity-50"
+              className="lv-button lv-button-danger w-full min-h-[48px] font-semibold text-[13.5px]"
             >
               {busy
                 ? loc('جارٍ…', 'Working…', 'لە کارکردندا…')
@@ -112,7 +112,7 @@ export default function SellerConflictDialog({
             <button
               onClick={onCancel}
               disabled={busy}
-              className="w-full min-h-[44px] rounded-2xl text-zinc-500 font-semibold text-[13px] disabled:opacity-50"
+              className="lv-button lv-button-ghost w-full font-semibold text-[13px]"
             >
               {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
             </button>

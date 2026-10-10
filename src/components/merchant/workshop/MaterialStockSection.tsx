@@ -174,7 +174,7 @@ export default function MaterialStockSection() {
       ) : (
         <ul className="space-y-2" data-stock-lines aria-describedby={`${id}-hint`}>
           {rows.map((r) => (
-            <li key={r.key} className="space-y-2 rounded-xl bg-white/[0.03] p-2.5" data-stock-line>
+            <li key={r.key} className="space-y-2 rounded-lg border border-border-subtle bg-surface-raised p-2.5" data-stock-line>
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1">
                   <Select aria-label={loc('الخامة', 'Material')} value={r.material_id} onChange={(e) => edit(r.key, { material_id: e.target.value })} className="w-full">

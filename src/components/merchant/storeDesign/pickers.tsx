@@ -285,7 +285,7 @@ export function RefPicker({
                     data-selected={on || undefined}
                   >
                     {kind === 'product' && (
-                      <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-raised">
+                      <span className="size-10 shrink-0 overflow-hidden rounded-sm bg-surface-raised">
                         {it.image ? <img src={it.image} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
                       </span>
                     )}
@@ -295,7 +295,7 @@ export function RefPicker({
                       </span>
                       {it.sub && <span className="block truncate text-[11.5px] text-text-muted">{it.sub}</span>}
                     </span>
-                    {on && <Check className="h-4 w-4 shrink-0 text-gold" aria-hidden="true" />}
+                    {on && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
                   </button>
                 </li>
               );

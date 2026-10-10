@@ -274,9 +274,10 @@ export function CollectionsManager({ canSell, autoFocusCreate = false }: { canSe
       ) : !items.length ? (
         <EmptyState title={w.none} compact />
       ) : (
-        <ul className="space-y-2">
+        // One tray, flat rows (build plan §5 DataList): the collections are a list, not a stack of cards.
+        <ul className="lv-surface divide-y divide-border-subtle">
           {items.map((c, i) => (
-            <li key={c.id} className="flex items-center gap-2 rounded-2xl border border-border-subtle bg-white/[0.03] px-3 py-2.5" data-collection={c.kind}>
+            <li key={c.id} className="flex items-center gap-2 px-3 py-2.5" data-collection={c.kind}>
               <CoverControl
                 collection={c}
                 busy={busy === `cover-${c.id}`}

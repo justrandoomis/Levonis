@@ -19,6 +19,7 @@ import { storeCheckoutApi, iqd, type MerchantCartData, type MerchantCartLine } f
 import { apiRefusal } from '../../lib/refusalStrings';
 import { ApiError } from '../../lib/api';
 import { QuantityInput } from '../ui/QuantityInput';
+import { IconButton } from '../ui/Button';
 import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 
@@ -120,10 +121,10 @@ export default function MerchantCartView() {
 
   if (!cart) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-6">
+      <div className="min-h-screen flex items-center justify-center px-6">
         {loadFailed ? (
           <div role="alert" className="text-center">
-            <p className="text-zinc-400 text-[13px] mb-3">
+            <p className="text-text-secondary text-[13px] mb-3">
               {loc('تعذّر تحميل السلة', 'Could not load the cart', 'نەتوانرا')}
             </p>
             <button
@@ -154,38 +155,37 @@ export default function MerchantCartView() {
     cart.items.filter((i) => i.product_id === productId).reduce((n, i) => n + i.qty, 0);
 
   return (
-    <div className="min-h-screen bg-black text-zinc-300 pb-36">
-      <div className="sticky top-0 z-30 bg-black border-b border-white/5 px-4 py-3 flex items-center gap-3">
-        <button
-          type="button"
+    <div className="min-h-screen text-text-secondary pb-36">
+      {/* The bar stays opaque (content scrolls under it); the page itself shows the canvas light. */}
+      <div className="sticky top-0 z-30 bg-canvas border-b border-border-subtle px-4 py-3 flex items-center gap-3">
+        <IconButton
+          variant="secondary"
           onClick={() => navigate(-1)}
-          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="w-11 h-11 rounded-xl border border-white/10 flex items-center justify-center text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
-        </button>
-        <h1 className="text-white font-bold text-[15px]">{loc('السلة', 'Cart', 'سەبەتە')}</h1>
+          label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          icon={<ArrowLeft className={`w-4 h-4 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />}
+        />
+        <h1 className="text-text-primary font-bold text-[15px]">{loc('السلة', 'Cart', 'سەبەتە')}</h1>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-4">
         {error && (
-          <div role="alert" className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 mb-3">
+          <div role="alert" className="lv-alert lv-alert-danger mb-3">
             <p className="text-red-300 text-[12px]">{error}</p>
           </div>
         )}
 
         {!cart.items.length ? (
           <div className="py-20 text-center">
-            <ShoppingCart className="w-10 h-10 text-zinc-700 mx-auto mb-4" />
-            <p className="text-zinc-500 text-[13px]">{loc('سلتك فارغة', 'Your cart is empty', 'سەبەتەکەت بەتاڵە')}</p>
+            <ShoppingCart className="w-10 h-10 text-text-muted mx-auto mb-4" />
+            <p className="text-text-muted text-[13px]">{loc('سلتك فارغة', 'Your cart is empty', 'سەبەتەکەت بەتاڵە')}</p>
           </div>
         ) : (
           <>
             {cart.store && (
               <div className="flex items-center gap-2 mb-3">
                 <Store className="w-4 h-4 text-gold" />
-                <span className="text-white text-[13px] font-bold">{cart.store.name}</span>
-                <span className="text-zinc-600 text-[11px]">
+                <span className="text-text-primary text-[13px] font-bold">{cart.store.name}</span>
+                <span className="text-text-muted text-[11px]">
                   {loc('يبيعه ويشحنه هذا المتجر', 'Sold and shipped by this store', 'لەم فرۆشگایەوە')}
                 </span>
               </div>
@@ -193,17 +193,17 @@ export default function MerchantCartView() {
 
             <div className="space-y-2.5">
               {cart.items.map((l) => (
-                <div key={l.cart_item_id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-2.5 flex gap-3">
-                  <div className="w-[72px] h-[72px] rounded-xl bg-black/40 overflow-hidden shrink-0">
+                <div key={l.cart_item_id} className="lv-surface p-2.5 flex gap-3">
+                  <div className="w-[72px] h-[72px] rounded-lg bg-surface-raised overflow-hidden shrink-0">
                     {l.images[0] && <img src={l.images[0]} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1 flex flex-col">
-                    <p className="text-zinc-100 text-[12.5px] font-semibold line-clamp-2 leading-snug">{l.name}</p>
-                    {l.variant && <p className="text-zinc-500 text-[11px] truncate">{l.variant}</p>}
+                    <p className="text-text-primary text-[12.5px] font-semibold line-clamp-2 leading-snug">{l.name}</p>
+                    {l.variant && <p className="text-text-muted text-[11px] truncate">{l.variant}</p>}
                     <div className="flex items-baseline gap-1.5 mt-0.5" dir="ltr">
                       <span className="text-gold font-bold text-[13px]">{iqd(l.unit_price_iqd)}</span>
                       {l.original_price_iqd && l.original_price_iqd > l.unit_price_iqd && (
-                        <span className="text-zinc-600 text-[10.5px] line-through">{iqd(l.original_price_iqd)}</span>
+                        <span className="text-text-muted text-[10.5px] line-through">{iqd(l.original_price_iqd)}</span>
                       )}
                     </div>
                     {!l.available && (
@@ -231,7 +231,7 @@ export default function MerchantCartView() {
                         type="button"
                         onClick={() => remove(l.cart_item_id)}
                         disabled={busy === l.cart_item_id}
-                        className="min-h-10 px-2 text-zinc-500 text-[11.5px] font-bold disabled:opacity-40"
+                        className="min-h-10 px-2 text-text-muted hover:text-text-primary text-[11.5px] font-bold disabled:opacity-40"
                       >
                         {loc('حذف', 'Remove', 'سڕینەوە')}
                       </button>
@@ -241,7 +241,7 @@ export default function MerchantCartView() {
               ))}
             </div>
 
-            <p className="text-zinc-600 text-[10.5px] mt-3">
+            <p className="text-text-muted text-[10.5px] mt-3">
               {loc(
                 'أجرة التوصيل وكوبونات المتجر تُحسب في صفحة إتمام الطلب.',
                 'Delivery and store coupons are applied at checkout.',
@@ -253,18 +253,19 @@ export default function MerchantCartView() {
       </div>
 
       {cart.items.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black px-4 sm:px-6 py-3">
+        <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border-subtle bg-surface-raised shadow-dock px-4 sm:px-6 py-3">
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <div className="min-w-0">
-              <p className="text-zinc-500 text-[10.5px]">{loc('المجموع', 'Subtotal', 'کۆ')}</p>
-              <p className="text-white font-bold text-[15px]" dir="ltr">{iqd(cart.subtotal_iqd)}</p>
+              <p className="text-text-muted text-[10.5px]">{loc('المجموع', 'Subtotal', 'کۆ')}</p>
+              <p className="text-text-primary font-bold text-[15px]" dir="ltr">{iqd(cart.subtotal_iqd)}</p>
             </div>
             <button
               type="button"
               onClick={() => navigate('/store-checkout')}
               disabled={!allAvailable}
               aria-describedby={allAvailable ? undefined : 'merchant-cart-blocked'}
-              className="flex-1 h-12 rounded-2xl bg-olive text-snow font-bold text-[14px] disabled:opacity-40 active:scale-[0.99] transition-transform"
+              // The one sticky purchase CTA: the only pill-shaped button (build plan §5).
+              className="lv-button lv-button-primary flex-1 h-12 rounded-full text-[14px]"
             >
               {loc('إتمام الطلب', 'Checkout', 'تەواوکردن')}
             </button>

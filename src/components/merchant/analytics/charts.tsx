@@ -356,7 +356,7 @@ export function BarList({ rows, color = '#3987e5', ariaLabel }: { rows: readonly
             </div>
             <div className="h-2 w-full" aria-hidden="true">
               <div
-                className="h-2 rounded-e-[4px] transition-[filter] group-hover:brightness-125"
+                className="h-2 rounded-e transition-[filter] group-hover:brightness-125"
                 style={{ width: `${pct}%`, background: color }}
               />
             </div>
@@ -392,7 +392,7 @@ export function StackedBar({ parts, ariaLabel }: { parts: readonly Part[]; ariaL
   const pctText = (v: number) => `${v.toLocaleString(lang === 'en' ? 'en-US' : undefined)}%`;
   return (
     <div data-stacked-bar>
-      <div role="img" aria-label={ariaLabel} className="flex h-3 w-full gap-[2px] overflow-hidden rounded-[4px]">
+      <div role="img" aria-label={ariaLabel} className="flex h-3 w-full gap-[2px] overflow-hidden rounded">
         {parts.map((p, i) =>
           p.value > 0 ? (
             <div
@@ -417,7 +417,7 @@ export function StackedBar({ parts, ariaLabel }: { parts: readonly Part[]; ariaL
             onPointerLeave={() => setActive(null)}
             className="flex min-w-0 items-center gap-2 rounded-md text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
-            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: p.color }} />
+            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded" style={{ background: p.color }} />
             <span className="min-w-0 flex-1 truncate text-text-secondary">{p.label}</span>
             <bdi className="shrink-0 font-semibold tabular-nums text-text-primary">{p.valueText}</bdi>
             <bdi className="w-11 shrink-0 text-end tabular-nums text-text-muted">{pctText(pcts[i])}</bdi>

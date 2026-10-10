@@ -30,17 +30,17 @@ export default function StoreUnavailable() {
   return (
     <main
       data-store-unavailable
-      className="min-h-[100dvh] bg-black flex items-center justify-center px-6 py-12"
+      className="min-h-[100dvh] flex items-center justify-center px-6 py-12"
     >
       <div className="w-full max-w-sm text-center">
-        <div className="mx-auto mb-5 w-14 h-14 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
-          <Store className="w-6 h-6 text-zinc-500" strokeWidth={1.5} aria-hidden="true" />
+        <div className="mx-auto mb-5 w-14 h-14 rounded-full lv-well flex items-center justify-center">
+          <Store className="w-6 h-6 text-text-muted" strokeWidth={1.5} aria-hidden="true" />
         </div>
-        <h1 className="text-white text-[17px] font-bold leading-snug [text-wrap:balance]">
+        <h1 className="text-text-primary text-[17px] font-bold leading-snug [text-wrap:balance]">
           {loc('المتجر غير متاح حاليًا', 'This store is not available right now')}
           {/* OWNER: Sorani to be written by hand. */}
         </h1>
-        <p className="mt-2 text-zinc-500 text-[13px] leading-relaxed [text-wrap:pretty]">
+        <p className="mt-2 text-text-muted text-[13px] leading-relaxed [text-wrap:pretty]">
           {loc(
             'إن كان لديك طلب من هذا المتجر فهو محفوظ في «طلباتي».',
             'If you have an order from this store, it is kept in My orders.'

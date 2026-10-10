@@ -239,8 +239,8 @@ export function CatalogManager({ canSell, store, focusProductId = null, initialS
       header: s.product,
       card: 'title',
       cell: (p) => (
-        <button type="button" onClick={() => setEditing({ id: p.id })} className="flex min-w-0 items-center gap-3 text-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold rounded-lg">
-          <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border-subtle bg-black/40">
+        <button type="button" onClick={() => setEditing({ id: p.id })} className="flex min-w-0 items-center gap-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-md">
+          <span className="size-11 shrink-0 overflow-hidden rounded-sm border border-border-subtle bg-surface-raised">
             {p.images[0] ? <img src={p.images[0]} alt="" className="h-full w-full object-cover" loading="lazy" /> : <Package className="m-3 h-5 w-5 text-text-muted" aria-hidden="true" />}
           </span>
           <span className="min-w-0">

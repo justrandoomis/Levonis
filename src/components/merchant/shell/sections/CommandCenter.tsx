@@ -271,7 +271,7 @@ export default function CommandCenter() {
                 {problems.map((p) => {
                   const t = problemText(p.code, loc, s);
                   return (
-                    <li key={p.code} data-store-problem={p.code} className="flex flex-col gap-3 rounded-e-2xl border-s-2 border-s-warning/70 bg-warning/[0.06] py-3 pe-3 ps-3.5 sm:flex-row sm:items-center">
+                    <li key={p.code} data-store-problem={p.code} className="lv-alert lv-alert-warning flex flex-col gap-3 sm:flex-row sm:items-center">
                       <AlertTriangle aria-hidden="true" className="hidden h-5 w-5 shrink-0 text-warning sm:block" />
                       <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-text-primary">{t.text}</p>
                       <Door to={p.link} className="lv-button lv-button-secondary lv-button-sm shrink-0 self-start sm:self-auto">
@@ -309,7 +309,7 @@ export default function CommandCenter() {
                         to={r.link}
                         className="group flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-raised focus-visible:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                       >
-                        <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ${r.tone === 'warning' ? 'text-warning' : 'text-text-secondary'}`}>
+                        <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full lv-well ${r.tone === 'warning' ? 'text-warning' : 'text-text-secondary'}`}>
                           {r.icon}
                         </span>
                         {/* The figure leads the sentence it counts — «3 طلبات جديدة…» —
@@ -321,7 +321,7 @@ export default function CommandCenter() {
                           <span className="block text-[14px] font-medium leading-snug text-text-primary">{r.text}</span>
                           {r.detail && <span className="mt-0.5 block text-[12.5px] text-text-muted">{r.detail}</span>}
                         </span>
-                        <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5" />
+                        <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted rtl:-scale-x-100" />
                       </Door>
                       <SubRows row={r.id} a={data} s={s} confirming={confirming} onConfirm={confirm} onRestock={openRestock} />
                     </Motion.li>
@@ -503,7 +503,7 @@ function SetupChecklist({ setup }: { setup: Setup }) {
         </button>
       </div>
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+        className="h-1.5 overflow-hidden rounded-full lv-well"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={steps.length}

@@ -46,7 +46,7 @@ import { useMediaStrings, type MediaStrings } from './strings';
 /** A small, faithful sample of a preset: its ground, a card, a product tile and the accent. */
 export function ThemeSwatch({ tokens, storeAccent, className = 'h-16' }: { tokens: ThemeTokens; storeAccent: unknown; className?: string }) {
   return (
-    <StoreTheme tokens={tokens} storeAccent={storeAccent} className={`relative w-full overflow-hidden rounded-lg border border-white/10 p-2 ${className}`}>
+    <StoreTheme tokens={tokens} storeAccent={storeAccent} className={`relative w-full overflow-hidden rounded-lg border border-border-subtle p-2 ${className}`}>
       <SwatchBody accent={accentFor(tokens, storeAccent).classes.indicator} />
     </StoreTheme>
   );

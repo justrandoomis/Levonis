@@ -198,7 +198,10 @@ test('the panel asks the server route that exists, and does nothing the house ru
   }
   const panel = code(SRC('components/merchant/share/ShareStore.tsx'));
   // The QR keeps its own white ground and crisp modules, or it does not scan.
-  assert.match(panel, /bg-white/);
+  // PIN MOVED (clay, build plan §6 Phase 3.4): `/bg-white/` was last met only
+  // by the panel's legacy card fill (`bg-white/[0.03]`), now `lv-surface`; the
+  // QR's own ground is the theme-proof snow fill behind the code itself.
+  assert.match(panel, /bg-snow p-2\.5" role="img"/);
   assert.match(panel, /shapeRendering="crispEdges"/);
   // Every control is a real button with a 44 px target (lv-button).
   assert.ok((panel.match(/className="lv-button /g) ?? []).length >= 4);

@@ -33,6 +33,7 @@ import {
   type QuotePrinter,
 } from '../../../lib/printQuote';
 import { Btn, Card, Empty, Notice, Spinner } from './ui';
+import { StatusChip } from '../../ui/Badge';
 import RequestsToCost from '../workshop/RequestsToCost';
 
 /** One cost component, exactly as the engine emitted it. */
@@ -255,11 +256,11 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
         />
         {file ? (
           <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 grid place-items-center shrink-0">
+            <span className="w-9 h-9 rounded-sm lv-well grid place-items-center shrink-0">
               <Box className="w-4 h-4 text-gold" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-white text-[12.5px] truncate">{file.name}</p>
+              <p className="text-text-primary text-[12.5px] truncate">{file.name}</p>
               <p className="text-text-muted text-[11px] tabular-nums" dir="ltr">
                 {(file.size / 1024 / 1024).toFixed(1)} MB
               </p>
@@ -273,10 +274,10 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
             type="button"
             onClick={() => fileInput.current?.click()}
             disabled={busy !== ''}
-            className="w-full py-7 flex flex-col items-center gap-1.5 rounded-2xl border border-dashed border-zinc-800 hover:border-zinc-700 transition-colors disabled:opacity-50"
+            className="w-full py-7 flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-border-subtle hover:bg-white/[0.04] transition-colors disabled:opacity-50"
           >
             <FileUp className="w-5 h-5 text-gold" />
-            <span className="text-white text-[12.5px]">{loc('ارفع ملف المجسم', 'Upload a model file')}</span>
+            <span className="text-text-primary text-[12.5px]">{loc('ارفع ملف المجسم', 'Upload a model file')}</span>
             <span className="text-text-muted text-[11px]">STL · 3MF · OBJ · STEP</span>
           </button>
         )}
@@ -287,12 +288,12 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
           <div className="grid grid-cols-2 gap-2.5">
             <Labelled label={loc('المادة', 'Material')}>
               <select
+                className="lv-input text-[12.5px]"
                 value={materialId}
                 onChange={(e) => {
                   setMaterialId(e.target.value);
                   reset();
                 }}
-                className={SELECT}
               >
                 {materials.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -303,12 +304,12 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
             </Labelled>
             <Labelled label={loc('طراز القياس', 'Measured against')}>
               <select
+                className="lv-input text-[12.5px]"
                 value={modelId}
                 onChange={(e) => {
                   setModelId(e.target.value);
                   reset();
                 }}
-                className={SELECT}
               >
                 {printers.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -319,6 +320,7 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
             </Labelled>
             <Labelled label={loc('عدد القطع', 'Quantity')}>
               <input
+                className="lv-input text-[12.5px]"
                 inputMode="numeric"
                 dir="ltr"
                 value={quantity}
@@ -326,16 +328,15 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
                   setQuantity(Math.max(1, Math.min(500, Number(e.target.value.replace(/\D/g, '')) || 1)));
                   reset();
                 }}
-                className={SELECT}
               />
             </Labelled>
             <Labelled label={loc('هامش الربح %', 'Target margin %')}>
               <input
+                className="lv-input text-[12.5px]"
                 inputMode="decimal"
                 dir="ltr"
                 value={margin}
                 onChange={(e) => setMargin(e.target.value.replace(/[^0-9.]/g, ''))}
-                className={SELECT}
               />
             </Labelled>
           </div>
@@ -422,7 +423,7 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
               <li key={r.merchant_printer_id} className="flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 text-text-muted shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-zinc-300 text-[12px]">{r.name}</p>
+                  <p className="text-text-primary text-[12px]">{r.name}</p>
                   <p className="text-text-muted text-[11px] leading-relaxed">
                     {(r.reasons ?? []).map((code) => reasonLabel(code, en)).join(' · ')}
                   </p>
@@ -438,9 +439,6 @@ export function CostingTab({ requestHref }: { requestHref?: (requestId: string) 
   );
 }
 
-const SELECT =
-  'w-full h-10 bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-white text-[12.5px] focus:outline-none focus:border-gold transition-colors';
-
 function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
@@ -452,9 +450,9 @@ function Labelled({ label, children }: { label: string; children: React.ReactNod
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-zinc-900/60 border border-zinc-800 px-3 py-2">
+    <div className="lv-well rounded-md px-3 py-2">
       <p className="text-text-muted text-[10px] uppercase tracking-wider">{label}</p>
-      <p className="text-white text-[12.5px] font-medium mt-0.5 tabular-nums" dir="ltr">
+      <p className="text-text-primary text-[12.5px] font-medium mt-0.5 tabular-nums" dir="ltr">
         {children}
       </p>
     </div>
@@ -486,23 +484,22 @@ function PrinterCard({
   const estimated = row.confidence !== 'exact';
   return (
     <div
-      className={`rounded-2xl border bg-zinc-950 overflow-hidden ${
-        cheapest ? 'border-gold/40' : 'border-zinc-800'
-      }`}
+      // One cue for the cheapest machine: its chip (the gold outline was a second one).
+      className="lv-surface overflow-hidden"
     >
       <div className="p-3.5">
         <div className="flex items-start gap-2.5">
-          <span className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 grid place-items-center shrink-0">
-            <Printer className="w-4 h-4 text-zinc-400" />
+          <span className="w-8 h-8 rounded-sm lv-well grid place-items-center shrink-0">
+            <Printer className="w-4 h-4 text-text-secondary" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-white text-[13px] font-medium truncate">{row.name}</p>
+            <p className="text-text-primary text-[13px] font-medium truncate">{row.name}</p>
             <p className="text-text-muted text-[11px] truncate">{row.model}</p>
           </div>
           {cheapest && (
-            <span className="text-[10px] text-gold border border-gold/30 bg-gold/10 rounded-full px-2 py-0.5 shrink-0">
+            <StatusChip tone="accent" dot={false} className="shrink-0">
               {loc('الأقل كلفة', 'Lowest cost')}
-            </span>
+            </StatusChip>
           )}
         </div>
 
@@ -542,7 +539,7 @@ function PrinterCard({
             type="button"
             onClick={onToggle}
             aria-expanded={open}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 text-[11.5px] text-zinc-400 hover:text-white py-1.5 rounded-lg hover:bg-zinc-900 transition-colors"
+            className="mt-3 w-full flex items-center justify-center gap-1.5 text-[11.5px] text-text-secondary hover:text-text-primary py-1.5 rounded-md hover:bg-white/[0.04] transition-colors"
           >
             {open ? loc('إخفاء التفاصيل', 'Hide breakdown') : loc('أين تذهب الكلفة', 'Where the cost goes')}
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -551,11 +548,11 @@ function PrinterCard({
       </div>
 
       {open && row.lines && (
-        <div className="border-t border-zinc-800 divide-y divide-zinc-800/60">
+        <div className="border-t border-border-subtle divide-y divide-border-subtle">
           {row.lines.map((line) => (
             <div key={line.component} className="px-3.5 py-2 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-zinc-300 text-[12px]">
+                <p className="text-text-secondary text-[12px]">
                   {COMPONENT_LABEL[line.component]?.[en ? 1 : 0] ?? line.component}
                 </p>
                 {line.detail && (
@@ -565,7 +562,7 @@ function PrinterCard({
                 )}
               </div>
               <div className="text-end shrink-0">
-                <p className="text-white text-[12px] tabular-nums" dir="ltr">
+                <p className="text-text-primary text-[12px] tabular-nums" dir="ltr">
                   {formatIqd(line.iqd)}
                 </p>
                 <p className="text-text-muted text-[10px]">{PROVENANCE_LABEL[line.from]?.[en ? 1 : 0] ?? line.from}</p>
@@ -574,7 +571,7 @@ function PrinterCard({
           ))}
           {/* The reserve is shown SEPARATELY from the base, because §13's whole
               point is that risk is not hidden inside the filament number. */}
-          <div className="px-3.5 py-2.5 bg-zinc-900/40 space-y-1">
+          <div className="px-3.5 py-2.5 bg-surface-raised space-y-1">
             <Sum label={loc('كلفة طبعة ناجحة', 'One successful print')} value={row.base_cost_iqd} />
             <Sum label={loc('احتياطي المحاولات الفاشلة', 'Reserve for failed attempts')} value={row.failure_reserve_iqd} />
             <Sum label={loc('نقطة التعادل', 'Break-even')} value={row.break_even_iqd} strong />
@@ -593,9 +590,9 @@ function PrinterCard({
 }
 
 function Money({ label, value, tone }: { label: string; value?: number; tone: 'neutral' | 'gold' | 'good' }) {
-  const color = tone === 'gold' ? 'text-gold' : tone === 'good' ? 'text-emerald-400' : 'text-white';
+  const color = tone === 'gold' ? 'text-gold' : tone === 'good' ? 'text-emerald-400' : 'text-text-primary';
   return (
-    <div className="rounded-xl bg-zinc-900/60 border border-zinc-800 px-2.5 py-2">
+    <div className="lv-well rounded-md px-2.5 py-2">
       <p className="text-text-muted text-[10px] uppercase tracking-wider truncate">{label}</p>
       <p className={`text-[13px] font-semibold mt-0.5 tabular-nums ${color}`} dir="ltr">
         {value === undefined ? '—' : formatIqd(value)}
@@ -607,8 +604,8 @@ function Money({ label, value, tone }: { label: string; value?: number; tone: 'n
 function Sum({ label, value, strong }: { label: string; value?: number; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={`text-[11.5px] ${strong ? 'text-white font-medium' : 'text-zinc-400'}`}>{label}</span>
-      <span className={`text-[12px] tabular-nums ${strong ? 'text-white font-semibold' : 'text-zinc-300'}`} dir="ltr">
+      <span className={`text-[11.5px] ${strong ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{label}</span>
+      <span className={`text-[12px] tabular-nums ${strong ? 'text-text-primary font-semibold' : 'text-text-secondary'}`} dir="ltr">
         {value === undefined ? '—' : formatIqd(value)}
       </span>
     </div>

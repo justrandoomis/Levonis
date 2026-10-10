@@ -127,9 +127,9 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
       )}
 
       {items.map((s) => (
-        <div key={s.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+        <div key={s.id} className="lv-surface p-3">
           <div className="flex gap-3">
-            <div className="w-12 h-12 rounded-xl bg-black/40 overflow-hidden shrink-0 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-md lv-well overflow-hidden shrink-0 flex items-center justify-center">
               {s.imageUrl ? (
                 <img src={s.imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -137,7 +137,7 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-white text-[13px] font-semibold truncate">{s.title}</p>
+              <p className="text-text-primary text-[13px] font-semibold truncate">{s.title}</p>
               <p className="text-text-muted text-[11px]">
                 {kindLabel(s.kind)}
                 {!s.active && ` · ${loc('موقوفة', 'paused', 'ڕاگیراوە')}`}
@@ -264,15 +264,15 @@ function ServiceEditor({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 space-y-3.5">
-      <h3 className="text-gold font-bold text-[13px]">
+    <div className="lv-surface p-3.5 space-y-3.5">
+      <h3 className="text-text-primary font-bold text-[13.5px]">
         {service ? loc('تعديل الخدمة', 'Edit service', 'دەستکاری') : loc('خدمة جديدة', 'New service', 'خزمەتگوزاری نوێ')}
       </h3>
 
       <Input label={loc('العنوان', 'Title', 'ناونیشان')} value={f.title} onChange={(v) => setF({ ...f, title: v })} />
 
       <div>
-        <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">{loc('النوع', 'Kind', 'جۆر')}</label>
+        <label className="block text-text-secondary text-[12px] font-semibold mb-1.5">{loc('النوع', 'Kind', 'جۆر')}</label>
         <div className="flex gap-1.5 flex-wrap">
           {SERVICE_KIND_LABELS.map(([id, ar, en, ckb]) => (
             <Chip key={id} label={loc(ar, en, ckb)} active={f.kind === id} onClick={() => setF({ ...f, kind: id })} />
@@ -451,18 +451,18 @@ export function ShowcaseTab() {
         if (!group.length) return null;
         return (
           <div key={k.id}>
-            <p className="text-zinc-400 text-[12px] font-bold mb-2 flex items-center gap-1.5">
+            <p className="text-text-secondary text-[12px] font-bold mb-2 flex items-center gap-1.5">
               {k.icon}
               {loc(k.ar, k.en, k.ckb)}
             </p>
             <div className="grid grid-cols-2 gap-2">
               {group.map((it) => (
-                <div key={it.id} className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
-                  <div className="aspect-[3/2] bg-black/40">
+                <div key={it.id} className="lv-surface overflow-hidden">
+                  <div className="aspect-[3/2] bg-surface-raised">
                     {it.imageUrl && <img src={it.imageUrl} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <div className="p-2">
-                    <p className="text-white text-[12px] font-semibold truncate">{it.title}</p>
+                    <p className="text-text-primary text-[12px] font-semibold truncate">{it.title}</p>
                     {it.details && <p className="text-text-muted text-[10.5px] line-clamp-2">{it.details}</p>}
                     <button
                       onClick={async () => {

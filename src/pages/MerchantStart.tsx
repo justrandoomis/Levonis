@@ -160,7 +160,7 @@ export default function MerchantStart() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-gold animate-spin" />
       </div>
     );
@@ -172,7 +172,7 @@ export default function MerchantStart() {
 
   if (!me && loadError) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center px-6" data-merchant-start-failed>
+      <div className="min-h-screen flex items-center justify-center px-6" data-merchant-start-failed>
         <ErrorState
           error={loadError}
           next="/merchant/start"
@@ -211,8 +211,7 @@ export default function MerchantStart() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-zinc-300 pb-32">
-      <div className="fixed top-[15%] left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] bg-olive/15 [mask-image:radial-gradient(closest-side,#000,transparent)] pointer-events-none z-0" />
+    <div className="min-h-screen text-text-secondary pb-32">
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -221,14 +220,14 @@ export default function MerchantStart() {
         className="relative z-10 max-w-lg mx-auto px-4 sm:px-6 pt-8"
       >
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-11 h-11 rounded-2xl bg-olive/30 border border-gold/20 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-md lv-well flex items-center justify-center">
             <Store className="w-5 h-5 text-gold" />
           </div>
           <div>
-            <h1 className="text-gold font-bold text-lg leading-tight">
+            <h1 className="text-text-primary font-bold text-lg leading-tight">
               {loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')}
             </h1>
-            <p className="text-zinc-500 text-[12px]">
+            <p className="text-text-muted text-[12px]">
               {loc('خطوة واحدة، ويمكنك تعديل كل شيء لاحقًا', 'One step — everything is editable later', 'یەک هەنگاو — دواتر هەموو شتێک دەگۆڕدرێت')}
             </p>
           </div>
@@ -236,11 +235,11 @@ export default function MerchantStart() {
 
         <Field label={loc('اسم المتجر', 'Store name', 'ناوی فرۆشگا')} required>
           <input
+            className="lv-input px-4 text-[14px]"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
             placeholder={loc('مثال: علي ثري دي', 'e.g. Ali 3D', 'نموونە: Ali 3D')}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40 transition-colors"
           />
         </Field>
 
@@ -255,21 +254,15 @@ export default function MerchantStart() {
         >
           <div className="relative">
             <input
+              className={`lv-input px-4 pe-11 text-[14px] ${slugState.kind === 'bad' ? 'border-danger' : slugState.kind === 'ok' ? 'border-success' : ''}`}
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               maxLength={32}
               dir="ltr"
               placeholder="ali3d"
-              className={`w-full min-h-[48px] rounded-2xl bg-black/40 border px-4 pe-11 text-white text-[14px] outline-none transition-colors ${
-                slugState.kind === 'bad'
-                  ? 'border-red-500/50'
-                  : slugState.kind === 'ok'
-                    ? 'border-emerald-500/40'
-                    : 'border-white/10 focus:border-gold/40'
-              }`}
             />
             <span className="absolute end-3 top-1/2 -translate-y-1/2">
-              {slugState.kind === 'checking' && <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />}
+              {slugState.kind === 'checking' && <Loader2 className="w-4 h-4 text-text-muted animate-spin" />}
               {slugState.kind === 'ok' && <Check className="w-4 h-4 text-emerald-400" />}
               {slugState.kind === 'bad' && <X className="w-4 h-4 text-red-400" />}
             </span>
@@ -295,19 +288,19 @@ export default function MerchantStart() {
 
         <Field label={loc('وصف مختصر', 'Short tagline', 'وەسفی کورت')}>
           <input
+            className="lv-input px-4 text-[14px]"
             value={tagline}
             onChange={(e) => setTagline(e.target.value)}
             maxLength={140}
             placeholder={loc('طباعة ثلاثية الأبعاد وقطع مخصصة', '3D printing and custom parts', 'چاپی سێ ڕەهەندی و پارچەی تایبەت')}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40 transition-colors"
           />
         </Field>
 
         <Field label={loc('المحافظة', 'Governorate', 'پارێزگا')}>
           <select
+            className="lv-input px-4 text-[14px]"
             value={governorate}
             onChange={(e) => setGovernorate(e.target.value)}
-            className="w-full min-h-[48px] rounded-2xl bg-black/40 border border-white/10 px-4 text-white text-[14px] outline-none focus:border-gold/40 transition-colors"
           >
             <option value="">{loc('اختر', 'Select', 'هەڵبژێرە')}</option>
             {GOVERNORATES.map((g) => (
@@ -320,16 +313,16 @@ export default function MerchantStart() {
 
         <Field label={loc('عن المتجر', 'About the store', 'دەربارەی فرۆشگا')}>
           <textarea
+            className="lv-input px-4 py-3 text-[14px] leading-relaxed resize-none"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={4000}
             rows={4}
-            className="w-full rounded-2xl bg-black/40 border border-white/10 px-4 py-3 text-white text-[14px] outline-none focus:border-gold/40 transition-colors resize-none"
           />
         </Field>
 
         {error && (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4">
+          <div className="lv-alert lv-alert-danger mb-4">
             <p className="text-red-300 text-[12.5px]">{error}</p>
           </div>
         )}
@@ -337,7 +330,7 @@ export default function MerchantStart() {
         <button
           onClick={submit}
           disabled={!canSubmit}
-          className="w-full min-h-[52px] rounded-2xl bg-olive text-snow font-bold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+          className="lv-button lv-button-primary w-full min-h-[52px] text-[15px]"
         >
           {submitting ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -366,28 +359,28 @@ function Field({
 }) {
   return (
     <div className="mb-5">
-      <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">
+      <label className="block text-text-secondary text-[12.5px] font-semibold mb-2">
         {label}
         {required && <span className="text-gold ms-1">*</span>}
       </label>
       {children}
-      {hint && <p className="text-zinc-600 text-[11.5px] mt-2 leading-relaxed">{hint}</p>}
+      {hint && <p className="text-text-muted text-[11.5px] mt-2 leading-relaxed">{hint}</p>}
     </div>
   );
 }
 
 function Gate({ title, body, to, label }: { title: string; body?: string; to: string; label: string }) {
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-6">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <div className="max-w-sm w-full text-center">
-        <div className="w-14 h-14 rounded-2xl bg-olive/30 border border-gold/20 flex items-center justify-center mx-auto mb-5">
+        <div className="w-14 h-14 rounded-2xl lv-well flex items-center justify-center mx-auto mb-5">
           <Store className="w-6 h-6 text-gold" />
         </div>
-        <h1 className="text-gold font-bold text-lg mb-2">{title}</h1>
-        {body && <p className="text-zinc-400 text-[13px] leading-relaxed mb-6">{body}</p>}
+        <h1 className="text-text-primary font-bold text-lg mb-2">{title}</h1>
+        {body && <p className="text-text-secondary text-[13px] leading-relaxed mb-6">{body}</p>}
         <Link
           to={to}
-          className="inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-2xl bg-olive text-snow font-bold text-[14px] active:scale-[0.98] transition-transform"
+          className="lv-button lv-button-primary min-h-[48px] px-6"
         >
           {label}
           <ArrowRight className="w-4 h-4 rtl:rotate-180" />

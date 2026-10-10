@@ -27,6 +27,8 @@ import {
 } from '../../../lib/merchant';
 import { Btn, Card, Chip, Empty, Input, Notice, Spinner, Toggle, useMainSiteHref, type Loc } from './ui';
 import { Sheet } from '../../ui/Overlay';
+import { StatusChip as ToneChip, type Tone } from '../../ui/Badge';
+import { IconButton } from '../../ui/Button';
 import { apiRefusal } from '../../../lib/refusalStrings';
 import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
@@ -68,18 +70,19 @@ export function statusLabel(k: string, loc: Loc): string {
 
 export function StatusChip({ status }: { status: string }) {
   const { loc } = useLanguage();
-  const map: Record<string, string> = {
-    pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    confirmed: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    processing: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    shipped: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
-    delivered: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    cancelled: 'bg-red-500/10 text-red-300 border-red-500/20',
+  // Information, so flat: the shared opaque status chip (AA on cream), one tone per stage.
+  const map: Record<string, Tone> = {
+    pending: 'warning',
+    confirmed: 'info',
+    processing: 'info',
+    shipped: 'accent',
+    delivered: 'success',
+    cancelled: 'danger',
   };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[status] ?? map.pending}`}>
+    <ToneChip tone={map[status] ?? map.pending} dot={false} className="shrink-0">
       {statusLabel(status, loc)}
-    </span>
+    </ToneChip>
   );
 }
 
@@ -263,7 +266,7 @@ export function OrdersTab({
         loadFailed ? (
           <div className="py-8 text-center space-y-3" role="alert">
             {/* OWNER: Sorani to be written by hand. */}
-            <p className="text-zinc-400 text-[13px]">{loc('تعذّر تحميل الطلبات', 'Could not load the orders')}</p>
+            <p className="text-text-secondary text-[13px]">{loc('تعذّر تحميل الطلبات', 'Could not load the orders')}</p>
             <Btn kind="ghost" small onClick={load}>
               {/* OWNER: Sorani to be written by hand. */}
               {loc('إعادة المحاولة', 'Try again')}
@@ -277,8 +280,8 @@ export function OrdersTab({
       ) : (
         <>
         {focusOrderId && !orders.some((o) => String(o.id) === focusOrderId) && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03]" data-focus-order={focusOrderId}>
-            <p className="px-3 pt-3 text-white text-[12.5px] font-semibold" dir="ltr">{focusOrderId}</p>
+          <div className="lv-surface" data-focus-order={focusOrderId}>
+            <p className="px-3 pt-3 text-text-primary text-[12.5px] font-semibold" dir="ltr">{focusOrderId}</p>
             <OrderDetail id={focusOrderId} />
           </div>
         )}
@@ -291,7 +294,7 @@ export function OrdersTab({
           return (
             <div
               key={id}
-              className="rounded-2xl border border-white/10 bg-white/[0.03]"
+              className="lv-surface"
               ref={id === focusOrderId ? (el) => el?.scrollIntoView({ block: 'start' }) : undefined}
             >
               <button
@@ -302,7 +305,7 @@ export function OrdersTab({
               >
                 <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div className="min-w-0">
-                    <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{id}</p>
+                    <p className="text-text-primary text-[12.5px] font-semibold truncate" dir="ltr">{id}</p>
                     <p className="text-text-muted text-[11px]">
                       {String(o.customer_name)} · {String(o.item_count)} {loc('منتج', 'items', 'بەرهەم')}
                     </p>
@@ -314,7 +317,7 @@ export function OrdersTab({
                 </div>
                 <div className="flex items-center justify-between text-[11.5px]">
                   <span className="text-text-muted">
-                    {loc('الإجمالي', 'Total', 'کۆ')}: <span className="text-white font-semibold" dir="ltr">{iqd(Number(o.total_iqd))}</span>
+                    {loc('الإجمالي', 'Total', 'کۆ')}: <span className="text-text-primary font-semibold" dir="ltr">{iqd(Number(o.total_iqd))}</span>
                   </span>
                   <span className="text-text-muted">
                     {loc('لك', 'You get', 'بۆ تۆ')}: <span className="text-gold font-semibold" dir="ltr">{iqd(Number(o.merchant_receivable_iqd))}</span>
@@ -401,8 +404,8 @@ export function OrdersTab({
         testId="merchant-cancel-order"
       >
         <div className="px-5 pb-6 pt-2">
-          <h2 className="text-white font-bold text-[16px]">{loc('إلغاء الطلب؟', 'Cancel this order?', 'هەڵوەشاندنەوە؟')}</h2>
-          <p className="text-zinc-400 text-[13px] mt-2 leading-relaxed">
+          <h2 className="text-text-primary font-bold text-[16px]">{loc('إلغاء الطلب؟', 'Cancel this order?', 'هەڵوەشاندنەوە؟')}</h2>
+          <p className="text-text-secondary text-[13px] mt-2 leading-relaxed">
             {/* OWNER: Sorani to be written by hand. */}
             {loc(
               'يُعاد إلى الزبون كامل ما دفعه في محفظته، وتعود الكمية إلى مخزونك، ويُحرَّر استخدام الكوبون. لا يمكن التراجع عن الإلغاء.',
@@ -417,7 +420,7 @@ export function OrdersTab({
               type="button"
               onClick={() => setCancelId('')}
               disabled={cancelling}
-              className="flex-1 min-h-[44px] rounded-xl border border-zinc-700 text-zinc-200 text-[13.5px] font-bold hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+              className="lv-button lv-button-secondary flex-1 text-[13.5px]"
             >
               {loc('الإبقاء على الطلب', 'Keep order', 'هێشتنەوەی داواکاری')}
             </button>
@@ -426,7 +429,7 @@ export function OrdersTab({
               onClick={() => void move(cancelId, 'cancelled')}
               disabled={cancelling}
               data-confirm-merchant-cancel
-              className="flex-1 min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-[13.5px] font-bold hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+              className="lv-button lv-button-danger flex-1 text-[13.5px] disabled:opacity-60"
             >
               {cancelling && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
               {cancelling
@@ -497,10 +500,10 @@ function OrderDetail({ id }: { id: string }) {
 
   return (
     <div className="px-3 pb-3 space-y-2.5">
-      <div className="rounded-xl bg-black/30 border border-white/5 p-2.5 space-y-1.5">
+      <div className="lv-well rounded-md p-2.5 space-y-1.5">
         {phone && (
           <div className="flex items-center justify-between gap-2 text-[12px]">
-            <span className="text-zinc-400 flex items-center gap-1.5">
+            <span className="text-text-secondary flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5" />
               <a href={`tel:${phone}`} className="text-gold font-semibold" dir="ltr">{phone}</a>
             </span>
@@ -515,7 +518,7 @@ function OrderDetail({ id }: { id: string }) {
         )}
         {addrText && (
           <div className="flex items-start justify-between gap-2 text-[12px]">
-            <span className="text-zinc-300 flex items-start gap-1.5">
+            <span className="text-text-primary flex items-start gap-1.5">
               <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0 text-text-muted" />
               {addrText}
             </span>
@@ -533,20 +536,20 @@ function OrderDetail({ id }: { id: string }) {
       <div className="space-y-1.5">
         {data.items.map((it) => (
           <div key={String(it.id)} className="flex items-center gap-2.5 text-[12px]">
-            <div className="w-9 h-9 rounded-lg bg-black/40 overflow-hidden shrink-0">
+            <div className="w-9 h-9 rounded-sm lv-well overflow-hidden shrink-0">
               {!!it.image_snapshot && <img src={String(it.image_snapshot)} alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-zinc-200 truncate">{String(it.name_snapshot)}</p>
+              <p className="text-text-primary truncate">{String(it.name_snapshot)}</p>
               {!!it.option_snapshot && <p className="text-text-muted text-[10.5px]" dir="auto">{String(it.option_snapshot)}</p>}
             </div>
             <span className="text-text-muted shrink-0" dir="ltr">×{String(it.qty)}</span>
-            <span className="text-zinc-300 font-semibold shrink-0" dir="ltr">{iqd(Number(it.line_total_iqd))}</span>
+            <span className="text-text-primary font-semibold shrink-0" dir="ltr">{iqd(Number(it.line_total_iqd))}</span>
           </div>
         ))}
       </div>
 
-      <div className="rounded-xl bg-black/30 border border-white/5 p-2.5 text-[11.5px] space-y-1">
+      <div className="lv-well rounded-md p-2.5 text-[11.5px] space-y-1">
         <Row label={loc('المنتجات', 'Items', 'بەرهەمەکان')} value={iqd(Number(o.subtotal_iqd))} />
         {Number(o.coupon_discount_iqd ?? 0) > 0 && (
           <Row label={`${loc('كوبون', 'Coupon', 'کۆبۆن')} ${String(o.coupon_code ?? '')}`} value={`− ${iqd(Number(o.coupon_discount_iqd))}`} />
@@ -574,7 +577,7 @@ function Row({ label, value, strong, gold }: { label: string; value: string; str
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-text-muted">{label}</span>
-      <span className={`${gold ? 'text-gold font-bold' : strong ? 'text-white font-bold' : 'text-zinc-300'}`} dir="ltr">
+      <span className={`${gold ? 'text-gold font-bold' : strong ? 'text-text-primary font-bold' : 'text-text-secondary'}`} dir="ltr">
         {value}
       </span>
     </div>
@@ -675,7 +678,7 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
       {communityAccess?.may_enter !== false && (
         <a
           href={mainHref('/requests')}
-          className="w-full min-h-11 rounded-xl border border-gold/30 bg-gold/10 text-gold font-bold text-[12.5px] flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="lv-button lv-button-accent w-full text-[12.5px]"
         >
           <Hammer className="w-4 h-4" />
           {loc('تصفح طلبات الزبائن وقدّم عروضك', 'Browse customer requests and make offers', 'داواکاریەکان ببینە و ئۆفەر بدە')}
@@ -713,7 +716,7 @@ export function CustomOrdersTab({ focusOrderId = null }: { focusOrderId?: string
             data-custom-order={o.id}
             data-focused={o.id === focusOrderId ? 'true' : undefined}
             onClick={() => openOrder(o.id)}
-            className={`w-full rounded-2xl border bg-surface p-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${o.id === focusOrderId ? 'border-gold/50 ring-1 ring-gold/40' : 'border-border-subtle'}`}
+            className={`lv-surface w-full p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${o.id === focusOrderId ? 'ring-2 ring-focus' : ''}`}
           >
             <div className="flex items-start justify-between gap-2 mb-1.5">
               <p dir="auto" className="text-text-primary text-[12.5px] font-semibold flex-1 min-w-0 truncate">{o.request_title}</p>
@@ -942,10 +945,10 @@ export function CouponsTab({
           tabIndex={cp.id === focusCouponId ? -1 : undefined}
           data-coupon={cp.id}
           data-focused={cp.id === focusCouponId ? 'true' : undefined}
-          className={`rounded-2xl border bg-white/[0.03] p-3 focus-visible:outline-none ${cp.id === focusCouponId ? 'border-gold/50 ring-1 ring-gold/40' : 'border-white/10'}`}
+          className={`lv-surface p-3 focus-visible:outline-none ${cp.id === focusCouponId ? 'ring-2 ring-focus' : ''}`}
         >
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-white font-bold text-[13px] tracking-wide" dir="ltr">{cp.code}</span>
+            <span className="text-text-primary font-bold text-[13px] tracking-wide" dir="ltr">{cp.code}</span>
             <span className="text-gold font-bold text-[12.5px]" dir="ltr">
               {cp.kind === 'percent' ? `${cp.value}%` : iqd(cp.value)}
             </span>
@@ -965,7 +968,7 @@ export function CouponsTab({
             );
           })()}
           {editing?.id === cp.id && (
-            <div className="mb-2 space-y-2 rounded-xl border border-white/10 bg-black/20 p-2.5" data-coupon-window-editor>
+            <div className="mb-2 space-y-2 rounded-lg border border-border-subtle bg-surface-raised p-2.5" data-coupon-window-editor>
               {/* OWNER: Sorani to be written by hand. */}
               <div className="grid grid-cols-2 gap-2">
                 <Input
@@ -1012,21 +1015,20 @@ export function CouponsTab({
               }}
             />
             {/* OWNER: Sorani to be written by hand. */}
-            <button
-              type="button"
+            <IconButton
               onClick={() =>
                 setEditing(editing?.id === cp.id ? null : { id: cp.id, starts: isoToDay(cp.starts_at), ends: isoToDay(cp.ends_at) })
               }
               aria-expanded={editing?.id === cp.id}
-              aria-label={loc('مدة الكوبون', 'Coupon dates')}
-              title={loc('مدة الكوبون', 'Coupon dates')}
+              label={loc('مدة الكوبون', 'Coupon dates')}
               data-coupon-dates={cp.id}
-              className="w-11 h-11 rounded-lg border border-white/10 text-zinc-300 flex items-center justify-center shrink-0 self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <CalendarClock aria-hidden="true" className="w-4 h-4" />
-            </button>
-            <button
-              onClick={async () => {
+              className="self-center"
+              icon={<CalendarClock aria-hidden="true" className="w-4 h-4" />}
+            />
+            <IconButton
+              variant="danger"
+              // Started, not returned: the press is the same plain click it always was.
+              onClick={() => void (async () => {
                 const ok = await confirm({
                   title: loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟'),
                   // OWNER: Sorani to be written by hand.
@@ -1045,13 +1047,12 @@ export function CouponsTab({
                 } finally {
                   setBusy('');
                 }
-              }}
+              })()}
               disabled={busy === cp.id}
-              aria-label={loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟')}
-              className="w-11 h-11 rounded-lg border border-red-500/30 text-red-300 disabled:opacity-40 flex items-center justify-center shrink-0 self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
-            </button>
+              label={loc('حذف الكوبون؟', 'Delete this coupon?', 'بسڕدرێتەوە؟')}
+              className="self-center"
+              icon={<Trash2 aria-hidden="true" className="w-3.5 h-3.5" />}
+            />
           </div>
         </div>
       ))}

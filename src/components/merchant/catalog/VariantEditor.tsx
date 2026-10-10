@@ -303,7 +303,7 @@ function GroupEditor({
         <p id={listId} className="mb-1.5 text-[12.5px] font-semibold text-text-secondary">{s.values}</p>
         <ul aria-labelledby={listId} className="flex flex-wrap gap-1.5">
           {group.values.map((v) => (
-            <li key={v.ref} className="flex items-center gap-1 rounded-lg border border-border-subtle bg-white/[0.03] ps-2">
+            <li key={v.ref} className="flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-raised ps-2">
               {group.kind === 'color' && <span className="lv-swatch text-[14px]" data-swatch={v.swatch || undefined} aria-hidden="true" />}
               <span className="text-[13px] text-text-primary">{shown(v)}</span>
               {group.kind === 'color' && (
@@ -311,10 +311,10 @@ function GroupEditor({
               )}
               {group.kind === 'color' && (
                 <select
+                  className="lv-input h-8 min-h-0 w-auto max-w-[7.5rem] rounded-sm px-2 text-[12px] text-text-secondary"
                   id={`${listId}-${v.ref}`}
                   value={v.swatch}
                   onChange={(e) => onChange({ values: group.values.map((x) => (x.ref === v.ref ? { ...x, swatch: e.target.value } : x)) })}
-                  className="h-8 max-w-[7.5rem] rounded-md border-0 bg-transparent text-[12px] text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
                 >
                   <option value="">{s.noSwatch}</option>
                   {SWATCHES.map((k: Swatch) => (

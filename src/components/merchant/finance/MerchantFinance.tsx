@@ -213,7 +213,7 @@ function Statement({ sum }: { sum: FinanceSummary }) {
     <Card title={s.statement} description={s.statementNote}>
       <dl className="text-[13.5px]" data-finance-statement>
         {rows.map((r) => (
-          <div key={r.label} className="flex items-baseline justify-between gap-3 py-2 border-b border-white/[0.06]">
+          <div key={r.label} className="flex items-baseline justify-between gap-3 py-2 border-b border-border-subtle">
             <dt className="min-w-0">
               <span className="text-text-secondary">{r.label}</span>
               {r.sub && <span className="block text-[12px] text-text-muted">{r.sub}</span>}

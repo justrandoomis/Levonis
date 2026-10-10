@@ -106,20 +106,21 @@ export function MediaEditor({
                 onClick={() => setFocus(focus === m.key ? null : m.key)}
                 aria-pressed={focus === m.key}
                 aria-label={`${m.kind === 'video' ? s.video : ''} ${i + 1}${i === 0 ? ` · ${s.cover}` : ''}`}
-                className={`block aspect-square w-full overflow-hidden rounded-xl border bg-black/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold ${
-                  focus === m.key ? 'border-gold' : 'border-white/10'
+                // A photo tray (flush); the chosen one is outlined in ink — gold stays the focus ring.
+                className={`block aspect-square w-full overflow-hidden rounded-lg border bg-surface-raised shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                  focus === m.key ? 'border-text-primary' : 'border-border-subtle'
                 }`}
               >
                 {m.kind === 'video' ? (
                   <span className="flex h-full w-full items-center justify-center">
-                    <Play className="h-6 w-6 text-white" aria-hidden="true" />
+                    <Play className="h-6 w-6 text-text-primary" aria-hidden="true" />
                   </span>
                 ) : (
                   <img src={m.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                 )}
               </button>
               {i === 0 && (
-                <span className="pointer-events-none absolute start-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[10.5px] font-semibold text-white">
+                <span className="pointer-events-none absolute start-1 top-1 rounded-sm bg-onyx/80 px-1.5 py-0.5 text-[10.5px] font-semibold text-snow">
                   {s.cover}
                 </span>
               )}

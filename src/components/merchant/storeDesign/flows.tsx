@@ -231,11 +231,11 @@ export function HistoryPanel({
       ) : (
         <ul className="space-y-2">
           {revisions.map((r) => (
-            <li key={r.id} className={`rounded-xl border p-3 ${viewing === r.revision ? 'border-gold/50 bg-surface-selected' : 'border-border-subtle bg-surface'}`}>
+            <li key={r.id} className={`rounded-lg border p-3 ${viewing === r.revision ? 'border-transparent bg-[var(--clay-well-bg)] shadow-press' : 'border-border-subtle bg-surface'}`}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[13px] font-bold text-text-primary tabular-nums">{loc(`النسخة ${r.revision}`, `Version ${r.revision}`)}</span>
                 {r.live && (
-                  <span className="rounded-full border border-success/25 bg-success/10 px-2 py-0.5 text-[10.5px] font-bold text-success">{loc('منشورة الآن', 'Live')}</span>
+                  <span className="rounded-full lv-chip [--chip:var(--color-success)] px-2 py-0.5 text-[10.5px] font-bold">{loc('منشورة الآن', 'Live')}</span>
                 )}
                 {r.restored_from && <span className="text-[11px] text-text-muted">{loc(`من النسخة ${r.restored_from}`, `from version ${r.restored_from}`)}</span>}
                 <span className="ms-auto text-[11.5px] text-text-muted">{when(r.published_at)}</span>

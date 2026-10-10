@@ -14,6 +14,7 @@
 import { X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Overlay } from '../../ui/Overlay';
+import { IconButton } from '../../ui/Button';
 import ShareStore from './ShareStore';
 import type { StoreShareKit } from './shareStoreApi';
 import { shareStrings } from './strings';
@@ -38,21 +39,14 @@ export default function ShareStoreSheet({
       solid
       z={210}
       testId="share-store"
-      panelClassName="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-zinc-900 text-white border border-white/10"
+      panelClassName="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-surface-raised text-text-primary border border-border-subtle"
     >
       <div className="p-4">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h2 className="text-[15px] font-bold text-zinc-100 text-balance">{s.title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={s.close}
-            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <X className="w-5 h-5" aria-hidden />
-          </button>
+          <h2 className="text-[15px] font-bold text-text-primary text-balance">{s.title}</h2>
+          <IconButton onClick={onClose} label={s.close} className="-me-2" icon={<X className="w-5 h-5" aria-hidden />} />
         </div>
-        <p className="text-zinc-400 text-[12px] leading-relaxed mb-3.5">{s.intro}</p>
+        <p className="text-text-secondary text-[12px] leading-relaxed mb-3.5">{s.intro}</p>
         <ShareStore initialKit={kit} variant="plain" qrOpen />
       </div>
     </Overlay>

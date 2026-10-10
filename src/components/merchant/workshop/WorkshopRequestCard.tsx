@@ -119,7 +119,7 @@ export default function WorkshopRequestCard({
             )}
           </p>
 
-          <div className="mt-3 border-t border-white/5 pt-3">
+          <div className="mt-3 border-t border-border-subtle pt-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[13px] font-semibold text-text-secondary">{loc('تكلفتك الخاصة', 'Your private costing')}</p>
               <Button size="sm" variant="secondary" icon={<Calculator aria-hidden="true" className="h-4 w-4" />} onClick={() => setSheet(true)} data-workshop-cost>
@@ -129,7 +129,7 @@ export default function WorkshopRequestCard({
             {costs.length > 0 ? (
               <ul className="mt-2 space-y-2" data-workshop-costs>
                 {costs.slice(0, 3).map((c) => (
-                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-white/[0.03] px-3 py-2.5">
+                  <li key={c.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-surface-raised px-3 py-2.5">
                     <span className="min-w-0 flex-1 basis-48">
                       <span className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]">
                         <span className="text-[14px] font-semibold text-text-primary"><Money iqd={c.price_iqd} /></span>
@@ -168,7 +168,7 @@ export default function WorkshopRequestCard({
           {verdict.reasons.map((code) => {
             const fix = reasonFix(code);
             return (
-              <li key={code} className="flex flex-wrap items-center justify-between gap-x-3 border-t border-white/5 pt-2 text-[13px] first:border-t-0 first:pt-0" data-reason={code}>
+              <li key={code} className="flex flex-wrap items-center justify-between gap-x-3 border-t border-border-subtle pt-2 text-[13px] first:border-t-0 first:pt-0" data-reason={code}>
                 <span className="min-w-0 flex-1 basis-56 leading-relaxed text-text-secondary">{reasonText(code, loc)}</span>
                 {fix && (
                   <a

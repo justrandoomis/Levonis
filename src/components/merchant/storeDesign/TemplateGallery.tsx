@@ -131,7 +131,7 @@ export default function TemplateGallery({
         {starters.map(({ theme, layout }) => {
           const recommended = pick?.theme === theme;
           return (
-            <li key={theme} className={`lv-surface flex flex-col overflow-hidden ${recommended ? 'ring-1 ring-gold/50' : ''}`} data-sd-starter-card={theme}>
+            <li key={theme} className="lv-surface flex flex-col overflow-hidden" data-sd-starter-card={theme}>
               {/* The picture is a whole store page (with its own inert buttons),
                   so the door to the full preview lies OVER it, as a sibling —
                   a button may not contain another. */}
@@ -156,7 +156,7 @@ export default function TemplateGallery({
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-[14px] font-bold text-text-primary">{say(loc, THEME_COPY[theme].name)}</h3>
                   {recommended && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold" data-sd-recommended>
+                    <span className="inline-flex items-center gap-1 rounded-full lv-chip [--chip:var(--color-gold)] px-2 py-0.5 text-[11px] font-semibold" data-sd-recommended>
                       <Sparkles className="h-3 w-3" aria-hidden="true" />
                       {loc('مقترح لمتجرك', 'Suggested for your store')}
                     </span>

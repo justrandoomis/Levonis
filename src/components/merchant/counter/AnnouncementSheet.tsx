@@ -469,7 +469,7 @@ export default function AnnouncementSheet({ open, onClose, api = liveApi }: { op
                 <p className="text-[12px] font-medium text-text-secondary">{a.preview}</p>
                 {/* At a PHONE's width, wrapped as the store page wraps it (up to three lines):
                     the merchant sees what a customer on a phone will read. */}
-                <div className="flex min-h-11 max-w-xs items-center gap-2 rounded-xl border border-border-subtle bg-surface-raised px-3 text-[12.5px] text-text-primary" data-announce-preview-line>
+                <div className="flex min-h-11 max-w-xs items-center gap-2 rounded-lg border border-border-subtle bg-surface-raised px-3 text-[12.5px] text-text-primary" data-announce-preview-line>
                   <Megaphone className="h-3.5 w-3.5 shrink-0 text-gold" aria-hidden="true" />
                   <span dir="auto" className="min-w-0 flex-1 line-clamp-3 py-1.5">
                     {previewText}

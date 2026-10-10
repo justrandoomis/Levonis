@@ -74,7 +74,7 @@ export default function MerchantDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex h-[100dvh] w-full flex-1 bg-canvas" role="status" aria-busy="true" aria-label={loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}>
+      <div className="flex h-[100dvh] w-full flex-1" role="status" aria-busy="true" aria-label={loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}>
         <div aria-hidden="true" className="hidden w-[72px] shrink-0 border-e border-border-subtle bg-surface sm:block lg:w-64" />
         <div aria-hidden="true" className="flex-1">
           <div className="h-16 border-b border-border-subtle" />
@@ -85,7 +85,7 @@ export default function MerchantDashboardPage() {
 
   if (!me) {
     return (
-      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center bg-canvas px-6" data-merchant-load-failed>
+      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center px-6" data-merchant-load-failed>
         <ErrorState error={error} onRetry={retry} next="/merchant" className="max-w-sm" />
       </div>
     );
@@ -94,7 +94,7 @@ export default function MerchantDashboardPage() {
   // No store yet: point at the one thing that fixes it.
   if (!me.store) {
     return (
-      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center bg-canvas px-6">
+      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center px-6">
         <div className="max-w-sm text-center">
           <Store aria-hidden="true" className="mx-auto mb-4 h-10 w-10 text-text-muted" />
           <h1 className="mb-2 text-lg font-bold text-text-primary">
@@ -116,7 +116,7 @@ export default function MerchantDashboardPage() {
   if (!onOwnHost(me.store, { storeId: hostStore?.id ?? null, storeHost }, window.location.host)) {
     const ownAdmin = /^https?:\/\//.test(me.store.url) ? `${me.store.url}/admin` : '/merchant';
     return (
-      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center bg-canvas px-6" data-not-your-store>
+      <div className="flex h-[100dvh] w-full flex-1 items-center justify-center px-6" data-not-your-store>
         <div className="max-w-sm text-center">
           <Store className="mx-auto mb-4 h-10 w-10 text-text-muted" aria-hidden="true" />
           <h1 className="mb-2 text-[17px] font-bold text-text-primary [text-wrap:balance]">

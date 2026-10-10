@@ -66,18 +66,18 @@ export default function StoreCta() {
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className="px-4 sm:px-6 mb-10 max-w-lg mx-auto relative z-10"
     >
-      <div className="rounded-[24px] border border-white/10 bg-surface-raised p-5 shadow-lg">
+      <div className="lv-surface-raised p-5">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-2xl bg-olive/30 border border-gold/20 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-md lv-well flex items-center justify-center shrink-0">
             <Store className="w-5 h-5 text-gold" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-gold font-bold text-[15px] leading-tight">
+            <h3 className="text-text-primary font-bold text-[15px] leading-tight">
               {me.store
                 ? loc('متجرك في مجتمع ليفو', 'Your store in the Levo community', 'فرۆشگاکەت لە کۆمەڵگەی Levo')
                 : loc('أنشئ متجرك في ليفو', 'Create your Levo store', 'فرۆشگای Levo خۆت دروست بکە')}
             </h3>
-            <p className="text-zinc-400 text-[12px] mt-1 leading-relaxed">
+            <p className="text-text-secondary text-[12px] mt-1 leading-relaxed">
               {me.store
                 ? loc(
                     'أدر منتجاتك وطلباتك وعروضك من لوحة تحكم متجرك.',
@@ -95,16 +95,16 @@ export default function StoreCta() {
 
         {/* A restriction is explained, never left as a missing button. §84. */}
         {restricted && (
-          <div className="flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 mb-4">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-amber-200/90 text-[11.5px] leading-relaxed">{reasonText(me.selling.reason, loc)}</p>
+          <div className="lv-alert lv-alert-warning flex items-start gap-2 mb-4">
+            <AlertCircle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+            <p className="text-text-primary text-[11.5px] leading-relaxed">{reasonText(me.selling.reason, loc)}</p>
           </div>
         )}
 
         {me.store ? (
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between gap-3 rounded-2xl bg-black/30 border border-white/10 px-3 py-2.5">
-              <span className="text-zinc-500 text-[11px] shrink-0">
+            <div className="flex items-center justify-between gap-3 rounded-md lv-well px-3 py-2.5">
+              <span className="text-text-muted text-[11px] shrink-0">
                 {loc('العنوان', 'Address', 'ناونیشان')}
               </span>
               <a
@@ -120,7 +120,7 @@ export default function StoreCta() {
             </div>
             <Link
               to="/merchant"
-              className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              className="lv-button lv-button-primary w-full min-h-[48px]"
             >
               {loc('لوحة تحكم المتجر', 'Store dashboard', 'داشبۆردی فرۆشگا')}
               <ArrowRight className="w-4 h-4 rtl:rotate-180" />
@@ -129,7 +129,7 @@ export default function StoreCta() {
         ) : (
           <Link
             to="/merchant/start"
-            className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            className="lv-button lv-button-primary w-full min-h-[48px]"
           >
             {loc('أنشئ متجرك', 'Create your store', 'فرۆشگاکەت دروست بکە')}
             <ArrowRight className="w-4 h-4 rtl:rotate-180" />

@@ -31,7 +31,7 @@ export default function PrinterModelPicker({
   ];
   return (
     <div data-printer-model>
-      <label htmlFor={id} className="mb-1.5 block text-[12px] font-semibold text-zinc-400">
+      <label htmlFor={id} className="mb-1.5 block text-[12px] font-semibold text-text-secondary">
         {loc('الطابعة', 'Which printer')}
       </label>
       <Select id={id} value={value ?? ''} onChange={(e) => onPick(models.find((m) => m.id === e.target.value) ?? null)} data-printer-model-select>
@@ -48,7 +48,7 @@ export default function PrinterModelPicker({
           </optgroup>
         ))}
       </Select>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
         {picked
           ? loc(
               `المواصفات من الشركة المصنّعة: ${picked.build_mm.x} × ${picked.build_mm.y} × ${picked.build_mm.z} مم${picked.enclosed ? '، حجرة مغلقة' : ''}. تُطابَق الطلبات عليها ولا تُعدَّل يدويًا.`,

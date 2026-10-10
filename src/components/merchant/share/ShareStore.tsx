@@ -88,7 +88,7 @@ export default function ShareStore({ initialKit = null, variant = 'card', qrOpen
     <ShareBody kit={kit} s={s} qrOpen={qrOpen} />
   ) : failed ? (
     <div className="py-4 text-center" role="alert">
-      <p className="text-zinc-400 text-[12.5px]">{s.loadFailed}</p>
+      <p className="text-text-secondary text-[12.5px]">{s.loadFailed}</p>
       <button type="button" onClick={() => void load()} className="lv-button lv-button-secondary lv-button-sm mt-3">
         {s.retry}
       </button>
@@ -99,11 +99,11 @@ export default function ShareStore({ initialKit = null, variant = 'card', qrOpen
 
   if (variant === 'plain') return body;
   return (
-    <section aria-labelledby={titleId} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
-      <h3 id={titleId} className="text-gold font-bold text-[12.5px] mb-1 text-balance">
+    <section aria-labelledby={titleId} className="lv-surface p-3.5">
+      <h3 id={titleId} className="text-text-primary font-bold text-[13.5px] mb-1 text-balance">
         {s.title}
       </h3>
-      <p className="text-zinc-400 text-[12px] leading-relaxed mb-3">{s.intro}</p>
+      <p className="text-text-secondary text-[12px] leading-relaxed mb-3">{s.intro}</p>
       {body}
     </section>
   );
@@ -177,14 +177,14 @@ function ShareBody({ kit, s, qrOpen }: { kit: StoreShareKit; s: ShareStrings; qr
 
       {/* The link, and the action that matters most. */}
       <div>
-        <p className="text-zinc-400 text-[12px] font-semibold mb-1.5">{s.linkLabel}</p>
+        <p className="text-text-secondary text-[12px] font-semibold mb-1.5">{s.linkLabel}</p>
         <div className="flex items-stretch gap-2">
-          <div className="min-w-0 flex-1 flex items-center rounded-xl border border-white/10 bg-black/40 px-3 min-h-[44px]">
+          <div className="min-w-0 flex-1 flex items-center rounded-md lv-well px-3 min-h-[44px]">
             <span
               ref={addressRef}
               dir="ltr"
               translate="no"
-              className="block min-w-0 truncate select-all text-[13px] text-zinc-100 tabular-nums"
+              className="block min-w-0 truncate select-all text-[13px] text-text-primary tabular-nums"
             >
               {address}
             </span>
@@ -203,7 +203,7 @@ function ShareBody({ kit, s, qrOpen }: { kit: StoreShareKit; s: ShareStrings; qr
             {copied ? s.copied : s.copy}
           </button>
         </div>
-        <p id={statusId} role="status" aria-live="polite" className={copyFailed ? 'mt-1.5 text-[11.5px] leading-relaxed text-amber-200/90' : 'sr-only'}>
+        <p id={statusId} role="status" aria-live="polite" className={copyFailed ? 'mt-1.5 text-[11.5px] leading-relaxed text-warning' : 'sr-only'}>
           {copyFailed ? s.copyFailed : copied ? s.copied : ''}
         </p>
       </div>
@@ -241,7 +241,7 @@ function ShareBody({ kit, s, qrOpen }: { kit: StoreShareKit; s: ShareStrings; qr
               <div className="flex flex-col items-center gap-3 @md:flex-row @md:items-start">
                 {/* The modules stay true black on true white in every theme, or a
                     camera cannot read them — the one surface here with its own ground. */}
-                <div className="shrink-0 rounded-xl bg-snow p-2.5" role="img" aria-label={`${s.qrAlt}: ${address}`}>
+                <div className="shrink-0 rounded-lg bg-snow p-2.5" role="img" aria-label={`${s.qrAlt}: ${address}`}>
                   <svg
                     viewBox={`0 0 ${qr.viewBox} ${qr.viewBox}`}
                     className="block w-[168px] h-[168px]"
@@ -253,20 +253,20 @@ function ShareBody({ kit, s, qrOpen }: { kit: StoreShareKit; s: ShareStrings; qr
                   </svg>
                 </div>
                 <div className="min-w-0 flex-1 text-center @md:text-start">
-                  <p className="text-zinc-400 text-[12px] leading-relaxed">{s.qrHint}</p>
-                  <button type="button" onClick={download} className="lv-button lv-button-ghost lv-button-sm mt-2 hover:text-zinc-100">
+                  <p className="text-text-secondary text-[12px] leading-relaxed">{s.qrHint}</p>
+                  <button type="button" onClick={download} className="lv-button lv-button-ghost lv-button-sm mt-2 hover:text-text-primary">
                     <Download className="w-4 h-4 shrink-0" strokeWidth={2} aria-hidden />
                     {s.qrDownload}
                   </button>
                   {downloadFailed && (
-                    <p role="status" className="text-amber-200/90 text-[11.5px] mt-1">
+                    <p role="status" className="text-warning text-[11.5px] mt-1">
                       {s.qrDownloadFailed}
                     </p>
                   )}
                 </div>
               </div>
             ) : (
-              <p className="text-zinc-400 text-[12px]" role="status">
+              <p className="text-text-secondary text-[12px]" role="status">
                 {s.qrUnavailable}
               </p>
             )}
@@ -289,8 +289,8 @@ function LinkPreview({ card, address, caption, note }: { card: StoreShareCard; a
   const [broken, setBroken] = useState(false);
   return (
     <figure>
-      <div className="flex items-stretch gap-3 rounded-xl border border-white/10 bg-black/30 p-2.5">
-        <div className="w-16 h-16 shrink-0 overflow-hidden rounded-lg bg-black flex items-center justify-center">
+      <div className="flex items-stretch gap-3 rounded-lg border border-border-subtle bg-surface-raised p-2.5">
+        <div className="w-16 h-16 shrink-0 overflow-hidden rounded-md lv-well flex items-center justify-center">
           {card.image && !broken ? (
             <img
               src={card.image}
@@ -302,24 +302,24 @@ function LinkPreview({ card, address, caption, note }: { card: StoreShareCard; a
               onError={() => setBroken(true)}
             />
           ) : (
-            <StoreGlyph className="w-6 h-6 text-zinc-500" strokeWidth={1.5} aria-hidden />
+            <StoreGlyph className="w-6 h-6 text-text-muted" strokeWidth={1.5} aria-hidden />
           )}
         </div>
         <div className="min-w-0 flex-1 py-0.5">
-          <p className="truncate text-[13px] font-bold leading-snug text-zinc-100" dir="auto">
+          <p className="truncate text-[13px] font-bold leading-snug text-text-primary" dir="auto">
             {card.title}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-zinc-400" dir="auto">
+          <p className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-text-secondary" dir="auto">
             {card.description}
           </p>
-          <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+          <p className="mt-0.5 truncate text-[11px] text-text-muted">
             <span dir="ltr" translate="no">
               {address}
             </span>
           </p>
         </div>
       </div>
-      <figcaption className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+      <figcaption className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
         {caption}. {note}
       </figcaption>
     </figure>
@@ -331,12 +331,12 @@ function AppIconRow({ kit, title, lead, line }: { kit: StoreShareKit; title: str
   const { state, icon, short_name } = kit.app_icon;
   const [broken, setBroken] = useState(false);
   return (
-    <div className="border-t border-white/[0.06] pt-3.5">
-      <p className="text-zinc-300 text-[12.5px] font-semibold">{title}</p>
-      <p className="text-zinc-500 text-[11.5px] leading-relaxed mb-2.5">{lead}</p>
+    <div className="border-t border-border-subtle pt-3.5">
+      <p className="text-text-primary text-[12.5px] font-semibold">{title}</p>
+      <p className="text-text-muted text-[11.5px] leading-relaxed mb-2.5">{lead}</p>
       <div className="flex items-center gap-3">
         <div
-          className="w-12 h-12 shrink-0 overflow-hidden rounded-[11px] border border-white/10 bg-black flex items-center justify-center"
+          className="w-12 h-12 shrink-0 overflow-hidden rounded-sm border border-border-subtle bg-surface-raised flex items-center justify-center"
           aria-hidden="true"
         >
           {state === 'ready' && icon && !broken ? (
@@ -344,14 +344,14 @@ function AppIconRow({ kit, title, lead, line }: { kit: StoreShareKit; title: str
           ) : state === 'pending' ? (
             <Skeleton className="w-full h-full rounded-none" />
           ) : (
-            <StoreGlyph className="w-5 h-5 text-zinc-500" strokeWidth={1.5} />
+            <StoreGlyph className="w-5 h-5 text-text-muted" strokeWidth={1.5} />
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-zinc-100">
+          <p className="truncate text-[13px] font-semibold text-text-primary">
             <bdi>{short_name}</bdi>
           </p>
-          <p className="text-[11.5px] leading-5 text-zinc-400" role="status" aria-live="polite">
+          <p className="text-[11.5px] leading-5 text-text-secondary" role="status" aria-live="polite">
             {line}
           </p>
         </div>
