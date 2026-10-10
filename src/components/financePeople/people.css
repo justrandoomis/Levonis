@@ -80,7 +80,6 @@
 .fp-timeline-item { padding:16px 0 16px 16px; margin-inline-start:6px; border-inline-start:2px solid var(--ap-border); padding-inline-start:18px; position:relative; }
 .fp-timeline-item::before { content:""; width:8px; height:8px; border-radius:50%; position:absolute; inset-inline-start:-5px; top:24px; background:var(--ap-text-3); }
 .fp-timeline-item p { margin-top:6px; font-size:13px; line-height:1.7; }
-.fp-movement-balance { font-size:12px; color:var(--ap-text-2); display:block; margin-top:5px; }
 @media (max-width:540px) {
   .fp-surface{padding:16px;border-radius:var(--radius-lg)}.fp-hero{padding:20px}.fp-hero>.lv-button{width:100%}.fp-dialog{max-height:94dvh;padding:18px 16px max(20px,env(safe-area-inset-bottom))}.fp-grid{grid-template-columns:1fr}.fp-stat{padding:13px}.fp-heading{align-items:flex-start}.fp .lv-input{font-size:16px}.fp-footer>.lv-button:last-child{flex:1}.fp-account .fp-status{display:none}
   .fp-review-heading { padding:12px; }

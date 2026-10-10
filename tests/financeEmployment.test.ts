@@ -111,6 +111,12 @@ test('owner recheck restores historical pending wages with confirmed checkout co
   const earnings = await json(await get(self, '/earnings'));
   assert.equal(earnings.summary.available_earnings_iqd, 3000);
   assert.equal(earnings.summary.pending_costs, 0);
+  // «أرباحي» carries no movements log (owner 2026-10-10): balances, sources and
+  // withdrawals stay; the wage costs and the 4,200 payment above are untouched.
+  for (const gone of ['movements', 'movement_count', 'history_review_count']) assert.equal(gone in earnings, false, gone);
+  assert.deepEqual(earnings.entries.map((e: { order_id: string }) => e.order_id).sort(), ['manual-source', 'pending-source'], 'both wage sources are still listed');
+  assert.ok(Array.isArray(earnings.withdrawals));
+  assert.ok(earnings.employment && earnings.investment, 'the rest of the page is still served');
   const journalCount = count(raw, 'SELECT COUNT(*) n FROM accounting_entries');
   assert.equal((await json(await post(boss, `/people/staff/${id}/recheck`, body))).already, true);
   await drain(id);
