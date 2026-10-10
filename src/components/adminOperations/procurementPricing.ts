@@ -16,6 +16,8 @@ export interface PricingSummary {
   shipping_profile: string | null;
   profile_source: 'default' | 'proposed' | 'first_route' | null;
   engine_priced: boolean;
+  /** The bar's model sells direct today (absent from an older server). */
+  sells_direct?: boolean;
   option_id: string;
   rule_level: string | null;
   minimum_target_profit_usd: string | null;
@@ -153,6 +155,15 @@ export interface PricingMinimumProfit {
   target_profit_iqd: number | null;
 }
 
+/** A stored Direct Sale Extra at the card's levels (product, option); the amount only when ACTIVE. */
+export interface PricingDirectSaleExtra {
+  scope: 'product' | 'option';
+  scope_id: string;
+  state: string;
+  source: string;
+  direct_sale_extra_iqd: number | null;
+}
+
 export interface PricingProduct {
   product_id: string;
   label: string;
@@ -172,6 +183,10 @@ export interface PricingProduct {
   missing_codes: string[];
   cod_priced_as_direct: boolean;
   minimum_profits: PricingMinimumProfit[];
+  /** The stored Direct Sale Extras (absent from an older server). */
+  direct_sale_extras?: PricingDirectSaleExtra[];
+  /** Today's Direct Sale Extra per direct-selling model where the old prices give one clean answer (answer B). */
+  extra_suggestions?: Array<{ option_id: string; direct_sale_extra_iqd: number }>;
   /** What applying this purchase does to the product's prices (owner decision 8). */
   adoption?: EngineAdoption | null;
 }
@@ -190,15 +205,50 @@ export interface TypedMinimum {
   amount_usd: string;
 }
 
+/**
+ * The owner's typed Direct Sale Extra of one target, in dinars as typed ('' =
+ * inherit). The review of a stock purchase asks for it in place (owner request
+ * 2026-10-10: the stock is for direct sale); the server validates and decides.
+ */
+export interface TypedExtra {
+  product_id: string;
+  scope: 'product' | 'option';
+  scope_id: string;
+  amount_iqd: string;
+}
+
 export interface PricingChoices {
   minimums: TypedMinimum[];
+  /** Typed Direct Sale Extras (absent = none typed). */
+  extras?: TypedExtra[];
   optIn: string[];
   usePurchase: Record<string, boolean>;
   prefer: Record<string, boolean>;
 }
 
-const pricingBody = (c: PricingChoices) => ({
+/**
+ * A typed Direct Sale Extra as whole dinars: Arabic-Indic and Extended digits
+ * read as digits, thousands separators and spaces dropped. '' → null (inherit);
+ * anything else that is not whole dinars → NaN (the screen refuses it; the
+ * server would too). The 1,000 step is the caller's check (`extraOnStep`).
+ */
+export function extraAmount(typed: string): number | null {
+  const t = typed.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0)).replace(/[\s,،٬']/g, '');
+  if (t === '') return null;
+  return /^[0-9]{1,10}$/.test(t) ? Number(t) : NaN;
+}
+
+/** A typed Direct Sale Extra the server accepts: empty, or whole dinars on the 1,000 step up to 1,000,000,000. */
+export const extraOnStep = (typed: string): boolean => {
+  const n = extraAmount(typed);
+  return n === null || (Number.isSafeInteger(n) && n >= 0 && n <= 1_000_000_000 && n % 1000 === 0);
+};
+
+export const pricingBody = (c: PricingChoices) => ({
   minimum_profits: c.minimums.map((m) => ({ product_id: m.product_id, scope: m.scope, scope_id: m.scope === 'product' ? '' : m.scope_id, amount_usd: m.amount_usd.trim() === '' ? null : m.amount_usd.trim() })),
+  ...(c.extras?.length
+    ? { direct_sale_extras: c.extras.map((x) => ({ product_id: x.product_id, scope: x.scope, scope_id: x.scope === 'product' ? '' : x.scope_id, amount_iqd: extraAmount(x.amount_iqd) })) }
+    : {}),
   manual_line_opt_in: c.optIn,
   use_purchase: c.usePurchase,
   prefer_purchase_values: c.prefer,
@@ -227,12 +277,19 @@ export function applyPurchase(productId: string, purchaseId: string, previewHash
     prefer_purchase_values: choices.prefer[productId] === true,
     manual_line_opt_in: choices.optIn.filter((k) => k.startsWith(`${productId}:`)),
     minimum_profits: body.minimum_profits.filter((m) => m.product_id === productId).map(({ scope, scope_id, amount_usd }) => ({ scope, scope_id, amount_usd })),
+    ...(body.direct_sale_extras?.some((x) => x.product_id === productId)
+      ? { direct_sale_extras: body.direct_sale_extras.filter((x) => x.product_id === productId).map(({ scope, scope_id, amount_iqd }) => ({ scope, scope_id, amount_iqd })) }
+      : {}),
   });
 }
 
-/** Whether a product has something an apply would write (its purchase values, or a typed minimum). */
+/** The owner typed a minimum profit or a Direct Sale Extra for this product. */
+export const typedFor = (productId: string, choices: PricingChoices): boolean =>
+  choices.minimums.some((m) => m.product_id === productId) || (choices.extras ?? []).some((x) => x.product_id === productId);
+
+/** Whether a product has something an apply would write (its purchase values, or a typed minimum or Direct Sale Extra). */
 export function hasSomethingToApply(p: PricingProduct, choices: PricingChoices): boolean {
-  const typed = choices.minimums.some((m) => m.product_id === p.product_id);
+  const typed = typedFor(p.product_id, choices);
   const values = p.use_purchase && p.eligible && p.entries.some((e) => Object.keys(e.changes).length > 0);
   return typed || values;
 }

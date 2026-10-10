@@ -64,6 +64,8 @@ export default {
         'GET /receiving/:id': { cls: 'op', path: '/api/admin/procurement/receiving/po1' },
         'POST /documents': 'cost_write',
         'PUT /documents/:id': { cls: 'cost_write', path: '/api/admin/procurement/documents/po1' },
+        // «تغيير الاسم» (owner request 2026-10-10): the purchase's name at any status, behind the same `purchase` door as PUT.
+        'PATCH /documents/:id/name': { cls: 'cost_write', path: '/api/admin/procurement/documents/po1/name' },
         // A receiving assistant receives against the document; the answer carries no cost.
         'POST /documents/:id/receive': {
           cls: 'op',

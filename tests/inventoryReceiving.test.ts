@@ -22,7 +22,8 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { adminInventoryRoutes } from '../worker/routes/adminInventory';
 import { planReceive, readyToReceive, statusAfterReceipt, planAdjustmentLedger, counterTarget, type IncomingRow } from '../worker/lib/inventoryReceiving';
-import { freshDb, asD1, stubApp, post, patch, get, json, row, all, count, type StubUser } from './fixtures/app';
+import { freshDb, asD1, stubApp, post, patch, put, get, json, row, all, count, type StubUser } from './fixtures/app';
+import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 
 // ----------------------------------------------------------------- harness
 
@@ -516,4 +517,65 @@ test('the confirmation sheet is computed by the server, and matches the commit e
   // 100,000 over 7 units is 14,285.71…: the remainder goes to the first units,
   // and the lot's total is the shipment's total to the dinar.
   assert.equal(row<{ total_cost_iqd: number }>(raw, 'SELECT total_cost_iqd FROM inventory_lots')!.total_cost_iqd, 7 * 300_000 + 100_000);
+});
+
+// =====================================================================
+//  «في الطريق» — what was ordered and has not arrived (owner request 2026-10-10)
+// =====================================================================
+
+test('«في الطريق» counts confirmed purchases only, per purchase rather than per line: a draft of 14 units is not on its way', async () => {
+  const raw = freshDb();
+  seed(raw);
+  const both = (user: StubUser = OWNER) =>
+    stubApp(asD1(raw), user, (a) => {
+      a.route('/api/admin/inventory', adminInventoryRoutes);
+      a.route('/api/admin/procurement', adminProcurementRoutes);
+    });
+  const overview = async (user: StubUser = OWNER) => json(await get(both(user), '/api/admin/inventory/overview'));
+  // One purchase, two lines, 14 units — saved as a draft («مسودة»).
+  const body = {
+    operation_id: 'op_on_the_way_0001',
+    currency: 'IQD',
+    purchase_day: '2026-10-10',
+    status: 'draft',
+    cost_state: 'final',
+    lines: [
+      { product_id: 'p1', scope: 'base', scope_id: '', qty_ordered: 10, source_unit_amount: 400_000 },
+      { product_id: 'p3', scope: 'option', scope_id: 'o1', qty_ordered: 4, source_unit_amount: 30_000 },
+    ],
+    charges: [],
+  };
+  const created = await post(both(), '/api/admin/procurement/documents', body);
+  assert.equal(created.status, 200, JSON.stringify(await json(created.clone())));
+  const id = String((await json(created)).id);
+  let o = await overview();
+  assert.equal(o.incoming_units, 0, 'a draft is not on its way');
+  assert.equal(o.incoming_purchases, 0);
+  assert.equal(o.incoming_purchase_total_iqd, 0);
+
+  // Confirmed: 14 units on their way, ONE purchase (two lines).
+  const version = row<{ version: number }>(raw, 'SELECT version FROM purchase_orders WHERE id = ?', id)!.version;
+  const confirmed = await put(both(), `/api/admin/procurement/documents/${id}`, { ...body, status: 'ordered', version });
+  assert.equal(confirmed.status, 200, JSON.stringify(await json(confirmed.clone())));
+  o = await overview();
+  assert.equal(o.incoming_units, 14);
+  assert.equal(o.incoming_purchases, 1, 'counted per purchase, not per line');
+  assert.equal(o.incoming_purchase_total_iqd, 10 * 400_000 + 4 * 30_000);
+
+  // A partial receipt leaves the remainder on its way; a legacy single-line purchase counts as one more.
+  const doc = await json(await get(both(), `/api/admin/procurement/documents/${id}`));
+  const p1 = (doc.lines as Array<{ line_id: string; product_id: string }>).find((l) => l.product_id === 'p1')!;
+  const received = await post(both(), `/api/admin/procurement/documents/${id}/receive`, { operation_id: 'op_on_the_way_rcv1', lines: [{ line_id: p1.line_id, qty: 3 }] });
+  assert.equal(received.status, 200, JSON.stringify(await json(received.clone())));
+  purchase(raw, { id: 'legacy', qty_ordered: 2 });
+  o = await overview();
+  assert.equal(o.incoming_units, 11 + 2);
+  assert.equal(o.incoming_purchases, 2);
+  assert.equal(o.on_hand_units, 3);
+
+  // The assistant counts the units and never sees what they cost.
+  const asst = await overview(ASSISTANT);
+  assert.equal(asst.incoming_units, 13);
+  assert.equal(asst.incoming_purchases, 2);
+  assert.equal('incoming_purchase_total_iqd' in asst, false);
 });

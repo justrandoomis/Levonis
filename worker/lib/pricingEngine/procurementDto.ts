@@ -19,6 +19,7 @@ export function summaryDto(s: LineSummary) {
     shipping_profile: s.shipping_profile,
     profile_source: s.profile_source,
     engine_priced: s.engine_priced,
+    sells_direct: s.sells_direct,
     option_id: s.option_id,
     rule_level: s.rule_level,
     minimum_target_profit_usd: s.minimum_target_profit_usd,
@@ -88,6 +89,24 @@ export function minimumProfitsDto(productId: string, rules: readonly StoredRuleR
 }
 
 /**
+ * The current Direct Sale Extras of a product at the card's levels (product,
+ * option), for the review's field (owner request 2026-10-10): its placeholder,
+ * and which models' own rows are BLOCKED (a legacy answer-B review), so the
+ * product's typed value also lands on them. Named by kind, never `amount_iqd`.
+ */
+export function directSaleExtrasDto(productId: string, rules: readonly StoredRuleRow[]) {
+  return rules
+    .filter((r) => r.product_id === productId && r.kind === 'direct_sale_extra' && (r.scope === 'product' || r.scope === 'option'))
+    .map((r) => ({
+      scope: r.scope,
+      scope_id: r.scope_id,
+      state: r.state,
+      source: r.source,
+      direct_sale_extra_iqd: r.state === 'ACTIVE' ? (r.amount_iqd ?? null) : null,
+    }));
+}
+
+/**
  * Owner decision 8's six figures per model × channel (the current replacement
  * cost, the minimum profit, the new pre-order price, the Direct Sale Extra,
  * the new direct price, old → new), field by field.
@@ -150,6 +169,8 @@ export function productPreviewDto(p: ProductPreview, extra: { applied?: boolean;
     missing_codes: [...p.missing_codes],
     cod_priced_as_direct: p.cod_as_direct,
     minimum_profits: minimumProfitsDto(p.product_id, extra.rules),
+    direct_sale_extras: directSaleExtrasDto(p.product_id, extra.rules),
+    extra_suggestions: p.extra_suggestions.map((x) => ({ option_id: x.option_id, direct_sale_extra_iqd: x.value_iqd })),
   };
 }
 

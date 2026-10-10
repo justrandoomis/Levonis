@@ -581,6 +581,20 @@ export const COST_REFUSALS = {
     en: 'This purchase cannot be applied to pricing: it must be confirmed and its cost final.',
     ckb: 'ناتوانرێت ئەم کڕینە لە نرخداناندا جێبەجێ بکرێت: دەبێت پشتڕاستکرابێتەوە و تێچووەکەی کۆتایی بێت.',
   },
+  // ---- «تغيير الاسم»: a purchase's name at any status (owner request 2026-10-10) ----
+  // `PATCH /api/admin/procurement/documents/:id/name`. The name is
+  // `purchase_orders.invoice_no` («اسم الشراء أو رقم الفاتورة»); neither
+  // sentence repeats the name typed.
+  PURCHASE_NAME_TOO_LONG: {
+    ar: 'اسم الشراء أطول من 120 حرفًا.',
+    en: 'The purchase name is longer than 120 characters.',
+    ckb: 'ناوی کڕینەکە لە 120 پیت درێژترە.',
+  },
+  PURCHASE_NAME_CHANGED: {
+    ar: 'تغيّر اسم الشراء في مكان آخر؛ حدّث الصفحة وأعد المحاولة.',
+    en: 'The purchase name changed elsewhere; refresh the page and try again.',
+    ckb: 'ناوی کڕینەکە لە شوێنێکی ترەوە گۆڕا؛ پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

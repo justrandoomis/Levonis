@@ -524,6 +524,35 @@ export function minimumProfitWrites(productId: string, drafts: readonly MinimumP
   }));
 }
 
+// ------------------------------------------------------------ the Direct Sale Extra (owner request 2026-10-10)
+
+/**
+ * The owner's typed Direct Sale Extra on the procurement card's review: a stock
+ * purchase is reviewed for DIRECT SALE, so the review asks for the one input
+ * the direct price lacks, in place. Product or model (option) level — colour
+ * and SKU levels are not offered on this card. `amount_iqd` is whole dinars on
+ * the 1,000 step (validated by `parseDirectSaleExtraAmount`); null = INHERIT.
+ * There is no invented default: an untyped extra stays as stored.
+ */
+export interface DirectSaleExtraDraft {
+  scope: 'product' | 'option';
+  scope_id: string;
+  amount_iqd: number | null;
+}
+
+/** The rule writes the owner's typed Direct Sale Extras make (mirrors `minimumProfitWrites`). */
+export function directSaleExtraWrites(productId: string, drafts: readonly DirectSaleExtraDraft[], stored: ProductPricingData): RuleWrite[] {
+  return drafts.map((d) => ({
+    kind: 'direct_sale_extra' as const,
+    scope: d.scope,
+    scope_id: d.scope === 'product' ? '' : d.scope_id,
+    existing: ruleAt(stored.rules, productId, 'direct_sale_extra', d.scope, d.scope === 'product' ? '' : d.scope_id),
+    next: d.amount_iqd === null
+      ? { state: 'INHERIT' as const, amount_usd: null, amount_iqd: null, source: 'OWNER' as const, legacy_result_id: null }
+      : { state: 'ACTIVE' as const, amount_iqd: d.amount_iqd, amount_usd: null, source: 'OWNER' as const, legacy_result_id: null },
+  }));
+}
+
 /** The rules as they would be after the writes. */
 export function mergedRules(stored: ProductPricingData, writes: readonly RuleWrite[]): ProductPricingData['rules'] {
   const rows = stored.rules.map((r) => ({ ...r }));
