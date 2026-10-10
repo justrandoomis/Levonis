@@ -4,7 +4,7 @@ import { COMMON_ISO, COUNTRIES, countryByIso, countryNames, flagOf, toAsciiDigit
 /**
  * CountryPicker — 245 countries, in the shop's own theme, findable by typing.
  *
- * WHAT THIS REPLACED. A native `<select>`. It works, it is accessible, and on
+ * WHAT THIS REPLACED. A native `select`. It works, it is accessible, and on
  * a phone it opens the operating system's own list — which is why the owner's
  * screenshot of it looks like a different decade of a different product: grey
  * system chrome in the middle of a black and gold page, 245 rows deep, with no

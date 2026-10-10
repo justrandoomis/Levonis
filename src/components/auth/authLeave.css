@@ -12,7 +12,7 @@
 .lv-leave {
   margin-top: 12px;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: 18px;
   border: 1px solid var(--lv-panel-line);
   background: var(--lv-ground-2);
   color: var(--lv-text-2);
@@ -29,7 +29,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--lv-panel-line);
   background: var(--lv-panel);
   color: var(--lv-gold-text);
@@ -91,7 +91,7 @@
   min-width: 0;
   height: 40px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--lv-panel-line);
   background: var(--lv-panel);
   color: var(--lv-text-1);
@@ -112,7 +112,7 @@
   gap: 6px;
   height: 40px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--lv-line-strong);
   background: transparent;
   color: var(--lv-text-1);

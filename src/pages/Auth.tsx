@@ -1209,7 +1209,7 @@ export default function Auth() {
   );
 
   const errorSummary = serverError ? (
-    <div className="lv-alert" role="alert">
+    <div className="lv-notice" role="alert">
       <X aria-hidden />
       <div style={{ minWidth: 0 }}>
         <p>{serverError}</p>
@@ -1866,7 +1866,7 @@ export default function Auth() {
                   {ob.country} <span style={{ fontWeight: 400, color: 'var(--lv-text-3)' }}>· {s.optional}</span>
                 </label>
                 {/*
-                  The picker, not a native <select>: 245 rows of operating-system
+                  The picker, not a native select: 245 rows of operating-system
                   chrome in the middle of this page, with no way to type «العراق»
                   or `964`. `unsetLabel` keeps the question optional — a picker
                   with no way back to blank turns "you may tell us" into

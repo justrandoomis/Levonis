@@ -452,7 +452,7 @@ export default function CodeAuth({
 
   if (notConfigured) {
     return (
-      <div className="lv-alert lv-alert-warning flex items-start gap-2" role="status">
+      <div className="lv-notice lv-notice--warn" role="status">
         <AlertCircle aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" />
         <span>{channel === 'email' ? s.notConfiguredEmail : s.notConfiguredWhatsapp}</span>
       </div>
@@ -506,7 +506,7 @@ export default function CodeAuth({
             />
           </div>
           {error ? (
-            <p className="lv-alert lv-alert-danger mt-3 text-xs" role="alert">
+            <p className="lv-notice" role="alert">
               {error}
             </p>
           ) : null}
@@ -531,7 +531,7 @@ export default function CodeAuth({
     const fp = OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar;
     return (
       <div>
-        <div className="lv-alert lv-alert-warning flex items-start gap-2" role="alert" data-owner-first-proof="ask">
+        <div className="lv-notice lv-notice--warn" role="alert" data-owner-first-proof="ask">
           <AlertCircle aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" />
           <span className="leading-relaxed">{refusalText(OWNER_FIRST_PROOF_REQUIRED, lang)}</span>
         </div>
@@ -685,7 +685,7 @@ export default function CodeAuth({
           )}
         </div>
         {error && targetReady ? (
-          <p className="lv-alert lv-alert-danger mt-3 text-xs" role="alert">
+          <p className="lv-notice" role="alert">
             {error}
           </p>
         ) : null}

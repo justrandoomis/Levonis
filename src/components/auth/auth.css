@@ -47,7 +47,6 @@
   --lv-line-strong: #3a3f37;
   --lv-line-hover: #4a5046;
   --lv-olive: #6f7d4c;
-  --lv-olive-deep: #3d4630;
   --lv-olive-text: #a6b283;
   --lv-olive-soft: #151a11;
   --lv-olive-line: #2d3a24;
@@ -62,20 +61,16 @@
   --lv-text-1: #f1f0ea;
   --lv-text-2: #b4b6ae;
   --lv-text-3: #878b82;
-  --lv-placeholder: #7d8178;
+  --lv-placeholder: #82867d;
   --lv-focus-ring: #c9ad6a;
+  /* keyboard focus on a well: a solid 1px ring outside the focus border, then
+     a soft halo (the field line and the focus ink are close on cream) */
+  --lv-halo: 0 0 0 1px var(--lv-focus-ring), 0 0 0 3px rgb(201 173 106/.14);
   --lv-cta-ink: #14120a;
-  --lv-cta-base: #1b1e19;
+  /* one step lighter than the panel: what a raised button is made of */
+  --lv-raised: #1b1e19;
   /* the ink the grid, the wells and the hover washes are drawn in, as r g b */
   --lv-ink-rgb: 241 240 234;
-  /* names older recipes still read */
-  --lv-void: var(--lv-ground);
-  --lv-carbon: var(--lv-panel);
-  --lv-well: var(--lv-ground-2);
-  --lv-line: var(--lv-panel-line);
-  --lv-gold-bright: var(--lv-gold-text);
-  --lv-filament: var(--lv-olive);
-  --lv-ink: var(--lv-text-1);
   --plx-x: 0; /* pointer parallax, −1..1, set by AuthShell on fine pointers */
   --plx-y: 0;
   --lv-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -87,41 +82,43 @@
 
 
 /* THE LIGHT THEME (src/index.css, THE TWO THEMES): the same blueprint drawn on
-   drafting paper — ivory ground, ink grid, the olive and gold deepened until
-   they read on it (4.5:1 for every text token). The gold FILL of the sign-in
-   button stays the brand's bright gold with dark ink on it, as in dark. */
+   the app's own cream (D4: «كريمي، ليس أبيض») — the page is IVORY, the card
+   PAPER, a field the app's well, a raised button one step lighter than the
+   card; the olive and gold deepened until they read on it. Every text ink is
+   4.5:1 on the page, the card and a well (tests/claySystem.test.ts). The gold
+   FILL of the sign-in button stays the brand's bright gold with dark ink on
+   it, as in dark. Shadows are the app's clay (--clay-*), warm on cream. */
 [data-theme='light'] .lv-auth {
-  --lv-ground: #f3f0ea;
-  --lv-ground-2: #ebe7de;
-  --lv-panel: #fbfaf7;
-  --lv-panel-line: #e0dace;
-  --lv-line-strong: #cfc8ba;
-  --lv-line-hover: #b3ab9b;
+  --lv-ground: #e3dacb;
+  --lv-ground-2: #e2d9c9;
+  --lv-panel: #ebe4d6;
+  --lv-panel-line: #cfc5b2;
+  --lv-line-strong: #bdb29c;
+  --lv-line-hover: #a99e88;
   --lv-olive: #5d6a3a;
-  --lv-olive-deep: #c7cfae;
   --lv-olive-text: #56623a;
-  --lv-olive-soft: #eef0e4;
-  --lv-olive-line: #d5dbc2;
+  --lv-olive-soft: #ddd8c6;
+  --lv-olive-line: #b9bf98;
   --lv-gold: #bca36b;
   --lv-gold-deep: #7a6331;
-  --lv-gold-text: #7a6331;
+  --lv-gold-text: #6f592b;
+  /* a gold fill's hover lightens on cream (dark ink stays 4.5:1 on it); in dark it is --lv-gold-text */
+  --lv-gold-hi: #c7af78;
   --lv-gold-soft: rgba(122, 99, 49, 0.08);
   --lv-red: #a4443a;
   --lv-red-text: #9d3a30;
-  --lv-red-soft: #f7e6e2;
-  --lv-red-line: #e5c2bb;
+  --lv-red-soft: #e4d4c6;
+  --lv-red-line: #d4aba0;
   --lv-text-1: #16181b;
   --lv-text-2: #45484e;
-  --lv-text-3: #5f6268;
-  --lv-placeholder: #75777c;
-  --lv-focus-ring: #7a6331;
+  --lv-text-3: #595c62;
+  --lv-placeholder: #595c62;
+  --lv-focus-ring: #6f592b;
+  --lv-halo: 0 0 0 1px var(--lv-focus-ring), 0 0 0 3px rgb(111 89 43/.2);
   --lv-cta-ink: #14120a;
-  --lv-cta-base: #ebe6dc;
+  --lv-raised: #f0eadf;
   --lv-ink-rgb: 22 24 27;
   color-scheme: light;
-}
-[data-theme='light'] .lv-auth .lv-card {
-  box-shadow: 0 1px 2px rgb(22 24 27 / 0.06), 0 10px 30px -18px rgb(22 24 27 / 0.18);
 }
 .lv-mono {
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -424,20 +421,22 @@
   .lv-brand__eyebrow { font-size: 9px; letter-spacing: 0.12em; }
 }
 
-/* Language switch: three mono chips in the brand row's free side. */
+/* Language switch: three mono chips in the brand row's free side — a well
+   track with a raised thumb, as the app's Segmented. */
 .lv-lang {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--lv-panel-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--lv-panel) 85%, transparent);
+  border-radius: 14px;
+  background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
   direction: ltr;
 }
 .lv-lang__btn {
   min-width: 40px;
   height: 40px;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -447,12 +446,16 @@
 .lv-lang__btn:hover { color: var(--lv-text-1); }
 .lv-lang__btn[aria-pressed='true'] {
   color: var(--lv-text-1);
-  background: var(--lv-ground-2);
-  box-shadow: inset 0 0 0 1px var(--lv-line-strong);
+  background: var(--lv-raised);
+  box-shadow: var(--clay-lift);
 }
 .lv-lang__btn:focus-visible {
   outline: 2px solid var(--lv-focus-ring);
   outline-offset: -2px;
+}
+/* Forced colours drop every shadow, and with it the raised thumb. */
+@media (forced-colors: active) {
+  .lv-lang__btn[aria-pressed='true'] { outline: 1px solid Highlight; outline-offset: -1px; }
 }
 
 /* The centred column and its vertical rhythm. Paddings live here (not in
@@ -478,14 +481,15 @@
   margin-top: 16px;
 }
 
-/* Card: lighter, thinner, one light shadow; two registration ticks in olive. */
+/* Card: the one lifted slab on the drawing (--clay-2: lit rim, base shade,
+   one soft cast), the app's card radius; two registration ticks in olive. */
 .lv-card {
   position: relative;
   padding: 20px;
   background: var(--lv-panel);
   border: 1px solid var(--lv-panel-line);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px -18px rgba(0, 0, 0, 0.55);
+  border-radius: 22px;
+  box-shadow: var(--clay-2);
 }
 @media (min-width: 360px) {
   .lv-card { padding: 24px; }
@@ -572,7 +576,6 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
-.lv-link--sm { font-size: 12px; min-height: 40px; }
 .lv-textbtn {
   display: inline-flex;
   align-items: center;
@@ -602,18 +605,12 @@
 .lv-back:hover { color: var(--lv-text-1); }
 .lv-back svg { width: 15px; height: 15px; }
 [dir='rtl'] .lv-back svg { transform: scaleX(-1); }
-.lv-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 2px;
-}
 .lv-foot {
   margin: 18px 0 0;
   text-align: center;
   font-size: 13px;
   color: var(--lv-text-2);
 }
-.lv-foot--tight { margin-top: 10px; }
 .lv-terms {
   margin: 14px 2px 0;
   text-align: center;
@@ -696,8 +693,9 @@
 /* Review block (signup step 3) */
 .lv-review {
   border: 1px solid var(--lv-panel-line);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
   overflow: hidden;
 }
 .lv-review__row {
@@ -735,7 +733,7 @@
   min-width: 44px;
   min-height: 40px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 12px;
   font-weight: 600;
   color: var(--lv-gold-text);
@@ -788,9 +786,10 @@
 .lv-field__input {
   width: 100%;
   height: 46px;
-  border-radius: 8px;
-  border: 1px solid var(--lv-line-strong);
+  border-radius: 14px;
+  border: 1px solid var(--clay-field);
   background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
   padding: 0 12px;
   font-size: 16px; /* ≥16px: iOS Safari must not zoom the page on focus */
   color: var(--lv-text-1);
@@ -801,12 +800,9 @@
   color: var(--lv-placeholder);
   opacity: 1;
 }
-.lv-field__input:hover:not(:disabled) {
-  border-color: var(--lv-line-hover);
-}
 .lv-field__input:focus {
   border-color: var(--lv-focus-ring);
-  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+  box-shadow: var(--clay-well), var(--lv-halo);
 }
 .lv-field__input:disabled {
   opacity: 0.55;
@@ -822,10 +818,10 @@
   border-color: var(--lv-red);
 }
 .lv-field__input.is-error:focus {
-  box-shadow: 0 0 0 3px rgba(164, 68, 58, 0.16);
+  box-shadow: var(--clay-well), 0 0 0 3px rgb(164 68 58/.16);
 }
 .lv-field__input.is-ok {
-  border-color: var(--lv-olive-deep);
+  border-color: var(--lv-olive);
 }
 .lv-field__icon {
   position: absolute;
@@ -851,7 +847,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--lv-text-3);
   transition: color 0.15s ease, background-color 0.15s ease;
 }
@@ -895,25 +891,6 @@
 .lv-field__help.is-ok { color: var(--lv-olive-text); }
 .lv-field__help.is-bad { color: var(--lv-red-text); font-weight: 500; }
 
-/* Native select with the field chrome and a drawn chevron. */
-.lv-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding-inline-end: 38px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23878b82' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-  background-repeat: no-repeat;
-  background-size: 12px 12px;
-  background-position: right 14px center;
-  cursor: pointer;
-}
-[dir='rtl'] .lv-select {
-  background-position: left 14px center;
-}
-.lv-select option {
-  background: var(--lv-panel);
-  color: var(--lv-text-1);
-}
-
 /* Phone (PhoneField): country display + national number, always LTR. */
 .lv-phone {
   display: flex;
@@ -922,34 +899,6 @@
 .lv-phone__country {
   position: relative;
   flex: none;
-}
-.lv-phone__display {
-  display: flex;
-  height: 46px;
-  align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  border: 1px solid var(--lv-line-strong);
-  background: var(--lv-ground-2);
-  padding: 0 12px;
-  font-size: 15px;
-  color: var(--lv-text-1);
-  transition: border-color 0.16s ease;
-}
-.lv-phone__display.is-error { border-color: var(--lv-red); }
-.lv-phone__display.is-disabled { opacity: 0.55; }
-.lv-phone__display svg { width: 13px; height: 13px; color: var(--lv-text-3); }
-.lv-phone__country:focus-within .lv-phone__display {
-  border-color: var(--lv-focus-ring);
-  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
-}
-.lv-phone__select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
 }
 .lv-phone__input {
   font-variant-numeric: tabular-nums;
@@ -964,14 +913,14 @@
 .lv-auth input:-webkit-autofill:hover,
 .lv-auth input:-webkit-autofill:focus,
 .lv-auth input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 1000px var(--lv-ground-2) inset !important;
-  box-shadow: 0 0 0 1000px var(--lv-ground-2) inset !important;
+  -webkit-box-shadow: var(--clay-well), 0 0 0 1000px var(--lv-ground-2) inset !important;
+  box-shadow: var(--clay-well), 0 0 0 1000px var(--lv-ground-2) inset !important;
   -webkit-text-fill-color: var(--lv-text-1) !important;
   caret-color: var(--lv-text-1);
   transition: background-color 9999999s ease-out;
 }
 .lv-auth input:autofill {
-  box-shadow: 0 0 0 1000px var(--lv-ground-2) inset;
+  box-shadow: var(--clay-well), 0 0 0 1000px var(--lv-ground-2) inset;
   -webkit-text-fill-color: var(--lv-text-1);
   caret-color: var(--lv-text-1);
 }
@@ -988,20 +937,21 @@
   display: block;
   width: 100%;
   height: 46px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-line-strong);
-  background: var(--lv-cta-base);
+  background: var(--lv-panel);
   isolation: isolate;
   cursor: pointer;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.2s ease, transform 0.12s ease;
+  transition: border-color 0.2s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
 .lv-fillbtn:disabled {
   cursor: not-allowed;
 }
 .lv-fillbtn:not(:disabled):active {
   transform: translateY(1px);
+  box-shadow: var(--clay-press);
 }
 .lv-fillbtn:focus-visible {
   outline: 2px solid var(--lv-focus-ring);
@@ -1072,11 +1022,17 @@
 [dir='rtl'] .lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__arrow {
   transform: scaleX(-1) translateX(2px);
 }
+/* Raised means it can be pressed: the not-ready button lies flat on the card;
+   ready, it rests as clay; while it works the press holds. */
 .lv-fillbtn.is-ready {
   border-color: var(--lv-gold-deep);
+  box-shadow: var(--clay-1);
+}
+.lv-fillbtn.is-ready[aria-busy] {
+  box-shadow: var(--clay-press);
 }
 .lv-fillbtn.is-ready:not(:disabled):hover .lv-fillbtn__fill {
-  background: var(--lv-gold-text);
+  background: var(--lv-gold-hi, var(--lv-gold-text));
 }
 .lv-fillbtn.is-error {
   border-color: var(--lv-red);
@@ -1136,17 +1092,18 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-gold-deep);
   background: var(--lv-gold);
+  box-shadow: var(--clay-1);
   color: var(--lv-cta-ink);
   font-size: 14px;
   font-weight: 600;
-  transition: background-color 0.15s ease, transform 0.12s ease;
+  transition: background-color 0.15s ease, box-shadow 0.12s ease, transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.lv-btn-gold:hover { background: var(--lv-gold-text); }
-.lv-btn-gold:active { transform: translateY(1px); }
+.lv-btn-gold:hover { background: var(--lv-gold-hi, var(--lv-gold-text)); }
+.lv-btn-gold:active { transform: translateY(1px); box-shadow: var(--clay-press); }
 .lv-btn-gold:focus-visible {
   outline: 2px solid var(--lv-focus-ring);
   outline-offset: 2px;
@@ -1159,23 +1116,18 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-line-strong);
-  background: transparent;
+  background: var(--lv-raised);
+  box-shadow: var(--clay-1);
   color: var(--lv-text-1);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+  transition: border-color 0.15s ease, box-shadow 0.12s ease, transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .lv-btn-quiet svg { width: 16px; height: 16px; flex: none; color: var(--lv-gold-text); }
-.lv-btn-quiet:hover:not(:disabled) {
-  border-color: var(--lv-line-hover);
-  background: rgb(var(--lv-ink-rgb) / 0.025);
-}
-.lv-btn-quiet:active:not(:disabled) { transform: translateY(1px); }
-.lv-btn-quiet:disabled { opacity: 0.5; cursor: not-allowed; }
 .lv-btn-quiet:focus-visible {
   outline: 2px solid var(--lv-focus-ring);
   outline-offset: 2px;
@@ -1215,25 +1167,32 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-line-strong);
-  background: transparent;
+  background: var(--lv-raised);
+  box-shadow: var(--clay-1);
   color: var(--lv-text-1);
   font-size: 14px;
   font-weight: 500;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+  transition: border-color 0.15s ease, box-shadow 0.12s ease, transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.lv-social:hover:not(:disabled) {
+/* Secondary clay (.lv-social, .lv-btn-quiet): a raised fill one step above the
+   card; hover darkens the edge only, a press dents it, disabled lies flat. */
+.lv-social:hover:not(:disabled),
+.lv-btn-quiet:hover:not(:disabled) {
   border-color: var(--lv-line-hover);
-  background: rgb(var(--lv-ink-rgb) / 0.025);
 }
-.lv-social:active:not(:disabled) {
+.lv-social:active:not(:disabled),
+.lv-btn-quiet:active:not(:disabled) {
   transform: translateY(1px);
+  box-shadow: var(--clay-press);
 }
-.lv-social:disabled {
+.lv-social:disabled,
+.lv-btn-quiet:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .lv-social:focus-visible {
   outline: 2px solid var(--lv-focus-ring);
@@ -1259,9 +1218,10 @@
   align-items: center;
   justify-content: center;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-line-strong);
   background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
 }
 .lv-google.is-busy {
   opacity: 0.5;
@@ -1306,14 +1266,15 @@
  * Notices
  * ===================================================================== */
 
-.lv-alert,
+/* Flat information (the app's note radius). Only .lv-notice: a bare .lv-alert
+   here would restyle every app alert (index.css) once /auth had loaded. */
 .lv-notice {
   display: flex;
   gap: 10px;
   align-items: flex-start;
   margin: 0 0 14px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--lv-red-line);
   background: var(--lv-red-soft);
   color: var(--lv-red-text);
@@ -1321,9 +1282,7 @@
   line-height: 1.6;
   font-weight: 500;
 }
-.lv-alert p,
 .lv-notice p { margin: 0; min-width: 0; }
-.lv-alert svg,
 .lv-notice svg { width: 15px; height: 15px; flex: none; margin-top: 3px; }
 .lv-notice--ok {
   border-color: var(--lv-olive-line);
@@ -1343,7 +1302,7 @@
 }
 .lv-notice--info svg { color: var(--lv-gold-text); }
 .lv-notice--tight { margin: 12px 0 0; }
-.lv-alert .lv-btn-quiet {
+.lv-notice .lv-btn-quiet {
   width: auto;
   height: 40px;
   margin-top: 8px;
@@ -1372,15 +1331,16 @@
   font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
   color: var(--lv-text-1);
   background: var(--lv-ground-2);
-  border: 1px solid var(--lv-line-strong);
-  border-radius: 8px;
+  border: 1px solid var(--clay-field);
+  border-radius: 14px;
+  box-shadow: var(--clay-well);
   outline: none;
   caret-color: var(--lv-gold);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .lv-otp__box:focus {
   border-color: var(--lv-focus-ring);
-  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+  box-shadow: var(--clay-well), var(--lv-halo);
 }
 .lv-otp__box.is-filled {
   border-color: var(--lv-gold-deep);
@@ -1407,7 +1367,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-panel-line);
   background: transparent;
   padding: 0 12px;
@@ -1457,7 +1417,7 @@
   justify-content: space-between;
   gap: 8px;
   min-height: 46px;
-  border-radius: 8px;
+  border-radius: 14px;
   border: 1px solid var(--lv-olive-line);
   background: var(--lv-olive-soft);
   padding: 4px 4px 4px 12px;
@@ -1481,7 +1441,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--lv-olive-text);
   transition: color 0.15s ease, background-color 0.15s ease;
 }
@@ -1509,7 +1469,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--lv-panel-line);
   background: var(--lv-ground-2);
   color: var(--lv-gold-text);
@@ -1756,9 +1716,10 @@
   width: 100%;
   height: 46px;
   padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--lv-line-strong);
+  border-radius: 14px;
+  border: 1px solid var(--clay-field);
   background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
   color: var(--lv-text-1);
   /* ≥16px: a control that opens a text field must not be the thing that
      makes the page zoom when the field takes focus. */
@@ -1772,12 +1733,11 @@
   flex: none;
   gap: 6px;
 }
-.lv-cpick__button:hover:not(:disabled) { border-color: var(--lv-line-hover); }
 .lv-cpick__button:focus-visible,
 .lv-cpick__button.is-open {
   outline: none;
   border-color: var(--lv-focus-ring);
-  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+  box-shadow: var(--clay-well), var(--lv-halo);
 }
 .lv-cpick__button.is-error { border-color: var(--lv-red); }
 .lv-cpick__button:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -1814,22 +1774,29 @@
   display: flex;
   flex-direction: column;
   max-height: 340px;
-  border-radius: 12px;
+  border-radius: 18px;
   border: 1px solid var(--lv-panel-line);
   background: var(--lv-panel);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--clay-2);
   overflow: hidden;
 }
 .lv-cpick__panel.is-compact { width: min(320px, 84vw); }
 
 .lv-cpick__search {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--lv-panel-line);
+  height: 44px;
+  margin: 8px 8px 4px;
+  padding: 0 12px;
+  border: 1px solid var(--clay-field);
+  border-radius: 14px;
+  background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
   color: var(--lv-text-3);
 }
+.lv-cpick__search:focus-within { border-color: var(--lv-focus-ring); }
 .lv-cpick__search svg { width: 16px; height: 16px; flex: none; }
 .lv-cpick__input {
   flex: 1 1 auto;
@@ -1864,7 +1831,7 @@
   align-items: center;
   gap: 10px;
   padding: 9px 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   color: var(--lv-text-1);
   font-size: 14px;
@@ -1897,7 +1864,8 @@
     inset: auto 0 0 0;
     width: 100%;
     max-height: min(70vh, 480px);
-    border-radius: 16px 16px 0 0;
+    border-radius: 32px 32px 0 0;
+    box-shadow: var(--clay-dock);
     border-inline: 0;
     border-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
@@ -1933,24 +1901,23 @@
   gap: 12px;
   width: 100%;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--lv-line-strong);
-  background: var(--lv-ground-2);
+  background: var(--lv-raised);
+  box-shadow: var(--clay-1);
   color: var(--lv-text-1);
   text-align: start;
   cursor: pointer;
-  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
-.lv-chan:hover:not(:disabled) {
-  border-color: var(--lv-line-hover);
-  background: var(--lv-panel);
-}
+.lv-chan:hover:not(:disabled) { border-color: var(--lv-line-hover); }
+.lv-chan:active:not(:disabled) { box-shadow: var(--clay-press); }
 .lv-chan:focus-visible {
   outline: none;
   border-color: var(--lv-focus-ring);
-  box-shadow: 0 0 0 3px rgba(201, 173, 106, 0.14);
+  box-shadow: var(--clay-1), var(--lv-halo);
 }
-.lv-chan:disabled { opacity: 0.45; cursor: not-allowed; }
+.lv-chan:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 .lv-chan svg { width: 20px; height: 20px; flex: none; color: var(--lv-gold-text); }
 .lv-chan span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lv-chan b { font-size: 14px; font-weight: 600; }

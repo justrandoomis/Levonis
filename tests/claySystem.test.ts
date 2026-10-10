@@ -38,7 +38,10 @@
  *     solid focus line on cream, where the 3:1 field line and the focus ink
  *     are a near match; photo tiles keep their focus ring off the photo; the
  *     admin tab wrapper is a flat tray; a scroller of clay buttons leaves
- *     room for their cast.
+ *     room for their cast;
+ *  9. the sign-in screen (its own `--lv-*` palette): on the app's cream in
+ *     light (D4), every text ink 4.5:1 on its grounds in both themes, fields
+ *     are wells with a 3:1 line, and every shadow is a clay composite.
  *
  * Run: node --import tsx --test tests/claySystem.test.ts
  */
@@ -473,4 +476,87 @@ test('the foundation QA: one raised container per stack, focus that shows on cre
   assert.doesNotMatch(read('src/pages/Admin.tsx'), /rounded-2xl p-4 md:p-5 shadow-/);
   // A horizontal scroller of clay buttons leaves room for their cast (overflow-x clips y too).
   assert.match(read('src/components/merchant/counter/QuickDock.tsx'), /data-quick-dock className="[^"]*-my-2[^"]*overflow-x-auto[^"]*py-2/);
+});
+
+// ---------------------------------------------------------------------- 9
+/**
+ * THE SIGN-IN SCREEN (build plan §3.8, §6 Phase 3.6; D4). /auth draws itself
+ * from its own palette (src/components/auth/auth.css, `--lv-*`) and the app's
+ * clay geometry. In light its page and card are the app's cream IVORY and
+ * PAPER («كريمي، ليس أبيض»), not the near-white they were — so every text ink
+ * of that palette is re-measured on the grounds it now sits on, in both
+ * themes; a text-entry field is a well with a 3:1 line; and no hand-written
+ * (black) shadow is left to land on cream.
+ */
+test('the sign-in screen is clay on the app cream (D4): every auth text ink reads on its grounds, fields are wells', () => {
+  const sheets = ['src/components/auth/auth.css', 'src/components/auth/authLeave.css'].map((f) => [f, stripCssComments(read(f))] as const);
+  const auth = sheets[0][1];
+  const tokens = (re: RegExp, label: string): Record<string, string> => {
+    const m = re.exec(auth);
+    assert.ok(m, `auth.css: the ${label} token block is missing`);
+    return Object.fromEntries([...m![1].matchAll(/--(lv-[a-z0-9-]+):\s*([^;]+);/g)].map((d) => [d[1], d[2].trim()]));
+  };
+  const base = tokens(/(?:^|\n)\.lv-auth \{([^}]*)\}/, 'dark (.lv-auth)');
+  const palette: Record<Theme, Record<string, string>> = {
+    dark: base,
+    light: { ...base, ...tokens(/\[data-theme='light'\] \.lv-auth \{([^}]*)\}/, 'light') },
+  };
+  // D4: the light page and card are the app's own grounds, the field the app's well.
+  assert.equal(palette.light['lv-ground'].toLowerCase(), IVORY, 'the light /auth page is not IVORY');
+  assert.equal(palette.light['lv-panel'].toLowerCase(), PAPER, 'the light /auth card is not PAPER');
+  assert.equal(palette.light['lv-ground-2'].toLowerCase(), V.light['clay-well-bg'].toLowerCase(), 'a light /auth field is not the app well');
+
+  const failures: string[] = [];
+  const need = (label: string, value: number, min: number) => {
+    if (!(value >= min)) failures.push(`${label}: ${value.toFixed(2)}:1, under ${min}`);
+  };
+  for (const theme of ['light', 'dark'] as const) {
+    const p = palette[theme];
+    const inks = Object.keys(p).filter((k) => /^lv-text-\d+$/.test(k));
+    assert.ok(inks.length >= 3, `${theme}: the auth text inks were not found`);
+    // Every text ink (and the placeholder and the toned inks) on the page, a
+    // well, the card and a raised button.
+    const grounds = ['lv-ground', 'lv-ground-2', 'lv-panel', 'lv-raised'];
+    for (const ink of [...inks, 'lv-placeholder', 'lv-gold-text', 'lv-olive-text', 'lv-red-text']) {
+      assert.ok(p[ink], `${theme}: --${ink} is missing`);
+      for (const g of grounds) need(`${theme} --${ink} on --${g}`, ratio(p[ink], p[g]), 4.5);
+    }
+    // A notice's ink on its own tint.
+    need(`${theme} --lv-red-text on --lv-red-soft`, ratio(p['lv-red-text'], p['lv-red-soft']), 4.5);
+    need(`${theme} --lv-olive-text on --lv-olive-soft`, ratio(p['lv-olive-text'], p['lv-olive-soft']), 4.5);
+    // A field's line (the app's --clay-field), a valid field's line and the focus ink: 3:1 on the well and the card.
+    for (const g of ['lv-ground-2', 'lv-panel']) {
+      need(`${theme} --clay-field on --${g}`, ratio(V[theme]['clay-field'], p[g]), 3);
+      need(`${theme} --lv-olive (a valid field) on --${g}`, ratio(p['lv-olive'], p[g]), 3);
+      need(`${theme} --lv-focus-ring on --${g}`, ratio(p['lv-focus-ring'], p[g]), 3);
+    }
+    // Higher means lighter: the card above the page, a raised button above the card, a well below it.
+    assert.ok(lightness(p['lv-panel']) > lightness(p['lv-ground']), `${theme}: the /auth card is not lighter than its page`);
+    assert.ok(lightness(p['lv-raised']) > lightness(p['lv-panel']), `${theme}: a raised /auth button is not lighter than the card`);
+    assert.ok(lightness(p['lv-ground-2']) < lightness(p['lv-panel']), `${theme}: an /auth well is not darker than the card`);
+  }
+  assert.deepEqual(failures, [], `/auth contrast under the floor:\n${failures.join('\n')}`);
+
+  // Clay, not hand-drawn: every shadow on the screen is a clay composite (or none),
+  // so no black cast lands on the cream; the card lifts, the sheet docks, the wells sink.
+  for (const [f, src] of sheets) {
+    for (const m of src.matchAll(/(?:^|[;{\s])box-shadow:\s*([^;}]+)/g)) {
+      const v = m[1].trim();
+      assert.ok(v === 'none' || /var\(--clay-[a-z0-9-]+\)/.test(v), `${f}: a box-shadow is not clay: ${v}`);
+    }
+    assert.doesNotMatch(src, /border-radius:\s*(6|8|12|16)px/, `${f}: a radius off the role scale (controls 14, cards 22, popovers 18, notes and small keys 10)`);
+  }
+  const rule = (sel: string) => new RegExp(`(?:^|\\n)${sel.replace(/[.[\]()*+?^$|\\]/g, '\\$&')} \\{([^}]*)\\}`).exec(auth)?.[1] ?? '';
+  assert.match(rule('.lv-card'), /border-radius:\s*22px;[^}]*box-shadow:\s*var\(--clay-2\);/, 'the /auth card is not lifted clay at the card radius');
+  for (const field of ['.lv-field__input', '.lv-otp__box', '.lv-cpick__button', '.lv-cpick__search']) {
+    const body = rule(field);
+    assert.match(body, /border:\s*1px solid var\(--clay-field\);/, `${field}: a field's line is not the 3:1 --clay-field`);
+    assert.match(body, /box-shadow:\s*var\(--clay-well\);/, `${field}: a field is not a well`);
+  }
+  for (const focus of ['.lv-field__input:focus', '.lv-otp__box:focus']) {
+    assert.match(rule(focus), /box-shadow:\s*var\(--clay-well\),\s*var\(--lv-halo\);/, `${focus}: focus must keep the well and add the ring and halo`);
+  }
+  assert.match(auth, /@media \(pointer: coarse\) \{[\s\S]*?\.lv-cpick__panel[^{]*\{[^}]*border-radius:\s*32px 32px 0 0;[^}]*box-shadow:\s*var\(--clay-dock\);/, 'the country sheet is not a docked sheet');
+  // A bare .lv-alert in this sheet restyled every app alert (index.css) once /auth had loaded.
+  for (const [f, src] of sheets) assert.doesNotMatch(src, /\.lv-alert\b/, `${f} styles the app's .lv-alert`);
 });

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
+import { IconButton } from '../ui/Button';
 import { api, ApiError } from '../../lib/api';
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
@@ -303,16 +304,16 @@ export default function EmailVerifyBanner() {
   // Confirm card takes precedence: the user followed the email link.
   if (token && confirmState !== 'done' && confirmState !== 'cancelled') {
     return (
-      <div className={`${headerClearance} mx-3 rounded-2xl border border-warning/30 bg-warning/[0.08] p-4 text-sm`}>
-        <p className="font-bold text-yellow-500 mb-1">{t.confirmTitle}</p>
+      <div className={`${headerClearance} mx-3 lv-alert lv-alert-warning text-sm`}>
+        <p className="font-bold text-text-primary mb-1">{t.confirmTitle}</p>
         {confirmState === 'sign_in' ? (
           <p role="status" className="text-text-secondary leading-relaxed">
             {refusalText('VERIFY_SIGN_IN_REQUIRED', lang)}
           </p>
         ) : confirmState === 'failed' ? (
           <>
-            <p className="text-red-400 mb-1">{t.confirmFailed}</p>
-            <p className="text-gray-400 text-xs">{t.confirmFailedHint}</p>
+            <p className="text-danger-ink mb-1">{t.confirmFailed}</p>
+            <p className="text-text-muted text-xs">{t.confirmFailedHint}</p>
           </>
         ) : askFirstProof ? (
           <>
@@ -325,7 +326,7 @@ export default function EmailVerifyBanner() {
                 type="button"
                 onClick={() => void confirm(true)}
                 disabled={confirmState === 'confirming'}
-                className="w-full sm:w-auto rounded-xl bg-yellow-600 px-5 py-2.5 font-bold text-black disabled:opacity-60"
+                className="lv-button lv-button-primary w-full sm:w-auto"
               >
                 {confirmState === 'confirming' ? t.confirming : (OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).acceptConfirm}
               </button>
@@ -341,7 +342,7 @@ export default function EmailVerifyBanner() {
           </>
         ) : (
           <>
-            <p className="text-gray-300 mb-3">{t.confirmHint}</p>
+            <p className="text-text-secondary mb-3">{t.confirmHint}</p>
             {/* The owner's own unverified session is about to make the first
                 proof of the main admin's address: say what it ends before the
                 press (lib/ownerFirstProof.ts, worker/lib/emailStamp.ts). The
@@ -356,7 +357,7 @@ export default function EmailVerifyBanner() {
               type="button"
               onClick={() => void confirm(warnedBefore)}
               disabled={confirmState === 'confirming'}
-              className="w-full sm:w-auto rounded-xl bg-yellow-600 px-5 py-2.5 font-bold text-black disabled:opacity-60"
+              className="lv-button lv-button-primary w-full sm:w-auto"
             >
               {confirmState === 'confirming' ? t.confirming : t.confirmCta}
             </button>
@@ -368,23 +369,16 @@ export default function EmailVerifyBanner() {
 
   if (token && confirmState === 'done') {
     return (
-      <div className={`${headerClearance} mx-3 rounded-2xl border border-success/30 bg-success/[0.08] p-4 text-sm flex items-start justify-between gap-3`}>
+      <div className={`${headerClearance} mx-3 lv-alert lv-alert-success text-sm flex items-start justify-between gap-3`}>
         <div className="min-w-0">
-          <p className="text-green-400">{t.confirmed}</p>
+          <p className="text-success">{t.confirmed}</p>
           {firstProof && (
             <p role="status" className="mt-1.5 text-text-secondary leading-relaxed">
               {(OWNER_FIRST_PROOF_STRINGS[lang] ?? OWNER_FIRST_PROOF_STRINGS.ar).body(firstProof.sessions_ended)}
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label={t.dismiss}
-          className="shrink-0 w-11 h-11 -m-2 grid place-items-center rounded-lg text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <X aria-hidden="true" className="w-4 h-4" />
-        </button>
+        <IconButton label={t.dismiss} onClick={dismiss} icon={<X aria-hidden="true" className="w-4 h-4" />} className="-m-2" />
       </div>
     );
   }
@@ -402,35 +396,28 @@ export default function EmailVerifyBanner() {
   if (status.email.toLowerCase().endsWith('@telegram.local')) return null;
 
   return (
-    <div className={`${headerClearance} mx-3 rounded-2xl border border-warning/25 bg-warning/[0.07] p-3.5 text-sm`}>
+    <div className={`${headerClearance} mx-3 lv-alert lv-alert-warning text-sm`}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-text-secondary leading-snug">{t.unverified}</p>
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label={t.dismiss}
-          className="shrink-0 w-11 h-11 -m-2 grid place-items-center rounded-lg text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <X aria-hidden="true" className="w-4 h-4" />
-        </button>
+        <IconButton label={t.dismiss} onClick={dismiss} icon={<X aria-hidden="true" className="w-4 h-4" />} className="-m-2" />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {sendState === 'not_configured' || !status.emailConfigured ? (
-          <p className="text-yellow-500 text-xs">{t.notConfigured}</p>
+          <p className="text-text-secondary text-xs">{t.notConfigured}</p>
         ) : (
           <>
             <button
               type="button"
               onClick={resend}
               disabled={sendState === 'sending' || cooldown > 0}
-              className="rounded-xl bg-yellow-600 px-4 py-2 font-bold text-black disabled:opacity-60"
+              className="lv-button lv-button-secondary lv-button-sm"
             >
               {sendState === 'sending' ? t.resending : t.resend}
             </button>
-            {cooldown > 0 && <span className="text-gray-400 text-xs">{t.cooldown(cooldown)}</span>}
-            {sendState === 'sent' && <span className="text-green-400 text-xs">{t.sent}</span>}
-            {sendState === 'too_many' && <span className="text-red-400 text-xs">{t.tooMany}</span>}
-            {sendState === 'error' && <span className="text-red-400 text-xs">{t.sendFailed}</span>}
+            {cooldown > 0 && <span className="text-text-muted text-xs">{t.cooldown(cooldown)}</span>}
+            {sendState === 'sent' && <span className="text-success text-xs">{t.sent}</span>}
+            {sendState === 'too_many' && <span className="text-danger-ink text-xs">{t.tooMany}</span>}
+            {sendState === 'error' && <span className="text-danger-ink text-xs">{t.sendFailed}</span>}
           </>
         )}
       </div>

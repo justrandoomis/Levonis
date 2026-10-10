@@ -251,7 +251,7 @@ export default function PhoneField({
       <div className="lv-phone" dir="ltr">
         <div className="lv-phone__country">
           {/*
-            THE PICKER, NOT A <select>. The native control opens the operating
+            THE PICKER, NOT A NATIVE SELECT. The native control opens the operating
             system's own list — grey system chrome in the middle of a black and
             gold page, 245 rows deep, with no way to type «العراق» or `964` and
             land on the answer. CountryPicker keeps every keyboard behaviour the
