@@ -116,7 +116,7 @@ export const SEMANTIC = {
   'canvas':              ['#0b0c0f', IVORY],
   'surface':             ['#131519', PAPER],
   'surface-raised':      ['#191c21', '#f0eadf'],
-  'surface-selected':    ['#20242a', '#d8cfbd'],
+  'surface-selected':    ['#20242a', '#ddd4c3'],
   'border-subtle':       ['#2a2e35', '#cfc5b2'],
   'text-primary':        ['#f2f3f5', '#16181b'],
   'text-secondary':      ['#b7bbc3', '#45484e'],
@@ -267,28 +267,44 @@ export function buildBlock() {
     dark.push(`--color-${k}:${palette[k]}`);
     light.push(`--color-${k}:${NEUTRALS.includes(fam) ? NEUTRAL_LIGHT[shade] : chromaticLight(palette, fam, +shade)}`);
   }
-  // Light shadows are a WARM ink at low strength: a black shadow on cream is
-  // the grey smudge the owner saw under the bars («غواش»). `--lv-shadow-soft`
-  // and `--lv-shadow-deep` are the colours Tailwind's own `shadow-sm…2xl`
-  // draw with (src/index.css, THE SHADOW UTILITIES FOLLOW THE THEME); their
-  // dark values are Tailwind's own, so the dark theme does not move.
+  // CLAY PRIMITIVES (docs/DECISIONS.md row 207): the COLOURS of one light
+  // source above the screen, per theme. The geometry is theme-free and lives
+  // in src/index.css (CLAY ELEVATION), which composes these into --clay-0 …
+  // --clay-dock; @theme maps Tailwind's shadow-* names onto those. Light is a
+  // WARM ink at low strength — a black shadow on cream is the grey smudge the
+  // owner saw under the bars («غواش»); dark casts are black.
+  //   rim       lit top edge (inner 1px)         base     shaded bottom edge (inner 2px)
+  //   contact   tight contact shadow             ambient  soft cast, levels 1–2
+  //   deep      slab / dock cast                 sink     shade inside a well or a press
+  //   well-bg   the fill of a well (inputs, tracks), between the page and a card
+  //   field     the 3:1 boundary of a text-entry well
+  //   wash      the workbench light on the shell's canvas (.lv-canvas); its peak
+  //             stays under a card (light L .910 < PAPER .921), so a card still
+  //             reads as the higher, lighter thing
+  // `--lv-shadow-ink` stays: the dark .scroll-edge fade reads it.
   const lightShadows = [
-    '--shadow-1:0 1px 2px rgb(58 46 28/.07)',
-    '--shadow-2:0 12px 32px -16px rgb(58 46 28/.2)',
-    '--shadow-3:0 28px 70px -28px rgb(58 46 28/.26)',
     '--lv-shadow-ink:58 46 28',
-    '--lv-shadow-strength:.12',
-    '--lv-shadow-soft:rgb(58 46 28/.07)',
-    '--lv-shadow-deep:rgb(58 46 28/.14)',
+    '--clay-rim:rgb(255 253 248/.8)',
+    '--clay-base:rgb(58 46 28/.08)',
+    '--clay-contact:rgb(58 46 28/.1)',
+    '--clay-ambient:rgb(58 46 28/.18)',
+    '--clay-deep:rgb(58 46 28/.26)',
+    '--clay-sink:rgb(58 46 28/.16)',
+    '--clay-well-bg:#e2d9c9',
+    '--clay-field:#7c715c',
+    '--clay-wash:rgb(255 248 235/.2)',
   ];
   const darkShadows = [
-    '--shadow-1:0 1px 2px rgb(0 0 0/.35)',
-    '--shadow-2:0 12px 32px -16px rgb(0 0 0/.8)',
-    '--shadow-3:0 28px 70px -28px rgb(0 0 0/.9)',
     '--lv-shadow-ink:0 0 0',
-    '--lv-shadow-strength:.9',
-    '--lv-shadow-soft:#0000001a',
-    '--lv-shadow-deep:#00000040',
+    '--clay-rim:rgb(255 255 255/.06)',
+    '--clay-base:rgb(0 0 0/.32)',
+    '--clay-contact:rgb(0 0 0/.4)',
+    '--clay-ambient:rgb(0 0 0/.55)',
+    '--clay-deep:rgb(0 0 0/.75)',
+    '--clay-sink:rgb(0 0 0/.5)',
+    '--clay-well-bg:#0e1013',
+    '--clay-field:#6a707b',
+    '--clay-wash:rgb(196 188 166/.03)',
   ];
   return [
     BEGIN,

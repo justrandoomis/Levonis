@@ -309,7 +309,7 @@ export function QuantityInput({
         <span
           aria-hidden="true"
           data-quantity-hint
-          className={`pointer-events-none absolute z-10 whitespace-nowrap rounded-lg border border-border-subtle bg-surface-raised px-2.5 py-1.5 text-[12px] font-medium text-text-secondary shadow-[0_8px_24px_-12px_rgb(0_0_0/.45)] tabular-nums ${
+          className={`pointer-events-none absolute z-10 whitespace-nowrap rounded-lg border border-border-subtle bg-surface-raised px-2.5 py-1.5 text-[12px] font-medium text-text-secondary shadow-lg tabular-nums ${
             hintPlacement === 'start'
               ? 'end-full top-1/2 me-2 -translate-y-1/2'
               : hintPlacement === 'above'

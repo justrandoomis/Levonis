@@ -188,7 +188,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
   ) => (
     <div
       onClick={onClick}
-      className={`bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-3 shadow-[0_4px_16px_rgba(0,0,0,0.25)] flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
+      className={`bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-3 shadow-sm flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
     >
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
       <div className="min-w-0">
@@ -341,7 +341,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
         {/* Pending wallet requests — real list with working actions */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests'}
@@ -419,7 +419,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       <button
                         onClick={() => decideWallet(req, 'approved')}
                         disabled={!!loadingActionId}
-                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8a9a49] to-[#708238] text-snow flex items-center justify-center shadow-[0_4px_12px_rgba(112,130,56,0.4)] hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
+                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8a9a49] to-[#708238] text-snow flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
                         title={req.type === 'withdrawal' && req.withdrawal
                           ? (dir === 'rtl' ? 'موافقة للمعالجة (لا يُدفع هنا)' : 'Approve for processing (no payout here)')
                           : (dir === 'rtl' ? 'موافقة' : 'Approve')}
@@ -448,7 +448,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         </div>
 
         {/* Recent orders — real list */}
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/5 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
               {dir === 'rtl' ? 'أحدث الطلبات' : 'Recent Orders'}

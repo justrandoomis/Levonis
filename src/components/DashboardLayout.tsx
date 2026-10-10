@@ -269,7 +269,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
     <div className="flex h-dvh w-full bg-zinc-900 overflow-hidden font-sans" dir={dir}>
       {/* ------------------------------------------------ desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 bg-black text-zinc-300 shadow-[4px_0_24px_rgba(0,0,0,0.3)] z-20 border-e border-zinc-800 transition-[width] duration-200 ${
+        className={`hidden lg:flex flex-col shrink-0 bg-black text-zinc-300 shadow-lg z-20 border-e border-zinc-800 transition-[width] duration-200 ${
           collapsed ? 'w-[4.5rem]' : 'w-[13.5rem] xl:w-[15.5rem]'
         }`}
       >
@@ -325,7 +325,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                       collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
                     } ${
                       activeTab === item.id
-                        ? 'bg-[#708238] text-snow shadow-[0_4px_15px_rgba(112,130,56,0.3)]'
+                        ? 'bg-[#708238] text-snow'
                         : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
                     }`}
                   >

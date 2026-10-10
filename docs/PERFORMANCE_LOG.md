@@ -1556,3 +1556,38 @@ and follow the active language direction in chart tooltips. Those styles
 remain lazy and subject to the existing 7 KiB combined operations budget.
 Source and automated checks do not substitute for real-phone visual QA.
 Post-deployment lab results must establish any speed change.
+
+## 2026-10-10 — clay Phase 1, push 1.1: tokens, the shared components and Funding A (DECISIONS row 207)
+
+The «Layered clay» redesign's first push (the build plan's Phase 1, push 1.1): the per-theme clay
+primitives and the composite rule, the shadow and radius scales in `@theme`, the workbench light
+(`.lv-canvas`) on the two non-scrolling shells, clay on `lv-surface`/`lv-surface-raised`/`lv-choice`/
+`lv-button`/`lv-input` plus the new `lv-well`/`lv-chip`, glass made solid (`.material` lost its 18–24 px
+backdrop blur), and the funding that pays for it: 27 of the 28 one-off `shadow-[…]` sites became
+named utilities or nothing. Nothing was measured in the lab; these are the gate's figures.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (HEAD `a68790b9`, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 48,517 B (342,519 B raw) | **48,308 B** (337,421 B raw) | — |
+| CSS, public files (8) | 61,414 B | **61,205 B (−209 B)**; local headroom 235 B (≈ 225 B on CI, which builds ≈ 10 B larger) | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,216 B | 7,216 B (untouched) | 7.5 KB |
+| entry chunk / initial payload | — | 63.8 KB / 180.5 KB over 4 files | 72 KB / 200 KB |
+
+Where the bytes went (the plan's `measure-final.mjs` steps, re-run on this HEAD before building): tokens,
+primitives and composites +149 B; the theme's shadow and radius remap −100 B; glass to solid −136 B;
+the Tier-1 component classes, the canvas and the two accessibility blocks +358 B; Funding A
+(arbitrary shadows) −595 B in the plan's model. The real build lands at −209 B rather than the model's
+−282 B because the map's 28 sites are not exactly the model's 25 rules: the model also deleted three
+rules the plan keeps (the two printer-finder rings, whose escaped form its keep-pattern missed, and the
+`.ap` button's inset hairline in `adminProducts/theme.ts`, which is not on the map); the store page's
+back-arrow `drop-shadow-[…]` stays (legibility of a white arrow on a merchant's photograph, not
+decoration); and the replacements emit `shadow-2`, `shadow-dock`, `shadow-well` and
+`aria-selected:shadow-1` once each. `lv-chip` writes its
+own `@supports (color: color-mix(…))` so the fallback on an old WebView is the untinted raised fill
+(Tailwind's own fallback would have been a full-strength tone under tone-coloured text).
+
+Paint: every backdrop filter in `src/index.css` is gone (the 89 `backdrop-blur*` call sites in pages go in
+push 1.2); a resting card paints one blurred layer (12 px), a lifted one two, held by
+`tests/claySystem.test.ts`. The scroll trace on a ×4-throttled 360 × 800 phone (plan §8) is still owed.

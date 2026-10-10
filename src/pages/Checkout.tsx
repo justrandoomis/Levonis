@@ -3094,7 +3094,7 @@ export default function Checkout() {
             <div data-checkout-wallet className="mt-4 pt-4 border-t border-white/5 transition-all">
                 <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${walletSwitchOn ? 'bg-white text-black shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'bg-zinc-900 text-zinc-400'}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${walletSwitchOn ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-400'}`}>
                             <Wallet className="w-4 h-4" strokeWidth={1.5} />
                         </div>
                         <div className="min-w-0">

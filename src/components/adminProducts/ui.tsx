@@ -547,7 +547,7 @@ export function Modal({
         style={{ maxHeight: Math.max(240, viewport.height - 24) }}
         className={`${workspace ? 'ap-quick-workspace sm:max-w-[1180px]' : wide ? 'sm:max-w-5xl' : 'sm:max-w-2xl'}
           bg-[var(--ap-surface-1)] border border-[var(--ap-border-strong)] rounded-t-[24px] sm:rounded-[24px]
-          w-full min-w-0 overflow-hidden flex flex-col shadow-[0_32px_90px_-24px_rgb(0_0_0_/_0.85)] outline-none`}
+          w-full min-w-0 overflow-hidden flex flex-col shadow-2xl outline-none`}
       >
         <div className="px-4 sm:px-5 py-3.5 border-b border-[var(--ap-hairline)] flex items-center justify-between gap-3 shrink-0 bg-[var(--ap-surface-1)]">
           <h3 id={titleId} className="min-w-0">

@@ -66,7 +66,7 @@ export default function StoreCta() {
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className="px-4 sm:px-6 mb-10 max-w-lg mx-auto relative z-10"
     >
-      <div className="rounded-[24px] border border-white/10 bg-white/[0.03] backdrop-blur-2xl p-5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]">
+      <div className="rounded-[24px] border border-white/10 bg-white/[0.03] backdrop-blur-2xl p-5 shadow-lg">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-10 h-10 rounded-2xl bg-olive/30 border border-gold/20 flex items-center justify-center shrink-0">
             <Store className="w-5 h-5 text-gold" />

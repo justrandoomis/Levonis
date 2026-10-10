@@ -417,8 +417,8 @@ export default function Rewards() {
               <div className="relative right-2">
                 <div className="w-24 h-24 rounded-full relative z-10 transform -rotate-12">
                   <div className="absolute inset-0 rounded-full bg-[#6b5f3c] transform translate-x-[3px] translate-y-[4px]"></div>
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#BAA369] to-[#ffe55c] border-[4px] border-gold-light flex items-center justify-center shadow-[inset_-3px_-3px_12px_rgba(0,0,0,0.15)]">
-                    <div className="text-black drop-shadow-[1px_2px_2px_rgba(0,0,0,0.25)] relative top-[-1px]">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#BAA369] to-[#ffe55c] border-[4px] border-gold-light flex items-center justify-center shadow-well">
+                    <div className="text-black drop-shadow-md relative top-[-1px]">
                       <svg viewBox="0 0 24 24" fill="white" className="w-[44px] h-[44px] transform rotate-12">
                         <path d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z" />
                       </svg>
@@ -480,7 +480,7 @@ export default function Rewards() {
             {/* Check-in card */}
             <div className="relative mb-6 mx-1">
               <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-[28px] transform -rotate-[2deg] translate-y-1 -translate-x-1 shadow-sm"></div>
-              <div className="bg-black rounded-[24px] p-4 shadow-[0_8px_30px_rgba(0,0,0,0.06)] relative z-10">
+              <div className="bg-black rounded-[24px] p-4 shadow-sm relative z-10">
                 <div className="absolute top-5 bottom-5 left-2 flex flex-col justify-between opacity-50">
                   {[...Array(12)].map((_, i) => (
                     <div key={i} className="w-1.5 h-1.5 rounded-full bg-black/50 shadow-inner"></div>
@@ -510,7 +510,7 @@ export default function Rewards() {
                         key={d.day}
                         className={`flex flex-col items-center flex-shrink-0 relative ${
                           d.status === 'today'
-                            ? 'w-[48px] pb-1.5 border border-gold rounded-[14px] shadow-[0_4px_12px_rgba(186,163,105,0.15)] bg-zinc-800 transform -translate-y-1 overflow-hidden animate-day-pop'
+                            ? 'w-[48px] pb-1.5 border border-gold rounded-[14px] bg-zinc-800 transform -translate-y-1 overflow-hidden animate-day-pop'
                             : d.status === 'checked'
                               ? 'w-[42px] pt-1 pb-1.5 bg-gradient-to-b from-zinc-900 to-zinc-800 rounded-[14px]'
                               : 'w-[42px] pt-1 pb-1.5 bg-zinc-900 rounded-[14px]'

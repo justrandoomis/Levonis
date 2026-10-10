@@ -719,7 +719,7 @@ function AppContent() {
 
   if (isFullScreenRoute) {
     return (
-      <div className="h-[100dvh] min-h-0 flex flex-col font-sans overflow-hidden bg-canvas text-text-primary">
+      <div className="h-[100dvh] min-h-0 flex flex-col font-sans overflow-hidden lv-canvas text-text-primary">
         <MotionCharacterFallbackHeader />
         <main className="flex-1 flex overflow-hidden">
           {/* The same boundary as the storefront and main trees: a route chunk
@@ -880,14 +880,16 @@ function AppContent() {
   const productRoute = /^\/product\/[^/]+\/?$/.test(pathForShell);
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-hidden">
+    <div className="h-[100dvh] flex flex-col lv-canvas text-white font-sans overflow-hidden">
       <Header />
       {navHidden && !productRoute && <MotionCharacterFallbackHeader />}
-      {/* Single intentional background: uniform LEVONIS black (matches
-          html/body/#root in index.css). The previous diagonal gradient into
-          olive-green (hex 1a210e) painted an unintended glow in the bottom
-          corner near the nav — removed at the source, not covered up. */}
-      <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto bg-black">
+      {/* One intentional background: the page's canvas with the clay
+          workbench light (`.lv-canvas`, src/index.css), painted on this
+          NON-scrolling shell. The scroller below is transparent so the light
+          shows through it and never moves or repaints with the scroll. The
+          old diagonal gradient into olive-green (hex 1a210e) painted an
+          unintended glow near the nav and is not coming back. */}
+      <main id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto">
         <EmailVerifyBanner />
         {/* The first run, each once and in this order (src/lib/firstRun.ts):
             «أكمل ملفك الشخصي» right after the account is created, then

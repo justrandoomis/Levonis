@@ -210,7 +210,7 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
             onClick={() => choose(v)}
             data-warranty-view={v}
             className={`min-h-[40px] px-4 rounded-[7px] text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] ${
-              view === v ? 'bg-[var(--ap-surface-4)] text-[var(--ap-text-1)] shadow-[0_1px_2px_rgb(0_0_0_/_0.25)]' : 'text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
+              view === v ? 'bg-[var(--ap-surface-4)] text-[var(--ap-text-1)] shadow-1' : 'text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
             }`}
           >
             {v === 'receipts'

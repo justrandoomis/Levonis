@@ -127,11 +127,55 @@ test('the bars are clean on the light theme: no black scrim, no black shadow, no
   assert.match(css, /\[data-theme='light'\] \[data-nav-scrim\] \{/);
   assert.match(css, /\[data-theme='light'\] \.scroll-edge::after,/);
   assert.match(read('src/components/Header.tsx'), /lv-topbar-solid/);
-  // Tailwind's black shadows take a theme colour; dark keeps Tailwind's own.
-  assert.match(css, /\.shadow-2xl \{\s*--tw-shadow-color: var\(--lv-shadow-deep, #00000040\);/);
+  // NO BLACK SHADOW ON CREAM, for every shadow utility at once (clay,
+  // docs/DECISIONS.md row 207). It used to be pinned by giving Tailwind's
+  // black `--tw-shadow-color` a warm value on five utilities; now each shadow
+  // name IS a clay composite whose colours are per-theme primitives.
+  // (a) The shadow scale is clay: Tailwind's names map onto the composites.
+  assert.match(css, /--shadow-sm:\s*var\(--clay-1\);/, '@theme --shadow-sm is clay level 1');
+  assert.match(css, /--shadow-2xl:\s*var\(--clay-3\);/, '@theme --shadow-2xl is the clay slab');
+  // (b) Every light clay colour is the warm ink or a cream white, never black.
   const block = buildBlock();
-  assert.match(block, /\[data-theme='light'\]\{[^}]*--lv-shadow-soft:rgb\(58 46 28\/\.07\)/);
-  assert.match(block, /\[data-theme='dark'\],\[data-store-theme\]\{[^}]*--lv-shadow-soft:#0000001a;--lv-shadow-deep:#00000040/);
+  const light = block.slice(block.indexOf("[data-theme='light']"), block.indexOf("[data-theme='dark']"));
+  const dark = block.slice(block.indexOf("[data-theme='dark']"));
+  const clay = (part: string) => Object.fromEntries([...part.matchAll(/--clay-([a-z-]+):([^;}]+)/g)].map((m) => [m[1], m[2]]));
+  const lightClay = clay(light);
+  const darkClay = clay(dark);
+  assert.ok(Object.keys(lightClay).length >= 9, 'the light clay primitives are missing from the generated block');
+  for (const [name, v] of Object.entries(lightClay)) {
+    assert.doesNotMatch(v, /\b0 0 0\b|#000\b|#000000/i, `light --clay-${name} (${v}) is black on cream`);
+    const rgb = v.match(/^rgb\((\d+) (\d+) (\d+)\//);
+    if (rgb) {
+      const [r, g, b] = rgb.slice(1).map(Number);
+      const warmInk = r === 58 && g === 46 && b === 28;
+      const creamWhite = r === 255 && g >= 245 && b >= 230 && g >= b;
+      assert.ok(warmInk || creamWhite, `light --clay-${name} (${v}) is neither the warm ink nor a cream white`);
+    } else {
+      // A fill or a line written as hex: warm (red ≥ green ≥ blue), never grey-black.
+      const [r, g, b] = parseColor(v);
+      assert.ok(r >= g && g >= b && r > 0.3, `light --clay-${name} (${v}) is not a warm cream tone`);
+    }
+  }
+  // (c) The dark casts are black: the dark theme keeps a black page's shadows.
+  for (const name of ['base', 'contact', 'ambient', 'deep', 'sink']) {
+    assert.match(darkClay[name] ?? '', /^rgb\(0 0 0\/[.\d]+\)$/, `dark --clay-${name} is not a black cast`);
+  }
+  // (d) The text-entry line reads at 3:1 on every light ground it meets.
+  const field = parseColor(lightClay.field);
+  for (const [ground, hex] of [['IVORY', IVORY], ['PAPER', PAPER], ['the well', lightClay['well-bg']], ['surface-selected', lightValue('surface-selected')]]) {
+    const c = contrast(field, parseColor(hex));
+    assert.ok(c >= 3, `light --clay-field on ${ground} (${hex}) reads ${c.toFixed(2)}:1, under 3`);
+  }
+  // (e) The workbench light stays cream, and under a card: its peak (the wash
+  // composited on the page) is lower than PAPER and nowhere near white.
+  const wash = lightClay.wash.match(/^rgb\((\d+) (\d+) (\d+)\/([.\d]+)\)$/);
+  assert.ok(wash, `light --clay-wash (${lightClay.wash}) is not rgb(r g b/a)`);
+  const [wr, wg, wb, wa] = wash!.slice(1).map(Number);
+  const page = parseColor(IVORY);
+  const peak = [wr / 255, wg / 255, wb / 255].map((c, i) => c * wa + page[i] * (1 - wa)) as [number, number, number];
+  const peakL = rgbToOklch(peak)[0];
+  assert.ok(peakL < L(PAPER), `the wash peak (L ${peakL.toFixed(3)}) is not under a card (PAPER L ${L(PAPER).toFixed(3)})`);
+  assert.ok(peakL < 0.97, `the wash peak (L ${peakL.toFixed(3)}) is near-white`);
   // No page paints its glass black whatever the theme.
   const community = read('src/pages/Community.tsx');
   assert.doesNotMatch(community, /--material-tint:#000/, 'the community bars were a black strip on ivory');

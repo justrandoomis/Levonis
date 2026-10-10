@@ -203,10 +203,15 @@ html {
   --color-olive-light: #2B3318;
   --color-gold: #BAA369;
   --color-gold-light: #ffe55c;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
+  /* THE CLAY RADII, by role (docs/DECISIONS.md row 207). Nested corners step
+     down by the inset (a 22px card holds an 18px tray at 4px). `rounded`
+     (4px) and `rounded-full` stay literal. */
+  --radius-sm: 0.625rem;   /* 10px  compact controls, thumbnails ≤ 40px, menu items, photo chips */
+  --radius-md: 0.875rem;   /* 14px  CONTROLS: lv-button, lv-input, lv-choice, popover items */
+  --radius-lg: 1.125rem;   /* 18px  inner panels, popovers and menus, photo trays, Segmented thumb */
+  --radius-xl: 1.375rem;   /* 22px  CARDS: lv-surface, Card, KpiTile, product card, toasts, table trays */
+  --radius-2xl: 1.5rem;    /* 24px  dialogs, bottom-nav pods, hero and feature frames (Tailwind's was 16, under xl) */
+  --radius-3xl: 2rem;      /* 32px  bottom-sheet top corners */
   --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
   /* Tailwind v4's preflight sets the <html> font to var(--default-font-family,
      <system stack>) — defining --font-sans alone only creates the `font-sans`
@@ -228,8 +233,17 @@ html {
    A TYPE SCALE FOR NEW CODE: `text-ui-2xs … text-ui-xl` = 11/12/13/15/17/20px
    with the leading Cairo needs. Namespaced `ui-` because Tailwind's own
    `text-sm`/`text-base` are 14/16px and 3,440 call sites depend on them —
-   nothing existing is resized. Three elevations, `shadow-1/2/3`: resting
-   tile, floating menu, window.
+   nothing existing is resized.
+
+   EVERY SHADOW IS CLAY (docs/DECISIONS.md row 207). Each Tailwind shadow name
+   is one level of the clay grammar (CLAY ELEVATION, after the theme tokens):
+   `shadow-xs` flush, `shadow-sm`/`md` resting, `shadow-lg`/`xl` lifted,
+   `shadow-2xl` a slab, `shadow-inner`/`shadow-well` sunk, `shadow-press` held,
+   `shadow-dock` a bottom sheet or sticky bar; `shadow-1/2/3` (lift, menu,
+   window) keep their names. The value is a bare var(), so Tailwind writes it
+   into `--tw-shadow` and `ring-*` still composes; it also means a colour
+   modifier (`shadow-gold/20`) no longer tints it. Never write
+   `shadow-[var(--shadow-N)]` in a class: use the named utility.
 
    These live in @theme, and Tailwind 4 emits a theme variable only when
    something uses it, so an unused token costs the storefront nothing.
@@ -237,9 +251,20 @@ html {
 @theme {
   --color-accent: var(--color-gold);
   --color-accent-contrast: #101114;
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.35);
-  --shadow-2: 0 12px 32px -16px rgb(0 0 0 / 0.8);
-  --shadow-3: 0 28px 70px -28px rgb(0 0 0 / 0.9);
+  --shadow-1: var(--clay-lift);
+  --shadow-2: var(--clay-2);
+  --shadow-3: var(--clay-3);
+  --shadow-2xs: var(--clay-0);
+  --shadow-xs: var(--clay-0);
+  --shadow-sm: var(--clay-1);
+  --shadow-md: var(--clay-1);
+  --shadow-lg: var(--clay-2);
+  --shadow-xl: var(--clay-2);
+  --shadow-2xl: var(--clay-3);
+  --shadow-inner: var(--clay-well);
+  --shadow-press: var(--clay-press);
+  --shadow-well: var(--clay-well);
+  --shadow-dock: var(--clay-dock);
   --text-ui-2xs: 0.6875rem;
   --text-ui-2xs--line-height: 1rem;
   --text-ui-xs: 0.75rem;
@@ -270,6 +295,9 @@ html {
   --duration-press: 100ms;
   --duration-quick: 150ms;
   --duration-ui: 250ms;
+  /* Release and settle: a clay control coming back up (already the
+     lv-choice-mark curve). */
+  --ease-clay: cubic-bezier(0.2, 0.8, 0.2, 1);
   --shell-bottom-inset: 0px;
 }
 
@@ -333,17 +361,24 @@ html {
    clarifies an interactive boundary. Gold is a small brand cue, not a fill.
    --------------------------------------------------------------------------- */
 @layer components {
+  /* A CARD IS RESTING CLAY (level 1): a lit rim, a shaded base and one soft
+     cast. The shadow is written into `--tw-shadow` so a `ring-*` utility on
+     the same card composes with it, and `shadow-none` demotes a nested card. */
   .lv-surface {
     background-color: var(--color-surface);
     border: 1px solid color-mix(in oklab, var(--color-border-subtle) 78%, transparent);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-xl);
+    --tw-shadow: var(--clay-1);
+    box-shadow: var(--tw-shadow);
   }
 
+  /* The one focal card of a screen (level 2): a step lighter and higher. */
   .lv-surface-raised {
     background-color: var(--color-surface-raised);
     border: 1px solid color-mix(in oklab, var(--color-border-subtle) 82%, transparent);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 16px 42px -30px rgb(var(--lv-shadow-ink, 0 0 0) / var(--lv-shadow-strength, 0.9));
+    border-radius: var(--radius-xl);
+    --tw-shadow: var(--clay-2);
+    box-shadow: var(--tw-shadow);
   }
 
   .lv-section {
@@ -374,8 +409,10 @@ html {
     background-color: var(--color-surface);
     border: 1px solid color-mix(in oklab, var(--color-border-subtle) 82%, transparent);
     border-radius: var(--radius-md);
+    /* Flush at rest (the rim alone): a row of options stays quiet. */
+    box-shadow: var(--clay-0);
     transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease,
-      box-shadow 150ms ease;
+      box-shadow 100ms ease;
   }
 
   .lv-choice:hover:not(:disabled):not([aria-disabled='true']) {
@@ -383,19 +420,22 @@ html {
     background-color: color-mix(in oklab, var(--color-surface-raised) 92%, var(--color-white) 8%);
   }
 
+  /* SELECTION IS A PRESS (docs/DECISIONS.md row 207): the option sinks into
+     the selected fill, plus ONE secondary cue — the 2px gold start bar (and
+     the lv-choice-mark where the option has one). No border swap, no gold
+     fill; the gold ring is keyboard focus only. */
   .lv-choice[aria-pressed='true'],
   .lv-choice[aria-checked='true'],
   .lv-choice[data-selected='true'] {
     color: var(--color-text-primary);
     background-color: var(--color-surface-selected);
-    border-color: color-mix(in oklab, var(--color-text-muted) 55%, transparent);
-    box-shadow: inset 2px 0 0 var(--color-gold);
+    box-shadow: inset 2px 0 0 var(--color-gold), var(--clay-press);
   }
 
   [dir='rtl'] .lv-choice[aria-pressed='true'],
   [dir='rtl'] .lv-choice[aria-checked='true'],
   [dir='rtl'] .lv-choice[data-selected='true'] {
-    box-shadow: inset -2px 0 0 var(--color-gold);
+    box-shadow: inset -2px 0 0 var(--color-gold), var(--clay-press);
   }
 
   /* Keyboard focus on a CHOSEN option. The start-edge bar above is a
@@ -440,8 +480,12 @@ html {
     font-size: 0.875rem;
     font-weight: 700;
     line-height: 1.25;
+    /* Raised clay you can press: resting level 1, dented while held. In
+       `--tw-shadow`, so a ring utility composes and a shadow utility wins. */
+    --tw-shadow: var(--clay-1);
+    box-shadow: var(--tw-shadow);
     transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease,
-      opacity 150ms ease;
+      opacity 150ms ease, box-shadow 150ms var(--ease-clay), transform 150ms var(--ease-clay);
   }
 
   /*
@@ -462,10 +506,14 @@ html {
     outline-offset: 2px;
   }
 
+  /* Its own rim and base, one rule for both themes: the rim reads on the
+     light theme's ink fill, the base lip on the dark theme's cream fill. */
   .lv-button-primary {
     color: var(--color-canvas);
     background-color: var(--color-primary-fill);
     border: 1px solid transparent;
+    --tw-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), inset 0 -2px 0 rgb(0 0 0 / 0.22),
+      0 4px 12px -6px var(--clay-ambient);
   }
 
   .lv-button-primary:hover:not(:disabled) {
@@ -478,10 +526,12 @@ html {
     border: 1px solid var(--color-border-subtle);
   }
 
+  /* Flat: a ghost dents its parent only while it is held. */
   .lv-button-ghost {
     color: var(--color-text-secondary);
     background-color: transparent;
     border: 1px solid transparent;
+    --tw-shadow: 0 0 #0000;
   }
 
   .lv-button-danger {
@@ -512,15 +562,13 @@ html {
     system uses for premium and for a selected state, so this is not a fifth
     accent — it is the existing one, applied at the low intensity §7 asks for:
     a tinted surface and accent text, NOT border + fill + glow together.
+    The tint is 10% into the raised fill (4.84:1 for the light label) and it
+    has no hover tint: a deeper one took the label under 4.5:1 on cream.
   */
   .lv-button-accent {
     color: var(--color-gold);
-    background-color: color-mix(in oklab, var(--color-gold) 12%, var(--color-surface));
+    background-color: color-mix(in oklab, var(--color-gold) 10%, var(--color-surface-raised));
     border: 1px solid color-mix(in oklab, var(--color-gold) 32%, transparent);
-  }
-
-  .lv-button-accent:hover:not(:disabled) {
-    background-color: color-mix(in oklab, var(--color-gold) 20%, var(--color-surface));
   }
 
   .lv-button-danger:hover:not(:disabled) {
@@ -535,14 +583,44 @@ html {
   .lv-button[aria-disabled='true'] {
     opacity: 0.45;
     cursor: not-allowed;
+    --tw-shadow: 0 0 #0000;
   }
 
+  /* BUSY HOLDS THE PRESS, AT FULL OPACITY (ui/Button sets aria-busy,
+     aria-disabled and data-busy): the spinner and the loading label say why,
+     and a busy button is not drawn as a disabled one. After the disabled rule
+     on purpose — equal specificity, so this one wins. */
+  .lv-button[data-busy] {
+    opacity: 1;
+    cursor: progress;
+    --tw-shadow: var(--clay-press);
+    transform: translateY(1px);
+  }
+
+  /* THE PRESS IS A DENT. It replaces the base layer's 0.72 dim on these
+     buttons (the components layer outranks base); under reduced motion the
+     unlayered rule still dims and drops the 1px travel, and the dent stays. */
+  .lv-button:not(:disabled):not([aria-disabled='true']):active {
+    opacity: 1;
+    --tw-shadow: var(--clay-press);
+    transform: translateY(1px);
+    transition-duration: var(--duration-press);
+  }
+
+  .lv-button-ghost:not(:disabled):active {
+    background-color: var(--clay-well-bg);
+  }
+
+  /* A TEXT FIELD IS A WELL: sunk into the surface, with a boundary that reads
+     at 3:1 (the old border-subtle hairline measured about 1.35:1, under WCAG
+     1.4.11). Focus keeps the well and adds the halo. */
   .lv-input {
     inline-size: 100%;
     min-block-size: 46px;
     color: var(--color-text-primary);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border-subtle);
+    background-color: var(--clay-well-bg);
+    border: 1px solid var(--clay-field);
+    box-shadow: var(--clay-well);
     border-radius: var(--radius-md);
     padding-inline: 0.875rem;
     outline: none;
@@ -553,10 +631,17 @@ html {
     color: var(--color-text-muted);
   }
 
+  /* Read-only is a value on the surface, not a well. Before the focus rule
+     (equal specificity), so a focused read-only field still shows focus. */
+  .lv-input[readonly] {
+    background-color: var(--color-surface);
+    border-color: var(--color-border-subtle);
+    box-shadow: none;
+  }
+
   .lv-input:focus-visible {
     border-color: var(--color-focus);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus) 22%, transparent);
-    background-color: var(--color-surface-raised);
+    box-shadow: var(--clay-well), 0 0 0 3px color-mix(in oklab, var(--color-focus) 22%, transparent);
   }
 
   .lv-input[aria-invalid='true'] {
@@ -581,6 +666,34 @@ html {
   .lv-alert-warning { --alert-color: var(--color-warning); }
   .lv-alert-danger { --alert-color: var(--color-danger); }
   .lv-alert-info { --alert-color: var(--color-info); }
+
+  /* A WELL: anything sunk into its parent — a search field, a Segmented
+     track, a Switch's off track, a quantity stepper, a read-out box. Never
+     for something you tap to act. */
+  .lv-well {
+    background-color: var(--clay-well-bg);
+    --tw-shadow: var(--clay-well);
+    box-shadow: var(--tw-shadow);
+  }
+
+  /* A STATUS CHIP IS INFORMATION: flat and opaque. `--chip` is the tone
+     (`[--chip:var(--color-success)]`), `--chip-ink` an optional darker ink.
+     The 12% mix into the raised fill reads at 4.55:1 or better in both
+     themes, where a translucent `bg-<tone>/10` measured about 4.1 on cream.
+     The @supports is written out on purpose: left to itself, Tailwind's
+     color-mix fallback for a var() it cannot resolve is the FIRST colour —
+     a full-strength `--chip` fill under `--chip` ink, i.e. no text at all on
+     a WebView without color-mix. Written this way the fallback is the
+     untinted raised fill, which reads. */
+  .lv-chip {
+    color: var(--chip-ink, var(--chip));
+    background-color: var(--color-surface-raised);
+  }
+  @supports (color: color-mix(in lab, red, red)) {
+    .lv-chip {
+      background-color: color-mix(in oklab, var(--chip) 12%, var(--color-surface-raised));
+    }
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -709,38 +822,22 @@ html {
 }
 
 /* ---------------------------------------------------------------------------
-   MATERIALS — translucent chrome, and what it becomes when a viewer asks for
-   less of it.
-   
-   `.material` marks a surface that is deliberately glass: a floating bar, a
-   sheet, a menu. Marking them is what makes the two accessibility settings
-   below implementable at all — `prefers-reduced-transparency` has to raise the
-   background and drop the blur, and it can only do that on surfaces that say
-   which colour they should become when they stop being glass.
+   MATERIALS — the chrome that floats: bars, sheets, menus.
+
+   SOLID CLAY, NOT GLASS (docs/DECISIONS.md row 207). These were translucent
+   with an 18–24px backdrop blur, re-rastered under every scrolling frame on
+   the mid-range Android phones most customers use. A floating surface is now
+   opaque: `--material-tint` (default the raised fill) and, on the thick one,
+   the dock shadow of a bottom sheet. The class stays as the one hook a bar or
+   sheet carries, so the light theme and the contrast setting below can still
+   find them.
    --------------------------------------------------------------------------- */
-/* THE FILTER IS ONE VARIABLE, NOT A VARIABLE INSIDE A FILTER FUNCTION, AND THE
-   STANDARD PROPERTY IS DECLARED ALONE. Written the obvious way — the standard
-   and `-webkit-` properties side by side, each `blur(var(--material-blur))` —
-   Lightning CSS (Tailwind v4's minifier) decides it owns prefixing, collapses
-   the pair, and here kept the `-webkit-` alias while DROPPING the standard
-   one. Chromium reads the standard property, so every glass surface in the app
-   shipped completely flat: `.material{-webkit-backdrop-filter:...}` was the
-   whole rule in the built stylesheet. A var() standing as the ENTIRE value is
-   passed through untouched, and declaring only the standard property lets
-   Lightning add whatever prefix the browser targets actually need. */
 .material {
-  background-color: color-mix(in oklab, var(--material-tint, var(--color-surface-raised)) var(--material-opacity, 90%), transparent);
-  backdrop-filter: var(--material-filter, blur(18px) saturate(125%));
+  background-color: var(--material-tint, var(--color-surface-raised));
 }
-/* Bigger surfaces read THICKER: more blur, deeper shadow. A sheet is not a chip. */
+/* Bigger surfaces sit higher: a sheet casts upward onto the page. */
 .material-thick {
-  --material-filter: blur(24px) saturate(125%);
-  --material-opacity: 97%;
-  box-shadow: 0 -18px 48px -22px rgb(var(--lv-shadow-ink, 0 0 0) / 0.78);
-}
-.material-thin {
-  --material-filter: blur(12px) saturate(120%);
-  --material-opacity: 94%;
+  box-shadow: var(--clay-dock);
 }
 
 /* SCROLL EDGE, NOT A DIVIDER. A 1px border under floating chrome is a line the
@@ -763,8 +860,8 @@ html {
 }
 
 /* ---------------------------------------------------------------------------
-   ACCESSIBILITY PREFERENCES — three independent signals, all three answered.
-   
+   ACCESSIBILITY PREFERENCES — four independent signals, all four answered.
+
    Reduced motion does NOT mean no feedback: the press dim, the colour changes
    and the opacity cross-fades all stay, because they are what tells a person
    their tap registered. What goes is travel — slides, springs, parallax and
@@ -792,12 +889,6 @@ html {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .material,
-  .material-thick,
-  .material-thin {
-    --material-opacity: 100%;
-    backdrop-filter: none;
-  }
   .scroll-edge::after,
   .scroll-edge-up::after {
     display: none;
@@ -808,9 +899,30 @@ html {
   .material,
   .material-thick,
   .material-thin {
-    --material-opacity: 100%;
-    backdrop-filter: none;
     border-color: color-mix(in srgb, var(--color-white) 55%, transparent);
+  }
+  /* Clay edges are shadows; asked for more contrast, every raised or sunk
+     surface also draws the 3:1 field line. */
+  .lv-surface,
+  .lv-surface-raised,
+  .lv-choice,
+  .lv-button-secondary,
+  .lv-well {
+    border-color: var(--clay-field);
+  }
+}
+
+/* FORCED COLOURS DROP EVERY BOX-SHADOW, and with them the clay selection
+   (a press) and the ring-only focus styles. Selection gets a Highlight
+   outline; focus an outline in the system ink. */
+@media (forced-colors: active) {
+  .lv-choice:is([aria-pressed='true'], [aria-checked='true'], [data-selected='true']),
+  [aria-current='page'][data-clay-dimple] {
+    border-color: Highlight;
+    outline: 1px solid Highlight;
+  }
+  :focus-visible {
+    outline: 2px solid CanvasText;
   }
 }
 
@@ -1448,9 +1560,53 @@ html.lv-lang-vt[data-lang-flow='to-rtl']::view-transition-new(root) { animation-
 }
 
 /* THEME TOKENS:BEGIN — generated by scripts/theme-tokens.mjs --write; do not edit by hand */
-[data-theme='light']{color-scheme:light;--color-black:#e3dacb;--color-white:#16181b;--color-canvas:#e3dacb;--color-surface:#ebe4d6;--color-surface-raised:#f0eadf;--color-surface-selected:#d8cfbd;--color-border-subtle:#cfc5b2;--color-text-primary:#16181b;--color-text-secondary:#45484e;--color-text-muted:#595c62;--color-success:#1a6a43;--color-warning:#87520a;--color-danger:#ad3037;--color-info:#2d5f9a;--color-focus:#6f592b;--color-gold:#6f592b;--color-gold-light:#735800;--color-primary-fill:#16181b;--color-primary-fill-hover:#2a2c30;--color-danger-ink:#8f2328;--color-error-ink:#ad3037;--color-accent:#6f592b;--color-accent-contrast:#ebe4d6;--color-gilt:#7b5800;--color-iris:#5a4fb7;--color-iris-deep:#5a38e6;--color-mint:#006d37;--color-crimson:#ae3041;--color-honey:#815500;--color-coral:#ac2f46;--color-leaf:#1e6d00;--color-moss:#546517;--color-blush:#964355;--color-sage:#586237;--color-scarlet:#ad3036;--color-apricot:#8a5100;--color-sprout:#2f6c18;--color-aqua:#006d43;--color-flame:#ab3609;--color-petal:#7f5159;--color-wheat:#795900;--color-zinc-50:#16181b;--color-zinc-100:#1f2124;--color-zinc-200:#2a2c30;--color-zinc-300:#3a3d42;--color-zinc-400:#505359;--color-zinc-500:#55585e;--color-zinc-600:#55585e;--color-zinc-700:#cdc4b3;--color-zinc-800:#e2dbcd;--color-zinc-900:#ebe4d6;--color-zinc-950:#e7e0d3;--color-gray-300:#3a3d42;--color-gray-400:#505359;--color-slate-200:#2a2c30;--color-slate-300:#3a3d42;--color-slate-400:#505359;--color-slate-500:#55585e;--color-slate-900:#ebe4d6;--color-red-100:oklch(44.4% 0.177 26.899);--color-red-200:oklch(44.4% 0.177 26.899);--color-red-300:oklch(50.5% 0.213 27.518);--color-red-400:oklch(50.5% 0.213 27.518);--color-red-500:oklch(50.5% 0.213 27.518);--color-red-600:oklch(50.5% 0.213 27.518);--color-red-900:oklch(93.6% 0.032 17.717);--color-red-950:oklch(97.1% 0.013 17.38);--color-orange-300:oklch(47% 0.157 37.304);--color-orange-400:oklch(47% 0.157 37.304);--color-orange-500:oklch(47% 0.157 37.304);--color-orange-900:oklch(95.4% 0.038 75.164);--color-amber-100:oklch(41.4% 0.112 45.904);--color-amber-200:oklch(41.4% 0.112 45.904);--color-amber-300:oklch(47.3% 0.137 46.201);--color-amber-400:oklch(47.3% 0.137 46.201);--color-amber-500:oklch(47.3% 0.137 46.201);--color-amber-600:oklch(47.3% 0.137 46.201);--color-amber-900:oklch(96.2% 0.059 95.617);--color-amber-950:oklch(98.7% 0.022 95.277);--color-yellow-200:oklch(42.1% 0.095 57.708);--color-yellow-300:oklch(47.6% 0.114 61.907);--color-yellow-400:oklch(47.6% 0.114 61.907);--color-yellow-500:oklch(47.6% 0.114 61.907);--color-yellow-600:oklch(47.6% 0.114 61.907);--color-yellow-900:oklch(97.3% 0.071 103.193);--color-lime-500:oklch(45.3% 0.124 130.933);--color-green-400:oklch(44.8% 0.119 151.328);--color-green-500:oklch(44.8% 0.119 151.328);--color-green-600:oklch(44.8% 0.119 151.328);--color-green-700:oklch(44.8% 0.119 151.328);--color-emerald-100:oklch(37.8% 0.077 168.94);--color-emerald-200:oklch(37.8% 0.077 168.94);--color-emerald-300:oklch(43.2% 0.095 166.913);--color-emerald-400:oklch(43.2% 0.095 166.913);--color-emerald-500:oklch(43.2% 0.095 166.913);--color-emerald-600:oklch(43.2% 0.095 166.913);--color-emerald-700:oklch(43.2% 0.095 166.913);--color-emerald-900:oklch(95% 0.052 163.051);--color-emerald-950:oklch(97.9% 0.021 166.113);--color-teal-200:oklch(38.6% 0.063 188.416);--color-teal-300:oklch(43.7% 0.078 188.216);--color-teal-400:oklch(43.7% 0.078 188.216);--color-teal-500:oklch(43.7% 0.078 188.216);--color-teal-950:oklch(98.4% 0.014 180.72);--color-cyan-300:oklch(45% 0.085 224.283);--color-cyan-500:oklch(45% 0.085 224.283);--color-sky-200:oklch(39.1% 0.09 240.876);--color-sky-300:oklch(44.3% 0.11 240.79);--color-sky-400:oklch(44.3% 0.11 240.79);--color-sky-500:oklch(44.3% 0.11 240.79);--color-sky-900:oklch(95.1% 0.026 236.824);--color-blue-300:oklch(48.8% 0.243 264.376);--color-blue-400:oklch(48.8% 0.243 264.376);--color-blue-500:oklch(48.8% 0.243 264.376);--color-blue-600:oklch(48.8% 0.243 264.376);--color-blue-700:oklch(48.8% 0.243 264.376);--color-indigo-300:oklch(51.1% 0.262 276.966);--color-indigo-500:oklch(51.1% 0.262 276.966);--color-violet-200:oklch(43.2% 0.232 292.759);--color-violet-300:oklch(49.1% 0.27 292.581);--color-violet-400:oklch(49.1% 0.27 292.581);--color-violet-500:oklch(49.1% 0.27 292.581);--color-violet-700:oklch(49.1% 0.27 292.581);--color-violet-950:oklch(96.9% 0.016 293.756);--color-purple-200:oklch(43.8% 0.218 303.724);--color-purple-300:oklch(49.6% 0.265 301.924);--color-purple-400:oklch(49.6% 0.265 301.924);--color-purple-500:oklch(49.6% 0.265 301.924);--color-purple-900:oklch(94.6% 0.033 307.174);--color-purple-950:oklch(97.7% 0.014 308.299);--color-fuchsia-500:oklch(45.2% 0.211 324.591);--color-pink-400:oklch(45.9% 0.187 3.815);--color-rose-200:oklch(41% 0.159 10.272);--color-rose-300:oklch(45.5% 0.188 13.697);--color-rose-400:oklch(45.5% 0.188 13.697);--color-rose-500:oklch(45.5% 0.188 13.697);--color-rose-600:oklch(45.5% 0.188 13.697);--shadow-1:0 1px 2px rgb(58 46 28/.07);--shadow-2:0 12px 32px -16px rgb(58 46 28/.2);--shadow-3:0 28px 70px -28px rgb(58 46 28/.26);--lv-shadow-ink:58 46 28;--lv-shadow-strength:.12;--lv-shadow-soft:rgb(58 46 28/.07);--lv-shadow-deep:rgb(58 46 28/.14)}
-[data-theme='dark'],[data-store-theme]{color-scheme:dark;--color-black:#0b0c0f;--color-white:#f2f3f5;--color-canvas:#0b0c0f;--color-surface:#131519;--color-surface-raised:#191c21;--color-surface-selected:#20242a;--color-border-subtle:#2a2e35;--color-text-primary:#f2f3f5;--color-text-secondary:#b7bbc3;--color-text-muted:#858b95;--color-success:#42b77a;--color-warning:#d79b45;--color-danger:#dc6363;--color-info:#6f9bd1;--color-focus:#d2c392;--color-gold:#BAA369;--color-gold-light:#ffe55c;--color-primary-fill:#ece8dc;--color-primary-fill-hover:#fffaf0;--color-danger-ink:#ffdada;--color-error-ink:#f2a4a4;--color-accent:#BAA369;--color-accent-contrast:#101114;--color-gilt:#D4AF37;--color-iris:#6B46FF;--color-iris-deep:#5A38E6;--color-mint:#2CE59B;--color-crimson:#B03142;--color-honey:#E4B363;--color-coral:#E06070;--color-leaf:#59A846;--color-moss:#708238;--color-blush:#E4899A;--color-sage:#A6B283;--color-scarlet:#EF233C;--color-apricot:#E6A84F;--color-sprout:#8FD07C;--color-aqua:#06D6A0;--color-flame:#FF5000;--color-petal:#F3BDC5;--color-wheat:#E6C27A;--color-zinc-50:oklch(98.5% 0 none);--color-zinc-100:oklch(96.7% 0.001 286.375);--color-zinc-200:oklch(92% 0.004 286.32);--color-zinc-300:oklch(87.1% 0.006 286.286);--color-zinc-400:oklch(70.5% 0.015 286.067);--color-zinc-500:oklch(55.2% 0.016 285.938);--color-zinc-600:oklch(44.2% 0.017 285.786);--color-zinc-700:oklch(37% 0.013 285.805);--color-zinc-800:oklch(27.4% 0.006 286.033);--color-zinc-900:oklch(21% 0.006 285.885);--color-zinc-950:oklch(14.1% 0.005 285.823);--color-gray-300:oklch(87.2% 0.01 258.338);--color-gray-400:oklch(70.7% 0.022 261.325);--color-slate-200:oklch(92.9% 0.013 255.508);--color-slate-300:oklch(86.9% 0.022 252.894);--color-slate-400:oklch(70.4% 0.04 256.788);--color-slate-500:oklch(55.4% 0.046 257.417);--color-slate-900:oklch(20.8% 0.042 265.755);--color-red-100:oklch(93.6% 0.032 17.717);--color-red-200:oklch(88.5% 0.062 18.334);--color-red-300:oklch(80.8% 0.114 19.571);--color-red-400:oklch(70.4% 0.191 22.216);--color-red-500:oklch(63.7% 0.237 25.331);--color-red-600:oklch(57.7% 0.245 27.325);--color-red-900:oklch(39.6% 0.141 25.723);--color-red-950:oklch(25.8% 0.092 26.042);--color-orange-300:oklch(83.7% 0.128 66.29);--color-orange-400:oklch(75% 0.183 55.934);--color-orange-500:oklch(70.5% 0.213 47.604);--color-orange-900:oklch(40.8% 0.123 38.172);--color-amber-100:oklch(96.2% 0.059 95.617);--color-amber-200:oklch(92.4% 0.12 95.746);--color-amber-300:oklch(87.9% 0.169 91.605);--color-amber-400:oklch(82.8% 0.189 84.429);--color-amber-500:oklch(76.9% 0.188 70.08);--color-amber-600:oklch(66.6% 0.179 58.318);--color-amber-900:oklch(41.4% 0.112 45.904);--color-amber-950:oklch(27.9% 0.077 45.635);--color-yellow-200:oklch(94.5% 0.129 101.54);--color-yellow-300:oklch(90.5% 0.182 98.111);--color-yellow-400:oklch(85.2% 0.199 91.936);--color-yellow-500:oklch(79.5% 0.184 86.047);--color-yellow-600:oklch(68.1% 0.162 75.834);--color-yellow-900:oklch(42.1% 0.095 57.708);--color-lime-500:oklch(76.8% 0.233 130.85);--color-green-400:oklch(79.2% 0.209 151.711);--color-green-500:oklch(72.3% 0.219 149.579);--color-green-600:oklch(62.7% 0.194 149.214);--color-green-700:oklch(52.7% 0.154 150.069);--color-emerald-100:oklch(95% 0.052 163.051);--color-emerald-200:oklch(90.5% 0.093 164.15);--color-emerald-300:oklch(84.5% 0.143 164.978);--color-emerald-400:oklch(76.5% 0.177 163.223);--color-emerald-500:oklch(69.6% 0.17 162.48);--color-emerald-600:oklch(59.6% 0.145 163.225);--color-emerald-700:oklch(50.8% 0.118 165.612);--color-emerald-900:oklch(37.8% 0.077 168.94);--color-emerald-950:oklch(26.2% 0.051 172.552);--color-teal-200:oklch(91% 0.096 180.426);--color-teal-300:oklch(85.5% 0.138 181.071);--color-teal-400:oklch(77.7% 0.152 181.912);--color-teal-500:oklch(70.4% 0.14 182.503);--color-teal-950:oklch(27.7% 0.046 192.524);--color-cyan-300:oklch(86.5% 0.127 207.078);--color-cyan-500:oklch(71.5% 0.143 215.221);--color-sky-200:oklch(90.1% 0.058 230.902);--color-sky-300:oklch(82.8% 0.111 230.318);--color-sky-400:oklch(74.6% 0.16 232.661);--color-sky-500:oklch(68.5% 0.169 237.323);--color-sky-900:oklch(39.1% 0.09 240.876);--color-blue-300:oklch(80.9% 0.105 251.813);--color-blue-400:oklch(70.7% 0.165 254.624);--color-blue-500:oklch(62.3% 0.214 259.815);--color-blue-600:oklch(54.6% 0.245 262.881);--color-blue-700:oklch(48.8% 0.243 264.376);--color-indigo-300:oklch(78.5% 0.115 274.713);--color-indigo-500:oklch(58.5% 0.233 277.117);--color-violet-200:oklch(89.4% 0.057 293.283);--color-violet-300:oklch(81.1% 0.111 293.571);--color-violet-400:oklch(70.2% 0.183 293.541);--color-violet-500:oklch(60.6% 0.25 292.717);--color-violet-700:oklch(49.1% 0.27 292.581);--color-violet-950:oklch(28.3% 0.141 291.089);--color-purple-200:oklch(90.2% 0.063 306.703);--color-purple-300:oklch(82.7% 0.119 306.383);--color-purple-400:oklch(71.4% 0.203 305.504);--color-purple-500:oklch(62.7% 0.265 303.9);--color-purple-900:oklch(38.1% 0.176 304.987);--color-purple-950:oklch(29.1% 0.149 302.717);--color-fuchsia-500:oklch(66.7% 0.295 322.15);--color-pink-400:oklch(71.8% 0.202 349.761);--color-rose-200:oklch(89.2% 0.058 10.001);--color-rose-300:oklch(81% 0.117 11.638);--color-rose-400:oklch(71.2% 0.194 13.428);--color-rose-500:oklch(64.5% 0.246 16.439);--color-rose-600:oklch(58.6% 0.253 17.585);--shadow-1:0 1px 2px rgb(0 0 0/.35);--shadow-2:0 12px 32px -16px rgb(0 0 0/.8);--shadow-3:0 28px 70px -28px rgb(0 0 0/.9);--lv-shadow-ink:0 0 0;--lv-shadow-strength:.9;--lv-shadow-soft:#0000001a;--lv-shadow-deep:#00000040}
+[data-theme='light']{color-scheme:light;--color-black:#e3dacb;--color-white:#16181b;--color-canvas:#e3dacb;--color-surface:#ebe4d6;--color-surface-raised:#f0eadf;--color-surface-selected:#ddd4c3;--color-border-subtle:#cfc5b2;--color-text-primary:#16181b;--color-text-secondary:#45484e;--color-text-muted:#595c62;--color-success:#1a6a43;--color-warning:#87520a;--color-danger:#ad3037;--color-info:#2d5f9a;--color-focus:#6f592b;--color-gold:#6f592b;--color-gold-light:#735800;--color-primary-fill:#16181b;--color-primary-fill-hover:#2a2c30;--color-danger-ink:#8f2328;--color-error-ink:#ad3037;--color-accent:#6f592b;--color-accent-contrast:#ebe4d6;--color-gilt:#7b5800;--color-iris:#5a4fb7;--color-iris-deep:#5a38e6;--color-mint:#006d37;--color-crimson:#ae3041;--color-honey:#815500;--color-coral:#ac2f46;--color-leaf:#1e6d00;--color-moss:#546517;--color-blush:#964355;--color-sage:#586237;--color-scarlet:#ad3036;--color-apricot:#8a5100;--color-sprout:#2f6c18;--color-aqua:#006d43;--color-flame:#ab3609;--color-petal:#7f5159;--color-wheat:#795900;--color-zinc-50:#16181b;--color-zinc-100:#1f2124;--color-zinc-200:#2a2c30;--color-zinc-300:#3a3d42;--color-zinc-400:#505359;--color-zinc-500:#55585e;--color-zinc-600:#55585e;--color-zinc-700:#cdc4b3;--color-zinc-800:#e2dbcd;--color-zinc-900:#ebe4d6;--color-zinc-950:#e7e0d3;--color-gray-300:#3a3d42;--color-gray-400:#505359;--color-slate-200:#2a2c30;--color-slate-300:#3a3d42;--color-slate-400:#505359;--color-slate-500:#55585e;--color-slate-900:#ebe4d6;--color-red-100:oklch(44.4% 0.177 26.899);--color-red-200:oklch(44.4% 0.177 26.899);--color-red-300:oklch(50.5% 0.213 27.518);--color-red-400:oklch(50.5% 0.213 27.518);--color-red-500:oklch(50.5% 0.213 27.518);--color-red-600:oklch(50.5% 0.213 27.518);--color-red-900:oklch(93.6% 0.032 17.717);--color-red-950:oklch(97.1% 0.013 17.38);--color-orange-300:oklch(47% 0.157 37.304);--color-orange-400:oklch(47% 0.157 37.304);--color-orange-500:oklch(47% 0.157 37.304);--color-orange-900:oklch(95.4% 0.038 75.164);--color-amber-100:oklch(41.4% 0.112 45.904);--color-amber-200:oklch(41.4% 0.112 45.904);--color-amber-300:oklch(47.3% 0.137 46.201);--color-amber-400:oklch(47.3% 0.137 46.201);--color-amber-500:oklch(47.3% 0.137 46.201);--color-amber-600:oklch(47.3% 0.137 46.201);--color-amber-900:oklch(96.2% 0.059 95.617);--color-amber-950:oklch(98.7% 0.022 95.277);--color-yellow-200:oklch(42.1% 0.095 57.708);--color-yellow-300:oklch(47.6% 0.114 61.907);--color-yellow-400:oklch(47.6% 0.114 61.907);--color-yellow-500:oklch(47.6% 0.114 61.907);--color-yellow-600:oklch(47.6% 0.114 61.907);--color-yellow-900:oklch(97.3% 0.071 103.193);--color-lime-500:oklch(45.3% 0.124 130.933);--color-green-400:oklch(44.8% 0.119 151.328);--color-green-500:oklch(44.8% 0.119 151.328);--color-green-600:oklch(44.8% 0.119 151.328);--color-green-700:oklch(44.8% 0.119 151.328);--color-emerald-100:oklch(37.8% 0.077 168.94);--color-emerald-200:oklch(37.8% 0.077 168.94);--color-emerald-300:oklch(43.2% 0.095 166.913);--color-emerald-400:oklch(43.2% 0.095 166.913);--color-emerald-500:oklch(43.2% 0.095 166.913);--color-emerald-600:oklch(43.2% 0.095 166.913);--color-emerald-700:oklch(43.2% 0.095 166.913);--color-emerald-900:oklch(95% 0.052 163.051);--color-emerald-950:oklch(97.9% 0.021 166.113);--color-teal-200:oklch(38.6% 0.063 188.416);--color-teal-300:oklch(43.7% 0.078 188.216);--color-teal-400:oklch(43.7% 0.078 188.216);--color-teal-500:oklch(43.7% 0.078 188.216);--color-teal-950:oklch(98.4% 0.014 180.72);--color-cyan-300:oklch(45% 0.085 224.283);--color-cyan-500:oklch(45% 0.085 224.283);--color-sky-100:oklch(39.1% 0.09 240.876);--color-sky-200:oklch(39.1% 0.09 240.876);--color-sky-300:oklch(44.3% 0.11 240.79);--color-sky-400:oklch(44.3% 0.11 240.79);--color-sky-500:oklch(44.3% 0.11 240.79);--color-sky-900:oklch(95.1% 0.026 236.824);--color-blue-300:oklch(48.8% 0.243 264.376);--color-blue-400:oklch(48.8% 0.243 264.376);--color-blue-500:oklch(48.8% 0.243 264.376);--color-blue-600:oklch(48.8% 0.243 264.376);--color-blue-700:oklch(48.8% 0.243 264.376);--color-indigo-300:oklch(51.1% 0.262 276.966);--color-indigo-500:oklch(51.1% 0.262 276.966);--color-violet-200:oklch(43.2% 0.232 292.759);--color-violet-300:oklch(49.1% 0.27 292.581);--color-violet-400:oklch(49.1% 0.27 292.581);--color-violet-500:oklch(49.1% 0.27 292.581);--color-violet-700:oklch(49.1% 0.27 292.581);--color-violet-950:oklch(96.9% 0.016 293.756);--color-purple-200:oklch(43.8% 0.218 303.724);--color-purple-300:oklch(49.6% 0.265 301.924);--color-purple-400:oklch(49.6% 0.265 301.924);--color-purple-500:oklch(49.6% 0.265 301.924);--color-purple-900:oklch(94.6% 0.033 307.174);--color-purple-950:oklch(97.7% 0.014 308.299);--color-fuchsia-500:oklch(45.2% 0.211 324.591);--color-pink-400:oklch(45.9% 0.187 3.815);--color-rose-200:oklch(41% 0.159 10.272);--color-rose-300:oklch(45.5% 0.188 13.697);--color-rose-400:oklch(45.5% 0.188 13.697);--color-rose-500:oklch(45.5% 0.188 13.697);--color-rose-600:oklch(45.5% 0.188 13.697);--lv-shadow-ink:58 46 28;--clay-rim:rgb(255 253 248/.8);--clay-base:rgb(58 46 28/.08);--clay-contact:rgb(58 46 28/.1);--clay-ambient:rgb(58 46 28/.18);--clay-deep:rgb(58 46 28/.26);--clay-sink:rgb(58 46 28/.16);--clay-well-bg:#e2d9c9;--clay-field:#7c715c;--clay-wash:rgb(255 248 235/.2)}
+[data-theme='dark'],[data-store-theme]{color-scheme:dark;--color-black:#0b0c0f;--color-white:#f2f3f5;--color-canvas:#0b0c0f;--color-surface:#131519;--color-surface-raised:#191c21;--color-surface-selected:#20242a;--color-border-subtle:#2a2e35;--color-text-primary:#f2f3f5;--color-text-secondary:#b7bbc3;--color-text-muted:#858b95;--color-success:#42b77a;--color-warning:#d79b45;--color-danger:#dc6363;--color-info:#6f9bd1;--color-focus:#d2c392;--color-gold:#BAA369;--color-gold-light:#ffe55c;--color-primary-fill:#ece8dc;--color-primary-fill-hover:#fffaf0;--color-danger-ink:#ffdada;--color-error-ink:#f2a4a4;--color-accent:#BAA369;--color-accent-contrast:#101114;--color-gilt:#D4AF37;--color-iris:#6B46FF;--color-iris-deep:#5A38E6;--color-mint:#2CE59B;--color-crimson:#B03142;--color-honey:#E4B363;--color-coral:#E06070;--color-leaf:#59A846;--color-moss:#708238;--color-blush:#E4899A;--color-sage:#A6B283;--color-scarlet:#EF233C;--color-apricot:#E6A84F;--color-sprout:#8FD07C;--color-aqua:#06D6A0;--color-flame:#FF5000;--color-petal:#F3BDC5;--color-wheat:#E6C27A;--color-zinc-50:oklch(98.5% 0 none);--color-zinc-100:oklch(96.7% 0.001 286.375);--color-zinc-200:oklch(92% 0.004 286.32);--color-zinc-300:oklch(87.1% 0.006 286.286);--color-zinc-400:oklch(70.5% 0.015 286.067);--color-zinc-500:oklch(55.2% 0.016 285.938);--color-zinc-600:oklch(44.2% 0.017 285.786);--color-zinc-700:oklch(37% 0.013 285.805);--color-zinc-800:oklch(27.4% 0.006 286.033);--color-zinc-900:oklch(21% 0.006 285.885);--color-zinc-950:oklch(14.1% 0.005 285.823);--color-gray-300:oklch(87.2% 0.01 258.338);--color-gray-400:oklch(70.7% 0.022 261.325);--color-slate-200:oklch(92.9% 0.013 255.508);--color-slate-300:oklch(86.9% 0.022 252.894);--color-slate-400:oklch(70.4% 0.04 256.788);--color-slate-500:oklch(55.4% 0.046 257.417);--color-slate-900:oklch(20.8% 0.042 265.755);--color-red-100:oklch(93.6% 0.032 17.717);--color-red-200:oklch(88.5% 0.062 18.334);--color-red-300:oklch(80.8% 0.114 19.571);--color-red-400:oklch(70.4% 0.191 22.216);--color-red-500:oklch(63.7% 0.237 25.331);--color-red-600:oklch(57.7% 0.245 27.325);--color-red-900:oklch(39.6% 0.141 25.723);--color-red-950:oklch(25.8% 0.092 26.042);--color-orange-300:oklch(83.7% 0.128 66.29);--color-orange-400:oklch(75% 0.183 55.934);--color-orange-500:oklch(70.5% 0.213 47.604);--color-orange-900:oklch(40.8% 0.123 38.172);--color-amber-100:oklch(96.2% 0.059 95.617);--color-amber-200:oklch(92.4% 0.12 95.746);--color-amber-300:oklch(87.9% 0.169 91.605);--color-amber-400:oklch(82.8% 0.189 84.429);--color-amber-500:oklch(76.9% 0.188 70.08);--color-amber-600:oklch(66.6% 0.179 58.318);--color-amber-900:oklch(41.4% 0.112 45.904);--color-amber-950:oklch(27.9% 0.077 45.635);--color-yellow-200:oklch(94.5% 0.129 101.54);--color-yellow-300:oklch(90.5% 0.182 98.111);--color-yellow-400:oklch(85.2% 0.199 91.936);--color-yellow-500:oklch(79.5% 0.184 86.047);--color-yellow-600:oklch(68.1% 0.162 75.834);--color-yellow-900:oklch(42.1% 0.095 57.708);--color-lime-500:oklch(76.8% 0.233 130.85);--color-green-400:oklch(79.2% 0.209 151.711);--color-green-500:oklch(72.3% 0.219 149.579);--color-green-600:oklch(62.7% 0.194 149.214);--color-green-700:oklch(52.7% 0.154 150.069);--color-emerald-100:oklch(95% 0.052 163.051);--color-emerald-200:oklch(90.5% 0.093 164.15);--color-emerald-300:oklch(84.5% 0.143 164.978);--color-emerald-400:oklch(76.5% 0.177 163.223);--color-emerald-500:oklch(69.6% 0.17 162.48);--color-emerald-600:oklch(59.6% 0.145 163.225);--color-emerald-700:oklch(50.8% 0.118 165.612);--color-emerald-900:oklch(37.8% 0.077 168.94);--color-emerald-950:oklch(26.2% 0.051 172.552);--color-teal-200:oklch(91% 0.096 180.426);--color-teal-300:oklch(85.5% 0.138 181.071);--color-teal-400:oklch(77.7% 0.152 181.912);--color-teal-500:oklch(70.4% 0.14 182.503);--color-teal-950:oklch(27.7% 0.046 192.524);--color-cyan-300:oklch(86.5% 0.127 207.078);--color-cyan-500:oklch(71.5% 0.143 215.221);--color-sky-100:oklch(95.1% 0.026 236.824);--color-sky-200:oklch(90.1% 0.058 230.902);--color-sky-300:oklch(82.8% 0.111 230.318);--color-sky-400:oklch(74.6% 0.16 232.661);--color-sky-500:oklch(68.5% 0.169 237.323);--color-sky-900:oklch(39.1% 0.09 240.876);--color-blue-300:oklch(80.9% 0.105 251.813);--color-blue-400:oklch(70.7% 0.165 254.624);--color-blue-500:oklch(62.3% 0.214 259.815);--color-blue-600:oklch(54.6% 0.245 262.881);--color-blue-700:oklch(48.8% 0.243 264.376);--color-indigo-300:oklch(78.5% 0.115 274.713);--color-indigo-500:oklch(58.5% 0.233 277.117);--color-violet-200:oklch(89.4% 0.057 293.283);--color-violet-300:oklch(81.1% 0.111 293.571);--color-violet-400:oklch(70.2% 0.183 293.541);--color-violet-500:oklch(60.6% 0.25 292.717);--color-violet-700:oklch(49.1% 0.27 292.581);--color-violet-950:oklch(28.3% 0.141 291.089);--color-purple-200:oklch(90.2% 0.063 306.703);--color-purple-300:oklch(82.7% 0.119 306.383);--color-purple-400:oklch(71.4% 0.203 305.504);--color-purple-500:oklch(62.7% 0.265 303.9);--color-purple-900:oklch(38.1% 0.176 304.987);--color-purple-950:oklch(29.1% 0.149 302.717);--color-fuchsia-500:oklch(66.7% 0.295 322.15);--color-pink-400:oklch(71.8% 0.202 349.761);--color-rose-200:oklch(89.2% 0.058 10.001);--color-rose-300:oklch(81% 0.117 11.638);--color-rose-400:oklch(71.2% 0.194 13.428);--color-rose-500:oklch(64.5% 0.246 16.439);--color-rose-600:oklch(58.6% 0.253 17.585);--lv-shadow-ink:0 0 0;--clay-rim:rgb(255 255 255/.06);--clay-base:rgb(0 0 0/.32);--clay-contact:rgb(0 0 0/.4);--clay-ambient:rgb(0 0 0/.55);--clay-deep:rgb(0 0 0/.75);--clay-sink:rgb(0 0 0/.5);--clay-well-bg:#0e1013;--clay-field:#6a707b;--clay-wash:rgb(196 188 166/.03)}
 /* THEME TOKENS:END */
+
+/* CLAY ELEVATION — geometry only, no colour (docs/DECISIONS.md row 207).
+   One light source above the screen: y-only offsets, so RTL and LTR are
+   identical, and higher means lighter. The colours are the per-theme
+   primitives in the generated block above; these compose them into levels:
+     0     flush: the lit rim alone (an option at rest, a filter chip)
+     lift  a small raised part inside a control (a Switch knob, a stepper key)
+     1     resting: a card or a button (rim, shaded base, one soft cast)
+     2     lifted: menus, popovers, the focal card, toasts
+     3     a slab: dialogs, the command palette
+     dock  a bottom sheet or a sticky bar, casting upward
+     press a held control, a selected option: the light falls inside it
+     well  sunk into the surface: fields, tracks, steppers
+   Declared on every themed element, not :root: a composite resolves where it
+   is declared, so a data-theme="dark" island and every [data-store-theme]
+   re-resolve their own primitives. It follows that a component cannot
+   re-tint `--clay-1` by setting `--clay-rim` locally; one that needs other
+   colours writes its own box-shadow from the primitives (as
+   .lv-button-primary does). An unthemed subtree (print) resolves to none.
+   tests/claySystem.test.ts holds the layer and blur limits. */
+[data-theme],
+[data-store-theme] {
+  --clay-0: inset 0 1px 0 var(--clay-rim);
+  --clay-lift: var(--clay-0), 0 1px 2px var(--clay-contact), 0 3px 8px -3px var(--clay-ambient);
+  --clay-1: var(--clay-0), inset 0 -2px 0 var(--clay-base), 0 4px 12px -6px var(--clay-ambient);
+  --clay-2: var(--clay-0), inset 0 -2px 0 var(--clay-base), 0 1px 2px var(--clay-contact),
+    0 12px 28px -12px var(--clay-ambient);
+  --clay-3: var(--clay-0), 0 2px 6px var(--clay-contact), 0 28px 56px -24px var(--clay-deep);
+  --clay-dock: var(--clay-0), 0 -10px 32px -16px var(--clay-deep);
+  --clay-press: inset 0 2px 5px var(--clay-sink), inset 0 -1px 0 var(--clay-rim);
+  --clay-well: inset 0 1px 3px var(--clay-sink), inset 0 -1px 0 var(--clay-rim);
+}
+
+/* THE WORKBENCH LIGHT: one static gradient on the NON-scrolling app shell
+   (src/App.tsx), under the scroller, so the top of every page is faintly lit
+   and a card still reads as the higher, lighter thing (the light peak stays
+   under PAPER). Never on a scrolling element, never background-attachment:
+   fixed, never animated. html, body and #root keep the flat canvas, so the
+   pre-paint ground (index.html) equals the first paint. */
+.lv-canvas {
+  background:
+    radial-gradient(120% 70% at 50% 0, var(--clay-wash), #0000 70%) 50% 0 / 100% 42rem no-repeat,
+    var(--color-canvas);
+}
 
 /* A dark island inside a light page (a feature band, the 3D viewer) paints its
    own ground's text colour, so an unclassed line inside it is not light-theme
@@ -1522,10 +1678,11 @@ html.lv-lang-vt[data-lang-flow='to-rtl']::view-transition-new(root) { animation-
    rules drew a grey smudge: `shadow-lg`/`shadow-2xl` are rgb(0 0 0) and the
    glass tint was pure #fff. Light theme only — the dark bars are untouched:
    - the home header over the hero: no scrim (its pills and field carry their
-     own surfaces); scrolled: the page's own cream as glass, a hairline under
-     it, no shadow;
-   - the bottom bar: its two groups in raised cream with a hairline and a soft
-     warm lift; the fade under it is the page's cream and shorter.
+     own surfaces); scrolled: the page's own cream, opaque, a hairline under
+     it, no shadow (dark: the hairline and one soft ambient cast);
+   - the bottom bar: its two groups in raised cream with a hairline; their
+     lift is the clay shadow their own utility names, warm on cream; the fade
+     under it is the page's cream and shorter.
    --------------------------------------------------------------------------- */
 /* Every other floating bar marks the overlap with `.scroll-edge`: a 16 px
    shadow of ink at 28%, invisible on black and a grey band on cream. On the
@@ -1538,15 +1695,15 @@ html.lv-lang-vt[data-lang-flow='to-rtl']::view-transition-new(root) { animation-
 [data-theme='light'] .lv-topbar-scrim {
   background-image: none;
 }
+.lv-topbar-solid {
+  box-shadow: 0 1px 0 var(--color-border-subtle), 0 8px 20px -14px var(--clay-ambient);
+}
 [data-theme='light'] .lv-topbar-solid {
   --material-tint: var(--color-canvas);
-  --material-opacity: 88%;
   box-shadow: 0 1px 0 var(--color-border-subtle);
 }
 [data-theme='light'] [data-bottom-nav-group] {
   --material-tint: var(--color-surface-raised);
-  --material-opacity: 92%;
-  box-shadow: 0 1px 2px rgb(58 46 28 / 0.06), 0 10px 28px -14px rgb(58 46 28 / 0.22);
 }
 [data-theme='light'] [data-nav-scrim] {
   background-image: linear-gradient(
@@ -1664,23 +1821,11 @@ html.lv-lang-vt[data-lang-flow='to-rtl']::view-transition-new(root) { animation-
     radial-gradient(120% 140% at 100% 0%, rgb(188 163 107 / 0.16), transparent 60%);
 }
 
-/* THE SHADOW UTILITIES FOLLOW THE THEME. Tailwind compiles `shadow-lg` to
-   `var(--tw-shadow-color, #0000001a)` — pure black, which on the cream page
-   is a grey smudge. Giving the colour a theme value fixes every `shadow-sm…2xl`
-   in the app at once: the dark theme's values are Tailwind's own (no pixel
-   moves), the light theme's a soft warm ink (scripts/theme-tokens.mjs). In
-   the components layer, so an explicit `shadow-iris/30` still wins. */
-@layer components {
-  .shadow-sm,
-  .shadow-md,
-  .shadow-lg,
-  .shadow-xl {
-    --tw-shadow-color: var(--lv-shadow-soft, #0000001a);
-  }
-  .shadow-2xl {
-    --tw-shadow-color: var(--lv-shadow-deep, #00000040);
-  }
-}
+/* THE SHADOW UTILITIES FOLLOW THE THEME, because they are clay now. The old
+   fix here gave Tailwind's black `--tw-shadow-color` a warm value on cream;
+   every shadow-sm…2xl is now a `--clay-*` composite (the @theme shadow scale),
+   whose colours are per-theme primitives, so there is no colour left to
+   re-point and a colour modifier (`shadow-iris/30`) no longer tints one. */
 
 /* THE DIM BEHIND A SHEET OR A DIALOG. Always a darkening, never an ivory wash
    (a light scrim reads as fog, not as "the page behind is inactive"), and

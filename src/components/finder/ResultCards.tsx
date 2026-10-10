@@ -85,7 +85,7 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
     <article
       aria-labelledby={headingId}
       data-finder-rank={result.rank}
-      className="overflow-hidden rounded-[22px] border border-border-subtle bg-surface shadow-[var(--shadow-2)]"
+      className="overflow-hidden rounded-[22px] border border-border-subtle bg-surface shadow-2"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-charcoal">
         <SafeImage
@@ -98,7 +98,7 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
           fallbackClassName="text-snow/35"
           imgClassName="object-[50%_18%]"
         />
-        <span className="absolute end-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-gold-fill px-3 py-1.5 text-[12.5px] font-extrabold text-ink shadow-[0_6px_18px_-8px_rgb(0_0_0/0.6)]">
+        <span className="absolute end-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-gold-fill px-3 py-1.5 text-[12.5px] font-extrabold text-ink shadow-sm">
           <Star aria-hidden="true" className="size-3.5 fill-ink" strokeWidth={0} />
           {t.bestBadge}
         </span>

@@ -4382,7 +4382,7 @@ export default function Product() {
       </div>
 
       {/* ------------------------------------------------ phone purchase bar */}
-      <div ref={buyBarRef} data-testid="product-buybar" className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_-12px_36px_-24px_rgb(0_0_0/.9)]">
+      <div ref={buyBarRef} data-testid="product-buybar" className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
         {/*
           THE CONFIRMATION LIVES WHERE THE TAP HAPPENED. On a phone the CTA is
           this fixed bar while the status panel is hundreds of pixels above the

@@ -82,7 +82,7 @@ export function CheckoutBar({
 
   const meta = TIER_META[plan.tier];
   const barClass =
-    'fixed inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[min(36rem,calc(100%-1.5rem))] bottom-[calc(var(--nav-stack)+0.25rem)] z-[130] material rounded-2xl border border-border-subtle p-3 shadow-[0_18px_40px_-18px_rgb(0_0_0/0.9)] lg:sticky lg:mx-0 lg:w-auto lg:bottom-auto lg:top-6 lg:z-auto lg:p-5 lg:rounded-[20px]';
+    'fixed inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[min(36rem,calc(100%-1.5rem))] bottom-[calc(var(--nav-stack)+0.25rem)] z-[130] material rounded-2xl border border-border-subtle p-3 shadow-lg lg:sticky lg:mx-0 lg:w-auto lg:bottom-auto lg:top-6 lg:z-auto lg:p-5 lg:rounded-[20px]';
 
   /**
    * A PAUSED TIER (PRO, migration 0145): «قريبًا… يتم العمل على تطوير

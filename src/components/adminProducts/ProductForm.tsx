@@ -2192,7 +2192,7 @@ export default function ProductForm({
           itself still reaches the glass. */}
       <div
         data-form="save-bar"
-        className="sticky bottom-0 z-10 -mx-3 border-t border-zinc-800 bg-zinc-900 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_24px_-12px_rgba(0,0,0,0.9)]"
+        className="sticky bottom-0 z-10 -mx-3 border-t border-zinc-800 bg-zinc-900 pb-[env(safe-area-inset-bottom)] shadow-dock"
       >
         <div className="min-w-0 px-3 py-2 flex items-center gap-2">
           <span className="min-w-0 flex-1 text-[11px] truncate">

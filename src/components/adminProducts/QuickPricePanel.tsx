@@ -787,7 +787,7 @@ export default function QuickPricePanel({
             key={x.id}
             type="button"
             role="tab"
-            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-[var(--ap-text-2)] transition-[color,background-color,box-shadow] duration-150 hover:text-[var(--ap-text-1)] aria-selected:bg-[var(--ap-surface-4)] aria-selected:text-[var(--ap-text-1)] aria-selected:shadow-[0_1px_3px_rgb(0_0_0_/_0.35)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] sm:flex-none"
+            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-[var(--ap-text-2)] transition-[color,background-color,box-shadow] duration-150 hover:text-[var(--ap-text-1)] aria-selected:bg-[var(--ap-surface-4)] aria-selected:text-[var(--ap-text-1)] aria-selected:shadow-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] sm:flex-none"
             aria-selected={tab === x.id}
             data-qp-tab={x.id}
             onClick={() => setTab(x.id)}

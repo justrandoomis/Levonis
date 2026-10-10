@@ -91,7 +91,7 @@ export default function AdminAds() {
           <button
             onClick={handleSave}
             disabled={saveState === 'saving'}
-            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-5 py-2.5 rounded-full transition-all font-bold shadow-[0_4px_12px_rgba(107,70,255,0.4)] hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-5 py-2.5 rounded-full transition-all font-bold hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
           >
             <Save className="w-4 h-4" /> {saveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ' : 'Save'}
           </button>

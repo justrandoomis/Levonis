@@ -395,7 +395,7 @@ export default function AdminWalletRequests() {
                         onClick={() => { setActionError(null); setDecision({ id: t.id, step: b.step, note: '' }); }}
                         disabled={!!loadingAction}
                         className={b.primary
-                          ? 'flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-snow px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-[0_4px_10px_rgba(44,229,155,0.4)] hover:scale-105 disabled:opacity-50'
+                          ? 'flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-snow px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-50'
                           : 'flex items-center gap-1 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800/50 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:scale-105 disabled:opacity-50'}
                       >
                         {b.icon === 'check' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} {b.label}
