@@ -1,6 +1,5 @@
 import { investorAccountProgress } from './financeInvestorAccount';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
-import { accountMovements } from './financeAccountHistory';
 import { reconcileEffectiveWages } from './financeWageCalculation';
 import { investorProjectionStaleSql } from './investorFinance';
 import { getOrderProfitBase } from './orderProfit';
@@ -155,9 +154,10 @@ export async function participantOverview(db: D1Database, userId: string) {
   const employment=employmentRows.map((s)=>({...s,first_earning_day:s.start_work_date?nextEmploymentDay(s.start_work_date):null}));
   const summary=participantSummary(entries,advance.balance);
   summary.reconciliation_pending ||= employment.some((s)=>s.reconciliation_state!==null&&s.reconciliation_state!=='complete');
-  const history=await accountMovements(db,userId);
   const investment=await investorAccountProgress(db,userId,entries,participantWithdrawableSources(entries,advance.balance));
-  return { summary, employment, investment, ...history, entries: entries.map(({ eligible: _e, version: _v, staff_id: _s, blocked, ...e }) => ({...e,state:blocked?'pending_reconciliation':e.state})), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
+  // No movements log («سجل الحركات»): the owner removed it from «أرباحي» on
+  // 2026-10-10. Balances come from the same sources; no ledger row changed.
+  return { summary, employment, investment, entries: entries.map(({ eligible: _e, version: _v, staff_id: _s, blocked, ...e }) => ({...e,state:blocked?'pending_reconciliation':e.state})), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
 }
 /** Allocate the shared ledger budget once, in the same order used by a withdrawal.
  * A contract with earnings cannot hide another contract's already-paid correction. */
@@ -181,8 +181,11 @@ async function sourceSetFence(db: D1Database, userId: string, sources: Participa
   const expected=JSON.stringify([...sources].sort((a,b)=>a.kind===b.kind?(a.id<b.id?-1:a.id>b.id?1:0):(a.kind<b.kind?-1:1)).map((s)=>[s.id,s.kind,s.amount_iqd,s.paid_iqd,s.held_iqd,s.state,s.version,s.blocked?1:0,s.pending_payment_cover_iqd??0]));
   // One snapshot fence covers both changed rows and newly added sources. A
   // large staff history does not turn one payout into thousands of queries.
-  const parts=[staffSql,...(includeInvestors?[investorSql]:[]),...(includeSurplus?[fenceSurplusSql]:[])];
-  return [...fence(db,`(SELECT json_group_array(json_array(id,kind,amount,paid,held,state,version,blocked,cover)) FROM (${parts.join(' UNION ALL ')} ORDER BY kind,id))=?`,[...parts.map(()=>userId),expected]),
+  // At most three compound terms (wages, investor earnings, funding surplus);
+  // the live D1 refuses a chain of more than five (tests/d1CompoundLimit.test.ts).
+  const chain=`${staffSql}${includeInvestors?` UNION ALL ${investorSql}`:''}${includeSurplus?` UNION ALL ${fenceSurplusSql}`:''}`;
+  const terms=1+(includeInvestors?1:0)+(includeSurplus?1:0);
+  return [...fence(db,`(SELECT json_group_array(json_array(id,kind,amount,paid,held,state,version,blocked,cover)) FROM (${chain} ORDER BY kind,id))=?`,[...Array.from({length:terms},()=>userId),expected]),
     ...fence(db,`(SELECT json_group_array(json_array(id,amount_iqd,allocated)) FROM (${participantAdvanceSql(scope)}))=?`,[userId,advanceSnapshot])];
 }
 
