@@ -1,4 +1,4 @@
-# Handoff — where the work stands (updated 2026-10-10, 20:15 UTC)
+# Handoff — where the work stands (updated 2026-10-10, 20:40 UTC)
 
 This file lets any agent pick up the work if a session stops. Read `CLAUDE.md`
 first (default branch `claude/new-session-2hq4ci`, every push deploys through
@@ -10,8 +10,9 @@ deploy (workflow 7 ignores `docs/**` and `*.md`).
 | Commit | What | Live? |
 |---|---|---|
 | `4b5fc125` | Clay redesign foundation (tokens, canvas, glass removed, primitives, chrome) — DECISIONS 207–210 | live (run 38063157537) |
-| `75cc99a9` | Clay Phase 3: every page family converted (ratchet 0 / 14 / 172 / 2) — DECISIONS 211 | deploying (run 38077126903) |
-| `d0221f0a` | «تحديث البيانات»: a large data file applies as one atomic batch per product (no fixed 200 cap; budget from D1's 1,000), every field labelled in ar/en/ckb — DECISIONS 212 | queued behind 75cc99a9 |
+| `75cc99a9` | Clay Phase 3: every page family converted (ratchet 0 / 14 / 172 / 2) — DECISIONS 211 | live (run 38077126903) |
+| `d0221f0a` | «تحديث البيانات»: a large data file applies as one atomic batch per product (no fixed 200 cap; budget from D1's 1,000), every field labelled in ar/en/ckb — DECISIONS 212 | deploying (run 38079820825) |
+| this push | «التسعير بالدولار والشحن»: «نشر» saves what the owner typed (data first, price only on the owner's confirm, never silent) — DECISIONS 213, 214 (was `wip/usd-pricing-save`) | queued behind d0221f0a |
 
 After a deploy: `curl https://levonis-iq.com/api/health` (schema current,
 178 migrations, last `0185_security_deception.sql`) and
@@ -24,21 +25,10 @@ touch its decoys, and production data is off-limits.
 Pushing a `wip/*` branch does not deploy (workflow 7's job only runs for the
 default branch). To land one: rebase it onto the default branch, renumber its
 DECISIONS rows to the next free numbers (the last row on the default branch is
-**212**), run the gates (§4), then fast-forward the default branch and push.
+**214**), run the gates (§4), then fast-forward the default branch and push.
 
-### `wip/usd-pricing-save` (head `cb218bb9`, already rebased onto `d0221f0a`)
-Owner report: values typed in «التسعير بالدولار والشحن» in «تعديل المنتج»
-were lost on «نشر». Root cause: the save that would complete the product was
-held (409 `PRICING_PREVIEW_REQUIRED`) and its review sheet rendered only inside
-the closed section ٨, while the bar said «محفوظ ✓»; «دينار» was offered with no
-approved USD rate (whole batch refused); decimal separators differed between
-client and server. Fix: data is saved first (`data_only`), the price is written
-only when the owner confirms the review (opened at the form's root), nothing is
-silent, leaving with unsaved pricing asks first. DECISIONS rows **213, 214**.
-Verified by its workflow (994 targeted tests, 123 browser checks). Local gates
-on the rebased tree were running at handoff
-(`npm run check` ✓, `npm run build` ✓, 171 targeted test files + the browser
-regression `scripts/e2e-usd-pricing-save.mjs` in progress).
+### `wip/usd-pricing-save` — LANDED on the default branch (DECISIONS 213, 214)
+The branch is kept only as a record. Gates on the landed tree: `npm run check`, `npm run build`, 1,904/1,905 targeted tests (1 skipped), browser regression `scripts/e2e-usd-pricing-save.mjs` 123/123.
 
 ### `wip/inventory-investment` (head `ef29c44b`, base `4b5fc125` — needs a rebase)
 Owner request 2026-10-10: (1) name a stock purchase; (2) a stock purchase is
@@ -110,7 +100,7 @@ redesign (the screenshot tool has no language option yet).
 ## 7. Prompt for a new agent
 
 > Read `CLAUDE.md` and `docs/HANDOFF.md`. Check workflow 7's latest runs and
-> the live health. Land `wip/usd-pricing-save`, then `wip/inventory-investment`
+> the live health. Land `wip/inventory-investment`
 > (re-run its money/pricing/privacy verification first), each with the §4 gates
 > and renumbered DECISIONS rows; push to the default branch one at a time and
 > verify live after each. Then continue with §3 if the leak fixes are not on
