@@ -86,3 +86,27 @@ test('deploy ahead of 0179: an ordered purchase still saves, with no FX statemen
   assert.equal(res.status, 200);
   assert.equal(hasColumn(raw, 'purchase_orders', 'fx_snapshot_at'), false);
 });
+
+test('FX-6 (0182): the snapshot records each rate\'s version beside it, once — a pair with no rate then has none', async () => {
+  const { raw, app } = setup();
+  applyRate(raw, 'USD_IQD', '1650');
+  applyRate(raw, 'USD_IQD', '1660'); // version 2
+  applyRate(raw, 'EUR_USD', '1.1186'); // version 1; CNY/USD never approved
+  const res = await json(await post(app, '/p/documents', bodyOf('ordered')));
+  const versions = () => row<Record<string, unknown>>(raw, 'SELECT fx_usd_iqd_version_at_purchase u, fx_eur_usd_version_at_purchase e, fx_cny_usd_version_at_purchase c FROM purchase_orders WHERE id = ?', res.id)!;
+  assert.deepEqual(versions(), { u: 2, e: 1, c: null });
+  applyRate(raw, 'USD_IQD', '1700');
+  await edit(app, res.id, bodyOf('ordered'), { note: 'later' });
+  assert.deepEqual(versions(), { u: 2, e: 1, c: null }, 'a later edit and a later rate leave the versions as they were');
+  // …and the database refuses rewriting a snapshot once taken (0182).
+  assert.throws(() => raw.exec(`UPDATE purchase_orders SET fx_usd_iqd_version_at_purchase = 3 WHERE id = '${res.id}'`), /PURCHASE_FROZEN/);
+});
+
+test('deploy ahead of 0182: on a 0181 database the snapshot is the FX-1 statement, values only', async () => {
+  const raw = dbThrough('0181');
+  const { app } = setup(raw);
+  applyRate(raw, 'USD_IQD', '1660');
+  const res = await json(await post(app, '/p/documents', bodyOf('ordered')));
+  assert.equal(hasColumn(raw, 'purchase_orders', 'fx_usd_iqd_version_at_purchase'), false);
+  assert.equal(snapshot(raw, res.id).u, '1660');
+});

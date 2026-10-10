@@ -115,6 +115,13 @@ const AREAS: Record<string, readonly string[]> = {
   ],
   // USD procurement pricing (USD design §9; migration 0181): the minimum profit in
   // USD, the USD chain's figures, the card's summary and the converted legacy minimum.
+  // FX-6 (FX plan §4.3, §4.5; migration 0182): a batch's purchase snapshot beyond the FX-1 names —
+  // the version of each rate, when and from where it was taken, the purchase snapshot's versions and
+  // the lot's landed total in the owner's batch read model.
+  FX6: [
+    'usd_iqd_fx_version', 'eur_usd_fx_version', 'cny_usd_fx_version', 'fx_snapshot_at', 'fx_snapshot_source',
+    'fx_usd_iqd_version_at_purchase', 'fx_eur_usd_version_at_purchase', 'fx_cny_usd_version_at_purchase', 'actual_landed_total_iqd',
+  ],
   USD_PRICING: [
     'minimum_target_profit_usd', 'target_profit_usd', 'target_profit_iqd_exact', 'amount_usd', 'current_total_cost_usd',
     'supplier_cost_usd', 'shipping_cost_usd', 'additional_cost_usd', 'final_price_usd', 'current_total_cost_cents',
@@ -234,6 +241,32 @@ const PA_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   at_time_count: 'how many orders were converted at the rate of their own time — a count',
   today_count: "how many orders fell back to today's rate («≈») — a count",
   approximate: 'yes/no: some figure fell back to today\'s rate',
+  batch_cost_lines: "how many lines' goods cost is at their batches' purchase-time rates (FX-6) — a count",
+};
+
+/**
+ * FX-6 (FX plan §4.3, §8; worker/lib/batchSnapshot.ts): the owner's batch
+ * read model, GET /api/admin/pricing/batches. Owner-only keys that carry no
+ * figure — a container, a code, a flag, a version marker, a time or a lot id
+ * — served only behind requireCostRead; every figure, rate, rate version and
+ * the snapshot's source are in FINANCIAL_FIELDS. The generic column names
+ * (snapshot_version, snapshot_source, calculated_at, split_from_lot_id) stay
+ * out of the net and out of every assistant lot read by the explicit column
+ * lists (tests/batchSnapshotPrivacy.test.ts).
+ */
+const FX6_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
+  batches: 'a container: the batches of one product, lot or purchase',
+  installed: 'yes/no: migration 0182 is on this database',
+  batch_cost: 'a container: what the batch actually cost in IQD, each figure under a FINANCIAL_FIELDS key',
+  snapshot_state: "'recorded' / 'derived' / 'iqd_only' — how much of the purchase-time snapshot is known",
+  snapshot: 'a container: the purchase-time snapshot, each figure under a FINANCIAL_FIELDS key',
+  derived: 'a container: an old batch\'s equivalent derived from its own purchase, under FINANCIAL_FIELDS keys',
+  derived_from: "'purchase_document' / 'purchase_snapshot' — where a derived figure came from, never the figure",
+  unknown_fields: 'the NAMES of the snapshot figures that are unknown («غير معروف») — never a value',
+  snapshot_version: 'a constant 1 marking a recorded snapshot',
+  snapshot_source: "'purchase' / 'legacy_incoming' — which receipt wrote the snapshot",
+  calculated_at: 'when the snapshot was recorded at receipt — a time',
+  split_from_lot_id: 'the parent batch id of a transfer split — an id',
 };
 
 /**
@@ -271,7 +304,7 @@ test('none of the forbidden names is in the list (F18)', () => {
 });
 
 test('a name is either in the net or registered as private-but-not-in-the-net, never both', () => {
-  for (const dict of [PRIVATE_NON_FINANCIAL, FX_PRIVATE_NON_FINANCIAL, PA_PRIVATE_NON_FINANCIAL]) {
+  for (const dict of [PRIVATE_NON_FINANCIAL, FX_PRIVATE_NON_FINANCIAL, PA_PRIVATE_NON_FINANCIAL, FX6_PRIVATE_NON_FINANCIAL]) {
     assert.deepEqual(Object.keys(dict).filter((k) => LIST.has(k)), []);
     for (const [k, why] of Object.entries(dict)) assert.ok(why.trim().length > 0, `${k} needs its reason`);
   }
@@ -495,3 +528,73 @@ test('P-A: the USD display block and the report deductions are stripped whole; t
   assert.doesNotMatch(stripped, /"(net_goods|cogs|gross_profit|owner_net|owner_period_net|coupon|price_protection)_cents"|1587\.25|1612\.5|"price_protection_iqd"|net_after_report_adjustments/, 'no cent figure, rate or deduction survives the strip');
 });
 
+
+// ------------------------------------------------------------- the batch read model (FX-6)
+
+/**
+ * EVERY KEY GET /api/admin/pricing/batches ANSWERS IS CLASSIFIED (FX plan
+ * §4.3, §4.5, §14.2 S1): a recorded snapshot, a split child, a derived old
+ * batch and one known only in IQD are walked to their last leaf. A key new to
+ * the code base is in FINANCIAL_FIELDS or in FX6_PRIVATE_NON_FINANCIAL with
+ * its reason; every money, rate or measure key is in the net; and the strip
+ * leaves no seeded figure.
+ */
+test('FX-6: every key the batch read model answers is in FINANCIAL_FIELDS, in FX6_PRIVATE_NON_FINANCIAL, or shared vocabulary — and the strip leaves no figure', async () => {
+  const { readFileSync, readdirSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { ROOT } = await import('./fixtures/d1');
+  const { OWNER, asD1, freshDb, stubApp } = await import('./fixtures/app');
+  const { call } = await import('./fixtures/roleMatrix');
+  const { BATCH_SENTINELS, BATCH_SENTINEL_LOT, seedBatchSentinels } = await import('./fixtures/fxSentinels');
+  const { adminPricingRoutes } = await import('../worker/routes/adminPricing');
+
+  const raw = freshDb();
+  raw.exec(`INSERT INTO users(id,email,role) VALUES ('usr_owner','boss@x.co','admin');
+    INSERT INTO products(id,name,slug,price_iqd,stock,inventory_mode) VALUES ('p_a1','A','fx6-keys-a',1000,0,'BASE');
+    INSERT INTO purchase_orders(id,currency,exchange_rate,purchase_day,status,cost_state,created_by,created_at,updated_at)
+      VALUES ('po_usd','USD',1500,'2026-09-01','received','final','usr_owner','2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z');
+    INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd,shipping_total_iqd,internal_delivery_total_iqd,status)
+      VALUES ('inc_usd','p_a1','base','',1,1,300000,0,0,'received');
+    INSERT INTO purchase_lines(id,purchase_id,incoming_id,label,source_unit_amount) VALUES ('pl_usd','po_usd','inc_usd','A',200);
+    INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,incoming_id,received_at)
+      VALUES ('lot_derived','p_a1','base','',1,1,300000,300000,0,0,300000,'received','inc_usd','2026-09-02T00:00:00.000Z'),
+             ('lot_iqd','p_a1','base','',1,1,1000,1000,0,0,1000,'opening',NULL,'2026-01-01T00:00:00.000Z');`);
+  seedBatchSentinels(raw);
+  raw.exec(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at,
+      snapshot_version,snapshot_source,purchase_id,supplier_original_currency,supplier_original_amount,supplier_cost_mode,exchange_rate_at_purchase,usd_iqd_rate_at_purchase,fx_snapshot_source,historical_usd_equivalent,calculated_at,split_from_lot_id)
+    SELECT 'lot_child',product_id,scope,scope_id,1,1,unit_cost_iqd,purchase_unit_iqd,0,0,unit_cost_iqd,cost_basis,received_at,1,snapshot_source,purchase_id,supplier_original_currency,supplier_original_amount,supplier_cost_mode,exchange_rate_at_purchase,usd_iqd_rate_at_purchase,fx_snapshot_source,historical_usd_equivalent,calculated_at,'${BATCH_SENTINEL_LOT}'
+      FROM inventory_lots WHERE id = '${BATCH_SENTINEL_LOT}'`);
+  const app = stubApp(asD1(raw), OWNER, (a) => a.route('/api/admin/pricing', adminPricingRoutes));
+  const res = await call(app, 'GET', '/api/admin/pricing/batches?product_id=p_a1');
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const states = ((res.body as { batches: Array<{ snapshot_state: string }> }).batches).map((b) => b.snapshot_state).sort();
+  assert.deepEqual(states, ['derived', 'iqd_only', 'recorded', 'recorded']);
+  const keys = new Set<string>();
+  const walk = (v: unknown) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { keys.add(k); walk(x); }
+  };
+  walk(res.body);
+  assert.ok(keys.size > 30, `only ${keys.size} keys walked`);
+
+  const files: string[] = [];
+  const collect = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) collect(p);
+      else if (p.endsWith('.ts') && name !== 'adminPricing.ts' && name !== 'batchSnapshot.ts') files.push(p);
+    }
+  };
+  collect(join(ROOT, 'worker'));
+  const corpus = files.map((f) => readFileSync(f, 'utf8')).join('\n');
+  const shared = (k: string) => new RegExp(`(^|[^\\w$])${k}\\s*\\??:`, 'm').test(corpus) || new RegExp(`['"]${k}['"]\\s*:`).test(corpus);
+  assert.equal(shared('snapshot_state'), false, 'not vacuous');
+  const unclassified = [...keys].filter((k) => !LIST.has(k) && !(k in FX6_PRIVATE_NON_FINANCIAL) && !shared(k)).sort();
+  assert.deepEqual(unclassified, [], 'add each to FINANCIAL_FIELDS (both copies) or to FX6_PRIVATE_NON_FINANCIAL with its reason');
+  const MONEY = /_iqd$|_mm$|_g$|cbm|^fx_|_rate$|_rates$|^supplier_|^replacement_|^shipping_|^landed_|_at_purchase$|_usd$|equivalent/;
+  assert.deepEqual([...keys].filter((k) => MONEY.test(k) && !LIST.has(k)).sort(), [], 'a money, rate or measure key outside FINANCIAL_FIELDS');
+  assert.deepEqual(Object.keys(FX6_PRIVATE_NON_FINANCIAL).filter((k) => !keys.has(k) && k !== 'installed'), [], 'a stale reason');
+  // The strip leaves no figure: every sentinel is gone once the net has run.
+  const stripped = JSON.stringify(stripFinancials(res.body));
+  for (const s of BATCH_SENTINELS) assert.equal(stripped.includes(s), false, s);
+});

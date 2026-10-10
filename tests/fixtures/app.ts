@@ -126,6 +126,26 @@ export function withoutLotCostLock(raw: DatabaseSync, sql: string): void {
   }
 }
 
+/**
+ * STAGING A ROW AS AN OLDER DATABASE LEFT IT (FX-6, migration 0182): a
+ * purchase's FX snapshot and a received purchase's cost are frozen by
+ * triggers, so a fixture that needs, say, a purchase "ordered before 0179"
+ * (its snapshot NULL) stages it through here: the named triggers are lifted
+ * for exactly that SQL and put back verbatim. Never for the code under test.
+ */
+export function withoutTriggers(raw: DatabaseSync, names: readonly string[], sql: string): void {
+  const saved = names.flatMap((name) => {
+    const t = raw.prepare("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?").get(name) as { sql: string } | undefined;
+    return t ? [{ name, sql: t.sql }] : [];
+  });
+  for (const t of saved) raw.exec(`DROP TRIGGER ${t.name}`);
+  try {
+    raw.exec(sql);
+  } finally {
+    for (const t of saved) raw.exec(t.sql);
+  }
+}
+
 export const count = (raw: DatabaseSync, sql: string, ...params: unknown[]) =>
   (raw.prepare(sql).get(...(params as never[])) as { n: number }).n;
 

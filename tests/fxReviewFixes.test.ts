@@ -26,7 +26,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { OWNER, asD1, count, freshDb, get, json, post, put, stubApp } from './fixtures/app';
+import { OWNER, asD1, count, freshDb, get, json, post, put, stubApp, withoutTriggers } from './fixtures/app';
 import { OWNER_ROW_SQL, applyRate, fxEnv, logsOf, market, ownerCommit, pairOf } from './fixtures/fx';
 import { adminPricingRoutes } from '../worker/routes/adminPricing';
 import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
@@ -335,8 +335,9 @@ test('C7: a purchase ordered before 0179 (NULL rates) keeps NULL when it is edit
     charges: [],
   };
   const created = await json(await post(app, '/p/documents', body));
-  // As 0179's ALTER leaves a document ordered before it: the four columns NULL.
-  raw.prepare('UPDATE purchase_orders SET fx_usd_iqd_at_purchase=NULL, fx_eur_usd_at_purchase=NULL, fx_cny_usd_at_purchase=NULL, fx_snapshot_at=NULL WHERE id=?').run(created.id);
+  // As 0179's ALTER leaves a document ordered before it: the four columns NULL
+  // (staged past 0182's freeze of a taken snapshot, which no code path lifts).
+  withoutTriggers(raw, ['purchase_order_fx_snapshot_frozen'], `UPDATE purchase_orders SET fx_usd_iqd_at_purchase=NULL, fx_eur_usd_at_purchase=NULL, fx_cny_usd_at_purchase=NULL, fx_snapshot_at=NULL WHERE id='${String(created.id).replace(/'/g, "''")}'`);
   applyRate(raw, 'USD_IQD', '1700');
   const detail = await json(await get(app, `/p/documents/${created.id}`));
   const res = await put(app, `/p/documents/${created.id}`, { ...body, operation_id: crypto.randomUUID(), note: 'invoice corrected', version: detail.purchase.version });

@@ -23,6 +23,7 @@ import { investorFinanceInstalled } from '../lib/investorFinance';
 import { packedMeasure, procurementProfiles, profileRates, type PurchaseCharge } from '../lib/procurementCosts';
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { engineColumnInstalled } from '../lib/engineInstalled';
+import { batchSnapshotInstalled, purchaseLotSnapshot, type PurchaseFxSource } from '../lib/batchSnapshot';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -36,7 +37,7 @@ type Purchase = {
   cost_state: string;
   invoice_total_iqd: number | null;
   request_json: string;
-};
+} & Partial<Omit<PurchaseFxSource, 'id'>>;
 type Line = IncomingRow & {
   line_id: string;
   label: string;
@@ -46,6 +47,7 @@ type Line = IncomingRow & {
   rejected_qty: number;
   source_unit_amount: number;
   source_total_amount: number | null;
+  purchase_cost_mode?: string | null;
   weight_g: number;
   volume_mm3: number;
   selling_price_iqd: number | null;
@@ -58,6 +60,11 @@ async function commitPurchase(
   try {
     await db.batch(statements);
   } catch (error) {
+    // The database's own freeze of a received purchase and its FX snapshot
+    // (migration 0182) answers as the route's refusal does: the cost after a
+    // receipt is fixed. Never the driver's text.
+    if (/(^|[^A-Z_])PURCHASE_FROZEN([^A-Z_]|$)/.test(`${String(error)} ${String((error as { cause?: unknown })?.cause ?? '')}`))
+      throw conflict('لا تعدّل التكلفة بعد الاستلام؛ استخدم شحنة جديدة', 'PURCHASE_FROZEN');
     const current = await db
       .prepare('SELECT version FROM purchase_orders WHERE id=?')
       .bind(purchase.id)
@@ -308,18 +315,33 @@ adminProcurementRoutes.get('/receiving/:id', async (c) => {
 /**
  * The purchase's FX snapshot (FX plan §17, L6): the effective USD/IQD, EUR/USD
  * and CNY/USD of `fx_rate_pairs` at the moment it is first ordered, written
- * once (`WHERE fx_snapshot_at IS NULL`). The rates are read here, not by a
- * sub-select, so a database without 0179 is detected and the snapshot skipped
- * instead of failing the purchase.
+ * once (`WHERE fx_snapshot_at IS NULL`; from 0182 the database refuses any
+ * later change too). The rates are read here, not by a sub-select, so a
+ * database without 0179 is detected and the snapshot skipped instead of
+ * failing the purchase. FX-6 (0182) records each rate's version beside it —
+ * the batches received from this purchase carry them (worker/lib/batchSnapshot.ts);
+ * without 0182 the statement is the FX-1 one, byte for byte.
  */
 async function fxSnapshotStatements(db: D1Database, id: string, now: string): Promise<D1PreparedStatement[]> {
-  let rates: Array<{ pair: string; effective_rate: string | null }>;
+  let rates: Array<{ pair: string; effective_rate: string | null; effective_version: number | null }>;
   try {
-    rates = (await db.prepare('SELECT pair, effective_rate FROM fx_rate_pairs').all<{ pair: string; effective_rate: string | null }>()).results ?? [];
+    rates = (await db.prepare('SELECT pair, effective_rate, effective_version FROM fx_rate_pairs').all<{ pair: string; effective_rate: string | null; effective_version: number | null }>()).results ?? [];
   } catch {
     return [];
   }
   const of = (pair: string) => rates.find((r) => r.pair === pair)?.effective_rate ?? null;
+  const versionOf = (pair: string) => {
+    const r = rates.find((x) => x.pair === pair);
+    return r?.effective_rate != null && Number.isSafeInteger(r.effective_version) && Number(r.effective_version) > 0 ? Number(r.effective_version) : null;
+  };
+  if (await batchSnapshotInstalled(db))
+    return [
+      db
+        .prepare(
+          'UPDATE purchase_orders SET fx_usd_iqd_at_purchase=?, fx_eur_usd_at_purchase=?, fx_cny_usd_at_purchase=?, fx_snapshot_at=?, fx_usd_iqd_version_at_purchase=?, fx_eur_usd_version_at_purchase=?, fx_cny_usd_version_at_purchase=? WHERE id=? AND fx_snapshot_at IS NULL',
+        )
+        .bind(of('USD_IQD'), of('EUR_USD'), of('CNY_USD'), now, versionOf('USD_IQD'), versionOf('EUR_USD'), versionOf('CNY_USD'), id),
+    ];
   return [
     db
       .prepare(
@@ -615,6 +637,11 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
     ).bind(eventId, id, JSON.stringify(b)),
   ];
   const funded=(await c.env.DB.prepare('SELECT * FROM purchase_investor_allocations WHERE purchase_id=?').bind(id).all<{incoming_id:string;contract_id:string;principal_iqd:number}>()).results??[];
+  // FX-6 (§17): each lot records, in its own INSERT, the rates this purchase
+  // was confirmed at, the supplier's own currency and amount and the IQD it is
+  // booked at. Without 0182 the lot INSERT is the one before FX-6.
+  const snapshots = await batchSnapshotInstalled(c.env.DB);
+  const calculatedAt = new Date().toISOString();
   let total = 0,
     seq = 0,
     changed = 0;
@@ -661,6 +688,9 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
         lotId: lot,
         actorUserId: user.id,
         receivedAt: `${day}T09:00:00.000Z`,
+        snapshotOf: snapshots
+          ? (cost) => purchaseLotSnapshot({ ...d.purchase, id } as PurchaseFxSource, line, { unitCostIqd: cost.unitCostIqd, purchaseUnitIqd: cost.purchaseUnitIqd }, calculatedAt)
+          : null,
       });
       statements.push(...plan.statements);
       for(const share of capitalShares)statements.push(c.env.DB.prepare('INSERT INTO purchase_investor_lot_capital(lot_id,contract_id,unit_principal_iqd,qty) VALUES (?,?,?,?)').bind(lot,share.contract_id,Math.floor(share.principal_iqd/line.qty_ordered)+Number(position<share.principal_iqd%line.qty_ordered),segment.qty));

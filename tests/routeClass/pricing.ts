@@ -30,6 +30,13 @@ export default {
       routes: {
         'GET /overview': 'cost_read',
         'GET /products/:id': 'cost_read',
+        // FX-6 (FX programme plan §8, §9 §16-§19): the owner's batch read model —
+        // each batch's fixed IQD cost and its purchase-time rates.
+        'GET /batches': {
+          cls: 'cost_read',
+          path: '/api/admin/pricing/batches?product_id=p_a1',
+          why: 'what each batch actually cost in IQD and the exchange rates it was bought at (the 0182 snapshot) — every figure private',
+        },
         'POST /products/:id/what-if': {
           cls: 'cost_read',
           body: { supplier_cost: '100.5', currency: 'EUR' },

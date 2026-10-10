@@ -410,6 +410,22 @@ export const FINANCIAL_FIELDS = [
   // -- FX-5 (FX plan §7.8, §8): the preview before an owner rate act — how far today's price lies
   // -- below the new replacement cost + minimum profit (a cost oracle).
   'deficit_iqd',
+  // -- FX-6 (FX plan §4.3, §4.5): a batch's purchase snapshot beyond the FX-1 names above — the
+  // -- version of each rate it carries, when and from where it took them, the purchase snapshot's
+  // -- versions, and the lot's landed total in the owner's batch read model. A version or a time is
+  // -- no amount, but it names WHICH private rate a batch carries (an oracle with the rate history),
+  // -- so the whole family is in the net; the generic snapshot_version / snapshot_source /
+  // -- calculated_at / split_from_lot_id / purchase_id stay out (purchase_id is investor vocabulary)
+  // -- and reach no assistant through the explicit lot column lists.
+  'usd_iqd_fx_version',
+  'eur_usd_fx_version',
+  'cny_usd_fx_version',
+  'fx_snapshot_at',
+  'fx_snapshot_source',
+  'fx_usd_iqd_version_at_purchase',
+  'fx_eur_usd_version_at_purchase',
+  'fx_cny_usd_version_at_purchase',
+  'actual_landed_total_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

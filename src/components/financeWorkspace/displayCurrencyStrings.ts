@@ -120,6 +120,12 @@ export const PA_STRINGS = {
     en: 'Accounting value: {amount}',
     ckb: 'بەهای ژمێریاری: {amount}',
   },
+  // ---- FX-6 (FX plan §17, §19): a line's cost of goods at its batches' purchase-time rates
+  usdBatchCost: {
+    ar: 'تكلفة البضاعة في {n} بندًا محسوبة بسعر الدولار الذي سجّلته دفعاتها وقت الشراء؛ والإيراد بسعر وقت الطلب.',
+    en: 'Goods cost on {n} lines is at the dollar rate their batches recorded when bought; revenue is at the rate when ordered.',
+    ckb: 'تێچووی بەرهەم لە {n} هێڵدا بە نرخی ئەو دۆلارەیە کە وەجبەکانیان لە کاتی کڕیندا تۆماریان کردووە؛ داهات بە نرخی کاتی داواکردنە.',
+  },
   chartsInUsd: {
     ar: 'القيم بالدولار للعرض، كل طلب بسعر وقت إنشائه؛ حسب يوم استلام الطلب بتوقيت بغداد.',
     en: 'Values in US dollars for display, each order at the rate of its own time; by delivered date in Baghdad time.',

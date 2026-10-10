@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, Card, Input, money, T, today, useLabels, useOperation } from '../adminOperations/shared';
 import LotCountForm from './LotCountForm';
 import LotScanner from './LotScanner';
+import BatchSnapshotCard from './BatchSnapshotCard';
 import { daysSince } from './shared';
 
 const INVESTMENT = '/api/admin/investment-finance';
@@ -54,6 +55,7 @@ export default function InventoryLotPanel({ onChanged, onOperations }: { onChang
       <div className="mb-4 flex flex-wrap gap-2"><button type="button" className={T.btnSecondary} onClick={() => setShowCount((v) => !v)}>{loc('جرد هذه الدفعة', 'Count this lot')}</button><button type="button" className={T.btnSecondary} disabled={!detail.lot.incoming_id} onClick={() => setShowCost((v) => !v)}>{loc('تعديل تكلفة الوحدة', 'Adjust unit cost')}</button><button type="button" className={T.btnGhost} onClick={() => setDetail(null)}>{loc('إغلاق', 'Close')}</button></div>
       <LotScanner selection={{ product_id: detail.lot.product_id, scope: detail.lot.scope, scope_id: detail.lot.scope_id }} onScanned={(r) => { if (r.lot?.id !== detail.lot.id) throw new Error(loc('الرمز يخص دفعة أخرى من هذا المنتج', 'The label belongs to another lot of this item')); }} />
       <dl className="inventory-review mb-4"><div><dt>{loc('المستلم / المتبقي', 'Received / remaining')}</dt><dd>{detail.lot.qty_received} / {detail.lot.qty_remaining}</dd></div><div><dt>{loc('تكلفة الوحدة الحالية', 'Current unit cost')}</dt><dd>{money(currentCost(detail.lot))}</dd></div><div><dt>{loc('مصدر الشراء', 'Purchase origin')}</dt><dd>{detail.lot.incoming_id || loc('رصيد افتتاحي', 'Opening balance')}</dd></div><div><dt>{loc('الموقع', 'Location')}</dt><dd>{detail.lot.location_name || '—'}</dd></div></dl>
+      <BatchSnapshotCard key={`snapshot:${detail.lot.id}`} filter={{ lot_id: detail.lot.id }} />
       {showCount && <div className="inventory-line mb-4"><LotCountForm key={detail.lot.id} initialLot={detail.lot.id} lots={[detail.lot]} onChanged={async () => { await load(); await open(detail.lot.id); onChanged(); }} /></div>}
       {showCost && <div className="inventory-line mb-4">
         <p className={`mb-3 text-sm ${T.text2}`}>{loc('التكلفة السابقة', 'Previous cost')}: {money(currentCost(detail.lot))}</p>

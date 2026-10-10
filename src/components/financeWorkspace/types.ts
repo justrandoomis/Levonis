@@ -93,6 +93,8 @@ export interface DisplayUsdSummary {
   today_rate?: string | null;
   at_time_count?: number;
   today_count?: number;
+  /** FX-6: lines whose goods cost is at their batches' purchase-time rates. */
+  batch_cost_lines?: number;
   approximate?: boolean;
   orders?: Record<string, UsdOrderCents>;
   kinds?: Record<string, UsdCents>;
@@ -104,9 +106,9 @@ export interface DisplayUsdSummary {
   totals?: UsdCents;
 }
 /** `display_usd` of `GET /orders?display=USD`. */
-export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; orders?: Record<string, UsdOrderCents> }
+export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; batch_cost_lines?: number; orders?: Record<string, UsdOrderCents> }
 /** `display_usd` of `GET /orders/:id?display=USD`. */
-export interface DisplayUsdOrder { available: boolean; today_rate?: string | null; usd_basis?: 'at_time' | 'today'; fx_rate_snapshot?: string; cents?: UsdCents; lines?: Record<string, UsdCents> }
+export interface DisplayUsdOrder { available: boolean; today_rate?: string | null; usd_basis?: 'at_time' | 'today'; fx_rate_snapshot?: string; cents?: UsdCents; lines?: Record<string, UsdCents>; batch_cost_lines?: number }
 
 export interface FinanceSummary {
   /** Present only with `?display=USD`. */

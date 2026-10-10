@@ -72,13 +72,54 @@ const DERIVED: ReadonlyArray<readonly [string, (c: Cents) => number | null]> = [
 
 /**
  * One row (an order's totals or one line) in cents. A field the row does not
- * carry is left out; a field that is null in dinars is null in cents.
+ * carry is left out; a field that is null in dinars is null in cents. An
+ * `override` replaces one additive field's cents (FX-6: a line's cost of goods
+ * at its batches' own purchase-time rates) BEFORE the derived fields are
+ * recomputed, so revenue − cost = profit still holds to the cent.
  */
-export function centsOf(row: Row, rate: string): Cents {
+export function centsOf(row: Row, rate: string, override: Partial<Record<(typeof ADDITIVE_IQD_FIELDS)[number], number>> = {}): Cents {
   const out: Cents = {};
-  for (const f of ADDITIVE_IQD_FIELDS) if (f in row) out[cent(f)] = row[f] === null ? null : iqdToCents(row[f] ?? 0, rate);
+  for (const f of ADDITIVE_IQD_FIELDS) {
+    if (!(f in row)) continue;
+    const forced = override[f];
+    out[cent(f)] = row[f] === null ? null : forced !== undefined ? forced : iqdToCents(row[f] ?? 0, rate);
+  }
   for (const [f, formula] of DERIVED) if (f in row) out[cent(f)] = row[f] === null || row[f] === undefined ? null : formula(out);
   return out;
+}
+
+/** The parts of a profit line this module reads to cost it at its batches' rates. */
+export interface BatchCostedLine {
+  cogs_iqd: number | null;
+  allocations?: ReadonlyArray<{ lot_id: string; cogs_iqd: number | null; returned_qty?: number; returned_cogs_iqd: number | null; late_cost_iqd: number }>;
+}
+
+/**
+ * FX-6 (FX plan §17, §19; the profit page's USD view): a line's cost of goods
+ * in cents at the purchase-time USD/IQD its batches RECORDED — each FIFO
+ * allocation's dinars (what was consumed, less what came back, plus a later
+ * owner reconciliation of the lot) at its own lot's rate, summed. Null — the
+ * caller then converts at the order's rate, as before — unless every
+ * allocation's lot has a recorded rate and the allocations add up EXACTLY to
+ * the line's cost (a manual cost correction, an unknown return or a legacy
+ * refund breaks that, and such a line is never half-converted).
+ */
+export function batchCogsCents(line: BatchCostedLine, lotRates: ReadonlyMap<string, string>): number | null {
+  const allocations = line.allocations ?? [];
+  if (line.cogs_iqd === null || !allocations.length) return null;
+  let iqd = 0, cents = 0;
+  for (const a of allocations) {
+    const rate = lotRates.get(a.lot_id);
+    if (!rate || a.cogs_iqd === null) return null;
+    const returned = a.returned_cogs_iqd ?? ((a.returned_qty ?? 0) > 0 ? null : 0);
+    if (returned === null) return null;
+    const own = a.cogs_iqd - returned + (a.late_cost_iqd ?? 0);
+    const c = iqdToCents(own, rate);
+    if (c === null) return null;
+    iqd += own;
+    cents += c;
+  }
+  return iqd === line.cogs_iqd ? cents : null;
 }
 
 /** Column sums of cents; a null anywhere in a column makes it null (as the IQD `sumRows` does). */

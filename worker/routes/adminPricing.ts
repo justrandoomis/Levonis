@@ -54,6 +54,13 @@
  * and, once any product is engine-priced, the act carries that preview's
  * `preview_hash` (409 PRICING_PREVIEW_REQUIRED / PRICING_PREVIEW_STALE return
  * the fresh preview).
+ *
+ * FX-6 (FX programme plan §8, §9 §16-§19) adds the owner's batch read model:
+ *   GET  /batches?product_id= | ?lot_id= | ?purchase_id=
+ * each batch's fixed IQD cost (`batch_cost`) and, apart, its purchase-time
+ * snapshot — recorded at receipt (migration 0182), derived from its own
+ * purchase and labelled so, or known only in IQD (worker/lib/batchSnapshot.ts).
+ * A read: nothing written.
  */
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -147,6 +154,7 @@ import { sha256Hex } from '../lib/crypto';
 import { FX_GUARD_CHANGED, recordSecurityEvent } from '../lib/securityEvents';
 import { previewRateAct, type RateMove, type RatePreview } from '../lib/pricingEngine/ratePreview';
 import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
+import { loadBatches, type BatchFilter } from '../lib/batchSnapshot';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -193,6 +201,24 @@ adminPricingRoutes.get('/products/:id', async (c) => {
   const evaluation = evaluateProduct(loaded, ctx, reference);
   // `legacy_hash` fences «قبول القيم المرحّلة» on the values shown here (POST …/targets/adopt).
   return c.json({ ...productDetailDto(evaluation, reference), legacy_hash: await legacyHashOf(evaluation.rules) });
+});
+
+/**
+ * «الدفعات وأسعار الشراء» (FX-6, §16-§19): exactly one of `product_id`,
+ * `lot_id` or `purchase_id`. The two costs are never mixed: this is what each
+ * batch ACTUALLY cost (and the rates it was bought at); the engine's current
+ * replacement cost is on /products/:id.
+ */
+adminPricingRoutes.get('/batches', async (c) => {
+  const pick = (['product_id', 'lot_id', 'purchase_id'] as const).flatMap((k) => {
+    const v = c.req.query(k);
+    return v === undefined ? [] : [[k, v.trim()] as const];
+  });
+  const [only] = pick;
+  if (pick.length !== 1 || !only || !/^[A-Za-z0-9_:.-]{1,60}$/.test(only[1]))
+    throw new HttpError(400, 'اختر منتجًا أو دفعة أو أمر شراء واحدًا / Name exactly one product, batch or purchase', 'BATCH_FILTER_REQUIRED');
+  const filter = { [only[0]]: only[1] } as BatchFilter;
+  return c.json({ success: true, ...(await loadBatches(c.env.DB, filter)) });
 });
 
 adminPricingRoutes.post('/products/:id/what-if', async (c) => {

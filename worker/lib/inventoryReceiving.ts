@@ -59,6 +59,7 @@
 
 import type { StockScope } from './inventory';
 import { lotCostBreakdown, type LotCostBreakdown } from './inventoryLots';
+import { snapshotInsertParts, type LotSnapshot } from './batchSnapshot';
 
 export type IncomingStatus = 'draft' | 'incoming' | 'partial' | 'received' | 'cancelled';
 
@@ -76,6 +77,10 @@ export interface IncomingRow {
   supplier_id: string | null;
   purchase_date: string | null;
   status: IncomingStatus;
+  /** §43: the source currency, preserved and never used for accounting (a batch's FX-6 snapshot records it). */
+  source_currency?: string | null;
+  source_unit_amount?: number | null;
+  exchange_rate_used?: number | null;
 }
 
 /** The three components, and only the three (§8). */
@@ -197,6 +202,14 @@ export interface ReceiveInput {
   lotId: string;
   actorUserId: string | null;
   receivedAt: string;
+  /**
+   * FX-6 (migration 0182): the batch's purchase-time snapshot, built from the
+   * cost this receipt books (worker/lib/batchSnapshot.ts). Written in the lot's
+   * OWN insert, once — the database refuses any later change. Omitted (a
+   * database without 0182, or a caller with nothing to record) and the insert
+   * is byte-identical to the one before FX-6.
+   */
+  snapshotOf?: ((cost: LotCostBreakdown) => LotSnapshot) | null;
 }
 
 /**
@@ -241,10 +254,37 @@ export function planReceive(db: D1Database, input: ReceiveInput): ReceivePlan {
   const idem = `receipt:${receiptId}`;
   const statements: D1PreparedStatement[] = [];
 
+  const lotValues = [
+    lotId,
+    row.product_id,
+    row.scope,
+    row.scope_id,
+    qty,
+    cost.unitCostIqd,
+    cost.purchaseUnitIqd,
+    cost.shippingShareIqd,
+    cost.internalShareIqd,
+    cost.totalCostIqd,
+    row.id,
+    row.supplier_id,
+    row.purchase_date,
+    receivedAt,
+    actorUserId,
+    counterRowId,
+  ];
+  const snapshot = input.snapshotOf ? snapshotInsertParts(input.snapshotOf(cost), 17) : null;
   statements.push(
     db
       .prepare(
-        `INSERT INTO inventory_lots
+        snapshot
+          ? `INSERT INTO inventory_lots
+           (id, product_id, scope, scope_id, qty_received, qty_remaining,
+            unit_cost_iqd, purchase_unit_iqd, shipping_share_iqd, internal_share_iqd, total_cost_iqd,
+            cost_basis, incoming_id, supplier_id, purchase_date, received_at, created_by, ${snapshot.columns})
+         SELECT ?1, ?2, ?3, ?4, ?5, ?5, ?6, ?7, ?8, ?9, ?10, 'received', ?11, ?12, ?13, ?14, ?15, ${snapshot.placeholders}
+          WHERE EXISTS (SELECT 1 FROM "${target.table}"
+                         WHERE id = ?16 AND "${target.column}" IS NOT NULL)`
+          : `INSERT INTO inventory_lots
            (id, product_id, scope, scope_id, qty_received, qty_remaining,
             unit_cost_iqd, purchase_unit_iqd, shipping_share_iqd, internal_share_iqd, total_cost_iqd,
             cost_basis, incoming_id, supplier_id, purchase_date, received_at, created_by)
@@ -252,24 +292,7 @@ export function planReceive(db: D1Database, input: ReceiveInput): ReceivePlan {
           WHERE EXISTS (SELECT 1 FROM "${target.table}"
                          WHERE id = ?16 AND "${target.column}" IS NOT NULL)`
       )
-      .bind(
-        lotId,
-        row.product_id,
-        row.scope,
-        row.scope_id,
-        qty,
-        cost.unitCostIqd,
-        cost.purchaseUnitIqd,
-        cost.shippingShareIqd,
-        cost.internalShareIqd,
-        cost.totalCostIqd,
-        row.id,
-        row.supplier_id,
-        row.purchase_date,
-        receivedAt,
-        actorUserId,
-        counterRowId
-      )
+      .bind(...lotValues, ...(snapshot?.values ?? []))
   );
 
   statements.push(

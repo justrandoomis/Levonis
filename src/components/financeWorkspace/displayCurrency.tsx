@@ -57,9 +57,11 @@ export function CurrencyToggle({ value, onChange }: { value: DisplayCurrency; on
  * («≈»), or a mix — or, with no approved rate at all, that the page stays in
  * dinars.
  */
-export function UsdBasisNote({ available, atTimeCount = 0, todayCount = 0, todayRate, single }: {
+export function UsdBasisNote({ available, atTimeCount = 0, todayCount = 0, todayRate, single, batchLines = 0 }: {
   available: boolean; atTimeCount?: number; todayCount?: number; todayRate?: string | null;
   single?: { usd_basis: 'at_time' | 'today'; fx_rate_snapshot: string };
+  /** FX-6: how many lines' goods cost is at their batches' purchase-time rates (the server's `batch_cost_lines`). */
+  batchLines?: number;
 }) {
   const { loc } = useLanguage();
   if (!available) return <p className="fw-note" role="status" data-finance-usd-note="none">{tri(loc, PA_STRINGS.usdNone)}</p>;
@@ -71,5 +73,6 @@ export function UsdBasisNote({ available, atTimeCount = 0, todayCount = 0, today
         : tri(loc, PA_STRINGS.usdAtTimeEach);
   return <p className="fw-note" role="status" data-finance-usd-note={single?.usd_basis ?? (todayCount > 0 ? (atTimeCount ? 'mixed' : 'today') : 'at_time')}>
     {tri(loc, PA_STRINGS.usdNote)} <bdi>{basis}</bdi>
+    {batchLines > 0 && <> <bdi data-finance-usd-batch-cost>{tri(loc, PA_STRINGS.usdBatchCost, { n: batchLines })}</bdi></>}
   </p>;
 }

@@ -14,6 +14,7 @@ import { counterTarget } from '../lib/inventoryReceiving';
 import type { StockScope } from '../lib/inventory';
 import { investorFinanceInstalled, planInvestorCapitalLoss, planInvestorSources, type InvestmentContract } from '../lib/investorFinance';
 import { effectiveLotCostSql } from '../lib/inventoryLots';
+import { SPLIT_CHILD_INSERT_SQL, batchSnapshotInstalled, preSnapshotLotSelect } from '../lib/batchSnapshot';
 
 export const adminStockOperationsRoutes = new Hono<AppContext>();
 adminStockOperationsRoutes.use('*', requireAdmin);
@@ -116,6 +117,10 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
   const versioned=await investorFinanceInstalled(db);
   const costVersion=versioned?await db.prepare('SELECT * FROM inventory_lot_cost_versions WHERE lot_id=? ORDER BY version DESC LIMIT 1').bind(lotId).first<{version:number;unit_cost_iqd:number;adjustment_id:string}>():null;
   const counter = counterTarget(l.scope)!;
+  // FX-6 (§17): a split's child is part of the same batch, so it copies the
+  // parent's purchase-time snapshot in the same INSERT and names its parent.
+  // Without 0182 the INSERT is the one before FX-6.
+  const snapshots = target !== lotId && (await batchSnapshotInstalled(db));
   const statements = [
     ...fence(
       db,
@@ -128,7 +133,9 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
       db.prepare('UPDATE inventory_lots SET qty_remaining=qty_remaining-? WHERE id=?').bind(qty, lotId),
       db
         .prepare(
-          'INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at,created_by,incoming_id,supplier_id,purchase_date) VALUES (?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?)',
+          snapshots
+            ? SPLIT_CHILD_INSERT_SQL
+            : 'INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at,created_by,incoming_id,supplier_id,purchase_date) VALUES (?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?)',
         )
         .bind(
           target,
@@ -146,6 +153,7 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
           l.incoming_id,
           l.supplier_id,
           l.purchase_date,
+          ...(snapshots ? [lotId, lotId] : []),
         ),
     );
   if(versioned){
@@ -665,7 +673,10 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
 adminStockOperationsRoutes.post('/scan',async c=>{
   const user=c.get('user')!;await requireCapability(c.env,user,'receive');const b=await c.req.json<Record<string,unknown>>(),db=c.env.DB;
   const code=text(b.code,160).trim(),serial=await db.prepare('SELECT * FROM stock_serial_links WHERE serial_norm=?').bind(normalizeSerial(code)).first<{lot_id:string;serial_norm:string;order_item_id:string|null}>();
-  const lot=await db.prepare('SELECT l.*,p.name,p.name_ar FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.id=?').bind(serial?.lot_id??code).first<Record<string,unknown>>();if(!lot)throw notFound('الرمز غير مرتبط بدفعة أو رقم جهاز موثق');
+  // The pre-0182 lot columns by name (FX plan §4.3, critique F14a): a scan is
+  // open to every admin who receives, and a batch's purchase snapshot is the
+  // owner's alone (GET /api/admin/pricing/batches).
+  const lot=await db.prepare(`SELECT ${preSnapshotLotSelect('l')},p.name,p.name_ar FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id WHERE l.id=?`).bind(serial?.lot_id??code).first<Record<string,unknown>>();if(!lot)throw notFound('الرمز غير مرتبط بدفعة أو رقم جهاز موثق');
   if((b.product_id&&b.product_id!==lot.product_id)||(b.scope&&b.scope!==lot.scope)||(b.scope_id!==undefined&&b.scope_id!==lot.scope_id))throw badRequest('الرمز لا يطابق المنتج أو الخيار أو اللون المختار','SCAN_SELECTION_MISMATCH');
   if(b.order_item_id&&!await lineHoldsLot(db,text(b.order_item_id,60),String(lot.id)))throw badRequest('الدفعة ليست من أصل هذا الطلب','SCAN_ORDER_MISMATCH');
   return c.json(projectForAdmin(c.env,user,{success:true,lot,serial,match:true}));

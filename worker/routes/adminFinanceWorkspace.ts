@@ -18,7 +18,8 @@ import { enrichOrderProfitReview } from '../lib/orderProfitReview';
 import { enrichOrderCostProjections } from '../lib/orderCostProjection';
 import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportOverlay';
 import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/historyRate';
-import { baghdadDayStart, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, sumCents, type Cents } from '../lib/financeUsdDisplay';
+import { baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, sumCents, type Cents } from '../lib/financeUsdDisplay';
+import { loadLotUsdRates } from '../lib/batchSnapshot';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -158,6 +159,13 @@ async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
  * promotion at the start of its month. With no applied rate at all,
  * `display_usd.available` is false and the page stays in dinars. Owner only,
  * private and no-store, as the rest of this router (the door above).
+ *
+ * FX-6 (FX plan §17, §19): a line's cost of goods converts at the USD/IQD its
+ * BATCHES recorded when they were bought (migration 0182) wherever every
+ * batch of the line recorded one and its allocations add up to the line's
+ * cost exactly; otherwise at the order's rate, as above. Revenue stays at the
+ * order's rate, and every derived figure is recomputed from those cents.
+ * `batch_cost_lines` counts the lines so costed.
  */
 type Display='IQD'|'USD';
 function displayOf(value:string|undefined):Display{
@@ -171,15 +179,29 @@ async function usdSteps(db:D1Database,instants:Array<number|null>){
   return loadUsdRateSteps(db,new Date(Math.min(anchor,now)).toISOString(),new Date(now).toISOString());
 }
 const unavailableUsd=()=>({available:false as const});
-interface OrderUsd{usd_basis:'at_time'|'today';fx_rate_snapshot:string;cents:Cents;lines:Map<string,Cents>}
-/** Each order and each of its lines in cents, at the order's own creation-time rate. Null when no rate exists at all. */
-function ordersInUsd(bases:OrderProfitBase[],steps:UsdRateSteps|null){
+interface OrderUsd{usd_basis:'at_time'|'today';fx_rate_snapshot:string;cents:Cents;lines:Map<string,Cents>;batch_lines:number}
+/** The purchase-time USD/IQD every batch these orders consumed recorded (FX-6); empty without 0182. */
+const lotRatesOf=(db:D1Database,bases:OrderProfitBase[])=>loadLotUsdRates(db,bases.flatMap((b)=>b.lines.flatMap((l)=>(l.allocations??[]).map((a)=>a.lot_id))));
+/** One order in cents: each line at its batches' recorded rates where it can be (FX-6), else at the order's rate; the totals' cost of goods to match. */
+function orderInUsd(b:OrderProfitBase,rate:string,lotRates:ReadonlyMap<string,string>){
+  const plain=()=>({cents:centsOf(b.totals,rate),lines:new Map(b.lines.map((l)=>[l.id,centsOf(l,rate)])),batch_lines:0});
+  if(!lotRates.size||b.totals.cogs_iqd===null||b.lines.some((l)=>l.cogs_iqd===null)||b.lines.reduce((v,l)=>v+n(l.cogs_iqd),0)!==b.totals.cogs_iqd)return plain();
+  let batchIqd=0,batchCents=0,batchLines=0;const lines=new Map<string,Cents>();
+  for(const l of b.lines){const c=batchCogsCents(l,lotRates);
+    if(c===null){lines.set(l.id,centsOf(l,rate));continue;}
+    batchLines+=1;batchIqd+=n(l.cogs_iqd);batchCents+=c;lines.set(l.id,centsOf(l,rate,{cogs_iqd:c}));}
+  const rest=iqdToCents(b.totals.cogs_iqd-batchIqd,rate);
+  if(!batchLines||rest===null)return plain();
+  return {cents:centsOf(b.totals,rate,{cogs_iqd:rest+batchCents}),lines,batch_lines:batchLines};
+}
+/** Each order and each of its lines in cents, at the order's own creation-time rate (a line's cost of goods at its batches' rates, FX-6). Null when no rate exists at all. */
+function ordersInUsd(bases:OrderProfitBase[],steps:UsdRateSteps|null,lotRates:ReadonlyMap<string,string>=new Map()){
   const out=new Map<string,OrderUsd>();
   for(const b of bases){const hit=usdRateAt(steps,instantOf(b.order.created_at));if(!hit)return null;
-    out.set(b.order_id,{usd_basis:hit.basis,fx_rate_snapshot:hit.rate,cents:centsOf(b.totals,hit.rate),lines:new Map(b.lines.map((l)=>[l.id,centsOf(l,hit.rate)]))});}
+    out.set(b.order_id,{usd_basis:hit.basis,fx_rate_snapshot:hit.rate,...orderInUsd(b,hit.rate,lotRates)});}
   return out;
 }
-const basisCounts=(orders:Map<string,OrderUsd>)=>{const today=[...orders.values()].filter((o)=>o.usd_basis==='today').length;return {at_time_count:orders.size-today,today_count:today};};
+const basisCounts=(orders:Map<string,OrderUsd>)=>{const today=[...orders.values()].filter((o)=>o.usd_basis==='today').length;return {at_time_count:orders.size-today,today_count:today,batch_cost_lines:[...orders.values()].reduce((v,o)=>v+o.batch_lines,0)};};
 const orderBlock=(orders:Map<string,OrderUsd>)=>Object.fromEntries([...orders].map(([id,o])=>[id,{usd_basis:o.usd_basis,fx_rate_snapshot:o.fx_rate_snapshot,cents:o.cents}]));
 function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',orders:Map<string,OrderUsd>){
   const groups=new Map<string,Cents[]>();
@@ -191,7 +213,7 @@ function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',orders:Map<
 async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean){
   const expenseStarts=expenses.map((e)=>baghdadDayStart(s(e.expense_day))),monthStarts=[...unallocatedDays.keys()].map((d)=>baghdadDayStart(d));
   const steps=await usdSteps(db,[...bases.map((b)=>instantOf(b.order.created_at)),...expenseStarts,...monthStarts]);
-  const orders=ordersInUsd(bases,steps);if(!orders||(!steps?.today&&!steps?.steps.length))return unavailableUsd();
+  const orders=ordersInUsd(bases,steps,await lotRatesOf(db,bases));if(!orders||(!steps?.today&&!steps?.steps.length))return unavailableUsd();
   let approximate=[...orders.values()].some((o)=>o.usd_basis==='today');
   const atDay=(day:string,iqd:number)=>{const hit=usdRateAt(steps,baghdadDayStart(day));if(!hit)return null;if(hit.basis==='today')approximate=true;return iqdToCents(iqd,hit.rate);};
   const generalByDay=new Map<string,number>();for(const e of expenses){const c=atDay(s(e.expense_day),n(e.total));if(c===null)return unavailableUsd();generalByDay.set(s(e.expense_day),c);}
@@ -269,7 +291,7 @@ adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const answer={success:true,orders:result.bases.map(orderRow),total:result.total,offset,range:r};
   if(display==='IQD')return c.json(answer);
   const steps=await usdSteps(c.env.DB,result.bases.map((b)=>instantOf(b.order.created_at)));
-  const orders=ordersInUsd(result.bases,steps);
+  const orders=ordersInUsd(result.bases,steps,await lotRatesOf(c.env.DB,result.bases));
   return c.json({...answer,display_usd:!orders||(!steps?.today&&!steps?.steps.length)?unavailableUsd():{available:true,today_rate:steps?.today??null,...basisCounts(orders),orders:orderBlock(orders)}});
 });
 async function detail(db:D1Database,id:string,canVerify=true){
@@ -297,8 +319,8 @@ adminFinanceWorkspaceRoutes.get('/orders/:id',async(c)=>{
   const answer={success:true,...await detail(c.env.DB,c.req.param('id'),canVerify),can_reconcile:canReconcile};
   if(display==='IQD')return c.json(answer);
   const steps=await usdSteps(c.env.DB,[instantOf(answer.order.created_at)]);
-  const order=ordersInUsd([answer],steps)?.get(answer.order_id);
-  return c.json({...answer,display_usd:!order?unavailableUsd():{available:true,today_rate:steps?.today??null,usd_basis:order.usd_basis,fx_rate_snapshot:order.fx_rate_snapshot,cents:order.cents,lines:Object.fromEntries(order.lines)}});
+  const order=ordersInUsd([answer],steps,await lotRatesOf(c.env.DB,[answer]))?.get(answer.order_id);
+  return c.json({...answer,display_usd:!order?unavailableUsd():{available:true,today_rate:steps?.today??null,usd_basis:order.usd_basis,fx_rate_snapshot:order.fx_rate_snapshot,cents:order.cents,lines:Object.fromEntries(order.lines),batch_cost_lines:order.batch_lines}});
 });
 adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
   const db=c.env.DB,actor=c.get('user')!,id=c.req.param('id');await requireCapability(c.env,actor,'accounting');

@@ -23,14 +23,17 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index';
 import { APEX, asD1, ctx } from './fixtures/app';
 import { OWNER, ROLES, seededCopy, sweepGets, type SweepResult } from './fixtures/roleMatrix';
-import { FX_PUBLIC_RATE, FX_SENTINELS, seedFxSentinels } from './fixtures/fxSentinels';
+import { BATCH_SENTINELS, FX_PUBLIC_RATE, FX_SENTINELS, seedBatchSentinels, seedFxSentinels } from './fixtures/fxSentinels';
 
 const seed = () => {
   const raw = seededCopy();
   seedFxSentinels(raw);
+  // FX-6: a batch whose purchase snapshot carries sentinels (migration 0182).
+  seedBatchSentinels(raw);
   return raw;
 };
-const extra = { decimals: FX_SENTINELS, numbers: FX_SENTINELS.map(Number) };
+const SENTINELS = [...FX_SENTINELS, ...BATCH_SENTINELS];
+const extra = { decimals: SENTINELS, numbers: SENTINELS.map(Number) };
 
 let sweep: Promise<Record<string, SweepResult>> | null = null;
 const all = () => (sweep ??= sweepGets({ seed, extra, roles: { ...ROLES, owner: OWNER } }));
@@ -59,7 +62,7 @@ test('S1: the public answers carry the display rate and nothing else of FX; the 
   assert.equal(settings.settings.displayUsdRate, FX_PUBLIC_RATE, 'the exception: the effective USD/IQD is public by design');
   for (const path of ['/', '/p/a1', '/api/settings/public', '/api/home', '/api/home/sections', '/api/products', '/api/products/a1', '/api/public/v1/products']) {
     const { text } = await fetchText(path);
-    for (const s of FX_SENTINELS) assert.equal(text.includes(s), false, `${path} carries ${s}`);
+    for (const s of SENTINELS) assert.equal(text.includes(s), false, `${path} carries ${s}`);
     assert.doesNotMatch(text, /market_rate|adjustment_iqd_per_usd|market_adjustment_iqd|settings_diff|pending_effective|last_known_good|drift_anchor|iqwealth|rate_iqd"/, path);
   }
 });

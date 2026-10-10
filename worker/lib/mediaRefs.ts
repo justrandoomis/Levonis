@@ -707,6 +707,11 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'pricing_audit.pricing_before_json': 'private pricing values before a change (amounts, rates, ids); no media',
   'pricing_audit.pricing_after_json': 'private pricing values after a change (amounts, rates, ids); no media',
   'pricing_audit.summary_json': 'counts and codes of a pricing change; no media',
+  // 0182 — FX plan §4.3: a batch's purchase snapshot. Enum words, a timestamp and a currency code.
+  'inventory_lots.snapshot_source': "where a batch's snapshot came from (purchase / legacy_incoming / adjustment); no media",
+  'inventory_lots.fx_snapshot_at': 'a timestamp: when the purchase captured the central rates the batch carries; no media',
+  'inventory_lots.fx_snapshot_source': "where a batch's USD/IQD came from (document / central); no media",
+  'inventory_lots.supplier_original_currency': "the supplier invoice's currency code (IQD / USD / EUR / CNY); no media",
   'order_items.engine_combo_key': 'the SKU combination key an engine price was bought at (owner decision 6); no media',
   'quick_buy_actions.key': 'a request de-duplication token',
   'quick_buy_events.action_key': 'the de-duplication token of the change that wrote the row',

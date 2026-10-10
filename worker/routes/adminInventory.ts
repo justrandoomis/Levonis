@@ -19,6 +19,7 @@ import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
 import { requireSelection } from '../lib/inventorySelection';
+import { PRE_SNAPSHOT_LOT_COLUMNS, batchSnapshotInstalled, legacyIncomingLotSnapshot } from '../lib/batchSnapshot';
 
 /**
  * «إدارة المخزون» — THE OPERATIONAL LAYER, AS AN API.
@@ -277,8 +278,14 @@ adminInventoryRoutes.get('/lots', async (c) => {
     : 'l.product_id = ?';
   const args = isScope(scope) ? [scope, scopeId, ...(productId ? [productId] : [])] : [productId];
 
+  // The pre-0182 columns BY NAME, never `l.*` (FX plan §4.3, critique F14a):
+  // this list is open to assistant admins, and a batch's purchase snapshot —
+  // its rates, versions and source — is the owner's alone (GET
+  // /api/admin/pricing/batches). The cost columns among these are stripped
+  // for everyone but the owner by projectForAdmin, as before.
+  const lotColumns = PRE_SNAPSHOT_LOT_COLUMNS.map((k) => (k === 'unit_cost_iqd' ? `${cost} AS unit_cost_iqd` : `l.${k}`)).join(', ');
   const { results } = await c.env.DB.prepare(
-    `SELECT l.*, ${cost} AS unit_cost_iqd, s.name AS supplier_name,
+    `SELECT ${lotColumns}, s.name AS supplier_name,
             (SELECT COALESCE(SUM(qty), 0) FROM order_item_inventory_allocations a
               WHERE a.lot_id = l.id AND a.released_at IS NULL) AS consumed
        FROM inventory_lots l
@@ -560,13 +567,19 @@ adminInventoryRoutes.post('/incoming/:id/receive', async (c) => {
     );
   }
 
+  // FX-6 (§17): the batch records the bare incoming record's own currency,
+  // amount and rate (a USD record's rate is its USD/IQD at purchase); no
+  // central snapshot exists for it. Without 0182 the lot INSERT is unchanged.
+  const receivedAt = new Date().toISOString();
+  const snapshots = await batchSnapshotInstalled(c.env.DB);
   const plan = planReceive(c.env.DB, {
     row,
     qty,
     receiptId,
     lotId: newId('ilot'),
     actorUserId: user.id,
-    receivedAt: new Date().toISOString(),
+    receivedAt,
+    snapshotOf: snapshots ? (cost) => legacyIncomingLotSnapshot(row, { unitCostIqd: cost.unitCostIqd, purchaseUnitIqd: cost.purchaseUnitIqd }, receivedAt) : null,
   });
 
   /**

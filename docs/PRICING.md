@@ -334,6 +334,83 @@ exchange rate alone pays nothing (`FX_ONLY_DROP`). A line bought at a manual
 price keeps the dinar rule. Orders created earlier keep the rule they were
 bought under (`worker/lib/pricingEngine/protectionBasis.ts`).
 
+## A batch remembers the rates of its purchase (FX-6, migration 0182, DECISIONS row 199)
+
+FX programme plan §4.3 and §9 §16-§19. `inventory_lots` IS the batch. Two
+costs are never mixed (§19): what a batch **actually cost** — its IQD, fixed
+at receipt — and the engine's **current replacement cost** (`pricing_*`),
+which follows today's rates. The profit and FIFO paths read lot costs only;
+the engine reads no lot (`tests/pricingCurrencyRoles.test.ts`).
+
+- **When it is written.** A purchase confirmed `ordered` takes the central
+  effective USD/IQD (U), EUR/USD (E) and CNY/USD (C) once (FX-1), and from
+  0182 each rate's `effective_version` beside it
+  (`purchase_orders.fx_*_version_at_purchase`). When it is **received**, each
+  new lot records, in its own INSERT and never again
+  (`worker/lib/batchSnapshot.ts` through `planReceive`): the supplier's own
+  currency and amount per unit (`supplier_original_*`; a 'total' line's
+  `supplier_line_total_original`), the document's own rate
+  (`exchange_rate_at_purchase`), U / E / C with their versions and the moment
+  the purchase took them (`fx_snapshot_at`), where U came from
+  (`fx_snapshot_source`: `document` — a USD document's own rate, the rate
+  actually paid — or `central`), the supplier cost in USD
+  (`supplier_cost_usd_at_purchase`: USD as is, EUR × E, CNY × C, an IQD price
+  ÷ U floored to 6 places) and the historical USD equivalent
+  (`historical_usd_equivalent` = the lot's unit cost ÷ U, floored to 6 places
+  — an audit figure only). A bare incoming record (no purchase document)
+  records its own currency, amount and rate (`snapshot_source =
+  'legacy_incoming'`). A transfer split's child copies its parent's snapshot
+  and names it (`split_from_lot_id`). Found units (a positive count
+  adjustment) carry no purchase and no snapshot. The batch's landed IQD is the
+  existing `unit_cost_iqd` (an owner reconciliation wins, through
+  `effectiveLotCostSql`) — no duplicate column. Nothing reads today's rate.
+- **Immutable (§16).** `inventory_lot_snapshot_immutable` refuses any change
+  to a snapshot column — `NULL → value` included, so an old batch can never be
+  back-filled — beside 0181's lock on the cost columns, its no-delete and
+  no-re-insert. `inventory_lot_snapshot_shape` refuses a half-written
+  snapshot. A purchase's own FX snapshot is frozen once taken
+  (`purchase_order_fx_snapshot_frozen`), and a received purchase's cost
+  columns on `incoming_inventory`, `purchase_lines`, `purchase_orders` and
+  `purchase_charges` are frozen in the database too (value-compared; no
+  DELETE, no re-INSERT under its own id) — the routes already refused, and
+  every live path after a receipt still works
+  (`tests/receivedPurchaseFreezeLivePaths.test.ts`). A refused write answers
+  409 `PURCHASE_FROZEN` / `BATCH_COST_IMMUTABLE`.
+- **Old batches (§18).** Every lot received before 0182 keeps every new column
+  NULL. The owner's read model shows it «بالدينار فقط» / known only in IQD /
+  «تەنها بە دینار», each FX figure «غير معروف» / Unknown / «نەزانراو» — or,
+  when the purchase-time USD/IQD is known from its own purchase (a USD
+  document's rate, or a purchase ordered after FX-1 with its central
+  snapshot), a historical equivalent **derived for display, not stored**,
+  labelled «مشتق من مستند الشراء» / «مشتق من سعر الشراء المسجَّل».
+- **Where the owner sees it.** `GET /api/admin/pricing/batches?product_id= |
+  lot_id= | purchase_id=` (the owner's door; a read): per batch `batch_cost`
+  (booked unit cost, actual landed unit and total, the components) and, apart,
+  `snapshot` (recorded), `derived` or nothing, with `unknown_fields`. The card
+  «الدفعة وأسعار الشراء» shows it in the lot details of «المخزون» and under a
+  received purchase in «المشتريات» (ar / en / ckb); refused callers see nothing.
+- **Privacy.** Every snapshot figure, rate, rate version and source is in both
+  FINANCIAL_FIELDS copies. The two lot reads open to assistant admins
+  (`GET /api/admin/inventory/lots`, `POST /api/admin/stock-operations/scan`)
+  select the pre-0182 columns by name, so no snapshot column — private or
+  merely generic — reaches them (`tests/batchSnapshotPrivacy.test.ts`).
+- **The profit page's USD view** («الأرباح والتكاليف», `?display=USD`): a
+  line's cost of goods converts at the USD/IQD its **batches recorded** when
+  every FIFO allocation of the line came from such a batch and the
+  allocations add up to the line's cost exactly; otherwise at the order's rate
+  (the P-A history rate) as before. Revenue stays at the order's rate, the
+  derived figures are recomputed from the cents, and `batch_cost_lines` says
+  how many lines were costed so («تكلفة البضاعة في {n} بندًا محسوبة بسعر
+  الدولار الذي سجّلته دفعاتها وقت الشراء»). The dinars are untouched.
+- **Deploy-ahead.** Without 0182 the lot INSERT, the purchase snapshot and the
+  split are byte-identical to before; the read model shows no snapshot and the
+  USD view converts at the order's rate.
+- **Not stored (yet):** v2's split of a batch's charges into freight and other
+  additional costs per unit, and the route's profile, weight and volume on
+  the lot. The lot keeps its recorded IQD components (purchase, shipping incl.
+  the purchase's charges, internal delivery) and the purchase document keeps
+  the rest.
+
 ## The four price fields
 
 At **product**, **option** and **color** level:

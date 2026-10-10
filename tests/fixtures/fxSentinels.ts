@@ -66,3 +66,38 @@ export function seedFxSentinels(raw: DatabaseSync): void {
               '[{"field":"market_adjustment_iqd","before":"29.8642","after":"37.2501"}]');
   `);
 }
+
+/**
+ * FX-6 (FX plan §14.2 S1, migration 0182): a batch whose purchase snapshot is
+ * seeded with sentinels — the purchase-time U, E and C, the document's own
+ * rate, the supplier's amount and line total, the supplier cost in USD and
+ * the historical USD equivalent. The owner reads them on GET
+ * /api/admin/pricing/batches; no other caller may meet one anywhere.
+ */
+export const BATCH_SENTINELS = [
+  '1633.3133', // USD/IQD at purchase
+  '1.0777', // EUR/USD at purchase
+  '0.1399999', // CNY/USD at purchase
+  '1987.6543', // the document's own rate (IQD per EUR)
+  '371.4159', // the supplier's amount per unit
+  '2599.5017', // the line's original total
+  '400.271', // the supplier cost in USD at purchase
+  '432.104321', // the historical USD equivalent
+] as const;
+
+export const BATCH_SENTINEL_LOT = 'lot_fx6_sentinel';
+
+export function seedBatchSentinels(raw: DatabaseSync, productId = 'p_a1'): void {
+  raw
+    .prepare(
+      `INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at,
+         snapshot_version,snapshot_source,purchase_id,supplier_original_currency,supplier_original_amount,supplier_cost_mode,supplier_line_total_original,exchange_rate_at_purchase,
+         supplier_cost_usd_at_purchase,usd_iqd_rate_at_purchase,eur_usd_rate_at_purchase,cny_usd_rate_at_purchase,usd_iqd_fx_version,eur_usd_fx_version,cny_usd_fx_version,
+         fx_snapshot_at,fx_snapshot_source,historical_usd_equivalent,calculated_at)
+       VALUES (?, ?, 'base', '', 7, 7, 705800, 705800, 0, 0, 4940600, 'received', '2026-10-07T00:00:00.000Z',
+         1, 'purchase', 'po_fx6_sentinel', 'EUR', '371.4159', 'total', '2599.5017', '1987.6543',
+         '400.271', '1633.3133', '1.0777', '0.1399999', 3, 4, 5,
+         '2026-10-06T00:00:00.000Z', 'central', '432.104321', '2026-10-07T00:00:00.000Z')`
+    )
+    .run(BATCH_SENTINEL_LOT, productId);
+}
