@@ -40,3 +40,9 @@ CREATE TABLE IF NOT EXISTS product_completeness (
 CREATE INDEX IF NOT EXISTS idx_product_completeness_held ON product_completeness(product_id) WHERE held = 1;
 -- The admin list's «ناقص» filter and the owner's count.
 CREATE INDEX IF NOT EXISTS idx_product_completeness_incomplete ON product_completeness(complete) WHERE complete = 0;
+
+-- OWNER DECISION (2026-10-10): «في نعم اخفي كل المنتجات» — the switch ships ON. The verdict rows are
+-- written by every catalogue write and by the quarter-hour sweep, so `held` follows within the first
+-- ticks after this migration; the owner can still turn it off from «المنتجات». INSERT OR IGNORE: a
+-- switch the owner already moved is never overwritten, and a re-run changes nothing.
+INSERT OR IGNORE INTO admin_settings (key, value) VALUES ('catalogHideIncomplete', '{"enabled":true,"since":"2026-10-10T00:00:00.000Z","by":null}');

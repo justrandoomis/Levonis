@@ -40,6 +40,13 @@ export interface ProductSeed {
 }
 
 export function seedCatalog(raw: DatabaseSync): void {
+  // Migration 0184 ships the owner's switch ON (owner decision 2026-10-10). These fixtures test the
+  // switch itself, so they start from OFF; tests/catalogHideIncompleteDefault.test.ts holds the seed.
+  try {
+    raw.exec("DELETE FROM admin_settings WHERE key = 'catalogHideIncomplete'");
+  } catch {
+    /* a database before 0001's admin_settings — nothing to clear */
+  }
   raw.exec(`INSERT INTO catalogs (id, slug, name_ar, name_en, name_ckb, sort, active) VALUES ('cat_p', 'completeness-test-section', 'قسم الاختبار', 'Test section', 'بەشی تاقیکردنەوە', 0, 1)`);
 }
 
