@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, FileText, ImageIcon, MessageCircle, Mic, RefreshCw, Video } from 'lucide-react';
+import { IconButton } from '../ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError } from '../../lib/api';
 import { STRINGS, shortDate } from '../adminMemberships/strings';
@@ -98,21 +99,21 @@ export default function MessagesDesk() {
     return (
       <div className="flex h-[calc(100dvh-12.5rem)] min-h-[380px] flex-col gap-2" data-support-chat-thread>
         <div className="shrink-0 space-y-2">
-          <button onClick={back} className="inline-flex min-h-9 items-center gap-1 text-xs font-bold text-zinc-400 hover:text-white">
+          <button onClick={back} className="inline-flex min-h-9 items-center gap-1 text-xs font-bold text-text-secondary hover:text-white">
             <ChevronLeft className="h-4 w-4 rtl:rotate-180" aria-hidden />
             {cs.back}
           </button>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-border-subtle bg-surface px-3 py-2.5">
             <span className="min-w-0 break-words text-sm font-bold text-white">{who}</span>
-            <span className="font-mono text-xs text-zinc-400">
+            <span className="font-mono text-xs text-text-secondary">
               {cs.order} {open.order_id}
             </span>
-            {open.customer.email && open.customer.email !== who && <span className="break-all text-xs text-zinc-500">{open.customer.email}</span>}
+            {open.customer.email && open.customer.email !== who && <span className="break-all text-xs text-text-muted">{open.customer.email}</span>}
           </div>
         </div>
         {/* The panel is `h-full` inside its parent; this box is the parent,
             and it is what bounds the list so the composer stays on screen. */}
-        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/40">
+        <div className="lv-surface min-h-0 flex-1 overflow-hidden">
           <OrderChatPanel orderId={open.order_id} active />
         </div>
       </div>
@@ -124,38 +125,41 @@ export default function MessagesDesk() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-black text-white">{cs.messagesTitle}</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">{cs.messagesHint}</p>
+          <p className="mt-0.5 text-xs text-text-muted">{cs.messagesHint}</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-zinc-700 bg-zinc-800 p-0.5" role="group">
+          <div className="lv-well flex rounded-full border border-border-subtle p-0.5" role="group">
             {(['all', 'unread'] as const).map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
                 aria-pressed={filter === f}
-                className={`min-h-8 rounded-md px-3 text-xs font-bold transition-colors ${
-                  filter === f ? 'bg-zinc-600 text-white' : 'text-zinc-400 hover:text-white'
+                className={`min-h-8 rounded-full border px-3 text-xs font-bold transition-colors ${
+                  filter === f ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
               >
                 {f === 'all' ? cs.allThreads : cs.unreadOnly}
               </button>
             ))}
           </div>
-          <button onClick={() => void load()} aria-label={cs.refresh} title={cs.refresh} className="rounded-lg border border-zinc-700 bg-zinc-800 p-2 text-zinc-300 hover:text-white">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <IconButton
+            variant="secondary"
+            onClick={() => void load()}
+            label={cs.refresh}
+            icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
+          />
         </div>
       </div>
 
-      {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">{error}</div>}
+      {error && <div className="lv-alert lv-alert-danger text-sm text-text-primary">{error}</div>}
 
       {rows === null ? (
-        <div className="py-10 text-center text-zinc-500">…</div>
+        <div className="py-10 text-center text-text-muted">…</div>
       ) : rows.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 py-10 text-center text-sm text-zinc-500">{cs.messagesEmpty}</div>
+        <div className="lv-surface py-10 text-center text-sm text-text-muted">{cs.messagesEmpty}</div>
       ) : (
-        <ul className="space-y-2" data-support-chat-list>
+        <ul className="lv-surface divide-y divide-border-subtle overflow-hidden" data-support-chat-list>
           {rows.map((r) => {
             const who = r.customer.name || r.customer.username || r.customer.email || r.customer.id;
             const k = r.last_message.kind;
@@ -166,32 +170,32 @@ export default function MessagesDesk() {
                   type="button"
                   onClick={() => setOpen(r)}
                   data-chat-id={r.id}
-                  className={`flex w-full items-start gap-3 rounded-xl border p-3 text-start transition-colors hover:bg-zinc-800/60 ${
-                    r.unread > 0 ? 'border-sky-500/30 bg-sky-500/[0.06]' : 'border-zinc-800 bg-zinc-900'
+                  className={`flex w-full items-start gap-3 p-3 text-start transition-colors hover:bg-surface-selected ${
+                    r.unread > 0 ? 'bg-surface-raised' : ''
                   }`}
                 >
-                  <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-800 text-zinc-300">
+                  <span className="lv-well mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-text-secondary">
                     <MessageCircle className="h-4 w-4" aria-hidden />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className={`min-w-0 truncate text-sm ${r.unread > 0 ? 'font-bold text-white' : 'text-zinc-200'}`}>{who}</span>
-                      <span className="shrink-0 text-[11px] text-zinc-500">{shortDate(r.last_message.at)}</span>
+                      <span className={`min-w-0 truncate text-sm ${r.unread > 0 ? 'font-bold text-white' : 'text-text-primary'}`}>{who}</span>
+                      <span className="shrink-0 text-[11px] text-text-muted">{shortDate(r.last_message.at)}</span>
                     </span>
-                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-400">
-                      {!r.last_message.from_customer && <span className="shrink-0 text-zinc-500">{cs.fromTeam}:</span>}
+                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-text-secondary">
+                      {!r.last_message.from_customer && <span className="shrink-0 text-text-muted">{cs.fromTeam}:</span>}
                       {k === 'image' && <ImageIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                       {k === 'video' && <Video className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                       {k === 'audio' && <Mic className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                       {k === 'file' && <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                       <span className="min-w-0 truncate">{preview}</span>
                     </span>
-                    <span className="mt-1 flex items-center gap-2 text-[11px] text-zinc-500">
+                    <span className="mt-1 flex items-center gap-2 text-[11px] text-text-muted">
                       <span className="font-mono">
                         {cs.order} {r.order_id}
                       </span>
                       {r.unread > 0 && (
-                        <span className="rounded-full bg-sky-500/15 px-2 py-0.5 font-bold text-sky-300">{cs.unreadBadge(r.unread)}</span>
+                        <span className="lv-chip rounded-full px-2 py-0.5 font-bold [--chip:var(--color-info)]">{cs.unreadBadge(r.unread)}</span>
                       )}
                     </span>
                   </span>

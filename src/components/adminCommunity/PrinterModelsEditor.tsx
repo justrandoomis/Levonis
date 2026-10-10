@@ -158,7 +158,7 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
 
   if (loadErr) {
     return (
-      <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-300 text-[12.5px]">{loadErr}</div>
+      <div className="lv-alert lv-alert-danger text-text-primary text-[12.5px]">{loadErr}</div>
     );
   }
   if (!data || !summary) {
@@ -171,15 +171,15 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
 
   return (
     <div className="space-y-4" data-printer-models-editor>
-      <div className="rounded-2xl border border-gold/25 bg-gold/[0.06] p-3 space-y-1.5">
-        <p className="text-gold text-[12.5px] font-bold">{t('لماذا لا يتغيّر السعر بين بعض الطابعات', 'Why some printers quote alike')}</p>
-        <p className="text-zinc-300 text-[11.5px] leading-relaxed">
+      <div className="lv-alert lv-alert-info space-y-1.5">
+        <p className="text-text-primary text-[12.5px] font-bold">{t('لماذا لا يتغيّر السعر بين بعض الطابعات', 'Why some printers quote alike')}</p>
+        <p className="text-text-secondary text-[11.5px] leading-relaxed">
           {t(
             `من ${summary.total} طابعة FDM، ${summary.unpriced} بلا سعر شراء أو ساعات مسجّلة، فتُحسب ساعتها بأجرة المنصة الواحدة (${dinars(data.platform_machine_hour_iqd.fdm)} د.ع). لذلك تنقسم الطابعات إلى ${summary.groups} مجموعات فقط، وطابعات المجموعة الواحدة تُسعّر القطعة الواحدة بالسعر نفسه. أكبر مجموعة: ${summary.largest.join('، ')}. أدخل ما دفعته فعلًا لكل طراز وكم ساعة تتوقع أن يطبع، فيصبح سعره خاصًا به.`,
             `Of ${summary.total} FDM printers, ${summary.unpriced} have no purchase price or hours recorded, so their hour is billed at the one platform rate (${dinars(data.platform_machine_hour_iqd.fdm)} IQD). So the printers fall into only ${summary.groups} groups, and every printer in a group prices one piece identically. The largest group: ${summary.largest.join(', ')}. Enter what you actually paid for each model and the hours you expect from it, and its price becomes its own.`
           )}
         </p>
-        <p className="text-zinc-500 text-[11px] leading-relaxed">
+        <p className="text-text-muted text-[11px] leading-relaxed">
           {t(
             'الخانة الفارغة تعني «غير مسجّل». لا يُستخدم أي رقم لم تكتبه أنت، وكل حفظ يُسجَّل في سجل التدقيق.',
             'An empty box means “not recorded”. No figure you did not type is used, and every save is written to the audit log.'
@@ -191,7 +191,7 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
         const dirty = Object.keys(changedFields(m)).length > 0;
         const note = notes[m.id];
         return (
-          <section key={m.id} className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4" data-printer-model={m.id}>
+          <section key={m.id} className="lv-surface p-4" data-printer-model={m.id}>
             <div className="flex items-start justify-between gap-2 mb-3">
               <div className="min-w-0">
                 <h3 className="text-white font-bold text-[13.5px] flex items-center gap-2 min-w-0">
@@ -200,14 +200,14 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
                     {m.manufacturer} {m.model}
                   </span>
                 </h3>
-                <p className="text-zinc-500 text-[11px] mt-0.5">
+                <p className="text-text-muted text-[11px] mt-0.5">
                   {m.machine_iqd_per_hour > 0
                     ? t(`استهلاك الساعة: ${dinars(m.machine_iqd_per_hour)} د.ع`, `Depreciation: ${dinars(m.machine_iqd_per_hour)} IQD/h`)
                     : t('يُحسب بأجرة ساعة المنصة', 'Billed at the platform machine-hour rate')}
                 </p>
               </div>
               <span
-                className="shrink-0 rounded-full border border-zinc-700 px-2 py-0.5 text-[10.5px] text-zinc-400"
+                className="shrink-0 rounded-full border border-border-subtle px-2 py-0.5 text-[10.5px] text-text-secondary"
                 title={t('الطابعات بالرمز نفسه تُسعَّر القطعة الواحدة بالسعر نفسه', 'Printers with the same label price one piece identically')}
                 dir="ltr"
               >
@@ -220,11 +220,12 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
                 const meta = META[f.column];
                 return (
                   <label key={f.column} className="block min-w-0">
-                    <span className="block text-zinc-400 text-[11.5px] font-semibold mb-1 truncate">
+                    <span className="block text-text-secondary text-[11.5px] font-semibold mb-1 truncate">
                       {meta ? t(meta.ar, meta.en) : f.column}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <input
+                        className="lv-input min-w-0 flex-1 text-[13px]"
                         type="number"
                         inputMode="decimal"
                         dir="ltr"
@@ -237,11 +238,10 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
                           setDrafts((d) => ({ ...d, [m.id]: { ...(d[m.id] ?? {}), [f.column]: e.target.value } }))
                         }
                         data-printer-field={f.column}
-                        className="min-w-0 flex-1 min-h-[44px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 px-3 text-white text-[13px] outline-none focus:border-gold/40"
                       />
-                      {meta && <span className="text-zinc-500 text-[10.5px] shrink-0">{t(meta.unit[0], meta.unit[1])}</span>}
+                      {meta && <span className="text-text-muted text-[10.5px] shrink-0">{t(meta.unit[0], meta.unit[1])}</span>}
                     </span>
-                    {meta?.hint && <span className="block text-zinc-600 text-[10px] mt-1 leading-relaxed">{t(meta.hint[0], meta.hint[1])}</span>}
+                    {meta?.hint && <span className="block text-text-muted text-[10px] mt-1 leading-relaxed">{t(meta.hint[0], meta.hint[1])}</span>}
                   </label>
                 );
               })}
@@ -252,7 +252,7 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
                 type="button"
                 disabled={!dirty || saving === m.id}
                 onClick={() => void save(m)}
-                className="inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-2xl bg-gold text-accent-contrast text-[12.5px] font-bold disabled:opacity-40"
+                className="lv-button lv-button-primary"
                 data-printer-save={m.id}
               >
                 {saving === m.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -267,7 +267,7 @@ export default function PrinterModelsEditor({ t }: { t: T }) {
                       [m.id]: Object.fromEntries(data.fields.map((f) => [f.column, text(m[f.column])])),
                     }))
                   }
-                  className="inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-2xl bg-zinc-800 text-zinc-300 text-[12.5px]"
+                  className="lv-button lv-button-secondary"
                 >
                   <RotateCcw className="w-4 h-4" />
                   {t('تراجع', 'Undo')}

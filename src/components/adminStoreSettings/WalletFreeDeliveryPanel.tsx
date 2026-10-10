@@ -82,7 +82,6 @@ interface CatalogOption {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-const FIELD = 'w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2';
 
 export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown }) {
   const [value, setValue] = useState<WalletFreeDeliveryConfig>(() => walletFreeFrom(initial));
@@ -138,9 +137,9 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
     edit((v) => ({ ...v, methods: on ? [...new Set([...v.methods, m])] : v.methods.filter((x) => x !== m) }));
 
   return (
-    <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="wallet-free-delivery">
+    <div className="lv-surface p-6" data-admin="wallet-free-delivery">
       <h2 className="text-xl font-bold mb-1">توصيل عادي مجاني — للدفع الكامل من محفظة Levo</h2>
-      <p className="text-sm text-zinc-400 mb-4">
+      <p className="text-sm text-text-secondary mb-4">
         يُعفى الزبون من رسم التوصيل عندما يدفع الطلب كاملاً من محفظة Levo وتنطبق إحدى القواعد أدناه. يُسجَّل الرسم
         الأصلي على الطلب مع القاعدة التي أعفته ويُحاسَب الزبون بصفر — لا يُحسب الرسم ثم يُخصم. لا يشمل الاستلام من
         المخزن ولا رسوم الحماية الإضافية، وعضوية PRO/PREMIUM تبقى لها الأسبقية.
@@ -159,7 +158,7 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
           <span className="text-sm">يشترط الدفع الكامل من المحفظة (بدون نقاط ولا دفع مختلط)</span>
         </label>
         <div>
-          <span className="block text-sm text-zinc-400 mb-1">طرق التوصيل المشمولة</span>
+          <span className="block text-sm text-text-secondary mb-1">طرق التوصيل المشمولة</span>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={value.methods.includes('standard')} onChange={(e) => toggleMethod('standard', e.target.checked)} />
             <span className="text-sm">التوصيل العادي (standard)</span>
@@ -172,25 +171,25 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
       </div>
 
       <div className="flex justify-between items-center mt-5 mb-1">
-        <span className="text-sm text-zinc-400">القواعد حسب القسم</span>
+        <span className="text-sm text-text-secondary">القواعد حسب القسم</span>
         <button
           type="button"
           onClick={() => edit((v) => ({ ...v, rules: [...v.rules, { catalog_id: '', min_products_iqd: 0, enabled: true }] }))}
-          className="flex items-center gap-2 bg-[#ef233c] hover:bg-[#d90429] px-4 py-2 rounded-lg font-bold"
+          className="lv-button lv-button-secondary"
         >
           <Plus className="w-4 h-4" /> إضافة قاعدة
         </button>
       </div>
-      <p className="text-xs text-zinc-500 mb-4">
+      <p className="text-xs text-text-muted mb-4">
         تنطبق القاعدة إذا احتوى الطلب على منتج مدفوع من هذا القسم (أو من أقسامه الفرعية) وكان مجموع المنتجات — بعد
         الخصومات وقبل الكوبون والتوصيل — لا يقل عن الحد الأدنى. الهدايا لا تُحتسب.
       </p>
       <div className="space-y-4">
         {value.rules.map((rule, i) => (
-          <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-4 border border-zinc-700 p-4 rounded-xl" data-wallet-rule={rule.catalog_id}>
+          <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-4 border border-border-subtle p-4 rounded-lg" data-wallet-rule={rule.catalog_id}>
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">القسم</span>
-              <select value={rule.catalog_id} onChange={(e) => editRule(i, { catalog_id: e.target.value })} className={FIELD}>
+              <span className="block text-sm text-text-secondary mb-1">القسم</span>
+              <select className="lv-input" value={rule.catalog_id} onChange={(e) => editRule(i, { catalog_id: e.target.value })}>
                 <option value="">— اختر القسم —</option>
                 {rule.catalog_id && !catalogs.some((c) => c.id === rule.catalog_id) && (
                   <option value={rule.catalog_id}>{rule.catalog_id}</option>
@@ -203,8 +202,9 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
               </select>
             </label>
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">الحد الأدنى لمجموع المنتجات (د.ع)</span>
+              <span className="block text-sm text-text-secondary mb-1">الحد الأدنى لمجموع المنتجات (د.ع)</span>
               <input
+                className="lv-input"
                 type="number"
                 min={0}
                 step={1}
@@ -213,7 +213,6 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
                   const n = Math.round(Number(e.target.value));
                   editRule(i, { min_products_iqd: Number.isFinite(n) && n >= 0 ? n : 0 });
                 }}
-                className={FIELD}
               />
             </label>
             <div className="flex items-center gap-2 self-end py-2">
@@ -225,7 +224,7 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
                 type="button"
                 aria-label="حذف القاعدة"
                 onClick={() => edit((v) => ({ ...v, rules: v.rules.filter((_, j) => j !== i) }))}
-                className="bg-red-500/20 text-red-500 p-2 rounded-lg"
+                className="lv-button lv-button-danger w-11 px-0"
               >
                 <Trash2 className="w-5 h-5" />
               </button>
@@ -237,7 +236,7 @@ export default function WalletFreeDeliveryPanel({ initial }: { initial: unknown 
         <button
           onClick={() => void save()}
           disabled={state === 'saving'}
-          className="w-full bg-green-600 hover:bg-green-700 font-bold py-3 rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+          className="lv-button lv-button-primary w-full"
         >
           {state === 'saving' ? 'جارٍ الحفظ...' : state === 'saved' ? (<><Check className="w-4 h-4" /> تم الحفظ</>) : 'حفظ التغييرات'}
         </button>

@@ -228,7 +228,7 @@ export function EstimateBadge({ label, detail }: { label: string; detail: string
     <span
       data-finance-estimated
       title={detail}
-      className="inline-flex items-center gap-1.5 rounded-md border border-warning/35 bg-warning/10 px-2 py-1 text-[11px] leading-[1.45] font-bold text-warning"
+      className="lv-chip inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] leading-[1.45] font-bold [--chip:var(--color-warning)]"
     >
       <TriangleAlert className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
       {label}

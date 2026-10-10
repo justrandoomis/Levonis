@@ -69,7 +69,7 @@ export function ShelvedPanel({ s }: { s: FarmAdminStrings }) {
   const unchanged = draft !== null && shelved !== null && draft === !shelved;
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3.5 space-y-3 min-w-0" data-farm-shelved-panel>
+    <section className="lv-surface p-3.5 space-y-3 min-w-0" data-farm-shelved-panel>
       <div className="flex items-start gap-2 min-w-0">
         {shelved === false ? (
           <LockOpen className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden="true" />
@@ -78,12 +78,12 @@ export function ShelvedPanel({ s }: { s: FarmAdminStrings }) {
         )}
         <div className="min-w-0 flex-1">
           <h3 className="text-[13.5px] font-bold text-white">{s.shelvedTitle}</h3>
-          <p className="text-[12px] text-zinc-400 leading-relaxed mt-0.5">{s.shelvedBody}</p>
+          <p className="text-[12px] text-text-secondary leading-relaxed mt-0.5">{s.shelvedBody}</p>
         </div>
       </div>
 
       {shelved === null && note === null && (
-        <div role="status" className="flex items-center gap-2 py-2 text-[12.5px] text-zinc-400">
+        <div role="status" className="flex items-center gap-2 py-2 text-[12.5px] text-text-secondary">
           <Spinner size="sm" delayMs={0} decorative />
           {s.loading}
         </div>

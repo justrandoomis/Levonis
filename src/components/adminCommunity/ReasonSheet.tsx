@@ -78,12 +78,13 @@ export default function ReasonSheet({
           <h2 id={titleId} className="text-white font-bold text-[15px] leading-snug">
             {request.title}
           </h2>
-          <p className="text-zinc-400 text-[12.5px] leading-relaxed">{request.consequence}</p>
+          <p className="text-text-secondary text-[12.5px] leading-relaxed">{request.consequence}</p>
           <div>
-            <label htmlFor={fieldId} className="block text-zinc-300 text-[12px] font-semibold mb-1.5">
+            <label htmlFor={fieldId} className="block text-text-secondary text-[12px] font-semibold mb-1.5">
               {min > 0 ? t('السبب (مطلوب)', 'Reason (required)') : t('ملاحظة (اختياري)', 'Note (optional)')}
             </label>
             <textarea
+              className="lv-input min-h-[88px] py-2.5 resize-y text-[13px]"
               id={fieldId}
               name="reason"
               autoComplete="off"
@@ -96,7 +97,6 @@ export default function ReasonSheet({
               maxLength={500}
               aria-invalid={!!error}
               aria-describedby={error ? `${fieldId}-error` : undefined}
-              className="lv-input min-h-[88px] py-2.5 resize-y text-[13px]"
             />
             {error && (
               <p id={`${fieldId}-error`} role="alert" className="lv-field-error">

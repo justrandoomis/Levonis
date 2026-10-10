@@ -115,8 +115,6 @@ const EMPTY: ConditionEntry = {
   unit_images: [],
 };
 
-const INPUT =
-  'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none min-h-[44px]';
 
 export function ConditionSection({
   condition,
@@ -155,7 +153,7 @@ export function ConditionSection({
   return (
     <div>
       {inUsedSection && !condition ? (
-        <p role="status" data-used-section-hint className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] leading-5 text-amber-200">
+        <p role="status" data-used-section-hint className="lv-alert lv-alert-warning mb-3 text-[12px] leading-5 text-text-primary">
           هذا المنتج في قسم «المستعمل» — اختر حالته (مستعمل أو علبة مفتوحة أو مُجدَّد) لتظهر درجته وساعات تشغيله للزبون وفي المقارنة، وإلا بيع على أنه جديد.
         </p>
       ) : null}
@@ -167,8 +165,8 @@ export function ConditionSection({
           htmlFor="condition-kind"
         >
           <select
+            className="lv-input text-sm"
             id="condition-kind"
-            className={INPUT}
             value={condition?.kind ?? ''}
             onChange={(e) => {
               const v = e.target.value;
@@ -190,7 +188,7 @@ export function ConditionSection({
 
       {condition && (
         <>
-          <p className="mt-3 mb-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.07] px-3 py-2 text-[12px] leading-relaxed text-amber-200/90">
+          <p className="lv-alert lv-alert-warning mt-3 mb-3 text-[12px] leading-relaxed text-text-primary">
             هذا المنتج سيظهر في قسم «Open Box والمستعمل»، ولن يقبل الإرجاع لتغيير
             الرأي (يبقى مشمولاً إذا وصل تالفاً أو كان خاطئاً)، ولا تُباع عليه خطط
             ضمان ممدّد — الضمان هو ما تختاره هنا.
@@ -201,16 +199,16 @@ export function ConditionSection({
               role="status"
               data-graded-serial-tracking={tracking.on ? 'on' : 'off'}
               data-graded-serial-source={tracking.source}
-              className="mb-3 flex items-start gap-1.5 text-[12px] leading-relaxed text-zinc-300"
+              className="mb-3 flex items-start gap-1.5 text-[12px] leading-relaxed text-text-secondary"
             >
-              <ScanLine className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden />
+              <ScanLine className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-secondary" aria-hidden />
               <span className="min-w-0">{ss.usedSerialLine(tracking.on ? ss.usedStateOn : ss.usedStateOff, trackingSource)}</span>
             </p>
           )}
           {/* Off only by default: a used device that needs a serial (an AMS) is
               missed unless its section says so — the section editor's own hint. */}
           {tracking?.source === 'default' && (
-            <p data-graded-serial-hint className="-mt-2 mb-3 text-[11.5px] leading-relaxed text-zinc-400">
+            <p data-graded-serial-hint className="-mt-2 mb-3 text-[11.5px] leading-relaxed text-text-secondary">
               {ss.sectionUsedHint}
             </p>
           )}
@@ -218,8 +216,8 @@ export function ConditionSection({
           <Grid cols={3}>
             <Field ar="درجة الحالة" en="Grade" htmlFor="condition-grade">
               <select
+                className="lv-input text-sm"
                 id="condition-grade"
-                className={INPUT}
                 value={condition.grade}
                 onChange={(e) => set('grade', e.target.value as ConditionEntry['grade'])}
               >
@@ -233,13 +231,13 @@ export function ConditionSection({
 
             <Field ar="ساعات التشغيل" en="Hours used" hint="اتركه فارغاً إذا كان غير معروف" htmlFor="condition-hours">
               <input
+                className="lv-input text-sm"
                 id="condition-hours"
                 type="number"
                 inputMode="numeric"
                 min={0}
                 step={1}
                 dir="ltr"
-                className={INPUT}
                 value={condition.usage_hours ?? ''}
                 onChange={(e) => {
                   const raw = e.target.value.trim();
@@ -253,8 +251,8 @@ export function ConditionSection({
 
             <Field ar="ضمان ليفو" en="LEVONIS warranty" htmlFor="condition-warranty">
               <select
+                className="lv-input text-sm"
                 id="condition-warranty"
-                className={INPUT}
                 value={String(condition.warranty_months)}
                 onChange={(e) => set('warranty_months', Number(e.target.value))}
               >
@@ -273,10 +271,10 @@ export function ConditionSection({
               span
             >
               <input
+                className="lv-input text-sm"
                 id="condition-new-id"
                 type="text"
                 dir="ltr"
-                className={INPUT}
                 value={condition.new_product_id ?? ''}
                 onChange={(e) => set('new_product_id', e.target.value.trim() || null)}
               />
@@ -326,16 +324,16 @@ function TriLingual({
   ];
   return (
     <div className="mt-3">
-      <label className="block text-xs font-bold text-zinc-500 uppercase mb-1.5">{label}</label>
+      <label className="block text-xs font-bold text-text-muted uppercase mb-1.5">{label}</label>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         {langs.map((l) => (
           <div key={String(l.key)} className="min-w-0">
-            <span className="block text-[10px] text-zinc-600 mb-1">{l.label}</span>
+            <span className="block text-[10px] text-text-muted mb-1">{l.label}</span>
             <textarea
+              className="lv-input resize-y py-2.5 text-sm leading-relaxed"
               dir={l.dir}
               rows={2}
               aria-label={`${label} — ${l.label}`}
-              className={`${INPUT} resize-y`}
               value={String(condition[l.key] ?? '')}
               onChange={(e) => onChange(l.key, e.target.value)}
             />

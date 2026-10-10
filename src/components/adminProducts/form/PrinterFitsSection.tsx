@@ -91,7 +91,7 @@ export default function PrinterFitsSection({
     return (
       <button key={p.id} type="button" className={T.chip} aria-pressed={on} dir="ltr" onClick={() => toggle(p.id)} data-fit-printer={p.slug}>
         {nameOf(p)}
-        {STATUS[p.status] ? <span className="text-[11px] text-zinc-500" dir="rtl">· {STATUS[p.status]}</span> : null}
+        {STATUS[p.status] ? <span className="text-[11px] text-text-muted" dir="rtl">· {STATUS[p.status]}</span> : null}
       </button>
     );
   };
@@ -103,10 +103,10 @@ export default function PrinterFitsSection({
   // `--ap-accent-*` — without them a chosen printer looks unchosen.
   return (
     <div className="ap min-w-0 mb-4" data-form="printer-fits">
-      <h4 className="text-[13px] font-bold text-zinc-300 mb-2 truncate">
-        يناسب الطابعات <span className="text-[11px] font-medium text-zinc-500">Compatible printers</span>
+      <h4 className="text-[13px] font-bold text-text-secondary mb-2 truncate">
+        يناسب الطابعات <span className="text-[11px] font-medium text-text-muted">Compatible printers</span>
       </h4>
-      <p className="text-[12px] text-zinc-500 mb-3">
+      <p className="text-[12px] text-text-muted mb-3">
         اختر كل طابعة تُركَّب عليها هذه القطعة. تظهر القطعة في صفحة كل طابعة مختارة، وفي فلتر «مواد الصيانة» حسب الطابعة،
         وتُقترح لمن اشترى الطابعة.
       </p>
@@ -118,15 +118,15 @@ export default function PrinterFitsSection({
           </button>
         </p>
       ) : printers === null ? (
-        <p className="text-[12px] text-zinc-500">جارٍ تحميل الطابعات…</p>
+        <p className="text-[12px] text-text-muted">جارٍ تحميل الطابعات…</p>
       ) : offered.length === 0 ? (
-        <p className="text-[12px] text-zinc-500">لا توجد طابعات في المتجر بعد — أضف الطابعة في قسم الطابعات أولًا، ثم اربط القطعة بها.</p>
+        <p className="text-[12px] text-text-muted">لا توجد طابعات في المتجر بعد — أضف الطابعة في قسم الطابعات أولًا، ثم اربط القطعة بها.</p>
       ) : (
         <div className="space-y-2 min-w-0">
           {value.length > 0 ? (
-            <p className="text-[12px] text-zinc-500" data-fit-summary>
+            <p className="text-[12px] text-text-muted" data-fit-summary>
               {value.length === 1 ? 'مختارة طابعة واحدة' : value.length === 2 ? 'مختارة طابعتان' : `مختارة ${value.length} طابعات`}:{' '}
-              <span className="text-zinc-300" dir="ltr">
+              <span className="text-text-secondary" dir="ltr">
                 {value.map((id) => (byId.get(id) ? nameOf(byId.get(id)!) : id)).join(' · ')}
               </span>
             </p>
@@ -134,7 +134,7 @@ export default function PrinterFitsSection({
           {offered.length >= SEARCH_FROM ? (
             <label className="relative block">
               <span className="sr-only">ابحث عن طابعة</span>
-              <Search aria-hidden="true" className="absolute start-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search aria-hidden="true" className="absolute start-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
               <input
                 type="search"
                 value={term}
@@ -154,7 +154,7 @@ export default function PrinterFitsSection({
             </button>
           ) : null}
           {q && models.length === 0 && used.length === 0 ? (
-            <p className="text-[12px] text-zinc-500">لا طابعة بهذا الاسم.</p>
+            <p className="text-[12px] text-text-muted">لا طابعة بهذا الاسم.</p>
           ) : null}
           {unknown.length > 0 ? (
             <div className="flex flex-wrap gap-1.5" data-fit-unknown>

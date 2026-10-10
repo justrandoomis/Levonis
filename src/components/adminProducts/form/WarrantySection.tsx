@@ -131,15 +131,15 @@ function SerialTracking({
         ? s.policyFromSection(section.sectionName)
         : s.policyDefault;
   return (
-    <div className="mb-3 min-w-0 rounded-xl border border-zinc-700/70 bg-zinc-900/40 p-3" data-form="serial-tracking" data-serial-effective={effective ? 'required' : 'off'}>
+    <div className="mb-3 min-w-0 rounded-lg border border-border-subtle p-3" data-form="serial-tracking" data-serial-effective={effective ? 'required' : 'off'}>
       <div className="flex items-start gap-2 mb-2.5 min-w-0">
         <ScanLine className="w-4 h-4 text-text-secondary shrink-0 mt-0.5" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h4 className="text-[12.5px] font-bold text-white">{s.policyTitle}</h4>
-          <p className="text-[11px] text-zinc-400 leading-snug">{s.policyHint}</p>
+          <p className="text-[11px] text-text-secondary leading-snug">{s.policyHint}</p>
         </div>
         {!canEdit && (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-zinc-400" data-serial-policy-locked>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-text-secondary" data-serial-policy-locked>
             <Lock className="h-3.5 w-3.5" aria-hidden />
             {s.policyOwnerOnly}
           </span>
@@ -162,7 +162,7 @@ function SerialTracking({
         <p className="text-[13px] font-semibold text-white">{effective ? s.policyEffectiveOn : s.policyEffectiveOff}</p>
       )}
       {/* Where today's answer comes from; the locked view has just said what it is. */}
-      <p className="mt-1.5 text-[11px] text-zinc-400" data-serial-policy-source>
+      <p className="mt-1.5 text-[11px] text-text-secondary" data-serial-policy-source>
         {canEdit ? `${effective ? s.policyEffectiveOn : s.policyEffectiveOff} · ${source}` : source}
       </p>
     </div>
@@ -260,9 +260,9 @@ function PrinterWarranty({
         <ShieldCheck className="w-4 h-4 text-gold shrink-0 mt-0.5" aria-hidden="true" />
         <div className="min-w-0">
           <h4 className="text-[12.5px] font-bold text-white">
-            الضمان الممدد <span className="text-[10px] font-medium text-zinc-500">Extended warranty · printers only</span>
+            الضمان الممدد <span className="text-[10px] font-medium text-text-muted">Extended warranty · printers only</span>
           </h4>
-          <p className="text-[11px] text-zinc-400 leading-snug">
+          <p className="text-[11px] text-text-secondary leading-snug">
             يشتريه الزبون قبل إتمام الطلب فقط (صفحة المنتج أو السلة). الرسم نسبة من سعر الطابعة الاعتيادي، ولا يُعفى
             بالعضوية.
           </p>
@@ -292,7 +292,7 @@ function PrinterWarranty({
             sub={serialized === null ? 'افتراضي' : undefined}
           />
           {!canEditSerial && (
-            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-zinc-400" data-serial-policy-locked>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-text-secondary" data-serial-policy-locked>
               <Lock className="h-3 w-3" aria-hidden />
               {ss.policyOwnerOnly}
             </span>
@@ -311,9 +311,7 @@ function PrinterWarranty({
             <div
               key={ext}
               data-form={`warranty-plan-${ext}`}
-              className={`rounded-lg border p-2.5 min-w-0 ${
-                on ? 'bg-gold/[0.08] border-gold/40' : 'bg-zinc-800/30 border-zinc-700'
-              }`}
+              className={`rounded-lg border border-border-subtle p-2.5 min-w-0 ${on ? 'bg-surface-raised' : ''}`}
             >
               <Toggle
                 checked={on}
@@ -347,7 +345,7 @@ function PrinterWarranty({
                       disabled={plan.fee_percent !== null}
                     />
                   </Field>
-                  <p className="text-[11px] text-zinc-400 tabular-nums" data-form={`warranty-preview-${ext}`}>
+                  <p className="text-[11px] text-text-secondary tabular-nums" data-form={`warranty-preview-${ext}`}>
                     {preview !== null
                       ? `على السعر الأساسي ${formatIqd(priceIqd as number)}: +${formatIqd(preview)}`
                       : 'أدخل السعر الأساسي لعرض مثال على الرسم'}

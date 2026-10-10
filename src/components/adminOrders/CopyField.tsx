@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { IconButton } from '../ui/Button';
 
 /**
  * A value the admin has to retype somewhere else — into a courier's form,
@@ -72,23 +73,21 @@ export default function CopyField({
 
   return (
     <div
-      className={`rounded-xl border px-3 py-2.5 min-w-0 ${
-        emphasis ? 'border-olive/50 bg-olive/10' : 'border-zinc-800 bg-zinc-900/50'
-      }`}
+      className={`rounded-md px-3 py-2.5 min-w-0 ${emphasis ? 'border border-olive/50 bg-olive/10' : 'lv-well'}`}
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
         <div className="min-w-0 flex-1">
           {hint ? (
             <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mb-1">
-              <span className="text-[11px] font-bold text-zinc-500">{label}</span>
+              <span className="text-[11px] font-bold text-text-muted">{label}</span>
               {hint}
             </span>
           ) : (
-            <span className="block text-[11px] font-bold text-zinc-500 mb-0.5">{label}</span>
+            <span className="block text-[11px] font-bold text-text-muted mb-0.5">{label}</span>
           )}
           {empty ? (
             // Never an empty box the admin has to interpret: say it is not set.
-            <span className="text-[13px] text-zinc-600 italic">
+            <span className="text-[13px] text-text-muted italic">
               {loc('غير محدّد', 'not set', 'دیارینەکراو')}
             </span>
           ) : (
@@ -110,21 +109,21 @@ export default function CopyField({
           )}
         </div>
         {!empty && (
-          <button
-            type="button"
-            onClick={copy}
+          <IconButton
+            onClick={() => {
+              void copy();
+            }}
             data-copy-button={label}
-            aria-label={`${loc('نسخ', 'Copy', 'لەبەرگرتنەوە')} — ${label}`}
-            className={`shrink-0 w-11 h-11 -me-1 rounded-lg flex items-center justify-center transition-colors ${
-              state === 'copied'
-                ? 'text-emerald-400'
-                : state === 'failed'
-                  ? 'text-amber-400'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-            }`}
-          >
-            {state === 'copied' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
+            label={`${loc('نسخ', 'Copy', 'لەبەرگرتنەوە')} — ${label}`}
+            className="-me-1"
+            icon={
+              state === 'copied' ? (
+                <Check className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Copy className={`w-4 h-4 ${state === 'failed' ? 'text-amber-400' : ''}`} />
+              )
+            }
+          />
         )}
       </div>
       {state === 'failed' && (

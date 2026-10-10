@@ -153,7 +153,7 @@ export function PriceHoldBadge({ order, loc }: { order: AdminOrderRow; loc: Loc 
   return (
     <span
       data-order-price-hold
-      className="inline-flex items-center gap-1 rounded-md border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold text-warning"
+      className="lv-chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold [--chip:var(--color-warning)]"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
       {loc('بانتظار موافقة السعر', 'Awaiting price approval')}
@@ -175,7 +175,7 @@ export function OrderKindBadge({ order, loc }: { order: AdminOrderRow; loc: Loc 
   return (
     <span
       data-order-kind={order.order_kind}
-      className="inline-flex items-center gap-1 rounded-md border border-gold/35 bg-gold/10 px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold text-gold"
+      className="lv-chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold [--chip:var(--color-gold)]"
     >
       {loc('🎁 هدية', '🎁 Gift', '🎁 دیاری')}
     </span>

@@ -50,12 +50,12 @@ export function PlayersPanel({ s, lang }: { s: FarmAdminStrings; lang: Language 
   };
 
   return (
-    <section data-farm-players className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 sm:p-4">
+    <section data-farm-players className="lv-surface min-w-0 p-3 sm:p-4">
       <h3 className="text-[14px] font-black text-white flex items-center gap-2">
         <Users className="w-4 h-4 text-gold" aria-hidden="true" />
         {s.playersTitle}
       </h3>
-      <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">{s.playersBody}</p>
+      <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{s.playersBody}</p>
 
       <div className="mt-3 flex flex-wrap items-end gap-2 min-w-0">
         <div className="min-w-0 flex-1 max-w-sm">
@@ -88,7 +88,7 @@ function PlayerView({ player, s, lang, onMoved }: { player: FarmAdminPlayerRespo
     <div className="mt-4 space-y-4 min-w-0" data-farm-player={player.user.id}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
         <span className="text-[14px] font-bold text-white truncate">{who}</span>
-        <code className="text-[11px] text-zinc-500" dir="ltr">
+        <code className="text-[11px] text-text-muted" dir="ltr">
           {player.user.id}
         </code>
       </div>
@@ -105,8 +105,8 @@ function Dl({ items }: { items: Array<[string, ReactNode]> }) {
     <dl className="grid gap-x-4 gap-y-1.5 [grid-template-columns:repeat(2,minmax(0,1fr))] sm:[grid-template-columns:repeat(4,minmax(0,1fr))] text-[12px] min-w-0">
       {items.map(([k, v]) => (
         <div key={k} className="min-w-0">
-          <dt className="text-[10.5px] text-zinc-500 truncate">{k}</dt>
-          <dd className="text-zinc-100 tabular-nums truncate">{v}</dd>
+          <dt className="text-[10.5px] text-text-muted truncate">{k}</dt>
+          <dd className="text-text-primary tabular-nums truncate">{v}</dd>
         </div>
       ))}
     </dl>
@@ -116,13 +116,13 @@ function Dl({ items }: { items: Array<[string, ReactNode]> }) {
 function Table({ caption, head, rows, empty }: { caption: string; head: string[]; rows: ReactNode[][]; empty: string }) {
   return (
     <div className="min-w-0">
-      <h4 className="text-[12px] font-bold text-zinc-300 mb-1.5">{caption}</h4>
+      <h4 className="text-[12px] font-bold text-text-secondary mb-1.5">{caption}</h4>
       {rows.length === 0 ? (
-        <p className="text-[11.5px] text-zinc-500">{empty}</p>
+        <p className="text-[11.5px] text-text-muted">{empty}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full text-[11.5px] text-zinc-200">
-            <thead className="bg-zinc-950/60 text-zinc-500">
+        <div className="overflow-x-auto rounded-lg border border-border-subtle">
+          <table className="w-full text-[11.5px] text-text-primary">
+            <thead className="bg-surface-raised text-text-muted">
               <tr>
                 {head.map((h) => (
                   <th key={h} scope="col" className="px-2 py-1.5 text-start font-bold whitespace-nowrap">
@@ -133,7 +133,7 @@ function Table({ caption, head, rows, empty }: { caption: string; head: string[]
             </thead>
             <tbody>
               {rows.map((cells, i) => (
-                <tr key={i} className="border-t border-zinc-800/70">
+                <tr key={i} className="border-t border-border-subtle">
                   {cells.map((c, j) => (
                     <td key={j} className="px-2 py-1.5 whitespace-nowrap tabular-nums">
                       {c}
@@ -181,7 +181,7 @@ function FarmDetails({ farm, s, lang }: { farm: FarmAdminPlayerFarm; s: FarmAdmi
         ]}
       />
       <div>
-        <h4 className="text-[12px] font-bold text-zinc-300 mb-1.5">{s.stats}</h4>
+        <h4 className="text-[12px] font-bold text-text-secondary mb-1.5">{s.stats}</h4>
         <Dl
           items={[
             [s.statDelivered, stat('delivered', 'jobs_delivered')],
@@ -301,12 +301,12 @@ function GrantForm({ userId, who, s, lang, onMoved }: { userId: string; who: str
   };
 
   return (
-    <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/30 p-3" data-farm-grant={userId}>
+    <div className="min-w-0 rounded-lg border border-border-subtle p-3" data-farm-grant={userId}>
       <h4 className="text-[13px] font-bold text-white flex items-center gap-2">
         <Coins className="w-4 h-4 text-gold" aria-hidden="true" />
         {s.grantTitle}
       </h4>
-      <p className="text-[11.5px] text-zinc-400 mt-1 leading-relaxed">{s.grantBody}</p>
+      <p className="text-[11.5px] text-text-secondary mt-1 leading-relaxed">{s.grantBody}</p>
       <div className="mt-3 grid gap-3 [grid-template-columns:minmax(0,1fr)] md:[grid-template-columns:repeat(3,minmax(0,1fr))] min-w-0">
         <FarmField label={s.amount} hint={s.amountHint} error={amount !== 0 && !amountOk ? s.amountInvalid : null} path="grant.amount">
           <NumInput value={amount} onChange={setAmount} integer unit={s.unitCoins} />
@@ -356,8 +356,8 @@ function GrantForm({ userId, who, s, lang, onMoved }: { userId: string; who: str
       >
         <div className="p-5 sm:p-6">
           <h3 id={titleId} className="text-white font-bold text-[16px]">{s.confirmGrantTitle}</h3>
-          <p className="text-zinc-300 text-[13px] mt-2 leading-relaxed">{deduct ? s.confirmDeductBody(abs, who) : s.confirmGrantBody(abs, who)}</p>
-          <p className="text-zinc-500 text-[11.5px] mt-2 leading-relaxed">{reason.trim()}</p>
+          <p className="text-text-secondary text-[13px] mt-2 leading-relaxed">{deduct ? s.confirmDeductBody(abs, who) : s.confirmGrantBody(abs, who)}</p>
+          <p className="text-text-muted text-[11.5px] mt-2 leading-relaxed">{reason.trim()}</p>
           <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
             <button type="button" onClick={() => setConfirmOpen(false)} disabled={busy} className={`${btnGhost} flex-1 h-11`}>
               {s.cancel}

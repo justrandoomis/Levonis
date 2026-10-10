@@ -108,6 +108,7 @@ export default function OrderSearchField({
             language, so the icon does not need a second RTL rule. */}
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" aria-hidden />
         <input
+          className="lv-input w-full ps-10 pe-12"
           type="text"
           data-order-search
           value={text}
@@ -118,7 +119,6 @@ export default function OrderSearchField({
             'Order number, phone, name or date',
             'ژمارەی داواکاری، مۆبایل، ناو یان بەروار'
           )}
-          className="lv-input w-full ps-10 pe-12"
         />
         {text && (
           <button

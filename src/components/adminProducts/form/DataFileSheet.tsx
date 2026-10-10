@@ -236,7 +236,7 @@ export default function DataFileSheet({
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <span className="text-[11px] text-zinc-500 flex-1 min-w-[140px]">
+          <span className="text-[11px] text-text-muted flex-1 min-w-[140px]">
             {preview
               ? fill(t(S.summary), {
                   n: preview.products.reduce((s, p) => s + p.counts.changes, 0),
@@ -254,12 +254,12 @@ export default function DataFileSheet({
         </div>
       }
     >
-      <p className="text-[12px] leading-relaxed text-zinc-400 mb-3">{t(S.intro)}</p>
+      <p className="text-[12px] leading-relaxed text-text-secondary mb-3">{t(S.intro)}</p>
 
       <div className="space-y-2.5 min-w-0">
         {/* 1 — the file */}
-        <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2" data-data-file-step="download">
-          <h4 className="text-[12px] font-bold text-zinc-200">{t(bulk ? S.stepDownloadBulk : S.stepDownload)}</h4>
+        <div className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2" data-data-file-step="download">
+          <h4 className="text-[12px] font-bold text-text-primary">{t(bulk ? S.stepDownloadBulk : S.stepDownload)}</h4>
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             {productId ? (
               <>
@@ -281,7 +281,7 @@ export default function DataFileSheet({
                 </button>
               </>
             ) : chunks.length === 0 ? (
-              <span className="text-[11px] text-zinc-500">{t(S.noProducts)}</span>
+              <span className="text-[11px] text-text-muted">{t(S.noProducts)}</span>
             ) : (
               chunks.map((ids, i) => {
                 const key = `chunk-${i}`;
@@ -312,8 +312,8 @@ export default function DataFileSheet({
         </div>
 
         {/* 2 — the edited file */}
-        <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2" data-data-file-step="upload">
-          <h4 className="text-[12px] font-bold text-zinc-200">{t(S.stepUpload)}</h4>
+        <div className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2" data-data-file-step="upload">
+          <h4 className="text-[12px] font-bold text-text-primary">{t(S.stepUpload)}</h4>
           <input
             ref={fileRef}
             type="file"
@@ -330,7 +330,7 @@ export default function DataFileSheet({
               <FileUp className="w-4 h-4" /> {file ? t(S.chooseOther) : t(S.chooseFile)}
             </button>
             {file && (
-              <span className="text-[11px] text-zinc-400 truncate min-w-0" dir="ltr">
+              <span className="text-[11px] text-text-secondary truncate min-w-0" dir="ltr">
                 {file.name}
               </span>
             )}
@@ -339,22 +339,22 @@ export default function DataFileSheet({
 
         {/* 3 — the comparison */}
         {(checking || preview || problem) && (
-          <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2" data-data-file-step="compare">
+          <div className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2" data-data-file-step="compare">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h4 className="text-[12px] font-bold text-zinc-200 flex-1 min-w-0">{t(S.stepChanges)}</h4>
+              <h4 className="text-[12px] font-bold text-text-primary flex-1 min-w-0">{t(S.stepChanges)}</h4>
               {file && !checking && (
                 <button type="button" className={btnGhost} onClick={() => void compare(file)}>
                   <RefreshCw className="w-4 h-4" /> {t(S.compareAgain)}
                 </button>
               )}
             </div>
-            {checking && <p className="text-[11px] text-zinc-500">{t(S.comparing)}</p>}
+            {checking && <p className="text-[11px] text-text-muted">{t(S.comparing)}</p>}
             {problem && (
               <p className="text-[12px] text-red-400 inline-flex items-center gap-1" role="alert">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {problem}
               </p>
             )}
-            {preview?.viewer === 'staff' && <p className="text-[11px] text-zinc-500">{t(S.staffFile)}</p>}
+            {preview?.viewer === 'staff' && <p className="text-[11px] text-text-muted">{t(S.staffFile)}</p>}
             {preview?.products.map((card) => (
               <ProductBlock
                 key={card.product_id}
@@ -413,11 +413,11 @@ function ProductBlock({
   const rowName = (r: PricingRow) => (lang === 'en' ? r.name_en : lang === 'ckb' ? r.name_ckb || r.name_ar : r.name_ar) || r.name_en || '';
 
   return (
-    <div className="min-w-0 rounded-md border border-zinc-800 bg-black/20 p-2 space-y-2" data-data-file-product={card.product_id}>
+    <div className="min-w-0 rounded-md border border-border-subtle p-2 space-y-2" data-data-file-product={card.product_id}>
       {bulk && (
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <span className="text-[12px] font-bold text-zinc-100 truncate min-w-0 flex-1">{card.name ?? card.product_id}</span>
-          <span className="text-[10px] text-zinc-500 truncate" dir="ltr">
+          <span className="text-[12px] font-bold text-text-primary truncate min-w-0 flex-1">{card.name ?? card.product_id}</span>
+          <span className="text-[10px] text-text-muted truncate" dir="ltr">
             {card.slug ?? card.product_id}
           </span>
         </div>
@@ -427,20 +427,20 @@ function ProductBlock({
           {t(S.productError)}: {errorText}
         </p>
       )}
-      {!card.error && changes.length === 0 && refused.length === 0 && <p className="text-[12px] text-zinc-400">{t(S.noChanges)}</p>}
+      {!card.error && changes.length === 0 && refused.length === 0 && <p className="text-[12px] text-text-secondary">{t(S.noChanges)}</p>}
 
       {bySection(changes).map(([section, list]) => (
         <div key={`c-${section}`} className="space-y-1.5 min-w-0">
-          <h5 className="text-[11px] font-bold text-zinc-400">{sectionName(section)}</h5>
+          <h5 className="text-[11px] font-bold text-text-secondary">{sectionName(section)}</h5>
           {list.map((f) => (
-            <div key={f.key} className="rounded-md bg-black/30 border border-zinc-800 px-2 py-1.5 min-w-0" data-data-file-change={f.key}>
+            <div key={f.key} className="lv-well rounded-md px-2 py-1.5 min-w-0" data-data-file-change={f.key}>
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className="text-[12px] font-bold text-zinc-200 truncate min-w-0 flex-1">{fieldName(f)}</span>
-                <span className="text-[10px] text-zinc-500 truncate" dir="ltr">
+                <span className="text-[12px] font-bold text-text-primary truncate min-w-0 flex-1">{fieldName(f)}</span>
+                <span className="text-[10px] text-text-muted truncate" dir="ltr">
                   {f.key} · {t(S.line)} {f.line}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-500 whitespace-pre-wrap break-words" dir="auto">
+              <p className="text-[11px] text-text-muted whitespace-pre-wrap break-words" dir="auto">
                 {t(S.before)}: {shown(f.before)}
               </p>
               <p className="text-[11px] text-emerald-300 whitespace-pre-wrap break-words" dir="auto">
@@ -454,17 +454,17 @@ function ProductBlock({
       {refused.length > 0 && (
         <div className="space-y-1.5 min-w-0">
           {refused.map((f) => (
-            <div key={`r-${f.key}-${f.line}`} className="rounded-md border border-red-500/40 bg-red-500/5 px-2 py-1.5 min-w-0" data-data-file-refused={f.status}>
+            <div key={`r-${f.key}-${f.line}`} className="lv-alert lv-alert-danger px-2 py-1.5 min-w-0" data-data-file-refused={f.status}>
               <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
                 <span className="text-[12px] font-bold text-red-300 truncate min-w-0 flex-1">{fieldName(f)}</span>
-                <span className="text-[10px] text-zinc-500 truncate" dir="ltr">
+                <span className="text-[10px] text-text-muted truncate" dir="ltr">
                   {f.key} · {t(S.line)} {f.line}
                 </span>
               </div>
               <p className="text-[11px] text-red-300 break-words">{reason(f)}</p>
               {(f.before !== null || f.after !== null) && (
-                <p className="text-[11px] text-zinc-500 whitespace-pre-wrap break-words" dir="auto">
+                <p className="text-[11px] text-text-muted whitespace-pre-wrap break-words" dir="auto">
                   {shown(f.before)} → {shown(f.after)}
                 </p>
               )}
@@ -474,7 +474,7 @@ function ProductBlock({
       )}
 
       {card.derived.length > 0 && (
-        <details className="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 min-w-0">
+        <details className="lv-alert lv-alert-warning px-2 py-1.5 min-w-0">
           <summary className="text-[11px] text-amber-300 cursor-pointer">{fill(t(S.derived), { n: card.derived.length })}</summary>
           <ul className="mt-1 space-y-0.5 text-[11px] text-amber-200/80">
             {card.derived.map((d) => (
@@ -487,9 +487,9 @@ function ProductBlock({
       )}
 
       {stale.length > 0 && (
-        <details className="rounded-md border border-zinc-800 bg-zinc-800/30 px-2 py-1.5 min-w-0">
-          <summary className="text-[11px] text-zinc-400 cursor-pointer">{fill(t(S.stale), { n: stale.length })}</summary>
-          <ul className="mt-1 space-y-0.5 text-[11px] text-zinc-500">
+        <details className="rounded-md bg-surface-raised px-2 py-1.5 min-w-0">
+          <summary className="text-[11px] text-text-secondary cursor-pointer">{fill(t(S.stale), { n: stale.length })}</summary>
+          <ul className="mt-1 space-y-0.5 text-[11px] text-text-muted">
             {stale.map((f) => (
               <li key={f.key} className="break-words" dir="auto">
                 <span dir="ltr">{f.key}</span> — {reason(f)}
@@ -499,37 +499,37 @@ function ProductBlock({
         </details>
       )}
 
-      {card.gone_items.length > 0 && <p className="text-[11px] text-zinc-500 break-words">{fill(t(S.gone), { list: card.gone_items.join(', ') })}</p>}
+      {card.gone_items.length > 0 && <p className="text-[11px] text-text-muted break-words">{fill(t(S.gone), { list: card.gone_items.join(', ') })}</p>}
 
       {/* The missing flags (owner brief 2026-10-10): which required fields the product
           would still miss once these changes are applied. */}
       {card.completeness && (card.completeness.before.length > 0 || card.completeness.after.length > 0) && (
         card.completeness.after.length === 0 ? (
-          <p className="rounded-md border border-emerald-500/40 bg-emerald-500/5 px-2 py-1.5 text-[11px] text-emerald-200" data-data-file-complete>
+          <p className="lv-alert lv-alert-success px-2 py-1.5 text-[11px] text-text-primary" data-data-file-complete>
             {tri(COMPLETENESS_UI.afterApplyComplete, lang)}
           </p>
         ) : (
-          <div className="rounded-md border border-red-500/50 bg-red-500/5 px-2 py-1.5 min-w-0" data-data-file-missing={card.completeness.after.length}>
+          <div className="lv-alert lv-alert-danger px-2 py-1.5 min-w-0" data-data-file-missing={card.completeness.after.length}>
             <p className="flex items-center gap-1.5 text-[11px] font-bold text-red-300">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" aria-hidden="true" />
               {fill(tri(COMPLETENESS_UI.afterApplyMissing, lang), { n: card.completeness.after.length })}
             </p>
             <ul className="mt-1 flex flex-wrap gap-1.5">
               {[...new Map(card.completeness.after.map((i) => [i.code, i])).values()].map((i) => (
-                <li key={i.code} className="rounded border border-red-500/40 px-1.5 py-0.5 text-[11px] text-red-200" data-missing={i.code}>
+                <li key={i.code} className="lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)] rounded px-1.5 py-0.5 text-[11px]" data-missing={i.code}>
                   {completenessLabel(i.code, lang)}
                 </li>
               ))}
             </ul>
             {card.completeness.before.length !== card.completeness.after.length && (
-              <p className="mt-1 text-[10px] text-zinc-500">{fill(tri(COMPLETENESS_UI.nowMissing, lang), { n: card.completeness.before.length })}</p>
+              <p className="mt-1 text-[10px] text-text-muted">{fill(tri(COMPLETENESS_UI.nowMissing, lang), { n: card.completeness.before.length })}</p>
             )}
           </div>
         )
       )}
 
       {card.pricing && card.pricing.kind !== 'none' && (
-        <div className="rounded-md border border-sky-500/30 bg-sky-500/5 px-2 py-1.5 space-y-1 min-w-0" data-data-file-pricing={card.pricing.kind}>
+        <div className="lv-alert lv-alert-info px-2 py-1.5 space-y-1 min-w-0" data-data-file-pricing={card.pricing.kind}>
           <p className="text-[11px] text-sky-200">
             {card.pricing.kind === 'data' ? t(S.pricingData) : card.pricing.adoption?.kind === 'adopt' ? t(S.pricingAdopt) : t(S.pricingReprice)}
           </p>
@@ -558,7 +558,7 @@ function ProductBlock({
         </p>
       )}
       {!outcome && !card.token && !card.error && changes.length === 0 && refused.length > 0 && (
-        <p className="text-[11px] text-zinc-500">{t(S.resultNothing)}</p>
+        <p className="text-[11px] text-text-muted">{t(S.resultNothing)}</p>
       )}
     </div>
   );

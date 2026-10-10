@@ -28,6 +28,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { useMotion } from '../../../lib/motion';
 import { Sheet } from '../../ui/Sheet';
 import Spinner from '../../ui/Spinner';
+import { IconButton } from '../../ui/Button';
 import { scanFeedback } from '../../scanner/feedback';
 import type { ScanRead } from '../../scanner/BarcodeScanner';
 import { serialStrings } from './strings';
@@ -316,7 +317,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
             exit={{ opacity: 0 }}
             transition={m.spring('quick')}
             role="status"
-            className="flex items-start gap-3 rounded-2xl border border-success/30 bg-success/10 p-3"
+            className="lv-alert lv-alert-success flex items-start gap-3"
           >
             <motion.span
               initial={{ scale: m.reduced ? 1 : 0.85, opacity: 0 }}
@@ -384,7 +385,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
             exit={{ opacity: 0 }}
             transition={m.spring('quick')}
             role="alert"
-            className="rounded-2xl border border-danger/30 bg-danger/10 p-3"
+            className="lv-alert lv-alert-danger"
             data-serial-refusal={error instanceof ApiError ? error.code ?? '' : ''}
           >
             <div className="flex items-start gap-3">
@@ -460,6 +461,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
                     {s.reasonLabel}
                   </label>
                   <textarea
+                    className="lv-input resize-none py-2 text-[14px] leading-relaxed"
                     ref={reasonRef}
                     id={reasonId}
                     rows={2}
@@ -469,7 +471,6 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     aria-describedby={`${reasonId}-hint`}
-                    className="w-full rounded-xl border border-border-subtle bg-surface px-3 py-2 text-[14px] text-text-primary outline-none transition-colors focus:border-gold resize-none"
                   />
                   <p id={`${reasonId}-hint`} className="mt-0.5 text-[11.5px] text-text-secondary">
                     {s.reasonHint}
@@ -522,15 +523,7 @@ export default function SerialScanSheet({ orderId, target, viewerOwner, initialR
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={s.close}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-selected hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-          data-serial-sheet-close
-        >
-          <X className="h-5 w-5" aria-hidden />
-        </button>
+        <IconButton onClick={() => onClose()} label={s.close} icon={<X className="h-5 w-5" aria-hidden />} data-serial-sheet-close />
       </div>
     </div>
   );

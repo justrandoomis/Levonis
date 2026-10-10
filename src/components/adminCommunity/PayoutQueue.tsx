@@ -151,16 +151,16 @@ export default function PayoutQueue({ t }: { t: T }) {
         />
       </div>
       {load === 'scope' ? (
-        <p className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 px-4 py-3 text-zinc-400 text-[12.5px]" data-finance-scope>
+        <p className="rounded-lg bg-surface-raised px-4 py-3 text-text-secondary text-[12.5px]" data-finance-scope>
           {t('طلبات التحويل وقراراتها للمالك أو الدور المالي فقط.', 'Payout requests and their decisions are for the owner or a financial admin only.')}
         </p>
       ) : load === 'error' && !rows ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-700/50 px-4 py-3 text-[12.5px] text-zinc-300" role="alert">
+        <div className="lv-alert lv-alert-danger flex items-center justify-between gap-3 text-[12.5px] text-text-primary" role="alert">
           {t('تعذّر تحميل الطلبات.', 'Could not load the requests.')}
           <Button variant="secondary" size="sm" onClick={refresh}>{t('إعادة المحاولة', 'Try again')}</Button>
         </div>
       ) : !rows ? (
-        <div className="h-24 rounded-2xl bg-white/[0.04] animate-pulse" aria-hidden="true" />
+        <div className="h-24 rounded-xl bg-surface-selected animate-pulse" aria-hidden="true" />
       ) : rows.length === 0 ? (
         <p className="text-text-muted text-[12.5px]" data-queue-empty>
           {state === 'open' ? t('لا توجد طلبات تنتظر.', 'No requests are waiting.') : t('لا شيء هنا.', 'Nothing here.')}
@@ -180,16 +180,16 @@ export default function PayoutQueue({ t }: { t: T }) {
                 </div>
               </div>
               <dl className="mt-2.5 grid grid-cols-1 gap-1 text-[12px] sm:grid-cols-2">
-                <div className="flex gap-1.5"><dt className="text-text-muted">{t('القناة:', 'Channel:')}</dt><dd className="text-zinc-200">{p.method.label || p.method.channel}</dd></div>
+                <div className="flex gap-1.5"><dt className="text-text-muted">{t('القناة:', 'Channel:')}</dt><dd className="text-text-primary">{p.method.label || p.method.channel}</dd></div>
                 {p.method.account && (
-                  <div className="flex gap-1.5"><dt className="text-text-muted">{t('الحساب:', 'Account:')}</dt><dd className="text-zinc-200 select-all" dir="ltr">{p.method.account}</dd></div>
+                  <div className="flex gap-1.5"><dt className="text-text-muted">{t('الحساب:', 'Account:')}</dt><dd className="text-text-primary select-all" dir="ltr">{p.method.account}</dd></div>
                 )}
                 {p.method.holder && (
-                  <div className="flex gap-1.5"><dt className="text-text-muted">{t('صاحب الحساب:', 'Holder:')}</dt><dd className="text-zinc-200">{p.method.holder}</dd></div>
+                  <div className="flex gap-1.5"><dt className="text-text-muted">{t('صاحب الحساب:', 'Holder:')}</dt><dd className="text-text-primary">{p.method.holder}</dd></div>
                 )}
                 <div className="flex gap-1.5">
                   <dt className="text-text-muted">{t('رصيد التاجر:', 'Merchant balance:')}</dt>
-                  <dd className="text-zinc-200">
+                  <dd className="text-text-primary">
                     {t('متاح', 'available')} <Money iqd={p.merchant.available_iqd} /> · {t('محجوز', 'reserved')} <Money iqd={p.merchant.reserved_iqd} />
                   </dd>
                 </div>
@@ -202,8 +202,8 @@ export default function PayoutQueue({ t }: { t: T }) {
                 {p.merchant.status && p.merchant.status !== 'active' && (
                   <div className="sm:col-span-2"><StatusChip tone="danger">{p.merchant.status === 'suspended' ? t('حساب التاجر موقوف', 'Merchant suspended') : p.merchant.status === 'restricted' ? t('حساب التاجر مقيّد', 'Merchant restricted') : t('حساب التاجر ليس نشطًا', 'Merchant not active')}</StatusChip></div>
                 )}
-                {p.note && <div className="sm:col-span-2 text-zinc-400">{t('ملاحظة التاجر:', 'Merchant note:')} {p.note}</div>}
-                {p.reference && p.state === 'paid' && <div className="sm:col-span-2 text-zinc-400">{t('المرجع:', 'Reference:')} {p.reference}</div>}
+                {p.note && <div className="sm:col-span-2 text-text-secondary">{t('ملاحظة التاجر:', 'Merchant note:')} {p.note}</div>}
+                {p.reference && p.state === 'paid' && <div className="sm:col-span-2 text-text-secondary">{t('المرجع:', 'Reference:')} {p.reference}</div>}
                 {p.decision_reason && p.state === 'failed' && <div className="sm:col-span-2 text-red-300">{t('السبب:', 'Reason:')} {p.decision_reason}</div>}
               </dl>
               {(p.state === 'requested' || p.state === 'approved') && (
@@ -298,7 +298,7 @@ function MarkPaidSheet({ payout, onClose, onDone, t }: { payout: QueuePayout | n
           <h2 id={titleId} className="text-white font-bold text-[15px]">
             {t('تسجيل التحويل', 'Record the transfer')} — <Money iqd={payout?.amount_iqd ?? null} />
           </h2>
-          <p className="text-zinc-400 text-[12.5px] leading-relaxed">
+          <p className="text-text-secondary text-[12.5px] leading-relaxed">
             {t(
               'سجّل بعد أن ترسل المال فعلًا. ينتقل المبلغ من «محجوز» إلى «مدفوع» في سجل التاجر، ويرى التاجر المرجع.',
               'Record it after you have actually sent the money. The amount moves from Reserved to Paid in the merchant’s ledger, and the merchant sees the reference.'

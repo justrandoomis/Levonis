@@ -8,8 +8,6 @@ import {
 } from '../../../lib/productTypes';
 import { Field, Grid, btnGhost } from './formUi';
 
-const INPUT =
-  'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-iris outline-none min-h-[44px]';
 
 /** Format a canonical integer without floating-point arithmetic. */
 export function formatScaledInteger(value: number | null, scale: 10 | 1000): string {
@@ -78,7 +76,7 @@ export function MeasurementInput({
   const inheritedText = inheritedMeasurementPlaceholder(inherited, scale);
   return (
     <input
-      className={INPUT}
+      className="lv-input text-sm"
       dir="ltr"
       inputMode="decimal"
       value={text}
@@ -142,10 +140,10 @@ export function DimensionsSection({
     <div className="grid gap-5">
       <div>
         <h4 className="mb-2.5 text-[13px] font-bold text-white">
-          المنتج نفسه <span className="text-zinc-500 font-medium">/ The product itself</span>
+          المنتج نفسه <span className="text-text-muted font-medium">/ The product itself</span>
         </h4>
         {!collapsible && (
-          <p className="mb-3 text-[11.5px] leading-[1.6] text-zinc-400">
+          <p className="mb-3 text-[11.5px] leading-[1.6] text-text-secondary">
             ما يراه الزبون — «هل يدخل على الطاولة؟». ليست أبعاد الصندوق.
           </p>
         )}
@@ -168,10 +166,10 @@ export function DimensionsSection({
 
       <div>
         <h4 className="mb-2.5 text-[13px] font-bold text-white">
-          صندوق الشحن <span className="text-zinc-500 font-medium">/ The shipping box</span>
+          صندوق الشحن <span className="text-text-muted font-medium">/ The shipping box</span>
         </h4>
         {!collapsible && (
-          <p className="mb-3 text-[11.5px] leading-[1.6] text-zinc-400">
+          <p className="mb-3 text-[11.5px] leading-[1.6] text-text-secondary">
             ما يحسب عليه الناقل. عادةً أكبر وأثقل من المنتج نفسه.
           </p>
         )}
@@ -204,7 +202,7 @@ export function DimensionsSection({
   if (!collapsible) return body;
 
   return (
-    <div className="mt-2.5 min-w-0 rounded-lg border border-zinc-700/70 bg-zinc-950/25" data-dimensions-editor>
+    <div className="mt-2.5 min-w-0 rounded-lg border border-border-subtle" data-dimensions-editor>
       <button
         type="button"
         className="flex min-h-10 w-full min-w-0 items-center gap-2 px-2.5 text-start"
@@ -212,12 +210,12 @@ export function DimensionsSection({
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />
-        <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-zinc-300">
+        <ChevronDown className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-text-secondary">
           {label ?? 'الأبعاد والوزن / Dimensions & weight'}
         </span>
         <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${customCount > 0 ? 'border-iris/50 bg-iris/10 text-violet-200' : 'border-zinc-700 bg-zinc-900 text-zinc-500'}`}
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${customCount > 0 ? 'lv-chip [--chip:var(--color-info)]' : 'bg-surface-selected text-text-muted'}`}
           data-dimensions-mode={customCount > 0 ? 'custom' : 'inherit'}
         >
           {customCount > 0 ? `مخصص ${customCount} / custom` : 'موروث / inherit'}
@@ -225,8 +223,8 @@ export function DimensionsSection({
       </button>
       <div id={panelId} className={`grid min-w-0 transition-[grid-template-rows] duration-200 ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="min-h-0 min-w-0 overflow-hidden">
-          <div className="border-t border-zinc-800 p-2.5">
-            <p className="mb-3 text-[10px] leading-relaxed text-zinc-500">
+          <div className="border-t border-border-subtle p-2.5">
+            <p className="mb-3 text-[10px] leading-relaxed text-text-muted">
               اترك الحقل فارغًا ليرث الرقم الظاهر من المستوى السابق. Leave blank to inherit the placeholder value.
             </p>
             {body}
@@ -242,9 +240,9 @@ function BoxVolume({ d }: { d: ProductDimensionsV2 }) {
   if (width === null || depth === null || height === null) return null;
   const litres = Math.round((width * depth * height) / 100_000) / 10;
   return (
-    <p className="mt-3 text-[11.5px] leading-[1.6] text-zinc-400">
+    <p className="mt-3 text-[11.5px] leading-[1.6] text-text-secondary">
       حجم الصندوق: <span className="font-semibold text-white tabular-nums">{litres}</span> لتر
-      <span className="text-zinc-500"> — محسوب من الأبعاد أعلاه، غير مخزّن.</span>
+      <span className="text-text-muted"> — محسوب من الأبعاد أعلاه، غير مخزّن.</span>
     </p>
   );
 }

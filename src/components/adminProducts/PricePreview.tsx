@@ -118,7 +118,7 @@ export default function PricePreview({
   return (
     <Section ar="معاينة السعر الحية" en="Live price preview" defaultOpen>
       {dirty && (
-        <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-3 mb-4 text-xs">
+        <div className="lv-alert lv-alert-warning flex items-start gap-2 mb-4 text-xs text-text-primary">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
             المعاينة تُحسب من آخر نسخة محفوظة — احفظ أولاً لرؤية تعديلاتك.
@@ -192,14 +192,14 @@ export default function PricePreview({
         </div>
         <div>
           <L ar="الفئة" en="Tier" />
-          <div className="flex rounded-xl overflow-hidden border border-zinc-700">
+          <div className="lv-well flex gap-1 rounded-full border border-border-subtle p-1">
             {tierChoices.map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTier(t)}
-                className={`flex-1 py-3 text-sm font-bold transition-colors ${
-                  tier === t ? 'bg-[#6B46FF] text-snow' : 'bg-zinc-800/40 text-zinc-400 hover:text-white'
+                className={`flex-1 rounded-full border py-2.5 text-sm font-bold transition-colors ${
+                  tier === t ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
               >
                 {t === 'free' ? 'الزبون' : 'PRO'}
@@ -210,16 +210,16 @@ export default function PricePreview({
       </div>
 
       {loading && (
-        <div className="flex items-center gap-2 text-zinc-500 text-sm py-3">
+        <div className="flex items-center gap-2 text-text-muted text-sm py-3">
           <RefreshCw className="w-4 h-4 animate-spin" /> جارٍ الحساب… / calculating…
         </div>
       )}
       {error && <div className="text-red-400 text-sm py-2">{error}</div>}
 
       {quote && !loading && (
-        <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4">
+        <div className="lv-well rounded-lg p-4">
           {quote.errors.length > 0 && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-3">
+            <div className="lv-alert lv-alert-danger mb-3">
               <div className="text-red-400 text-sm font-bold mb-1">اختيار غير صالح / invalid selection</div>
               <ul className="text-red-300/90 text-xs list-disc ms-4">
                 {quote.errors.map((e) => (
@@ -304,16 +304,16 @@ function Row({ ar, en, v, strong, dim, admin }: {
   ar: string; en: string; v: string; strong?: boolean; dim?: boolean; admin?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1 border-b border-zinc-800/60">
-      <span className={`${dim ? 'text-zinc-500' : 'text-zinc-300'}`}>
-        {ar} <span className="text-[10px] text-zinc-600 mx-1">{en}</span>
+    <div className="flex items-center justify-between gap-3 py-1 border-b border-border-subtle">
+      <span className={`${dim ? 'text-text-muted' : 'text-text-secondary'}`}>
+        {ar} <span className="text-[10px] text-text-muted mx-1">{en}</span>
         {admin && (
-          <span className="text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/30 rounded px-1 py-0.5 mx-1">
+          <span className="lv-chip text-[9px] font-bold rounded px-1 py-0.5 mx-1 [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]">
             إداري فقط
           </span>
         )}
       </span>
-      <span className={`${strong ? 'text-white font-bold' : dim ? 'text-zinc-500' : 'text-zinc-200'} whitespace-nowrap`} dir="ltr">
+      <span className={`${strong ? 'text-white font-bold' : dim ? 'text-text-muted' : 'text-text-primary'} whitespace-nowrap`} dir="ltr">
         {v}
       </span>
     </div>

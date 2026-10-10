@@ -146,8 +146,8 @@ export default function UnitHistory({
   }, [unitId, refreshKey]);
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5" data-unit-history={unitId}>
-      <p className="text-[11px] font-bold text-zinc-400 mb-1.5 flex items-center gap-1.5">
+    <div className="lv-well rounded-md p-2.5" data-unit-history={unitId}>
+      <p className="text-[11px] font-bold text-text-secondary mb-1.5 flex items-center gap-1.5">
         <History className="w-3.5 h-3.5" aria-hidden />
         {t.title}
       </p>
@@ -156,9 +156,9 @@ export default function UnitHistory({
           {err}
         </p>
       ) : rows === null ? (
-        <p className="text-[11px] text-zinc-500">{t.loading}</p>
+        <p className="text-[11px] text-text-muted">{t.loading}</p>
       ) : rows.length === 0 ? (
-        <p className="text-[11px] text-zinc-500">{t.empty}</p>
+        <p className="text-[11px] text-text-muted">{t.empty}</p>
       ) : (
         <ol className="space-y-1.5">
           {rows.map((h) => {
@@ -166,21 +166,21 @@ export default function UnitHistory({
             const reason = str(h.detail?.reason);
             return (
               <li key={String(h.id)} className="text-[11px] leading-relaxed" data-unit-history-row={h.action}>
-                <span className="text-zinc-200 font-bold">{t.actions[h.action] ?? h.action}</span>{' '}
-                <span className="text-zinc-500">
+                <span className="text-text-primary font-bold">{t.actions[h.action] ?? h.action}</span>{' '}
+                <span className="text-text-muted">
                   · <time dateTime={h.created_at}>{when(h.created_at, lang)}</time> · {t.by}{' '}
-                  <span className="text-zinc-300 break-all" dir="ltr">
+                  <span className="text-text-secondary break-all" dir="ltr">
                     {who(h, t)}
                   </span>
                 </span>
                 {facts.length > 0 && (
-                  <span className="block text-zinc-400" dir="auto">
+                  <span className="block text-text-secondary" dir="auto">
                     {facts.join(' · ')}
                   </span>
                 )}
                 {reason && (
-                  <span className="block text-zinc-500">
-                    {t.reason}: <span className="text-zinc-300">{reason}</span>
+                  <span className="block text-text-muted">
+                    {t.reason}: <span className="text-text-secondary">{reason}</span>
                   </span>
                 )}
               </li>

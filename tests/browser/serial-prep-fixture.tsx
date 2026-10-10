@@ -471,10 +471,13 @@ function BoardScene() {
     row('ORD-2026-0144', loc('نور محمد', 'Noor Mohammed', 'نوور محەمەد'), 'Bambu PLA Basic', undefined),
   ];
   return (
-    <div className="mx-auto max-w-2xl space-y-2 p-3" dir={l === 'en' ? 'ltr' : 'rtl'}>
-      {rows.map((o) => (
-        <OrderBoardRow key={o.id} order={o} loc={loc} onOpen={() => undefined} onDelete={() => undefined} onAdvance={() => undefined} advancing={false} deleting={false} latin={l === 'en'} />
-      ))}
+    <div className="mx-auto max-w-2xl p-3" dir={l === 'en' ? 'ltr' : 'rtl'}>
+      {/* The board's own day tray (OrdersBoard): one clay tray, flat rows. */}
+      <div className="lv-surface divide-y divide-border-subtle overflow-hidden">
+        {rows.map((o) => (
+          <OrderBoardRow key={o.id} order={o} loc={loc} onOpen={() => undefined} onDelete={() => undefined} onAdvance={() => undefined} advancing={false} deleting={false} latin={l === 'en'} />
+        ))}
+      </div>
     </div>
   );
 }

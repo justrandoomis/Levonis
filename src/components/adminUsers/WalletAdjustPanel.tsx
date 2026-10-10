@@ -147,10 +147,11 @@ export function WalletAdjustPanel({
             />
           </div>
           <label className="block">
-            <span className="text-[11px] font-bold text-zinc-500">
+            <span className="text-[11px] font-bold text-text-muted">
               {kind === 'balance' ? s.adjAmountIqd : s.adjAmountPoints}
             </span>
             <input
+              className="lv-input mt-1 text-sm font-bold tabular-nums"
               inputMode="numeric"
               dir="ltr"
               value={amountRaw}
@@ -159,20 +160,19 @@ export function WalletAdjustPanel({
                 setDone(null);
               }}
               placeholder={kind === 'balance' ? '50,000' : '100'}
-              className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm font-bold tabular-nums text-white outline-none focus:border-zinc-600"
             />
           </label>
           <label className="block">
-            <span className="text-[11px] font-bold text-zinc-500">{s.adjReason}</span>
+            <span className="text-[11px] font-bold text-text-muted">{s.adjReason}</span>
             <textarea
+              className="lv-input mt-1 resize-none py-2.5 text-sm leading-relaxed"
               dir="auto"
               rows={2}
               maxLength={300}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 w-full resize-none rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-zinc-600"
             />
-            <span className="mt-1 block text-[11px] leading-relaxed text-zinc-600">{s.adjReasonHint}</span>
+            <span className="mt-1 block text-[11px] leading-relaxed text-text-muted">{s.adjReasonHint}</span>
           </label>
           {overdraw && (
             <p className="flex items-center gap-1.5 text-xs font-medium text-red-400">
@@ -180,7 +180,7 @@ export function WalletAdjustPanel({
             </p>
           )}
           {!overdraw && after !== null && !reasonOk && reason.length > 0 && (
-            <p className="text-xs font-medium text-zinc-500">{s.adjReasonShort}</p>
+            <p className="text-xs font-medium text-text-muted">{s.adjReasonShort}</p>
           )}
           {done && (
             <p className="flex items-center gap-1.5 text-xs font-bold text-mint" role="status">
@@ -195,7 +195,7 @@ export function WalletAdjustPanel({
               setError(null);
               setDone(null);
             }}
-            className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-zinc-200 disabled:opacity-40"
+            className="lv-button lv-button-primary w-full"
           >
             {s.adjReview}
           </button>
@@ -203,17 +203,17 @@ export function WalletAdjustPanel({
       ) : (
         <div className="space-y-3" data-adjust-review>
           <h5 className="text-sm font-black text-white">{s.adjConfirmTitle}</h5>
-          <p className="text-xs font-medium text-zinc-400">
+          <p className="text-xs font-medium text-text-secondary">
             {direction === 'credit' ? s.adjAdd : s.adjDeduct} · {kind === 'balance' ? formatIqd(amount) : fmt(amount)}
           </p>
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+          <div className="lv-well flex items-center justify-between gap-3 rounded-md p-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-bold text-zinc-500">{s.adjCurrent}</div>
-              <div className="text-sm font-bold tabular-nums text-zinc-300">{fmt(current)}</div>
+              <div className="text-[11px] font-bold text-text-muted">{s.adjCurrent}</div>
+              <div className="text-sm font-bold tabular-nums text-text-secondary">{fmt(current)}</div>
             </div>
-            <ArrowLeftRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden />
+            <ArrowLeftRight className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
             <div className="min-w-0 text-end">
-              <div className="text-[11px] font-bold text-zinc-500">{s.adjAfter}</div>
+              <div className="text-[11px] font-bold text-text-muted">{s.adjAfter}</div>
               <div
                 className={`text-lg font-black tabular-nums ${direction === 'credit' ? 'text-mint' : 'text-white'}`}
                 data-adjust-after
@@ -222,7 +222,7 @@ export function WalletAdjustPanel({
               </div>
             </div>
           </div>
-          <p dir="auto" className="rounded-xl bg-zinc-900 px-3 py-2 text-xs leading-relaxed text-zinc-400">
+          <p dir="auto" className="lv-well rounded-md px-3 py-2 text-xs leading-relaxed text-text-secondary">
             {s.fReason}: {reason.trim()}
           </p>
           {error && (
@@ -235,7 +235,7 @@ export function WalletAdjustPanel({
               type="button"
               disabled={busy}
               onClick={reset}
-              className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-400 transition-colors hover:bg-zinc-800 disabled:opacity-40"
+              className="lv-button lv-button-ghost flex-1"
             >
               {s.adjBack}
             </button>
@@ -243,9 +243,7 @@ export function WalletAdjustPanel({
               type="button"
               disabled={busy}
               onClick={() => void submit()}
-              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors disabled:opacity-40 ${
-                direction === 'debit' ? 'bg-red-500 text-snow hover:bg-red-400' : 'bg-white text-black hover:bg-zinc-200'
-              }`}
+              className={`lv-button flex-1 ${direction === 'debit' ? 'lv-button-danger' : 'lv-button-primary'}`}
             >
               {busy ? s.adjWorking : s.adjConfirm}
             </button>

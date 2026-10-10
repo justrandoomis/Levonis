@@ -183,6 +183,7 @@ export default function OrderStatusCorrection({
       {note && <p className="lv-alert lv-alert-warning text-[12px] leading-[1.6] text-text-primary">{note}</p>}
 
       <select
+        className="lv-input w-full text-[14px] leading-[1.4]"
         value=""
         disabled={busy}
         data-order-status-select={orderId}
@@ -192,7 +193,6 @@ export default function OrderStatusCorrection({
           if (to) void change(to);
           e.target.value = '';
         }}
-        className="lv-input w-full text-[14px] leading-[1.4]"
       >
         <option value="" disabled>
           {busy ? loc('جارٍ الحفظ...', 'Saving...', 'پاشەکەوت دەکرێت...') : loc('تغيير إلى...', 'Move to...', 'بیگۆڕە بۆ...')}

@@ -937,7 +937,7 @@ function MeasureFields({ scope, id, route, summary }: { scope: PricingScope; id:
           <MeasurementInput value={dims?.package_weight_g ?? null} inherited={inherited?.package_weight_g} scale={1000} onChange={(v) => set({ package_weight_g: v })} />
         </Field>
       )}
-      <div className="min-w-0 self-end pb-1 text-[11px] leading-relaxed text-zinc-400 md:col-span-2 xl:col-span-3" data-usd-measure={keyOf(scope, id)}>
+      <div className="min-w-0 self-end pb-1 text-[11px] leading-relaxed text-text-secondary md:col-span-2 xl:col-span-3" data-usd-measure={keyOf(scope, id)}>
         <p>{s.measureFromForm}</p>
         {volume && form.partial_box && <p className="text-amber-300">{s.boxIncomplete}</p>}
         {volume && summary?.basis === 'volume' && summary.effective_cbm && <p dir="auto">{s.cbmComputed(summary.effective_cbm)}</p>}
@@ -1031,7 +1031,7 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
         </Select>
       </Field>
       {(iqd || storedIqd) && (
-        <div className="min-w-0 text-[11px] leading-relaxed text-zinc-400 md:col-span-2 xl:col-span-3" data-usd-iqd={keyOf(scope.scope, scope.scope_id)}>
+        <div className="min-w-0 text-[11px] leading-relaxed text-text-secondary md:col-span-2 xl:col-span-3" data-usd-iqd={keyOf(scope.scope, scope.scope_id)}>
           {/* What the save stores: the server's conversion of the typed dinars (the preview), or the stored snapshot. */}
           {d.supplier_cost_iqd != null && shownInputs?.supplier_input_mode === 'IQD_CONVERTED' && shownInputs.supplier_cost_amount && shownInputs.conversion_rate_snapshot && (
             <p dir="auto">{s.iqdWillConvert(shownInputs.supplier_cost_amount, shownInputs.conversion_rate_snapshot)}</p>
@@ -1084,7 +1084,7 @@ function SaveRow() {
         </button>
       )}
       {st.dirty && <button type="button" className={btnGhost} disabled={st.saving} onClick={st.discard}>{s.discard}</button>}
-      <span className="text-[11px] text-zinc-500">{st.dirty ? `${s.unsaved} · ${s.saveHint}` : s.saveHint}</span>
+      <span className="text-[11px] text-text-muted">{st.dirty ? `${s.unsaved} · ${s.saveHint}` : s.saveHint}</span>
       {st.dirty && st.shown?.adoption?.kind && st.shown.adoption.complete && <span className="text-[11px] text-amber-300" data-engine-ready>{engineSaveStrings(lang).readyHint}</span>}
       {st.productId && st.engine && !st.dirty && (
         <button
@@ -1125,8 +1125,8 @@ function Status() {
 function Head({ text, english }: { text: string; english: string }) {
   const { lang } = useLanguage();
   return (
-    <h4 className="text-[13px] font-bold text-zinc-200">
-      {text} {lang !== 'en' && <span className="text-[10px] font-medium text-zinc-500">{english}</span>}
+    <h4 className="text-[13px] font-bold text-text-primary">
+      {text} {lang !== 'en' && <span className="text-[10px] font-medium text-text-muted">{english}</span>}
     </h4>
   );
 }
@@ -1139,7 +1139,7 @@ export function UsdPricingProductPanel() {
   const st = useUsdPricing();
   if (!st || !st.enabled) return null;
   const head = <Head text={s.formTitle} english={USD_PRICING_FORM_STRINGS.en.formTitle} />;
-  if (st.notInstalled) return <div className="ap mt-4 rounded-xl border border-zinc-800 p-3" data-form="usd-pricing">{head}<p className="mt-1 text-[12px] text-zinc-500">{ps.notInstalled}</p></div>;
+  if (st.notInstalled) return <div className="ap mt-4 rounded-lg border border-border-subtle p-3" data-form="usd-pricing">{head}<p className="mt-1 text-[12px] text-text-muted">{ps.notInstalled}</p></div>;
   const base = scopeOf(st.answer, 'base', '');
   const models = st.shown?.models ?? [];
   // A product with one model shows that model's bar here; several models show theirs in their cards.
@@ -1147,23 +1147,23 @@ export function UsdPricingProductPanel() {
   const ok = models.filter((m) => m.pricing_summary.state === 'ok').length;
   const sellsDirect = st.form.productSellsDirect || models.some((m) => m.sells_direct);
   return (
-    <div className="ap mt-4 rounded-xl border border-zinc-800 p-3" data-form="usd-pricing">
+    <div className="ap mt-4 rounded-lg border border-border-subtle p-3" data-form="usd-pricing">
       {head}
-      <p className="mt-1 mb-3 text-[12px] text-zinc-500">{s.formIntro}</p>
+      <p className="mt-1 mb-3 text-[12px] text-text-muted">{s.formIntro}</p>
       <Status />
       {!base ? (
-        <p role="status" className="text-[12px] text-zinc-500">{st.busy ? s.loading : ''}</p>
+        <p role="status" className="text-[12px] text-text-muted">{st.busy ? s.loading : ''}</p>
       ) : (
         <>
           <ScopeFields scope={base} sellsDirect={sellsDirect} summary={productModel?.pricing_summary ?? null} />
           {!st.productId ? (
-            <p className="mt-3 text-[12px] text-zinc-400">{s.summaryAfterFirstSave}</p>
+            <p className="mt-3 text-[12px] text-text-secondary">{s.summaryAfterFirstSave}</p>
           ) : productModel ? (
             <PricingSummaryBar summary={productModel.pricing_summary} label={s.productLevel} busy={st.busy && st.dirty} />
           ) : (
-            models.length > 0 && <p className="mt-3 text-[12px] text-zinc-400">{s.modelsSummary(String(ok), String(models.length))}</p>
+            models.length > 0 && <p className="mt-3 text-[12px] text-text-secondary">{s.modelsSummary(String(ok), String(models.length))}</p>
           )}
-          <p className="mt-2 text-[11px] text-zinc-500">{s.pricesLater}</p>
+          <p className="mt-2 text-[11px] text-text-muted">{s.pricesLater}</p>
           <SaveRow />
         </>
       )}
@@ -1191,25 +1191,25 @@ export function UsdPricingModelRow({ model }: { model: FormModel }) {
   const touched = !!st.effective[keyOf('option', model.id)];
   const ok = summary?.state === 'ok';
   return (
-    <div className="ap mt-2.5 min-w-0 rounded-lg border border-zinc-700/70 bg-zinc-950/25 px-2.5 py-2" data-usd-model={model.id}>
+    <div className="ap mt-2.5 min-w-0 rounded-lg border border-border-subtle px-2.5 py-2" data-usd-model={model.id}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-[12px] font-bold text-zinc-300">{s.modelTitle}</span>
+        <span className="text-[12px] font-bold text-text-secondary">{s.modelTitle}</span>
         {saved && st.productId && (
-          <span className="flex flex-wrap gap-x-3 text-[12px] tabular-nums text-zinc-200" data-usd-model-price>
+          <span className="flex flex-wrap gap-x-3 text-[12px] tabular-nums text-text-primary" data-usd-model-price>
             {ok ? (
               <>
                 <span>{s.customerPrice(money(summary!.preorder_base_iqd))}</span>
                 {summary!.direct_sale_price_iqd != null && <span>{s.directPrice(money(summary!.direct_sale_price_iqd))}</span>}
               </>
             ) : (
-              <span className="text-zinc-500">{st.busy && touched ? '…' : s.modelBlocked}</span>
+              <span className="text-text-muted">{st.busy && touched ? '…' : s.modelBlocked}</span>
             )}
           </span>
         )}
       </div>
-      <p className="mt-1 text-[11px] text-zinc-500">{saved ? (st.answer.sku_levels ? s.coloursOwn : s.coloursFollow) : s.modelSavedLater}</p>
+      <p className="mt-1 text-[11px] text-text-muted">{saved ? (st.answer.sku_levels ? s.coloursOwn : s.coloursFollow) : s.modelSavedLater}</p>
       <details className="mt-1.5" open={touched || undefined}>
-        <summary className="cursor-pointer text-[12px] text-zinc-400">{s.edit}</summary>
+        <summary className="cursor-pointer text-[12px] text-text-secondary">{s.edit}</summary>
         <div className="mt-3">
           <ScopeFields scope={scope} sellsDirect={model.sells_direct} summary={summary} />
         </div>
@@ -1225,20 +1225,20 @@ function SkuPrices({ skus, busy }: { skus: readonly SkuAnswer[]; busy: boolean }
   const s = usdPricingFormStrings(lang);
   if (!skus.length) return null;
   return (
-    <ul className="mt-1 space-y-0.5 text-[12px] tabular-nums text-zinc-200" data-usd-sku-prices>
+    <ul className="mt-1 space-y-0.5 text-[12px] tabular-nums text-text-primary" data-usd-sku-prices>
       {skus.map((k) => {
         const sum = k.pricing_summary;
         const ok = sum.state === 'ok';
         return (
           <li key={k.combo_key} className="flex flex-wrap gap-x-3" data-usd-sku={k.combo_key}>
-            <span className="text-zinc-400" dir="auto">{nameOf(k, lang)}</span>
+            <span className="text-text-secondary" dir="auto">{nameOf(k, lang)}</span>
             {ok ? (
               <>
                 <span>{s.customerPrice(money(sum.preorder_base_iqd))}</span>
                 {sum.direct_sale_price_iqd != null && <span>{s.directPrice(money(sum.direct_sale_price_iqd))}</span>}
               </>
             ) : (
-              <span className="text-zinc-500">{busy ? '…' : s.modelBlocked}</span>
+              <span className="text-text-muted">{busy ? '…' : s.modelBlocked}</span>
             )}
           </li>
         );
@@ -1277,12 +1277,12 @@ export function UsdPricingColourRow({ colour }: { colour: FormColour }) {
   const touched = !!st.effective[keyOf('color', colour.id)];
   const sellsDirect = skus.some((k) => k.sells_direct) || st.form.models.some((m) => m.sells_direct) || st.form.productSellsDirect;
   return (
-    <div className="ap mt-2.5 min-w-0 rounded-lg border border-zinc-700/70 bg-zinc-950/25 px-2.5 py-2" data-usd-colour={colour.id}>
-      <span className="text-[12px] font-bold text-zinc-300">{s.colourTitle}</span>
+    <div className="ap mt-2.5 min-w-0 rounded-lg border border-border-subtle px-2.5 py-2" data-usd-colour={colour.id}>
+      <span className="text-[12px] font-bold text-text-secondary">{s.colourTitle}</span>
       {saved && st.productId && <SkuPrices skus={skus} busy={st.busy && touched} />}
-      <p className="mt-1 text-[11px] text-zinc-500">{saved ? s.colourInherits : s.colourSavedLater}</p>
+      <p className="mt-1 text-[11px] text-text-muted">{saved ? s.colourInherits : s.colourSavedLater}</p>
       <details className="mt-1.5" open={touched || undefined}>
-        <summary className="cursor-pointer text-[12px] text-zinc-400">{s.edit}</summary>
+        <summary className="cursor-pointer text-[12px] text-text-secondary">{s.edit}</summary>
         <div className="mt-3">
           <ScopeFields scope={scope} sellsDirect={sellsDirect} summary={skus.length === 1 ? skus[0]!.pricing_summary : null} />
         </div>
@@ -1308,12 +1308,12 @@ export function UsdPricingSkuRow({ comboKey }: { comboKey: string }) {
   const scope = saved ?? emptyScope('sku', comboKey, sku ?? { name_en: comboKey });
   const touched = !!st.effective[keyOf('sku', comboKey)];
   return (
-    <div className="ap mt-2 min-w-0 rounded-md border border-zinc-800/80 bg-zinc-950/20 px-2 py-1.5" data-usd-variant={comboKey}>
-      <span className="text-[11px] font-bold text-zinc-300">{s.skuTitle}</span>
+    <div className="ap mt-2 min-w-0 rounded-md border border-border-subtle px-2 py-1.5" data-usd-variant={comboKey}>
+      <span className="text-[11px] font-bold text-text-secondary">{s.skuTitle}</span>
       {sku && st.productId && <SkuPrices skus={[sku]} busy={st.busy && touched} />}
       <details className="mt-1" open={touched || undefined}>
-        <summary className="cursor-pointer text-[11px] text-zinc-400">{s.edit}</summary>
-        <p className="mt-1 text-[11px] text-zinc-500">{s.skuInherits}</p>
+        <summary className="cursor-pointer text-[11px] text-text-secondary">{s.edit}</summary>
+        <p className="mt-1 text-[11px] text-text-muted">{s.skuInherits}</p>
         <div className="mt-2">
           <ScopeFields scope={scope} sellsDirect={sku?.sells_direct ?? false} summary={sku?.pricing_summary ?? null} />
         </div>
@@ -1359,14 +1359,14 @@ export function UsdPricingPreview() {
   if (!st || !st.enabled || st.notInstalled || !st.productId || !st.shown) return null;
   const rows = st.shown.rows ?? [];
   return (
-    <section className="ap mt-3 rounded-lg border border-zinc-800 p-3" aria-busy={st.busy || undefined} data-form="usd-pricing-preview">
+    <section className="ap mt-3 rounded-lg border border-border-subtle p-3" aria-busy={st.busy || undefined} data-form="usd-pricing-preview">
       <Head text={s.previewTitle} english={USD_PRICING_FORM_STRINGS.en.previewTitle} />
-      <p className="mt-1 text-[11px] text-zinc-500">
+      <p className="mt-1 text-[11px] text-text-muted">
         {s.previewNote}
         {st.shown.per_sku && <span className="block">{s.perSkuNote}</span>}
         {st.dirty && <span className="block text-amber-300">{s.previewIncludesDrafts}</span>}
       </p>
-      {rows.length ? <PricingRowsTable rows={rows} /> : <p className="mt-2 text-[12px] text-zinc-500">{s.previewEmpty}</p>}
+      {rows.length ? <PricingRowsTable rows={rows} /> : <p className="mt-2 text-[12px] text-text-muted">{s.previewEmpty}</p>}
     </section>
   );
 }

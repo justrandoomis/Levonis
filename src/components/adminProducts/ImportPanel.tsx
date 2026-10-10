@@ -697,7 +697,7 @@ export default function ImportPanel({
   return (
     <div className="min-w-0 text-sm" data-panel="import-v2">
       <ErrorBanner text={err} />
-      {note && <div className="bg-sky-500/10 border border-sky-500/30 text-sky-200 rounded-xl p-2.5 mb-3 text-[11px]">{note}</div>}
+      {note && <div className="lv-alert lv-alert-info mb-3 text-[11px] text-text-primary">{note}</div>}
 
       {/* 1 — the one question that reshapes everything below ------------- */}
       <Step title={t.step1}>
@@ -724,16 +724,14 @@ export default function ImportPanel({
                   setPasted('');
                   invalidate();
                 }}
-                className={`min-w-0 text-start rounded-xl border p-2.5 transition-colors ${
-                  on ? 'border-violet-500 bg-violet-500/10 text-white' : 'border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-600'
-                }`}
+                className="lv-choice min-w-0 text-start p-2.5"
               >
                 <span className="flex items-center gap-1.5 text-[13px] font-bold">
                   {icon}
                   <span dir="ltr">{name}</span>
-                  {on && <Check className="w-3.5 h-3.5 ms-auto text-violet-300" aria-hidden />}
+                  {on && <Check className="w-3.5 h-3.5 ms-auto text-text-secondary" aria-hidden />}
                 </span>
-                <span className="block text-[11px] leading-relaxed text-zinc-500 mt-1">{what}</span>
+                <span className="block text-[11px] leading-relaxed text-text-muted mt-1">{what}</span>
               </button>
             );
           })}
@@ -790,7 +788,7 @@ export default function ImportPanel({
             download runs, before anything is downloaded.
         */}
         {section && typeof section.spec_columns === 'number' && (
-          <div className="mt-2 rounded-xl border border-border-subtle bg-black/20 p-2.5" data-import="section-shape">
+          <div className="lv-well mt-2 rounded-md p-2.5" data-import="section-shape">
             <p className="text-[12px] font-bold text-white">
               {fill(t.sectionColumns, { n: section.spec_columns })}
             </p>
@@ -800,7 +798,7 @@ export default function ImportPanel({
               const typeName = lang === 'en' ? typeDef.label_en : typeDef.label_ar;
               const dropped = typeDef.spec_columns - section.spec_columns;
               return (
-                <p className="text-[11px] text-zinc-400 mt-0.5">
+                <p className="text-[11px] text-text-secondary mt-0.5">
                   {dropped > 0
                     ? fill(t.sectionNarrowed, { n: dropped, type: typeName })
                     : fill(t.sectionSame, { type: typeName })}
@@ -808,8 +806,8 @@ export default function ImportPanel({
               );
             })()}
             {section.spec_groups && section.spec_groups.length > 0 && (
-              <p className="text-[11px] text-zinc-400 mt-1.5">
-                <span className="text-zinc-500">{t.sectionGroups} </span>
+              <p className="text-[11px] text-text-secondary mt-1.5">
+                <span className="text-text-muted">{t.sectionGroups} </span>
                 {section.spec_groups
                   .map((g) => `${lang === 'en' ? g.label_en : g.label_ar} (${g.fields})`)
                   .join(lang === 'en' ? ', ' : ' · ')}
@@ -817,7 +815,7 @@ export default function ImportPanel({
             )}
           </div>
         )}
-        {!isTable && <p className="text-[11px] text-zinc-500 mt-2">{t.sectionOptional}</p>}
+        {!isTable && <p className="text-[11px] text-text-muted mt-2">{t.sectionOptional}</p>}
         {catalogs.length > 0 && options.length === 0 && <p className="text-amber-300/90 text-[11px] mt-2">{t.noFamily}</p>}
         {lookups && <LookupsBox lookups={lookups} section={section} lang={lang} t={t} />}
       </Step>
@@ -889,7 +887,7 @@ export default function ImportPanel({
             {/* The box is forced LTR because template keys are ASCII and a
                 pasted template must not be reordered; so the Arabic label sits
                 ABOVE it and the placeholder inside it is a template line. */}
-            <label className="block text-[11px] text-zinc-500 mt-2 mb-1" htmlFor="import-paste">{t.orPaste}</label>
+            <label className="block text-[11px] text-text-muted mt-2 mb-1" htmlFor="import-paste">{t.orPaste}</label>
             <textarea
               id="import-paste"
               data-import="paste"
@@ -901,12 +899,12 @@ export default function ImportPanel({
             />
           </>
         )}
-        {!check && <p className="text-[11px] text-zinc-500 mt-2">{t.mustCheck}</p>}
+        {!check && <p className="text-[11px] text-text-muted mt-2">{t.mustCheck}</p>}
       </Step>
 
       {/* the check report ------------------------------------------------ */}
       {check && !result && buckets && (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3" data-import="check-report">
+        <div className="mt-4 rounded-lg border border-border-subtle bg-surface p-3" data-import="check-report">
           <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
             <ListChecks className="w-4 h-4 text-violet-400" aria-hidden /> {t.checkTitle}
           </h4>
@@ -943,7 +941,7 @@ export default function ImportPanel({
           <ItemTable items={check.items} t={t} />
 
           {unknownKeysPending.length > 0 && (
-            <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200 cursor-pointer" data-import="ack-unknown">
+            <label className="lv-alert lv-alert-warning mt-3 flex items-start gap-2 text-[11px] text-text-primary cursor-pointer" data-import="ack-unknown">
               <input
                 type="checkbox"
                 className="mt-0.5 shrink-0"
@@ -957,7 +955,7 @@ export default function ImportPanel({
             </label>
           )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
             <button
               type="button"
               data-import="confirm"
@@ -984,9 +982,9 @@ export default function ImportPanel({
 
       {/* the duplicate question — asked, never answered for the admin ----- */}
       {duplicates.length > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5" data-import="duplicate">
-          <p className="text-[11px] font-bold text-amber-200 mb-1.5">{t.dupTitle}</p>
-          <ul className="text-[11px] text-amber-200/90 mb-2 space-y-0.5" dir="ltr">
+        <div className="lv-alert lv-alert-warning mt-3" data-import="duplicate">
+          <p className="text-[11px] font-bold text-text-primary mb-1.5">{t.dupTitle}</p>
+          <ul className="text-[11px] text-text-secondary mb-2 space-y-0.5" dir="ltr">
             {duplicates.map((d) => <li key={d}>{d}</li>)}
           </ul>
           <div className="flex flex-wrap gap-2">
@@ -1002,17 +1000,17 @@ export default function ImportPanel({
 
       {/* the result ------------------------------------------------------ */}
       {result && (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3" data-import="result">
-          <p className="text-xs text-zinc-200 mb-2 font-bold">
+        <div className="mt-4 rounded-lg border border-border-subtle bg-surface p-3" data-import="result">
+          <p className="text-xs text-text-primary mb-2 font-bold">
             {fill(t.summary, { c: result.summary.created, u: result.summary.updated, s: result.summary.skipped, f: result.summary.failed })}
           </p>
           <ResultTable rows={result.rows} t={t} onOpenProduct={onOpenProduct} />
           {(result.review?.length ?? 0) > 0 && (
-            <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
+            <div className="lv-alert lv-alert-warning mt-2">
               <p className="text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> {t.reviewNeeded}
               </p>
-              <ul className="text-[11px] text-amber-200 space-y-0.5" dir="ltr">
+              <ul className="text-[11px] text-text-secondary space-y-0.5" dir="ltr">
                 {result.review!.slice(0, 20).map((x, n) => <li key={n}>{x}</li>)}
               </ul>
             </div>
@@ -1336,7 +1334,7 @@ function Step({ title, hint, children }: { title: string; hint?: string; childre
   return (
     <section className="mt-3 first:mt-0">
       <h4 className="text-[12px] font-bold text-white mb-1">{title}</h4>
-      {hint && <p className="text-[11px] leading-relaxed text-zinc-500 mb-1.5">{hint}</p>}
+      {hint && <p className="text-[11px] leading-relaxed text-text-muted mb-1.5">{hint}</p>}
       {children}
     </section>
   );
@@ -1350,32 +1348,33 @@ function TypeChip({ id, on, onClick, label, sub }: { id?: string; on: boolean; o
       aria-pressed={on}
       onClick={onClick}
       title={sub}
-      className={`min-h-9 px-2.5 rounded-lg border text-[12px] font-bold transition-colors ${
-        on ? 'border-violet-500 bg-violet-500/10 text-white' : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-600'
+      className={`inline-flex items-center gap-1 min-h-9 px-3 rounded-full border border-border-subtle text-[12px] font-bold transition-colors ${
+        on ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
       }`}
     >
+      {on && <Check className="w-3.5 h-3.5 shrink-0" aria-hidden />}
       {label}
-      {sub && <span className="text-[10px] font-medium text-zinc-500 ms-1.5">{sub}</span>}
+      {sub && <span className="text-[10px] font-medium text-text-muted ms-0.5">{sub}</span>}
     </button>
   );
 }
 
 const TONE = {
-  good: 'text-emerald-300 border-emerald-500/25 bg-emerald-500/5',
-  bad: 'text-red-300 border-red-500/25 bg-red-500/5',
-  warn: 'text-amber-300 border-amber-500/25 bg-amber-500/5',
-  info: 'text-sky-300 border-sky-500/25 bg-sky-500/5',
-  muted: 'text-zinc-500 border-zinc-800 bg-zinc-900/40',
+  good: 'lv-chip [--chip:var(--color-success)]',
+  bad: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
+  warn: 'lv-chip [--chip:var(--color-warning)]',
+  info: 'lv-chip [--chip:var(--color-info)]',
+  muted: 'bg-surface-raised text-text-muted',
 };
 
 function Stat({ label, value, tone, icon, testId }: { label: string; value: number; tone: keyof typeof TONE; icon?: React.ReactNode; testId: string }) {
   return (
-    <div className={`min-w-0 rounded-lg border px-2 py-1.5 ${TONE[tone]}`} data-import-stat={testId}>
+    <div className={`min-w-0 rounded-md px-2 py-1.5 ${TONE[tone]}`} data-import-stat={testId}>
       <span className="flex items-center gap-1 text-[15px] font-bold leading-none">
         {icon}
         <span dir="ltr">{value}</span>
       </span>
-      <span className="block text-[10px] leading-tight text-zinc-400 mt-1 truncate" title={label}>{label}</span>
+      <span className="block text-[10px] leading-tight text-text-secondary mt-1 truncate" title={label}>{label}</span>
     </div>
   );
 }
@@ -1389,9 +1388,9 @@ function IssueList({ title, issues, t, tone }: { title: string; issues: ImportIs
   const [all, setAll] = useState(false);
   if (issues.length === 0) return null;
   const shown = all ? issues : issues.slice(0, 10);
-  const c = tone === 'bad' ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  const c = tone === 'bad' ? 'lv-alert-danger' : 'lv-alert-warning';
   return (
-    <div className={`mt-2 rounded-lg border p-2 ${c}`} data-import-issues={tone}>
+    <div className={`lv-alert mt-2 text-text-primary ${c}`} data-import-issues={tone}>
       <p className="text-[11px] font-bold mb-1">{title} ({issues.length})</p>
       <ul className="text-[11px] space-y-1">
         {shown.map((i, n) => (
@@ -1432,18 +1431,18 @@ function ItemTable({ items, t }: { items: CheckedItem[]; t: Strings }) {
   if (items.length === 0) return null;
   return (
     <div className="mt-2 overflow-x-auto -mx-1 px-1">
-      <p className="text-[11px] font-bold text-zinc-400 mb-1">{t.rowsTitle}</p>
+      <p className="text-[11px] font-bold text-text-secondary mb-1">{t.rowsTitle}</p>
       <table className="w-full text-[11px] border-collapse min-w-[24rem]">
         <tbody>
           {items.map((i) => (
-            <tr key={i.id} className="border-t border-zinc-800/60 align-top">
-              <td className="py-1 pe-2 font-mono text-zinc-300"><span dir="ltr">{i.id}</span></td>
-              <td className="py-1 pe-2 text-zinc-300"><span dir="ltr">{i.name}</span></td>
+            <tr key={i.id} className="border-t border-border-subtle align-top">
+              <td className="py-1 pe-2 font-mono text-text-secondary"><span dir="ltr">{i.id}</span></td>
+              <td className="py-1 pe-2 text-text-secondary"><span dir="ltr">{i.name}</span></td>
               <td className={`py-1 pe-2 font-bold ${i.action === 'blocked' ? 'text-red-300' : i.action === 'create' ? 'text-emerald-300' : 'text-sky-300'}`}>
                 {i.action === 'blocked' ? t.blockedRow : i.action === 'create' ? t.create : t.update}
               </td>
-              <td className="py-1 text-zinc-500" dir="ltr">{i.images} img</td>
-              <td className="py-1 ps-2 text-zinc-500" dir="ltr" data-import-plan={i.plan ? 'reported' : 'none'}>
+              <td className="py-1 text-text-muted" dir="ltr">{i.images} img</td>
+              <td className="py-1 ps-2 text-text-muted" dir="ltr" data-import-plan={i.plan ? 'reported' : 'none'}>
                 {i.plan ? planLine(i.plan, t) : ''}
               </td>
             </tr>
@@ -1464,16 +1463,16 @@ function ResultTable({ rows, t, onOpenProduct }: { rows: ResultRow[]; t: Strings
         <tbody>
           {rows.map((r, i) => (
             <React.Fragment key={`${r.key}-${i}`}>
-              <tr className="border-t border-zinc-800/60 align-top" data-import-row={r.action}>
-                <td className="py-1 pe-2 font-mono text-zinc-300"><span dir="ltr">{r.key}</span></td>
-                <td className="py-1 pe-2 text-zinc-300"><span dir="ltr">{r.name}</span></td>
+              <tr className="border-t border-border-subtle align-top" data-import-row={r.action}>
+                <td className="py-1 pe-2 font-mono text-text-secondary"><span dir="ltr">{r.key}</span></td>
+                <td className="py-1 pe-2 text-text-secondary"><span dir="ltr">{r.name}</span></td>
                 <td className={`py-1 pe-2 font-bold ${tone[r.action]}`}>{word[r.action]}</td>
-                <td className="py-1 text-zinc-400 break-words">
+                <td className="py-1 text-text-secondary break-words">
                   <span dir="auto">{r.detail}</span>
                   {onOpenProduct && r.outcome?.productId && (
                     <button
                       type="button"
-                      className="ms-2 underline text-violet-300 hover:text-white"
+                      className="ms-2 underline text-text-primary hover:text-gold"
                       onClick={() => onOpenProduct(r.outcome!.productId)}
                       data-import="open-product"
                     >
@@ -1503,10 +1502,10 @@ function OutcomeDetails({ o, t }: { o: ApplyOutcome; t: Strings }) {
   return (
     <tr className="align-top" data-import-outcome={o.action}>
       <td colSpan={4} className="pb-2 ps-2">
-        <div className="text-[10.5px] text-zinc-400 space-y-0.5">
+        <div className="text-[10.5px] text-text-secondary space-y-0.5">
           <p data-import-verify={v.reported ? 'reported' : 'unreported'}>
-            <span className="text-zinc-500">{t.verifyTitle} </span>
-            <span dir="ltr" className={v.reported ? 'text-zinc-200' : 'text-amber-300'}>{line}</span>
+            <span className="text-text-muted">{t.verifyTitle} </span>
+            <span dir="ltr" className={v.reported ? 'text-text-primary' : 'text-amber-300'}>{line}</span>
             {v.reported && v.spec_outside.length > 0 && (
               <span className="text-amber-300" dir="ltr"> — {t.vw.outsideSection}: {v.spec_outside.length} ({v.spec_outside.join(', ')})</span>
             )}
@@ -1527,7 +1526,7 @@ function OutcomeDetails({ o, t }: { o: ApplyOutcome; t: Strings }) {
           )}
           {o.warnings.length > 0 && (
             <>
-              <p className="text-zinc-500">{t.warningsAtApply}</p>
+              <p className="text-text-muted">{t.warningsAtApply}</p>
               <ul className="text-amber-200/90 list-disc ms-4" data-import-apply-warnings>
                 {o.warnings.map((w, n) => <li key={n} dir="auto" className="break-words">{w}</li>)}
               </ul>
@@ -1571,7 +1570,7 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
   };
   const chips = (items: Array<{ key: string; value: string; label?: string; title?: string }>, group: string) =>
     items.length === 0 ? (
-      <p className="text-[11px] text-zinc-500">{t.lkEmpty}</p>
+      <p className="text-[11px] text-text-muted">{t.lkEmpty}</p>
     ) : (
       <div className="flex flex-wrap gap-1" data-lookup-group={group}>
         {items.map((it) => (
@@ -1580,21 +1579,21 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
             type="button"
             onClick={() => void copy(it.value)}
             title={it.title ?? it.value}
-            className={`inline-flex items-center gap-1 min-h-9 px-2.5 rounded-full border text-[11px] transition-colors ${
-              copied === it.value ? 'border-emerald-500/50 text-emerald-300 bg-emerald-500/10' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-white'
+            className={`inline-flex items-center gap-1 min-h-9 px-2.5 rounded-full border border-border-subtle text-[11px] transition-colors ${
+              copied === it.value ? 'lv-chip [--chip:var(--color-success)]' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
             }`}
             data-lookup-value={it.value}
           >
             {copied === it.value ? <Check className="w-3 h-3" aria-hidden /> : <Copy className="w-3 h-3 opacity-60" aria-hidden />}
             <span dir="ltr">{it.value}</span>
-            {it.label && <span className="text-zinc-500">· {it.label}</span>}
+            {it.label && <span className="text-text-muted">· {it.label}</span>}
             {copied === it.value && <span className="sr-only">{t.copied}</span>}
           </button>
         ))}
       </div>
     );
   return (
-    <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/40" data-import="lookups">
+    <div className="mt-2 rounded-lg border border-border-subtle bg-surface" data-import="lookups">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -1607,24 +1606,24 @@ function LookupsBox({ lookups, section, lang, t }: { lookups: Lookups; section?:
       </button>
       {!open ? null : (
         <div className="px-3 pb-3 space-y-3 max-h-72 overflow-y-auto">
-          <p className="text-[11px] text-zinc-500">{t.lookupsHint}</p>
+          <p className="text-[11px] text-text-muted">{t.lookupsHint}</p>
           <div role="status" aria-live="polite" className="sr-only">{copied ? `${t.copied}: ${copied}` : ''}</div>
           <div>
-            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkCategory}</h5>
+            <h5 className="text-[11px] font-bold text-text-secondary mb-1">{t.lkCategory}</h5>
             {chips(roots.map((s) => ({ key: s.id, value: s.slug, label: isEn ? s.name_en : s.name_ar || s.name_en })), 'category')}
           </div>
           <div>
-            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkSub}</h5>
+            <h5 className="text-[11px] font-bold text-text-secondary mb-1">{t.lkSub}</h5>
             {chips(subs.map((s) => ({ key: s.id, value: s.slug, label: subLabel(s) })), 'sub_category')}
           </div>
           <div>
-            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkBrand}</h5>
+            <h5 className="text-[11px] font-bold text-text-secondary mb-1">{t.lkBrand}</h5>
             {chips(lookups.brands.map((b) => ({ key: b.id, value: b.slug, label: isEn ? b.name_en : b.name_ar || b.name_en })), 'brand')}
           </div>
           <div>
-            <h5 className="text-[11px] font-bold text-zinc-300 mb-1">{t.lkHashtag}</h5>
+            <h5 className="text-[11px] font-bold text-text-secondary mb-1">{t.lkHashtag}</h5>
             {chips(lookups.hashtags.map((h) => ({ key: h.tag, value: h.tag, label: h.name_ar || undefined })), 'hashtags')}
-            <p className="text-[10px] text-zinc-500 mt-1">{t.lkHashtagFree}</p>
+            <p className="text-[10px] text-text-muted mt-1">{t.lkHashtagFree}</p>
           </div>
         </div>
       )}

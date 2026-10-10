@@ -553,7 +553,7 @@ export default function AdminBundles() {
             <option value="hidden">{loc('مخفية', 'Hidden', 'شاراوە')}</option>
           </select>
           {totalWarnings > 0 && (
-            <span className={`${T.badgeBase} bg-amber-500/10 text-amber-300 border-amber-500/30`}>
+            <span className={`${T.badgeBase} lv-chip border-transparent [--chip:var(--color-warning)]`}>
               {loc('تنبيهات', 'Warnings', 'ئاگادارییەکان')}: {totalWarnings}
             </span>
           )}
@@ -605,16 +605,16 @@ export default function AdminBundles() {
                         <span
                           className={`${T.badgeBase} ${
                             state.tone === 'ok'
-                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                              ? 'lv-chip border-transparent [--chip:var(--color-success)]'
                               : state.tone === 'warn'
-                                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                                : 'bg-red-500/10 text-red-300 border-red-500/30'
+                                ? 'lv-chip border-transparent [--chip:var(--color-warning)]'
+                                : 'lv-chip border-transparent [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]'
                           }`}
                         >
                           {loc(state.ar, state.en, state.ckb)}
                         </span>
                         {b.offer && b.offer.required_tiers.length > 0 && (
-                          <span className={`${T.badgeBase} bg-violet-500/10 text-violet-300 border-violet-500/30`}>
+                          <span className={`${T.badgeBase} lv-chip border-transparent [--chip:var(--color-gold)]`}>
                             {b.offer.required_tiers.join(' · ').toUpperCase()}
                           </span>
                         )}
@@ -891,12 +891,12 @@ export default function AdminBundles() {
             return (
               <div
                 key={c.id ?? `new_${i}`}
-                className={`rounded-lg border p-2.5 min-w-0 ${rowIssues.length ? 'border-red-500/50 bg-red-500/[0.04]' : 'border-zinc-800 bg-zinc-900/30'}`}
+                className={`rounded-lg border p-2.5 min-w-0 ${rowIssues.length ? 'border-red-500/50 bg-red-500/[0.04]' : 'border-border-subtle'}`}
               >
                 <Grid cols={3}>
                   {/* A DEBOUNCED SEARCH, NOT THE FIRST 100 PRODUCTS.
                       `/api/admin/products-v2` caps `limit` at 100, so a plain
-                      `<select>` over one unsearchable page could not be widened
+                      native select over one unsearchable page could not be widened
                       and, on a real catalogue, simply did not contain the
                       product an owner wanted to put in a bundle. The route
                       already accepts `search`; this is the picker that uses

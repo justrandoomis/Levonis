@@ -147,13 +147,13 @@ export default function PeriodControl({
               {s.from}
             </label>
             <input
+              className="lv-input mt-1 text-[13px] leading-[1.5]"
               id="finance-from"
               type="date"
               dir="ltr"
               value={draft.from}
               aria-invalid={problem === 'from_not_a_day' || problem === 'reversed'}
               onChange={(e) => onDraft({ from: e.target.value, to: draft.to })}
-              className="lv-input mt-1 text-[13px] leading-[1.5]"
             />
           </div>
           <div className="min-w-[9rem]">
@@ -161,13 +161,13 @@ export default function PeriodControl({
               {s.to}
             </label>
             <input
+              className="lv-input mt-1 text-[13px] leading-[1.5]"
               id="finance-to"
               type="date"
               dir="ltr"
               value={draft.to}
               aria-invalid={problem === 'to_not_a_day' || problem === 'too_long'}
               onChange={(e) => onDraft({ from: draft.from, to: e.target.value })}
-              className="lv-input mt-1 text-[13px] leading-[1.5]"
             />
           </div>
           <button

@@ -2,7 +2,7 @@
  * PICK A CATALOGUE PRODUCT AT CATALOGUE SIZE.
  *
  * Every panel that has to name a product — a bundle component, an offer
- * subject, a mystery pool entry — used to do it with a plain `<select>` over
+ * subject, a mystery pool entry — used to do it with a plain native select over
  * the FIRST 100 products, unsearchable and unpaginated, or with a text field
  * asking the owner to paste `prd_…`. `worker/routes/adminProducts.ts` caps
  * `limit` at 100, so the dropdown could not be widened, and on a real Levonis
@@ -204,7 +204,7 @@ export default function ProductPicker({
                   </span>
                   <span
                     className={`shrink-0 text-[10.5px] font-bold rounded px-1.5 py-0.5 ${
-                      p.status === 'active' ? 'text-emerald-300 bg-emerald-500/10' : 'text-amber-300 bg-amber-500/10'
+                      p.status === 'active' ? 'lv-chip [--chip:var(--color-success)]' : 'lv-chip [--chip:var(--color-warning)]'
                     }`}
                   >
                     {p.status}

@@ -356,7 +356,7 @@ export default function UnitSerialSlots({ orderId, serials, viewerOwner, onChang
         <p className="text-[12px] leading-relaxed text-text-secondary max-w-[60ch]">{s.sectionHint}</p>
         <span
           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold tabular-nums ${
-            linkedCount === slots.length ? 'bg-success/10 text-success' : 'bg-surface-selected text-text-secondary'
+            linkedCount === slots.length ? 'lv-chip [--chip:var(--color-success)]' : 'bg-surface-selected text-text-secondary'
           }`}
           data-serial-progress
         >
@@ -635,7 +635,7 @@ function SlotRow({
             data-serial-form
           >
             <div
-              className={`flex h-11 items-center gap-2 rounded-full border bg-surface-raised ps-3.5 pe-1 transition-colors focus-within:border-gold/60 focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-gold)_18%,transparent)] ${
+              className={`lv-well flex h-11 items-center gap-2 rounded-full border ps-3.5 pe-1 transition-colors focus-within:border-gold/60 focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-gold)_18%,transparent)] ${
                 refusal ? 'border-danger/50' : 'border-border-subtle'
               }`}
             >
@@ -790,7 +790,7 @@ function Chip({ children, tone = 'neutral' }: { children: React.ReactNode; tone?
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-medium ${
-        tone === 'ok' ? 'bg-success/10 text-success' : tone === 'warn' ? 'bg-warning/10 text-warning' : 'bg-surface-selected text-text-secondary'
+        tone === 'ok' ? 'lv-chip [--chip:var(--color-success)]' : tone === 'warn' ? 'lv-chip [--chip:var(--color-warning)]' : 'bg-surface-selected text-text-secondary'
       }`}
     >
       {children}

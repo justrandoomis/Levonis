@@ -335,6 +335,7 @@ export default function WhatIfPanel({
               <div className="grid grid-cols-3 gap-2" dir="ltr">
                 {(['length', 'width', 'height'] as const).map((k) => (
                   <input
+                    className="lv-input text-center"
                     key={k}
                     aria-label={fieldLabel(k === 'length' ? 'shipping_length_mm' : k === 'width' ? 'shipping_width_mm' : 'shipping_height_mm', lang)}
                     aria-invalid={errors.box ? true : undefined}
@@ -343,7 +344,6 @@ export default function WhatIfPanel({
                     value={draft[k]}
                     onChange={(e) => set(k, e.target.value)}
                     placeholder={k === 'length' ? 'L' : k === 'width' ? 'W' : 'H'}
-                    className="lv-input text-center"
                   />
                 ))}
               </div>

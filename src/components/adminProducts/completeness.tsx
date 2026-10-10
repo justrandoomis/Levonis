@@ -223,7 +223,7 @@ export function MissingBlock({ codes }: { codes: readonly CompletenessItemCode[]
   const hits = items.filter((i) => codes.includes(i.code) && i.option_id === '');
   if (!hits.length) return null;
   return (
-    <div role="note" className="mb-2.5 min-w-0 rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-2 text-[12px] leading-snug text-red-200" data-missing-block>
+    <div role="note" className="lv-alert lv-alert-danger mb-2.5 min-w-0 px-3 py-2 text-[12px] leading-snug text-text-primary" data-missing-block>
       {hits.map((i) => (
         <p key={i.code} className="flex items-start gap-1.5" data-missing={i.code}>
           <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0 text-red-400" aria-hidden="true" />
@@ -248,7 +248,7 @@ export function MissingBadge({ n, lang, held = false }: { n: number; lang: strin
     <span className="inline-flex flex-wrap items-center gap-1">
       {n > 0 && (
         <span
-          className="inline-flex h-5 items-center gap-1 rounded-full border border-red-500/60 bg-red-500/15 px-2 text-[11px] font-bold text-red-200"
+          className="lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)] inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-bold"
           data-missing-badge={n}
           title={fill(tri(COMPLETENESS_UI.badgeLabel, lang), { n })}
         >
@@ -258,7 +258,7 @@ export function MissingBadge({ n, lang, held = false }: { n: number; lang: strin
         </span>
       )}
       {held && (
-        <span className="inline-flex h-5 items-center rounded-full border border-zinc-600 bg-zinc-800 px-2 text-[11px] font-bold text-zinc-200" data-held-badge>
+        <span className="inline-flex h-5 items-center rounded-full bg-surface-selected px-2 text-[11px] font-bold text-text-primary" data-held-badge>
           {tri(COMPLETENESS_UI.heldBadge, lang)}
         </span>
       )}
@@ -280,19 +280,19 @@ export function CompletenessBanner({ read, lang, dirty, status }: { read: Comple
         ? COMPLETENESS_UI.bannerHeld
         : COMPLETENESS_UI.bannerShown;
   return (
-    <div role="status" className="mb-2.5 min-w-0 rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-2 text-[12px] leading-snug text-red-100" data-completeness-banner>
+    <div role="status" className="lv-alert lv-alert-danger mb-2.5 min-w-0 px-3 py-2 text-[12px] leading-snug text-text-primary" data-completeness-banner>
       <p className="flex items-start gap-1.5 font-bold">
         <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-red-400" aria-hidden="true" />
         <span className="min-w-0">{fill(tri(sentence, lang), { n })}</span>
       </p>
       <ul className="mt-1 flex flex-wrap gap-1.5 ps-5">
         {[...new Map(items.map((i) => [i.code, i])).values()].map((i) => (
-          <li key={i.code} className="rounded-md border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[11px] text-red-100" data-missing={i.code}>
+          <li key={i.code} className="lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)] rounded-md px-1.5 py-0.5 text-[11px]" data-missing={i.code}>
             {completenessLabel(i.code, lang)}
           </li>
         ))}
       </ul>
-      {dirty && <p className="mt-1 ps-5 text-[11px] text-red-300/80">{tri(COMPLETENESS_UI.afterSave, lang)}</p>}
+      {dirty && <p className="mt-1 ps-5 text-[11px] text-text-secondary">{tri(COMPLETENESS_UI.afterSave, lang)}</p>}
     </div>
   );
 }

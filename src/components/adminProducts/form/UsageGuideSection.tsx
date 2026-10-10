@@ -70,9 +70,9 @@ export function UsageGuideSection({
   return (
     <div className="min-w-0 space-y-3">
       <div className="flex items-baseline justify-between gap-2 min-w-0">
-        <h4 className="text-[12px] font-bold text-zinc-300">
+        <h4 className="text-[12px] font-bold text-text-secondary">
           دليل التركيب والاستخدام{' '}
-          <span className="text-[10px] font-medium text-zinc-500">Setup & usage guide</span>
+          <span className="text-[10px] font-medium text-text-muted">Setup & usage guide</span>
         </h4>
         <div className="flex gap-1.5 shrink-0">
           {KINDS.map((k) => (
@@ -82,7 +82,7 @@ export function UsageGuideSection({
           ))}
         </div>
       </div>
-      <p className="text-[10px] text-zinc-600 -mt-1">
+      <p className="text-[10px] text-text-muted -mt-1">
         كل خطوة: عنوان ووصف وصور وفيديو ورابط للدليل الرسمي. تُعرض خطوات التركيب أولًا ثم الاستخدام.
       </p>
 
@@ -100,29 +100,29 @@ export function UsageGuideSection({
       </Field>
 
       {steps.length === 0 ? (
-        <p className="text-[12px] text-zinc-500">
+        <p className="text-[12px] text-text-muted">
           لا خطوات بعد — أضف خطوة تركيب أو استخدام. (نص «طريقة الاستخدام» الحر أدناه يبقى يُعرض إن لم توجد خطوات.)
         </p>
       ) : (
         <div className="space-y-2">
           {steps.map((st, i) => (
-            <div key={st.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
+            <div key={st.id} className="min-w-0 rounded-lg border border-border-subtle p-2.5">
               <div className="flex items-center gap-2 min-w-0 mb-2">
                 <span
                   className={`shrink-0 w-6 h-6 rounded-md grid place-items-center text-[10px] font-black ${
-                    st.kind === 'setup' ? 'bg-amber-500/15 text-amber-300' : 'bg-iris/15 text-violet-300'
+                    st.kind === 'setup' ? 'lv-chip [--chip:var(--color-warning)]' : 'lv-chip [--chip:var(--color-info)]'
                   }`}
                 >
                   {i + 1}
                 </span>
-                <div className="flex rounded-lg border border-zinc-700 overflow-hidden shrink-0">
+                <div className="lv-well flex gap-0.5 rounded-full border border-border-subtle p-0.5 shrink-0">
                   {KINDS.map((k) => (
                     <button
                       key={k.id}
                       type="button"
                       onClick={() => patch(st.id, { kind: k.id })}
-                      className={`h-8 px-2 text-[11px] font-bold transition-colors ${
-                        st.kind === k.id ? 'bg-iris/20 text-white' : 'bg-zinc-800/40 text-zinc-500 hover:text-zinc-300'
+                      className={`h-8 rounded-full border px-2.5 text-[11px] font-bold transition-colors ${
+                        st.kind === k.id ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-muted hover:text-text-secondary'
                       }`}
                     >
                       {k.ar}
@@ -161,11 +161,11 @@ export function UsageGuideSection({
               */}
               {!st.title.trim() && !st.body.trim() && (st.images.length > 0 || st.video_url || st.link_url) && (
                 <p
-                  className="mb-2 rounded border border-amber-500/40 bg-amber-500/5 px-2 py-1.5 text-[10px] text-amber-300 leading-snug"
+                  className="lv-alert lv-alert-warning mb-2 px-2 py-1.5 text-[10px] text-text-primary leading-snug"
                   data-usage-step-warning={st.id}
                 >
                   هذه الخطوة تحمل وسائط بلا عنوان ولا وصف — لن تُحفَظ. أضف عنوانًا أو وصفًا حتى لا تضيع الصور والفيديو.
-                  <span className="text-zinc-500"> A step with neither a title nor a description is not saved.</span>
+                  <span className="text-text-muted"> A step with neither a title nor a description is not saved.</span>
                 </p>
               )}
 
@@ -203,8 +203,8 @@ export function UsageGuideSection({
               </Grid>
 
               <div className="mt-2">
-                <div className="text-[11px] font-bold text-zinc-400 mb-1">
-                  صور الخطوة <span className="text-[10px] font-medium text-zinc-600">حتى ٦ صور</span>
+                <div className="text-[11px] font-bold text-text-secondary mb-1">
+                  صور الخطوة <span className="text-[10px] font-medium text-text-muted">حتى ٦ صور</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {st.images.map((url, idx) => (

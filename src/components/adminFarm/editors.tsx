@@ -250,20 +250,20 @@ function RecordListEditor({ path, value, fallback, onChange, ctx }: EditorProps)
   return (
     <div className="min-w-0" data-farm-list={path}>
       <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-        <span className="text-[11px] text-zinc-500 tabular-nums">{s.entriesCount(items.length)}</span>
+        <span className="text-[11px] text-text-muted tabular-nums">{s.entriesCount(items.length)}</span>
         <button type="button" onClick={() => onChange([...items, blankFrom(template)])} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
           <Plus className="w-3.5 h-3.5" aria-hidden="true" />
           {s.addItem}
         </button>
       </div>
-      {items.length === 0 && <p className="text-[11px] text-zinc-600">{s.emptyList}</p>}
+      {items.length === 0 && <p className="text-[11px] text-text-muted">{s.emptyList}</p>}
       <div className="space-y-2 min-w-0">
         {items.map((item, i) => {
           const itemPath = `${path}.${i}`;
           const shape = shapeOf(item, template);
           return (
-            <div key={i} className="flex items-start gap-2 min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/30 p-2">
-              <span className="shrink-0 w-6 h-10 grid place-items-center text-[11px] text-zinc-500 tabular-nums">{i + 1}</span>
+            <div key={i} className="flex items-start gap-2 min-w-0 rounded-lg border border-border-subtle p-2">
+              <span className="shrink-0 w-6 h-10 grid place-items-center text-[11px] text-text-muted tabular-nums">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 {shape === 'localized' ? (
                   <LocalizedInputs value={item} fallback={template} onChange={(v) => set(i, v)} label={`${lb.label} ${i + 1}`} s={s} />
@@ -295,12 +295,12 @@ function RecordListEditor({ path, value, fallback, onChange, ctx }: EditorProps)
 function NestedBlock({ path, ctx, children }: { path: string; ctx: EditorCtx; children: ReactNode }) {
   const lb = labelFor(path, ctx.lang);
   return (
-    <fieldset data-farm-group={path} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/30 p-3">
-      <legend className="px-1 text-[12px] font-bold text-zinc-200">
+    <fieldset data-farm-group={path} className="min-w-0 rounded-lg border border-border-subtle p-3">
+      <legend className="px-1 text-[12px] font-bold text-text-primary">
         {lb.label}
-        {lb.secondary && <span className="ms-1.5 text-[10px] font-medium text-zinc-500">{lb.secondary}</span>}
+        {lb.secondary && <span className="ms-1.5 text-[10px] font-medium text-text-muted">{lb.secondary}</span>}
       </legend>
-      {lb.hint && <p className="mb-2 text-[11px] text-zinc-500 leading-snug">{lb.hint}</p>}
+      {lb.hint && <p className="mb-2 text-[11px] text-text-muted leading-snug">{lb.hint}</p>}
       {children}
     </fieldset>
   );
@@ -341,9 +341,9 @@ function JsonField({ path, value, ctx }: EditorProps) {
   const lb = labelFor(path, ctx.lang);
   return (
     <div className="md:col-span-2 xl:col-span-3 min-w-0" data-farm-field={path}>
-      <p className="text-[12px] font-bold text-zinc-300 mb-1">{lb.label}</p>
-      <p className="text-[11px] text-zinc-500 mb-1">{ctx.s.shapeUnsupported}</p>
-      <pre dir="ltr" className="text-[11px] text-zinc-400 bg-zinc-950/60 border border-zinc-800 rounded-lg p-2 overflow-x-auto max-h-48">
+      <p className="text-[12px] font-bold text-text-secondary mb-1">{lb.label}</p>
+      <p className="text-[11px] text-text-muted mb-1">{ctx.s.shapeUnsupported}</p>
+      <pre dir="ltr" className="lv-well text-[11px] text-text-secondary rounded-md p-2 overflow-x-auto max-h-48">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>
@@ -414,7 +414,7 @@ export function CatalogEditor({ path, value, fallback, onChange, ctx }: EditorPr
   return (
     <div className="min-w-0" data-farm-catalog={path}>
       <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-        <span className="text-[11px] text-zinc-500 tabular-nums">{s.entriesCount(keys.length)}</span>
+        <span className="text-[11px] text-text-muted tabular-nums">{s.entriesCount(keys.length)}</span>
         {!fixed && (
           <button type="button" onClick={add} className={`${btnGhost} h-8 px-2.5 text-[12px]`} data-farm-add={path}>
             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
@@ -422,8 +422,8 @@ export function CatalogEditor({ path, value, fallback, onChange, ctx }: EditorPr
           </button>
         )}
       </div>
-      {fixed && <p className="mb-2 text-[11px] text-zinc-500">{s.keysFixed}</p>}
-      {keys.length === 0 && <p className="text-[11px] text-zinc-600">{s.emptyList}</p>}
+      {fixed && <p className="mb-2 text-[11px] text-text-muted">{s.keysFixed}</p>}
+      {keys.length === 0 && <p className="text-[11px] text-text-muted">{s.emptyList}</p>}
       <div className="space-y-1.5 min-w-0">
         {keys.map((k) => {
           const row = obj[k];
@@ -438,7 +438,7 @@ export function CatalogEditor({ path, value, fallback, onChange, ctx }: EditorPr
             <div
               key={k}
               data-farm-row={k}
-              className={`min-w-0 rounded-lg border overflow-hidden ${open ? 'border-gold/40 bg-zinc-950/40' : 'border-zinc-800 bg-zinc-950/20'}`}
+              className={`min-w-0 rounded-lg border border-border-subtle overflow-hidden ${open ? 'bg-surface-raised' : ''}`}
             >
               <div className="flex items-center gap-1 min-w-0 pe-1">
                 <button
@@ -446,16 +446,16 @@ export function CatalogEditor({ path, value, fallback, onChange, ctx }: EditorPr
                   aria-expanded={open}
                   aria-label={open ? s.collapseRow(k) : s.expandRow(k)}
                   onClick={() => setOpenKey(open ? null : k)}
-                  className="flex-1 min-w-0 flex items-center gap-2 ps-2.5 h-11 text-start hover:bg-zinc-800/30 transition-colors"
+                  className="flex-1 min-w-0 flex items-center gap-2 ps-2.5 h-11 text-start hover:bg-surface-raised transition-colors"
                 >
-                  <ChevronDown className={`shrink-0 w-4 h-4 text-zinc-500 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
-                  <span className="shrink-0 inline-flex items-center gap-1 font-mono text-[12px] text-zinc-100" dir="ltr">
-                    {existing && !fixed && <Lock className="w-3 h-3 text-zinc-500" aria-hidden="true" />}
+                  <ChevronDown className={`shrink-0 w-4 h-4 text-text-muted transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  <span className="shrink-0 inline-flex items-center gap-1 font-mono text-[12px] text-text-primary" dir="ltr">
+                    {existing && !fixed && <Lock className="w-3 h-3 text-text-muted" aria-hidden="true" />}
                     {k}
                   </span>
-                  {title && <span className="min-w-0 truncate text-[12px] text-zinc-400">{title}</span>}
+                  {title && <span className="min-w-0 truncate text-[12px] text-text-secondary">{title}</span>}
                   {!existing && !fixed && (
-                    <span className="shrink-0 h-5 px-1.5 rounded-full bg-gold/15 text-gold text-[10px] font-bold grid place-items-center">{s.newRow}</span>
+                    <span className="lv-chip shrink-0 h-5 px-1.5 rounded-full text-[10px] font-bold grid place-items-center [--chip:var(--color-gold)]">{s.newRow}</span>
                   )}
                 </button>
                 {!fixed && (
@@ -475,9 +475,9 @@ export function CatalogEditor({ path, value, fallback, onChange, ctx }: EditorPr
                 )}
               </div>
               {open && (
-                <div className="p-3 border-t border-zinc-800/70 min-w-0 space-y-3">
+                <div className="p-3 border-t border-border-subtle min-w-0 space-y-3">
                   {!existing && !fixed && <KeyInput value={k} taken={keys} onCommit={(to) => rename(k, to)} s={s} />}
-                  {existing && !fixed && <p className="text-[11px] text-zinc-500">{s.keyLocked}</p>}
+                  {existing && !fixed && <p className="text-[11px] text-text-muted">{s.keyLocked}</p>}
                   <GroupEditor
                     path={`${path}.${k}`}
                     value={row}
@@ -502,7 +502,7 @@ export function CatalogEditor({ path, value, fallback, onChange, ctx }: EditorPr
       >
         <div className="p-5">
           <h3 id={titleId} className="text-white font-bold text-[15px]">{s.removeTitle}</h3>
-          <p className="text-zinc-300 text-[13px] mt-2 leading-relaxed">{s.removeBody(pendingRemove ?? '')}</p>
+          <p className="text-text-secondary text-[13px] mt-2 leading-relaxed">{s.removeBody(pendingRemove ?? '')}</p>
           <div className="mt-4 flex flex-col-reverse sm:flex-row gap-2">
             <button type="button" onClick={() => setPendingRemove(null)} className={`${btnGhost} flex-1 h-10`}>
               {s.cancel}

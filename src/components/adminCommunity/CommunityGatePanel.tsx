@@ -39,8 +39,7 @@ interface Member {
   phone_masked?: string | null;
 }
 
-const btn =
-  'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12.5px] font-bold transition-colors disabled:opacity-50';
+const btn = 'lv-button lv-button-sm';
 
 export default function CommunityGatePanel({ t }: { t: T }) {
   /** The server's answer. `null` until it has given one — never assumed. */
@@ -118,7 +117,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
 
   return (
     <section
-      className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3 min-w-0"
+      className="lv-surface p-4 space-y-3 min-w-0"
       data-community-gate-panel
     >
       <div className="flex items-start gap-2 min-w-0">
@@ -129,7 +128,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
         )}
         <div className="min-w-0 flex-1">
           <h3 className="text-[13.5px] font-bold text-white">{t('صيانة المجتمع', 'Community maintenance')}</h3>
-          <p className="text-[12px] text-zinc-400 leading-relaxed mt-0.5">
+          <p className="text-[12px] text-text-secondary leading-relaxed mt-0.5">
             {t(
               'عند الإغلاق يرفض الخادم كل طلبات المجتمع — ومنها لوحة طلبات الطباعة والعروض والمتابعة — لمن ليس مسؤولاً وليس في القائمة. الإغلاق لا يحذف أي متجر أو منتج أو طلب، والتجار يواصلون إدارة متاجرهم، والطلبات الجارية تكتمل.',
               'While it is shut the SERVER refuses every community request — the print-request board, offers and follows included — from anyone who is not an admin and not on the list. Closing deletes no store, product or request, merchants keep running their shops, and orders already running finish.'
@@ -139,7 +138,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
       </div>
 
       {open === null && note === null && (
-        <p role="status" className="text-[12.5px] text-zinc-400 py-2">
+        <p role="status" className="text-[12.5px] text-text-secondary py-2">
           {t('جارٍ التحميل…', 'Loading…')}
         </p>
       )}
@@ -155,7 +154,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
               setNote({ ok: false, text: e instanceof ApiError ? e.message : t('تعذّر القراءة', 'Could not load') })
             );
           }}
-          className={`${btn} bg-zinc-800 text-zinc-200`}
+          className={`${btn} lv-button-secondary`}
           data-community-gate-retry
         >
           <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
@@ -177,7 +176,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
               type="button"
               onClick={() => void apply(!draftOpen, members)}
               disabled={busy}
-              className={`${btn} bg-gold text-accent-contrast`}
+              className={`${btn} lv-button-primary`}
               data-community-gate-toggle
             >
               {draftOpen ? t('أغلق المجتمع', 'Close the community') : t('افتح المجتمع', 'Open the community')}
@@ -189,7 +188,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
                 load().catch(() => setNote({ ok: false, text: t('تعذّر القراءة', 'Could not load') }));
               }}
               disabled={busy}
-              className={`${btn} bg-zinc-800 text-zinc-200`}
+              className={`${btn} lv-button-secondary`}
             >
               <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
               {t('تحديث', 'Refresh')}
@@ -197,12 +196,12 @@ export default function CommunityGatePanel({ t }: { t: T }) {
           </div>
 
           {/* ---- the allow-list ---- */}
-          <div className="pt-2 border-t border-zinc-800 space-y-2">
+          <div className="pt-2 border-t border-border-subtle space-y-2">
             <h4 className="text-[12.5px] font-bold text-white">
               {t('الأعضاء المسموح لهم', 'Allowed members')}
-              <span className="text-zinc-500 font-normal"> ({members.length})</span>
+              <span className="text-text-muted font-normal"> ({members.length})</span>
             </h4>
-            <p className="text-[11.5px] text-zinc-500 leading-relaxed">
+            <p className="text-[11.5px] text-text-muted leading-relaxed">
               {t(
                 'يدخل هؤلاء أثناء الصيانة. المطابقة على معرّف الحساب وليس على الاسم — الاسم يمكن تغييره.',
                 'These accounts come in while it is shut. Matched on the account id, never the name — a name can be changed.'
@@ -214,7 +213,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
                 {members.map((m) => (
                   <li
                     key={m.id}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-2 py-1 text-[12px] text-zinc-200"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-surface-selected px-2 py-1 text-[12px] text-text-primary"
                   >
                     <span className="truncate max-w-[180px]">{label(m)}</span>
                     <button
@@ -222,7 +221,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
                       aria-label={t('إزالة', 'Remove')}
                       disabled={busy}
                       onClick={() => void apply(draftOpen, members.filter((x) => x.id !== m.id))}
-                      className="text-zinc-400 hover:text-red-400"
+                      className="text-text-secondary hover:text-red-400"
                     >
                       <X className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
@@ -233,6 +232,7 @@ export default function CommunityGatePanel({ t }: { t: T }) {
 
             <div className="flex flex-wrap items-center gap-2">
               <input
+                className="lv-input flex-1 min-w-[180px] text-[12.5px]"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => {
@@ -242,9 +242,8 @@ export default function CommunityGatePanel({ t }: { t: T }) {
                   }
                 }}
                 placeholder={t('ابحث بالاسم أو البريد أو رقم الهاتف أو المعرّف', 'Search by name, email, phone number or id')}
-                className="flex-1 min-w-[180px] bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-white text-[12.5px] focus:outline-none focus:border-gold"
               />
-              <button type="button" onClick={() => void search()} disabled={searching} className={`${btn} bg-zinc-800 text-zinc-200`}>
+              <button type="button" onClick={() => void search()} disabled={searching} className={`${btn} lv-button-secondary`}>
                 <Search className="w-3.5 h-3.5" aria-hidden="true" />
                 {t('بحث', 'Search')}
               </button>
@@ -252,25 +251,25 @@ export default function CommunityGatePanel({ t }: { t: T }) {
 
             {found !== null && (
               <ul className="space-y-1" data-community-gate-results>
-                {found.length === 0 && <li className="text-[12px] text-zinc-500">{t('لا نتائج', 'No results')}</li>}
+                {found.length === 0 && <li className="text-[12px] text-text-muted">{t('لا نتائج', 'No results')}</li>}
                 {found.map((u) => {
                   const already = members.some((m) => m.id === u.id);
                   return (
-                    <li key={u.id} className="flex items-center gap-2 text-[12px] text-zinc-300">
+                    <li key={u.id} className="flex items-center gap-2 text-[12px] text-text-secondary">
                       <span className="truncate flex-1">
                         {label(u)}{' '}
                         {u.phone_masked && (
-                          <span dir="ltr" className="text-zinc-500">
+                          <span dir="ltr" className="text-text-muted">
                             {u.phone_masked}{' '}
                           </span>
                         )}
-                        <span className="text-zinc-600">{u.id}</span>
+                        <span className="text-text-muted">{u.id}</span>
                       </span>
                       <button
                         type="button"
                         disabled={busy || already}
                         onClick={() => void apply(draftOpen, [...members, u])}
-                        className={`${btn} bg-zinc-800 text-zinc-200 !py-1`}
+                        className={`${btn} lv-button-secondary`}
                       >
                         <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
                         {already ? t('مضاف', 'Added') : t('أضف', 'Add')}

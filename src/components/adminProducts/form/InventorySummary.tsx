@@ -53,12 +53,12 @@ export function InventorySummary({ productId }: { productId: string }) {
   const next = lots[0]?.unit_cost_iqd;
 
   return (
-    <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3.5" data-form="inventory-summary">
+    <div className="lv-well mt-4 rounded-lg p-3.5" data-form="inventory-summary">
       <h4 className="mb-2 flex items-center gap-2 text-[13px] font-bold text-white">
-        <Layers size={14} className="text-zinc-400" aria-hidden />
-        دفعات هذا المنتج <span className="font-medium text-zinc-500">/ This product&apos;s batches</span>
+        <Layers size={14} className="text-text-secondary" aria-hidden />
+        دفعات هذا المنتج <span className="font-medium text-text-muted">/ This product&apos;s batches</span>
       </h4>
-      <p className="mb-3 text-[11.5px] leading-[1.6] text-zinc-400">
+      <p className="mb-3 text-[11.5px] leading-[1.6] text-text-secondary">
         المخزون على الرف يحمل التكاليف التالية. البيعة القادمة تستهلك أقدمها.
       </p>
 
@@ -67,19 +67,19 @@ export function InventorySummary({ productId }: { productId: string }) {
           <li
             key={l.id}
             className={`flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-[12.5px] ${
-              i === 0 ? 'bg-iris/12 text-white' : 'text-zinc-300'
+              i === 0 ? 'bg-surface-raised text-text-primary' : 'text-text-secondary'
             }`}
           >
             <span className="flex items-center gap-2 min-w-0">
               <span className="tabular-nums font-semibold">{l.qty_remaining}</span>
-              <span className="text-zinc-500">×</span>
+              <span className="text-text-muted">×</span>
               <span className="tabular-nums">
                 {l.unit_cost_iqd === null || l.unit_cost_iqd === undefined
-                  ? <span className="italic text-zinc-500">تكلفة غير معروفة</span>
+                  ? <span className="italic text-text-muted">تكلفة غير معروفة</span>
                   : formatIqd(l.unit_cost_iqd)}
               </span>
             </span>
-            <span className="shrink-0 text-[11px] text-zinc-500 tabular-nums" dir="ltr">
+            <span className="shrink-0 text-[11px] text-text-muted tabular-nums" dir="ltr">
               {(l.received_at ?? '').slice(0, 10)}
               {i === 0 ? ' ← التالية' : ''}
             </span>
@@ -87,7 +87,7 @@ export function InventorySummary({ productId }: { productId: string }) {
         ))}
       </ul>
 
-      <dl className="mt-3 grid gap-1 border-t border-zinc-800 pt-3 text-[12px]">
+      <dl className="mt-3 grid gap-1 border-t border-border-subtle pt-3 text-[12px]">
         <Line label="الوحدات على الرف" value={<span className="tabular-nums">{units}</span>} />
         {next !== null && next !== undefined && (
           <Line label="تكلفة الوحدة التالية" value={<span className="tabular-nums">{formatIqd(next)}</span>} strong />
@@ -103,7 +103,7 @@ export function InventorySummary({ productId }: { productId: string }) {
 
       {/* Said out loud, because the field above it invites the opposite
           conclusion: editing «سعر الكلفة» does not change any of these. */}
-      <p className="mt-3 text-[11px] leading-[1.6] text-zinc-500">
+      <p className="mt-3 text-[11px] leading-[1.6] text-text-muted">
         هذه سجلات شراء ولا تُعدَّل من هنا. تغييرها يكون باستلام دفعة جديدة أو بتعديل كمية من «إدارة المخزون».
         سعر الكلفة أعلاه يُستخدم للمنتجات التي لا دفعات لها.
       </p>
@@ -114,8 +114,8 @@ export function InventorySummary({ productId }: { productId: string }) {
 function Line({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className={strong ? 'font-semibold text-white' : 'text-zinc-400'}>{label}</dt>
-      <dd className={strong ? 'font-bold text-white' : 'text-zinc-200'}>{value}</dd>
+      <dt className={strong ? 'font-semibold text-white' : 'text-text-secondary'}>{label}</dt>
+      <dd className={strong ? 'font-bold text-white' : 'text-text-primary'}>{value}</dd>
     </div>
   );
 }

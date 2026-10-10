@@ -215,16 +215,16 @@ export default function AdminFarmConfig() {
             <Factory className="w-5 h-5 text-gold" aria-hidden="true" />
             {s.title}
           </h2>
-          <p className="text-[12.5px] text-zinc-400 leading-relaxed mt-1 max-w-3xl">{s.subtitle}</p>
+          <p className="text-[12.5px] text-text-secondary leading-relaxed mt-1 max-w-3xl">{s.subtitle}</p>
           {docs.saved && (
             <div className="flex flex-wrap gap-1.5 mt-2 text-[11px] tabular-nums">
-              <span className="h-6 px-2 rounded-full bg-gold/10 border border-gold/30 text-gold font-bold grid place-items-center" data-farm-version={version}>
+              <span className="lv-chip h-6 px-2 rounded-full font-bold grid place-items-center [--chip:var(--color-gold)]" data-farm-version={version}>
                 {s.version(version)}
               </span>
               {typeof schema === 'number' && (
-                <span className="h-6 px-2 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300 grid place-items-center">{s.schema(schema)}</span>
+                <span className="h-6 px-2 rounded-full bg-surface-selected text-text-secondary grid place-items-center">{s.schema(schema)}</span>
               )}
-              <span className="h-6 px-2 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300 grid place-items-center">{s.sectionsCount(ordered.length)}</span>
+              <span className="h-6 px-2 rounded-full bg-surface-selected text-text-secondary grid place-items-center">{s.sectionsCount(ordered.length)}</span>
             </div>
           )}
         </div>
@@ -245,7 +245,7 @@ export default function AdminFarmConfig() {
       )}
 
       {loading && (
-        <div role="status" className="flex items-center justify-center gap-2 py-12 text-[13px] text-zinc-400">
+        <div role="status" className="flex items-center justify-center gap-2 py-12 text-[13px] text-text-secondary">
           <Spinner size="sm" delayMs={0} decorative />
           {s.loading}
         </div>

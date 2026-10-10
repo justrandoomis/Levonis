@@ -94,20 +94,18 @@ export function SectionPanel({
   return (
     <section
       data-farm-section={section}
-      className={`min-w-0 rounded-xl border overflow-hidden ${
-        hasProblem ? 'border-red-500/40 bg-red-500/[0.03]' : open ? 'border-gold/30 bg-zinc-900/60' : 'border-zinc-800 bg-zinc-900/40'
-      }`}
+      className={`lv-surface min-w-0 overflow-hidden ${hasProblem ? 'border-red-500/40 bg-red-500/[0.03]' : ''}`}
     >
       <button
         type="button"
         data-farm-section-toggle={section}
         aria-expanded={open}
         onClick={onToggle}
-        className="w-full min-w-0 flex items-center gap-2.5 px-3 h-12 text-start hover:bg-zinc-800/30 transition-colors"
+        className="w-full min-w-0 flex items-center gap-2.5 px-3 h-12 text-start hover:bg-surface-raised transition-colors"
       >
         <span
           className={`shrink-0 w-6 h-6 rounded-md grid place-items-center text-[10px] font-black tabular-nums ${
-            open ? 'bg-gold text-accent-contrast' : 'bg-zinc-800 text-zinc-400'
+            open ? 'bg-gold text-accent-contrast' : 'bg-surface-selected text-text-secondary'
           }`}
         >
           {n}
@@ -115,34 +113,34 @@ export function SectionPanel({
         <span className="min-w-0 flex-1">
           <span className="block text-[13px] font-bold text-white truncate">
             {lb.label}
-            {lb.secondary && <span className="hidden sm:inline text-[10px] font-medium text-zinc-500"> {lb.secondary}</span>}
-            <span className="ms-2 font-mono text-[10px] font-medium text-zinc-600" dir="ltr">
+            {lb.secondary && <span className="hidden sm:inline text-[10px] font-medium text-text-muted"> {lb.secondary}</span>}
+            <span className="ms-2 font-mono text-[10px] font-medium text-text-muted" dir="ltr">
               {section}
             </span>
           </span>
           {!open && (
-            <span className="block text-[10.5px] text-zinc-500 truncate tabular-nums">
+            <span className="block text-[10.5px] text-text-muted truncate tabular-nums">
               {count.catalog ? s.entriesCount(count.entries) : s.fieldsCount(count.entries)}
               {storedProblems.length > 0 && <span className="text-red-400"> · {s.problemsInSection(storedProblems.length)}</span>}
             </span>
           )}
         </span>
         {isPrivate && (
-          <span className="shrink-0 h-5 px-1.5 rounded-full border border-zinc-700 text-[10px] font-bold text-zinc-400 grid place-items-center">
+          <span className="shrink-0 h-5 px-1.5 rounded-full border border-border-subtle text-[10px] font-bold text-text-secondary grid place-items-center">
             {s.privateChip}
           </span>
         )}
         {dirty && (
-          <span className="shrink-0 h-5 px-1.5 rounded-full bg-gold/15 text-gold text-[10px] font-bold grid place-items-center" data-farm-dirty={section}>
+          <span className="lv-chip shrink-0 h-5 px-1.5 rounded-full text-[10px] font-bold grid place-items-center [--chip:var(--color-gold)]" data-farm-dirty={section}>
             {s.unsavedMark}
           </span>
         )}
-        <ChevronDown className={`shrink-0 w-4 h-4 text-zinc-500 transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+        <ChevronDown className={`shrink-0 w-4 h-4 text-text-muted transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
 
       {open && (
-        <div className="p-3 border-t border-zinc-800/70 min-w-0">
-          {lb.hint && <p className="mb-3 text-[12px] text-zinc-400 leading-relaxed">{lb.hint}</p>}
+        <div className="p-3 border-t border-border-subtle min-w-0">
+          {lb.hint && <p className="mb-3 text-[12px] text-text-secondary leading-relaxed">{lb.hint}</p>}
 
           {storedProblems.length > 0 && (
             <Banner kind="warn">
@@ -179,7 +177,7 @@ export function SectionPanel({
             </p>
           )}
 
-          <div className="sticky bottom-0 -mx-3 -mb-3 mt-3 px-3 py-2.5 bg-zinc-950 border-t border-zinc-800/70 flex flex-wrap items-center gap-2">
+          <div className="sticky bottom-0 -mx-3 -mb-3 mt-3 px-3 py-2.5 bg-surface-raised border-t border-border-subtle flex flex-wrap items-center gap-2">
             <button type="button" data-farm-save={section} onClick={onSave} disabled={!dirty || saving || !savable} className={btnGold}>
               {saving ? s.saving : dirty ? s.save : s.noChanges}
             </button>
@@ -220,8 +218,9 @@ export function SectionPanel({
       >
         <div className="p-5 sm:p-6">
           <h3 id={resetTitleId} className="text-white font-bold text-[16px]">{s.resetTitle(lb.label)}</h3>
-          <p className="text-zinc-300 text-[13px] mt-2 leading-relaxed">{s.resetBody}</p>
+          <p className="text-text-secondary text-[13px] mt-2 leading-relaxed">{s.resetBody}</p>
           <input
+            className="lv-input mt-4 font-mono tracking-widest"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             onKeyDown={(e) => {
@@ -232,9 +231,8 @@ export function SectionPanel({
             spellCheck={false}
             placeholder="RESET"
             aria-label={s.typeReset}
-            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-red-500/70"
           />
-          <p className="mt-1.5 text-[11px] text-zinc-500">{s.typeReset}</p>
+          <p className="mt-1.5 text-[11px] text-text-muted">{s.typeReset}</p>
           <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
             <button type="button" onClick={() => setResetOpen(false)} disabled={resetting} className={`${btnGhost} flex-1 h-11`}>
               {s.cancel}

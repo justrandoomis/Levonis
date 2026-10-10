@@ -1020,7 +1020,7 @@ export default function ProductForm({
   }, [reviewDetail]);
   if (loading) {
     return (
-      <div className="p-6 text-center text-zinc-400 text-sm">
+      <div className="p-6 text-center text-text-secondary text-sm">
         <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" /> جارٍ التحميل…
       </div>
     );
@@ -1073,15 +1073,15 @@ export default function ProductForm({
         </button>
         <h2 className="text-base font-black text-white truncate min-w-0 flex-1">
           {productId ? 'تعديل منتج' : 'منتج جديد'}
-          <span className="text-[11px] font-medium text-zinc-500 ms-2">{doc.name_en || '—'}</span>
+          <span className="text-[11px] font-medium text-text-muted ms-2">{doc.name_en || '—'}</span>
         </h2>
         <span
           className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-md ${
             doc.status === 'active'
-              ? 'bg-emerald-500/15 text-emerald-300'
+              ? 'lv-chip [--chip:var(--color-success)]'
               : doc.status === 'draft'
-                ? 'bg-zinc-700 text-zinc-300'
-                : 'bg-amber-500/15 text-amber-300'
+                ? 'bg-surface-selected text-text-secondary'
+                : 'lv-chip [--chip:var(--color-warning)]'
           }`}
         >
           {doc.status === 'active' ? 'منشور' : doc.status === 'draft' ? 'مسودة' : 'مخفي'}
@@ -1096,7 +1096,7 @@ export default function ProductForm({
             <p className="mb-2 leading-relaxed">
               النسخة المحفوظة تغيّرت بعد فتح هذه الصفحة — غالبًا لأن تعديلًا سريعًا حُفظ، أو لأن
               المنتج مفتوح في تبويب آخر. تغييراتك ما زالت أمامك ولم يُحذف شيء.
-              <span className="block text-zinc-400 text-[11px] mt-1">
+              <span className="block text-text-secondary text-[11px] mt-1">
                 The stored copy moved since this page was opened. Nothing you typed was lost.
               </span>
             </p>
@@ -1334,7 +1334,7 @@ export default function ProductForm({
                       key={t}
                       type="button"
                       onClick={() => addHashtag(t)}
-                      className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-zinc-600 px-2.5 min-h-8 text-[11px] text-zinc-400 hover:text-white hover:border-zinc-400 transition-colors"
+                      className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border-subtle px-2.5 min-h-8 text-[11px] text-text-secondary hover:text-text-primary hover:border-text-muted transition-colors"
                       aria-label={`إضافة الوسم ${t}`}
                     >
                       <Plus className="w-3 h-3" aria-hidden />
@@ -1348,13 +1348,13 @@ export default function ProductForm({
                   {doc.hashtags.map((h) => (
                     <span
                       key={h}
-                      className="inline-flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-full px-2 h-6 text-[11px] text-zinc-200"
+                      className="inline-flex items-center gap-1 bg-surface-selected border border-border-subtle rounded-full px-2 h-6 text-[11px] text-text-primary"
                     >
                       <span dir="ltr">#{h}</span>
                       <button
                         type="button"
                         aria-label={`حذف ${h}`}
-                        className="text-zinc-500 hover:text-red-400"
+                        className="text-text-muted hover:text-red-400"
                         onClick={() => setDoc((d) => ({ ...d, hashtags: d.hashtags.filter((x) => x !== h) }))}
                       >
                         ×
@@ -1393,7 +1393,7 @@ export default function ProductForm({
             silently listed none was the reason an imported product looked
             unfiled. */}
         {extraCatalogs.length > 0 && (
-          <p className="text-[11px] text-zinc-400 mt-2" data-form="catalogs-preserved">
+          <p className="text-[11px] text-text-secondary mt-2" data-form="catalogs-preserved">
             كتالوجات محفوظة: {extraCatalogs.join('، ')} — تُدار من صفحة التصنيفات أو عبر القالب النصي.
           </p>
         )}
@@ -1455,11 +1455,11 @@ export default function ProductForm({
               hint="مخزّنة كما وردت من القالب النصي — لا مدخل لها في هذا النموذج"
               span
             >
-              <div className="space-y-1 rounded-lg border border-zinc-800 bg-zinc-800/30 p-2" data-form="imported-texts">
+              <div className="space-y-1 rounded-lg bg-surface-raised p-2" data-form="imported-texts">
                 {imported.map((r) => (
                   <div key={r.key} className="text-[12px] min-w-0">
-                    <span className="text-zinc-500">{r.label}: </span>
-                    <span className="text-zinc-200 break-words" dir="auto">
+                    <span className="text-text-muted">{r.label}: </span>
+                    <span className="text-text-primary break-words" dir="auto">
                       {r.value}
                     </span>
                   </div>
@@ -1613,7 +1613,7 @@ export default function ProductForm({
             carried by every save, and it is shown so it is never mistaken for
             a value the import lost. */}
         {doc.original_price_iqd !== null && doc.original_price_iqd !== undefined && (
-          <p className="text-[11px] text-zinc-400 mb-3" data-form="original-price-preserved">
+          <p className="text-[11px] text-text-secondary mb-3" data-form="original-price-preserved">
             السعر قبل التخفيض المحفوظ: {formatIqd(doc.original_price_iqd)} — يُعدَّل عبر القالب النصي.
           </p>
         )}
@@ -1689,13 +1689,13 @@ export default function ProductForm({
         {/* Product-owned delivery tariffs. Existing products remain on the
             global legacy tariff until an admin explicitly opts them in; this
             prevents an unrelated edit from changing live checkout totals. */}
-        <div className="border-t border-zinc-800 pt-3 mb-4" data-form="delivery-options">
+        <div className="border-t border-border-subtle pt-3 mb-4" data-form="delivery-options">
           <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
             <div className="min-w-0">
-              <h4 className="text-[13px] font-bold text-zinc-200">
-                خيارات التوصيل <span className="text-[11px] font-medium text-zinc-500">Delivery options</span>
+              <h4 className="text-[13px] font-bold text-text-primary">
+                خيارات التوصيل <span className="text-[11px] font-medium text-text-muted">Delivery options</span>
               </h4>
-              <p className="text-[11px] leading-relaxed text-zinc-500 mt-0.5">
+              <p className="text-[11px] leading-relaxed text-text-muted mt-0.5">
                 العادي رسم واحد للشحنة: ٥٬٠٠٠ د.ع للقطع العادية و١٠٬٠٠٠ د.ع للشحنة التي تحتوي طابعة. شرائح الكمية تخص التوصيل الشخصي. تعطيل الطريقة يمنع اختيارها لهذا المنتج.
               </p>
             </div>
@@ -1723,11 +1723,11 @@ export default function ProductForm({
           <DeliveryAvailabilityNotice options={doc.delivery_options} printer={isPrinterCatalog} />
 
           {!doc.delivery_options ? (
-            <p className="rounded-md bg-zinc-800/35 px-3 py-2 text-[11px] text-zinc-400" data-delivery-legacy-note>
+            <p className="rounded-md bg-surface-raised px-3 py-2 text-[11px] text-text-secondary" data-delivery-legacy-note>
               هذا المنتج يستخدم تعرفة التوصيل العامة الحالية للحفاظ على توافق الطلبات والمنتجات القديمة.
             </p>
           ) : (
-            <div className="divide-y divide-zinc-800 rounded-lg bg-zinc-900/45 px-3">
+            <div className="divide-y divide-border-subtle rounded-lg border border-border-subtle px-3">
               {([
                 ['standard', 'التوصيل العادي', 'Standard delivery'],
                 ['personal', 'التوصيل الشخصي', 'Personal delivery'],
@@ -1770,7 +1770,7 @@ export default function ProductForm({
                       >
                         <Money value={rule.fee_iqd} onChange={(v) => setRule({ fee_iqd: v ?? 0 })} />
                       </Field>
-                    </Grid> : <p className="text-[11px] text-zinc-400">تعطيل أو تفعيل التوصيل العادي فقط؛ الرسم ثابت للشحنة ولا يزيد مع الكمية أو عدد المنتجات.</p>}
+                    </Grid> : <p className="text-[11px] text-text-secondary">تعطيل أو تفعيل التوصيل العادي فقط؛ الرسم ثابت للشحنة ولا يزيد مع الكمية أو عدد المنتجات.</p>}
                   </div>
                 );
               })}
@@ -1784,12 +1784,12 @@ export default function ProductForm({
             filed under a printer catalog; a non-printer that still carries
             plans is told the save will be refused and offered a clear. */}
         {warrantyHiddenValues && (
-          <p className="text-[11px] text-zinc-400 mb-3" data-form="warranty-preserved">
+          <p className="text-[11px] text-text-secondary mb-3" data-form="warranty-preserved">
             محفوظ من الملف: {`ضمان أساسي ${doc.warranty_base_months} شهرًا`} — محرره يظهر لأقسام الطابعات فقط.
           </p>
         )}
         {doc.payment_options.length > 0 && (
-          <p className="text-[11px] text-zinc-400 mb-3" data-form="payment-options-preserved">
+          <p className="text-[11px] text-text-secondary mb-3" data-form="payment-options-preserved">
             خيارات الدفع المحفوظة: <span dir="ltr">{doc.payment_options.join(', ')}</span> — تُعدَّل عبر القالب النصي.
           </p>
         )}
@@ -1840,7 +1840,7 @@ export default function ProductForm({
             listing's coverage IS one of its condition facts — the server
             refuses to sell extensions on top of it. Collapsed to a single
             select for a new product, which is nearly every product. */}
-        <div className="mt-5 pt-5 border-t border-zinc-800">
+        <div className="mt-5 pt-5 border-t border-border-subtle">
           <ConditionSection
             condition={doc.condition ?? null}
             onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
@@ -1853,9 +1853,9 @@ export default function ProductForm({
             three are facts about the physical thing rather than about its
             price — and because a courier quote and a «هل يدخل على الطاولة؟»
             are the two questions this block answers. */}
-        <div className="mt-5 pt-5 border-t border-zinc-800">
+        <div className="mt-5 pt-5 border-t border-border-subtle">
           <h3 className="mb-3 text-sm font-bold text-white">
-            الأبعاد والوزن <span className="text-zinc-500 font-medium">/ Dimensions & weight</span>
+            الأبعاد والوزن <span className="text-text-muted font-medium">/ Dimensions & weight</span>
           </h3>
           <DimensionsSection
             dimensions={doc.dimensions ?? emptyDimensions()}
@@ -1982,7 +1982,7 @@ export default function ProductForm({
           />
         ) : null}
         {tplGroups.length === 0 && (
-          <p className="text-[12px] text-zinc-500 mb-3">
+          <p className="text-[12px] text-text-muted mb-3">
             حقول المواصفات تتبع القسم والقالب. اختر القسم الرئيسي في القسم رقم 1 لتظهر هنا.
             {storedSpecCount > 0 ? ' المواصفات المحفوظة معروضة أدناه حتى بلا قالب.' : ''}
           </p>
@@ -1991,8 +1991,8 @@ export default function ProductForm({
           <div className="space-y-4 mb-4">
             {tplGroups.map((g) => (
               <div key={g.id} className="min-w-0">
-                <h4 className="text-[13px] font-bold text-zinc-300 mb-2 truncate">
-                  {g.label_ar} <span className="text-[11px] font-medium text-zinc-500">{g.label_en}</span>
+                <h4 className="text-[13px] font-bold text-text-secondary mb-2 truncate">
+                  {g.label_ar} <span className="text-[11px] font-medium text-text-muted">{g.label_en}</span>
                 </h4>
                 <Grid cols={2}>
                   {g.fields.map((f) => (
@@ -2057,9 +2057,9 @@ export default function ProductForm({
             Shown editable; an emptied value is deleted by the server. */}
         {outsideSpecs.length > 0 && (
           <div className="min-w-0 mb-4" data-form="spec-outside-template">
-            <h4 className="text-[13px] font-bold text-zinc-300 mb-2 truncate">
+            <h4 className="text-[13px] font-bold text-text-secondary mb-2 truncate">
               مواصفات محفوظة خارج قالب هذا القسم{' '}
-              <span className="text-[11px] font-medium text-zinc-500">Stored spec fields outside the section template</span>
+              <span className="text-[11px] font-medium text-text-muted">Stored spec fields outside the section template</span>
             </h4>
             <Grid cols={2}>
               {outsideSpecs.map((id) => (
@@ -2091,14 +2091,14 @@ export default function ProductForm({
             every save; showing them is the difference between "preserved" and
             "lost" in the owner's eyes. */}
         {preserved.length > 0 && (
-          <div className="min-w-0 mb-4 rounded-lg border border-zinc-800 bg-zinc-800/30 p-2.5" data-form="preserved-groups">
-            <h4 className="text-[12px] font-bold text-zinc-300 mb-1.5">
+          <div className="min-w-0 mb-4 rounded-lg bg-surface-raised p-2.5" data-form="preserved-groups">
+            <h4 className="text-[12px] font-bold text-text-secondary mb-1.5">
               محتوى محفوظ يُعدَّل عبر القالب النصي{' '}
-              <span className="text-[11px] font-medium text-zinc-500">Preserved — edit via the TXT template</span>
+              <span className="text-[11px] font-medium text-text-muted">Preserved — edit via the TXT template</span>
             </h4>
             {preserved.map((g) => (
-              <div key={g.key} className="text-[11px] text-zinc-400 mb-1.5 min-w-0" data-preserved={g.key}>
-                <span className="text-zinc-200 font-bold">
+              <div key={g.key} className="text-[11px] text-text-secondary mb-1.5 min-w-0" data-preserved={g.key}>
+                <span className="text-text-primary font-bold">
                   {g.label} ({g.count})
                 </span>
                 <ul className="ms-4 list-disc space-y-0.5">
@@ -2142,7 +2142,7 @@ export default function ProductForm({
         summary={dirty ? 'تغييرات غير محفوظة' : 'محفوظ'}
         {...section(8)}
       >
-        <div className="space-y-2 text-[12px] text-zinc-300 min-w-0">
+        <div className="space-y-2 text-[12px] text-text-secondary min-w-0">
           <Row k="الاسم" v={doc.name_en || '—'} />
           <Row k="القسم" v={catalogs.find((c) => c.id === doc.category_id)?.name_en ?? '—'} />
           <Row k="السعر" v={doc.price_iqd === null ? '—' : formatIqd(doc.price_iqd)} />
@@ -2156,8 +2156,8 @@ export default function ProductForm({
         {canSeeCost && <UsdPricingPreview />}
         {canSeeCost && <UsdPricingSaveSheet />}
         {previewOpen && (
-          <div className="mt-3 rounded-lg border border-zinc-800 bg-black/30 p-3 min-w-0">
-            <pre className="text-[11px] text-zinc-400 overflow-x-auto" dir="ltr">
+          <div className="lv-well mt-3 rounded-md p-3 min-w-0">
+            <pre className="text-[11px] text-text-secondary overflow-x-auto" dir="ltr">
               {JSON.stringify({ doc: { ...doc, spec_fields: doc.spec_fields }, relations: relationsToWire(rel) }, null, 2)}
             </pre>
           </div>
@@ -2265,9 +2265,9 @@ export default function ProductForm({
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 min-w-0 border-b border-zinc-800/60 pb-1.5">
-      <span className="text-zinc-500 shrink-0">{k}</span>
-      <span className="text-zinc-200 truncate min-w-0 text-end" dir="ltr">
+    <div className="flex items-center justify-between gap-3 min-w-0 border-b border-border-subtle pb-1.5">
+      <span className="text-text-muted shrink-0">{k}</span>
+      <span className="text-text-primary truncate min-w-0 text-end" dir="ltr">
         {v}
       </span>
     </div>

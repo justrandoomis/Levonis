@@ -45,7 +45,7 @@ export default function SerialsBlockerCard({
   const Arrow = dir === 'rtl' ? ArrowLeft : ArrowRight;
   const l = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as 'ar' | 'en' | 'ckb';
   return (
-    <section role="status" className="rounded-2xl border border-warning/35 bg-warning/10 p-3.5" data-serial-blocker>
+    <section role="status" className="lv-alert lv-alert-warning p-3.5" data-serial-blocker>
       <p className="flex items-start gap-2 text-[13.5px] font-bold text-text-primary">
         <ScanLine className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
         {refusalText('SERIALS_REQUIRED', l, s.blockerIntro)}

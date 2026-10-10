@@ -100,7 +100,7 @@ function memberWalletIqd(f: { wallet_iqd?: number; wallet_usd_cents: number }, e
 const ROLE_ICON: Record<string, React.ReactNode> = {
   admin: <Shield className="h-5 w-5 text-iris" />,
   merchant: <Store className="h-5 w-5 text-gilt" />,
-  customer: <User className="h-5 w-5 text-zinc-400" />,
+  customer: <User className="h-5 w-5 text-text-secondary" />,
 };
 
 export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }: MemberDetailModalProps) {
@@ -167,15 +167,15 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
       // panel so the header and its identity stay put while the profile moves.
       panelClassName={`w-full max-w-2xl max-h-[min(88dvh,46rem)] flex flex-col overflow-hidden${open ? '' : ' pointer-events-none'}`}
     >
-      <header className="flex items-start gap-3 border-b border-zinc-800 p-4 sm:p-5">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800">
+      <header className="flex items-start gap-3 border-b border-border-subtle p-4 sm:p-5">
+        <div className="lv-well flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
           {ROLE_ICON[m?.identity.role ?? 'customer'] ?? ROLE_ICON.customer}
         </div>
         <div className="min-w-0 flex-1">
           <h3 id="admin-member-title" className="truncate text-lg font-black text-white" dir="auto">
             {m ? m.identity.name || m.identity.username || s.memberTitle : s.memberTitle}
           </h3>
-          <p dir="auto" className="truncate text-xs font-medium text-zinc-500">
+          <p dir="auto" className="truncate text-xs font-medium text-text-muted">
             {m?.identity.email ?? ''}
           </p>
           {m && (
@@ -214,17 +214,17 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="-me-1 -mt-1 shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="-me-1 -mt-1 shrink-0 rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-selected hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
-        {loading && !view && <p className="py-10 text-center text-sm font-medium text-zinc-500">{s.loading}</p>}
+        {loading && !view && <p className="py-10 text-center text-sm font-medium text-text-muted">{s.loading}</p>}
 
         {error && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-medium text-red-400">
+          <div className="lv-alert lv-alert-danger flex items-center justify-between gap-3 text-sm font-medium text-text-primary">
             <span className="flex min-w-0 items-center gap-2">
               <TriangleAlert className="h-4 w-4 shrink-0" />
               <span className="min-w-0 break-words">{error}</span>
@@ -233,7 +233,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
               <button
                 type="button"
                 onClick={() => void load(userId)}
-                className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-bold text-red-300"
+                className="lv-button lv-button-danger lv-button-sm shrink-0"
               >
                 {s.retry}
               </button>
@@ -251,12 +251,12 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
               {view.financial ? (
                 <Stat label={s.fLifetime} value={formatIqd(view.financial.lifetime_value_iqd)} tone="money" sub={`${s.fDeliveredValue}: ${formatIqd(view.financial.delivered_value_iqd)}`} />
               ) : (
-                <Stat label={s.fLifetime} value={<Lock className="h-4 w-4 text-zinc-600" />} sub={s.fScope} />
+                <Stat label={s.fLifetime} value={<Lock className="h-4 w-4 text-text-muted" />} sub={s.fScope} />
               )}
               {view.financial ? (
                 <Stat label={s.fWalletUsd} value={memberWalletIqd(view.financial, exchangeRate)} tone="money" sub={`${formatUsdCents(view.financial.wallet_usd_cents)} · ${s.fWalletPoints}: ${view.financial.wallet_points.toLocaleString()}`} />
               ) : (
-                <Stat label={s.fWalletUsd} value={<Lock className="h-4 w-4 text-zinc-600" />} sub={s.fScope} />
+                <Stat label={s.fWalletUsd} value={<Lock className="h-4 w-4 text-text-muted" />} sub={s.fScope} />
               )}
               <Stat label={s.fJoined} value={dayLabelOf(m.identity.created_at, s.never)} sub={`${s.fTier}: ${m.membership.tier}`} />
             </div>
@@ -302,7 +302,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                   label={s.fLastSeen}
                   value={
                     <span className="inline-flex items-center gap-1.5">
-                      <LogIn className="h-3.5 w-3.5 text-zinc-500" />
+                      <LogIn className="h-3.5 w-3.5 text-text-muted" />
                       {whenLabel(m.activity.newest_session_at, s.never)}
                     </span>
                   }
@@ -348,7 +348,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                 </Section>
               ) : (
                 <Section title={s.secMoney} icon={<Lock className="h-3.5 w-3.5" />} testId="financial-denied">
-                  <p className="text-xs leading-relaxed text-zinc-500">{s.moneyHidden}</p>
+                  <p className="text-xs leading-relaxed text-text-muted">{s.moneyHidden}</p>
                 </Section>
               )}
 
@@ -383,7 +383,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                     {m.kyc.reason && <Row label={s.fReason} value={m.kyc.reason} />}
                   </>
                 ) : (
-                  <p className="text-xs text-zinc-500">{s.noKyc}</p>
+                  <p className="text-xs text-text-muted">{s.noKyc}</p>
                 )}
               </Section>
 
@@ -396,13 +396,13 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                     <Row label={s.fApproved} value={whenLabel(m.approved_address.approved_at, s.never)} />
                   </>
                 ) : (
-                  <p className="text-xs text-zinc-500">{s.noAddress}</p>
+                  <p className="text-xs text-text-muted">{s.noAddress}</p>
                 )}
               </Section>
 
               <Section title={s.secChannels} icon={<Bell className="h-3.5 w-3.5" />} testId="channels">
                 {m.channels.length === 0 ? (
-                  <p className="text-xs text-zinc-500">{s.noChannels}</p>
+                  <p className="text-xs text-text-muted">{s.noChannels}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {m.channels.map((ch) => (
@@ -427,11 +427,11 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                 testId="restrictions"
               >
                 {m.restrictions.length === 0 ? (
-                  <p className="text-xs text-zinc-500">{s.noRestrictions}</p>
+                  <p className="text-xs text-text-muted">{s.noRestrictions}</p>
                 ) : (
                   <ul className="space-y-2">
                     {m.restrictions.map((r) => (
-                      <li key={r.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-2.5">
+                      <li key={r.id} className="rounded-lg bg-surface-raised p-2.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Pill tone={r.state === 'active' ? 'red' : 'zinc'}>{r.state}</Pill>
                           <Pill tone="zinc">{r.case_type || r.kind}</Pill>
@@ -440,10 +440,10 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
                               {f}
                             </Pill>
                           ))}
-                          <span className="ms-auto text-[11px] text-zinc-600">{dayLabelOf(r.opened_at, s.never)}</span>
+                          <span className="ms-auto text-[11px] text-text-muted">{dayLabelOf(r.opened_at, s.never)}</span>
                         </div>
                         {r.reason && (
-                          <p dir="auto" className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                          <p dir="auto" className="mt-1.5 text-xs leading-relaxed text-text-secondary">
                             {r.reason}
                           </p>
                         )}
@@ -457,15 +457,15 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
         )}
       </div>
 
-      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-zinc-800 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
-        <span className="min-w-0 truncate text-[11px] font-medium text-zinc-600" dir="ltr">
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border-subtle p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
+        <span className="min-w-0 truncate text-[11px] font-medium text-text-muted" dir="ltr">
           {m?.identity.id ?? ''}
         </span>
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-400 transition-colors hover:bg-zinc-800"
+            className="lv-button lv-button-ghost"
           >
             {s.close}
           </button>
@@ -473,7 +473,7 @@ export default function MemberDetailModal({ userId, anchorRef, onClose, onEdit }
             type="button"
             disabled={!m}
             onClick={() => m && onEdit(m.identity.id)}
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
+            className="lv-button lv-button-primary"
           >
             <Shield className="h-4 w-4" /> {s.editMember}
           </button>

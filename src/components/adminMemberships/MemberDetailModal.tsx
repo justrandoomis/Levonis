@@ -121,7 +121,7 @@ function Money({ iqd, s, tone = 'plain' }: { iqd: number | null | undefined; s: 
    */
   if (iqd === undefined || iqd === null || !Number.isFinite(iqd)) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-zinc-500">
+      <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold leading-5 text-text-muted">
         <Lock className="h-3.5 w-3.5" aria-hidden />
         {s.moneyLocked}
         {/* The reason is announced, not merely implied by a padlock glyph. */}
@@ -133,7 +133,7 @@ function Money({ iqd, s, tone = 'plain' }: { iqd: number | null | undefined; s: 
     <span
       dir="auto"
       className={`text-[13px] font-semibold leading-5 tabular-nums ${
-        tone === 'debt' && iqd > 0 ? 'text-red-300' : 'text-zinc-200'
+        tone === 'debt' && iqd > 0 ? 'text-red-300' : 'text-text-primary'
       }`}
     >
       {formatIqd(iqd)}
@@ -278,15 +278,15 @@ export default function MemberDetailModal({
         open ? '' : ' pointer-events-none'
       }`}
     >
-      <header className="flex items-start gap-3 border-b border-zinc-800 p-4 sm:p-5">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800">
+      <header className="flex items-start gap-3 border-b border-border-subtle p-4 sm:p-5">
+        <div className="lv-well flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
           <CreditCard className="h-5 w-5 text-gilt" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
           <h3 id={TITLE_ID} className="truncate text-lg font-black leading-6 text-white" dir="auto">
             {view ? view.user.name || view.user.username || s.detailTitle : s.detailTitle}
           </h3>
-          <p dir="auto" className="truncate text-xs font-medium leading-4 text-zinc-500">
+          <p dir="auto" className="truncate text-xs font-medium leading-4 text-text-muted">
             {view?.user.email ?? ''}
           </p>
           {view && (
@@ -320,17 +320,17 @@ export default function MemberDetailModal({
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="-me-1 -mt-1 shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="-me-1 -mt-1 shrink-0 rounded-lg p-2 text-text-secondary transition-colors hover:bg-surface-selected hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
-        {loading && !view && <p className="py-10 text-center text-sm font-medium leading-5 text-zinc-500">{s.loading}</p>}
+        {loading && !view && <p className="py-10 text-center text-sm font-medium leading-5 text-text-muted">{s.loading}</p>}
 
         {error && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-medium leading-5 text-red-400">
+          <div className="lv-alert lv-alert-danger flex items-center justify-between gap-3 text-sm font-medium leading-5 text-text-primary">
             <span className="flex min-w-0 items-center gap-2">
               <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
               <span className="min-w-0 break-words">{error}</span>
@@ -339,7 +339,7 @@ export default function MemberDetailModal({
               <button
                 type="button"
                 onClick={() => void load(userId)}
-                className="shrink-0 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-bold leading-4 text-red-300"
+                className="lv-button lv-button-danger lv-button-sm shrink-0"
               >
                 {s.retry}
               </button>
@@ -388,11 +388,11 @@ export default function MemberDetailModal({
                   />
                 )}
                 {view.memberships.length === 0 ? (
-                  <p className="pt-2 text-xs leading-5 text-zinc-600">{s.subsNone}</p>
+                  <p className="pt-2 text-xs leading-5 text-text-muted">{s.subsNone}</p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
                     {view.memberships.map((m) => (
-                      <li key={m.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-2.5">
+                      <li key={m.id} className="rounded-lg bg-surface-raised p-2.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Pill tone={m.state === 'active' ? 'green' : 'zinc'}>{tierLabel(m.tier)}</Pill>
                           <Pill tone="zinc">{m.state}</Pill>
@@ -401,7 +401,7 @@ export default function MemberDetailModal({
                             <Money iqd={m.price_paid_iqd} s={s} />
                           </span>
                         </div>
-                        <p className="mt-1 text-[11px] leading-4 text-zinc-600" dir="auto">
+                        <p className="mt-1 text-[11px] leading-4 text-text-muted" dir="auto">
                           {shortDate(m.starts_at)} → {shortDate(m.expires_at)} · {m.source}
                         </p>
                       </li>
@@ -424,7 +424,7 @@ export default function MemberDetailModal({
                 testId="kyc"
               >
                 {view.kyc_cases.length === 0 ? (
-                  <p className="text-xs leading-5 text-zinc-600">{s.kycNone}</p>
+                  <p className="text-xs leading-5 text-text-muted">{s.kycNone}</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {view.kyc_cases.map((k) => (
@@ -432,13 +432,13 @@ export default function MemberDetailModal({
                         <Pill tone={k.state === 'verified' ? 'green' : k.state === 'rejected' ? 'red' : 'zinc'}>
                           {k.state}
                         </Pill>
-                        <span className="text-[11px] leading-4 text-zinc-400">{k.case_type}</span>
-                        {k.doc_type && <span className="text-[11px] leading-4 text-zinc-500">{k.doc_type}</span>}
-                        <span className="ms-auto text-[11px] leading-4 text-zinc-600">
+                        <span className="text-[11px] leading-4 text-text-secondary">{k.case_type}</span>
+                        {k.doc_type && <span className="text-[11px] leading-4 text-text-muted">{k.doc_type}</span>}
+                        <span className="ms-auto text-[11px] leading-4 text-text-muted">
                           {shortDate(k.submitted_at ?? k.created_at)}
                         </span>
                         {k.reason && (
-                          <p dir="auto" className="w-full text-[11px] leading-relaxed text-zinc-500">
+                          <p dir="auto" className="w-full text-[11px] leading-relaxed text-text-muted">
                             {k.reason}
                           </p>
                         )}
@@ -464,7 +464,7 @@ export default function MemberDetailModal({
                   <p className="pt-2 text-xs leading-5 text-mint">{s.benefitNoneGated}</p>
                 ) : (
                   <div className="mt-2">
-                    <p className="mb-1.5 text-[11px] leading-4 text-zinc-500">{s.benefitGated}</p>
+                    <p className="mb-1.5 text-[11px] leading-4 text-text-muted">{s.benefitGated}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {view.benefit_context.gated_benefit_flags.map((f) => (
                         <Pill key={f} tone="red">
@@ -479,19 +479,19 @@ export default function MemberDetailModal({
 
               <Section title={s.secAddresses} icon={<MapPin className="h-3.5 w-3.5" />} testId="address">
                 {view.approved_addresses.length === 0 ? (
-                  <p className="text-xs leading-5 text-zinc-600">{s.addrNone}</p>
+                  <p className="text-xs leading-5 text-text-muted">{s.addrNone}</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {view.approved_addresses.map((a) => (
-                      <li key={a.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-2.5">
+                      <li key={a.id} className="rounded-lg bg-surface-raised p-2.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Pill tone={a.state === 'approved' ? 'green' : 'zinc'}>{a.state}</Pill>
                           <Pill tone="zinc">v{a.version}</Pill>
-                          <span className="ms-auto text-[11px] leading-4 text-zinc-600">
+                          <span className="ms-auto text-[11px] leading-4 text-text-muted">
                             {shortDate(a.approved_at ?? a.requested_at)}
                           </span>
                         </div>
-                        <p dir="auto" className="mt-1 break-words text-[11px] leading-relaxed text-zinc-400">
+                        <p dir="auto" className="mt-1 break-words text-[11px] leading-relaxed text-text-secondary">
                           {a.address}
                           {a.landmark ? ` — ${a.landmark}` : ''}
                         </p>
@@ -527,7 +527,7 @@ export default function MemberDetailModal({
                   </Pill>
                 </div>
                 {!view.debt.eligible && view.debt.eligibility_reason && (
-                  <p dir="auto" className="mb-2 text-[11px] leading-relaxed text-zinc-500">
+                  <p dir="auto" className="mb-2 text-[11px] leading-relaxed text-text-muted">
                     {view.debt.eligibility_reason}
                   </p>
                 )}
@@ -544,14 +544,15 @@ export default function MemberDetailModal({
                   is the same one fact, `storedLimit`, deciding both.
                 */}
                 {storedLimit === undefined ? (
-                  <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">{s.moneyHidden}</p>
+                  <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{s.moneyHidden}</p>
                 ) : (
                   <div className="mt-3">
-                    <label className="mb-1 block text-[11px] leading-4 text-zinc-500" htmlFor="bnpl-credit-limit">
+                    <label className="mb-1 block text-[11px] leading-4 text-text-muted" htmlFor="bnpl-credit-limit">
                       {s.bnplControls}
                     </label>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input
+                        className="lv-input min-w-0 flex-1 text-[13px] leading-5"
                         id="bnpl-credit-limit"
                         type="number"
                         inputMode="numeric"
@@ -560,13 +561,12 @@ export default function MemberDetailModal({
                         value={bnplLimit}
                         onChange={(e) => setBnplLimit(e.target.value)}
                         placeholder={s.limitPlaceholder}
-                        className="min-h-10 min-w-0 flex-1 rounded-xl border border-zinc-700 bg-black px-3 text-[13px] leading-5 text-white focus:outline-none focus:ring-2 focus:ring-gold/60"
                       />
                       <button
                         type="button"
                         disabled={bnplBusy}
                         onClick={() => void updateBnpl('approved', storedLimit)}
-                        className="min-h-10 rounded-xl bg-gold px-3 text-[12px] font-black leading-4 text-accent-contrast disabled:opacity-50"
+                        className="lv-button lv-button-primary lv-button-sm"
                       >
                         {s.approveBnpl}
                       </button>
@@ -574,7 +574,7 @@ export default function MemberDetailModal({
                         type="button"
                         disabled={bnplBusy || view.debt.account_state === 'suspended'}
                         onClick={() => void updateBnpl('suspended', storedLimit)}
-                        className="min-h-10 rounded-xl border border-red-500/35 bg-red-500/10 px-3 text-[12px] font-bold leading-4 text-red-300 disabled:opacity-50"
+                        className="lv-button lv-button-danger lv-button-sm"
                       >
                         {s.suspendBnpl}
                       </button>
@@ -590,19 +590,19 @@ export default function MemberDetailModal({
                   </p>
                 )}
 
-                <p className="mt-3 text-[11px] font-bold uppercase leading-4 tracking-wider text-zinc-500">
+                <p className="mt-3 text-[11px] font-bold uppercase leading-4 tracking-wider text-text-muted">
                   {s.ledgerTitle}
                 </p>
                 {!view.debt.ledger || view.debt.ledger.length === 0 ? (
-                  <p className="mt-1 text-xs leading-5 text-zinc-600">{s.noLedger}</p>
+                  <p className="mt-1 text-xs leading-5 text-text-muted">{s.noLedger}</p>
                 ) : (
                   <ul className="mt-1 space-y-1">
                     {view.debt.ledger.map((l) => (
-                      <li key={l.id} className="flex flex-wrap items-center gap-2 text-[11px] leading-4 text-zinc-500">
-                        <span className="text-zinc-400">{l.kind}</span>
+                      <li key={l.id} className="flex flex-wrap items-center gap-2 text-[11px] leading-4 text-text-muted">
+                        <span className="text-text-secondary">{l.kind}</span>
                         <Money iqd={l.amount_iqd} s={s} />
                         {l.due_at && <span>→ {shortDate(l.due_at)}</span>}
-                        <span className="ms-auto text-zinc-600">{shortDate(l.created_at)}</span>
+                        <span className="ms-auto text-text-muted">{shortDate(l.created_at)}</span>
                       </li>
                     ))}
                   </ul>
@@ -620,7 +620,7 @@ export default function MemberDetailModal({
                     type="button"
                     aria-expanded={showCaseForm}
                     onClick={() => setShowCaseForm((v) => !v)}
-                    className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold leading-4 text-red-300"
+                    className="lv-button lv-button-danger lv-button-sm"
                   >
                     {s.openCase}
                   </button>
@@ -646,11 +646,11 @@ export default function MemberDetailModal({
                 )}
 
                 {view.restriction_cases.length === 0 ? (
-                  <p className="text-xs leading-5 text-zinc-600">{s.caseNone}</p>
+                  <p className="text-xs leading-5 text-text-muted">{s.caseNone}</p>
                 ) : (
                   <ul className="space-y-2">
                     {view.restriction_cases.map((rc) => (
-                      <li key={rc.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+                      <li key={rc.id} className="rounded-lg bg-surface-raised p-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Pill tone={rc.state === 'active' ? 'red' : 'green'}>
                             {rc.state === 'active' ? s.active : s.resolved}
@@ -661,15 +661,15 @@ export default function MemberDetailModal({
                           {rc.decision && (
                             <Pill tone="gold">{rc.decision === 'pause' ? s.d_pause : s.d_revoke}</Pill>
                           )}
-                          <span className="ms-auto text-[11px] leading-4 text-zinc-600">
+                          <span className="ms-auto text-[11px] leading-4 text-text-muted">
                             {s.openedAt}: {shortDate(rc.opened_at)}
                           </span>
                         </div>
-                        <p dir="auto" className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                        <p dir="auto" className="mt-1.5 text-xs leading-relaxed text-text-secondary">
                           {rc.reason}
                         </p>
                         {rc.evidence.length > 0 && (
-                          <p dir="auto" className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-zinc-500">
+                          <p dir="auto" className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-relaxed text-text-muted">
                             {rc.evidence.join('\n')}
                           </p>
                         )}
@@ -683,7 +683,7 @@ export default function MemberDetailModal({
                           </div>
                         )}
                         {rc.resolved_at && (
-                          <p dir="auto" className="mt-1.5 text-[11px] leading-4 text-zinc-600">
+                          <p dir="auto" className="mt-1.5 text-[11px] leading-4 text-text-muted">
                             {s.resolvedAt}: {shortDate(rc.resolved_at)} — {rc.decision_reason}
                           </p>
                         )}
@@ -692,7 +692,7 @@ export default function MemberDetailModal({
                             type="button"
                             onClick={() => setResumeTarget(rc)}
                             disabled={rowBusy === rc.id || resumeTarget?.id === rc.id}
-                            className="mt-2 rounded-lg border border-mint/30 bg-mint/10 px-3 py-1.5 text-xs font-bold leading-4 text-mint disabled:opacity-50"
+                            className="lv-button lv-button-secondary lv-button-sm mt-2"
                           >
                             {rowBusy === rc.id ? s.creating : s.resume}
                           </button>
@@ -720,15 +720,15 @@ export default function MemberDetailModal({
         )}
       </div>
 
-      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-zinc-800 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
-        <span className="min-w-0 truncate text-[11px] font-medium leading-4 text-zinc-600" dir="ltr">
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border-subtle p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
+        <span className="min-w-0 truncate text-[11px] font-medium leading-4 text-text-muted" dir="ltr">
           <span className="sr-only">{s.memberIdLabel}: </span>
           {view?.user.id ?? ''}
         </span>
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-sm font-bold leading-5 text-black transition-colors hover:bg-zinc-200"
+          className="lv-button lv-button-primary shrink-0"
         >
           {s.close}
         </button>

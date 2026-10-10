@@ -6,7 +6,7 @@ export default function DeliveryAvailabilityNotice({ options, printer }: { optio
   const standard = options?.standard.enabled !== false;
   const personal = options?.personal.enabled !== false;
   return (
-    <div className={`mb-3 rounded-lg border px-3 py-2 text-xs leading-6 ${!standard || !personal ? 'border-amber-500/50 bg-amber-950/25 text-amber-200' : 'border-zinc-700 text-zinc-300'}`}
+    <div className={`mb-3 text-xs leading-6 ${!standard || !personal ? 'lv-alert lv-alert-warning text-text-primary' : 'rounded-lg border border-border-subtle px-3 py-2 text-text-secondary'}`}
       role={!standard || !personal ? 'alert' : undefined} data-delivery-availability-preview>
       <p>التوصيل العادي: {standard ? `متاح — ${standardDeliveryFeeIqd(printer).toLocaleString('en-US')} د.ع للشحنة كاملة قبل مزايا العضوية` : 'معطّل لهذا المنتج'}.</p>
       <p>التوصيل الشخصي: {personal ? 'مسموح — تحدد التعرفة النهائية في عرض سعر الطلب' : 'معطّل لهذا المنتج'}.</p>

@@ -211,7 +211,7 @@ export default function AdminChannels() {
 
   if (loading && !data) {
     return (
-      <div className="flex items-center gap-2 text-zinc-400 py-8">
+      <div className="flex items-center gap-2 text-text-secondary py-8">
         <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />
         <span>…</span>
       </div>
@@ -234,7 +234,7 @@ export default function AdminChannels() {
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h2 className="text-lg font-bold text-white">{s.title}</h2>
-          <p className="mt-1 text-[12px] text-zinc-400 leading-relaxed max-w-[62ch]">{s.intro}</p>
+          <p className="mt-1 text-[12px] text-text-secondary leading-relaxed max-w-[62ch]">{s.intro}</p>
         </div>
         <button
           type="button"
@@ -342,15 +342,15 @@ function Card({
   icon: React.ReactNode; title: string; ok: boolean; okLabel: string; offLabel: string; children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 min-w-0">
+    <section className="lv-surface p-4 min-w-0">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 min-w-0">
-          <span className="text-zinc-400 shrink-0">{icon}</span>
+          <span className="text-text-secondary shrink-0">{icon}</span>
           <span className="font-bold text-[14px] text-white truncate">{title}</span>
         </span>
         <span
           className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-            ok ? 'text-success bg-success/10' : 'text-warning bg-warning/10'
+            ok ? 'lv-chip [--chip:var(--color-success)]' : 'lv-chip [--chip:var(--color-warning)]'
           }`}
         >
           {ok ? okLabel : offLabel}
@@ -362,7 +362,7 @@ function Card({
 }
 
 function Line({ tone, children }: { tone: 'ok' | 'warn' | 'muted'; children: React.ReactNode }) {
-  const cls = tone === 'ok' ? 'text-success' : tone === 'warn' ? 'text-warning' : 'text-zinc-500';
+  const cls = tone === 'ok' ? 'text-success' : tone === 'warn' ? 'text-warning' : 'text-text-muted';
   return <p className={`text-[12px] leading-relaxed ${cls}`}>{children}</p>;
 }
 
@@ -375,11 +375,12 @@ function TestBox({
   const id = `channel-test-${inputMode}`;
   return (
     <div className="mt-3">
-      <label htmlFor={id} className="block text-[11px] font-bold text-zinc-500 uppercase mb-1">
+      <label htmlFor={id} className="block text-[11px] font-bold text-text-muted uppercase mb-1">
         {label}
       </label>
       <div className="flex gap-2">
         <input
+          className="lv-input flex-1 min-w-0 text-sm"
           id={id}
           type="text"
           dir="ltr"
@@ -389,7 +390,6 @@ function TestBox({
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-sm text-white focus:border-iris outline-none min-h-[44px]"
         />
         <button
           type="button"
@@ -409,14 +409,14 @@ function Result({ r, accepted, refused }: { r: TestResult | null; accepted: stri
   return (
     <div
       role="status"
-      className={`mt-2 flex items-start gap-2 rounded-lg px-2.5 py-2 text-[12px] leading-relaxed ${
-        r.sent ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+      className={`lv-alert mt-2 flex items-start gap-2 px-2.5 py-2 text-[12px] leading-relaxed text-text-primary ${
+        r.sent ? 'lv-alert-success' : 'lv-alert-warning'
       }`}
     >
       {r.sent ? (
-        <CheckCircle2 aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" />
+        <CheckCircle2 aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0 text-success" />
       ) : (
-        <AlertTriangle aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" />
+        <AlertTriangle aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0 text-warning" />
       )}
       <span className="min-w-0">
         <span className="font-bold">{r.sent ? accepted : refused}</span>

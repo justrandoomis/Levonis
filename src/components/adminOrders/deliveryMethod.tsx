@@ -56,7 +56,7 @@ export function DeliveryMethodBadge({ method, lang, className = '' }: { method: 
   const Icon = BY_ID[id ?? '']?.Icon ?? Truck;
   const tone =
     id === 'personal'
-      ? 'border-info/30 bg-info/10 text-info'
+      ? 'lv-chip border-transparent [--chip:var(--color-info)]'
       : 'border-border-subtle bg-surface-raised text-text-secondary';
   return (
     <span

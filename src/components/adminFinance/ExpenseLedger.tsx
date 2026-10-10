@@ -60,7 +60,6 @@ import type { FinanceStrings } from './strings';
  * `include_voided`, has lost trust in both screens at once.
  */
 
-const FIELD = 'lv-input w-full text-[13px] leading-[1.6]';
 const LABEL = 'block text-[12px] leading-[1.5] font-bold text-text-secondary';
 
 export default function ExpenseLedger({
@@ -292,7 +291,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldCategory}</span>
             <select
-              className={FIELD}
+              className="lv-input w-full text-[13px] leading-[1.6]"
               value={draft.category_id}
               onChange={(e) => setDraft((d) => ({ ...d, category_id: e.target.value }))}
             >
@@ -308,7 +307,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldAmount}</span>
             <input
-              className={FIELD}
+              className="lv-input w-full text-[13px] leading-[1.6]"
               dir="ltr"
               inputMode="numeric"
               value={draft.amount}
@@ -319,7 +318,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldDay}</span>
             <input
-              className={FIELD}
+              className="lv-input w-full text-[13px] leading-[1.6]"
               dir="ltr"
               type="date"
               value={draft.expense_day}
@@ -330,7 +329,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldRepeat}</span>
             <input
-              className={FIELD}
+              className="lv-input w-full text-[13px] leading-[1.6]"
               dir="ltr"
               inputMode="numeric"
               type="number"
@@ -344,7 +343,7 @@ export default function ExpenseLedger({
           <label className="min-w-0 sm:col-span-2">
             <span className={LABEL}>{s.fieldTitle}</span>
             <input
-              className={FIELD}
+              className="lv-input w-full text-[13px] leading-[1.6]"
               value={draft.title}
               onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
             />
@@ -353,7 +352,7 @@ export default function ExpenseLedger({
           <label className="min-w-0 sm:col-span-2">
             <span className={LABEL}>{s.fieldNote}</span>
             <input
-              className={FIELD}
+              className="lv-input w-full text-[13px] leading-[1.6]"
               value={draft.note}
               onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))}
             />
@@ -410,7 +409,7 @@ export default function ExpenseLedger({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
-            className={`${FIELD} max-w-[18rem]`}
+            className="lv-input w-full text-[13px] leading-[1.6] max-w-[18rem]"
             placeholder={s.categoryNamePlaceholder}
             value={newCategoryName}
             onChange={(e) => setNewCategoryName(e.target.value)}

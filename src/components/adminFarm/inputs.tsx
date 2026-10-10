@@ -36,10 +36,10 @@ export function FarmField({
   const id = htmlFor ?? auto;
   return (
     <div className={`min-w-0 ${span ? 'md:col-span-2 xl:col-span-3' : ''}`} data-farm-field={path}>
-      <label htmlFor={id} className="flex items-baseline gap-1.5 mb-1 min-w-0 text-[12px] font-bold text-zinc-300">
+      <label htmlFor={id} className="flex items-baseline gap-1.5 mb-1 min-w-0 text-[12px] font-bold text-text-secondary">
         <span className="truncate">{label}</span>
         {secondary && secondary !== label && (
-          <span className="text-[10px] font-medium text-zinc-500 truncate">{secondary}</span>
+          <span className="text-[10px] font-medium text-text-muted truncate">{secondary}</span>
         )}
       </label>
       {React.isValidElement(children) && !htmlFor
@@ -49,7 +49,7 @@ export function FarmField({
         <p className="mt-1 text-[11px] text-red-400">{error}</p>
       ) : (
         (hint || defaultText) && (
-          <p className="mt-1 text-[11px] text-zinc-500 leading-snug">
+          <p className="mt-1 text-[11px] text-text-muted leading-snug">
             {hint && <span>{hint}</span>}
             {hint && defaultText && <span aria-hidden="true"> · </span>}
             {defaultText && <span className="tabular-nums" dir="auto">{defaultText}</span>}
@@ -135,7 +135,7 @@ export function NumInput({
           className={`${field} tabular-nums ${unit ? 'pe-12' : ''}`}
         />
         {unit && (
-          <span aria-hidden="true" className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">
+          <span aria-hidden="true" className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[11px] text-text-muted">
             {unit}
           </span>
         )}
@@ -230,17 +230,15 @@ export function Switch({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border text-[13px] text-start transition-colors disabled:opacity-50 ${
-        checked ? 'bg-gold/10 border-gold/50 text-white' : 'bg-zinc-800/40 border-zinc-700 text-zinc-300'
-      }`}
+      className="flex items-center justify-between gap-3 w-full min-w-0 h-10 px-2.5 rounded-lg border border-border-subtle bg-surface-raised text-[13px] text-text-primary text-start transition-colors disabled:opacity-50"
     >
       <span className="min-w-0 truncate">{label}</span>
       <span
         aria-hidden="true"
-        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors motion-reduce:transition-none ${checked ? 'bg-gold' : 'bg-zinc-600'}`}
+        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors motion-reduce:transition-none ${checked ? 'bg-accent' : 'lv-well'}`}
       >
         <span
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-snow shadow-1 transition-all motion-reduce:transition-none ${checked ? 'start-[18px]' : 'start-0.5'}`}
+          className={`absolute top-0.5 w-4 h-4 rounded-full shadow-1 transition-all motion-reduce:transition-none ${checked ? 'start-[18px] bg-accent-contrast' : 'start-0.5 bg-text-secondary'}`}
         />
       </span>
     </button>
@@ -275,11 +273,11 @@ export function ChipEditor({
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap gap-1.5 mb-1.5 min-h-[1.5rem]">
-        {value.length === 0 && <span className="text-[11px] text-zinc-600">{s.emptyList}</span>}
+        {value.length === 0 && <span className="text-[11px] text-text-muted">{s.emptyList}</span>}
         {value.map((k) => (
           <span
             key={k}
-            className="inline-flex items-center gap-1 h-7 ps-2.5 pe-1 rounded-full bg-zinc-800 border border-zinc-700 text-[12px] text-zinc-100 font-mono"
+            className="inline-flex items-center gap-1 h-7 ps-2.5 pe-1 rounded-full bg-surface-selected border border-border-subtle text-[12px] text-text-primary font-mono"
             dir="ltr"
           >
             {k}
@@ -287,7 +285,7 @@ export function ChipEditor({
               type="button"
               aria-label={s.removeChip(k)}
               onClick={() => onChange(value.filter((x) => x !== k))}
-              className="w-5 h-5 rounded-full grid place-items-center text-zinc-400 hover:text-red-300 hover:bg-zinc-700"
+              className="w-5 h-5 rounded-full grid place-items-center text-text-secondary hover:text-red-300 hover:bg-surface-raised"
             >
               <X className="w-3 h-3" aria-hidden="true" />
             </button>
@@ -353,7 +351,7 @@ export function NumListEditor({
   return (
     <div className="min-w-0">
       <div className="flex flex-wrap gap-1.5 items-center">
-        {value.length === 0 && <span className="text-[11px] text-zinc-600">{s.emptyList}</span>}
+        {value.length === 0 && <span className="text-[11px] text-text-muted">{s.emptyList}</span>}
         {value.map((n, i) => (
           <div key={i} className="flex items-center gap-1 min-w-0">
             <NumInput
@@ -371,7 +369,7 @@ export function NumListEditor({
                 type="button"
                 aria-label={s.removeNumber(i + 1)}
                 onClick={() => onChange(value.filter((_, j) => j !== i))}
-                className="w-7 h-7 rounded-md grid place-items-center text-zinc-500 hover:text-red-300 hover:bg-zinc-800"
+                className="w-7 h-7 rounded-md grid place-items-center text-text-muted hover:text-red-300 hover:bg-surface-selected"
               >
                 <X className="w-3.5 h-3.5" aria-hidden="true" />
               </button>

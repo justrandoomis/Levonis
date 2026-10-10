@@ -74,10 +74,10 @@ export function MainImagesPair({
 
   return (
     <div data-form="main-images" className="mb-4 grid gap-3 [grid-template-columns:minmax(0,1fr)] sm:[grid-template-columns:repeat(2,minmax(0,1fr))]">
-      <figure className="min-w-0 rounded-xl border border-zinc-700 p-2.5">
+      <figure className="min-w-0 rounded-lg border border-border-subtle p-2.5">
         <figcaption className="mb-2 flex min-w-0 items-baseline justify-between gap-2">
           <span className="truncate text-[13px] font-bold text-white">الصورة الرئيسية للوضع الداكن</span>
-          <span dir="ltr" className="shrink-0 text-[11px] text-zinc-500">Dark main image</span>
+          <span dir="ltr" className="shrink-0 text-[11px] text-text-muted">Dark main image</span>
         </figcaption>
         <div className="aspect-[6/5] overflow-hidden rounded-lg bg-charcoal">
           {darkUrl ? (
@@ -86,15 +86,15 @@ export function MainImagesPair({
             <p className="grid h-full place-items-center px-3 text-center text-[12px] text-snow/60">لا صورة رئيسية بعد</p>
           )}
         </div>
-        <p className="mt-2 text-[11.5px] leading-snug text-zinc-400">
+        <p className="mt-2 text-[11.5px] leading-snug text-text-secondary">
           هي الصورة المحددة بـ ★ في معرض الصور أدناه — غيّرها من هناك.
         </p>
       </figure>
 
-      <figure className="min-w-0 rounded-xl border border-zinc-700 p-2.5">
+      <figure className="min-w-0 rounded-lg border border-border-subtle p-2.5">
         <figcaption className="mb-2 flex min-w-0 items-baseline justify-between gap-2">
           <span className="truncate text-[13px] font-bold text-white">الصورة الرئيسية للوضع الفاتح</span>
-          <span dir="ltr" className="shrink-0 text-[11px] text-zinc-500">Light main image</span>
+          <span dir="ltr" className="shrink-0 text-[11px] text-text-muted">Light main image</span>
         </figcaption>
         {/* The store's cream, fixed: this is a preview of the light theme
             whatever theme the admin panel itself is in. */}

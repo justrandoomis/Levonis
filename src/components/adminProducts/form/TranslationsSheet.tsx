@@ -153,7 +153,7 @@ function ReasonChip({ reason }: { reason: ReviewReason }) {
   return (
     <span
       className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
-        r.tone === 'warn' ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-800 text-zinc-300'
+        r.tone === 'warn' ? 'lv-chip [--chip:var(--color-warning)]' : 'bg-surface-selected text-text-secondary'
       }`}
     >
       {r.tone === 'warn' && <AlertTriangle className="w-3 h-3" aria-hidden="true" />}
@@ -205,7 +205,7 @@ export default function TranslationsSheet({
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <span className="text-[11px] text-zinc-500 flex-1 min-w-[140px]">
+          <span className="text-[11px] text-text-muted flex-1 min-w-[140px]">
             {written} من {rows.length} مكتملة · تُحفظ مع المنتج عند «نشر» أو «مسودة»
           </span>
           <button type="button" className={btnGhost} onClick={onClose}>
@@ -224,38 +224,38 @@ export default function TranslationsSheet({
         </div>
       }
     >
-      <p className="text-[12px] leading-relaxed text-zinc-400 mb-3">
+      <p className="text-[12px] leading-relaxed text-text-secondary mb-3">
         المترجم المحلي يعمل من الإنجليزية إلى العربية والكردية، ولا يؤلّف جملًا — هذه قاعدة مقصودة، لا عطل. الحقول
         أدناه هي التي لم يستطع تغطيتها؛ اكتب نسختها العربية والكردية هنا وستُحفظ كما كتبتها ولن تُستبدل تلقائيًا ما دام
         النص الإنجليزي كما هو.
       </p>
 
       {rows.length === 0 ? (
-        <p className="text-[12px] text-zinc-500">لا حقول بانتظار ترجمة يدوية.</p>
+        <p className="text-[12px] text-text-muted">لا حقول بانتظار ترجمة يدوية.</p>
       ) : (
         <div className="space-y-2.5 min-w-0">
           {rows.map((row) => (
             <div
               key={row.key}
               data-translation-row={row.key}
-              className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2"
+              className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2"
             >
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <h4 className="text-[12px] font-bold text-zinc-200 truncate min-w-0 flex-1">{row.label}</h4>
+                <h4 className="text-[12px] font-bold text-text-primary truncate min-w-0 flex-1">{row.label}</h4>
                 <ReasonChip reason={row.reason} />
               </div>
-              <p className="text-[10px] text-zinc-500 leading-snug">{REASON[row.reason].hint}</p>
+              <p className="text-[10px] text-text-muted leading-snug">{REASON[row.reason].hint}</p>
 
-              <div className="rounded-md bg-black/30 border border-zinc-800 px-2 py-1.5">
-                <span className="block text-[10px] font-bold text-zinc-500 mb-0.5">المصدر / source</span>
-                <p className="text-[11px] text-zinc-300 whitespace-pre-wrap break-words" dir="auto">
+              <div className="lv-well rounded-md px-2 py-1.5">
+                <span className="block text-[10px] font-bold text-text-muted mb-0.5">المصدر / source</span>
+                <p className="text-[11px] text-text-secondary whitespace-pre-wrap break-words" dir="auto">
                   {row.en}
                 </p>
               </div>
 
               <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] min-w-0">
                 <label className="min-w-0 block">
-                  <span className="block text-[11px] font-bold text-zinc-400 mb-1">العربية</span>
+                  <span className="block text-[11px] font-bold text-text-secondary mb-1">العربية</span>
                   <TextArea
                     rows={3}
                     dir="rtl"
@@ -266,7 +266,7 @@ export default function TranslationsSheet({
                   />
                 </label>
                 <label className="min-w-0 block">
-                  <span className="block text-[11px] font-bold text-zinc-400 mb-1">الكردية (سوراني)</span>
+                  <span className="block text-[11px] font-bold text-text-secondary mb-1">الكردية (سوراني)</span>
                   <TextArea
                     rows={3}
                     dir="rtl"

@@ -87,7 +87,7 @@
  *    browser west of Baghdad renders as the 22nd. The server sends the label.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, RefreshCw, Tag } from 'lucide-react';
+import { Archive, RefreshCw, Tag } from 'lucide-react';
 import { loc as locOutside, useLanguage } from '../../LanguageContext';
 import {
   api,
@@ -492,6 +492,7 @@ export default function OrdersBoard() {
           the row wider than the screen. */}
       <div data-order-filters className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 min-w-0">
         <select
+          className="lv-input min-w-0 px-2 text-[14px] leading-[1.4] font-bold"
           data-order-filter="type"
           value={journey}
           onChange={(e) => {
@@ -499,7 +500,6 @@ export default function OrdersBoard() {
             setPage(0);
           }}
           aria-label={loc('نوع الطلب', 'Order type', 'جۆری داواکاری')}
-          className="lv-input min-w-0 px-2 text-[14px] leading-[1.4] font-bold"
         >
           <option value="all">{opt(loc('الكل', 'All', 'هەموو'), typeOpts?.all)}</option>
           {/* «يجب تجهيزها» — every box to pack now, direct or pre-order. The
@@ -519,6 +519,7 @@ export default function OrdersBoard() {
         </select>
 
         <select
+          className="lv-input min-w-0 px-2 text-[14px] leading-[1.4] font-bold"
           data-order-filter="status"
           value={archive ? archiveScope : status}
           onChange={(e) => {
@@ -527,7 +528,6 @@ export default function OrdersBoard() {
             setPage(0);
           }}
           aria-label={loc('حالة الطلب', 'Order status', 'دۆخی داواکاری')}
-          className="lv-input min-w-0 px-2 text-[14px] leading-[1.4] font-bold"
         >
           {/* The archive IS a state, so inside it this select chooses WHICH
               completed state rather than offering live ones that cannot
@@ -564,7 +564,7 @@ export default function OrdersBoard() {
           }}
           className="lv-choice press-scale flex min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] leading-[1.4] font-bold"
         >
-          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${archive ? 'rotate-180' : ''}`} aria-hidden />
+          <Archive className="h-4 w-4 shrink-0" aria-hidden />
           <span className="truncate">{loc('المكتملة', 'Completed', 'تەواوبووەکان')}</span>
         </button>
       </div>
@@ -599,7 +599,9 @@ export default function OrdersBoard() {
       )}
 
       {/* ------------------------------------------------- 4. THE DAY LIST.
-          A CARD LAYOUT AT EVERY WIDTH, not a table that becomes one. Sticky
+          ONE TRAY OF FLAT ROWS PER DAY, AT EVERY WIDTH (clay: a long list
+          is one resting tray with dividers, never a stack of cards), not a
+          table that becomes one. Sticky
           headers inside an `overflow-x-auto` table do not stick — the overflow
           box becomes the scrollport — and that failure appears only at the
           desktop breakpoint, which is the one nobody re-checks after testing
@@ -607,12 +609,12 @@ export default function OrdersBoard() {
       {groups.map((g) => (
         <section key={g.id} data-order-group={g.id} className="min-w-0">
           <h3
-            className="sticky top-0 z-10 mb-2 flex items-baseline gap-1.5 rounded-lg bg-canvas px-2 py-2 text-[13px] leading-[1.5] font-black text-text-secondary"
+            className="sticky top-0 z-10 mb-2 flex items-baseline gap-1.5 bg-surface px-2 py-2 text-[13px] leading-[1.5] font-black text-text-secondary"
           >
             {loc(g.ar, g.en, g.ckb)}
             <span className="tabular-nums text-text-muted">({countText(groupCount(g.id), latin)})</span>
           </h3>
-          <div className="space-y-2">
+          <div className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {g.rows.map((o) => (
               <OrderBoardRow
                 key={o.id}

@@ -25,6 +25,7 @@ import { api, ApiError } from '../../../lib/api';
 import { useLanguage } from '../../../LanguageContext';
 import { Sheet } from '../../ui/Sheet';
 import Spinner from '../../ui/Spinner';
+import { IconButton } from '../../ui/Button';
 import { serialStrings, type SerialStrings } from '../../adminOrders/serials/strings';
 import { dateTime, serialRefusal, shortDate } from '../../adminOrders/serials/serialsApi';
 import type { SerialStatus, SerialStory, StoryEvent, WarrantyState } from '../../adminOrders/serials/types';
@@ -43,12 +44,12 @@ interface DetailResponse {
 }
 
 const STATUS_TONE: Record<string, string> = {
-  in_stock: 'bg-info/10 text-info',
-  reserved: 'bg-warning/10 text-warning',
-  sold: 'bg-success/10 text-success',
-  registered: 'bg-success/10 text-success',
-  returned: 'bg-warning/10 text-warning',
-  unavailable: 'bg-danger/10 text-danger',
+  in_stock: 'lv-chip [--chip:var(--color-info)]',
+  reserved: 'lv-chip [--chip:var(--color-warning)]',
+  sold: 'lv-chip [--chip:var(--color-success)]',
+  registered: 'lv-chip [--chip:var(--color-success)]',
+  returned: 'lv-chip [--chip:var(--color-warning)]',
+  unavailable: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
   void: 'bg-surface-selected text-text-secondary',
 };
 
@@ -186,14 +187,7 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
         <h2 id={titleId} className="text-[16px] font-bold text-text-primary truncate">
           {s.pageTitle}
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={s.close}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-selected hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-        >
-          <X className="h-5 w-5" aria-hidden />
-        </button>
+        <IconButton onClick={() => onClose()} label={s.close} icon={<X className="h-5 w-5" aria-hidden />} />
       </div>
     </div>
   );
@@ -223,7 +217,7 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
               <button
                 type="button"
                 onClick={() => void load(serial)}
-                className="mt-3 inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full border border-border-subtle text-[13px] font-semibold text-text-primary hover:bg-surface-selected"
+                className="lv-button lv-button-secondary mt-3"
               >
                 <RefreshCw className="h-4 w-4" aria-hidden />
                 {s.retry}
@@ -245,18 +239,17 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
                 )}
               </div>
               {copyable && (
-                <button
-                  type="button"
-                  onClick={copy}
-                  aria-label={s.copy}
-                  title={s.copy}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-surface-selected focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
-                >
-                  {copied ? <Check className="h-4 w-4 text-success" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+                <>
+                  <IconButton
+                    variant="secondary"
+                    onClick={() => copy()}
+                    label={s.copy}
+                    icon={copied ? <Check className="h-4 w-4 text-success" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+                  />
                   <span className="sr-only" aria-live="polite">
                     {copied ? s.copied : ''}
                   </span>
-                </button>
+                </>
               )}
             </header>
             {story?.legacy && <p className="text-[12px] text-text-secondary">{s.legacy}</p>}

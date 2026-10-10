@@ -201,7 +201,7 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
   const label = (ar: string, en: string) => (lang === 'en' ? en : ar);
   return (
     <div className={`${T.AP} space-y-4`} dir={dir}>
-      <div role="group" aria-label={label('الضمانات والأجهزة', 'Warranties & devices')} className="inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)]">
+      <div role="group" aria-label={label('الضمانات والأجهزة', 'Warranties & devices')} className="lv-well inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)]">
         {VIEWS.map((v) => (
           <button
             key={v}
@@ -209,8 +209,8 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
             aria-pressed={view === v}
             onClick={() => choose(v)}
             data-warranty-view={v}
-            className={`min-h-[40px] px-4 rounded-[7px] text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] ${
-              view === v ? 'bg-[var(--ap-surface-4)] text-[var(--ap-text-1)] shadow-1' : 'text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
+            className={`min-h-[40px] px-4 rounded-sm border text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ap-ring)] ${
+              view === v ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
             }`}
           >
             {v === 'receipts'

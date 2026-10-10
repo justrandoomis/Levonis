@@ -36,8 +36,8 @@ export function ItemRow({ lang, item, trailing }: { lang: AdminLang; item: ItemV
   const color = item.color ? triOf(lang, item.color) : '';
   return (
     <div className="flex items-start gap-3 min-w-0">
-      <div className="w-12 h-12 shrink-0 overflow-hidden rounded-lg bg-zinc-900">
-        <SafeImage src={item.image} alt={name} aspect="auto" className="w-full h-full" bgClassName="bg-zinc-900" fallbackClassName="text-zinc-600" />
+      <div className="w-12 h-12 shrink-0 overflow-hidden rounded-sm bg-surface-raised">
+        <SafeImage src={item.image} alt={name} aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-semibold leading-snug text-[var(--ap-text-1)] line-clamp-2">

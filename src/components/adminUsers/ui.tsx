@@ -15,10 +15,10 @@
  *            because they are not equally important and drawing them equally
  *            is what makes a card unreadable.
  *
- * The palette is AdminUsers.tsx's own zinc family rather than the shared admin
- * tokens: this window is opened out of that table and sits over it, and a
- * window that does not match the surface it grew out of reads as a different
- * application.
+ * Clay (docs/DECISIONS.md rows 207–209): a Section and a Stat are `lv-surface`
+ * cards, and since this window is an overlay panel they sit FLUSH inside it
+ * (the rim only — one raised container per stack). Rows are flat with
+ * hairline dividers; a Pill is information, a flat opaque `lv-chip`.
  */
 
 import React from 'react';
@@ -43,13 +43,13 @@ export function Section({
   return (
     <section
       data-member-section={testId}
-      className={`rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 ${className}`}
+      className={`lv-surface p-4 ${className}`}
     >
-      <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+      <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-text-muted">
         {icon}
         <span>{title}</span>
       </h4>
-      {note && <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">{note}</p>}
+      {note && <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">{note}</p>}
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -64,11 +64,11 @@ export function Section({
  */
 export function Row({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-zinc-800/60 last:border-0">
-      <span className="shrink-0 text-xs font-medium text-zinc-500">{label}</span>
+    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-border-subtle last:border-0">
+      <span className="shrink-0 text-xs font-medium text-text-muted">{label}</span>
       <span
         dir="auto"
-        className={`min-w-0 text-end text-[13px] font-semibold text-zinc-200 break-words ${mono ? 'tabular-nums' : ''}`}
+        className={`min-w-0 text-end text-[13px] font-semibold text-text-primary break-words ${mono ? 'tabular-nums' : ''}`}
       >
         {value}
       </span>
@@ -90,12 +90,12 @@ export function Stat({
 }) {
   const color = tone === 'money' ? 'text-mint' : tone === 'warn' ? 'text-gilt' : 'text-white';
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2.5">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{label}</div>
+    <div className="lv-surface px-3 py-2.5">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}</div>
       <div dir="auto" className={`mt-1 text-lg font-black tabular-nums ${color}`}>
         {value}
       </div>
-      {sub && <div className="mt-0.5 text-[11px] font-medium text-zinc-500">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[11px] font-medium text-text-muted">{sub}</div>}
     </div>
   );
 }
@@ -103,12 +103,12 @@ export function Stat({
 export type PillTone = 'zinc' | 'violet' | 'gold' | 'green' | 'red' | 'blue';
 
 const PILL: Record<PillTone, string> = {
-  zinc: 'bg-zinc-800 text-zinc-300 border-zinc-700',
-  violet: 'bg-iris/10 text-iris border-iris/30',
-  gold: 'bg-gilt/10 text-gilt border-gilt/30',
-  green: 'bg-mint/10 text-mint border-mint/30',
-  red: 'bg-red-500/10 text-red-400 border-red-500/30',
-  blue: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+  zinc: 'bg-surface-selected text-text-secondary',
+  violet: 'lv-chip [--chip:var(--color-info)]',
+  gold: 'lv-chip [--chip:var(--color-gold)]',
+  green: 'lv-chip [--chip:var(--color-success)]',
+  red: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
+  blue: 'lv-chip [--chip:var(--color-info)]',
 };
 
 export function Pill({
@@ -122,7 +122,7 @@ export function Pill({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${PILL[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${PILL[tone]}`}
     >
       {icon}
       {children}

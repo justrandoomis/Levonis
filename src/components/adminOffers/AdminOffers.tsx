@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, Percent as PercentIcon, Search, Tag, Trash2 } from 'lucide-react';
+import { CalendarClock, Check, Percent as PercentIcon, Search, Tag, Trash2 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api } from '../../lib/api';
 import { ErrorState } from '../ui/AsyncStates';
@@ -322,12 +322,12 @@ export default function AdminOffers() {
   const stateChip = (state: OfferRow['schedule_state']) => {
     const tone =
       state === 'live'
-        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+        ? 'lv-chip [--chip:var(--color-success)]'
         : state === 'upcoming'
-          ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-          : 'bg-zinc-700/40 text-zinc-400 border-zinc-700';
+          ? 'lv-chip [--chip:var(--color-info)]'
+          : 'bg-surface-selected text-text-muted';
     return (
-      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone}`}>{s.state[state]}</span>
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${tone}`}>{s.state[state]}</span>
     );
   };
 
@@ -337,12 +337,12 @@ export default function AdminOffers() {
     <div className="min-w-0" dir={dir} data-panel="offers">
       <header className="mb-3 min-w-0">
         <h2 className="text-[15px] font-black text-white truncate">{s.title}</h2>
-        <p className="text-[12px] text-zinc-400">{s.subtitle}</p>
+        <p className="text-[12px] text-text-secondary">{s.subtitle}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-2.5 h-4 w-4 text-zinc-500" aria-hidden />
+          <Search className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-2.5 h-4 w-4 text-text-muted" aria-hidden />
           <TextInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -404,9 +404,9 @@ export default function AdminOffers() {
           <Spinner />
         </div>
       )}
-      {rows !== null && list.length === 0 && !error && <p className="py-6 text-[12px] text-zinc-500">{s.none}</p>}
+      {rows !== null && list.length === 0 && !error && <p className="py-6 text-[12px] text-text-muted">{s.none}</p>}
 
-      <ul className="space-y-2">
+      <ul className={list.length > 0 ? 'lv-surface divide-y divide-border-subtle overflow-hidden' : ''}>
         {list.map((o) => (
           <li key={o.subject_id}>
             <button
@@ -417,21 +417,21 @@ export default function AdminOffers() {
                 setWarnings([]);
                 setNote(null);
               }}
-              className="w-full min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-start hover:border-zinc-600 transition-colors"
+              className="w-full min-w-0 p-3 text-start hover:bg-surface-raised transition-colors"
             >
               <div className="flex min-w-0 items-center gap-2">
-                <Tag className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                <Tag className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-white" dir="ltr">
                   {o.product.name || o.subject_id}
                 </span>
                 {stateChip(o.schedule_state)}
                 {!o.active && (
-                  <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-400">
+                  <span className="shrink-0 rounded-full bg-surface-selected px-2 py-0.5 text-[10px] font-bold text-text-muted">
                     {loc('موقوف', 'off', 'ناچالاک')}
                   </span>
                 )}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-400">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-secondary">
                 {o.required_tiers.length > 0 && (
                   <span className="text-gold">{o.required_tiers.join(' · ').toUpperCase()}</span>
                 )}
@@ -456,7 +456,7 @@ export default function AdminOffers() {
                 <span>
                   {s.redeemed}: <bdi dir="ltr" className="tabular-nums">{o.redeemed}</bdi>
                   {(o.released ?? 0) > 0 && (
-                    <span className="text-zinc-500">
+                    <span className="text-text-muted">
                       {' '}· {s.released}: <bdi dir="ltr" className="tabular-nums">{o.released}</bdi>
                     </span>
                   )}
@@ -468,7 +468,7 @@ export default function AdminOffers() {
       </ul>
 
       {editing && (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+        <div className="lv-surface mt-4 p-3">
           <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
             <h3 className="min-w-0 truncate text-[13px] font-black text-white" dir="ltr">
               {editing.product.name || editing.subject_id}
@@ -544,16 +544,17 @@ export default function AdminOffers() {
                           : [...editing.required_tiers, t],
                       })
                     }
-                    className={`min-h-[36px] rounded-full border px-3 text-[12px] font-bold transition-colors ${
-                      on ? 'border-gold bg-gold/15 text-gold' : 'border-zinc-700 bg-zinc-900/60 text-zinc-300'
+                    className={`inline-flex min-h-[36px] items-center gap-1 rounded-full border border-border-subtle px-3 text-[12px] font-bold transition-colors ${
+                      on ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
                     }`}
                   >
+                    {on && <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />}
                     {t.toUpperCase()}
                   </button>
                 );
               })}
             </div>
-            <p className="mt-2 text-[11px] text-zinc-500">
+            <p className="mt-2 text-[11px] text-text-muted">
               {loc(
                 'اتركها فارغة ليكون العرض عامًا — للزوار والحسابات المجانية أيضًا.',
                 'Leave empty for a public offer — guests and free accounts included.',

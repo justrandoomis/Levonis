@@ -52,7 +52,7 @@ export default function SupportQueue() {
 
   return (
     <div className="space-y-3" data-support-console>
-      <div className="flex gap-1 overflow-x-auto rounded-xl bg-zinc-900 p-1 hide-scrollbar" role="tablist" aria-label={cs.consoleLabel}>
+      <div className="lv-well flex gap-1 overflow-x-auto rounded-xl border border-border-subtle p-1 hide-scrollbar" role="tablist" aria-label={cs.consoleLabel}>
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -61,8 +61,8 @@ export default function SupportQueue() {
             aria-selected={desk === t.id}
             data-support-desk={t.id}
             onClick={() => setDesk(t.id)}
-            className={`flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-[13px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:gap-2 sm:px-3 ${
-              desk === t.id ? 'bg-zinc-700/80 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+            className={`flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-2 text-[13px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:gap-2 sm:px-3 ${
+              desk === t.id ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
           >
             {/* At phone width the three words and their counts are what fit;
@@ -70,7 +70,7 @@ export default function SupportQueue() {
             <t.icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden />
             <span>{t.label}</span>
             {t.count > 0 && (
-              <span className="min-w-5 rounded-full bg-sky-500/20 px-1.5 text-center text-[11px] font-black tabular-nums text-sky-300">
+              <span className="lv-chip min-w-5 rounded-full px-1.5 text-center text-[11px] font-black tabular-nums [--chip:var(--color-info)]">
                 <span className="sr-only">{cs.waiting}: </span>
                 {t.count.toLocaleString(lang === 'en' ? 'en' : 'ar')}
               </span>
@@ -82,7 +82,7 @@ export default function SupportQueue() {
       {desk === 'tickets' && <TicketsDesk />}
       {desk === 'messages' && <MessagesDesk />}
       {desk === 'complaints' && (
-        <React.Suspense fallback={<div className="py-10 text-center text-sm text-zinc-500">…</div>}>
+        <React.Suspense fallback={<div className="py-10 text-center text-sm text-text-muted">…</div>}>
           <ComplaintsDesk dir={dir} />
         </React.Suspense>
       )}

@@ -67,7 +67,7 @@ export default function SerialGateRefusal({
   const ok = reason.trim().length >= 5;
 
   return (
-    <div role="alert" className="rounded-2xl border border-warning/35 bg-warning/10 p-3.5" data-serial-gate-refusal={testId ?? ''}>
+    <div role="alert" className="lv-alert lv-alert-warning p-3.5" data-serial-gate-refusal={testId ?? ''}>
       <p className="flex items-start gap-2 text-[13.5px] font-bold text-text-primary">
         <ScanLine className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
         {refusalText('SERIALS_REQUIRED', l, s.blockerIntro)}
@@ -116,6 +116,7 @@ export default function SerialGateRefusal({
             {s.reasonLabel}
           </label>
           <textarea
+            className="lv-input resize-none py-2 text-[13.5px] leading-relaxed"
             id={reasonId}
             rows={2}
             minLength={5}
@@ -124,7 +125,6 @@ export default function SerialGateRefusal({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             aria-describedby={`${reasonId}-hint`}
-            className="w-full rounded-xl border border-border-subtle bg-surface px-3 py-2 text-[13.5px] text-text-primary outline-none focus:border-gold resize-none"
           />
           <p id={`${reasonId}-hint`} className="text-[11.5px] text-text-secondary">
             {s.ownerProceedHint}

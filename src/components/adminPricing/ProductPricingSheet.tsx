@@ -134,7 +134,7 @@ function TodayChannels({ channels, lang, s }: { channels: PricingChannelToday[];
       {/* Phones: one block per channel, label beside value. */}
       <ul className="space-y-2 md:hidden" data-pricing-today-list>
         {channels.map((c) => (
-          <li key={c.channel} data-today-channel={c.channel} className="rounded-[var(--radius-md)] bg-white/[0.03] p-3">
+          <li key={c.channel} data-today-channel={c.channel} className="lv-well rounded-md p-3">
             <p className="text-[13px] font-bold text-text-primary">{channelLabel(c.channel, lang)}</p>
             {unpriced(c)}
             <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[13px]">
@@ -190,7 +190,7 @@ function DerivedValue({
   const candidateName = (c: { kind: PricingCandidateKind; route: PricingRoute | null }) =>
     c.kind === 'floor' ? s.candFloor : c.kind === 'ceiling' ? s.candCeiling : c.route ? channelLabel(routeChannel(c.route), lang) : '—';
   return (
-    <div className="min-w-0 rounded-[var(--radius-md)] bg-white/[0.03] p-3" data-derived={title}>
+    <div className="lv-well min-w-0 rounded-md p-3" data-derived={title}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <p className="text-[12px] font-semibold text-text-muted">{title}</p>
         <ValueStateChip state={state} lang={lang} />
@@ -204,7 +204,7 @@ function DerivedValue({
           <p className="text-[12px] text-text-muted">{s.candidates}</p>
           <ul className="mt-1 flex flex-wrap gap-1.5">
             {candidates.map((c, i) => (
-              <li key={`${c.kind}-${c.route ?? ''}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-[12px] text-text-secondary">
+              <li key={`${c.kind}-${c.route ?? ''}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-surface-selected px-2.5 py-1 text-[12px] text-text-secondary">
                 <span>{candidateName(c)}</span>
                 <Money iqd={c.value} className="font-semibold text-text-primary" />
               </li>

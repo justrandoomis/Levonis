@@ -138,7 +138,7 @@ export default function PayoutSheet({
           <h2 id={titleId} className="text-white font-bold text-[15px] leading-snug">
             {t(`تسجيل تحويل إلى ${merchant.name}`, `Record a payout to ${merchant.name}`)}
           </h2>
-          <p className="text-zinc-400 text-[12.5px] leading-relaxed">
+          <p className="text-text-secondary text-[12.5px] leading-relaxed">
             {t(
               'سجّل التحويل بعد أن ترسل المال فعلًا. يُسجَّل طلبَ سحب مدفوعًا ويُنقص المتاح بقدره، والملاحظة مرجعه.',
               'Record it after you have actually sent the money. It is recorded as a paid payout request that lowers what is available by the same amount; the note is its reference.'
@@ -146,7 +146,7 @@ export default function PayoutSheet({
           </p>
           <div>
             <div className="flex items-baseline justify-between gap-2 mb-1.5">
-              <label htmlFor={amountId} className="text-zinc-300 text-[12px] font-semibold">
+              <label htmlFor={amountId} className="text-text-secondary text-[12px] font-semibold">
                 {t('المبلغ (د.ع)', 'Amount (IQD)')}
               </label>
               <button
@@ -162,6 +162,7 @@ export default function PayoutSheet({
               </button>
             </div>
             <input
+              className="lv-input text-[14px] tabular-nums"
               id={amountId}
               name="amount"
               type="text"
@@ -175,7 +176,6 @@ export default function PayoutSheet({
               }}
               aria-invalid={!!error}
               aria-describedby={error ? `${amountId}-error` : undefined}
-              className="lv-input text-[14px] tabular-nums"
             />
             {error && (
               <p id={`${amountId}-error`} role="alert" className="lv-field-error">
@@ -184,10 +184,11 @@ export default function PayoutSheet({
             )}
           </div>
           <div>
-            <label htmlFor={noteId} className="block text-zinc-300 text-[12px] font-semibold mb-1.5">
+            <label htmlFor={noteId} className="block text-text-secondary text-[12px] font-semibold mb-1.5">
               {t('ملاحظة — طريقة التحويل والمرجع (اختياري)', 'Note — method and reference (optional)')}
             </label>
             <input
+              className="lv-input text-[13px]"
               id={noteId}
               name="note"
               type="text"
@@ -195,7 +196,6 @@ export default function PayoutSheet({
               maxLength={300}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="lv-input text-[13px]"
             />
           </div>
           <div className="flex gap-2 pt-1">

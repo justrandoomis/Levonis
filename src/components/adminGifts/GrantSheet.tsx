@@ -196,7 +196,7 @@ export default function GrantSheet({
 
         {/* 2. The level */}
         <fieldset className="space-y-1.5">
-          <legend className="mb-1 text-[12px] font-bold text-zinc-300">{t('chooseLevel')}</legend>
+          <legend className="mb-1 text-[12px] font-bold text-text-secondary">{t('chooseLevel')}</legend>
           <div className="flex flex-wrap gap-1.5">
             {levels.map((l) => (
               <button
@@ -218,7 +218,7 @@ export default function GrantSheet({
 
         {/* 3. How */}
         <fieldset className="space-y-1.5">
-          <legend className="mb-1 text-[12px] font-bold text-zinc-300">{t('how')}</legend>
+          <legend className="mb-1 text-[12px] font-bold text-text-secondary">{t('how')}</legend>
           <div className="flex flex-wrap gap-1.5">
             {hows.map(([h, label]) => (
               <button key={h} type="button" className={T.chip} aria-pressed={how === h} onClick={() => setHow(h)} disabled={busy} data-gift-grant-how={h}>

@@ -109,7 +109,7 @@ export default function AdminTradeIn() {
           </h1>
           <p className={`text-[13px] ${T.text3}`}>{L('طلبات استبدال أجهزة LEVONIS، وقواعد تقييمها.', 'LEVONIS device trade-in requests, and the rules that value them.')}</p>
         </div>
-        <div role="group" aria-label={L('العرض', 'View')} className="inline-flex items-center gap-1 p-1 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)]">
+        <div role="group" aria-label={L('العرض', 'View')} className="lv-well inline-flex items-center gap-1 p-1 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)]">
           {(['requests', 'rules'] as const).map((v) => (
             <button
               key={v}
@@ -117,8 +117,8 @@ export default function AdminTradeIn() {
               aria-pressed={view === v}
               onClick={() => setView(v)}
               data-trade-in-view={v}
-              className={`min-h-[36px] px-4 rounded-[7px] text-[13px] font-semibold transition-colors ${
-                view === v ? 'bg-[var(--ap-surface-4)] text-[var(--ap-text-1)]' : 'text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
+              className={`min-h-[36px] px-4 rounded-sm border text-[13px] font-semibold transition-colors ${
+                view === v ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
               }`}
             >
               {v === 'requests' ? L('الطلبات', 'Requests') : L('القواعد والنسب', 'Rules & weights')}

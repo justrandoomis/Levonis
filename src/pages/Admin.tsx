@@ -126,7 +126,7 @@ const AdminSecurity = React.lazy(() => import('../components/adminSecurity/Admin
  */
 function PanelFallback({ dir }: { dir: 'rtl' | 'ltr' }) {
   return (
-    <div className="py-16 text-center text-sm text-zinc-500" dir={dir}>
+    <div className="py-16 text-center text-sm text-text-muted" dir={dir}>
       {dir === 'rtl' ? 'جارٍ التحميل…' : 'Loading…'}
     </div>
   );
@@ -328,7 +328,7 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <Toaster />
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'pricing' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' ? '' : 'bg-surface border border-zinc-800/50 rounded-2xl p-4 md:p-5'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'pricing' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' ? '' : 'bg-surface border border-border-subtle rounded-2xl p-4 md:p-5'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (

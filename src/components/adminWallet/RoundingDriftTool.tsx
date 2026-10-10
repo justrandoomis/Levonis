@@ -127,11 +127,11 @@ export default function RoundingDriftTool() {
   const actionable = scan ? scan.members.filter((m) => m.apply_iqd !== 0) : [];
 
   return (
-    <section className="rounded-3xl border border-zinc-800 bg-zinc-900 p-6" data-rounding-drift>
+    <section className="lv-surface p-6" data-rounding-drift>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-lg font-bold text-white">{loc('فروقات التقريب القديمة', 'Old rounding differences')}</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+          <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
             {loc(
               'أرصدة انحرفت بضعة دنانير عمّا كتبه العميل (مثل 49,994 بدل 50,000). الفحص لا يغيّر شيئًا؛ التطبيق يكتب تسوية واحدة مسجّلة لكل عضو، ولا يخصم أبدًا تحت الصفر.',
               'Balances that drifted a few dinars from what the customer typed (e.g. 49,994 for 50,000). Checking changes nothing; applying writes one recorded adjustment per member and never takes a balance below zero.'
@@ -142,7 +142,7 @@ export default function RoundingDriftTool() {
           type="button"
           onClick={() => void check()}
           disabled={busy}
-          className="flex shrink-0 items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
+          className="lv-button lv-button-secondary shrink-0"
         >
           <ScanSearch className="h-4 w-4" /> {loc('فحص فروقات التقريب', 'Check rounding differences')}
         </button>
@@ -160,7 +160,7 @@ export default function RoundingDriftTool() {
       )}
 
       {notApplied.length > 0 && (
-        <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300" role="status" data-drift-not-applied>
+        <div className="lv-alert lv-alert-warning mt-3 text-xs text-text-primary" role="status" data-drift-not-applied>
           <p className="font-bold">
             {loc(`لم تُطبَّق التسوية لـ ${notApplied.length} عضو:`, `Not applied for ${notApplied.length} member(s):`)}
           </p>
@@ -177,12 +177,12 @@ export default function RoundingDriftTool() {
       {scan && (
         <div className="mt-4 space-y-4">
           {scan.members.length === 0 ? (
-            <p className="text-sm text-zinc-400">{loc('لا توجد فروقات — كل الأرصدة مطابقة لما كُتب.', 'No differences — every balance matches what was typed.')}</p>
+            <p className="text-sm text-text-secondary">{loc('لا توجد فروقات — كل الأرصدة مطابقة لما كُتب.', 'No differences — every balance matches what was typed.')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[32rem] text-sm">
                 <thead>
-                  <tr className="text-start text-[11px] font-bold text-zinc-500">
+                  <tr className="text-start text-[11px] font-bold text-text-muted">
                     <th className="py-2 text-start">{loc('العضو', 'Member')}</th>
                     <th className="py-2 text-start">{loc('العمليات', 'Operations')}</th>
                     <th className="py-2 text-start">{loc('الرصيد', 'Balance')}</th>
@@ -191,12 +191,12 @@ export default function RoundingDriftTool() {
                 </thead>
                 <tbody>
                   {scan.members.map((m) => (
-                    <tr key={m.user_id} className="border-t border-zinc-800 align-top">
+                    <tr key={m.user_id} className="border-t border-border-subtle align-top">
                       <td className="py-2 pe-3">
                         <div className="font-bold text-white" dir="auto">{m.name || m.user_id}</div>
-                        <div className="text-[11px] text-zinc-500" dir="ltr">{m.email}</div>
+                        <div className="text-[11px] text-text-muted" dir="ltr">{m.email}</div>
                       </td>
-                      <td className="py-2 pe-3 text-[11px] text-zinc-400">
+                      <td className="py-2 pe-3 text-[11px] text-text-secondary">
                         {m.rows.map((r) => (
                           <div key={r.tx_id} className="tabular-nums">
                             {r.kind === 'deposit' ? loc('إيداع', 'Deposit') : loc('سحب', 'Withdrawal')} ·{' '}
@@ -209,9 +209,9 @@ export default function RoundingDriftTool() {
                           </div>
                         )}
                       </td>
-                      <td className="py-2 pe-3 tabular-nums text-zinc-300">{formatIqd(m.balance_iqd)}</td>
+                      <td className="py-2 pe-3 tabular-nums text-text-secondary">{formatIqd(m.balance_iqd)}</td>
                       <td className="py-2 tabular-nums">
-                        <span className={`font-black ${m.apply_iqd > 0 ? 'text-mint' : m.apply_iqd < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
+                        <span className={`font-black ${m.apply_iqd > 0 ? 'text-mint' : m.apply_iqd < 0 ? 'text-red-400' : 'text-text-muted'}`}>
                           {signed(m.apply_iqd)}
                         </span>
                         {m.capped && (
@@ -228,8 +228,8 @@ export default function RoundingDriftTool() {
           )}
 
           {actionable.length > 0 && (
-            <div className="space-y-2 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-              <p className="text-xs text-zinc-400">
+            <div className="space-y-2 rounded-lg border border-border-subtle p-4">
+              <p className="text-xs text-text-secondary">
                 {loc(
                   `إضافة ${formatIqd(scan.total_credit_iqd)} وخصم ${formatIqd(scan.total_debit_iqd)} على ${actionable.length} عضو. للتأكيد اكتب «${scan.confirm_phrase}».`,
                   `Credit ${formatIqd(scan.total_credit_iqd)} and debit ${formatIqd(scan.total_debit_iqd)} across ${actionable.length} member(s). To confirm type «${scan.confirm_phrase}» or APPLY.`
@@ -237,17 +237,17 @@ export default function RoundingDriftTool() {
               </p>
               <div className="flex flex-wrap gap-2">
                 <input
+                  className="lv-input min-w-0 flex-1 text-sm"
                   value={phrase}
                   onChange={(e) => setPhrase(e.target.value)}
                   dir="auto"
                   placeholder={scan.confirm_phrase}
-                  className="min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-600"
                 />
                 <button
                   type="button"
                   onClick={() => void apply()}
                   disabled={busy || !(phrase.trim() === scan.confirm_phrase || phrase.trim() === 'APPLY')}
-                  className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-zinc-200 disabled:opacity-40"
+                  className="lv-button lv-button-primary"
                 >
                   {loc('تطبيق التسوية', 'Apply the settlement')}
                 </button>

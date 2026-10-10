@@ -289,11 +289,11 @@ export default function MembershipDiscountSection({
 
   const header = (
     <div className="min-w-0">
-      <h4 className="text-[13px] font-bold text-zinc-300 mb-1 truncate">
+      <h4 className="text-[13px] font-bold text-text-secondary mb-1 truncate">
         خصم العضوية لهذا المنتج{' '}
-        <span className="text-[11px] font-medium text-zinc-500">Membership discount for this product</span>
+        <span className="text-[11px] font-medium text-text-muted">Membership discount for this product</span>
       </h4>
-      <p className="text-[11px] leading-snug text-zinc-500 mb-2.5">
+      <p className="text-[11px] leading-snug text-text-muted mb-2.5">
         {loc(
           'ما يُضبط هنا يسبق قاعدة القسم وقاعدة المتجر: المنتج أولًا، ثم القسم الفرعي، ثم القسم الرئيسي، ثم كل المنتجات — وقاعدة واحدة فقط تسري على كل سطر، فلا تُجمع اثنتان.',
           'What is set here beats the section and the store-wide rule: product first, then sub-section, then main section, then every product — and exactly one rule applies per line, never two added together.'
@@ -304,9 +304,9 @@ export default function MembershipDiscountSection({
 
   if (loading) {
     return (
-      <div className="mt-4 pt-3 border-t border-zinc-800/70 min-w-0" data-form="membership-discount">
+      <div className="mt-4 pt-3 border-t border-border-subtle min-w-0" data-form="membership-discount">
         {header}
-        <div className="flex items-center justify-center gap-2 py-5 text-[13px] text-zinc-500">
+        <div className="flex items-center justify-center gap-2 py-5 text-[13px] text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />
           {loc('جارِ التحميل…', 'Loading…')}
         </div>
@@ -321,7 +321,7 @@ export default function MembershipDiscountSection({
   const locked = !productId;
 
   return (
-    <div className="mt-4 pt-3 border-t border-zinc-800/70 min-w-0" data-form="membership-discount">
+    <div className="mt-4 pt-3 border-t border-border-subtle min-w-0" data-form="membership-discount">
       {header}
 
       {locked && (
@@ -359,13 +359,13 @@ export default function MembershipDiscountSection({
             <div
               key={tier}
               data-mb-tier={tier}
-              className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-800/20 p-2.5"
+              className="min-w-0 rounded-lg border border-border-subtle p-2.5"
             >
               <div className="flex items-center gap-2 mb-2 min-w-0">
                 <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-black ${tierChip(tier)}`}>
                   {tierName(tier)}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">
+                <span className="min-w-0 flex-1 truncate text-[11px] text-text-muted">
                   {rule
                     ? loc('تجاوز مضبوط لهذا المنتج', 'An override is set on this product')
                     : loc('بلا تجاوز — تسري قاعدة القسم أو المتجر', 'No override — the section or store-wide rule applies')}
@@ -541,7 +541,7 @@ export default function MembershipDiscountSection({
                   {working ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   {rule ? loc('حفظ التجاوز', 'Save override') : loc('ضبط التجاوز', 'Set override')}
                 </button>
-                <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-500">
+                <span className="min-w-0 flex-1 truncate text-[11px] text-text-muted">
                   {dirty
                     ? loc('تغييرات غير محفوظة — يُحفظ هنا مستقلًا عن المنتج', 'Unsaved — this saves on its own, not with the product')
                     : loc('يُحفظ هنا مستقلًا عن المنتج', 'This saves on its own, not with the product')}

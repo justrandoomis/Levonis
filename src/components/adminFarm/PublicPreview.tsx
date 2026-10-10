@@ -19,23 +19,23 @@ export function PublicPreview({ config, pub, s, lang }: { config: JsonObject | n
   const publicSections = pub ? orderedSections(pub) : [];
 
   return (
-    <section data-farm-public className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 sm:p-4">
+    <section data-farm-public className="lv-surface min-w-0 p-3 sm:p-4">
       <h3 className="text-[14px] font-black text-white flex items-center gap-2">
         <Eye className="w-4 h-4 text-gold" aria-hidden="true" />
         {s.publicTitle}
       </h3>
-      <p className="text-[12px] text-zinc-400 mt-1 leading-relaxed">{s.publicBody}</p>
+      <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">{s.publicBody}</p>
 
       {!pub || publicSections.length === 0 ? (
-        <p className="mt-3 text-[12px] text-zinc-500">{s.publicNone}</p>
+        <p className="mt-3 text-[12px] text-text-muted">{s.publicNone}</p>
       ) : (
         <>
-          <div className="mt-3 flex flex-wrap gap-2 text-[10.5px] text-zinc-500">
+          <div className="mt-3 flex flex-wrap gap-2 text-[10.5px] text-text-muted">
             <span className="inline-flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-gold" aria-hidden="true" /> {s.publicLegendPublic}
             </span>
             <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-zinc-600" aria-hidden="true" /> {s.publicLegendPrivate}
+              <span className="w-2 h-2 rounded-full bg-text-muted" aria-hidden="true" /> {s.publicLegendPrivate}
             </span>
           </div>
           <ul className="mt-2 flex flex-wrap gap-1.5 min-w-0">
@@ -57,16 +57,16 @@ export function PublicPreview({ config, pub, s, lang }: { config: JsonObject | n
                     className={`inline-flex items-center gap-1.5 h-8 ps-2 pe-2.5 rounded-full border text-[12px] transition-colors disabled:cursor-default ${
                       isPublic
                         ? open
-                          ? 'border-gold/60 bg-gold/15 text-white'
-                          : 'border-gold/30 bg-gold/5 text-zinc-100 hover:bg-gold/10'
-                        : 'border-zinc-800 bg-zinc-900 text-zinc-500'
+                          ? 'border-border-subtle bg-[var(--clay-well-bg)] shadow-press text-text-primary'
+                          : 'border-border-subtle bg-surface-raised shadow-xs text-text-primary hover:bg-surface-selected'
+                        : 'border-border-subtle bg-surface text-text-muted'
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${isPublic ? 'bg-gold' : 'bg-zinc-600'}`} aria-hidden="true" />
+                    <span className={`w-2 h-2 rounded-full ${isPublic ? 'bg-gold' : 'bg-text-muted'}`} aria-hidden="true" />
                     <span className="font-mono" dir="ltr">
                       {k}
                     </span>
-                    <span className="text-[10px] text-zinc-500 tabular-nums">
+                    <span className="text-[10px] text-text-muted tabular-nums">
                       {count.catalog ? s.entriesCount(count.entries) : s.fieldsCount(count.entries)}
                     </span>
                   </button>
@@ -77,7 +77,7 @@ export function PublicPreview({ config, pub, s, lang }: { config: JsonObject | n
           {shown && pub[shown] !== undefined && (
             <div className="mt-3 min-w-0">
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="font-mono text-[12px] text-zinc-300" dir="ltr">
+                <span className="font-mono text-[12px] text-text-secondary" dir="ltr">
                   {shown}
                 </span>
                 <button type="button" onClick={() => setShown(null)} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
@@ -88,7 +88,7 @@ export function PublicPreview({ config, pub, s, lang }: { config: JsonObject | n
               <pre
                 dir="ltr"
                 data-farm-public-json={shown}
-                className="text-[11px] leading-relaxed text-zinc-300 bg-zinc-950/70 border border-zinc-800 rounded-lg p-3 overflow-auto max-h-80"
+                className="lv-well text-[11px] leading-relaxed text-text-secondary rounded-md p-3 overflow-auto max-h-80"
               >
                 {JSON.stringify(pub[shown], null, 2)}
               </pre>

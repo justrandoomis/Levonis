@@ -454,20 +454,20 @@ export function ImagesSection({
       {errors.images && <Banner kind="error">{errors.images}</Banner>}
 
       {(rel.quarantined_images?.length ?? 0) > 0 && (
-        <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 space-y-2" data-image-quarantine>
+        <div className="lv-alert lv-alert-warning mb-3 space-y-2" data-image-quarantine>
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-400 shrink-0" aria-hidden="true" />
-            <p className="text-[11px] text-amber-100 leading-snug">
+            <p className="text-[11px] text-text-primary leading-snug">
               صور قديمة معزولة لا تظهر للزبائن. بقي رابط المصدر محفوظًا؛ أعد جلبه ثم احفظ لتفعيل WebP محلي آمن.
-              <span className="text-zinc-500"> Quarantined legacy media is provenance only.</span>
+              <span className="text-text-muted"> Quarantined legacy media is provenance only.</span>
             </p>
           </div>
           {(rel.quarantined_images ?? []).map((image) => (
-            <div key={image.id} className="flex flex-wrap items-center gap-2 rounded border border-zinc-800 bg-black/20 px-2 py-1.5">
-              <code dir="ltr" className="min-w-0 flex-1 truncate text-[10px] text-zinc-400" title={image.source_url}>
+            <div key={image.id} className="lv-well flex flex-wrap items-center gap-2 rounded px-2 py-1.5">
+              <code dir="ltr" className="min-w-0 flex-1 truncate text-[10px] text-text-secondary" title={image.source_url}>
                 {image.source_url}
               </code>
-              <span className="text-[9px] text-zinc-600">{image.quarantine_reason}</span>
+              <span className="text-[9px] text-text-muted">{image.quarantine_reason}</span>
               <button
                 type="button"
                 className={`${btnGhost} h-8 px-2 text-[11px]`}
@@ -484,13 +484,13 @@ export function ImagesSection({
 
       {repair.needed && (
         <div
-          className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-2.5 flex flex-wrap items-center gap-2"
+          className="lv-alert lv-alert-warning mb-3 flex flex-wrap items-center gap-2"
           data-image-primary-broken
         >
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />
-          <p className="text-[11px] text-amber-200 flex-1 min-w-[200px] leading-snug">
+          <p className="text-[11px] text-text-primary flex-1 min-w-[200px] leading-snug">
             الصورة الرئيسية لا تُحمَّل — وهذا ما سيراه الزبون في صفحة المنتج. توجد صورة أخرى تعمل.
-            <span className="text-zinc-500"> The primary image is not loading.</span>
+            <span className="text-text-muted"> The primary image is not loading.</span>
           </p>
           <button
             type="button"
@@ -514,7 +514,7 @@ export function ImagesSection({
           className="hidden"
           onChange={(e) => pick(e.target.files)}
         />
-        <span className="text-[11px] text-zinc-500">JPEG / PNG / WebP / GIF / AVIF · تُحوَّل تلقائيًا إلى WebP</span>
+        <span className="text-[11px] text-text-muted">JPEG / PNG / WebP / GIF / AVIF · تُحوَّل تلقائيًا إلى WebP</span>
       </div>
 
       <div className="flex flex-wrap items-end gap-2 mb-3 min-w-0">
@@ -543,11 +543,11 @@ export function ImagesSection({
           {uploads.map((u) => (
             <div
               key={u.key}
-              className="flex items-center gap-2 min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 px-2.5 py-2"
+              className="flex items-center gap-2 min-w-0 rounded-lg bg-surface-raised px-2.5 py-2"
             >
-              <span className="text-[12px] text-zinc-300 truncate flex-1 min-w-0">{u.name}</span>
+              <span className="text-[12px] text-text-secondary truncate flex-1 min-w-0">{u.name}</span>
               {u.state === 'uploading' ? (
-                <span className="text-[11px] text-zinc-500 shrink-0 inline-flex items-center gap-1">
+                <span className="text-[11px] text-text-muted shrink-0 inline-flex items-center gap-1">
                   <RefreshCw className="w-3 h-3 animate-spin" /> جارٍ الرفع
                 </span>
               ) : (
@@ -581,7 +581,7 @@ export function ImagesSection({
       )}
 
       {rel.images.length === 0 ? (
-        <p className="text-[12px] text-zinc-500">لا صور بعد.</p>
+        <p className="text-[12px] text-text-muted">لا صور بعد.</p>
       ) : (
         [
           { scope: 0, ar: 'صور المنتج العامة', en: 'General', hint: 'تظهر دائمًا في معرض المنتج' },
@@ -595,10 +595,10 @@ export function ImagesSection({
         return (
           <div key={grp.scope} className="min-w-0 mb-3">
             <div className="flex items-baseline gap-2 mb-1.5 min-w-0">
-              <h4 className="text-[12px] font-bold text-zinc-300">
-                {grp.ar} <span className="text-[10px] font-medium text-zinc-500">{grp.en}</span>
+              <h4 className="text-[12px] font-bold text-text-secondary">
+                {grp.ar} <span className="text-[10px] font-medium text-text-muted">{grp.en}</span>
               </h4>
-              <span className="text-[10px] text-zinc-600 truncate">{grp.hint}</span>
+              <span className="text-[10px] text-text-muted truncate">{grp.hint}</span>
             </div>
             <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))] min-w-0">
               {members.map((img) => {
@@ -616,8 +616,8 @@ export function ImagesSection({
                 dragFrom.current = null;
               }}
               className={`min-w-0 rounded-lg border overflow-hidden ${
-                img.is_primary ? 'border-iris' : 'border-zinc-800'
-              } bg-zinc-900/60`}
+                img.is_primary ? 'border-iris' : 'border-border-subtle'
+              } bg-surface-raised`}
             >
               <div className="relative aspect-square bg-black/40">
                 {/*
@@ -636,7 +636,7 @@ export function ImagesSection({
                   fit="contain"
                   className="w-full h-full"
                   bgClassName="bg-transparent"
-                  fallbackClassName="text-zinc-500 gap-1"
+                  fallbackClassName="text-text-muted gap-1"
                   onStatus={(st) => noteStatus(img.id, st)}
                 />
                 {img.is_primary && (
@@ -645,7 +645,7 @@ export function ImagesSection({
                   </span>
                 )}
                 {(img.option_value_id || img.color_id || img.variant_id) && (
-                  <span className="absolute top-1 end-1 max-w-[70%] truncate bg-zinc-950/85 border border-zinc-700 text-zinc-200 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                  <span className="absolute top-1 end-1 max-w-[70%] truncate bg-onyx/80 text-snow text-[9px] font-bold px-1.5 py-0.5 rounded">
                     {img.option_value_id
                       ? `خيار: ${valueNames.get(img.option_value_id) ?? ''}`
                       : img.color_id
@@ -691,11 +691,11 @@ export function ImagesSection({
                   action it already was.
                 */}
                 {failed.has(img.id) && (
-                  <div className="rounded border border-amber-500/40 bg-amber-500/5 p-1.5 space-y-1" data-image-failed={img.id}>
+                  <div className="lv-alert lv-alert-warning p-1.5 space-y-1" data-image-failed={img.id}>
                     <p className="text-[10px] text-amber-300 leading-snug">
                       تعذّر تحميل هذه الصورة. قد يكون المضيف يمنع الروابط الخارجية مؤقتًا — لا تُحذف تلقائيًا.
                     </p>
-                    <p className="text-[9px] text-zinc-500 break-all" dir="ltr" title={img.url}>
+                    <p className="text-[9px] text-text-muted break-all" dir="ltr" title={img.url}>
                       {img.url}
                     </p>
                     {editingUrl?.id === img.id ? (
@@ -763,7 +763,7 @@ export function ImagesSection({
                     was one of the losses this round removes. */}
                 {(img.alt_ar || img.alt_ckb) && (
                   <p
-                    className="text-[10px] text-zinc-500 truncate"
+                    className="text-[10px] text-text-muted truncate"
                     dir="auto"
                     data-form="image-imported-alt"
                     title="نص بديل محفوظ من القالب النصي"

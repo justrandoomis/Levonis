@@ -189,7 +189,7 @@ export default function PriceAdjustPanel({ orderId, onChanged }: { orderId: stri
       </h3>
 
       {p ? (
-        <div data-price-adjust-pending className="rounded-2xl border border-warning/35 bg-warning/10 p-3.5 space-y-2.5">
+        <div data-price-adjust-pending className="lv-alert lv-alert-warning p-3.5 space-y-2.5">
           <p className="flex items-center gap-2 text-[13px] font-bold text-warning" role="status">
             <Clock3 className="h-4 w-4 shrink-0" aria-hidden />
             {loc('بانتظار موافقة الزبون على السعر', 'Waiting for the customer to approve the price')}

@@ -121,7 +121,7 @@ export function QuickAddDialog({
           </Field>
         )}
       </Grid>
-      <p className="mt-3 text-[11px] text-zinc-500">
+      <p className="mt-3 text-[11px] text-text-muted">
         {loc('يُضاف إلى قائمة التصنيفات فورًا ويصبح متاحًا في قالب الاستيراد التالي.', 'Added to the taxonomy list at once and offered by the next import template.')}
       </p>
     </Modal>

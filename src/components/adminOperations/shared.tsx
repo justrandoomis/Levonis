@@ -69,12 +69,12 @@ export function useOperation() {
     feedback: (
       <>
         {error && (
-          <p role="alert" className="mb-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-600">
+          <p role="alert" className="lv-alert lv-alert-danger mb-3 text-sm text-text-primary">
             {error}
           </p>
         )}
         {notice && (
-          <p role="status" className="mb-3 rounded-lg bg-green-500/10 p-3 text-sm text-green-600">
+          <p role="status" className="lv-alert lv-alert-success mb-3 text-sm text-text-primary">
             {notice}
           </p>
         )}

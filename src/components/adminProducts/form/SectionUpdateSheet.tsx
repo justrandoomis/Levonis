@@ -236,7 +236,7 @@ export default function SectionUpdateSheet({
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <span className="text-[11px] text-zinc-500 flex-1 min-w-[140px]">
+          <span className="text-[11px] text-text-muted flex-1 min-w-[140px]">
             {preview && preview.changes.length > 0
               ? `${changesText(preview.changes.length)} في المواصفات والمحتوى الإضافي${
                   formDirty ? ' — تعديلاتك غير المحفوظة في بقية الأقسام تبقى كما هي' : ''
@@ -252,15 +252,15 @@ export default function SectionUpdateSheet({
         </div>
       }
     >
-      <p className="text-[12px] leading-relaxed text-zinc-400 mb-3">
+      <p className="text-[12px] leading-relaxed text-text-secondary mb-3">
         يُحفظ من الملف قسم «المواصفات والمحتوى الإضافي» وحده. السعر والخيارات والألوان والصور والاسم وبقية الأقسام لا
         تتغير مهما كان في الملف.
       </p>
 
       <div className="space-y-2.5 min-w-0">
         {/* 1 — the file to edit */}
-        <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2" data-section-update-step="download">
-          <h4 className="text-[12px] font-bold text-zinc-200">١. نزّل بيانات المنتج</h4>
+        <div className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2" data-section-update-step="download">
+          <h4 className="text-[12px] font-bold text-text-primary">١. نزّل بيانات المنتج</h4>
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             <button type="button" className={btnGhost} disabled={!!downloading} onClick={() => void download('txt')}>
               {downloading === 'txt' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} TXT
@@ -278,8 +278,8 @@ export default function SectionUpdateSheet({
         </div>
 
         {/* 2 — the edited file */}
-        <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2" data-section-update-step="upload">
-          <h4 className="text-[12px] font-bold text-zinc-200">٢. ارفع ملف التحديث</h4>
+        <div className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2" data-section-update-step="upload">
+          <h4 className="text-[12px] font-bold text-text-primary">٢. ارفع ملف التحديث</h4>
           <input
             ref={fileRef}
             type="file"
@@ -296,7 +296,7 @@ export default function SectionUpdateSheet({
               <FileUp className="w-4 h-4" /> {file ? 'اختر ملفًا آخر' : 'اختر الملف'}
             </button>
             {file && (
-              <span className="text-[11px] text-zinc-400 truncate min-w-0" dir="ltr">
+              <span className="text-[11px] text-text-secondary truncate min-w-0" dir="ltr">
                 {file.name}
               </span>
             )}
@@ -305,16 +305,16 @@ export default function SectionUpdateSheet({
 
         {/* 3 — the comparison */}
         {(checking || preview || problem) && (
-          <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-2.5 space-y-2" data-section-update-step="compare">
+          <div className="min-w-0 rounded-lg border border-border-subtle bg-surface p-2.5 space-y-2" data-section-update-step="compare">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h4 className="text-[12px] font-bold text-zinc-200 flex-1 min-w-0">٣. التغييرات</h4>
+              <h4 className="text-[12px] font-bold text-text-primary flex-1 min-w-0">٣. التغييرات</h4>
               {file && !checking && (
                 <button type="button" className={btnGhost} onClick={() => void compare(file)}>
                   <RefreshCw className="w-4 h-4" /> أعد المقارنة
                 </button>
               )}
             </div>
-            {checking && <p className="text-[11px] text-zinc-500">جارٍ المقارنة…</p>}
+            {checking && <p className="text-[11px] text-text-muted">جارٍ المقارنة…</p>}
             {problem && (
               <p className="text-[12px] text-red-400 inline-flex items-center gap-1" role="alert">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {problem}
@@ -338,7 +338,7 @@ export default function SectionUpdateSheet({
                   </p>
                 )}
                 {!blocked && preview.changes.length === 0 && (
-                  <p className="text-[12px] text-zinc-400">
+                  <p className="text-[12px] text-text-secondary">
                     {preview.lines === 0
                       ? 'لا يحتوي الملف على أي سطر من المواصفات أو المحتوى الإضافي.'
                       : 'لا تغيير — قيم الملف مطابقة لما هو محفوظ.'}
@@ -347,16 +347,16 @@ export default function SectionUpdateSheet({
                 {preview.changes.length > 0 && (
                   <div className="space-y-2.5 min-w-0">
                     {preview.changes.map((ch) => (
-                      <div key={ch.field} className="rounded-md bg-black/30 border border-zinc-800 px-2 py-1.5 min-w-0" data-section-change={ch.field}>
+                      <div key={ch.field} className="lv-well rounded-md px-2 py-1.5 min-w-0" data-section-change={ch.field}>
                         <div className="flex flex-wrap items-center gap-2 min-w-0">
-                          <span className="text-[12px] font-bold text-zinc-200 truncate min-w-0 flex-1">
+                          <span className="text-[12px] font-bold text-text-primary truncate min-w-0 flex-1">
                             {sectionFieldLabel(ch.field, specs)}
                           </span>
-                          <span className="text-[10px] text-zinc-500 truncate" dir="ltr">
+                          <span className="text-[10px] text-text-muted truncate" dir="ltr">
                             {ch.field}
                           </span>
                         </div>
-                        <p className="text-[11px] text-zinc-500 whitespace-pre-wrap break-words" dir="auto">
+                        <p className="text-[11px] text-text-muted whitespace-pre-wrap break-words" dir="auto">
                           قبل: {shown(ch.before)}
                         </p>
                         <p className="text-[11px] text-emerald-300 whitespace-pre-wrap break-words" dir="auto">
@@ -367,10 +367,10 @@ export default function SectionUpdateSheet({
                   </div>
                 )}
                 {preview.ignored_keys.length > 0 && (
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-2.5 min-w-0">
+                  <div className="rounded-md bg-surface-raised p-2.5 min-w-0">
                     <button
                       type="button"
-                      className="text-[11px] text-zinc-400 text-start w-full"
+                      className="text-[11px] text-text-secondary text-start w-full"
                       aria-expanded={showIgnored}
                       onClick={() => setShowIgnored((v) => !v)}
                     >
@@ -379,7 +379,7 @@ export default function SectionUpdateSheet({
                         : `${linesText(preview.ignored_keys.length)} خارج هذا القسم في الملف — لن يُحفظ`}
                     </button>
                     {showIgnored && (
-                      <ul className="ms-4 mt-1.5 list-disc space-y-0.5 text-[11px] text-zinc-500">
+                      <ul className="ms-4 mt-1.5 list-disc space-y-0.5 text-[11px] text-text-muted">
                         {(preview.ignored_changes.length > 0
                           ? preview.ignored_changes.map((c) => `${c.field} — قبل: ${shown(c.before)} · بعد: ${shown(c.after)}`)
                           : preview.ignored_keys
