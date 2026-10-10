@@ -1,6 +1,6 @@
 /**
  * PRIVACY of the «التسعير بالدولار والشحن» save fix (owner report 2026-10-10;
- * docs/DECISIONS.md row 211; the verifiers' privacy review).
+ * docs/DECISIONS.md row 213; the verifiers' privacy review).
  *
  * What the fix changed that could carry cost: `data_only` on PUT …/inputs (a
  * complete manual product's data now stored without a price write), the new

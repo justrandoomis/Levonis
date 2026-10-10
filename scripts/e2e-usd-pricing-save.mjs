@@ -2,7 +2,7 @@
 /**
  * «التسعير بالدولار والشحن» — WHAT THE OWNER TYPES IS KEPT (owner report 2026-10-10:
  * «بالرغم من كتابة التسعير بالدولار والشحن وملء الحقول فعند الضغط على كلمة نشر
- * والحفظ لا يحفظ وعند الرجوع إلى تعديل المنتج تبقى القيم فارغة»; docs/DECISIONS.md row 211).
+ * والحفظ لا يحفظ وعند الرجوع إلى تعديل المنتج تبقى القيم فارغة»; docs/DECISIONS.md row 213).
  *
  * The browser regression of the fix: the real built SPA, the real worker and a
  * real local D1, in the three rate worlds the owner can be in —
