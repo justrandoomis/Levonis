@@ -147,7 +147,8 @@ export interface ProductRelationsView {
    * 0183 (FX-7). The engine's final regular price per exact SKU × channel —
    * the resolver's last rung (`SkuPriceRow`). `null` (or absent, on a view
    * built before this field existed) = the table is not on this database;
-   * `[]` = present, and this product has no per-SKU price.
+   * `[]` = present, and this product has no per-SKU price the engine still
+   * says (a row it no longer does is inert: `skuPriceRows`).
    */
   sku_prices?: SkuPriceRow[] | null;
   /**
@@ -229,6 +230,16 @@ interface SkuPriceDbRow extends SkuPriceRow {
  * like every relation read, and answers 'failed': the storefront degrades to
  * "no SKU row" (the ladder, never lower), and the view says the read failed
  * (`sku_prices_unread`) so no writer mistakes it for a database without 0183.
+ *
+ * A ROW COUNTS ONLY WHILE THE ENGINE STILL SAYS IT (`SKU_ROW_LIVE`): its product
+ * is engine-priced and the engine's own stored result for that exact SKU ×
+ * channel (`pricing_sku_costs`, written in the same batch as the row, every
+ * time) is the same price. An older Worker (before 0183) writes the engine's
+ * tables without knowing this one: its exit to manual pricing deletes the
+ * results and leaves the rows, its per-model repricing rewrites the results
+ * under the models' keys. A row left like that is inert — the ladder answers,
+ * as it does for that older Worker — instead of overriding the manual prices
+ * typed since, or the engine's newer figures, once this Worker is back.
  */
 async function skuPriceRows(run: () => Promise<{ results: SkuPriceDbRow[] }>): Promise<SkuPriceDbRow[] | 'absent' | 'failed'> {
   try {
@@ -251,6 +262,12 @@ function skuFields(read: SkuPriceDbRow[] | 'absent' | 'failed'): Pick<ProductRel
 }
 
 const SKU_PRICE_COLUMNS = 'product_id, combo_key, channel, regular_price_iqd';
+
+/** A SKU row is read only while the engine still says it (see `skuPriceRows`). Correlated on the table's own name. */
+const SKU_ROW_LIVE = `EXISTS (SELECT 1 FROM pricing_sku_costs c
+   JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
+  WHERE c.product_id = product_sku_prices.product_id AND c.combo_key = product_sku_prices.combo_key
+    AND c.channel = product_sku_prices.channel AND c.computed_price_iqd = product_sku_prices.regular_price_iqd)`;
 
 /** Loads everything relational for one product in four batched reads. */
 export async function loadRelationsView(
@@ -278,7 +295,7 @@ export async function loadRelationsView(
         .all<ImageRow>()
     ),
     skuPriceRows(() =>
-      db.prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id = ? ORDER BY combo_key, channel`).bind(productId).all<SkuPriceDbRow>()
+      db.prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id = ? AND ${SKU_ROW_LIVE} ORDER BY combo_key, channel`).bind(productId).all<SkuPriceDbRow>()
     ),
   ]);
   const activeImages = images.filter(isActiveProductImageRow);
@@ -363,7 +380,7 @@ export async function loadRelationsViews(
     ),
     skuPriceRows(() =>
       db
-        .prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY product_id, combo_key, channel`)
+        .prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id IN (SELECT value FROM json_each(?)) AND ${SKU_ROW_LIVE} ORDER BY product_id, combo_key, channel`)
         .bind(JSON.stringify(ids))
         .all<SkuPriceDbRow>()
     ),

@@ -334,6 +334,19 @@ Owner decision 1 of 2026-10-07 (DECISIONS row 184 (1)): «SKU آخر درجة و
   per-model save, or the flip to manual, would leave SKU rows overriding the
   new prices. The bulk save reports it per product; the automatic repricing
   skips the product (no block, no bell) and retries on the next tick.
+- **A SKU row counts only while the engine still says it** (FX-7 blockers
+  review, DECISIONS row 203; `productOverlay.ts` `SKU_ROW_LIVE`). The overlay
+  reads a `product_sku_prices` row only when its product is engine-priced AND
+  the engine's own stored result for that exact SKU × channel
+  (`pricing_sku_costs`, written in the same batch every time) is the same
+  price. Any other row is inert and the ladder answers. Why: a Worker from
+  before 0183 (8a170ee6, the commit a rollback lands on) writes the engine's
+  tables without knowing this one — its «رجوع إلى التسعير اليدوي» deletes the
+  results and leaves the SKU rows; its per-model repricing rewrites the
+  results under the models' keys. Read back by this Worker, those rows
+  overrode the manual prices typed since (for good: nothing deletes a manual
+  product's rows) or the engine's newer figures. Same one statement; the
+  view, the card, compare, the finder and the cart read the same rows.
 - **Orphaned colour and SKU levels are dropped from the plan** (FX-7 gaps). A
   colour input or rule whose colour is deleted or switched off, or a SKU input
   whose SKU is no longer sold, names nothing sellable: it no longer makes the
