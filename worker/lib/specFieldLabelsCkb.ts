@@ -1,5 +1,5 @@
 /**
- * THE SPEC FIELDS IN SORANI (docs/DECISIONS.md row 207): one hand-written
+ * THE SPEC FIELDS IN SORANI (docs/DECISIONS.md row 212): one hand-written
  * Sorani label for every spec field id of worker/lib/templateFamilies.ts
  * (`FAMILIES` and `PRODUCT_TYPES`, 204 ids). The registry carries Arabic and
  * English only; the data file's comparison («تحديث البيانات») names a

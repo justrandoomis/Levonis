@@ -1,7 +1,7 @@
 /**
  * «تحديث البيانات» ON LARGE PRODUCTS — the shared harness of
  * tests/productDataFileLargeApply.test.ts and tests/productDataFileBudget.test.ts
- * (docs/DECISIONS.md row 207).
+ * (docs/DECISIONS.md row 212).
  *
  * THE CENSUS: the D1 binding is wrapped (prepare / bind / run / first / all /
  * raw / batch), never the product code. Every statement is tagged at prepare

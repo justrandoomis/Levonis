@@ -1,5 +1,5 @@
 /**
- * «تحديث البيانات» — THE APPLY'S D1 BUDGET, COUNTED (docs/DECISIONS.md row 207).
+ * «تحديث البيانات» — THE APPLY'S D1 BUDGET, COUNTED (docs/DECISIONS.md row 212).
  *
  * D1 allows 1,000 queries per Worker invocation, a batch counting each of its
  * statements. The data file's apply sends ONE batch per product and may give

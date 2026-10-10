@@ -62,7 +62,7 @@ export const DATA_FILE_REFUSALS = {
     en: 'The product changed after the comparison — review the new comparison, then apply.',
     ckb: 'بەرهەمەکە دوای بەراوردکردن گۆڕا — بەراوردی نوێ ببینە و پاشان جێبەجێی بکە.',
   },
-  // One product's changes go in ONE batch or not at all (docs/DECISIONS.md row 207):
+  // One product's changes go in ONE batch or not at all (docs/DECISIONS.md row 212):
   // past what D1's 1,000 queries per invocation leave, nothing is written and the
   // refusal says which lines to take out, so the file is applied in two goes —
   // each its own comparison and its own atomic apply.

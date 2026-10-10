@@ -116,7 +116,7 @@ export interface ScopedCountingD1 extends CountingD1 {
 }
 
 /**
- * ONE REQUEST'S QUERIES, AND ONLY ITS OWN (docs/DECISIONS.md row 207).
+ * ONE REQUEST'S QUERIES, AND ONLY ITS OWN (docs/DECISIONS.md row 212).
  *
  * `countingD1` is one view per binding per isolate, so its counter also sees
  * every concurrent request the isolate serves (and the quarter-hour tick):

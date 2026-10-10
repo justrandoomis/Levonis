@@ -1,6 +1,6 @@
 /**
  * «تحديث البيانات» — ONE COMPARISON CALL STAYS UNDER D1'S 1,000 QUERIES
- * (docs/DECISIONS.md row 207; reproduced by the d1-budget verifier of 317e878d).
+ * (docs/DECISIONS.md row 212; reproduced by the d1-budget verifier of 317e878d).
  *
  * D1 allows 1,000 queries per Worker invocation. On 317e878d `POST
  * /data-preview` had no budget: it compared every block it was given (≤ 25)

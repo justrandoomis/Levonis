@@ -65,7 +65,7 @@ export const DATA_FILE_STRINGS = {
   menuEntry: { ar: 'ملف بيانات المنتجات (تنزيل / إرفاق)', en: 'Products data file (download / attach)', ckb: 'فایلی زانیاریی بەرهەمەکان (داگرتن / هاوپێچ)' },
   updateDataTitle: { ar: 'تنزيل ملف بيانات المنتج وتطبيق ما تغيّر فيه', en: 'Download the product data file and apply what changed in it', ckb: 'فایلی زانیاریی بەرهەم دابگرە و ئەوەی تێیدا گۆڕاوە جێبەجێی بکە' },
   productError: { ar: 'لا يمكن مقارنة هذا المنتج', en: 'This product cannot be compared', ckb: 'ئەم بەرهەمە بەراورد ناکرێت' },
-  // A bulk file is compared over several calls (each one invocation of D1's 1,000 queries, row 207).
+  // A bulk file is compared over several calls (each one invocation of D1's 1,000 queries, row 212).
   comparingProgress: { ar: 'جارٍ المقارنة… ({n} من {total})', en: 'Comparing… ({n} of {total})', ckb: 'بەراورد دەکرێت… ({n} لە {total})' },
   sizeNote: { ar: '({needed} عملية كتابة، والحد {allowance})', en: '({needed} writes; the limit is {allowance})', ckb: '({needed} کرداری نووسین؛ سنوورەکە {allowance})' },
 } satisfies Record<string, Tri>;
@@ -114,7 +114,7 @@ export const DATA_FILE_SECTIONS: Record<string, Tri> = {
 
 /**
  * A line's own field, in the reader's words — every scalar and every generic
- * item leaf the data file writes (requirement 5 of row 207: no key falls back
+ * item leaf the data file writes (requirement 5 of row 212: no key falls back
  * to its raw name). A leaf whose meaning depends on its group is in
  * `DATA_FILE_GROUP_FIELDS`; an `_ar` / `_en` / `_ckb` leaf is its base's label
  * with the language (`fieldLabel`); the owner's pricing leaves are

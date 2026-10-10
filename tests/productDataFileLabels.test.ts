@@ -1,5 +1,5 @@
 /**
- * «تحديث البيانات» NAMES EVERY LINE (docs/DECISIONS.md row 207, requirement 5:
+ * «تحديث البيانات» NAMES EVERY LINE (docs/DECISIONS.md row 212, requirement 5:
  * the owner saw `shipping_height_mm`, `shipping_length_mm`, `shipping_width_mm`
  * and `manual_cbm` as row titles beside «وزن الشحن (غ)»).
  *

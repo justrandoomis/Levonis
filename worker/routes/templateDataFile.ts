@@ -17,7 +17,7 @@
  *        idempotent, audited batch that writes the changed fields alone — all
  *        of them or none.
  *
- * THE BATCH'S SIZE (docs/DECISIONS.md row 207). D1 allows 1,000 queries per
+ * THE BATCH'S SIZE (docs/DECISIONS.md row 212). D1 allows 1,000 queries per
  * Worker invocation, a batch counting each statement. The apply counts every
  * query IT runs before the batch (`scopedCountingD1`: this request's own, no
  * other request's) and sends the batch when it fits what is left:
@@ -793,7 +793,7 @@ const fileError = (status: 400 | 409, code: DataFileRefusalCode, errors: FileErr
   new HttpError(status, dataFileMessage(code), code, { errors });
 
 /**
- * ONE COMPARISON CALL, WITHIN D1'S 1,000 (row 207). The blocks are compared
+ * ONE COMPARISON CALL, WITHIN D1'S 1,000 (row 212). The blocks are compared
  * in the file's order on `counted` — a view of this request's own queries
  * with a hard limit (`scopedCountingD1`, DATA_PREVIEW_BUDGET): the query that
  * would cross it is refused before it is sent. The block it belonged to is
@@ -933,7 +933,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
   routes.post('/data-apply', async (c) => {
     await rateLimit(c, 'tpl_apply', 120, 3600);
     // From here on every query THIS request runs is counted, on its own view (no other request's
-    // queries): the batch may hold what D1's 1,000 leave (row 207).
+    // queries): the batch may hold what D1's 1,000 leave (row 212).
     const counted = scopedCountingD1(c.env.DB);
     const db = counted.db;
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));

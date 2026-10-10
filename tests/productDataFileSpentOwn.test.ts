@@ -1,6 +1,6 @@
 /**
  * «تحديث البيانات» — `spent` IS THIS REQUEST'S OWN QUERIES (docs/DECISIONS.md
- * row 207; reproduced by the atomicity verifier of 317e878d).
+ * row 212; reproduced by the atomicity verifier of 317e878d).
  *
  * The apply sizes its ONE batch as `1000 − 50 − 60 − spent`. On 317e878d
  * `spent` was read from `countingD1(c.env.DB)` — one counting view per binding

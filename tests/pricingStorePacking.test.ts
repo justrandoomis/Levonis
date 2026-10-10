@@ -1,5 +1,5 @@
 /**
- * THE PRICING STORE'S PACKED WRITES (docs/DECISIONS.md row 207): the data
+ * THE PRICING STORE'S PACKED WRITES (docs/DECISIONS.md row 212): the data
  * file's apply writes new `pricing_inputs` and `pricing_rules` rows and its
  * `pricing_audit` rows as multi-row INSERTs — the SAME rows, the same values
  * bound in the same order, as one statement per row writes them; fewer

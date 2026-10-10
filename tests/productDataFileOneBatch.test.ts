@@ -1,6 +1,6 @@
 /**
  * «تحديث البيانات» — ONE PRODUCT, ONE BATCH: ALL OF ITS CHANGES OR NONE
- * (docs/DECISIONS.md row 207; reproduced by the atomicity verifier of 317e878d).
+ * (docs/DECISIONS.md row 212; reproduced by the atomicity verifier of 317e878d).
  *
  * 317e878d applied a product too large for one batch in two: the product part,
  * a fresh comparison, then the pricing part. Between the two the product was

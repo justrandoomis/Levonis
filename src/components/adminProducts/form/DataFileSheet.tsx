@@ -92,7 +92,7 @@ interface ProductCard {
   token: string | null;
   /** The central required-field list on the product now and after this apply (codes only; owner-projected). */
   completeness?: { before: CompletenessItemDto[]; after: CompletenessItemDto[] } | null;
-  /** The names the rows are titled with: each item (`group:id`) and each spec field (row 207). */
+  /** The names the rows are titled with: each item (`group:id`) and each spec field (row 212). */
   labels?: DataFileLabels;
 }
 
@@ -100,7 +100,7 @@ interface Preview {
   viewer: 'owner' | 'staff';
   errors: Array<{ line: number; message: string; code: string }>;
   products: ProductCard[];
-  /** The products of the file this call had no room to compare (row 207): asked for in the next call. */
+  /** The products of the file this call had no room to compare (row 212): asked for in the next call. */
   pending?: string[];
 }
 

@@ -3,7 +3,7 @@
  * REGRESSION (owner report 2026-10-10: the preview read «سيُطبّق 409 · رُفض
  * 0», mostly `pricing.options.N.shipping_*` / `manual_cbm` filled from empty,
  * pricing kind 'data'; «تطبيق التغييرات» answered DATA_FILE_TOO_LARGE —
- * docs/DECISIONS.md row 207).
+ * docs/DECISIONS.md row 212).
  *
  * The product: 24 models, one colour, the 24 exact combinations (variant
  * stock), a spec group — 50 pricing scopes (the product, 24 models, 1 colour,
@@ -290,7 +290,7 @@ test('R — the 41 live shapes: one stock line, and the shipping fill plus that 
     CATALOGUE.push(out);
   }
   assert.equal(CATALOGUE.length, 41);
-  // Every live shape applies — one stock line, and the shipping fill plus it — as one batch (row 207).
+  // Every live shape applies — one stock line, and the shipping fill plus it — as one batch (row 212).
   const refused = CATALOGUE.filter((r) => (r.structural && r.structural.status !== 200) || (r.shippingPlusOne && r.shippingPlusOne.status !== 200));
   assert.deepEqual(refused.map((r) => r.slug), []);
   const out = process.env.DATAFILE_CENSUS_OUT;

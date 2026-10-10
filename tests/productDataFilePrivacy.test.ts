@@ -93,7 +93,7 @@ test('the owner\'s file in a non-owner\'s hands: every cost line is refused by n
   assert.doesNotMatch(text, /700000|650000/, 'the preview never echoes a private value');
 });
 
-test('the names a comparison sends (row 207): a non-owner is never sent a pricing scope\'s name, the owner is', async () => {
+test('the names a comparison sends (row 212): a non-owner is never sent a pricing scope\'s name, the owner is', async () => {
   const raw = freshDb();
   const owner = setup(OWNER, raw);
   const id = await create(owner.app, PRODUCT);

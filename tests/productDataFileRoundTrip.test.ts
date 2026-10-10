@@ -322,7 +322,7 @@ test('combinations: an unedited file is zero changes; one combination\'s stock w
   assert.ok(row(raw, "SELECT id FROM product_variants WHERE id = 'pv_white'"));
 });
 
-// ------------------------------------------------------------------ row 207: the rounds' leftover, and the preview's product filter
+// ------------------------------------------------------------------ row 212: the rounds' leftover, and the preview's product filter
 
 test('lines left when the refusal rounds run out are said (never silently dropped): the count of changes is the rows shown', async () => {
   const { raw, app } = setup();

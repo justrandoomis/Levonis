@@ -1209,7 +1209,7 @@ const DETACH_ROWS_PER_STATEMENT = Math.floor(90 / DETACH_COLUMNS);
  * (`queueDetachedProductMediaAfterCommit`): one statement per
  * DETACH_ROWS_PER_STATEMENT keys in its batch, then its audit row. A handler
  * that sizes its batch from what D1's 1,000 leave sets this aside too
- * (worker/routes/templateDataFile.ts, row 207).
+ * (worker/routes/templateDataFile.ts, row 212).
  */
 export const detachQueueQueries = (count: number): number => (count > 0 ? Math.ceil(count / DETACH_ROWS_PER_STATEMENT) + 1 : 0);
 

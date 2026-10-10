@@ -1,6 +1,6 @@
 /**
  * «تحديث البيانات» — THE APPLY'S INVOCATION, RECOUNTED INDEPENDENTLY
- * (docs/DECISIONS.md row 207; written by the d1-budget verifier of 317e878d).
+ * (docs/DECISIONS.md row 212; written by the d1-budget verifier of 317e878d).
  *
  * The claim: the batch may hold `1000 − 50 (reserve) − (60 + the picture-detach
  * queue) (after the batch) − spent`, so the whole `POST /data-apply` invocation

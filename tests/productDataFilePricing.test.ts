@@ -128,10 +128,10 @@ test('an invalid pricing value is refused on its own line; a scope the product d
   assert.equal(st['pricing.options.9.supplier_cost_amount'], 'PRICING_SCOPE_UNKNOWN');
 });
 
-// ------------------------------------------------------------------ more scopes than the form's page (row 207)
+// ------------------------------------------------------------------ more scopes than the form's page (row 212)
 
 test('an 80-model product with the shipping fill on every scope: the comparison renders and the apply passes as one batch', async () => {
-  // Before row 207 the whole-save parse refused more than 61 scopes and the WHOLE preview answered 400.
+  // Before row 212 the whole-save parse refused more than 61 scopes and the WHOLE preview answered 400.
   const w = await bigWorld({ opts: 80, slug: 'eighty' });
   const scopes = scopePrefixes(w.text);
   assert.ok(scopes.length > 61, `${scopes.length} scopes listed`);
