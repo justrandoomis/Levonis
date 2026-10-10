@@ -105,12 +105,18 @@ adminInventoryRoutes.get('/overview', async (c) => {
            FROM inventory_lots WHERE qty_remaining > 0`
       )
       .first<{ lots: number; units: number; value: number; unpriced_units: number }>(),
+    // «في الطريق»: what was ORDERED and has not arrived — a draft is not on
+    // its way (owner request 2026-10-10: a drafted purchase of 14 units read
+    // «في الطريق ١٤»). Counted per PURCHASE, not per line: a purchase's lines
+    // share it (`purchase_lines.incoming_id` is UNIQUE, so the join never
+    // multiplies a row), and a legacy single-line purchase counts as one.
     db
       .prepare(
-        `SELECT COUNT(*) AS purchases,
-                COALESCE(SUM(qty_ordered - qty_received), 0) AS units,
-                COALESCE(SUM((qty_ordered - qty_received) * purchase_unit_iqd), 0) AS value
-           FROM incoming_inventory WHERE status IN ('draft','incoming','partial')`
+        `SELECT COUNT(DISTINCT COALESCE(pl.purchase_id, 'incoming:' || i.id)) AS purchases,
+                COALESCE(SUM(i.qty_ordered - i.qty_received), 0) AS units,
+                COALESCE(SUM((i.qty_ordered - i.qty_received) * i.purchase_unit_iqd), 0) AS value
+           FROM incoming_inventory i LEFT JOIN purchase_lines pl ON pl.incoming_id = i.id
+          WHERE i.status IN ('incoming','partial')`
       )
       .first<{ purchases: number; units: number; value: number }>(),
     db

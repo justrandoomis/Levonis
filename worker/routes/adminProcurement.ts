@@ -1,10 +1,10 @@
 import { Hono, type Context } from 'hono';
 import { allocateProcurementCharges, exactProcurementUnitDefault, procurementSelectionKey } from '../../packages/contracts/src/procurementCost';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
+import { requireAdmin, badRequest, conflict, forbidden, notFound, str, HttpError } from '../lib/http';
 import { isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
 import { requireSelection, productSelections } from '../lib/inventorySelection';
 import { planReceive, type IncomingRow } from '../lib/inventoryReceiving';
 import {
@@ -12,6 +12,7 @@ import {
   dateValue,
   decimal,
   fence,
+  isFenceMiss,
   journalPlan,
   periodOpen,
   requireCapability,
@@ -24,6 +25,7 @@ import { packedMeasure, procurementProfiles, profileRates, type PurchaseCharge }
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { engineColumnInstalled } from '../lib/engineInstalled';
 import { batchSnapshotInstalled, purchaseLotSnapshot, type PurchaseFxSource } from '../lib/batchSnapshot';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -604,6 +606,65 @@ adminProcurementRoutes.put('/documents/:id', async (c) => {
     version: d.purchase.version + 1,
   });
   return c.json({ success: true, id });
+});
+/**
+ * «تغيير الاسم» — A PURCHASE'S NAME, AT ANY STATUS (owner request 2026-10-10:
+ * «لا يمكن تسمية المخزون»).
+ *
+ * The name is `purchase_orders.invoice_no` («اسم الشراء أو رقم الفاتورة»):
+ * every reader already shows it as the purchase's name — the register, the
+ * receiving list (assistant receivers too), the investor-finance labels and
+ * the participant report. The full PUT cannot rename a confirmed, funded or
+ * received purchase (it re-plans the cost and is frozen then); this route
+ * changes the label alone:
+ *   - draft, ordered, investor-funded, partly or fully received, cancelled;
+ *   - trimmed, whitespace collapsed, 0-120 characters (empty clears it);
+ *   - `before` (optional): the name the screen showed; a different stored name
+ *     is someone else's rename → 409 PURCHASE_NAME_CHANGED;
+ *   - the same name → `already`, no write, no audit;
+ *   - ONE batch: a fence on the name read (a concurrent rename → 409), the
+ *     purchase's name, the receiving copies (`incoming_inventory.supplier_ref`,
+ *     not frozen by 0182) and the audit row `purchase.renamed {before, after}`.
+ * `version` is NOT bumped — it fences cost edits, and a rename must not break
+ * an open editor — and `request_json` is untouched, so a replayed POST stays
+ * `already`. No cost column is written.
+ */
+const PURCHASE_NAME_MAX = 120;
+adminProcurementRoutes.patch('/documents/:id/name', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'purchase');
+  const raw = await bodyOf(c);
+  const b: Record<string, unknown> = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  // Only these two keys (a name is never sent with a cost beside it); FX's strictBody stays FX's.
+  const unknown = Object.keys(b).filter((k) => k !== 'name' && k !== 'before').sort();
+  if (unknown.length) throw new HttpError(400, serverMessage('UNKNOWN_FIELD'), 'UNKNOWN_FIELD', { fields: unknown });
+  const id = text(c.req.param('id'), 60);
+  // The name is always sent (an empty one clears it): a body without it is a mistake, never a rename to nothing.
+  if (typeof b.name !== 'string') throw badRequest('اسم الشراء نص / The purchase name is text');
+  if (b.before !== undefined && b.before !== null && typeof b.before !== 'string') throw badRequest('اسم الشراء نص / The purchase name is text');
+  const name = b.name.replace(/\s+/g, ' ').trim();
+  if (name.length > PURCHASE_NAME_MAX) throw new HttpError(400, serverMessage('PURCHASE_NAME_TOO_LONG'), 'PURCHASE_NAME_TOO_LONG', { max: PURCHASE_NAME_MAX });
+  const db = c.env.DB;
+  const current = await db.prepare('SELECT invoice_no FROM purchase_orders WHERE id=?').bind(id).first<{ invoice_no: string | null }>();
+  if (!current) throw notFound('Purchase not found');
+  const before = current.invoice_no ?? '';
+  if (before === name) return c.json({ success: true, id, name, already: true });
+  if (typeof b.before === 'string' && b.before.replace(/\s+/g, ' ').trim() !== before)
+    throw conflict(serverMessage('PURCHASE_NAME_CHANGED'), 'PURCHASE_NAME_CHANGED');
+  const now = new Date().toISOString();
+  const statements = [
+    ...fence(db, 'EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND invoice_no=?)', [id, before]),
+    db.prepare('UPDATE purchase_orders SET invoice_no=?, updated_at=? WHERE id=?').bind(name, now, id),
+    db.prepare('UPDATE incoming_inventory SET supplier_ref=? WHERE id IN (SELECT incoming_id FROM purchase_lines WHERE purchase_id=?)').bind(name, id),
+    ...(await auditStatements(db, user.id, 'purchase.renamed', id, { before, after: name })).statements,
+  ];
+  try {
+    await db.batch(statements);
+  } catch (e) {
+    if (isFenceMiss(e)) throw conflict(serverMessage('PURCHASE_NAME_CHANGED'), 'PURCHASE_NAME_CHANGED');
+    throw e;
+  }
+  return c.json({ success: true, id, name });
 });
 adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
   const user = c.get('user')!;

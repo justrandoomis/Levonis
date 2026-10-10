@@ -58,3 +58,24 @@ test('the brief’s field label replaces the old reference price in all three la
     ['التكلفة النهائية', 'الحد الأدنى للربح', 'السعر النهائي بالدولار', 'السعر النهائي للزبون']
   );
 });
+
+test('the direct-sale review (owner request 2026-10-10): the Direct Sale Extra always by its full name, in every language; never a bare «زيادة» / «زیادە»', () => {
+  const KEYS = ['extraLabel', 'extraHint', 'noExtra', 'todayExtra', 'extraNeeded', 'extraInvalid', 'colBeforeExtra', 'directCaption', 'extraInReview'] as const;
+  for (const k of KEYS) {
+    assert.match(text(PROCUREMENT_PRICING_STRINGS.ar[k]), /زيادة البيع المباشر/, `ar.${k}`);
+    assert.match(text(PROCUREMENT_PRICING_STRINGS.en[k]), /Direct Sale Extra/, `en.${k}`);
+    assert.match(text(PROCUREMENT_PRICING_STRINGS.ckb[k]), /زیادەی فرۆشتنی ڕاستەوخۆ/, `ckb.${k}`);
+  }
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const all = Object.values(PROCUREMENT_PRICING_STRINGS[lang]).map(text).join('\n');
+    // «زيادة» only as «زيادة البيع المباشر»; «زیادە» only as «زیادەی فرۆشتنی ڕاستەوخۆ» (or the existing «تێچووە زیادەکان»).
+    assert.doesNotMatch(all, /(?:الزيادة|زيادة)(?! البيع المباشر)/, lang);
+    assert.doesNotMatch(all, /زیادە(?!ی فرۆشتنی ڕاستەوخۆ|کان)/, lang);
+    assert.doesNotMatch(all, /علاو[ةتا]|premium/i, lang);
+  }
+  // The direct-sale words the review leads with.
+  assert.equal(PROCUREMENT_PRICING_STRINGS.ar.sectionDirect, 'البيع المباشر');
+  assert.equal(PROCUREMENT_PRICING_STRINGS.ckb.sectionDirect, 'فرۆشتنی ڕاستەوخۆ');
+  assert.match(PROCUREMENT_PRICING_STRINGS.ckb.preorderFollow('2'), /پێشداواکاری/);
+  assert.match(PROCUREMENT_PRICING_STRINGS.ar.noExtra, /\(0\)$/);
+});

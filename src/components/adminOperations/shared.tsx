@@ -108,6 +108,8 @@ export function Input({
   min,
   required = false,
   decimals = 6,
+  placeholder,
+  inputMode,
 }: {
   label: string;
   value: string | number;
@@ -117,6 +119,9 @@ export function Input({
   min?: number;
   required?: boolean;
   decimals?: number;
+  /** A text field's placeholder (never on a number field). */
+  placeholder?: string;
+  inputMode?: 'numeric' | 'text';
 }) {
   return (
     <Field label={label} hint={hint}>
@@ -128,6 +133,8 @@ export function Input({
         min={min}
         step={type === 'number' ? 'any' : undefined}
         required={required}
+        placeholder={placeholder}
+        inputMode={inputMode}
       />}
     </Field>
   );

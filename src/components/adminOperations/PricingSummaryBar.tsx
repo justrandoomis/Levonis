@@ -25,7 +25,7 @@ const CELL = 'rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-1)] px-3 py-2';
 const usd = (cents: number | null | undefined) => (cents == null ? '—' : formatUsdCents(cents));
 const Fig = ({ children }: { children: React.ReactNode }) => <bdi dir="ltr" className="whitespace-nowrap tabular-nums">{children}</bdi>;
 
-export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel }: {
+export default function PricingSummaryBar({ summary, label, busy = false, notInstalled = false, readOnlyLabel, directFirst = false }: {
   summary: PricingSummary | null | undefined;
   /** The line's name, for the bar's and the pill's accessible names. */
   label: string;
@@ -34,6 +34,15 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
   notInstalled?: boolean;
   /** «الحالي» on the review step and on a saved document. */
   readOnlyLabel?: boolean;
+  /**
+   * The procurement card (owner request 2026-10-10: a stock purchase is for
+   * direct sale): for a model that sells direct, cell 4 is its direct sale
+   * price — the pre-order base + the Direct Sale Extra, the caption says so —
+   * or, while the extra is missing, the base pre-order price under its own
+   * name with the way to complete it. A pre-order-only model, and every other
+   * screen (no prop), reads exactly as before.
+   */
+  directFirst?: boolean;
 }) {
   const { lang } = useLanguage();
   const s = procurementPricingStrings(lang);
@@ -51,6 +60,11 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
       )
     : [];
   const shown = (v: string) => (busy ? '…' : v);
+  // Direct first: the model sells direct; `priced` when the engine gave its direct cell a price.
+  const direct = directFirst && summary?.sells_direct === true;
+  const priced = direct && ok && summary!.direct_sale_price_iqd != null;
+  const cell4Label = !direct ? (engine ? s.cellCustomer : s.cellSuggested) : priced || !ok ? (engine ? s.cellDirectCustomer : s.cellDirectSuggested) : s.cellPreorderBase;
+  const cell4Value = !ok ? '—' : priced ? money(summary!.direct_sale_price_iqd) : money(summary!.preorder_base_iqd);
 
   return (
     <section aria-label={s.barAria(label)} aria-busy={busy || undefined} className="mt-3 border-t border-[var(--ap-border)] pt-3" data-pricing-summary>
@@ -69,9 +83,9 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
           <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]"><Fig>{shown(ok ? usd(summary!.final_price_cents) : '—')}</Fig></dd>
         </div>
         <div className="rounded-[var(--ap-radius-md)] bg-[var(--ap-accent-soft)] px-3 py-2 text-[var(--ap-accent-text)]">
-          <dt className="text-[12px]">{engine ? s.cellCustomer : s.cellSuggested}</dt>
+          <dt className="text-[12px]">{cell4Label}</dt>
           <dd className="text-[15px] font-semibold">
-            <output aria-live="polite"><Fig>{shown(ok ? money(summary!.preorder_base_iqd) : '—')}</Fig></output>
+            <output aria-live="polite"><Fig>{shown(cell4Value)}</Fig></output>
           </dd>
         </div>
       </dl>
@@ -80,7 +94,13 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
       {ok && (
         <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--ap-text-3)]">
           <span>{s.basedOn(profileName(summary!.shipping_profile, lang))}</span>
-          {summary!.direct_sale_price_iqd != null && <span>{s.directSale(money(summary!.direct_sale_price_iqd))}</span>}
+          {priced ? (
+            <span data-direct-caption>{s.directCaption(money(summary!.preorder_base_iqd), money(summary!.direct_sale_extra_iqd))}</span>
+          ) : direct ? (
+            summary!.direct_sale_extra_iqd == null && <span>{s.extraInReview}</span>
+          ) : (
+            summary!.direct_sale_price_iqd != null && <span>{s.directSale(money(summary!.direct_sale_price_iqd))}</span>
+          )}
           {!engine && summary!.store_price_iqd != null && <span>{s.storePrice(money(summary!.store_price_iqd))}</span>}
         </p>
       )}

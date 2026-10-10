@@ -168,10 +168,11 @@ export default function AdminInventory() {
             label={s.stats.aging}
             value={
               <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[14px]">
-                <Age n={count(overview.aging_units.d0_30)} tag="0–30" ok />
-                <Age n={count(overview.aging_units.d31_90)} tag="31–90" ok />
-                <Age n={count(overview.aging_units.d91_180)} tag="91–180" />
-                <Age n={count(overview.aging_units.d180_plus)} tag="180+" warn />
+                {/* The day ranges in the digits of their counts: one card, one digit system. */}
+                <Age n={count(overview.aging_units.d0_30)} tag={`${count(0)}–${count(30)}`} ok />
+                <Age n={count(overview.aging_units.d31_90)} tag={`${count(31)}–${count(90)}`} ok />
+                <Age n={count(overview.aging_units.d91_180)} tag={`${count(91)}–${count(180)}`} />
+                <Age n={count(overview.aging_units.d180_plus)} tag={`${count(180)}+`} warn />
               </span>
             }
             sub={s.stats.agingHint}

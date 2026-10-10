@@ -26,7 +26,7 @@
  * prices. `apply-purchase` recomputes it from the COMMITTED purchase; a
  * mismatch is PRICING_PREVIEW_STALE.
  */
-import { priceSku, resolveSkuInputs, type ChannelPrice, type PricingIssue } from '@levonis/pricing/costToPrice';
+import { priceSku, resolveSkuInputs, ROUNDING_STEP_IQD, type ChannelPrice, type PricingIssue } from '@levonis/pricing/costToPrice';
 import { resolveRuleAt, type PricingRuleRow, type RuleTarget } from '@levonis/pricing/ruleResolution';
 import { channelOfRoute, ROUTE_PROFILE, PREORDER_ROUTES, type PreorderRoute, type ShippingProfile, type SkuChannel } from '@levonis/pricing/skuChannel';
 import { procurementExact, quotientProcurementExact, ceilProcurementExact, type ProcurementExact } from '@levonis/contracts/procurementCost';
@@ -40,6 +40,7 @@ import type { PricingRates } from './rates';
 import { chainOf, chainOfUnit, INPUT_FIELD_NAMES, type InputFields, type InputScope, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
 import {
   deriveProductEntries,
+  directSaleExtraWrites,
   lineFeeds,
   mergedInputs,
   mergedRules,
@@ -48,6 +49,7 @@ import {
   purchaseIneligibility,
   skuLevelOf,
   type DerivedProduct,
+  type DirectSaleExtraDraft,
   type MinimumProfitDraft,
   type PurchaseForPricing,
   type PurchaseLineForPricing,
@@ -74,6 +76,14 @@ export function purchaseSkuLevels(loaded: LoadedProduct): PurchaseSkuLevels | un
 export interface PreviewOptions {
   /** The owner's typed minimum profits, per product (absent = untouched). */
   minimum_profits: ReadonlyMap<string, readonly MinimumProfitDraft[]>;
+  /**
+   * The owner's typed Direct Sale Extras, per product (absent = untouched;
+   * owner request 2026-10-10: the review of a stock purchase asks for the one
+   * input the direct price lacks). They join the rule writes, so the engine
+   * evaluation, the bar, the preview hash and the apply's idempotency key all
+   * see them — no stale apply can write a different extra.
+   */
+  direct_sale_extras?: ReadonlyMap<string, readonly DirectSaleExtraDraft[]>;
   /** Selection keys of the manual lines the owner ticked. */
   opt_in: ReadonlySet<string>;
   /** «استعمل هذا الشراء لتسعير هذا المنتج»: false skips the product's purchase values. */
@@ -124,6 +134,8 @@ export interface LineSummary {
   shipping_profile: ShippingProfile | null;
   profile_source: 'default' | 'proposed' | 'first_route' | null;
   engine_priced: boolean;
+  /** The bar's model sells direct today (an enabled direct-sale cell): the card leads with its direct price. */
+  sells_direct: boolean;
   /** The model the bar prices ('' = the product itself). */
   option_id: string;
   rule_level: string | null;
@@ -167,6 +179,7 @@ const emptySummary = (): LineSummary => ({
   shipping_profile: null,
   profile_source: null,
   engine_priced: false,
+  sells_direct: false,
   option_id: '',
   rule_level: null,
   minimum_target_profit_usd: null,
@@ -230,6 +243,13 @@ export interface ProductPreview {
   }>;
   missing_codes: string[];
   cod_as_direct: boolean;
+  /**
+   * Today's Direct Sale Extra per model that sells direct, where the old prices
+   * give one clean answer (P1's answer B: `MIGRATED`, on the 1,000 step) — the
+   * review's «زيادة البيع المباشر الحالية» button. A suggestion, never written
+   * unless the owner presses it.
+   */
+  extra_suggestions: Array<{ option_id: string; value_iqd: number }>;
 }
 
 interface ProductInput {
@@ -261,11 +281,18 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
   const productLines = p.lines.filter((l) => l.product_id === pid);
   const optIn = new Set([...opts.opt_in].filter((k) => productLines.some((l) => l.key === k)));
   const derived = deriveProductEntries(p, pid, stored, { optIn, prefer, usePurchase, rates, levels: purchaseSkuLevels(input.loaded) });
-  const ruleWrites = minimumProfitWrites(pid, opts.minimum_profits.get(pid) ?? [], stored);
+  const ruleWrites = [
+    ...minimumProfitWrites(pid, opts.minimum_profits.get(pid) ?? [], stored),
+    ...directSaleExtraWrites(pid, opts.direct_sale_extras?.get(pid) ?? [], stored),
+  ];
   const inputs = mergedInputs(stored.inputs, derived.entries.map((e) => e.write));
   const rules: PricingRuleRow[] = mergedRules(stored, ruleWrites);
   const legacy = evaluateLegacy(pid, input.loaded.doc, input.loaded.view, ctx);
   const models = priceModels(pid, legacy.models, inputs, rules, rates);
+  const direct = new Set(legacy.models.filter((m) => m.channels.some((c) => c.ok && c.channel === 'direct_sale')).map((m) => m.option_id));
+  const extraSuggestions = legacy.legacy.models
+    .filter((m) => direct.has(m.option_id) && m.extra.state === 'MIGRATED' && typeof m.extra.value_iqd === 'number' && m.extra.value_iqd >= 0 && m.extra.value_iqd % ROUNDING_STEP_IQD === 0)
+    .map((m) => ({ option_id: m.option_id, value_iqd: m.extra.value_iqd as number }));
   const missing = rates ? [...new Set(models.flatMap((m) => (m.result ? uniqueCodes(m.result.issues) : [])))].sort() : ['FX_RATE_MISSING'];
   const feeds = productLines.some((l) => lineFeeds(p, l, optIn));
   const reason = purchaseIneligibility({ status: p.status, cost_state: p.cost_state, lines: productLines });
@@ -307,6 +334,7 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
     models,
     missing_codes: missing,
     cod_as_direct: legacy.models.some((m) => m.channels.some((c) => c.ok && c.cod_as_direct)),
+    extra_suggestions: extraSuggestions,
   };
 }
 
@@ -441,6 +469,7 @@ export function modelSummary(a: ModelSummaryInput): LineSummary {
     return out;
   }
   out.option_id = model.option_id;
+  out.sells_direct = model.channels.some((c) => c.ok && c.channel === 'direct_sale');
   // A SKU (FX-7: a colour or a variant) resolves over every level of its selection; a model over the product and itself.
   const unit = model.sku
     ? { option_value_ids: model.option_value_ids ?? (model.option_id ? [model.option_id] : []), color_id: model.color_id ?? null, combo_key: model.combo_key ?? null }
@@ -486,7 +515,7 @@ export function modelSummary(a: ModelSummaryInput): LineSummary {
     out.issue_codes = ['SHIPPING_PROFILE_MISSING'];
     return out;
   }
-  const sellsDirect = model.channels.some((c) => c.ok && c.channel === 'direct_sale');
+  const sellsDirect = out.sells_direct;
   const barChannel = channelOfRoute(PROFILE_ROUTE[profile]);
   const channels: SkuChannel[] = sellsDirect ? ['direct_sale', barChannel] : [barChannel];
   const result = priceSku({

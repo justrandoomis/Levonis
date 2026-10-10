@@ -145,6 +145,8 @@ const REQUIRED: Record<string, readonly string[]> = {
   'USD design §6.1 (Writer)': ['PRICING_ENGINE_INCOMPLETE'],
   // FX-7 gaps (DECISIONS row 202): a failed read of the SKU rung (0183) is not a missing table.
   'FX-7 gaps (row 202)': ['PRICING_READ_FAILED'],
+  // Owner request 2026-10-10: a stock purchase is named, and renamed at any status.
+  'Purchase name (owner request 2026-10-10)': ['PURCHASE_NAME_TOO_LONG', 'PURCHASE_NAME_CHANGED'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

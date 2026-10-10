@@ -67,6 +67,9 @@ const INPUTS_PRIVATE_NON_FINANCIAL: Readonly<Record<string, string>> = {
   sku_levels: 'yes/no: the database has the per-SKU price rung, so the colour and variant levels are offered',
   per_sku: 'yes/no: the product is priced per colour or variant (its preview rows are one per SKU)',
   skus: 'a container: each SKU with its names, keys and bar under pricing_summary (FINANCIAL_FIELDS)',
+  // Owner request 2026-10-10: a stock purchase is reviewed for direct sale, and the review asks for the Direct Sale Extra.
+  direct_sale_extras: 'a container: the stored Direct Sale Extra per level (scope, state, source), the amount under direct_sale_extra_iqd (FINANCIAL_FIELDS)',
+  extra_suggestions: 'a container: today’s Direct Sale Extra per model (answer B), the amount under direct_sale_extra_iqd (FINANCIAL_FIELDS)',
 };
 
 function workerCorpus(): string {
@@ -108,6 +111,11 @@ test('every key of the Inputs stage’s answers is in FINANCIAL_FIELDS, register
   const rulesRead = await json(await get(w.app, `/api/admin/pricing/products/${AMS}/rules`));
   answers.push(rulesRead);
   answers.push((await w.putRules(AMS, { inputs_seq: rulesRead.inputs_seq, rules: [{ kind: 'direct_sale_extra', scope: 'product', amount_iqd: 25_000 }] })).body);
+  // The review with a stored extra (its DTO carries the amount) and a typed one (the request key is accepted).
+  const typed = await w.preview({ purchase_id: id, pricing: { direct_sale_extras: [{ product_id: AMS, scope: 'product', scope_id: '', amount_iqd: 25_000 }] } });
+  assert.equal(typed.status, 200, JSON.stringify(typed.body));
+  assert.equal(typed.body.products[0].direct_sale_extras[0].direct_sale_extra_iqd, 25_000);
+  answers.push(typed.body);
   const inputs = await w.getInputs(AMS);
   answers.push(inputs.body);
   answers.push((await w.previewInputs(AMS, { inputs: [{ scope: 'option', scope_id: AMS_MODEL, supplier_cost_amount: '500', supplier_cost_currency: 'CNY' }] })).body);

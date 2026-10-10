@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, Card, Input, PROCUREMENT, T, useLabels, useOperation } from './shared';
 import '../adminInventory/inventory-workspace.css';
+import { useLanguage } from '../../LanguageContext';
+import { purchaseNameStrings } from './purchaseName';
 
 /**
  * RECEIVING A SHIPMENT WITHOUT SEEING ITS COST — owner decision 2, step S1.
@@ -31,6 +33,7 @@ type Draft = Record<string, { qty: number; rejected_qty: number }>;
 const remaining = (l: Line) => Math.max(0, l.qty_ordered - l.qty_received);
 
 export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => void }) {
+  const pn = purchaseNameStrings(useLanguage().lang);
   const { loc } = useLabels(),
     op = useOperation();
   const [purchases, setPurchases] = useState<Head[] | null>(null),
@@ -93,7 +96,7 @@ export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => v
     <div>
       {op.feedback}
       {selected && (
-        <Card title={selected.purchase.invoice_no || loc('شراء بلا رقم فاتورة', 'Purchase without invoice number', 'کڕین بێ ژمارەی پسوولە')}>
+        <Card title={selected.purchase.invoice_no || pn.fallback}>
           <p className={`mb-3 text-sm ${T.text3}`}>
             {selected.purchase.supplier_name || loc('بدون مورد', 'No supplier', 'بێ دابینکەر')} · {statusLabel(selected.purchase.status)}
             {selected.purchase.warehouse_name ? ` · ${selected.purchase.warehouse_name}` : ''}
@@ -166,7 +169,7 @@ export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => v
               <article className="inventory-line" key={p.id}>
                 <div className="inventory-line-head">
                   <div>
-                    <strong>{p.invoice_no || loc('شراء بلا رقم فاتورة', 'Purchase without invoice number', 'کڕین بێ ژمارەی پسوولە')}</strong>
+                    <strong>{p.invoice_no || pn.fallback}</strong>
                     <small>
                       {p.supplier_name || loc('بدون مورد', 'No supplier', 'بێ دابینکەر')} · {statusLabel(p.status)}
                       {p.expected_day ? ` · ${p.expected_day}` : ''}

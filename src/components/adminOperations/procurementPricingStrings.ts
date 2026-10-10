@@ -114,6 +114,24 @@ export interface ProcurementPricingStrings {
   notApplied: string;
   applyNow: string;
   cancelledSource: string;
+  // a stock purchase is reviewed for direct sale (owner request 2026-10-10)
+  sectionDirect: string;
+  extraLabel: string;
+  extraHint: string;
+  noExtra: string;
+  todayExtra: Fill;
+  extraNeeded: string;
+  extraInvalid: string;
+  preorderFollow: Fill;
+  preorderWhy: Fill;
+  preorderOnly: string;
+  colBeforeExtra: string;
+  directRoute: Fill;
+  cellDirectCustomer: string;
+  cellDirectSuggested: string;
+  cellPreorderBase: string;
+  directCaption: Fill2;
+  extraInReview: string;
 }
 
 const ar: ProcurementPricingStrings = {
@@ -202,6 +220,23 @@ const ar: ProcurementPricingStrings = {
   notApplied: 'لم تُعتمد تكلفة هذا الشراء في التسعير بعد',
   applyNow: 'اعتمدها الآن',
   cancelledSource: 'مصدر التكلفة شراء مُلغى — راجع التكلفة',
+  sectionDirect: 'البيع المباشر',
+  extraLabel: 'زيادة البيع المباشر (د.ع)',
+  extraHint: 'تُضاف زيادة البيع المباشر إلى سعر الطلب المسبق الأساسي لتعطي سعر البيع المباشر، لكل موديل في المنتج لم تُحدَّد له زيادة البيع المباشر الخاصة به. 0 مقبول.',
+  noExtra: 'بدون زيادة البيع المباشر (0)',
+  todayExtra: (x) => `زيادة البيع المباشر الحالية: ${x}`,
+  extraNeeded: 'لتسعير البيع المباشر أدخل زيادة البيع المباشر أعلاه (0 مقبول). بدونها تُحفظ البيانات فقط.',
+  extraInvalid: 'أدخل زيادة البيع المباشر بالدينار، مضاعفًا لـ 1,000 (0 مقبول)',
+  preorderFollow: (n) => `وتتغير معها أسعار الطلب المسبق لأنها من التكلفة نفسها (${n})`,
+  preorderWhy: (route) => `يظهر الطلب المسبق لأن المنتج معروض للطلب المسبق — ${route}. لإيقافه أطفئ الطلب المسبق في إعدادات المنتج.`,
+  preorderOnly: 'هذا المنتج غير معروض للبيع المباشر؛ يُسعَّر للطلب المسبق فقط.',
+  colBeforeExtra: 'السعر قبل زيادة البيع المباشر',
+  directRoute: (route) => `يُبنى سعر البيع المباشر على: ${route} (مقترح من هذا الشراء)`,
+  cellDirectCustomer: 'سعر البيع المباشر للزبون',
+  cellDirectSuggested: 'سعر البيع المباشر المقترح',
+  cellPreorderBase: 'سعر الطلب المسبق الأساسي',
+  directCaption: (pre, x) => `الطلب المسبق ${pre} + زيادة البيع المباشر ${x}`,
+  extraInReview: 'أدخل زيادة البيع المباشر في المراجعة لتسعير البيع المباشر',
 };
 
 const en: ProcurementPricingStrings = {
@@ -290,6 +325,23 @@ const en: ProcurementPricingStrings = {
   notApplied: "This purchase's cost has not been applied to pricing yet",
   applyNow: 'Apply it now',
   cancelledSource: 'The cost came from a cancelled purchase — review it',
+  sectionDirect: 'Direct sale',
+  extraLabel: 'Direct Sale Extra (IQD)',
+  extraHint: 'The Direct Sale Extra is added to the base pre-order price to give the direct sale price, for every model of the product without its own. 0 is allowed.',
+  noExtra: 'No Direct Sale Extra (0)',
+  todayExtra: (x) => `Current Direct Sale Extra: ${x}`,
+  extraNeeded: 'To price direct sale, enter the Direct Sale Extra above (0 is allowed). Without it only the data is saved.',
+  extraInvalid: 'Enter the Direct Sale Extra in whole dinars, a multiple of 1,000 (0 is allowed)',
+  preorderFollow: (n) => `Pre-order prices move with it, from the same cost (${n})`,
+  preorderWhy: (route) => `Pre-order shows because the product is offered for pre-order — ${route}. To stop it, turn pre-order off in the product settings.`,
+  preorderOnly: 'This product is not offered for direct sale; it is priced for pre-order only.',
+  colBeforeExtra: 'Price before Direct Sale Extra',
+  directRoute: (route) => `The direct sale price is built on: ${route} (proposed by this purchase)`,
+  cellDirectCustomer: 'Direct sale price to the customer',
+  cellDirectSuggested: 'Suggested direct sale price',
+  cellPreorderBase: 'Base pre-order price',
+  directCaption: (pre, x) => `Pre-order ${pre} + Direct Sale Extra ${x}`,
+  extraInReview: 'Enter the Direct Sale Extra in the review to price direct sale',
 };
 
 const ckb: ProcurementPricingStrings = {
@@ -378,6 +430,23 @@ const ckb: ProcurementPricingStrings = {
   notApplied: 'تێچووی ئەم کڕینە هێشتا لە نرخداناندا جێبەجێ نەکراوە',
   applyNow: 'ئێستا جێبەجێی بکە',
   cancelledSource: 'تێچووەکە لە کڕینێکی هەڵوەشێنراوەوە هاتووە — پێیدا بچۆرەوە',
+  sectionDirect: 'فرۆشتنی ڕاستەوخۆ',
+  extraLabel: 'زیادەی فرۆشتنی ڕاستەوخۆ (د.ع)',
+  extraHint: 'زیادەی فرۆشتنی ڕاستەوخۆ دەخرێتە سەر نرخی بنەڕەتیی پێشداواکاری بۆ نرخی فرۆشتنی ڕاستەوخۆ، بۆ هەموو مۆدێلەکانی بەرهەمەکە کە زیادەی فرۆشتنی ڕاستەوخۆی تایبەتیان نییە. 0 قبوڵە.',
+  noExtra: 'بێ زیادەی فرۆشتنی ڕاستەوخۆ (0)',
+  todayExtra: (x) => `زیادەی فرۆشتنی ڕاستەوخۆی ئێستا: ${x}`,
+  extraNeeded: 'بۆ نرخدانانی فرۆشتنی ڕاستەوخۆ، زیادەی فرۆشتنی ڕاستەوخۆ لە سەرەوە بنووسە (0 قبوڵە). بەبێ ئەوە تەنها زانیارییەکان پاشەکەوت دەکرێن.',
+  extraInvalid: 'زیادەی فرۆشتنی ڕاستەوخۆ بە دیناری تەواو بنووسە، چەندجارەیەکی 1,000 (0 قبوڵە)',
+  preorderFollow: (n) => `نرخەکانی پێشداواکاریش لەگەڵیدا دەگۆڕێن چونکە لە هەمان تێچوونەوەن (${n})`,
+  preorderWhy: (route) => `پێشداواکاری دەردەکەوێت چونکە بەرهەمەکە بۆ پێشداواکاری پێشکەش کراوە — ${route}. بۆ ڕاگرتنی، پێشداواکاری لە ڕێکخستنەکانی بەرهەمەکەدا بکوژێنەوە.`,
+  preorderOnly: 'ئەم بەرهەمە بۆ فرۆشتنی ڕاستەوخۆ پێشکەش نەکراوە؛ تەنها بۆ پێشداواکاری نرخی بۆ دادەنرێت.',
+  colBeforeExtra: 'نرخ پێش زیادەی فرۆشتنی ڕاستەوخۆ',
+  directRoute: (route) => `نرخی فرۆشتنی ڕاستەوخۆ لەسەر ئەمە دادەنرێت: ${route} (لەم کڕینەوە پێشنیار کراوە)`,
+  cellDirectCustomer: 'نرخی فرۆشتنی ڕاستەوخۆ بۆ کڕیار',
+  cellDirectSuggested: 'نرخی پێشنیارکراوی فرۆشتنی ڕاستەوخۆ',
+  cellPreorderBase: 'نرخی بنەڕەتیی پێشداواکاری',
+  directCaption: (pre, x) => `پێشداواکاری ${pre} + زیادەی فرۆشتنی ڕاستەوخۆ ${x}`,
+  extraInReview: 'زیادەی فرۆشتنی ڕاستەوخۆ لە پێداچوونەوەدا بنووسە بۆ نرخدانانی فرۆشتنی ڕاستەوخۆ',
 };
 
 export const PROCUREMENT_PRICING_STRINGS: Readonly<Record<Language, ProcurementPricingStrings>> = { ar, en, ckb };

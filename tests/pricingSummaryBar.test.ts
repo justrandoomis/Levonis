@@ -75,3 +75,40 @@ test('the bar, the card and the product form import no pricing or FX maths; they
     assert.doesNotMatch(code, /from '[^']*(costToPrice|ruleResolution|legacyTargets|pricingEngine|fxChain|packages\/pricing)[^']*'/, file);
   }
 });
+
+// ---------------------------------------------------------------- the procurement card leads with the direct price (owner request 2026-10-10)
+
+const DIRECT: PricingSummary = { ...BRIEF, sells_direct: true, direct_sale_extra_iqd: 0, direct_sale_price_iqd: 992_000 };
+
+test('the card, a model that sells direct and is priced: cell 4 is the direct sale price, the caption names its two parts', () => {
+  const s = PROCUREMENT_PRICING_STRINGS.ar;
+  const manual = render(createElement(PricingSummaryBar, { summary: { ...DIRECT, direct_sale_extra_iqd: 50_000, direct_sale_price_iqd: 1_042_000 }, label: 'A1', directFirst: true }));
+  assert.ok(manual.includes(s.cellDirectSuggested), 'a manual product: «سعر البيع المباشر المقترح»');
+  assert.ok(!manual.includes(s.cellSuggested));
+  assert.match(manual, /<output aria-live="polite"><bdi dir="ltr"[^>]*>1,042,000 د.ع<\/bdi><\/output>/);
+  assert.ok(manual.includes(s.directCaption('992,000 د.ع', '50,000 د.ع')));
+  assert.ok(!manual.includes(s.directSale('1,042,000 د.ع')), 'the old caption is replaced, not repeated');
+  assert.ok(manual.includes('$500.00') && manual.includes('+$120.00') && manual.includes('$620.00'), 'cells 1-3 (USD) unchanged; the extra stays in dinars');
+  assert.equal((manual.match(/<bdi dir="ltr"/g) ?? []).length, 4);
+  const engine = render(createElement(PricingSummaryBar, { summary: { ...DIRECT, engine_priced: true }, label: 'A1', directFirst: true }));
+  assert.ok(engine.includes(s.cellDirectCustomer), 'an engine product: «سعر البيع المباشر للزبون»');
+  assert.ok(engine.includes(s.directCaption('992,000 د.ع', '0 د.ع')));
+});
+
+test('the card, a model that sells direct but has no Direct Sale Extra: the base pre-order price under its own name, and where to complete it', () => {
+  const s = PROCUREMENT_PRICING_STRINGS.ar;
+  const html = render(createElement(PricingSummaryBar, { summary: { ...DIRECT, direct_sale_extra_iqd: null, direct_sale_price_iqd: null }, label: 'A1', directFirst: true }));
+  assert.ok(html.includes(s.cellPreorderBase));
+  assert.match(html, /<output aria-live="polite"><bdi dir="ltr"[^>]*>992,000 د.ع<\/bdi><\/output>/);
+  assert.ok(html.includes(s.extraInReview));
+});
+
+test('a pre-order-only model on the card, and every screen without the prop (the product form), read exactly as before', () => {
+  const before = render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'AMS HT' }));
+  assert.equal(render(createElement(PricingSummaryBar, { summary: { ...BRIEF, sells_direct: false }, label: 'AMS HT', directFirst: true })), before);
+  assert.equal(render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'AMS HT', directFirst: true })), before, 'an older server without sells_direct');
+  const formDirect = render(createElement(PricingSummaryBar, { summary: DIRECT, label: 'AMS HT' }));
+  assert.ok(formDirect.includes(PROCUREMENT_PRICING_STRINGS.ar.cellSuggested), 'the product form keeps «السعر المقترح للزبون»');
+  assert.ok(formDirect.includes(PROCUREMENT_PRICING_STRINGS.ar.directSale('992,000 د.ع')));
+  assert.ok(!formDirect.includes(PROCUREMENT_PRICING_STRINGS.ar.cellDirectSuggested));
+});

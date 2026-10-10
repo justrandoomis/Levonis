@@ -75,12 +75,25 @@ export function parseRuleWrites(
       return { kind, scope, scope_id: scopeId, existing, next: { state: 'ACTIVE' as const, amount_usd: usd, amount_iqd: null, source: 'OWNER' as const, legacy_result_id: null } };
     }
     if (r.amount_usd !== undefined && r.amount_usd !== null) throw inputInvalid(`rules[${i}].amount_usd`);
-    if (r.amount_iqd === undefined || r.amount_iqd === null || r.amount_iqd === '') return { kind, scope, scope_id: scopeId, existing, next: inherit };
-    const iqd = r.amount_iqd;
-    if (typeof iqd !== 'number' || !Number.isSafeInteger(iqd) || iqd < 0 || iqd > 1_000_000_000) throw inputInvalid('direct_sale_extra_iqd');
-    if (iqd % ROUNDING_STEP_IQD !== 0) throw new HttpError(400, serverMessage('DIRECT_SALE_EXTRA_NOT_ON_STEP'), 'DIRECT_SALE_EXTRA_NOT_ON_STEP', { field: 'direct_sale_extra_iqd' });
+    const iqd = parseDirectSaleExtraAmount(r.amount_iqd);
+    if (iqd === null) return { kind, scope, scope_id: scopeId, existing, next: inherit };
     return { kind, scope, scope_id: scopeId, existing, next: { state: 'ACTIVE' as const, amount_iqd: iqd, amount_usd: null, source: 'OWNER' as const, legacy_result_id: null } };
   });
+}
+
+/**
+ * THE ONE VALIDATOR OF A TYPED DIRECT SALE EXTRA — «التسعير والشحن», the
+ * product form and the procurement card's review alike (owner request
+ * 2026-10-10: the review asks for it in place). Empty (absent, null, '') is
+ * INHERIT → null. Otherwise whole dinars, 0 ≤ x ≤ 1,000,000,000, on the 1,000
+ * step. Zero is the owner's own answer ("the direct price is the base
+ * pre-order price"), never a default. Refusals name the FIELD, never the value.
+ */
+export function parseDirectSaleExtraAmount(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === '') return null;
+  if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw < 0 || raw > 1_000_000_000) throw inputInvalid('direct_sale_extra_iqd');
+  if (raw % ROUNDING_STEP_IQD !== 0) throw new HttpError(400, serverMessage('DIRECT_SALE_EXTRA_NOT_ON_STEP'), 'DIRECT_SALE_EXTRA_NOT_ON_STEP', { field: 'direct_sale_extra_iqd' });
+  return raw;
 }
 
 /**

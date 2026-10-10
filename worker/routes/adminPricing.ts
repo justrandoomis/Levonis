@@ -121,10 +121,10 @@ import {
   type ProductPricingData,
   type RuleWrite,
 } from '../lib/pricingEngine/store';
-import { MinimumProfitError, parseMinimumProfit, purchaseIneligibility, type MinimumProfitDraft, type PurchaseForPricing } from '../lib/pricingEngine/fromPurchase';
+import { MinimumProfitError, parseMinimumProfit, purchaseIneligibility, type DirectSaleExtraDraft, type MinimumProfitDraft, type PurchaseForPricing } from '../lib/pricingEngine/fromPurchase';
 import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
 import { lineDto, productPreviewDto, ratesHeadDto, storedRulesDto } from '../lib/pricingEngine/procurementDto';
-import { legacyAcceptWrites, parseRuleWrites } from '../lib/pricingEngine/ownerRules';
+import { legacyAcceptWrites, parseDirectSaleExtraAmount, parseRuleWrites } from '../lib/pricingEngine/ownerRules';
 import { evaluateLegacy, sellableSkus } from '../lib/pricingEngine/legacy';
 import { legacyHashOf } from '../lib/pricingEngine/legacyHash';
 import { parseProcurementDraft } from '../lib/procurementDraft';
@@ -737,6 +737,36 @@ function minimumProfits(raw: unknown, loaded: ReadonlyMap<string, LoadedProduct>
   return out;
 }
 
+/**
+ * The owner's typed Direct Sale Extras on the review of a stock purchase (owner
+ * request 2026-10-10), validated against each product's models: product or an
+ * active model (colour and SKU levels are not offered on this card), one entry
+ * per target, the amount through the one validator `«التسعير والشحن»` uses
+ * (`parseDirectSaleExtraAmount`: whole dinars, the 1,000 step, null = inherit).
+ */
+function directSaleExtras(raw: unknown, loaded: ReadonlyMap<string, LoadedProduct>, onlyProduct?: string): Map<string, DirectSaleExtraDraft[]> {
+  const out = new Map<string, DirectSaleExtraDraft[]>();
+  if (raw === undefined || raw === null) return out;
+  if (!Array.isArray(raw) || raw.length > 60) throw inputInvalid('direct_sale_extras');
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const r = strictBody(item, onlyProduct ? ['scope', 'scope_id', 'amount_iqd'] : ['product_id', 'scope', 'scope_id', 'amount_iqd']);
+    const pid = onlyProduct ?? (typeof r.product_id === 'string' ? r.product_id : '');
+    const product = loaded.get(pid);
+    if (!product) throw inputInvalid('direct_sale_extras');
+    const scope = r.scope;
+    if (scope !== 'product' && scope !== 'option') throw inputInvalid('direct_sale_extras');
+    const scopeId = scope === 'product' ? '' : typeof r.scope_id === 'string' ? r.scope_id : '';
+    if (scope === 'option' && !optionIdsOf(product).has(scopeId)) throw inputInvalid('direct_sale_extras');
+    if (scope === 'product' && r.scope_id !== undefined && r.scope_id !== null && r.scope_id !== '') throw inputInvalid('direct_sale_extras');
+    const key = `${pid}:${scope}:${scopeId}`;
+    if (seen.has(key)) throw inputInvalid('direct_sale_extras');
+    seen.add(key);
+    out.set(pid, [...(out.get(pid) ?? []), { scope, scope_id: scopeId, amount_iqd: parseDirectSaleExtraAmount(r.amount_iqd) }]);
+  }
+  return out;
+}
+
 /** Products whose prices this purchase was applied to (an apply audit row exists). */
 async function appliedProducts(db: D1Database, purchaseId: string | null): Promise<Set<string>> {
   if (!purchaseId) return new Set();
@@ -751,11 +781,12 @@ async function appliedProducts(db: D1Database, purchaseId: string | null): Promi
 async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForPricing, pricingRaw: unknown, onlyProduct?: string) {
   const db = c.env.DB;
   const rates = await engineRates(db);
-  const pricing = strictBody(pricingRaw ?? {}, ['minimum_profits', 'manual_line_opt_in', 'use_purchase', 'prefer_purchase_values']);
+  const pricing = strictBody(pricingRaw ?? {}, ['minimum_profits', 'direct_sale_extras', 'manual_line_opt_in', 'use_purchase', 'prefer_purchase_values']);
   const ids = [...new Set(purchase.lines.map((l) => l.product_id))].filter((id) => !onlyProduct || id === onlyProduct);
   const [loaded, stored, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
   const opts: PreviewOptions = {
     minimum_profits: minimumProfits(pricing.minimum_profits, loaded),
+    direct_sale_extras: directSaleExtras(pricing.direct_sale_extras, loaded),
     opt_in: new Set(stringList(pricing.manual_line_opt_in, 'manual_line_opt_in')),
     use_purchase: booleanMap(pricing.use_purchase, 'use_purchase'),
     prefer: booleanMap(pricing.prefer_purchase_values, 'prefer_purchase_values'),
@@ -825,7 +856,7 @@ const APPLY_STATEMENT_CAP = 200;
 
 adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
   assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['purchase_id', 'use_purchase', 'prefer_purchase_values', 'manual_line_opt_in', 'minimum_profits', 'preview_hash', 'confirm_large_change']);
+  const body = strictBody(await jsonObject(c), ['purchase_id', 'use_purchase', 'prefer_purchase_values', 'manual_line_opt_in', 'minimum_profits', 'direct_sale_extras', 'preview_hash', 'confirm_large_change']);
   const db = c.env.DB;
   const rates = await engineRates(db);
   if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
@@ -849,12 +880,17 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
     use_purchase: { [pid]: usePurchase },
     prefer_purchase_values: { [pid]: body.prefer_purchase_values === true },
   };
-  // The minimum profits are this product's: each entry names its scope only.
+  // The minimum profits and Direct Sale Extras are this product's: each entry names its scope only.
   const typed = minimumProfits(pricing.minimum_profits, new Map([[pid, loaded]]), pid);
+  const extras = directSaleExtras(body.direct_sale_extras, new Map([[pid, loaded]]), pid);
   const { previews, stored, products, engine } = await procurementPreview(
     c,
     purchase,
-    { ...pricing, minimum_profits: (typed.get(pid) ?? []).map((d) => ({ product_id: pid, ...d })) },
+    {
+      ...pricing,
+      minimum_profits: (typed.get(pid) ?? []).map((d) => ({ product_id: pid, ...d })),
+      direct_sale_extras: (extras.get(pid) ?? []).map((d) => ({ product_id: pid, ...d })),
+    },
     pid
   );
   const preview = previews.get(pid);
