@@ -195,14 +195,14 @@ export default function AdminSecurity() {
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {tiles.map(([k, v]) => (
-          <div key={k} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-            <div className="text-xs text-zinc-400">{s(k)}</div>
+          <div key={k} className="lv-surface p-3">
+            <div className="text-xs text-text-muted">{s(k)}</div>
             <div className="mt-1 text-2xl font-semibold tabular-nums">{v}</div>
           </div>
         ))}
       </div>
 
-      <div role="tablist" className="flex gap-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-1">
+      <div role="tablist" className="lv-well flex gap-1 rounded-xl border border-border-subtle p-1">
         {(['blocks', 'log', 'scores'] as const).map((t) => (
           <button
             key={t}
@@ -233,7 +233,7 @@ export default function AdminSecurity() {
             {s('showAll')}
           </label>
           {blocks && blocks.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{s('empty')}</p>}
-          <ul className="divide-y divide-zinc-800 rounded-xl border border-zinc-800">
+          <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {(blocks ?? []).map((b) => (
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
                 <div className="min-w-0">
@@ -270,7 +270,7 @@ export default function AdminSecurity() {
       {tab === 'log' && (
         <section className="space-y-2">
           {events && events.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{s('emptyLog')}</p>}
-          <ul className="divide-y divide-zinc-800 rounded-xl border border-zinc-800">
+          <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {(events ?? []).map((e) => (
               <li key={e.id} className="p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -303,7 +303,7 @@ export default function AdminSecurity() {
       {tab === 'scores' && (
         <section className="space-y-2">
           {scores && scores.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{s('emptyScores')}</p>}
-          <ul className="divide-y divide-zinc-800 rounded-xl border border-zinc-800">
+          <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {(scores ?? []).map((r, i) => (
               <li key={`${r.actor_kind}-${i}`} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                 <div>
@@ -329,7 +329,7 @@ export default function AdminSecurity() {
             aria-modal="true"
             aria-label={s('incident')}
             onClick={(e) => e.stopPropagation()}
-            className="h-full w-full max-w-xl overflow-y-auto border-s border-zinc-800 bg-zinc-950 p-4"
+            className="h-full w-full max-w-xl overflow-y-auto border-s border-border-subtle bg-surface-raised p-4 shadow-2xl"
             dir={dir}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -404,7 +404,7 @@ export default function AdminSecurity() {
 
       {confirm && (
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4">
-          <div role="alertdialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-4" dir={dir}>
+          <div role="alertdialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-border-subtle bg-surface-raised p-4 shadow-2xl" dir={dir}>
             <p className="text-sm">{s('liftConfirm')}</p>
             <p className="mt-1 text-xs text-zinc-400">
               {confirm.whole ? s('liftIncident') : `${s(KIND_KEY[confirm.block.actor_kind])} · ${actorText(confirm.block)}`} · <bdi className="font-mono">{confirm.block.reference}</bdi>

@@ -37,18 +37,18 @@ export default function AccessBlockedScreen({ reference, signedIn }: { reference
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="access-blocked-title"
-      className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto bg-zinc-950/95 px-4 py-8 text-zinc-100 backdrop-blur"
+      className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto bg-canvas px-4 py-8 text-text-primary"
     >
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-5 shadow-xl">
+      <div className="w-full max-w-lg rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-2xl">
         <div className="mb-3 flex justify-center text-amber-400">
           <ShieldAlert className="h-10 w-10" aria-hidden="true" />
         </div>
         {LANGS.map(({ lang, dir }, i) => (
-          <section key={lang} lang={lang} dir={dir} className={`py-3 ${i > 0 ? 'border-t border-zinc-800' : ''}`}>
+          <section key={lang} lang={lang} dir={dir} className={`py-3 ${i > 0 ? 'border-t border-border-subtle' : ''}`}>
             <h2 id={i === 0 ? 'access-blocked-title' : undefined} className="text-base font-semibold leading-snug">
               {ACCESS_BLOCKED_TEXT.title[lang]}
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-zinc-300">{ACCESS_BLOCKED_TEXT.mistake[lang]}</p>
+            <p className="mt-1 text-sm leading-relaxed text-text-secondary">{ACCESS_BLOCKED_TEXT.mistake[lang]}</p>
             {reference && (
               <p className="mt-1 text-sm text-amber-300">
                 {ACCESS_BLOCKED_TEXT.reference[lang]}: <bdi className="font-mono">{reference}</bdi>
