@@ -113,6 +113,9 @@ const AREAS: Record<string, readonly string[]> = {
     'final_price_cents', 'pricing_summary', 'legacy_amount_iqd', 'legacy_usd_iqd_rate', 'actual_purchase_cost_iqd',
     'actual_landed_cost_iqd', 'actual_additional_costs_iqd',
   ],
+  // The product form's data-first save (owner report 2026-10-10; DECISIONS row 211): the typed dinars'
+  // conversion hash — the dinars and the rate hashed, an oracle like preview_hash.
+  USD_SAVE: ['conversion_hash'],
   // USD procurement pricing (USD design §9; migration 0181): the minimum profit in
   // USD, the USD chain's figures, the card's summary and the converted legacy minimum.
   // FX-6 (FX plan §4.3, §4.5; migration 0182): a batch's purchase snapshot beyond the FX-1 names —

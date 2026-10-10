@@ -1910,6 +1910,13 @@ export function apiRefusal(err: unknown, lang: Lang, fallback = ''): string {
 /** The site's language as this table's key — Arabic unless English or Sorani. */
 export const refusalLang = (lang: string | null | undefined): Lang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');
 
+/** «{field}» with no name the screen can give: the refusal still reads as a sentence. */
+const FIELD_GENERIC: Record<Lang, string> = {
+  ar: 'قيمة غير صالحة في أحد الحقول.',
+  en: 'One of the fields holds an invalid value.',
+  ckb: 'یەکێک لە خانەکان بەهایەکی نادروستی تێدایە.',
+};
+
 /**
  * ADMIN SCREENS: THE PROGRAMME CONTRACT'S REFUSALS, BY CODE (serial landing
  * round 3, F3).
@@ -1925,11 +1932,17 @@ export const refusalLang = (lang: string | null | undefined): Lang => (lang === 
  * untouched for any other code. Duck-typed like `apiRefusal`: an
  * `ApiError`, or a `{ code, message }` validation object.
  */
-export function contractRefusal(err: unknown, lang: Lang, shown?: string): string {
-  const e = err as { code?: unknown; message?: unknown } | null;
+export function contractRefusal(err: unknown, lang: Lang, shown?: string, fieldLabel?: (field: string) => string | null): string {
+  const e = err as { code?: unknown; message?: unknown; details?: unknown } | null;
   const said = shown ?? (e && typeof e.message === 'string' ? e.message : '');
   if (e && (isCostRefusalCode(e.code) || (typeof e.code === 'string' && (isDataFileRefusalCode(e.code) || isCompletenessRefusalCode(e.code))))) {
-    return refusalText(e.code as string, lang, said);
+    const text = refusalText(e.code as string, lang, said);
+    if (!text.includes('{field}')) return text;
+    // A sentence with «{field}» is never printed raw (owner report 2026-10-10): the screen's own label for
+    // `details.field` (the bare name, `inputs[0].` / `rules[0].` dropped), else the sentence without a name.
+    const raw = e.details && typeof e.details === 'object' ? (e.details as { field?: unknown }).field : undefined;
+    const label = typeof raw === 'string' && fieldLabel ? fieldLabel(raw.replace(/^(?:inputs|rules)\[\d+\]\./, '')) : null;
+    return label ? text.replace('{field}', label) : FIELD_GENERIC[lang];
   }
   return said;
 }

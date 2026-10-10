@@ -200,6 +200,24 @@ export interface ProcurementDecimalOptions {
 const DECIMAL_TEXT = /^([+-]?)(\d+)(?:\.(\d+))?$/;
 
 /**
+ * A decimal AS THE OWNER TYPES IT → the ASCII text the strict parsers read:
+ * Arabic-Indic and Extended digits to ASCII, the Arabic decimal separator «٫»
+ * to '.', and a comma to '.' only as a DECIMAL comma (one or two digits after
+ * it, at the end). '1,200' stays unparseable (never 1.2, never 1200); '5.'
+ * stays refused. One reader for the supplier cost, the manual CBM and the
+ * minimum profit, on the server and in the product form alike (owner report
+ * 2026-10-10: the cost refused «٨٩٩٫٥» while the minimum profit took it).
+ */
+export function typedDecimalText(text: string): string {
+  return text
+    .trim()
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/\u066b/g, '.')
+    .replace(/^([0-9]+),([0-9]{1,2})$/, '$1.$2');
+}
+
+/**
  * The validator for every decimal a body, a file row or a form sends to the
  * pricing engine (ENG §4.1, §5): returns the CANONICAL text the 0179 CHECKs
  * accept — digits, at most one '.', no exponent, no leading or trailing '.',

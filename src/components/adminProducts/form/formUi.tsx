@@ -21,6 +21,7 @@
 import React, { useId, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ImagePlus, Info, Link2, RefreshCw, X } from 'lucide-react';
 import { uploadFile, failureText, formatIqd } from '../../../lib/api';
+import { toAsciiDigits } from '../../../lib/localeNumber';
 import SafeImage from '../../ui/SafeImage';
 import { MissingNote, useMissing, useMissingId } from '../completeness';
 import type { CompletenessItemCode } from '../../../../packages/contracts/src/productCompleteness';
@@ -499,6 +500,13 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 }
 
 /**
+ * Whole dinars AS TYPED: Arabic-Indic and Extended digits are digits (owner
+ * report 2026-10-10 — «١٥٠٠٠» in «تكاليف إضافية» was dropped key by key),
+ * every separator is dropped.
+ */
+export const wholeDigits = (raw: string): string => toAsciiDigits(raw).replace(/[^\d]/g, '');
+
+/**
  * Integer IQD money input. EMPTY means "inherit / not set" (null) and an
  * explicit 0 is a real price — never a truthiness check, because a genuinely
  * free item and an unset price are different facts.
@@ -534,7 +542,7 @@ export function Money({
       placeholder={placeholder ?? (required ? '0' : 'يرث / inherit')}
       value={text}
       onChange={(e) => {
-        const raw = e.target.value.replace(/[^\d]/g, '');
+        const raw = wholeDigits(e.target.value);
         setTouched(true);
         setText(raw);
         onChange(raw === '' ? null : Number(raw));

@@ -95,10 +95,11 @@ const formOf = (over: Partial<UsdPricingFormContext> = {}): UsdPricingFormContex
   ...over,
 });
 const stateOf = (answer: UsdPricingAnswer, over: Partial<UsdPricingState> = {}): UsdPricingState => ({
-  enabled: true, productId: 'p1', form: formOf(), answer, shown: answer, drafts: {}, effective: {}, dirty: false, invalid: false, busy: false,
-  saving: false, notInstalled: false, error: '', notice: '', engine: false, setDraft: () => {}, discard: () => {}, save: async () => {},
-  reload: () => {}, snapshot: () => null, saveAfterProduct: async () => ({ ok: true, message: '' }),
-  afterProductSaved: async () => {}, review: null, reviewBusy: false, confirmReview: async () => {}, cancelReview: () => {}, exitEngine: async () => {}, ...over,
+  enabled: true, productId: 'p1', form: formOf(), answer, shown: answer, drafts: {}, effective: {}, dirty: false, touched: false, invalid: false,
+  invalidWhere: '', busy: false, saving: false, notInstalled: false, error: '', notice: '', outcome: null, serverField: null, rateKnownMissing: false,
+  engine: false, setDraft: () => {}, discard: () => {}, save: async () => {}, reload: () => {}, snapshot: () => null,
+  saveAfterProduct: async () => ({ ok: true, message: '' }), afterProductSaved: async () => {}, review: null, reviewBusy: false,
+  confirmReview: async () => {}, cancelReview: () => {}, openReview: () => {}, exitEngine: async () => {}, ...over,
 });
 const withState = (state: UsdPricingState, el: Parameters<typeof renderToStaticMarkup>[0]) => render(createElement(UsdPricingProvider, { value: state, children: el }));
 
@@ -219,14 +220,100 @@ test('the product form: every mount point is the owner’s, the document never c
   assert.doesNotMatch(form, /supplier_cost_amount|supplier_cost_iqd|minimum_target_profit_usd|direct_sale_extra_iqd|conversion_rate_snapshot/);
 
   const section = codeOf('src/components/adminProducts/form/UsdPricingSection.tsx');
-  // Every request of the section goes to the pricing door (the writer adds the held save's confirm, the read after a
-  // product save and «رجوع إلى التسعير اليدوي»).
-  const paths = [...section.matchAll(/\.(?:get|post|put)<[^>]*>\(\s*`([^`]*)`/g)].map((m) => m[1]);
-  assert.equal(paths.length, 8, String(paths));
-  assert.equal((section.match(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\b/g) ?? []).length, 8, 'no request outside the eight above');
-  for (const p of paths) assert.match(p!, /^\$\{PRICING\}\/products\//);
+  // Every request of the section goes to the pricing door: the save path's `io` (a product's inputs and
+  // preview, nothing else), the live read and preview, the sheet's confirm and «رجوع إلى التسعير اليدوي».
+  const calls = [...section.matchAll(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\s*<[^>]*>\(\s*([^,\n]+?)\s*,/g)].map((m) => m[1]);
+  assert.equal(calls.length, 7, String(calls));
+  assert.equal((section.match(/\bapi\s*\.\s*(?:get|post|put|patch|delete)\b/g) ?? []).length, 7, 'no request outside the seven above');
+  for (const p of calls) assert.match(p!, /^(?:p|inputsPath\([^)]*\)|previewPath\([^)]*\)|`\$\{PRICING\}\/products\/[^`]*`)$/, p);
+  assert.match(section, /export const inputsPath = \(pid: string\) => `\$\{PRICING\}\/products\/\$\{encodeURIComponent\(pid\)\}\/inputs`;/);
+  assert.match(section, /export const previewPath = \(pid: string\) => `\$\{PRICING\}\/products\/\$\{encodeURIComponent\(pid\)\}\/preview`;/);
+  // The `io` the save path is handed reads, previews and writes exactly those two paths.
+  const ioCalls = [...section.matchAll(/\bio\.(?:get|post|put)\(\s*([A-Za-z]+)\(/g)].map((m) => m[1]);
+  assert.ok(ioCalls.length >= 5, String(ioCalls));
+  for (const fn of ioCalls) assert.match(fn!, /^(?:inputsPath|previewPath)$/);
   assert.match(section, /const PRICING = '\/api\/admin\/pricing';/);
   // The options card renders the section's row for each model, and nothing for anyone else.
   const options = codeOf('src/components/adminProducts/form/OptionsSection.tsx');
   assert.match(options, /\{valueExtra\?\.\(v\)\}/);
+});
+
+// ------------------------------------------------------------------ never silent (owner report 2026-10-10)
+
+test('no approved dollar rate: the panel says so with the way to «التسعير والشحن» in a new tab; «دينار» is offered disabled; the old cost is said to stay; no route says to pick one first', () => {
+  const plain = answerOf(null);
+  const noRate: UsdPricingAnswer = { ...plain, rates: { ...plain.rates, usd_iqd_rate: null } };
+  const html = withState(stateOf(noRate, { rateKnownMissing: true }), createElement(UsdPricingProductPanel));
+  assert.ok(html.includes(S.ratesNoUsd), 'the missing rate is named');
+  assert.match(html, /<a href="\/admin\?tab=pricing" target="_blank" rel="noopener"[^>]*data-open-pricing/);
+  assert.ok(html.includes(`<option value="IQD" disabled="">${S.currencyIqdNoRate}</option>`), html);
+  assert.ok(html.includes(S.legacyCostStays));
+  assert.ok(html.includes(S.routeFirst), 'no route: the weight / box fields wait for one');
+  // An approved rate: «دينار» as before, nothing about rates.
+  const ok = withState(stateOf(plain), createElement(UsdPricingProductPanel));
+  assert.ok(ok.includes(`<option value="IQD">${S.currencyIqd}</option>`));
+  assert.ok(!ok.includes(S.ratesNoUsd));
+});
+
+test('a central gap (no shipping rate for the route) is named under the bar with the way to fix it; field gaps stay in the bar’s own line', () => {
+  const a = answerOf(inputs({ shipping_profile: 'CHINA_SEA' }));
+  const blocked = { ...SUMMARY, state: 'blocked' as const, issue_codes: ['SHIPPING_RATE_MISSING', 'TARGET_PROFIT_MISSING'] };
+  const answer: UsdPricingAnswer = { ...a, models: [{ ...a.models[0]!, pricing_summary: blocked }] };
+  const html = withState(stateOf(answer), createElement(UsdPricingProductPanel));
+  assert.ok(html.includes(S.centralMissing(P.shippingRateMissing)), 'only the central gap is listed');
+  assert.match(html, /data-pricing-where[^>]*>[\s\S]*?data-open-pricing/);
+  assert.ok(!html.includes(S.routeFirst), 'a route is chosen');
+});
+
+test('a save’s outcome stays in the panel when a preview lands; a blocked save says which field, of which scope, and why — under the field too', () => {
+  const answer = answerOf(inputs({ shipping_profile: 'GERMANY_LAND' }));
+  const outcome = { kind: 'refused' as const, tone: 'error' as const, text: S.notSavedAlone('X'), section: 3 as const };
+  const one = withState(stateOf(answer, { outcome }), createElement(UsdPricingProductPanel));
+  assert.match(one, /data-pricing-outcome="refused"/);
+  assert.ok(one.includes(S.notSavedAlone('X')));
+  const previewed: UsdPricingAnswer = { ...answer, preview_hash: 'b'.repeat(64), rows: [] };
+  assert.ok(withState(stateOf(answer, { outcome, shown: previewed }), createElement(UsdPricingProductPanel)).includes(S.notSavedAlone('X')), 'a preview never wipes it');
+  const where = `${S.productLevel} · ${S.supplierCost}: ${S.decimalSeparator}`;
+  const typed = { base: { supplier_cost_amount: '1,250' } };
+  const blocked = withState(stateOf(answer, { dirty: true, invalid: true, invalidWhere: where, drafts: typed, effective: typed }), createElement(UsdPricingProductPanel));
+  assert.ok(blocked.includes(S.saveBlocked(where)), 'the save row says why it is disabled');
+  assert.match(blocked, /data-pricing-blocked/);
+  assert.match(blocked, /<button type="button"[^>]*disabled=""[^>]*data-pricing-save/);
+  assert.ok(blocked.includes(`<p class="mt-1 text-[11px] text-red-400">${S.decimalSeparator}</p>`), 'under the field itself');
+  // The server's word on one field of this scope takes that field's place.
+  const server = withState(stateOf(answer, { serverField: { key: 'base', field: 'minimum_target_profit_usd', text: 'SERVER-SAID' } }), createElement(UsdPricingProductPanel));
+  assert.ok(server.includes('SERVER-SAID'));
+});
+
+test('stored and complete: the panel offers «راجع السعر الجديد واعتمده»; incomplete or nothing to write offers nothing', () => {
+  const a = answerOf(inputs({ shipping_profile: 'GERMANY_LAND' }));
+  const adoption = { kind: 'adopt', complete: true, needs_write: true, large_change: false, rows: [], missing_codes: [] } as never;
+  const html = withState(stateOf({ ...a, adoption }), createElement(UsdPricingProductPanel));
+  assert.ok(html.includes(S.readyWaiting) && html.includes(S.reviewAndAdopt));
+  assert.match(html, /data-pricing-review/);
+  const none = withState(stateOf({ ...a, adoption: { kind: 'adopt', complete: true, needs_write: false } as never }), createElement(UsdPricingProductPanel));
+  assert.ok(!none.includes(S.reviewAndAdopt));
+  const ready = withState(stateOf({ ...a, adoption }, { outcome: { kind: 'ready', tone: 'warn', text: S.savedDataReady } }), createElement(UsdPricingProductPanel));
+  assert.match(ready, /data-pricing-outcome="ready"/);
+});
+
+test('the form: the sheet at its root, leaving asks while pricing is unsaved, the bar says every pricing outcome with «اعرض»', () => {
+  const form = codeOf('src/components/adminProducts/ProductForm.tsx');
+  const sheet = form.indexOf('{canSeeCost && <UsdPricingSaveSheet />}');
+  assert.ok(sheet > form.lastIndexOf('</SectionCard>'), 'never inside a section that can be closed');
+  assert.equal((form.match(/onClick=\{leave\}/g) ?? []).length, 2);
+  assert.doesNotMatch(form, /onClick=\{onBack\}/);
+  assert.match(form, /const pricingAtRisk = canSeeCost && \(pricing\.touched \|\| \(!!pricing\.review && !pricing\.review\.stored\)\);/);
+  assert.match(form, /window\.confirm\(us\.leaveUnsaved\)/);
+  assert.match(form, /addEventListener\('beforeunload', warn\)/);
+  assert.ok(form.indexOf("addEventListener('beforeunload'") < form.indexOf('if (loading) {'), 'a hook like the others, above the early returns');
+  assert.match(form, /data-pricing-status=\{pricing\.outcome\.kind\}/);
+  assert.match(form, /onClick=\{\(\) => showPricing\(pricing\.outcome\?\.section \?\? 3\)\}/);
+  assert.match(form, /data-pricing-status="product-error"/);
+  assert.match(form, /summary=\{dirty \|\| \(canSeeCost && pricing\.touched\) \? 'تغييرات غير محفوظة' : 'محفوظ'\}/);
+  const section = codeOf('src/components/adminProducts/form/UsdPricingSection.tsx');
+  assert.match(section, /cancelLabel=\{review\.stored \? s\.later : undefined\}/);
+  assert.match(section, /note=\{review\.stored \? s\.sheetDataSaved : s\.sheetNothingSaved\}/);
+  assert.match(section, /data_only: true/);
+  assert.match(codeOf('src/components/adminOperations/EngineSaveSheet.tsx'), /\{cancelLabel \?\? s\.cancel\}/);
 });

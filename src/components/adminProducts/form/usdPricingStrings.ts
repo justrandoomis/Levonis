@@ -93,6 +93,38 @@ export interface UsdPricingFormStrings {
   previewNote: string;
   previewIncludesDrafts: string;
   previewEmpty: string;
+  // ---- the save is never silent (owner report 2026-10-10) ----
+  /** A decimal written with a thousands separator or a comma the server cannot read. */
+  decimalSeparator: string;
+  decimalTooLong: string;
+  /** A stored amount whose currency was cleared: the server needs the currency of every amount. */
+  currencyNeeded: string;
+  /** Dinars typed while no dollar rate is approved: they cannot convert. */
+  iqdNeedsRate: string;
+  currencyIqdNoRate: string;
+  ratesNoUsd: string;
+  ratesDerivedStale: string;
+  centralMissing: Fill;
+  openPricingTab: string;
+  routeFirst: string;
+  legacyCostStays: string;
+  savedDataReady: string;
+  readyWaiting: string;
+  reviewAndAdopt: string;
+  heldNotSaved: string;
+  heldCancelled: string;
+  savedLater: string;
+  later: string;
+  sheetDataSaved: string;
+  sheetNothingSaved: string;
+  signInAgain: string;
+  pricingUnsaved: string;
+  leaveUnsaved: string;
+  show: string;
+  saveBlocked: Fill;
+  notSavedAlone: Fill;
+  boxLabel: string;
+  converted: Fill3;
 }
 
 const ar: UsdPricingFormStrings = {
@@ -170,6 +202,34 @@ const ar: UsdPricingFormStrings = {
   previewNote: 'معاينة فقط: لا تُكتب أسعار الزبون في هذه المرحلة، ويبقى سعر المتجر كما هو',
   previewIncludesDrafts: 'تشمل تغييرات التسعير غير المحفوظة',
   previewEmpty: 'لا يوجد موديل معروض للبيع الآن',
+  decimalSeparator: 'اكتب الكسر بنقطة (مثل 899.5)، ولا تفصل الآلاف بفاصلة',
+  decimalTooLong: 'الرقم أطول من المسموح به في هذا الحقل',
+  currencyNeeded: 'اختر عملة المورد لهذا المبلغ',
+  iqdNeedsRate: 'لا يوجد سعر دولار معتمد بعد، فلا يمكن تحويل الدينار. اعتمد سعر الصرف من «التسعير والشحن»، أو أدخل التكلفة بعملة المورد (USD أو EUR أو CNY).',
+  currencyIqdNoRate: 'دينار — يحتاج سعر دولار معتمد',
+  ratesNoUsd: 'لا يوجد سعر دولار معتمد بعد: تُحفظ بيانات التسعير هنا كما تكتبها، ولا يُحسب سعر جديد حتى تعتمد أسعار الصرف في «التسعير والشحن».',
+  ratesDerivedStale: 'أسعار الصرف المشتقة تحتاج تحديثًا في «التسعير والشحن»؛ لا يُحفظ التسعير قبل ذلك.',
+  centralMissing: (l) => `ينقص من الإعدادات المركزية: ${l}`,
+  openPricingTab: 'افتح «التسعير والشحن»',
+  routeFirst: 'اختر «مسار الشحن الأساسي» أولًا لتظهر حقول الوزن أو أبعاد الصندوق',
+  legacyCostStays: '«التكلفة القديمة» لا يغيّرها هذا القسم؛ بعد اعتماد السعر يحسب المحرك التكلفة من هذه البيانات',
+  savedDataReady: 'حُفظت بيانات التسعير، وهي مكتملة: راجع السعر الجديد واعتمده. يبقى سعر المتجر كما هو حتى تعتمده.',
+  readyWaiting: 'البيانات مكتملة — السعر الجديد بانتظار اعتمادك',
+  reviewAndAdopt: 'راجع السعر الجديد واعتمده',
+  heldNotSaved: 'لم يُحفظ التسعير بعد: الأسعار الجديدة تنتظر مراجعتك في النافذة المفتوحة',
+  heldCancelled: 'لم يُحفظ التسعير: أُلغيت مراجعة الأسعار الجديدة، وما كتبته باقٍ في الحقول',
+  savedLater: 'بيانات التسعير محفوظة؛ يبقى سعر المتجر كما هو حتى تعتمد السعر الجديد',
+  later: 'لاحقًا — البيانات محفوظة',
+  sheetDataSaved: 'بيانات التسعير محفوظة. لا يتغير سعر المتجر إلا إذا اعتمدت الأسعار أدناه.',
+  sheetNothingSaved: 'لم يُحفظ شيء بعد: هذا المنتج مسعّر تلقائيًا، فتُحفظ تغييراتك مع أسعاره الجديدة معًا.',
+  signInAgain: 'سجّل الدخول مجددًا (البيانات محفوظة)',
+  pricingUnsaved: 'تغييرات تسعير غير محفوظة',
+  leaveUnsaved: 'في «التسعير بالدولار والشحن» تغييرات لم تُحفظ وستضيع إن خرجت الآن. هل تخرج؟',
+  show: 'اعرض',
+  saveBlocked: (w) => `لا يُحفظ قبل تصحيح: ${w}`,
+  notSavedAlone: (m) => `لم يُحفظ التسعير بالدولار: ${m}`,
+  boxLabel: 'أبعاد الصندوق',
+  converted: (a, u, r) => `حُوِّل ${a} د.ع إلى $${u} بسعر ${r}`,
 };
 
 const en: UsdPricingFormStrings = {
@@ -247,6 +307,34 @@ const en: UsdPricingFormStrings = {
   previewNote: 'Preview only: customer prices are not written at this stage, and the store price stays as it is',
   previewIncludesDrafts: 'Includes unsaved pricing changes',
   previewEmpty: 'No model is on sale now',
+  decimalSeparator: 'Write decimals with a point (e.g. 899.5) and no thousands separators',
+  decimalTooLong: 'The number is longer than this field allows',
+  currencyNeeded: 'Choose the supplier currency for this amount',
+  iqdNeedsRate: 'There is no approved dollar rate yet, so dinars cannot be converted. Approve the rate in «Pricing & shipping», or enter the cost in the supplier’s currency (USD, EUR or CNY).',
+  currencyIqdNoRate: 'IQD — needs an approved dollar rate',
+  ratesNoUsd: 'No approved dollar rate yet: the pricing data is saved here as you type it, and no new price is computed until you approve the exchange rates in «Pricing & shipping».',
+  ratesDerivedStale: 'The derived exchange rates need refreshing in «Pricing & shipping»; pricing cannot be saved until then.',
+  centralMissing: (l) => `Missing from the central settings: ${l}`,
+  openPricingTab: 'Open «Pricing & shipping»',
+  routeFirst: 'Choose the «Base shipping route» first to show the weight or box fields',
+  legacyCostStays: '«Legacy cost» is not changed by this section; once the price is adopted the engine computes the cost from this data',
+  savedDataReady: 'Pricing data saved, and it is complete: review and adopt the new price. The store price stays as it is until you do.',
+  readyWaiting: 'Data complete — the new price awaits your approval',
+  reviewAndAdopt: 'Review and adopt the new price',
+  heldNotSaved: 'Pricing not saved yet: the new prices await your review in the open window',
+  heldCancelled: 'Pricing not saved: the price review was cancelled; what you typed is still in the fields',
+  savedLater: 'The pricing data is saved; the store price stays as it is until you adopt the new price',
+  later: 'Later — the data is saved',
+  sheetDataSaved: 'The pricing data is saved. The store price changes only if you adopt the prices below.',
+  sheetNothingSaved: 'Nothing is saved yet: this product is priced automatically, so your changes are saved together with its new prices.',
+  signInAgain: 'Sign in again (the data is saved)',
+  pricingUnsaved: 'Unsaved pricing changes',
+  leaveUnsaved: '«USD pricing and shipping» has unsaved changes that will be lost if you leave now. Leave anyway?',
+  show: 'Show',
+  saveBlocked: (w) => `Cannot be saved until you fix: ${w}`,
+  notSavedAlone: (m) => `USD pricing not saved: ${m}`,
+  boxLabel: 'Box dimensions',
+  converted: (a, u, r) => `${a} IQD converted to $${u} at ${r}`,
 };
 
 const ckb: UsdPricingFormStrings = {
@@ -324,6 +412,34 @@ const ckb: UsdPricingFormStrings = {
   previewNote: 'تەنها پێشبینین: لەم قۆناغەدا نرخی کڕیار نانووسرێت و نرخی فرۆشگا وەک خۆی دەمێنێتەوە',
   previewIncludesDrafts: 'گۆڕانکارییە پاشەکەوتنەکراوەکانی نرخدانان لەخۆ دەگرێت',
   previewEmpty: 'ئێستا هیچ مۆدێلێک بۆ فرۆشتن پیشان نادرێت',
+  decimalSeparator: 'کەرت بە خاڵ بنووسە (وەک 899.5)، و هەزارەکان بە فاریزە جیا مەکەرەوە',
+  decimalTooLong: 'ژمارەکە لەوە درێژترە کە ئەم خانەیە ڕێگەی پێدەدات',
+  currencyNeeded: 'دراوی دابینکەر بۆ ئەم بڕە هەڵبژێرە',
+  iqdNeedsRate: 'هێشتا نرخێکی پەسەندکراوی دۆلار نییە، بۆیە دینار ناگۆڕدرێت. نرخی ئاڵوگۆڕ لە «نرخدانان و ناردنی بەرهەم» پەسەند بکە، یان تێچووەکە بە دراوی دابینکەر بنووسە (USD یان EUR یان CNY).',
+  currencyIqdNoRate: 'دینار — نرخێکی پەسەندکراوی دۆلاری دەوێت',
+  ratesNoUsd: 'هێشتا نرخێکی پەسەندکراوی دۆلار نییە: زانیارییەکانی نرخدانان وەک خۆی لێرە پاشەکەوت دەکرێن، و هیچ نرخێکی نوێ هەژمار ناکرێت تا نرخەکانی ئاڵوگۆڕ لە «نرخدانان و ناردنی بەرهەم» پەسەند دەکەیت.',
+  ratesDerivedStale: 'نرخە داڕێژراوەکانی ئاڵوگۆڕ پێویستیان بە نوێکردنەوە هەیە لە «نرخدانان و ناردنی بەرهەم»؛ تا ئەو کاتە نرخدانان پاشەکەوت ناکرێت.',
+  centralMissing: (l) => `لە ڕێکخستنە ناوەندییەکاندا کەمە: ${l}`,
+  openPricingTab: '«نرخدانان و ناردنی بەرهەم» بکەرەوە',
+  routeFirst: 'سەرەتا «ڕێگای بنەڕەتیی ناردن» هەڵبژێرە بۆ ئەوەی خانەکانی کێش یان پێوانەی سندوق دەربکەون',
+  legacyCostStays: '«تێچووی کۆن» بەم بەشە ناگۆڕێت؛ دوای پەسەندکردنی نرخەکە، بزوێنەرەکە تێچوو لەم زانیارییانە هەژمار دەکات',
+  savedDataReady: 'زانیارییەکانی نرخدانان پاشەکەوت کران و تەواون: نرخە نوێیەکە ببینە و پەسەندی بکە. نرخی فرۆشگا وەک خۆی دەمێنێتەوە تا پەسەندی دەکەیت.',
+  readyWaiting: 'زانیارییەکان تەواون — نرخە نوێیەکە چاوەڕێی پەسەندکردنی تۆیە',
+  reviewAndAdopt: 'نرخە نوێیەکە ببینە و پەسەندی بکە',
+  heldNotSaved: 'نرخدانان هێشتا پاشەکەوت نەکراوە: نرخە نوێیەکان لە پەنجەرە کراوەکەدا چاوەڕێی پێداچوونەوەی تۆن',
+  heldCancelled: 'نرخدانان پاشەکەوت نەکرا: پێداچوونەوەی نرخە نوێیەکان هەڵوەشێنرایەوە؛ ئەوەی نووسیوتە هێشتا لە خانەکاندایە',
+  savedLater: 'زانیارییەکانی نرخدانان پاشەکەوت کراون؛ نرخی فرۆشگا وەک خۆی دەمێنێتەوە تا نرخە نوێیەکە پەسەند دەکەیت',
+  later: 'دواتر — زانیارییەکان پاشەکەوت کراون',
+  sheetDataSaved: 'زانیارییەکانی نرخدانان پاشەکەوت کراون. نرخی فرۆشگا تەنها ئەو کاتە دەگۆڕێت کە نرخەکانی خوارەوە پەسەند بکەیت.',
+  sheetNothingSaved: 'هێشتا هیچ پاشەکەوت نەکراوە: ئەم بەرهەمە بە خۆکاری نرخی بۆ دادەنرێت، بۆیە گۆڕانکارییەکانت لەگەڵ نرخە نوێیەکانیدا پێکەوە پاشەکەوت دەکرێن.',
+  signInAgain: 'دووبارە بچۆ ژوورەوە (زانیارییەکان پاشەکەوت کراون)',
+  pricingUnsaved: 'گۆڕانکاریی نرخدانانی پاشەکەوتنەکراو',
+  leaveUnsaved: '«نرخدانان بە دۆلار و ناردن» گۆڕانکاریی پاشەکەوتنەکراوی هەیە کە ئەگەر ئێستا دەربچیت لەدەست دەچن. هەر دەردەچیت؟',
+  show: 'پیشانی بدە',
+  saveBlocked: (w) => `پاشەکەوت ناکرێت تا ئەمە ڕاست دەکەیتەوە: ${w}`,
+  notSavedAlone: (m) => `نرخدانان بە دۆلار پاشەکەوت نەکرا: ${m}`,
+  boxLabel: 'پێوانەکانی سندوق',
+  converted: (a, u, r) => `${a} د.ع گۆڕدرا بۆ $${u} بە نرخی ${r}`,
 };
 
 export const USD_PRICING_FORM_STRINGS: Readonly<Record<Language, UsdPricingFormStrings>> = { ar, en, ckb };

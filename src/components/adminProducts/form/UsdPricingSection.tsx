@@ -37,33 +37,45 @@
  * server's (E1 at the central rates, `POST …/preview` while typing); the screen
  * formats and never computes money.
  *
- * THE SAVE THAT WRITES PRICES SHOWS THEM FIRST (owner decision 8). While the
- * product stays incomplete a save stores the pricing data only and the store
- * price stays manual. The save that leaves it complete — or any save of an
- * engine-priced product — is held by the server (409 with the preview); the
- * sheet (`UsdPricingSaveSheet`) shows the new prices, and «حفظ» sends the same
- * body with the preview's hash (and the tick above 15%), which adopts the
- * engine and writes the prices in that one batch. A product save that changed
- * nothing here but completed the product opens the same sheet.
+ * THE DATA FIRST, THE PRICE ONLY WHEN THE OWNER CONFIRMS IT (owner decision 8,
+ * amended by the owner's report of 2026-10-10: «نشر» kept nothing that was
+ * typed). Every save of a MANUAL product — «حفظ التسعير بالدولار», «نشر» and
+ * «مسودة» alike, one path (`commitPricing`) — stores what was typed as data
+ * (`data_only`), complete or not; the store price stays manual. When the
+ * stored data completes the product, the sheet (`UsdPricingSaveSheet`, mounted
+ * at the form's root) shows the new prices, and «حفظ» sends the preview's hash
+ * (and the tick above 15%, with a fresh sign-in) — the only request that
+ * adopts the engine and writes prices; «لاحقًا» loses nothing. An ENGINE-priced
+ * product's save stays one held write (409 with the preview): its stored
+ * prices never drift from its stored inputs, and cancelling keeps the typed
+ * values in the fields, guarded on leaving. No outcome is silent: saved,
+ * ready, held, refused or not sent, the panel and the form's bar say which,
+ * and a field the server would refuse says why under itself before anything
+ * is sent.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Check, Loader2, Save } from 'lucide-react';
 import { ApiError, api, isAborted } from '../../../lib/api';
 import { useLanguage } from '../../../LanguageContext';
 import { contractRefusal, refusalLang } from '../../../lib/refusalStrings';
+import { useOptionalAuth } from '../../../AuthContext';
+import type { Language } from '../../../translations';
+import { parseProcurementDecimal, typedDecimalText } from '../../../../packages/contracts/src/procurementCost';
 import type { ProductDimensionsV2 } from '../../../lib/productTypes';
 import PricingSummaryBar from '../../adminOperations/PricingSummaryBar';
 import { PricingRowsTable } from '../../adminOperations/ProcurementPricingReview';
 import type { EngineAdoption, PricingPreviewRow, PricingSummary } from '../../adminOperations/procurementPricing';
-import { issueText, procurementPricingStrings, profileName } from '../../adminOperations/procurementPricingStrings';
+import { issueText, procurementPricingStrings, profileName, type ProcurementPricingStrings } from '../../adminOperations/procurementPricingStrings';
 import EngineSaveSheet from '../../adminOperations/EngineSaveSheet';
 import { engineSaveStrings } from '../../adminOperations/engineSaveStrings';
 import { money } from '../../adminOperations/shared';
 import { MeasurementInput, formatScaledInteger } from './DimensionsSection';
 import { Banner, Field, Grid, Money, Select, TextInput, btnGhost, btnPrimary } from './formUi';
-import { USD_PRICING_FORM_STRINGS, usdPricingFormStrings } from './usdPricingStrings';
+import { USD_PRICING_FORM_STRINGS, usdPricingFormStrings, type UsdPricingFormStrings } from './usdPricingStrings';
 
 const PRICING = '/api/admin/pricing';
+/** «التسعير والشحن» (the same address as adminPricing/fxParts PRICING_TAB_PATH; not imported, so the form loads no tab code). */
+export const PRICING_TAB_HREF = '/admin?tab=pricing';
 const CURRENCIES = ['USD', 'EUR', 'CNY'] as const;
 const ROUTES = ['GERMANY_LAND', 'CHINA_AIR', 'CHINA_SEA'] as const;
 
@@ -145,6 +157,8 @@ export interface UsdPricingAnswer {
   rows: PricingPreviewRow[];
   /** What the save carries: the engine write's hash when it writes prices, else the dinar conversion's. */
   preview_hash: string;
+  /** The typed dinars' conversion hash on its own (null without dinars; absent on an older server): a data-only save carries it. */
+  conversion_hash?: string | null;
   /** What saving these drafts does to the product's prices (owner decision 8): adopt, reprice or data only. */
   adoption?: EngineAdoption | null;
 }
@@ -293,27 +307,149 @@ function ancestorsOf(form: UsdPricingFormContext | null, scope: PricingScope, id
   return [...(color ? ([['color', color]] as Array<[PricingScope, string]>) : []), ...options.map((o) => ['option', o] as [PricingScope, string]), ['base', '']];
 }
 
-const DECIMAL = /^[0-9٠-٩۰-۹]+(?:[.,٫][0-9٠-٩۰-۹]+)?$/;
-const USD_TEXT = /^[0-9٠-٩۰-۹]+(?:[.,٫][0-9٠-٩۰-۹]{1,2})?$/;
-
 const isIqdDraft = (d: ScopeDraft) => d.supplier_cost_currency === 'IQD' || (d.supplier_cost_currency === undefined && d.supplier_cost_iqd !== undefined);
 
-/** A draft's problems, by field (the server refuses the same, by field). */
-export function draftProblems(d: ScopeDraft, stored: StoredInputs | null = null): Partial<Record<keyof ScopeDraft, true>> {
-  const out: Partial<Record<keyof ScopeDraft, true>> = {};
+/**
+ * Why the server would refuse a field (productInputs.ts / ownerRules.ts), so the form says it under the
+ * field before anything is sent — never a whole batch lost to one field (owner report 2026-10-10).
+ */
+export type FieldProblem = 'invalid' | 'separator' | 'too_long' | 'fx_missing' | 'step' | 'needs_amount' | 'needs_currency';
+
+/** A thousands separator or a comma the server cannot read as a decimal comma. */
+const SEPARATOR = /[,،٬\s]/;
+/** The server's own bounds (packages/pricing costToPrice, productInputs.ts). */
+const MAX_SUPPLIER_IQD = 1_000_000_000_000;
+const MAX_IQD_AMOUNT = 1_000_000_000;
+const MAX_BOX_MM = 100_000;
+const MAX_WEIGHT_G = 100_000_000;
+
+/** The server's grammar for a typed decimal (`positiveDecimal` after `typedDecimalText`): null = it will be stored. */
+export function decimalProblem(raw: string, maxInt: number, maxFrac: number, maxLen = Infinity): FieldProblem | null {
+  const text = typedDecimalText(raw);
+  if (SEPARATOR.test(text)) return 'separator';
+  try {
+    return parseProcurementDecimal(text, { maxIntDigits: maxInt, maxFractionDigits: maxFrac, min: 'positive' }).length > maxLen ? 'too_long' : null;
+  } catch {
+    return /^\d+(\.\d+)?$/.test(text) && /[1-9]/.test(text) ? 'too_long' : 'invalid';
+  }
+}
+
+/** The canonical text the server stores for a decimal `decimalProblem` passed (else the typed text, which the server names). */
+export function canonicalDecimal(raw: string, maxInt: number, maxFrac: number): string {
+  try {
+    return parseProcurementDecimal(typedDecimalText(raw), { maxIntDigits: maxInt, maxFractionDigits: maxFrac, min: 'positive' });
+  } catch {
+    return typedDecimalText(raw);
+  }
+}
+
+/** The minimum profit exactly as the server's `canonicalUsdRuleAmount` reads it: ≤ 2 decimals, 0 < x ≤ 100,000. */
+export function usdRuleProblem(raw: string): FieldProblem | null {
+  const text = typedDecimalText(raw);
+  if (SEPARATOR.test(text)) return 'separator';
+  const m = /^0*([0-9]+)(?:\.([0-9]*?)0*)?$/.exec(text);
+  if (!m || text.endsWith('.') || text.startsWith('.')) return 'invalid';
+  const whole = m[1]!.replace(/^0+(?=\d)/, '');
+  const canonical = m[2] ? `${whole}.${m[2]}` : whole;
+  if (canonical.length > 9 || !/^[0-9]+(?:\.[0-9]{1,2})?$/.test(canonical) || !/[1-9]/.test(canonical) || Number(canonical) > 100_000) return 'invalid';
+  return null;
+}
+
+/**
+ * A draft's problems, by field — exactly what the server refuses, by field. `usdIqdRate`: the approved
+ * dollar rate as the stored answer says it (null = known to be missing: typed dinars cannot convert;
+ * undefined = not known yet, a new product). The same dinars already stored convert nothing.
+ */
+export function draftProblems(d: ScopeDraft, stored: StoredInputs | null = null, opts: { usdIqdRate?: string | null } = {}): Partial<Record<keyof ScopeDraft, FieldProblem>> {
+  const out: Partial<Record<keyof ScopeDraft, FieldProblem>> = {};
   const storedIqd = stored?.supplier_input_mode === 'IQD_CONVERTED';
   if (isIqdDraft(d)) {
-    if (d.supplier_cost_iqd === undefined ? !storedIqd : d.supplier_cost_iqd !== null && (!Number.isSafeInteger(d.supplier_cost_iqd) || d.supplier_cost_iqd < 1)) out.supplier_cost_iqd = true;
+    const v = d.supplier_cost_iqd;
+    if (v === undefined ? !storedIqd : v !== null && (!Number.isSafeInteger(v) || v < 1 || v > MAX_SUPPLIER_IQD)) out.supplier_cost_iqd = 'invalid';
+    else if (opts.usdIqdRate === null && v != null && (!storedIqd || stored?.original_input_amount !== String(v) || d.reconvert === true)) out.supplier_cost_iqd = 'fx_missing';
   } else {
     const amount = d.supplier_cost_amount?.trim();
-    if (amount && !DECIMAL.test(amount)) out.supplier_cost_amount = true;
+    const problem = amount ? decimalProblem(amount, 12, 6) : null;
+    if (problem) out.supplier_cost_amount = problem;
     // Leaving the dinar input for a source currency needs that currency's amount (never the converted USD reread).
-    if (storedIqd && d.supplier_cost_currency && d.supplier_cost_currency !== 'IQD' && !amount) out.supplier_cost_amount = true;
+    else if (storedIqd && d.supplier_cost_currency && d.supplier_cost_currency !== 'IQD' && !amount) out.supplier_cost_amount = 'needs_amount';
+    // A stored amount keeps a currency (0181): «—» with an amount still there is refused by name.
+    if (d.supplier_cost_currency === '' && d.supplier_cost_amount === undefined && !storedIqd && stored?.supplier_cost_amount) out.supplier_cost_currency = 'needs_currency';
   }
-  if (d.manual_cbm !== undefined && d.manual_cbm.trim() !== '' && !DECIMAL.test(d.manual_cbm.trim())) out.manual_cbm = true;
-  if (d.minimum_target_profit_usd !== undefined && d.minimum_target_profit_usd.trim() !== '' && !USD_TEXT.test(d.minimum_target_profit_usd.trim())) out.minimum_target_profit_usd = true;
-  if (d.direct_sale_extra_iqd != null && d.direct_sale_extra_iqd % 1000 !== 0) out.direct_sale_extra_iqd = true;
+  if (d.manual_cbm !== undefined && d.manual_cbm.trim() !== '') {
+    const problem = decimalProblem(d.manual_cbm, 3, 9, 12);
+    if (problem) out.manual_cbm = problem;
+  }
+  if (d.minimum_target_profit_usd !== undefined && d.minimum_target_profit_usd.trim() !== '') {
+    const problem = usdRuleProblem(d.minimum_target_profit_usd);
+    if (problem) out.minimum_target_profit_usd = problem;
+  }
+  if (d.direct_sale_extra_iqd != null) {
+    if (!Number.isSafeInteger(d.direct_sale_extra_iqd) || d.direct_sale_extra_iqd > MAX_IQD_AMOUNT) out.direct_sale_extra_iqd = 'too_long';
+    else if (d.direct_sale_extra_iqd % 1000 !== 0) out.direct_sale_extra_iqd = 'step';
+  }
+  if (d.additional_cost_iqd != null && (!Number.isSafeInteger(d.additional_cost_iqd) || d.additional_cost_iqd > MAX_IQD_AMOUNT)) out.additional_cost_iqd = 'too_long';
+  if (d.box && d.box.some((a) => a > MAX_BOX_MM)) out.box = 'too_long';
+  if (d.shipping_weight_g != null && d.shipping_weight_g > MAX_WEIGHT_G) out.shipping_weight_g = 'too_long';
   return out;
+}
+
+/** A problem's words under its field, in the reader's language. */
+export function problemText(field: keyof ScopeDraft, code: FieldProblem, s: UsdPricingFormStrings, ps: ProcurementPricingStrings): string {
+  if (code === 'separator') return s.decimalSeparator;
+  if (code === 'too_long') return s.decimalTooLong;
+  if (code === 'fx_missing') return s.iqdNeedsRate;
+  if (code === 'step') return s.extraInvalid;
+  if (code === 'needs_currency') return s.currencyNeeded;
+  if (field === 'supplier_cost_iqd') return s.iqdInvalid;
+  if (field === 'minimum_target_profit_usd') return ps.invalid;
+  if (field === 'direct_sale_extra_iqd') return s.extraInvalid;
+  return s.decimalInvalid;
+}
+
+/** A draft field's label, as the panel shows it. */
+export function draftFieldLabel(field: keyof ScopeDraft, s: UsdPricingFormStrings): string {
+  const labels: Partial<Record<keyof ScopeDraft, string>> = {
+    supplier_cost_amount: s.supplierCost,
+    supplier_cost_currency: s.supplierCurrency,
+    supplier_cost_iqd: s.supplierCostIqd,
+    reconvert: s.supplierCostIqd,
+    shipping_profile: s.route,
+    shipping_weight_g: s.weightKg,
+    box: s.boxLabel,
+    manual_cbm: s.manualCbm,
+    additional_cost_iqd: s.additional,
+    minimum_target_profit_usd: s.minProfit,
+    direct_sale_extra_iqd: s.extra,
+  };
+  return labels[field] ?? field;
+}
+
+/** A field the server names in a refusal (`details.field`, `inputs[i].` / `rules[i].` dropped) → the draft field it is. */
+const SERVER_FIELDS: Readonly<Record<string, keyof ScopeDraft>> = {
+  supplier_cost_amount: 'supplier_cost_amount',
+  supplier_cost_currency: 'supplier_cost_currency',
+  shipping_profile: 'shipping_profile',
+  shipping_weight_g: 'shipping_weight_g',
+  manual_cbm: 'manual_cbm',
+  additional_cost_iqd: 'additional_cost_iqd',
+  shipping_box: 'box',
+  shipping_length_mm: 'box',
+  shipping_width_mm: 'box',
+  shipping_height_mm: 'box',
+  supplier_cost_iqd: 'supplier_cost_iqd',
+  reconvert: 'supplier_cost_iqd',
+  amount_usd: 'minimum_target_profit_usd',
+  minimum_target_profit_usd: 'minimum_target_profit_usd',
+  amount_iqd: 'direct_sale_extra_iqd',
+  direct_sale_extra_iqd: 'direct_sale_extra_iqd',
+};
+const serverFieldName = (raw: string) => raw.replace(/^(?:inputs|rules)\[\d+\]\./, '');
+
+/** The panel's own label for a field a refusal names (null: no field of the panel). */
+export function fieldLabelOf(field: string, s: UsdPricingFormStrings): string | null {
+  const f = SERVER_FIELDS[serverFieldName(field)];
+  return f ? draftFieldLabel(f, s) : null;
 }
 
 const scopeOf = (answer: UsdPricingAnswer | null, scope: PricingScope, id: string) =>
@@ -402,7 +538,11 @@ export function draftWire(drafts: Readonly<Record<string, ScopeDraft>>, answer: 
         if (d.reconvert) entry.reconvert = true;
       } else if (d.supplier_cost_iqd === null) entry.supplier_cost_amount = null;
     } else {
-      if (d.supplier_cost_amount !== undefined) entry.supplier_cost_amount = blank(d.supplier_cost_amount);
+      // The canonical text the server stores («٨٩٩٫٥» → '899.5'), so a preview and a save read one number.
+      if (d.supplier_cost_amount !== undefined) {
+        const typed = blank(d.supplier_cost_amount);
+        entry.supplier_cost_amount = typed == null ? typed : canonicalDecimal(typed, 12, 6);
+      }
       if (d.supplier_cost_currency !== undefined) entry.supplier_cost_currency = d.supplier_cost_currency || null;
       // A typed amount always names its currency (the stored one when untouched, USD when none).
       if (d.supplier_cost_amount !== undefined && blank(d.supplier_cost_amount) !== null && entry.supplier_cost_currency == null) {
@@ -417,12 +557,18 @@ export function draftWire(drafts: Readonly<Record<string, ScopeDraft>>, answer: 
       entry.shipping_width_mm = d.box?.[1] ?? null;
       entry.shipping_height_mm = d.box?.[2] ?? null;
     }
-    if (d.manual_cbm !== undefined) entry.manual_cbm = blank(d.manual_cbm);
+    if (d.manual_cbm !== undefined) {
+      const typed = blank(d.manual_cbm);
+      entry.manual_cbm = typed == null ? typed : canonicalDecimal(typed, 3, 9);
+    }
     if (d.additional_cost_iqd !== undefined) entry.additional_cost_iqd = d.additional_cost_iqd;
     if (Object.keys(entry).length > (s.scope !== 'base' ? 2 : 1)) inputs.push(entry);
     const ruleScope = s.scope === 'base' ? 'product' : s.scope;
     const at = s.scope !== 'base' ? { scope_id: s.scope_id } : {};
-    if (d.minimum_target_profit_usd !== undefined) rules.push({ kind: 'target_profit', scope: ruleScope, ...at, amount_usd: blank(d.minimum_target_profit_usd) });
+    if (d.minimum_target_profit_usd !== undefined) {
+      const typed = blank(d.minimum_target_profit_usd);
+      rules.push({ kind: 'target_profit', scope: ruleScope, ...at, amount_usd: typed == null ? typed : typedDecimalText(typed) });
+    }
     if (d.direct_sale_extra_iqd !== undefined) rules.push({ kind: 'direct_sale_extra', scope: ruleScope, ...at, amount_iqd: d.direct_sale_extra_iqd });
   }
   return { inputs, rules };
@@ -449,17 +595,18 @@ const NEW_PRODUCT_ANSWER: UsdPricingAnswer = {
 
 // ------------------------------------------------------------------ the state
 
-/** The drafts at the moment the product's save starts, with the hash of the preview that showed them. */
+/** The drafts at the moment the product's save starts, with the preview that showed them (its conversion hash). */
 export interface PricingSnapshot {
   drafts: Record<string, ScopeDraft>;
-  hash: string | null;
   invalid: boolean;
+  preview: { wire: string; answer: UsdPricingAnswer } | null;
 }
 
 /**
- * A save the server held for the owner's look at the new prices (owner decision
- * 8: 409 PRICING_PREVIEW_REQUIRED / _STALE / PRICING_LARGE_CHANGE_CONFIRM carry
- * the preview). The same body goes again with the preview's hash on «حفظ».
+ * The new prices awaiting the owner's look (owner decision 8): a complete manual product whose data is
+ * stored (`stored`: cancelling — «لاحقًا» — loses nothing), or an engine product's held save (409
+ * PRICING_PREVIEW_REQUIRED / _STALE / PRICING_LARGE_CHANGE_CONFIRM carry the preview; nothing is stored
+ * until «حفظ» sends the same body with the preview's hash).
  */
 export interface PricingReview {
   pid: string;
@@ -467,6 +614,7 @@ export interface PricingReview {
   hash: string;
   adoption: EngineAdoption;
   error: string;
+  stored: boolean;
 }
 
 const REVIEW_CODES = new Set(['PRICING_PREVIEW_REQUIRED', 'PRICING_PREVIEW_STALE', 'PRICING_LARGE_CHANGE_CONFIRM']);
@@ -476,6 +624,196 @@ export function heldPreview(e: unknown): UsdPricingAnswer | null {
   if (!(e instanceof ApiError) || !REVIEW_CODES.has(e.code ?? '')) return null;
   const shown = (e.details as { preview?: UsdPricingAnswer } | undefined)?.preview;
   return shown && shown.adoption?.kind && typeof shown.preview_hash === 'string' && shown.preview_hash ? shown : null;
+}
+
+/** A stored answer whose prices a confirm would write: the review the sheet opens (the data is saved). */
+export function readyReview(pid: string, r: UsdPricingAnswer | null): PricingReview | null {
+  return r && r.adoption?.kind && r.adoption.needs_write && r.adoption.complete && r.preview_hash
+    ? { pid, body: { inputs_seq: r.inputs_seq, inputs: [], rules: [] }, hash: r.preview_hash, adoption: r.adoption, error: '', stored: true }
+    : null;
+}
+
+/**
+ * An older server's conversion hash (no `conversion_hash` in its answer): the preview's own hash, and only
+ * when that preview writes no price — a save that writes prices never rides on the live preview's hash.
+ */
+export const legacyConversionHash = (preview: { wire: string; answer: UsdPricingAnswer } | null, w: string): string | null =>
+  preview && preview.wire === w && !preview.answer.adoption?.kind ? preview.answer.preview_hash : null;
+
+/** The requests the save makes (the form's `api`; a test drives the real routes through it). */
+export interface PricingIo {
+  get: (path: string) => Promise<UsdPricingAnswer>;
+  post: (path: string, body: unknown) => Promise<UsdPricingAnswer>;
+  put: (path: string, body: unknown) => Promise<UsdPricingAnswer>;
+}
+export const inputsPath = (pid: string) => `${PRICING}/products/${encodeURIComponent(pid)}/inputs`;
+export const previewPath = (pid: string) => `${PRICING}/products/${encodeURIComponent(pid)}/preview`;
+
+/** Where a refusal belongs: the draft (and field) it names, and the section it lives in (٣ the product, ٥ a model, colour or variant). */
+export interface RefusalTarget {
+  key: string | null;
+  field: keyof ScopeDraft | null;
+  section: 3 | 5;
+}
+
+const baseFirst = (a: string, b: string) => (a === 'base' ? -1 : b === 'base' ? 1 : 0);
+
+export function refusalTarget(e: unknown, drafts: Readonly<Record<string, ScopeDraft>>): RefusalTarget {
+  if (!(e instanceof ApiError)) return { key: null, field: null, section: 3 };
+  const d = (e.details ?? {}) as { field?: unknown; scope?: unknown; scope_id?: unknown };
+  const field = typeof d.field === 'string' ? (SERVER_FIELDS[serverFieldName(d.field)] ?? null) : null;
+  let key: string | null = null;
+  if (e.code === 'PRICING_FX_RATE_MISSING' && typeof d.scope === 'string') key = keyOf(d.scope as PricingScope, typeof d.scope_id === 'string' ? d.scope_id : '');
+  else if (field) key = Object.keys(drafts).sort(baseFirst).find((k) => drafts[k]![field] !== undefined) ?? null;
+  const named = e.code === 'PRICING_FX_RATE_MISSING' ? 'supplier_cost_iqd' : field;
+  return { key, field: named, section: !key || key === 'base' ? 3 : 5 };
+}
+
+export type CommitResult =
+  | { kind: 'nothing'; answer: UsdPricingAnswer; ready: PricingReview | null }
+  | { kind: 'saved'; answer: UsdPricingAnswer; ready: PricingReview | null; converted: string[] }
+  | { kind: 'held'; answer: UsdPricingAnswer; review: PricingReview }
+  | { kind: 'refused'; error: unknown; target: RefusalTarget };
+
+const isStaleHash = (e: unknown) =>
+  e instanceof ApiError && (e.code === 'PRICING_PREVIEW_STALE' || (e.code === 'PRICING_INPUT_INVALID' && (e.details as { field?: string } | undefined)?.field === 'preview_hash'));
+const refusesDataOnly = (e: unknown) =>
+  e instanceof ApiError && e.code === 'UNKNOWN_FIELD' && Array.isArray((e.details as { fields?: unknown } | undefined)?.fields) && ((e.details as { fields: unknown[] }).fields.includes('data_only'));
+
+type WireBody = ReturnType<typeof draftWire>;
+
+/**
+ * ONE SAVE PATH for «حفظ التسعير بالدولار», «نشر» and «مسودة» (owner report 2026-10-10). The drafts go
+ * against the answer the server holds now (`base`, else a fresh GET), as data first (`data_only`): a
+ * manual product's data is stored even when it completes the product, and the answer then carries the
+ * review its new prices need (`ready`). Typed dinars carry the conversion hash of a preview that showed
+ * them (the cached one, else a fresh look; one more fresh look when the rate moved in between). An engine
+ * product — or an older server that refuses `data_only` (retried once without it) — holds the save for
+ * the sheet. Pure: every request goes through `io`; nothing is stored in the browser.
+ */
+export async function commitPricing(
+  io: PricingIo,
+  pid: string,
+  drafts: Readonly<Record<string, ScopeDraft>>,
+  opts: { base?: UsdPricingAnswer | null; preview?: { wire: string; answer: UsdPricingAnswer } | null; describe?: (shown: UsdPricingAnswer, body: WireBody) => string[] } = {}
+): Promise<CommitResult> {
+  const refused = (e: unknown): CommitResult => ({ kind: 'refused', error: e, target: refusalTarget(e, drafts) });
+  let current: UsdPricingAnswer;
+  try {
+    current = opts.base ?? (await io.get(inputsPath(pid)));
+  } catch (e) {
+    return refused(e);
+  }
+  const body = draftWire(drafts, current);
+  if (!body.inputs.length && !body.rules.length) return { kind: 'nothing', answer: current, ready: readyReview(pid, current) };
+  const wire = JSON.stringify(body);
+  const typedIqd = wireHasIqd(body);
+  const conversion = async (fresh: boolean) => {
+    if (!typedIqd) return { hash: null as string | null, converted: [] as string[] };
+    const shown = !fresh && opts.preview && opts.preview.wire === wire ? opts.preview.answer : await io.post(previewPath(pid), { draft: body });
+    return { hash: shown.conversion_hash ?? legacyConversionHash({ wire, answer: shown }, wire), converted: opts.describe?.(shown, body) ?? [] };
+  };
+  let conv: { hash: string | null; converted: string[] };
+  try {
+    conv = await conversion(false);
+  } catch (e) {
+    return refused(e);
+  }
+  let dataOnly = true;
+  let reread = false;
+  for (;;) {
+    try {
+      const r = await io.put(inputsPath(pid), { inputs_seq: current.inputs_seq, ...body, ...(dataOnly ? { data_only: true } : {}), ...(conv.hash ? { preview_hash: conv.hash } : {}) });
+      return { kind: 'saved', answer: r, ready: readyReview(pid, r), converted: conv.converted };
+    } catch (e) {
+      // Owner decision 8 for an engine product (or an older server): held, with the preview of its new prices.
+      const held = heldPreview(e);
+      if (held) {
+        // The body without `data_only`: the sheet's «حفظ» is the one write, with the preview's hash.
+        const review: PricingReview = { pid, body: { inputs_seq: current.inputs_seq, inputs: body.inputs, rules: body.rules }, hash: held.preview_hash, adoption: held.adoption!, error: '', stored: false };
+        return { kind: 'held', answer: current, review };
+      }
+      if (dataOnly && refusesDataOnly(e)) {
+        dataOnly = false;
+        continue;
+      }
+      if (typedIqd && !reread && isStaleHash(e)) {
+        // The rate moved since the conversion the owner was shown: one fresh look, then the save again.
+        reread = true;
+        try {
+          conv = await conversion(true);
+        } catch (e2) {
+          return refused(e2);
+        }
+        continue;
+      }
+      return refused(e);
+    }
+  }
+}
+
+/** «حُوِّل X د.ع إلى $Y بسعر Z» for every scope whose typed dinars the shown preview converts. */
+export function convertedLines(shown: UsdPricingAnswer, body: WireBody, fill: (amount: string, usd: string, rate: string) => string): string[] {
+  const out: string[] = [];
+  for (const e of body.inputs) {
+    if (typeof e.supplier_cost_iqd !== 'number') continue;
+    const sc = scopeOf(shown, e.scope as PricingScope, typeof e.scope_id === 'string' ? e.scope_id : '');
+    const p = sc?.pricing_inputs;
+    if (p?.supplier_input_mode === 'IQD_CONVERTED' && p.original_input_amount === String(e.supplier_cost_iqd) && p.supplier_cost_amount && p.conversion_rate_snapshot)
+      out.push(fill(e.supplier_cost_iqd.toLocaleString('en-US'), p.supplier_cost_amount, p.conversion_rate_snapshot));
+  }
+  return out;
+}
+
+/** The name of a scope as the owner reads it (the product level, a model, a colour, a variant). */
+function scopeName(key: string, answer: UsdPricingAnswer | null, form: UsdPricingFormContext | null, lang: Language, s: UsdPricingFormStrings): string {
+  const { scope, id } = parseKey(key);
+  if (scope === 'base') return s.productLevel;
+  const known = scopeOf(answer, scope, id) ?? (scope === 'option' ? form?.models.find((m) => m.id === id) : scope === 'color' ? form?.colours?.find((c) => c.id === id) : null) ?? null;
+  return known ? nameOf(known, lang) : id;
+}
+
+/**
+ * Every field that cannot be saved, «<scope> · <field>: <reason>», and the section the first lives in —
+ * what «حفظ التسعير بالدولار», «نشر» and the form's bar say instead of saving it.
+ */
+export function invalidWhere(
+  effective: Readonly<Record<string, ScopeDraft>>,
+  answer: UsdPricingAnswer | null,
+  form: UsdPricingFormContext | null,
+  lang: Language
+): { text: string; section: 3 | 5 } {
+  const s = usdPricingFormStrings(lang);
+  const ps = procurementPricingStrings(lang);
+  const usdIqdRate = answer?.product_id ? answer.rates.usd_iqd_rate : undefined;
+  const parts: string[] = [];
+  let section: 3 | 5 | null = null;
+  for (const key of Object.keys(effective).sort(baseFirst)) {
+    const { scope, id } = parseKey(key);
+    const problems = draftProblems(effective[key]!, scopeOf(answer, scope, id)?.pricing_inputs ?? null, { usdIqdRate });
+    const fields = Object.keys(problems) as Array<keyof ScopeDraft>;
+    if (!fields.length) continue;
+    section ??= key === 'base' ? 3 : 5;
+    const name = scopeName(key, answer, form, lang, s);
+    for (const f of fields) parts.push(`${name} · ${draftFieldLabel(f, s)}: ${problemText(f, problems[f]!, s, ps)}`);
+  }
+  return { text: parts.join(lang === 'en' ? '; ' : '؛ '), section: section ?? 3 };
+}
+
+/** A pricing save's outcome, said in the panel and the form's bar until the owner types again (a preview never wipes it). */
+export interface PricingOutcome {
+  kind: 'saved' | 'ready' | 'held' | 'refused' | 'invalid';
+  tone: 'ok' | 'warn' | 'error';
+  text: string;
+  /** Where the field it names lives: section ٣ (the product) or ٥ (a model, a colour, a variant). */
+  section?: 3 | 5;
+}
+
+/** A refusal the server answered for one field of one scope: said under that field. */
+export interface ServerField {
+  key: string;
+  field: keyof ScopeDraft;
+  text: string;
 }
 
 export interface UsdPricingState {
@@ -490,12 +828,22 @@ export interface UsdPricingState {
   /** The drafts as they would be saved (typed + measures taken from the form). */
   effective: Record<string, ScopeDraft>;
   dirty: boolean;
+  /** The owner typed (or adopted) something not saved yet — leaving the form asks first. */
+  touched: boolean;
   invalid: boolean;
+  /** Each field that cannot be saved, «<scope> · <field>: <reason>» ('' when none). */
+  invalidWhere: string;
   busy: boolean;
   saving: boolean;
   notInstalled: boolean;
   error: string;
   notice: string;
+  /** The last save's outcome (saved / ready / held / refused / invalid), until the owner types again. */
+  outcome: PricingOutcome | null;
+  /** A refusal the server named for one field: said under that field. */
+  serverField: ServerField | null;
+  /** The stored answer says no dollar rate is approved (unknown for a new product). */
+  rateKnownMissing: boolean;
   /** The engine prices this product (its store price is then read-only in the form). */
   engine: boolean;
   setDraft: (scope: PricingScope, id: string, patch: ScopeDraft) => void;
@@ -508,11 +856,13 @@ export interface UsdPricingState {
   saveAfterProduct: (productId: string, snap: PricingSnapshot) => Promise<{ ok: boolean; message: string }>;
   /** After a product save with no pricing drafts: the fresh answer, and the preview when that save completed the product. */
   afterProductSaved: (productId: string) => Promise<void>;
-  /** The held save awaiting the owner's look at the new prices (the sheet). */
+  /** The new prices awaiting the owner's look (the sheet). */
   review: PricingReview | null;
   reviewBusy: boolean;
   confirmReview: (confirmLarge: boolean) => Promise<void>;
   cancelReview: () => void;
+  /** «راجع السعر الجديد واعتمده»: the sheet again, for stored data that is complete. */
+  openReview: () => void;
   /** «رجوع إلى التسعير اليدوي»: the prices stay exactly as they are and are edited by hand again. */
   exitEngine: () => Promise<void>;
 }
@@ -537,10 +887,23 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
   const [notInstalled, setNotInstalled] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [outcome, setOutcome] = useState<PricingOutcome | null>(null);
+  const [serverField, setServerField] = useState<ServerField | null>(null);
+  // The ready reviews the owner put off with «لاحقًا» (by hash): a later product save does not reopen them.
+  const dismissed = useRef(new Set<string>());
   const [tick, setTick] = useState(0);
   const [previewTick, setPreviewTick] = useState(0);
   const live = enabled && !!productId;
-  const message = useCallback((e: unknown) => contractRefusal(e, refusalLang(lang), e instanceof Error ? e.message : String(e)), [lang]);
+  // A refusal in the reader's language, naming the panel's own field («{field}» is never printed).
+  const message = useCallback((e: unknown) => contractRefusal(e, refusalLang(lang), e instanceof Error ? e.message : String(e), (f) => fieldLabelOf(f, s)), [lang, s]);
+  const io = useMemo<PricingIo>(
+    () => ({
+      get: (p) => api.get<UsdPricingAnswer>(p, { mascot: 'silent' }),
+      post: (p, b) => api.post<UsdPricingAnswer>(p, b, { mascot: 'silent' }),
+      put: (p, b) => api.put<UsdPricingAnswer>(p, b, { mascot: 'silent' }),
+    }),
+    []
+  );
 
   // Another product: its own drafts (a new product's first save keeps what was typed for it).
   const previousId = useRef(productId);
@@ -549,6 +912,9 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       setDrafts({});
       setStored(null);
       setPreview(null);
+      setOutcome(null);
+      setServerField(null);
+      dismissed.current.clear();
     }
     previousId.current = productId;
   }, [productId]);
@@ -558,7 +924,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     const ctrl = new AbortController();
     setBusy(true);
     api
-      .get<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(productId!)}/inputs`, { signal: ctrl.signal, mascot: 'silent' })
+      .get<UsdPricingAnswer>(inputsPath(productId!), { signal: ctrl.signal, mascot: 'silent' })
       .then((r) => {
         setStored(r);
         setPreview(null);
@@ -578,10 +944,11 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
   const answer = enabled ? (productId ? stored : NEW_PRODUCT_ANSWER) : null;
   const effective = useMemo(() => (answer ? effectiveDrafts(drafts, answer, form) : {}), [drafts, answer, form]);
   const dirty = Object.keys(effective).length > 0;
-  const invalid = Object.entries(effective).some(([k, d]) => {
-    const { scope, id } = parseKey(k);
-    return Object.keys(draftProblems(d, scopeOf(answer, scope, id)?.pricing_inputs ?? null)).length > 0;
-  });
+  // What the owner typed or adopted (the measures the form derives do not count: opening a product never nags).
+  const touched = Object.values(drafts).some((d) => (Object.keys(d) as Array<keyof ScopeDraft>).some((k) => (k === 'adopt_measure' ? d[k] === true : d[k] !== undefined)));
+  const rateKnownMissing = !!answer?.product_id && answer.rates.usd_iqd_rate === null;
+  const where = useMemo(() => invalidWhere(effective, answer, form, lang), [effective, answer, form, lang]);
+  const invalid = where.text !== '';
   const wireObject = useMemo(() => (answer && productId && dirty && !invalid ? draftWire(effective, answer) : null), [answer, productId, dirty, invalid, effective]);
   const wire = wireObject && (wireObject.inputs.length || wireObject.rules.length) ? JSON.stringify(wireObject) : '';
 
@@ -592,7 +959,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     const timer = setTimeout(() => {
       setBusy(true);
       api
-        .post<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(productId!)}/preview`, { draft: JSON.parse(wire) }, { signal: ctrl.signal, mascot: 'silent' })
+        .post<UsdPricingAnswer>(previewPath(productId!), { draft: JSON.parse(wire) }, { signal: ctrl.signal, mascot: 'silent' })
         .then((r) => {
           setPreview({ wire, answer: r });
           setError('');
@@ -612,42 +979,21 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
   }, [live, productId, wire, previewTick, message]);
 
   const shown = wire ? (preview?.answer ?? answer) : answer;
-  /**
-   * The hash of the preview that showed exactly these drafts (a dinar conversion needs it). A save that writes
-   * prices never rides on the live preview: it goes without a hash, and the server answers with the sheet.
-   */
-  const hashFor = useCallback((w: string) => (preview && preview.wire === w && !preview.answer.adoption?.kind ? preview.answer.preview_hash : null), [preview]);
 
   const setDraft = useCallback((scope: PricingScope, id: string, patch: ScopeDraft) => {
+    const key = keyOf(scope, id);
     setNotice('');
-    setDrafts((all) => ({ ...all, [keyOf(scope, id)]: { ...all[keyOf(scope, id)], ...patch } }));
+    // A new keystroke is a new question: the last outcome and the server's word on this scope give way.
+    setOutcome(null);
+    setServerField((f) => (f && f.key === key ? null : f));
+    setDrafts((all) => ({ ...all, [key]: { ...all[key], ...patch } }));
   }, []);
   const discard = useCallback(() => {
     setDrafts({});
     setPreview(null);
     setError('');
-  }, []);
-
-  /** One PUT for `pid`: the snapshot's drafts against the answer the server holds now. */
-  const putDrafts = useCallback(async (pid: string, snap: Record<string, ScopeDraft>, hash: string | null, base: UsdPricingAnswer | null) => {
-    const current = base ?? (await api.get<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(pid)}/inputs`, { mascot: 'silent' }));
-    const body = draftWire(snap, current);
-    if (!body.inputs.length && !body.rules.length) return { answer: current, sent: false, review: null };
-    const wire = { inputs_seq: current.inputs_seq, ...body };
-    try {
-      const r = await api.put<UsdPricingAnswer>(
-        `${PRICING}/products/${encodeURIComponent(pid)}/inputs`,
-        { ...wire, ...(hash && wireHasIqd(body) ? { preview_hash: hash } : {}) },
-        { mascot: 'silent' }
-      );
-      return { answer: r, sent: true, review: null };
-    } catch (e) {
-      // Owner decision 8: this save writes prices — the server holds it and answers with the preview.
-      const shown = heldPreview(e);
-      if (!shown) throw e;
-      const held: PricingReview = { pid, body: wire, hash: shown.preview_hash, adoption: shown.adoption!, error: '' };
-      return { answer: current, sent: false, review: held };
-    }
+    setOutcome(null);
+    setServerField(null);
   }, []);
 
   /** Drafts for models the server does not know yet (unsaved) stay; the rest were saved. */
@@ -660,105 +1006,140 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     return out;
   }, []);
 
+  /** A refusal's words (with what an engine product misses), and its side effects: a fresh look, a fresh read. */
   const failed = useCallback(
-    async (e: unknown, pid: string) => {
-      const stale = e instanceof ApiError && (e.code === 'PRICING_PREVIEW_STALE' || (e.code === 'PRICING_INPUT_INVALID' && (e.details as { field?: string } | undefined)?.field === 'preview_hash'));
+    async (e: unknown, pid: string): Promise<string> => {
+      const stale = isStaleHash(e);
       // An engine product never loses its price: a save that would leave it incomplete is refused, naming what is missing.
       const missing = e instanceof ApiError && e.code === 'PRICING_ENGINE_INCOMPLETE' ? ((e.details as { missing_codes?: string[] } | undefined)?.missing_codes ?? []) : [];
-      setError(stale ? `${message(e)} — ${s.reviewConversion}` : missing.length ? `${message(e)} — ${missing.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')}` : message(e));
+      const text = stale ? `${message(e)} — ${s.reviewConversion}` : missing.length ? `${message(e)} — ${missing.map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')}` : message(e);
       if (stale) setPreviewTick((t) => t + 1);
       // Someone else saved first (a purchase applied, another tab): show the fresh values, keep the typed ones.
       if (e instanceof ApiError && e.code === 'PRICING_CHANGED') {
         try {
-          setStored(await api.get<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(pid)}/inputs`, { mascot: 'silent' }));
+          setStored(await io.get(inputsPath(pid)));
         } catch {
           /* the message above stands */
         }
       }
+      return text;
     },
-    [message, s.reviewConversion, lang]
+    [message, s.reviewConversion, lang, io]
+  );
+
+  const describe = useCallback((shownAnswer: UsdPricingAnswer, body: WireBody) => convertedLines(shownAnswer, body, s.converted), [s]);
+
+  /** One save's result → the store, the drafts, the sheet and the outcome (never silent). */
+  const apply = useCallback(
+    async (res: CommitResult, pid: string, alone: boolean): Promise<PricingOutcome | null> => {
+      let out: PricingOutcome | null;
+      if (res.kind === 'refused') {
+        const m = await failed(res.error, pid);
+        out = { kind: 'refused', tone: 'error', text: alone ? s.notSavedAlone(m) : s.pricingNotSaved(m), section: res.target.section };
+        if (res.target.key && res.target.field) setServerField({ key: res.target.key, field: res.target.field, text: m });
+      } else if (res.kind === 'held') {
+        // The new prices wait for the owner's look (the sheet); nothing is stored, the drafts stay.
+        setStored(res.answer);
+        setReview(res.review);
+        out = { kind: 'held', tone: 'warn', text: s.heldNotSaved };
+      } else {
+        setStored(res.answer);
+        setServerField(null);
+        if (res.kind === 'saved') {
+          setPreview(null);
+          setDrafts((all) => keepUnsent(all, res.answer));
+        }
+        const ready = res.ready && !dismissed.current.has(res.ready.hash) ? res.ready : null;
+        if (ready) {
+          // Stored, and complete: the new price is the owner's to adopt («لاحقًا» loses nothing).
+          setReview(ready);
+          out = { kind: 'ready', tone: 'warn', text: res.kind === 'saved' ? s.savedDataReady : s.readyWaiting };
+        } else if (res.kind === 'saved') {
+          const text = [alone ? s.saved : s.savedWithProduct, ...res.converted].join(' · ');
+          setNotice(text);
+          out = { kind: 'saved', tone: 'ok', text };
+        } else out = null;
+      }
+      setOutcome(out);
+      return out;
+    },
+    [failed, s, keepUnsent]
   );
 
   const saveRef = useRef(false);
   const save = useCallback(async () => {
-    if (!stored || !productId || saveRef.current || invalid || !dirty) return;
+    if (!stored || !productId || saveRef.current || !dirty) return;
+    if (invalid) {
+      // Never sent: the panel says which field, of which scope, and why.
+      setOutcome({ kind: 'invalid', tone: 'error', text: s.saveBlocked(where.text), section: where.section });
+      return;
+    }
     saveRef.current = true;
     setSaving(true);
     setError('');
     try {
-      const { answer: r, review: held } = await putDrafts(productId, effective, hashFor(wire), stored);
-      if (held) {
-        setReview(held);
-        return;
-      }
-      setStored(r);
-      setPreview(null);
-      setDrafts((all) => keepUnsent(all, r));
-      setNotice(s.saved);
-    } catch (e) {
-      await failed(e, productId);
+      await apply(await commitPricing(io, productId, effective, { base: stored, preview, describe }), productId, true);
     } finally {
       saveRef.current = false;
       setSaving(false);
     }
-  }, [stored, productId, invalid, dirty, putDrafts, effective, hashFor, wire, keepUnsent, s.saved, failed]);
+  }, [stored, productId, dirty, invalid, s, where, apply, io, effective, preview, describe]);
 
   const snapshot = useCallback((): PricingSnapshot | null => {
     if (!enabled || !dirty) return null;
-    return { drafts: JSON.parse(JSON.stringify(effective)) as Record<string, ScopeDraft>, hash: wire ? hashFor(wire) : null, invalid };
-  }, [enabled, dirty, effective, wire, hashFor, invalid]);
+    return { drafts: JSON.parse(JSON.stringify(effective)) as Record<string, ScopeDraft>, invalid, preview: preview && preview.wire === wire ? preview : null };
+  }, [enabled, dirty, effective, invalid, preview, wire]);
 
   const saveAfterProduct = useCallback(
     async (pid: string, snap: PricingSnapshot) => {
       // The typed values become explicit drafts, so a refusal never loses them (the form's measures are saved by now).
       setDrafts(snap.drafts);
       if (snap.invalid) {
-        const why = s.pricingNotSaved(procurementPricingStrings(lang).invalid);
-        setError(why);
-        return { ok: false, message: why };
+        const why = invalidWhere(snap.drafts, answer, form, lang);
+        const out: PricingOutcome = { kind: 'invalid', tone: 'error', text: s.pricingNotSaved(why.text), section: why.section };
+        setOutcome(out);
+        return { ok: false, message: out.text };
       }
       setSaving(true);
       setError('');
       try {
-        const { answer: r, sent, review: held } = await putDrafts(pid, snap.drafts, snap.hash, null);
-        if (held) {
-          // The product is saved; its new prices wait for the owner's look (the sheet), the drafts stay.
-          setStored(r);
-          setReview(held);
-          return { ok: true, message: '' };
-        }
-        setStored(r);
-        setPreview(null);
-        setDrafts((all) => keepUnsent(all, r));
-        if (sent) setNotice(s.savedWithProduct);
+        const res = await commitPricing(io, pid, snap.drafts, { preview: snap.preview, describe });
+        const out = await apply(res, pid, false);
         // The product's save moved its models and channels: read the answer again.
         setTick((t) => t + 1);
-        return { ok: true, message: sent ? s.savedWithProduct : '' };
-      } catch (e) {
-        await failed(e, pid);
-        return { ok: false, message: s.pricingNotSaved(message(e)) };
+        return { ok: res.kind !== 'refused', message: out?.text ?? '' };
       } finally {
         setSaving(false);
       }
     },
-    [putDrafts, keepUnsent, failed, message, s, lang]
+    [answer, form, lang, s, io, describe, apply]
   );
 
-  /** A product save with no pricing drafts: when it completed the product (or its rates moved), the sheet. */
+  /** A product save with no pricing drafts: when the stored data is complete (or its rates moved), the sheet. */
   const afterProductSaved = useCallback(
     async (pid: string) => {
       try {
-        const r = await api.get<UsdPricingAnswer>(`${PRICING}/products/${encodeURIComponent(pid)}/inputs`, { mascot: 'silent' });
+        const r = await io.get(inputsPath(pid));
         setStored(r);
         setPreview(null);
-        if (r.adoption?.kind && r.adoption.needs_write && r.adoption.complete && r.preview_hash)
-          setReview({ pid, body: { inputs_seq: r.inputs_seq, inputs: [], rules: [] }, hash: r.preview_hash, adoption: r.adoption, error: '' });
+        const ready = readyReview(pid, r);
+        if (ready && !dismissed.current.has(ready.hash)) {
+          setReview(ready);
+          setOutcome({ kind: 'ready', tone: 'warn', text: s.readyWaiting });
+        }
       } catch (e) {
         if (!isAborted(e)) setError(message(e));
       }
     },
-    [message]
+    [io, message, s.readyWaiting]
   );
+
+  const openReview = useCallback(() => {
+    const ready = stored ? readyReview(stored.product_id, stored) : null;
+    if (!ready) return;
+    dismissed.current.delete(ready.hash);
+    setReview(ready);
+  }, [stored]);
 
   const reviewRef = useRef(false);
   const confirmReview = useCallback(
@@ -769,7 +1150,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       setReviewBusy(true);
       try {
         const r = await api.put<UsdPricingAnswer>(
-          `${PRICING}/products/${encodeURIComponent(held.pid)}/inputs`,
+          inputsPath(held.pid),
           { ...held.body, preview_hash: held.hash, ...(confirmLarge ? { confirm_large_change: true } : {}) },
           { mascot: 'silent' }
         );
@@ -778,7 +1159,9 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
         setPreview(null);
         setError('');
         setDrafts((all) => keepUnsent(all, r));
-        setNotice(held.adoption.kind === 'adopt' ? es.savedAdopted : es.savedRepriced);
+        const done = held.adoption.kind === 'adopt' ? es.savedAdopted : es.savedRepriced;
+        setNotice(done);
+        setOutcome({ kind: 'saved', tone: 'ok', text: done });
         onPricesWritten?.(held.pid);
       } catch (e) {
         const fresh = heldPreview(e);
@@ -789,20 +1172,29 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
           setReview({ ...held, error: es.reauth });
         } else {
           setReview(null);
-          await failed(e, held.pid);
+          const m = await failed(e, held.pid);
+          setOutcome({ kind: 'refused', tone: 'error', text: held.stored ? m : s.pricingNotSaved(m) });
         }
       } finally {
         reviewRef.current = false;
         setReviewBusy(false);
       }
     },
-    [review, keepUnsent, es, onPricesWritten, message, failed]
+    [review, keepUnsent, es, onPricesWritten, message, failed, s]
   );
   const cancelReview = useCallback(() => {
-    // Nothing more is written: the typed values stay as drafts, the store price as it is.
+    const held = review;
+    if (held?.stored) {
+      // The data is stored: «لاحقًا» keeps the store price as it is, and this review does not reopen on its own.
+      dismissed.current.add(held.hash);
+      setOutcome({ kind: 'ready', tone: 'warn', text: s.savedLater });
+    } else if (held) {
+      // Nothing is written: the typed values stay as drafts (guarded on leaving), the store price as it is.
+      setOutcome({ kind: 'held', tone: 'warn', text: s.heldCancelled });
+    }
     setReview(null);
     setTick((t) => t + 1);
-  }, []);
+  }, [review, s]);
 
   const exitEngine = useCallback(async () => {
     if (!stored || stored.mode !== 'engine' || !productId || saveRef.current) return;
@@ -814,7 +1206,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
       setTick((t) => t + 1);
       onPricesWritten?.(productId);
     } catch (e) {
-      await failed(e, productId);
+      setError(await failed(e, productId));
     } finally {
       saveRef.current = false;
       setSaving(false);
@@ -830,12 +1222,17 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     drafts,
     effective,
     dirty,
+    touched,
     invalid,
+    invalidWhere: where.text,
     busy,
     saving,
     notInstalled,
     error,
     notice,
+    outcome,
+    serverField,
+    rateKnownMissing,
     engine: stored?.mode === 'engine',
     setDraft,
     discard,
@@ -848,6 +1245,7 @@ export function useUsdPricingState({ productId, enabled, form, onPricesWritten }
     reviewBusy,
     confirmReview,
     cancelReview,
+    openReview,
     exitEngine,
   };
 }
@@ -874,6 +1272,7 @@ function MeasureFields({ scope, id, route, summary }: { scope: PricingScope; id:
   const { lang } = useLanguage();
   const s = usdPricingFormStrings(lang);
   const en = USD_PRICING_FORM_STRINGS.en;
+  const ps = procurementPricingStrings(lang);
   const st = useUsdPricing()!;
   const f = st.form;
   const dims = dimensionsOf(f, scope, id) ?? null;
@@ -886,6 +1285,10 @@ function MeasureFields({ scope, id, route, summary }: { scope: PricingScope; id:
   const label = (ar: string, english: string) => ({ ar, en: lang === 'en' ? '' : english });
   const set = (patch: Partial<ProductDimensionsV2>) => f.setMeasure(scope, id, patch);
   const volume = route === 'CHINA_SEA';
+  // The measures as they would be saved (typed CBM, and the box or weight the form carries to pricing).
+  const problems = draftProblems({ ...eff, ...d }, row);
+  const errorOf = (field: keyof ScopeDraft) =>
+    st.serverField?.key === keyOf(scope, id) && st.serverField.field === field ? st.serverField.text : problems[field] ? problemText(field, problems[field]!, s, ps) : null;
 
   let status: ReactNode = null;
   const adopt = (
@@ -919,7 +1322,7 @@ function MeasureFields({ scope, id, route, summary }: { scope: PricingScope; id:
     <>
       {volume ? (
         <>
-          <Field {...label(s.boxWidth, en.boxWidth)}>
+          <Field {...label(s.boxWidth, en.boxWidth)} error={errorOf('box')}>
             <MeasurementInput value={dims?.package_width_mm ?? null} inherited={inherited?.package_width_mm} scale={10} onChange={(v) => set({ package_width_mm: v })} />
           </Field>
           <Field {...label(s.boxDepth, en.boxDepth)}>
@@ -928,12 +1331,12 @@ function MeasureFields({ scope, id, route, summary }: { scope: PricingScope; id:
           <Field {...label(s.boxHeight, en.boxHeight)}>
             <MeasurementInput value={dims?.package_height_mm ?? null} inherited={inherited?.package_height_mm} scale={10} onChange={(v) => set({ package_height_mm: v })} />
           </Field>
-          <Field {...label(s.manualCbm, en.manualCbm)} hint={s.manualCbmHint} error={draftProblems(d).manual_cbm ? s.decimalInvalid : null}>
+          <Field {...label(s.manualCbm, en.manualCbm)} hint={s.manualCbmHint} error={errorOf('manual_cbm')}>
             <TextInput inputMode="decimal" value={d.manual_cbm ?? row?.manual_cbm ?? ''} onChange={(e) => st.setDraft(scope, id, { manual_cbm: e.target.value })} />
           </Field>
         </>
       ) : (
-        <Field {...label(s.weightKg, en.weightKg)} hint={row?.pricing_weight_g != null ? s.pricingWeightWins : undefined}>
+        <Field {...label(s.weightKg, en.weightKg)} hint={row?.pricing_weight_g != null ? s.pricingWeightWins : undefined} error={errorOf('shipping_weight_g')}>
           <MeasurementInput value={dims?.package_weight_g ?? null} inherited={inherited?.package_weight_g} scale={1000} onChange={(v) => set({ package_weight_g: v })} />
         </Field>
       )}
@@ -967,7 +1370,11 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
   // The nearest level above that holds a value, per field.
   const inheritedOf = <K extends keyof StoredInputs>(k: K): StoredInputs | null => above.find((a) => a.pricing_inputs?.[k] != null)?.pricing_inputs ?? null;
   const inherited = inheritedOf('supplier_cost_amount') ?? base?.pricing_inputs ?? null;
-  const problems = draftProblems(d, stored);
+  // Exactly what the server would refuse, said under the field before anything is sent (a refusal the
+  // server named for this scope's field takes its place until the owner types again).
+  const problems = draftProblems(d, stored, { usdIqdRate: st.answer?.product_id ? st.answer.rates.usd_iqd_rate : undefined });
+  const errorOf = (field: keyof ScopeDraft) =>
+    st.serverField?.key === keyOf(scope.scope, scope.scope_id) && st.serverField.field === field ? st.serverField.text : problems[field] ? problemText(field, problems[field]!, s, ps) : null;
   const label = (ar: string, english: string) => ({ ar, en: lang === 'en' ? '' : english });
   const ph = (v: string | null | undefined) => (scope.scope !== 'base' && v ? s.inheritPlaceholder(v) : undefined);
   const set = (patch: ScopeDraft) => st.setDraft(scope.scope, scope.scope_id, patch);
@@ -1001,14 +1408,14 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
   return (
     <Grid cols={3}>
       {iqd ? (
-        <Field {...label(s.supplierCostIqd, en.supplierCostIqd)} error={problems.supplier_cost_iqd ? s.iqdInvalid : null} hint={s.iqdHint}>
+        <Field {...label(s.supplierCostIqd, en.supplierCostIqd)} error={errorOf('supplier_cost_iqd')} hint={s.iqdHint}>
           <Money
             value={d.supplier_cost_iqd !== undefined ? d.supplier_cost_iqd : storedIqd ? Number(stored?.original_input_amount ?? 0) || null : null}
             onChange={(v) => set({ supplier_cost_currency: 'IQD', supplier_cost_iqd: v, reconvert: undefined })}
           />
         </Field>
       ) : (
-        <Field {...label(s.supplierCost, en.supplierCost)} error={problems.supplier_cost_amount ? s.decimalInvalid : null}>
+        <Field {...label(s.supplierCost, en.supplierCost)} error={errorOf('supplier_cost_amount')}>
           <TextInput
             inputMode="decimal"
             value={d.supplier_cost_amount ?? (storedIqd ? '' : (stored?.supplier_cost_amount ?? ''))}
@@ -1017,19 +1424,22 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
           />
         </Field>
       )}
-      <Field {...label(s.supplierCurrency, en.supplierCurrency)}>
+      <Field {...label(s.supplierCurrency, en.supplierCurrency)} error={errorOf('supplier_cost_currency')}>
         <Select value={currency} onChange={(e) => pickCurrency(e.target.value)}>
           <option value="">{scope.scope !== 'base' ? s.inheritPlaceholder(inherited?.supplier_input_mode === 'IQD_CONVERTED' ? 'IQD' : (inherited?.supplier_cost_currency ?? '—')) : '—'}</option>
           {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          <option value="IQD">{s.currencyIqd}</option>
+          {/* With no approved dollar rate typed dinars cannot convert (the server refuses them): offered only once one is approved. */}
+          <option value="IQD" disabled={st.rateKnownMissing && currency !== 'IQD'}>{st.rateKnownMissing ? s.currencyIqdNoRate : s.currencyIqd}</option>
         </Select>
       </Field>
-      <Field {...label(s.route, en.route)}>
+      <Field {...label(s.route, en.route)} error={errorOf('shipping_profile')}>
         <Select value={d.shipping_profile ?? stored?.shipping_profile ?? ''} onChange={(e) => set({ shipping_profile: e.target.value })}>
           <option value="">{scope.scope !== 'base' && inheritedRoute ? s.inheritPlaceholder(profileName(inheritedRoute, lang)) : s.routeNone}</option>
           {ROUTES.map((r) => <option key={r} value={r}>{profileName(r, lang)}</option>)}
         </Select>
       </Field>
+      {/* The weight or box fields appear for the route that prices by them: no route anywhere, no measure. */}
+      {!route && <p className="min-w-0 self-end pb-1 text-[11px] leading-relaxed text-amber-300" data-pricing-route-first>{s.routeFirst}</p>}
       {(iqd || storedIqd) && (
         <div className="min-w-0 text-[11px] leading-relaxed text-text-secondary md:col-span-2 xl:col-span-3" data-usd-iqd={keyOf(scope.scope, scope.scope_id)}>
           {/* What the save stores: the server's conversion of the typed dinars (the preview), or the stored snapshot. */}
@@ -1056,14 +1466,14 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
       {route && (scope.scope !== 'sku' || (st.form.skus ?? []).some((k) => k.combo_key === scope.scope_id)) && (
         <MeasureFields scope={scope.scope} id={scope.scope_id} route={route} summary={summary} />
       )}
-      <Field {...label(s.additional, en.additional)}>
+      <Field {...label(s.additional, en.additional)} error={errorOf('additional_cost_iqd')}>
         <Money value={d.additional_cost_iqd !== undefined ? d.additional_cost_iqd : (stored?.additional_cost_iqd ?? null)} placeholder={ph(inheritedAdditional != null ? String(inheritedAdditional) : null)} onChange={(v) => set({ additional_cost_iqd: v })} />
       </Field>
-      <Field {...label(s.minProfit, en.minProfit)} error={problems.minimum_target_profit_usd ? ps.invalid : null} hint={s.minProfitHint}>
+      <Field {...label(s.minProfit, en.minProfit)} error={errorOf('minimum_target_profit_usd')} hint={s.minProfitHint}>
         <TextInput inputMode="decimal" value={minProfit} placeholder={ph(baseMin) ?? (scope.target_profit_iqd != null ? `${scope.target_profit_iqd.toLocaleString('en-US')} IQD` : undefined)} onChange={(e) => set({ minimum_target_profit_usd: e.target.value })} />
       </Field>
       {(sellsDirect || extraStored != null || d.direct_sale_extra_iqd != null) && (
-        <Field {...label(s.extra, en.extra)} error={problems.direct_sale_extra_iqd ? s.extraInvalid : null} hint={s.extraHint}>
+        <Field {...label(s.extra, en.extra)} error={errorOf('direct_sale_extra_iqd')} hint={s.extraHint}>
           <Money value={d.direct_sale_extra_iqd !== undefined ? d.direct_sale_extra_iqd : extraStored} placeholder={ph(aboveExtra != null ? String(aboveExtra) : null)} onChange={(v) => set({ direct_sale_extra_iqd: v })} />
         </Field>
       )}
@@ -1078,7 +1488,7 @@ function SaveRow() {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {st.productId && (
-        <button type="button" className={btnPrimary} disabled={!st.dirty || st.invalid || st.saving || st.busy} onClick={() => void st.save()}>
+        <button type="button" className={btnPrimary} disabled={!st.dirty || st.invalid || st.saving || !st.answer} onClick={() => void st.save()} data-pricing-save>
           {st.saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Save className="w-4 h-4" aria-hidden="true" />}
           {s.save}
         </button>
@@ -1086,6 +1496,16 @@ function SaveRow() {
       {st.dirty && <button type="button" className={btnGhost} disabled={st.saving} onClick={st.discard}>{s.discard}</button>}
       <span className="text-[11px] text-text-muted">{st.dirty ? `${s.unsaved} · ${s.saveHint}` : s.saveHint}</span>
       {st.dirty && st.shown?.adoption?.kind && st.shown.adoption.complete && <span className="text-[11px] text-amber-300" data-engine-ready>{engineSaveStrings(lang).readyHint}</span>}
+      {/* Why the button is disabled: the field, its scope and the reason — never a silent grey button. */}
+      {st.dirty && st.invalid && <span className="text-[11px] text-red-300" data-pricing-blocked>{s.saveBlocked(st.invalidWhere)}</span>}
+      {st.productId && !st.dirty && !st.review && readyReview(st.productId, st.answer) && (
+        <span className="text-[11px] text-amber-300">
+          {s.readyWaiting}{' '}
+          <button type="button" className="underline" onClick={st.openReview} data-pricing-review>
+            {s.reviewAndAdopt}
+          </button>
+        </span>
+      )}
       {st.productId && st.engine && !st.dirty && (
         <button
           type="button"
@@ -1104,14 +1524,72 @@ function SaveRow() {
   );
 }
 
+/** «التسعير والشحن» in a new tab: the form and its drafts stay where they are. */
+function OpenPricing() {
+  const { lang } = useLanguage();
+  return (
+    <a href={PRICING_TAB_HREF} target="_blank" rel="noopener" className="underline" data-open-pricing>
+      {usdPricingFormStrings(lang).openPricingTab}
+    </a>
+  );
+}
+
+/** The central settings a price is still waiting for (a rate, a shipping rate, the engine's pause), and where to set them. */
+const CENTRAL_CODES = new Set(['FX_RATE_MISSING', 'FX_RATE_UNCONFIRMED', 'FX_DERIVED_STALE', 'SHIPPING_RATE_MISSING', 'SHIPPING_RATE_UNCONFIRMED', 'PRICING_ENGINE_PAUSED']);
+
+function WhereToFix() {
+  const { lang } = useLanguage();
+  const s = usdPricingFormStrings(lang);
+  const ps = procurementPricingStrings(lang);
+  const st = useUsdPricing()!;
+  const summaries = [...(st.shown?.models ?? []), ...(st.shown?.skus ?? [])].map((m) => m.pricing_summary);
+  const codes = [...new Set(summaries.flatMap((x) => x?.issue_codes ?? []))].filter((c) => CENTRAL_CODES.has(c));
+  if (!st.productId || !codes.length) return null;
+  const list = codes.map((c) => (c === 'SHIPPING_RATE_MISSING' ? ps.shippingRateMissing : issueText(c, lang))).join(lang === 'en' ? '; ' : '؛ ');
+  return (
+    <p className="mt-2 text-[11px] leading-relaxed text-amber-300" data-pricing-where>
+      {s.centralMissing(list)} <OpenPricing />
+    </p>
+  );
+}
+
 function Status() {
   const { lang } = useLanguage();
   const s = usdPricingFormStrings(lang);
   const ps = procurementPricingStrings(lang);
   const st = useUsdPricing()!;
+  const o = st.outcome;
   return (
     <>
       {st.shown?.rates.review_pending && st.shown.rates.usd_iqd_rate && <Banner kind="warn">{ps.reviewBanner(st.shown.rates.usd_iqd_rate)}</Banner>}
+      {st.rateKnownMissing && (
+        <div data-pricing-rates="no-usd">
+          <Banner kind="warn">
+            {s.ratesNoUsd} <OpenPricing />
+          </Banner>
+        </div>
+      )}
+      {st.shown?.rates.derived_stale && (
+        <Banner kind="warn">
+          {s.ratesDerivedStale} <OpenPricing />
+        </Banner>
+      )}
+      {/* The last save's outcome: no preview or read wipes it, only the owner's next keystroke. */}
+      {o && (
+        <div data-pricing-outcome={o.kind} role={o.tone === 'error' ? 'alert' : 'status'}>
+          <Banner kind={o.tone}>
+            {o.text}
+            {o.kind === 'ready' && !st.review && st.productId && readyReview(st.productId, st.answer) && (
+              <>
+                {' '}
+                <button type="button" className="underline" onClick={st.openReview}>
+                  {s.reviewAndAdopt}
+                </button>
+              </>
+            )}
+          </Banner>
+        </div>
+      )}
       {st.error && (
         <Banner kind="error">
           {st.error}{' '}
@@ -1163,7 +1641,10 @@ export function UsdPricingProductPanel() {
           ) : (
             models.length > 0 && <p className="mt-3 text-[12px] text-text-secondary">{s.modelsSummary(String(ok), String(models.length))}</p>
           )}
+          <WhereToFix />
           <p className="mt-2 text-[11px] text-text-muted">{s.pricesLater}</p>
+          {/* «التكلفة القديمة» and the store price beside this panel do not move with a data save. */}
+          <p className="mt-1 text-[11px] text-text-muted" data-pricing-legacy-cost>{s.legacyCostStays}</p>
           <SaveRow />
         </>
       )}
@@ -1329,24 +1810,51 @@ export function UsdPricingOptionsFooter() {
   return (
     <div className="ap mt-3" data-form="usd-pricing-options">
       <Status />
+      <WhereToFix />
       <SaveRow />
     </div>
   );
 }
 
-/** The writer's preview sheet (owner decision 8), mounted once by the form: open while a save waits for the owner's look. */
+/**
+ * The writer's preview sheet (owner decision 8), mounted ONCE at the form's root — never inside a section
+ * that can be closed (owner report 2026-10-10: a held save waited in closed section ٨, unseen). When the
+ * data is already stored, its cancel is «لاحقًا — البيانات محفوظة» and a large change's fresh sign-in
+ * loses nothing.
+ */
 export function UsdPricingSaveSheet() {
   const st = useUsdPricing();
+  const { lang } = useLanguage();
+  const auth = useOptionalAuth();
   if (!st || !st.review) return null;
-  const label = st.review.adoption.rows[0]?.name_ar ?? '';
+  const review = st.review;
+  const s = usdPricingFormStrings(lang);
+  const label = review.adoption.rows[0]?.name_ar ?? '';
+  const signInAgain = async () => {
+    // The session must end first: only a NEW sign-in is fresh. The way back is this product's form.
+    try {
+      await auth?.logout();
+    } finally {
+      window.location.assign(`/auth?next=${encodeURIComponent(`/admin?tab=products&edit=${encodeURIComponent(review.pid)}`)}`);
+    }
+  };
   return (
     <EngineSaveSheet
-      key={st.review.hash}
-      products={[{ product_id: st.review.pid, label, adoption: st.review.adoption }]}
+      key={review.hash}
+      products={[{ product_id: review.pid, label, adoption: review.adoption }]}
       busy={st.reviewBusy}
-      error={st.review.error}
+      error={review.error}
       onConfirm={(confirmLarge) => void st.confirmReview(confirmLarge)}
       onCancel={st.cancelReview}
+      cancelLabel={review.stored ? s.later : undefined}
+      note={review.stored ? s.sheetDataSaved : s.sheetNothingSaved}
+      extra={
+        review.stored && review.error === engineSaveStrings(lang).reauth ? (
+          <button type="button" className="justify-self-start text-[13px] underline" onClick={() => void signInAgain()} data-pricing-sign-in>
+            {s.signInAgain}
+          </button>
+        ) : null
+      }
     />
   );
 }

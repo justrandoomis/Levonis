@@ -7,6 +7,7 @@ import {
   type ProductDimensionsV2,
 } from '../../../lib/productTypes';
 import { Field, Grid, btnGhost } from './formUi';
+import { toAsciiDigits } from '../../../lib/localeNumber';
 
 
 /** Format a canonical integer without floating-point arithmetic. */
@@ -23,7 +24,9 @@ export function formatScaledInteger(value: number | null, scale: 10 | 1000): str
  * precision that maps exactly to grams/millimetres is accepted.
  */
 export function parseScaledInteger(text: string, scale: 10 | 1000): number | null {
-  const clean = text.trim();
+  // Arabic-Indic digits and the Arabic decimal separator are read as typed (owner report 2026-10-10:
+  // «٦٠» in a box field was dropped key by key and the box never reached pricing).
+  const clean = toAsciiDigits(text).trim().replace(/\u066b/g, '.');
   if (clean === '') return null;
   const precision = String(scale).length - 1;
   const match = clean.match(new RegExp(`^(\\d+)(?:\\.(\\d{0,${precision}}))?$`));

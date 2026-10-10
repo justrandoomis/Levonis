@@ -779,6 +779,30 @@ export default function ProductForm({
   });
   const us = usdPricingFormStrings(lang);
   const usEn = USD_PRICING_FORM_STRINGS.en;
+  // THE OWNER'S PRICING NEVER LEAVES SILENTLY (owner report 2026-10-10): typed values that are not saved —
+  // or a held engine save waiting in its sheet — live only in this page, so leaving it asks first. The
+  // product's own unsaved edits are not guarded here (as before).
+  const pricingAtRisk = canSeeCost && (pricing.touched || (!!pricing.review && !pricing.review.stored));
+  const leave = () => {
+    if (pricingAtRisk && !window.confirm(us.leaveUnsaved)) return;
+    onBack();
+  };
+  useEffect(() => {
+    if (!pricingAtRisk) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [pricingAtRisk]);
+  /** «اعرض»: the section the pricing outcome names, opened and scrolled to (٣ the product, ٥ its models). */
+  const showPricing = (n: 3 | 5) => {
+    setOpen(n);
+    requestAnimationFrame(() =>
+      document.querySelector(n === 3 ? '[data-form="usd-pricing"]' : '[data-form="usd-pricing-options"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    );
+  };
 
   const errors: FormErrors = useMemo(
     () =>
@@ -1029,7 +1053,7 @@ export default function ProductForm({
     return (
       <div className="p-4">
         <Banner kind="error">{loadErr}</Banner>
-        <button type="button" className={btnGhost} onClick={onBack}>
+        <button type="button" className={btnGhost} onClick={leave}>
           رجوع
         </button>
       </div>
@@ -1068,7 +1092,7 @@ export default function ProductForm({
     <CompletenessProvider items={missingItems} lang={lang} optionName={optionNameOf}>
     <div ref={columnRef} className="min-w-0 w-full max-w-[880px] mx-auto px-3">
       <div className="flex items-center gap-2 py-3 min-w-0">
-        <button type="button" onClick={onBack} className={`${btnGhost} h-10 px-2.5`} aria-label="رجوع">
+        <button type="button" onClick={leave} className={`${btnGhost} h-10 px-2.5`} aria-label="رجوع">
           <Back className="w-4 h-4" />
         </button>
         <h2 className="text-base font-black text-white truncate min-w-0 flex-1">
@@ -2139,7 +2163,7 @@ export default function ProductForm({
         n={8}
         ar="المعاينة والحفظ"
         en="Preview & save"
-        summary={dirty ? 'تغييرات غير محفوظة' : 'محفوظ'}
+        summary={dirty || (canSeeCost && pricing.touched) ? 'تغييرات غير محفوظة' : 'محفوظ'}
         {...section(8)}
       >
         <div className="space-y-2 text-[12px] text-text-secondary min-w-0">
@@ -2154,7 +2178,6 @@ export default function ProductForm({
         </div>
         {/* Owner decision 8's six figures per model × channel, with the unsaved pricing. */}
         {canSeeCost && <UsdPricingPreview />}
-        {canSeeCost && <UsdPricingSaveSheet />}
         {previewOpen && (
           <div className="lv-well mt-3 rounded-md p-3 min-w-0">
             <pre className="text-[11px] text-text-secondary overflow-x-auto" dir="ltr">
@@ -2202,10 +2225,42 @@ export default function ProductForm({
                 {errorList[0]}
                 {errorList.length > 1 && ` (+${errorList.length - 1})`}
               </span>
+            ) : saveErr ? (
+              // The product's save failed: the pricing was not sent either.
+              <span className="text-red-400 inline-flex items-center gap-1" title={saveErr} data-pricing-status="product-error">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {saveErr}
+              </span>
+            ) : canSeeCost && pricing.outcome && (pricing.outcome.kind === 'refused' || pricing.outcome.kind === 'invalid') ? (
+              // EVERY PRICING OUTCOME IS SAID WHERE «نشر» IS PRESSED (owner report 2026-10-10: «محفوظ ✓» over a lost save).
+              <span className="text-red-400 flex min-w-0 items-center gap-1" title={pricing.outcome.text} data-pricing-status={pricing.outcome.kind}>
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span className="min-w-0 truncate">{pricing.outcome.text}</span>
+                <button type="button" className="underline ms-1 shrink-0" onClick={() => showPricing(pricing.outcome?.section ?? 3)}>
+                  {us.show}
+                </button>
+              </span>
+            ) : canSeeCost && pricing.review ? (
+              <span className="text-amber-300" title={pricing.review.stored ? us.readyWaiting : us.heldNotSaved} data-pricing-status="review">
+                {pricing.review.stored ? us.readyWaiting : us.heldNotSaved}
+              </span>
             ) : dirty ? (
               <span className="text-amber-300">تغييرات غير محفوظة</span>
+            ) : canSeeCost && pricing.touched ? (
+              <span className="text-amber-300" title={us.pricingUnsaved} data-pricing-status="unsaved">
+                {us.pricingUnsaved}
+              </span>
+            ) : canSeeCost && pricing.outcome && (pricing.outcome.kind === 'ready' || pricing.outcome.kind === 'held') ? (
+              <span className="text-amber-300 flex min-w-0 items-center gap-1" title={pricing.outcome.text} data-pricing-status={pricing.outcome.kind}>
+                <span className="min-w-0 truncate">{pricing.outcome.text}</span>
+                {pricing.outcome.kind === 'ready' && (
+                  <button type="button" className="underline ms-1 shrink-0" onClick={pricing.openReview}>
+                    {us.reviewAndAdopt}
+                  </button>
+                )}
+              </span>
             ) : (
-              <span className="text-emerald-300 inline-flex items-center gap-1">
+              <span className="text-emerald-300 inline-flex items-center gap-1" data-pricing-status={canSeeCost && pricing.outcome?.kind === 'saved' ? 'saved' : undefined}>
                 <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? 'محفوظ'}
               </span>
             )}
@@ -2243,6 +2298,9 @@ export default function ProductForm({
           </button>
         </div>
       </div>
+
+      {/* The writer's preview sheet, at the form's ROOT: a held or ready save is seen whichever section is open. */}
+      {canSeeCost && <UsdPricingSaveSheet />}
 
       {sectionUpdateOpen && productId && (
         <React.Suspense fallback={null}>

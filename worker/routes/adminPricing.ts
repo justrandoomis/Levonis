@@ -1103,9 +1103,12 @@ type RuleWriteList = ReturnType<typeof effectiveWrites>['ruleWrites'];
 
 adminPricingRoutes.put('/products/:id/inputs', async (c) => {
   assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['inputs_seq', 'inputs', 'rules', 'preview_hash', 'confirm_large_change', 'adopt']);
+  const body = strictBody(await jsonObject(c), ['inputs_seq', 'inputs', 'rules', 'preview_hash', 'confirm_large_change', 'adopt', 'data_only']);
   if (body.adopt !== undefined && typeof body.adopt !== 'boolean') throw inputInvalid('adopt');
   if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
+  if (body.data_only !== undefined && typeof body.data_only !== 'boolean') throw inputInvalid('data_only');
+  // Storing data only and adopting the engine in the same request contradict each other.
+  if (body.data_only === true && body.adopt === true) throw inputInvalid('data_only');
   const { db, rates, loaded, stored, ctx, reads } = await productInputsContext(c);
   if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
   const pid = loaded.id;
@@ -1138,8 +1141,14 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
     ),
   ];
 
+  // «البيانات أولاً» (owner report 2026-10-10; docs/DECISIONS.md): the product form stores a MANUAL
+  // product's data as data when it asks (`data_only`), even when the data completes the product — its
+  // store price moves only by the confirming request with the preview's hash (the branch below, with the
+  // 15% tick and the fresh sign-in, unchanged). An engine product ignores the flag: its stored prices must
+  // match its stored inputs, so its save stays one held write behind the preview.
+  const dataOnly = body.data_only === true && stored.state?.mode !== 'engine';
   // Owner decision 8: the save writes prices (adopt / reprice) — or stores the data only.
-  if (ev.kind && (ev.needs_write || !ev.complete)) {
+  if (!dataOnly && ev.kind && (ev.needs_write || !ev.complete)) {
     const dataHash = await formPreviewHash(pid, draft.iqd, rates);
     await commitEngine(
       c,
@@ -1158,7 +1167,7 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
     return c.json(await productInputsAnswer(reloaded, after, ctx, rates, undefined, await loadEngineReads(db, pid)));
   }
 
-  // Data only: an incomplete manual product keeps its manual price.
+  // Data only: an incomplete manual product — or a manual product's `data_only` save — keeps its manual price.
   // Typed dinars convert at the rate the owner was shown (FX plan §12): the preview's hash, recomputed now.
   if (draft.iqd.length) {
     if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');

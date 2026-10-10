@@ -13,7 +13,7 @@
  * explicit tick; the save then sends the preview's hash (and the tick) and
  * nothing else. Every figure is the server's; the sheet formats.
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { Modal } from '../adminProducts/ui';
 import * as T from '../adminProducts/theme';
@@ -29,7 +29,7 @@ export interface EngineSaveProduct {
   adoption: EngineAdoption;
 }
 
-export default function EngineSaveSheet({ products, busy, error, onConfirm, onCancel, saveLabel }: {
+export default function EngineSaveSheet({ products, busy, error, onConfirm, onCancel, saveLabel, cancelLabel, note, extra }: {
   products: readonly EngineSaveProduct[];
   busy: boolean;
   error: string;
@@ -37,6 +37,12 @@ export default function EngineSaveSheet({ products, busy, error, onConfirm, onCa
   onCancel: () => void;
   /** The confirm's words when the sheet carries several products («حفظ الكل»). */
   saveLabel?: string;
+  /** The cancel's words when cancelling loses nothing (the product form's data is already stored: «لاحقًا»). */
+  cancelLabel?: string;
+  /** One line under the intro: what is already saved, and what the confirm adds. */
+  note?: string;
+  /** Beside the error line: the way out of it (a fresh sign-in). */
+  extra?: ReactNode;
 }) {
   const { lang } = useLanguage();
   const s = engineSaveStrings(lang);
@@ -56,12 +62,13 @@ export default function EngineSaveSheet({ products, busy, error, onConfirm, onCa
           <button type="button" className={T.btnPrimary} disabled={busy || (large && !ticked)} onClick={() => onConfirm(large && ticked)} data-engine-save-confirm>
             {busy ? s.saving : saveLabel ?? (adopting ? s.saveAdopt : s.saveReprice)}
           </button>
-          <button type="button" className={T.btnSecondary} disabled={busy} onClick={onCancel}>{s.cancel}</button>
+          <button type="button" className={T.btnSecondary} disabled={busy} onClick={onCancel} data-engine-save-cancel>{cancelLabel ?? s.cancel}</button>
         </div>
       }
     >
       <div className="grid gap-3" data-engine-save-sheet>
         <p className={`text-[13px] ${T.text2}`}>{adopting ? s.adoptIntro : s.repriceIntro}</p>
+        {note && <p className={`text-[13px] ${T.text2}`} data-engine-save-note>{note}</p>}
         {products.map((p) => {
           const notices = engineNotices(p.adoption, lang);
           return (
@@ -86,6 +93,7 @@ export default function EngineSaveSheet({ products, busy, error, onConfirm, onCa
           </div>
         )}
         {error && <p role="alert" className="text-[13px] text-[var(--ap-danger)]">{error}</p>}
+        {extra}
       </div>
     </Modal>
   );
