@@ -194,7 +194,10 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
   const basePrice = perSku && !hasModels ? Math.max(...all) : Math.min(...all);
 
   // FX-7: the SKU rows, the colours' cleared prices and the variants' mirror (with the SKU rung only).
-  const skus: PricePlan['skus'] = perSku && skuTable ? prices.map((p) => ({ combo_key: p.combo_key, channel: p.channel, price: p.price.computed_price_iqd })) : [];
+  // The product itself (key '') is never a SKU row — the table refuses the key, and the ladder's own
+  // product price already is that unit's price (verifyPlan reads it back either way). FX-7 gaps.
+  const skus: PricePlan['skus'] =
+    perSku && skuTable ? prices.filter((p) => p.combo_key !== '').map((p) => ({ combo_key: p.combo_key, channel: p.channel, price: p.price.computed_price_iqd })) : [];
   const colors = skuTable ? (view?.colors ?? []).filter(colourStatesPrice).map((c) => c.id) : [];
   const variants: PricePlan['variants'] = [];
   if (skuTable) {

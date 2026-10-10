@@ -40,7 +40,8 @@ function useCardBits(result: FinderResult, lang: FinderLang) {
         display_prime_iqd: null,
         display_pro_iqd: null,
         display_applied_tier: 'regular',
-        display_from: false,
+        // FX-7: a configuration priced per colour or variant shows its lowest SKU «from».
+        display_from: variant.from === true,
       } as CardProduct)
     : base;
   const name = cardName(base);

@@ -150,6 +150,16 @@ export interface ProductRelationsView {
    * `[]` = present, and this product has no per-SKU price.
    */
   sku_prices?: SkuPriceRow[] | null;
+  /**
+   * FX-7 gaps: the table IS there but this read of it FAILED (a temporary
+   * database error, not "no such table"). `sku_prices` is then null as well,
+   * so the storefront walks the ladder (each model's highest SKU, never
+   * lower); but a writer that would act on "no SKU row" — the exit to manual
+   * pricing, an engine save priced per model — refuses with the retryable
+   * PRICING_READ_FAILED instead of leaving SKU rows that override its prices.
+   * Absent on every successful read and on a database without 0183.
+   */
+  sku_prices_unread?: true;
 }
 
 export const EMPTY_RELATIONS: ProductRelationsView = {
@@ -213,21 +223,31 @@ interface SkuPriceDbRow extends SkuPriceRow {
 
 /**
  * THE SKU RUNG'S ROWS (0183, FX-7), read QUIETLY: a database without the table
- * answers null — the resolver then walks the ladder exactly as before — and
+ * answers 'absent' — the resolver then walks the ladder exactly as before — and
  * that window (a deploy ahead of its migration) is expected, so it is not
  * logged as a fault on every product read. Any other failure is logged once,
- * like every relation read, and also degrades to "no SKU row".
+ * like every relation read, and answers 'failed': the storefront degrades to
+ * "no SKU row" (the ladder, never lower), and the view says the read failed
+ * (`sku_prices_unread`) so no writer mistakes it for a database without 0183.
  */
-async function skuPriceRows(run: () => Promise<{ results: SkuPriceDbRow[] }>): Promise<SkuPriceDbRow[] | null> {
+async function skuPriceRows(run: () => Promise<{ results: SkuPriceDbRow[] }>): Promise<SkuPriceDbRow[] | 'absent' | 'failed'> {
   try {
     const rows = (await run()).results ?? [];
     return rows
       .map((r) => ({ product_id: String(r.product_id), combo_key: String(r.combo_key), channel: String(r.channel), regular_price_iqd: Number(r.regular_price_iqd) }))
       .filter((r) => Number.isSafeInteger(r.regular_price_iqd) && r.regular_price_iqd > 0);
   } catch (e) {
-    if (!isMissingRelationTable(e)) console.error(`product relations unavailable (sku prices): ${e instanceof Error ? e.message : String(e)}`);
-    return null;
+    if (isMissingRelationTable(e)) return 'absent';
+    console.error(`product relations unavailable (sku prices): ${e instanceof Error ? e.message : String(e)}`);
+    return 'failed';
   }
+}
+
+/** The view's two SKU fields from one read: the rows, null when absent or failed, and the failure flag. */
+function skuFields(read: SkuPriceDbRow[] | 'absent' | 'failed'): Pick<ProductRelationsView, 'sku_prices' | 'sku_prices_unread'> {
+  if (read === 'failed') return { sku_prices: null, sku_prices_unread: true };
+  if (read === 'absent') return { sku_prices: null };
+  return { sku_prices: read.map(({ combo_key, channel, regular_price_iqd }) => ({ combo_key, channel, regular_price_iqd })) };
 }
 
 const SKU_PRICE_COLUMNS = 'product_id, combo_key, channel, regular_price_iqd';
@@ -278,7 +298,7 @@ export async function loadRelationsView(
     images: activeImages,
     fulfillments: rel.fulfillments,
     transports: rel.transports,
-    sku_prices: skuPrices === null ? null : skuPrices.map(({ combo_key, channel, regular_price_iqd }) => ({ combo_key, channel, regular_price_iqd })),
+    ...skuFields(skuPrices),
   };
 }
 
@@ -366,7 +386,7 @@ export async function loadRelationsViews(
   const im = bucket(images);
   const fl = bucket(fulfillments);
   const ot = bucket(optionTransports);
-  const sp = skuPrices === null ? null : bucket(skuPrices);
+  const sp = Array.isArray(skuPrices) ? bucket(skuPrices) : null;
 
   for (const row of rows) {
     const gs = g.get(row.id) ?? [];
@@ -390,7 +410,7 @@ export async function loadRelationsViews(
       images: ims,
       fulfillments: fl.get(row.id) ?? [],
       transports: ot.get(row.id) ?? [],
-      sku_prices: sp === null ? null : (sp.get(row.id) ?? []).map(({ combo_key, channel, regular_price_iqd }) => ({ combo_key, channel, regular_price_iqd })),
+      ...skuFields(sp === null ? (skuPrices as 'absent' | 'failed') : (sp.get(row.id) ?? [])),
     });
   }
   return out;

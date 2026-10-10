@@ -145,6 +145,8 @@ import {
   loadStoredSkuCosts,
   priceImageOf,
   skuTableOf,
+  skuReadFailed,
+  refuseUnreadSkus,
   staleReasons,
   withRuleIds,
   type EngineEvaluation,
@@ -881,7 +883,7 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
         derived_hash: preview.derived_hash,
         use_purchase: usePurchase,
         prefer_purchase_values: body.prefer_purchase_values === true,
-        line_ids: preview.derived.entries.flatMap((e) => e.line_ids),
+        line_ids: [...new Set(preview.derived.entries.flatMap((e) => e.line_ids))],
         inputs_changed: inputWrites.length,
         rules_changed: ruleWrites.length,
         priced: pricesWritten,
@@ -1234,6 +1236,8 @@ adminPricingRoutes.get('/save-list', async (c) => {
       continue;
     }
     if (st.opted_out_at) continue;
+    // FX-7 gaps: its SKU prices could not be read this time — not listed as ready until a read succeeds.
+    if (skuReadFailed(product)) continue;
     const stored = stores.get(st.product_id)!;
     const ev = await evaluateEngineWrite({ loaded: product, stored, ctx, rates, control, inputs: stored.inputs, inputWrites: [], ruleWrites: [], image: '', storedCosts: [] });
     if (ev.kind === 'adopt') ready.push({ product_id: st.product_id, ...productNames(product), reasons: [] });
@@ -1307,7 +1311,8 @@ adminPricingRoutes.post('/products/save-bulk', async (c) => {
       const status = await commitEngine(c, ev, { inputWrites: [], ruleWrites: [] }, { hash: item.preview_hash, confirm: body.confirm_large_change }, { source: 'bulk', preview: async () => engineEvaluationDto(ev) });
       results.push({ product_id: item.product_id, status });
     } catch (e) {
-      if (e instanceof HttpError && e.status !== 401 && e.status < 500) {
+      // FX-7 gaps: a failed read of one product's SKU prices refuses that product (retryable), not the bulk.
+      if (e instanceof HttpError && e.status !== 401 && (e.status < 500 || e.code === 'PRICING_READ_FAILED')) {
         results.push({ product_id: item.product_id, status: 'refused', code: e.code ?? 'REFUSED' });
         continue;
       }
@@ -1334,6 +1339,9 @@ adminPricingRoutes.post('/products/:id/manual', async (c) => {
   const stored = await loadProductPricing(db, pid);
   if (stored.state?.mode !== 'engine') throw new HttpError(409, serverMessage('PRICING_NOT_MANAGED'), 'PRICING_NOT_MANAGED');
   if (typeof body.write_seq !== 'number' || body.write_seq !== stored.state.write_seq) throw fxRefusal(409, 'PRICING_CHANGED');
+  // FX-7 gaps: a failed read of the SKU prices is not "none": flipping to manual without deleting them
+  // would leave SKU rows that override every manual price. Refused, retryable; nothing is written.
+  refuseUnreadSkus(loaded);
   const actor = c.get('user')!.id;
   const now = new Date().toISOString();
   // How many per-SKU prices the product carries (0 on a database without 0183, or priced per model).

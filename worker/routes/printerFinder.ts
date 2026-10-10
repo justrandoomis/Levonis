@@ -130,6 +130,8 @@ async function loadCandidates(c: Context<AppContext>): Promise<Loaded> {
           },
           price_iqd: v.level.unit_subtotal_iqd,
           others: variants.length - 1,
+          // FX-7: the lowest of the configuration's own SKUs when they differ («يبدأ من»).
+          ...(v.from ? { from: true } : {}),
         },
       });
     }

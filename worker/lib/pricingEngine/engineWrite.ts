@@ -52,8 +52,10 @@ import { ceilToPlaces, compareProcurementExact, procurementExact, procurementExa
 import type { PricingContext } from '../../routes/cart';
 import { newId, sha256Hex } from '../crypto';
 import { fence } from '../operations';
+import { HttpError } from '../http';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { auditStatements } from '../audit';
-import { evaluateLegacy, modelsOf, unitComboKey, type LegacyEvaluation } from './legacy';
+import { evaluateLegacy, modelsOf, sellableSkus, unitComboKey, type LegacyEvaluation } from './legacy';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
 import { canonical, priceModels, type PricedModel } from './procurementPreview';
@@ -357,23 +359,66 @@ const hasValue = (r: Partial<StoredInputRow>) => INPUT_FIELD_NAMES.some((k) => r
  * an active colour that still states a price of its own (the preview then
  * shows each colour's old price → new). Every other product is priced per
  * model, exactly as before FX-7.
+ *
+ * ORPHANED LEVELS DO NOT COUNT (FX-7 gaps). A colour input or rule outlives its
+ * colour when the colour is deleted or switched off (the stored row is the
+ * owner's data and is never dropped from the table), and a SKU input outlives
+ * a SKU that is no longer sold. Such a level names nothing a customer can buy,
+ * so it is dropped from the decision: a product with no option whose colours
+ * are all gone is priced as the product itself again, instead of planning a SKU
+ * row under an empty key the table refuses.
  */
 export function needsSkuPricing(
   loaded: LoadedProduct,
   inputs: ReadonlyArray<Partial<StoredInputRow>>,
-  rules: ReadonlyArray<Pick<StoredRuleRow, 'product_id' | 'scope' | 'state'>>,
+  rules: ReadonlyArray<Pick<StoredRuleRow, 'product_id' | 'scope' | 'scope_id' | 'state'>>,
   optionGroups: number
 ): boolean {
   if (optionGroups > 1) return true;
-  if (inputs.some((r) => (r.scope === 'color' || r.scope === 'sku') && hasValue(r))) return true;
-  if (rules.some((r) => r.product_id === loaded.id && (r.scope === 'color' || r.scope === 'sku') && r.state !== 'INHERIT')) return true;
+  const live = liveSkuLevels(loaded);
+  const names = (scope: unknown, scopeId: unknown) =>
+    !live || (scope === 'color' ? live.color.has(String(scopeId ?? '')) : scope === 'sku' ? live.sku.has(String(scopeId ?? '')) : false);
+  if (inputs.some((r) => (r.scope === 'color' || r.scope === 'sku') && hasValue(r) && names(r.scope, r.scope_id))) return true;
+  if (rules.some((r) => r.product_id === loaded.id && (r.scope === 'color' || r.scope === 'sku') && r.state !== 'INHERIT' && names(r.scope, r.scope_id))) return true;
   return (loaded.view?.colors ?? []).some(
     (c) => c.active !== 0 && c.active !== false && [c.regular_price_iqd, c.prime_price_iqd, c.pro_price_iqd, c.regular_adjust_iqd, c.prime_adjust_iqd, c.pro_adjust_iqd].some((v) => v !== null && v !== undefined)
   );
 }
 
+/**
+ * The colour and SKU levels that still name something sellable (FX-7 gaps):
+ * every colour some sellable SKU carries, and every sellable SKU's key. An
+ * input or rule at any other colour or SKU is orphaned (see `needsSkuPricing`).
+ */
+export function liveSkuLevels(loaded: LoadedProduct): { color: Set<string>; sku: Set<string> } | null {
+  const grid = sellableSkus(loaded.doc, loaded.view);
+  // Too many SKUs to list: nothing is called orphaned, and the plan refuses the grid (SKU_GRID_TOO_LARGE) as before.
+  if (grid.overflow) return null;
+  const color = new Set<string>();
+  const sku = new Set<string>();
+  for (const k of grid.skus) {
+    if (k.color) color.add(k.color.id);
+    sku.add(k.combo_key);
+  }
+  return { color, sku };
+}
+
 /** Is the SKU rung (0183) on this database? The overlay read it: a list, or null when the table is absent. */
 export const skuTableOf = (loaded: LoadedProduct): boolean => Array.isArray(loaded.view?.sku_prices);
+
+/**
+ * FX-7 gaps: the SKU rung's read FAILED — the table is there, this read of it
+ * was not (a temporary database error). `skuTableOf` then answers false, the
+ * same as a database without 0183, so a plan built on it would price per model
+ * and leave the product's SKU rows standing above its new prices. Nothing that
+ * depends on the rung is decided on such a read: the evaluation refuses with
+ * the retryable PRICING_READ_FAILED (503), and the caller tries again.
+ */
+export const skuReadFailed = (loaded: LoadedProduct): boolean => loaded.view?.sku_prices_unread === true;
+
+export function refuseUnreadSkus(loaded: LoadedProduct): void {
+  if (skuReadFailed(loaded)) throw new HttpError(503, serverMessage('PRICING_READ_FAILED'), 'PRICING_READ_FAILED');
+}
 
 const setImage = (set: Partial<InputFields>) => Object.fromEntries(INPUT_FIELD_NAMES.filter((k) => k in set).map((k) => [k, set[k] ?? null]));
 
@@ -389,6 +434,8 @@ export function withRuleIds(writes: readonly RuleWrite[]): RuleWrite[] {
 }
 
 export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<EngineEvaluation> {
+  // Per SKU or per model, and which SKU rows the write replaces, both read the rung: never on a failed read.
+  refuseUnreadSkus(a.loaded);
   const pid = a.loaded.id;
   const mode = a.stored.state?.mode === 'engine' ? 'engine' : 'manual';
   const rates = a.rates;

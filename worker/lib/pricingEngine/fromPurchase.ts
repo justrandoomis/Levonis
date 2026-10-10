@@ -25,9 +25,22 @@
  *     none — never overwritten;
  *   - source_ref = 'purchase:<id>' (line ids change on every PUT).
  * Scopes: base → base, option → option, variant → its first option, colour →
- * base (until FX-7). A line NARROWER than its pricing scope never lowers a
- * stored value (max per field) unless the owner ticks «استعمل قيمة هذا الشراء
- * حتى لو كانت أقل من الحالية»; several lines on one scope take the maximum.
+ * base. A line NARROWER than its pricing scope never lowers a stored value (max
+ * per field) unless the owner ticks «استعمل قيمة هذا الشراء حتى لو كانت أقل من
+ * الحالية»; several lines on one scope take the maximum.
+ *
+ * FX-7 gaps — THE COLOUR'S AND THE VARIANT'S OWN LEVEL (with the SKU rung,
+ * 0183): a colour line ALSO feeds its colour, and a variant line its SKU
+ * (`skuLevelOf`), exactly — the purchase priced that colour or that variant,
+ * not a neighbour. Inheritance is respected: a field is written at that level
+ * only where it holds a value of its own already, or where the purchase's value
+ * differs from what every one of the level's SKUs inherits (product → model →
+ * colour, after this purchase's broader writes) — a colour bought at its
+ * product's own cost keeps inheriting instead of pinning a copy; a shipping
+ * weight is never written above the owner's pricing weight it would beat. The
+ * double-freight guard is the same: the level's extra is fed only by charges
+ * marked 'additional' (`lineFields`), never route freight. No shipping profile
+ * is proposed at these levels (the broader scope's proposal is inherited).
  *
  * Reads purchase rows; never writes one (USD design §7.1 G2).
  */
@@ -43,8 +56,8 @@ import {
 } from '@levonis/contracts/procurementCost';
 import { resolveSkuInputs, type SupplierCurrency } from '@levonis/pricing/costToPrice';
 import { canonicalUsdRuleAmount } from '@levonis/pricing/ruleResolution';
-import type { ShippingProfile } from '@levonis/pricing/skuChannel';
-import { chainOf, ownerRow, ruleAt, type InputFields, type InputScope, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow } from './store';
+import { parseSkuComboKey, type ShippingProfile } from '@levonis/pricing/skuChannel';
+import { chainOf, chainOfUnit, ownerRow, ruleAt, type InputFields, type InputScope, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow, type UnitSelection } from './store';
 import type { PricingRates } from './rates';
 
 export type PurchaseStatus = 'draft' | 'ordered' | 'partial' | 'received' | 'cancelled';
@@ -113,7 +126,32 @@ export function lineFeeds(p: PurchaseForPricing, line: PurchaseLineForPricing, o
   return p.profile !== null || optIn.has(line.key);
 }
 
-/** The pricing scope a selection writes to before FX-7. */
+/**
+ * FX-7 gaps: the colour and SKU levels this product's inputs may name, and its
+ * sellable SKUs — present only with the SKU rung (0183); without it a colour or
+ * variant line feeds its broader scope alone, exactly as before.
+ */
+export interface PurchaseSkuLevels {
+  color: ReadonlySet<string>;
+  sku: ReadonlySet<string>;
+  /** A variant row's id → its combo key (a procurement variant line names the row). */
+  variants: ReadonlyMap<string, string>;
+  /** Every sellable SKU (relation order, the model first): the units a level reaches. */
+  units: ReadonlyArray<UnitSelection & { combo_key: string }>;
+}
+
+/** The colour or SKU level a colour or variant line is exactly (FX-7 gaps), or null: no SKU rung, a colour or variant gone, a variant that is its model alone. */
+export function skuLevelOf(line: Pick<PurchaseLineForPricing, 'scope' | 'scope_id'>, levels: PurchaseSkuLevels | undefined): { scope: 'color' | 'sku'; scope_id: string } | null {
+  if (!levels) return null;
+  if (line.scope === 'color') return levels.color.has(line.scope_id) ? { scope: 'color', scope_id: line.scope_id } : null;
+  if (line.scope === 'variant') {
+    const key = levels.variants.get(line.scope_id);
+    return key && levels.sku.has(key) ? { scope: 'sku', scope_id: key } : null;
+  }
+  return null;
+}
+
+/** The pricing scope a selection writes to (its broader scope; FX-7's own colour or SKU level is `skuLevelOf`). */
 export function pricingScopeOf(line: Pick<PurchaseLineForPricing, 'scope' | 'scope_id' | 'option_id'>): { scope: InputScope; scope_id: string; narrow: boolean } {
   if (line.scope === 'option') return { scope: 'option', scope_id: line.scope_id, narrow: false };
   if (line.scope === 'variant') return line.option_id ? { scope: 'option', scope_id: line.option_id, narrow: true } : { scope: 'base', scope_id: '', narrow: true };
@@ -233,18 +271,18 @@ export function deriveProductEntries(
   p: PurchaseForPricing,
   productId: string,
   stored: ProductPricingData,
-  opts: { optIn: ReadonlySet<string>; prefer: boolean; usePurchase: boolean; rates: PricingRates | null }
+  opts: { optIn: ReadonlySet<string>; prefer: boolean; usePurchase: boolean; rates: PricingRates | null; levels?: PurchaseSkuLevels }
 ): DerivedProduct {
   const out: DerivedProduct = { product_id: productId, raw: [], entries: [], proposals: [], shadowed: [] };
   if (!opts.usePurchase) return out;
   const sourceRef = p.purchase_id ? `purchase:${p.purchase_id}` : 'purchase:draft';
-  const groups = new Map<string, { scope: InputScope; scope_id: string; narrow: boolean; fields: LineFields; indexes: number[]; ids: string[] }>();
-  for (const line of p.lines) {
-    if (line.product_id !== productId || !lineFeeds(p, line, opts.optIn)) continue;
-    const target = pricingScopeOf(line);
+  type Group = { scope: InputScope; scope_id: string; narrow: boolean; fields: LineFields; indexes: number[]; ids: string[] };
+  const groups = new Map<string, Group>();
+  // FX-7 gaps: the colour's and the variant's own levels, fed after the broader scopes (see the file header).
+  const exact = new Map<string, Group>();
+  const add = (into: Map<string, Group>, target: { scope: InputScope; scope_id: string; narrow: boolean }, line: PurchaseLineForPricing, fields: LineFields) => {
     const key = `${target.scope}:${target.scope_id}`;
-    const fields = lineFields(p, line, p.profile === null);
-    const g = groups.get(key) ?? { scope: target.scope, scope_id: target.scope_id, narrow: false, fields: {}, indexes: [], ids: [] };
+    const g = into.get(key) ?? { scope: target.scope, scope_id: target.scope_id, narrow: false, fields: {}, indexes: [], ids: [] };
     g.narrow ||= target.narrow;
     g.indexes.push(line.index);
     if (line.line_id) g.ids.push(line.line_id);
@@ -254,7 +292,14 @@ export function deriveProductEntries(
     g.fields.shipping_weight_g = maxNum(g.fields.shipping_weight_g, fields.shipping_weight_g) ?? g.fields.shipping_weight_g;
     g.fields.manual_cbm = maxDecimal(g.fields.manual_cbm, fields.manual_cbm) ?? g.fields.manual_cbm;
     g.fields.additional_cost_iqd = maxNum(g.fields.additional_cost_iqd, fields.additional_cost_iqd) ?? g.fields.additional_cost_iqd;
-    groups.set(key, g);
+    into.set(key, g);
+  };
+  for (const line of p.lines) {
+    if (line.product_id !== productId || !lineFeeds(p, line, opts.optIn)) continue;
+    const fields = lineFields(p, line, p.profile === null);
+    add(groups, pricingScopeOf(line), line, fields);
+    const own = skuLevelOf(line, opts.levels);
+    if (own) add(exact, { ...own, narrow: false }, line, fields);
   }
 
   // The product's own scope first, so a profile proposed there covers its models.
@@ -324,10 +369,14 @@ export function deriveProductEntries(
     }
   }
 
+  // FX-7 gaps: each colour's and variant's own level, against what its SKUs inherit after the writes above.
+  if (opts.levels && exact.size) skuLevelEntries(out, [...exact.values()], stored, opts.levels, sourceRef);
+
   // Shadowing: a value written at the product level that a model's own row holds,
   // or a shipping weight the owner's pricing weight beats.
   const optionRows = stored.inputs.filter((r) => r.scope === 'option');
   for (const e of out.entries) {
+    if (e.write.scope === 'color' || e.write.scope === 'sku') continue; // their own (skuLevelEntries)
     for (const field of Object.keys(e.write.set) as Array<keyof InputFields>) {
       if (field === 'supplier_cost_currency') continue;
       const sameRowPricingWeight = field === 'shipping_weight_g' && (e.write.existing?.pricing_weight_g ?? null) !== null;
@@ -338,6 +387,83 @@ export function deriveProductEntries(
     }
   }
   return out;
+}
+
+/**
+ * FX-7 gaps: the entries of the colour and SKU levels a purchase's colour and
+ * variant lines are exactly (see the file header). A field is written where the
+ * level holds its own value already, or where the purchase's value differs from
+ * what one of the level's SKUs inherits; a shipping weight the owner's pricing
+ * weight decides above it is listed as shadowed instead.
+ */
+function skuLevelEntries(
+  out: DerivedProduct,
+  groups: ReadonlyArray<{ scope: InputScope; scope_id: string; fields: LineFields; indexes: number[]; ids: string[] }>,
+  stored: ProductPricingData,
+  levels: PurchaseSkuLevels,
+  sourceRef: string
+): void {
+  // What the level's SKUs inherit: the store after this purchase's broader writes, the level's own rows left out.
+  const after = mergedInputs(stored.inputs, out.entries.map((e) => e.write));
+  const ordered = [...groups].sort((a, b) => (a.scope === b.scope ? (a.scope_id < b.scope_id ? -1 : a.scope_id > b.scope_id ? 1 : 0) : a.scope === 'color' ? -1 : 1));
+  for (const g of ordered) {
+    out.raw.push({
+      scope: g.scope,
+      scope_id: g.scope_id,
+      narrow: false,
+      fields: Object.fromEntries(Object.entries(g.fields).filter(([, v]) => v !== undefined)) as Record<string, string | number>,
+    });
+    const existing = ownerRow(stored.inputs, g.scope, g.scope_id);
+    const without = after.filter((r) => !(r.scope === g.scope && r.scope_id === g.scope_id));
+    let units = levels.units.filter((u) => (g.scope === 'color' ? u.color_id === g.scope_id : u.combo_key === g.scope_id));
+    if (!units.length && g.scope === 'sku') {
+      // A variant row the form lists but no sellable SKU is: its own selection, as its key names it.
+      const sel = parseSkuComboKey(g.scope_id);
+      if (sel) units = [{ option_value_ids: sel.option_value_ids, color_id: sel.color_id, combo_key: g.scope_id }];
+    }
+    const inherited = units.map((u) => resolveSkuInputs(chainOfUnit(without, u)).inputs);
+    const set: Partial<InputFields> = {};
+    const ownValue = (field: keyof InputFields) => existing?.[field] != null;
+    if (g.fields.supplier_cost_amount && g.fields.supplier_cost_currency) {
+      const amount = procurementExact(g.fields.supplier_cost_amount);
+      const same = inherited.length > 0 && inherited.every((i) => !!i.supplier && i.supplier.currency === g.fields.supplier_cost_currency && compareProcurementExact(procurementExact(i.supplier.amount), amount) === 0);
+      if (ownValue('supplier_cost_amount') || ownValue('supplier_cost_delta') || !same) {
+        set.supplier_cost_amount = g.fields.supplier_cost_amount;
+        set.supplier_cost_currency = g.fields.supplier_cost_currency;
+      }
+    }
+    if (g.fields.shipping_weight_g !== undefined) {
+      const v = g.fields.shipping_weight_g;
+      // The owner's pricing weight (at this level or above) decides the weight: never beaten from a purchase.
+      const pricedAbove = inherited.some((i) => i.weight?.field === 'pricing_weight_g') || ownValue('pricing_weight_g');
+      if (pricedAbove) out.shadowed.push({ scope: g.scope, scope_id: g.scope_id, field: 'shipping_weight_g' });
+      else if (ownValue('shipping_weight_g') || !(inherited.length > 0 && inherited.every((i) => i.weight?.value === v))) set.shipping_weight_g = v;
+    }
+    if (g.fields.manual_cbm !== undefined) {
+      const cbm = procurementExact(g.fields.manual_cbm);
+      const same = inherited.length > 0 && inherited.every((i) => !!i.cbm && compareProcurementExact(procurementExact(i.cbm.effective), cbm) === 0);
+      if (ownValue('manual_cbm') || !same) set.manual_cbm = g.fields.manual_cbm;
+    }
+    if (g.fields.additional_cost_iqd !== undefined) {
+      const v = g.fields.additional_cost_iqd;
+      if (ownValue('additional_cost_iqd') || !(inherited.length > 0 && inherited.every((i) => (i.additional_cost_iqd?.value ?? 0) === v))) set.additional_cost_iqd = v;
+    }
+    out.entries.push({
+      write: { scope: g.scope, scope_id: g.scope_id, existing, set, source_ref: sourceRef },
+      line_indexes: g.indexes,
+      line_ids: g.ids,
+      narrow: false,
+      kept_higher: [],
+    });
+    // A colour's value a SKU row of that colour holds is shadowed there.
+    if (g.scope === 'color') {
+      for (const field of Object.keys(set) as Array<keyof InputFields>) {
+        if (field === 'supplier_cost_currency') continue;
+        const deeper = stored.inputs.some((r) => r.scope === 'sku' && parseSkuComboKey(r.scope_id)?.color_id === g.scope_id && r[field as keyof StoredInputRow] != null);
+        if (deeper) out.shadowed.push({ scope: g.scope, scope_id: g.scope_id, field });
+      }
+    }
+  }
 }
 
 /** The store as it would be after the writes (rows of the owner's origin replaced or added). */

@@ -405,6 +405,24 @@ export function sellableSkus(doc: ProductDoc, view: ProductRelationsView | undef
   return { skus, overflow: false };
 }
 
+/** A SKU worth its own level: a colour, or more than one option value (one value alone is the model's level). */
+export const skuOwnLevel = (combo: string): boolean => combo.includes('c:') || combo.split('|').length > 1;
+
+/**
+ * The colour and SKU levels a product's inputs and rules may name (FX-7): every
+ * colour of the product, and its colour or variant SKUs — the sellable ones,
+ * and the variant rows the form lists. With `units`, every sellable SKU too
+ * (the purchase feed reads what each one inherits).
+ */
+export function skuLevelScopeIds(doc: ProductDoc, view: ProductRelationsView | undefined): { color: Set<string>; sku: Set<string>; units: SellableSku[] } {
+  const color = new Set((view?.colors ?? []).map((c) => c.id));
+  const sku = new Set<string>();
+  const units = sellableSkus(doc, view).skus;
+  for (const k of units) if (skuOwnLevel(k.combo_key)) sku.add(k.combo_key);
+  for (const v of view?.variants ?? []) if (v.active !== 0 && skuOwnLevel(v.combo_key)) sku.add(v.combo_key);
+  return { color, sku, units };
+}
+
 /** Today's channels of every model, and the old profit they carry (answer B) — and, priced per SKU (FX-7), every sellable SKU's. */
 export function evaluateLegacy(
   productId: string,

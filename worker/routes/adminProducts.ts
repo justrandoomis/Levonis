@@ -33,6 +33,7 @@ import {
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import { applyRelations, loadRelationsView } from '../lib/productOverlay';
+import { optionValueIdsInRelationOrder } from '../lib/cartSelectionIdentity';
 import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '../lib/pinnedPrices';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
@@ -2080,9 +2081,18 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
     getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']),
     getDisplayUsdRate(c.env.DB),
   ]);
+  // FX-7 (0183): the WHOLE selection, one value per option group, names the exact SKU whose stored
+  // engine price the cart charges — ordered as the cart orders it (the model first). A product
+  // priced per colour or variant previewed with its first group alone would show the ladder beneath
+  // the rung: the model's HIGHEST SKU. Bounded and string-only; an absent list is `[optionId]`.
+  const optionValueIds = Array.isArray(body.optionValueIds)
+    ? optionValueIdsInRelationOrder(body.optionValueIds.filter((v): v is string => typeof v === 'string' && v.length > 0 && v.length <= 120).slice(0, 12), relations)
+    : [];
+  const optionId = optionValueIds[0] ?? (typeof body.optionId === 'string' && body.optionId ? body.optionId : null);
   const resolved = resolveUnitPrice({
     product: doc,
-    optionId: typeof body.optionId === 'string' && body.optionId ? body.optionId : null,
+    optionId,
+    ...(optionValueIds.length ? { optionValueIds } : {}),
     colorId: typeof body.colorId === 'string' && body.colorId ? body.colorId : null,
     transportMethod: typeof body.transportMethod === 'string' ? body.transportMethod : null,
     warrantyPlanId: typeof body.warrantyPlanId === 'string' && body.warrantyPlanId ? body.warrantyPlanId : null,

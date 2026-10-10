@@ -51,7 +51,7 @@ import { iqdToCanonicalUsd } from '@levonis/pricing/fxChain';
 import type { PricingContext } from '../../routes/cart';
 import { sha256Hex } from '../crypto';
 import { fxRefusal, positiveDecimal, strictBody } from '../fx/ownerActs';
-import { evaluateLegacy, modelsOf, sellableSkus, unitNamesOf } from './legacy';
+import { evaluateLegacy, modelsOf, sellableSkus, skuLevelScopeIds, unitNamesOf } from './legacy';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
 import { inputInvalid } from './whatIf';
@@ -81,6 +81,7 @@ import {
   needsSkuPricing,
   priceImageOf,
   skuTableOf,
+  refuseUnreadSkus,
   withRuleIds,
   type EngineControl,
   type EngineEvaluation,
@@ -123,9 +124,6 @@ export interface IqdEntry {
 export const formOptionIds = (loaded: LoadedProduct): Set<string> =>
   new Set(loaded.doc.options.filter((o) => o.active !== false && !o.merged_into).map((o) => o.id));
 
-/** A SKU worth its own level: a colour, or more than one option value (one value alone is the model's level). */
-const skuOwnLevel = (combo: string) => combo.includes('c:') || combo.split('|').length > 1;
-
 /**
  * The ids each level may name (FX-7): the active models, and — with the SKU
  * rung (0183) only — every colour of the product and its colour or variant
@@ -133,11 +131,10 @@ const skuOwnLevel = (combo: string) => combo.includes('c:') || combo.split('|').
  */
 export function formScopeIds(loaded: LoadedProduct): PricingScopeIds {
   const option = formOptionIds(loaded);
+  // A failed read of the SKU rung is not a database without it: refused (retryable), never "no colour level".
+  refuseUnreadSkus(loaded);
   if (!skuTableOf(loaded)) return { option };
-  const color = new Set((loaded.view?.colors ?? []).map((c) => c.id));
-  const sku = new Set<string>();
-  for (const k of sellableSkus(loaded.doc, loaded.view).skus) if (skuOwnLevel(k.combo_key)) sku.add(k.combo_key);
-  for (const v of loaded.view?.variants ?? []) if (v.active !== 0 && skuOwnLevel(v.combo_key)) sku.add(v.combo_key);
+  const { color, sku } = skuLevelScopeIds(loaded.doc, loaded.view);
   return { option, color, sku };
 }
 

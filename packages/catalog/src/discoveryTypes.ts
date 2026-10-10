@@ -233,6 +233,12 @@ export interface FinderVariant {
   price_iqd: number;
   /** How many other configurations of the same printer were weighed. */
   others: number;
+  /**
+   * FX-7: the configuration is several SKUs priced one by one (its colours, or a
+   * second option group) and they differ — `price_iqd` is their lowest, a
+   * «يبدأ من» figure. Absent from an older server: one price.
+   */
+  from?: boolean;
 }
 
 export interface FinderResult<Card = unknown> {

@@ -306,11 +306,58 @@ Owner decision 1 of 2026-10-07 (DECISIONS row 184 (1)): «SKU آخر درجة و
   value), with its computed customer price per channel. The model card no
   longer says its colours follow it. Shown only when the database has 0183;
   owner only.
-- **Not covered by the rung**: bundles, trade-in, gifts, compare and the
-  product page's price levels read an option and a colour only, so a SKU of a
-  multi-group product falls back there to its model's highest price (never
-  lower). Purchase lines entered per colour or variant still feed the model's
-  or the product's cost.
+- **One figure per product or model reads the rung too** (FX-7 gaps, DECISIONS
+  row 202; `worker/lib/skuLevels.ts`). The listing card resolves every SKU the
+  rung names with its whole selection, as the cart does, and shows the lowest
+  «from» (`display_from` when they differ). The comparison's columns and the
+  printer finder's configurations (`resolveVariantPricing`) price a model —
+  or a second group's value — at the LOWEST of its SKUs, with `from: true`
+  when they differ (the finder card then says «يبدأ من»; the comparison
+  already labels every price «from»), never the model's highest that the
+  ladder beneath the rung holds. Each SKU's single figure is read on the
+  direct line when it has a `direct_sale` row, else on its cheapest pre-order
+  route. The admin quote preview takes `optionValueIds` (one value per group,
+  ordered as the cart orders them) and its panel asks one value per group
+  when the product has two groups or more. Bundles and trade-in already pass
+  the whole selection (FX-7 review). Still not covered: gifts, and the product
+  page's level for a PARTIAL selection (one group of two chosen), which shows
+  the ladder's figure as pending until the quote answers the whole selection.
+- **A failed read is not a missing table** (FX-7 gaps). The overlay's read of
+  `product_sku_prices` answers the rows, "absent" (no such table: a database
+  before 0183 — the view's `sku_prices` is null) or "failed" (any other error:
+  `sku_prices` null and `sku_prices_unread: true`). The storefront degrades to
+  the ladder either way (each model's highest SKU, never lower). Nothing that
+  depends on the rung is decided on a failed read: the engine evaluation, the
+  form's colour and SKU levels and back to manual refuse with
+  `PRICING_READ_FAILED` (503, retryable; ar/en/ckb in
+  `packages/contracts/src/costRefusals.ts`) and write nothing — otherwise a
+  per-model save, or the flip to manual, would leave SKU rows overriding the
+  new prices. The bulk save reports it per product; the automatic repricing
+  skips the product (no block, no bell) and retries on the next tick.
+- **Orphaned colour and SKU levels are dropped from the plan** (FX-7 gaps). A
+  colour input or rule whose colour is deleted or switched off, or a SKU input
+  whose SKU is no longer sold, names nothing sellable: it no longer makes the
+  product per SKU (`needsSkuPricing` counts only the levels some sellable SKU
+  carries; with more SKUs than the engine lists nothing is called orphaned and
+  `SKU_GRID_TOO_LARGE` stands). A product with no option whose colours are all
+  gone is priced as the product itself again; its old SKU rows are deleted; no
+  row is ever planned under the empty key. The stored rows stay (the owner's
+  data), unused.
+- **Purchase lines per colour or variant feed that level too** (FX-7 gaps;
+  `fromPurchase.ts` `skuLevelOf`). With the SKU rung, a colour line also feeds
+  its colour and a variant line its SKU, exactly (not narrower), besides the
+  broader scope it always fed (the product or the model, never lower unless
+  the owner prefers the purchase). Inheritance is respected: a field is
+  written at the colour or SKU level only where that level already holds its
+  own value, or where the purchase differs from what every one of its SKUs
+  inherits after the purchase's broader writes — a colour bought at its
+  product's cost keeps inheriting. A shipping weight is never written at a
+  level where it would override the owner's pricing weight from above (it is
+  listed as shadowed instead). The
+  double-freight guard is unchanged: only charges marked `additional` feed
+  `additional_cost_iqd`; route freight never does. No shipping profile is
+  proposed at these levels. Without 0183 a colour or variant line feeds its
+  broader scope alone, exactly as before.
 
 ## Automatic repricing when a confirmed rate changes (FX-5)
 

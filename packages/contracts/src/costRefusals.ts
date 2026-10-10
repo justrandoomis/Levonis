@@ -355,6 +355,14 @@ export const COST_REFUSALS = {
     en: 'This change would leave an automatically priced product without complete pricing data; complete the data or return it to manual pricing.',
     ckb: 'ئەم گۆڕانکارییە بەرهەمێکی نرخدانراوی خۆکار بەبێ زانیاریی تەواوی نرخدانان بەجێدەهێڵێت؛ زانیارییەکان تەواو بکە یان بیگەڕێنەوە بۆ نرخدانانی دەستی.',
   },
+  // FX-7 gaps (DECISIONS row 202): the product's colour and variant prices (0183) could not be read —
+  // a temporary database error, never "the table is not there". A write that would act on "no SKU
+  // row" (back to manual, a save priced per model) refuses rather than leave rows that override it.
+  PRICING_READ_FAILED: {
+    ar: 'تعذّرت قراءة أسعار ألوان هذا المنتج ونسخه الآن؛ لم يتغيّر شيء. أعد المحاولة بعد لحظة.',
+    en: "This product's colour and variant prices could not be read just now; nothing was changed. Try again in a moment.",
+    ckb: 'نرخەکانی ڕەنگ و جۆرەکانی ئەم بەرهەمە ئێستا نەخوێندرانەوە؛ هیچ شتێک نەگۆڕا. کەمێکی تر دووبارە هەوڵ بدەرەوە.',
+  },
   PRICING_PREVIEW_BUSY: {
     ar: 'المعاينة قيد الحساب في نافذة أخرى؛ انتظر لحظة.',
     en: 'This preview is being calculated in another window; wait a moment.',

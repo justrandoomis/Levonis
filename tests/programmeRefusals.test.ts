@@ -143,6 +143,8 @@ const REQUIRED: Record<string, readonly string[]> = {
   'USD design §5.4 (Inputs)': ['PRICING_PURCHASE_NOT_ELIGIBLE'],
   // USD design §6.1 (the writer, owner decision 8): a save that would leave an engine product incomplete.
   'USD design §6.1 (Writer)': ['PRICING_ENGINE_INCOMPLETE'],
+  // FX-7 gaps (DECISIONS row 202): a failed read of the SKU rung (0183) is not a missing table.
+  'FX-7 gaps (row 202)': ['PRICING_READ_FAILED'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

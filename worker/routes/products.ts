@@ -97,6 +97,7 @@ import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '..
 import { activePoolProductIds } from '../lib/mysteryDraw';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { isPrinterProduct } from '../lib/printerIdentity';
+import { skuLevelResolveInput, skuLevelSelections, type SkuLevelSelection } from '../lib/skuLevels';
 import { activeFitsFor, MAINTENANCE_ROOT_ID, maintenanceFor, printerFitsInstalled, type FitPrinter } from '../lib/printerFits';
 import { resolveSiteMedia } from '../lib/siteMedia';
 import { normalizeHomeBento } from '../lib/homeBento';
@@ -2284,12 +2285,13 @@ export function levelPrice(
   offer: OfferView | null | undefined,
   optionId: string | null,
   colorId: string | null,
-  now: number
+  now: number,
+  /** FX-7: one SKU of the rung — its whole selection and the line its figure is read on (`skuLevels.ts`). */
+  sku?: SkuLevelSelection
 ): PriceLevel {
   let r = resolveUnitPrice({
     product: doc,
-    optionId,
-    colorId,
+    ...(sku ? skuLevelResolveInput(sku) : { optionId, colorId }),
     tier: ctx.tier,
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
@@ -2362,8 +2364,34 @@ export interface VariantPricing {
   doc: ProductDoc;
   /** The product priced with no option chosen. */
   base: PriceLevel;
-  /** Every ACTIVE option, priced alone, in the admin's order. */
-  options: Array<{ option: ProductDoc['options'][number]; level: PriceLevel; available: number | null }>;
+  /**
+   * Every ACTIVE option, priced alone, in the admin's order. On a product the
+   * engine prices per colour or variant (FX-7, 0183) an option is several SKUs:
+   * its level is then the LOWEST of the SKUs it is part of, read through the
+   * rung exactly as the cart reads each one, and `from` says they differ — never
+   * the model's highest, which is what the ladder beneath the rung holds.
+   */
+  options: Array<{ option: ProductDoc['options'][number]; level: PriceLevel; available: number | null; from: boolean }>;
+}
+
+/**
+ * FX-7: an option's single figure on a product priced per SKU — the lowest of
+ * its SKUs (unit subtotal, the figure the comparison and the finder show), and
+ * whether they differ. `priced` is every SKU of the rung priced once
+ * (`levelPrice` with its selection). Null when no SKU carries the option.
+ */
+export function lowestSkuLevel(
+  priced: ReadonlyArray<{ sku: SkuLevelSelection; level: PriceLevel }>,
+  optionId: string
+): { level: PriceLevel; from: boolean } | null {
+  let low: PriceLevel | null = null;
+  let high = 0;
+  for (const { sku, level } of priced) {
+    if (!sku.option_value_ids.includes(optionId)) continue;
+    if (!low || level.unit_subtotal_iqd < low.unit_subtotal_iqd) low = level;
+    high = Math.max(high, level.unit_subtotal_iqd);
+  }
+  return low ? { level: low, from: high > low.unit_subtotal_iqd } : null;
 }
 
 export async function resolveVariantPricing(
@@ -2387,14 +2415,18 @@ export async function resolveVariantPricing(
     const snap = view
       ? snapshotFrom(view, { stock: doc.stock, reserved: Number(r.stock_reserved ?? 0), low_stock_threshold: null })
       : null;
+    // FX-7: the SKUs the rung names, each priced once (none on a product priced per model, or without 0183).
+    const priced = skuLevelSelections(doc, view).map((sku) => ({ sku, level: levelPrice(doc, ctx, offer, sku.option_id, sku.color_id, now, sku) }));
     const options = doc.options
       .filter((o) => o.active !== false)
       .map((option) => {
         const stock = snap ? resolveStock(snap, { option_value_ids: [option.id], color_id: null }) : null;
+        const sku = priced.length ? lowestSkuLevel(priced, option.id) : null;
         return {
           option,
-          level: levelPrice(doc, ctx, offer, option.id, null, now),
+          level: sku ? sku.level : levelPrice(doc, ctx, offer, option.id, null, now),
           available: stock && stock.tracked && stock.available !== null ? Math.max(0, stock.available) : null,
+          from: sku?.from ?? false,
         };
       });
     out.set(id, { doc, base: levelPrice(doc, ctx, offer, null, null, now), options });
@@ -2479,9 +2511,13 @@ export function publicWithDisplayPrice(
     coarseStock
   );
   if (directStock !== null) out.direct_stock_available = directStock;
-  const levels: Array<{ optionId?: string; colorId?: string }> = [{}];
+  const levels: Array<{ optionId?: string; colorId?: string; sku?: SkuLevelSelection }> = [{}];
   for (const o of doc.options) if (o.active !== false) levels.push({ optionId: o.id });
   for (const col of doc.colors) if (col.active !== false) levels.push({ colorId: col.id });
+  // FX-7 (0183): every SKU the rung names, read with its whole selection as the cart reads it, so a
+  // product priced per colour or variant is shown «from» its lowest SKU — an option or a colour alone
+  // reads the ladder beneath the rung, which holds each model's HIGHEST SKU.
+  for (const sku of skuLevelSelections(doc, view)) levels.push({ sku });
   let best: ResolvedPrice | null = null;
   let maxApplied = 0;
   let primeMin: number | null = null;
@@ -2492,8 +2528,7 @@ export function publicWithDisplayPrice(
     // arithmetic — only the numbers are read here, never the errors.
     const r = resolveUnitPrice({
       product: doc,
-      optionId: sel.optionId ?? null,
-      colorId: sel.colorId ?? null,
+      ...(sel.sku ? skuLevelResolveInput(sel.sku) : { optionId: sel.optionId ?? null, colorId: sel.colorId ?? null }),
       tier: ctx.tier,
       tierActive: ctx.tierActive,
       proPolicy: ctx.proPolicy,
@@ -2604,8 +2639,7 @@ export function publicWithDisplayPrice(
       for (const sel of levels) {
         const r = resolveUnitPrice({
           product: doc,
-          optionId: sel.optionId ?? null,
-          colorId: sel.colorId ?? null,
+          ...(sel.sku ? skuLevelResolveInput(sel.sku) : { optionId: sel.optionId ?? null, colorId: sel.colorId ?? null }),
           tier,
           tierActive: true,
           proPolicy: ctx.proPolicy,

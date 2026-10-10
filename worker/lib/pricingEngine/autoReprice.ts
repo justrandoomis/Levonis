@@ -304,6 +304,12 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
           storedCosts: p.rows,
         });
       } catch (e) {
+        // FX-7 gaps: the SKU rung's read failed this time (not a missing table) — a transient error, not
+        // a product the owner must fix: no block, no bell; it is still stale and the next tick retries.
+        if (product.view?.sku_prices_unread) {
+          console.error('auto reprice: SKU prices unreadable, retried next tick:', pid);
+          continue;
+        }
         console.error('auto reprice: evaluation failed:', pid, e instanceof Error ? e.name : 'unknown');
         failing.push({ p, code: 'REPRICE_BLOCKED' });
         continue;

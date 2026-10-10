@@ -33,7 +33,7 @@ import { procurementExact, quotientProcurementExact, ceilProcurementExact, type 
 import { sameRate } from '@levonis/pricing/fxChain';
 import { sha256Hex } from '../crypto';
 import type { PricingContext } from '../../routes/cart';
-import { evaluateLegacy, unitColorId, unitComboKey, unitOptionIds, type ModelToday } from './legacy';
+import { evaluateLegacy, skuLevelScopeIds, unitColorId, unitComboKey, unitOptionIds, type ModelToday } from './legacy';
 import { ruleTargetOf } from './compute';
 import type { LoadedProduct } from './load';
 import type { PricingRates } from './rates';
@@ -46,11 +46,30 @@ import {
   minimumProfitWrites,
   pricingScopeOf,
   purchaseIneligibility,
+  skuLevelOf,
   type DerivedProduct,
   type MinimumProfitDraft,
   type PurchaseForPricing,
   type PurchaseLineForPricing,
+  type PurchaseSkuLevels,
 } from './fromPurchase';
+
+/**
+ * FX-7 gaps: the colour and SKU levels a purchase's colour and variant lines
+ * may feed — only with the SKU rung (0183) read for this product; otherwise
+ * undefined, and every line feeds its broader scope alone, as before. (A failed
+ * read of the rung never gets here: the engine evaluation refuses it first.)
+ */
+export function purchaseSkuLevels(loaded: LoadedProduct): PurchaseSkuLevels | undefined {
+  if (!Array.isArray(loaded.view?.sku_prices)) return undefined;
+  const { color, sku, units } = skuLevelScopeIds(loaded.doc, loaded.view);
+  return {
+    color,
+    sku,
+    variants: new Map((loaded.view?.variants ?? []).map((v) => [v.id, v.combo_key] as const)),
+    units: units.map((u) => ({ option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, combo_key: u.combo_key })),
+  };
+}
 
 export interface PreviewOptions {
   /** The owner's typed minimum profits, per product (absent = untouched). */
@@ -241,7 +260,7 @@ export async function previewProduct(p: PurchaseForPricing, input: ProductInput,
   const prefer = opts.prefer.get(pid) === true;
   const productLines = p.lines.filter((l) => l.product_id === pid);
   const optIn = new Set([...opts.opt_in].filter((k) => productLines.some((l) => l.key === k)));
-  const derived = deriveProductEntries(p, pid, stored, { optIn, prefer, usePurchase, rates });
+  const derived = deriveProductEntries(p, pid, stored, { optIn, prefer, usePurchase, rates, levels: purchaseSkuLevels(input.loaded) });
   const ruleWrites = minimumProfitWrites(pid, opts.minimum_profits.get(pid) ?? [], stored);
   const inputs = mergedInputs(stored.inputs, derived.entries.map((e) => e.write));
   const rules: PricingRuleRow[] = mergedRules(stored, ruleWrites);
@@ -340,10 +359,21 @@ function namesOf(option: { name_ar?: string; name_en?: string; name_ckb?: string
 export function lineSummary(p: PurchaseForPricing, line: PurchaseLineForPricing, input: ProductInput, preview: ProductPreview, rates: PricingRates | null): LineSummary {
   const excluded = p.charges.filter((c) => c.pricing_role === 'excluded' && c.shares.some((s) => s.index === line.index)).map((c) => c.title);
   const target = pricingScopeOf(line);
-  const model =
+  const found =
     preview.models.find((m) => target.scope === 'option' && m.option_id === target.scope_id) ??
     preview.models.find((m) => m.option_id === (line.option_id ?? '')) ??
     preview.models[0];
+  // FX-7 gaps: a colour or variant line with a level of its own shows one of its SKUs — the colour with the
+  // line's model (else the first), or the variant itself — over every level of its selection.
+  const levels = purchaseSkuLevels(input.loaded);
+  const own = skuLevelOf(line, levels);
+  const unit = own
+    ? (own.scope === 'sku'
+        ? levels!.units.find((u) => u.combo_key === own.scope_id)
+        : (levels!.units.find((u) => u.color_id === own.scope_id && u.option_value_ids[0] === (line.option_id ?? found?.option_id)) ?? levels!.units.find((u) => u.color_id === own.scope_id))) ?? null
+    : null;
+  const unitModel = unit ? (preview.models.find((m) => m.option_id === (unit.option_value_ids[0] ?? '')) ?? found) : null;
+  const model = unit && unitModel ? { ...unitModel, option_value_ids: [...unit.option_value_ids], color_id: unit.color_id, combo_key: unit.combo_key, sku: true } : found;
   let documentRate: string | null = null;
   if (rates && p.profile && p.currency !== 'IQD' && Number.isFinite(p.exchange_rate) && p.exchange_rate > 0) {
     const central = rates.central.fx[p.currency as 'USD' | 'EUR' | 'CNY']?.rate ?? null;

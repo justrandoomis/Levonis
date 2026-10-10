@@ -55,6 +55,22 @@ export default function PricePreview({
   const colorChoices = fromRel
     ? rel.colors.map((c) => ({ id: c.id, label: c.name_en || c.name_ar || c.hex || c.id, active: c.active }))
     : (savedDoc.colors ?? []).map((c) => ({ id: c.id, label: c.name_ar || c.name_en || c.hex || c.id, active: c.active }));
+  /**
+   * FX-7 (0183): a product with two option groups or more is priced per SKU —
+   * one value of EVERY group — so the preview asks one value per group and
+   * sends the whole selection (`optionValueIds`), the cart's own question. With
+   * the first group alone the server could only answer the ladder beneath the
+   * SKU rung: the model's highest SKU.
+   */
+  const groupChoices = fromRel
+    ? rel.groups
+        .filter((g) => g.values.length > 0)
+        .map((g) => ({ id: g.id, label: g.name_en || g.id, active: g.active, values: g.values.map((v) => ({ id: v.id, label: v.name_en || v.name_ar || v.id, active: v.active })) }))
+    : [];
+  const perGroup = groupChoices.length > 1;
+  const [groupPick, setGroupPick] = useState<Record<string, string>>({});
+  const pickedValueIds = perGroup ? groupChoices.map((g) => groupPick[g.id] ?? '').filter(Boolean) : [];
+  const pickedKey = pickedValueIds.join('|');
   const [optionId, setOptionId] = useState('');
   const [colorId, setColorId] = useState('');
   const [transport, setTransport] = useState('');
@@ -75,7 +91,8 @@ export default function PricePreview({
     const t = setTimeout(async () => {
       try {
         const data = await api.post<QuoteResponse>(`/api/admin/products-v2/${productId}/quote`, {
-          optionId: optionId || undefined,
+          optionId: (perGroup ? pickedValueIds[0] : optionId) || undefined,
+          optionValueIds: perGroup && pickedValueIds.length ? pickedValueIds : undefined,
           colorId: colorId || undefined,
           transportMethod: transport || undefined,
           warrantyPlanId: warrantyId || undefined,
@@ -92,7 +109,9 @@ export default function PricePreview({
       }
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [productId, optionId, colorId, transport, warrantyId, tier]);
+    // `pickedKey` stands for `pickedValueIds` (a new array on every render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId, optionId, pickedKey, perGroup, colorId, transport, warrantyId, tier]);
 
   const activeTransports = (savedDoc.preorder_transports ?? []).filter((t) => t.active);
 
@@ -109,15 +128,34 @@ export default function PricePreview({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <div>
-          <L ar="الخيار" en="Option" />
-          <select value={optionId} onChange={(e) => setOptionId(e.target.value)} className={inputCls}>
-            <option value="">بدون / none</option>
-            {optionChoices.map((o) => (
-              <option key={o.id} value={o.id}>{o.label + (o.active ? '' : ' (معطّل)')}</option>
-            ))}
-          </select>
-        </div>
+        {perGroup ? (
+          groupChoices.map((g) => (
+            <div key={g.id}>
+              <div className="mb-1.5 text-[12px] font-bold text-[var(--ap-text-1)] truncate">{g.label + (g.active ? '' : ' (معطّل)')}</div>
+              <select
+                aria-label={g.label}
+                value={groupPick[g.id] ?? ''}
+                onChange={(e) => setGroupPick((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                className={inputCls}
+              >
+                <option value="">بدون / none</option>
+                {g.values.map((v) => (
+                  <option key={v.id} value={v.id}>{v.label + (v.active ? '' : ' (معطّل)')}</option>
+                ))}
+              </select>
+            </div>
+          ))
+        ) : (
+          <div>
+            <L ar="الخيار" en="Option" />
+            <select value={optionId} onChange={(e) => setOptionId(e.target.value)} className={inputCls}>
+              <option value="">بدون / none</option>
+              {optionChoices.map((o) => (
+                <option key={o.id} value={o.id}>{o.label + (o.active ? '' : ' (معطّل)')}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <L ar="اللون" en="Color" />
           <select value={colorId} onChange={(e) => setColorId(e.target.value)} className={inputCls}>
