@@ -12,6 +12,7 @@ import { notifyStatement } from './notifications';
 import { PRIVATE_DELEGATION_ENABLED, canViewCost, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
 import { employmentInstalled, investorEmploymentPendingSql, nextEmploymentDay, staffDateEligible } from './financeEmployment';
+import { SURPLUS_PREFIX, SURPLUS_ROWS_SQL, surplusInstalled } from './investorSurplus';
 
 export type BalanceType = 'earnings' | 'capital' | 'all';
 export type EarningKind = 'staff' | 'investor_profit' | 'investor_capital';
@@ -53,6 +54,14 @@ const pendingPaymentCoverSql=(cost='c.id')=>`COALESCE((SELECT MIN(${staffPaidSql
 
 const investorReconciliationBlockedSql=(contractSql='e.contract_id')=>`(${investorEmploymentPendingSql(contractSql)} OR ${investorProjectionStaleSql(contractSql)} OR EXISTS(SELECT 1 FROM finance_posting_errors pe JOIN order_item_inventory_allocations ia ON ia.order_id=pe.order_id JOIN inventory_lots il ON il.id=ia.lot_id JOIN investment_contracts ic ON ic.incoming_id=il.incoming_id WHERE ic.id=${contractSql}))`;
 const active = (state: string) => ['requested', 'approved', 'part_paid'].includes(state);
+/**
+ * THE INVESTMENT REMAINDER IN «أرباحي» (worker/lib/investorSurplus.ts): returned
+ * capital, one source per funded purchase, derived from immutable receipts.
+ * Both wrappers are built from the ONE fragment, so what the page and a
+ * withdrawal read is exactly what the withdrawal's snapshot fence re-reads.
+ */
+const participantSurplusSql = `SELECT s.*,${paidSourceSql("'investor_capital'", 's.id')} AS paid_iqd,${heldSourceSql("'investor_capital'", 's.id')} AS held_iqd,0 AS blocked,1 AS eligible FROM (${SURPLUS_ROWS_SQL}) s ORDER BY s.day,s.id`;
+const fenceSurplusSql = `SELECT s.id,s.kind,s.amount_iqd AS amount,0 AS cover,${paidSourceSql("'investor_capital'", 's.id')} AS paid,${heldSourceSql("'investor_capital'", 's.id')} AS held,s.state,0 AS blocked,s.version FROM (${SURPLUS_ROWS_SQL}) s`;
 
 /** Only the participant's payable amounts. No customer, margin, cost base or other people's accounts. */
 export async function participantSources(db: D1Database, userId: string, scope: 'account' | 'staff' = 'account'): Promise<ParticipantSource[]> {
@@ -71,6 +80,10 @@ export async function participantSources(db: D1Database, userId: string, scope: 
       CASE WHEN e.state='available' THEN 1 ELSE 0 END AS eligible
       FROM finance_investor_earnings e WHERE e.user_id=? ORDER BY e.day,e.id`).bind(userId).all<ParticipantSource>();
     sources = [...sources, ...(investor.results ?? [])];
+  }
+  if (scope === 'account' && await surplusInstalled(db)) {
+    const surplus = await db.prepare(participantSurplusSql).bind(userId).all<ParticipantSource>();
+    sources = [...sources, ...(surplus.results ?? [])];
   }
   return sources.map((s) => ({ ...s, eligible: !!s.eligible&&!s.blocked, available_iqd: s.eligible&&!s.blocked ? Math.max(0, s.amount_iqd-s.paid_iqd-s.held_iqd) : 0 }));
 }
@@ -119,6 +132,8 @@ export function participantSummary(entries: ParticipantSource[],advanceBalance=0
     pending_costs:entries.filter(s=>s.state==='pending_cost'||s.pending_cost).length,
     debt_iqd:staff.debt_iqd+profit.debt_iqd,staff_debt_iqd:staff.debt_iqd,investor_profit_debt_iqd:profit.debt_iqd,
     capital_debt_iqd:capital.debt_iqd,
+    // Of the returned capital: the investment remainder of funded purchases (worker/lib/investorSurplus.ts).
+    capital_surplus_iqd:sum(s=>s.kind==='investor_capital'&&s.id.startsWith(SURPLUS_PREFIX)?s.accrued_iqd:0),
     staff_iqd:sum(s=>s.kind==='staff'?s.accrued_iqd:0),investor_profit_iqd:sum(s=>s.kind==='investor_profit'?s.accrued_iqd:0),capital_iqd:sum(s=>s.kind==='investor_capital'?s.accrued_iqd:0),
   };
 }
@@ -158,6 +173,7 @@ export function participantWithdrawableSources(entries: ParticipantSource[], adv
 async function sourceSetFence(db: D1Database, userId: string, sources: ParticipantSource[],advanceSnapshot:string,scope: 'account' | 'staff' = 'account') {
   const investorInstalled=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_investor_earnings'").first();
   const includeInvestors=!!investorInstalled&&scope==='account';
+  const includeSurplus=scope==='account'&&await surplusInstalled(db);
   const staffSql=`SELECT c.id AS id,'staff' AS kind,COALESCE(${effectiveStaffCostSql()},0) AS amount,${pendingPaymentCoverSql()} AS cover,${staffPaidSql()} AS paid,${heldSourceSql("'staff'",'c.id')} AS held,c.state,${staffReconciliationBlockedSql('c.order_id','c.id',!!investorInstalled)} AS blocked,
     (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version
     FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND c.state<>'reversed'`;
@@ -165,7 +181,8 @@ async function sourceSetFence(db: D1Database, userId: string, sources: Participa
   const expected=JSON.stringify([...sources].sort((a,b)=>a.kind===b.kind?(a.id<b.id?-1:a.id>b.id?1:0):(a.kind<b.kind?-1:1)).map((s)=>[s.id,s.kind,s.amount_iqd,s.paid_iqd,s.held_iqd,s.state,s.version,s.blocked?1:0,s.pending_payment_cover_iqd??0]));
   // One snapshot fence covers both changed rows and newly added sources. A
   // large staff history does not turn one payout into thousands of queries.
-  return [...fence(db,`(SELECT json_group_array(json_array(id,kind,amount,paid,held,state,version,blocked,cover)) FROM (${staffSql}${includeInvestors?' UNION ALL '+investorSql:''} ORDER BY kind,id))=?`,includeInvestors?[userId,userId,expected]:[userId,expected]),
+  const parts=[staffSql,...(includeInvestors?[investorSql]:[]),...(includeSurplus?[fenceSurplusSql]:[])];
+  return [...fence(db,`(SELECT json_group_array(json_array(id,kind,amount,paid,held,state,version,blocked,cover)) FROM (${parts.join(' UNION ALL ')} ORDER BY kind,id))=?`,[...parts.map(()=>userId),expected]),
     ...fence(db,`(SELECT json_group_array(json_array(id,amount_iqd,allocated)) FROM (${participantAdvanceSql(scope)}))=?`,[userId,advanceSnapshot])];
 }
 

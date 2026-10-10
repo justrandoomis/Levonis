@@ -3,24 +3,44 @@ import { useRef, useState } from 'react';
 import { ArrowDownToLine, RefreshCw, Wallet } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
+import { investmentReturnStrings, investorReturnView } from '../../lib/investmentReturn';
 import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loading, Money, StateBadge, Surface, useLanguage, useMutation, useRemote, type Withdrawal } from './shared';
 
 type Entry = { id: string; kind: 'staff' | 'investor_profit' | 'investor_capital'; title: string; order_id?: string; day: string; amount_iqd: number; accrued_iqd?: number; paid_iqd: number; held_iqd: number; available_iqd: number; state: string };
 export type EarningsData = {
-  summary: { earnings_pending_iqd?: number; net_balance_iqd?: number; staff_debt_iqd?: number; investor_profit_debt_iqd?: number; earned_iqd: number; available_iqd: number; held_iqd: number; paid_iqd: number; pending_iqd: number; staff_iqd: number; investor_profit_iqd: number; capital_iqd: number; earnings_paid_iqd?: number; earnings_held_iqd?: number; earnings_available_iqd?: number; capital_available_iqd?: number; pending_costs?: number; debt_iqd?: number; advance_balance_iqd?: number; reconciliation_pending?: boolean };
+  summary: { earnings_pending_iqd?: number; net_balance_iqd?: number; staff_debt_iqd?: number; investor_profit_debt_iqd?: number; earned_iqd: number; available_iqd: number; held_iqd: number; paid_iqd: number; pending_iqd: number; staff_iqd: number; investor_profit_iqd: number; capital_iqd: number; earnings_paid_iqd?: number; earnings_held_iqd?: number; earnings_available_iqd?: number; capital_available_iqd?: number; capital_surplus_iqd?: number; pending_costs?: number; debt_iqd?: number; advance_balance_iqd?: number; reconciliation_pending?: boolean };
   entries: Entry[]; withdrawals: Withdrawal[];
   movements?: { id: string; account: string; kind: string; day: string; earning_day: string | null; amount_iqd: number; reason: string; balance_iqd: number; debt_covered_iqd: number }[];
   history_review_count?: number;
-  investment?: {unallocated_iqd:number;batches:{id:string;name:string;state:string;principal_iqd:number;received_iqd:number;qty_received:number;delivered_qty:number;remaining_qty:number;earned_iqd:number;available_iqd:number;paid_iqd:number;recovered_capital_iqd:number;capital_paid_iqd:number}[]};
+  investment?: {unallocated_iqd:number;returned_surplus_iqd?:number;pending_surplus_iqd?:number;batches:{id:string;name:string;state:string;principal_iqd:number;received_iqd:number;qty_received:number;delivered_qty:number;remaining_qty:number;earned_iqd:number;available_iqd:number;paid_iqd:number;recovered_capital_iqd:number;capital_paid_iqd:number}[]};
   employment?: { start_work_date: string | null; first_earning_day: string | null; active: number; archived: number; has_rules: number; reconciliation_state: string | null; processed_orders: number }[];
 };
 
+/**
+ * «مصادر مستحقاتك»: work, investment profit and returned capital — of which the
+ * investment remainder of funded shipments (owner request 2026-10-10), withdrawn
+ * with «سحب رأس المال» like any returned capital.
+ */
+export function EarningsSources({ summary, capitalAvailable, onWithdrawCapital }: { summary: EarningsData['summary']; capitalAvailable: number; onWithdrawCapital: () => void }) {
+  const { loc, lang } = useLanguage();
+  const ir = investmentReturnStrings(lang);
+  return <Surface title={loc('مصادر مستحقاتك', 'Your earnings sources')}><div className="fp-rows">
+    <div className="fp-row"><span>{loc('أجور العمل', 'Work earnings')}</span><Money value={summary.staff_iqd} /></div>
+    <div className="fp-row"><span>{loc('أرباح الاستثمار', 'Investment profits')}</span><Money value={summary.investor_profit_iqd} /></div>
+    <div className="fp-row"><span>{loc('رأس المال المسترد', 'Recovered capital')}</span><Money value={summary.capital_iqd} /></div>
+    {investorReturnView(summary, null).sources_surplus_iqd > 0 && <div className="fp-row"><span className="fp-row-meta">{ir.sourcesSurplus}</span><Money value={investorReturnView(summary, null).sources_surplus_iqd} /></div>}
+    {capitalAvailable > 0 && <div className="fp-row"><div><span>{loc('رأس المال المتاح للسحب', 'Capital available to withdraw')}</span><p className="fp-row-meta"><Money value={capitalAvailable} /></p></div><Button size="sm" onClick={onWithdrawCapital}>{loc('سحب رأس المال', 'Withdraw capital')}</Button></div>}
+  </div></Surface>;
+}
+
 export default function MyEarnings() {
   const { loc, lang, dir } = useLanguage();
+  const ir = investmentReturnStrings(lang);
   const remote = useRemote<EarningsData>(EARNINGS), op = useMutation();
   const [open, setOpen] = useState(false), [amount, setAmount] = useState<number | null>(null), [balanceType, setBalanceType] = useState<'earnings' | 'capital'>('earnings');
   const operationId = useRef('');
   const data = remote.data, s = data?.summary;
+  const returnView = investorReturnView(s, data?.investment);
   const calculating = data?.employment?.some((e) => ['pending', 'running'].includes(e.reconciliation_state ?? '')) ?? false;
   // The owner can change the start date from another device after this screen
   // was opened. Keep checking even when the last read had no pending job.
@@ -42,7 +62,7 @@ export default function MyEarnings() {
     <Feedback error={op.error} notice={op.notice} />
     {!data ? <Loading error={remote.error} retry={remote.load} /> : <>
       <Feedback error={remote.error} />
-      <section className="fp-hero"><div><p className="flex items-center gap-2"><Wallet size={17} aria-hidden="true" />{(s.net_balance_iqd ?? 0) < 0 ? loc('عليك', 'You owe') : loc('لك', 'Your balance')}</p><Money value={Math.abs(s.net_balance_iqd ?? balance('earnings'))} className={(s.net_balance_iqd ?? 0) < 0 ? 'fp-negative' : ''} /><p className="text-xs mt-1">{loc('رصيد الأرباح التراكمي بعد التسديد والسلف', 'Cumulative earnings after payments and advances')}</p></div><Button variant="primary" icon={<ArrowDownToLine size={17} />} disabled={balance('earnings') <= 0} onClick={() => startWithdrawal('earnings')}>{loc('طلب سحب الأرباح', 'Request withdrawal')}</Button></section>
+      <section className="fp-hero"><div><p className="flex items-center gap-2"><Wallet size={17} aria-hidden="true" />{(s.net_balance_iqd ?? 0) < 0 ? loc('عليك', 'You owe') : loc('لك', 'Your balance')}</p><Money value={Math.abs(s.net_balance_iqd ?? balance('earnings'))} className={(s.net_balance_iqd ?? 0) < 0 ? 'fp-negative' : ''} /><p className="text-xs mt-1">{loc('رصيد الأرباح التراكمي بعد التسديد والسلف', 'Cumulative earnings after payments and advances')}</p>{returnView.hero_capital_iqd > 0 && <p className="text-xs mt-1">{ir.heroCapital}: <Money value={returnView.hero_capital_iqd} /></p>}</div><Button variant="primary" icon={<ArrowDownToLine size={17} />} disabled={balance('earnings') <= 0} onClick={() => startWithdrawal('earnings')}>{loc('طلب سحب الأرباح', 'Request withdrawal')}</Button></section>
       <div className="fp-stats">
         <div className="fp-stat"><span>{loc('متاح للسحب', 'Available to withdraw')}</span><Money value={balance('earnings')} /></div>
         <div className="fp-stat"><span>{loc('قيد الاستحقاق', 'Pending')}</span><Money value={s.earnings_pending_iqd ?? 0} /></div>
@@ -61,13 +81,10 @@ export default function MyEarnings() {
       {!!s.advance_balance_iqd && <p className="fp-note">{loc('حُسمت السلف غير المسواة من المبلغ المتاح: ', 'Unsettled advances deducted from available earnings: ')}<Money value={s.advance_balance_iqd} /></p>}
       {!!s.pending_costs && <p className="fp-note">{loc(`يوجد ${s.pending_costs} استحقاق بانتظار تثبيت التكلفة؛ لم يدخل في المجموع بعد.`, `${s.pending_costs} earnings await final costs and are not included in the total yet.`)}</p>}
       {!!s.debt_iqd && <p className="fp-note">{loc('الدين المتبقي الآن: ', 'Remaining debt now: ')}<Money value={s.debt_iqd} /> · {loc('ينخفض تلقائيًا من الأرباح الجديدة في الحساب نفسه، دون خصم إضافي أو مساس برأس المال.', 'Covered by future earnings in the same account, without another deduction or use of investment principal.')}</p>}
-      <Surface title={loc('مصادر مستحقاتك', 'Your earnings sources')}><div className="fp-rows">
-        <div className="fp-row"><span>{loc('أجور العمل', 'Work earnings')}</span><Money value={s.staff_iqd} /></div>
-        <div className="fp-row"><span>{loc('أرباح الاستثمار', 'Investment profits')}</span><Money value={s.investor_profit_iqd} /></div>
-        <div className="fp-row"><span>{loc('رأس المال المسترد', 'Recovered capital')}</span><Money value={s.capital_iqd} /></div>{balance('capital') > 0 && <div className="fp-row"><div><span>{loc('رأس المال المتاح للسحب', 'Capital available to withdraw')}</span><p className="fp-row-meta"><Money value={balance('capital')} /></p></div><Button size="sm" onClick={() => startWithdrawal('capital')}>{loc('سحب رأس المال', 'Withdraw capital')}</Button></div>}
-      </div></Surface>
-      {!!data.investment?.batches.length && <Surface title={loc('دفعات استثماري', 'My investment batches')} hint={loc('رأس المال مستقل عن الأرباح. الإتاحة تتطلب التسليم والتحصيل وتثبيت التكلفة والتمويل.', 'Principal is separate from profit. Availability requires delivery, collection, verified costs and funding.')}>
-        {data.investment.unallocated_iqd>0 && <p className="fp-note">{loc('تمويل مستلم غير مخصص', 'Received funding not allocated')}: <Money value={data.investment.unallocated_iqd}/></p>}
+      <EarningsSources summary={s} capitalAvailable={balance('capital')} onWithdrawCapital={() => startWithdrawal('capital')} />
+      {returnView.show_batches && data.investment && <Surface title={loc('دفعات استثماري', 'My investment batches')} hint={loc('رأس المال مستقل عن الأرباح. الإتاحة تتطلب التسليم والتحصيل وتثبيت التكلفة والتمويل.', 'Principal is separate from profit. Availability requires delivery, collection, verified costs and funding.')}>
+        {returnView.batches_returned_iqd > 0 && <p className="fp-note">{ir.batchesReturned}: <Money value={returnView.batches_returned_iqd} /></p>}
+        {returnView.batches_pending_iqd > 0 && <p className="fp-note">{ir.batchesPending}: <Money value={returnView.batches_pending_iqd} /></p>}
         <div className="fp-stack">{data.investment.batches.map(b=><details className="fp-rule" key={b.id}><summary><strong>{b.name}</strong><p className="fp-muted">{({settlement:loc('بانتظار تثبيت التكلفة أو إكمال التسوية','Awaiting verified costs or settlement'),funding:loc('بانتظار إكمال التمويل','Awaiting funding'),incoming:loc('بانتظار وصول المخزون','Awaiting inventory'),delivery:loc('بانتظار البيع والتسليم','Awaiting sale and delivery'),collection:loc('تم التسليم وبانتظار التحصيل','Delivered, awaiting collection'),available:loc('متاح للسحب','Available to withdraw'),reserved:loc('محجوز للسحب','Reserved for withdrawal'),paid:loc('تم سحب الأرباح المستحقة','Accrued profit paid')} as Record<string,string>)[b.state]}</p></summary><div className="fp-stats">{[[loc('رأس المال المتفق / المستلم','Agreed / received principal'),b.principal_iqd,b.received_iqd],[loc('أرباح مستحقة / متاحة','Accrued / available profit'),b.earned_iqd,b.available_iqd],[loc('رأس مال مسترد / مسحوب','Recovered / paid principal'),b.recovered_capital_iqd,b.capital_paid_iqd]].map(([title,n,k])=><div className="fp-stat" key={String(title)}><span>{title}</span><Money value={Number(n)}/><Money value={Number(k)}/></div>)}</div><p className="fp-muted">{loc('مستلم / مباع مسلّم / متبقٍ','Received / sold and delivered / remaining')}: {b.qty_received} / {b.delivered_qty} / {b.remaining_qty}</p></details>)}</div>
       </Surface>}
       <Surface title={loc('سجل الحركات', 'Account activity')} hint={loc('استحقاقات وتسويات ومدفوعات، مع الرصيد الناتج في حساب الأجور أو الاستثمار.', 'Earnings, adjustments and payments, with the running wage or investment balance.')}>

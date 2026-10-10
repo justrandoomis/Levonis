@@ -1,7 +1,10 @@
 import { allocateExact, baghdadDay, dateValue, fence, journalPlan, periodOpen, whole } from './operations';
 import { badRequest, conflict, notFound, str } from './http';
 import { newId } from './crypto';
+import { auditStatements } from './audit';
 import { planInvestorSources, type InvestmentContract } from './investorFinance';
+import { surplusReturnStatements } from './investorSurplus';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 export interface InvestorProfile {user_id:string;state:string;default_profit_share_bps:number;default_capital_share_bps:number;default_loss_share_bps:number;version:number}
 export async function eligibleInvestorProfile(db:D1Database,id:string){
@@ -14,7 +17,16 @@ export function fundingDistribution(agreed:number,lines:FundedPurchaseLine[]){
   return {cost,allocated,unallocated:agreed-allocated,store_contribution:Math.max(0,cost-agreed),shares:cost?allocateExact(allocated,lines.map(l=>l.total_iqd)):lines.map(()=>0)};
 }
 type FundingAllocation={contract:InvestmentContract;principal_iqd:number;funded_iqd:number};
-async function fundingReceiptPlan(db:D1Database,purchaseId:string,allocations:FundingAllocation[],priorReceived:number,input:Record<string,unknown>,actor:string){
+/**
+ * One receipt of the investor's cash. It fills the purchase's contracts first
+ * (capacity = Σ principal); whatever no contract takes — the investment
+ * remainder (agreed − landed cost) once the agreed amount has arrived, and any
+ * cash above the agreed amount — is the investor's returned capital
+ * (worker/lib/investorSurplus.ts): its audit row and the investor's notice
+ * commit in this same batch, keyed by the receipt id, so a replay neither
+ * credits nor notifies twice. Every receipt is audited (amounts only).
+ */
+async function fundingReceiptPlan(db:D1Database,purchaseId:string,investorId:string,allocations:FundingAllocation[],priorReceived:number,input:Record<string,unknown>,actor:string){
   const amount=whole(input.received_iqd??input.amount_iqd,'المبلغ المستلم',1),day=dateValue(input.received_day??input.payment_day,baghdadDay()),reference=str(input.reference,'مرجع استلام التمويل',{min:1,max:300});
   const operation=str(input.operation_id,'رقم استلام التمويل',{min:8,max:100}),request=JSON.stringify({purchase_id:purchaseId,amount_iqd:amount,payment_day:day,reference});
   const prior=await db.prepare('SELECT request_json FROM purchase_investor_receipts WHERE id=?').bind(operation).first<{request_json:string}>();
@@ -27,6 +39,10 @@ async function fundingReceiptPlan(db:D1Database,purchaseId:string,allocations:Fu
     ...fence(db,'(SELECT COALESCE(SUM(amount_iqd),0) FROM purchase_investor_receipts WHERE purchase_id=?)=?',[purchaseId,priorReceived]),
     db.prepare('INSERT INTO purchase_investor_receipts(id,purchase_id,amount_iqd,allocated_iqd,payment_day,reference,actor_id,created_at,request_json) VALUES (?,?,?,?,?,?,?,?,?)').bind(operation,purchaseId,amount,total-funded,day,reference,actor,now,request),
     ...journalPlan(db,{key:`purchase-investment:${operation}`,day,title:'استلام تمويل دفعة مخزون',source:'purchase_investment',sourceId:purchaseId,actor},[{account:'1000',debit:amount},{account:'3100',credit:amount}]).statements];
+  // Never negative: the contracts take at most this receipt's amount.
+  const returned=amount-(total-funded);
+  statements.push(...(await auditStatements(db,actor,'purchase.investor_funding_received',purchaseId,{receipt_id:operation,amount_iqd:amount,allocated_iqd:total-funded})).statements,
+    ...await surplusReturnStatements(db,{purchaseId,userId:investorId,receiptId:operation,amount:returned,actor}));
   for(const [i,a] of allocations.entries()){
     const delta=targets[i]-a.funded_iqd;if(delta<0)throw conflict('راجع التمويل السابق قبل إعادة توزيعه');
     statements.push(...fence(db,"(SELECT COALESCE(SUM(amount_iqd),0) FROM investor_finance_events WHERE contract_id=? AND kind='funding')=?",[a.contract.id,a.funded_iqd]));
@@ -37,10 +53,18 @@ async function fundingReceiptPlan(db:D1Database,purchaseId:string,allocations:Fu
 }
 
 /** Header, purchase lines, contracts, actual cash and allocations all commit in
- * the caller's existing purchase transaction. Agreement alone books no cash. */
-export async function planPurchaseFunding(db:D1Database,purchaseId:string,input:unknown,lines:FundedPurchaseLine[],actor:string){
+ * the caller's existing purchase transaction. Agreement alone books no cash.
+ *
+ * This is the confirm («تأكيد الشراء القادم» / «تأكيد وإضافة المخزون»): it fixes
+ * the agreement, so the remainder that returns to the investor is fixed here,
+ * from the final cost (an estimated one is refused, INVESTMENT_NEEDS_FINAL_COST),
+ * and a purchase keeps the one agreement it was confirmed with
+ * (INVESTMENT_AGREEMENT_EXISTS, never the database's own key as a 500). */
+export async function planPurchaseFunding(db:D1Database,purchaseId:string,input:unknown,lines:FundedPurchaseLine[],actor:string,opts:{costState?:string}={}){
   if(!input||typeof input!=='object'||Array.isArray(input))return [];
   const body=input as Record<string,unknown>;if(body.mode!=='investor')return [];
+  if(opts.costState!=='final')throw conflict(serverMessage('INVESTMENT_NEEDS_FINAL_COST'),'INVESTMENT_NEEDS_FINAL_COST');
+  if(await db.prepare('SELECT 1 FROM purchase_investor_agreements WHERE purchase_id=?').bind(purchaseId).first())throw conflict(serverMessage('INVESTMENT_AGREEMENT_EXISTS'),'INVESTMENT_AGREEMENT_EXISTS');
   const userId=str(body.user_id,'المستثمر',{min:1,max:100}),profile=await eligibleInvestorProfile(db,userId);
   const agreed=whole(body.agreed_iqd,'الاستثمار المتفق عليه',1),profit=whole(body.profit_share_bps??profile.default_profit_share_bps,'نسبة الربح',0,10000),loss=whole(body.loss_share_bps??profile.default_loss_share_bps,'نسبة الخسارة',0,10000);
   const selection=Array.isArray(body.incoming_indexes)?body.incoming_indexes.map(v=>whole(v,'البند',0,lines.length-1)):lines.map((_,i)=>i);
@@ -59,7 +83,7 @@ export async function planPurchaseFunding(db:D1Database,purchaseId:string,input:
     allocations.push({contract,principal_iqd:principal,funded_iqd:0});
   }
   const received=body.received_iqd===undefined||body.received_iqd===''?0:whole(body.received_iqd,'المستلم فعليًا');
-  if(received)statements.push(...(await fundingReceiptPlan(db,purchaseId,allocations,0,{...body,operation_id:`receipt:${purchaseId}`,received_iqd:received},actor)).statements);
+  if(received)statements.push(...(await fundingReceiptPlan(db,purchaseId,userId,allocations,0,{...body,operation_id:`receipt:${purchaseId}`,received_iqd:received},actor)).statements);
   else for(const a of allocations)statements.push(...planInvestorSources(db,a.contract,baghdadDay()));
   if(body.save_default===true){
     const after={...profile,default_profit_share_bps:profit,default_loss_share_bps:loss,version:profile.version+1};
@@ -69,13 +93,15 @@ export async function planPurchaseFunding(db:D1Database,purchaseId:string,input:
   return statements;
 }
 
+/** «تسجيل تمويل مستلم»: cash recorded after the confirm. A voided contract takes
+ * no cash, so what it would have taken returns to the investor as well. */
 export async function receivePurchaseFunding(db:D1Database,purchaseId:string,body:Record<string,unknown>,actor:string){
-  const agreement=await db.prepare('SELECT * FROM purchase_investor_agreements WHERE purchase_id=?').bind(purchaseId).first();if(!agreement)throw notFound('اتفاق تمويل الدفعة غير موجود');
-  const contracts=(await db.prepare('SELECT c.* FROM purchase_investor_allocations a JOIN investment_contracts c ON c.id=a.contract_id WHERE a.purchase_id=? ORDER BY a.incoming_id').bind(purchaseId).all<InvestmentContract>()).results??[];
+  const agreement=await db.prepare('SELECT * FROM purchase_investor_agreements WHERE purchase_id=?').bind(purchaseId).first<{user_id:string}>();if(!agreement)throw notFound('اتفاق تمويل الدفعة غير موجود');
+  const contracts=(await db.prepare("SELECT c.* FROM purchase_investor_allocations a JOIN investment_contracts c ON c.id=a.contract_id WHERE a.purchase_id=? AND c.state='active' ORDER BY a.incoming_id").bind(purchaseId).all<InvestmentContract>()).results??[];
   const allocations:FundingAllocation[]=[];
   for(const c of contracts){const funded=await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND kind='funding'").bind(c.id).first<{n:number}>();allocations.push({contract:c,principal_iqd:c.principal_iqd,funded_iqd:funded?.n??0});}
   const prior=await db.prepare('SELECT COALESCE(SUM(amount_iqd),0) AS n FROM purchase_investor_receipts WHERE purchase_id=?').bind(purchaseId).first<{n:number}>();
-  const plan=await fundingReceiptPlan(db,purchaseId,allocations,prior?.n??0,body,actor);
+  const plan=await fundingReceiptPlan(db,purchaseId,agreement.user_id,allocations,prior?.n??0,body,actor);
   if(plan.statements.length)try{await db.batch(plan.statements);}catch(e){if(/CHECK constraint|UNIQUE/.test(String(e)))throw conflict('تغير رصيد التمويل أثناء التسجيل؛ حدّث الصفحة');throw e;}
   return {already:plan.already};
 }
@@ -86,8 +112,13 @@ export async function purchaseFundingSummary(db:D1Database,purchaseId:string){
     (SELECT COALESCE(SUM(allocated_iqd),0) FROM purchase_investor_receipts WHERE purchase_id=a.purchase_id) AS allocated_received_iqd
     FROM purchase_investor_agreements a JOIN users u ON u.id=a.user_id WHERE purchase_id=?`).bind(purchaseId).first<Record<string,unknown>>();
   if(!agreement)return null;
-  const received=Number(agreement.received_iqd),allocated=Number(agreement.allocated_iqd),cost=Number(agreement.batch_cost_iqd);
-  return {...agreement,unallocated_iqd:Math.max(0,received-Number(agreement.allocated_received_iqd)),agreed_unallocated_iqd:Number(agreement.agreed_iqd)-allocated,
+  const received=Number(agreement.received_iqd),allocated=Number(agreement.allocated_iqd),cost=Number(agreement.batch_cost_iqd),agreed=Number(agreement.agreed_iqd);
+  // returned_iqd: received cash no contract took — already the investor's
+  // returned capital in «أرباحي». return_total_iqd: what returns once all the
+  // cash has arrived (the remainder agreed − allocated, or more when more cash
+  // came). unallocated_iqd is kept for older screens (it equals returned_iqd).
+  const returned=Math.max(0,received-Number(agreement.allocated_received_iqd)),returnTotal=Math.max(returned,Math.max(agreed,received)-allocated);
+  return {...agreement,unallocated_iqd:returned,returned_iqd:returned,return_total_iqd:returnTotal,return_pending_iqd:Math.max(0,returnTotal-returned),agreed_unallocated_iqd:agreed-allocated,
     store_contribution_iqd:Math.max(0,cost-allocated),funding_shortfall_iqd:Math.max(0,allocated-received),
     allocations:(await db.prepare('SELECT a.*,c.profit_share_bps,c.capital_share_bps,c.loss_share_bps FROM purchase_investor_allocations a JOIN investment_contracts c ON c.id=a.contract_id WHERE a.purchase_id=? ORDER BY a.incoming_id').bind(purchaseId).all()).results??[],
     receipts:(await db.prepare('SELECT * FROM purchase_investor_receipts WHERE purchase_id=? ORDER BY payment_day,id').bind(purchaseId).all()).results??[]};
