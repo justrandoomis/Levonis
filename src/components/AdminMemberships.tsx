@@ -93,34 +93,34 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
   }, [tier, status, kyc, restriction, expiryDays]);
 
   const selectCls =
-    'bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none';
+    'w-auto min-h-9 px-2 py-1.5 text-xs';
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input
+          className="lv-input flex-1 min-w-[180px] min-h-9 py-1.5 text-sm"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') load();
           }}
           placeholder={s.searchPlaceholder}
-          className="flex-1 min-w-[180px] bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none"
         />
-        <select value={tier} onChange={(e) => setTier(e.target.value)} className={selectCls} aria-label={s.fTier}>
+        <select className={`lv-input ${selectCls}`} value={tier} onChange={(e) => setTier(e.target.value)} aria-label={s.fTier}>
           <option value="">{s.fTier}: {s.all}</option>
           <option value="pro">PRO</option>
           <option value="plus">PLUS</option>
           <option value="free">{s.none}</option>
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectCls} aria-label={s.fStatus}>
+        <select className={`lv-input ${selectCls}`} value={status} onChange={(e) => setStatus(e.target.value)} aria-label={s.fStatus}>
           <option value="">{s.fStatus}: {s.all}</option>
           <option value="active">active</option>
           <option value="expired">expired</option>
           <option value="pending_launch">pending_launch</option>
           <option value="none">{s.none}</option>
         </select>
-        <select value={kyc} onChange={(e) => setKyc(e.target.value)} className={selectCls} aria-label={s.fKyc}>
+        <select className={`lv-input ${selectCls}`} value={kyc} onChange={(e) => setKyc(e.target.value)} aria-label={s.fKyc}>
           <option value="">{s.fKyc}: {s.all}</option>
           {['draft', 'submitted', 'reviewing', 'changes_requested', 'rejected', 'verified'].map((k) => (
             <option key={k} value={k}>
@@ -128,23 +128,23 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
             </option>
           ))}
         </select>
-        <select value={restriction} onChange={(e) => setRestriction(e.target.value)} className={selectCls} aria-label={s.fRestriction}>
+        <select className={`lv-input ${selectCls}`} value={restriction} onChange={(e) => setRestriction(e.target.value)} aria-label={s.fRestriction}>
           <option value="">{s.fRestriction}: {s.all}</option>
           <option value="active">{s.active}</option>
         </select>
-        <select value={expiryDays} onChange={(e) => setExpiryDays(e.target.value)} className={selectCls} aria-label={s.fExpiry}>
+        <select className={`lv-input ${selectCls}`} value={expiryDays} onChange={(e) => setExpiryDays(e.target.value)} aria-label={s.fExpiry}>
           <option value="">{s.fExpiry}: {s.all}</option>
           <option value="7">7 {s.days}</option>
           <option value="30">30 {s.days}</option>
           <option value="90">90 {s.days}</option>
         </select>
-        <button onClick={load} className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white">
+        <button onClick={load} className="lv-button lv-button-secondary w-11 px-0">
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-sm">
+        <div className="lv-alert lv-alert-danger text-sm text-text-primary">
           {error}{' '}
           <button onClick={load} className="underline">
             {s.retry}
@@ -152,13 +152,13 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
         </div>
       )}
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+      <div className="lv-surface overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-start border-collapse min-w-[820px]">
             <thead>
-              <tr className="bg-zinc-800/50 border-b border-zinc-700 text-start">
+              <tr className="bg-surface-raised border-b border-border-subtle text-start">
                 {[s.colMember, s.colTier, s.colState, s.colExpiry, s.colKyc, s.colRestr, s.colAddr].map((h) => (
-                  <th key={h} className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase tracking-wider text-start">
+                  <th key={h} className="py-3 px-4 text-xs font-bold text-text-secondary uppercase tracking-wider text-start">
                     {h}
                   </th>
                 ))}
@@ -166,7 +166,7 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
             </thead>
             <tbody>
               {members.map((m) => (
-                <tr key={m.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
+                <tr key={m.id} className="border-b border-border-subtle hover:bg-surface-raised transition-colors">
                   <td className="py-3 px-4">
                     {/*
                       PRESSING THE MEMBER IS WHAT OPENS THE PROFILE, so the
@@ -191,40 +191,40 @@ function MembersSection({ s, lang }: { s: S; lang: 'ar' | 'en' | 'ckb' }) {
                       aria-label={`${s.openMember}: ${m.name || m.username || m.email}`}
                       className="-mx-2 w-full rounded-xl px-2 py-1 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gilt/60"
                     >
-                      <span dir="auto" className="block truncate text-sm font-bold leading-5 text-white">
+                      <span dir="auto" className="block truncate text-sm font-bold leading-5 text-text-primary">
                         {m.name || m.username || '—'}
                       </span>
-                      <span dir="auto" className="block truncate text-xs leading-4 text-zinc-500">
+                      <span dir="auto" className="block truncate text-xs leading-4 text-text-muted">
                         {m.email}
                       </span>
                     </button>
                   </td>
-                  <td className="py-3 px-4 text-xs font-bold uppercase text-zinc-300">{tierLabel(m.tier)}</td>
-                  <td className="py-3 px-4 text-xs text-zinc-400">{m.membership_state}</td>
-                  <td className="py-3 px-4 text-xs text-zinc-500 whitespace-nowrap">{shortDate(m.expires_at)}</td>
-                  <td className="py-3 px-4 text-xs text-zinc-400">{m.kyc_state ?? '—'}</td>
+                  <td className="py-3 px-4 text-xs font-bold uppercase text-text-secondary">{tierLabel(m.tier)}</td>
+                  <td className="py-3 px-4 text-xs text-text-secondary">{m.membership_state}</td>
+                  <td className="py-3 px-4 text-xs text-text-muted whitespace-nowrap">{shortDate(m.expires_at)}</td>
+                  <td className="py-3 px-4 text-xs text-text-secondary">{m.kyc_state ?? '—'}</td>
                   <td className="py-3 px-4">
                     {m.active_restrictions > 0 ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]">
                         {m.active_restrictions}
                       </span>
                     ) : (
-                      <span className="text-xs text-zinc-600">—</span>
+                      <span className="text-xs text-text-muted">—</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-xs text-zinc-400">{m.has_approved_address ? s.yes : s.no}</td>
+                  <td className="py-3 px-4 text-xs text-text-secondary">{m.has_approved_address ? s.yes : s.no}</td>
                 </tr>
               ))}
               {!loading && members.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-zinc-500">
+                  <td colSpan={7} className="py-10 text-center text-text-muted">
                     {s.empty}
                   </td>
                 </tr>
               )}
               {loading && members.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-zinc-500">
+                  <td colSpan={7} className="py-10 text-center text-text-muted">
                     {s.loading}
                   </td>
                 </tr>
@@ -564,30 +564,30 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
   }
 
   const inputCls =
-    'min-h-[36px] w-32 rounded-lg bg-zinc-800 border border-zinc-700 px-2 text-white text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-gold';
+    'w-32 min-h-9 px-2 text-sm tabular-nums';
 
   return (
     <div className="space-y-6">
       <section className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-white font-bold text-base flex items-center gap-2">
+            <h3 className="text-text-primary font-bold text-base flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-gold" aria-hidden /> {ps.title}
             </h3>
-            <p className="text-zinc-500 text-xs mt-1 max-w-2xl leading-relaxed">{ps.intro}</p>
+            <p className="text-text-muted text-xs mt-1 max-w-2xl leading-relaxed">{ps.intro}</p>
           </div>
           <button
             type="button"
             onClick={load}
             aria-label={ps.retry}
-            className="p-2 min-h-[36px] min-w-[36px] bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white"
+            className="lv-button lv-button-secondary w-11 shrink-0 px-0"
           >
             <RefreshCw className={`w-4 h-4 ${plans === null ? 'animate-spin' : ''}`} aria-hidden />
           </button>
         </div>
 
         {loadError && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-sm">
+          <div className="lv-alert lv-alert-danger text-sm text-text-primary">
             {loadError}{' '}
             <button type="button" onClick={load} className="underline">
               {ps.retry}
@@ -596,11 +596,11 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
         )}
 
         {plans === null ? (
-          <p className="text-zinc-500 text-sm py-6">{ps.loading}</p>
+          <p className="text-text-muted text-sm py-6">{ps.loading}</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <div className="overflow-x-auto lv-surface">
             <table className="w-full text-sm min-w-[640px]">
-              <thead className="bg-zinc-900/60 text-zinc-400 text-[11px] uppercase">
+              <thead className="bg-surface-raised text-text-secondary text-[11px] uppercase">
                 <tr>
                   <th className="text-start py-2.5 px-3 font-bold">{ps.tier}</th>
                   <th className="text-start py-2.5 px-3 font-bold">{ps.duration}</th>
@@ -609,7 +609,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
                   <th className="py-2.5 px-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
+              <tbody className="divide-y divide-border-subtle">
                 {plans.map((p) => {
                   const meta = tierMetaFor(p.tier);
                   const note = rowNote[p.id];
@@ -617,18 +617,19 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
                   return (
                     <tr key={p.id} data-admin-plan={p.id}>
                       <td className="py-2.5 px-3">
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-md border ${meta ? meta.chip : 'border-zinc-700 text-zinc-300'}`}>
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-md border ${meta ? meta.chip : 'border-border-subtle text-text-secondary'}`}>
                           {meta && <meta.Icon className="w-3.5 h-3.5" aria-hidden />}
                           {tierLabel(p.tier)}
                         </span>
-                        <div className="text-[10px] text-zinc-600 font-mono mt-1">{p.id}</div>
+                        <div className="text-[10px] text-text-muted font-mono mt-1">{p.id}</div>
                       </td>
-                      <td className="py-2.5 px-3 text-white tabular-nums" dir="ltr">
+                      <td className="py-2.5 px-3 text-text-primary tabular-nums" dir="ltr">
                         {p.duration_months} {ps.months}
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2 flex-wrap">
                           <input
+                            className={`lv-input ${inputCls}`}
                             value={drafts[p.id] ?? ''}
                             onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
                             onKeyDown={(e) => {
@@ -638,22 +639,21 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
                             dir="ltr"
                             placeholder={ps.unpriced}
                             aria-label={`${ps.price} — ${tierLabel(p.tier)} ${p.duration_months}`}
-                            className={inputCls}
                           />
                           <button
                             type="button"
                             onClick={() => savePrice(p)}
                             disabled={busy}
-                            className="min-h-[36px] px-3 rounded-lg bg-gold text-accent-contrast text-xs font-bold disabled:opacity-40"
+                            className="lv-button lv-button-primary lv-button-sm"
                           >
                             {busy ? ps.working : ps.save}
                           </button>
-                          <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full border ${p.paused ? 'border-amber-500/30 text-amber-300 bg-amber-500/10' : p.purchasable ? 'border-emerald-500/30 text-emerald-300 bg-emerald-500/10' : 'border-amber-500/30 text-amber-300 bg-amber-500/10'}`}>
+                          <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded-full ${p.purchasable && !p.paused ? 'lv-chip [--chip:var(--color-success)]' : 'lv-chip [--chip:var(--color-warning)]'}`}>
                             {p.paused ? ps.pausedChip : p.purchasable ? `${ps.purchasable} · ${formatIqd(p.price_iqd as number)}` : ps.unpriced}
                           </span>
                         </div>
                         {note?.text && (
-                          <p role={note.ok ? 'status' : 'alert'} className={`text-[11px] mt-1 ${note.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <p role={note.ok ? 'status' : 'alert'} className={`text-[11px] mt-1 ${note.ok ? 'text-success' : 'text-danger'}`}>
                             {note.text}
                           </p>
                         )}
@@ -668,14 +668,14 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
                           onClick={() => patch(p, { active: !p.active })}
                           className={`min-h-[32px] px-3 rounded-full text-xs font-bold border transition-colors disabled:opacity-40 ${
                             p.active
-                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                              : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                              ? 'border-transparent bg-[var(--clay-well-bg)] text-success shadow-press'
+                              : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
                           }`}
                         >
                           {p.active ? ps.active : ps.inactive}
                         </button>
                       </td>
-                      <td className="py-2.5 px-3 text-[10px] text-zinc-600 tabular-nums" dir="ltr">
+                      <td className="py-2.5 px-3 text-[10px] text-text-muted tabular-nums" dir="ltr">
                         sort {p.sort}
                       </td>
                     </tr>
@@ -688,14 +688,14 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
       </section>
 
       {proPause && (
-        <section data-pro-pause={proPause.paused ? 'paused' : 'live'} className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
-          <h3 className="text-white font-bold text-base flex items-center gap-2">
+        <section data-pro-pause={proPause.paused ? 'paused' : 'live'} className="lv-surface p-4 space-y-3">
+          <h3 className="text-text-primary font-bold text-base flex items-center gap-2">
             <PauseCircle className="w-4 h-4 text-coral" aria-hidden /> {ps.pauseTitle}
           </h3>
-          <p className={`text-sm font-bold ${proPause.paused ? 'text-amber-300' : 'text-emerald-300'}`}>
+          <p className={`text-sm font-bold ${proPause.paused ? 'text-warning' : 'text-success'}`}>
             {proPause.paused ? ps.pausedState((proPause.since ?? '').slice(0, 10), proPause.frozen_count) : ps.liveState}
           </p>
-          <p className="text-zinc-500 text-xs leading-relaxed max-w-2xl">{ps.pauseHint}</p>
+          <p className="text-text-muted text-xs leading-relaxed max-w-2xl">{ps.pauseHint}</p>
           <button
             ref={pauseBtnRef}
             type="button"
@@ -705,11 +705,11 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
               setPauseOpen(true);
             }}
             aria-haspopup="dialog"
-            className={`min-h-[40px] px-4 rounded-xl text-sm font-bold ${proPause.paused ? 'bg-emerald-600 text-snow' : 'bg-[#B03142] text-snow'}`}
+            className={`lv-button ${proPause.paused ? 'lv-button-primary' : 'lv-button-danger'}`}
           >
             {proPause.paused ? ps.resumeBtn : ps.pauseBtn}
           </button>
-          {pauseNote && <p className={`text-[12.5px] ${pauseNote.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pauseNote.text}</p>}
+          {pauseNote && <p className={`text-[12.5px] ${pauseNote.ok ? 'text-success' : 'text-danger'}`}>{pauseNote.text}</p>}
         </section>
       )}
 
@@ -726,11 +726,12 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
         panelClassName="w-full max-w-md"
       >
         <div className="p-5 sm:p-6">
-          <h2 id="pro-pause-title" className="text-white font-bold text-lg flex items-center gap-2">
+          <h2 id="pro-pause-title" className="text-text-primary font-bold text-lg flex items-center gap-2">
             <PauseCircle className="w-5 h-5 text-coral" aria-hidden /> {proPause?.paused ? ps.resumeBtn : ps.pauseBtn}
           </h2>
-          <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{proPause?.paused ? ps.resumeBody : ps.pauseBody}</p>
+          <p className="text-text-secondary text-sm mt-2 leading-relaxed">{proPause?.paused ? ps.resumeBody : ps.pauseBody}</p>
           <input
+            className="lv-input mt-4 font-mono tracking-widest"
             value={pauseText}
             onChange={(e) => setPauseText(e.target.value)}
             onKeyDown={(e) => {
@@ -741,14 +742,13 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
             spellCheck={false}
             placeholder={proPause?.paused ? 'RESUME' : 'PAUSE'}
             aria-label={proPause?.paused ? 'RESUME' : 'PAUSE'}
-            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-crimson"
           />
           <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
             <button
               type="button"
               onClick={() => setPauseOpen(false)}
               disabled={pausing}
-              className="flex-1 min-h-[48px] rounded-2xl border border-zinc-700 text-zinc-200 font-semibold hover:bg-zinc-900 disabled:opacity-50"
+              className="lv-button lv-button-secondary flex-1"
             >
               {ps.cancel}
             </button>
@@ -756,7 +756,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
               type="button"
               onClick={() => void toggleProPause()}
               disabled={pausing || pauseText !== (proPause?.paused ? 'RESUME' : 'PAUSE')}
-              className="flex-1 min-h-[48px] rounded-2xl bg-[#B03142] text-snow font-bold disabled:opacity-40"
+              className="lv-button lv-button-danger flex-1"
             >
               {pausing ? ps.working : proPause?.paused ? ps.resumeBtn : ps.pauseBtn}
             </button>
@@ -764,26 +764,26 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
         </div>
       </Overlay>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
-        <h3 className="text-white font-bold text-base flex items-center gap-2">
+      <section className="lv-surface p-4 space-y-3">
+        <h3 className="text-text-primary font-bold text-base flex items-center gap-2">
           <Rocket className="w-4 h-4 text-gold" aria-hidden /> {ps.launchTitle}
         </h3>
         {launch ? (
           <div className="text-sm space-y-1.5">
-            <p className={launch.activated ? 'text-emerald-300 font-bold' : 'text-amber-300'}>
+            <p className={launch.activated ? 'text-success font-bold' : 'text-warning'}>
               {launch.activated ? ps.launchActive : ps.launchInactive}
             </p>
-            <p className="text-zinc-400 text-xs" dir="ltr">
+            <p className="text-text-secondary text-xs" dir="ltr">
               {ps.launchAt}: {launch.launch_at ?? ps.notSet}
             </p>
             {launch.activated && (
-              <p className="text-zinc-400 text-xs" dir="ltr">
+              <p className="text-text-secondary text-xs" dir="ltr">
                 {ps.activatedAt}: {launch.activated_at ?? ps.notSet}
               </p>
             )}
           </div>
         ) : (
-          <p className="text-zinc-500 text-sm">{ps.loading}</p>
+          <p className="text-text-muted text-sm">{ps.loading}</p>
         )}
         <button
           ref={activateBtnRef}
@@ -797,14 +797,14 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
           // used to be unreachable once the launch was on.
           disabled={!launch || (launch.activated && prepaidCount === 0)}
           aria-haspopup="dialog"
-          className="min-h-[40px] px-4 rounded-xl bg-[#B03142] text-snow text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+          className="lv-button lv-button-danger"
         >
           {launch?.activated ? ps.sweep(prepaidCount) : ps.activate}
         </button>
-        {launch?.activated && prepaidCount === 0 && deferredCount === 0 && <p className="text-[12px] text-zinc-500">{ps.sweepNone}</p>}
-        {deferredCount > 0 && <p className="text-[12px] text-amber-300">{ps.deferred(deferredCount)}</p>}
+        {launch?.activated && prepaidCount === 0 && deferredCount === 0 && <p className="text-[12px] text-text-muted">{ps.sweepNone}</p>}
+        {deferredCount > 0 && <p className="text-[12px] text-warning">{ps.deferred(deferredCount)}</p>}
         {launchNote && (
-          <p className={`text-[12.5px] ${launchNote.ok ? 'text-emerald-400' : 'text-red-400'}`}>{launchNote.text}</p>
+          <p className={`text-[12.5px] ${launchNote.ok ? 'text-success' : 'text-danger'}`}>{launchNote.text}</p>
         )}
       </section>
 
@@ -822,11 +822,12 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
         panelClassName="w-full max-w-md"
       >
         <div className="p-5 sm:p-6">
-          <h2 id="activate-launch-title" className="text-white font-bold text-lg flex items-center gap-2">
+          <h2 id="activate-launch-title" className="text-text-primary font-bold text-lg flex items-center gap-2">
             <Rocket className="w-5 h-5 text-coral" aria-hidden /> {launch?.activated ? ps.sweepTitle : ps.activateTitle}
           </h2>
-          <p className="text-zinc-300 text-sm mt-2 leading-relaxed">{launch?.activated ? ps.sweepBody : ps.activateBody}</p>
+          <p className="text-text-secondary text-sm mt-2 leading-relaxed">{launch?.activated ? ps.sweepBody : ps.activateBody}</p>
           <input
+            className="lv-input mt-4 font-mono tracking-widest"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             onKeyDown={(e) => {
@@ -837,14 +838,13 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
             spellCheck={false}
             placeholder={ps.typeHere}
             aria-label={ps.typeHere}
-            className="mt-4 w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-700 px-3 text-white font-mono tracking-widest outline-none focus-visible:ring-2 focus-visible:ring-crimson"
           />
           <div className="mt-5 flex flex-col-reverse sm:flex-row gap-2.5">
             <button
               type="button"
               onClick={() => setActivateOpen(false)}
               disabled={activating}
-              className="flex-1 min-h-[48px] rounded-2xl border border-zinc-700 text-zinc-200 font-semibold hover:bg-zinc-900 disabled:opacity-50"
+              className="lv-button lv-button-secondary flex-1"
             >
               {ps.cancel}
             </button>
@@ -852,7 +852,7 @@ function PlansSection({ lang }: { lang: 'ar' | 'en' | 'ckb' }) {
               type="button"
               onClick={activateLaunch}
               disabled={confirmText !== 'ACTIVATE' || activating}
-              className="flex-1 min-h-[48px] rounded-2xl bg-[#B03142] text-snow font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+              className="lv-button lv-button-danger flex-1"
             >
               {activating ? ps.working : ps.confirm}
             </button>
@@ -873,12 +873,12 @@ export default function AdminMemberships() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap bg-zinc-900 border border-zinc-800 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap lv-well border border-border-subtle p-1 rounded-xl w-fit">
         <button
           type="button"
           onClick={() => setTab('members')}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
-            tab === 'members' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+            tab === 'members' ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           <Users className="w-3.5 h-3.5" />
@@ -888,7 +888,7 @@ export default function AdminMemberships() {
           type="button"
           onClick={() => setTab('queue')}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
-            tab === 'queue' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+            tab === 'queue' ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           <Inbox className="w-3.5 h-3.5" />
@@ -899,7 +899,7 @@ export default function AdminMemberships() {
           data-admin-tab="plans"
           onClick={() => setTab('plans')}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
-            tab === 'plans' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+            tab === 'plans' ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           <CreditCard className="w-3.5 h-3.5" />

@@ -131,11 +131,11 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
   return (
     <div className="space-y-6" data-admin-delivery>
       <div>
-        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+        <h2 className="text-text-primary font-bold text-lg flex items-center gap-2">
           <Truck className="w-5 h-5 text-gold" aria-hidden />
           {ar ? 'التوصيل المحلي' : 'Local delivery'}
         </h2>
-        <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
+        <p className="text-text-secondary text-xs mt-1 leading-relaxed">
           {ar
             ? 'حالة غير مخرَّطة لا تحرّك أي طلب. هذا مقصود: لا نخمّن معنى حالة لم تحددها.'
             : 'An unmapped status moves no order. That is deliberate — we do not guess what a status means.'}
@@ -143,42 +143,42 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
       </div>
 
       {error && (
-        <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs rounded-2xl p-3">
+        <div role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary">
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="bg-leaf/10 border border-leaf/40 text-sprout text-xs rounded-2xl p-3 flex items-center gap-2">
+        <div role="status" className="lv-alert lv-alert-success text-xs text-text-primary flex items-center gap-2">
           <Check className="w-4 h-4" aria-hidden /> {notice}
         </div>
       )}
 
       {loading ? (
-        <p className="text-zinc-400 text-sm">{ar ? 'جارٍ التحميل…' : 'Loading…'}</p>
+        <p className="text-text-secondary text-sm">{ar ? 'جارٍ التحميل…' : 'Loading…'}</p>
       ) : (
         <>
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2 text-sm">
+          <div className="lv-surface p-4 space-y-2 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-zinc-400">{ar ? 'بيانات الدخول' : 'Credentials'}</span>
-              <span className={config?.credentials_configured ? 'text-sprout font-bold' : 'text-amber-400 font-bold'}>
+              <span className="text-text-secondary">{ar ? 'بيانات الدخول' : 'Credentials'}</span>
+              <span className={config?.credentials_configured ? 'text-success font-bold' : 'text-warning font-bold'}>
                 {config?.credentials_configured ? (ar ? 'مهيأة' : 'Configured') : (ar ? 'غير مهيأة' : 'Not configured')}
               </span>
             </div>
             {/* Names only, and only because an owner needs to know what to
                 set. No route anywhere returns a credential's value. */}
             {!config?.credentials_configured && (config?.missing_credentials?.length ?? 0) > 0 && (
-              <p className="text-zinc-400 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" aria-hidden />
+              <p className="text-text-secondary text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-warning" aria-hidden />
                 <span dir="ltr" className="font-mono">{config?.missing_credentials.join(', ')}</span>
               </p>
             )}
             <div className="flex items-center justify-between gap-3">
-              <span className="text-zinc-400">{ar ? 'الحالات المعروفة' : 'Statuses known'}</span>
-              <span dir="ltr" className="text-white font-bold">{config?.statuses_known ?? 0}</span>
+              <span className="text-text-secondary">{ar ? 'الحالات المعروفة' : 'Statuses known'}</span>
+              <span dir="ltr" className="text-text-primary font-bold">{config?.statuses_known ?? 0}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-zinc-400">{ar ? 'المخرَّطة' : 'Mapped'}</span>
-              <span dir="ltr" className="text-white font-bold">{config?.statuses_mapped ?? 0}</span>
+              <span className="text-text-secondary">{ar ? 'المخرَّطة' : 'Mapped'}</span>
+              <span dir="ltr" className="text-text-primary font-bold">{config?.statuses_mapped ?? 0}</span>
             </div>
           </div>
 
@@ -187,7 +187,7 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
               type="button"
               onClick={() => void refreshStatuses()}
               disabled={!!busy}
-              className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-[13px] font-bold disabled:opacity-60"
+              className="lv-button lv-button-secondary"
             >
               {busy === 'refresh' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <RefreshCw className="w-4 h-4" aria-hidden />}
               {ar ? 'جلب قائمة الحالات الرسمية' : 'Fetch official status list'}
@@ -196,7 +196,7 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
               type="button"
               onClick={() => void syncAll()}
               disabled={!!busy}
-              className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-gold hover:bg-gold-light text-accent-contrast text-[13px] font-bold disabled:opacity-60 transition-colors"
+              className="lv-button lv-button-primary"
             >
               {busy === 'sync' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Truck className="w-4 h-4" aria-hidden />}
               {ar ? 'مزامنة حالة الوسيط' : 'Sync courier statuses'}
@@ -204,34 +204,32 @@ export default function AdminDelivery({ dir }: { dir: 'rtl' | 'ltr' }) {
           </div>
 
           {statuses.length === 0 ? (
-            <p className="text-zinc-400 text-sm bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 text-center">
+            <p className="text-text-secondary text-sm rounded-xl border border-dashed border-border-subtle p-6 text-center">
               {ar
                 ? 'لم تُجلب قائمة الحالات بعد. اضغط «جلب قائمة الحالات الرسمية».'
                 : 'The status list has not been fetched yet.'}
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+            <div className="overflow-x-auto lv-surface">
               <table className="w-full text-sm min-w-[560px]">
-                <thead className="bg-zinc-900/70 text-zinc-400 text-[11px] uppercase tracking-wider">
+                <thead className="bg-surface-raised text-text-secondary text-[11px] uppercase tracking-wider">
                   <tr>
                     <th className="text-start p-3">{ar ? 'رقم الحالة' : 'Status id'}</th>
                     <th className="text-start p-3">{ar ? 'اسمها عندهم' : 'Their label'}</th>
                     <th className="text-start p-3">{ar ? 'تعني عندنا' : 'Means here'}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-border-subtle">
                   {statuses.map((r) => (
-                    <tr key={r.remote_id} className="text-zinc-300" data-status-row={r.remote_id}>
-                      <td className="p-3 font-mono text-white" dir="ltr">{r.remote_id}</td>
+                    <tr key={r.remote_id} className="text-text-secondary" data-status-row={r.remote_id}>
+                      <td className="p-3 font-mono text-text-primary" dir="ltr">{r.remote_id}</td>
                       <td className="p-3">{r.remote_text || '—'}</td>
                       <td className="p-3">
                         <select
+                          className={`lv-input w-auto min-h-9 py-2 text-sm ${r.internal_stage ? '' : 'border-amber-500/40 text-warning'}`}
                           value={r.internal_stage}
                           disabled={busy === r.remote_id}
                           onChange={(e) => void setMapping(r.remote_id, e.target.value)}
-                          className={`bg-zinc-900 border rounded-xl px-3 py-2 text-sm focus:outline-none ${
-                            r.internal_stage ? 'border-zinc-700 text-white' : 'border-amber-500/40 text-amber-300'
-                          }`}
                         >
                           {MAPPABLE.map((m) => (
                             <option key={m.stage} value={m.stage}>

@@ -65,33 +65,33 @@ export default function AdminAds() {
   };
 
   if (loading) {
-    return <div className="text-center text-zinc-500 py-16">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>;
+    return <div className="text-center text-text-muted py-16">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-        <h2 className="text-2xl font-black text-white">
+        <h2 className="text-2xl font-black text-text-primary">
           {dir === 'rtl' ? 'إدارة الإعلانات / النصوص المتحركة' : 'Manage Ads / Animated Texts'}
         </h2>
         <div className="flex items-center gap-3">
           {saveState === 'saved' && (
-            <span className="text-xs font-bold text-mint flex items-center gap-1">
+            <span className="text-xs font-bold text-success flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> {dir === 'rtl' ? 'تم الحفظ' : 'Saved'}
             </span>
           )}
           {saveState === 'error' && (
-            <span className="text-xs font-bold text-red-400 flex items-center gap-1">
+            <span className="text-xs font-bold text-danger flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5" /> {saveError || (dir === 'rtl' ? 'فشل الحفظ' : 'Save failed')}
             </span>
           )}
-          <button onClick={addAd} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-5 py-2.5 rounded-full transition-all font-bold">
+          <button onClick={addAd} className="lv-button lv-button-secondary">
             <Plus className="w-4 h-4" /> {dir === 'rtl' ? 'إضافة نص' : 'Add Text'}
           </button>
           <button
             onClick={handleSave}
             disabled={saveState === 'saving'}
-            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-5 py-2.5 rounded-full transition-all font-bold hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+            className="lv-button lv-button-primary"
           >
             <Save className="w-4 h-4" /> {saveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ' : 'Save'}
           </button>
@@ -99,40 +99,40 @@ export default function AdminAds() {
       </div>
 
       {loadError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 text-sm font-medium">
+        <div className="lv-alert lv-alert-danger text-sm font-medium text-text-primary">
           {loadError}
         </div>
       )}
 
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 p-6">
-        <h3 className="text-lg font-bold mb-4 text-zinc-300">
+      <div className="lv-surface p-6">
+        <h3 className="text-lg font-bold mb-4 text-text-secondary">
           {dir === 'rtl' ? 'النصوص الحالية (تظهر في الرئيسية)' : 'Current texts (shown on the home page)'}
         </h3>
         <div className="space-y-4">
           {ads.map((ad, index) => (
-            <div key={ad.id} className="flex items-center gap-4 bg-zinc-800 p-4 rounded-xl">
-              <span className="text-zinc-500 font-bold">{index + 1}.</span>
+            <div key={ad.id} className="flex items-center gap-4 rounded-lg bg-surface-raised p-4">
+              <span className="text-text-muted font-bold">{index + 1}.</span>
               <input
+                className="lv-input flex-1"
                 type="text"
                 value={ad.text}
                 onChange={(e) => updateAd(ad.id, 'text', e.target.value)}
-                className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-iris outline-none"
                 placeholder={dir === 'rtl' ? 'النص...' : 'Text...'}
               />
               <select
+                className="lv-input w-auto"
                 value={ad.animation}
                 onChange={(e) => updateAd(ad.id, 'animation', e.target.value)}
-                className="bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:border-iris outline-none"
               >
                 <option value="true_focus">True Focus</option>
               </select>
-              <button onClick={() => deleteAd(ad.id)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
+              <button onClick={() => deleteAd(ad.id)} className="lv-button lv-button-ghost px-2.5 hover:text-danger">
                 <Trash2 className="w-5 h-5" />
               </button>
             </div>
           ))}
           {ads.length === 0 && (
-            <div className="text-zinc-500 text-center py-4">
+            <div className="text-text-muted text-center py-4">
               {dir === 'rtl' ? 'لا توجد نصوص. أضف نصاً جديداً.' : 'No texts yet. Add a new one.'}
             </div>
           )}

@@ -144,25 +144,25 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
             they agree to it. A permission granted without its consequences
             spelled out is granted by accident. */}
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-mint/20 bg-mint/[0.05] p-3">
-            <h5 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-mint">
+          <div className="lv-alert lv-alert-success">
+            <h5 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-success">
               <ShieldCheck className="h-3.5 w-3.5" /> {s.canDo}
             </h5>
             <ul className="mt-2 space-y-1.5">
               {s.canList.map((line) => (
-                <li key={line} className="text-xs leading-relaxed text-zinc-300">
+                <li key={line} className="text-xs leading-relaxed text-text-secondary">
                   • {line}
                 </li>
               ))}
             </ul>
           </div>
-          <div className="rounded-xl border border-red-500/20 bg-red-500/[0.05] p-3">
-            <h5 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-400">
+          <div className="lv-alert lv-alert-danger">
+            <h5 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-danger">
               <Lock className="h-3.5 w-3.5" /> {s.cannotDo}
             </h5>
             <ul className="mt-2 space-y-1.5">
               {s.cannotList.map((line) => (
-                <li key={line} className="text-xs leading-relaxed text-zinc-300">
+                <li key={line} className="text-xs leading-relaxed text-text-secondary">
                   • {line}
                 </li>
               ))}
@@ -173,7 +173,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
 
       <p
         data-testid="new-admin-note"
-        className="flex items-start gap-2 rounded-xl border border-iris/30 bg-iris/10 p-3 text-xs font-medium leading-relaxed text-zinc-200"
+        className="lv-alert lv-alert-info flex items-start gap-2 text-xs font-medium leading-relaxed text-text-primary"
       >
         <Shield className="mt-0.5 h-4 w-4 shrink-0" />
         {s.newAdminNote}
@@ -192,6 +192,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
             {s.emailLabel}
           </label>
           <input
+            className="lv-input"
             id="assistant-grant-email"
             type="email"
             dir="ltr"
@@ -200,12 +201,11 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
             placeholder="name@example.com"
-            className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-iris/50"
           />
           <button
             type="submit"
             disabled={looking || emailInput.trim().length === 0}
-            className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
+            className="lv-button lv-button-primary shrink-0"
           >
             <Search className="h-4 w-4" /> {looking ? s.looking : s.lookupBtn}
           </button>
@@ -213,13 +213,13 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
       </Section>
 
       {error && (
-        <p className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-medium text-red-400">
+        <p className="lv-alert lv-alert-danger flex items-start gap-2 text-sm font-medium text-text-primary">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="min-w-0 break-words">{error}</span>
         </p>
       )}
       {notice && (
-        <p className="rounded-xl border border-mint/30 bg-mint/10 p-3 text-sm font-bold text-mint">
+        <p className="lv-alert lv-alert-success text-sm font-bold text-text-primary">
           {notice}
         </p>
       )}
@@ -227,7 +227,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
       {found && (
         <Section title={s.confirmWho} icon={<UserPlus className="h-3.5 w-3.5" />} testId="grant-target">
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            <span dir="auto" className="text-sm font-black text-white">
+            <span dir="auto" className="text-sm font-black text-text-primary">
               {found.name || found.username || found.email}
             </span>
             <Pill tone={found.role === 'admin' ? 'violet' : found.role === 'merchant' ? 'gold' : 'zinc'}>{found.role}</Pill>
@@ -243,7 +243,7 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
           <Row label={s.fJoined} value={dayLabelOf(found.created_at, s.never)} />
 
           {lockedReason ? (
-            <p className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-700 bg-zinc-800/60 p-3 text-xs font-medium leading-relaxed text-zinc-400">
+            <p className="mt-3 flex items-start gap-2 rounded-lg bg-surface-raised p-3 text-xs font-medium leading-relaxed text-text-secondary">
               <Lock className="mt-0.5 h-4 w-4 shrink-0" />
               {lockedReason}
             </p>
@@ -272,13 +272,13 @@ export default function AssistantAccess({ onChanged }: { onChanged?: () => void 
                     onCancel={() => setConfirming(null)}
                     cancelLabel={s.cancel}
                   />
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">{s.liftExplains}</p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-text-secondary">{s.liftExplains}</p>
                 </div>
               )}
               {isAdmin && isAssistant && !mayLift && (
                 <p
                   data-testid="grant-lift-owner-only"
-                  className="flex items-start gap-2 rounded-xl border border-zinc-700 bg-zinc-800/60 p-3 text-xs font-medium leading-relaxed text-zinc-400"
+                  className="flex items-start gap-2 rounded-lg bg-surface-raised p-3 text-xs font-medium leading-relaxed text-text-secondary"
                 >
                   <Lock className="mt-0.5 h-4 w-4 shrink-0" />
                   {refusalText('SCOPE_ELEVATION_OWNER_ONLY', lang)}
@@ -335,15 +335,11 @@ function ActionButton({
   cancelLabel?: string;
 }) {
   const styles =
-    tone === 'primary'
-      ? 'bg-[#6B46FF] text-snow hover:bg-iris-deep'
-      : tone === 'warn'
-        ? 'bg-gilt/15 text-gilt border border-gilt/40 hover:bg-gilt/25'
-        : 'bg-red-500/15 text-red-400 border border-red-500/40 hover:bg-red-500/25';
+    tone === 'primary' ? 'lv-button-primary' : tone === 'warn' ? 'lv-button-accent' : 'lv-button-danger';
   return (
     <div>
       {confirm && (
-        <p className="mb-2 flex items-start gap-2 rounded-xl border border-gilt/30 bg-gilt/10 p-3 text-xs font-bold leading-relaxed text-gilt">
+        <p className="mb-2 lv-alert lv-alert-warning flex items-start gap-2 text-xs font-bold leading-relaxed text-text-primary">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           {confirm}
         </p>
@@ -353,7 +349,7 @@ function ActionButton({
           type="button"
           onClick={onClick}
           disabled={busy}
-          className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition-colors disabled:opacity-50 ${styles}`}
+          className={`lv-button flex-1 ${styles}`}
         >
           {icon} {busy ? busyLabel : label}
         </button>
@@ -361,7 +357,7 @@ function ActionButton({
           <button
             type="button"
             onClick={onCancel}
-            className="flex min-h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-bold text-zinc-400 transition-colors hover:bg-zinc-800"
+            className="lv-button lv-button-ghost"
           >
             <X className="h-4 w-4" /> {cancelLabel}
           </button>

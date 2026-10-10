@@ -271,7 +271,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
     <div className="flex flex-col h-full min-h-0">
       <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0" data-order-chat>
         {messages.length === 0 && (
-          <p className="text-center text-sm text-zinc-500 py-10">
+          <p className="text-center text-sm text-text-muted py-10">
             {readOnly
               ? loc(
                   'لم يتراسل الزبون والمتجر بخصوص هذا الطلب بعد.',
@@ -289,8 +289,8 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                  mine ? 'bg-olive text-snow' : 'bg-zinc-800 text-zinc-100'
+                className={`max-w-[75%] rounded-xl px-3.5 py-2 text-sm ${
+                  mine ? 'bg-olive text-snow' : 'bg-surface-raised text-text-primary'
                 }`}
               >
                 {isAttachmentKind(m.kind) && m.fileUrl ? (
@@ -311,16 +311,16 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
       </div>
 
       {readOnly ? (
-        <p data-order-chat-read-only className="border-t border-zinc-800 p-3 shrink-0 text-center text-xs text-zinc-400">
+        <p data-order-chat-read-only className="border-t border-border-subtle p-3 shrink-0 text-center text-xs text-text-secondary">
           {loc(
             'للقراءة فقط — محادثة بين الزبون والمتجر. لا تنضم الإدارة إليها، وكل اطلاع عليها يُسجَّل.',
             'Read-only — a conversation between the customer and the store. Staff do not join it, and every view is recorded.'
           ) /* OWNER: Sorani to be written by hand. */}
         </p>
       ) : (
-      <div className="border-t border-zinc-800 p-3 shrink-0">
+      <div className="border-t border-border-subtle p-3 shrink-0">
         {presence.typing && <p role="status" className="text-xs text-text-secondary mb-2">{loc('يكتب الآن…', 'Typing…', 'دەنووسێت…')}</p>}
-        {(sendError || voiceError) && <p className="text-[12px] text-red-400 mb-2">{sendError || voiceError}</p>}
+        {(sendError || voiceError) && <p className="text-[12px] text-danger mb-2">{sendError || voiceError}</p>}
         {voice.recording ? (
           /* RECORDING REPLACES THE COMPOSER, so there is one thing to do: send
              it or throw it away. The time runs so the admin can see the
@@ -332,12 +332,12 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
               data-order-chat-voice-cancel
               aria-label={loc('إلغاء التسجيل', 'Discard the recording')}
               title={loc('إلغاء التسجيل', 'Discard the recording')}
-              className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center hover:bg-zinc-800 transition-colors"
+              className="lv-button lv-button-ghost w-11 shrink-0 px-0"
             >
               <X className="w-4 h-4" aria-hidden />
             </button>
-            <p role="status" aria-live="polite" className="flex-1 flex items-center gap-2 text-sm text-zinc-200">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" aria-hidden />
+            <p role="status" aria-live="polite" className="flex-1 flex items-center gap-2 text-sm text-text-primary">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-danger animate-pulse" aria-hidden />
               {loc('جارٍ التسجيل', 'Recording')}{' '}
               <span className="tabular-nums" dir="ltr">
                 {formatElapsed(voice.elapsed, lang === 'en')}
@@ -348,7 +348,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
               onClick={sendVoice}
               data-order-chat-voice-send
               aria-label={loc('إرسال الرسالة الصوتية', 'Send the voice message')}
-              className="w-11 h-11 shrink-0 rounded-xl bg-olive text-snow flex items-center justify-center hover:bg-olive-light transition-colors"
+              className="lv-button lv-button-primary w-11 shrink-0 px-0"
             >
               <Send className="w-4 h-4 rtl:-scale-x-100" aria-hidden />
             </button>
@@ -392,7 +392,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             data-order-chat-camera-button
             title={loc('التقاط صورة', 'Take a photo') /* OWNER: Sorani by hand. */}
             aria-label={loc('التقاط صورة', 'Take a photo') /* OWNER: Sorani by hand. */}
-            className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center disabled:opacity-40 hover:bg-zinc-800 transition-colors"
+            className="lv-button lv-button-ghost w-11 shrink-0 px-0"
           >
             {attaching ? <Spinner size="sm" /> : <Camera className="w-4 h-4" aria-hidden />}
           </button>
@@ -403,7 +403,7 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             data-order-chat-attach
             title={loc('إرفاق ملف', 'Attach a file') /* OWNER: Sorani by hand. */}
             aria-label={loc('إرفاق ملف', 'Attach a file') /* OWNER: Sorani by hand. */}
-            className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center disabled:opacity-40 hover:bg-zinc-800 transition-colors"
+            className="lv-button lv-button-ghost w-11 shrink-0 px-0"
           >
             <Paperclip className="w-4 h-4" aria-hidden />
           </button>
@@ -415,12 +415,13 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
               data-order-chat-voice
               title={loc('تسجيل رسالة صوتية', 'Record a voice message')}
               aria-label={loc('تسجيل رسالة صوتية', 'Record a voice message')}
-              className="w-11 h-11 shrink-0 rounded-xl border border-zinc-700 text-zinc-300 flex items-center justify-center disabled:opacity-40 hover:bg-zinc-800 transition-colors"
+              className="lv-button lv-button-ghost w-11 shrink-0 px-0"
             >
               <Mic className="w-4 h-4" aria-hidden />
             </button>
           )}
           <textarea
+            className="lv-input flex-1 min-h-[44px] max-h-32 resize-y py-2.5 text-sm"
             value={draft}
             onChange={(e) => { setDraft(e.target.value); presence.onEdit(e.target.value); }}
             onBlur={presence.onStop}
@@ -433,13 +434,12 @@ export default function OrderChatPanel({ orderId, active }: { orderId: string; a
             rows={1}
             data-order-chat-input
             placeholder={loc('اكتب رسالة…', 'Write a message…', 'نامەیەک بنووسە…')}
-            className="flex-1 min-h-[44px] max-h-32 resize-y bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-olive outline-none"
           />
           <button
             type="submit"
             disabled={!draft.trim() || sending}
             data-order-chat-send
-            className="w-11 h-11 shrink-0 rounded-xl bg-olive text-snow flex items-center justify-center disabled:opacity-40 hover:bg-olive-light transition-colors"
+            className="lv-button lv-button-primary w-11 shrink-0 px-0"
             aria-label={loc('إرسال', 'Send', 'ناردن')}
           >
             {sending ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}

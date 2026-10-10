@@ -199,19 +199,19 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     >
       <div data-order-modal className="flex flex-col flex-1 min-h-0">
         {/* ---------------------------------------------------------- header */}
-        <div className="shrink-0 border-b border-zinc-800">
+        <div className="shrink-0 border-b border-border-subtle">
           <div className="flex items-center justify-between gap-3 p-4 pb-3">
             <div className="min-w-0">
-              <h2 id="order-detail-title" className="text-white font-black text-lg truncate">
+              <h2 id="order-detail-title" className="text-text-primary font-black text-lg truncate">
                 {loc('تجهيز الطلب', 'Prepare order', 'ئامادەکردنی داواکاری')}
               </h2>
-              <p className="text-[12px] font-mono text-zinc-500 truncate">{orderId}</p>
+              <p className="text-[12px] font-mono text-text-muted truncate">{orderId}</p>
             </div>
             <button
               type="button"
               onClick={close}
               aria-label={loc('إغلاق', 'Close', 'داخستن')}
-              className="w-11 h-11 shrink-0 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+              className="lv-button lv-button-ghost w-11 shrink-0 px-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -231,8 +231,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 onClick={() => setTab(id)}
                 className={`flex items-center gap-2 px-4 min-h-[44px] rounded-t-xl text-sm font-bold border-b-2 transition-colors ${
                   tab === id
-                    ? 'text-white border-olive bg-zinc-900/60'
-                    : 'text-zinc-500 border-transparent hover:text-zinc-300'
+                    ? 'text-text-primary border-text-primary'
+                    : 'text-text-secondary border-transparent hover:text-text-primary'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -296,7 +296,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
             ) : (
               // The tracking block is an enrichment and degrades like the
               // others: an honest note beats a 500 on the whole screen.
-              <p className="text-zinc-400 text-sm">
+              <p className="text-text-secondary text-sm">
                 {loc('تعذّر تحميل مراحل هذا الطلب.', 'Stages could not be loaded for this order.', 'قۆناغەکان بار نەکران.')}
               </p>
             )}
@@ -317,7 +317,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
             {detail.priority === 1 && (
-              <section data-pro-priority className="rounded-2xl border border-crimson/40 bg-gradient-to-r from-crimson/15 to-amber-500/[0.06] p-3.5">
+              <section data-pro-priority className="lv-alert lv-alert-danger p-3.5">
                 <div className="flex items-start gap-2.5">
                   <Truck className="mt-0.5 h-4.5 w-4.5 shrink-0 text-petal" aria-hidden="true" />
                   <div>
@@ -337,7 +337,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
             )}
             {/* ------------------------------------------- what to write down */}
             <section>
-              <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
+              <h3 className="text-[13px] font-bold text-text-secondary mb-2">
                 {loc('المبلغ النهائي للوصل', 'Final amount for the receipt', 'کۆی کۆتایی بۆ پسوولە')}
               </h3>
               {/* THE FIGURE THE COURIER COLLECTS, not the order total (owner,
@@ -359,7 +359,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 emphasis
                 mono
               />
-              <p data-collect-note className="text-[12px] text-zinc-500 mt-1.5">
+              <p data-collect-note className="text-[12px] text-text-muted mt-1.5">
                 {formatIqd(collectIqd)}
                 {collectIqd !== detail.total_iqd && (
                   <>
@@ -385,13 +385,13 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                     data-breakdown-toggle
                     aria-expanded={showBreakdown}
                     onClick={() => setShowBreakdown((v) => !v)}
-                    className="mt-3 flex items-center gap-1.5 min-h-[44px] text-[13px] font-bold text-zinc-300 hover:text-white transition-colors"
+                    className="mt-3 flex items-center gap-1.5 min-h-[44px] text-[13px] font-bold text-text-secondary hover:text-text-primary transition-colors"
                   >
                     <ChevronDown className={`w-4 h-4 transition-transform ${showBreakdown ? 'rotate-180' : ''}`} />
                     {loc('تفاصيل السعر', 'Price details', 'وردەکاری نرخ')}
                   </button>
                   {showBreakdown && (
-                    <dl data-breakdown className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
+                    <dl data-breakdown className="mt-2 rounded-lg border border-border-subtle divide-y divide-border-subtle">
                       <Row label={loc('البضاعة', 'Merchandise', 'کاڵا')} value={formatIqd(fin.merchandise_iqd)} />
                       {fin.fees_iqd > 0 && (
                         <Row
@@ -462,7 +462,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
 
             {/* -------------------------------------------------- the customer */}
             <section>
-              <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
+              <h3 className="text-[13px] font-bold text-text-secondary mb-2">
                 {loc('العميل والعنوان', 'Customer and address', 'کڕیار و ناونیشان')}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -500,7 +500,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 )}
               </div>
               {!govId && !addr.area && (
-                <p className="text-[12px] text-amber-400/90 mt-2">
+                <p className="text-[12px] text-warning mt-2">
                   {loc(
                     'هذا العنوان محفوظ قبل فصل المحافظة والمنطقة — المتاح هو النص الكامل أعلاه. سيملأ العميل الحقول عند أول تعديل للعنوان.',
                     'This address was saved before the governorate and area were separate fields — the full text above is what exists. The customer fills them in the next time they edit it.',
@@ -524,7 +524,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
 
             {/* ----------------------------------------------------- the goods */}
             <section>
-              <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
+              <h3 className="text-[13px] font-bold text-text-secondary mb-2">
                 {loc('المنتجات', 'Items', 'بەرهەمەکان')}
               </h3>
               {/* A membership gift is not a line: it costs the customer 0 IQD
@@ -532,13 +532,13 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   where whoever fills the box will read it. */}
               {detail.membership_gift && (
                 <div
-                  className="mb-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-emerald-300"
+                  className="mb-2 lv-alert lv-alert-success text-text-primary"
                   data-admin="order-gift"
                 >
                   <p className="text-[12.5px] font-semibold">
                     {loc('يُرفَق مع الشحنة — هدية عضوية', 'Ships with the parcel — membership gift', 'لەگەڵ پاکەتەکە — دیاری ئەندامێتی')}
                   </p>
-                  <p className="text-[12px] text-emerald-200/85 mt-0.5">
+                  <p className="text-[12px] text-text-secondary mt-0.5">
                     {detail.membership_gift.label_ar || detail.membership_gift.product_id}
                     {detail.membership_gift.qty > 1 && ` × ${detail.membership_gift.qty}`}
                   </p>
@@ -557,21 +557,21 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                         {it.image ? (
                           <img src={it.image} alt="" width={56} height={56} loading="lazy" decoding="async" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
-                          <Package className="w-5 h-5 text-zinc-600" />
+                          <Package className="w-5 h-5 text-text-muted" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-text-primary font-bold text-sm leading-relaxed break-words">{it.name}</p>
-                        <p className="text-[12px] text-zinc-400 mt-1">
-                          <span className="font-bold text-white">×{it.qty}</span>
+                        <p className="text-[12px] text-text-secondary mt-1">
+                          <span className="font-bold text-text-primary">×{it.qty}</span>
                           {' · '}
                           {formatIqd(it.unit_price_iqd)}
                           {' · '}
-                          <span className="text-zinc-300">{formatIqd(it.line_total_iqd)}</span>
+                          <span className="text-text-secondary">{formatIqd(it.line_total_iqd)}</span>
                         </p>
                         {serialChip(it.id)}
                         {units.length > 0 && (
-                          <p className="text-[11px] text-zinc-500 mt-1">
+                          <p className="text-[11px] text-text-muted mt-1">
                             {loc('وحدات مسلسلة', 'Serialized units', 'یەکە ژمارەدارەکان')}: {units.length}
                             {units.some((u) => u.serial) &&
                               ` — ${units.map((u) => u.serial).filter(Boolean).join(', ')}`}
@@ -606,8 +606,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                       {it.bundle && it.bundle.components.length > 0 && (
                         <ul className="w-full min-w-0 border-s-2 border-border-subtle ps-3 space-y-3" data-order-bundle={it.id}>
                           {it.bundle.components.map((k) => (
-                            <li key={k.order_item_id} className="text-[12px] text-zinc-300 flex items-baseline gap-2">
-                              <span className="font-bold text-white tabular-nums shrink-0">×{k.qty}</span>
+                            <li key={k.order_item_id} className="text-[12px] text-text-secondary flex items-baseline gap-2">
+                              <span className="font-bold text-text-primary tabular-nums shrink-0">×{k.qty}</span>
                               <span className="min-w-0 flex-1 break-words">
                                 {k.name}
                                 {k.variant && <PackingSelection value={k.variant} />}
@@ -640,10 +640,10 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
 
             {detail.admin_note && (
               <section>
-                <h3 className="text-[13px] font-bold text-zinc-400 mb-2">
+                <h3 className="text-[13px] font-bold text-text-secondary mb-2">
                   {loc('ملاحظة الإدارة', 'Admin note', 'تێبینی بەڕێوەبەر')}
                 </h3>
-                <p className="text-sm text-zinc-300 whitespace-pre-wrap rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+                <p className="text-sm text-text-secondary whitespace-pre-wrap lv-well rounded-md p-3">
                   {detail.admin_note}
                 </p>
               </section>
@@ -663,7 +663,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
         {!loading && error == null && detail && tab === 'order' && (
           <div
             data-order-print-bar
-            className="shrink-0 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 flex flex-wrap gap-2"
+            className="shrink-0 border-t border-border-subtle bg-surface-raised px-4 py-3 flex flex-wrap gap-2"
           >
             {([
               ['receipt', `/api/admin/orders/${orderId}/receipt?print=1`, Receipt,
@@ -684,7 +684,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 // panel cannot answer from what it was sent — and the route
                 // refuses with a message rather than printing a blank form.
                 title={deviceOnly ? loc('للأجهزة التي لها ضمان', 'For devices under warranty', 'بۆ ئامێرە گەرەنتیدارەکان') : undefined}
-                className="inline-flex items-center gap-2 min-h-[44px] px-3.5 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 text-[13px] font-bold hover:bg-zinc-800 hover:text-white transition-colors"
+                className="lv-button lv-button-secondary"
               >
                 <Icon className="w-4 h-4" aria-hidden />
                 {label}
@@ -728,10 +728,10 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-2.5 min-w-0">
-      <dt className={`text-[13px] min-w-0 truncate ${strong ? 'text-white font-bold' : 'text-zinc-400'}`}>{label}</dt>
+      <dt className={`text-[13px] min-w-0 truncate ${strong ? 'text-text-primary font-bold' : 'text-text-secondary'}`}>{label}</dt>
       <dd
         className={`text-[13px] shrink-0 tabular-nums ${
-          tone === 'down' ? 'text-emerald-400' : strong ? 'text-white font-black' : 'text-zinc-200'
+          tone === 'down' ? 'text-success' : strong ? 'text-text-primary font-black' : 'text-text-primary'
         }`}
       >
         {value}

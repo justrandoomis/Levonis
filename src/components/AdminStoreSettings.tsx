@@ -133,12 +133,12 @@ function SaveButton({ state, onClick, error }: { state: SaveState; onClick: () =
       <button
         onClick={onClick}
         disabled={state === 'saving'}
-        className="w-full bg-green-600 hover:bg-green-700 font-bold py-3 rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
+        className="lv-button lv-button-primary w-full"
       >
         {state === 'saving' ? 'جارٍ الحفظ...' : state === 'saved' ? (<><Check className="w-4 h-4" /> تم الحفظ</>) : 'حفظ التغييرات'}
       </button>
       {state === 'error' && (
-        <div className="mt-2 text-sm text-red-400 flex items-center gap-1.5">
+        <div className="mt-2 text-sm text-danger flex items-center gap-1.5">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {error || 'Save failed'}
         </div>
       )}
@@ -357,12 +357,13 @@ export default function AdminStoreSettings() {
     onDirty: () => void
   ) => (
     row.existing ? (
-      <div className="flex items-center gap-2 bg-zinc-800/60 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-400 cursor-not-allowed" title="Existing IDs are locked — products reference them">
+      <div className="flex items-center gap-2 min-h-[46px] rounded-md border border-border-subtle px-3.5 text-text-muted cursor-not-allowed" title="Existing IDs are locked — products reference them">
         <Lock className="w-3.5 h-3.5 shrink-0" />
         <span className="truncate font-mono text-sm">{row.value.id}</span>
       </div>
     ) : (
       <input
+        className="lv-input"
         type="text"
         value={row.value.id}
         onChange={e => {
@@ -371,21 +372,20 @@ export default function AdminStoreSettings() {
           onDirty();
         }}
         placeholder="ID (e.g. standard)"
-        className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
       />
     )
   );
 
   if (!isLoaded) {
     return (
-      <div className="text-center text-zinc-500 py-16">Loading settings...</div>
+      <div className="text-center text-text-muted py-16">Loading settings...</div>
     );
   }
 
   return (
     <div className="space-y-8">
       {/* Checkout Delivery Methods */}
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6">
+      <div className="lv-surface p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">طرق التوصيل (Checkout Delivery Methods)</h2>
           <button
@@ -394,47 +394,47 @@ export default function AdminStoreSettings() {
               setDeliveryRows(rows => [...rows, { key, existing: false, value: { id: '', titleAr: 'جديد', titleEn: 'New', descAr: '', descEn: '', price_iqd: 0, icon: 'Truck' } }]);
               setDeliveryState('idle');
             }}
-            className="flex items-center gap-2 bg-[#ef233c] hover:bg-[#d90429] px-4 py-2 rounded-lg font-bold"
+            className="lv-button lv-button-secondary lv-button-sm"
           >
             <Plus className="w-4 h-4" /> إضافة
           </button>
         </div>
         <div className="space-y-4">
           {deliveryRows.map((row) => (
-            <div key={row.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 border border-zinc-700 p-4 rounded-xl">
+            <div key={row.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-lg bg-surface-raised p-4">
               {idInput(row, setDeliveryRows, () => setDeliveryState('idle'))}
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.titleAr}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleAr: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Title (Ar)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.titleEn}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleEn: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Title (En)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.descAr}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descAr: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Desc (Ar)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.descEn}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descEn: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Desc (En)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <select
+                className="lv-input"
                 value={row.value.icon || 'Truck'}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, icon: e.target.value } } : r)); setDeliveryState('idle'); }}
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
                 title="Icon"
               >
                 {DELIVERY_ICONS.map(icon => (
@@ -448,20 +448,20 @@ export default function AdminStoreSettings() {
                   use; the checkout draws it only on methods that have one, so
                   leaving it empty changes nothing. */}
               <input
+                className="lv-input md:col-span-2"
                 type="url"
                 inputMode="url"
                 value={row.value.map_url || ''}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, map_url: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Map link (pickup only, optional)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 md:col-span-2"
               />
               <div className="flex gap-2">
                 <input
+                  className="lv-input flex-1"
                   type="number"
                   value={row.value.price_iqd}
                   onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, price_iqd: Number(e.target.value) } } : r)); setDeliveryState('idle'); }}
                   placeholder="Price (IQD)"
-                  className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 flex-1"
                 />
                 <button
                   onClick={() => {
@@ -469,7 +469,7 @@ export default function AdminStoreSettings() {
                     setDeliveryRows(rows => rows.filter(r => r.key !== row.key));
                     setDeliveryState('idle');
                   }}
-                  className="bg-red-500/20 text-red-500 p-2 rounded-lg"
+                  className="lv-button lv-button-danger shrink-0 px-3"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -481,7 +481,7 @@ export default function AdminStoreSettings() {
       </div>
 
       {/* Checkout Payment Methods */}
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6">
+      <div className="lv-surface p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">طرق الدفع (Checkout Payment Methods)</h2>
           <button
@@ -490,36 +490,36 @@ export default function AdminStoreSettings() {
               setPaymentRows(rows => [...rows, { key, existing: false, value: { id: '', titleAr: 'جديد', titleEn: 'New', icon: 'CreditCard' } }]);
               setPaymentState('idle');
             }}
-            className="flex items-center gap-2 bg-[#ef233c] hover:bg-[#d90429] px-4 py-2 rounded-lg font-bold"
+            className="lv-button lv-button-secondary lv-button-sm"
           >
             <Plus className="w-4 h-4" /> إضافة
           </button>
         </div>
         <div className="space-y-4">
           {paymentRows.map((row) => (
-            <div key={row.key} className="grid grid-cols-1 md:grid-cols-4 gap-4 border border-zinc-700 p-4 rounded-xl">
+            <div key={row.key} className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-lg bg-surface-raised p-4">
               {idInput(row, setPaymentRows, () => setPaymentState('idle'))}
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.titleAr}
                 onChange={e => { setPaymentRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleAr: e.target.value } } : r)); setPaymentState('idle'); }}
                 placeholder="Title (Ar)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.titleEn}
                 onChange={e => { setPaymentRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleEn: e.target.value } } : r)); setPaymentState('idle'); }}
                 placeholder="Title (En)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <div className="flex gap-2">
                 <input
+                  className="lv-input flex-1"
                   type="text"
                   value={row.value.icon}
                   onChange={e => { setPaymentRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, icon: e.target.value } } : r)); setPaymentState('idle'); }}
                   placeholder="Icon Name"
-                  className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 flex-1"
                 />
                 <button
                   onClick={() => {
@@ -527,7 +527,7 @@ export default function AdminStoreSettings() {
                     setPaymentRows(rows => rows.filter(r => r.key !== row.key));
                     setPaymentState('idle');
                   }}
-                  className="bg-red-500/20 text-red-500 p-2 rounded-lg"
+                  className="lv-button lv-button-danger shrink-0 px-3"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -539,7 +539,7 @@ export default function AdminStoreSettings() {
       </div>
 
       {/* Cart Shipping Methods */}
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6">
+      <div className="lv-surface p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">شحن المنتجات (Cart Shipping Methods)</h2>
           <button
@@ -548,43 +548,43 @@ export default function AdminStoreSettings() {
               setShippingRows(rows => [...rows, { key, existing: false, value: { id: '', titleAr: 'جديد', titleEn: 'New', descAr: '', descEn: '' } }]);
               setShippingState('idle');
             }}
-            className="flex items-center gap-2 bg-[#ef233c] hover:bg-[#d90429] px-4 py-2 rounded-lg font-bold"
+            className="lv-button lv-button-secondary lv-button-sm"
           >
             <Plus className="w-4 h-4" /> إضافة
           </button>
         </div>
         <div className="space-y-4">
           {shippingRows.map((row) => (
-            <div key={row.key} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 border border-zinc-700 p-4 rounded-xl">
+            <div key={row.key} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 rounded-lg bg-surface-raised p-4">
               {idInput(row, setShippingRows, () => setShippingState('idle'))}
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.titleAr}
                 onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleAr: e.target.value } } : r)); setShippingState('idle'); }}
                 placeholder="Title (Ar)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.titleEn}
                 onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleEn: e.target.value } } : r)); setShippingState('idle'); }}
                 placeholder="Title (En)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <input
+                className="lv-input"
                 type="text"
                 value={row.value.descAr}
                 onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descAr: e.target.value } } : r)); setShippingState('idle'); }}
                 placeholder="Desc (Ar)"
-                className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
               <div className="flex gap-2">
                 <input
+                  className="lv-input flex-1"
                   type="text"
                   value={row.value.descEn}
                   onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descEn: e.target.value } } : r)); setShippingState('idle'); }}
                   placeholder="Desc (En)"
-                  className="bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 flex-1"
                 />
                 <button
                   onClick={() => {
@@ -592,7 +592,7 @@ export default function AdminStoreSettings() {
                     setShippingRows(rows => rows.filter(r => r.key !== row.key));
                     setShippingState('idle');
                   }}
-                  className="bg-red-500/20 text-red-500 p-2 rounded-lg"
+                  className="lv-button lv-button-danger shrink-0 px-3"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -605,9 +605,9 @@ export default function AdminStoreSettings() {
 
       {/* Global shipping rules — the engine's own configuration. */}
       {policy && (
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="shipping-policy">
+        <div className="lv-surface p-6" data-admin="shipping-policy">
           <h2 className="text-xl font-bold mb-1">قواعد الشحن العامة (Global shipping rules)</h2>
-          <p className="text-sm text-zinc-400 mb-4">
+          <p className="text-sm text-text-secondary mb-4">
             تُطبَّق على كل المنتجات. الحقول الفارغة تعني «غير مُفعَّلة» — لا يُحتسب أي مبلغ لم تحدّده.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -662,33 +662,33 @@ export default function AdminStoreSettings() {
               onChange={(v) => { setPolicy((p) => (p ? { ...p, carton_fee_iqd: v } : p)); setPolicyState('idle'); }}
             />
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">إعفاء PRO يغطي</span>
+              <span className="block text-sm text-text-secondary mb-1">إعفاء PRO يغطي</span>
               <select
+                className="lv-input"
                 value={policy.pro_waiver_covers}
                 onChange={(e) => { setPolicy((p) => (p ? { ...p, pro_waiver_covers: e.target.value as ShippingPolicy['pro_waiver_covers'] } : p)); setPolicyState('idle'); }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               >
                 <option value="all">كل الرسوم (شامل الطابعة والكرتون)</option>
                 <option value="ordinary_only">التوصيل العادي فقط</option>
               </select>
             </label>
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">إعفاء PRIME يغطي</span>
+              <span className="block text-sm text-text-secondary mb-1">إعفاء PRIME يغطي</span>
               <select
+                className="lv-input"
                 value={policy.prime_waiver_covers}
                 onChange={(e) => { setPolicy((p) => (p ? { ...p, prime_waiver_covers: e.target.value as ShippingPolicy['prime_waiver_covers'] } : p)); setPolicyState('idle'); }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               >
                 <option value="ordinary_only">التوصيل العادي فقط</option>
                 <option value="all">كل الرسوم</option>
               </select>
             </label>
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">أساس احتساب الحد</span>
+              <span className="block text-sm text-text-secondary mb-1">أساس احتساب الحد</span>
               <select
+                className="lv-input"
                 value={policy.threshold_basis}
                 onChange={(e) => { setPolicy((p) => (p ? { ...p, threshold_basis: e.target.value as ShippingPolicy['threshold_basis'] } : p)); setPolicyState('idle'); }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               >
                 <option value="merchandise_after_coupon">قيمة البضاعة بعد الكوبون</option>
                 <option value="merchandise_before_coupon">قيمة البضاعة قبل الكوبون</option>
@@ -713,32 +713,32 @@ export default function AdminStoreSettings() {
 
       {/* Global membership rules that are not prices. */}
       {gift && (
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="preorder-gift">
+        <div className="lv-surface p-6" data-admin="preorder-gift">
           <h2 className="text-xl font-bold mb-1">هدية الطلب المسبق لمشتركي PRO</h2>
-          <p className="text-sm text-zinc-400 mb-4">
+          <p className="text-sm text-text-secondary mb-4">
             عندما يدفع مشترك PRO طلبًا مسبقًا بالكامل عند الشراء، تُسجَّل بكرة فلمنت هدية على الطلب.
             لا يتغيّر أي مبلغ — الهدية تُرفَق بالشحنة. لا تُمنح أي هدية قبل اختيار المنتج.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">معرّف منتج الفلمنت</span>
+              <span className="block text-sm text-text-secondary mb-1">معرّف منتج الفلمنت</span>
               <input
+                className="lv-input font-mono text-sm"
                 type="text"
                 value={gift.product_id}
                 placeholder="prd_..."
                 onChange={(e) => { setGift((g) => (g ? { ...g, product_id: e.target.value.trim() } : g)); setGiftState('idle'); }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 font-mono text-sm"
               />
-              <span className="block text-xs text-zinc-500 mt-1">يُتحقَّق من وجوده عند الحفظ</span>
+              <span className="block text-xs text-text-muted mt-1">يُتحقَّق من وجوده عند الحفظ</span>
             </label>
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">وصف الهدية للزبون (اختياري)</span>
+              <span className="block text-sm text-text-secondary mb-1">وصف الهدية للزبون (اختياري)</span>
               <input
+                className="lv-input"
                 type="text"
                 value={gift.label_ar}
                 placeholder="بكرة PLA بلون من اختيارك"
                 onChange={(e) => { setGift((g) => (g ? { ...g, label_ar: e.target.value } : g)); setGiftState('idle'); }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
             </label>
             <MoneyField
@@ -762,9 +762,9 @@ export default function AdminStoreSettings() {
       )}
 
       {printerNote !== null && (
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="printer-home-delivery-note">
+        <div className="lv-surface p-6" data-admin="printer-home-delivery-note">
           <h2 className="text-xl font-bold mb-1">ملاحظة توصيل الطابعات إلى المنزل</h2>
-          <p className="text-sm text-zinc-400 mb-4">
+          <p className="text-sm text-text-secondary mb-4">
             ملاحظة فقط، لا تُضاف إلى أي مبلغ: تظهر للزبون على صفحة الطابعة وفي السلة وعند الدفع وفي تفاصيل الطلب،
             وتخبره بالمبلغ الذي يُدفع عند طلب التوصيل إلى المنزل (البيع المباشر، والطلب المسبق عند الدفع عند الاستلام).
             الصفر يُخفي الملاحظة.
@@ -785,9 +785,9 @@ export default function AdminStoreSettings() {
 
       {/* The Gini partnership — the switch, the wait, and the bank's wording. */}
       {gini && (
-        <div className="bg-zinc-900 rounded-2xl border border-zinc-700 p-6" data-admin="gini-policy">
+        <div className="lv-surface p-6" data-admin="gini-policy">
           <h2 className="text-xl font-bold mb-1">أقساط جني (مصرف الرافدين)</h2>
-          <p className="text-sm text-zinc-400 mb-4">
+          <p className="text-sm text-text-secondary mb-4">
             التقسيط يتم بالكامل داخل تطبيق جني ولا يمر أي مبلغ منه عبر الموقع. إطفاء المفتاح يخفي
             الخيار من الدفع ومن صفحة المنتج فورًا، ولا يمس أي طلب سبق تقديمه.
           </p>
@@ -801,8 +801,9 @@ export default function AdminStoreSettings() {
               <span className="text-sm">تفعيل الدفع بالأقساط عبر جني</span>
             </label>
             <label className="block">
-              <span className="block text-sm text-zinc-400 mb-1">مدة تعليق الطلب (ساعات)</span>
+              <span className="block text-sm text-text-secondary mb-1">مدة تعليق الطلب (ساعات)</span>
               <input
+                className="lv-input"
                 type="number"
                 min={GINI_HOLD_MIN_HOURS}
                 max={GINI_HOLD_MAX_HOURS}
@@ -813,32 +814,31 @@ export default function AdminStoreSettings() {
                   setGini((g) => (g ? { ...g, hold_hours: Number.isFinite(n) ? n : g.hold_hours } : g));
                   setGiniState('idle');
                 }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
               />
-              <span className="block text-xs text-zinc-500 mt-1">
+              <span className="block text-xs text-text-muted mt-1">
                 من {GINI_HOLD_MIN_HOURS} إلى {GINI_HOLD_MAX_HOURS} ساعة، والافتراضي 24. ينتظر الطلب وصل جني
                 هذه المدة ثم يُلغى وتُحرَّر بضاعته. الرقم يُجمَّد على الطلب عند تقديمه، فتغييره هنا لا يمس طلبًا قائمًا.
               </span>
             </label>
             <label className="block md:col-span-2">
-              <span className="block text-sm text-zinc-400 mb-1">رابط تطبيق جني (اختياري)</span>
+              <span className="block text-sm text-text-secondary mb-1">رابط تطبيق جني (اختياري)</span>
               <input
+                className="lv-input font-mono text-sm"
                 type="text"
                 value={gini.app_url}
                 placeholder="https://..."
                 onChange={(e) => { setGini((g) => (g ? { ...g, app_url: e.target.value } : g)); setGiniState('idle'); }}
-                className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 font-mono text-sm"
                 dir="ltr"
               />
-              <span className="block text-xs text-zinc-500 mt-1">
+              <span className="block text-xs text-text-muted mt-1">
                 يُستخدم للمنتجات التي لا رابط جني خاصًا لها. اتركه فارغًا لعرض الملاحظة بلا رابط
                 بدل الإشارة إلى صفحة لا تعرض المنتج.
               </span>
             </label>
           </div>
           <div className="mt-5">
-            <span className="block text-sm text-zinc-400 mb-1">شروط المصرف كما يعلنها — تظهر للزبون</span>
-            <p className="text-xs text-zinc-500 mb-3">
+            <span className="block text-sm text-text-secondary mb-1">شروط المصرف كما يعلنها — تظهر للزبون</span>
+            <p className="text-xs text-text-muted mb-3">
               ثلاث لغات مكتوبة بخط اليد، لا ترجمة آلية. إفراغ لغة ليس خطأ: يُعرض للزبون أول لغة كتبتها.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -848,8 +848,9 @@ export default function AdminStoreSettings() {
                 ['ckb', 'کوردی', 'rtl'],
               ] as const).map(([lang, label, dir]) => (
                 <label key={lang} className="block">
-                  <span className="block text-sm text-zinc-400 mb-1">{label}</span>
+                  <span className="block text-sm text-text-secondary mb-1">{label}</span>
                   <textarea
+                    className="lv-input py-2 text-sm"
                     rows={4}
                     value={gini.conditions[lang]}
                     dir={dir}
@@ -858,7 +859,6 @@ export default function AdminStoreSettings() {
                       setGini((g) => (g ? { ...g, conditions: { ...g.conditions, [lang]: text } } : g));
                       setGiniState('idle');
                     }}
-                    className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
                   />
                 </label>
               ))}
@@ -893,8 +893,9 @@ function MoneyField({
 }) {
   return (
     <label className="block">
-      <span className="block text-sm text-zinc-400 mb-1">{label}</span>
+      <span className="block text-sm text-text-secondary mb-1">{label}</span>
       <input
+        className="lv-input"
         type="number"
         min={0}
         step={1}
@@ -906,9 +907,8 @@ function MoneyField({
           const n = Math.round(Number(raw));
           onChange(Number.isFinite(n) && n >= 0 ? n : null);
         }}
-        className="w-full bg-zinc-800/30 border border-zinc-700 rounded-lg px-3 py-2"
       />
-      {hint && <span className="block text-xs text-zinc-500 mt-1">{hint}</span>}
+      {hint && <span className="block text-xs text-text-muted mt-1">{hint}</span>}
     </label>
   );
 }

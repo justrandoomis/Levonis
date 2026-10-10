@@ -63,31 +63,29 @@ function LocalizedField({
     { key: 'en', label: 'English', dir: 'ltr' },
     { key: 'ckb', label: 'کوردی', dir: 'rtl' },
   ];
-  const cls =
-    'w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none min-h-[44px]';
   return (
     <div>
-      <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">{label}</label>
-      {hint && <p className="text-[11px] text-zinc-500 mb-2">{hint}</p>}
+      <label className="block text-xs font-bold text-text-muted uppercase mb-1">{label}</label>
+      {hint && <p className="text-[11px] text-text-muted mb-2">{hint}</p>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         {langs.map((l) => (
           <div key={l.key} className="min-w-0">
-            <span className="block text-[10px] text-zinc-600 mb-1">{l.label}</span>
+            <span className="block text-[10px] text-text-muted mb-1">{l.label}</span>
             {multiline ? (
               <textarea
+                className="lv-input py-2.5 text-sm resize-y"
                 dir={l.dir}
                 rows={2}
                 value={value[l.key]}
                 onChange={(e) => onChange({ ...value, [l.key]: e.target.value })}
-                className={`${cls} resize-y`}
               />
             ) : (
               <input
+                className="lv-input py-2.5 text-sm"
                 type="text"
                 dir={l.dir}
                 value={value[l.key]}
                 onChange={(e) => onChange({ ...value, [l.key]: e.target.value })}
-                className={cls}
               />
             )}
           </div>
@@ -102,14 +100,14 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 function SaveStatusLabel({ state, error, dir }: { state: SaveState; error: string | null; dir: string }) {
   if (state === 'saved') {
     return (
-      <span className="text-xs font-bold text-mint flex items-center gap-1">
+      <span className="text-xs font-bold text-success flex items-center gap-1">
         <Check className="w-3.5 h-3.5" /> {dir === 'rtl' ? 'تم الحفظ' : 'Saved'}
       </span>
     );
   }
   if (state === 'error') {
     return (
-      <span className="text-xs font-bold text-red-400 flex items-center gap-1">
+      <span className="text-xs font-bold text-danger flex items-center gap-1">
         <AlertTriangle className="w-3.5 h-3.5" /> {error || (dir === 'rtl' ? 'فشل الحفظ' : 'Save failed')}
       </span>
     );
@@ -125,13 +123,13 @@ function ImageField({ value, onChange, dir }: { value: string; onChange: (url: s
     <div>
       <div className="flex gap-2">
         <input
+          className="lv-input flex-1 text-sm"
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none"
           placeholder="https://..."
         />
-        <label className={`flex items-center justify-center gap-1.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <label className={`lv-button lv-button-secondary lv-button-sm shrink-0 cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
           <Upload className="w-3.5 h-3.5" />
           {uploading ? (dir === 'rtl' ? 'جارٍ الرفع...' : 'Uploading...') : (dir === 'rtl' ? 'رفع' : 'Upload')}
           <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
@@ -150,7 +148,7 @@ function ImageField({ value, onChange, dir }: { value: string; onChange: (url: s
           }} />
         </label>
       </div>
-      {uploadError && <div className="text-xs text-red-400 mt-1">{uploadError}</div>}
+      {uploadError && <div className="text-xs text-danger mt-1">{uploadError}</div>}
     </div>
   );
 }
@@ -290,7 +288,7 @@ export default function AdminHomeSettings() {
   };
 
   if (loading) {
-    return <div className="text-center text-zinc-500 py-16">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading home settings...'}</div>;
+    return <div className="text-center text-text-muted py-16">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading home settings...'}</div>;
   }
 
   const rtl = dir === 'rtl';
@@ -300,8 +298,8 @@ export default function AdminHomeSettings() {
       type="button"
       onClick={() => setActiveTab(id)}
       aria-pressed={activeTab === id}
-      className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-xl font-bold transition-all shrink-0 ${
-        activeTab === id ? 'bg-[#6B46FF] text-snow shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+      className={`flex items-center gap-2 whitespace-nowrap px-4 py-2.5 rounded-full border font-bold transition-colors shrink-0 ${
+        activeTab === id ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
       }`}
     >
       <Icon className="w-4 h-4" />
@@ -312,18 +310,18 @@ export default function AdminHomeSettings() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black text-white">{rtl ? 'إعدادات الصفحة الرئيسية' : 'Home Settings'}</h2>
+        <h2 className="text-2xl font-black text-text-primary">{rtl ? 'إعدادات الصفحة الرئيسية' : 'Home Settings'}</h2>
       </div>
 
       {loadError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 mb-6 text-sm font-medium">
+        <div className="lv-alert lv-alert-danger mb-6 text-sm font-medium text-text-primary">
           {loadError}
         </div>
       )}
 
       {/* Horizontal Tabs */}
-      <div className="relative mb-8 bg-zinc-900/50 p-2 rounded-2xl border border-zinc-800 flex items-center">
-        <button type="button" aria-label={rtl ? 'تمرير' : 'Scroll'} onClick={() => scrollTabs('left')} className="p-2 text-zinc-400 hover:text-white transition-colors z-10 shrink-0">
+      <div className="relative mb-8 flex items-center">
+        <button type="button" aria-label={rtl ? 'تمرير' : 'Scroll'} onClick={() => scrollTabs('left')} className="p-2 text-text-secondary hover:text-text-primary transition-colors z-10 shrink-0">
           <ArrowLeft className="w-5 h-5" />
         </button>
 
@@ -333,16 +331,16 @@ export default function AdminHomeSettings() {
           {HOME_SECTIONS.map((section) => tabButton(section.id, SECTION_ICONS[section.id], rtl ? section.titleAr : section.titleEn))}
         </div>
 
-        <button type="button" aria-label={rtl ? 'تمرير' : 'Scroll'} onClick={() => scrollTabs('right')} className="p-2 text-zinc-400 hover:text-white transition-colors z-10 shrink-0">
+        <button type="button" aria-label={rtl ? 'تمرير' : 'Scroll'} onClick={() => scrollTabs('right')} className="p-2 text-text-secondary hover:text-text-primary transition-colors z-10 shrink-0">
           <ArrowRight className="w-5 h-5" />
         </button>
       </div>
 
       <div className="flex-1">
         {activeTab === 'layout' && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+          <div className="lv-surface p-6">
             <div className="flex justify-between items-center mb-6 gap-4">
-              <p className="text-zinc-400 text-sm">
+              <p className="text-text-secondary text-sm">
                 {rtl
                   ? 'هذه أقسام الصفحة الرئيسية كما تظهر الآن. اسحب الأقسام أو استخدم الأسهم لإعادة ترتيبها، والعين لإخفائها أو إظهارها. الواجهة الرئيسية والشريط المتحرك مثبّتان في الأعلى.'
                   : 'These are the home page sections as it draws them now. Drag or use the arrows to reorder, the eye to hide or show. The hero and the ticker are pinned to the top.'}
@@ -353,7 +351,7 @@ export default function AdminHomeSettings() {
                   type="button"
                   onClick={() => void saveLayout()}
                   disabled={layoutState === 'saving'}
-                  className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-5 py-2.5 rounded-xl transition-all font-bold shadow-lg disabled:opacity-50"
+                  className="lv-button lv-button-primary"
                 >
                   <Save className="w-4 h-4" />
                   {layoutState === 'saving' ? (rtl ? 'جارٍ الحفظ...' : 'Saving...') : rtl ? 'حفظ الترتيب' : 'Save Layout'}
@@ -372,18 +370,18 @@ export default function AdminHomeSettings() {
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
                     onDragOver={handleDragOver}
-                    className={`flex items-center justify-between p-4 bg-zinc-800/50 border ${section.isVisible ? 'border-zinc-700' : 'border-zinc-800 opacity-50'} rounded-2xl ${section.pinned ? '' : 'cursor-move'} hover:bg-zinc-800 transition-colors group`}
+                    className={`flex items-center justify-between p-4 rounded-lg bg-surface-raised ${section.isVisible ? '' : 'opacity-50'} ${section.pinned ? '' : 'cursor-move'} hover:bg-surface-selected transition-colors group`}
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <div className="p-2 text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                      <div className="p-2 text-text-muted group-hover:text-text-primary transition-colors">
                         {section.pinned ? <Pin className="w-5 h-5" aria-hidden="true" /> : <GripVertical className="w-5 h-5" aria-hidden="true" />}
                       </div>
-                      <Icon className="w-5 h-5 text-zinc-400 shrink-0" aria-hidden="true" />
+                      <Icon className="w-5 h-5 text-text-secondary shrink-0" aria-hidden="true" />
                       <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-white text-base">
+                        <span className="font-bold text-text-primary text-base">
                           {rtl ? section.titleAr : section.titleEn}
                         </span>
-                        <span className="text-xs text-zinc-500">
+                        <span className="text-xs text-text-muted">
                           {section.pinned ? (rtl ? 'مثبّت في الأعلى' : 'Pinned to the top') : <span className="font-mono">{section.id}</span>}
                         </span>
                       </div>
@@ -396,7 +394,7 @@ export default function AdminHomeSettings() {
                             type="button"
                             onClick={() => moveSection(index, index - 1)}
                             disabled={index <= firstMovable}
-                            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors disabled:opacity-30"
+                            className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-colors disabled:opacity-30"
                             title={rtl ? 'تحريك للأعلى' : 'Move up'}
                             aria-label={`${rtl ? 'تحريك للأعلى' : 'Move up'} — ${rtl ? section.titleAr : section.titleEn}`}
                           >
@@ -406,7 +404,7 @@ export default function AdminHomeSettings() {
                             type="button"
                             onClick={() => moveSection(index, index + 1)}
                             disabled={index === sections.length - 1}
-                            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors disabled:opacity-30"
+                            className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-colors disabled:opacity-30"
                             title={rtl ? 'تحريك للأسفل' : 'Move down'}
                             aria-label={`${rtl ? 'تحريك للأسفل' : 'Move down'} — ${rtl ? section.titleAr : section.titleEn}`}
                           >
@@ -417,7 +415,7 @@ export default function AdminHomeSettings() {
                       <button
                         type="button"
                         onClick={() => toggleVisibility(section.id)}
-                        className={`p-2 rounded-xl transition-colors ${section.isVisible ? 'text-mint hover:bg-mint/10' : 'text-zinc-500 hover:bg-zinc-700'}`}
+                        className={`p-2 rounded-lg transition-colors hover:bg-white/[0.06] ${section.isVisible ? 'text-success' : 'text-text-muted'}`}
                         title={section.isVisible ? (rtl ? 'إخفاء القسم' : 'Hide section') : (rtl ? 'إظهار القسم' : 'Show section')}
                         aria-pressed={section.isVisible}
                       >
@@ -428,7 +426,7 @@ export default function AdminHomeSettings() {
                         onClick={() => setActiveTab(section.id)}
                         title={rtl ? 'إعدادات القسم' : 'Section settings'}
                         aria-label={`${rtl ? 'إعدادات القسم' : 'Section settings'} — ${rtl ? section.titleAr : section.titleEn}`}
-                        className="p-2 text-zinc-400 hover:text-iris hover:bg-iris/10 rounded-xl transition-colors"
+                        className="p-2 text-text-secondary hover:text-text-primary hover:bg-white/[0.06] rounded-lg transition-colors"
                       >
                         <Settings className="w-5 h-5" />
                       </button>
@@ -449,7 +447,7 @@ export default function AdminHomeSettings() {
             />
             {HERO_SLIDE_GROUPS.map((group, i) => (
               <div key={group} className="space-y-3">
-                <label className="flex items-center gap-3 text-sm text-zinc-300">
+                <label className="flex items-center gap-3 text-sm text-text-secondary">
                   <input
                     type="checkbox"
                     className="w-5 h-5 accent-iris"
@@ -546,13 +544,13 @@ function InfoPanel({
 }) {
   const rtl = dir === 'rtl';
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-3">
-      <p className="text-sm text-zinc-300 leading-relaxed">{rtl ? ar : en}</p>
+    <div className="lv-surface p-5 space-y-3">
+      <p className="text-sm text-text-secondary leading-relaxed">{rtl ? ar : en}</p>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold border border-zinc-700"
+          className="lv-button lv-button-secondary"
         >
           <ImageIcon className="w-4 h-4" aria-hidden="true" />
           {rtl ? action.ar : action.en}
@@ -673,11 +671,11 @@ function BentoSettings({
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+    <div className="lv-surface p-6">
       <div className="flex flex-wrap justify-between items-start mb-5 gap-4">
         <div className="min-w-0 max-w-2xl">
-          <h3 className="text-xl font-bold text-white">{rtl ? 'تسوق حسب الفئة — ماذا يظهر في كل مربع' : 'Shop by category — what each square shows'}</h3>
-          <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+          <h3 className="text-xl font-bold text-text-primary">{rtl ? 'تسوق حسب الفئة — ماذا يظهر في كل مربع' : 'Shop by category — what each square shows'}</h3>
+          <p className="text-xs text-text-secondary mt-1 leading-relaxed">
             {rtl
               ? 'اختر لكل مربع قسمًا (رئيسيًا أو فرعيًا) أو «المنتجات المستعملة»، واكتب عنوانًا إن أردت. «تلقائي» يُبقي القسم الافتراضي. القسم الذي لا يحتوي على منتجات لا يظهر على الصفحة. صورة كل مربع (فاتح وداكن) تُرفع من تبويب الصور.'
               : 'Pick a section (main or sub) or “Pre-owned” for each square, and a title if you want one. “Automatic” keeps the built-in section. A section with no products is not drawn. Each square’s picture (light and dark) is uploaded in the images tab.'}
@@ -688,7 +686,7 @@ function BentoSettings({
           <button
             type="button"
             onClick={onImages}
-            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl transition-colors font-bold border border-zinc-700"
+            className="lv-button lv-button-secondary"
           >
             <ImageIcon className="w-4 h-4" /> {rtl ? 'صور المربعات' : 'Square pictures'}
           </button>
@@ -696,7 +694,7 @@ function BentoSettings({
             type="button"
             onClick={() => void save()}
             disabled={state === 'saving'}
-            className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-4 py-2 rounded-xl transition-all font-bold disabled:opacity-50"
+            className="lv-button lv-button-primary"
           >
             <Save className="w-4 h-4" /> {state === 'saving' ? (rtl ? 'جارٍ الحفظ...' : 'Saving...') : rtl ? 'حفظ' : 'Save'}
           </button>
@@ -704,26 +702,26 @@ function BentoSettings({
       </div>
 
       {catalogError && (
-        <div role="alert" className="mb-4 text-sm text-red-400 flex items-center gap-2">
+        <div role="alert" className="mb-4 text-sm text-danger flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {catalogError}
         </div>
       )}
 
       {/* A map of the six squares, as the page draws them in Arabic: the
           large square on the left, the two wide and three small on the right. */}
-      <div dir="rtl" aria-hidden="true" className="mb-6 grid h-28 max-w-sm grid-cols-[58fr_42fr] gap-1.5 text-[10px] font-bold text-zinc-300">
+      <div dir="rtl" aria-hidden="true" className="mb-6 grid h-28 max-w-sm grid-cols-[58fr_42fr] gap-1.5 text-[10px] font-bold text-text-secondary">
         <div className="grid grid-rows-[1fr_1.08fr] gap-1.5">
           <div className="grid grid-cols-2 gap-1.5">
-            <span className="grid place-items-center rounded-md bg-zinc-800">1</span>
-            <span className="grid place-items-center rounded-md bg-zinc-800">2</span>
+            <span className="grid place-items-center rounded-md bg-surface-selected">1</span>
+            <span className="grid place-items-center rounded-md bg-surface-selected">2</span>
           </div>
           <div className="grid grid-cols-3 gap-1.5">
-            <span className="grid place-items-center rounded-md bg-zinc-800">3</span>
-            <span className="grid place-items-center rounded-md bg-zinc-800">4</span>
-            <span className="grid place-items-center rounded-md bg-zinc-800">5</span>
+            <span className="grid place-items-center rounded-md bg-surface-selected">3</span>
+            <span className="grid place-items-center rounded-md bg-surface-selected">4</span>
+            <span className="grid place-items-center rounded-md bg-surface-selected">5</span>
           </div>
         </div>
-        <span className="grid place-items-center rounded-md bg-zinc-700">{rtl ? 'الكبير' : 'Large'}</span>
+        <span className="grid place-items-center rounded-md bg-surface-selected text-text-primary">{rtl ? 'الكبير' : 'Large'}</span>
       </div>
 
       <div className="space-y-4">
@@ -733,17 +731,17 @@ function BentoSettings({
           const chosen = entry ? catalogs.find((c) => c.id === entry.category) : undefined;
           const label = POSITION_LABELS[position];
           return (
-            <div key={position} data-bento-admin={position} className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700 space-y-3">
+            <div key={position} data-bento-admin={position} className="rounded-lg bg-surface-raised p-4 space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="grid h-7 w-7 place-items-center rounded-lg bg-zinc-700 text-xs font-bold text-white">
+                <span className="grid h-7 w-7 place-items-center rounded-sm bg-surface-selected text-xs font-bold text-text-primary">
                   {position === 'large' ? '★' : i}
                 </span>
-                <span className="font-bold text-white">{rtl ? label.ar : label.en}</span>
+                <span className="font-bold text-text-primary">{rtl ? label.ar : label.en}</span>
                 <select
+                  className="lv-input ms-auto w-auto min-w-[220px] max-w-full text-sm"
                   value={entry?.category ?? ''}
                   onChange={(e) => set(position, e.target.value)}
                   aria-label={`${rtl ? 'القسم' : 'Section'} — ${rtl ? label.ar : label.en}`}
-                  className="ms-auto min-h-[44px] min-w-[220px] max-w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 text-sm text-white focus:border-iris outline-none"
                 >
                   <option value="">{rtl ? `تلقائي (${preset.ar})` : `Automatic (${preset.en})`}</option>
                   <option value="used">{rtl ? 'المنتجات المستعملة (Open Box)' : 'Pre-owned (Open Box)'}</option>
@@ -755,7 +753,7 @@ function BentoSettings({
                 </select>
               </div>
               {chosen && chosen.product_count === 0 && (
-                <p className="text-[12px] text-amber-400">
+                <p className="text-[12px] text-warning">
                   {rtl ? 'هذا القسم لا يحتوي على منتجات الآن، لذلك لن يظهر هذا المربع حتى تُضاف له منتجات.' : 'This section has no products now, so the square stays hidden until it does.'}
                 </p>
               )}
@@ -820,8 +818,8 @@ function HomePhotoPairs({
 
   return (
     <div className="mb-7">
-      <h4 className="text-sm font-bold text-white mb-1">{rtl ? 'صور الصفحة الرئيسية — فاتح وداكن' : 'Home page pictures — light and dark'}</h4>
-      <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
+      <h4 className="text-sm font-bold text-text-primary mb-1">{rtl ? 'صور الصفحة الرئيسية — فاتح وداكن' : 'Home page pictures — light and dark'}</h4>
+      <p className="text-xs text-text-muted mb-3 leading-relaxed">
         {rtl
           ? 'لكل صورة نسختان: للثيم الفاتح وللثيم الداكن. إن رفعت واحدة فقط تُستخدم للثيمين، وإن لم ترفع شيئًا تظهر صورة منتج تلقائيًا. الصورة تملأ البطاقة وتُقصّ من المنتصف، فاجعل الموضوع في وسطها واترك الزاوية السفلية لجهة النص هادئة. PNG أو JPEG أو WebP.'
           : 'Each picture has two versions, for the light and the dark theme. Upload only one and it is used for both; upload none and a product photo is used. The picture fills its card and is cropped from the centre, so keep the subject central and the bottom corner on the reading side calm. PNG, JPEG or WebP.'}
@@ -831,8 +829,8 @@ function HomePhotoPairs({
           const pair = (['light', 'dark'] as const).map((theme) => rows.find((m) => m.target === target && m.theme === theme));
           const title = pair[0] ? labelOf(pair[0]) : target;
           return (
-            <div key={target} data-home-photo={target} className="bg-zinc-950/60 border border-zinc-800 rounded-2xl p-3">
-              <div className="text-sm font-bold text-white mb-2">{title}</div>
+            <div key={target} data-home-photo={target} className="rounded-lg bg-surface-raised p-3">
+              <div className="text-sm font-bold text-text-primary mb-2">{title}</div>
               <div className="grid grid-cols-2 gap-2">
                 {pair.map((m, i) => {
                   if (!m) return <div key={i} />;
@@ -858,7 +856,7 @@ function HomePhotoPairs({
                       <div className="mt-2 flex items-center gap-1.5">
                         {/* `sr-only`, not `hidden`: the input stays in the focus order (see the rows below). */}
                         <label
-                          className={`has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus flex flex-1 items-center justify-center gap-1.5 px-2 py-2 min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${busy ? 'opacity-50 pointer-events-none' : ''}`}
+                          className={`has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus lv-button lv-button-secondary lv-button-sm flex-1 px-2 cursor-pointer ${busy ? 'opacity-50 pointer-events-none' : ''}`}
                         >
                           <Upload className="w-3.5 h-3.5" aria-hidden="true" />
                           {busy ? (rtl ? 'جارٍ الرفع…' : 'Uploading…') : (rtl ? 'رفع' : 'Upload')}
@@ -882,14 +880,14 @@ function HomePhotoPairs({
                             disabled={busy}
                             aria-label={`${rtl ? 'مسح الصورة' : 'Clear the picture'} — ${m.label}`}
                             title={rtl ? 'مسح الصورة' : 'Clear the picture'}
-                            className="px-2.5 py-2 min-h-[44px] bg-zinc-800 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 rounded-lg border border-zinc-700 text-xs font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                            className="lv-button lv-button-ghost px-2.5 hover:text-danger"
                           >
                             <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>
                         )}
                       </div>
                       {slotError[m.slot] && (
-                        <span role="alert" className="block text-[11px] text-red-400 mt-1">{slotError[m.slot]}</span>
+                        <span role="alert" className="block text-[11px] text-danger mt-1">{slotError[m.slot]}</span>
                       )}
                     </div>
                   );
@@ -1040,17 +1038,17 @@ function SiteMediaSettings({ dir }: { dir: string }) {
 
   if (loading) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-zinc-400 text-sm">
+      <div className="lv-surface p-6 text-text-secondary text-sm">
         {rtl ? 'جارٍ التحميل…' : 'Loading…'}
       </div>
     );
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+    <div className="lv-surface p-6">
       <div className="mb-5">
-        <h3 className="text-lg font-bold text-white">{rtl ? 'صور وأيقونات الصفحة الرئيسية' : 'Main page images & icons'}</h3>
-        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+        <h3 className="text-lg font-bold text-text-primary">{rtl ? 'صور وأيقونات الصفحة الرئيسية' : 'Main page images & icons'}</h3>
+        <p className="text-xs text-text-secondary mt-1 leading-relaxed">
           {rtl
             ? 'تُحفظ كلها في مجلد UiUx/MainPage داخل التخزين العام بصيغة WebP (صور الصفحة تُحوَّل تلقائيًا من PNG/JPEG). كل رفع ينشئ ملفًا جديدًا حتى لا تبقى النسخة القديمة محفوظة في ذاكرة المتصفحات.'
             : 'All of these live in UiUx/MainPage in public storage as WebP (page photographs are converted from PNG/JPEG for you). Every upload writes a NEW file, so browsers and edge caches cannot keep serving the old one.'}
@@ -1058,7 +1056,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
       </div>
 
       {loadError && (
-        <div role="alert" className="mb-4 text-sm text-red-400 flex items-center gap-2">
+        <div role="alert" className="mb-4 text-sm text-danger flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" aria-hidden="true" /> {loadError}
           <button onClick={() => void load()} className="underline font-bold">{rtl ? 'إعادة المحاولة' : 'Retry'}</button>
         </div>
@@ -1078,11 +1076,11 @@ function SiteMediaSettings({ dir }: { dir: string }) {
         if (rows.length === 0) return null;
         return (
           <div key={g.group} className="mb-7 last:mb-0">
-            <h4 className="text-sm font-bold text-white mb-1">{rtl ? g.titleAr : g.titleEn}</h4>
-            <p className="text-xs text-zinc-500 mb-3">{rtl ? g.noteAr : g.noteEn}</p>
+            <h4 className="text-sm font-bold text-text-primary mb-1">{rtl ? g.titleAr : g.titleEn}</h4>
+            <p className="text-xs text-text-muted mb-3">{rtl ? g.noteAr : g.noteEn}</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {rows.map((m) => (
-                <div key={m.slot} className="flex items-center gap-3 bg-zinc-950/60 border border-zinc-800 rounded-2xl p-3">
+                <div key={m.slot} className="flex items-center gap-3 rounded-lg bg-surface-raised p-3">
                   {/* A DARK PLATE, BECAUSE THE STOREFRONT IS DARK. This preview
                       used to be `bg-zinc-100`, so a logo exported on a white
                       matte looked perfect here and rendered as a white box on
@@ -1090,14 +1088,14 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                       have spotted the problem was the one screen hiding it. The
                       owner can only fix what they can see, and the Upload button
                       that fixes it is two centimetres away. */}
-                  <span className="w-12 h-12 shrink-0 rounded-xl bg-zinc-950 border border-zinc-800 grid place-items-center overflow-hidden">
+                  <span className="w-12 h-12 shrink-0 rounded-sm lv-well border border-border-subtle grid place-items-center overflow-hidden">
                     {m.url
                       ? <img src={m.url} alt="" width={48} height={48} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />
-                      : <ImageIcon className="w-5 h-5 text-zinc-500" aria-hidden="true" />}
+                      : <ImageIcon className="w-5 h-5 text-text-muted" aria-hidden="true" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-white truncate">{m.label}</span>
-                    <span className="block text-[11px] text-zinc-500 truncate">
+                    <span className="block text-sm font-bold text-text-primary truncate">{m.label}</span>
+                    <span className="block text-[11px] text-text-muted truncate">
                       {m.custom
                         ? (rtl ? 'صورة مرفوعة' : 'Uploaded image')
                         : m.url
@@ -1105,7 +1103,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                           : (rtl ? 'لا توجد صورة' : 'No image')}
                     </span>
                     {slotError[m.slot] && (
-                      <span role="alert" className="block text-[11px] text-red-400 mt-0.5">{slotError[m.slot]}</span>
+                      <span role="alert" className="block text-[11px] text-danger mt-0.5">{slotError[m.slot]}</span>
                     )}
                   </span>
                   <span className="flex items-center gap-1.5 shrink-0">
@@ -1119,7 +1117,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                         would be wrong here: the input is a DESCENDANT of the
                         label, not a preceding sibling.) */}
                     <label
-                      className={`has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus flex items-center gap-1.5 px-3 py-2 min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg cursor-pointer transition-colors border border-zinc-700 text-xs font-bold ${busySlot === m.slot ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus lv-button lv-button-secondary lv-button-sm cursor-pointer ${busySlot === m.slot ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       <Upload className="w-3.5 h-3.5" aria-hidden="true" />
                       {busySlot === m.slot ? (rtl ? 'جارٍ الرفع…' : 'Uploading…') : (rtl ? 'رفع' : 'Upload')}
@@ -1143,7 +1141,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                         disabled={busySlot === m.slot}
                         aria-label={`${rtl ? 'العودة للصورة الافتراضية' : 'Back to the default image'} — ${m.label}`}
                         title={rtl ? 'العودة للصورة الافتراضية' : 'Back to the default image'}
-                        className="px-2.5 py-2 min-h-[44px] bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg border border-zinc-700 text-xs font-bold disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        className="lv-button lv-button-ghost px-2.5"
                       >
                         <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
@@ -1181,15 +1179,15 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+    <div className="lv-surface p-6">
       <div className="flex justify-between items-center mb-6 gap-4">
-        <h3 className="text-xl font-bold text-white">{dir === 'rtl' ? titleAr : titleEn}</h3>
+        <h3 className="text-xl font-bold text-text-primary">{dir === 'rtl' ? titleAr : titleEn}</h3>
         <div className="flex items-center gap-3">
           <SaveStatusLabel state={saveState} error={saveError} dir={dir} />
-          <button onClick={add} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl transition-colors font-bold">
+          <button onClick={add} className="lv-button lv-button-secondary">
             <Plus className="w-4 h-4" /> {dir === 'rtl' ? 'إضافة بانر' : 'Add Banner'}
           </button>
-          <button onClick={onSave} disabled={saveState === 'saving'} className="flex items-center gap-2 bg-[#6B46FF] hover:bg-iris-deep text-snow px-4 py-2 rounded-xl transition-all font-bold disabled:opacity-50">
+          <button onClick={onSave} disabled={saveState === 'saving'} className="lv-button lv-button-primary">
             <Save className="w-4 h-4" /> {saveState === 'saving' ? (dir === 'rtl' ? 'جارٍ الحفظ...' : 'Saving...') : dir === 'rtl' ? 'حفظ' : 'Save'}
           </button>
         </div>
@@ -1197,17 +1195,17 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
 
       <div className="space-y-4">
         {banners.map((b, i) => (
-          <div key={b.id} className="bg-zinc-800/50 p-4 rounded-2xl border border-zinc-700 flex flex-col md:flex-row gap-4">
-            <div className="w-32 h-20 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
+          <div key={b.id} className="rounded-lg bg-surface-raised p-4 flex flex-col md:flex-row gap-4">
+            <div className="w-32 h-20 bg-surface-selected border border-border-subtle rounded-md overflow-hidden flex items-center justify-center shrink-0">
               {b.image ? (
                 <img src={b.image || undefined} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
               ) : (
-                <ImageIcon className="w-8 h-8 text-zinc-600" />
+                <ImageIcon className="w-8 h-8 text-text-muted" />
               )}
             </div>
             <div className="flex-1 space-y-3">
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Image URL</label>
+                <label className="block text-xs font-bold text-text-muted uppercase mb-1">Image URL</label>
                 <ImageField
                   value={b.image}
                   onChange={(url) => {
@@ -1218,18 +1216,18 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Link URL</label>
+                <label className="block text-xs font-bold text-text-muted uppercase mb-1">Link URL</label>
                 <input
+                  className="lv-input text-sm"
                   type="text"
                   value={b.link}
                   onChange={(e) => {
                     const nb = banners.map((x, xi) => xi === i ? { ...x, link: e.target.value } : x);
                     onChange(nb);
                   }}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-sm text-white focus:border-iris outline-none min-h-[44px]"
                   placeholder="/products?category=cat_printers"
                 />
-                <p className="text-[11px] text-zinc-500 mt-1">
+                <p className="text-[11px] text-text-muted mt-1">
                   {dir === 'rtl'
                     ? 'مسار داخلي يبدأ بـ / أو رابط http(s). أي شيء آخر يُهمَل.'
                     : 'An internal path starting with / or an http(s) URL. Anything else is dropped.'}
@@ -1270,14 +1268,14 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
                 if (!window.confirm(dir === 'rtl' ? 'حذف هذا البانر؟' : 'Delete this banner?')) return;
                 onChange(banners.filter(x => x.id !== b.id));
               }}
-              className="p-3 bg-zinc-900 hover:bg-red-500/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors border border-zinc-800 self-start"
+              className="lv-button lv-button-ghost px-3 hover:text-danger self-start"
             >
               <Trash2 className="w-5 h-5" />
             </button>
           </div>
         ))}
         {banners.length === 0 && (
-          <div className="text-center text-zinc-500 py-8">No banners added yet.</div>
+          <div className="text-center text-text-muted py-8">No banners added yet.</div>
         )}
       </div>
     </div>

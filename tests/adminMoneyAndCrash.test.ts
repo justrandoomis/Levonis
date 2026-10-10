@@ -170,7 +170,7 @@ test('the dollar figure is kept, named and quiet — not deleted', () => {
   // review card already carries both plus the rate, for the same reason.
   const requests = read('src/components/AdminWalletRequests.tsx');
   assert.match(requests,
-    /<div className="text-\[11px\] text-zinc-500 tabular-nums" dir="ltr">\s*\{formatUsdCents\(t\.amount\)\} · \{display\.rate\.toLocaleString\(\)\} IQD\/USD/,
+    /<div className="text-\[11px\] text-text-muted tabular-nums" dir="ltr">\s*\{formatUsdCents\(t\.amount\)\} · \{display\.rate\.toLocaleString\(\)\} IQD\/USD/,
     'the ledger dollars and chosen historical rate must remain together in the quiet secondary caption');
   assert.match(requests, /recordedRate: t\.exchange_rate_snapshot,/);
   assert.match(requests, /currentRate: exchangeRate,/, 'old rows still need the configured-rate fallback');

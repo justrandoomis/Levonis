@@ -154,18 +154,18 @@ export default function OrderStagePanel({
   return (
     <section data-order-stages dir={dir} className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-white font-bold text-sm">{loc('مراحل الطلب', 'Order stages', 'قۆناغەکانی داواکاری')}</h3>
+        <h3 className="text-text-primary font-bold text-sm">{loc('مراحل الطلب', 'Order stages', 'قۆناغەکانی داواکاری')}</h3>
         <button
           type="button"
           onClick={() => setShowHistory((v) => !v)}
-          className="text-zinc-400 hover:text-white text-[11px] font-bold"
+          className="text-text-secondary hover:text-text-primary text-[11px] font-bold"
         >
           {showHistory ? loc('إخفاء السجل', 'Hide history', 'شاردنەوەی مێژوو') : loc('عرض السجل', 'Show history', 'پیشاندانی مێژوو')}
         </button>
       </div>
 
       {error && (
-        <p role="alert" className="text-blush text-xs bg-crimson/10 border border-crimson/40 rounded-xl p-2.5">
+        <p role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary">
           {error}
         </p>
       )}
@@ -183,7 +183,7 @@ export default function OrderStagePanel({
         />
       )}
 
-      <ol className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 space-y-0">
+      <ol className="rounded-lg border border-border-subtle p-3 space-y-0">
         {tracking.steps.map((step, i) => {
           const Icon = SOURCE_ICON[step.source];
           const last = i === tracking.steps.length - 1;
@@ -196,22 +196,22 @@ export default function OrderStagePanel({
                       ? 'bg-olive border-olive text-snow'
                       : step.reached
                         ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-400'
-                        : 'bg-transparent border-zinc-700 text-zinc-700'
+                        : 'bg-transparent border-border-subtle text-text-muted'
                   }`}
                 >
                   {step.reached ? <Check className="w-3 h-3" aria-hidden /> : <Circle className="w-2 h-2" aria-hidden />}
                 </span>
-                {!last && <span className={`w-px flex-1 min-h-[16px] ${step.reached ? 'bg-emerald-500/40' : 'bg-zinc-800'}`} />}
+                {!last && <span className={`w-px flex-1 min-h-[16px] ${step.reached ? 'bg-emerald-500/40' : 'bg-border-subtle'}`} />}
               </div>
               <div className={`min-w-0 ${last ? '' : 'pb-2.5'}`}>
-                <p className={`text-[13px] leading-tight flex items-center gap-1.5 ${step.current ? 'text-white font-bold' : step.reached ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                <p className={`text-[13px] leading-tight flex items-center gap-1.5 ${step.current ? 'text-text-primary font-bold' : step.reached ? 'text-text-primary' : 'text-text-muted'}`}>
                   {label(step)}
                   {/* Who normally moves this one. An admin seeing the truck
                       icon knows the courier owns it and that setting it by
                       hand is the fallback, not the route. */}
-                  <Icon className="w-3 h-3 text-zinc-500 shrink-0" aria-hidden />
+                  <Icon className="w-3 h-3 text-text-muted shrink-0" aria-hidden />
                 </p>
-                {step.at && <p className="text-zinc-500 text-[10.5px] mt-0.5">{when(step.at, lang)}</p>}
+                {step.at && <p className="text-text-muted text-[10.5px] mt-0.5">{when(step.at, lang)}</p>}
               </div>
             </li>
           );
@@ -220,41 +220,41 @@ export default function OrderStagePanel({
 
       {/* Only ever shown when the SERVER scheduled it. */}
       {tracking.next_stage_at && (
-        <p className="text-zinc-400 text-[11px]">
+        <p className="text-text-secondary text-[11px]">
           {loc('الانتقال التلقائي التالي', 'Next automatic move', 'گواستنەوەی خۆکاری داهاتوو')}: {when(tracking.next_stage_at, lang)}
         </p>
       )}
 
       {(d.remote_id || d.status_text || d.error) && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-[11px] space-y-1">
-          <p className="text-white font-bold text-[12px]">{loc('شركة التوصيل', 'Courier', 'کۆمپانیای گەیاندن')}</p>
-          {d.remote_id && <p className="text-zinc-400">ID: <span dir="ltr" className="text-zinc-200 font-mono">{d.remote_id}</span></p>}
-          {d.tracking_no && <p className="text-zinc-400">{loc('التتبع', 'Tracking', 'بەدواداچوون')}: <span dir="ltr" className="text-zinc-200 font-mono">{d.tracking_no}</span></p>}
-          {d.status_text && <p className="text-zinc-400">{loc('حالتهم', 'Their status', 'دۆخی ئەوان')}: <span className="text-zinc-200">{d.status_text}</span></p>}
-          {d.synced_at && <p className="text-zinc-500">{loc('آخر مزامنة', 'Last sync', 'دوایین هاوکاتکردن')}: {when(d.synced_at, lang)}</p>}
+        <div className="rounded-lg border border-border-subtle p-3 text-[11px] space-y-1">
+          <p className="text-text-primary font-bold text-[12px]">{loc('شركة التوصيل', 'Courier', 'کۆمپانیای گەیاندن')}</p>
+          {d.remote_id && <p className="text-text-secondary">ID: <span dir="ltr" className="text-text-primary font-mono">{d.remote_id}</span></p>}
+          {d.tracking_no && <p className="text-text-secondary">{loc('التتبع', 'Tracking', 'بەدواداچوون')}: <span dir="ltr" className="text-text-primary font-mono">{d.tracking_no}</span></p>}
+          {d.status_text && <p className="text-text-secondary">{loc('حالتهم', 'Their status', 'دۆخی ئەوان')}: <span className="text-text-primary">{d.status_text}</span></p>}
+          {d.synced_at && <p className="text-text-muted">{loc('آخر مزامنة', 'Last sync', 'دوایین هاوکاتکردن')}: {when(d.synced_at, lang)}</p>}
           {/* A sync failure is SHOWN, not swallowed: the order did not move
               because we could not reach them, and an admin needs to know
               that rather than assume nothing happened. */}
-          {d.error && <p className="text-blush">{loc('خطأ المزامنة', 'Sync error', 'هەڵەی هاوکاتکردن')}: {d.error}</p>}
+          {d.error && <p className="text-danger">{loc('خطأ المزامنة', 'Sync error', 'هەڵەی هاوکاتکردن')}: {d.error}</p>}
         </div>
       )}
 
       <div>
-        <label className="block text-zinc-400 text-[10px] font-bold mb-1.5 uppercase tracking-wider" htmlFor="stage-note">
+        <label className="block text-text-secondary text-[10px] font-bold mb-1.5 uppercase tracking-wider" htmlFor="stage-note">
           {loc('ملاحظة (اختياري)', 'Note (optional)', 'تێبینی (ئارەزوومەندانە)')}
         </label>
         <input
+          className="lv-input py-2.5 text-sm"
           id="stage-note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={loc('تُحفظ في سجل الطلب', 'Saved to the order history', 'لە مێژووی داواکارییەکەدا پاشەکەوت دەکرێت')}
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-600"
         />
       </div>
 
       <div className="flex flex-wrap gap-2">
         {tracking.available.length === 0 ? (
-          <p className="text-zinc-500 text-xs">{loc('لا توجد نقلات متاحة من هنا.', 'No moves available from here.', 'لێرەوە هیچ گواستنەوەیەک بەردەست نییە.')}</p>
+          <p className="text-text-muted text-xs">{loc('لا توجد نقلات متاحة من هنا.', 'No moves available from here.', 'لێرەوە هیچ گواستنەوەیەک بەردەست نییە.')}</p>
         ) : (
           tracking.available.map((m) => {
             const Icon = SOURCE_ICON[m.source];
@@ -275,12 +275,12 @@ export default function OrderStagePanel({
                       )
                     : undefined
                 }
-                className={`inline-flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl border text-[13px] font-bold transition-colors disabled:opacity-60 ${
+                className={`lv-button lv-button-sm ${
                   m.stage === 'cancelled'
-                    ? 'border-crimson/50 text-blush hover:bg-crimson/10'
+                    ? 'lv-button-danger'
                     : isCourier
-                      ? 'border-zinc-700 border-dashed text-zinc-300 hover:bg-zinc-800'
-                      : 'border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800'
+                      ? 'lv-button-ghost border-border-subtle border-dashed hover:bg-surface-raised'
+                      : 'lv-button-secondary'
                 }`}
               >
                 {busy === m.stage ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Icon className="w-3.5 h-3.5" aria-hidden />}
@@ -292,17 +292,17 @@ export default function OrderStagePanel({
       </div>
 
       {showHistory && (
-        <ul data-stage-history className="rounded-xl border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800 text-[11px]">
+        <ul data-stage-history className="rounded-lg border border-border-subtle divide-y divide-border-subtle text-[11px]">
           {tracking.history.length === 0 ? (
-            <li className="p-3 text-zinc-500">{loc('لا سجل بعد.', 'No history yet.', 'هێشتا هیچ مێژوویەک نییە.')}</li>
+            <li className="p-3 text-text-muted">{loc('لا سجل بعد.', 'No history yet.', 'هێشتا هیچ مێژوویەک نییە.')}</li>
           ) : (
             tracking.history.map((h, i) => (
               <li key={`${h.changed_at}-${i}`} className="p-2.5 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-zinc-200">{h.stage}</p>
-                  {h.note && <p className="text-zinc-500 mt-0.5">{h.note}</p>}
+                  <p className="text-text-primary">{h.stage}</p>
+                  {h.note && <p className="text-text-muted mt-0.5">{h.note}</p>}
                 </div>
-                <div className="text-end shrink-0 text-zinc-500">
+                <div className="text-end shrink-0 text-text-muted">
                   <p>{when(h.changed_at, lang)}</p>
                   {/* manual / automatic / delivery_api — the record has to be
                       able to prove later who decided a move. */}

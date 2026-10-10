@@ -482,14 +482,14 @@ export default function BarcodeScanner({
         </h2>
       ) : (
         <div className="flex items-center justify-between gap-3 ps-4 pe-2 pt-3 pb-2">
-          <h2 id={titleId} className="text-white font-bold text-base truncate">
+          <h2 id={titleId} className="text-text-primary font-bold text-base truncate">
             {title ?? s.title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={s.close}
-            className="inline-flex items-center justify-center w-11 h-11 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="lv-button lv-button-ghost w-11 px-0 rounded-full hover:bg-white/[0.06] hover:text-text-primary"
           >
             <X aria-hidden="true" className="w-5 h-5" />
           </button>
@@ -514,16 +514,16 @@ export default function BarcodeScanner({
         />
         {cameraOff && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
-            <span className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+            <span className="w-12 h-12 rounded-full bg-surface border border-border-subtle flex items-center justify-center text-text-secondary">
               <CameraOff aria-hidden="true" className="w-6 h-6" />
             </span>
-            <p className="text-zinc-200 text-sm leading-relaxed max-w-[34ch]">{status}</p>
-            {camera === 'denied' && <p className="text-zinc-400 text-[12px] leading-relaxed max-w-[36ch]">{s.deniedHelp}</p>}
+            <p className="text-text-primary text-sm leading-relaxed max-w-[34ch]">{status}</p>
+            {camera === 'denied' && <p className="text-text-secondary text-[12px] leading-relaxed max-w-[36ch]">{s.deniedHelp}</p>}
             {(camera === 'denied' || camera === 'failed') && (
               <button
                 type="button"
                 onClick={retry}
-                className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 text-[13px] font-bold hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                className="lv-button lv-button-secondary"
               >
                 <RotateCcw aria-hidden="true" className="w-4 h-4" />
                 {s.retry}
@@ -584,14 +584,14 @@ export default function BarcodeScanner({
 
       {verdict}
       <div className={embedded ? 'py-3 space-y-3' : 'px-4 py-3 space-y-3'}>
-        <p role="status" aria-live="polite" className={live ? 'sr-only' : 'text-[13px] text-zinc-300 min-h-[1.25rem]'}>
+        <p role="status" aria-live="polite" className={live ? 'sr-only' : 'text-[13px] text-text-secondary min-h-[1.25rem]'}>
           {status}
         </p>
-        {live && <p className="text-[11.5px] text-zinc-500 leading-relaxed">{s.tapToFocus}</p>}
+        {live && <p className="text-[11.5px] text-text-muted leading-relaxed">{s.tapToFocus}</p>}
         <div className="flex items-stretch gap-2 flex-wrap">
           <label
             htmlFor={photoId}
-            className={`inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl border border-zinc-700/70 bg-zinc-800/70 hover:bg-zinc-800 text-zinc-100 text-[13px] font-bold cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-gold ${
+            className={`lv-button lv-button-secondary cursor-pointer focus-within:ring-2 focus-within:ring-focus ${
               photo === 'decoding' ? 'opacity-60 pointer-events-none' : ''
             }`}
           >
@@ -614,6 +614,7 @@ export default function BarcodeScanner({
                 {s.manualLabel}
               </label>
               <input
+                className="lv-input flex-1 min-w-0 font-mono text-sm placeholder:font-sans"
                 ref={manualInputRef}
                 id={manualId}
                 value={manual}
@@ -625,7 +626,6 @@ export default function BarcodeScanner({
                 autoCapitalize="characters"
                 spellCheck={false}
                 dir="ltr"
-                className="flex-1 min-w-0 min-h-[44px] rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 font-mono text-sm text-white placeholder:text-zinc-500 placeholder:font-sans outline-none focus:border-gold/50 focus-visible:ring-2 focus-visible:ring-gold"
               />
               <span id={`${manualId}-hint`} className="sr-only">
                 {s.manualPlaceholder}
@@ -633,7 +633,7 @@ export default function BarcodeScanner({
               <button
                 type="submit"
                 disabled={!manual.trim()}
-                className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl bg-gold text-accent-contrast text-[13px] font-bold hover:brightness-110 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                className="lv-button lv-button-primary"
               >
                 {s.manualSubmit}
               </button>

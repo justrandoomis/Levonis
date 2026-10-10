@@ -45,9 +45,7 @@ const BLANK = {
   max_per_user: '1',
 };
 
-const input =
-  'w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-gold transition-colors';
-const label = 'block text-zinc-400 text-[10px] font-bold mb-1.5 uppercase tracking-wider';
+const label = 'block text-text-secondary text-[10px] font-bold mb-1.5 uppercase tracking-wider';
 
 export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
   const ar = dir === 'rtl';
@@ -139,11 +137,11 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
   return (
     <div className="space-y-6" data-admin-coupons>
       <div>
-        <h2 className="text-white font-bold text-lg flex items-center gap-2">
+        <h2 className="text-text-primary font-bold text-lg flex items-center gap-2">
           <Ticket className="w-5 h-5 text-gold" aria-hidden />
           {ar ? 'أكواد الخصم' : 'Promo codes'}
         </h2>
-        <p className="text-zinc-400 text-xs mt-1">
+        <p className="text-text-secondary text-xs mt-1">
           {ar
             ? 'الكود يُطبَّق عند إتمام الطلب ويُتحقق منه على الخادم — لا يمكن تعديل الكود بعد إنشائه، ويمكن تعطيله فقط.'
             : 'Codes are applied and validated at checkout, server-side. A code cannot be renamed after creation — deactivate it instead.'}
@@ -151,49 +149,49 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
       </div>
 
       {error && (
-        <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs rounded-2xl p-3">
+        <div role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary">
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="bg-leaf/10 border border-leaf/40 text-sprout text-xs rounded-2xl p-3 flex items-center gap-2">
+        <div role="status" className="lv-alert lv-alert-success text-xs text-text-primary flex items-center gap-2">
           <Check className="w-4 h-4" aria-hidden /> {notice}
         </div>
       )}
 
-      <form onSubmit={create} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <form onSubmit={create} className="lv-surface p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2">
           <label className={label} htmlFor="cpn-code">{ar ? 'الكود' : 'Code'}</label>
           <input
+            className="lv-input text-sm font-mono"
             id="cpn-code"
             dir="ltr"
             required
             value={form.code}
             onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
             placeholder="SAVE10"
-            className={`${input} font-mono`}
           />
         </div>
         <div>
           <label className={label} htmlFor="cpn-kind">{ar ? 'نوع الخصم' : 'Discount type'}</label>
-          <select id="cpn-kind" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as 'percent' | 'fixed_iqd' }))} className={input}>
+          <select className="lv-input text-sm" id="cpn-kind" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as 'percent' | 'fixed_iqd' }))}>
             <option value="percent">{ar ? 'نسبة %' : 'Percentage %'}</option>
             <option value="fixed_iqd">{ar ? 'مبلغ ثابت (د.ع)' : 'Fixed amount (IQD)'}</option>
           </select>
         </div>
         <div>
           <label className={label} htmlFor="cpn-value">{ar ? 'القيمة' : 'Value'}</label>
-          <input id="cpn-value" dir="ltr" type="number" min={1} max={form.kind === 'percent' ? 100 : undefined} required
-            value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} className={input} />
+          <input className="lv-input text-sm" id="cpn-value" dir="ltr" type="number" min={1} max={form.kind === 'percent' ? 100 : undefined} required
+            value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} />
         </div>
         <div>
           <label className={label} htmlFor="cpn-min">{ar ? 'أقل مبلغ للسلة' : 'Minimum cart'}</label>
-          <input id="cpn-min" dir="ltr" type="number" min={0} value={form.min_total_iqd}
-            onChange={(e) => setForm((f) => ({ ...f, min_total_iqd: e.target.value }))} className={input} />
+          <input className="lv-input text-sm" id="cpn-min" dir="ltr" type="number" min={0} value={form.min_total_iqd}
+            onChange={(e) => setForm((f) => ({ ...f, min_total_iqd: e.target.value }))} />
         </div>
         <div>
           <label className={label} htmlFor="cpn-tier">{ar ? 'يتطلب عضوية' : 'Requires tier'}</label>
-          <select id="cpn-tier" value={form.tier_required} onChange={(e) => setForm((f) => ({ ...f, tier_required: e.target.value }))} className={input}>
+          <select className="lv-input text-sm" id="cpn-tier" value={form.tier_required} onChange={(e) => setForm((f) => ({ ...f, tier_required: e.target.value }))}>
             <option value="">{ar ? 'الجميع' : 'Anyone'}</option>
             <option value="plus">PLUS</option>
             <option value="pro">PRO</option>
@@ -204,27 +202,27 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
         </div>
         <div>
           <label className={label} htmlFor="cpn-starts">{ar ? 'يبدأ' : 'Starts'}</label>
-          <input id="cpn-starts" type="datetime-local" value={form.starts_at}
-            onChange={(e) => setForm((f) => ({ ...f, starts_at: e.target.value }))} className={input} />
+          <input className="lv-input text-sm" id="cpn-starts" type="datetime-local" value={form.starts_at}
+            onChange={(e) => setForm((f) => ({ ...f, starts_at: e.target.value }))} />
         </div>
         <div>
           <label className={label} htmlFor="cpn-ends">{ar ? 'ينتهي' : 'Ends'}</label>
-          <input id="cpn-ends" type="datetime-local" value={form.ends_at}
-            onChange={(e) => setForm((f) => ({ ...f, ends_at: e.target.value }))} className={input} />
+          <input className="lv-input text-sm" id="cpn-ends" type="datetime-local" value={form.ends_at}
+            onChange={(e) => setForm((f) => ({ ...f, ends_at: e.target.value }))} />
         </div>
         <div>
           <label className={label} htmlFor="cpn-global">{ar ? 'حد الاستخدام الكلي' : 'Total uses'}</label>
-          <input id="cpn-global" dir="ltr" type="number" min={1} placeholder={ar ? 'بلا حد' : 'Unlimited'}
-            value={form.max_global} onChange={(e) => setForm((f) => ({ ...f, max_global: e.target.value }))} className={input} />
+          <input className="lv-input text-sm" id="cpn-global" dir="ltr" type="number" min={1} placeholder={ar ? 'بلا حد' : 'Unlimited'}
+            value={form.max_global} onChange={(e) => setForm((f) => ({ ...f, max_global: e.target.value }))} />
         </div>
         <div>
           <label className={label} htmlFor="cpn-user">{ar ? 'لكل مستخدم' : 'Per customer'}</label>
-          <input id="cpn-user" dir="ltr" type="number" min={1} value={form.max_per_user}
-            onChange={(e) => setForm((f) => ({ ...f, max_per_user: e.target.value }))} className={input} />
+          <input className="lv-input text-sm" id="cpn-user" dir="ltr" type="number" min={1} value={form.max_per_user}
+            onChange={(e) => setForm((f) => ({ ...f, max_per_user: e.target.value }))} />
         </div>
         <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
           <button type="submit" disabled={saving || !form.code.trim()}
-            className="bg-gold hover:bg-gold-light text-accent-contrast font-bold text-sm px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-60 transition-colors">
+            className="lv-button lv-button-primary">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
             {ar ? 'إنشاء الكود' : 'Create coupon'}
           </button>
@@ -232,15 +230,15 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
       </form>
 
       {loading ? (
-        <p className="text-zinc-400 text-sm">{ar ? 'جارٍ التحميل…' : 'Loading…'}</p>
+        <p className="text-text-secondary text-sm">{ar ? 'جارٍ التحميل…' : 'Loading…'}</p>
       ) : rows.length === 0 ? (
-        <p className="text-zinc-400 text-sm bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 text-center">
+        <p className="text-text-secondary text-sm rounded-xl border border-dashed border-border-subtle p-6 text-center">
           {ar ? 'لا توجد أكواد بعد.' : 'No coupons yet.'}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+        <div className="overflow-x-auto lv-surface">
           <table className="w-full text-sm min-w-[720px]">
-            <thead className="bg-zinc-900/70 text-zinc-400 text-[11px] uppercase tracking-wider">
+            <thead className="bg-surface-raised text-text-secondary text-[11px] uppercase tracking-wider">
               <tr>
                 <th className="text-start p-3">{ar ? 'الكود' : 'Code'}</th>
                 <th className="text-start p-3">{ar ? 'الخصم' : 'Discount'}</th>
@@ -251,10 +249,10 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
                 <th className="text-end p-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody className="divide-y divide-border-subtle">
               {rows.map((r) => (
-                <tr key={r.id} className="text-zinc-300">
-                  <td className="p-3 font-mono text-white" dir="ltr">{r.code}</td>
+                <tr key={r.id} className="text-text-secondary">
+                  <td className="p-3 font-mono text-text-primary" dir="ltr">{r.code}</td>
                   <td className="p-3" dir="ltr">{discountText(r)}</td>
                   <td className="p-3" dir="ltr">{r.min_total_iqd ? r.min_total_iqd.toLocaleString('en-US') : '—'}</td>
                   <td className="p-3 uppercase">{r.tier_required ?? '—'}</td>
@@ -265,13 +263,13 @@ export default function AdminCoupons({ dir }: { dir: 'rtl' | 'ltr' }) {
                     {r.max_global !== null ? ` / ${r.max_global}` : ''}
                   </td>
                   <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r.active ? 'bg-leaf/15 text-sprout' : 'bg-zinc-800 text-zinc-400'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r.active ? 'lv-chip [--chip:var(--color-success)]' : 'bg-white/[0.06] text-text-secondary'}`}>
                       {r.active ? (ar ? 'مفعّل' : 'Active') : (ar ? 'معطّل' : 'Off')}
                     </span>
                   </td>
                   <td className="p-3 text-end">
                     <button onClick={() => void toggle(r)} disabled={busyId === r.id}
-                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-zinc-300 hover:text-white border border-zinc-700 rounded-lg px-2.5 py-1.5 disabled:opacity-60">
+                      className="lv-button lv-button-secondary lv-button-sm">
                       {busyId === r.id ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden /> : <Power className="w-3 h-3" aria-hidden />}
                       {r.active ? (ar ? 'تعطيل' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}
                     </button>

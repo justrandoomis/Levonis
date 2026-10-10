@@ -195,16 +195,17 @@ type Tab = 'identity' | 'phone_change' | 'addresses';
 const CASE_STATES = ['', 'submitted', 'reviewing', 'changes_requested', 'rejected', 'verified'];
 const ADDR_STATES = ['pending', 'approved', 'rejected', 'superseded'];
 
+/** A state is information: a flat chip in its tone (build plan §5). */
 const STATE_STYLE: Record<string, string> = {
-  submitted: 'bg-sky-500/15 text-sky-400',
-  reviewing: 'bg-amber-500/15 text-amber-400',
-  changes_requested: 'bg-orange-500/15 text-orange-400',
-  rejected: 'bg-red-500/15 text-red-400',
-  verified: 'bg-emerald-500/15 text-emerald-400',
-  pending: 'bg-sky-500/15 text-sky-400',
-  approved: 'bg-emerald-500/15 text-emerald-400',
-  superseded: 'bg-zinc-700/40 text-zinc-400',
-  draft: 'bg-zinc-700/40 text-zinc-400',
+  submitted: 'lv-chip [--chip:var(--color-info)]',
+  reviewing: 'lv-chip [--chip:var(--color-warning)]',
+  changes_requested: 'lv-chip [--chip:var(--color-warning)]',
+  rejected: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
+  verified: 'lv-chip [--chip:var(--color-success)]',
+  pending: 'lv-chip [--chip:var(--color-info)]',
+  approved: 'lv-chip [--chip:var(--color-success)]',
+  superseded: 'bg-white/[0.06] text-text-secondary',
+  draft: 'bg-white/[0.06] text-text-secondary',
 };
 
 export default function AdminKyc() {
@@ -352,19 +353,19 @@ export default function AdminKyc() {
   );
 
   return (
-    <div className="text-white">
+    <div className="text-text-primary">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
         <h2 className="font-bold text-[17px] flex items-center gap-2">
           <IdCard className="w-5 h-5 text-gold" /> {t.title}
         </h2>
         <button
           onClick={load}
-          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-full text-[12px] font-bold inline-flex items-center gap-1.5"
+          className="lv-button lv-button-secondary lv-button-sm"
         >
           <RefreshCw className="w-3.5 h-3.5" /> {t.refresh}
         </button>
       </div>
-      <p className="text-[12px] text-zinc-500 mb-4">{t.rolesGap}</p>
+      <p className="text-[12px] text-text-muted mb-4">{t.rolesGap}</p>
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {(
@@ -378,7 +379,7 @@ export default function AdminKyc() {
             key={id}
             onClick={() => setTab(id)}
             className={`px-4 py-2 rounded-full text-[13px] font-bold inline-flex items-center gap-1.5 border transition-colors ${
-              tab === id ? 'border-gold/50 bg-gold/10 text-gold' : 'border-zinc-800 text-zinc-400 hover:bg-zinc-900'
+              tab === id ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             <Icon className="w-4 h-4" /> {label}
@@ -393,7 +394,7 @@ export default function AdminKyc() {
               key={s || 'all'}
               onClick={() => setStateFilter(s)}
               className={`px-3 py-1 rounded-full text-[12px] font-bold border ${
-                stateFilter === s ? 'border-gold/50 text-gold' : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                stateFilter === s ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
               }`}
             >
               {s ? t.stateNames[s] || s : t.all}
@@ -407,7 +408,7 @@ export default function AdminKyc() {
               key={s}
               onClick={() => setAddrFilter(s)}
               className={`px-3 py-1 rounded-full text-[12px] font-bold border ${
-                addrFilter === s ? 'border-gold/50 text-gold' : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                addrFilter === s ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
               }`}
             >
               {t.stateNames[s] || s}
@@ -417,10 +418,10 @@ export default function AdminKyc() {
       )}
 
       {actionError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] rounded-2xl p-3 mb-4">{actionError}</div>
+        <div className="lv-alert lv-alert-danger text-[13px] text-text-primary mb-4">{actionError}</div>
       )}
       {loadError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] rounded-2xl p-3 mb-4">{loadError}</div>
+        <div className="lv-alert lv-alert-danger text-[13px] text-text-primary mb-4">{loadError}</div>
       )}
 
       {isLoading ? (
@@ -429,15 +430,15 @@ export default function AdminKyc() {
         </div>
       ) : tab !== 'addresses' ? (
         cases.length === 0 ? (
-          <p className="text-zinc-500 text-sm text-center py-10">{t.empty}</p>
+          <p className="text-text-muted text-sm text-center py-10">{t.empty}</p>
         ) : (
           <div className="space-y-3">
             {cases.map((k) => (
-              <div key={k.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+              <div key={k.id} className="lv-surface p-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
                     <p className="font-bold text-[14px] truncate">{k.user_email}</p>
-                    <p className="text-[12px] text-zinc-500">
+                    <p className="text-[12px] text-text-muted">
                       {k.case_type === 'identity' ? (k.doc_type || '—') : t.tabPhone} ·{' '}
                       {k.submitted_at ? new Date(k.submitted_at).toLocaleString() : '—'}
                       {k.case_type === 'identity' && ` · ${k.evidence_count} 📎`}
@@ -447,55 +448,55 @@ export default function AdminKyc() {
                     {stateChip(k.state)}
                     <button
                       onClick={() => openCase(k.id)}
-                      className="px-3 py-1.5 rounded-lg border border-zinc-700 text-[12px] font-bold hover:bg-zinc-800 inline-flex items-center gap-1.5"
+                      className="lv-button lv-button-secondary lv-button-sm"
                     >
                       <Eye className="w-3.5 h-3.5" /> {t.openCase}
                     </button>
                   </div>
                 </div>
                 {k.reason && (
-                  <p className="text-[12px] text-orange-300 mt-2">{k.reason}</p>
+                  <p className="text-[12px] text-warning mt-2">{k.reason}</p>
                 )}
               </div>
             ))}
           </div>
         )
       ) : addrRequests.length === 0 ? (
-        <p className="text-zinc-500 text-sm text-center py-10">{t.empty}</p>
+        <p className="text-text-muted text-sm text-center py-10">{t.empty}</p>
       ) : (
         <div className="space-y-3">
           {addrRequests.map((r) => (
-            <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+            <div key={r.id} className="lv-surface p-4">
               <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                 <p className="font-bold text-[14px] truncate">{r.user_email}</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-[11px] text-text-muted">
                     {t.version} #{r.version}
                   </span>
                   {stateChip(r.state)}
                 </div>
               </div>
               <p className="text-[13px]">{r.name}</p>
-              <p className="text-[13px] text-zinc-400">{r.address}</p>
-              {r.landmark && <p className="text-[12px] text-zinc-500">{r.landmark}</p>}
-              <p className="text-[12px] text-zinc-500 mt-1" dir="ltr">{r.phone_e164}</p>
-              <p className="text-[12px] text-zinc-400 mt-2">
+              <p className="text-[13px] text-text-secondary">{r.address}</p>
+              {r.landmark && <p className="text-[12px] text-text-muted">{r.landmark}</p>}
+              <p className="text-[12px] text-text-muted mt-1" dir="ltr">{r.phone_e164}</p>
+              <p className="text-[12px] text-text-secondary mt-2">
                 <span className="font-bold">{t.customerReason}</span> {r.reason}
               </p>
-              <p className="text-[11px] text-zinc-600 mt-1">{t.snapshotNote}</p>
+              <p className="text-[11px] text-text-muted mt-1">{t.snapshotNote}</p>
               {r.state === 'pending' && (
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => decideAddress(r.id, true)}
                     disabled={busy}
-                    className="px-4 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 text-[13px] font-bold hover:bg-emerald-500/25 disabled:opacity-40 inline-flex items-center gap-1.5"
+                    className="lv-button lv-button-primary lv-button-sm"
                   >
                     <ShieldCheck className="w-4 h-4" /> {t.approve}
                   </button>
                   <button
                     onClick={() => decideAddress(r.id, false)}
                     disabled={busy}
-                    className="px-4 py-2 rounded-xl bg-red-500/10 text-red-400 text-[13px] font-bold hover:bg-red-500/20 disabled:opacity-40"
+                    className="lv-button lv-button-danger lv-button-sm"
                   >
                     {t.rejectAddr}
                   </button>
@@ -525,35 +526,35 @@ export default function AdminKyc() {
         z={60}
         solid
         testId="kyc-case-detail"
-        panelClassName={`w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-black border border-zinc-800 !rounded-t-[28px] sm:!rounded-[28px]${detail ? '' : ' pointer-events-none'}`}
+        panelClassName={`w-full max-w-xl max-h-[88dvh] overflow-y-auto bg-canvas border border-border-subtle${detail ? '' : ' pointer-events-none'}`}
       >
           <div className="p-5">
             <div className="flex items-center justify-between mb-1">
               <p className="font-bold">{shownCase.user_email}</p>
               {stateChip(shownCase.state)}
             </div>
-            <p className="text-[11px] text-amber-400 flex items-center gap-1.5 mb-4">
+            <p className="text-[11px] text-warning flex items-center gap-1.5 mb-4">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {t.auditWarn}
             </p>
 
             {shownCase.case_type === 'identity' ? (
               <div className="space-y-2 text-[13px]">
                 {!shownCase.fields_readable && (
-                  <p className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[12px]">
+                  <p className="lv-alert lv-alert-danger text-[12px] text-text-primary">
                     {t.unreadable}
                   </p>
                 )}
-                <p><span className="text-zinc-500">{t.fullName}:</span> <span className="font-bold">{shownCase.full_name ?? '—'}</span></p>
-                <p><span className="text-zinc-500">{t.dob}:</span> <span dir="ltr">{shownCase.dob ?? '—'}</span></p>
-                <p><span className="text-zinc-500">{t.docType}:</span> {shownCase.doc_type ?? '—'}</p>
-                <p><span className="text-zinc-500">{t.docNumber}:</span> <span dir="ltr" className="font-mono">{shownCase.doc_number ?? '—'}</span></p>
+                <p><span className="text-text-muted">{t.fullName}:</span> <span className="font-bold">{shownCase.full_name ?? '—'}</span></p>
+                <p><span className="text-text-muted">{t.dob}:</span> <span dir="ltr">{shownCase.dob ?? '—'}</span></p>
+                <p><span className="text-text-muted">{t.docType}:</span> {shownCase.doc_type ?? '—'}</p>
+                <p><span className="text-text-muted">{t.docNumber}:</span> <span dir="ltr" className="font-mono">{shownCase.doc_number ?? '—'}</span></p>
 
                 <div className="pt-2">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-zinc-400 text-[12px] font-bold">{t.evidence}</p>
+                    <p className="text-text-secondary text-[12px] font-bold">{t.evidence}</p>
                     <button
                       onClick={() => setShowEvidence((v) => !v)}
-                      className="px-3 py-1 rounded-lg border border-zinc-700 text-[12px] font-bold inline-flex items-center gap-1.5"
+                      className="lv-button lv-button-secondary lv-button-sm"
                     >
                       {showEvidence ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       {showEvidence ? t.hideEvidence : t.showEvidence}
@@ -566,7 +567,7 @@ export default function AdminKyc() {
                           key={i}
                           src={`/api/kyc/admin/cases/${shownCase.id}/evidence/${i}`}
                           alt={`evidence ${i + 1}`}
-                          className="w-full rounded-xl border border-zinc-800 max-w-full"
+                          className="w-full rounded-xl border border-border-subtle max-w-full"
                           loading="lazy"
                         />
                       ))}
@@ -577,26 +578,26 @@ export default function AdminKyc() {
             ) : (
               <div className="space-y-2 text-[13px]">
                 <p>
-                  <span className="text-zinc-500">{t.newPhone}:</span>{' '}
+                  <span className="text-text-muted">{t.newPhone}:</span>{' '}
                   <span dir="ltr" className="font-bold">{shownCase.payload?.new_phone_e164 || '—'}</span>
                 </p>
-                <p><span className="text-zinc-500">{t.proof}:</span> {shownCase.payload?.proof || '—'}</p>
+                <p><span className="text-text-muted">{t.proof}:</span> {shownCase.payload?.proof || '—'}</p>
               </div>
             )}
 
             {shownCase.reason && (
-              <p className="text-[12px] text-orange-300 mt-3">{shownCase.reason}</p>
+              <p className="text-[12px] text-warning mt-3">{shownCase.reason}</p>
             )}
 
             {(shownCase.state === 'submitted' || shownCase.state === 'reviewing') && (
-              <div className="mt-5 border-t border-zinc-800 pt-4">
-                <p className="text-[12px] font-bold text-zinc-400 mb-2">{t.decisions}</p>
+              <div className="mt-5 border-t border-border-subtle pt-4">
+                <p className="text-[12px] font-bold text-text-secondary mb-2">{t.decisions}</p>
                 <div className="flex gap-2 flex-wrap">
                   {shownCase.state === 'submitted' && (
                     <button
                       onClick={() => decide(shownCase.id, 'reviewing')}
                       disabled={busy}
-                      className="px-3.5 py-2 rounded-xl bg-amber-500/15 text-amber-300 text-[13px] font-bold hover:bg-amber-500/25 disabled:opacity-40 inline-flex items-center gap-1.5"
+                      className="lv-button lv-button-secondary lv-button-sm"
                     >
                       <Clock className="w-4 h-4" /> {t.startReview}
                     </button>
@@ -604,21 +605,21 @@ export default function AdminKyc() {
                   <button
                     onClick={() => decide(shownCase.id, 'changes_requested')}
                     disabled={busy}
-                    className="px-3.5 py-2 rounded-xl bg-orange-500/15 text-orange-300 text-[13px] font-bold hover:bg-orange-500/25 disabled:opacity-40"
+                    className="lv-button lv-button-accent lv-button-sm"
                   >
                     {t.reqChanges}
                   </button>
                   <button
                     onClick={() => decide(shownCase.id, 'rejected')}
                     disabled={busy}
-                    className="px-3.5 py-2 rounded-xl bg-red-500/10 text-red-400 text-[13px] font-bold hover:bg-red-500/20 disabled:opacity-40"
+                    className="lv-button lv-button-danger lv-button-sm"
                   >
                     {t.reject}
                   </button>
                   <button
                     onClick={() => decide(shownCase.id, 'verified')}
                     disabled={busy}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 text-[13px] font-bold hover:bg-emerald-500/25 disabled:opacity-40 inline-flex items-center gap-1.5"
+                    className="lv-button lv-button-primary lv-button-sm"
                   >
                     <ShieldCheck className="w-4 h-4" /> {t.verify}
                   </button>
@@ -628,7 +629,7 @@ export default function AdminKyc() {
 
             <button
               onClick={() => setDetail(null)}
-              className="mt-5 w-full py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 font-bold text-sm"
+              className="mt-5 lv-button lv-button-secondary w-full"
             >
               {t.close}
             </button>

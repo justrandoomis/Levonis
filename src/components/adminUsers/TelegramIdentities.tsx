@@ -185,6 +185,7 @@ export default function TelegramIdentities() {
             {s.tgAdminLabel}
           </label>
           <input
+            className="lv-input"
             id="tg-admin-email"
             type="email"
             dir="ltr"
@@ -193,29 +194,28 @@ export default function TelegramIdentities() {
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
             placeholder="admin@example.com"
-            className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-iris/50"
           />
           <button
             type="submit"
             disabled={looking || emailInput.trim().length === 0}
-            className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-black transition-colors hover:bg-zinc-200 disabled:opacity-50"
+            className="lv-button lv-button-primary shrink-0"
           >
             <Search className="h-4 w-4" /> {looking ? s.looking : s.lookupBtn}
           </button>
         </form>
-        <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">{s.tgAdminHint}</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{s.tgAdminHint}</p>
         </>
         )}
       </Section>
 
       {error && (
-        <p className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-medium text-red-400">
+        <p className="lv-alert lv-alert-danger flex items-start gap-2 text-sm font-medium text-text-primary">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="min-w-0 break-words">{error}</span>
         </p>
       )}
       {notice && (
-        <p className="rounded-xl border border-mint/30 bg-mint/10 p-3 text-sm font-bold text-mint">
+        <p className="lv-alert lv-alert-success text-sm font-bold text-text-primary">
           {notice}
         </p>
       )}
@@ -223,7 +223,7 @@ export default function TelegramIdentities() {
       {target && (
         <Section title={s.tgAdd} icon={<Link2 className="h-3.5 w-3.5" />} note={s.tgIdHint} testId="tg-add">
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            <span dir="auto" className="text-sm font-black text-white">
+            <span dir="auto" className="text-sm font-black text-text-primary">
               {target.name || target.username || target.email}
             </span>
             <Pill tone={target.role === 'admin' ? 'violet' : 'zinc'}>{target.role}</Pill>
@@ -232,17 +232,18 @@ export default function TelegramIdentities() {
           <Row label={s.fEmail} value={target.email} />
 
           {target.role !== 'admin' ? (
-            <p className="mt-3 flex items-start gap-2 rounded-xl border border-zinc-700 bg-zinc-800/60 p-3 text-xs font-medium leading-relaxed text-zinc-400">
+            <p className="mt-3 flex items-start gap-2 rounded-lg bg-surface-raised p-3 text-xs font-medium leading-relaxed text-text-secondary">
               <Lock className="mt-0.5 h-4 w-4 shrink-0" />
               {s.tgAdminHint}
             </p>
           ) : (
             <form onSubmit={add} className="mt-4 space-y-3">
               <div>
-                <label htmlFor="tg-numeric-id" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-zinc-500">
+                <label htmlFor="tg-numeric-id" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-text-muted">
                   {s.tgIdLabel}
                 </label>
                 <input
+                  className="lv-input tabular-nums"
                   id="tg-numeric-id"
                   type="text"
                   inputMode="numeric"
@@ -254,21 +255,19 @@ export default function TelegramIdentities() {
                   aria-invalid={tgIdLooksLikeUsername}
                   aria-describedby={tgIdLooksLikeUsername ? 'tg-numeric-id-error' : undefined}
                   placeholder="123456789"
-                  className={`min-h-11 w-full rounded-xl border bg-zinc-900 px-4 py-2 tabular-nums text-white focus:outline-none focus:ring-2 ${
-                    tgIdLooksLikeUsername ? 'border-red-500/60 focus:ring-red-500/40' : 'border-zinc-700 focus:ring-iris/50'
-                  }`}
                 />
                 {tgIdLooksLikeUsername && (
-                  <p id="tg-numeric-id-error" role="alert" className="mt-1.5 text-xs font-bold text-red-400">
+                  <p id="tg-numeric-id-error" role="alert" className="mt-1.5 text-xs font-bold text-danger">
                     {s.tgIdNotUsername}
                   </p>
                 )}
               </div>
               <div>
-                <label htmlFor="tg-label" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-zinc-500">
+                <label htmlFor="tg-label" className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-text-muted">
                   {s.tgLabelLabel}
                 </label>
                 <input
+                  className="lv-input"
                   id="tg-label"
                   type="text"
                   dir="auto"
@@ -276,13 +275,12 @@ export default function TelegramIdentities() {
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={80}
                   placeholder={s.tgLabelPlaceholder}
-                  className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-iris/50"
                 />
               </div>
               <button
                 type="submit"
                 disabled={adding || !tgIdValid}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#6B46FF] px-4 text-sm font-bold text-snow transition-colors hover:bg-iris-deep disabled:opacity-50"
+                className="lv-button lv-button-primary w-full"
               >
                 <Send className="h-4 w-4" /> {adding ? s.saving : s.tgAdd}
               </button>
@@ -292,13 +290,13 @@ export default function TelegramIdentities() {
       )}
 
       <Section title={s.tgTitle} icon={<Link2 className="h-3.5 w-3.5" />} testId="tg-list">
-        {loading && rows.length === 0 && <p className="py-6 text-center text-sm text-zinc-500">{s.loading}</p>}
-        {!loading && rows.length === 0 && <p className="py-6 text-center text-sm text-zinc-500">{s.tgEmpty}</p>}
+        {loading && rows.length === 0 && <p className="py-6 text-center text-sm text-text-muted">{s.loading}</p>}
+        {!loading && rows.length === 0 && <p className="py-6 text-center text-sm text-text-muted">{s.tgEmpty}</p>}
         <ul className="space-y-2">
           {rows.map((r) => (
-            <li key={r.telegram_user_id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+            <li key={r.telegram_user_id} className="rounded-lg bg-surface-raised p-3">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span dir="ltr" className="text-sm font-black tabular-nums text-white">
+                <span dir="ltr" className="text-sm font-black tabular-nums text-text-primary">
                   {r.telegram_user_id}
                 </span>
                 {/* The server decides `active`: live mapping AND the site
@@ -309,7 +307,7 @@ export default function TelegramIdentities() {
                   {r.revoked_at ? s.tgRevoked : r.active ? s.tgActive : s.tgInactive}
                 </Pill>
                 {r.label && <Pill tone="zinc">{r.label}</Pill>}
-                <span dir="auto" className="ms-auto min-w-0 truncate text-xs font-medium text-zinc-400">
+                <span dir="auto" className="ms-auto min-w-0 truncate text-xs font-medium text-text-secondary">
                   {r.name || r.username || r.user_id}
                 </span>
               </div>
@@ -324,11 +322,12 @@ export default function TelegramIdentities() {
                   <div className="mt-3 space-y-2">
                     <label
                       htmlFor={`tg-revoke-reason-${r.telegram_user_id}`}
-                      className="block text-xs font-bold uppercase tracking-wider text-zinc-500"
+                      className="block text-xs font-bold uppercase tracking-wider text-text-muted"
                     >
                       {s.tgRevokeReason}
                     </label>
                     <input
+                      className="lv-input"
                       id={`tg-revoke-reason-${r.telegram_user_id}`}
                       type="text"
                       dir="auto"
@@ -336,14 +335,13 @@ export default function TelegramIdentities() {
                       onChange={(e) => setRevokeReason(e.target.value)}
                       minLength={3}
                       maxLength={200}
-                      className="min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500/40"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         disabled={revoking || revokeReason.trim().length < 3}
                         onClick={() => void revoke(r.telegram_user_id)}
-                        className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/15 px-4 text-sm font-bold text-red-400 transition-colors hover:bg-red-500/25 disabled:opacity-50"
+                        className="lv-button lv-button-danger flex-1"
                       >
                         {revoking ? s.saving : s.tgRevoke}
                       </button>
@@ -353,7 +351,7 @@ export default function TelegramIdentities() {
                           setRevokingId(null);
                           setRevokeReason('');
                         }}
-                        className="flex min-h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-bold text-zinc-400 transition-colors hover:bg-zinc-800"
+                        className="lv-button lv-button-ghost"
                       >
                         <X className="h-4 w-4" /> {s.cancel}
                       </button>
@@ -366,7 +364,7 @@ export default function TelegramIdentities() {
                       setRevokingId(r.telegram_user_id);
                       setRevokeReason('');
                     }}
-                    className="mt-3 min-h-11 rounded-xl border border-zinc-700 px-4 text-sm font-bold text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                    className="mt-3 lv-button lv-button-secondary"
                   >
                     {s.tgRevoke}
                   </button>

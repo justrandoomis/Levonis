@@ -3,6 +3,8 @@ import { useLanguage } from '../LanguageContext';
 import { api, ApiError, WalletTx, formatIqd, formatUsdCents, formatWalletIqd } from '../lib/api';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
+import { KpiTile } from './ui/KpiTile';
+import { StatusChip, type Tone } from './ui/Badge';
 import {
   Users,
   ShoppingCart,
@@ -76,13 +78,14 @@ const EMPTY_STATS: OverviewStats = {
  */
 const OwnerRatesCard = React.lazy(() => import('./admin/OwnerRatesCard'));
 
-const ORDER_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-500/20 text-yellow-300',
-  confirmed: 'bg-blue-500/20 text-blue-300',
-  processing: 'bg-purple-500/20 text-purple-300',
-  shipped: 'bg-cyan-500/20 text-cyan-300',
-  delivered: 'bg-mint/20 text-mint',
-  cancelled: 'bg-red-500/20 text-red-400',
+/** A status is information: a flat chip in its semantic tone (build plan §5). */
+const ORDER_STATUS_TONES: Record<string, Tone> = {
+  pending: 'warning',
+  confirmed: 'info',
+  processing: 'info',
+  shipped: 'info',
+  delivered: 'success',
+  cancelled: 'danger',
 };
 
 export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
@@ -179,39 +182,42 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
     }
   };
 
+  // KPI TILES (build plan §5): a neutral resting surface on the canvas, a
+  // quiet label, the figure as the one loud thing — no per-tile tint. A tile
+  // that opens a queue keeps its click and answers a pointer with a fill step.
   const statCard = (
     label: string,
     value: React.ReactNode,
     icon: React.ReactNode,
-    accent: string,
     onClick?: () => void
   ) => (
-    <div
-      onClick={onClick}
-      className={`bg-zinc-900 border border-white/5 rounded-xl p-3 shadow-sm flex items-center gap-2.5 ${onClick ? 'cursor-pointer hover:border-white/15 transition-colors' : ''}`}
-    >
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>{icon}</div>
-      <div className="min-w-0">
-        <div className="text-[9px] font-black uppercase tracking-wider text-zinc-500 mb-0.5">{label}</div>
-        <div className="text-[15px] font-black text-white truncate">{loading ? '…' : value}</div>
-      </div>
+    <div onClick={onClick} className="min-w-0">
+      <KpiTile
+        // The tile truncates its label; an Arabic label here is a sentence
+        // («تعبئة المحفظة (الموافق عليها)»), so it wraps instead of losing words.
+        label={<span className="whitespace-normal">{label}</span>}
+        value={value}
+        icon={icon}
+        loading={loading}
+        className={onClick ? 'h-full cursor-pointer transition-colors hover:bg-surface-raised' : 'h-full'}
+      />
     </div>
   );
 
   return (
-    <div className="space-y-4 text-white pb-10 font-sans" dir={dir}>
+    <div className="space-y-4 text-text-primary pb-10 font-sans" dir={dir}>
 
       {/* Top Bar */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 p-3 rounded-2xl shadow-xl">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3 w-full lg:w-auto">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#c5a059] via-[#e6c27a] to-[#708238] flex items-center justify-center shadow-lg shadow-gold/30 shrink-0 font-black text-sm text-snow">
+          <div className="w-9 h-9 rounded-lg bg-surface-raised border border-border-subtle flex items-center justify-center shrink-0 font-black text-sm text-text-primary">
             L
           </div>
           <div>
-            <h1 className="text-base font-black text-white flex items-center gap-2">
+            <h1 className="text-base font-black text-text-primary flex items-center gap-2">
               {dir === 'rtl' ? 'لوحة القيادة والإحصائيات' : 'Executive Overview Dashboard'}
             </h1>
-            <p className="text-[11px] text-zinc-400 font-medium">
+            <p className="text-[11px] text-text-secondary font-medium">
               {dir === 'rtl' ? 'إحصائيات حقيقية من قاعدة البيانات' : 'Live figures straight from the database'}
             </p>
           </div>
@@ -221,17 +227,17 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           <button
             onClick={fetchOverviewData}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 min-h-9 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-300 hover:text-white transition-all shadow-sm active:scale-95 disabled:opacity-50 text-[11px] font-bold"
+            className="lv-button lv-button-secondary lv-button-sm"
             title={dir === 'rtl' ? 'تحديث البيانات' : 'Refresh Data'}
           >
-            <Zap className="w-4 h-4 text-moss" />
+            <Zap className="w-4 h-4" />
             {loading ? (dir === 'rtl' ? 'جارٍ التحديث...' : 'Refreshing...') : dir === 'rtl' ? 'تحديث' : 'Refresh'}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[13px] font-medium">
+        <div className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">
           {error}
         </div>
       )}
@@ -239,63 +245,54 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       {/* Stat cards — all values come from GET /api/admin/overview.
           iPad portrait (768-1024) gets 3 columns and landscape 4: the old
           2-column xl-gated grid stacked 11 cards into six huge rows there. */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
         {statCard(
           dir === 'rtl' ? 'إجمالي الإيرادات' : 'Total Revenue',
           formatIqd(stats.revenue_iqd),
-          <TrendingUp className="w-5 h-5 text-gold" />,
-          'bg-gold/10'
+          <TrendingUp className="w-4 h-4" />
         )}
         {statCard(
           dir === 'rtl' ? 'إجمالي الطلبات' : 'Total Orders',
           stats.orders_total.toLocaleString(),
-          <ShoppingCart className="w-5 h-5 text-moss" />,
-          'bg-moss/10',
+          <ShoppingCart className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('orders') : undefined
         )}
         {statCard(
           dir === 'rtl' ? 'طلبات قيد الانتظار' : 'Pending Orders',
           stats.orders_pending.toLocaleString(),
-          <Clock className="w-5 h-5 text-yellow-400" />,
-          'bg-yellow-500/10',
+          <Clock className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('orders') : undefined
         )}
         {statCard(
           dir === 'rtl' ? 'طلبات مكتملة' : 'Delivered Orders',
           stats.orders_delivered.toLocaleString(),
-          <CheckCircle2 className="w-5 h-5 text-mint" />,
-          'bg-mint/10'
+          <CheckCircle2 className="w-4 h-4" />
         )}
         {statCard(
           dir === 'rtl' ? 'المستخدمون' : 'Total Users',
           stats.users_total.toLocaleString(),
-          <Users className="w-5 h-5 text-blue-400" />,
-          'bg-blue-500/10',
+          <Users className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('users') : undefined
         )}
         {statCard(
           dir === 'rtl' ? 'مشتركو Pro / Plus' : 'Pro / Plus Subscribers',
           `${stats.pro_subscribers.toLocaleString()} / ${stats.plus_subscribers.toLocaleString()}`,
-          <Crown className="w-5 h-5 text-wheat" />,
-          'bg-wheat/10'
+          <Crown className="w-4 h-4" />
         )}
         {statCard(
           dir === 'rtl' ? 'تعبئة المحفظة (الموافق عليها)' : 'Wallet Top-ups (approved)',
           formatWalletIqd(stats.incoming_usd_cents, exchangeRate),
-          <ArrowUpRight className="w-5 h-5 text-mint" />,
-          'bg-mint/10'
+          <ArrowUpRight className="w-4 h-4" />
         )}
         {statCard(
           dir === 'rtl' ? 'السحوبات (الموافق عليها)' : 'Wallet Payouts (approved)',
           formatWalletIqd(stats.outgoing_usd_cents, exchangeRate),
-          <ArrowDownRight className="w-5 h-5 text-pink-400" />,
-          'bg-pink-400/10'
+          <ArrowDownRight className="w-4 h-4" />
         )}
         {statCard(
           dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests',
           stats.pending_wallet_requests.toLocaleString(),
-          <Wallet className="w-5 h-5 text-gold" />,
-          'bg-gold/10',
+          <Wallet className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('wallet_requests') : undefined
         )}
         {/* THE SUPPORT QUEUE, on the first screen. «الدعم والتذاكر» shipped as a
@@ -313,21 +310,18 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             (stats.support_chats_unread || 0) +
             (stats.support_complaints_open || 0)
           ).toLocaleString(),
-          <LifeBuoy className="w-5 h-5 text-sky-400" />,
-          'bg-sky-500/10',
+          <LifeBuoy className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('support') : undefined
         )}
         {statCard(
           dir === 'rtl' ? 'طلبات المجتمع المفتوحة' : 'Open Community Requests',
           stats.open_community_requests.toLocaleString(),
-          <MessageSquare className="w-5 h-5 text-purple-400" />,
-          'bg-purple-500/10'
+          <MessageSquare className="w-4 h-4" />
         )}
         {statCard(
           dir === 'rtl' ? 'المستثمرون' : 'Investors',
           stats.investors.toLocaleString(),
-          <Users className="w-5 h-5 text-moss" />,
-          'bg-moss/10'
+          <Users className="w-4 h-4" />
         )}
       </div>
 
@@ -341,9 +335,9 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
         {/* Pending wallet requests — real list with working actions */}
-        <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 shadow-sm">
+        <div className="lv-surface p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
+            <h3 className="text-[12px] font-black uppercase tracking-wider text-text-secondary">
               {dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests'}
             </h3>
             {onNavigateTab && (
@@ -357,18 +351,18 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           </div>
 
           {loading && pendingWalletRequests.length === 0 ? (
-            <div className="text-center text-zinc-500 py-10 text-sm">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>
+            <div className="text-center text-text-muted py-10 text-sm">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>
           ) : pendingWalletRequests.length === 0 ? (
-            <div className="text-center text-zinc-500 py-10 text-sm border border-dashed border-zinc-800 rounded-2xl">
+            <div className="text-center text-text-muted py-10 text-sm border border-dashed border-border-subtle rounded-lg">
               {dir === 'rtl' ? 'لا توجد طلبات معلقة' : 'No pending requests'}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-border-subtle">
               {pendingWalletRequests.map((req) => (
-                <div key={req.id} className="p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-lg">
+                <div key={req.id} className="py-2.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-bold text-white text-sm truncate flex items-center gap-2">
+                      <div className="font-bold text-text-primary text-sm truncate flex items-center gap-2">
                         <span className="capitalize">{req.type}</span>
                         {/* EITHER KIND PRINTS WHAT THE CUSTOMER TYPED — a
                         withdrawal from its own row (migration 0106), a deposit
@@ -394,11 +388,11 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                         entirely would make the dinars look like the stored number and
                         a reconciliation against the ledger impossible. This is the
                         shape the Telegram review card already uses. */}
-                        <span className="text-[10px] font-normal text-zinc-600" dir="ltr">
+                        <span className="text-[10px] font-normal text-text-muted" dir="ltr">
                           {formatUsdCents(req.amount)}
                         </span>
                       </div>
-                      <div className="text-[11px] text-zinc-500 truncate">
+                      <div className="text-[11px] text-text-muted truncate">
                         {req.email || req.username || '—'}
                         {req.paymentMethod ? ` • ${req.paymentMethod}` : ''}
                       </div>
@@ -419,7 +413,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       <button
                         onClick={() => decideWallet(req, 'approved')}
                         disabled={!!loadingActionId}
-                        className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8a9a49] to-[#708238] text-snow flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
+                        className="lv-button lv-button-primary w-11 px-0"
                         title={req.type === 'withdrawal' && req.withdrawal
                           ? (dir === 'rtl' ? 'موافقة للمعالجة (لا يُدفع هنا)' : 'Approve for processing (no payout here)')
                           : (dir === 'rtl' ? 'موافقة' : 'Approve')}
@@ -429,7 +423,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                       <button
                         onClick={() => decideWallet(req, 'rejected')}
                         disabled={!!loadingActionId}
-                        className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-red-400 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
+                        className="lv-button lv-button-secondary w-11 px-0 hover:text-danger"
                         title={dir === 'rtl' ? 'رفض' : 'Reject'}
                       >
                         <X className="w-4 h-4 stroke-[3]" />
@@ -439,7 +433,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                     </div>
                   </div>
                   {actionError?.id === req.id && (
-                    <div className="text-[11px] text-red-400 mt-2">{actionError.message}</div>
+                    <div className="text-[11px] text-danger mt-2">{actionError.message}</div>
                   )}
                 </div>
               ))}
@@ -448,9 +442,9 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         </div>
 
         {/* Recent orders — real list */}
-        <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 shadow-sm">
+        <div className="lv-surface p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[12px] font-black uppercase tracking-wider text-zinc-300">
+            <h3 className="text-[12px] font-black uppercase tracking-wider text-text-secondary">
               {dir === 'rtl' ? 'أحدث الطلبات' : 'Recent Orders'}
             </h3>
             {onNavigateTab && (
@@ -464,29 +458,25 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           </div>
 
           {loading && recentOrders.length === 0 ? (
-            <div className="text-center text-zinc-500 py-10 text-sm">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>
+            <div className="text-center text-text-muted py-10 text-sm">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>
           ) : recentOrders.length === 0 ? (
-            <div className="text-center text-zinc-500 py-10 text-sm border border-dashed border-zinc-800 rounded-2xl">
+            <div className="text-center text-text-muted py-10 text-sm border border-dashed border-border-subtle rounded-lg">
               {dir === 'rtl' ? 'لا توجد طلبات بعد' : 'No orders yet'}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-border-subtle">
               {recentOrders.map((o) => (
                 <div
                   key={o.id}
-                  className="flex items-center justify-between gap-3 p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-lg"
+                  className="flex items-center justify-between gap-3 py-2.5"
                 >
                   <div className="min-w-0">
-                    <div className="font-mono text-xs text-zinc-300 truncate">{o.id}</div>
-                    <div className="text-[11px] text-zinc-500">{new Date(o.created_at).toLocaleString()}</div>
+                    <div className="font-mono text-xs text-text-secondary truncate">{o.id}</div>
+                    <div className="text-[11px] text-text-muted">{new Date(o.created_at).toLocaleString()}</div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-white whitespace-nowrap">{formatIqd(o.total_iqd)}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${ORDER_STATUS_COLORS[o.status] || 'bg-zinc-800 text-zinc-400'}`}
-                    >
-                      {o.status}
-                    </span>
+                    <span className="text-sm font-bold text-text-primary whitespace-nowrap tabular-nums">{formatIqd(o.total_iqd)}</span>
+                    <StatusChip tone={ORDER_STATUS_TONES[o.status] ?? 'neutral'}>{o.status}</StatusChip>
                   </div>
                 </div>
               ))}

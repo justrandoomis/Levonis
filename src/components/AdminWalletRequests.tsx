@@ -204,11 +204,11 @@ export default function AdminWalletRequests() {
     const wd = t.type === 'withdrawal' ? t.withdrawal : null;
     const state = wd ? wd.state : t.status;
     const cls =
-      state === 'pending' || state === 'requested' ? 'bg-wheat/20 text-apricot' :
-      state === 'approved' && wd ? 'bg-iris/20 text-iris' :
-      state === 'processing' ? 'bg-iris/20 text-iris' :
-      state === 'approved' || state === 'paid' ? 'bg-mint/20 text-aqua' :
-      'bg-red-400/20 text-scarlet';
+      state === 'pending' || state === 'requested' ? 'lv-chip [--chip:var(--color-warning)]' :
+      state === 'approved' && wd ? 'lv-chip [--chip:var(--color-info)]' :
+      state === 'processing' ? 'lv-chip [--chip:var(--color-info)]' :
+      state === 'approved' || state === 'paid' ? 'lv-chip [--chip:var(--color-success)]' :
+      'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]';
     return { text: wd?.needs_reconciliation ? `${state} · needs reconciliation` : state, cls };
   };
 
@@ -219,25 +219,25 @@ export default function AdminWalletRequests() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-black text-white">Wallet Requests</h2>
+          <h2 className="text-2xl font-black text-text-primary">Wallet Requests</h2>
           {pendingCount > 0 && (
-            <span className="bg-red-400 text-snow px-3 py-1 rounded-full text-xs font-bold shadow-sm">{pendingCount} Pending</span>
+            <span className="bg-crimson text-snow px-3 py-1 rounded-full text-xs font-bold tabular-nums">{pendingCount} Pending</span>
           )}
           <button
             onClick={fetchTransactions}
-            className="p-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors"
+            className="lv-button lv-button-secondary w-11 px-0"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
-        <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
+        <div className="flex lv-well border border-border-subtle p-1 rounded-xl">
           {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-colors ${filter === f ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-colors ${filter === f ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
             >
               {f}
             </button>
@@ -246,7 +246,7 @@ export default function AdminWalletRequests() {
       </div>
 
       {loadError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 text-sm font-medium">
+        <div className="lv-alert lv-alert-danger text-sm font-medium text-text-primary">
           {loadError}
         </div>
       )}
@@ -263,42 +263,40 @@ export default function AdminWalletRequests() {
             currentRate: exchangeRate,
           });
           return (
-          <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div key={t.id} className="lv-surface p-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner shrink-0 ${
-                  t.type === 'deposit' ? 'bg-mint/10 border-mint/20' : 'bg-pink-400/10 border-pink-400/20'
-                }`}>
-                  <Wallet className={`w-5 h-5 ${t.type === 'deposit' ? 'text-mint' : 'text-pink-400'}`} />
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 lv-well">
+                  <Wallet className={`w-5 h-5 ${t.type === 'deposit' ? 'text-success' : 'text-text-secondary'}`} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-white capitalize text-lg">{t.type}</h3>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider ${badgeFor(t).cls}`}>
+                    <h3 className="font-bold text-text-primary capitalize text-lg">{t.type}</h3>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${badgeFor(t).cls}`}>
                       {badgeFor(t).text}
                     </span>
                   </div>
-                  <div className="text-sm text-zinc-400 font-medium flex flex-wrap items-center gap-2">
-                    <span className="text-zinc-200">{t.email || t.username || t.userId || 'Unknown user'}</span>
+                  <div className="text-sm text-text-secondary font-medium flex flex-wrap items-center gap-2">
+                    <span className="text-text-primary">{t.email || t.username || t.userId || 'Unknown user'}</span>
                     {t.paymentMethod && (
                       <>
-                        <span className="text-zinc-600">•</span>
+                        <span className="text-text-muted">•</span>
                         <span className="uppercase">{t.paymentMethod}</span>
                       </>
                     )}
                     {t.withdrawal && channelName(t.withdrawal) && (
                       <>
-                        <span className="text-zinc-600">•</span>
-                        <span className="text-zinc-100 font-bold" data-withdrawal-channel>{channelName(t.withdrawal)}</span>
+                        <span className="text-text-muted">•</span>
+                        <span className="text-text-primary font-bold" data-withdrawal-channel>{channelName(t.withdrawal)}</span>
                       </>
                     )}
                     {t.accountNumber && (
                       <>
-                        <span className="text-zinc-600">•</span>
+                        <span className="text-text-muted">•</span>
                         <span dir="ltr">{t.accountNumber}</span>
                       </>
                     )}
-                    <span className="text-zinc-600">•</span>
+                    <span className="text-text-muted">•</span>
                     <span>{t.date ? new Date(t.date).toLocaleDateString() : '—'}</span>
                   </div>
                   {t.hasReceipt && t.receiptUrl && (
@@ -312,13 +310,13 @@ export default function AdminWalletRequests() {
                     </a>
                   )}
                   {t.note && (
-                    <div className="text-xs text-zinc-500 mt-1 max-w-md" title={t.note}>User note: {t.note}</div>
+                    <div className="text-xs text-text-muted mt-1 max-w-md" title={t.note}>User note: {t.note}</div>
                   )}
                 </div>
               </div>
 
-              <div className="flex flex-col md:items-end gap-2 border-t md:border-t-0 md:border-l border-zinc-800 pt-4 md:pt-0 md:pl-6">
-                <div className="text-xl font-black text-white tabular-nums">
+              <div className="flex flex-col md:items-end gap-2 border-t md:border-t-0 md:border-s border-border-subtle pt-4 md:pt-0 md:ps-6">
+                <div className="text-xl font-black text-text-primary tabular-nums">
                   {/* Every ledger row, including refunds, carries its exact
                       dinars when recorded. Older request testimony is the
                       fallback; conversion is only for unrecorded amounts. */}
@@ -330,7 +328,7 @@ export default function AdminWalletRequests() {
                     on this card — the Telegram review card already says
                     «المبلغ: X د.ع (الدفتر: $Y — سعر الصرف Z)» for the same
                     reason. */}
-                <div className="text-[11px] text-zinc-500 tabular-nums" dir="ltr">
+                <div className="text-[11px] text-text-muted tabular-nums" dir="ltr">
                   {formatUsdCents(t.amount)} · {display.rate.toLocaleString()} IQD/USD
                 </div>
                 {/**
@@ -371,14 +369,14 @@ export default function AdminWalletRequests() {
                   && t.withdrawal.fee_cents > 0 && (
                   <div className="w-full md:w-auto rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 mt-1">
                     <div className="flex items-baseline justify-between gap-4 md:justify-end">
-                      <span className="text-[10px] uppercase tracking-wide text-amber-200/70">Transfer</span>
-                      <span className="text-base font-bold text-amber-100 tabular-nums" data-withdrawal-transfer>
+                      <span className="text-[10px] uppercase tracking-wide text-warning">Transfer</span>
+                      <span className="text-base font-bold text-text-primary tabular-nums" data-withdrawal-transfer>
                         {typeof t.withdrawal.net_iqd === 'number'
                           ? formatIqd(t.withdrawal.net_iqd)
                           : formatWalletIqd(t.withdrawal.net_cents, t.withdrawal.exchange_rate_snapshot || exchangeRate)}
                       </span>
                     </div>
-                    <div className="text-[10px] text-zinc-500 tabular-nums mt-0.5 md:text-right" dir="ltr">
+                    <div className="text-[10px] text-text-muted tabular-nums mt-0.5 md:text-end" dir="ltr">
                       commission{' '}
                       {typeof t.withdrawal.fee_iqd === 'number'
                         ? formatIqd(t.withdrawal.fee_iqd)
@@ -395,8 +393,8 @@ export default function AdminWalletRequests() {
                         onClick={() => { setActionError(null); setDecision({ id: t.id, step: b.step, note: '' }); }}
                         disabled={!!loadingAction}
                         className={b.primary
-                          ? 'flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-snow px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-50'
-                          : 'flex items-center gap-1 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800/50 text-zinc-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm hover:scale-105 disabled:opacity-50'}
+                          ? 'lv-button lv-button-primary lv-button-sm'
+                          : 'lv-button lv-button-secondary lv-button-sm'}
                       >
                         {b.icon === 'check' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />} {b.label}
                       </button>
@@ -404,12 +402,12 @@ export default function AdminWalletRequests() {
                   </div>
                 )}
                 {t.type === 'withdrawal' && t.withdrawal?.payout_reference && (
-                  <div className="text-xs text-zinc-500 max-w-[220px] text-right truncate" title={t.withdrawal.payout_reference}>
+                  <div className="text-xs text-text-muted max-w-[220px] text-end truncate" title={t.withdrawal.payout_reference}>
                     Payout ref: {t.withdrawal.payout_reference}
                   </div>
                 )}
                 {t.adminNote && (
-                  <div className="text-xs text-zinc-500 max-w-[200px] text-right truncate" title={t.adminNote}>
+                  <div className="text-xs text-text-muted max-w-[200px] text-end truncate" title={t.adminNote}>
                     Note: {t.adminNote}
                   </div>
                 )}
@@ -418,13 +416,14 @@ export default function AdminWalletRequests() {
 
             {/* Inline decision panel with an admin-note input */}
             {decision?.id === t.id && (
-              <div className="mt-4 pt-4 border-t border-zinc-800">
+              <div className="mt-4 pt-4 border-t border-border-subtle">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                   <div className="flex-1">
-                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-1.5">
                       {noteLabel(decision.step)}
                     </label>
                     <input
+                      className="lv-input text-sm"
                       type="text"
                       value={decision.note}
                       onChange={e => setDecision({ ...decision, note: e.target.value })}
@@ -439,7 +438,6 @@ export default function AdminWalletRequests() {
                           : decision.step.action === 'fail' ? 'e.g. Channel refused the transfer'
                           : 'No note needed for this step'
                       }
-                      className="w-full bg-zinc-800 border border-zinc-700 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-iris/50"
                       autoFocus
                     />
                   </div>
@@ -447,18 +445,14 @@ export default function AdminWalletRequests() {
                     <button
                       onClick={confirmDecision}
                       disabled={!!loadingAction}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
-                        isPositive(decision.step)
-                          ? 'bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx'
-                          : 'bg-red-500/90 hover:bg-red-500 text-snow'
-                      }`}
+                      className={`lv-button ${isPositive(decision.step) ? 'lv-button-primary' : 'lv-button-danger'}`}
                     >
                       {loadingAction ? 'Working...' : confirmLabel(decision.step)}
                     </button>
                     <button
                       onClick={() => setDecision(null)}
                       disabled={!!loadingAction}
-                      className="px-4 py-2 rounded-xl text-sm font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-50"
+                      className="lv-button lv-button-ghost"
                     >
                       Cancel
                     </button>
@@ -468,7 +462,7 @@ export default function AdminWalletRequests() {
             )}
 
             {actionError?.id === t.id && (
-              <div className="mt-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-sm font-medium">
+              <div className="mt-3 lv-alert lv-alert-danger text-sm font-medium text-text-primary">
                 {actionError.message}
               </div>
             )}
@@ -476,12 +470,12 @@ export default function AdminWalletRequests() {
           );
         })}
         {!loading && filtered.length === 0 && (
-          <div className="text-center text-zinc-500 py-16 bg-zinc-900/50 border border-zinc-800/50 rounded-3xl border-dashed">
+          <div className="text-center text-text-muted py-16 rounded-xl border border-dashed border-border-subtle">
             No {filter !== 'all' ? filter : ''} requests found
           </div>
         )}
         {loading && transactions.length === 0 && (
-          <div className="text-center text-zinc-500 py-16 bg-zinc-900/50 border border-zinc-800/50 rounded-3xl border-dashed">
+          <div className="text-center text-text-muted py-16 rounded-xl border border-dashed border-border-subtle">
             Loading...
           </div>
         )}

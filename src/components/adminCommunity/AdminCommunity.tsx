@@ -39,6 +39,7 @@ import PayoutQueue from './PayoutQueue';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { usePrompt } from '../ui/PromptDialog';
 import { toast } from '../ui/Toast';
+import { StatusChip, type Tone } from '../ui/Badge';
 import { refusalText } from '../../lib/refusalStrings';
 import {
   adminCommunityApi, iqd, badgeLabel,
@@ -69,16 +70,16 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
   ];
 
   return (
-    <div className="text-white">
+    <div className="text-text-primary">
       <div className="flex gap-1.5 overflow-x-auto hide-scrollbar mb-6 pb-1">
         {SECTIONS.map((s) => (
           <button
             key={s.id}
             onClick={() => setSection(s.id)}
-            className={`shrink-0 flex items-center gap-2 px-4 min-h-[42px] rounded-2xl text-[13px] font-semibold border transition-colors ${
+            className={`shrink-0 flex items-center gap-2 px-4 min-h-[42px] rounded-full text-[13px] font-semibold border transition-colors ${
               section === s.id
-                ? 'bg-olive text-snow border-olive'
-                : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+                ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             <s.icon className="w-4 h-4" />
@@ -220,9 +221,9 @@ function Overview({ t }: { t: T }) {
       </div>
 
       {d.complaints.open > 0 && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-          <p className="text-amber-200 text-[13px]">
+        <div className="lv-alert lv-alert-warning flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
+          <p className="text-text-primary text-[13px]">
             {t(
               `${d.complaints.open} شكوى تنتظر المراجعة.`,
               `${d.complaints.open} complaints are waiting for review.`
@@ -314,15 +315,15 @@ function Merchants({ t }: { t: T }) {
   return (
     <div className="space-y-4">
       <div className="relative">
-        <Search className="w-4 h-4 text-zinc-500 absolute start-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+        <Search className="w-4 h-4 text-text-muted absolute start-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
         <input
+          className="lv-input min-h-[44px] rounded-full ps-10 pe-4 text-[13px]"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t('ابحث باسم التاجر أو المتجر…', 'Search by merchant or store name…')}
           aria-label={t('بحث', 'Search')}
           name="merchant-search"
           autoComplete="off"
-          className="w-full min-h-[44px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 ps-10 pe-4 text-white text-[13px] outline-none focus:border-gold/40"
         />
       </div>
 
@@ -333,24 +334,24 @@ function Merchants({ t }: { t: T }) {
         const rowBusy = busy === m.id;
         const address = m.store_url ? m.store_url.replace(/^https?:\/\//, '') : m.store_slug ? `@${m.store_slug}` : '';
         return (
-          <div key={m.id} className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4" data-admin-merchant={m.id}>
+          <div key={m.id} className="lv-surface p-4" data-admin-merchant={m.id}>
             <div className="flex items-start justify-between gap-3 mb-3">
               <button onClick={() => setOpen(m)} className="min-w-0 text-start">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-white font-semibold text-[14px] truncate">{m.name}</span>
+                  <span className="text-text-primary font-semibold text-[14px] truncate">{m.name}</span>
                   {!!m.verified && <BadgeCheck className="w-4 h-4 text-gold shrink-0" aria-label={t('موثّق', 'Verified')} />}
                 </div>
-                <p className="text-zinc-500 text-[11.5px] truncate">
+                <p className="text-text-muted text-[11.5px] truncate">
                   <span dir="ltr" translate="no">{address || t('لا يوجد متجر', 'no store')}</span> · {m.owner_email}
                 </p>
                 <div className="flex items-center gap-2 mt-1 text-[11px]">
                   <span className="text-gold/80">{badgeLabel(m.badge_override || m.badge, (ar, en) => t(ar, en))}</span>
                   {!!m.rating_count && (
-                    <span className="text-zinc-500 tabular-nums">
+                    <span className="text-text-muted tabular-nums">
                       {(m.rating_avg_x100 / 100).toFixed(1)} ★ ({m.rating_count})
                     </span>
                   )}
-                  <span className="text-zinc-500">
+                  <span className="text-text-muted">
                     {t(`${m.completed_orders} مكتمل`, `${m.completed_orders} completed`)}
                   </span>
                 </div>
@@ -361,7 +362,7 @@ function Merchants({ t }: { t: T }) {
             {state && (
               <p
                 className={`text-[11.5px] mb-3 ${
-                  state.tone === 'bad' ? 'text-red-300/90' : state.tone === 'warn' ? 'text-amber-300/90' : state.tone === 'ok' ? 'text-emerald-300/80' : 'text-zinc-500'
+                  state.tone === 'bad' ? 'text-danger' : state.tone === 'warn' ? 'text-warning' : state.tone === 'ok' ? 'text-success' : 'text-text-muted'
                 }`}
                 data-store-state
               >
@@ -472,24 +473,24 @@ function Merchants({ t }: { t: T }) {
             </div>
 
             {m.store_status === 'suspended' && m.status === 'suspended' && (
-              <p className="text-zinc-500 text-[11.5px] mt-2">
+              <p className="text-text-muted text-[11.5px] mt-2">
                 {t('أعد تفعيل التاجر أولًا، ثم أعد فتح المتجر إن لزم.', 'Restore the merchant first, then re-open the store if needed.')}
               </p>
             )}
             {m.status_reason && (
-              <p className="text-amber-300/80 text-[11.5px] mt-2">
+              <p className="text-warning text-[11.5px] mt-2">
                 {t('سبب حالة التاجر', 'Merchant status reason')}: {m.status_reason}
               </p>
             )}
             {m.store_status === 'suspended' && m.store_status_reason && (
-              <p className="text-amber-300/80 text-[11.5px] mt-1">
+              <p className="text-warning text-[11.5px] mt-1">
                 {t('سبب إيقاف المتجر', 'Store suspension reason')}: {m.store_status_reason}
               </p>
             )}
             {notes[m.id]?.text && (
               <p
                 role={notes[m.id].error ? 'alert' : 'status'}
-                className={`text-[11.5px] mt-2 ${notes[m.id].error ? 'text-red-300' : 'text-zinc-300'}`}
+                className={`text-[11.5px] mt-2 ${notes[m.id].error ? 'text-danger' : 'text-text-secondary'}`}
               >
                 {notes[m.id].text}
               </p>
@@ -533,15 +534,15 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px]">
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-text-secondary text-[13px]">
         <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
         {t('رجوع', 'Back')}
       </button>
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-white font-bold text-[15px]">{merchant.name}</h3>
-          <p className="text-zinc-500 text-[12px] truncate">{merchant.owner_email}</p>
+          <h3 className="text-text-primary font-bold text-[15px]">{merchant.name}</h3>
+          <p className="text-text-muted text-[12px] truncate">{merchant.owner_email}</p>
         </div>
         <Act
           label={t('السمعة والتقييمات', 'Reputation')}
@@ -551,7 +552,7 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
       </div>
 
       {finRefused === 'scope' ? (
-        <p className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 px-4 py-3 text-zinc-400 text-[12.5px]" data-finance-scope>
+        <p className="lv-alert lv-alert-info text-text-secondary text-[12.5px]" data-finance-scope>
           {t(
             'رصيد التاجر وسجله المالي والتحويلات للمالك أو الدور المالي فقط.',
             "The merchant's balance, ledger and payouts are for the owner or a financial admin only."
@@ -575,12 +576,12 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
               setPaying(true);
             }}
             disabled={fin.balance.available_iqd <= 0}
-            className="w-full min-h-[46px] rounded-2xl bg-olive text-snow font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
+            className="lv-button lv-button-primary w-full"
           >
             <Wallet className="w-4 h-4" aria-hidden="true" />
             {t('تسجيل تحويل للتاجر', 'Record a payout')}
           </button>
-          <p role="status" className={paid ? 'text-emerald-300 text-[12px] -mt-2' : 'sr-only'}>
+          <p role="status" className={paid ? 'text-success text-[12px] -mt-2' : 'sr-only'}>
             {paid}
           </p>
           <PayoutSheet
@@ -598,7 +599,7 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
             }}
             t={t}
           />
-          <p className="text-zinc-600 text-[11px] -mt-2">
+          <p className="text-text-muted text-[11px] -mt-2">
             {t(
               'يُسجَّل التحويل طلبَ سحب مدفوعًا: ينتقل المبلغ من «متاح» إلى «مدفوع» في السجل — الرصيد يظل مجموع الحركات ولا يُعدَّل يدويًا.',
               'A payout is recorded as a paid payout request: the amount moves from Available to Paid in the ledger — the balance stays a sum of entries and is never edited by hand.'
@@ -607,15 +608,15 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
 
           <Section title={t('الضمانات', 'Escrows')}>
             {!fin.escrows.length ? (
-              <p className="text-zinc-500 text-[12.5px]">{t('لا توجد', 'None')}</p>
+              <p className="text-text-muted text-[12.5px]">{t('لا توجد', 'None')}</p>
             ) : (
               <div className="space-y-2">
                 {fin.escrows.map((e) => (
                   <div key={e.id} className="flex items-center justify-between gap-3 text-[12.5px]">
-                    <span className="text-zinc-400 truncate" dir="ltr">{e.community_order_id}</span>
+                    <span className="text-text-secondary truncate" dir="ltr">{e.community_order_id}</span>
                     <div className="flex items-center gap-2 shrink-0">
                       <EscrowPill state={e.state} t={t} />
-                      <span className="text-white font-semibold" dir="ltr">{iqd(e.gross_iqd)}</span>
+                      <span className="text-text-primary font-semibold" dir="ltr">{iqd(e.gross_iqd)}</span>
                     </div>
                   </div>
                 ))}
@@ -625,16 +626,16 @@ function MerchantDetail({ merchant, t, onBack }: { merchant: AdminMerchantRow; t
 
           <Section title={t('سجل الحركات', 'Ledger')}>
             {!fin.ledger.length ? (
-              <p className="text-zinc-500 text-[12.5px]">{t('لا توجد حركات', 'No entries')}</p>
+              <p className="text-text-muted text-[12.5px]">{t('لا توجد حركات', 'No entries')}</p>
             ) : (
               <div className="space-y-1.5">
                 {fin.ledger.slice(0, 40).map((l) => (
                   <div key={String(l.id)} className="flex items-center justify-between gap-3 text-[12px]">
-                    <span className="text-zinc-400 truncate">
+                    <span className="text-text-secondary truncate">
                       {String(l.kind)} · {String(l.bucket ?? l.state ?? '')}
                     </span>
                     <span
-                      className={`font-semibold shrink-0 ${Number(l.amount_iqd) < 0 ? 'text-zinc-500' : 'text-gold'}`}
+                      className={`font-semibold shrink-0 ${Number(l.amount_iqd) < 0 ? 'text-text-muted' : 'text-gold'}`}
                       dir="ltr"
                     >
                       {Number(l.amount_iqd) < 0 ? '−' : '+'}
@@ -690,30 +691,30 @@ function MerchantProducts({ merchantId, t }: { merchantId: string; t: T }) {
 
   return (
     <Section title={t('المنتجات', 'Products')}>
-      {err && <p role="alert" className="text-red-300 text-[12px] mb-2">{err}</p>}
+      {err && <p role="alert" className="text-danger text-[12px] mb-2">{err}</p>}
       {rows === null ? (
         !err && <Spin />
       ) : !rows.length ? (
-        <p className="text-zinc-500 text-[12.5px]">{t('لا توجد منتجات', 'No products')}</p>
+        <p className="text-text-muted text-[12.5px]">{t('لا توجد منتجات', 'No products')}</p>
       ) : (
         <ul className="space-y-2" data-admin-products>
           {rows.map((p) => (
             <li key={p.id} className="flex items-center gap-3 min-w-0">
               {p.image ? (
-                <img src={p.image} alt="" width={40} height={40} loading="lazy" className="w-10 h-10 rounded-lg object-cover bg-zinc-800 shrink-0" />
+                <img src={p.image} alt="" width={40} height={40} loading="lazy" className="w-10 h-10 rounded-sm object-cover bg-surface-selected shrink-0" />
               ) : (
-                <span className="w-10 h-10 rounded-lg bg-zinc-800 shrink-0" aria-hidden="true" />
+                <span className="w-10 h-10 rounded-sm bg-surface-selected shrink-0" aria-hidden="true" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-white text-[13px] font-semibold truncate" dir="auto">{p.name_ar || p.name}</p>
+                <p className="text-text-primary text-[13px] font-semibold truncate" dir="auto">{p.name_ar || p.name}</p>
                 <p className="text-[11px] truncate">
                   {p.admin_hidden ? (
-                    <span className="text-red-300/90">
+                    <span className="text-danger">
                       {t('مخفي من الإدارة', 'Hidden by Levonis')}
                       {p.admin_hidden_reason ? ` — ${p.admin_hidden_reason}` : ''}
                     </span>
                   ) : (
-                    <span className={p.live ? 'text-emerald-300/80' : 'text-zinc-500'}>
+                    <span className={p.live ? 'text-success' : 'text-text-muted'}>
                       {p.live ? t('ظاهر في المتجر', 'Live on the store') : t('غير منشور', 'Not published')}
                     </span>
                   )}
@@ -800,12 +801,12 @@ function Board({ t }: { t: T }) {
   return (
     <div className="space-y-4">
       <div className="relative">
-        <Search className="w-4 h-4 text-zinc-500 absolute start-3 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-text-muted absolute start-3 top-1/2 -translate-y-1/2" />
         <input
+          className="lv-input min-h-[44px] rounded-full ps-10 pe-4 text-[13px]"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={t('ابحث بعنوان الطلب أو رقمه', 'Search by request title or id')}
-          className="w-full min-h-[44px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 ps-10 pe-4 text-white text-[13px] outline-none focus:border-gold/40"
         />
       </div>
 
@@ -814,10 +815,10 @@ function Board({ t }: { t: T }) {
           <button
             key={s || 'all'}
             onClick={() => setState(s)}
-            className={`shrink-0 min-h-[34px] px-3 rounded-xl text-[12px] font-semibold border transition-colors ${
+            className={`shrink-0 min-h-[34px] px-3 rounded-full text-[12px] font-semibold border transition-colors ${
               state === s
-                ? 'bg-olive text-snow border-olive'
-                : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+                ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {requestStateLabel(s, t)}
@@ -832,16 +833,16 @@ function Board({ t }: { t: T }) {
         <button
           key={r.id}
           onClick={() => setOpen(r.id)}
-          className="w-full text-start rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4"
+          className="w-full text-start lv-surface p-4 transition-colors hover:bg-surface-raised"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-white font-semibold text-[14px] truncate">{r.title}</p>
-              <p className="text-zinc-500 text-[11.5px] truncate">
+              <p className="text-text-primary font-semibold text-[14px] truncate">{r.title}</p>
+              <p className="text-text-muted text-[11.5px] truncate">
                 {r.customer_name || r.customer_email} · {r.governorate || t('غير محدد', 'no location')}
               </p>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 border-zinc-600/40 bg-zinc-700/20 text-zinc-300">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-white/[0.06] text-text-secondary">
               {requestStateLabel(r.state, t)}
             </span>
           </div>
@@ -849,14 +850,14 @@ function Board({ t }: { t: T }) {
             <span className="text-gold font-semibold">
               {t(`${r.offers_pending} عرض قيد الانتظار`, `${r.offers_pending} pending offers`)}
             </span>
-            <span className="text-zinc-500">
+            <span className="text-text-muted">
               {t(`${r.offers_total} إجمالي`, `${r.offers_total} total`)}
             </span>
             {r.budget_iqd ? (
-              <span className="text-zinc-400" dir="ltr">{t('الميزانية', 'Budget')} {iqd(r.budget_iqd)}</span>
+              <span className="text-text-secondary" dir="ltr">{t('الميزانية', 'Budget')} {iqd(r.budget_iqd)}</span>
             ) : null}
             {r.community_order_id && (
-              <span className="text-emerald-400/80">{t('يوجد طلب مرتبط', 'Has an order')}</span>
+              <span className="text-success">{t('يوجد طلب مرتبط', 'Has an order')}</span>
             )}
           </div>
         </button>
@@ -904,26 +905,26 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px]">
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-text-secondary text-[13px]">
         <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
         {t('رجوع', 'Back')}
       </button>
 
       <div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-white font-bold text-[15px]">{String(r.title ?? '')}</h3>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-zinc-600/40 bg-zinc-700/20 text-zinc-300">
+          <h3 className="text-text-primary font-bold text-[15px]">{String(r.title ?? '')}</h3>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-text-secondary">
             {requestStateLabel(state, t)}
           </span>
         </div>
-        <p className="text-zinc-500 text-[12px]">
+        <p className="text-text-muted text-[12px]">
           {String(r.customer_name ?? '')} · {String(r.customer_email ?? '')}
         </p>
       </div>
 
       {!!String(r.description ?? '') && (
         <Section title={t('الوصف', 'Description')}>
-          <p className="text-zinc-300 text-[12.5px] whitespace-pre-wrap">{String(r.description)}</p>
+          <p className="text-text-secondary text-[12.5px] whitespace-pre-wrap">{String(r.description)}</p>
         </Section>
       )}
 
@@ -947,8 +948,8 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           <div className="space-y-1.5">
             {d.files.map((f) => (
               <div key={f.id} className="flex items-center justify-between gap-3 text-[12px]">
-                <span className="text-zinc-300 truncate">{f.file_name}</span>
-                <span className="text-zinc-600 shrink-0" dir="ltr">
+                <span className="text-text-secondary truncate">{f.file_name}</span>
+                <span className="text-text-muted shrink-0" dir="ltr">
                   {f.kind} · {Math.round(f.size_bytes / 1024)} KB
                 </span>
               </div>
@@ -959,18 +960,18 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
 
       <Section title={t(`العروض (${d.offers.length})`, `Offers (${d.offers.length})`)}>
         {!d.offers.length ? (
-          <p className="text-zinc-500 text-[12.5px]">{t('لا توجد عروض', 'No offers')}</p>
+          <p className="text-text-muted text-[12.5px]">{t('لا توجد عروض', 'No offers')}</p>
         ) : (
           <div className="space-y-3">
             {d.offers.map((o) => (
-              <div key={o.id} className="rounded-xl border border-zinc-700/40 bg-zinc-900/40 p-3">
+              <div key={o.id} className="rounded-lg bg-surface-raised p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-white font-semibold text-[13px] truncate">{o.merchant_name}</span>
+                      <span className="text-text-primary font-semibold text-[13px] truncate">{o.merchant_name}</span>
                       {!!o.verified && <BadgeCheck className="w-3.5 h-3.5 text-gold shrink-0" />}
                     </div>
-                    <p className="text-zinc-500 text-[11px] truncate">
+                    <p className="text-text-muted text-[11px] truncate">
                       {/* The slug names the store; the domain is configuration,
                           never typed into the panel (audit 04 #25). */}
                       {o.store_slug ? <span dir="ltr" translate="no">@{o.store_slug}</span> : t('لا يوجد متجر', 'no store')}
@@ -979,18 +980,18 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                   </div>
                   <div className="text-end shrink-0">
                     <p className="text-gold font-bold text-[13.5px]" dir="ltr">{iqd(o.price_iqd)}</p>
-                    <p className="text-zinc-600 text-[10.5px]">
+                    <p className="text-text-muted text-[10.5px]">
                       {t(`${o.completion_days} يوم`, `${o.completion_days} days`)}
                     </p>
                   </div>
                 </div>
 
                 {!!o.message && (
-                  <p className="text-zinc-400 text-[12px] mt-2 whitespace-pre-wrap">{o.message}</p>
+                  <p className="text-text-secondary text-[12px] mt-2 whitespace-pre-wrap">{o.message}</p>
                 )}
 
                 <div className="flex items-center justify-between gap-3 mt-2.5">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-zinc-600/40 bg-zinc-700/20 text-zinc-300">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-text-secondary">
                     {offerStateLabel(o.state, t)}
                   </span>
                   {o.state === 'pending' && (
@@ -1030,13 +1031,13 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           </div>
           {d.escrow ? (
             <div className="flex items-center justify-between gap-3 text-[12.5px]">
-              <span className="text-zinc-400">{t('حالة الضمان', 'Escrow state')}</span>
+              <span className="text-text-secondary">{t('حالة الضمان', 'Escrow state')}</span>
               <EscrowPill state={d.escrow.state} t={t} />
             </div>
           ) : (
-            <p className="text-zinc-500 text-[12.5px]">{t('لا يوجد ضمان بعد', 'No escrow yet')}</p>
+            <p className="text-text-muted text-[12.5px]">{t('لا يوجد ضمان بعد', 'No escrow yet')}</p>
           )}
-          <p className="text-zinc-600 text-[11px] mt-2">
+          <p className="text-text-muted text-[11px] mt-2">
             {t(
               'تحرير الأموال أو إرجاعها يتم من قسم النزاعات، مع سبب مسجَّل.',
               'Releasing or refunding is done from the Disputes section, with a recorded reason.'
@@ -1073,7 +1074,7 @@ function RequestDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
               });
             }}
           />
-          <p className="text-zinc-600 text-[11px] mt-2">
+          <p className="text-text-muted text-[11px] mt-2">
             {t(
               'الإزالة تُلغي الطلب ولا تحذفه — يبقى في السجل مع سببه.',
               'Removal cancels the request; nothing is deleted. It stays on the record with its reason.'
@@ -1148,20 +1149,20 @@ function Reputation({ t }: { t: T }) {
           <button
             key={f.v || 'all'}
             onClick={() => setHidden(f.v)}
-            className={`min-h-[34px] px-3 rounded-xl text-[12px] font-semibold border transition-colors ${
-              hidden === f.v ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            className={`min-h-[34px] px-3 rounded-full text-[12px] font-semibold border transition-colors ${
+              hidden === f.v ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {f.label}
           </button>
         ))}
-        <span className="w-px bg-zinc-700/50 mx-1" />
+        <span className="w-px bg-border-subtle mx-1" />
         {[5, 3, 2].map((n) => (
           <button
             key={n}
             onClick={() => setMaxRating(n)}
-            className={`min-h-[34px] px-3 rounded-xl text-[12px] font-semibold border transition-colors ${
-              maxRating === n ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            className={`min-h-[34px] px-3 rounded-full text-[12px] font-semibold border transition-colors ${
+              maxRating === n ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {n === 5 ? t('كل التقييمات', 'Any rating') : t(`${n} نجوم فأقل`, `${n}★ and below`)}
@@ -1175,41 +1176,39 @@ function Reputation({ t }: { t: T }) {
       {rows?.map((rv) => (
         <div
           key={rv.id}
-          className={`rounded-2xl border p-4 ${
-            rv.hidden ? 'border-amber-500/25 bg-amber-500/[0.05]' : 'border-zinc-700/50 bg-zinc-800/30'
-          }`}
+          className={`p-4 ${rv.hidden ? 'rounded-xl border border-amber-500/25 bg-amber-500/[0.05]' : 'lv-surface'}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <button
                 onClick={() => setOpen({ id: rv.merchant_id, name: rv.merchant_name })}
-                className="text-white font-semibold text-[13.5px] truncate hover:text-gold transition-colors"
+                className="text-text-primary font-semibold text-[13.5px] truncate hover:text-gold transition-colors"
               >
                 {rv.merchant_name}
               </button>
-              <p className="text-zinc-500 text-[11.5px] truncate">
+              <p className="text-text-muted text-[11.5px] truncate">
                 {rv.customer_name || rv.customer_email} ·{' '}
                 {rv.community_order_id ? t('طلب مجتمع', 'community order') : t('طلب متجر', 'store order')}
               </p>
             </div>
             <div className="shrink-0 text-end">
-              <p className="text-gold font-bold text-[13px]">{'★'.repeat(rv.rating)}<span className="text-zinc-700">{'★'.repeat(5 - rv.rating)}</span></p>
+              <p className="text-gold font-bold text-[13px]">{'★'.repeat(rv.rating)}<span className="text-text-muted">{'★'.repeat(5 - rv.rating)}</span></p>
               {!!rv.hidden && (
-                <span className="text-amber-300 text-[10px] font-bold">{t('مخفي', 'Hidden')}</span>
+                <span className="text-warning text-[10px] font-bold">{t('مخفي', 'Hidden')}</span>
               )}
             </div>
           </div>
 
-          {!!rv.body && <p className="text-zinc-300 text-[12.5px] mt-2 whitespace-pre-wrap">{rv.body}</p>}
+          {!!rv.body && <p className="text-text-secondary text-[12.5px] mt-2 whitespace-pre-wrap">{rv.body}</p>}
           {!!rv.merchant_reply && (
-            <p className="text-zinc-400 text-[12px] mt-2 ps-3 border-s-2 border-zinc-700">
-              <span className="text-zinc-500">{t('رد التاجر', 'Merchant reply')}: </span>
+            <p className="text-text-secondary text-[12px] mt-2 ps-3 border-s-2 border-border-subtle">
+              <span className="text-text-muted">{t('رد التاجر', 'Merchant reply')}: </span>
               {rv.merchant_reply}
             </p>
           )}
 
           <div className="flex items-center justify-between gap-3 mt-3">
-            <span className="text-zinc-600 text-[11px]">
+            <span className="text-text-muted text-[11px]">
               {t(
                 `متوسط التاجر ${(rv.rating_avg_x100 / 100).toFixed(1)} من ${rv.rating_count}`,
                 `Merchant averages ${(rv.rating_avg_x100 / 100).toFixed(1)} over ${rv.rating_count}`
@@ -1266,12 +1265,12 @@ function MerchantReputation({
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px]">
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-text-secondary text-[13px]">
         <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
         {t('رجوع', 'Back')}
       </button>
 
-      <h3 className="text-white font-bold text-[15px]">{name}</h3>
+      <h3 className="text-text-primary font-bold text-[15px]">{name}</h3>
 
       <div className="grid grid-cols-3 gap-3">
         <Stat
@@ -1289,12 +1288,12 @@ function MerchantReputation({
             purpose: pinning one should be a decision made in full view of
             what the published criteria already award (§42). */}
         <div className="flex items-center justify-between gap-3 text-[12.5px] mb-3">
-          <span className="text-zinc-400">{t('المستحقة بالمعايير', 'Earned by the criteria')}</span>
-          <span className="text-white font-semibold">{badgeLabel(d.earned_badge, (ar, en) => t(ar, en))}</span>
+          <span className="text-text-secondary">{t('المستحقة بالمعايير', 'Earned by the criteria')}</span>
+          <span className="text-text-primary font-semibold">{badgeLabel(d.earned_badge, (ar, en) => t(ar, en))}</span>
         </div>
         <div className="flex items-center justify-between gap-3 text-[12.5px] mb-3">
-          <span className="text-zinc-400">{t('المثبتة إداريًا', 'Pinned by an admin')}</span>
-          <span className={d.badge_override ? 'text-gold font-semibold' : 'text-zinc-600'}>
+          <span className="text-text-secondary">{t('المثبتة إداريًا', 'Pinned by an admin')}</span>
+          <span className={d.badge_override ? 'text-gold font-semibold' : 'text-text-muted'}>
             {d.badge_override ? badgeLabel(d.badge_override, (ar, en) => t(ar, en)) : t('لا شيء', 'none')}
           </span>
         </div>
@@ -1308,7 +1307,7 @@ function MerchantReputation({
             />
           ))}
         </div>
-        <p className="text-zinc-600 text-[11px] mt-2">
+        <p className="text-text-muted text-[11px] mt-2">
           {t(
             'إلغاء التثبيت يعيد التاجر إلى الشارة التي تستحقها معاييره تلقائيًا.',
             'Clearing the override returns the merchant to the badge their record earns.'
@@ -1318,18 +1317,18 @@ function MerchantReputation({
 
       <Section title={t('توزيع التقييمات', 'Rating breakdown')}>
         {!total ? (
-          <p className="text-zinc-500 text-[12.5px]">{t('لا توجد تقييمات ظاهرة', 'No visible reviews')}</p>
+          <p className="text-text-muted text-[12.5px]">{t('لا توجد تقييمات ظاهرة', 'No visible reviews')}</p>
         ) : (
           <div className="space-y-1.5">
             {[5, 4, 3, 2, 1].map((star) => {
               const n = d.breakdown.find((b) => b.rating === star)?.n ?? 0;
               return (
                 <div key={star} className="flex items-center gap-2 text-[11.5px]">
-                  <span className="text-zinc-500 w-6 shrink-0" dir="ltr">{star}★</span>
-                  <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <span className="text-text-muted w-6 shrink-0" dir="ltr">{star}★</span>
+                  <div className="flex-1 h-2 rounded-full lv-well overflow-hidden">
                     <div className="h-full bg-gold/70" style={{ width: `${total ? (n / total) * 100 : 0}%` }} />
                   </div>
-                  <span className="text-zinc-500 w-8 text-end shrink-0" dir="ltr">{n}</span>
+                  <span className="text-text-muted w-8 text-end shrink-0" dir="ltr">{n}</span>
                 </div>
               );
             })}
@@ -1365,11 +1364,11 @@ function MerchantReputation({
             act(() => adminCommunityApi.adjustReputation(id, Math.trunc(Number(raw)), note));
           }}
           disabled={busy}
-          className="w-full min-h-[42px] rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 text-[12.5px] font-semibold mb-3 disabled:opacity-40"
+          className="lv-button lv-button-secondary w-full mb-3"
         >
           {t('إضافة تعديل إداري', 'Add an admin adjustment')}
         </button>
-        <p className="text-zinc-600 text-[11px] mb-3">
+        <p className="text-text-muted text-[11px] mb-3">
           {t(
             'الخطأ في السمعة يُصحَّح بحدث جديد يُضاف، لا بتعديل حدث قديم أو حذفه.',
             'A mistaken reputation event is corrected by adding another event, never by editing or deleting the first.'
@@ -1377,17 +1376,17 @@ function MerchantReputation({
         </p>
 
         {!d.events.length ? (
-          <p className="text-zinc-500 text-[12.5px]">{t('لا توجد أحداث', 'No events')}</p>
+          <p className="text-text-muted text-[12.5px]">{t('لا توجد أحداث', 'No events')}</p>
         ) : (
           <div className="space-y-1.5">
             {d.events.map((e) => (
               <div key={e.id} className="flex items-start justify-between gap-3 text-[12px]">
                 <div className="min-w-0">
-                  <span className="text-zinc-300">{reputationKindLabel(e.kind, t)}</span>
-                  {!!e.note && <p className="text-zinc-600 text-[11px] truncate">{e.note}</p>}
+                  <span className="text-text-secondary">{reputationKindLabel(e.kind, t)}</span>
+                  {!!e.note && <p className="text-text-muted text-[11px] truncate">{e.note}</p>}
                 </div>
                 <span
-                  className={`font-semibold shrink-0 ${e.points < 0 ? 'text-red-300' : e.points > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}
+                  className={`font-semibold shrink-0 ${e.points < 0 ? 'text-danger' : e.points > 0 ? 'text-success' : 'text-text-muted'}`}
                   dir="ltr"
                 >
                   {e.points > 0 ? '+' : ''}{e.points}
@@ -1426,8 +1425,8 @@ function reputationKindLabel(k: string, t: T): string {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-zinc-600 text-[11px]">{label}</p>
-      <p className="text-zinc-300">{value}</p>
+      <p className="text-text-muted text-[11px]">{label}</p>
+      <p className="text-text-secondary">{value}</p>
     </div>
   );
 }
@@ -1459,8 +1458,8 @@ function Disputes({ t }: { t: T }) {
           <button
             key={s || 'all'}
             onClick={() => setFilter(s)}
-            className={`shrink-0 px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
-              filter === s ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            className={`shrink-0 px-3.5 min-h-[36px] rounded-full text-[12px] font-semibold border transition-colors ${
+              filter === s ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {s ? complaintStatusLabel(s, t) : t('الكل', 'All')}
@@ -1474,30 +1473,30 @@ function Disputes({ t }: { t: T }) {
         <button
           key={c.id}
           onClick={() => setOpen(c.id)}
-          className="w-full text-start rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4"
+          className="w-full text-start lv-surface p-4 transition-colors hover:bg-surface-raised"
         >
           <div className="flex items-start justify-between gap-3 mb-1.5">
-            <span className="text-white font-semibold text-[13.5px]">
+            <span className="text-text-primary font-semibold text-[13.5px]">
               {c.merchant_name ?? t('شكوى عامة', 'General complaint')}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
               {/* The same rule as the console's «الشكاوى» count: the reporter
                   (or the merchant) wrote last, or nobody has answered yet. */}
               {c.awaiting_reply === 1 && (
-                <span data-complaint-awaiting className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300">
+                <span data-complaint-awaiting className="text-[10px] font-bold px-1.5 py-0.5 rounded-full lv-chip [--chip:var(--color-info)]">
                   {t('بانتظار الرد', 'Awaiting a reply')}
                 </span>
               )}
               {c.priority === 'urgent' && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-300">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]">
                   {t('عاجل', 'Urgent')}
                 </span>
               )}
               <ComplaintPill status={c.status} t={t} />
             </div>
           </div>
-          <p className="text-zinc-400 text-[12.5px] line-clamp-2 leading-relaxed">{c.description}</p>
-          <p className="text-zinc-600 text-[11px] mt-1.5">
+          <p className="text-text-secondary text-[12.5px] line-clamp-2 leading-relaxed">{c.description}</p>
+          <p className="text-text-muted text-[11px] mt-1.5">
             {t('من', 'From')}: {c.reporter_name} · {c.category}
           </p>
         </button>
@@ -1772,14 +1771,14 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-zinc-400 text-[13px]">
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-text-secondary text-[13px]">
         <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
         {t('رجوع', 'Back')}
       </button>
 
       <Section title={t('الشكوى', 'The complaint')}>
-        <p className="text-zinc-200 text-[13px] leading-relaxed whitespace-pre-wrap mb-3">{d.complaint.description}</p>
-        <div className="flex flex-wrap gap-2 text-[11.5px] text-zinc-500">
+        <p className="text-text-primary text-[13px] leading-relaxed whitespace-pre-wrap mb-3">{d.complaint.description}</p>
+        <div className="flex flex-wrap gap-2 text-[11.5px] text-text-muted">
           <span>{t('من', 'From')}: {d.complaint.reporter_name}</span>
           <span>·</span>
           <span>{d.complaint.category}</span>
@@ -1790,7 +1789,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
 
       <Section title={t('المحادثة', 'The conversation')}>
         {!d.messages.length && (
-          <p className="text-zinc-600 text-[12px] mb-3">
+          <p className="text-text-muted text-[12px] mb-3">
             {t('لا توجد رسائل بعد — أول رد يبدأ من هنا.', 'No messages yet — the first reply starts here.')}
           </p>
         )}
@@ -1802,18 +1801,18 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           {d.messages.map((m) => (
             <div
               key={m.id}
-              className={`rounded-2xl px-3.5 py-2.5 border ${
+              className={`rounded-xl px-3.5 py-2.5 border ${
                 m.internal
                   ? 'border-amber-500/30 bg-amber-500/5'
                   : m.sender_role === 'admin'
                     ? 'border-olive/40 bg-olive/10'
-                    : 'border-zinc-700/50 bg-zinc-800/30'
+                    : 'border-border-subtle bg-surface-raised'
               } ${m.pending ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-zinc-400 text-[11px]">{m.sender_name ?? m.sender_role}</span>
+                <span className="text-text-secondary text-[11px]">{m.sender_name ?? m.sender_role}</span>
                 {!!m.internal && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full lv-chip [--chip:var(--color-warning)]">
                     {t('ملاحظة داخلية — لا يراها أحد الطرفين', 'Internal note — neither party sees it')}
                   </span>
                 )}
@@ -1823,7 +1822,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                 url={m.file_url ?? (m.file_key ? `/files/${m.file_key}` : null)}
                 openLabel={t('فتح الصورة بالحجم الكامل', 'Open the full-size image')}
               />
-              {!!m.body && <p className="text-zinc-200 text-[13px] leading-relaxed whitespace-pre-wrap">{m.body}</p>}
+              {!!m.body && <p className="text-text-primary text-[13px] leading-relaxed whitespace-pre-wrap">{m.body}</p>}
             </div>
           ))}
         </div>
@@ -1834,14 +1833,14 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             bottom edge of the screen (see `composerRef`). It is not sticky on
             purpose — a sticky bar here covered the newest message of the very
             box above it on a phone (measured at 360px). */}
-        <div ref={composerRef} className="border-t border-zinc-700/50 pt-3" data-complaint-composer>
+        <div ref={composerRef} className="border-t border-border-subtle pt-3" data-complaint-composer>
         <textarea
+          className="lv-input py-2.5 text-[13px]"
           value={reply}
           onChange={(e) => setReply(e.target.value)}
           rows={2}
           maxLength={4000}
           placeholder={t('اكتب ردك على الشكوى…', 'Write your reply to the complaint…')}
-          className="w-full rounded-2xl border border-zinc-700/50 bg-zinc-900/60 px-3.5 py-2.5 text-[13px] text-zinc-100 placeholder:text-zinc-600"
         />
         <div className="flex flex-wrap items-center gap-2 mt-2">
           {/* Two named buttons, not one checkbox: the admin picks what this
@@ -1850,8 +1849,8 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           <button
             type="button"
             onClick={() => setInternal(false)}
-            className={`px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
-              !internal ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            className={`px-3.5 min-h-[36px] rounded-full text-[12px] font-semibold border transition-colors ${
+              !internal ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {t('رد يراه صاحب الشكوى', 'Reply the reporter sees')}
@@ -1859,10 +1858,10 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           <button
             type="button"
             onClick={() => setInternal(true)}
-            className={`px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
+            className={`px-3.5 min-h-[36px] rounded-full text-[12px] font-semibold border transition-colors ${
               internal
-                ? 'bg-amber-500/20 text-amber-200 border-amber-500/50'
-                : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+                ? 'border-transparent bg-[var(--clay-well-bg)] text-warning shadow-press'
+                : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {t('ملاحظة داخلية', 'Internal note')}
@@ -1875,7 +1874,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             aria-label={t('إرفاق صورة أو فيديو', 'Attach a photo or video')}
             title={t('إرفاق صورة أو فيديو', 'Attach a photo or video')}
             data-complaint-attach
-            className="ms-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 disabled:opacity-40"
+            className="ms-auto lv-button lv-button-secondary w-11 px-0"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
           </button>
@@ -1883,12 +1882,12 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             type="button"
             onClick={send}
             disabled={busy || uploading || !reply.trim()}
-            className="px-5 min-h-[40px] rounded-2xl bg-olive text-snow font-bold text-[13px] disabled:opacity-40"
+            className="lv-button lv-button-primary px-5"
           >
             {t('إرسال', 'Send')}
           </button>
         </div>
-        {!!replyError && <p className="text-red-300 text-[12px] mt-2">{replyError}</p>}
+        {!!replyError && <p className="text-danger text-[12px] mt-2">{replyError}</p>}
         </div>
       </Section>
 
@@ -1901,11 +1900,11 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
           </div>
 
           {settled ? (
-            <div className="rounded-2xl border border-zinc-700/50 bg-zinc-800/40 px-4 py-3">
-              <p className="text-zinc-300 text-[12.5px]">
+            <div className="rounded-lg bg-surface-raised px-4 py-3">
+              <p className="text-text-secondary text-[12.5px]">
                 {t('تمت التسوية:', 'Already settled:')} <EscrowPill state={d.escrow.state} t={t} />
               </p>
-              <p className="text-zinc-600 text-[11.5px] mt-1">
+              <p className="text-text-muted text-[11.5px] mt-1">
                 {t(
                   'لا يمكن تغيير تسوية منتهية — أي تصحيح يكون حركة جديدة.',
                   'A completed settlement cannot be changed — a correction is a new movement.'
@@ -1917,21 +1916,21 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
               <button
                 onClick={() => settle('release')}
                 disabled={busy}
-                className="w-full min-h-[46px] rounded-2xl bg-olive text-snow font-bold text-[13px] disabled:opacity-40"
+                className="lv-button lv-button-primary w-full"
               >
                 {t('تحرير المبلغ للتاجر', 'Release to the merchant')}
               </button>
               <button
                 onClick={() => settle('refund')}
                 disabled={busy}
-                className="w-full min-h-[46px] rounded-2xl border border-amber-500/40 bg-amber-500/10 text-amber-300 font-semibold text-[13px] disabled:opacity-40"
+                className="lv-button lv-button-secondary w-full text-warning"
               >
                 {t('إرجاع كامل للعميل', 'Refund the customer in full')}
               </button>
               <button
                 onClick={() => settle('partial_refund')}
                 disabled={busy}
-                className="w-full min-h-[46px] rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 font-semibold text-[13px] disabled:opacity-40"
+                className="lv-button lv-button-secondary w-full"
               >
                 {t('إرجاع جزئي', 'Partial refund')}
               </button>
@@ -1948,12 +1947,12 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
             {d.escrow_events.map((e) => (
               <div key={String(e.id)} className="flex items-start justify-between gap-3 text-[12px]">
                 <div className="min-w-0">
-                  <p className="text-zinc-300">
-                    {String(e.kind)} <span className="text-zinc-600">· {String(e.actor_role)}</span>
+                  <p className="text-text-secondary">
+                    {String(e.kind)} <span className="text-text-muted">· {String(e.actor_role)}</span>
                   </p>
-                  {!!e.reason && <p className="text-zinc-600 text-[11px] truncate">{String(e.reason)}</p>}
+                  {!!e.reason && <p className="text-text-muted text-[11px] truncate">{String(e.reason)}</p>}
                 </div>
-                <span className="text-zinc-400 shrink-0" dir="ltr">
+                <span className="text-text-secondary shrink-0" dir="ltr">
                   {Number(e.amount_iqd) ? iqd(Number(e.amount_iqd)) : '—'}
                 </span>
               </div>
@@ -1987,7 +1986,7 @@ function DisputeDetail({ id, t, onBack }: { id: string; t: T; onBack: () => void
                   setBusy(false);
                 }
               }}
-              className="px-3 min-h-[36px] rounded-xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 text-[12px] font-semibold disabled:opacity-40"
+              className="lv-button lv-button-secondary lv-button-sm"
             >
               {complaintStatusLabel(s, t)}
             </button>
@@ -2019,24 +2018,24 @@ function Finance({ t }: { t: T }) {
 
       <Section title={t('الأموال حسب الحالة', 'Money by escrow state')}>
         {!d.escrows.length ? (
-          <p className="text-zinc-500 text-[12.5px]">{t('لا توجد ضمانات', 'No escrows yet')}</p>
+          <p className="text-text-muted text-[12.5px]">{t('لا توجد ضمانات', 'No escrows yet')}</p>
         ) : (
           <div className="space-y-2.5">
             {d.escrows.map((e) => (
               <div key={e.state} className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <EscrowPill state={e.state} t={t} />
-                  <span className="text-zinc-500 text-[11.5px]">
+                  <span className="text-text-muted text-[11.5px]">
                     {t(`${e.n} طلب`, `${e.n} orders`)}
                   </span>
                 </div>
-                <span className="text-white font-semibold text-[13px] shrink-0" dir="ltr">
+                <span className="text-text-primary font-semibold text-[13px] shrink-0" dir="ltr">
                   {iqd(e.total)}
                 </span>
               </div>
             ))}
-            <div className="pt-2.5 mt-1 border-t border-zinc-700/50 flex items-center justify-between">
-              <span className="text-zinc-400 text-[12.5px] font-semibold">{t('الإجمالي', 'Total')}</span>
+            <div className="pt-2.5 mt-1 border-t border-border-subtle flex items-center justify-between">
+              <span className="text-text-secondary text-[12.5px] font-semibold">{t('الإجمالي', 'Total')}</span>
               <span className="text-gold font-bold text-[14px]" dir="ltr">{iqd(total)}</span>
             </div>
           </div>
@@ -2048,7 +2047,7 @@ function Finance({ t }: { t: T }) {
           <Stat label={t('عمولة محقّقة', 'Commission earned')} value={iqd(d.orders.fees)} accent />
           <Stat label={t('حجم التداول', 'Gross volume')} value={iqd(d.orders.gross)} />
         </div>
-        <p className="text-zinc-600 text-[11px] mt-3 leading-relaxed">
+        <p className="text-text-muted text-[11px] mt-3 leading-relaxed">
           {t(
             'كل طلب يحمل نسخة من نسبة العمولة وقت البيع. تغيير النسبة لا يُعيد حساب أي طلب سابق.',
             'Every order carries a snapshot of the commission rate at the time of sale. Changing the rate never recalculates a past order.'
@@ -2112,18 +2111,18 @@ function StoreOrderReconciliation({ t }: { t: T }) {
       {state === 'loading' ? (
         <Spin />
       ) : state === 'scope' ? (
-        <p className="text-zinc-400 text-[12.5px]" data-finance-scope>
+        <p className="text-text-secondary text-[12.5px]" data-finance-scope>
           {t('هذه القائمة وقراراتها للمالك أو الدور المالي فقط.', 'This list and its decisions are for the owner or a financial admin only.')}
         </p>
       ) : state === 'error' || !data ? (
         <Err text={t('تعذّر تحميل القائمة.', 'Could not load the list.')} />
       ) : !data.refunded_reopened.length && !data.cancelled_unrefunded.length ? (
-        <p className="text-zinc-500 text-[12.5px]" data-reconcile-empty>
+        <p className="text-text-muted text-[12.5px]" data-reconcile-empty>
           {t('لا توجد طلبات تحتاج مطابقة.', 'Nothing needs reconciling.')}
         </p>
       ) : (
         <div className="space-y-4" data-store-reconciliation>
-          <p className="text-zinc-500 text-[11.5px] leading-relaxed">
+          <p className="text-text-muted text-[11.5px] leading-relaxed">
             {t(
               'طلبات تركها النظام القديم بمال في غير مكانه. العرض لا يغيّر شيئًا؛ كل طلب يُصحَّح بقرار منفرد وسبب يُسجَّل.',
               'Orders the old code left with money in the wrong place. Looking changes nothing; each order is put right by its own decision, with a reason on the record.'
@@ -2132,15 +2131,15 @@ function StoreOrderReconciliation({ t }: { t: T }) {
 
           {data.cancelled_unrefunded.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-zinc-300 text-[12.5px] font-semibold">
+              <h4 className="text-text-secondary text-[12.5px] font-semibold">
                 {t('ملغاة ومدفوعة ولم يُعَد مبلغها', 'Cancelled and paid, never refunded')}
               </h4>
               {data.cancelled_unrefunded.map((o) => (
-                <div key={o.order_id} className="flex items-center justify-between gap-3 border-t border-zinc-700/40 pt-2">
+                <div key={o.order_id} className="flex items-center justify-between gap-3 border-t border-border-subtle pt-2">
                   <div className="min-w-0">
-                    <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{o.order_id}</p>
-                    <p className="text-zinc-500 text-[11.5px] truncate">{people(o)}</p>
-                    <p className="text-zinc-400 text-[11.5px]">
+                    <p className="text-text-primary text-[12.5px] font-semibold truncate" dir="ltr">{o.order_id}</p>
+                    <p className="text-text-muted text-[11.5px] truncate">{people(o)}</p>
+                    <p className="text-text-secondary text-[11.5px]">
                       {t('دُفع من المحفظة:', 'Paid from the wallet:')}{' '}
                       <span dir="ltr" className="tabular-nums">{iqd(o.paid_iqd ?? o.total_iqd)}</span>
                     </p>
@@ -2180,15 +2179,15 @@ function StoreOrderReconciliation({ t }: { t: T }) {
 
           {data.refunded_reopened.length > 0 && (
             <div className="space-y-2">
-              <h4 className="text-zinc-300 text-[12.5px] font-semibold">
+              <h4 className="text-text-secondary text-[12.5px] font-semibold">
                 {t('أُعيد مبلغها ثم أُعيد فتحها', 'Refunded, then re-opened')}
               </h4>
               {data.refunded_reopened.map((o) => (
-                <div key={o.order_id} className="flex items-center justify-between gap-3 border-t border-zinc-700/40 pt-2">
+                <div key={o.order_id} className="flex items-center justify-between gap-3 border-t border-border-subtle pt-2">
                   <div className="min-w-0">
-                    <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">{o.order_id}</p>
-                    <p className="text-zinc-500 text-[11.5px] truncate">{people(o)}</p>
-                    <p className="text-zinc-400 text-[11.5px]">
+                    <p className="text-text-primary text-[12.5px] font-semibold truncate" dir="ltr">{o.order_id}</p>
+                    <p className="text-text-muted text-[11.5px] truncate">{people(o)}</p>
+                    <p className="text-text-secondary text-[11.5px]">
                       {t('مستحقات التاجر:', 'Merchant credit:')}{' '}
                       <span dir="ltr" className="tabular-nums">{iqd(o.credit_iqd)}</span>{' '}
                       {o.credit_state === 'available' ? t('(متاحة)', '(available)') : t('(معلّقة)', '(pending)')}
@@ -2229,7 +2228,7 @@ function StoreOrderReconciliation({ t }: { t: T }) {
           )}
         </div>
       )}
-      <p role="status" className={done ? 'text-emerald-300 text-[12px] mt-3' : 'sr-only'}>
+      <p role="status" className={done ? 'text-success text-[12px] mt-3' : 'sr-only'}>
         {done}
       </p>
       <ReasonSheet request={ask} onClose={() => setAsk(null)} t={t} />
@@ -2305,14 +2304,14 @@ function SettingsSection({ t }: { t: T }) {
             value={num('merchantDeliveryFeeMaxIqd')}
             onChange={(v) => set('merchantDeliveryFeeMaxIqd', String(v))}
           />
-          <p className="text-zinc-500 text-[11.5px] leading-relaxed">
+          <p className="text-text-muted text-[11.5px] leading-relaxed">
             {t(
               'العمولة على البضاعة لا على التوصيل، فالحد يمنع نقل السعر إلى أجرة التوصيل. أي أجرة محفوظة أعلى منه تُحسب عند الدفع بقيمة الحد.',
               'Commission is on the goods, not the delivery, so this cap stops the price moving into the delivery fee. Any saved fee above it is charged at the cap.'
             )}
           </p>
         </div>
-        <p className="text-amber-300/80 text-[11.5px] mt-4 leading-relaxed">
+        <p className="text-warning text-[11.5px] mt-4 leading-relaxed">
           {t(
             'التغيير يسري على المعاملات الجديدة فقط. كل طلب سابق يحتفظ بنسبته المسجّلة وقت البيع.',
             'A change applies to NEW transactions only. Every past order keeps the rate recorded at the time of sale.'
@@ -2327,7 +2326,7 @@ function SettingsSection({ t }: { t: T }) {
             value={num('communityAutoCompleteDays')}
             onChange={(v) => set('communityAutoCompleteDays', String(v))}
           />
-          <p className="text-zinc-500 text-[11.5px] leading-relaxed -mt-2">
+          <p className="text-text-muted text-[11.5px] leading-relaxed -mt-2">
             {num('communityAutoCompleteDays') === 0
               ? t(
                   'القيمة 0 تعني: لا تحرير تلقائي إطلاقًا. الأموال لا تتحرك إلا بتأكيد إنسان.',
@@ -2351,7 +2350,7 @@ function SettingsSection({ t }: { t: T }) {
       <button
         onClick={save}
         disabled={saving}
-        className="w-full min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40"
+        className="lv-button lv-button-primary w-full"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
         {saved ? t('تم الحفظ', 'Saved') : t('حفظ الإعدادات', 'Save settings')}
@@ -2380,21 +2379,21 @@ function PercentField({
 }) {
   return (
     <div>
-      <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">{label}</label>
+      <label className="block text-text-secondary text-[12.5px] font-semibold mb-2">{label}</label>
       <div className="flex items-center gap-2">
         <input
+          className="lv-input flex-1 text-[14px]"
           type="number"
           step="0.01"
           min="0"
           max="100"
           value={(valueX100 / 100).toFixed(2)}
           onChange={(e) => onChange(Math.round(Number(e.target.value) * 100))}
-          className="flex-1 min-h-[46px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 px-4 text-white text-[14px] outline-none focus:border-gold/40"
           dir="ltr"
         />
-        <span className="text-zinc-400 text-[14px] font-semibold w-6">%</span>
+        <span className="text-text-secondary text-[14px] font-semibold w-6">%</span>
       </div>
-      <p className="text-zinc-600 text-[11px] mt-1.5" dir="ltr">
+      <p className="text-text-muted text-[11px] mt-1.5" dir="ltr">
         {t('مثال: 50,000 د.ع →', 'e.g. 50,000 IQD →')} {iqd(Math.floor((50000 * valueX100) / 10000))}{' '}
         {t('عمولة', 'fee')}
       </p>
@@ -2405,13 +2404,13 @@ function PercentField({
 function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div>
-      <label className="block text-zinc-400 text-[12.5px] font-semibold mb-2">{label}</label>
+      <label className="block text-text-secondary text-[12.5px] font-semibold mb-2">{label}</label>
       <input
+        className="lv-input text-[14px]"
         type="number"
         min="0"
         value={value}
         onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-        className="w-full min-h-[46px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 px-4 text-white text-[14px] outline-none focus:border-gold/40"
         dir="ltr"
       />
     </div>
@@ -2429,20 +2428,20 @@ function Spin() {
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="py-12 text-center text-zinc-500 text-[13px]">{text}</p>;
+  return <p className="py-12 text-center text-text-muted text-[13px]">{text}</p>;
 }
 
 function Err({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-      <p className="text-red-300 text-[12.5px]">{text}</p>
+    <div className="lv-alert lv-alert-danger">
+      <p className="text-text-primary text-[12.5px]">{text}</p>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4">
+    <div className="lv-surface p-4">
       <h3 className="text-gold font-bold text-[13px] mb-3">{title}</h3>
       {children}
     </div>
@@ -2464,18 +2463,16 @@ function Stat({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-3 ${
-        danger ? 'border-red-500/30 bg-red-500/[0.06]' : 'border-zinc-700/50 bg-zinc-800/30'
-      }`}
+      className={`rounded-lg p-3 ${danger ? 'bg-danger/10' : 'lv-well'}`}
     >
-      <p className="text-zinc-500 text-[11px] mb-1">{label}</p>
+      <p className="text-text-muted text-[11px] mb-1">{label}</p>
       <p
-        className={`font-bold text-[15px] ${danger ? 'text-red-300' : accent ? 'text-gold' : 'text-white'}`}
+        className={`font-bold text-[15px] tabular-nums ${danger ? 'text-danger' : accent ? 'text-gold' : 'text-text-primary'}`}
         dir="ltr"
       >
         {value}
       </p>
-      {sub && <p className="text-zinc-600 text-[10.5px] mt-0.5">{sub}</p>}
+      {sub && <p className="text-text-muted text-[10.5px] mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -2497,11 +2494,7 @@ function Act({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`min-h-[36px] px-3 rounded-xl border text-[12px] font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-40 ${
-        danger
-          ? 'border-red-500/30 bg-red-500/10 text-red-300'
-          : 'border-zinc-700/50 bg-zinc-800/40 text-zinc-300'
-      }`}
+      className={`lv-button lv-button-sm ${danger ? 'lv-button-danger' : 'lv-button-secondary'}`}
     >
       {icon}
       {label}
@@ -2510,10 +2503,11 @@ function Act({
 }
 
 function StatusPill({ status, t }: { status: string; t: T }) {
-  const map: Record<string, string> = {
-    active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    restricted: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    suspended: 'bg-red-500/10 text-red-300 border-red-500/20',
+  // A status is information: a flat chip in its semantic tone (build plan §5).
+  const map: Record<string, Tone> = {
+    active: 'success',
+    restricted: 'warning',
+    suspended: 'danger',
   };
   const label: Record<string, string> = {
     active: t('نشط', 'Active'),
@@ -2521,21 +2515,21 @@ function StatusPill({ status, t }: { status: string; t: T }) {
     suspended: t('موقوف', 'Suspended'),
   };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[status] ?? map.active}`}>
+    <StatusChip tone={map[status] ?? map.active} className="shrink-0">
       {label[status] ?? status}
-    </span>
+    </StatusChip>
   );
 }
 
 function EscrowPill({ state, t }: { state: string; t: T }) {
-  const map: Record<string, string> = {
-    held: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    released: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    refunded: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-    partially_refunded: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    disputed: 'bg-red-500/10 text-red-300 border-red-500/20',
-    pending: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-    cancelled: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+  const map: Record<string, Tone> = {
+    held: 'info',
+    released: 'success',
+    refunded: 'neutral',
+    partially_refunded: 'warning',
+    disputed: 'danger',
+    pending: 'neutral',
+    cancelled: 'neutral',
   };
   const label: Record<string, string> = {
     held: t('محتجز', 'Held'),
@@ -2547,26 +2541,26 @@ function EscrowPill({ state, t }: { state: string; t: T }) {
     cancelled: t('ملغي', 'Cancelled'),
   };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[state] ?? map.pending}`}>
+    <StatusChip tone={map[state] ?? map.pending} className="shrink-0">
       {label[state] ?? state}
-    </span>
+    </StatusChip>
   );
 }
 
 function ComplaintPill({ status, t }: { status: string; t: T }) {
-  const map: Record<string, string> = {
-    submitted: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    under_review: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
-    waiting_customer: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
-    waiting_merchant: 'bg-purple-500/10 text-purple-300 border-purple-500/20',
-    resolved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    rejected: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
-    closed: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
+  const map: Record<string, Tone> = {
+    submitted: 'warning',
+    under_review: 'info',
+    waiting_customer: 'neutral',
+    waiting_merchant: 'neutral',
+    resolved: 'success',
+    rejected: 'neutral',
+    closed: 'neutral',
   };
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${map[status] ?? map.submitted}`}>
+    <StatusChip tone={map[status] ?? map.submitted} className="shrink-0">
       {complaintStatusLabel(status, t)}
-    </span>
+    </StatusChip>
   );
 }
 

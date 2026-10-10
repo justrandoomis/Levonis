@@ -64,11 +64,12 @@ interface TicketMsg {
   pending?: boolean;
 }
 
+/** A state is information: a flat chip in its tone (build plan §5). */
 const STATE_STYLES: Record<AdminTicket['state'], string> = {
-  open: 'bg-blue-500/20 text-blue-300',
-  waiting_customer: 'bg-amber-500/20 text-amber-300',
-  waiting_staff: 'bg-purple-500/20 text-purple-300',
-  resolved: 'bg-emerald-500/20 text-emerald-300',
+  open: 'lv-chip [--chip:var(--color-info)]',
+  waiting_customer: 'lv-chip [--chip:var(--color-warning)]',
+  waiting_staff: 'lv-chip [--chip:var(--color-gold)]',
+  resolved: 'lv-chip [--chip:var(--color-success)]',
 };
 
 function ticketStateLabel(s: S, state: AdminTicket['state']): string {
@@ -334,35 +335,35 @@ export default function TicketsDesk() {
          thread usable in a landscape phone. */
       <div className="flex h-[calc(100dvh-12.5rem)] min-h-[380px] flex-col gap-2" data-support-thread>
         <div className="shrink-0 space-y-2">
-          <button onClick={() => setOpenId(null)} className="inline-flex min-h-9 items-center gap-1 text-xs font-bold text-zinc-400 hover:text-white">
+          <button onClick={() => setOpenId(null)} className="inline-flex min-h-9 items-center gap-1 text-xs font-bold text-text-secondary hover:text-text-primary">
             <ChevronLeft className="h-4 w-4 rtl:rotate-180" aria-hidden />
             {s.tabQueue}
           </button>
           {thread && (
-            <div className="space-y-1 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+            <div className="space-y-1 lv-surface p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="break-words text-sm font-bold text-white">{thread.ticket.subject}</span>
+                <span className="break-words text-sm font-bold text-text-primary">{thread.ticket.subject}</span>
                 {thread.ticket.priority === 1 && (
-                  <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-300">{s.proBadge}</span>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold lv-chip [--chip:var(--color-gold)]">{s.proBadge}</span>
                 )}
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATE_STYLES[thread.ticket.state]}`}>
                   {ticketStateLabel(s, thread.ticket.state)}
                 </span>
-                <span className="text-[10px] font-bold text-zinc-500">
+                <span className="text-[10px] font-bold text-text-muted">
                   {s.colAge}: {ageOf(thread.ticket.created_at, s)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0 text-xs text-zinc-500">
+                <div className="min-w-0 text-xs text-text-muted">
                   <span className="break-all">{thread.ticket.email || thread.ticket.username || thread.ticket.user_id}</span>
                   {thread.ticket.order_id && <span className="font-mono"> · {thread.ticket.order_id}</span>}
                 </div>
                 <select
+                  className="lv-input w-auto min-h-9 px-2 py-1.5 text-xs disabled:opacity-50"
                   value=""
                   disabled={busy}
                   onChange={(e) => changeState(e.target.value)}
                   aria-label={s.moveTo}
-                  className="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-white focus:outline-none disabled:opacity-50"
                 >
                   <option value="" disabled>
                     {s.moveTo}
@@ -380,18 +381,18 @@ export default function TicketsDesk() {
           )}
         </div>
 
-        <div ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain rounded-xl bg-black/20 p-2" data-support-thread-messages>
+        <div ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain rounded-xl lv-well p-2" data-support-thread-messages>
           {threadLoading ? (
-            <div className="py-8 text-center text-zinc-500">{s.loading}</div>
+            <div className="py-8 text-center text-text-muted">{s.loading}</div>
           ) : thread ? (
             thread.messages.map((m) => (
               <div key={m.id} className={`flex ${m.is_staff ? 'justify-end' : 'justify-start'}`}>
                 <div
                   className={`max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-sm ${
-                    m.is_staff ? 'border border-iris/30 bg-iris/10 text-zinc-100' : 'border border-zinc-800 bg-zinc-900 text-zinc-200'
+                    m.is_staff ? 'border border-iris/30 bg-iris/10 text-text-primary' : 'border border-border-subtle bg-surface-raised text-text-primary'
                   } ${m.pending ? 'opacity-60' : ''}`}
                 >
-                  <div className="mb-0.5 text-[10px] text-zinc-500">
+                  <div className="mb-0.5 text-[10px] text-text-muted">
                     {m.is_staff ? s.staffLabel : s.customer} · {m.pending && m.kind !== 'text' ? s.uploading : shortDate(m.created_at)}
                   </div>
                   <MessageMedia kind={m.kind} url={m.file_url} openLabel={cs.openImage} />
@@ -400,14 +401,14 @@ export default function TicketsDesk() {
               </div>
             ))
           ) : (
-            <div className="py-8 text-center text-sm text-red-400">{threadError || s.loadError}</div>
+            <div className="py-8 text-center text-sm text-danger">{threadError || s.loadError}</div>
           )}
         </div>
 
         {thread && (
-          <div className="shrink-0 space-y-1.5 border-t border-zinc-800 bg-zinc-900/80 pt-2" data-support-thread-composer>
+          <div className="shrink-0 space-y-1.5 border-t border-border-subtle bg-surface pt-2" data-support-thread-composer>
             {threadError && (
-              <div role="alert" className="text-xs text-red-400">
+              <div role="alert" className="text-xs text-danger">
                 {threadError}
               </div>
             )}
@@ -419,11 +420,12 @@ export default function TicketsDesk() {
                 disabled={uploading || busy}
                 aria-label={s.attach}
                 title={s.attach}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 hover:text-white disabled:opacity-50"
+                className="lv-button lv-button-secondary w-11 shrink-0 px-0"
               >
                 <Paperclip className="h-4 w-4" />
               </button>
               <input
+                className="lv-input min-w-0 flex-1 text-sm"
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => {
@@ -432,12 +434,11 @@ export default function TicketsDesk() {
                 maxLength={4000}
                 placeholder={uploading ? s.uploading : s.replyPlaceholder}
                 aria-label={s.replyPlaceholder}
-                className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"
               />
               <button
                 onClick={sendReply}
                 disabled={busy || uploading || reply.trim().length === 0}
-                className="min-h-11 shrink-0 rounded-xl bg-[#2CE59B] px-4 text-sm font-black text-onyx disabled:opacity-50"
+                className="lv-button lv-button-primary shrink-0"
               >
                 {s.reply}
               </button>
@@ -451,12 +452,12 @@ export default function TicketsDesk() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-black text-white">{s.queueTitle}</h3>
+        <h3 className="text-sm font-black text-text-primary">{s.queueTitle}</h3>
         <div className="flex items-center gap-2">
           <select
+            className="lv-input w-auto min-h-9 px-2 py-1.5 text-xs"
             value={stateFilter}
             onChange={(e) => setStateFilter(e.target.value)}
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-white focus:outline-none"
             aria-label={s.qState}
           >
             <option value="">{s.unresolved}</option>
@@ -467,14 +468,14 @@ export default function TicketsDesk() {
               </option>
             ))}
           </select>
-          <button onClick={() => load()} aria-label={s.retry} className="rounded-lg border border-zinc-700 bg-zinc-800 p-2 text-zinc-300 hover:text-white">
+          <button onClick={() => load()} aria-label={s.retry} className="lv-button lv-button-secondary w-11 px-0">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+        <div className="lv-alert lv-alert-danger text-sm text-text-primary">
           {error}{' '}
           <button onClick={() => load()} className="underline">
             {s.retry}
@@ -484,38 +485,38 @@ export default function TicketsDesk() {
 
       {/* A phone gets rows it can read without scrolling sideways; the table
           stays for the tablet and the desk, where its columns fit. */}
-      <div className="space-y-2 md:hidden">
+      <div className="lv-surface divide-y divide-border-subtle overflow-hidden md:hidden">
         {tickets.map((t) => (
           <button
             key={t.id}
             onClick={() => openThread(t.id)}
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-start transition-colors hover:bg-zinc-800/60"
+            className="w-full p-3 text-start transition-colors hover:bg-surface-raised"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="min-w-0 break-words text-sm font-bold text-white">{t.subject}</span>
+              <span className="min-w-0 break-words text-sm font-bold text-text-primary">{t.subject}</span>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${STATE_STYLES[t.state]}`}>{ticketStateLabel(s, t.state)}</span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
               <span className="break-all">{t.email || t.username || '—'}</span>
               <span>· {ageOf(t.created_at, s)}</span>
-              {t.priority === 1 && <span className="font-bold text-yellow-300">{s.proBadge}</span>}
+              {t.priority === 1 && <span className="font-bold text-gold">{s.proBadge}</span>}
               <span className="flex items-center gap-1">
                 <MessageSquare className="h-3 w-3" /> {t.message_count ?? 0}
               </span>
             </div>
           </button>
         ))}
-        {!loading && tickets.length === 0 && <div className="py-10 text-center text-zinc-500">{s.ticketsEmpty}</div>}
-        {loading && tickets.length === 0 && <div className="py-10 text-center text-zinc-500">{s.loading}</div>}
+        {!loading && tickets.length === 0 && <div className="py-10 text-center text-text-muted">{s.ticketsEmpty}</div>}
+        {loading && tickets.length === 0 && <div className="py-10 text-center text-text-muted">{s.loading}</div>}
       </div>
 
-      <div className="hidden overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 md:block">
+      <div className="hidden lv-surface overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse">
             <thead>
-              <tr className="border-b border-zinc-700 bg-zinc-800/50">
+              <tr className="border-b border-border-subtle bg-surface-raised">
                 {[s.colTicket, s.colCustomer, s.colPriority, s.colAge, s.qState, s.colMsgs].map((h) => (
-                  <th key={h} className="px-4 py-3 text-start text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  <th key={h} className="px-4 py-3 text-start text-xs font-bold uppercase tracking-wider text-text-secondary">
                     {h}
                   </th>
                 ))}
@@ -523,24 +524,24 @@ export default function TicketsDesk() {
             </thead>
             <tbody>
               {tickets.map((t) => (
-                <tr key={t.id} onClick={() => openThread(t.id)} className="cursor-pointer border-b border-zinc-800 transition-colors hover:bg-zinc-800/30">
+                <tr key={t.id} onClick={() => openThread(t.id)} className="cursor-pointer border-b border-border-subtle transition-colors hover:bg-surface-raised">
                   <td className="px-4 py-3">
-                    <div className="max-w-[260px] break-words text-sm font-bold text-white">{t.subject}</div>
-                    <div className="font-mono text-[10px] text-zinc-600">{t.id}</div>
+                    <div className="max-w-[260px] break-words text-sm font-bold text-text-primary">{t.subject}</div>
+                    <div className="font-mono text-[10px] text-text-muted">{t.id}</div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{t.email || t.username || '—'}</td>
+                  <td className="px-4 py-3 text-xs text-text-secondary">{t.email || t.username || '—'}</td>
                   <td className="px-4 py-3">
                     {t.priority === 1 ? (
-                      <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-300">{s.proBadge}</span>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-bold lv-chip [--chip:var(--color-gold)]">{s.proBadge}</span>
                     ) : (
-                      <span className="text-xs text-zinc-500">{s.ordinary}</span>
+                      <span className="text-xs text-text-muted">{s.ordinary}</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm font-black text-white">{ageOf(t.created_at, s)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm font-black text-text-primary">{ageOf(t.created_at, s)}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATE_STYLES[t.state]}`}>{ticketStateLabel(s, t.state)}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">
+                  <td className="px-4 py-3 text-xs text-text-secondary">
                     <span className="flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" /> {t.message_count ?? 0}
                     </span>
@@ -549,14 +550,14 @@ export default function TicketsDesk() {
               ))}
               {!loading && tickets.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-zinc-500">
+                  <td colSpan={6} className="py-10 text-center text-text-muted">
                     {s.ticketsEmpty}
                   </td>
                 </tr>
               )}
               {loading && tickets.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-zinc-500">
+                  <td colSpan={6} className="py-10 text-center text-text-muted">
                     {s.loading}
                   </td>
                 </tr>

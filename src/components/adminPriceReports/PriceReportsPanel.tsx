@@ -127,21 +127,21 @@ export default function PriceReportsPanel() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-white font-black text-[15px] flex items-center gap-2">
-          <Tag className="w-4 h-4 text-amber-300" />
+        <h2 className="text-text-primary font-black text-[15px] flex items-center gap-2">
+          <Tag className="w-4 h-4 text-warning" />
           {loc('شكاوى الأسعار', 'Price reports')}
         </h2>
         <button
           type="button"
           onClick={() => void load()}
-          className="inline-flex items-center gap-1.5 text-zinc-400 text-[12.5px] min-h-[36px] px-3 rounded-xl border border-zinc-700/50"
+          className="inline-flex items-center gap-1.5 text-text-secondary text-[12.5px] min-h-[36px] px-3 rounded-xl border border-border-subtle"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           {loc('تحديث', 'Refresh')}
         </button>
       </div>
 
-      <p className="text-zinc-500 text-[12px] leading-relaxed">
+      <p className="text-text-muted text-[12px] leading-relaxed">
         {loc(
           'بلاغات الزبائن بأن سعرًا لدينا أعلى من مكان آخر. الرابط نص فقط — لا يفتحه النظام ولا يجلبه.',
           'Customer reports that a price of ours is higher elsewhere. The link is text only — the system never fetches it.'
@@ -154,10 +154,10 @@ export default function PriceReportsPanel() {
             key={s}
             type="button"
             onClick={() => setFilter(s)}
-            className={`shrink-0 px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border transition-colors ${
+            className={`shrink-0 px-3.5 min-h-[36px] rounded-full text-[12px] font-semibold border transition-colors ${
               filter === s
-                ? 'bg-amber-500/20 text-amber-200 border-amber-500/50'
-                : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+                ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {stateLabel(s)}
@@ -165,46 +165,46 @@ export default function PriceReportsPanel() {
         ))}
       </div>
 
-      {!!error && <p className="text-red-300 text-[12.5px]">{error}</p>}
+      {!!error && <p className="lv-alert lv-alert-danger text-[12.5px]">{error}</p>}
 
-      {rows === null && <p className="text-zinc-500 text-[12.5px]">{loc('جارٍ التحميل…', 'Loading…')}</p>}
+      {rows === null && <p className="text-text-muted text-[12.5px]">{loc('جارٍ التحميل…', 'Loading…')}</p>}
       {rows !== null && rows.length === 0 && (
-        <p className="text-zinc-500 text-[12.5px]">{loc('لا توجد بلاغات', 'No reports')}</p>
+        <p className="text-text-muted text-[12.5px]">{loc('لا توجد بلاغات', 'No reports')}</p>
       )}
 
       <div className="space-y-3">
         {(rows ?? []).map((r) => {
           const moved = r.product.price_now_iqd !== null && r.product.price_now_iqd !== r.our_price_iqd;
           return (
-            <div key={r.id} className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4">
+            <div key={r.id} className="lv-surface p-4">
               <div className="flex items-start justify-between gap-3 mb-2">
-                <span className="text-white font-semibold text-[13.5px]">
+                <span className="text-text-primary font-semibold text-[13.5px]">
                   {lang === 'en' ? r.product.name_en || r.product.name_ar : r.product.name_ar || r.product.name_en}
                 </span>
-                <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-zinc-700/40 text-zinc-300">
+                <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/[0.06] text-text-secondary">
                   {stateLabel(r.state)}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12px] mb-3">
                 <div>
-                  <p className="text-zinc-600 text-[11px]">{loc('سعرنا وقت البلاغ', 'Our price when filed')}</p>
-                  <p className="text-zinc-200" dir="ltr">{iqd(r.our_price_iqd)}</p>
+                  <p className="text-text-muted text-[11px]">{loc('سعرنا وقت البلاغ', 'Our price when filed')}</p>
+                  <p className="text-text-primary" dir="ltr">{iqd(r.our_price_iqd)}</p>
                 </div>
                 <div>
-                  <p className="text-zinc-600 text-[11px]">{loc('سعرهم', 'Their price')}</p>
-                  <p className="text-zinc-200" dir="ltr">{iqd(r.their_price_iqd)}</p>
+                  <p className="text-text-muted text-[11px]">{loc('سعرهم', 'Their price')}</p>
+                  <p className="text-text-primary" dir="ltr">{iqd(r.their_price_iqd)}</p>
                 </div>
                 <div>
-                  <p className="text-zinc-600 text-[11px]">{loc('الفارق', 'Gap')}</p>
-                  <p className="text-amber-300" dir="ltr">
+                  <p className="text-text-muted text-[11px]">{loc('الفارق', 'Gap')}</p>
+                  <p className="text-warning" dir="ltr">
                     {iqd(r.gap_iqd)}
                     {r.gap_percent !== null ? ` · ${r.gap_percent}%` : ''}
                   </p>
                 </div>
                 <div>
-                  <p className="text-zinc-600 text-[11px]">{loc('سعرنا الآن', 'Our price now')}</p>
-                  <p className={moved ? 'text-sky-300' : 'text-zinc-200'} dir="ltr">
+                  <p className="text-text-muted text-[11px]">{loc('سعرنا الآن', 'Our price now')}</p>
+                  <p className={moved ? 'text-info' : 'text-text-primary'} dir="ltr">
                     {r.product.price_now_iqd === null ? '—' : iqd(r.product.price_now_iqd)}
                   </p>
                 </div>
@@ -213,7 +213,7 @@ export default function PriceReportsPanel() {
               {/* THE ROW'S MOST USEFUL FACT, said out loud rather than left to
                   the reader to notice by comparing two numbers. */}
               {moved && (
-                <p className="text-sky-300/90 text-[11.5px] mb-2">
+                <p className="text-info text-[11.5px] mb-2">
                   {loc(
                     'تغيّر سعرنا بعد هذا البلاغ — الفارق أعلاه تاريخ، لا وضعًا قائمًا.',
                     'Our price moved after this report — the gap above is history, not a standing problem.'
@@ -221,35 +221,35 @@ export default function PriceReportsPanel() {
                 </p>
               )}
 
-              <div className="text-[11.5px] text-zinc-500 space-y-1 mb-3">
+              <div className="text-[11.5px] text-text-muted space-y-1 mb-3">
                 <p>
-                  {loc('البائع', 'Seller')}: <span className="text-zinc-300">{r.seller_name || '—'}</span>
+                  {loc('البائع', 'Seller')}: <span className="text-text-secondary">{r.seller_name || '—'}</span>
                 </p>
                 {!!r.url && (
                   <a
                     href={r.url}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1 text-sky-300 break-all"
+                    className="inline-flex items-center gap-1 text-info break-all"
                     dir="ltr"
                   >
                     <ExternalLink className="w-3 h-3 shrink-0" />
                     {r.url}
                   </a>
                 )}
-                {!!r.note && <p className="text-zinc-400 whitespace-pre-wrap">{r.note}</p>}
+                {!!r.note && <p className="text-text-secondary whitespace-pre-wrap">{r.note}</p>}
                 <p>
                   {loc('من', 'From')}: {r.reported_by.name || r.reported_by.username || r.reported_by.id}
                 </p>
               </div>
 
               <textarea
+                className="lv-input py-2 text-[12.5px] mb-2"
                 value={notes[r.id] ?? ''}
                 onChange={(e) => setNotes((n) => ({ ...n, [r.id]: e.target.value }))}
                 rows={2}
                 maxLength={500}
                 placeholder={loc('ملاحظة القرار (تُحفظ مع الحالة)', 'Decision note (saved with the state)')}
-                className="w-full rounded-xl border border-zinc-700/50 bg-zinc-900/60 px-3 py-2 text-[12.5px] text-zinc-100 placeholder:text-zinc-600 mb-2"
               />
 
               <div className="flex flex-wrap gap-2">
@@ -259,7 +259,7 @@ export default function PriceReportsPanel() {
                     type="button"
                     disabled={busyId === r.id || r.state === s}
                     onClick={() => void decide(r, s)}
-                    className="px-3.5 min-h-[36px] rounded-xl text-[12px] font-semibold border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 disabled:opacity-40"
+                    className="lv-button lv-button-secondary lv-button-sm"
                   >
                     {stateLabel(s)}
                   </button>

@@ -34,24 +34,24 @@ type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 function SaveStatus({ state, error }: { state: SaveState; error?: string | null }) {
   if (state === 'saving') {
-    return <div className="text-xs font-semibold text-zinc-400 mt-2">Saving...</div>;
+    return <div className="text-xs font-semibold text-text-secondary mt-2">Saving...</div>;
   }
   if (state === 'saved') {
     return (
-      <div className="text-xs font-semibold text-zinc-500 flex items-center gap-1 mt-2">
-        <Check className="w-3 h-3 text-mint" /> Saved
+      <div className="text-xs font-semibold text-text-muted flex items-center gap-1 mt-2">
+        <Check className="w-3 h-3 text-success" /> Saved
       </div>
     );
   }
   if (state === 'error') {
     return (
-      <div className="text-xs font-semibold text-red-400 flex items-center gap-1 mt-2">
+      <div className="text-xs font-semibold text-danger flex items-center gap-1 mt-2">
         <AlertTriangle className="w-3 h-3" /> {error || 'Save failed'}
       </div>
     );
   }
   if (state === 'dirty') {
-    return <div className="text-xs font-semibold text-yellow-400/80 mt-2">Unsaved changes</div>;
+    return <div className="text-xs font-semibold text-warning mt-2">Unsaved changes</div>;
   }
   return null;
 }
@@ -337,39 +337,39 @@ export default function AdminWalletSettings() {
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-black text-white">Wallet Settings</h2>
+        <h2 className="text-2xl font-black text-text-primary">Wallet Settings</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+        <div className="lv-surface p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-500" />
+            <div className="shrink-0">
+              <DollarSign className="w-5 h-5 text-text-secondary" />
             </div>
-            <h3 className="text-lg font-bold text-white">Exchange Rate</h3>
+            <h3 className="text-lg font-bold text-text-primary">Exchange Rate</h3>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-zinc-400">1 USD = IQD</label>
+            <label className="text-sm font-bold text-text-secondary">1 USD = IQD</label>
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <input
+                  className="lv-input font-bold disabled:opacity-50"
                   type="number"
                   value={rateInput}
                   onChange={(e) => { setRateInput(e.target.value); setRateState('dirty'); }}
                   disabled={!isLoaded}
-                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
+                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">IQD</span>
               </div>
               <button
                 onClick={handleSaveRate}
                 disabled={rateState === 'saving' || !isLoaded}
-                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+                className="lv-button lv-button-primary shrink-0"
               >
                 <Save className="w-4 h-4" /> Save
               </button>
             </div>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-text-muted">
               Product prices are stored in IQD and are not affected by rate changes; the rate only converts wallet USD at checkout.
             </p>
             <SaveStatus state={rateState} error={rateError} />
@@ -383,50 +383,50 @@ export default function AdminWalletSettings() {
             IT IS NOT RETROACTIVE, and the note says so: every order stores the
             figure it was charged in `orders.cod_tax_iqd` at placement, so
             lowering this today cannot rewrite last month's invoices. */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+        <div className="lv-surface p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-              <Truck className="w-5 h-5 text-amber-500" />
+            <div className="shrink-0">
+              <Truck className="w-5 h-5 text-text-secondary" />
             </div>
-            <h3 className="text-lg font-bold text-white">Cash-on-Delivery Charge</h3>
+            <h3 className="text-lg font-bold text-text-primary">Cash-on-Delivery Charge</h3>
           </div>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-400">Charge</label>
+                <label className="text-sm font-bold text-text-secondary">Charge</label>
                 <div className="relative">
                   <input
+                    className="lv-input font-bold disabled:opacity-50"
                     type="number"
                     value={codPerInput}
                     onChange={(e) => { setCodPerInput(e.target.value); setCodState('dirty'); }}
                     disabled={!isLoaded}
-                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
+                  <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">IQD</span>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-400">For every</label>
+                <label className="text-sm font-bold text-text-secondary">For every</label>
                 <div className="relative">
                   <input
+                    className="lv-input font-bold disabled:opacity-50"
                     type="number"
                     value={codBlockInput}
                     onChange={(e) => { setCodBlockInput(e.target.value); setCodState('dirty'); }}
                     disabled={!isLoaded}
-                    className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">IQD</span>
+                  <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">IQD</span>
                 </div>
               </div>
             </div>
             <button
               onClick={handleSaveCodTax}
               disabled={codState === 'saving' || !isLoaded}
-              className="w-full flex items-center justify-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+              className="lv-button lv-button-primary w-full"
             >
               <Save className="w-4 h-4" /> Save
             </button>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-text-muted">
               Charged only on cash-on-delivery orders sent to an address — never on store pickup,
               wallet or advance payment. Orders already placed keep the charge they were quoted;
               changing this affects new orders only. Set the charge to 0 to switch it off.
@@ -439,40 +439,40 @@ export default function AdminWalletSettings() {
             the worked example below is there so that cannot be read the other
             way — and never retroactive: a filed request keeps the fee it was
             quoted, the same contract `orders.cod_tax_iqd` carries. */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+        <div className="lv-surface p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
-              <ArrowUpFromLine className="w-5 h-5 text-rose-500" />
+            <div className="shrink-0">
+              <ArrowUpFromLine className="w-5 h-5 text-text-secondary" />
             </div>
-            <h3 className="text-lg font-bold text-white">Withdrawal Commission</h3>
+            <h3 className="text-lg font-bold text-text-primary">Withdrawal Commission</h3>
           </div>
           <div className="space-y-2">
-            <label htmlFor="withdrawal-fee-percent" className="text-sm font-bold text-zinc-400">Commission (percent of the requested amount)</label>
+            <label htmlFor="withdrawal-fee-percent" className="text-sm font-bold text-text-secondary">Commission (percent of the requested amount)</label>
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
                 <input
+                  className="lv-input font-bold"
                   id="withdrawal-fee-percent"
                   type="text"
                   inputMode="decimal"
                   value={feePctInput}
                   onChange={(e) => { setFeePctInput(e.target.value); setFeeState('dirty'); }}
-                  className="w-full bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-bold focus:ring-2 focus:ring-iris/50"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold text-sm">%</span>
+                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-text-muted font-bold text-sm">%</span>
               </div>
               <button
                 onClick={handleSaveFee}
                 disabled={feeState === 'saving'}
-                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+                className="lv-button lv-button-primary shrink-0"
               >
                 <Save className="w-4 h-4" /> Save
               </button>
             </div>
-            <p className="text-[11px] text-zinc-400 tabular-nums" dir="ltr">
+            <p className="text-[11px] text-text-secondary tabular-nums" dir="ltr">
               {formatIqd(SAMPLE_IQD)} requested → commission {formatIqd(feeSample)}, net {formatIqd(SAMPLE_IQD - feeSample)} reaches
               the customer, {formatIqd(SAMPLE_IQD)} leaves their balance.
             </p>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-text-muted">
               Deducted from the requested amount, never added on top. Requests already filed keep
               the commission they were quoted; changing this affects new requests only. Set it to 0
               to switch the commission off.
@@ -481,28 +481,28 @@ export default function AdminWalletSettings() {
           </div>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+        <div className="lv-surface p-6">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <Video className="w-5 h-5 text-blue-500" />
+            <div className="shrink-0">
+              <Video className="w-5 h-5 text-text-secondary" />
             </div>
-            <h3 className="text-lg font-bold text-white">Ad Video Config</h3>
+            <h3 className="text-lg font-bold text-text-primary">Ad Video Config</h3>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-bold text-zinc-400">Video URL (Direct link to mp4)</label>
+            <label className="text-sm font-bold text-text-secondary">Video URL (Direct link to mp4)</label>
             <div className="flex items-center gap-3">
               <input
+                className="lv-input flex-1 font-medium disabled:opacity-50"
                 type="text"
                 value={urlInput}
                 onChange={(e) => { setUrlInput(e.target.value); setUrlState('dirty'); }}
                 disabled={!isLoaded}
                 placeholder="e.g. https://www.w3schools.com/html/mov_bbb.mp4"
-                className="flex-1 bg-zinc-800 border-none text-white px-4 py-3 rounded-2xl font-medium focus:ring-2 focus:ring-iris/50 disabled:opacity-50"
               />
               <button
                 onClick={handleSaveUrl}
                 disabled={urlState === 'saving' || !isLoaded}
-                className="flex items-center gap-2 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-3 rounded-2xl font-bold transition-colors disabled:opacity-50"
+                className="lv-button lv-button-primary shrink-0"
               >
                 <Save className="w-4 h-4" /> Save
               </button>
@@ -514,15 +514,15 @@ export default function AdminWalletSettings() {
 
       {/* WITHDRAWAL PAYOUT CHANNELS — where a customer's withdrawal is paid.
           Not the deposit methods below: those are the shop's own accounts. */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm" data-admin="payout-methods">
+      <div className="lv-surface p-6" data-admin="payout-methods">
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <Banknote className="w-5 h-5 text-emerald-500" />
+            <div className="shrink-0">
+              <Banknote className="w-5 h-5 text-text-secondary" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Withdrawal Payout Channels</h3>
-              <p className="text-xs text-zinc-400">
+              <h3 className="text-lg font-bold text-text-primary">Withdrawal Payout Channels</h3>
+              <p className="text-xs text-text-secondary">
                 What a customer can choose to be paid through when they withdraw. Names are shown to customers exactly as typed.
               </p>
             </div>
@@ -531,14 +531,14 @@ export default function AdminWalletSettings() {
             <button
               onClick={addPayout}
               disabled={!isLoaded}
-              className="flex items-center gap-1 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+              className="lv-button lv-button-secondary lv-button-sm"
             >
               <Plus className="w-4 h-4" /> Add Channel
             </button>
             <button
               onClick={() => savePayouts(payouts)}
               disabled={payoutState === 'saving' || !isLoaded || payoutState === 'idle' || payoutState === 'saved'}
-              className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+              className="lv-button lv-button-primary lv-button-sm"
             >
               <Save className="w-4 h-4" /> Save
             </button>
@@ -549,17 +549,17 @@ export default function AdminWalletSettings() {
           {payouts.map((p) => (
             <div
               key={p.id}
-              className="flex flex-col sm:flex-row sm:items-center gap-3 bg-zinc-800/50 border border-zinc-700/50 p-3 rounded-2xl"
+              className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg bg-surface-raised p-3"
             >
               <input
+                className="lv-input flex-1 min-w-0"
                 type="text"
                 value={p.name}
                 onChange={(e) => updatePayout(p.id, { name: e.target.value })}
                 placeholder="Channel name, e.g. زين كاش"
                 aria-label="Channel name"
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-white px-3 py-2 rounded-lg"
               />
-              <label className="flex items-center gap-2 text-sm text-zinc-300 shrink-0 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-sm text-text-secondary shrink-0 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={p.requires_account}
@@ -571,39 +571,39 @@ export default function AdminWalletSettings() {
               <button
                 onClick={() => removePayout(p.id)}
                 aria-label={`Remove ${p.name || 'channel'}`}
-                className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors self-end sm:self-auto"
+                className="lv-button lv-button-ghost px-3 text-danger self-end sm:self-auto"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ))}
           {payouts.length === 0 && (
-            <div className="text-center text-zinc-500 py-6 text-sm">{isLoaded ? 'No payout channels.' : 'Loading...'}</div>
+            <div className="text-center text-text-muted py-6 text-sm">{isLoaded ? 'No payout channels.' : 'Loading...'}</div>
           )}
         </div>
-        <p className="text-[11px] text-zinc-500 mt-3">
+        <p className="text-[11px] text-text-muted mt-3">
           Untick the account box for a channel paid without one, such as cash pickup («استلام كاش»). Each request keeps
           the channel name it was filed with, so renaming or removing a channel does not change requests already filed.
         </p>
         <SaveStatus state={payoutState} error={payoutError} />
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-sm">
+      <div className="lv-surface p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-              <CreditCard className="w-5 h-5 text-purple-500" />
+            <div className="shrink-0">
+              <CreditCard className="w-5 h-5 text-text-secondary" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Deposit Methods</h3>
-              <p className="text-xs text-zinc-400">Manage manual payment options available to users.</p>
+              <h3 className="text-lg font-bold text-text-primary">Deposit Methods</h3>
+              <p className="text-xs text-text-secondary">Manage manual payment options available to users.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {methodsState === 'dirty' && (
               <button
                 onClick={() => saveMethods(methods)}
-                className="flex items-center gap-1 bg-[#2CE59B] hover:bg-[#06D6A0] text-onyx px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                className="lv-button lv-button-primary lv-button-sm"
               >
                 <Save className="w-4 h-4" /> Save All
               </button>
@@ -611,7 +611,7 @@ export default function AdminWalletSettings() {
             <button
               onClick={handleAddMethod}
               disabled={!isLoaded}
-              className="flex items-center gap-1 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+              className="lv-button lv-button-secondary lv-button-sm"
             >
               <Plus className="w-4 h-4" /> Add Method
             </button>
@@ -622,26 +622,26 @@ export default function AdminWalletSettings() {
 
         <div className="space-y-4 mt-4">
           {methods.map(method => (
-            <div key={method.id} className="bg-zinc-800/50 border border-zinc-700/50 p-4 rounded-2xl">
+            <div key={method.id} className="rounded-lg bg-surface-raised p-4">
               {editingMethodId === method.id ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1">Method Name</label>
+                      <label className="block text-xs font-bold text-text-muted mb-1">Method Name</label>
                       <input
+                        className="lv-input"
                         type="text"
                         value={method.name}
                         onChange={e => handleUpdateMethod(method.id, 'name', e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-700 text-white px-3 py-2 rounded-lg"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 mb-1">Account Details / Numbers</label>
+                      <label className="block text-xs font-bold text-text-muted mb-1">Account Details / Numbers</label>
                       <input
+                        className="lv-input"
                         type="text"
                         value={method.details}
                         onChange={e => handleUpdateMethod(method.id, 'details', e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-700 text-white px-3 py-2 rounded-lg"
                       />
                     </div>
                   </div>
@@ -649,7 +649,7 @@ export default function AdminWalletSettings() {
                     <button
                       onClick={() => saveMethods(methods)}
                       disabled={methodsState === 'saving'}
-                      className="bg-[#2CE59B] text-onyx px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1 hover:bg-[#06D6A0] disabled:opacity-50"
+                      className="lv-button lv-button-primary lv-button-sm"
                     >
                       <Check className="w-4 h-4" /> {methodsState === 'saving' ? 'Saving...' : 'Save'}
                     </button>
@@ -658,19 +658,19 @@ export default function AdminWalletSettings() {
               ) : (
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-white">{method.name}</h4>
-                    <p className="text-sm text-zinc-400">{method.details}</p>
+                    <h4 className="font-bold text-text-primary">{method.name}</h4>
+                    <p className="text-sm text-text-secondary">{method.details}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setEditingMethodId(method.id)}
-                      className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 transition-colors"
+                      className="lv-button lv-button-ghost px-3"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteMethod(method.id)}
-                      className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
+                      className="lv-button lv-button-ghost px-3 text-danger"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -680,7 +680,7 @@ export default function AdminWalletSettings() {
             </div>
           ))}
           {methods.length === 0 && (
-            <div className="text-center text-zinc-500 py-8 text-sm">
+            <div className="text-center text-text-muted py-8 text-sm">
               {isLoaded ? 'No deposit methods configured.' : 'Loading...'}
             </div>
           )}

@@ -662,7 +662,7 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
   });
 
   return (
-    <div className="text-white">
+    <div className="text-text-primary">
       {/* The owner before the address is verified: the three cost tabs are not
           offered — and this is the way to open them. */}
       {user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
@@ -672,10 +672,10 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
             key={s.id}
             data-print-admin-tab={s.id}
             onClick={() => setTab(s.id)}
-            className={`shrink-0 flex items-center gap-2 px-4 min-h-[42px] rounded-2xl text-[13px] font-semibold border transition-colors ${
+            className={`shrink-0 flex items-center gap-2 px-4 min-h-[42px] rounded-full text-[13px] font-semibold border transition-colors ${
               tab === s.id
-                ? 'bg-olive text-snow border-olive'
-                : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+                ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             <s.icon className="w-4 h-4" />
@@ -723,10 +723,8 @@ export default function PrintPricingAdmin({ dir }: { dir?: 'ltr' | 'rtl' }) {
         <div className="fixed bottom-4 inset-x-4 flex justify-center pointer-events-none z-50">
           <div
             role="status"
-            className={`pointer-events-auto flex items-center gap-2 px-4 min-h-[44px] rounded-2xl border text-[12.5px] font-semibold shadow-xl ${
-              toast.ok
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                : 'bg-red-500/15 border-red-500/30 text-red-300'
+            className={`pointer-events-auto flex items-center gap-2 px-4 min-h-[44px] rounded-xl border border-border-subtle bg-surface-raised text-[12.5px] font-semibold shadow-2xl ${
+              toast.ok ? 'text-success' : 'text-danger'
             }`}
           >
             {toast.ok ? <Check className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
@@ -832,7 +830,7 @@ function PricingPanel({
         />
         <button
           onClick={bar.onReset}
-          className="min-h-[44px] px-4 rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 text-[12.5px] font-semibold flex items-center gap-2"
+          className="lv-button lv-button-secondary"
         >
           <RotateCcw className="w-4 h-4" />
           {t('إعادة التحميل من الخادم', 'Reload from the server')}
@@ -891,31 +889,31 @@ function MarginNote({ t, c }: { t: T; c: PrintPricingConfig }) {
     return m <= 0 ? cost : Math.round(cost / (1 - m));
   };
   return (
-    <div className="mt-4 rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
+    <div className="mt-4 rounded-lg border border-gold/25 bg-gold/[0.06] p-3">
       <p className="text-gold text-[12.5px] font-bold mb-1.5">
         {t('الهامش حصة من سعر البيع، لا زيادة على الكلفة', 'Margin is a share of the SELLING price, not a markup on cost')}
       </p>
-      <p className="text-zinc-300 text-[11.5px] leading-relaxed">
+      <p className="text-text-secondary text-[11.5px] leading-relaxed">
         {t(
           'هامش ٣٥٪ يعني ٣٥ دينارًا من كل ١٠٠ دينار يقبضها المشغّل — أي أن السعر = الكلفة ÷ (١ − ٠٫٣٥). من يقرأها زيادةً على الكلفة يبيع بهامش ٢٦٪ وهو يظن أنه ٣٥٪.',
           'A 35% margin means 35 dinars out of every 100 taken — price = cost ÷ (1 − 0.35). Read as a markup on cost it delivers 26% while looking like 35%.'
         )}
       </p>
       <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div className="rounded-xl border border-zinc-700/50 bg-zinc-900/40 px-3 py-2">
-          <p className="text-zinc-500 text-[10.5px] mb-0.5">
+        <div className="lv-well rounded-md px-3 py-2">
+          <p className="text-text-muted text-[10.5px] mb-0.5">
             {t(`كلفة ${formatIqd(cost)} بالهامش المستهدف`, `${formatIqd(cost)} of cost at the target margin`)}
           </p>
-          <p className="text-white font-bold text-[14px]" dir="ltr">{formatIqd(priceAt(c.target_margin_percent))}</p>
+          <p className="text-text-primary font-bold text-[14px]" dir="ltr">{formatIqd(priceAt(c.target_margin_percent))}</p>
         </div>
-        <div className="rounded-xl border border-zinc-700/50 bg-zinc-900/40 px-3 py-2">
-          <p className="text-zinc-500 text-[10.5px] mb-0.5">
+        <div className="lv-well rounded-md px-3 py-2">
+          <p className="text-text-muted text-[10.5px] mb-0.5">
             {t('الأرضية عند الحد الأدنى', 'The floor at the minimum margin')}
           </p>
-          <p className="text-white font-bold text-[14px]" dir="ltr">{formatIqd(priceAt(c.min_margin_percent))}</p>
+          <p className="text-text-primary font-bold text-[14px]" dir="ltr">{formatIqd(priceAt(c.min_margin_percent))}</p>
         </div>
       </div>
-      <p className="text-zinc-500 text-[10.5px] mt-2 leading-relaxed">
+      <p className="text-text-muted text-[10.5px] mt-2 leading-relaxed">
         {t(
           'الخادم يقصّ أي هامش فوق ٩٥٪، لأن ١٠٠٪ تعني قسمة على صفر.',
           'The server clamps any margin above 95% — 100% would be a division by zero.'
@@ -1024,17 +1022,17 @@ function MaterialsPanel({
     <div data-print-admin="materials" className="space-y-4">
       <SaveBar {...bar} errors={problems} />
 
-      <div className="rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
+      <div className="rounded-lg border border-gold/25 bg-gold/[0.06] p-3">
         <p className="text-gold text-[12.5px] font-bold mb-1.5">
           {t('ما الذي يغيّره كل عمود', 'What each column actually changes')}
         </p>
-        <p className="text-zinc-300 text-[11.5px] leading-relaxed">
+        <p className="text-text-secondary text-[11.5px] leading-relaxed">
           {t(
             'الكثافة والسعر والهدر ومعامل الدعم تدخل في الكلفة. أما «يحتاج غرفة مغلقة» و«كاشط» فهما شرطا مطابقة قبل أن يكونا سعرًا: الورشة التي لا تملك غرفة مغلقة أو فوهة مقوّاة لا يصلها الطلب أصلًا، مهما كان تقييمها.',
             'Density, price, waste and support factor feed the cost. Enclosure and abrasive are MATCHING facts before they are pricing ones: a shop without the chamber or the hardened nozzle is never offered the job at all, whatever its rating.'
           )}
         </p>
-        <p className="text-zinc-400 text-[11.5px] leading-relaxed mt-1.5">
+        <p className="text-text-secondary text-[11.5px] leading-relaxed mt-1.5">
           {t(
             '«الصعوبة» (٠ إلى ١) تغذّي مخصّص الفشل، و«أقل قيمة» تمنع تسعير طبعة لا تستحق تغيير البكرة.',
             'Difficulty (0 to 1) feeds the failure provision, and the minimum job stops a print being quoted that is not worth the spool change.'
@@ -1047,14 +1045,14 @@ function MaterialsPanel({
           <button
             key={k}
             onClick={() => setFilter(k)}
-            className={`min-h-[34px] px-3 rounded-xl border text-[12px] font-semibold ${
-              filter === k ? 'bg-olive text-snow border-olive' : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/50'
+            className={`min-h-[34px] px-3 rounded-full border text-[12px] font-semibold transition-colors ${
+              filter === k ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
             }`}
           >
             {k === 'all' ? t('الكل', 'All') : processLabel(k, t)}
           </button>
         ))}
-        <span className="text-zinc-500 text-[11px] ms-auto">
+        <span className="text-text-muted text-[11px] ms-auto">
           {t(`${value.length} مادة · ${activeCount} فعّالة`, `${value.length} materials · ${activeCount} active`)}
         </span>
       </div>
@@ -1064,18 +1062,16 @@ function MaterialsPanel({
           <div
             key={m.id}
             data-material-row={m.id}
-            className={`rounded-2xl border p-3 ${
-              m.active ? 'border-zinc-700/50 bg-zinc-800/30' : 'border-zinc-800 bg-zinc-900/40 opacity-70'
-            }`}
+            className={`lv-surface p-3 ${m.active ? '' : 'opacity-70'}`}
           >
             <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <span className="font-mono text-[11px] text-zinc-500 truncate max-w-[45%]" dir="ltr">{m.id}</span>
+              <span className="font-mono text-[11px] text-text-muted truncate max-w-[45%]" dir="ltr">{m.id}</span>
               <select
+                className="lv-input w-auto min-h-[34px] px-2 text-[11.5px] font-semibold"
                 data-print-field="process"
                 value={m.process}
                 onChange={(e) => patch(m.id, { process: e.target.value === 'resin' ? 'resin' : 'fdm' })}
                 aria-label={t('التقنية', 'Process')}
-                className="min-h-[34px] rounded-xl bg-zinc-800/60 border border-zinc-700/50 px-2 text-zinc-200 text-[11.5px] font-semibold outline-none focus:border-gold/40"
               >
                 {PROCESSES.map((p) => (
                   <option key={p} value={p}>{processLabel(p, t)}</option>
@@ -1096,13 +1092,13 @@ function MaterialsPanel({
                         onChange(value.filter((x) => x.id !== m.id));
                         setConfirmDel('');
                       }}
-                      className="min-h-[34px] px-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-[11.5px] font-semibold"
+                      className="lv-button lv-button-danger lv-button-sm"
                     >
                       {t('تأكيد الحذف', 'Confirm')}
                     </button>
                     <button
                       onClick={() => setConfirmDel('')}
-                      className="min-h-[34px] px-2.5 rounded-xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-400 text-[11.5px] font-semibold"
+                      className="lv-button lv-button-secondary lv-button-sm"
                     >
                       {t('إلغاء', 'Cancel')}
                     </button>
@@ -1112,7 +1108,7 @@ function MaterialsPanel({
                     data-material-delete={m.id}
                     onClick={() => setConfirmDel(m.id)}
                     aria-label={t('حذف المادة', 'Delete material')}
-                    className="w-9 h-9 rounded-xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-400 flex items-center justify-center"
+                    className="lv-button lv-button-ghost w-11 px-0"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1216,11 +1212,11 @@ function MaterialsPanel({
           </div>
         ))}
         {shown.length === 0 && (
-          <p className="py-10 text-center text-zinc-500 text-[13px]">{t('لا مواد في هذا التصنيف', 'No materials in this filter')}</p>
+          <p className="py-10 text-center text-text-muted text-[13px]">{t('لا مواد في هذا التصنيف', 'No materials in this filter')}</p>
         )}
       </div>
 
-      <div className="rounded-2xl border border-dashed border-zinc-700/60 bg-zinc-800/20 p-3">
+      <div className="rounded-xl border border-dashed border-border-subtle p-3">
         <h4 className="text-gold font-bold text-[12.5px] mb-2.5">{t('إضافة مادة', 'Add a material')}</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <TextField
@@ -1232,12 +1228,12 @@ function MaterialsPanel({
             dataField="new_id"
           />
           <div>
-            <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">{t('التقنية', 'Process')}</label>
+            <label className="block text-text-secondary text-[12px] font-semibold mb-1.5">{t('التقنية', 'Process')}</label>
             <select
+              className="lv-input text-[13px]"
               data-material-field="new_process"
               value={newProcess}
               onChange={(e) => setNewProcess(e.target.value === 'resin' ? 'resin' : 'fdm')}
-              className="w-full min-h-[44px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 px-3 text-white text-[13px] outline-none focus:border-gold/40"
             >
               {PROCESSES.map((p) => (
                 <option key={p} value={p}>{processLabel(p, t)}</option>
@@ -1258,16 +1254,16 @@ function MaterialsPanel({
             dataField="new_name_en"
           />
         </div>
-        {addErr && <p className="text-red-300 text-[11.5px] mt-2">{addErr}</p>}
+        {addErr && <p className="text-danger text-[11.5px] mt-2">{addErr}</p>}
         <button
           data-material-add
           onClick={add}
-          className="mt-3 min-h-[44px] px-4 rounded-2xl bg-zinc-800/60 border border-zinc-700/50 text-white text-[12.5px] font-semibold flex items-center gap-2"
+          className="mt-3 lv-button lv-button-secondary"
         >
           <Plus className="w-4 h-4" />
           {t('إضافة إلى الجدول', 'Add to the table')}
         </button>
-        <p className="text-zinc-500 text-[11px] mt-2.5 leading-relaxed">
+        <p className="text-text-muted text-[11px] mt-2.5 leading-relaxed">
           {t(
             'المادة الجديدة تبدأ بكثافة وسعر صفر، والحفظ يبقى ممنوعًا حتى تُكتب الأرقام الحقيقية — لا تُخترع أرقام هنا. ولإيقاف مادة قديمة أطفئ «فعّالة» بدل حذفها: الحذف لا يمس الطلبات السابقة، لكنه يفقد اسمها في أي شاشة تقرأ الجدول.',
             'A new material starts at zero density and zero price and the save stays blocked until real numbers replace them — nothing is invented here. To retire an old material switch “Active” off rather than deleting it: deleting touches no past request, but every screen that reads the table loses its name.'
@@ -1326,7 +1322,7 @@ function WeightsPanel({
         />
         <button
           onClick={bar.onReset}
-          className="min-h-[44px] px-4 rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 text-[12.5px] font-semibold flex items-center gap-2"
+          className="lv-button lv-button-secondary"
         >
           <RotateCcw className="w-4 h-4" />
           {t('إعادة التحميل من الخادم', 'Reload from the server')}
@@ -1345,7 +1341,7 @@ function WeightsPanel({
       <SaveBar {...bar} errors={problems} />
 
       <Section title={t('التوازن الحالي', 'The current balance')}>
-        <div className="flex h-3 w-full rounded-full overflow-hidden bg-zinc-900/60 border border-zinc-700/50">
+        <div className="flex h-3 w-full rounded-full overflow-hidden lv-well">
           {WEIGHT_KEYS.map((k) => (
             <div
               key={k}
@@ -1355,7 +1351,7 @@ function WeightsPanel({
             />
           ))}
         </div>
-        <p className="text-zinc-500 text-[11px] mt-2" dir="ltr">
+        <p className="text-text-muted text-[11px] mt-2" dir="ltr">
           {t('المجموع', 'Total')}: {total}
         </p>
         <Note
@@ -1371,14 +1367,14 @@ function WeightsPanel({
           {WEIGHT_KEYS.map((k) => (
             <div key={k} className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <label className="block text-zinc-300 text-[12.5px] font-semibold mb-1 truncate">
+                <label className="block text-text-secondary text-[12.5px] font-semibold mb-1 truncate">
                   {t(WEIGHT_META[k].ar, WEIGHT_META[k].en)}
                 </label>
-                <div className="h-1.5 rounded-full bg-zinc-900/60 overflow-hidden">
+                <div className="h-1.5 rounded-full lv-well overflow-hidden">
                   <div className={`h-full ${WEIGHT_META[k].bar}`} style={{ width: `${share(value[k])}%` }} />
                 </div>
               </div>
-              <span className="text-zinc-500 text-[11px] w-12 text-end tabular-nums shrink-0" dir="ltr">
+              <span className="text-text-muted text-[11px] w-12 text-end tabular-nums shrink-0" dir="ltr">
                 {share(value[k]).toFixed(1)}%
               </span>
               <NumInput
@@ -1436,17 +1432,17 @@ function ProvidersPanel({
     <div data-print-admin="providers" className="space-y-4">
       <SaveBar {...bar} errors={problems} />
 
-      <div className="rounded-2xl border border-gold/25 bg-gold/[0.06] p-3">
+      <div className="rounded-lg border border-gold/25 bg-gold/[0.06] p-3">
         <p className="text-gold text-[12.5px] font-bold mb-1.5">
           {t('Levonis لا يكشط الصفحات', 'Levonis never scrapes a page')}
         </p>
-        <p className="text-zinc-300 text-[11.5px] leading-relaxed">
+        <p className="text-text-secondary text-[11.5px] leading-relaxed">
           {t(
             'بدون رابط API يظل Levonis يفهم الرابط نفسه — يعرف الموقع ويستخرج معرّف الموديل — لكنه لا يقرأ تفاصيل التصميم: لا أبعاد ولا حجم ولا صور. مع رابط API يسأل الموقع سؤالًا مباشرًا عبر واجهته المعلنة، ولا يفتح صفحة العرض ليقرأها.',
             'With no API URL Levonis still understands the link itself — it knows the site and pulls out the model id — but it cannot read the design’s details: no dimensions, no volume, no images. With an API URL it asks that site a direct question through its published interface; it never opens the listing page to read it.'
           )}
         </p>
-        <p className="text-zinc-400 text-[11.5px] leading-relaxed mt-1.5">
+        <p className="text-text-secondary text-[11.5px] leading-relaxed mt-1.5">
           {t(
             '{id} داخل الرابط يُستبدل بمعرّف الموديل المستخرج. الإعدادات يقرأها كل مشرف، فلا يوضع أي مفتاح سري هنا.',
             '{id} inside the URL is replaced with the extracted model id. Settings are readable by every admin, so no secret key belongs here.'
@@ -1456,11 +1452,11 @@ function ProvidersPanel({
 
       <div className="space-y-3">
         {value.map((p) => (
-          <div key={p.id} className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-3">
+          <div key={p.id} className="lv-surface p-3">
             <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-              <span className="text-white font-bold text-[13px]" dir="ltr">{p.id}</span>
+              <span className="text-text-primary font-bold text-[13px]" dir="ltr">{p.id}</span>
               {p.hosts.map((h) => (
-                <span key={h} className="text-[10.5px] text-zinc-400 bg-zinc-900/60 border border-zinc-700/50 rounded-full px-2 py-0.5" dir="ltr">
+                <span key={h} className="text-[10.5px] text-text-secondary bg-white/[0.06] rounded-full px-2 py-0.5" dir="ltr">
                   {h}
                 </span>
               ))}
@@ -1482,7 +1478,7 @@ function ProvidersPanel({
               dataField="api_url"
             />
             {p.api_url.trim() !== '' && !p.api_url.includes('{id}') && (
-              <p className="text-amber-300/90 text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-warning text-[11px] mt-1.5 leading-relaxed">
                 {t(
                   'الرابط لا يحوي {id}، فسيُطلب العنوان نفسه لكل موديل ولن يصل معرّف التصميم إلى الموقع.',
                   'This URL has no {id}, so the same address is requested for every model and the design’s id never reaches the site.'
@@ -1490,7 +1486,7 @@ function ProvidersPanel({
               </p>
             )}
             {p.headers && Object.keys(p.headers).length > 0 && (
-              <p className="text-zinc-500 text-[11px] mt-1.5" dir="ltr">
+              <p className="text-text-muted text-[11px] mt-1.5" dir="ltr">
                 {t('رؤوس محفوظة', 'Stored headers')}: {Object.keys(p.headers).join(', ')}
               </p>
             )}
@@ -1498,7 +1494,7 @@ function ProvidersPanel({
         ))}
       </div>
 
-      <p className="text-zinc-500 text-[11px] leading-relaxed">
+      <p className="text-text-muted text-[11px] leading-relaxed">
         {t(
           'لا تُضاف مواقع جديدة من هنا: Levonis يحتاج أولًا أن يعرف شكل روابط الموقع ليستخرج معرّف الموديل منها، وذلك يُضاف في الكود لا في الإعدادات.',
           'New sites are not added here: Levonis must first know the shape of that site’s links to pull a model id out of them, and that lives in code rather than in a setting.'
@@ -1513,11 +1509,11 @@ function ProvidersPanel({
 function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProps & { errors: string[] }) {
   const blocked = errors.length > 0;
   return (
-    <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-zinc-900">
+    <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-surface">
       {blocked && (
-        <ul className="mb-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-3 py-2 space-y-0.5 max-h-40 overflow-y-auto">
+        <ul className="mb-2 lv-alert lv-alert-danger space-y-0.5 max-h-40 overflow-y-auto">
           {errors.map((e, i) => (
-            <li key={`${i}-${e}`} className="text-red-300 text-[11.5px] leading-relaxed">{e}</li>
+            <li key={`${i}-${e}`} className="text-text-primary text-[11.5px] leading-relaxed">{e}</li>
           ))}
         </ul>
       )}
@@ -1526,7 +1522,7 @@ function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProp
           data-print-admin-save={section}
           onClick={onSave}
           disabled={!dirty || saving || blocked}
-          className="flex-1 min-h-[46px] rounded-2xl bg-olive text-snow font-bold text-[13.5px] flex items-center justify-center gap-2 disabled:opacity-40"
+          className="lv-button lv-button-primary flex-1"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {dirty ? t('حفظ هذا القسم', 'Save this section') : t('لا تغييرات', 'No changes')}
@@ -1535,12 +1531,12 @@ function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProp
           onClick={onReset}
           disabled={saving}
           aria-label={t('إعادة التحميل من الخادم', 'Reload from the server')}
-          className="w-12 min-h-[46px] rounded-2xl border border-zinc-700/50 bg-zinc-800/40 text-zinc-300 flex items-center justify-center disabled:opacity-40"
+          className="lv-button lv-button-secondary w-12 px-0"
         >
           <RotateCcw className="w-4 h-4" />
         </button>
       </div>
-      <p className="text-zinc-500 text-[10.5px] mt-1.5 leading-relaxed">
+      <p className="text-text-muted text-[10.5px] mt-1.5 leading-relaxed">
         {t(
           'الحفظ يكتب هذا المفتاح وحده. زر الإرجاع يعيد قراءة القيم من الخادم ويتخلى عن أي تعديل غير محفوظ — وهي القيم الافتراضية ما لم تُحفظ من قبل.',
           'Saving writes this key alone. The reload button re-reads the values from the server and drops any unsaved edit — and those are the defaults until something has been saved.'
@@ -1552,7 +1548,7 @@ function SaveBar({ t, section, dirty, saving, errors, onSave, onReset }: BarProp
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-zinc-700/50 bg-zinc-800/30 p-4">
+    <div className="lv-surface p-4">
       <h3 className="text-gold font-bold text-[13px] mb-3">{title}</h3>
       {children}
     </div>
@@ -1560,22 +1556,22 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Note({ text }: { text: string }) {
-  return <p className="text-zinc-500 text-[11.5px] leading-relaxed mb-3">{text}</p>;
+  return <p className="text-text-muted text-[11.5px] leading-relaxed mb-3">{text}</p>;
 }
 
 function Warn({ text }: { text: string }) {
   return (
-    <div className="mt-3 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-      <p className="text-amber-200/90 text-[11.5px] leading-relaxed">{text}</p>
+    <div className="mt-3 flex items-start gap-2 lv-alert lv-alert-warning">
+      <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+      <p className="text-text-primary text-[11.5px] leading-relaxed">{text}</p>
     </div>
   );
 }
 
 function Err({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-      <p className="text-red-300 text-[12.5px] leading-relaxed">{text}</p>
+    <div className="lv-alert lv-alert-danger">
+      <p className="text-text-primary text-[12.5px] leading-relaxed">{text}</p>
     </div>
   );
 }
@@ -1620,6 +1616,7 @@ function NumInput({
 
   return (
     <input
+      className={`lv-input min-h-[44px] text-[13px] ${invalid ? 'border-danger' : ''} ${className}`}
       data-print-field={dataField}
       data-weight={dataWeight}
       aria-label={ariaLabel}
@@ -1640,9 +1637,6 @@ function NumInput({
         if (e.target.value !== '' && Number.isFinite(n)) onChange(n);
       }}
       dir="ltr"
-      className={`min-h-[44px] rounded-2xl bg-zinc-800/40 border px-3 text-white text-[13px] outline-none focus:border-gold/40 ${
-        invalid ? 'border-red-500/50' : 'border-zinc-700/50'
-      } ${className}`}
     />
   );
 }
@@ -1667,7 +1661,7 @@ function NumField({
 
   return (
     <div>
-      <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">{label}</label>
+      <label className="block text-text-secondary text-[12px] font-semibold mb-1.5">{label}</label>
       <div className="flex items-center gap-2">
         <NumInput
           value={value}
@@ -1680,9 +1674,9 @@ function NumField({
           ariaLabel={label}
           className="min-w-0 flex-1"
         />
-        {unit && <span className="text-zinc-500 text-[11.5px] shrink-0 min-w-[2.2rem]">{unit}</span>}
+        {unit && <span className="text-text-muted text-[11.5px] shrink-0 min-w-[2.2rem]">{unit}</span>}
       </div>
-      {hint && <p className="text-zinc-600 text-[10.5px] mt-1 leading-relaxed">{hint}</p>}
+      {hint && <p className="text-text-muted text-[10.5px] mt-1 leading-relaxed">{hint}</p>}
     </div>
   );
 }
@@ -1699,15 +1693,15 @@ function TextField({
 }) {
   return (
     <div>
-      <label className="block text-zinc-400 text-[12px] font-semibold mb-1.5">{label}</label>
+      <label className="block text-text-secondary text-[12px] font-semibold mb-1.5">{label}</label>
       <input
+        className="lv-input min-h-[44px] text-[13px]"
         data-print-field={dataField}
         type="text"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         dir={ltr ? 'ltr' : undefined}
-        className="w-full min-h-[44px] rounded-2xl bg-zinc-800/40 border border-zinc-700/50 px-3 text-white text-[13px] outline-none focus:border-gold/40 placeholder:text-zinc-600"
       />
     </div>
   );
@@ -1726,18 +1720,20 @@ function Toggle({
   tone?: 'default' | 'match';
   dataField?: string;
 }) {
+  // Selection is a press (the filter-chip recipe); a matching flag keeps its
+  // own ink so it does not read as one more pricing switch.
   const lit =
     tone === 'match'
-      ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-      : 'bg-olive border-olive text-snow';
+      ? 'border-transparent bg-[var(--clay-well-bg)] text-info shadow-press'
+      : 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press';
   return (
     <button
       type="button"
       data-print-field={dataField}
       aria-pressed={on}
       onClick={onClick}
-      className={`min-h-[34px] px-3 rounded-xl border text-[11.5px] font-semibold transition-colors ${
-        on ? lit : 'bg-zinc-800/40 border-zinc-700/50 text-zinc-500'
+      className={`min-h-[34px] px-3 rounded-full border text-[11.5px] font-semibold transition-colors ${
+        on ? lit : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
       }`}
     >
       {label}

@@ -372,8 +372,8 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
 
   const FactBadge = ({ ok, label }: { ok: boolean; label: string }) => (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-        ok ? 'bg-green-500/10 text-green-400 border-green-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+        ok ? 'lv-chip [--chip:var(--color-success)]' : 'lv-chip [--chip:var(--color-warning)]'
       }`}
     >
       {ok ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />} {label}
@@ -384,11 +384,11 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
     loc(p.name_ar || p.name || '—', p.name || p.name_ar || '—');
 
   return (
-    <div dir={dir} className="space-y-6 text-white">
+    <div dir={dir} className="space-y-6 text-text-primary">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-black">{S.title}</h2>
-        <div className="flex flex-wrap bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
-          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-800 text-white" aria-current="page">
+        <div className="flex flex-wrap lv-well border border-border-subtle p-1 rounded-xl">
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-surface-raised text-text-primary shadow-1" aria-current="page">
             <ClipboardList className="w-3.5 h-3.5" aria-hidden /> {S.tabs.queue}
           </span>
           {onOpenGifts &&
@@ -403,7 +403,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                 type="button"
                 onClick={() => onOpenGifts(t.view)}
                 data-open-gifts={t.view}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-zinc-500 hover:text-zinc-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 <t.icon className="w-3.5 h-3.5" aria-hidden /> {t.label}
               </button>
@@ -415,13 +415,13 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
       {(
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl overflow-x-auto">
+            <div className="flex lv-well border border-border-subtle p-1 rounded-xl overflow-x-auto">
               {(['submitted', 'revision_needed', 'approved', 'rejected', 'all'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setStateFilter(f)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-                    stateFilter === f ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    stateFilter === f ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   {S.states[f]}
@@ -430,7 +430,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
             </div>
             <button
               onClick={loadQueue}
-              className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 transition-colors"
+              className="lv-button lv-button-secondary w-11 px-0"
               title={S.refresh}
             >
               <RefreshCw className={`w-4 h-4 ${queueLoading ? 'animate-spin' : ''}`} />
@@ -438,16 +438,16 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
           </div>
 
           {pointsConfigured === null && (
-            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl p-3 text-[12px] font-medium">
+            <div className="lv-alert lv-alert-warning text-[12px] font-medium text-text-primary">
               {S.pointsUnconfigured}
             </div>
           )}
           {queueError && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm">{queueError}</div>
+            <div className="lv-alert lv-alert-danger text-sm text-text-primary">{queueError}</div>
           )}
-          {queueLoading && queue.length === 0 && <div className="text-center text-zinc-500 py-10">{S.loading}</div>}
+          {queueLoading && queue.length === 0 && <div className="text-center text-text-muted py-10">{S.loading}</div>}
           {!queueLoading && queue.length === 0 && !queueError && (
-            <div className="text-center text-zinc-500 py-10">{S.empty}</div>
+            <div className="text-center text-text-muted py-10">{S.empty}</div>
           )}
 
           {queue.map((row) => {
@@ -455,29 +455,29 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
             const undecided = row.reward_state === 'submitted' || row.reward_state === 'revision_needed';
             const selectedTier = scoreDraft[row.review_id] ?? row.quality_score ?? row.quality?.tier ?? undefined;
             return (
-              <div key={row.review_id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+              <div key={row.review_id} className="lv-surface overflow-hidden">
                 <button
                   onClick={() => setExpanded(open ? null : row.review_id)}
-                  className="w-full text-start p-4 hover:bg-zinc-800/40 transition-colors"
+                  className="w-full text-start p-4 hover:bg-surface-raised transition-colors"
                 >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
                       <div className="text-sm font-bold truncate">{productName(row.product)}</div>
-                      <div className="text-[11px] text-zinc-500 truncate">
+                      <div className="text-[11px] text-text-muted truncate">
                         {row.customer.email} · {row.order_id ?? '—'} · {new Date(row.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="flex items-center gap-1 text-[11px] text-yellow-400">
-                        <Star className="w-3.5 h-3.5 fill-yellow-400" /> {row.stars}/5
+                      <span className="flex items-center gap-1 text-[11px] text-gold">
+                        <Star className="w-3.5 h-3.5 fill-current" /> {row.stars}/5
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-iris/10 text-violet-400 border border-iris/30">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full lv-chip [--chip:var(--color-info)]">
                         {S.kinds[row.kind]}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-text-secondary">
                         {S.states[row.reward_state]}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/[0.06] text-text-secondary">
                         {S.reviewStatus[row.review_status]}
                       </span>
                     </div>
@@ -485,19 +485,19 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                 </button>
 
                 {open && (
-                  <div className="border-t border-zinc-800 p-4 space-y-4">
-                    <p className="text-[13px] text-zinc-300 whitespace-pre-wrap break-words">{row.body}</p>
+                  <div className="border-t border-border-subtle p-4 space-y-4">
+                    <p className="text-[13px] text-text-secondary whitespace-pre-wrap break-words">{row.body}</p>
 
                     {row.media.length > 0 && (
                       <div>
-                        <div className="text-[11px] font-bold text-zinc-500 mb-1">{S.media}</div>
+                        <div className="text-[11px] font-bold text-text-muted mb-1">{S.media}</div>
                         <div className="flex gap-2 overflow-x-auto pb-1">
                           {row.media.map((m) =>
                             m.kind === 'video' ? (
-                              <video key={m.url} src={m.url} controls preload="none" className="h-24 rounded-lg border border-zinc-700 shrink-0" />
+                              <video key={m.url} src={m.url} controls preload="none" className="h-24 rounded-lg border border-border-subtle shrink-0" />
                             ) : (
                               <a key={m.url} href={m.url} target="_blank" rel="noreferrer" className="shrink-0">
-                                <img src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-zinc-700" />
+                                <img src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-border-subtle" />
                               </a>
                             )
                           )}
@@ -506,7 +506,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                     )}
 
                     <div>
-                      <div className="text-[11px] font-bold text-zinc-500 mb-1">{S.facts}</div>
+                      <div className="text-[11px] font-bold text-text-muted mb-1">{S.facts}</div>
                       <div className="flex flex-wrap gap-1.5">
                         <FactBadge ok={row.facts.delivered} label={S.factLabels.delivered} />
                         <FactBadge ok={row.facts.is_printer} label={S.factLabels.is_printer} />
@@ -518,10 +518,10 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                     </div>
 
                     {row.quality && (
-                      <div className="rounded-lg bg-white/[0.035] px-3 py-2.5 text-[11.5px] text-zinc-400">
+                      <div className="rounded-lg bg-white/[0.035] px-3 py-2.5 text-[11.5px] text-text-secondary">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span>{loc('درجة الجودة', 'Quality score', 'نمرەی کوالیتی')}: <b className="text-zinc-200">{row.quality.score}/100</b></span>
-                          <span>{loc('المستوى المتوقع', 'Predicted level', 'ئاستی پێشبینیکراو')}: <b className="text-zinc-200">{row.quality.tier ?? '—'}</b></span>
+                          <span>{loc('درجة الجودة', 'Quality score', 'نمرەی کوالیتی')}: <b className="text-text-primary">{row.quality.score}/100</b></span>
+                          <span>{loc('المستوى المتوقع', 'Predicted level', 'ئاستی پێشبینیکراو')}: <b className="text-text-primary">{row.quality.tier ?? '—'}</b></span>
                           <span>{loc('جودة النص', 'Text quality', 'کوالیتی دەق')}: {row.quality.textQuality}/42</span>
                           <span>{loc('الصور الفريدة', 'Unique images', 'وێنە ڕەسەنەکان')}: {row.quality.imageCount}</span>
                           <span>{loc('جودة الفيديو', 'Video quality', 'کوالیتی ڤیدیۆ')}: {row.quality.videoQuality}/18</span>
@@ -530,7 +530,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                           <p className="mt-1 break-words">{loc('الأسباب', 'Reasons', 'هۆکارەکان')}: {row.quality.reasons.join(' · ')}</p>
                         )}
                         {row.quality.suspiciousSignals.length > 0 && (
-                          <p className="mt-1 text-amber-300 break-words">
+                          <p className="mt-1 text-warning break-words">
                             {loc('إشارات تحتاج فحصًا', 'Signals to inspect', 'نیشانە پێویستە بپشکنرێت')}: {row.quality.suspiciousSignals.join(' · ')}
                           </p>
                         )}
@@ -538,7 +538,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                     )}
 
                     <div>
-                      <div className="text-[11px] font-bold text-zinc-500 mb-1 flex items-center gap-1">
+                      <div className="text-[11px] font-bold text-text-muted mb-1 flex items-center gap-1">
                         <Instagram className="w-3.5 h-3.5 text-pink-400" /> {S.evidence}
                       </div>
                       {row.instagram ? (
@@ -555,20 +555,20 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                           )}
                         </div>
                       ) : (
-                        <div className="text-[12px] text-zinc-500">{S.noEvidence}</div>
+                        <div className="text-[12px] text-text-muted">{S.noEvidence}</div>
                       )}
                     </div>
 
                     {/* Public moderation — separate from reward */}
-                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-2">
-                      <div className="text-[11px] font-bold text-zinc-400">{S.moderation}</div>
-                      {row.moderation_note && <div className="text-[11px] text-amber-400">{row.moderation_note}</div>}
+                    <div className="rounded-lg bg-surface-raised p-3 space-y-2">
+                      <div className="text-[11px] font-bold text-text-secondary">{S.moderation}</div>
+                      {row.moderation_note && <div className="text-[11px] text-warning">{row.moderation_note}</div>}
                       <div className="flex flex-wrap gap-2">
                         {row.review_status !== 'published' && (
                           <button
                             disabled={busyId === row.review_id}
                             onClick={() => moderate(row, 'approve')}
-                            className="text-[12px] font-bold bg-green-600/80 hover:bg-green-600 disabled:opacity-50 px-3 py-1.5 rounded-full"
+                            className="lv-button lv-button-secondary lv-button-sm"
                           >
                             {S.publish}
                           </button>
@@ -577,7 +577,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                           <button
                             disabled={busyId === row.review_id}
                             onClick={() => moderate(row, 'reject')}
-                            className="text-[12px] font-bold bg-red-600/70 hover:bg-red-600 disabled:opacity-50 px-3 py-1.5 rounded-full"
+                            className="lv-button lv-button-danger lv-button-sm"
                           >
                             {S.unpublishReject}
                           </button>
@@ -585,7 +585,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                         <button
                           disabled={busyId === row.review_id}
                           onClick={() => moderate(row, 'request_changes')}
-                          className="text-[12px] font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 px-3 py-1.5 rounded-full"
+                          className="lv-button lv-button-secondary lv-button-sm"
                         >
                           {S.requestChanges}
                         </button>
@@ -593,24 +593,24 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                     </div>
 
                     {/* Reward decision */}
-                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-3">
-                      <div className="text-[11px] font-bold text-zinc-400">{S.rewardPanel}</div>
+                    <div className="rounded-lg bg-surface-raised p-3 space-y-3">
+                      <div className="text-[11px] font-bold text-text-secondary">{S.rewardPanel}</div>
                       {row.reward_state === 'approved' ? (
-                        <div className="text-[13px] text-zinc-300 space-y-1">
+                        <div className="text-[13px] text-text-secondary space-y-1">
                           {row.kind === 'printer_gift' ? (
                             <div>
                               {S.score}: <b>{row.quality_score}/5</b>
-                              {row.entitlement_id && <span className="text-zinc-500 text-[11px]"> · {row.entitlement_id}</span>}
+                              {row.entitlement_id && <span className="text-text-muted text-[11px]"> · {row.entitlement_id}</span>}
                             </div>
                           ) : (
                             <div>
                               {S.kinds.points}: <b>{row.points_awarded.toLocaleString()}</b>
                             </div>
                           )}
-                          {row.reason && <div className="text-[12px] text-zinc-500">{S.decided}: {row.reason}</div>}
+                          {row.reason && <div className="text-[12px] text-text-muted">{S.decided}: {row.reason}</div>}
                         </div>
                       ) : row.reward_state === 'rejected' ? (
-                        <div className="text-[12px] text-zinc-400">
+                        <div className="text-[12px] text-text-secondary">
                           {S.states.rejected}
                           {row.reason ? ` — ${row.reason}` : ''}
                         </div>
@@ -620,7 +620,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                         <>
                           {row.kind === 'printer_gift' && (
                             <div className="space-y-2">
-                              <label className="block text-[11px] text-zinc-500">{S.scoreLabel}</label>
+                              <label className="block text-[11px] text-text-muted">{S.scoreLabel}</label>
                               <div className="flex gap-1.5">
                                 {[1, 2, 3, 4, 5].map((n) => (
                                   <button
@@ -629,8 +629,8 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                                     onClick={() => setScoreDraft((m) => ({ ...m, [row.review_id]: n }))}
                                     className={`w-9 h-9 rounded-lg border text-sm font-black transition-colors ${
                                       selectedTier === n
-                                        ? 'bg-[#6B46FF] border-iris text-snow'
-                                        : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                                        ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                                        : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
                                     }`}
                                   >
                                     {n}
@@ -640,13 +640,13 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                             </div>
                           )}
                           <div>
-                            <label className="block text-[11px] text-zinc-500 mb-1">{S.rubricLabel}</label>
+                            <label className="block text-[11px] text-text-muted mb-1">{S.rubricLabel}</label>
                             <textarea
+                              className="lv-input py-2 text-[13px]"
                               value={rubricDraft[row.review_id] ?? ''}
                               onChange={(e) => setRubricDraft((m) => ({ ...m, [row.review_id]: e.target.value }))}
                               rows={2}
                               placeholder={S.rubricPlaceholder}
-                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-[13px] text-white focus:border-iris outline-none"
                             />
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -658,7 +658,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                                   (rubricDraft[row.review_id]?.trim().length ?? 0) < 10
                                 }
                                 onClick={() => decideReward(row, 'approve')}
-                                className="text-[12px] font-bold bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-40 px-4 py-1.5 rounded-full"
+                                className="lv-button lv-button-primary lv-button-sm"
                               >
                                 {busyId === row.review_id ? S.working : S.approveGift}
                               </button>
@@ -666,24 +666,24 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                               <button
                                 disabled={busyId === row.review_id || (rubricDraft[row.review_id]?.trim().length ?? 0) < 3}
                                 onClick={() => decideReward(row, 'approve')}
-                                className="text-[12px] font-bold bg-[#6B46FF] hover:bg-iris-deep disabled:opacity-40 px-4 py-1.5 rounded-full"
+                                className="lv-button lv-button-primary lv-button-sm"
                               >
                                 {busyId === row.review_id ? S.working : S.approvePoints(pointsConfigured)}
                               </button>
                             ) : (
-                              <span className="text-[11px] text-amber-400">{S.pointsUnconfigured}</span>
+                              <span className="text-[11px] text-warning">{S.pointsUnconfigured}</span>
                             )}
                             <button
                               disabled={busyId === row.review_id}
                               onClick={() => decideReward(row, 'request_changes')}
-                              className="text-[12px] font-bold bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 px-3 py-1.5 rounded-full"
+                              className="lv-button lv-button-secondary lv-button-sm"
                             >
                               {S.requestChanges}
                             </button>
                             <button
                               disabled={busyId === row.review_id}
                               onClick={() => decideReward(row, 'reject')}
-                              className="text-[12px] font-bold bg-red-600/70 hover:bg-red-600 disabled:opacity-50 px-3 py-1.5 rounded-full"
+                              className="lv-button lv-button-danger lv-button-sm"
                             >
                               {S.rejectReward}
                             </button>
@@ -693,7 +693,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                     </div>
 
                     {rowError?.id === row.review_id && (
-                      <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[12px] rounded-xl p-3">
+                      <div className="lv-alert lv-alert-danger text-[12px] text-text-primary">
                         {rowError.message}
                       </div>
                     )}

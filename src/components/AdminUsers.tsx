@@ -36,10 +36,11 @@ interface AdminUserRow {
 /** Which of the three jobs this screen is doing. */
 type UsersView = 'members' | 'assistant' | 'telegram';
 
+/** A role is information: a flat chip in its tone (build plan §5). */
 const ROLE_STYLES: Record<string, string> = {
-  admin: 'bg-iris/10 text-iris border-iris/20',
-  merchant: 'bg-gilt/10 text-gilt border-gilt/20',
-  customer: 'bg-zinc-800 text-zinc-400 border-zinc-700',
+  admin: 'lv-chip [--chip:var(--color-info)]',
+  merchant: 'lv-chip [--chip:var(--color-gold)]',
+  customer: 'bg-white/[0.06] text-text-secondary',
 };
 
 export default function AdminUsers() {
@@ -166,9 +167,9 @@ export default function AdminUsers() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-black text-white">{t('adminUsers')}</h2>
+          <h2 className="text-2xl font-black text-text-primary">{t('adminUsers')}</h2>
           {view === 'members' && (
-            <span className="text-xs font-bold text-zinc-500 bg-zinc-800 px-3 py-1 rounded-full border border-zinc-700">
+            <span className="text-xs font-bold text-text-secondary bg-white/[0.06] px-3 py-1 rounded-full tabular-nums">
               {/* `loc(ar, en, ckb)` AND NOT `dir === 'rtl' ? ar : en`, which is
                   what stood here. Kurdish is ALSO right-to-left, so the
                   direction test served ARABIC to every Kurdish admin and called
@@ -184,14 +185,14 @@ export default function AdminUsers() {
               {s.searchPlaceholder}
             </label>
             <input
+              className="lv-input rounded-full ps-10 pe-4"
               id="admin-users-search"
               type="text"
               placeholder={s.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 text-white pl-10 pr-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-iris/50"
             />
-            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-text-muted absolute start-3 top-1/2 -translate-y-1/2" />
           </div>
         )}
       </div>
@@ -233,34 +234,34 @@ export default function AdminUsers() {
       {view === 'telegram' && <TelegramIdentities />}
 
       {view === 'members' && loadError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-4 text-sm font-medium">
+        <div className="lv-alert lv-alert-danger text-sm font-medium text-text-primary">
           {loadError}
         </div>
       )}
 
       {view === 'members' && (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+      <div className="lv-surface overflow-hidden">
         <div className="overflow-x-auto">
           {/* The actions column is pinned: this table is 900px wide inside a
               766px viewport on a tablet held upright, and its own row controls
               measured at x=-79 — off the screen entirely. The backgrounds are
-              this table's own zinc palette rather than the shared admin tokens,
+              the row fills (the tray's surface, the header's raised step),
               and they are opaque on purpose: a translucent cell lets the
               scrolled columns show through the buttons. */}
-          <table className="w-full text-left border-collapse min-w-[900px] [&_tr>*:last-child]:sticky [&_tr>*:last-child]:end-0 [&_tr>*:last-child]:z-[1] [&_tbody_tr>*:last-child]:bg-zinc-900 [&_thead_tr>*:last-child]:bg-zinc-800">
+          <table className="w-full text-start border-collapse min-w-[900px] [&_tr>*:last-child]:sticky [&_tr>*:last-child]:end-0 [&_tr>*:last-child]:z-[1] [&_tbody_tr>*:last-child]:bg-surface [&_thead_tr>*:last-child]:bg-surface-raised">
             <thead>
-              <tr className="bg-zinc-800/50 border-b border-zinc-700">
-                <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider">User Info</th>
-                <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider">Role</th>
-                <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider">Plan</th>
-                <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider">Investor</th>
-                <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider">Joined</th>
-                <th className="py-4 px-6 text-xs font-bold text-zinc-400 uppercase tracking-wider text-right">Actions</th>
+              <tr className="bg-surface-raised border-b border-border-subtle">
+                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">User Info</th>
+                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Role</th>
+                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Plan</th>
+                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Investor</th>
+                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Joined</th>
+                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((u) => (
-                <tr key={u.id} className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors">
+                <tr key={u.id} className="border-b border-border-subtle hover:bg-surface-raised transition-colors">
                   <td className="py-4 px-6">
                     {/*
                       «عند الضغط على مستخدم» — pressing the USER is what opens
@@ -283,20 +284,20 @@ export default function AdminUsers() {
                         setDetailUserId(u.id);
                       }}
                       aria-label={`${s.openMember}: ${u.name || u.username || u.email}`}
-                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-zinc-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-iris/60"
+                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-iris/60"
                     >
-                      <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0 border border-zinc-700">
-                        {u.role === 'admin' ? <Shield className="w-5 h-5 text-iris" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-gilt" /> : <User className="w-5 h-5 text-zinc-400" />}
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border border-border-subtle">
+                        {u.role === 'admin' ? <Shield className="w-5 h-5 text-iris" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-gilt" /> : <User className="w-5 h-5 text-text-secondary" />}
                       </div>
                       <div className="min-w-0">
-                        <div dir="auto" className="font-bold text-zinc-200 truncate">{u.name || u.username || 'Unnamed User'}</div>
-                        <div dir="auto" className="text-sm text-zinc-500 font-medium truncate">{u.email}</div>
+                        <div dir="auto" className="font-bold text-text-primary truncate">{u.name || u.username || 'Unnamed User'}</div>
+                        <div dir="auto" className="text-sm text-text-muted font-medium truncate">{u.email}</div>
                       </div>
                     </button>
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border capitalize ${ROLE_STYLES[u.role] || ROLE_STYLES.customer}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${ROLE_STYLES[u.role] || ROLE_STYLES.customer}`}>
                         {u.role}
                       </span>
                       {/*
@@ -308,16 +309,16 @@ export default function AdminUsers() {
                         person move money?".
                       */}
                       {u.role === 'admin' && u.is_owner === true && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-mint/10 text-mint border-mint/30">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold lv-chip [--chip:var(--color-success)]">
                           {s.ownerBadge}
                         </span>
                       )}
                       {u.role === 'admin' && u.is_owner !== true && (
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
                             u.admin_scope === 'assistant'
-                              ? 'bg-gilt/10 text-gilt border-gilt/30'
-                              : 'bg-iris/10 text-iris border-iris/25'
+                              ? 'lv-chip [--chip:var(--color-gold)]'
+                              : 'lv-chip [--chip:var(--color-info)]'
                           }`}
                         >
                           {u.admin_scope === 'assistant' && <Lock className="w-3 h-3" />}
@@ -328,28 +329,28 @@ export default function AdminUsers() {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-zinc-500" />
-                      <span className="text-sm font-bold text-zinc-300 capitalize">{u.membership_tier || 'free'}</span>
+                      <CreditCard className="w-4 h-4 text-text-muted" />
+                      <span className="text-sm font-bold text-text-secondary capitalize">{u.membership_tier || 'free'}</span>
                     </div>
                   </td>
                   <td className="py-4 px-6">
                     {u.is_investor ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-mint">
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-success">
                         <TrendingUp className="w-3.5 h-3.5" /> Yes
                       </span>
                     ) : (
-                      <span className="text-xs text-zinc-600 font-medium">—</span>
+                      <span className="text-xs text-text-muted font-medium">—</span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-xs text-zinc-500 whitespace-nowrap">
+                  <td className="py-4 px-6 text-xs text-text-muted whitespace-nowrap">
                     {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                   </td>
-                  <td className="py-4 px-6 text-right">
+                  <td className="py-4 px-6 text-end">
                     <button
                       type="button"
                       aria-label={`${s.editMember}: ${u.name || u.username || u.email}`}
                       onClick={(e) => { editAnchorRef.current = e.currentTarget; setSaveError(null); setEditingUser(u); }}
-                      className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                      className="p-2 hover:bg-white/[0.06] rounded-lg text-text-secondary hover:text-text-primary transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -358,14 +359,14 @@ export default function AdminUsers() {
               ))}
               {!loading && filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={6} className="py-12 text-center text-text-muted font-medium">
                     {searchTerm ? `${s.noneFound} — "${searchTerm}"` : s.noneFound}
                   </td>
                 </tr>
               )}
               {loading && users.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-zinc-500 font-medium">{s.loading}</td>
+                  <td colSpan={6} className="py-12 text-center text-text-muted font-medium">{s.loading}</td>
                 </tr>
               )}
             </tbody>
@@ -450,37 +451,37 @@ export default function AdminUsers() {
         >
           {/* The old inner padding lives on a plain div inside, where it belongs. */}
           <div className="p-6">
-            <h3 id="admin-edit-user-title" className="text-xl font-bold text-white mb-6">Edit User</h3>
+            <h3 id="admin-edit-user-title" className="text-xl font-bold text-text-primary mb-6">Edit User</h3>
 
             <div className="space-y-4 mb-8">
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Name</label>
+                <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Name</label>
                 <input
                   type="text"
                   value={editorUser.name || editorUser.username || ''}
                   disabled
-                  className="w-full bg-zinc-800/50 border border-zinc-700 text-zinc-400 px-4 py-3 rounded-xl cursor-not-allowed"
+                  className="lv-input text-text-secondary cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Role</label>
+                <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Role</label>
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setEditingUser({...editorUser, role: 'customer'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'customer' ? 'bg-zinc-800 text-white border-zinc-600' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'customer' ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'}`}
                   >
                     <User className="w-4 h-4" /> Customer
                   </button>
                   <button
                     onClick={() => setEditingUser({...editorUser, role: 'merchant'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'merchant' ? 'bg-gilt/20 text-gilt border-gilt/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'merchant' ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'}`}
                   >
                     <Store className="w-4 h-4" /> Merchant
                   </button>
                   <button
                     onClick={() => setEditingUser({...editorUser, role: 'admin'})}
-                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'admin' ? 'bg-iris/20 text-iris border-iris/50' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:bg-zinc-800/50'}`}
+                    className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'admin' ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'}`}
                   >
                     <Shield className="w-4 h-4" /> Admin
                   </button>
@@ -488,11 +489,11 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Subscription Plan</label>
+                <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Subscription Plan</label>
                 <select
+                  className="lv-input appearance-none font-medium capitalize"
                   value={editorUser.membership_tier || 'free'}
                   onChange={(e) => setEditingUser({...editorUser, membership_tier: e.target.value as AdminUserRow['membership_tier']})}
-                  className="w-full bg-zinc-800 border border-zinc-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-iris/50 appearance-none font-medium capitalize"
                 >
                   <option value="free">Free Plan</option>
                   <option value="plus">Plus Plan</option>
@@ -502,21 +503,21 @@ export default function AdminUsers() {
               </div>
 
               {mayFlagInvestor && (
-                <label className="flex items-center gap-3 cursor-pointer bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3">
+                <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border-subtle px-4 py-3">
                   <input
                     type="checkbox"
                     checked={!!editorUser.is_investor}
                     onChange={(e) => setEditingUser({...editorUser, is_investor: e.target.checked ? 1 : 0})}
-                    className="w-5 h-5 rounded border-zinc-700 bg-zinc-800 accent-mint"
+                    className="w-5 h-5 rounded accent-gold"
                   />
-                  <span className="text-white font-medium flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-mint" /> Investor
+                  <span className="text-text-primary font-medium flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-success" /> Investor
                   </span>
                 </label>
               )}
 
               {saveError && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-sm font-medium">
+                <div className="lv-alert lv-alert-danger text-sm font-medium text-text-primary">
                   {saveError}
                 </div>
               )}
@@ -526,14 +527,14 @@ export default function AdminUsers() {
               <button
                 onClick={closeEditor}
                 disabled={saving}
-                className="px-5 py-2.5 rounded-xl font-bold text-zinc-400 hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                className="lv-button lv-button-ghost"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleSaveUser(editorUser)}
                 disabled={saving}
-                className="px-5 py-2.5 rounded-xl font-bold bg-white text-black hover:bg-zinc-200 transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="lv-button lv-button-primary"
               >
                 <Check className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Changes'}
               </button>

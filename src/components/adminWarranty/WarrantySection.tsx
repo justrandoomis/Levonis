@@ -466,12 +466,12 @@ export default function WarrantySection({
     s === 'active' ? t.stActive : s === 'expired' ? t.stExpired : s === 'void' ? t.stVoid : s === 'replaced' ? t.stReplaced : t.stDraft;
   const statusClass = (s: string) =>
     s === 'active'
-      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      ? 'lv-chip [--chip:var(--color-success)]'
       : s === 'expired'
-        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+        ? 'lv-chip [--chip:var(--color-warning)]'
         : s === 'void' || s === 'replaced'
-          ? 'bg-red-500/10 text-red-300 border-red-500/30'
-          : 'bg-zinc-700/40 text-zinc-300 border-zinc-600';
+          ? 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]'
+          : 'bg-white/[0.06] text-text-secondary';
 
   // Before delivery, with serial-required units: the «Scan Serial» slots.
   const preDelivery =
@@ -479,25 +479,25 @@ export default function WarrantySection({
 
   return (
     <section data-warranty-section dir={dir} data-warranty-mode={preDelivery ? 'serial-slots' : 'units'}>
-      <h3 className="text-[13px] font-bold text-zinc-400 mb-1 flex items-center gap-2">
+      <h3 className="text-[13px] font-bold text-text-secondary mb-1 flex items-center gap-2">
         <ShieldCheck className="w-4 h-4" aria-hidden />
         {head.title}
       </h3>
-      {!preDelivery && <p className="text-[12px] text-zinc-500 mb-2">{head.subtitle}</p>}
+      {!preDelivery && <p className="text-[12px] text-text-muted mb-2">{head.subtitle}</p>}
 
       {err && (
-        <div className="mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300" role="alert">
+        <div className="mb-2 lv-alert lv-alert-danger text-[12px] text-text-primary" role="alert">
           {err}
         </div>
       )}
       {formatNote && (
-        <div className="mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-300" role="status" data-serial-format-note>
+        <div className="mb-2 lv-alert lv-alert-warning text-[12px] text-text-primary" role="status" data-serial-format-note>
           <span className="font-semibold">{serialStrings(lang).formatTitle}:</span> {formatNote}
         </div>
       )}
 
       {durationNote && (
-        <div className="mb-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[12px] text-emerald-300" role="status">
+        <div className="mb-2 lv-alert lv-alert-success text-[12px] text-text-primary" role="status">
           {durationNote}
         </div>
       )}
@@ -514,35 +514,35 @@ export default function WarrantySection({
           orderStatus={orderStatus}
         />
       ) : loading && !data ? (
-        <p className="text-zinc-500 text-[13px]">{t.loading}</p>
+        <p className="text-text-muted text-[13px]">{t.loading}</p>
       ) : !data || data.units.length === 0 ? (
         data && data.order.status === 'delivered' && data.order.delivered_at ? (
           <div className="space-y-2">
-            <p className="text-zinc-400 text-[13px]">{backfillNone ? t.backfillNone : t.noneDelivered}</p>
+            <p className="text-text-secondary text-[13px]">{backfillNone ? t.backfillNone : t.noneDelivered}</p>
             {!backfillNone && (
               <button
                 type="button"
                 onClick={() => void backfillUnits()}
                 disabled={backfilling}
-                className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-[12px] font-bold text-emerald-300 disabled:opacity-50"
+                className="lv-button lv-button-secondary lv-button-sm"
               >
                 {backfilling ? t.backfilling : t.backfill}
               </button>
             )}
           </div>
         ) : (
-          <p className="text-zinc-500 text-[13px]">{t.none}</p>
+          <p className="text-text-muted text-[13px]">{t.none}</p>
         )
       ) : (
         <>
           {data.order.status === 'cancelled' && !data.order.delivered_at && (
-            <div className="mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 flex items-center gap-2">
+            <div className="mb-2 lv-alert lv-alert-danger text-[12px] text-text-primary flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
               {t.cancelled}
             </div>
           )}
           {data.order.status !== 'cancelled' && !data.order.delivered_at && (
-            <div className="mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200 flex items-center gap-2">
+            <div className="mb-2 lv-alert lv-alert-warning text-[12px] text-text-primary flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
               {t.notDelivered}
             </div>
@@ -556,23 +556,23 @@ export default function WarrantySection({
                 <div
                   key={u.id}
                   data-warranty-unit={u.id}
-                  className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3"
+                  className="rounded-lg border border-border-subtle p-3"
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-[13px] font-bold text-white min-w-0 truncate">{u.product_name}</span>
-                    <span className="text-[11px] text-zinc-400 shrink-0">
+                    <span className="text-[13px] font-bold text-text-primary min-w-0 truncate">{u.product_name}</span>
+                    <span className="text-[11px] text-text-secondary shrink-0">
                       {t.unit} {u.unit_index}
                     </span>
-                    {u.option && <span className="text-[11px] text-zinc-500 truncate">{u.option}</span>}
+                    {u.option && <span className="text-[11px] text-text-muted truncate">{u.option}</span>}
                     {u.replaced && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-600 text-zinc-400">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border border-border-subtle text-text-secondary">
                         {t.replaced}
                       </span>
                     )}
                     {u.receipt && (
                       <span
                         data-warranty-status={u.receipt.status}
-                        className={`text-[10px] px-2 py-0.5 rounded-full border ${statusClass(u.receipt.status)}`}
+                        className={`text-[10px] px-2 py-0.5 rounded-full ${statusClass(u.receipt.status)}`}
                       >
                         {statusLabel(u.receipt.status)}
                       </span>
@@ -581,22 +581,22 @@ export default function WarrantySection({
 
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto] items-end">
                     <label className="block min-w-0">
-                      <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.serial}</span>
+                      <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.serial}</span>
                       <div className="flex gap-1.5">
                         <input
+                          className="lv-input flex-1 min-w-0 min-h-10 px-2.5 text-[13px] font-mono"
                           dir="ltr"
                           value={d.serial}
                           data-warranty-serial={u.id}
                           onChange={(e) => setDraft(u.id, { serial: e.target.value })}
                           placeholder={t.serialPlaceholder}
-                          className="flex-1 min-w-0 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white font-mono focus:border-iris focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => void saveSerial(u)}
                           disabled={busy(`serial:${u.id}`) || serialSaved}
                           data-warranty-save-serial={u.id}
-                          className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-lg border border-zinc-700 bg-zinc-800 text-[12px] font-bold text-zinc-200 hover:bg-zinc-700 disabled:opacity-40"
+                          className="lv-button lv-button-secondary lv-button-sm shrink-0"
                         >
                           {serialSaved ? <Check className="w-4 h-4" aria-hidden /> : <Barcode className="w-4 h-4" aria-hidden />}
                           {serialSaved ? t.saved : t.save}
@@ -607,8 +607,9 @@ export default function WarrantySection({
                     {!u.receipt && (
                       <div className="flex flex-wrap gap-2">
                         <label className="block">
-                          <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.months}</span>
+                          <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.months}</span>
                           <input
+                            className="lv-input w-20 min-h-10 px-2.5 text-[13px]"
                             type="number"
                             min={1}
                             max={240}
@@ -616,18 +617,17 @@ export default function WarrantySection({
                             value={d.months}
                             data-warranty-months={u.id}
                             onChange={(e) => setDraft(u.id, { months: e.target.value })}
-                            className="w-20 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                         <label className="block">
-                          <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.start}</span>
+                          <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.start}</span>
                           <input
+                            className="lv-input w-auto min-h-10 px-2.5 text-[13px]"
                             type="date"
                             dir="ltr"
                             value={d.start}
                             data-warranty-start={u.id}
                             onChange={(e) => setDraft(u.id, { start: e.target.value })}
-                            className="min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                         <button
@@ -636,7 +636,7 @@ export default function WarrantySection({
                           disabled={!u.serial || busy(`gen:${u.id}`)}
                           title={!u.serial ? t.needSerial : undefined}
                           data-warranty-generate={u.id}
-                          className="self-end inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-iris-deep text-snow text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="self-end lv-button lv-button-primary lv-button-sm"
                         >
                           {busy(`gen:${u.id}`) ? (
                             <RefreshCw className="w-4 h-4 animate-spin" aria-hidden />
@@ -650,7 +650,7 @@ export default function WarrantySection({
                   </div>
 
                   {!u.serial && !u.receipt && (
-                    <p className="mt-1.5 text-[11px] text-amber-300/90">{t.needSerial}</p>
+                    <p className="mt-1.5 text-[11px] text-warning">{t.needSerial}</p>
                   )}
 
                   {/* WHO HOLDS THE MACHINE, and the window it is under. The
@@ -659,21 +659,21 @@ export default function WarrantySection({
                       open on it. */}
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                     {u.registration ? (
-                      <span className="text-zinc-400" data-warranty-holder={u.id}>
-                        <ShieldCheck className="inline w-3 h-3 me-1 text-emerald-400" aria-hidden />
+                      <span className="text-text-secondary" data-warranty-holder={u.id}>
+                        <ShieldCheck className="inline w-3 h-3 me-1 text-success" aria-hidden />
                         {t.linkedTo}:{' '}
-                        <span className="text-zinc-200 break-all" dir="ltr">
+                        <span className="text-text-primary break-all" dir="ltr">
                           {u.registration.email || u.registration.username || u.registration.name || u.registration.user_id}
                         </span>{' '}
-                        <span className="text-zinc-500">
+                        <span className="text-text-muted">
                           {t.linkedSince} {dateInput(u.registration.registered_at)}
                         </span>
                       </span>
                     ) : (
-                      <span className="text-zinc-500" data-warranty-holder={u.id}>{t.notLinked}</span>
+                      <span className="text-text-muted" data-warranty-holder={u.id}>{t.notLinked}</span>
                     )}
                     {u.open_claims > 0 && (
-                      <span className="text-amber-300/90">
+                      <span className="text-warning">
                         <AlertTriangle className="inline w-3 h-3 me-1" aria-hidden />
                         {u.open_claims} {t.openClaims}
                       </span>
@@ -683,24 +683,24 @@ export default function WarrantySection({
                         for a replacement unit or a corrected delivery. The
                         start used to appear only as the draft input before a
                         receipt existed, and vanished once one did. */}
-                    <span className="text-zinc-500" data-warranty-window={u.id}>
-                      {t.delivered}: <span className="text-zinc-300" dir="ltr">{dateInput(u.delivered_at) || '—'}</span>
+                    <span className="text-text-muted" data-warranty-window={u.id}>
+                      {t.delivered}: <span className="text-text-secondary" dir="ltr">{dateInput(u.delivered_at) || '—'}</span>
                       {' · '}
-                      {t.start}: <span className="text-zinc-300" dir="ltr">{dateInput(u.warranty_start_at) || '—'}</span>
+                      {t.start}: <span className="text-text-secondary" dir="ltr">{dateInput(u.warranty_start_at) || '—'}</span>
                       {' · '}
-                      {t.months}: <span className="text-zinc-300" dir="ltr">{u.months ?? '—'}</span>
+                      {t.months}: <span className="text-text-secondary" dir="ltr">{u.months ?? '—'}</span>
                       {' · '}
-                      {t.end}: <span className="text-zinc-300" dir="ltr">{dateInput(u.warranty_end_at) || '—'}</span>
+                      {t.end}: <span className="text-text-secondary" dir="ltr">{dateInput(u.warranty_end_at) || '—'}</span>
                     </span>
                     {u.carried_end ? (
-                      <span className="text-zinc-500">{t.carriedEnd}</span>
+                      <span className="text-text-muted">{t.carriedEnd}</span>
                     ) : (
                       !u.replaced && (
                         <button
                           type="button"
                           onClick={() => openDuration(u)}
                           data-warranty-edit-duration={u.id}
-                          className="text-zinc-400 hover:text-white underline underline-offset-2"
+                          className="text-text-secondary hover:text-text-primary underline underline-offset-2"
                         >
                           {t.editDuration}
                         </button>
@@ -711,7 +711,7 @@ export default function WarrantySection({
                       onClick={() => setHistoryOpen((h) => ({ ...h, [u.id]: !h[u.id] }))}
                       aria-expanded={!!historyOpen[u.id]}
                       data-warranty-history-toggle={u.id}
-                      className="inline-flex items-center gap-1 text-zinc-400 hover:text-white underline underline-offset-2"
+                      className="inline-flex items-center gap-1 text-text-secondary hover:text-text-primary underline underline-offset-2"
                     >
                       <History className="w-3 h-3" aria-hidden />
                       {historyOpen[u.id] ? t.hideHistory : t.history}
@@ -725,12 +725,13 @@ export default function WarrantySection({
                   )}
 
                   {durationFor === u.id && (
-                    <div className="mt-2 rounded-xl border border-zinc-700 bg-zinc-900/70 p-3 space-y-2">
-                      <p className="text-[11px] text-zinc-400 leading-relaxed">{t.durationTitle}</p>
+                    <div className="mt-2 rounded-lg border border-border-subtle bg-surface p-3 space-y-2">
+                      <p className="text-[11px] text-text-secondary leading-relaxed">{t.durationTitle}</p>
                       <div className="flex flex-wrap gap-2">
                         <label className="block">
-                          <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.baseMonths}</span>
+                          <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.baseMonths}</span>
                           <input
+                            className="lv-input w-24 min-h-10 px-2.5 text-[13px]"
                             type="number"
                             min={1}
                             max={240}
@@ -738,12 +739,12 @@ export default function WarrantySection({
                             value={duration.base}
                             data-warranty-base={u.id}
                             onChange={(e) => setDuration((d) => ({ ...d, base: e.target.value }))}
-                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                         <label className="block">
-                          <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.extMonths}</span>
+                          <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.extMonths}</span>
                           <input
+                            className="lv-input w-24 min-h-10 px-2.5 text-[13px]"
                             type="number"
                             min={0}
                             max={240}
@@ -751,24 +752,23 @@ export default function WarrantySection({
                             value={duration.ext}
                             data-warranty-ext={u.id}
                             onChange={(e) => setDuration((d) => ({ ...d, ext: e.target.value }))}
-                            className="w-24 min-h-10 bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 text-[13px] text-white focus:border-iris focus:outline-none"
                           />
                         </label>
                       </div>
                       <label className="block">
-                        <span className="block text-[11px] font-bold text-zinc-400 mb-1">{t.durationReason}</span>
+                        <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.durationReason}</span>
                         <textarea
+                          className="lv-input px-2.5 py-2 text-[13px] resize-none"
                           rows={2}
                           minLength={5}
                           maxLength={500}
                           value={duration.reason}
                           data-warranty-reason={u.id}
                           onChange={(e) => setDuration((d) => ({ ...d, reason: e.target.value }))}
-                          className="w-full bg-zinc-800/40 border border-zinc-700 rounded-lg px-2.5 py-2 text-[13px] text-white focus:border-iris focus:outline-none resize-none"
                         />
                       </label>
                       {duration.shorter && (
-                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200 leading-relaxed">
+                        <div className="lv-alert lv-alert-warning text-[11px] text-text-primary leading-relaxed">
                           {t.shorterWarn}
                         </div>
                       )}
@@ -778,7 +778,7 @@ export default function WarrantySection({
                           onClick={() => void saveDuration(u)}
                           disabled={busy(`dur:${u.id}`)}
                           data-warranty-save-duration={u.id}
-                          className="inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-lg bg-[#6B46FF] hover:bg-iris-deep text-snow text-[12px] font-bold disabled:opacity-40"
+                          className="lv-button lv-button-primary lv-button-sm"
                         >
                           {busy(`dur:${u.id}`) ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <ShieldCheck className="w-4 h-4" aria-hidden />}
                           {duration.shorter ? t.shorterConfirm : t.saveDuration}
@@ -786,7 +786,7 @@ export default function WarrantySection({
                         <button
                           type="button"
                           onClick={() => setDurationFor(null)}
-                          className="min-h-10 px-3 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-300 hover:bg-zinc-800"
+                          className="lv-button lv-button-ghost lv-button-sm"
                         >
                           {t.cancel}
                         </button>
@@ -798,20 +798,20 @@ export default function WarrantySection({
                       or delivery date cannot reach back into it. Saying so is
                       the difference between a snapshot and a stale document. */}
                   {u.receipt?.drift?.serial && (
-                    <p className="mt-1.5 text-[11px] text-amber-300/90" data-warranty-drift={u.id}>
+                    <p className="mt-1.5 text-[11px] text-warning" data-warranty-drift={u.id}>
                       {t.driftSerial.replace('{old}', u.receipt.serial ?? '—').replace('{new}', u.serial ?? '—')}
                     </p>
                   )}
                   {u.receipt?.drift?.end && !u.receipt.drift.serial && (
-                    <p className="mt-1.5 text-[11px] text-amber-300/90" data-warranty-drift={u.id}>
+                    <p className="mt-1.5 text-[11px] text-warning" data-warranty-drift={u.id}>
                       {t.driftEnd}
                     </p>
                   )}
 
                   {u.receipt && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-2">
-                      <span className="text-[11px] text-zinc-400">{t.receiptNo}</span>
-                      <span className="font-mono text-[12px] text-white" dir="ltr">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-2">
+                      <span className="text-[11px] text-text-secondary">{t.receiptNo}</span>
+                      <span className="font-mono text-[12px] text-text-primary" dir="ltr">
                         {u.receipt.receipt_no}
                       </span>
                       <button
@@ -823,7 +823,7 @@ export default function WarrantySection({
                         }}
                         title={t.copy}
                         aria-label={t.copy}
-                        className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800"
+                        className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-raised"
                       >
                         {copied === u.receipt.receipt_no ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
@@ -832,7 +832,7 @@ export default function WarrantySection({
                           type="button"
                           onClick={() => void openDoc(u.receipt!.id, false)}
                           data-warranty-preview={u.id}
-                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800"
+                          className="lv-button lv-button-secondary lv-button-sm"
                         >
                           <Eye className="w-3.5 h-3.5" aria-hidden /> {t.preview}
                         </button>
@@ -840,7 +840,7 @@ export default function WarrantySection({
                           type="button"
                           onClick={() => void openDoc(u.receipt!.id, true)}
                           data-warranty-print={u.id}
-                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800"
+                          className="lv-button lv-button-secondary lv-button-sm"
                         >
                           <Printer className="w-3.5 h-3.5" aria-hidden /> {t.print}
                         </button>
@@ -849,7 +849,7 @@ export default function WarrantySection({
                           onClick={() => void openDoc(u.receipt!.id, true)}
                           data-warranty-pdf={u.id}
                           title={lang === 'en' ? 'Choose “Save as PDF” in the print dialog' : 'اختر «حفظ بصيغة PDF» في نافذة الطباعة'}
-                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800"
+                          className="lv-button lv-button-secondary lv-button-sm"
                         >
                           <FileText className="w-3.5 h-3.5" aria-hidden /> {t.pdf}
                         </button>
@@ -858,7 +858,7 @@ export default function WarrantySection({
                           onClick={() => void reprint(u.receipt!.id)}
                           disabled={busy(`print:${u.receipt.id}`)}
                           data-warranty-reprint={u.id}
-                          className="inline-flex items-center gap-1.5 min-h-9 px-2.5 rounded-lg border border-zinc-700 bg-zinc-900 text-[12px] font-bold text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+                          className="lv-button lv-button-secondary lv-button-sm"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${busy(`print:${u.receipt.id}`) ? 'animate-spin' : ''}`} aria-hidden />
                           {t.reprint}

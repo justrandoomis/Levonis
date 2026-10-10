@@ -426,14 +426,15 @@ const CLAIM_NEXT: Record<string, string[]> = {
   resolved: [],
 };
 
+/** A stage is information: a flat chip in its semantic tone (build plan §5). */
 const STAGE_CLS: Record<string, string> = {
-  received: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/30',
-  diagnosing: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
-  approved: 'bg-green-500/10 text-green-400 border-green-500/30',
-  rejected: 'bg-red-500/10 text-red-400 border-red-500/30',
-  repairing: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
-  replaced: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
-  resolved: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  received: 'bg-white/[0.06] text-text-secondary',
+  diagnosing: 'lv-chip [--chip:var(--color-warning)]',
+  approved: 'lv-chip [--chip:var(--color-success)]',
+  rejected: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
+  repairing: 'lv-chip [--chip:var(--color-info)]',
+  replaced: 'lv-chip [--chip:var(--color-info)]',
+  resolved: 'lv-chip [--chip:var(--color-success)]',
 };
 
 function fmtDate(iso: string | null, lang: string): string {
@@ -448,12 +449,12 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
   const st = device.warranty.state;
   const cls =
     st === 'active'
-      ? 'bg-green-500/10 text-green-400 border-green-500/30'
+      ? 'lv-chip [--chip:var(--color-success)]'
       : st === 'expired'
-        ? 'bg-red-500/10 text-red-400 border-red-500/30'
+        ? 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]'
         : st === 'needs_config' || st === 'closed'
-          ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
-          : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30';
+          ? 'lv-chip [--chip:var(--color-warning)]'
+          : 'bg-white/[0.06] text-text-secondary';
   const label =
     st === 'active'
       ? `${s.stActive}${device.warranty.remaining_days !== null ? ` · ${s.daysLeft(device.warranty.remaining_days)}` : ''}`
@@ -464,7 +465,7 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
           : st === 'closed'
             ? s.stClosed
             : s.stNotDelivered;
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${cls}`}>{label}</span>;
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${cls}`}>{label}</span>;
 }
 
 /**
@@ -853,36 +854,36 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   };
 
   const renderUnitsTable = (units: AdminDevice[]) => (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden">
+    <div className="lv-surface overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[980px]">
+        <table className="w-full text-start border-collapse min-w-[980px]">
           <thead>
-            <tr className="bg-zinc-800/50 border-b border-zinc-700">
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.unit}</th>
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.serial}</th>
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.delivered}</th>
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.warrantyEnd}</th>
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.stage}</th>
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase">{s.account}</th>
-              <th className="py-3 px-4 text-xs font-bold text-zinc-400 uppercase" />
+            <tr className="bg-surface-raised border-b border-border-subtle">
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.unit}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.serial}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.delivered}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.warrantyEnd}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.stage}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.account}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase" />
             </tr>
           </thead>
           <tbody>
             {units.map((u) => (
               <React.Fragment key={u.unit_id}>
-              <tr className="border-b border-zinc-800 hover:bg-zinc-800/30 transition-colors align-top">
+              <tr className="border-b border-border-subtle hover:bg-surface-raised transition-colors align-top">
                 <td className="py-3 px-4">
-                  <div className="text-sm text-white font-bold">{u.product.name_ar || u.product.name || '—'}</div>
-                  <div className="text-[11px] text-zinc-500 font-mono">#{u.unit_index} · {u.unit_id}</div>
-                  <div className="text-[11px] text-zinc-500 font-mono">{u.order_id}</div>
+                  <div className="text-sm text-text-primary font-bold">{u.product.name_ar || u.product.name || '—'}</div>
+                  <div className="text-[11px] text-text-muted font-mono">#{u.unit_index} · {u.unit_id}</div>
+                  <div className="text-[11px] text-text-muted font-mono">{u.order_id}</div>
                   {u.replaced_by_unit_id && (
-                    <span className="inline-flex items-center gap-1 mt-1 text-[11px] text-purple-300"><Repeat className="w-3 h-3" />{s.replaced}</span>
+                    <span className="inline-flex items-center gap-1 mt-1 text-[11px] text-info"><Repeat className="w-3 h-3" />{s.replaced}</span>
                   )}
                   <div className="text-[11px] mt-1">
                     {u.registration && !u.registration.revoked_at ? (
-                      <span className="text-green-400 inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" />{s.registered}</span>
+                      <span className="text-success inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" />{s.registered}</span>
                     ) : (
-                      <span className="text-zinc-500">{s.notRegistered}</span>
+                      <span className="text-text-muted">{s.notRegistered}</span>
                     )}
                   </div>
                 </td>
@@ -895,7 +896,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         setSerialPage(u.serial);
                       }}
                       aria-haspopup="dialog"
-                      className="font-mono text-sm text-white break-all text-start underline decoration-zinc-700 underline-offset-4 hover:decoration-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold rounded"
+                      className="font-mono text-sm text-text-primary break-all text-start underline decoration-zinc-700 underline-offset-4 hover:decoration-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold rounded"
                       data-unit-serial-page={u.unit_id}
                     >
                       {u.serial}
@@ -904,16 +905,16 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   {!u.replaced_by_unit_id && (
                     <div className="flex items-center gap-1.5 mt-1">
                       <input
+                        className="lv-input w-44 min-h-9 px-2 py-1.5 text-xs font-mono"
                         value={serialDrafts[u.unit_id] ?? ''}
                         onChange={(e) => setSerialDrafts((d) => ({ ...d, [u.unit_id]: e.target.value }))}
                         placeholder={u.serial ? '' : s.serialPlaceholder}
-                        className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono w-44 outline-none focus:border-olive/60"
                       />
                       <button
                         type="button"
                         onClick={() => assignSerial(u)}
                         disabled={busyUnit === u.unit_id || !(serialDrafts[u.unit_id] ?? '').trim()}
-                        className="text-xs font-bold bg-olive/20 text-olive border border-olive/30 rounded-lg px-2.5 py-1.5 hover:bg-olive/30 disabled:opacity-40 transition-colors"
+                        className="lv-button lv-button-secondary lv-button-sm"
                       >
                         {s.assign}
                       </button>
@@ -921,23 +922,23 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.delivered_at, lang)}</div>
+                  <div className="text-sm text-text-secondary whitespace-nowrap">{fmtDate(u.delivered_at, lang)}</div>
                   {!u.replaced_by_unit_id && (
                     <button
                       onClick={() => correctDelivery(u)}
                       disabled={busyUnit === u.unit_id}
-                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
+                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40"
                     >
                       <CalendarClock className="w-3 h-3" />{s.correctDelivery}
                     </button>
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="text-sm text-zinc-300 whitespace-nowrap">{fmtDate(u.warranty.end_at, lang)}</div>
-                  <div className="text-[11px] text-zinc-500 whitespace-nowrap" data-unit-start={u.unit_id}>
+                  <div className="text-sm text-text-secondary whitespace-nowrap">{fmtDate(u.warranty.end_at, lang)}</div>
+                  <div className="text-[11px] text-text-muted whitespace-nowrap" data-unit-start={u.unit_id}>
                     {s.warrantyStart}: {fmtDate(u.warranty.start_at, lang)}
                   </div>
-                  <div className="text-[11px] text-zinc-500">
+                  <div className="text-[11px] text-text-muted">
                     {u.warranty.base_months !== null ? `${u.warranty.base_months}m` : '—'}
                     {u.warranty.ext_months > 0 ? ` +${u.warranty.ext_months}m` : ''}
                   </div>
@@ -949,7 +950,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       type="button"
                       onClick={() => editWarranty(u)}
                       disabled={busyUnit === u.unit_id}
-                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-zinc-400 hover:text-white transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                     >
                       <ShieldCheck className="w-3 h-3" aria-hidden="true" />{s.editWarranty}
                     </button>
@@ -959,25 +960,25 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 <td className="py-3 px-4 text-[11px] leading-relaxed">
                   {u.buyer !== undefined || u.holder !== undefined ? (
                     <>
-                      <div className="text-zinc-500 whitespace-nowrap">
-                        {s.buyer}: <span className="text-zinc-300 break-all whitespace-normal">{accountLabel(u.buyer)}</span>
+                      <div className="text-text-muted whitespace-nowrap">
+                        {s.buyer}: <span className="text-text-secondary break-all whitespace-normal">{accountLabel(u.buyer)}</span>
                       </div>
-                      <div className="text-zinc-500 whitespace-nowrap">
+                      <div className="text-text-muted whitespace-nowrap">
                         {s.holder}:{' '}
                         {u.holder ? (
-                          <span className="text-green-400 break-all whitespace-normal">{accountLabel(u.holder)}</span>
+                          <span className="text-success break-all whitespace-normal">{accountLabel(u.holder)}</span>
                         ) : (
-                          <span className="text-zinc-400">{s.noHolder}</span>
+                          <span className="text-text-secondary">{s.noHolder}</span>
                         )}
                       </div>
                       {u.holder && u.registration && !u.registration.revoked_at && (
-                        <div className="text-zinc-500 whitespace-nowrap">
-                          {s.registeredAt}: <span className="text-zinc-300">{fmtDate(u.registration.registered_at, lang)}</span>
+                        <div className="text-text-muted whitespace-nowrap">
+                          {s.registeredAt}: <span className="text-text-secondary">{fmtDate(u.registration.registered_at, lang)}</span>
                         </div>
                       )}
                     </>
                   ) : (
-                    <span className="text-zinc-600">—</span>
+                    <span className="text-text-muted">—</span>
                   )}
                 </td>
                 <td className="py-3 px-4">
@@ -987,7 +988,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         type="button"
                         onClick={() => replaceUnit(u)}
                         disabled={busyUnit === u.unit_id}
-                        className="inline-flex items-center gap-1 text-xs font-bold bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded-lg px-2.5 py-1.5 hover:bg-purple-500/20 disabled:opacity-40 transition-colors"
+                        className="lv-button lv-button-secondary lv-button-sm"
                       >
                         <Repeat className="w-3 h-3" />{s.replace}
                       </button>
@@ -997,7 +998,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         type="button"
                         onClick={() => openUnlink(u)}
                         disabled={busyUnit === u.unit_id}
-                        className="inline-flex items-center gap-1 text-xs font-bold bg-red-500/10 text-red-300 border border-red-500/30 rounded-lg px-2.5 py-1.5 hover:bg-red-500/20 disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="lv-button lv-button-danger lv-button-sm whitespace-nowrap"
                       >
                         <Unlink className="w-3 h-3" aria-hidden="true" />{s.unlink}
                       </button>
@@ -1007,7 +1008,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       onClick={() => setHistoryOpen((h) => ({ ...h, [u.unit_id]: !h[u.unit_id] }))}
                       aria-expanded={!!historyOpen[u.unit_id]}
                       data-unit-history-toggle={u.unit_id}
-                      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                      className="inline-flex items-center gap-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
                     >
                       <History className="w-3 h-3" aria-hidden="true" />
                       {historyOpen[u.unit_id] ? s.hideHistory : s.history}
@@ -1016,7 +1017,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 </td>
               </tr>
               {historyOpen[u.unit_id] && (
-                <tr className="border-b border-zinc-800 bg-zinc-950/30">
+                <tr className="border-b border-border-subtle bg-[var(--clay-well-bg)]">
                   <td colSpan={7} className="px-4 py-3">
                     <UnitHistory unitId={u.unit_id} lang={lang} refreshKey={historyTick} />
                   </td>
@@ -1025,7 +1026,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               </React.Fragment>
             ))}
             {units.length === 0 && (
-              <tr><td colSpan={7} className="py-10 text-center text-zinc-500 font-medium">{s.noUnits}</td></tr>
+              <tr><td colSpan={7} className="py-10 text-center text-text-muted font-medium">{s.noUnits}</td></tr>
             )}
           </tbody>
         </table>
@@ -1036,13 +1037,13 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   return (
     <div className="space-y-6">
       {!view && <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl font-black text-white flex items-center gap-2"><Barcode className="w-6 h-6 text-olive" />{s.title}</h2>
-        <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
+        <h2 className="text-2xl font-black text-text-primary flex items-center gap-2"><Barcode className="w-6 h-6 text-olive" />{s.title}</h2>
+        <div className="flex lv-well border border-border-subtle p-1 rounded-xl">
           {(['units', 'claims'] as const).map((tb) => (
             <button
               key={tb}
               onClick={() => setTab(tb)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === tb ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === tb ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
             >
               {tb === 'units' ? s.tabUnits : s.tabClaims}
             </button>
@@ -1055,29 +1056,30 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
           <div className="flex flex-col sm:flex-row gap-2">
             <form className="flex gap-2 flex-1" onSubmit={(e) => { e.preventDefault(); loadOrder(orderQuery); }}>
               <input
+                className="lv-input flex-1 text-sm font-mono"
                 value={orderQuery}
                 onChange={(e) => setOrderQuery(e.target.value)}
                 placeholder={s.orderPlaceholder}
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50"
               />
-              <button type="submit" className="inline-flex items-center gap-1.5 bg-olive/20 text-olive border border-olive/30 rounded-xl px-4 text-sm font-bold hover:bg-olive/30 transition-colors">
+              <button type="submit" className="lv-button lv-button-secondary shrink-0">
                 <Search className="w-4 h-4" />{s.load}
               </button>
             </form>
             <form className="flex gap-2 flex-1" onSubmit={(e) => { e.preventDefault(); loadCustomer(emailQuery); }}>
               <input
+                className="lv-input flex-1 text-sm"
                 value={emailQuery}
                 onChange={(e) => setEmailQuery(e.target.value)}
                 placeholder={s.emailPlaceholder}
                 type="email"
-                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50"
               />
-              <button type="submit" className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-4 text-sm font-bold hover:bg-zinc-700 transition-colors">
+              <button type="submit" className="lv-button lv-button-secondary shrink-0">
                 <Search className="w-4 h-4" />{s.load}
               </button>
             </form>
             <form className="flex gap-2 flex-1" onSubmit={(e) => { e.preventDefault(); loadBySerial(serialQuery); }}>
               <input
+                className="lv-input flex-1 min-w-0 text-sm font-mono"
                 value={serialQuery}
                 onChange={(e) => setSerialQuery(e.target.value)}
                 placeholder={s.serialSearchPlaceholder}
@@ -1085,37 +1087,36 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 autoComplete="off"
                 spellCheck={false}
                 dir="ltr"
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
               />
-              <button type="submit" className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-4 text-sm font-bold hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+              <button type="submit" className="lv-button lv-button-secondary shrink-0">
                 <Barcode className="w-4 h-4" aria-hidden="true" />{s.load}
               </button>
             </form>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
             <button
               type="button"
               onClick={() => void backfillAll()}
               disabled={backfillAllBusy}
-              className="inline-flex items-center gap-1.5 bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold hover:bg-zinc-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-secondary lv-button-sm"
             >
               <PackageCheck className="w-4 h-4" aria-hidden="true" />{backfillAllBusy ? s.loading : s.backfillAll}
             </button>
             <span>{s.backfillAllHint}</span>
           </div>
 
-          {unitsError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm font-medium">{unitsError}</div>}
-          {unitsNotice && <div className="bg-green-500/10 border border-green-500/30 text-green-400 rounded-2xl p-3 text-sm font-medium">{unitsNotice}</div>}
-          {unitsLoading && <div className="text-zinc-500 text-sm font-medium py-6 text-center">{s.loading}</div>}
+          {unitsError && <div className="lv-alert lv-alert-danger text-sm font-medium text-text-primary">{unitsError}</div>}
+          {unitsNotice && <div className="lv-alert lv-alert-success text-sm font-medium text-text-primary">{unitsNotice}</div>}
+          {unitsLoading && <div className="text-text-muted text-sm font-medium py-6 text-center">{s.loading}</div>}
 
           {orderData && !unitsLoading && (
             <div className="space-y-3">
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                <span className="font-mono text-white font-bold">{orderData.order.id}</span>
-                <span className="text-zinc-400">{s.customer}: <span className="text-zinc-200">{orderData.order.email || orderData.order.user_id}</span></span>
-                <span className="text-zinc-400 capitalize">{orderData.order.status}</span>
-                <span className="text-zinc-400">{s.delivered}: {fmtDate(orderData.order.delivered_at, lang)}</span>
+              <div className="lv-surface p-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <span className="font-mono text-text-primary font-bold">{orderData.order.id}</span>
+                <span className="text-text-secondary">{s.customer}: <span className="text-text-primary">{orderData.order.email || orderData.order.user_id}</span></span>
+                <span className="text-text-secondary capitalize">{orderData.order.status}</span>
+                <span className="text-text-secondary">{s.delivered}: {fmtDate(orderData.order.delivered_at, lang)}</span>
               </div>
               {orderData.items.some((it) => it.serialized) ? (
                 <>
@@ -1124,20 +1125,20 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       orderData.items.filter((it) => it.serialized).reduce((n, it) => n + Number(it.qty), 0) && (
                       <button
                         onClick={backfill}
-                        className="inline-flex items-center gap-2 bg-olive/20 text-olive border border-olive/30 rounded-xl px-4 py-2.5 text-sm font-bold hover:bg-olive/30 transition-colors"
+                        className="lv-button lv-button-secondary"
                       >
                         <PackageCheck className="w-4 h-4" />{s.backfill}
                       </button>
                     )
                   ) : (
-                    <div className="flex items-center gap-2 text-orange-400 text-sm font-medium">
+                    <div className="flex items-center gap-2 text-warning text-sm font-medium">
                       <AlertTriangle className="w-4 h-4 shrink-0" />{s.orderNotDelivered}
                     </div>
                   )}
                   {renderUnitsTable(orderData.units)}
                 </>
               ) : (
-                <div className="text-zinc-500 text-sm font-medium py-4">{s.notSerialized}</div>
+                <div className="text-text-muted text-sm font-medium py-4">{s.notSerialized}</div>
               )}
             </div>
           )}
@@ -1166,24 +1167,25 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             onClick={() => setUnlinkTarget(null)}
             disabled={unlinkBusy}
             aria-label={s.close}
-            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="absolute top-4 end-4 p-2 text-text-muted hover:text-text-primary hover:bg-white/[0.06] rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
           <div className="pe-10">
-            <h3 id="admin-unlink-title" className="text-white text-base font-bold">{s.unlinkTitle}</h3>
+            <h3 id="admin-unlink-title" className="text-text-primary text-base font-bold">{s.unlinkTitle}</h3>
             {unlinkTarget && (
-              <p className="text-zinc-400 text-[12px] mt-1">
+              <p className="text-text-secondary text-[12px] mt-1">
                 {unlinkTarget.product.name_ar || unlinkTarget.product.name}
                 {unlinkTarget.serial ? <> · <span className="font-mono" dir="ltr">{unlinkTarget.serial}</span></> : null}
-                {' · '}{s.holder}: <span className="text-zinc-200">{accountLabel(unlinkTarget.holder)}</span>
+                {' · '}{s.holder}: <span className="text-text-primary">{accountLabel(unlinkTarget.holder)}</span>
               </p>
             )}
           </div>
-          <p className="text-zinc-400 text-sm leading-relaxed">{s.unlinkBody}</p>
+          <p className="text-text-secondary text-sm leading-relaxed">{s.unlinkBody}</p>
           <div>
-            <label htmlFor="admin-unlink-reason" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.reasonLabel}</label>
+            <label htmlFor="admin-unlink-reason" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.reasonLabel}</label>
             <textarea
+              className="lv-input py-2.5 text-sm resize-none"
               id="admin-unlink-reason"
               value={unlinkReason}
               onChange={(e) => setUnlinkReason(e.target.value)}
@@ -1192,18 +1194,17 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               rows={3}
               required
               disabled={unlinkBusy}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold resize-none"
             />
           </div>
           {unlinkError && (
-            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[13px] font-medium">{unlinkError}</div>
+            <div role="alert" className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">{unlinkError}</div>
           )}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setUnlinkTarget(null)}
               disabled={unlinkBusy}
-              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-secondary"
             >
               {s.cancel}
             </button>
@@ -1211,7 +1212,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               type="button"
               onClick={confirmUnlink}
               disabled={unlinkBusy || unlinkReason.trim().length < 5}
-              className="min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-danger"
             >
               {unlinkBusy ? s.unlinking : s.confirmUnlink}
             </button>
@@ -1239,28 +1240,28 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             onClick={() => setPending(null)}
             disabled={pendingBusy}
             aria-label={s.close}
-            className="absolute top-4 end-4 p-2 text-zinc-500 hover:text-white bg-zinc-900 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="absolute top-4 end-4 p-2 text-text-muted hover:text-text-primary hover:bg-white/[0.06] rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
           <div className="pe-10">
-            <h3 id="admin-unit-action-title" className="text-white text-base font-bold">
+            <h3 id="admin-unit-action-title" className="text-text-primary text-base font-bold">
               {pending?.kind === 'replace' ? s.replaceTitle : pending?.kind === 'warranty' ? s.warrantyTitle : s.reassignTitle}
             </h3>
             {pending && (
-              <p className="text-zinc-400 text-[12px] mt-1">
+              <p className="text-text-secondary text-[12px] mt-1">
                 {pending.device.product.name_ar || pending.device.product.name}
                 {' · '}
                 <span className="font-mono" dir="ltr">#{pending.device.unit_index} · {pending.device.unit_id}</span>
                 {pending.kind === 'reassign' && (
                   <>
-                    {' · '}{s.serial}: <span className="font-mono text-zinc-200" dir="ltr">{pending.serial}</span>
+                    {' · '}{s.serial}: <span className="font-mono text-text-primary" dir="ltr">{pending.serial}</span>
                   </>
                 )}
               </p>
             )}
           </div>
-          <p className="text-zinc-400 text-sm leading-relaxed">
+          <p className="text-text-secondary text-sm leading-relaxed">
             {pending?.kind === 'replace'
               ? `${s.replaceBody} ${s.replaceNote}`
               : pending?.kind === 'warranty'
@@ -1272,16 +1273,17 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               difference between a snapshot and a document that went stale
               without anyone being told. */}
           {pending?.kind === 'warranty' && (
-            <p className="text-zinc-500 text-[12px] leading-relaxed">{s.warrantyNote}</p>
+            <p className="text-text-muted text-[12px] leading-relaxed">{s.warrantyNote}</p>
           )}
           {/* The server's own account of the clash — which unit holds the serial today. */}
           {pending?.kind === 'reassign' && pending.detail && (
-            <p className="text-zinc-500 text-[12px] leading-relaxed" dir="auto">{pending.detail}</p>
+            <p className="text-text-muted text-[12px] leading-relaxed" dir="auto">{pending.detail}</p>
           )}
           {pending?.kind === 'replace' && (
             <div>
-              <label htmlFor="admin-unit-action-serial" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.replaceSerialLabel}</label>
+              <label htmlFor="admin-unit-action-serial" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.replaceSerialLabel}</label>
               <input
+                className="lv-input text-sm font-mono"
                 id="admin-unit-action-serial"
                 value={pendingSerial}
                 onChange={(e) => setPendingSerial(e.target.value)}
@@ -1290,7 +1292,6 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 spellCheck={false}
                 dir="ltr"
                 disabled={pendingBusy}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
               />
             </div>
           )}
@@ -1298,8 +1299,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="admin-unit-warranty-base" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.baseMonths}</label>
+                  <label htmlFor="admin-unit-warranty-base" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.baseMonths}</label>
                   <input
+                    className="lv-input text-sm"
                     id="admin-unit-warranty-base"
                     type="number"
                     min={1}
@@ -1309,12 +1311,12 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     value={pendingBase}
                     onChange={(e) => setPendingBase(e.target.value)}
                     disabled={pendingBusy}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
                   />
                 </div>
                 <div>
-                  <label htmlFor="admin-unit-warranty-ext" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.extMonths}</label>
+                  <label htmlFor="admin-unit-warranty-ext" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.extMonths}</label>
                   <input
+                    className="lv-input text-sm"
                     id="admin-unit-warranty-ext"
                     type="number"
                     min={0}
@@ -1324,25 +1326,25 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     value={pendingExt}
                     onChange={(e) => setPendingExt(e.target.value)}
                     disabled={pendingBusy}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold"
                   />
                 </div>
               </div>
-              <p className="text-[12px] text-zinc-500">
-                {s.currentEnd}: <span className="text-zinc-300">{fmtDate(pending.device.warranty.end_at, lang)}</span>
+              <p className="text-[12px] text-text-muted">
+                {s.currentEnd}: <span className="text-text-secondary">{fmtDate(pending.device.warranty.end_at, lang)}</span>
               </p>
               {pendingShorter && (
-                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
-                  <p className="text-amber-200 text-[13px] font-bold">{s.shorterTitle}</p>
-                  <p className="text-amber-200/80 text-[12px] leading-relaxed">{s.shorterBody}</p>
-                  <p className="text-amber-200/80 text-[12px] font-bold">{s.shorterConfirm}</p>
+                <div className="lv-alert lv-alert-warning space-y-2">
+                  <p className="text-text-primary text-[13px] font-bold">{s.shorterTitle}</p>
+                  <p className="text-text-secondary text-[12px] leading-relaxed">{s.shorterBody}</p>
+                  <p className="text-text-primary text-[12px] font-bold">{s.shorterConfirm}</p>
                 </div>
               )}
             </div>
           )}
           <div>
-            <label htmlFor="admin-unit-action-reason" className="text-[12px] text-zinc-400 mb-1.5 block font-medium">{s.reasonLabel}</label>
+            <label htmlFor="admin-unit-action-reason" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.reasonLabel}</label>
             <textarea
+              className="lv-input py-2.5 text-sm resize-none"
               id="admin-unit-action-reason"
               value={pendingReason}
               onChange={(e) => setPendingReason(e.target.value)}
@@ -1351,18 +1353,17 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               rows={3}
               required
               disabled={pendingBusy}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-olive/50 focus-visible:ring-2 focus-visible:ring-gold resize-none"
             />
           </div>
           {pendingError && (
-            <div role="alert" className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-3 text-[13px] font-medium">{pendingError}</div>
+            <div role="alert" className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">{pendingError}</div>
           )}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setPending(null)}
               disabled={pendingBusy}
-              className="min-h-[44px] rounded-xl bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold hover:bg-zinc-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-secondary"
             >
               {s.cancel}
             </button>
@@ -1370,7 +1371,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               type="button"
               onClick={confirmPending}
               disabled={pendingBusy || pendingReason.trim().length < 5}
-              className="min-h-[44px] rounded-xl bg-[#ef233c] text-snow text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-[filter,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-danger"
             >
               {pendingBusy
                 ? s.working
@@ -1389,16 +1390,16 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       {tab === 'claims' && (
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl overflow-x-auto">
+            <div className="flex lv-well border border-border-subtle p-1 rounded-xl overflow-x-auto">
               {(['all', ...CLAIM_STAGES] as const).map((st) => (
                 <button
                   key={st}
                   onClick={() => setStageFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors ${stageFilter === st ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors ${stageFilter === st ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
                 >
                   {st === 'all' ? s.all : st}
                   {claimCounts && claimCounts[st] !== undefined && (
-                    <span className="ms-1.5 tabular-nums text-zinc-500" data-claims-count={st}>
+                    <span className="ms-1.5 tabular-nums text-text-muted" data-claims-count={st}>
                       {claimCounts[st]}
                     </span>
                   )}
@@ -1407,31 +1408,31 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             </div>
             <button
               onClick={() => loadClaims(null)}
-              className="p-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-zinc-300 hover:text-white transition-colors"
+              className="lv-button lv-button-secondary w-11 px-0"
               title={s.refreshed}
             >
               <RefreshCw className={`w-4 h-4 ${claimsLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
-          {claimsError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl p-3 text-sm font-medium">{claimsError}</div>}
-          {claimsLoading && claims.length === 0 && <div className="text-zinc-500 text-sm font-medium py-6 text-center">{s.loading}</div>}
+          {claimsError && <div className="lv-alert lv-alert-danger text-sm font-medium text-text-primary">{claimsError}</div>}
+          {claimsLoading && claims.length === 0 && <div className="text-text-muted text-sm font-medium py-6 text-center">{s.loading}</div>}
           {!claimsLoading && claims.length === 0 && !claimsError && (
-            <div className="text-zinc-500 text-sm font-medium py-6 text-center">{s.claimsEmpty}</div>
+            <div className="text-text-muted text-sm font-medium py-6 text-center">{s.claimsEmpty}</div>
           )}
 
           <div className="space-y-3">
             {claims.map((cl) => (
-              <div key={cl.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+              <div key={cl.id} className="lv-surface p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
-                    <div className="text-white font-bold text-sm">{cl.subject}</div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                    <div className="text-text-primary font-bold text-sm">{cl.subject}</div>
+                    <div className="text-[11px] text-text-muted mt-0.5">
                       {cl.product_name} · {cl.email || '—'} · {cl.serial ? <span className="font-mono">{cl.serial}</span> : '—'} · {fmtDate(cl.created_at, lang)}
                       {cl.message_count !== undefined && <> · {s.messagesN(cl.message_count)}</>}
                     </div>
                     {cl.awaiting_staff && (
-                      <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-amber-300" data-claim-awaiting={cl.id}>
+                      <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-warning" data-claim-awaiting={cl.id}>
                         <MessageSquare className="w-3 h-3" aria-hidden="true" />
                         {s.awaitingStaff}
                       </div>
@@ -1444,7 +1445,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         target="_blank"
                         rel="noopener noreferrer"
                         data-claim-parts={cl.id}
-                        className="mt-1 ms-2 inline-flex items-center gap-1 text-[11px] font-bold text-zinc-400 hover:text-white transition-colors"
+                        className="mt-1 ms-2 inline-flex items-center gap-1 text-[11px] font-bold text-text-secondary hover:text-text-primary transition-colors"
                       >
                         <ExternalLink className="w-3 h-3" aria-hidden="true" />
                         {s.compatibleParts(cl.maintenance.count)}
@@ -1455,19 +1456,19 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     {cl.priority && (
                       <span
                         title={s.priorityHint}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-gold/40 bg-gold/10 text-gold text-[11px] font-bold whitespace-nowrap"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full lv-chip [--chip:var(--color-gold)] text-[11px] font-bold whitespace-nowrap"
                       >
                         <Crown aria-hidden="true" className="w-3 h-3" />
                         {s.priorityBadge}
                       </span>
                     )}
-                    <span className={`inline-flex px-2.5 py-1 rounded-full border text-[11px] font-bold capitalize ${STAGE_CLS[cl.stage] ?? STAGE_CLS.received}`}>{cl.stage}</span>
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold capitalize ${STAGE_CLS[cl.stage] ?? STAGE_CLS.received}`}>{cl.stage}</span>
                     {(CLAIM_NEXT[cl.stage] ?? []).length > 0 && (
                       <select
+                        className="lv-input w-auto min-h-9 px-2 py-1.5 text-xs disabled:opacity-50"
                         value=""
                         disabled={claimBusy}
                         onChange={(e) => { if (e.target.value) moveClaim(cl, e.target.value); }}
-                        className="bg-zinc-800 border border-zinc-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none disabled:opacity-50"
                       >
                         <option value="" disabled>{s.moveTo}</option>
                         {(CLAIM_NEXT[cl.stage] ?? []).map((st) => (
@@ -1477,14 +1478,14 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     )}
                   </div>
                 </div>
-                <p className="text-zinc-400 text-sm mt-2 whitespace-pre-wrap">{cl.description}</p>
+                <p className="text-text-secondary text-sm mt-2 whitespace-pre-wrap">{cl.description}</p>
                 {cl.decision_reason && (
-                  <p className="text-[12px] text-zinc-500 mt-1">{s.decisionReason} {cl.decision_reason}</p>
+                  <p className="text-[12px] text-text-muted mt-1">{s.decisionReason} {cl.decision_reason}</p>
                 )}
                 {cl.evidence.length > 0 && (
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {cl.evidence.map((ev) => (
-                      <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950">
+                      <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-sm overflow-hidden border border-border-subtle bg-surface-selected">
                         <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
                       </a>
                     ))}
@@ -1492,38 +1493,38 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 )}
                 <button
                   onClick={() => openThread(cl.id)}
-                  className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-zinc-400 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   {openClaim === cl.id ? s.hideThread : s.viewThread}
                   {openClaim === cl.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
                 {openClaim === cl.id && (
-                  <div className="mt-3 border-t border-zinc-800 pt-3 space-y-2">
-                    {threadLoading && <div className="text-zinc-500 text-xs">{s.loading}</div>}
+                  <div className="mt-3 border-t border-border-subtle pt-3 space-y-2">
+                    {threadLoading && <div className="text-text-muted text-xs">{s.loading}</div>}
                     {thread.map((m) => (
-                      <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.is_staff ? 'bg-olive/15 border border-olive/25 text-zinc-100 ms-auto' : 'bg-zinc-800/70 text-zinc-200'}`}>
+                      <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.is_staff ? 'bg-olive/15 border border-olive/25 text-text-primary ms-auto' : 'bg-surface-raised text-text-primary'}`}>
                         {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
                         {m.file_url && (
                           <a href={m.file_url} target="_blank" rel="noreferrer" className="block mt-1">
                             <img src={m.file_url} alt="" className="max-h-40 rounded-lg" loading="lazy" />
                           </a>
                         )}
-                        <div className="text-[10px] text-zinc-500 mt-1">{new Date(m.created_at).toLocaleString()}</div>
+                        <div className="text-[10px] text-text-muted mt-1">{new Date(m.created_at).toLocaleString()}</div>
                       </div>
                     ))}
                     <div className="flex gap-2 pt-1">
                       <input
+                        className="lv-input flex-1 text-sm"
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         placeholder={s.reply}
-                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-olive/50"
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(cl.id); } }}
                       />
                       <button
                         onClick={() => sendReply(cl.id)}
                         disabled={claimBusy || !replyText.trim()}
-                        className="inline-flex items-center gap-1.5 bg-olive/20 text-olive border border-olive/30 rounded-xl px-3 text-sm font-bold hover:bg-olive/30 disabled:opacity-40 transition-colors"
+                        className="lv-button lv-button-primary shrink-0 px-3"
                       >
                         <Send className="w-4 h-4" />{s.send}
                       </button>
@@ -1539,7 +1540,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               onClick={() => loadClaims(claimsCursor)}
               disabled={claimsLoading}
               data-claims-load-more
-              className="w-full min-h-[44px] rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm font-bold hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+              className="lv-button lv-button-secondary w-full"
             >
               {claimsLoading ? s.loading : s.loadMore}
             </button>

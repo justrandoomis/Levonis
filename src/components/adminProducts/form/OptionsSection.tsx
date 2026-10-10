@@ -485,7 +485,7 @@ export function OptionsSection({
         empty="لا توجد مجموعات. أضف مجموعة مثل «المقاس» أو «السعة»."
       >
         {rel.groups.map((g) => (
-          <div key={g.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
+          <div key={g.id} className="min-w-0 rounded-lg bg-surface-raised p-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <TextInput
                 value={g.name_en}
@@ -497,11 +497,11 @@ export function OptionsSection({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-            {errors[`group:${g.id}`] && <p className="mt-1 text-[11px] text-red-400">{errors[`group:${g.id}`]}</p>}
+            {errors[`group:${g.id}`] && <p className="mt-1 text-[11px] text-danger">{errors[`group:${g.id}`]}</p>}
 
             <div className="mt-2.5 space-y-2">
               {g.values.map((v) => (
-                <div key={v.id} className="min-w-0 rounded-lg bg-zinc-800/30 border border-zinc-800 p-2.5">
+                <div key={v.id} className="min-w-0 rounded-lg border border-border-subtle p-2.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <ImgSlot
                       url={boundImage('option', v.id)?.url ?? ''}
@@ -519,7 +519,7 @@ export function OptionsSection({
                         aria-label="Option value"
                       />
                       {(v.name_ar || v.name_ckb) && (
-                        <p className="text-[10px] text-zinc-500 mt-0.5 truncate" dir="auto" data-form="value-imported-name" title="اسم محفوظ من القالب النصي">
+                        <p className="text-[10px] text-text-muted mt-0.5 truncate" dir="auto" data-form="value-imported-name" title="اسم محفوظ من القالب النصي">
                           {[v.name_ar, v.name_ckb].filter(Boolean).join(' · ')}
                         </p>
                       )}
@@ -541,7 +541,7 @@ export function OptionsSection({
                     </button>
                   </div>
                   {(errors[`value:${v.id}`] || errors[`value_price:${v.id}`]) && (
-                    <p className="mt-1 text-[11px] text-red-400">
+                    <p className="mt-1 text-[11px] text-danger">
                       {errors[`value:${v.id}`] ?? errors[`value_price:${v.id}`]}
                     </p>
                   )}
@@ -566,16 +566,16 @@ export function OptionsSection({
                             }
                           >
                             {combosForOption(v.id).length > 0 ? (
-                              <div className={`${fieldCls} flex items-center justify-between bg-zinc-900/70 text-zinc-300`} data-option-stock-total={v.id}>
+                              <div className="flex h-10 w-full min-w-0 items-center justify-between rounded-lg lv-well px-2.5 text-[13px] text-text-secondary" data-option-stock-total={v.id}>
                                 <span>{optionStockTotal(v.id).toLocaleString('en-US')}</span>
-                                <span className="text-[10px] text-zinc-500">مجموع الألوان</span>
+                                <span className="text-[10px] text-text-muted">مجموع الألوان</span>
                               </div>
                             ) : (
                               <Qty value={v.stock} onChange={(n) => patchValue(g.id, v.id, { stock: n })} placeholder="مطلوب: 0 = نفد" />
                             )}
                           </Field>
                           {errors[`option_stock:${v.id}`] && (
-                            <p className="text-[11px] text-red-400 sm:col-span-2">
+                            <p className="text-[11px] text-danger sm:col-span-2">
                               {errors[`option_stock:${v.id}`]}
                             </p>
                           )}
@@ -634,9 +634,9 @@ export function OptionsSection({
       {hiddenColors > 0 ? (
         <div
           data-colors-hidden-notice
-          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
+          className="lv-alert lv-alert-warning mb-2 flex flex-wrap items-center justify-between gap-2"
         >
-          <span className="text-[13px] leading-snug text-amber-100">
+          <span className="text-[13px] leading-snug text-text-primary">
             {hiddenColors === rel.colors.length
               ? `كل الألوان (${hiddenColors}) مخفية — لا يظهر أي لون في صفحة المنتج.`
               : `${hiddenColors} من ${rel.colors.length} ألوان مخفية — لا تظهر في صفحة المنتج.`}
@@ -644,7 +644,7 @@ export function OptionsSection({
           <button
             type="button"
             onClick={showAllColors}
-            className="shrink-0 rounded-md border border-amber-400/60 px-3 py-1.5 text-[13px] font-bold text-amber-100 hover:bg-amber-500/20"
+            className="lv-button lv-button-secondary lv-button-sm shrink-0"
           >
             إظهار الكل
           </button>
@@ -652,7 +652,7 @@ export function OptionsSection({
       ) : null}
       <Repeater title="الألوان / Colours" addLabel="لون" onAdd={addColor} empty="لا توجد ألوان.">
         {rel.colors.map((c) => (
-          <div key={c.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5">
+          <div key={c.id} className="min-w-0 rounded-lg bg-surface-raised p-2.5">
             <div className="flex items-center gap-2 min-w-0">
               {/* A real colour picker: the swatch IS the input. The hex text
                   beside it stays for paste-in exact values. */}
@@ -662,7 +662,7 @@ export function OptionsSection({
                 value={/^#[0-9a-fA-F]{6}$/.test(c.hex) ? c.hex : '#000000'}
                 onChange={(e) => patchColor(c.id, { hex: e.target.value })}
                 aria-label="اختيار اللون"
-                className="w-10 h-10 rounded-lg border border-zinc-700 bg-zinc-800/40 p-1 shrink-0 cursor-pointer"
+                className="w-10 h-10 rounded-lg border border-border-subtle bg-surface p-1 shrink-0 cursor-pointer"
               />
               <div className="min-w-0 flex-1">
                 <TextInput
@@ -672,7 +672,7 @@ export function OptionsSection({
                   aria-label="Colour name"
                 />
                 {(c.name_ar || c.name_ckb) && (
-                  <p className="text-[10px] text-zinc-500 mt-0.5 truncate" dir="auto" data-form="color-imported-name" title="اسم محفوظ من القالب النصي">
+                  <p className="text-[10px] text-text-muted mt-0.5 truncate" dir="auto" data-form="color-imported-name" title="اسم محفوظ من القالب النصي">
                     {[c.name_ar, c.name_ckb].filter(Boolean).join(' · ')}
                   </p>
                 )}
@@ -699,7 +699,7 @@ export function OptionsSection({
               </button>
             </div>
             {(errors[`color:${c.id}`] || errors[`color_hex:${c.id}`] || errors[`color_price:${c.id}`]) && (
-              <p className="mt-1 text-[11px] text-red-400">
+              <p className="mt-1 text-[11px] text-danger">
                 {errors[`color:${c.id}`] ?? errors[`color_hex:${c.id}`] ?? errors[`color_price:${c.id}`]}
               </p>
             )}
@@ -737,17 +737,17 @@ export function OptionsSection({
 
             {/* ----------------------------------------------- link matrix */}
             {rel.groups.some((g) => g.values.length > 0) && (
-              <div className="mt-2.5 rounded-lg bg-zinc-800/20 border border-zinc-800 p-2.5 min-w-0">
-                <p className="text-[11px] text-zinc-400 mb-2">
+              <div className="mt-2.5 rounded-lg border border-border-subtle p-2.5 min-w-0">
+                <p className="text-[11px] text-text-secondary mb-2">
                   اربط اللون بخيارات محددة — داخل المجموعة «أو»، وبين المجموعات «و». بلا تحديد يظهر مع الجميع.
-                  <span className="text-zinc-600"> OR within a group, AND across groups.</span>
+                  <span className="text-text-muted"> OR within a group, AND across groups.</span>
                 </p>
                 <div className="space-y-2">
                   {rel.groups
                     .filter((g) => g.values.length > 0)
                     .map((g) => (
                       <div key={g.id} className="min-w-0">
-                        <div className="text-[11px] font-bold text-zinc-500 mb-1 truncate">
+                        <div className="text-[11px] font-bold text-text-muted mb-1 truncate">
                           {g.name_en || 'Group'}
                         </div>
                         <div className="flex flex-wrap gap-1.5 min-w-0">
@@ -760,10 +760,10 @@ export function OptionsSection({
                                 role="checkbox"
                                 aria-checked={on}
                                 onClick={() => toggleLink(c.id, v.id)}
-                                className={`h-8 px-2.5 rounded-md border text-[12px] font-medium transition-colors max-w-full truncate ${
+                                className={`h-8 px-3 rounded-full border text-[12px] font-medium transition-colors max-w-full truncate ${
                                   on
-                                    ? 'bg-iris/20 border-iris/60 text-white'
-                                    : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                                    ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
+                                    : 'border-border-subtle text-text-secondary hover:text-text-primary'
                                 }`}
                               >
                                 {v.name_en || v.id}
@@ -774,7 +774,7 @@ export function OptionsSection({
                       </div>
                     ))}
                 </div>
-                <p className="mt-2 text-[11px] text-zinc-500">
+                <p className="mt-2 text-[11px] text-text-muted">
                   {c.option_value_ids.length === 0
                     ? 'يظهر مع كل الخيارات / shown with every option'
                     : `مرتبط بـ ${c.option_value_ids.length} قيمة`}
@@ -783,18 +783,18 @@ export function OptionsSection({
             )}
 
             {directCombos.some((combo) => combo.color_id === c.id) && (
-              <div className="mt-2.5 rounded-lg border border-emerald-900/60 bg-emerald-950/15 p-2.5" data-color-direct-stock={c.id}>
+              <div className="mt-2.5 rounded-lg border border-success/30 p-2.5" data-color-direct-stock={c.id}>
                 <div className="mb-2">
-                  <p className="text-[12px] font-bold text-zinc-200">مخزون البيع المباشر حسب الخيار</p>
-                  <p className="text-[10px] text-zinc-500">
+                  <p className="text-[12px] font-bold text-text-primary">مخزون البيع المباشر حسب الخيار</p>
+                  <p className="text-[10px] text-text-muted">
                     لكل خيار مرتبط عدّاد مستقل. مخزون الخيار في الأعلى هو مجموع هذه الصفوف تلقائيًا.
                   </p>
                 </div>
                 {errors[`color_stock:${c.id}`] && (
-                  <p className="mb-2 text-[11px] text-red-400">{errors[`color_stock:${c.id}`]}</p>
+                  <p className="mb-2 text-[11px] text-danger">{errors[`color_stock:${c.id}`]}</p>
                 )}
                 {c.stock !== null && (
-                  <p className="mb-2 text-[10px] text-amber-300">
+                  <p className="mb-2 text-[10px] text-warning">
                     يوجد مخزون لون قديم ({c.stock.toLocaleString('en-US')}) محفوظ للتوافق؛ لا يُنسخ على الخيارات كي لا يتضاعف.
                   </p>
                 )}
@@ -805,9 +805,9 @@ export function OptionsSection({
                       const row = variantByKey.get(combinationKey(combo));
                       const label = combo.option_value_ids.map((id) => optionById.get(id)?.name_en || id).join(' / ');
                       return (
-                        <div key={combinationKey(combo)} className="min-w-0 rounded-lg border border-zinc-800/80 bg-zinc-950/20 p-2">
+                        <div key={combinationKey(combo)} className="min-w-0 rounded-lg border border-border-subtle p-2">
                           <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem] gap-2 items-end">
-                            <div className="min-w-0 pb-2 text-[12px] text-zinc-300 truncate" title={label}>{label}</div>
+                            <div className="min-w-0 pb-2 text-[12px] text-text-secondary truncate" title={label}>{label}</div>
                             <Field ar="المخزون" en="Stock">
                               <Qty
                                 value={row?.stock ?? null}
@@ -861,12 +861,12 @@ function AutoStockNote({ rel }: { rel: RelationsState }) {
           ? 'البيع المباشر يعتمد مخزون كل خيار. عند ربط ألوان به يُعطّل حقله ويصبح المجموع من الألوان.'
           : 'لا يوجد مخزون بيع مباشر على الخيارات بعد. الطلب المسبق يبقى متاحًا/غير متاح فقط ولا يملك مخزونًا.';
   return (
-    <div className="min-w-0 rounded-lg border border-zinc-700 bg-zinc-800/30 px-2.5 py-2">
-      <p className="text-[12px] text-zinc-300 font-bold mb-0.5">
-        المخزون تلقائي <span className="text-[10px] font-medium text-zinc-500">Automatic inventory source</span>
+    <div className="min-w-0 rounded-lg lv-well px-2.5 py-2">
+      <p className="text-[12px] text-text-secondary font-bold mb-0.5">
+        المخزون تلقائي <span className="text-[10px] font-medium text-text-muted">Automatic inventory source</span>
       </p>
-      <p className="text-[11px] text-zinc-400 leading-snug">{text}</p>
-      <p className="text-[10px] text-zinc-600 mt-0.5">
+      <p className="text-[11px] text-text-secondary leading-snug">{text}</p>
+      <p className="text-[10px] text-text-muted mt-0.5">
         الطلب المسبق لا يستهلك هذا المخزون. Pre-order has no stock counter.
       </p>
     </div>
@@ -947,7 +947,7 @@ function PriceCell({
         placeholder={landing === null ? 'يرث / inherit' : `يرث ${fmt(landing)}`}
       />
       {locked && (
-        <p className="mt-1 text-[10px] text-sky-300/90 truncate" data-price-mode="engine">
+        <p className="mt-1 text-[10px] text-info truncate" data-price-mode="engine">
           سعر محرك التسعير · Engine price · نرخی بزوێنەری نرخدانان
         </p>
       )}
@@ -956,12 +956,12 @@ function PriceCell({
           is the same fact the resolver acts on. */}
       <div className="mt-1 flex items-center justify-between gap-2 min-w-0">
         {cell.mode === 'adjust' && cell.adjust !== null ? (
-          <p className="text-[10px] text-amber-500/80 truncate" data-price-mode="adjust">
+          <p className="text-[10px] text-warning truncate" data-price-mode="adjust">
             {cell.adjust >= 0 ? '+' : '−'}
             {fmt(Math.abs(cell.adjust))} فوق {fmt(cell.inherited)}
           </p>
         ) : cell.mode === 'fixed' ? (
-          <p className="text-[10px] text-zinc-400 truncate" data-price-mode="fixed">
+          <p className="text-[10px] text-text-secondary truncate" data-price-mode="fixed">
             سعر ثابت لهذا الصف
           </p>
         ) : (
@@ -976,7 +976,7 @@ function PriceCell({
           // that member the regular price. The box shows what they pay and this
           // line says why, because an unexplained equal number reads as a bug
           // and an empty box reads as "free".
-          <p className="text-[10px] text-zinc-500 truncate" data-price-mode={viaRegular ? 'regular-fallback' : 'inherit'}>
+          <p className="text-[10px] text-text-muted truncate" data-price-mode={viaRegular ? 'regular-fallback' : 'inherit'}>
             {viaRegular
               ? `بلا سعر لهذه الفئة — تُحاسب بسعر البيع ${fmt(charged)}`
               : charged === null
@@ -991,7 +991,7 @@ function PriceCell({
           <button
             type="button"
             onClick={() => onCommit(null)}
-            className="shrink-0 text-[10px] text-zinc-500 hover:text-zinc-200 underline underline-offset-2"
+            className="shrink-0 text-[10px] text-text-muted hover:text-text-primary underline underline-offset-2"
             data-price-inherit
             title="امسح سعر هذا الصف ليتبع ما فوقه"
           >
@@ -1112,7 +1112,7 @@ function PriceCells({
       */}
       {spread && spread.length > 1 && (
         <p
-          className="col-span-full text-[10px] text-amber-400/90 leading-snug -mb-1"
+          className="col-span-full text-[10px] text-warning leading-snug -mb-1"
           data-color-price-spread
         >
           هذا اللون مرتبط بعدة خيارات، وسعره يتغيّر معها: من {fmt(spread[0])} إلى {fmt(spread[spread.length - 1])}.
@@ -1193,9 +1193,9 @@ function FulfillmentEditor({
   ];
 
   return (
-    <div className="mt-2 rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-2.5" data-option-availability={value.id}>
+    <div className="mt-2.5 border-t border-border-subtle pt-2.5" data-option-availability={value.id}>
       <div className="grid gap-2 sm:grid-cols-2">
-        <div className={`rounded-lg border p-2.5 ${direct.enabled ? 'border-emerald-700/60 bg-emerald-950/20' : 'border-zinc-800 bg-zinc-900/30'}`}>
+        <div className={`rounded-lg border p-2.5 ${direct.enabled ? 'border-success/30 bg-success/10' : 'border-border-subtle'}`}>
           <Toggle
             checked={direct.enabled}
             onChange={(enabled) => replaceCell({ ...direct, enabled })}
@@ -1218,7 +1218,7 @@ function FulfillmentEditor({
           )}
         </div>
 
-        <div className={`rounded-lg border p-2.5 ${preorder.enabled ? 'border-violet-700/60 bg-violet-950/20' : 'border-zinc-800 bg-zinc-900/30'}`}>
+        <div className={`rounded-lg border p-2.5 ${preorder.enabled ? 'border-info/30 bg-info/10' : 'border-border-subtle'}`}>
           <Toggle
             checked={preorder.enabled}
             onChange={(enabled) => replaceCell({ ...preorder, enabled })}
@@ -1231,7 +1231,7 @@ function FulfillmentEditor({
                 {ROUTES.map((meta) => {
                   const current = route(meta.method);
                   return (
-                    <div key={meta.method} className="rounded-md border border-zinc-800 bg-zinc-950/40 p-2" data-preorder-route={meta.method}>
+                    <div key={meta.method} className="rounded-md border border-border-subtle bg-surface p-2" data-preorder-route={meta.method}>
                       <Toggle
                         checked={current.enabled}
                         onChange={(enabled) => replaceRoute({ ...current, enabled })}
@@ -1246,7 +1246,7 @@ function FulfillmentEditor({
                             onChange={(surcharge_iqd) => replaceRoute({ ...current, surcharge_iqd })}
                             placeholder="بلا زيادة"
                           />
-                          <p className="mt-1 text-[10px] text-zinc-600">زيادة هذا المسار فقط؛ لا يوجد مخزون للطلب المسبق.</p>
+                          <p className="mt-1 text-[10px] text-text-muted">زيادة هذا المسار فقط؛ لا يوجد مخزون للطلب المسبق.</p>
                         </div>
                       )}
                     </div>
@@ -1280,7 +1280,7 @@ function FulfillmentEditor({
           )}
         </div>
       </div>
-      {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-[11px] text-danger">{error}</p>}
       <div className="mt-2">
         <Grid cols={2}>
           <Field ar="اسم النسخة" en="Model" hint="مثل التعبئة أو البكرة الكاملة">

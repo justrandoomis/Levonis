@@ -831,28 +831,28 @@ export default function AdminProducts() {
           <div className="relative flex-1 basis-[240px] min-w-[200px]">
             <Search className="w-4 h-4 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
             <input
+              className={`lv-input min-h-0 ${T.input} w-full ps-9 pe-3`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t.searchPlaceholder}
               aria-label={t.search}
-              className={`${T.input} w-full ps-9 pe-3`}
             />
           </div>
           {catalogs.length > 0 && (
-            <select value={catalog} onChange={(e) => { setCatalog(e.target.value); setPage(1); }} className={filterSel}>
+            <select className={`lv-input w-auto min-h-0 ${filterSel}`} value={catalog} onChange={(e) => { setCatalog(e.target.value); setPage(1); }}>
               <option value="">{loc('كل الأقسام', 'All sections', 'هەموو بەشەکان')}</option>
               {catalogs.map((cat) => (
                 <option key={cat.id} value={cat.id}>{brandName(cat)}</option>
               ))}
             </select>
           )}
-          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={filterSel}>
+          <select className={`lv-input w-auto min-h-0 ${filterSel}`} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
             <option value="">{loc('كل الحالات', 'All statuses', 'هەموو دۆخەکان')}</option>
             <option value="active">{loc('نشط', 'Active', 'چالاک')}</option>
             <option value="draft">{loc('مسودة', 'Draft', 'ڕەشنووس')}</option>
             <option value="hidden">{loc('مخفي', 'Hidden', 'شاراوە')}</option>
           </select>
-          <select value={stockF} onChange={(e) => { setStockF(e.target.value); setPage(1); }} className={filterSel}>
+          <select className={`lv-input w-auto min-h-0 ${filterSel}`} value={stockF} onChange={(e) => { setStockF(e.target.value); setPage(1); }}>
             <option value="">{loc('كل المخزون', 'All stock', 'هەموو کۆگا')}</option>
             <option value="in">{loc('متوفر', 'In stock', 'بەردەست')}</option>
             <option value="low">{loc('منخفض', 'Low', 'کەم')}</option>
@@ -860,9 +860,9 @@ export default function AdminProducts() {
             <option value="preorder">{loc('طلب مسبق فقط', 'Pre-order only', 'تەنها پێشداواکاری')}</option>
           </select>
           <select
+            className={`lv-input w-auto min-h-0 ${filterSel}`}
             value={priceBand}
             onChange={(e) => { setPriceBand(e.target.value); setPriceMin(''); setPriceMax(''); setPage(1); }}
-            className={filterSel}
           >
             <option value="">{loc('كل الأسعار', 'All prices', 'هەموو نرخەکان')}</option>
             <option value="b1">{loc('أقل من 25,000', 'Under 25,000', '< 25,000')}</option>
@@ -872,7 +872,7 @@ export default function AdminProducts() {
           </select>
           <div className="relative">
             <CalendarDays className="w-3.5 h-3.5 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 end-8 pointer-events-none" />
-            <select value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }} className={`${filterSel} ap-select--icon`}>
+            <select className={`lv-input w-auto min-h-0 ${filterSel} ap-select--icon`} value={days} onChange={(e) => { setDays(e.target.value); setPage(1); }}>
               <option value="">{loc('اختر الفترة', 'Any period', 'هەموو ماوەکان')}</option>
               <option value="7">{loc('آخر 7 أيام', 'Last 7 days', '٧ ڕۆژ')}</option>
               <option value="30">{loc('آخر 30 يومًا', 'Last 30 days', '٣٠ ڕۆژ')}</option>
@@ -908,7 +908,7 @@ export default function AdminProducts() {
               {tri(COMPLETENESS_UI.filterIncomplete, lang)}
             </button>
             {brands.length > 0 && (
-              <select value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }} className={T.select}>
+              <select className={`lv-input w-auto min-h-0 ${T.select}`} value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }}>
                 <option value="">{loc('كل العلامات', 'All brands', 'هەموو براندەکان')}</option>
                 {brands.map((b) => (
                   <option key={b.id} value={b.id}>{brandName(b)}</option>
@@ -916,19 +916,19 @@ export default function AdminProducts() {
               </select>
             )}
             <input
+              className={`lv-input min-h-0 ${T.input} w-28`}
               value={priceMin}
               onChange={(e) => { setPriceMin(e.target.value.replace(/[^\d]/g, '')); setPriceBand(''); setPage(1); }}
               placeholder={loc('السعر من', 'Price from', 'نرخ لە')}
               inputMode="numeric"
-              className={`${T.input} w-28`}
               dir="ltr"
             />
             <input
+              className={`lv-input min-h-0 ${T.input} w-28`}
               value={priceMax}
               onChange={(e) => { setPriceMax(e.target.value.replace(/[^\d]/g, '')); setPriceBand(''); setPage(1); }}
               placeholder={loc('إلى', 'to', 'بۆ')}
               inputMode="numeric"
-              className={`${T.input} w-28`}
               dir="ltr"
             />
             <button onClick={resetFilters} className={T.btnGhostSm}>
@@ -946,9 +946,9 @@ export default function AdminProducts() {
             {loc(`عرض ${from} - ${to} من ${total} ${t.unit}`, `Showing ${from}-${to} of ${total}`, `${from}-${to} لە ${total}`)}
           </span>
           <select
+            className={`lv-input w-auto min-h-0 ${T.selectSm}`}
             value={String(limit)}
             onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-            className={T.selectSm}
             aria-label={loc('حجم الصفحة', 'Page size', 'قەبارەی پەڕە')}
           >
             {PAGE_SIZES.map((n) => (
@@ -957,7 +957,7 @@ export default function AdminProducts() {
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={T.selectSm} aria-label={loc('الترتيب', 'Sort', 'ڕیزکردن')}>
+          <select className={`lv-input w-auto min-h-0 ${T.selectSm}`} value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label={loc('الترتيب', 'Sort', 'ڕیزکردن')}>
             <option value="updated">{loc('آخر تحديث', 'Last updated', 'دوایین نوێکردنەوە')}</option>
             <option value="newest">{loc('الأحدث', 'Newest', 'نوێترین')}</option>
             <option value="oldest">{loc('الأقدم', 'Oldest', 'کۆنترین')}</option>
@@ -1004,7 +1004,7 @@ export default function AdminProducts() {
         <LazyFallback label={t.loading} />
       ) : items.length === 0 && !loadErr ? (
         <div className={`${T.surface} text-center py-14 px-4`}>
-          <div className="w-11 h-11 rounded-[12px] bg-[var(--ap-surface-3)] border border-[var(--ap-border)] flex items-center justify-center mx-auto mb-3">
+          <div className="w-11 h-11 rounded-full lv-well flex items-center justify-center mx-auto mb-3">
             <Package className="w-5 h-5 text-[var(--ap-text-3)]" />
           </div>
           <p className="text-[13.5px] font-semibold text-[var(--ap-text-1)]">{anyFilter || total > 0 ? t.noMatch : t.empty}</p>
@@ -1436,7 +1436,7 @@ function InlinePrice({
         onClick={start}
         data-inline-price={product.id}
         title={loc('اضغط لتعديل السعر', 'Click to edit the price', 'کلیک بکە بۆ گۆڕینی نرخ')}
-        className="text-[13.5px] font-bold whitespace-nowrap text-[var(--ap-text-1)] rounded-[6px] px-1 -mx-1 hover:bg-[var(--ap-surface-3)] transition-colors duration-150"
+        className="text-[13.5px] font-bold whitespace-nowrap text-[var(--ap-text-1)] rounded px-1 -mx-1 hover:bg-[var(--ap-surface-3)] transition-colors duration-150"
       >
         <span dir="ltr">{formatIqd(product.price_iqd || 0)}</span>
       </button>
@@ -1445,6 +1445,7 @@ function InlinePrice({
 
   return (
     <input
+      className={`lv-input min-h-0 ${T.input} h-8 w-28 text-[12.5px]`}
       ref={inputRef}
       type="text"
       inputMode="numeric"
@@ -1453,7 +1454,6 @@ function InlinePrice({
       value={text}
       data-inline-price-input={product.id}
       aria-label={loc('السعر الأساسي', 'Base price', 'نرخی بنەڕەتی')}
-      className={`${T.input} h-8 w-28 text-[12.5px]`}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => void commit()}
       onKeyDown={(e) => {
@@ -1509,7 +1509,7 @@ function StatTile({
     <div className={T.statCard.base}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[12px] font-medium text-[var(--ap-text-2)] leading-snug line-clamp-2">{label}</span>
-        <span className={`w-8 h-8 rounded-[9px] flex items-center justify-center shrink-0 ${c.box}`}>{icon}</span>
+        <span className={`w-8 h-8 rounded-sm flex items-center justify-center shrink-0 ${c.box}`}>{icon}</span>
       </div>
       <div className="mt-2.5 text-[22px] font-bold leading-7 tracking-tight text-[var(--ap-text-1)]">
         <span dir="ltr">{value}</span>
@@ -1595,6 +1595,7 @@ function QuickFind({
     <div className="relative flex-1 min-w-[220px] max-w-xl">
       <Search className="w-4 h-4 text-[var(--ap-text-3)] absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
       <input
+        className={`lv-input min-h-0 ${T.input.replace('h-10 ', '')} h-9 w-full ps-9 pe-12`}
         ref={inputRef}
         value={q}
         onChange={(e) => {
@@ -1621,7 +1622,6 @@ function QuickFind({
         aria-expanded={showList}
         aria-controls={hasRows ? 'ap-quickfind-list' : undefined}
         aria-activedescendant={hasRows ? optionId(idx) : undefined}
-        className={`${T.input.replace('h-10 ', '')} h-9 w-full ps-9 pe-12`}
       />
       <span className="absolute top-1/2 -translate-y-1/2 end-2 hidden sm:inline-flex pointer-events-none">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--ap-text-3)]" /> : <kbd className={T.kbd} dir="ltr">⌘K</kbd>}
