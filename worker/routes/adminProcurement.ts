@@ -67,6 +67,10 @@ async function commitPurchase(
     // receipt is fixed. Never the driver's text.
     if (/(^|[^A-Z_])PURCHASE_FROZEN([^A-Z_]|$)/.test(`${String(error)} ${String((error as { cause?: unknown })?.cause ?? '')}`))
       throw conflict('لا تعدّل التكلفة بعد الاستلام؛ استخدم شحنة جديدة', 'PURCHASE_FROZEN');
+    // Two saves raced to fund the same purchase: it keeps the agreement that
+    // landed first (immutable) — a 409 in three languages, never a 500.
+    if (/UNIQUE constraint failed: purchase_investor_agreements\.purchase_id/.test(`${String(error)} ${String((error as { cause?: unknown })?.cause ?? '')}`))
+      throw conflict(serverMessage('INVESTMENT_AGREEMENT_EXISTS'), 'INVESTMENT_AGREEMENT_EXISTS');
     const current = await db
       .prepare('SELECT version FROM purchase_orders WHERE id=?')
       .bind(purchase.id)
@@ -561,7 +565,7 @@ async function planDocument(
             .bind(...values),
     );
   });
-  if(status==='ordered')statements.push(...await planPurchaseFunding(db,id,b.funding,plannedLines,actor));
+  if(status==='ordered')statements.push(...await planPurchaseFunding(db,id,b.funding,plannedLines,actor,{costState:state}));
   return statements;
 }
 adminProcurementRoutes.post('/documents', async (c) => {

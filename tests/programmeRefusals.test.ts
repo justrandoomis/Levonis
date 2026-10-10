@@ -147,6 +147,8 @@ const REQUIRED: Record<string, readonly string[]> = {
   'FX-7 gaps (row 202)': ['PRICING_READ_FAILED'],
   // Owner request 2026-10-10: a stock purchase is named, and renamed at any status.
   'Purchase name (owner request 2026-10-10)': ['PURCHASE_NAME_TOO_LONG', 'PURCHASE_NAME_CHANGED'],
+  // Owner request 2026-10-10: the investment remainder returns to the investor's «أرباحي».
+  'Investment remainder (owner request 2026-10-10)': ['INVESTMENT_NEEDS_FINAL_COST', 'INVESTMENT_AGREEMENT_EXISTS'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

@@ -595,6 +595,25 @@ export const COST_REFUSALS = {
     en: 'The purchase name changed elsewhere; refresh the page and try again.',
     ckb: 'ناوی کڕینەکە لە شوێنێکی ترەوە گۆڕا؛ پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
+  // ---- the investment remainder (owner request 2026-10-10) ----
+  // Confirming an investor-funded purchase fixes its funding: the remainder
+  // that returns to the investor's «أرباحي» is computed from the cost at that
+  // moment and never changes, and a funded purchase cannot be received with an
+  // estimated cost. So the confirm asks for the final cost first; a draft
+  // still saves with an estimated cost.
+  INVESTMENT_NEEDS_FINAL_COST: {
+    ar: 'ثبّت التكلفة النهائية قبل تأكيد شراء ممول من مستثمر؛ يُحسب منها فائض التمويل ولا يتغير بعدها.',
+    en: 'Set the final cost before confirming an investor-funded purchase; the funding surplus is computed from it and does not change afterwards.',
+    ckb: 'پێش پشتڕاستکردنەوەی کڕینێکی پارەدارکراو لەلایەن وەبەرهێنەرەوە تێچووی کۆتایی جێگیر بکە؛ زیادەی پارەدارکردن لێیەوە هەژمار دەکرێت و دواتر ناگۆڕێت.',
+  },
+  // A purchase keeps the one funding agreement it was confirmed with (the
+  // agreement is immutable); saving it again with investor funding is refused
+  // here instead of failing on the database's own key.
+  INVESTMENT_AGREEMENT_EXISTS: {
+    ar: 'لهذا الشراء اتفاق تمويل محفوظ؛ أنشئ شراءً جديدًا لتغيير التمويل.',
+    en: 'This purchase already has a saved funding agreement; create a new purchase to change the funding.',
+    ckb: 'ئەم کڕینە ڕێککەوتنی پارەدارکردنی پاشەکەوتکراوی هەیە؛ بۆ گۆڕینی پارەدارکردن کڕینێکی نوێ دروست بکە.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

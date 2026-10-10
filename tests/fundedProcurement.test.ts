@@ -48,13 +48,16 @@ test('purchase totals and freight remainders survive partial receiving and every
   await x.sale('all-pieces',5);assert.equal(count(x.raw,'SELECT SUM(cogs_iqd) n FROM order_item_inventory_allocations'),3000003);
 });
 
-test('funding is allocated once across items; agreement is not cash and overfunding stays unallocated',async()=>{
+test('funding is allocated once across items; agreement is not cash and overfunding returns to the investor as capital',async()=>{
   const x=await setup(),p=await x.create(x.payload({lines:[{product_id:'a1',scope:'option',scope_id:'combo',qty_ordered:5,purchase_cost_mode:'total',source_total_amount:2500000},{product_id:'part',scope:'base',scope_id:'',qty_ordered:5,purchase_cost_mode:'total',source_total_amount:500000}],charges:[],funding:{mode:'investor',user_id:'investor',agreed_iqd:2000000,received_iqd:0}}));
   assert.equal(count(x.raw,'SELECT SUM(principal_iqd) n FROM investment_contracts'),2000000);assert.equal(count(x.raw,"SELECT COALESCE(SUM(amount_iqd),0) n FROM investor_finance_events WHERE kind='funding'"),0);
   assert.equal(p.detail.funding.store_contribution_iqd,1000000);assert.equal(p.detail.funding.funding_shortfall_iqd,2000000);
   const receipt={operation_id:crypto.randomUUID(),amount_iqd:2200000,reference:'BANK-RECEIPT'};assert.equal((await post(x.app,`/p/documents/${p.id}/investor-receipts`,receipt)).status,200);
   assert.equal((await post(x.app,`/p/documents/${p.id}/investor-receipts`,receipt)).status,200);
   const detail=await json(await get(x.app,`/p/documents/${p.id}`));assert.equal(detail.funding.received_iqd,2200000);assert.equal(detail.funding.unallocated_iqd,200000);
+  // Owner request 2026-10-10: received cash no contract took is the investor's returned capital in «أرباحي».
+  assert.equal(detail.funding.returned_iqd,200000);const own=await participantOverview(x.db,'investor');
+  assert.equal(own.entries.find(e=>e.id===`invsurplus:${p.id}`)?.amount_iqd,200000);assert.equal(own.summary.capital_available_iqd,200000);assert.equal(own.summary.earnings_available_iqd,0);
   assert.equal(count(x.raw,"SELECT SUM(amount_iqd) n FROM investor_finance_events WHERE kind='funding'"),2000000);assert.equal(count(x.raw,"SELECT SUM(debit_iqd-credit_iqd) n FROM accounting_lines WHERE account_code='1000'"),2200000);
   assert.equal((await post(x.app,'/p/documents',p.body)).status,200);assert.equal(count(x.raw,'SELECT COUNT(*) n FROM investment_contracts'),2);
 });

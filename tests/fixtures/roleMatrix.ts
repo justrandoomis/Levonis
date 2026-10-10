@@ -34,7 +34,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { OWNER, asD1, freshDb, stubApp, type StubUser } from './app';
 import { resetPolicyCorpusMemo } from '../../worker/lib/policySync';
-import { leaks, seedCostlyOrder, seedCostlyProduct, seedCostlyPurchase, seedCostlyStock, type LeakExtra } from './costlyProduct';
+import { COST, leaks, seedCostlyOrder, seedCostlyProduct, seedCostlyPurchase, seedCostlyStock, type LeakExtra } from './costlyProduct';
 import type { AppContext } from '../../worker/lib/types';
 
 import { productRoutes, homeRoutes } from '../../worker/routes/products';
@@ -358,6 +358,17 @@ export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
       VALUES ('ic_rm','inc1','usr_inv','Investor contract',1000000,10000,3500,0,'usr_owner','2026-09-01T00:00:00.000Z','{}');
     INSERT INTO investment_profiles (user_id,state,default_profit_share_bps,created_by,created_at,updated_at)
       VALUES ('usr_inv','active',3500,'usr_owner','2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z');
+  `);
+  // The investment remainder (owner request 2026-10-10): the investor funded po1
+  // above its landed cost and the cash arrived, so 146,178 returns to their
+  // «أرباحي». The cost the contracts took is a sentinel (COST.lotTotal), so a
+  // returned-capital source, notice or summary that let the landed cost through
+  // to the investor would be caught by every sweep.
+  raw.exec(`
+    INSERT INTO purchase_investor_agreements (purchase_id,user_id,agreed_iqd,allocated_iqd,batch_cost_iqd,profit_share_bps,loss_share_bps,actor_id,created_at,request_json)
+      VALUES ('po1','usr_inv',${COST.lotTotal + 146_178},${COST.lotTotal},${COST.lotTotal},3500,0,'usr_owner','2026-09-01T00:00:00.000Z','{}');
+    INSERT INTO purchase_investor_receipts (id,purchase_id,amount_iqd,allocated_iqd,payment_day,reference,actor_id,created_at,request_json)
+      VALUES ('rcpt_rm','po1',${COST.lotTotal + 146_178},${COST.lotTotal},'2026-09-02','CASH','usr_owner','2026-09-02T00:00:00.000Z','{}');
   `);
   // A grant row as delegation would read it: ignored while it is off.
   try {
