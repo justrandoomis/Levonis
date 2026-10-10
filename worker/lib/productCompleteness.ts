@@ -12,9 +12,11 @@
  *                   (product, model, order-type cell or route — `legacyCostOf`)
  *                   above zero, or the USD pricing inputs resolve a supplier
  *                   cost for it (`resolveSkuInputs`, the engine's own resolver,
- *                   per model or for every one of its SKUs)
+ *                   per model or for every one of its SKUs). Stock-purchase
+ *                   inputs count only for selections offering direct sale.
  *   ENGINE_INPUTS ★ (engine products only) every model resolves a minimum
- *                   profit (`resolveRuleAt`), and the engine's last repricing
+ *                   profit (`resolveRuleAt`, including a stock minimum for a
+ *                   direct selection), and the engine's last repricing
  *                   was not blocked for a missing INPUT
  *   IMAGE           at least one displayable picture
  *   CATEGORY        a main section that exists
@@ -55,8 +57,10 @@ import type { OptionV2 } from './pricing';
 import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
 import { loadProducts } from './pricingEngine/load';
-import { chainOf, chainOfUnit, loadProductsPricing, type StoredInputRow } from './pricingEngine/store';
+import { chainOf, chainOfUnit, loadProductsPricing, type InputWrite, type ProductPricingData, type RuleWrite, type StoredInputRow, type StoredRuleRow } from './pricingEngine/store';
+import { directPurchaseStore, pruneDirectPurchase } from './pricingEngine/directPurchase';
 import { legacyCostOf, modelsOf, sellableSkus } from './pricingEngine/legacy';
+import { saleAvailability } from '../routes/products';
 import { sha256Hex } from './crypto';
 import { completenessInstalled } from './listing';
 
@@ -71,9 +75,9 @@ export const COMPLETENESS_CHUNK = 25;
 /**
  * Statements one recompute of `n` (≤ COMPLETENESS_CHUNK) products spends: the
  * facts and the rules signature (2), the relational load (the row and its nine
- * relation reads, 10), the pricing batch (4), the switch (1), one upsert each.
+ * relation reads, 10), the pricing store and direct purchase overlay (5), the switch (1), one upsert each.
  */
-export const recomputeCost = (n: number): number => (n > 0 ? 2 + 10 + 4 + 1 + n : 0);
+export const recomputeCost = (n: number): number => (n > 0 ? 2 + 10 + 5 + 1 + n : 0);
 
 /** The engine's blocked-repricing codes that name a missing INPUT (never the environment's). */
 const INPUT_BLOCK_CODES: ReadonlySet<string> = new Set([
@@ -198,6 +202,8 @@ export interface EvaluationInput {
   mode: 'manual' | 'engine';
   inputs: readonly Partial<StoredInputRow>[];
   rules: readonly PricingRuleRow[];
+  /** Stock-purchase evidence applies only to selections offering direct sale. */
+  direct?: { inputs: readonly Partial<StoredInputRow>[]; rules: readonly PricingRuleRow[] };
   /** The main section is set and exists. */
   category_ok: boolean;
   /** The engine's last blocked-repricing code ('' = none). */
@@ -230,6 +236,16 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
   // The SKUs a customer can buy, by model (FX-7: a supplier cost may sit on a colour or SKU level).
   const sku = sellableSkus(doc, e.view);
   const unitsOf = (modelId: string) => (sku.overflow ? [] : sku.skus.filter((s) => (s.model?.id ?? '') === modelId));
+  const offersDirect = (optionIds: string[], colorId: string | null = null) =>
+    saleAvailability(doc, { optionValueIds: optionIds, colorId }).modes.some((m) => m.type === 'direct_sale');
+  const directForModel = (modelId: string) => {
+    if (!e.direct || sku.overflow) return false;
+    const units = unitsOf(modelId);
+    return units.length
+      ? units.every((u) => offersDirect(u.option_value_ids, u.color?.id ?? null))
+      : offersDirect(modelId ? [modelId] : []);
+  };
+  const unitChain = (u: (typeof sku.skus)[number]) => ({ option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, combo_key: u.combo_key });
 
   if (!String(doc.name_ar ?? '').trim()) add('NAME_AR');
   if (e.mode !== 'engine' && !positive(doc.price_iqd)) add('PRICE');
@@ -240,8 +256,10 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
     const legacy = legacyCostOf(doc, m);
     if (legacy !== null && legacy > 0) continue;
     if (supplierResolves(chainOf(e.inputs, modelId))) continue;
+    if (directForModel(modelId) && supplierResolves(chainOf(e.direct!.inputs, modelId))) continue;
     const units = unitsOf(modelId);
-    if (units.length && units.every((u) => supplierResolves(chainOfUnit(e.inputs, { option_value_ids: u.option_value_ids, color_id: u.color?.id ?? null, combo_key: u.combo_key })))) continue;
+    if (units.length && units.every((u) => supplierResolves(chainOfUnit(e.inputs, unitChain(u))) ||
+      (!!e.direct && offersDirect(u.option_value_ids, u.color?.id ?? null) && supplierResolves(chainOfUnit(e.direct.inputs, unitChain(u)))))) continue;
     add('COST', modelId);
   }
 
@@ -251,8 +269,10 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
     for (const m of models) {
       const modelId = m?.id ?? '';
       if (targetActive(e.rules, e.id, modelId ? [modelId] : [], null)) continue;
+      if (directForModel(modelId) && targetActive(e.direct!.rules, e.id, modelId ? [modelId] : [], null)) continue;
       const units = unitsOf(modelId);
-      if (units.length && units.every((u) => targetActive(e.rules, e.id, u.option_value_ids, u.color?.id ?? null))) continue;
+      if (units.length && units.every((u) => targetActive(e.rules, e.id, u.option_value_ids, u.color?.id ?? null) ||
+        (!!e.direct && offersDirect(u.option_value_ids, u.color?.id ?? null) && targetActive(e.direct.rules, e.id, u.option_value_ids, u.color?.id ?? null)))) continue;
       if (!out.some((i) => i.code === 'ENGINE_INPUTS' && i.option_id === modelId)) add('ENGINE_INPUTS', modelId);
     }
   }
@@ -381,7 +401,7 @@ export async function recomputeCompleteness(
   }
   const idsToLoad = ordinary.map((f) => f.id);
   const [loaded, pricing] = await Promise.all([loadProducts(db, idsToLoad), loadProductsPricing(db, idsToLoad)]);
-  statements += 10 + 4;
+  statements += 10 + 5;
   const switchOn = await hideSwitchOn(db);
   statements += 1;
   const now = opts.now ?? new Date().toISOString();
@@ -398,6 +418,7 @@ export async function recomputeCompleteness(
       mode: f.mode === 'engine' ? 'engine' : 'manual',
       inputs: p?.inputs ?? [],
       rules: p?.rules ?? [],
+      ...(p?.direct_purchase ? { direct: directPurchaseStore(p) } : {}),
       category_ok: Number(f.cat_ok) === 1,
       blocked: String(f.blocked ?? ''),
     });
@@ -613,20 +634,31 @@ export async function evaluateDraft(
     mode: 'manual' | 'engine';
     inputs?: readonly Partial<StoredInputRow>[];
     rules?: readonly PricingRuleRow[];
+    /** Reuse the data-file planner's snapshot and exact ordinary edits. */
+    stored?: ProductPricingData;
+    inputWrites?: readonly InputWrite[];
+    ruleWrites?: readonly RuleWrite[];
   }
 ): Promise<CompletenessItem[]> {
   const categoryId = String(d.doc.category_id ?? '');
   const [category, pricing] = await Promise.all([
     categoryId ? db.prepare('SELECT 1 AS x FROM catalogs WHERE id = ?').bind(categoryId).first<{ x: number }>() : Promise.resolve(null),
-    d.inputs && d.rules ? Promise.resolve(null) : loadProductsPricing(db, [d.id]).then((m) => m.get(d.id) ?? null),
+    d.stored ? Promise.resolve(d.stored) : loadProductsPricing(db, [d.id]).then((m) => m.get(d.id) ?? null),
   ]);
+  const inputs = d.inputs ?? pricing?.inputs ?? [];
+  const rules = d.rules ?? pricing?.rules ?? [];
+  // An owner's draft may replace a stock field. Judge the same pruned overlay
+  // the pricing write will persist, never the superseded purchase value.
+  const direct = pricing?.direct_purchase ? directPurchaseStore({ ...pricing, inputs: [...inputs] as StoredInputRow[], rules: [...rules] as StoredRuleRow[] },
+    pruneDirectPurchase(pricing, d.inputWrites ?? [], d.ruleWrites ?? []) ?? pricing.direct_purchase) : undefined;
   return evaluateCompleteness({
     id: d.id,
     doc: d.doc,
     view: d.view,
     mode: d.mode,
-    inputs: d.inputs ?? pricing?.inputs ?? [],
-    rules: d.rules ?? pricing?.rules ?? [],
+    inputs,
+    rules,
+    direct,
     category_ok: !!category,
     blocked: '',
   });

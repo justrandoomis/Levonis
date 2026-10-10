@@ -15,6 +15,11 @@ The default-branch work now integrates the three commits formerly waiting on
   rate repricing, and are superseded by explicit owner edits of the same fields.
   An explicit complete review in the ordinary pricing editor can subsequently
   activate all channels; that apply clears the direct-only adoption flag.
+- Product completeness and data-file previews use that same direct-purchase
+  basis only for selections offering direct sale. A fully priced stock product
+  must not be held as missing cost/profit merely because its ordinary preorder
+  inputs are empty; a separate preorder-only model must still satisfy its own
+  requirements. Proposed owner edits supersede the purchase basis in previews.
 - Stored/prepaid preorder prices and route fees stay unchanged. The established
   checkout rule that COD may use the direct-sale price remains in force.
 - Unused investment funding returns to the investor earnings wallet once at
@@ -65,6 +70,15 @@ These are targeted local gates, not a claim that the entire unit suite ran
 locally. The combined tree is ready for workflow 7's mandatory full suite and
 live rollout; deployment has not yet been confirmed. Do not claim the site is
 updated from a local build or a queued workflow alone.
+
+Workflow run `38088439275` for `5e0593f2` was cancelled before any live phase
+after a synthetic regression proved that completeness could wrongly hide a
+directly adopted stock product. All migration/deploy/probe steps were skipped.
+The follow-up fix includes storefront visibility, draft-edit and query-budget
+regressions; its replacement workflow must complete all normal release gates.
+Its local verification passed 58 focused tests, 282 privacy/bundle/theme/UI
+gates and 12 programme-refusal tests, plus the complete `npm run check`, build,
+and a final test typecheck after the new regressions were stable.
 
 Local checks required before a code push:
 

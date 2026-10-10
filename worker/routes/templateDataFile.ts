@@ -630,7 +630,7 @@ async function completenessPreview(db: D1Database, ev: BlockEval, seesPrivate: b
       doc,
       view: state.view,
       mode: afterMode,
-      ...(j?.ev ? { inputs: j.ev.inputs, rules: j.ev.rules } : {}),
+      ...(j?.ev ? { inputs: j.ev.inputs, rules: j.ev.rules, stored: j.ev.stored, inputWrites: j.writes?.inputWrites, ruleWrites: j.writes?.ruleWrites } : {}),
     });
     return { before: projectItems(before, seesPrivate), after: projectItems(after, seesPrivate) };
   } catch (error) {
