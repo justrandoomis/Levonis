@@ -65,28 +65,8 @@ export const DATA_FILE_STRINGS = {
   menuEntry: { ar: 'ملف بيانات المنتجات (تنزيل / إرفاق)', en: 'Products data file (download / attach)', ckb: 'فایلی زانیاریی بەرهەمەکان (داگرتن / هاوپێچ)' },
   updateDataTitle: { ar: 'تنزيل ملف بيانات المنتج وتطبيق ما تغيّر فيه', en: 'Download the product data file and apply what changed in it', ckb: 'فایلی زانیاریی بەرهەم دابگرە و ئەوەی تێیدا گۆڕاوە جێبەجێی بکە' },
   productError: { ar: 'لا يمكن مقارنة هذا المنتج', en: 'This product cannot be compared', ckb: 'ئەم بەرهەمە بەراورد ناکرێت' },
-  // A file too large for one batch (row 207): the sheet applies the product part, compares again, then the pricing part.
-  applyingInParts: {
-    ar: 'يُطبَّق على دفعتين: تغييرات المنتج ثم بيانات التسعير…',
-    en: 'Applying in two steps: the product changes, then the pricing data…',
-    ckb: 'بە دوو هەنگاو جێبەجێ دەکرێت: گۆڕانکارییەکانی بەرهەم، پاشان زانیاریی نرخدانان…',
-  },
-  appliedInParts: {
-    ar: 'طُبّق {n} على دفعتين (تغييرات المنتج ثم التسعير)',
-    en: '{n} applied in two steps (product changes, then pricing)',
-    ckb: '{n} بە دوو هەنگاو جێبەجێ کرا (گۆڕانکارییەکانی بەرهەم، پاشان نرخدانان)',
-  },
-  partStopped: {
-    ar: 'طُبّقت تغييرات المنتج، وتغيّرت مقارنة التسعير بعدها — راجع أسطر التسعير أدناه ثم اضغط «تطبيق التغييرات» مرة أخرى.',
-    en: 'The product changes were applied and the pricing comparison changed after them — review the pricing lines below, then press «Apply changes» again.',
-    ckb: 'گۆڕانکارییەکانی بەرهەم جێبەجێ کران و بەراوردی نرخدانان دوای ئەوان گۆڕا — هێڵەکانی نرخدانان لە خوارەوە ببینە، پاشان دووبارە کرتە لە «جێبەجێکردنی گۆڕانکارییەکان» بکە.',
-  },
-  applyPricingOnly: { ar: 'طبّق أسطر التسعير وحدها', en: 'Apply the pricing lines only', ckb: 'تەنها هێڵەکانی نرخدانان جێبەجێ بکە' },
-  pricingOnlyApplied: {
-    ar: 'طُبّقت أسطر التسعير ({n})، ولم تُطبَّق أسطر المنتج — السبب أعلاه.',
-    en: 'The pricing lines were applied ({n}); the product lines were not — see why above.',
-    ckb: 'هێڵەکانی نرخدانان جێبەجێ کران ({n})؛ هێڵەکانی بەرهەم جێبەجێ نەکران — هۆکارەکە لە سەرەوەیە.',
-  },
+  // A bulk file is compared over several calls (each one invocation of D1's 1,000 queries, row 207).
+  comparingProgress: { ar: 'جارٍ المقارنة… ({n} من {total})', en: 'Comparing… ({n} of {total})', ckb: 'بەراورد دەکرێت… ({n} لە {total})' },
   sizeNote: { ar: '({needed} عملية كتابة، والحد {allowance})', en: '({needed} writes; the limit is {allowance})', ckb: '({needed} کرداری نووسین؛ سنوورەکە {allowance})' },
 } satisfies Record<string, Tri>;
 
@@ -369,11 +349,20 @@ export const DATA_FILE_GROUP_WORDS: Record<string, Tri> = {
   content_blocks: { ar: 'كتلة المحتوى', en: 'Content block', ckb: 'بلۆکی ناوەڕۆک' },
   usage_steps: { ar: 'خطوة الاستخدام', en: 'Usage step', ckb: 'هەنگاوی بەکارهێنان' },
   transports: { ar: 'طريق الشحن', en: 'Shipping route', ckb: 'ڕێگای ناردن' },
+  /** A row of a spec group (`spec_groups.N.rows.M.*`), when the comparison sends no label for it. */
+  spec_rows: { ar: 'البند', en: 'Row', ckb: 'ڕیز' },
   'pricing.options': PRICING_SCOPE_LABELS.option,
   'pricing.colors': PRICING_SCOPE_LABELS.color,
   'pricing.skus': PRICING_SCOPE_LABELS.sku,
   'pricing.base': PRICING_SCOPE_LABELS.base,
   spec: { ar: 'مواصفة', en: 'Specification', ckb: 'تایبەتمەندی' },
+};
+
+/** A shipping route by the method that names it (`transports[air]`): a model's pre-order route or the product's own. */
+export const DATA_FILE_ROUTE_NAMES: Record<string, Tri> = {
+  air: { ar: 'الطريق الجوي', en: 'Air route', ckb: 'ڕێگای ئاسمانی' },
+  sea: { ar: 'الطريق البحري', en: 'Sea route', ckb: 'ڕێگای دەریایی' },
+  land: { ar: 'الطريق البري', en: 'Land route', ckb: 'ڕێگای وشکانی' },
 };
 
 /** The language a `_ar` / `_en` / `_ckb` field is written in. */
@@ -383,10 +372,12 @@ export const DATA_FILE_LANG_TAGS: Record<'ar' | 'en' | 'ckb', Tri> = {
   ckb: { ar: 'كردي', en: 'Kurdish', ckb: 'بە کوردی' },
 };
 
-/** The names the server sends with a comparison: each row's item (`group:id`) and each spec field. */
+/** The names the server sends with a comparison: each row's item (`group:id`), each spec field, each item inside an item. */
 export interface DataFileLabels {
   items?: Record<string, Tri>;
   spec?: Record<string, Tri>;
+  /** A spec group's row by its label: `spec_groups:<group id>/rows:<row id>`. */
+  inner?: Record<string, Tri>;
 }
 
 /** `pricing.options.3.shipping_length_mm` → { family: 'pricing.options', leaf: 'shipping_length_mm', index: 3 } (indices stripped). */
@@ -453,21 +444,52 @@ export function itemOfNkey(nkey: string): { group: string; id: string } | null {
 }
 
 /**
+ * The item inside the row's item, when there is one — a model's pre-order
+ * route (`options.N.preorder.transports.M.*`) or a spec group's row
+ * (`spec_groups.N.rows.M.*`): two such lines of one item are two different
+ * lines, and their titles say so. By the line's `nkey` when the sheet has it
+ * (the route's method, the row's label the comparison sent), else by its
+ * number in the file.
+ */
+function innerOf(key: string, nkey: string | undefined, item: { group: string; id: string }, labels: DataFileLabels | undefined, lang: string): string | null {
+  const byKey = /\.(transports|rows)\.(\d+)\./.exec(key);
+  const byNkey = nkey ? /\.(transports|rows)\[([^\]]+)\]/.exec(nkey) : null;
+  const group = byNkey?.[1] ?? byKey?.[1];
+  if (!group) return null;
+  if (byNkey) {
+    const id = byNkey[2];
+    if (group === 'transports' && DATA_FILE_ROUTE_NAMES[id]) return pick(DATA_FILE_ROUTE_NAMES[id], lang);
+    const named = labels?.inner?.[`${item.group}:${item.id}/${group}:${id}`];
+    if (named && pick(named, lang)) return pick(named, lang);
+  }
+  const word = group === 'transports' ? DATA_FILE_GROUP_WORDS.transports : DATA_FILE_GROUP_WORDS.spec_rows;
+  return byKey ? `${pick(word, lang)} ${byKey[2]}` : pick(word, lang);
+}
+
+/**
  * A row's title: «the item · the field» — the item by the name the
  * comparison sent (the model, the colour, the combination, the pricing scope),
- * else its group's word and its number in the file; the product's own pricing
- * block reads «the product · the field».
+ * else its group's word and its number in the file; an item inside it (a
+ * pre-order route, a spec row) follows the item; the product's own pricing
+ * block reads «the product · the field». `nkey` (the comparison's own key for
+ * the line) names an inner item by its id; without it, by its number.
  */
-export function rowTitle(key: string, item: { group: string; id: string } | null, labels: DataFileLabels | undefined, lang: string): string {
+export function rowTitle(key: string, item: { group: string; id: string } | null, labels: DataFileLabels | undefined, lang: string, nkey?: string): string {
   const field = pick(fieldLabel(key, labels), lang);
   const { family, index } = keyShape(key);
   if (family === 'pricing.base') return `${pick(DATA_FILE_GROUP_WORDS['pricing.base'], lang)} · ${field}`;
   if (!item) return field;
   const named = labels?.items?.[`${item.group}:${item.id}`];
-  if (named && pick(named, lang)) return `${pick(named, lang)} · ${field}`;
   const word = DATA_FILE_GROUP_WORDS[item.group];
-  if (!word) return field;
-  return `${pick(word, lang)}${index !== null ? ` ${index}` : ''} · ${field}`;
+  const head =
+    named && pick(named, lang)
+      ? pick(named, lang)
+      : item.group === 'transports' && DATA_FILE_ROUTE_NAMES[item.id]
+        ? pick(DATA_FILE_ROUTE_NAMES[item.id], lang)
+        : word
+          ? `${pick(word, lang)}${index !== null ? ` ${index}` : ''}`
+          : null;
+  return [head, innerOf(key, nkey, item, labels, lang), field].filter(Boolean).join(' · ');
 }
 
 /** `{name}` placeholders, filled. */

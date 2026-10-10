@@ -22,6 +22,7 @@ import {
   DATA_FILE_FIELDS,
   DATA_FILE_GROUP_FIELDS,
   DATA_FILE_GROUP_WORDS,
+  DATA_FILE_ROUTE_NAMES,
   DATA_FILE_LANG_TAGS,
   DATA_FILE_MEMBERSHIP_FIELDS,
   DATA_FILE_PRICING_FIELDS,
@@ -134,6 +135,7 @@ test('the label tables themselves: ar, en and its own Sorani in every entry', ()
     DATA_FILE_MEMBERSHIP_FIELDS,
     DATA_FILE_PRICING_FIELDS,
     DATA_FILE_GROUP_WORDS,
+    DATA_FILE_ROUTE_NAMES,
     DATA_FILE_LANG_TAGS,
     ...Object.fromEntries(Object.entries(DATA_FILE_GROUP_FIELDS).map(([g, t]) => [`DATA_FILE_GROUP_FIELDS.${g}`, t])),
   };
@@ -177,8 +179,14 @@ test('the comparison sends each row\'s item name and each spec field\'s label �
   assert.deepEqual(labels.items?.['options:opt_combo'], { ar: 'كومبو', en: 'Combo', ckb: 'كومبو' });
   assert.equal(labels.items?.['colors:col_black']?.en, 'Black');
   assert.equal(labels.items?.['spec_groups:sg_main']?.en, 'Main');
-  const titles = p.fields.map((f) => rowTitle(f.key, (f as unknown as { item: { group: string; id: string } | null }).item, labels, 'en'));
+  // A spec row is an item inside the group: named by its own label (the sheet passes the line's nkey) …
+  assert.deepEqual(labels.inner?.['spec_groups:sg_main/rows:sr_vol'], { ar: 'حجم الطباعة', en: 'Build volume', ckb: 'حجم الطباعة' });
+  const item = (f: (typeof p.fields)[number]) => (f as unknown as { item: { group: string; id: string } | null }).item;
+  const titles = p.fields.map((f) => rowTitle(f.key, item(f), labels, 'en', f.nkey));
   assert.ok(titles.includes('Combo · Stock'), titles.join(' | '));
   assert.ok(titles.includes('Black · Name (Arabic)'), titles.join(' | '));
-  assert.ok(titles.includes('Main · Row value (English)'), titles.join(' | '));
+  assert.ok(titles.includes('Main · Build volume · Row value (English)'), titles.join(' | '));
+  // … and, without it, by its number in the file.
+  const bare = p.fields.map((f) => rowTitle(f.key, item(f), labels, 'en'));
+  assert.ok(bare.includes('Main · Row 1 · Row value (English)'), bare.join(' | '));
 });

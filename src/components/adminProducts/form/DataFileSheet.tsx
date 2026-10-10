@@ -11,18 +11,23 @@
  *      refused line with its reason, what the save derives, the engine's price
  *      preview when the pricing would write prices (POST …/data-preview, which
  *      writes nothing);
- *   4. «تطبيق التغييرات» — one call per product (POST …/data-apply), each its
- *      own atomic, fenced, audited batch holding the token of the comparison
- *      the admin read. A product whose changes are too many for one batch
- *      (DATA_FILE_TOO_LARGE, docs/DECISIONS.md row 207) is applied in two:
- *      the product part, a fresh comparison of that product alone, then the
- *      pricing part — only when the fresh comparison writes exactly the
- *      pricing lines the owner read; anything else stops with the fresh card.
+ *   4. «تطبيق التغييرات» — one call per product (POST …/data-apply), each ONE
+ *      atomic, fenced, audited batch holding the token of the comparison the
+ *      admin read: all of that product's changes or none of them. A product
+ *      whose changes are more than one batch can hold (docs/DECISIONS.md row
+ *      207) is refused with nothing written; the refusal says which lines to
+ *      take out so the file is applied in two goes, each compared and applied
+ *      on its own.
+ *
+ * A bulk file is compared over as many calls as it takes: each call compares
+ * what one invocation of D1's 1,000 queries can, and names the products it
+ * left (`pending`) — the next call asks for exactly those.
  *
  * Every row is titled «item · field» in the reader's language
  * (`rowTitle`, ../dataFileStrings.ts): the model, colour, combination or
- * pricing scope by the name the server sends, the field from the tables —
- * never a raw key (the key and its line stay in the small grey caption).
+ * pricing scope by the name the server sends (and the route or spec row
+ * inside it), the field from the tables — never a raw key. The title wraps
+ * on a phone; the key and its line stay in the small grey caption under it.
  *
  * The same sheet serves the product form (one product) and the products list
  * (`productIds`: the page's products, 25 to a file). The comparison is the
@@ -95,27 +100,19 @@ interface Preview {
   viewer: 'owner' | 'staff';
   errors: Array<{ line: number; message: string; code: string }>;
   products: ProductCard[];
+  /** The products of the file this call had no room to compare (row 207): asked for in the next call. */
+  pending?: string[];
 }
 
 type Outcome = {
   ok: boolean;
-  /** The product part landed, the pricing part did not (yet): amber, and Apply continues. */
-  partial?: boolean;
   text: string;
-  /** The product part is too large on its own: the pricing part may still be applied alone. */
-  pricingOnly?: { token: string; hash: string | null };
 };
 
-/** A part of an apply too large for one batch, as the server names it (counts and a token only). */
-interface PartDto {
-  token: string;
-  statements: number;
-  fits: boolean;
-}
+/** A refusal too large for one batch: the counts, never a value. */
 interface SizeDetails {
   needed?: number;
   allowance?: number;
-  parts?: { document?: PartDto; pricing?: PartDto };
 }
 interface ApplyAnswer {
   already?: boolean;
@@ -124,24 +121,8 @@ interface ApplyAnswer {
 }
 
 const CHUNK = 25;
-/** Products compared per preview call in the products list (each call one invocation of D1's 1,000 queries). */
-const COMPARE_CHUNK = 5;
-/** The product ids of a bulk file, in its order (its `=== product <id> ===` lines). */
-const fileProductIds = (text: string): string[] => [...new Set([...text.matchAll(/^===\s*product\s+([A-Za-z0-9_-]{1,80})\s*===\s*$/gm)].map((m) => m[1]))];
-/** The pricing lines a card will write, as `key=after` (what a second step must write, no more, no less). */
-const pricingIntent = (card: ProductCard): string[] =>
-  card.fields
-    .filter((f) => f.status === 'change' && f.key.startsWith('pricing.'))
-    .map((f) => `${f.key}=${f.after ?? ''}`)
-    .sort();
-const samePricingIntent = (card: ProductCard, fresh: ProductCard): boolean => {
-  const want = pricingIntent(card);
-  const got = fresh.fields
-    .filter((f) => f.status === 'change')
-    .map((f) => `${f.key}=${f.after ?? ''}`)
-    .sort();
-  return want.length > 0 && want.length === got.length && want.every((x, i) => x === got[i]);
-};
+/** Products one comparison call may be asked for (the server's `product_ids` limit). */
+const PREVIEW_IDS_MAX = 25;
 const shown = (v: string | null) => (v === null || v === '' || v === '__NULL__' ? '—' : v);
 const iqd = (n: number | null | undefined) => (typeof n === 'number' ? n.toLocaleString('en-US') : '—');
 
@@ -174,7 +155,7 @@ export default function DataFileSheet({
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  /** What the apply is doing now, when it is more than one call (a product applied in two steps). */
+  /** How far a comparison has come, when the file takes more than one call to compare. */
   const [note, setNote] = useState<string | null>(null);
   const [confirmLarge, setConfirmLarge] = useState<Record<string, boolean>>({});
   const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({});
@@ -211,34 +192,26 @@ export default function DataFileSheet({
       setPreview(null);
       setOutcomes({});
       try {
-        if (productId) {
-          setPreview(await api.post<Preview>('/api/admin/template/data-preview', { text: next.text, format: next.format, product_id: productId }));
-          return;
+        const base = { text: next.text, format: next.format };
+        // One call compares what one invocation of D1's 1,000 queries can; the server names the
+        // products it left (`pending`, in the file's order) and the next call asks for those.
+        const first = await api.post<Preview>('/api/admin/template/data-preview', productId ? { ...base, product_id: productId } : base);
+        const products = [...first.products];
+        let pending = first.pending ?? [];
+        const total = products.length + pending.length;
+        while (pending.length) {
+          setNote(fill(t(S.comparingProgress), { n: products.length, total }));
+          const more = await api.post<Preview>('/api/admin/template/data-preview', { ...base, product_ids: pending.slice(0, PREVIEW_IDS_MAX) });
+          // The server always answers the first product it is asked for: no answer is a failure, never a loop.
+          if (!more.products.length) throw new Error('comparison made no progress');
+          products.push(...more.products);
+          pending = [...(more.pending ?? []), ...pending.slice(PREVIEW_IDS_MAX)];
         }
-        // The products list: a few products a call (each call is one invocation of D1's budget), in the file's order.
-        const ids = next.format === 'txt' ? fileProductIds(next.text) : [];
-        if (ids.length <= COMPARE_CHUNK) {
-          setPreview(await api.post<Preview>('/api/admin/template/data-preview', { text: next.text, format: next.format }));
-          return;
-        }
-        let first: Preview | null = null;
-        const products: ProductCard[] = [];
-        try {
-          for (let i = 0; i < ids.length; i += COMPARE_CHUNK) {
-            const part = await api.post<Preview>('/api/admin/template/data-preview', { text: next.text, format: next.format, product_ids: ids.slice(i, i + COMPARE_CHUNK) });
-            first ??= part;
-            products.push(...part.products);
-          }
-        } catch (e) {
-          // A block the server does not take as a product (a malformed block): the whole file in one call, as before.
-          if (!(e instanceof ApiError) || e.code !== 'DATA_FILE_WRONG_PRODUCT') throw e;
-          setPreview(await api.post<Preview>('/api/admin/template/data-preview', { text: next.text, format: next.format }));
-          return;
-        }
-        setPreview({ ...first!, products });
+        setPreview({ ...first, products, pending: [] });
       } catch (e) {
         setProblem(e instanceof ApiError ? said(e, e.message) : t(S.compareFailed));
       } finally {
+        setNote(null);
         setChecking(false);
       }
     },
@@ -257,33 +230,10 @@ export default function DataFileSheet({
   const ready = (preview?.products ?? []).filter((p) => p.token && !outcomes[p.product_id]?.ok);
   const blockedByTick = ready.some((p) => p.pricing?.kind === 'price' && p.pricing.large_change && !confirmLarge[p.product_id]);
 
-  /** One apply call: everything, the product part, or the pricing part (each its own fenced batch). */
-  const applyCall = (card: ProductCard, o: { part: 'all' | 'document' | 'pricing'; token: string; hash?: string | null }) =>
-    api.post<ApplyAnswer>('/api/admin/template/data-apply', {
-      text: file!.text,
-      format: file!.format,
-      product_id: card.product_id,
-      token: o.token,
-      ...(o.part === 'all' ? {} : { part: o.part }),
-      ...(o.hash ? { pricing_hash: o.hash } : {}),
-      ...(o.part !== 'document' && card.pricing?.large_change ? { confirm_large_change: confirmLarge[card.product_id] === true } : {}),
-    });
-  /** A fresh comparison of one product of the attached file. */
-  const previewOne = async (id: string): Promise<ProductCard | null> => {
-    const res = await api.post<Preview>('/api/admin/template/data-preview', { text: file!.text, format: file!.format, product_ids: [id] });
-    return res.products[0] ?? null;
-  };
   const sizeNote = (d: SizeDetails | undefined) =>
     d?.needed !== undefined && d.allowance !== undefined ? ` ${fill(t(S.sizeNote), { needed: d.needed, allowance: d.allowance })}` : '';
-  const finished = (r: ApplyAnswer): Outcome => {
-    const missing = r.not_persisted ?? [];
-    return r.already
-      ? { ok: true, text: t(S.alreadyApplied) }
-      : missing.length
-        ? { ok: false, text: fill(t(S.notPersisted), { list: missing.join(', ') }) }
-        : { ok: true, text: fill(t(S.applied), { n: r.applied?.length ?? 0 }) };
-  };
 
+  /** One call per product: ONE batch each — all of that product's changes, or (refused) none of them. */
   const applyAll = async () => {
     if (!file || !preview || applying) return;
     setApplying(true);
@@ -292,59 +242,33 @@ export default function DataFileSheet({
     let total = 0;
     const next: Record<string, Outcome> = { ...outcomes };
     const cards = [...preview.products];
-    const replace = (fresh: ProductCard) => {
-      const at = cards.findIndex((c) => c.product_id === fresh.product_id);
-      if (at >= 0) cards[at] = fresh;
-    };
     for (const card of ready) {
       try {
-        const res = await applyCall(card, { part: 'all', token: card.token!, hash: card.pricing?.preview_hash });
-        total += res.applied?.length ?? 0;
+        const res = await api.post<ApplyAnswer>('/api/admin/template/data-apply', {
+          text: file.text,
+          format: file.format,
+          product_id: card.product_id,
+          token: card.token,
+          ...(card.pricing?.preview_hash ? { pricing_hash: card.pricing.preview_hash } : {}),
+          ...(card.pricing?.large_change ? { confirm_large_change: confirmLarge[card.product_id] === true } : {}),
+        });
+        const n = res.applied?.length ?? 0;
+        total += n;
         applied.push(card.product_id);
-        next[card.product_id] = finished(res);
+        const missing = res.not_persisted ?? [];
+        next[card.product_id] = res.already
+          ? { ok: true, text: t(S.alreadyApplied) }
+          : missing.length
+            ? { ok: false, text: fill(t(S.notPersisted), { list: missing.join(', ') }) }
+            : { ok: true, text: fill(t(S.applied), { n }) };
       } catch (e) {
-        const d = e instanceof ApiError ? (e.details as SizeDetails | undefined) : undefined;
-        const doc = d?.parts?.document;
-        const priced = d?.parts?.pricing;
-        if (e instanceof ApiError && e.code === 'DATA_FILE_TOO_LARGE' && doc?.fits && priced) {
-          // Too many for one batch: the product part first (its own batch), then the pricing part after a fresh comparison.
-          setNote(t(S.applyingInParts));
-          let landed = 0;
-          try {
-            const r1 = await applyCall(card, { part: 'document', token: doc.token });
-            landed = r1.applied?.length ?? 0;
-            applied.push(card.product_id);
-            total += landed;
-            const fresh = await previewOne(card.product_id);
-            if (fresh?.token && fresh.pricing?.kind === 'data' && !fresh.pricing.large_change && samePricingIntent(card, fresh)) {
-              const r2 = await applyCall(fresh, { part: 'all', token: fresh.token, hash: fresh.pricing.preview_hash });
-              total += r2.applied?.length ?? 0;
-              const missing = [...(r1.not_persisted ?? []), ...(r2.not_persisted ?? [])];
-              next[card.product_id] = missing.length
-                ? { ok: false, text: fill(t(S.notPersisted), { list: missing.join(', ') }) }
-                : { ok: true, text: fill(t(S.appliedInParts), { n: landed + (r2.applied?.length ?? 0) }) };
-            } else {
-              // The pricing comparison moved after the product part: the owner reads it and presses Apply again.
-              if (fresh) replace(fresh);
-              next[card.product_id] = { ok: false, partial: true, text: t(S.partStopped) };
-            }
-          } catch (e2) {
-            const fresh2 = e2 instanceof ApiError ? (e2.details?.preview as ProductCard | undefined) : undefined;
-            if (fresh2) replace(fresh2);
-            next[card.product_id] = landed || applied.includes(card.product_id)
-              ? { ok: false, partial: true, text: `${t(S.partStopped)} ${e2 instanceof ApiError ? said(e2, e2.message) : t(S.applyFailed)}` }
-              : { ok: false, text: e2 instanceof ApiError ? said(e2, e2.message) : t(S.applyFailed) };
-          } finally {
-            setNote(null);
-          }
-          continue;
-        }
         const fresh = e instanceof ApiError ? (e.details?.preview as ProductCard | undefined) : undefined;
-        if (fresh) replace(fresh);
-        if (e instanceof ApiError && e.code === 'DATA_FILE_PRODUCT_TOO_LARGE' && priced?.fits) {
-          next[card.product_id] = { ok: false, text: `${said(e, e.message)}${sizeNote(d)}`, pricingOnly: { token: priced.token, hash: card.pricing?.preview_hash ?? null } };
-          continue;
+        if (fresh) {
+          const at = cards.findIndex((c) => c.product_id === card.product_id);
+          if (at >= 0) cards[at] = fresh;
         }
+        // Too large for one batch: nothing was written, and the refusal says which lines to take out.
+        const d = e instanceof ApiError ? (e.details as SizeDetails | undefined) : undefined;
         next[card.product_id] = { ok: false, text: e instanceof ApiError ? `${said(e, e.message)}${sizeNote(d)}` : t(S.applyFailed) };
       }
     }
@@ -354,24 +278,8 @@ export default function DataFileSheet({
     if (applied.length) onApplied(fill(t(S.applied), { n: total }), applied);
   };
 
-  /** «طبّق أسطر التسعير وحدها»: the pricing part of a product whose product part is too large for one batch. */
-  const applyPricingOnly = async (card: ProductCard) => {
-    const only = outcomes[card.product_id]?.pricingOnly;
-    if (!file || !only || applying) return;
-    setApplying(true);
-    try {
-      const res = await applyCall(card, { part: 'pricing', token: only.token, hash: only.hash });
-      setOutcomes((m) => ({ ...m, [card.product_id]: { ok: false, partial: true, text: fill(t(S.pricingOnlyApplied), { n: res.applied?.length ?? 0 }) } }));
-      onApplied(fill(t(S.applied), { n: res.applied?.length ?? 0 }), [card.product_id]);
-    } catch (e) {
-      setOutcomes((m) => ({ ...m, [card.product_id]: { ok: false, text: e instanceof ApiError ? said(e, e.message) : t(S.applyFailed) } }));
-    } finally {
-      setApplying(false);
-    }
-  };
-
   /** «item · field», in the reader's language (never the raw key: that stays in the grey caption). */
-  const titleOf = (card: ProductCard) => (key: string, item: { group: string; id: string } | null) => rowTitle(key, item, card.labels, lang);
+  const titleOf = (card: ProductCard) => (key: string, item: { group: string; id: string } | null, nkey?: string) => rowTitle(key, item, card.labels, lang, nkey);
   const reason = (f: FieldLine): string => {
     const base = f.message === 'NEW_IMAGE' ? DATA_FILE_STATUS.NEW_IMAGE : DATA_FILE_STATUS[f.status];
     const head = base ? t(base) : f.status;
@@ -523,8 +431,6 @@ export default function DataFileSheet({
                 title={titleOf(card)}
                 reason={reason}
                 outcome={outcomes[card.product_id]}
-                busy={applying}
-                onPricingOnly={() => void applyPricingOnly(card)}
                 confirmed={confirmLarge[card.product_id] === true}
                 onConfirm={(v) => setConfirmLarge((m) => ({ ...m, [card.product_id]: v }))}
                 errorText={card.error ? contractRefusal({ code: card.error.code, message: card.error.message }, rl) : null}
@@ -545,8 +451,6 @@ function ProductBlock({
   title,
   reason,
   outcome,
-  busy,
-  onPricingOnly,
   confirmed,
   onConfirm,
   errorText,
@@ -555,11 +459,9 @@ function ProductBlock({
   bulk: boolean;
   lang: string;
   t: (x: Tri) => string;
-  title: (key: string, item: { group: string; id: string } | null) => string;
+  title: (key: string, item: { group: string; id: string } | null, nkey?: string) => string;
   reason: (f: FieldLine) => string;
   outcome: Outcome | undefined;
-  busy: boolean;
-  onPricingOnly: () => void;
   confirmed: boolean;
   onConfirm: (v: boolean) => void;
   errorText: string | null;
@@ -598,12 +500,13 @@ function ProductBlock({
           <h5 className="text-[11px] font-bold text-text-secondary">{sectionName(section)}</h5>
           {list.map((f) => (
             <div key={f.key} className="lv-well rounded-md px-2 py-1.5 min-w-0" data-data-file-change={f.key}>
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className="text-[12px] font-bold text-text-primary truncate min-w-0 flex-1">{title(f.key, f.item)}</span>
-                <span className="text-[10px] text-text-muted truncate" dir="ltr">
-                  {f.key} · {t(S.line)} {f.line}
-                </span>
-              </div>
+              {/* The title wraps (a phone shows the whole «item · field»); the raw key is the caption under it. */}
+              <p className="text-[12px] font-bold text-text-primary break-words min-w-0" data-data-file-title>
+                {title(f.key, f.item, f.nkey)}
+              </p>
+              <p className="text-[10px] text-text-muted truncate min-w-0" dir="ltr">
+                {f.key} · {t(S.line)} {f.line}
+              </p>
               <p className="text-[11px] text-text-muted whitespace-pre-wrap break-words" dir="auto">
                 {t(S.before)}: {shown(f.before)}
               </p>
@@ -619,12 +522,16 @@ function ProductBlock({
         <div className="space-y-1.5 min-w-0">
           {refused.map((f) => (
             <div key={`r-${f.key}-${f.line}`} className="lv-alert lv-alert-danger px-2 py-1.5 min-w-0" data-data-file-refused={f.status}>
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
-                <span className="text-[12px] font-bold text-red-300 truncate min-w-0 flex-1">{title(f.key, f.item)}</span>
-                <span className="text-[10px] text-text-muted truncate" dir="ltr">
-                  {f.key} · {t(S.line)} {f.line}
-                </span>
+              <div className="flex items-start gap-2 min-w-0">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-bold text-red-300 break-words" data-data-file-title>
+                    {title(f.key, f.item, f.nkey)}
+                  </p>
+                  <p className="text-[10px] text-text-muted truncate" dir="ltr">
+                    {f.key} · {t(S.line)} {f.line}
+                  </p>
+                </div>
               </div>
               <p className="text-[11px] text-red-300 break-words">{reason(f)}</p>
               {(f.before !== null || f.after !== null) && (
@@ -643,7 +550,7 @@ function ProductBlock({
           <ul className="mt-1 space-y-0.5 text-[11px] text-amber-200/80">
             {card.derived.map((d) => (
               <li key={d.key} className="break-words" dir="auto">
-                {title(d.key, itemOfNkey(d.nkey ?? ''))}: {shown(d.before)} → {shown(d.after)}{' '}
+                {title(d.key, itemOfNkey(d.nkey ?? ''), d.nkey)}: {shown(d.before)} → {shown(d.after)}{' '}
                 <span className="text-[10px] text-text-muted" dir="ltr">
                   {d.key}
                 </span>
@@ -659,7 +566,7 @@ function ProductBlock({
           <ul className="mt-1 space-y-0.5 text-[11px] text-text-muted">
             {stale.map((f) => (
               <li key={f.key} className="break-words" dir="auto">
-                {title(f.key, f.item)} — {reason(f)}{' '}
+                {title(f.key, f.item, f.nkey)} — {reason(f)}{' '}
                 <span className="text-[10px] text-text-muted" dir="ltr">
                   {f.key} · {t(S.line)} {f.line}
                 </span>
@@ -722,15 +629,10 @@ function ProductBlock({
       )}
 
       {outcome && (
-        <p className={`text-[12px] ${outcome.ok ? 'text-emerald-300' : outcome.partial ? 'text-amber-300' : 'text-red-400'}`} role="status">
+        <p className={`text-[12px] ${outcome.ok ? 'text-emerald-300' : 'text-red-400'}`} role="status">
           {outcome.ok ? `${t(S.resultApplied)} — ` : ''}
           {outcome.text}
         </p>
-      )}
-      {outcome?.pricingOnly && (
-        <button type="button" className={btnGhost} disabled={busy} onClick={onPricingOnly} data-data-file-pricing-only>
-          <Check className="w-4 h-4" /> {t(S.applyPricingOnly)}
-        </button>
       )}
       {!outcome && !card.token && !card.error && changes.length === 0 && refused.length > 0 && (
         <p className="text-[11px] text-text-muted">{t(S.resultNothing)}</p>

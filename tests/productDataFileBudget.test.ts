@@ -8,9 +8,10 @@
  *     allowance = 1000 − 50 (reserve) − 60 (after the batch) − spent
  *
  * where `spent` is every query the handler ran before the batch (worker/lib/
- * d1Count.ts `countingD1`). Past it, the refusal names the two parts — the
- * product part and the owner's pricing part — each with its own token, and the
- * sheet applies them as two fenced, idempotent, audited batches.
+ * d1Count.ts `scopedCountingD1`, this request's own). Past it, NOTHING is
+ * written: one product's changes go in one batch or not at all, and the
+ * refusal (counts only, no token) says which lines to take out so the file is
+ * applied in two goes — each its own comparison and its own atomic apply.
  *
  * The real router runs on a census binding that counts every query of the
  * invocation, the completeness hook after the response included
@@ -20,17 +21,19 @@
  * five shipping fields and both rules on every scope.
  *
  *   (a) the arithmetic is pinned to the census;
- *   (b) E at once is refused DATA_FILE_TOO_LARGE with both parts, nothing written;
+ *   (b) E at once is refused DATA_FILE_TOO_LARGE (each half would fit alone),
+ *       counts only, nothing written — and a `part` field writes nothing either;
  *   (c) the largest pricing file the allowance admits applies at its edge,
  *       the whole invocation ≤ 952 queries, the after-phase ≤ 60;
- *   (d) the split end to end: the product part, a fresh comparison of that
- *       product alone, the pricing part — every line of E written, audited;
- *   (e) every token replays as `already`, the whole's token never lands after a part;
- *   (f) a save between the refusal and a part, and an input changed between the
- *       fresh comparison and the pricing part, refuse it (DATA_FILE_CHANGED);
- *   (g) a 400-combination product (the planner's most): the product part alone
- *       is too large — DATA_FILE_PRODUCT_TOO_LARGE, and the pricing part applies on its own;
- *   (h) a non-owner never sees a pricing part or its token.
+ *   (d) the refusal's advice end to end: E without its pricing lines (one
+ *       batch), then E again (one batch) — every line of E written, audited;
+ *   (e) every token replays as `already`; E's first token never lands after;
+ *   (f) a save between a comparison and its apply, and an input changed through
+ *       the form's door, refuse the apply (DATA_FILE_CHANGED), nothing written;
+ *   (g) a 400-combination product (the planner's most): the product lines alone
+ *       are too large — DATA_FILE_PRODUCT_TOO_LARGE, nothing written; without
+ *       its options/colors/variants/images lines the file applies in one go;
+ *   (h) a non-owner's refusal names no pricing part.
  *
  * Heavy (≈ minutes): run it on its own. DATAFILE_BUDGET_OUT=<path> writes the measurements.
  */
@@ -135,7 +138,7 @@ interface Parts {
   needed: number;
   allowance: number;
   spent: number;
-  parts: { document?: { token: string; statements: number; fits: boolean }; pricing?: { token: string; statements: number; fits: boolean } };
+  parts: { document?: { statements: number; fits: boolean }; pricing?: { statements: number; fits: boolean } };
 }
 
 /** One apply on a fresh counted binding: the answer, its census, its time. */
@@ -144,7 +147,7 @@ async function applyCounted(raw: DatabaseSync, body: Record<string, unknown>, us
   const t0 = performance.now();
   const res = await post(ap.app, '/api/admin/template/data-apply', body);
   const ms = Math.round(performance.now() - t0);
-  const json = (await res.json()) as Record<string, unknown> & { code?: string; details?: Parts; applied?: string[]; not_persisted?: string[]; already?: boolean; part?: string };
+  const json = (await res.json()) as Record<string, unknown> & { code?: string; details?: Parts; applied?: string[]; not_persisted?: string[]; already?: boolean };
   return { status: res.status, body: json, census: ap.d1.census, ms };
 }
 
@@ -170,6 +173,14 @@ const counts = (raw: DatabaseSync, id: string) => ({
 const num = (v: string | null | undefined) => (v !== null && v !== undefined && /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v ?? null);
 const lineValue = (text: string, key: string): string | null => new RegExp(`^${key.replace(/\./g, '\\.')}=(.*)$`, 'm').exec(text)?.[1] ?? null;
 const unwritten = (text: string, edits: Map<string, string>) => [...edits].filter(([k, v]) => num(lineValue(text, k)) !== num(v)).map(([k, v]) => `${k}: ${lineValue(text, k)} ≠ ${v}`);
+const dropLines = (text: string, drop: (key: string) => boolean) =>
+  text
+    .split('\n')
+    .filter((l) => {
+      const eq = l.indexOf('=');
+      return eq < 0 || !drop(l.slice(0, eq));
+    })
+    .join('\n');
 const changeRows = (p: PreviewProduct, pricingOnly: boolean) =>
   p.fields
     .filter((f) => f.status === 'change' && (!pricingOnly || f.key.startsWith('pricing.')))
@@ -178,7 +189,7 @@ const changeRows = (p: PreviewProduct, pricingOnly: boolean) =>
 
 // ------------------------------------------------------------------ (a) (b)
 
-test('(a)(b) E at once: DATA_FILE_TOO_LARGE with both parts, the product part fits, nothing written — and `spent` is the census', async () => {
+test('(a)(b) E at once: DATA_FILE_TOO_LARGE, each half fits alone, counts only, nothing written — and `spent` is the census', async () => {
   const e = await edgeWorld({ seedRules: false });
   assert.equal(e.skus.length, 240);
   assert.equal(scopePrefixes(e.text).length, 275, 'the owner file lists every scope');
@@ -201,16 +212,19 @@ test('(a)(b) E at once: DATA_FILE_TOO_LARGE with both parts, the product part fi
   assert.equal(built.sent, false);
   assert.equal(built.recs.length, d.needed, 'needed = the statements the refused batch held');
   assert.ok(d.needed > d.allowance);
-  // (b) both parts, each with its own token; the product part fits on its own.
+  // (b) the product lines and the pricing lines would each fit alone: the advice is the two-file one.
   assert.ok(d.parts.document?.fits, JSON.stringify(d));
-  assert.ok(d.parts.pricing, JSON.stringify(d));
-  assert.match(d.parts.document!.token, /^[0-9a-f]{32}$/);
-  assert.match(d.parts.pricing!.token, /^[0-9a-f]{32}$/);
-  assert.notEqual(d.parts.document!.token, p.token);
-  assert.notEqual(d.parts.pricing!.token, p.token);
-  assert.equal(d.parts.document!.statements + d.parts.pricing!.statements, d.needed + 3, 'the fence and the trail ride in both parts');
-  // Counts and hashes only: no value travels in the refusal.
-  assert.doesNotMatch(JSON.stringify(r.body), /CHINA_SEA|0\.006|Model 1 \(renamed\)/);
+  assert.ok(d.parts.pricing?.fits, JSON.stringify(d));
+  assert.equal(d.parts.document!.statements + d.parts.pricing!.statements, d.needed + 3, 'the fence and the trail ride in either half');
+  // Counts only: no value, no token travels in the refusal.
+  assert.doesNotMatch(JSON.stringify(r.body), /CHINA_SEA|0\.006|Model 1 \(renamed\)|"token"/);
+  assert.deepEqual(counts(e.raw, e.id), before, 'nothing written');
+  // A `part` field is not read: the same token asks for the whole again, and nothing is written.
+  for (const part of ['document', 'pricing']) {
+    const again = await applyCounted(e.raw, { text, product_id: e.id, token: p.token, part, ...hashOf(p) });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.code, 'DATA_FILE_TOO_LARGE');
+  }
   assert.deepEqual(counts(e.raw, e.id), before, 'nothing written');
   MEASURED.E_all = { needed: d.needed, allowance: d.allowance, spent: d.spent, document: d.parts.document!.statements, pricing: d.parts.pricing!.statements, preview_changes: p.counts.changes, ms: r.ms };
 });
@@ -273,54 +287,48 @@ test('(c) the largest pricing file the allowance admits: one batch at its edge, 
 
 // ------------------------------------------------------------------ (d) (e)
 
-test('(d)(e) the split end to end on E: the product part, a fresh comparison, the pricing part — every line written, audited, each token replayable once', async () => {
+test('(d)(e) the refusal\'s advice on E: without its pricing lines, then E again — two atomic applies, every line written, audited, each token replayable once', async () => {
   const e = await edgeWorld({ seedRules: false });
   const { text, edits } = fileE(e, { rename: true });
   const p = await previewOf(e.raw, text, e.id);
   const refused = await applyCounted(e.raw, { text, product_id: e.id, token: p.token, ...hashOf(p) });
   assert.equal(refused.body.code, 'DATA_FILE_TOO_LARGE');
-  const d = refused.body.details!;
   const start = counts(e.raw, e.id);
 
-  // 1. The product part, its own batch.
-  const r1 = await applyCounted(e.raw, { text, product_id: e.id, token: d.parts.document!.token, part: 'document' });
+  // 1. «delete the pricing lines (those starting with pricing.) from the file, attach it and apply it».
+  const noPricing = dropLines(text, (k) => k.startsWith('pricing.'));
+  const p1 = await previewOf(e.raw, noPricing, e.id);
+  assert.deepEqual(changeRows(p1, false), ['options.1.name_en=Model 1 (renamed)']);
+  const r1 = await applyCounted(e.raw, { text: noPricing, product_id: e.id, token: p1.token, ...hashOf(p1) });
   assert.equal(r1.status, 200, JSON.stringify(r1.body).slice(0, 300));
-  assert.equal(r1.body.part, 'document');
   assert.deepEqual(r1.body.applied, ['options.1.name_en'], 'only the product lines');
   assert.deepEqual(r1.body.not_persisted, []);
   const afterDoc = counts(e.raw, e.id);
-  assert.equal(afterDoc.pricing_audit, start.pricing_audit, 'no pricing row in the product part');
+  assert.equal(afterDoc.pricing_audit, start.pricing_audit, 'no pricing row in the first apply');
   assert.equal(afterDoc.inputs_sum, start.inputs_sum);
   assert.equal(afterDoc.applied, start.applied + 1);
 
-  // (e) the product part's token replays as already; the whole's token never lands after a part.
-  const replay1 = await applyCounted(e.raw, { text, product_id: e.id, token: d.parts.document!.token, part: 'document' });
+  // (e) the first apply's token replays as already; E's own token never lands after it.
+  const replay1 = await applyCounted(e.raw, { text: noPricing, product_id: e.id, token: p1.token, ...hashOf(p1) });
   assert.equal(replay1.status, 200);
   assert.equal(replay1.body.already, true);
   const stale = await applyCounted(e.raw, { text, product_id: e.id, token: p.token, ...hashOf(p) });
   assert.equal(stale.status, 409);
   assert.equal(stale.body.code, 'DATA_FILE_CHANGED');
-  // A part token is never the other part's.
-  const crossed = await applyCounted(e.raw, { text, product_id: e.id, token: d.parts.document!.token, part: 'pricing' });
-  assert.equal(crossed.status, 200, 'the document token replays as already whatever part it names');
-  assert.equal(crossed.body.already, true);
   assert.deepEqual(counts(e.raw, e.id), afterDoc, 'replays write nothing');
 
-  // 2. A fresh comparison of this product alone (the sheet's `product_ids`): exactly the pricing lines the owner read.
-  const pv = await post(coldApp(e.raw).app, '/api/admin/template/data-preview', { text, product_ids: [e.id] });
-  const fresh = ((await pv.json()) as { products: PreviewProduct[] }).products[0];
-  assert.deepEqual(changeRows(fresh, false), changeRows(p, true), 'the second step writes exactly the pricing lines the owner read');
-  assert.equal(fresh.pricing?.kind, 'data');
-  assert.equal(fresh.pricing?.large_change, false);
-
-  // 3. The pricing part: one batch.
-  const r2 = await applyCounted(e.raw, { text, product_id: e.id, token: fresh.token, ...hashOf(fresh) });
+  // 2. «then attach the original file again»: exactly the pricing lines the owner read, as data.
+  const p2 = await previewOf(e.raw, text, e.id);
+  assert.deepEqual(changeRows(p2, false), changeRows(p, true), 'the second comparison writes exactly the pricing lines of the first');
+  assert.equal(p2.pricing?.kind, 'data');
+  assert.equal(p2.pricing?.large_change, false);
+  const r2 = await applyCounted(e.raw, { text, product_id: e.id, token: p2.token, ...hashOf(p2) });
   assert.equal(r2.status, 200, JSON.stringify(r2.body).slice(0, 300));
   assert.equal(r2.body.applied!.length, 275 * 7);
   const inv2 = readInvocation(r2.census, 200, null, true);
-  assert.equal(inv2.write!.reconstructed, false);
+  assert.equal(inv2.write!.reconstructed, false, 'one real batch');
   assert.ok(inv2.totalQueries <= 952, `${inv2.totalQueries}`);
-  const replay2 = await applyCounted(e.raw, { text, product_id: e.id, token: fresh.token, ...hashOf(fresh) });
+  const replay2 = await applyCounted(e.raw, { text, product_id: e.id, token: p2.token, ...hashOf(p2) });
   assert.equal(replay2.body.already, true);
 
   // Every line of E reads as written.
@@ -334,44 +342,43 @@ test('(d)(e) the split end to end on E: the product part, a fresh comparison, th
     .get(e.id, `sku:${e.skus[0]}`) as { b: string; a: string };
   assert.equal(JSON.parse(sku.b).shipping_weight_g, 900, 'the stored row before');
   assert.equal(JSON.parse(sku.a).manual_cbm, '0.006', 'the row after');
-  // audit_log: two applies, the first the product part; never a value.
+  // audit_log: two applies, neither naming a part; never a value.
   const trail = e.raw.prepare("SELECT detail FROM audit_log WHERE action = 'product.data_file.applied' AND target = ? ORDER BY rowid").all(e.id) as Array<{ detail: string }>;
   assert.equal(trail.length, 2);
-  assert.equal(JSON.parse(trail[0].detail).part, 'document');
-  assert.equal(JSON.parse(trail[1].detail).part, undefined);
-  for (const t of trail) assert.doesNotMatch(t.detail.replace(/"token":"[0-9a-f]+"/, ''), /CHINA_SEA|0\.006|"value"|1010|5000/);
-  MEASURED.split = { document_batch: readInvocation(r1.census, 200, null, true).write?.size, pricing_batch: inv2.write!.size, pricing_total: inv2.totalQueries, ms: [r1.ms, r2.ms] };
+  for (const t of trail) {
+    assert.equal(JSON.parse(t.detail).part, undefined);
+    assert.doesNotMatch(t.detail.replace(/"token":"[0-9a-f]+"/, ''), /CHINA_SEA|0\.006|"value"|1010|5000/);
+  }
+  MEASURED.advice = { first_batch: readInvocation(r1.census, 200, null, true).write?.size, second_batch: inv2.write!.size, second_total: inv2.totalQueries, ms: [r1.ms, r2.ms] };
 });
 
 // ------------------------------------------------------------------ (f)
 
-test('(f) the fences: a save after the refusal refuses the part; an input changed after the fresh comparison refuses the pricing part', async () => {
+test('(f) the fences: a save between a comparison and its apply refuses it; so does an input changed through the form\'s door', async () => {
   const e = await edgeWorld({ seedRules: false });
   const { text } = fileE(e, { rename: true });
-  const p = await previewOf(e.raw, text, e.id);
-  const d = (await applyCounted(e.raw, { text, product_id: e.id, token: p.token, ...hashOf(p) })).body.details!;
+  const noPricing = dropLines(text, (k) => k.startsWith('pricing.'));
+  const p1 = await previewOf(e.raw, noPricing, e.id);
 
   // A save of the product in between (a small file through the same door).
   const small = setLines(e.text, new Map([['name_ar', 'طقم الحافة']]));
   const ps = await previewOf(e.raw, small, e.id);
   assert.equal((await applyCounted(e.raw, { text: small, product_id: e.id, token: ps.token })).status, 200);
   const saved = counts(e.raw, e.id);
-  const late = await applyCounted(e.raw, { text, product_id: e.id, token: d.parts.document!.token, part: 'document' });
+  const late = await applyCounted(e.raw, { text: noPricing, product_id: e.id, token: p1.token, ...hashOf(p1) });
   assert.equal(late.status, 409);
   assert.equal(late.body.code, 'DATA_FILE_CHANGED');
   assert.deepEqual(counts(e.raw, e.id), saved, 'nothing written');
 
-  // From the start again: the product part, a fresh comparison — then an input changes through the form's door.
-  const p2 = await previewOf(e.raw, text, e.id);
-  const d2 = (await applyCounted(e.raw, { text, product_id: e.id, token: p2.token, ...hashOf(p2) })).body.details!;
-  assert.equal((await applyCounted(e.raw, { text, product_id: e.id, token: d2.parts.document!.token, part: 'document' })).status, 200);
-  const pv = await post(coldApp(e.raw).app, '/api/admin/template/data-preview', { text, product_ids: [e.id] });
-  const fresh = ((await pv.json()) as { products: PreviewProduct[] }).products[0];
+  // The pricing lines alone, compared — then an input changes through the form's door before the apply.
+  const { text: pricingOnly } = fileE(e, { rename: false });
+  const p2 = await previewOf(e.raw, pricingOnly, e.id);
+  assert.ok(p2.token);
   const seq = (e.raw.prepare('SELECT inputs_seq FROM product_pricing_state WHERE product_id = ?').get(e.id) as { inputs_seq: number } | undefined)?.inputs_seq ?? 0;
   const form = await put(e.pricingApp, `/api/admin/pricing/products/${e.id}/inputs`, { inputs_seq: seq, inputs: [{ scope: 'sku', scope_id: e.skus[0], shipping_weight_g: 777 }] });
   assert.equal(form.status, 200, await form.clone().text());
   const between = counts(e.raw, e.id);
-  const r2 = await applyCounted(e.raw, { text, product_id: e.id, token: fresh.token, ...hashOf(fresh) });
+  const r2 = await applyCounted(e.raw, { text: pricingOnly, product_id: e.id, token: p2.token, ...hashOf(p2) });
   assert.equal(r2.status, 409);
   assert.equal(r2.body.code, 'DATA_FILE_CHANGED');
   assert.deepEqual(counts(e.raw, e.id), between, 'nothing written');
@@ -387,7 +394,7 @@ test('(f) the fences: a save after the refusal refuses the part; an input change
  */
 const widest = () => edgeWorld({ seedRules: false, seedSkus: false, opts: 200, cols: 2 });
 
-test('(g) a 400-combination product: a model renamed with shipping lines — the product part alone is too large, the pricing part applies on its own', async () => {
+test('(g) a 400-combination product: a model renamed with shipping lines — the product lines alone are too large, nothing written; without them the file applies in one go', async () => {
   const e = await widest();
   const edits = new Map([...fillPricing(e.text, SHIPPING5), ['options.1.name_en', 'Model one renamed']]);
   const text = setLines(e.text, edits);
@@ -400,23 +407,28 @@ test('(g) a 400-combination product: a model renamed with shipping lines — the
   const d = r.body.details!;
   assert.ok(d.parts.document && !d.parts.document.fits, JSON.stringify(d));
   assert.ok(d.parts.pricing?.fits, JSON.stringify(d));
+  assert.doesNotMatch(JSON.stringify(r.body), /"token"/);
   assert.deepEqual(counts(e.raw, e.id), before, 'nothing written');
-  // «طبّق أسطر التسعير وحدها»: the pricing part, its own batch; the product row untouched; no product line reported.
-  const r2 = await applyCounted(e.raw, { text, product_id: e.id, token: d.parts.pricing!.token, part: 'pricing', ...hashOf(p) });
+  // The advice: «delete the options, colors, variants and images lines from the file, then attach it again».
+  const rest = dropLines(text, (k) => /^(options|colors|variants|images)\./.test(k));
+  const p2 = await previewOf(e.raw, rest, e.id);
+  assert.ok(p2.fields.filter((f) => f.status === 'change').every((f) => f.key.startsWith('pricing.')), 'only the pricing lines are left to apply');
+  const r2 = await applyCounted(e.raw, { text: rest, product_id: e.id, token: p2.token, ...hashOf(p2) });
   assert.equal(r2.status, 200, JSON.stringify(r2.body).slice(0, 300));
-  assert.equal(r2.body.part, 'pricing');
   assert.deepEqual(r2.body.not_persisted, []);
   assert.ok(r2.body.applied!.every((k) => k.startsWith('pricing.')));
+  assert.equal(readInvocation(r2.census, 200, null, true).write!.reconstructed, false, 'one real batch');
   const after = counts(e.raw, e.id);
   assert.equal(after.updated_at, before.updated_at, 'the product row is unchanged');
   assert.ok(after.pricing_audit > before.pricing_audit);
   const now = await (await get(coldApp(e.raw).app, `/api/admin/template/data-export/${e.id}`)).text();
   assert.equal(lineValue(now, 'options.1.name_en'), 'Model 1', 'the model stays as stored');
+  assert.equal([...now.matchAll(/^options\.\d+\.id=/gm)].length, 200, 'no model removed by the deleted lines');
   assert.deepEqual(unwritten(now, new Map([...edits].filter(([k]) => k.startsWith('pricing.')))), [], 'every pricing line written');
-  MEASURED.widest = { needed: d.needed, allowance: d.allowance, spent: d.spent, document: d.parts.document!.statements, pricing: d.parts.pricing!.statements, pricing_part_batch: readInvocation(r2.census, 200, null, true).write?.size };
+  MEASURED.widest = { needed: d.needed, allowance: d.allowance, spent: d.spent, document: d.parts.document!.statements, pricing: d.parts.pricing!.statements, pricing_batch: readInvocation(r2.census, 200, null, true).write?.size };
 });
 
-test('(h) a non-owner: the same refusal carries no pricing part and no pricing token; the staff file has no pricing block', async () => {
+test('(h) a non-owner: the same refusal names no pricing part; the staff file has no pricing block', async () => {
   const e = await widest();
   const staffText = await (await get(coldApp(e.raw, ASSISTANT).app, `/api/admin/template/data-export/${e.id}`)).text();
   assert.doesNotMatch(staffText, /^pricing\./m, 'the staff file has no pricing block');
@@ -428,5 +440,5 @@ test('(h) a non-owner: the same refusal carries no pricing part and no pricing t
   assert.equal(r.status, 409, JSON.stringify(r.body).slice(0, 300));
   assert.equal(r.body.code, 'DATA_FILE_PRODUCT_TOO_LARGE');
   assert.equal(r.body.details!.parts.pricing, undefined);
-  assert.doesNotMatch(JSON.stringify(r.body.details), /pricing"?:\{/);
+  assert.doesNotMatch(JSON.stringify(r.body.details), /pricing"?:\{|"token"/);
 });

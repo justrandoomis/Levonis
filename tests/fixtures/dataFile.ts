@@ -157,6 +157,8 @@ export async function download(app: App, productId: string): Promise<string> {
 
 export interface PreviewField {
   key: string;
+  /** The comparison's own key for the line (items by id: `options[opt_x].preorder.transports[air].…`). */
+  nkey?: string;
   status: string;
   before: string | null;
   after: string | null;

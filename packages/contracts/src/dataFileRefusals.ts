@@ -62,23 +62,33 @@ export const DATA_FILE_REFUSALS = {
     en: 'The product changed after the comparison — review the new comparison, then apply.',
     ckb: 'بەرهەمەکە دوای بەراوردکردن گۆڕا — بەراوردی نوێ ببینە و پاشان جێبەجێی بکە.',
   },
-  // The changes do not fit D1's one-invocation budget as ONE batch, but the
-  // product part and the pricing part each do: the sheet applies them as two
-  // fenced batches on its own (worker/routes/templateDataFile.ts, row 207).
+  // One product's changes go in ONE batch or not at all (docs/DECISIONS.md row 207):
+  // past what D1's 1,000 queries per invocation leave, nothing is written and the
+  // refusal says which lines to take out, so the file is applied in two goes —
+  // each its own comparison and its own atomic apply.
+  // Too large together, though the product lines and the pricing lines each fit alone.
   DATA_FILE_TOO_LARGE: {
-    ar: 'التعديلات أكبر من أن تُحفظ دفعة واحدة — تُطبَّق على دفعتين: تغييرات المنتج أولاً، ثم بيانات التسعير بعد مقارنة جديدة.',
-    en: 'The changes are too many to save in one go — they are applied in two steps: the product changes first, then the pricing data after a fresh comparison.',
-    ckb: 'گۆڕانکارییەکان زۆرن بۆ ئەوەی بە یەکجار پاشەکەوت بکرێن — بە دوو هەنگاو جێبەجێ دەکرێن: سەرەتا گۆڕانکارییەکانی بەرهەم، پاشان زانیاریی نرخدانان دوای بەراوردێکی نوێ.',
+    ar: 'لم يُطبَّق شيء: تعديلات هذا المنتج أكبر من أن تُحفظ دفعة واحدة. طبّقها على مرتين: احذف من الملف أسطر التسعير (التي تبدأ بـ pricing.) ثم أرفقه وطبّقه، ثم أرفق الملف الأصلي مرة أخرى: ما طُبّق يظهر بلا تغيير وتُطبَّق أسطر التسعير.',
+    en: "Nothing was applied: this product's changes are too many to save in one go. Apply them in two goes: delete the pricing lines (those starting with pricing.) from the file, attach it and apply it, then attach the original file again: what was applied reads as unchanged and the pricing lines are applied.",
+    ckb: 'هیچ شتێک جێبەجێ نەکرا: گۆڕانکارییەکانی ئەم بەرهەمە زۆرن بۆ ئەوەی بە یەکجار پاشەکەوت بکرێن. بە دوو جار جێبەجێیان بکە: هێڵەکانی نرخدانان (ئەوانەی بە pricing. دەست پێدەکەن) لە فایلەکە بسڕەوە، پاشان هاوپێچی بکە و جێبەجێی بکە، دواتر فایلە ڕەسەنەکە دووبارە هاوپێچ بکە: ئەوەی جێبەجێ کراوە بێ گۆڕان دەردەکەوێت و هێڵەکانی نرخدانان جێبەجێ دەکرێن.',
   },
+  // The product lines alone are too large (a relation rewrite of hundreds of combinations).
   DATA_FILE_PRODUCT_TOO_LARGE: {
-    ar: 'أسطر الموديلات والألوان والتركيبات والصور تعيد كتابة كل صفوف هذا المنتج، وهذا أكبر من أن يُحفظ دفعة واحدة. إن كان في الملف أسطر تسعير فطبّقها وحدها الآن، ثم احذف أسطر options وcolors وvariants وimages من الملف وأرفقه مرة أخرى لتطبيق باقي أسطر المنتج.',
-    en: 'Model, colour, combination and picture lines rewrite every row of this product, and that is too large to save in one go. If the file has pricing lines, apply them on their own now; then delete the options, colors, variants and images lines from the file and attach it again to apply the rest of the product lines.',
-    ckb: 'هێڵەکانی مۆدێل و ڕەنگ و تێکەڵە و وێنە هەموو ڕیزەکانی ئەم بەرهەمە دووبارە دەنووسنەوە، ئەمەش گەورەترە لەوەی بە یەکجار پاشەکەوت بکرێت. ئەگەر فایلەکە هێڵی نرخدانانی تێدایە، ئێستا تەنها ئەوان جێبەجێ بکە؛ پاشان هێڵەکانی options و colors و variants و images لە فایلەکە بسڕەوە و دووبارە هاوپێچی بکە بۆ جێبەجێکردنی هێڵەکانی تری بەرهەم.',
+    ar: 'لم يُطبَّق شيء: أسطر الموديلات والألوان والتركيبات والصور تعيد كتابة كل صفوف هذا المنتج، وهذا أكبر من أن يُحفظ دفعة واحدة. احذف من الملف أسطر options وcolors وvariants وimages ثم أرفقه مرة أخرى لتطبيق باقي أسطره.',
+    en: 'Nothing was applied: model, colour, combination and picture lines rewrite every row of this product, and that is too large to save in one go. Delete the options, colors, variants and images lines from the file, then attach it again to apply the rest of its lines.',
+    ckb: 'هیچ شتێک جێبەجێ نەکرا: هێڵەکانی مۆدێل و ڕەنگ و تێکەڵە و وێنە هەموو ڕیزەکانی ئەم بەرهەمە دووبارە دەنووسنەوە، ئەمەش گەورەترە لەوەی بە یەکجار پاشەکەوت بکرێت. هێڵەکانی options و colors و variants و images لە فایلەکە بسڕەوە، پاشان دووبارە هاوپێچی بکە بۆ جێبەجێکردنی هێڵەکانی تری.',
   },
+  // The pricing lines alone are too large (hundreds of stored pricing rows rewritten).
   DATA_FILE_PRICING_TOO_LARGE: {
-    ar: 'أسطر التسعير لهذا المنتج أكثر من أن تُحفظ دفعة واحدة. احذف من الملف نحو نصف كتل التسعير (ابدأ بكتل pricing.skus) وطبّق الباقي، ثم أرفق الملف الأصلي مرة أخرى: ما طُبّق يظهر بلا تغيير ويُطبَّق الباقي.',
-    en: "This product's pricing lines are too many to save in one go. Delete about half of the pricing blocks from the file (start with the pricing.skus blocks) and apply the rest, then attach the original file again: what was applied reads as unchanged and the rest is applied.",
-    ckb: 'هێڵەکانی نرخدانانی ئەم بەرهەمە زۆرن بۆ ئەوەی بە یەکجار پاشەکەوت بکرێن. نزیکەی نیوەی بلۆکەکانی نرخدانان لە فایلەکە بسڕەوە (لە بلۆکەکانی pricing.skus دەست پێبکە) و ئەوانی تر جێبەجێ بکە، پاشان فایلە ڕەسەنەکە دووبارە هاوپێچ بکە: ئەوەی جێبەجێ کراوە بێ گۆڕان دەردەکەوێت و ئەوانی تر جێبەجێ دەکرێن.',
+    ar: 'لم يُطبَّق شيء: أسطر التسعير لهذا المنتج أكثر من أن تُحفظ دفعة واحدة. احذف من الملف نحو نصف كتل التسعير (ابدأ بكتل pricing.skus) وطبّق الباقي، ثم أرفق الملف الأصلي مرة أخرى: ما طُبّق يظهر بلا تغيير ويُطبَّق الباقي.',
+    en: "Nothing was applied: this product's pricing lines are too many to save in one go. Delete about half of the pricing blocks from the file (start with the pricing.skus blocks) and apply the rest, then attach the original file again: what was applied reads as unchanged and the rest is applied.",
+    ckb: 'هیچ شتێک جێبەجێ نەکرا: هێڵەکانی نرخدانانی ئەم بەرهەمە زۆرن بۆ ئەوەی بە یەکجار پاشەکەوت بکرێن. نزیکەی نیوەی بلۆکەکانی نرخدانان لە فایلەکە بسڕەوە (لە بلۆکەکانی pricing.skus دەست پێبکە) و ئەوانی تر جێبەجێ بکە، پاشان فایلە ڕەسەنەکە دووبارە هاوپێچ بکە: ئەوەی جێبەجێ کراوە بێ گۆڕان دەردەکەوێت و ئەوانی تر جێبەجێ دەکرێن.',
+  },
+  // One product whose comparison alone needs more than one request's share of D1's 1,000 queries.
+  DATA_FILE_COMPARE_TOO_LARGE: {
+    ar: 'هذا المنتج أكبر من أن يُقارَن في طلب واحد — أرفق ملفه بأسطر معدّلة أقل.',
+    en: 'This product is too large to compare in one request — attach its file with fewer edited lines.',
+    ckb: 'ئەم بەرهەمە گەورەترە لەوەی لە یەک داواکاریدا بەراورد بکرێت — فایلەکەی بە هێڵی دەستکاریکراوی کەمتر هاوپێچ بکە.',
   },
   DATA_FILE_SIDE_EFFECT: {
     ar: 'الحفظ سيغيّر حقولاً أخرى لم تعدّلها — احفظ المنتج من النموذج مرة، ثم نزّل الملف من جديد',

@@ -8,22 +8,23 @@
  *   POST /data-preview {text, format?, product_id?, product_ids?}
  *        the comparison, key by key and item by item, per product: what will be
  *        written, what is refused and why, what the save derives — WRITES NOTHING
- *        (`product_ids`: only those blocks of a bulk file, so the sheet compares
- *        a 25-product file a few products a call)
- *   POST /data-apply {text, format?, product_id, token, part?, pricing_hash?, confirm_large_change?}
+ *        (`product_ids`: only those blocks of a bulk file). One call never runs
+ *        more than D1's 1,000 queries less the reserve: the blocks it has no
+ *        room for come back as `pending`, and the sheet asks for them next.
+ *   POST /data-apply {text, format?, product_id, token, pricing_hash?, confirm_large_change?}
  *        ONE product: the preview recomputed from the text (never trusted from
- *        the client) and held to the token the owner read; then one fenced,
- *        idempotent, audited batch that writes the changed fields alone.
+ *        the client) and held to the token the owner read; then ONE fenced,
+ *        idempotent, audited batch that writes the changed fields alone — all
+ *        of them or none.
  *
  * THE BATCH'S SIZE (docs/DECISIONS.md row 207). D1 allows 1,000 queries per
  * Worker invocation, a batch counting each statement. The apply counts every
- * query it runs before the batch (`countingD1`) and sends the batch when it
- * fits what is left: `1000 − 50 (reserve) − 60 (after the batch) − spent`.
- * When it does not, the refusal names the two parts — the product part and
- * the owner's pricing part — with a token each (`part` is inside the hash):
- * the sheet applies the product part, compares again, and applies the
- * pricing part — two batches, each fenced, idempotent and audited on what its
- * own evaluation read.
+ * query IT runs before the batch (`scopedCountingD1`: this request's own, no
+ * other request's) and sends the batch when it fits what is left:
+ * `1000 − 50 (reserve) − (60 + the picture-detach queue) (after the batch) −
+ * spent`. When it does not, nothing is written: the refusal says which lines
+ * make it too large and how to apply the file in two goes — each its own
+ * comparison and its own atomic apply, never two batches behind one press.
  *
  * The format and the comparison are worker/lib/productDataFile.ts; the owner's
  * pricing block is worker/lib/productDataFilePricing.ts. The writes go through
@@ -74,7 +75,8 @@ import {
 } from '../lib/pricingEngine/store';
 import { unitNamesOf } from '../lib/pricingEngine/legacy';
 import { D1_INVOCATION_STATEMENT_LIMIT } from '../lib/quarterHourBudget';
-import { countingD1 } from '../lib/d1Count';
+import { scopedCountingD1 } from '../lib/d1Count';
+import { detachQueueQueries } from '../lib/mediaRefs';
 import { SPEC_FIELD_LABEL_CKB } from '../lib/specFieldLabelsCkb';
 import { engineWriteStatements } from '../lib/pricingEngine/engineWrite';
 import {
@@ -143,19 +145,29 @@ const MAX_TEXT = 1_500_000;
  */
 export const DATA_APPLY_RESERVE = 50;
 /**
- * After the batch, in the same invocation: the read-back `liveState` ≈ 29, the
- * relations audit 1, the picture-detach queue ≤ 3, `completenessAfterWrite`
+ * After the batch, in the same invocation, whatever the batch holds: the
+ * read-back `liveState` ≈ 29, the relations audit 1, `completenessAfterWrite`
  * ≈ 19 (inline after `next()`). Measured ≤ 52; tests/productDataFileBudget.test.ts
- * holds it at or below this.
+ * holds it at or below this. The picture-detach queue is NOT constant (one
+ * statement per 18 pictures the save drops, and its audit row): the apply
+ * sets it aside per batch (`detachQueueQueries`, worker/lib/mediaRefs.ts).
  */
 export const DATA_APPLY_AFTER_BATCH = 60;
-/** The statements one apply's batch may hold once the handler has spent `spent` queries. */
-export const dataApplyAllowance = (spent: number): number =>
-  D1_INVOCATION_STATEMENT_LIMIT - DATA_APPLY_RESERVE - DATA_APPLY_AFTER_BATCH - Math.max(0, spent);
+/**
+ * The statements one apply's batch may hold once the handler has spent
+ * `spent` queries and the batch will be followed by `afterExtra` more than
+ * the constant after-phase (the pictures it detaches).
+ */
+export const dataApplyAllowance = (spent: number, afterExtra = 0): number =>
+  D1_INVOCATION_STATEMENT_LIMIT - DATA_APPLY_RESERVE - DATA_APPLY_AFTER_BATCH - Math.max(0, afterExtra) - Math.max(0, spent);
+/**
+ * The queries one comparison call may run: D1's 1,000 less the reserve (the
+ * middleware's few queries the handler cannot count). A block that would go
+ * past it is not compared in this call — it comes back in `pending`.
+ */
+export const DATA_PREVIEW_BUDGET = D1_INVOCATION_STATEMENT_LIMIT - DATA_APPLY_RESERVE;
 /** Blocks one preview call may name with `product_ids`. */
 const PREVIEW_IDS_MAX = 25;
-/** Which lines one apply writes: all of them, the product part, or the owner's pricing part. */
-type ApplyPart = 'all' | 'document' | 'pricing';
 const STRUCTURE_GROUPS = new Set(['options', 'colors', 'variants', 'images']);
 /** Keys the planner writes from what the patch says (the save's own derivation, never a side effect). */
 const DERIVED_SCALARS = new Set(['selling_type', 'inventory_mode', 'serialized', 'warranty_base_months']);
@@ -390,22 +402,25 @@ async function planSave(
 const ROUNDS_EXHAUSTED =
   'رُفضت أسطر كثيرة من هذا المنتج في مقارنة واحدة — صحّح الأسطر المرفوضة ثم أرفق الملف مرة أخرى / too many of this product\'s lines were refused in one comparison — fix the refused lines, then attach the file again / هێڵی زۆری ئەم بەرهەمە لە یەک بەراوردکردندا ڕەتکرانەوە — هێڵە ڕەتکراوەکان چاک بکە، پاشان فایلەکە دووبارە هاوپێچ بکە';
 
-async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: ParsedBlock, viewer: Viewer, db: D1Database = c.env.DB): Promise<BlockEval> {
-  const out: BlockEval = {
-    productId: block.productId,
-    live: null,
-    error: null,
-    fields: [],
-    accepted: [],
-    patch: null,
-    analysis: null,
-    derived: [],
-    pricing: null,
-    pricingAccepted: [],
-    goneItems: [],
-    token: null,
-    completeness: null,
-  };
+/** A block with nothing compared yet (or nothing to compare: `error` says why). */
+const blankEval = (productId: string, error: BlockEval['error'] = null): BlockEval => ({
+  productId,
+  live: null,
+  error,
+  fields: [],
+  accepted: [],
+  patch: null,
+  analysis: null,
+  derived: [],
+  pricing: null,
+  pricingAccepted: [],
+  goneItems: [],
+  token: null,
+  completeness: null,
+});
+
+async function evaluateBlock(deps: DataFileDeps, block: ParsedBlock, viewer: Viewer, db: D1Database): Promise<BlockEval> {
+  const out = blankEval(block.productId);
   const state = await liveState(db, deps, block.productId, viewer);
   if (state === 'missing') {
     out.error = { code: 'DATA_FILE_PRODUCT_MISSING', message: dataFileMessage('DATA_FILE_PRODUCT_MISSING') };
@@ -562,41 +577,27 @@ async function evaluateBlock(c: Context<AppContext>, deps: DataFileDeps, block: 
     out.pricingAccepted = j.accepted;
   }
 
-  // ---- the token: what the apply must find unchanged
-  out.token = await tokenOf(out, viewer, 'all');
+  // ---- the token: what the apply must find unchanged (everything it writes, in one batch)
+  if (out.accepted.length || out.pricingAccepted.length) {
+    out.token = (
+      await sha256Hex(
+        canonicalJson({
+          v: 1,
+          actor: viewer.id,
+          product: state.productId,
+          updated_at: state.updatedAt,
+          fps: [...state.fps.entries()].sort(),
+          accepted: out.accepted.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
+          new_ids: out.patch?.newIds ?? {},
+          derived: out.derived.map((d) => [d.nkey, d.after]).sort(),
+          pricing: out.pricingAccepted.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
+          pricing_kind: out.pricing?.kind ?? 'none',
+          pricing_hash: out.pricing?.hash ?? null,
+        })
+      )
+    ).slice(0, 32);
+  }
   return out;
-}
-
-/**
- * The token of what one apply writes: everything (`all`, the preview's own —
- * byte for byte the hash it always was), the product part alone, or the
- * owner's pricing part alone. The part is inside the hash, so a part's token
- * is never the whole's nor the other part's.
- */
-async function tokenOf(ev: BlockEval, viewer: Viewer, part: ApplyPart): Promise<string | null> {
-  const s = ev.live;
-  if (!s) return null;
-  const doc = part === 'pricing' ? [] : ev.accepted;
-  const pr = part === 'document' ? [] : ev.pricingAccepted;
-  if (!doc.length && !pr.length) return null;
-  return (
-    await sha256Hex(
-      canonicalJson({
-        v: 1,
-        ...(part === 'all' ? {} : { part }),
-        actor: viewer.id,
-        product: s.productId,
-        updated_at: s.updatedAt,
-        fps: [...s.fps.entries()].sort(),
-        accepted: doc.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
-        new_ids: part === 'pricing' ? {} : ev.patch?.newIds ?? {},
-        derived: part === 'pricing' ? [] : ev.derived.map((d) => [d.nkey, d.after]).sort(),
-        pricing: pr.map((n) => [n.nkey, canonicalValue(n, n.value)]).sort(),
-        pricing_kind: part === 'document' ? 'none' : ev.pricing?.kind ?? 'none',
-        pricing_hash: part === 'document' ? null : ev.pricing?.hash ?? null,
-      })
-    )
-  ).slice(0, 32);
 }
 
 /** One required-field item as the sheet reads it: the code, the model, the form section. */
@@ -657,11 +658,13 @@ const itemOfNkey = (nkey: string): { group: string; id: string } | null => {
  * the product's own data, never a value; a `pricing.*` item exists only in
  * the owner's comparison (no other viewer has a pricing row).
  */
-function labelsOf(b: BlockEval, viewer: Viewer): { items: Record<string, Tri>; spec: Record<string, Tri> } {
+function labelsOf(b: BlockEval, viewer: Viewer): { items: Record<string, Tri>; spec: Record<string, Tri>; inner: Record<string, Tri> } {
   const items: Record<string, Tri> = {};
   const spec: Record<string, Tri> = {};
+  /** An item inside an item: a spec group's row (`spec_groups:<group>/rows:<row>`), by its label. */
+  const inner: Record<string, Tri> = {};
   const s = b.live;
-  if (!s) return { items, spec };
+  if (!s) return { items, spec, inner };
   const doc = s.doc;
   const tri = (x: { name_ar?: string; name_en?: string; name_ckb?: string }): Tri => ({ ar: x.name_ar ?? '', en: x.name_en ?? '', ckb: x.name_ckb ?? '' });
   const nameIn = (x: { name_ar?: string | null; name_en?: string | null; name_ckb?: string | null } | undefined): Tri | null => {
@@ -716,6 +719,17 @@ function labelsOf(b: BlockEval, viewer: Viewer): { items: Record<string, Tri>; s
     if (!it) return;
     // A pricing scope is named to the owner alone (a non-owner's refused pricing line stays unnamed).
     if (it.group.startsWith('pricing.') && !viewer.view) return;
+    // Two rows of one spec group are two lines: each is named by its own label (a pre-order
+    // route by its method, which the sheet words itself — `transports[air]`).
+    const row = /^spec_groups\[([^\]]+)\]\.rows\[([^\]]+)\]/.exec(nkey);
+    if (row && !row[2].startsWith('#new')) {
+      const rk = `spec_groups:${row[1]}/rows:${row[2]}`;
+      if (!(rk in inner)) {
+        const r = doc.spec_groups.find((g) => g.id === row[1])?.rows.find((x) => x.id === row[2]);
+        const n = r ? nameIn({ name_ar: r.label_ar, name_en: r.label_en, name_ckb: r.label_ckb }) : null;
+        if (n) inner[rk] = n;
+      }
+    }
     const k = `${it.group}:${it.id}`;
     if (k in items) return;
     const n = named(it.group, it.id);
@@ -723,7 +737,7 @@ function labelsOf(b: BlockEval, viewer: Viewer): { items: Record<string, Tri>; s
   };
   for (const f of b.fields) seen(f.key, f.nkey);
   for (const d of b.derived) seen(d.key, d.nkey);
-  return { items, spec };
+  return { items, spec, inner };
 }
 
 /** The comparison as the sheet reads it (no internal state; private fields only for the owner). */
@@ -778,11 +792,43 @@ function sourceText(body: Record<string, unknown>): string {
 const fileError = (status: 400 | 409, code: DataFileRefusalCode, errors: FileError[] = []) =>
   new HttpError(status, dataFileMessage(code), code, { errors });
 
-/** The part an apply writes: absent or empty is everything; anything but the three names is refused. */
-function partOf(raw: unknown): ApplyPart {
-  if (raw === undefined || raw === null || raw === '') return 'all';
-  if (raw === 'all' || raw === 'document' || raw === 'pricing') return raw;
-  throw badRequest('part must be all, document or pricing');
+/**
+ * ONE COMPARISON CALL, WITHIN D1'S 1,000 (row 207). The blocks are compared
+ * in the file's order on `counted` — a view of this request's own queries
+ * with a hard limit (`scopedCountingD1`, DATA_PREVIEW_BUDGET): the query that
+ * would cross it is refused before it is sent. The block it belonged to is
+ * dropped whole (a comparison never shows half a product, even when the
+ * refusal was swallowed somewhere below) and is `pending` with every block
+ * after it — the sheet asks for those in its next call. The first block of a
+ * call has the whole budget: if even that is not enough, it is answered with
+ * `tooLarge`, so every call moves the file forward.
+ */
+export async function compareWithinBudget<B, T>(
+  blocks: readonly B[],
+  counted: { readonly db: D1Database; readonly refused: number },
+  compare: (block: B, db: D1Database) => Promise<T>,
+  tooLarge: (block: B) => T
+): Promise<{ done: T[]; pending: B[] }> {
+  const done: T[] = [];
+  const pending: B[] = [];
+  for (const block of blocks) {
+    if (pending.length || counted.refused > 0) {
+      if (done.length === 0) done.push(tooLarge(block));
+      else pending.push(block);
+      continue;
+    }
+    let out: { value: T } | null = null;
+    try {
+      const value = await compare(block, counted.db);
+      if (counted.refused === 0) out = { value };
+    } catch (error) {
+      if (counted.refused === 0) throw error;
+    }
+    if (out) done.push(out.value);
+    else if (done.length === 0) done.push(tooLarge(block));
+    else pending.push(block);
+  }
+  return { done, pending };
 }
 
 async function previousApply(db: D1Database, productId: string, token: string): Promise<boolean> {
@@ -845,7 +891,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     if (parsed.blocks.length > MAX_DATA_FILE_PRODUCTS) throw fileError(400, 'DATA_FILE_TOO_MANY');
     const only = typeof body.product_id === 'string' && body.product_id ? body.product_id : null;
     if (only && (parsed.blocks.length !== 1 || parsed.blocks[0].productId !== only)) throw fileError(400, 'DATA_FILE_WRONG_PRODUCT');
-    // A few blocks of a bulk file at a time (the sheet's chunks): each must be a block of this file.
+    // Some blocks of a bulk file (the ones a previous call left `pending`): each must be a block of this file.
     let blocks = parsed.blocks;
     if (body.product_ids !== undefined) {
       const ids = body.product_ids;
@@ -858,58 +904,60 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     }
     const viewer = viewerOf(c);
     const seesPrivate = canViewCost(c.env, c.get('user'));
-    const products = [];
-    for (const block of blocks) {
-      const ev = await evaluateBlock(c, deps, block, viewer);
-      if (ev.live) ev.completeness = await completenessPreview(c.env.DB, ev, seesPrivate);
-      products.push(blockDto(ev, viewer));
-    }
+    const counted = scopedCountingD1(c.env.DB, { limit: DATA_PREVIEW_BUDGET });
+    const { done: products, pending } = await compareWithinBudget(
+      blocks,
+      counted,
+      async (block, db) => {
+        const ev = await evaluateBlock(deps, block, viewer, db);
+        if (ev.live) ev.completeness = await completenessPreview(db, ev, seesPrivate);
+        return blockDto(ev, viewer);
+      },
+      (block) => blockDto(blankEval(block.productId, { code: 'DATA_FILE_COMPARE_TOO_LARGE', message: dataFileMessage('DATA_FILE_COMPARE_TOO_LARGE') }), viewer)
+    );
+    const compared = new Set(products.map((p) => p.product_id));
     return c.json(
       projectForAdmin(c.env, c.get('user'), {
         success: true,
         viewer: viewer.view ? 'owner' : 'staff',
         file_viewer: parsed.viewer,
         errors: parsed.errors,
-        malformed: blocks.flatMap((b) => b.malformed),
+        malformed: blocks.filter((b) => compared.has(b.productId)).flatMap((b) => b.malformed),
         products,
+        pending: pending.map((b) => b.productId),
       })
     );
   });
 
-  // ---- the write: one product, one batch (past D1's budget: one part a batch)
+  // ---- the write: one product, ONE batch — all of its changes or none of them
   routes.post('/data-apply', async (c) => {
     await rateLimit(c, 'tpl_apply', 120, 3600);
-    // From here on every query is counted: the batch may hold what D1's 1,000 leave (row 207).
-    const counted = countingD1(c.env.DB);
-    const start = counted.executed;
+    // From here on every query THIS request runs is counted, on its own view (no other request's
+    // queries): the batch may hold what D1's 1,000 leave (row 207).
+    const counted = scopedCountingD1(c.env.DB);
     const db = counted.db;
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
     const productId = str(body.product_id, 'product_id', { min: 1, max: 80 });
     const token = str(body.token, 'token', { min: 32, max: 32 });
-    const part = partOf(body.part);
     if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw badRequest('confirm_large_change must be true or false');
     const parsed = splitDataFile(sourceText(body));
     if (parsed.errors.some((e) => e.code === 'DATA_FILE_VERSION')) throw fileError(400, 'DATA_FILE_VERSION', parsed.errors);
     const block = parsed.blocks.find((b) => b.productId === productId);
     if (!block) throw fileError(400, 'DATA_FILE_WRONG_PRODUCT');
     const viewer = viewerOf(c);
-    const echoPart = part === 'all' ? {} : { part };
 
-    // A replay of an apply that landed answers as it did — before anything is recomputed (a part's token too).
-    if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId, ...echoPart });
+    // A replay of an apply that landed answers as it did — before anything is recomputed.
+    if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId });
 
-    const ev = await evaluateBlock(c, deps, block, viewer, db);
+    const ev = await evaluateBlock(deps, block, viewer, db);
     const fresh = () => projectForAdmin(c.env, c.get('user'), blockDto(ev, viewer));
     if (ev.error) throw new HttpError(400, ev.error.message, ev.error.code);
-    const expected = await tokenOf(ev, viewer, part);
-    if (!expected) throw new HttpError(400, dataFileMessage('DATA_FILE_NOTHING_TO_APPLY'), 'DATA_FILE_NOTHING_TO_APPLY', { preview: fresh() });
-    if (expected !== token) throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED', { preview: fresh() });
+    if (!ev.token) throw new HttpError(400, dataFileMessage('DATA_FILE_NOTHING_TO_APPLY'), 'DATA_FILE_NOTHING_TO_APPLY', { preview: fresh() });
+    if (ev.token !== token) throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED', { preview: fresh() });
     const state = ev.live!;
 
-    // ---- the pricing door's own gates (only when this call writes the pricing part)
-    const pricing = part !== 'document' && ev.pricingAccepted.length ? ev.pricing : null;
-    // A part is only ever offered for data: a price write rides with product lines never (STRUCTURE_WITH_ADOPTION).
-    if (part !== 'all' && pricing?.kind === 'price') throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED', { preview: fresh() });
+    // ---- the pricing door's own gates
+    const pricing = ev.pricingAccepted.length ? ev.pricing : null;
     if (pricing?.rates?.derived_stale) throw new HttpError(409, serverMessage('FX_DERIVED_STALE'), 'FX_DERIVED_STALE');
     if (pricing?.kind === 'price') {
       const sent = typeof body.pricing_hash === 'string' ? body.pricing_hash : '';
@@ -929,8 +977,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     const now = new Date().toISOString();
     // Written against the product the comparison read: anything saved since refuses the whole batch.
     const head = fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [productId, state.updatedAt]);
-    const writesDoc = part !== 'pricing';
-    const docLines = writesDoc ? ev.accepted : [];
+    const docLines = ev.accepted;
     const docStmts: D1PreparedStatement[] = [];
     let plan: ProductSavePlan | null = null;
     const a = ev.analysis;
@@ -945,7 +992,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
       }
       docStmts.push(...ps);
     }
-    if (writesDoc && a && a.membership.length) {
+    if (a && a.membership.length) {
       const mp = await deps.planTemplateMembership(db, viewer.id, productId, a.membership);
       if (mp) docStmts.push(...mp.statements);
     }
@@ -1010,30 +1057,32 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     const appliedKeys = written.map((n) => n.key);
     const detail = {
       token,
-      ...echoPart,
       keys: appliedKeys.slice(0, 80),
       changed: appliedKeys.length,
       private_changed: written.filter((n) => isPrivateEntry(n)).length,
       prices_changed: docLines.filter((n) => isPriceEntry(n)).length,
-      derived: writesDoc ? ev.derived.length : 0,
+      derived: ev.derived.length,
       pricing: pricing?.kind ?? 'none',
       refused: ev.fields.filter((f) => f.status !== 'change' && f.status !== 'STALE_IN_FILE').length,
     };
     const auditStmts = (await auditStatements(db, viewer.id, 'product.data_file.applied', productId, detail)).statements;
     const statements: D1PreparedStatement[] = [...head, ...docStmts, ...pricingStmts, ...auditStmts];
 
-    // ---- what D1's 1,000 leave for this batch, counted
-    const spent = counted.executed - start;
-    const allowance = dataApplyAllowance(spent);
+    // ---- what D1's 1,000 leave for this batch: counted before it, set aside after it (the
+    // pictures the save drops are queued once it has committed)
+    const spent = counted.executed;
+    const allowance = dataApplyAllowance(spent, detachQueueQueries(plan?.detachedMedia.length ?? 0));
     if (statements.length > allowance) {
+      // NOTHING is written: one product's changes land in one batch or not at all. The refusal
+      // names the lines that make it too large, so the owner applies the file in two goes — each
+      // its own comparison and its own atomic apply. Counts only: never a value, never a token.
       const docSize = docStmts.length ? head.length + docStmts.length + auditStmts.length : 0;
       const prSize = pricingStmts.length ? head.length + pricingStmts.length + auditStmts.length : 0;
-      const partDto = async (p: 'document' | 'pricing', size: number) => (size ? { token: await tokenOf(ev, viewer, p), statements: size, fits: size <= allowance } : undefined);
-      // Counts and hashes only — never a value.
-      const details = { needed: statements.length, allowance, spent, parts: { document: await partDto('document', docSize), pricing: await partDto('pricing', prSize) } };
-      if (part === 'all' && docSize && prSize && docSize <= allowance) throw new HttpError(409, dataFileMessage('DATA_FILE_TOO_LARGE'), 'DATA_FILE_TOO_LARGE', details);
-      if (docSize > allowance) throw new HttpError(409, dataFileMessage('DATA_FILE_PRODUCT_TOO_LARGE'), 'DATA_FILE_PRODUCT_TOO_LARGE', details);
-      throw new HttpError(409, dataFileMessage('DATA_FILE_PRICING_TOO_LARGE'), 'DATA_FILE_PRICING_TOO_LARGE', details);
+      const sized = (size: number) => (size ? { statements: size, fits: size <= allowance } : undefined);
+      const details = { needed: statements.length, allowance, spent, parts: { document: sized(docSize), pricing: sized(prSize) } };
+      const code: DataFileRefusalCode =
+        docSize > allowance ? 'DATA_FILE_PRODUCT_TOO_LARGE' : docSize && prSize && prSize <= allowance ? 'DATA_FILE_TOO_LARGE' : 'DATA_FILE_PRICING_TOO_LARGE';
+      throw new HttpError(409, dataFileMessage(code), code, details);
     }
 
     try {
@@ -1042,10 +1091,10 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(msg)) {
-        if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId, ...echoPart });
+        if (await previousApply(db, productId, token)) return c.json({ success: true, already: true, product_id: productId });
         throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED');
       }
-      if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return c.json({ success: true, already: true, product_id: productId, ...echoPart });
+      if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return c.json({ success: true, already: true, product_id: productId });
       if (/ENGINE_MANAGED/.test(msg)) throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
       if (msg.includes('UNIQUE') && msg.includes('products.sku')) throw new HttpError(400, 'sku: already used by another product / رمز المنتج مستخدم في منتج آخر', 'SKU_TAKEN');
       const refusal = engineDbRefusal(e);
@@ -1055,7 +1104,7 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     await afterCatalogueWrite(c, [state.slug]);
     c.set('completenessIds', [productId]);
 
-    // Read back: every product line this call wrote now reads as the file wrote it.
+    // Read back: every product line now reads as the file wrote it.
     const after = await liveState(db, deps, productId, viewer);
     const notPersisted: string[] = [];
     if (typeof after !== 'string') {
@@ -1073,9 +1122,8 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
         success: true,
         already: false,
         product_id: productId,
-        ...echoPart,
         applied: appliedKeys,
-        derived: writesDoc ? ev.derived.map((d) => d.key) : [],
+        derived: ev.derived.map((d) => d.key),
         priced: pricing?.kind === 'price',
         not_persisted: notPersisted,
         updated_at: typeof after === 'string' ? null : after.updatedAt,
