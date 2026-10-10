@@ -349,18 +349,32 @@ action and `price_history.price_source = 'engine_fx'`.
   largest first. Every read and batch is charged to the invocation's statement
   budget — 600 for the six-hour run and an owner's request; the quarter-hour
   sweep runs LAST in its invocation, after the staff recalculation, the durable
-  jobs and the upload sweep have settled, with its own 200 cut to what they
-  left of D1's 1,000 less a reserve of 50 (`quarterHourSweepBudget`; the jobs
-  run on a counting view of the binding, `worker/lib/d1Count.ts`). So the
-  sweep never takes the tick past the limit and never costs the jobs a
-  statement; when they leave nothing, it yields completely. A batch the budget
-  cannot cover is not sent; it and the products after it wait, in the same
-  order, for the next tick, until the list is empty
-  (tests/fxSweepBudget.test.ts: the usual tick at its bounds — 200 upload
-  sessions, a full outbox, a dozen stale products — executes about 600
-  statements; a staff recalculation at its own bound of 2 × 10 orders, or a
-  search-index catch-up chunk, takes the jobs ALONE past 1,000 — theirs, not
-  the sweep's, which then spends nothing).
+  jobs and the upload sweep have settled and the search-index catch-up has
+  spent what they left, with its own 200 cut to what is left of D1's 1,000
+  less a reserve of 50 (`quarterHourSweepBudget`; the jobs run on a counting
+  view of the binding, `worker/lib/d1Count.ts`; the share-out is
+  `worker/lib/quarterHourBudget.ts`). So the sweep never takes the tick past
+  the limit and never costs the jobs a statement; when they leave nothing, it
+  yields completely. A batch the budget cannot cover is not sent; it and the
+  products after it wait, in the same order, for the next tick, until the list
+  is empty (tests/fxSweepBudget.test.ts: the usual tick at its bounds — 200
+  upload sessions, a full outbox, a dozen stale products — executes about 609
+  statements; with EVERY job at its bound at once — a staff recalculation
+  waiting, the whole search index stale as well — 950).
+- **The jobs that share the quarter-hour tick are paced too (row 201).** The
+  staff wage recalculation once took 2 jobs × 10 orders a tick (about 3,581
+  statements) and the search-index catch-up a 50-product chunk (about 1,079
+  with the tick's jobs): each over D1's 1,000 on its own. The recalculation now
+  takes ONE order of ONE job a tick — an order's cost (about 150 statements
+  plus 7 a line) is decided by its data while it runs, so it is paced, not
+  budgeted; its durable cursor resumes next tick and the jobs take turns. The
+  catch-up runs after the jobs with only what they left of 1,000 less the
+  reserve (`quarterHourSearchBudget`): every statement charged before it is
+  sent, a batch sent only when the budget also covers its failure (each
+  product retried alone and marked), a product whose rows do not fit stays
+  stale and untouched for the next tick, and one too large for any tick is
+  marked and reported once. Tick after tick both finish exactly where the same
+  work done unpaced finishes.
 - **The preview before an owner rate act (§7.8).** `POST /rates/fx/:pair/review/preview`,
   `POST /rates/fx/:pair/manual/preview {rate | market_adjustment_iqd}` and
   `POST /rates/shipping/:profile/preview {rate_iqd}` answer, writing nothing,

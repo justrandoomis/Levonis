@@ -22,13 +22,13 @@ import type { Env } from '../types';
 import { repriceStaleEngineProducts, type AutoRepriceReport, type AutoRepriceTrigger } from '../pricingEngine/autoReprice';
 import { statementBudget, type StatementBudget } from './budget';
 import { notifyOwnerRepriceBlocked } from './notify';
+import { D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE } from '../quarterHourBudget';
 
 /** The quarter-hour sweep's own sub-budget (plan §7.4): about 6–7 products a tick. */
 export const AUTO_REPRICE_SWEEP_BUDGET = 200;
-/** D1's queries per Worker invocation (the paid plan's limit; a batch counts each statement). */
-export const D1_INVOCATION_STATEMENT_LIMIT = 1000;
-/** Kept free under that limit in the quarter-hour invocation, for anything a counter could miss. */
-export const QUARTER_HOUR_RESERVE = 50;
+// D1's 1,000 queries per invocation and the quarter-hour reserve of 50 are the
+// tick's share-out, defined once in worker/lib/quarterHourBudget.ts.
+export { D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE };
 
 /**
  * THE SWEEP'S SHARE OF THE QUARTER-HOUR INVOCATION (plan §7.4, critique H2):

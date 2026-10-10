@@ -28,13 +28,14 @@ import {
 } from './lib/socialPreview';
 import { conditional, weakEtag } from './lib/publicApi/cache';
 import { trustedOrigin } from './lib/appOrigin';
-import { runDurableJobs } from './lib/jobs';
+import { catchUpSearchIndex, runDurableJobs } from './lib/jobs';
 import { drainStaffReconciliations } from './lib/financeStaffAccrual';
 import { drainOrderFinanceRecovery } from './lib/financeOrderRecovery';
 import { runFxScheduler } from './lib/fx/scheduler';
 import { quarterHourSweepBudget, sweepStaleEnginePrices } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourSearchBudget } from './lib/quarterHourBudget';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
 import { cartRoutes } from './routes/cart';
@@ -1172,22 +1173,30 @@ export default {
       return;
     }
     // THIS INVOCATION'S D1 STATEMENTS ARE SHARED (FX plan 7.4, critique H2):
-    // D1 allows 1,000 per invocation and the four jobs below run in this one.
-    // The first three keep their own bounds and run exactly as before, on a
-    // counting view of the same binding (worker/lib/d1Count.ts); the engine's
-    // sweep runs AFTER them with what they left, so it is never the statement
-    // that crosses the limit (tests/fxSweepBudget.test.ts).
+    // D1 allows 1,000 per invocation and every job below runs in this one, on
+    // a counting view of the same binding (worker/lib/d1Count.ts). The share-
+    // out is worker/lib/quarterHourBudget.ts: the staff recalculation, the
+    // durable jobs and the upload sweep run together within their own bounds;
+    // once they have settled, the search-index catch-up spends only what they
+    // left, and the engine's sweep runs LAST with what is left after that. So
+    // neither of the last two is ever the statement that crosses the limit
+    // (tests/fxSweepBudget.test.ts measures every job at its bound).
     const counted = countingD1(env.DB);
     const before = counted.executed;
+    const used = () => counted.executed - before;
     const tickEnv: Env = { ...env, DB: counted.db };
     // Employment-date recalculation survives a closed admin tab. Each tick
-    // processes a bounded batch; its durable cursor resumes on the next run.
-    const staff = drainStaffReconciliations(tickEnv, { maxJobs: 2, maxOrders: 25 }).catch((error) => {
+    // processes ONE order of ONE job (an order is its unit, priced by its own
+    // data while it runs: quarterHourBudget.ts says why); the job's durable
+    // cursor resumes on the next run and the jobs take turns.
+    const staff = drainStaffReconciliations(tickEnv, STAFF_RECONCILIATION_TICK).catch((error) => {
       console.error('scheduled staff reconciliation rejected:', error);
     });
     ctx.waitUntil(staff);
     // See (1) above: the entrypoint contains what the steps already contain.
-    const durable = runDurableJobs(tickEnv).catch((error) => {
+    // Its search-index catch-up is not run inside it: it runs below, after
+    // the jobs, within what they left.
+    const durable = runDurableJobs(tickEnv, { searchCatchUp: 'after_jobs' }).catch((error) => {
       console.error('scheduled durable jobs rejected outside any step:', error);
     });
     ctx.waitUntil(durable);
@@ -1198,16 +1207,23 @@ export default {
       console.error('scheduled upload-session sweep rejected:', error);
     });
     ctx.waitUntil(uploads);
-    // FX-5 (FX plan 7.4): engine products a confirmed exchange or shipping
-    // rate left stale — beyond what the six-hour run or an owner's rate act
-    // could cover — are repriced here by the engine's own writer, deficit
-    // first. LAST, once the jobs above have settled, with its own sub-budget
-    // of 200 statements cut to what they left of the invocation's 1,000
-    // (less a reserve): the jobs keep theirs, and the tick stays under the
-    // limit. One indexed read when nothing is stale. Never throws.
+    // Once the jobs above have settled, two passes that spend from what they
+    // left, each charging every statement before it sends it:
+    //  - the search-index catch-up (the durable jobs' step 3b, fifty products
+    //    at most): what the jobs left of D1's 1,000 less the reserve; a
+    //    product whose rows do not fit stays stale for the next tick;
+    //  - FX-5 (FX plan 7.4): engine products a confirmed exchange or shipping
+    //    rate left stale — beyond what the six-hour run or an owner's rate act
+    //    could cover — repriced by the engine's own writer, deficit first,
+    //    with its own sub-budget of 200 cut to what is left. One indexed read
+    //    when nothing is stale. Never throws.
     ctx.waitUntil(
       Promise.allSettled([staff, durable, uploads])
-        .then(() => sweepStaleEnginePrices(tickEnv, { trigger: 'sweep', budget: statementBudget(quarterHourSweepBudget(counted.executed - before)) }))
+        .then(() => catchUpSearchIndex(tickEnv, { budget: statementBudget(quarterHourSearchBudget(used())), ceiling: QUARTER_HOUR_TICK_LIMIT }))
+        .catch((error) => {
+          console.error('scheduled search index catch-up rejected:', error instanceof Error ? error.message : String(error));
+        })
+        .then(() => sweepStaleEnginePrices(tickEnv, { trigger: 'sweep', budget: statementBudget(quarterHourSweepBudget(used())) }))
         .catch((error) => {
           console.error('scheduled engine repricing rejected:', error instanceof Error ? error.name : 'unknown');
         })

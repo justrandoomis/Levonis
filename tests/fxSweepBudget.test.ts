@@ -1,23 +1,30 @@
 /**
  * FX-5 — THE QUARTER-HOUR INVOCATION STAYS UNDER D1'S 1,000 STATEMENTS
- * (FX programme plan §7.4, critique H2).
+ * (FX programme plan §7.4, critique H2; DECISIONS rows 198 and 201).
  *
- * The `*\/15` tick runs four jobs in ONE Worker invocation: the staff
- * reconciliation (2 jobs, 25 orders asked — 10 a page), the durable jobs, the
- * upload-session sweep (200) and FX-5's engine repricing sweep. D1 allows
- * 1,000 queries per invocation, a batch counting each statement.
+ * The `*\/15` tick runs every job in ONE Worker invocation. D1 allows 1,000
+ * queries per invocation, a batch counting each statement. The share-out is
+ * worker/lib/quarterHourBudget.ts: the staff reconciliation (one job, one
+ * order a tick), the durable jobs and the upload-session sweep (200) run
+ * together within their own bounds; once they have settled, the search-index
+ * catch-up spends only what they left of 1,000 less the reserve; FX-5's
+ * engine sweep runs last with what is left after that.
  *
- * This runs the REAL `scheduled()` handler of worker/index.ts on a real 0181
+ * This runs the REAL `scheduled()` handler of worker/index.ts on a real
  * database: the census products with a dozen engine-priced products left
- * stale by a rate move, two staff recalculations at their page bound, 200
- * expired upload sessions and 200 closed ones to delete, and a full outbox.
+ * stale by a rate move, two staff recalculations waiting (24 delivered orders
+ * each), 200 expired upload sessions and 200 closed ones to delete, a full
+ * outbox and — on a catch-up tick — the whole catalogue's search index stale.
  * Every statement the invocation executes is counted at the binding. Proves:
- *   - the invocation's total stays under 1,000;
- *   - the sweep runs LAST and spends no more than what the jobs left
- *     (`quarterHourSweepBudget`: its 200, cut to 1,000 − 50 − the jobs');
+ *   - the invocation's total stays under 1,000 with EVERY job at its bound at
+ *     once, the sweep included;
+ *   - the catch-up runs after the jobs and spends no more than they left
+ *     (`quarterHourSearchBudget`), the sweep last within what is left
+ *     (`quarterHourSweepBudget`: its 200, cut to 1,000 − 50 − the rest);
  *   - the jobs' own statements are the same with and without sweep work;
- *   - when the jobs leave little, the sweep yields (and spends nothing when
- *     they leave nothing), so the total is provably under the limit.
+ *   - nothing is lost to the pacing: tick after tick the staff recalculations,
+ *     the index and the stale prices finish, each tick under the limit, and
+ *     end exactly where the same work done unpaced ends.
  *
  * Run: node --import tsx --test tests/fxSweepBudget.test.ts
  */
@@ -39,7 +46,9 @@ import { listPricedProducts } from '../worker/lib/pricingEngine/load';
 import { AUTO_REPRICE_SWEEP_BUDGET, D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE, quarterHourSweepBudget, sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { countingD1, d1Base } from '../worker/lib/d1Count';
-import { backfillSearchIndex } from '../worker/lib/search/store';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourSearchBudget } from '../worker/lib/quarterHourBudget';
+import { drainStaffReconciliations } from '../worker/lib/financeStaffAccrual';
+import { INDEX_FAILED_MARK, INDEX_STAMP, backfillSearchIndex } from '../worker/lib/search/store';
 import { resetEventBus } from '../worker/lib/eventBus';
 import type { Env } from '../worker/lib/types';
 
@@ -47,6 +56,8 @@ import type { Env } from '../worker/lib/types';
 
 /** The engine sweep's first read (autoReprice.ts ENGINE_STATES_SQL): no other quarter-hour job runs it. */
 const SWEEP_FIRST = /FROM product_pricing_state s JOIN products p ON p\.id = s\.product_id\s+WHERE s\.mode = 'engine'/;
+/** The search-index catch-up's first statement (jobs.ts `catchUpSearchIndex`): no other quarter-hour job runs it. */
+const CATCH_UP_FIRST = 'PRAGMA table_info("search_tokens")';
 
 class CountStmt {
   constructor(
@@ -115,7 +126,11 @@ async function tick(raw: DatabaseSync) {
   }
   const first = d1.log.findIndex((sql) => SWEEP_FIRST.test(sql));
   const jobs = first === -1 ? d1.log.length : first;
-  return { total: d1.log.length, jobs, sweep: d1.log.length - jobs, log: d1.log, errors };
+  // The tick's own jobs end where the catch-up's probe begins (it runs once, after them, or not at all).
+  const probes = d1.log.flatMap((sql, i) => (sql === CATCH_UP_FIRST ? [i] : []));
+  assert.ok(probes.length <= 1, 'the catch-up probe runs once a tick, and no other job runs it');
+  const own = probes.length === 1 && probes[0] < jobs ? probes[0] : jobs;
+  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: d1.log.length - jobs, log: d1.log, errors };
 }
 
 // ------------------------------------------------------------- the world, every job at its bound
@@ -282,29 +297,96 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 
-test('every job at its configured bound — a staff recalculation of 2 × 10 orders; a catch-up tick with the search backfill’s 50-product chunk — the jobs ALONE pass the limit (theirs, measured and reported); the sweep yields and executes nothing; the jobs are the same with and without it', async () => {
-  for (const variant of [
-    { name: 'staff recalculation at its bound', steady: true, staff: true, marker: /UPDATE finance_staff_reconciliations SET cursor/ },
-    { name: 'search backfill catch-up', steady: false, staff: false, marker: /INSERT OR REPLACE INTO search_tokens/ },
-  ]) {
-    const { stale, current } = await copies({ steady: variant.steady, staff: variant.staff });
-    const withSweep = await tick(stale);
-    const without = await tick(current);
-    assert.ok(withSweep.log.some((sql) => variant.marker.test(sql)), `${variant.name}: the job did its work`);
-    // The sweep's part: whatever the jobs used, it never adds a statement past 1,000 − the reserve.
-    const share = quarterHourSweepBudget(withSweep.jobs);
-    assert.ok(withSweep.sweep <= share, `${variant.name}: the sweep spent ${withSweep.sweep} of its ${share}`);
-    assert.ok(withSweep.total <= Math.max(withSweep.jobs, D1_INVOCATION_STATEMENT_LIMIT - QUARTER_HOUR_RESERVE), `${variant.name}: jobs ${withSweep.jobs}, sweep ${withSweep.sweep}`);
-    if (withSweep.jobs >= D1_INVOCATION_STATEMENT_LIMIT - QUARTER_HOUR_RESERVE) {
-      assert.equal(withSweep.sweep, 0, `${variant.name}: the sweep yielded — not one statement`);
-      assert.equal(staleCount(stale), 12, `${variant.name}: every stale product waits for a later tick`);
-    }
-    assert.equal(withSweep.jobs, without.jobs, `${variant.name}: the jobs are the same with and without sweep work (${withSweep.jobs} / ${without.jobs})`);
-    // A FINDING ABOUT THE JOBS, NOT THE SWEEP: at their own configured bounds they can pass D1's 1,000 by
-    // themselves. Their bounds are theirs to change (FX plan §7.4: "the sweep's sub-budget is lowered,
-    // never the jobs'"); the number is printed for the report.
-    console.log(`${variant.name}: jobs ${withSweep.jobs} (over ${D1_INVOCATION_STATEMENT_LIMIT}: ${withSweep.jobs >= D1_INVOCATION_STATEMENT_LIMIT}), sweep ${withSweep.sweep}`);
+/** Active products whose index rows are missing or stale — the catch-up's work. */
+const staleIndex = (raw: DatabaseSync) =>
+  Number(
+    (
+      raw
+        .prepare(
+          "SELECT COUNT(*) AS n FROM products p WHERE p.status = 'active' AND NOT EXISTS (SELECT 1 FROM search_tokens t WHERE t.product_id = p.id AND t.token IN (?, ?))"
+        )
+        .get(INDEX_STAMP, INDEX_FAILED_MARK) as { n: number }
+    ).n
+  );
+/** Staff recalculations still waiting (each one a durable cursor). */
+const pendingStaff = (raw: DatabaseSync) => count(raw, "SELECT COUNT(*) AS n FROM finance_staff_reconciliations WHERE state <> 'complete'");
+const ordersProcessed = (raw: DatabaseSync) => count(raw, 'SELECT COALESCE(SUM(processed_orders), 0) AS n FROM finance_staff_reconciliations');
+
+test('EVERY job at its bound in ONE tick — a staff recalculation waiting (two jobs, 24 orders each), the whole search index stale (a catch-up), 200 upload sessions expired and 200 deleted, a full outbox — plus a full FX-5 sweep: under 1,000 statements; the catch-up spends only what the jobs left, the sweep last within what is left', async () => {
+  assert.deepEqual({ ...STAFF_RECONCILIATION_TICK }, { maxJobs: 1, maxOrders: 1 }, 'one job, one order a tick');
+  const { stale, current } = await copies({ steady: false, staff: true });
+  const indexBefore = staleIndex(stale);
+  assert.ok(indexBefore >= 40, `the whole catalogue waits for the index (${indexBefore})`);
+  assert.equal(pendingStaff(stale), 2);
+  assert.equal(staleCount(stale), 12);
+
+  const withSweep = await tick(stale);
+  const without = await tick(current);
+  assert.deepEqual(withSweep.errors, [], 'no job reported an error');
+
+  // Every job did its bounded work, the paced two included.
+  assert.ok(withSweep.log.some((sql) => /UPDATE finance_staff_reconciliations SET cursor/.test(sql)), 'the staff recalculation moved');
+  assert.equal(ordersProcessed(stale), 1, 'ONE order of ONE job this tick; the cursor resumes next tick');
+  assert.equal(count(stale, "SELECT COUNT(*) AS n FROM upload_sessions WHERE state = 'expired'"), 200, '200 expired sessions closed');
+  assert.equal(count(stale, 'SELECT COUNT(*) AS n FROM upload_sessions'), 200, '200 closed sessions deleted');
+  assert.ok(withSweep.log.some((sql) => /UPDATE outbox SET attempts = attempts \+ 1/.test(sql)), 'the outbox was worked');
+  const indexed = indexBefore - staleIndex(stale);
+  assert.ok(indexed > 0, 'the catch-up indexed what fitted');
+
+  // THE LIMIT, part by part.
+  const searchShare = quarterHourSearchBudget(withSweep.own);
+  const sweepShare = quarterHourSweepBudget(withSweep.jobs);
+  assert.ok(withSweep.total < D1_INVOCATION_STATEMENT_LIMIT, `the tick executed ${withSweep.total} statements (jobs ${withSweep.own}, catch-up ${withSweep.catchUp}, sweep ${withSweep.sweep})`);
+  assert.ok(withSweep.catchUp <= searchShare, `the catch-up spent ${withSweep.catchUp} of the ${searchShare} the jobs left`);
+  assert.ok(withSweep.sweep <= sweepShare && sweepShare <= AUTO_REPRICE_SWEEP_BUDGET, `the sweep spent ${withSweep.sweep} of its ${sweepShare}`);
+  assert.ok(withSweep.total <= Math.max(withSweep.own, QUARTER_HOUR_TICK_LIMIT), 'the catch-up and the sweep never take the tick past 1,000 − the reserve');
+  assert.ok(withSweep.own < QUARTER_HOUR_TICK_LIMIT, `the jobs alone, every one at its bound: ${withSweep.own}`);
+  // Order: the jobs, then the catch-up, then the sweep.
+  assert.ok(withSweep.log.slice(withSweep.own).every((sql) => !/upload_sessions|finance_staff_reconciliations|FROM outbox/.test(sql)), 'nothing of the jobs after the catch-up began');
+  assert.ok(withSweep.log.slice(withSweep.jobs).every((sql) => !/search_tokens/.test(sql)), 'nothing of the catch-up after the sweep began');
+  // The jobs and the catch-up are the same with and without sweep work.
+  assert.equal(withSweep.own, without.own, `the jobs: ${withSweep.own} / ${without.own}`);
+  assert.equal(withSweep.catchUp, without.catchUp, `the catch-up: ${withSweep.catchUp} / ${without.catchUp}`);
+  console.log(
+    `every quarter-hour job at its bound: jobs ${withSweep.own}, catch-up ${withSweep.catchUp} (share ${searchShare}, ${indexed} of ${indexBefore} products), sweep ${withSweep.sweep} (share ${sweepShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`
+  );
+});
+
+test('nothing is lost to the pacing: tick after tick the staff recalculations, the search index and the stale prices finish — every tick under 1,000 — and end exactly where the same work done unpaced ends', async () => {
+  const paced = (await copies({ steady: false, staff: true })).stale;
+  const reference = (await copies({ steady: false, staff: true })).stale;
+
+  // UNPACED, on the reference copy: the same three pieces of work, no budget at all (the old bounds).
+  resetEventBus();
+  const refEnv = { DB: asD1(reference), INITIAL_ADMIN_EMAIL: 'boss@x.co', STORE_ROOT_DOMAIN: 'levonis-iq.com' } as unknown as Env;
+  for (let i = 0; i < 10 && pendingStaff(reference) > 0; i++) await drainStaffReconciliations(refEnv, { maxJobs: 2, maxOrders: 25 });
+  for (let i = 0; i < 10 && staleIndex(reference) > 0; i++) await backfillSearchIndex(asD1(reference), { limit: 50 });
+  for (let i = 0; i < 10 && staleCount(reference) > 0; i++) await sweepStaleEnginePrices(refEnv, { trigger: 'sweep', budget: statementBudget(100_000) });
+  assert.equal(pendingStaff(reference) + staleIndex(reference) + staleCount(reference), 0, 'the reference finished');
+
+  // PACED: the real scheduled() handler, tick after tick.
+  const totals: number[] = [];
+  while ((pendingStaff(paced) > 0 || staleIndex(paced) > 0 || staleCount(paced) > 0) && totals.length < 150) {
+    const t = await tick(paced);
+    assert.deepEqual(t.errors, [], `tick ${totals.length + 1}: no job reported an error`);
+    assert.ok(t.total < D1_INVOCATION_STATEMENT_LIMIT, `tick ${totals.length + 1}: ${t.total} statements`);
+    totals.push(t.total);
   }
+  assert.equal(pendingStaff(paced), 0, 'every staff recalculation finished');
+  assert.equal(staleIndex(paced), 0, 'every product indexed');
+  assert.equal(staleCount(paced), 0, 'every stale price repriced');
+
+  // The same end state, row for row.
+  const same = (sql: string, what: string) => assert.deepEqual(paced.prepare(sql).all(), reference.prepare(sql).all(), what);
+  same(
+    'SELECT order_id, order_item_id, rule_id, rule_version, staff_id, milestone, base_iqd, qty, amount_iqd, cost_day, state FROM finance_order_costs ORDER BY order_id, order_item_id, rule_id',
+    'the same wage costs, each once'
+  );
+  same('SELECT staff_id, revision, state, processed_orders, adjusted_orders, error FROM finance_staff_reconciliations ORDER BY staff_id', 'the same recalculations');
+  same('SELECT product_id, token, weight FROM search_tokens ORDER BY product_id, token', 'the same search index');
+  same('SELECT product_id, combo_key, channel, usd_iqd_rate, replacement_cost_iqd, computed_price_iqd FROM pricing_sku_costs ORDER BY product_id, combo_key, channel', 'the same engine figures');
+  same('SELECT id, price_iqd FROM products ORDER BY id', 'the same prices');
+  console.log(`paced to completion in ${totals.length} ticks, the largest ${Math.max(...totals)} statements (D1 allows ${D1_INVOCATION_STATEMENT_LIMIT})`);
 });
 
 test('the sweep yields: its share is its own 200 cut to what the jobs left of 1,000 less the reserve — and nothing when they left nothing', async () => {
@@ -315,6 +397,17 @@ test('the sweep yields: its share is its own 200 cut to what the jobs left of 1,
   assert.equal(quarterHourSweepBudget(949), 1);
   assert.equal(quarterHourSweepBudget(950), 0);
   assert.equal(quarterHourSweepBudget(5000), 0);
+  // The catch-up's share before it: all the jobs left of 1,000 less the reserve.
+  assert.equal(QUARTER_HOUR_TICK_LIMIT, 950);
+  assert.equal(quarterHourSearchBudget(0), 950);
+  assert.equal(quarterHourSearchBudget(589), 361);
+  assert.equal(quarterHourSearchBudget(950), 0);
+  assert.equal(quarterHourSearchBudget(5000), 0);
+  for (let used = 0; used <= 1200; used += 7) {
+    const search = quarterHourSearchBudget(used);
+    const sweep = quarterHourSweepBudget(used + search);
+    assert.ok(used + search + sweep <= Math.max(used, QUARTER_HOUR_TICK_LIMIT), `used ${used}: catch-up ${search}, sweep ${sweep}`);
+  }
   for (let used = 0; used <= 1200; used += 7) {
     const share = quarterHourSweepBudget(used);
     assert.ok(share >= 0 && share <= 200);

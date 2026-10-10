@@ -39,7 +39,7 @@ import {
 import { runGuardedMediaCleanup } from './mediaRefs';
 import { convertLegacyProducts } from './catalog/legacy';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
-import { backfillSearchIndex, searchIndexInstalled } from './search/store';
+import { backfillSearchIndex, searchIndexInstalled, type PassBudget } from './search/store';
 
 /**
  * Durable scheduled jobs (final-phase §11): one entrypoint the Worker wires
@@ -201,7 +201,71 @@ export interface DurableJobsReport {
 /** Rows already expired are kept this long for support/audit before pruning. */
 const PRUNE_GRACE_DAYS = 7;
 
-export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
+/** What one search-index catch-up did. */
+export interface SearchCatchUpReport {
+  indexed: number;
+  /** Products left stale for a later pass because the budget could not cover them. */
+  deferred: number;
+  /** One line per product that could not be indexed (also logged). */
+  errors: string[];
+}
+
+/**
+ * STEP 3b's BODY, callable on its own: the search-index backfill — see the
+ * step in `runDurableJobs` for what it repairs and why it is chunked.
+ *
+ * With a `budget` (the quarter-hour cron, after its jobs) every statement is
+ * charged first — the installed-table probe here, then each statement of
+ * `backfillSearchIndex` — and what the budget cannot cover waits, stale and
+ * untouched, for the next tick. `ceiling` is the most any budget handed to it
+ * can be. Without a budget it is the step exactly as it was. Never throws on a
+ * product it cannot write: that is reported.
+ */
+export async function catchUpSearchIndex(
+  env: Env,
+  opts: { budget?: PassBudget; ceiling?: number } = {}
+): Promise<SearchCatchUpReport> {
+  const out: SearchCatchUpReport = { indexed: 0, deferred: 0, errors: [] };
+  if (opts.budget && !opts.budget.spend(1)) return out;
+  // A Worker can be live one migration ahead of the database. `step` would
+  // catch the "no such table", but it would also report an error on every
+  // cron run until the migration lands, which is noise in the one place an
+  // operator looks for real failures.
+  if (!(await searchIndexInstalled(env.DB))) return out;
+  // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder — see
+  // `backfillSearchIndex`. It commits in small groups and marks a product it
+  // cannot write, so ONE bad product is reported here and skipped rather
+  // than failing the whole fifty and being selected first again next run,
+  // which is how a single row could have stopped the backfill for good.
+  const run = await backfillSearchIndex(env.DB, {
+    limit: 50,
+    ...(opts.budget ? { budget: opts.budget, ...(opts.ceiling === undefined ? {} : { ceiling: opts.ceiling }) } : {}),
+  });
+  out.indexed = run.indexed;
+  out.deferred = run.deferred;
+  for (const f of run.failed) {
+    console.error(`search index: product ${f.id} could not be indexed:`, f.error);
+    out.errors.push(`search_index_backfill: ${f.id}: ${f.error.slice(0, 160)}`);
+  }
+  // Pacing, not a failure — but a product that never fits what the ticks
+  // leave would otherwise wait in silence.
+  if (opts.budget && run.indexed === 0 && run.deferred > 0) {
+    console.warn(`search index: ${run.deferred} product(s) wait for a quarter-hour tick with more statements left`);
+  }
+  return out;
+}
+
+export interface DurableJobsOptions {
+  /**
+   * Where the search-index catch-up (step 3b) runs: inside this run (the
+   * default), or `after_jobs` — left to the caller, which runs
+   * `catchUpSearchIndex` itself with a statement budget (the quarter-hour
+   * cron, worker/index.ts).
+   */
+  searchCatchUp?: 'in_run' | 'after_jobs';
+}
+
+export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): Promise<DurableJobsReport> {
   const nowIso = new Date().toISOString();
   const pruneBefore = new Date(Date.now() - PRUNE_GRACE_DAYS * 86_400_000).toISOString();
   const report: DurableJobsReport = {
@@ -344,24 +408,20 @@ export async function runDurableJobs(env: Env): Promise<DurableJobsReport> {
    * one predicate, so the shop repairs itself with no admin button, no
    * migration and no re-saving the catalogue by hand.
    */
-  await step('search_index_backfill', async () => {
-    // A Worker can be live one migration ahead of the database. `step` would
-    // catch the "no such table", but it would also report an error on every
-    // cron run until the migration lands, which is noise in the one place an
-    // operator looks for real failures.
-    if (!(await searchIndexInstalled(env.DB))) return;
-    // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder — see
-    // `backfillSearchIndex`. It commits in small groups and marks a product it
-    // cannot write, so ONE bad product is reported here and skipped rather
-    // than failing the whole fifty and being selected first again next run,
-    // which is how a single row could have stopped the backfill for good.
-    const run = await backfillSearchIndex(env.DB, { limit: 50 });
-    report.search_indexed = run.indexed;
-    for (const f of run.failed) {
-      console.error(`search index: product ${f.id} could not be indexed:`, f.error);
-      report.errors.push(`search_index_backfill: ${f.id}: ${f.error.slice(0, 160)}`);
-    }
-  });
+  //
+  // THE QUARTER-HOUR CRON RUNS IT AFTER ITS JOBS, NOT HERE
+  // (`searchCatchUp: 'after_jobs'`): a fifty-product chunk can cost more
+  // statements than the whole tick may spend, so worker/index.ts runs
+  // `catchUpSearchIndex` once this run and the tick's other jobs have
+  // settled, with what they left of D1's 1,000. `search_indexed` then stays 0
+  // on this report. Every other caller runs it here, unbudgeted, as before.
+  if (opts.searchCatchUp !== 'after_jobs') {
+    await step('search_index_backfill', async () => {
+      const run = await catchUpSearchIndex(env);
+      report.search_indexed = run.indexed;
+      report.errors.push(...run.errors);
+    });
+  }
 
   // 4. Prune consumed/long-expired email-verification tokens.
   await step('email_verification_tokens', async () => {

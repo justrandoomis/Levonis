@@ -221,6 +221,25 @@ const inChunks = <T,>(xs: readonly T[]): T[][] => {
   return out;
 };
 
+/** The distinct brand and section ids `searchDocsForRows` resolves to names. */
+function nameIdsOf(rows: Record<string, unknown>[]): { brands: string[]; catalogs: string[] } {
+  const idsOf = (pick: (r: Record<string, unknown>) => unknown[]): string[] => [
+    ...new Set(rows.flatMap(pick).filter((x): x is string => typeof x === 'string' && x !== '')),
+  ];
+  return { brands: idsOf((r) => [r.brand_id]), catalogs: idsOf((r) => [r.category_id, r.sub_category_id]) };
+}
+
+/**
+ * The statements `searchDocsForRows(db, rows)` executes, counted before it
+ * runs: one read per `NAME_IN_CHUNK` slice of brand ids and of section ids.
+ * A pass with a statement budget charges them before it sends them.
+ */
+export function searchDocReadCount(rows: Record<string, unknown>[]): number {
+  if (rows.length === 0) return 0;
+  const ids = nameIdsOf(rows);
+  return inChunks(ids.brands).length + inChunks(ids.catalogs).length;
+}
+
 /**
  * `products` rows -> the documents to index them under.
  *
@@ -257,9 +276,6 @@ export async function searchDocsForRows(
   rows: Record<string, unknown>[]
 ): Promise<SearchDoc[]> {
   if (rows.length === 0) return [];
-  const idsOf = (pick: (r: Record<string, unknown>) => unknown[]): string[] => [
-    ...new Set(rows.flatMap(pick).filter((x): x is string => typeof x === 'string' && x !== '')),
-  ];
   const names = new Map<string, string>();
   const collect = async (table: 'brands' | 'catalogs', ids: string[]): Promise<void> => {
     for (const part of inChunks(ids)) {
@@ -271,8 +287,9 @@ export async function searchDocsForRows(
       for (const r of results ?? []) names.set(String(r.id), String(r.n ?? ''));
     }
   };
-  await collect('brands', idsOf((r) => [r.brand_id]));
-  await collect('catalogs', idsOf((r) => [r.category_id, r.sub_category_id]));
+  const ids = nameIdsOf(rows);
+  await collect('brands', ids.brands);
+  await collect('catalogs', ids.catalogs);
   return rows.map((r) =>
     toSearchDoc({
       id: String(r.id),
@@ -514,10 +531,29 @@ export async function reindexChunk(
   return { indexed: rows.length, lastId: String(rows[rows.length - 1].id) };
 }
 
+/**
+ * A statement budget as a budgeted pass spends it: the shape of
+ * worker/lib/fx/budget.ts `StatementBudget`, which the quarter-hour cron
+ * hands in. Named here rather than imported — the FX module is imported only
+ * by the cron and the pricing doors (tests/pricingCurrencyRoles.test.ts).
+ */
+export interface PassBudget {
+  readonly limit: number;
+  readonly used: number;
+  canSpend(n: number): boolean;
+  spend(n: number): boolean;
+}
+
 /** What one backfill pass did. `failed` is reported, never thrown. */
 export interface BackfillResult {
   indexed: number;
   failed: { id: string; error: string }[];
+  /**
+   * Products selected but left stale for a later pass because the pass's
+   * statement budget could not cover them (always 0 without a budget). They
+   * keep their old rows and are selected again, oldest id first.
+   */
+  deferred: number;
 }
 
 /**
@@ -545,13 +581,33 @@ const BACKFILL_GROUP = 10;
  * so the next selection moves past it, and returned in `failed` for the cron
  * report. Its old rows, if it had any, are untouched — a batch is atomic — so
  * it stays findable by whatever it was findable by before.
+ *
+ * WITH A STATEMENT BUDGET (the quarter-hour cron, worker/index.ts): D1 allows
+ * 1,000 statements per invocation and a product costs two plus one per index
+ * row, so fifty products can cost more than a whole tick. Every statement is
+ * charged BEFORE it is sent — the selection, the name reads
+ * (`searchDocReadCount`), each group's batch, each retry and each mark — and
+ * a product whose rows the budget cannot cover is not sent: it keeps its old
+ * rows and its stale stamp, so the next pass selects it again (`deferred`).
+ * A batch is sent only when the budget also covers its failure (the retries
+ * and the marks), so a failing product is still found and marked within the
+ * pass. Nothing is lost and nothing is written twice: a product is either
+ * written whole, with its stamp, in one batch, or left exactly as it was. A
+ * product whose batch and mark are more than `ceiling` (the most any budget
+ * handed to this pass can be) less the pass's own reads can never be written
+ * by one — it is marked and reported like a write that failed, instead of
+ * being selected first and skipped on every tick. Without a budget the pass
+ * is exactly what it was.
  */
 export async function backfillSearchIndex(
   db: D1Database,
-  opts: { limit?: number; scope?: { sql: string; params: unknown[] } } = {}
+  opts: { limit?: number; scope?: { sql: string; params: unknown[] }; budget?: PassBudget; ceiling?: number } = {}
 ): Promise<BackfillResult> {
   const limit = opts.limit ?? 50;
   const scope = opts.scope;
+  const budget = opts.budget ?? null;
+  const out: BackfillResult = { indexed: 0, failed: [], deferred: 0 };
+  if (budget && !budget.spend(1)) return out;
   const { results } = await db
     .prepare(
       `SELECT ${searchDocColumns('p')}
@@ -566,41 +622,101 @@ export async function backfillSearchIndex(
     .bind(INDEX_STAMP, INDEX_FAILED_MARK, ...(scope?.params ?? []), limit)
     .all<Record<string, unknown>>();
   const rows = results ?? [];
-  const out: BackfillResult = { indexed: 0, failed: [] };
   if (rows.length === 0) return out;
+  if (budget && !budget.spend(searchDocReadCount(rows))) {
+    out.deferred = rows.length;
+    return out;
+  }
 
   // THE SAME DOCUMENT THE SAVE PATH WRITES, from the same builder. The cron
   // once composed its own and dropped the option names; two writers of one
   // index must not be two documents.
   const docs = await searchDocsForRows(db, rows);
-  for (let i = 0; i < docs.length; i += BACKFILL_GROUP) {
-    const group = docs.slice(i, i + BACKFILL_GROUP);
+  const spend = (n: number) => !budget || budget.spend(n);
+  // WITH A BUDGET, A BATCH IS SENT ONLY WHEN ITS FAILURE IS PAID FOR TOO:
+  // a group of k products and S statements may need S more to retry each
+  // product alone, and k marks — so it reserves 2S + k. A lone product's retry
+  // would be the same batch again, so it reserves its batch and one mark.
+  // Without this a failing group near the end of the budget could not be
+  // retried, and the next pass would build the same group again: the very
+  // stall this function exists to prevent.
+  const need = (count: number, statements: number) => (count === 1 ? statements + 1 : 2 * statements + count);
+  const fits = (count: number, statements: number) => !budget || budget.canSpend(need(count, statements));
+  const mark = async (doc: SearchDoc, error: string) => {
+    out.failed.push({ id: doc.productId, error });
+    // No room to write the mark down: selected and reported again next pass.
+    if (!spend(1)) return;
     try {
-      await db.batch(group.flatMap((doc) => planSearchIndex(db, doc)));
-      out.indexed += group.length;
-      continue;
+      await db
+        .prepare('INSERT OR REPLACE INTO search_tokens (product_id, token, weight) VALUES (?, ?, 0)')
+        .bind(doc.productId, INDEX_FAILED_MARK)
+        .run();
     } catch {
+      // Could not even mark it. It will be selected again next run, and
+      // reported again — which is noisy, and still honest.
+    }
+  };
+  const write = async (group: { doc: SearchDoc; stmts: D1PreparedStatement[] }[]) => {
+    const stmts = group.flatMap((p) => p.stmts);
+    // Reserved as the group was built; never false here.
+    if (!spend(stmts.length)) {
+      out.deferred += group.length;
+      return;
+    }
+    try {
+      await db.batch(stmts);
+      out.indexed += group.length;
+      return;
+    } catch (e) {
+      if (budget && group.length === 1) {
+        await mark(group[0].doc, e instanceof Error ? e.message : String(e));
+        return;
+      }
       // Fall through to one product at a time, to find the one that failed.
     }
-    for (const doc of group) {
+    for (const { doc } of group) {
+      const own = planSearchIndex(db, doc);
+      if (!spend(own.length)) {
+        out.deferred += 1;
+        continue;
+      }
       try {
-        await db.batch(planSearchIndex(db, doc));
+        await db.batch(own);
         out.indexed += 1;
       } catch (e) {
-        const error = e instanceof Error ? e.message : String(e);
-        out.failed.push({ id: doc.productId, error });
-        try {
-          await db
-            .prepare('INSERT OR REPLACE INTO search_tokens (product_id, token, weight) VALUES (?, ?, 0)')
-            .bind(doc.productId, INDEX_FAILED_MARK)
-            .run();
-        } catch {
-          // Could not even mark it. It will be selected again next run, and
-          // reported again — which is noisy, and still honest.
-        }
+        await mark(doc, e instanceof Error ? e.message : String(e));
       }
     }
+  };
+
+  // The most any budgeted pass could ever spend on one product: its batch and its mark.
+  const largest = budget ? (opts.ceiling ?? budget.limit) - budget.used : Infinity;
+  let group: { doc: SearchDoc; stmts: D1PreparedStatement[] }[] = [];
+  let size = 0;
+  const flush = async () => {
+    if (group.length > 0) await write(group);
+    group = [];
+    size = 0;
+  };
+  for (const doc of docs) {
+    const stmts = planSearchIndex(db, doc);
+    if (need(1, stmts.length) > largest) {
+      // Never written by any budgeted pass: marked now (after what is already
+      // grouped), so it is reported once and never selected again.
+      await flush();
+      await mark(doc, `needs ${stmts.length} statements, more than one budgeted pass may spend (${largest - 1})`);
+      continue;
+    }
+    if (group.length > 0 && !fits(group.length + 1, size + stmts.length)) await flush();
+    if (!fits(group.length + 1, size + stmts.length)) {
+      out.deferred += 1;
+      continue;
+    }
+    group.push({ doc, stmts });
+    size += stmts.length;
+    if (group.length === BACKFILL_GROUP) await flush();
   }
+  await flush();
   return out;
 }
 
