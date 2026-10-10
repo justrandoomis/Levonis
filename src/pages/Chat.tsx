@@ -28,6 +28,7 @@ import ChatCardView, { SystemEventCard } from '../components/chat/cards/ChatCard
 import { ChatCardActionsContext, type ChatCardActions, type CustomProductPrefill, type QuotePrefill } from '../components/chat/cards/cardContext';
 import { newClientId, type ChatCard, type ChatThreadInfo } from '../lib/chatCards';
 import { toast } from '../lib/toastStore';
+import { IconButton } from '../components/ui/Button';
 // Link cards (§9.4): the bubble, the words, and the chat's own send.
 import { Link2 } from 'lucide-react';
 import LinkCard from '../components/community/links/LinkCard';
@@ -631,7 +632,7 @@ export default function Chat() {
 
   if (notFound) {
     return (
-      <div className="h-full min-h-0 w-full bg-canvas flex flex-col items-center justify-center gap-4 p-8 font-sans">
+      <div className="h-full min-h-0 w-full flex flex-col items-center justify-center gap-4 p-8 font-sans">
         <MessageSquare className="w-14 h-14 text-text-muted opacity-60" strokeWidth={1} />
         <p className="max-w-md text-text-secondary text-center leading-relaxed">
           {dir === 'rtl' ? 'المحادثة غير موجودة أو لا يمكنك الوصول إليها' : 'Conversation not found or you do not have access to it'}
@@ -656,7 +657,7 @@ export default function Chat() {
       // admin's order panel uses — so what one side sends, the other can play.
       return (
         <div
-          className={`${mine ? 'bg-surface-selected ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-lg max-w-[min(80%,24rem)] mt-1 p-2 text-[14px] text-text-primary ${faded ? 'opacity-60' : ''}`}
+          className={`${mine ? 'bg-surface-selected ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-xl shadow-xs max-w-[min(80%,24rem)] mt-1 p-2 text-[14px] text-text-primary ${faded ? 'opacity-60' : ''}`}
         >
           <ChatAttachment kind={kind as ChatAttachmentKind} url={fileUrl} loc={loc} />
           {body && <p dir="auto" className="mt-1 px-1 whitespace-pre-wrap break-words">{body}</p>}
@@ -665,7 +666,7 @@ export default function Chat() {
     }
     if (isAttachmentKind(kind)) {
       return (
-        <div className={`${mine ? 'ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-lg max-w-[min(76%,24rem)] mt-1 overflow-hidden bg-surface ${faded ? 'opacity-60' : ''}`}>
+        <div className={`${mine ? 'ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'ltr:rounded-tl-sm rtl:rounded-tr-sm'} rounded-xl shadow-xs max-w-[min(76%,24rem)] mt-1 overflow-hidden bg-surface ${faded ? 'opacity-60' : ''}`}>
           {fileUrl ? (
             <img referrerPolicy="no-referrer" src={fileUrl} alt="" className="w-full h-auto object-cover max-h-[300px]" />
           ) : (
@@ -679,7 +680,7 @@ export default function Chat() {
     return (
       <div
         dir="auto"
-        className={`${mine ? 'bg-surface-selected text-text-primary ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface text-text-primary ltr:rounded-tl-sm rtl:rounded-tr-sm'} px-3.5 py-2.5 rounded-lg text-[14px] sm:text-[15px] leading-relaxed max-w-[min(80%,34rem)] mt-1 whitespace-pre-wrap break-words ${faded ? 'opacity-60' : ''}`}
+        className={`${mine ? 'bg-surface-selected text-text-primary ltr:rounded-tr-sm rtl:rounded-tl-sm' : 'bg-surface text-text-primary ltr:rounded-tl-sm rtl:rounded-tr-sm'} px-3.5 py-2.5 rounded-xl shadow-xs text-[14px] sm:text-[15px] leading-relaxed max-w-[min(80%,34rem)] mt-1 whitespace-pre-wrap break-words ${faded ? 'opacity-60' : ''}`}
       >
         {body}
       </div>
@@ -716,7 +717,7 @@ export default function Chat() {
 
   return (
     <ChatCardActionsContext.Provider value={cardActions}>
-    <div data-chat-layout className="h-full min-h-0 w-full bg-canvas flex flex-col font-sans text-text-secondary">
+    <div data-chat-layout className="h-full min-h-0 w-full flex flex-col font-sans text-text-secondary">
       <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
       <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
       <input type="file" multiple accept={CHAT_FILE_ACCEPT} className="hidden" ref={documentInputRef} onChange={handleFileSelect} data-chat-document-input />
@@ -724,14 +725,14 @@ export default function Chat() {
       {/* Header */}
       <header className="lv-character-header shrink-0 bg-canvas px-3 sm:px-4 py-2 items-center border-b border-border-subtle/70">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-label={dir === 'rtl' ? 'رجوع' : 'Back'}
-            onClick={() => navigate(-1)}
-            className="min-w-11 min-h-11 -ms-2 rounded-md inline-flex items-center justify-center hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-text-primary"
-          >
-            {dir === 'rtl' ? <ArrowRight className="w-5 h-5" strokeWidth={2} /> : <ArrowLeft className="w-5 h-5" strokeWidth={2} />}
-          </button>
+          <IconButton
+            label={dir === 'rtl' ? 'رجوع' : 'Back'}
+            onClick={() => {
+              navigate(-1);
+            }}
+            className="-ms-2 text-text-primary"
+            icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" strokeWidth={2} /> : <ArrowLeft className="w-5 h-5" strokeWidth={2} />}
+          />
           {thread?.store && thread.role !== 'merchant' && (
             <button
               type="button"
@@ -766,16 +767,13 @@ export default function Chat() {
             {presence.typing ? loc('يكتب الآن…', 'Typing…', 'دەنووسێت…') : ''}
           </span>
           {thread?.store && (thread.role === 'customer' || thread.role === 'merchant') && (
-            <button
-              type="button"
+            <IconButton
               onClick={() => setOrdersOpen(true)}
-              aria-label={loc('الطلبات', 'Orders')}
+              label={loc('الطلبات', 'Orders')}
               title={loc('الطلبات', 'Orders')}
               data-chat-orders
-              className="min-w-11 min-h-11 rounded-md inline-flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <Receipt className="w-5 h-5" strokeWidth={1.75} />
-            </button>
+              icon={<Receipt className="w-5 h-5" strokeWidth={1.75} />}
+            />
           )}
         </div>
       </header>
@@ -928,14 +926,13 @@ export default function Chat() {
           /* RECORDING REPLACES THE BAR: one thing to do — send it, or throw it
              away — and the running time says the microphone is live. */
           <div data-chat-recording className="px-3 sm:px-4 py-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={voice.cancel}
-              aria-label={dir === 'rtl' ? 'إلغاء التسجيل' : 'Discard the recording'}
-              className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <X className="w-5 h-5" strokeWidth={1.5} />
-            </button>
+            <IconButton
+              onClick={() => {
+                voice.cancel();
+              }}
+              label={dir === 'rtl' ? 'إلغاء التسجيل' : 'Discard the recording'}
+              icon={<X className="w-5 h-5" strokeWidth={1.5} />}
+            />
             <p role="status" aria-live="polite" className="flex-1 min-h-11 flex items-center gap-2 text-sm text-text-primary">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" aria-hidden="true" />
               {dir === 'rtl' ? 'جارٍ التسجيل' : 'Recording'}
@@ -946,7 +943,7 @@ export default function Chat() {
               onClick={sendVoice}
               aria-label={dir === 'rtl' ? 'إرسال الرسالة الصوتية' : 'Send the voice message'}
               data-mascot="send"
-              className="min-w-11 min-h-11 inline-flex items-center justify-center text-canvas bg-primary-fill rounded-md hover:bg-primary-fill-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-primary w-11 shrink-0 px-0"
             >
               <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2.2} />
             </button>
@@ -956,20 +953,19 @@ export default function Chat() {
           {/* A browser with no recorder gets no microphone, rather than one
               that fails on every tap. */}
           {voice.supported && (
-            <button
-              type="button"
+            <IconButton
               disabled={uploading}
-              onClick={startVoice}
+              onClick={() => {
+                void startVoice();
+              }}
               data-chat-voice
-              aria-label={dir === 'rtl' ? 'تسجيل رسالة صوتية' : 'Record a voice message'}
+              label={dir === 'rtl' ? 'تسجيل رسالة صوتية' : 'Record a voice message'}
               title={dir === 'rtl' ? 'تسجيل رسالة صوتية' : 'Record a voice message'}
-              className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-raised disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            >
-              <Mic className="w-5 h-5" strokeWidth={1.5} />
-            </button>
+              icon={<Mic className="w-5 h-5" strokeWidth={1.5} />}
+            />
           )}
 
-          <div className="flex-1 min-h-11 bg-surface-raised rounded-lg flex items-center px-3 border border-border-subtle relative">
+          <div className="flex-1 min-h-11 lv-well rounded-lg flex items-center px-3 border border-[var(--clay-field)] focus-within:border-focus relative">
             <input
               type="text"
               value={inputText}
@@ -1000,28 +996,27 @@ export default function Chat() {
                type="button"
                aria-label={dir === 'rtl' ? 'إرسال الرسالة' : 'Send message'}
                data-mascot="send"
-               className="min-w-11 min-h-11 inline-flex items-center justify-center text-canvas bg-primary-fill rounded-md hover:bg-primary-fill-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+               className="lv-button lv-button-primary w-11 shrink-0 px-0"
                onClick={handleSendMessage}
              >
                <Send className="w-4 h-4 rtl:-scale-x-100" strokeWidth={2.2} />
              </button>
           ) : (
-            <button
-              type="button"
+            <IconButton
               data-chat-plus
               data-mascot="upload"
-              aria-label={dir === 'rtl' ? 'إرفاق' : 'Attach'}
+              label={dir === 'rtl' ? 'إرفاق' : 'Attach'}
               aria-expanded={isPlusMenuOpen}
-              className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-md text-text-primary hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus relative"
               onClick={() => {
                 setIsPlusMenuOpen(!isPlusMenuOpen);
                 setShowEmojiPicker(false);
               }}
-            >
-              <div className={`transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : 'rotate-0'}`}>
-                <Plus className="w-5 h-5" strokeWidth={1.5} />
-              </div>
-            </button>
+              icon={
+                <span className={`inline-flex transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : 'rotate-0'}`}>
+                  <Plus className="w-5 h-5" strokeWidth={1.5} />
+                </span>
+              }
+            />
           )}
         </div>
         )}

@@ -97,15 +97,15 @@ export default function ProductPickerSheet({
           <h2 id={titleId} className="text-center text-[16px] font-extrabold text-text-primary">
             {title ?? loc('أرسل منتجًا', 'Send a product')}
           </h2>
-          <label className="mt-3 flex min-h-11 items-center gap-2 rounded-lg border border-border-subtle bg-surface-raised px-3">
-            <Search className="w-4 h-4 text-text-muted shrink-0" aria-hidden="true" />
+          <label className="relative mt-3 block">
+            <Search className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden="true" />
             <input
+              className="lv-input min-h-11 rounded-full ps-10 text-[15px]"
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={loc('ابحث في منتجات المتجر', 'Search the store’s products')}
               aria-label={loc('ابحث في منتجات المتجر', 'Search the store’s products')}
-              className="min-w-0 flex-1 bg-transparent text-[15px] text-text-primary outline-none placeholder:text-text-muted"
             />
           </label>
           {/* OWNER: Sorani to be written by hand (this sheet). */}

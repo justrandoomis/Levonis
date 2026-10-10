@@ -70,7 +70,7 @@ function MiniPage({ theme }: { theme: Theme }) {
 
 function Preview({ choice }: { choice: ThemePreference }) {
   return (
-    <span aria-hidden className="relative block aspect-[4/5] w-full overflow-hidden rounded-[14px]">
+    <span aria-hidden className="relative block aspect-[4/5] w-full overflow-hidden rounded-md">
       {choice === 'system' ? (
         <>
           <MiniPage theme="light" />
@@ -165,10 +165,10 @@ export default function ThemeIntroSheet() {
       panelClassName="w-full sm:max-w-md"
     >
       <div className="px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-5 sm:pb-6">
-        <h2 id="theme-intro-title" className="text-center text-[19px] font-bold text-white">
+        <h2 id="theme-intro-title" className="text-center text-[19px] font-bold text-text-primary">
           {loc('اختر المظهر', 'Choose your look')}
         </h2>
-        <p className="mx-auto mt-1 max-w-[18rem] text-center text-[13px] leading-relaxed text-zinc-400">
+        <p className="mx-auto mt-1 max-w-[18rem] text-center text-[13px] leading-relaxed text-text-secondary">
           {loc('فاتح أو داكن، أو دعه يتبع إعداد جهازك.', 'Light or dark — or let it follow your device.')}
         </p>
 
@@ -182,9 +182,7 @@ export default function ThemeIntroSheet() {
                 aria-pressed={on}
                 data-theme-intro-choice={o.id}
                 onClick={(e) => pick(o.id, e)}
-                className={`group flex min-h-[44px] flex-col items-stretch gap-2 rounded-[18px] p-1.5 text-center transition-[box-shadow,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
-                  on ? 'bg-surface-selected ring-2 ring-gold' : 'bg-surface ring-1 ring-white/10 hover:ring-white/25'
-                }`}
+                className="lv-choice group flex min-h-[44px] flex-col items-stretch gap-2 rounded-lg p-1.5 text-center"
               >
                 <span className="relative block">
                   <Preview choice={o.id} />
@@ -198,22 +196,22 @@ export default function ThemeIntroSheet() {
                   </span>
                 </span>
                 <span className="px-0.5 pb-1">
-                  <span className={`block text-[13px] font-bold ${on ? 'text-white' : 'text-zinc-300'}`}>{o.label}</span>
-                  <span className="block text-[11px] text-zinc-500">{o.hint}</span>
+                  <span className="block text-[13px] font-bold">{o.label}</span>
+                  <span className="block text-[11px] text-text-muted">{o.hint}</span>
                 </span>
               </button>
             );
           })}
         </div>
 
-        <p id="theme-intro-note" className="mt-4 text-center text-[12px] leading-relaxed text-zinc-500">
+        <p id="theme-intro-note" className="mt-4 text-center text-[12px] leading-relaxed text-text-muted">
           {loc('يمكنك تغييره لاحقًا من الإعدادات ← المظهر.', 'You can change it any time in Settings → Appearance.')}
         </p>
 
         <button
           type="button"
           onClick={close}
-          className="mt-4 min-h-[48px] w-full rounded-xl bg-gold px-5 text-[15px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90"
+          className="lv-button lv-button-primary mt-4 min-h-12 w-full text-[15px]"
         >
           {loc('تم', 'Done')}
         </button>

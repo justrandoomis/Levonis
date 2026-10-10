@@ -71,9 +71,9 @@ const STRINGS = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-900/30 text-amber-400',
-  published: 'bg-emerald-900/30 text-emerald-400',
-  rejected: 'bg-red-900/30 text-red-400',
+  pending: 'lv-chip [--chip:var(--color-warning)]',
+  published: 'lv-chip [--chip:var(--color-success)]',
+  rejected: 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
 };
 
 export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -120,7 +120,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
 
   if (!isAuthenticated) {
     return (
-      <div className="text-center py-12 text-zinc-500">
+      <div className="text-center py-12 text-text-muted">
         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" aria-hidden="true" />
         <p className="text-[13px] font-medium mb-3">{s.signIn}</p>
         <button
@@ -144,12 +144,12 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
 
   if (error) {
     return (
-      <div className="text-center py-12 text-zinc-500">
-        <p className="text-[13px] text-red-500 mb-3">{error}</p>
+      <div className="text-center py-12 text-text-muted">
+        <p className="text-[13px] text-danger mb-3">{error}</p>
         <button
           type="button"
           onClick={load}
-          className="min-h-[44px] px-6 inline-flex items-center gap-1.5 rounded-xl border text-[13px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold border-white/15 text-zinc-300 hover:bg-white/5"
+          className="lv-button lv-button-secondary px-6"
         >
           <RefreshCw className="w-4 h-4" aria-hidden="true" />
           {s.retry}
@@ -160,7 +160,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
 
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-12 text-zinc-500">
+      <div className="text-center py-12 text-text-muted">
         <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" aria-hidden="true" />
         <p className="text-[13px] font-medium px-6 leading-relaxed">{s.empty}</p>
       </div>
@@ -172,7 +172,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
       {reviews.map((r) => {
         // §3/§12: the product name is English in every language and is never translated.
         const name = r.product_name || '';
-        const statusCls = STATUS_STYLES[r.status] ?? 'bg-zinc-800 text-zinc-400';
+        const statusCls = STATUS_STYLES[r.status] ?? 'bg-white/[0.06] text-text-secondary';
         return (
           <button
             key={r.id}
@@ -180,7 +180,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
             onClick={() => {
               if (r.product_slug) navigate(`/product/${r.product_slug}`);
             }}
-            className="rounded-[10px] p-3 text-start shadow-sm border active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/5 text-white hover:bg-white/[0.03]"
+            className="lv-surface p-3 text-start transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-text-primary"
           >
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="font-bold text-[13px] truncate">{name}</span>
@@ -197,22 +197,22 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
                 />
               ))}
             </div>
-            <p className="text-[12px] line-clamp-2 leading-snug mb-1.5 text-zinc-400">
+            <p className="text-[12px] line-clamp-2 leading-snug mb-1.5 text-text-secondary">
               {r.system_generated || r.source === 'system' ? s.systemGenerated : r.body}
             </p>
-            <div className="flex items-center justify-between text-[10px] text-zinc-500">
+            <div className="flex items-center justify-between text-[10px] text-text-muted">
               <span>{fmtDate(r.created_at)}</span>
               <span className="flex items-center gap-1">
                 {r.reward?.state === 'approved' && r.reward.kind === 'points' && r.reward.points_awarded > 0 && (
-                  <span className="font-bold text-emerald-400">
+                  <span className="font-bold text-success">
                     {s.pointsAwarded(r.reward.points_awarded)}
                   </span>
                 )}
                 {r.reward?.state === 'approved' && r.reward.kind === 'printer_gift' && (
-                  <span className="font-bold text-emerald-400">{s.giftReward}</span>
+                  <span className="font-bold text-success">{s.giftReward}</span>
                 )}
                 {!r.reward && Number(r.fallback_points_awarded) > 0 && (
-                  <span className="font-bold text-emerald-400">
+                  <span className="font-bold text-success">
                     {s.pointsAwarded(Number(r.fallback_points_awarded))}
                   </span>
                 )}

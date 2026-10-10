@@ -828,9 +828,23 @@ test('support page: the header title is width-guarded so the one bar cannot beco
   assert.match(h1[1], /\btruncate\b/, 'the title must not be allowed to wrap');
   assert.match(h1[1], /\bmin-w-0\b/, 'truncate without min-w-0 overflows the bar instead of ellipsizing');
 
-  // Back button and character slot must not absorb the shrink.
-  const backButton = header.slice(header.indexOf('<button'), header.indexOf('</button>'));
-  assert.match(backButton, /\bshrink-0\b/, 'the back button must keep its 44px hit target');
+  // Back button and character slot must not absorb the shrink. The back key
+  // is the house IconButton (clay, docs/DECISIONS.md row 209), whose own
+  // 44px target is `h-11 w-11 shrink-0`; a hand-drawn <button> must carry it.
+  const backAt = header.search(/<(?:button|IconButton)\b/);
+  assert.ok(backAt >= 0, 'the header has no back control');
+  if (header.startsWith('<IconButton', backAt)) {
+    const back = header.slice(backAt, header.indexOf('/>', backAt));
+    assert.match(back, /label=\{s\.back\}/, 'the first control in the header is the back button');
+    assert.match(
+      read('src/components/ui/Button.tsx'),
+      /data-icon-button[\s\S]{0,200}inline-flex h-11 w-11 shrink-0/,
+      'the back button must keep its 44px hit target'
+    );
+  } else {
+    const backButton = header.slice(backAt, header.indexOf('</button>', backAt));
+    assert.match(backButton, /\bshrink-0\b/, 'the back button must keep its 44px hit target');
+  }
   assert.match(
     header,
     /<div className="[^"]*\bshrink-0\b[^"]*">\s*<MotionCharacterHome kind="top-header" compact busy=\{busy\} \/>/,

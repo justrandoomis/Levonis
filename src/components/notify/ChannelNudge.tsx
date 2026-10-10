@@ -390,7 +390,7 @@ export default function ChannelNudge({ context, active }: ChannelNudgeProps) {
     >
       <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5" data-channel-nudge={context}>
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gold/15 text-gold">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-gold/15 text-gold">
             <BellRing aria-hidden="true" className="h-5 w-5" strokeWidth={1.7} />
           </span>
           <div className="min-w-0">

@@ -196,13 +196,9 @@ export default function AddressForm({
   }
 
   const gap = dense ? 'space-y-2.5' : 'space-y-3.5';
-  const field =
-    'w-full min-h-[46px] rounded-xl bg-zinc-900/60 border px-3 text-white text-[14px] outline-none transition-colors placeholder:text-zinc-600 focus-visible:border-gold/60';
-  const ok = 'border-zinc-800 hover:border-zinc-700';
-  const bad = 'border-red-500/60';
-  const labelCls = 'block text-[12px] font-medium text-zinc-400 mb-1.5';
-  const errCls = 'mt-1 text-[12px] text-red-400';
-  const req = <span aria-hidden="true" className="text-red-400 ms-0.5">*</span>;
+  const labelCls = 'block text-[13px] font-semibold text-text-secondary mb-1.5';
+  const errCls = 'lv-field-error';
+  const req = <span aria-hidden="true" className="text-danger ms-0.5">*</span>;
 
   return (
     <div className={gap}>
@@ -213,6 +209,7 @@ export default function AddressForm({
         </label>
         <input
           id="addr-name"
+          className="lv-input text-[14px]"
           ref={refs.name}
           name="name"
           autoComplete="name"
@@ -221,7 +218,6 @@ export default function AddressForm({
           aria-invalid={!!fieldErrors.name}
           aria-describedby={fieldErrors.name ? 'addr-name-err' : undefined}
           placeholder={loc('الاسم الكامل', 'Full name', 'ناوی تەواو')}
-          className={`${field} ${fieldErrors.name ? bad : ok}`}
         />
         {fieldErrors.name ? (
           <p id="addr-name-err" className={errCls}>
@@ -239,6 +235,7 @@ export default function AddressForm({
             every script, but it belongs on the reading edge of an RTL form. */}
         <input
           id="addr-phone"
+          className="lv-input text-[14px] text-start tabular-nums"
           ref={refs.phone}
           name="tel"
           type="tel"
@@ -250,7 +247,6 @@ export default function AddressForm({
           aria-invalid={!!fieldErrors.phone}
           aria-describedby={fieldErrors.phone ? 'addr-phone-err' : 'addr-phone-hint'}
           placeholder="07701234567"
-          className={`${field} text-start tabular-nums ${fieldErrors.phone ? bad : ok}`}
         />
         {fieldErrors.phone ? (
           <p id="addr-phone-err" className={errCls}>
@@ -271,13 +267,13 @@ export default function AddressForm({
           </label>
           <select
             id="addr-gov"
+          className="lv-input text-[14px]"
             ref={refs.governorate}
             name="address-level1"
             autoComplete="address-level1"
             value={governorate}
             onChange={(e) => setGovernorate(e.target.value)}
             aria-invalid={!!fieldErrors.governorate}
-            className={`${field} ${fieldErrors.governorate ? bad : ok}`}
           >
             <option value="">{loc('اختر المحافظة', 'Choose a governorate', 'پارێزگا هەڵبژێرە')}</option>
             {legacyGovernorate ? (
@@ -299,12 +295,12 @@ export default function AddressForm({
           </label>
           <input
             id="addr-area"
+          className="lv-input text-[14px]"
             name="address-level2"
             autoComplete="address-level2"
             value={area}
             onChange={(e) => setArea(e.target.value)}
             placeholder={loc('مثال: الكرادة', 'e.g. Karrada', 'نموونە: کەڕادە')}
-            className={`${field} ${ok}`}
           />
         </div>
       </div>
@@ -316,6 +312,7 @@ export default function AddressForm({
         </label>
         <textarea
           id="addr-street"
+          className="lv-input py-2.5 text-[14px] leading-relaxed resize-none"
           ref={refs.address}
           name="street-address"
           autoComplete="street-address"
@@ -324,7 +321,6 @@ export default function AddressForm({
           onChange={(e) => setAddress(e.target.value)}
           aria-invalid={!!fieldErrors.address}
           placeholder={loc('الحي، الشارع، رقم الدار…', 'District, street, house number…', 'گەڕەک، شەقام، ژمارەی ماڵ…')}
-          className={`${field} py-2.5 resize-none ${fieldErrors.address ? bad : ok}`}
         />
         {fieldErrors.address ? <p className={errCls}>{fieldErrors.address}</p> : null}
       </div>
@@ -336,10 +332,10 @@ export default function AddressForm({
           </label>
           <input
             id="addr-landmark"
+          className="lv-input text-[14px]"
             value={landmark}
             onChange={(e) => setLandmark(e.target.value)}
             placeholder={loc('اختياري', 'Optional', 'ئارەزوومەندانە')}
-            className={`${field} ${ok}`}
           />
         </div>
         <div>
@@ -348,10 +344,10 @@ export default function AddressForm({
           </label>
           <input
             id="addr-label"
+          className="lv-input text-[14px]"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder={loc('البيت، العمل…', 'Home, Work…', 'ماڵ، کار…')}
-            className={`${field} ${ok}`}
           />
         </div>
       </div>
@@ -362,16 +358,16 @@ export default function AddressForm({
         </label>
         <textarea
           id="addr-notes"
+          className="lv-input py-2.5 text-[14px] leading-relaxed resize-none"
           rows={2}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder={loc('مثال: اتصل قبل الوصول', 'e.g. call before arriving', 'نموونە: پێش هاتن پەیوەندی بکە')}
-          className={`${field} py-2.5 resize-none ${ok}`}
         />
       </div>
 
       {formError ? (
-        <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-[13px] text-red-300">
+        <p role="alert" className="lv-alert lv-alert-danger text-[13px] text-text-primary">
           {formError}
         </p>
       ) : null}
@@ -381,7 +377,7 @@ export default function AddressForm({
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-[48px] px-5 rounded-xl border border-zinc-800 bg-zinc-900/60 text-zinc-300 font-bold text-[14px] hover:border-zinc-600 transition-colors [touch-action:manipulation]"
+            className="lv-button lv-button-secondary min-h-12 px-5 [touch-action:manipulation]"
           >
             {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
           </button>
@@ -393,7 +389,7 @@ export default function AddressForm({
           type="button"
           onClick={save}
           disabled={busy}
-          className="flex-1 min-h-[48px] rounded-xl bg-gold text-accent-contrast font-black text-[15px] flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-45 transition-[filter,opacity] duration-150 active:scale-[0.99] [touch-action:manipulation]"
+          className="lv-button lv-button-primary flex-1 min-h-12 text-[15px] [touch-action:manipulation]"
         >
           {busy ? (
             <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />

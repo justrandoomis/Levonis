@@ -27,6 +27,7 @@ import { useAuth } from '../AuthContext';
 import { api, ApiError } from '../lib/api';
 import { classifyError, ErrorState, EmptyState, UnauthorizedState } from '../components/ui/AsyncStates';
 import { Sheet } from '../components/ui/Overlay';
+import { IconButton } from '../components/ui/Button';
 import { Search, MessageSquare, X, Bot, LifeBuoy, ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react';
 
 const STRINGS = {
@@ -325,7 +326,7 @@ export default function Chats() {
           action={
             <Link
               to={`/auth?next=${encodeURIComponent('/chats')}`}
-              className="mt-1 min-h-[44px] px-5 rounded-xl bg-gold text-accent-contrast text-sm font-bold flex items-center"
+              className="lv-button lv-button-primary mt-1"
             >
               {s.signIn}
             </Link>
@@ -368,24 +369,24 @@ export default function Chats() {
             <button
               key={chat.id}
               onClick={() => navigate(`/chat/${chat.id}`)}
-              className="flex items-center gap-4 px-4 py-3 min-h-[64px] transition-colors border-b text-start w-full hover:bg-white/5 border-white/5"
+              className="flex items-center gap-4 px-4 py-3 min-h-[64px] transition-colors border-b text-start w-full hover:bg-white/5 active:bg-[var(--clay-well-bg)] border-border-subtle"
             >
               <div className="relative">
-                <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden border bg-zinc-800 border-white/5">
-                  <span className="text-lg font-bold text-white">{name.charAt(0).toUpperCase()}</span>
+                <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden border bg-surface-raised border-border-subtle">
+                  <span className="text-lg font-bold text-text-primary">{name.charAt(0).toUpperCase()}</span>
                 </div>
                 {chat.unread > 0 && (
-                  <span className="absolute top-0 end-0 bg-[#ff5000] text-snow text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-canvas">
+                  <span className="absolute top-0 end-0 bg-crimson text-snow text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-canvas">
                     {chat.unread > 99 ? '99+' : chat.unread}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-[16px] font-bold truncate text-white">{name}</h3>
-                  <span className="text-[12px] text-zinc-500 whitespace-nowrap ms-2">{formatChatTime(chat.last_at, lang)}</span>
+                  <h3 className="text-[16px] font-bold truncate text-text-primary">{name}</h3>
+                  <span className="text-[12px] text-text-muted whitespace-nowrap ms-2">{formatChatTime(chat.last_at, lang)}</span>
                 </div>
-                <p className="text-[14px] truncate text-zinc-400">{chat.last_message || s.noMessages}</p>
+                <p className="text-[14px] truncate text-text-secondary">{chat.last_message || s.noMessages}</p>
               </div>
             </button>
           );
@@ -415,75 +416,76 @@ export default function Chats() {
   */
   return (
     <div
-      className="w-full min-h-screen flex flex-col font-sans bg-canvas text-text-secondary"
+      className="w-full min-h-screen flex flex-col font-sans text-text-secondary"
       dir={dir}
     >
       {/* Header */}
       <div className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b bg-canvas border-border-subtle/60">
-        <h1 className="font-bold text-2xl text-white">{t('webCenter') || s.title}</h1>
-        <button
+        <h1 className="font-bold text-2xl text-text-primary">{t('webCenter') || s.title}</h1>
+        <IconButton
           onClick={() => {
             setShowSearch((v) => !v);
             setSearch('');
           }}
-          aria-label={showSearch ? s.searchClose : s.searchOpen}
+          label={showSearch ? s.searchClose : s.searchOpen}
           aria-expanded={showSearch}
-          className="w-11 h-11 -me-2 flex items-center justify-center rounded-full transition-colors hover:bg-white/10 text-white"
-        >
-          {showSearch ? <X aria-hidden="true" className="w-6 h-6" /> : <Search aria-hidden="true" className="w-6 h-6" />}
-        </button>
+          className="-me-2"
+          icon={showSearch ? <X aria-hidden="true" className="w-6 h-6" /> : <Search aria-hidden="true" className="w-6 h-6" />}
+        />
       </div>
 
       {showSearch && (
-        <div className="px-4 py-2 border-b bg-canvas border-white/5">
+        <div className="px-4 py-2 border-b bg-canvas border-border-subtle">
           <input
+            className="lv-input min-h-11 rounded-full px-4 text-sm"
             type="text"
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={s.search}
             aria-label={s.search}
-            className="w-full min-h-[44px] border rounded-full py-2 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gold bg-zinc-900 border-white/10 text-white"
           />
         </div>
       )}
 
       {/* PERMANENT support entries — rendered before, during and after every
           list state, and for signed-out visitors too. */}
-      <div className="px-4 pt-3 pb-1 flex flex-col gap-2">
+      <div className="px-4 pt-3 pb-1">
+        <div className="lv-surface overflow-hidden divide-y divide-border-subtle">
         <button
           type="button"
           data-testid="chats-assistant"
           onClick={() => navigate('/support')}
-          className="w-full min-h-[64px] flex items-center gap-3 rounded-2xl border px-4 py-3 text-start hover:border-gold/60 transition-colors border-zinc-800 bg-zinc-900/60"
+          className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-white/5 active:bg-[var(--clay-well-bg)]"
         >
-          <span className="w-11 h-11 rounded-xl bg-gold/15 border border-gold/30 flex items-center justify-center shrink-0">
+          <span className="size-11 rounded-md bg-gold/15 border border-gold/30 flex items-center justify-center shrink-0">
             <Bot aria-hidden="true" className="w-5 h-5 text-gold" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block font-bold text-[15px] text-white">{s.assistant}</span>
-            <span className="block text-[12px] truncate text-zinc-400">{s.assistantDesc}</span>
+            <span className="block font-bold text-[15px] text-text-primary">{s.assistant}</span>
+            <span className="block text-[12px] truncate text-text-secondary">{s.assistantDesc}</span>
           </span>
-          <Chevron aria-hidden="true" className="w-5 h-5 text-zinc-400 shrink-0" />
+          <Chevron aria-hidden="true" className="w-5 h-5 text-text-muted shrink-0" />
         </button>
 
         <button
           type="button"
           data-testid="chats-contact"
           onClick={openSupportSheet}
-          className="w-full min-h-[64px] flex items-center gap-3 rounded-2xl border px-4 py-3 text-start hover:border-gold/60 transition-colors border-zinc-800 bg-zinc-900/60"
+          className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-white/5 active:bg-[var(--clay-well-bg)]"
         >
-          <span className="w-11 h-11 rounded-xl bg-olive/20 border border-olive/40 flex items-center justify-center shrink-0">
+          <span className="size-11 rounded-md bg-olive/20 border border-olive/40 flex items-center justify-center shrink-0">
             <LifeBuoy aria-hidden="true" className="w-5 h-5 text-olive" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block font-bold text-[15px] text-white">{s.contact}</span>
-            <span className="block text-[12px] truncate text-zinc-400">{s.contactDesc}</span>
+            <span className="block font-bold text-[15px] text-text-primary">{s.contact}</span>
+            <span className="block text-[12px] truncate text-text-secondary">{s.contactDesc}</span>
           </span>
-          <Chevron aria-hidden="true" className="w-5 h-5 text-zinc-400 shrink-0" />
+          <Chevron aria-hidden="true" className="w-5 h-5 text-text-muted shrink-0" />
         </button>
+        </div>
         {!isAuthenticated && isLoaded ? (
-          <p className="text-[12px] text-zinc-500 px-1">{s.signInFirst}</p>
+          <p className="mt-2 text-[12px] text-text-muted px-1">{s.signInFirst}</p>
         ) : null}
       </div>
 
@@ -504,19 +506,17 @@ export default function Chats() {
       >
         <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" dir={dir}>
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className="text-white font-bold text-[16px]">{s.sheetTitle}</h2>
-              <button
-                type="button"
+              <h2 className="text-text-primary font-bold text-[16px]">{s.sheetTitle}</h2>
+              <IconButton
+                variant="secondary"
                 onClick={() => setSheetOpen(false)}
-                aria-label={s.close}
-                className="w-11 h-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300"
-              >
-                <X aria-hidden="true" className="w-5 h-5" />
-              </button>
+                label={s.close}
+                icon={<X aria-hidden="true" className="w-5 h-5" />}
+              />
             </div>
 
             {ticketsLoading ? (
-              <p className="text-zinc-400 text-sm flex items-center gap-2 py-6">
+              <p className="text-text-secondary text-sm flex items-center gap-2 py-6">
                 <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" />
                 {s.checking}
               </p>
@@ -525,48 +525,48 @@ export default function Chats() {
             ) : (
               <>
                 {openTicket ? (
-                  <div className="rounded-2xl border border-olive/40 bg-olive/10 p-3 mb-3">
-                    <p className="text-white text-[14px] font-bold">
+                  <div className="lv-alert lv-alert-info mb-3">
+                    <p className="text-text-primary text-[14px] font-bold">
                       {s.openTicket} · <span className="font-mono text-[12px]">{openTicket.id}</span>
                     </p>
-                    <p className="text-zinc-300 text-[12px] mt-1">
+                    <p className="text-text-secondary text-[12px] mt-1">
                       {openTicket.subject} — {s.ticketState}: {stateLabel(openTicket.state)}
                     </p>
-                    <p className="text-zinc-400 text-[12px] mt-1">{s.reuseNote}</p>
+                    <p className="text-text-muted text-[12px] mt-1">{s.reuseNote}</p>
                   </div>
                 ) : (
                   <label className="block mb-3">
-                    <span className="block text-zinc-300 text-[13px] font-bold mb-1">{s.subject}</span>
+                    <span className="block text-text-secondary text-[13px] font-semibold mb-1.5">{s.subject}</span>
                     <input
+                      className="lv-input text-sm"
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       placeholder={s.subjectPh}
                       maxLength={200}
-                      className="w-full min-h-[44px] bg-zinc-900 border border-zinc-800 rounded-xl px-3 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-gold"
                     />
                   </label>
                 )}
 
                 <label className="block">
-                  <span className="block text-zinc-300 text-[13px] font-bold mb-1">{s.message}</span>
+                  <span className="block text-text-secondary text-[13px] font-semibold mb-1.5">{s.message}</span>
                   <textarea
+                    className="lv-input py-3 text-sm leading-relaxed resize-y"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder={s.messagePh}
                     rows={4}
                     maxLength={4000}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-gold resize-y"
                   />
                 </label>
 
                 {formError ? (
-                  <p role="alert" className="mt-2 text-red-300 text-[13px] bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">
+                  <p role="alert" className="mt-2 lv-alert lv-alert-danger text-[13px] text-text-primary">
                     {formError}
                   </p>
                 ) : null}
                 {done ? (
-                  <p className="mt-2 text-emerald-300 text-[13px] bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-3 py-2">
+                  <p className="mt-2 lv-alert lv-alert-success text-[13px] text-text-primary">
                     {done}
                   </p>
                 ) : null}
@@ -575,7 +575,7 @@ export default function Chats() {
                   type="button"
                   onClick={submitSupport}
                   disabled={submitting}
-                  className="mt-3 w-full min-h-[48px] rounded-2xl bg-gold text-accent-contrast font-black text-[15px] flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                  className="lv-button lv-button-primary mt-3 w-full min-h-12 text-[15px]"
                 >
                   {submitting ? (
                     <Loader2 aria-hidden="true" className="w-5 h-5 animate-spin" />
@@ -587,13 +587,13 @@ export default function Chats() {
 
                 <Link
                   to="/support"
-                  className="mt-3 block text-center text-zinc-300 text-[13px] font-bold underline underline-offset-4 min-h-[44px] leading-[44px]"
+                  className="mt-3 block text-center text-text-secondary text-[13px] font-bold underline underline-offset-4 min-h-[44px] leading-[44px]"
                 >
                   {s.viewTickets}
                 </Link>
 
-                <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">{s.honesty}</p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.noMoney}</p>
+                <p className="mt-2 text-[12px] text-text-muted leading-relaxed">{s.honesty}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.noMoney}</p>
               </>
             )}
         </div>

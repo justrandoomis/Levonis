@@ -8,6 +8,7 @@ import { useSignInPrompt } from '../lib/guest';
 import { api } from '../lib/api';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { Overlay } from '../components/ui/Overlay';
+import Spinner from '../components/ui/Spinner';
 
 /**
  * THE POINTS & MISSIONS PAGE.
@@ -334,12 +335,7 @@ export default function Rewards() {
   );
 
   return (
-    <div data-testid="rewards-root" dir={dir} className="w-full bg-black min-h-screen font-sans flex flex-col text-white pb-24 overflow-y-auto relative">
-      <div
-        aria-hidden="true"
-        className="absolute top-0 left-0 w-full h-[800px] pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, #141416 0%, #0d0d0f 45%, #000000 100%)' }}
-      ></div>
+    <div data-testid="rewards-root" dir={dir} className="w-full min-h-screen font-sans flex flex-col text-text-primary pb-24 overflow-y-auto relative">
       <div
         aria-hidden="true"
         className="absolute top-0 left-0 w-full h-96 opacity-[0.07] pointer-events-none"
@@ -356,7 +352,7 @@ export default function Rewards() {
         <button
           onClick={() => navigate(-1)}
           aria-label={loc('رجوع', 'Back')}
-          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors"
+          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
         >
           <ChevronLeft aria-hidden="true" className="w-6 h-6 text-gold rtl:rotate-180" strokeWidth={2.5} />
         </button>
@@ -378,17 +374,17 @@ export default function Rewards() {
         {authLoaded && !isAuthenticated ? (
           <div className="text-center py-20">
             <Star aria-hidden="true" className="w-10 h-10 mx-auto mb-3 text-gold/70" />
-            <p className="text-zinc-300 font-medium mb-4">
+            <p className="text-text-secondary font-medium mb-4">
               {loc('سجّل الدخول لجمع النقاط ومتابعتها', 'Sign in to earn and track your points')}
             </p>
-            <button onClick={signIn} className="px-6 py-2.5 bg-gold text-accent-contrast rounded-full font-bold text-sm">
+            <button onClick={signIn} className="lv-button lv-button-primary px-6">
               {loc('تسجيل الدخول', 'Sign in')}
             </button>
           </div>
         ) : (
           <>
             {loadError && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center mb-4">
+              <div className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary text-center mb-4">
                 {loadError}
               </div>
             )}
@@ -396,10 +392,8 @@ export default function Rewards() {
               <div
                 role="status"
                 aria-live="polite"
-                className={`text-[13px] font-medium rounded-2xl p-3 text-center mb-4 border ${
-                  notice.tone === 'good'
-                    ? 'bg-gold/10 border-gold/30 text-gold'
-                    : 'bg-red-500/10 border-red-500/30 text-red-400'
+                className={`lv-alert text-[13px] font-medium text-text-primary text-center mb-4 ${
+                  notice.tone === 'good' ? 'lv-alert-success' : 'lv-alert-danger'
                 }`}
               >
                 {notice.text}
@@ -414,7 +408,7 @@ export default function Rewards() {
                   {(data?.point_balance ?? pointBalance).toLocaleString()}
                 </div>
               </div>
-              <div className="relative right-2">
+              <div className="relative end-2">
                 <div className="w-24 h-24 rounded-full relative z-10 transform -rotate-12">
                   <div className="absolute inset-0 rounded-full bg-[#6b5f3c] transform translate-x-[3px] translate-y-[4px]"></div>
                   <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#BAA369] to-[#ffe55c] border-[4px] border-gold-light flex items-center justify-center shadow-well">
@@ -425,7 +419,6 @@ export default function Rewards() {
                     </div>
                   </div>
                 </div>
-                <div className="absolute inset-0 w-24 h-24 rounded-full bg-black/20 blur-md transform translate-y-6 -translate-x-0 z-0"></div>
               </div>
             </div>
 
@@ -438,13 +431,13 @@ export default function Rewards() {
             {multiplier && (
               <div
                 data-testid="rewards-multiplier"
-                className={`rounded-[20px] p-4 mb-6 border ${
-                  boosted ? 'bg-gold/10 border-gold/30' : 'bg-zinc-900 border-white/5'
+                className={`rounded-xl p-4 mb-6 border ${
+                  boosted ? 'bg-gold/10 border-gold/30' : 'bg-surface border-border-subtle'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Sparkles aria-hidden="true" className={`w-4 h-4 ${boosted ? 'text-gold' : 'text-zinc-400'}`} />
-                  <h3 className={`font-bold text-[14px] ${boosted ? 'text-gold' : 'text-white'}`}>
+                  <Sparkles aria-hidden="true" className={`w-4 h-4 ${boosted ? 'text-gold' : 'text-text-secondary'}`} />
+                  <h3 className={`font-bold text-[14px] ${boosted ? 'text-gold' : 'text-text-primary'}`}>
                     {boosted
                       ? loc(
                           `اشتراكك يمنحك ${multiplier.label.replace('x', '')}× من النقاط`,
@@ -453,7 +446,7 @@ export default function Rewards() {
                       : loc('نقاطك بالمعدّل الأساسي (1×)', 'You earn at the standard rate (1×)')}
                   </h3>
                 </div>
-                <p className="text-zinc-300 text-[12px] leading-relaxed">
+                <p className="text-text-secondary text-[12px] leading-relaxed">
                   {boosted
                     ? loc(
                         'يُطبَّق على تسجيل الدخول اليومي والمهام والشراء والتقييمات. المُضاعِف يُثبَّت لحظة منح النقاط، فانتهاء الاشتراك لاحقًا لا يغيّر ما رَبِحته.',
@@ -470,7 +463,7 @@ export default function Rewards() {
                         )}
                 </p>
                 {boosted && multiplier.expires_at && (
-                  <p className="text-zinc-400 text-[11px] mt-2">
+                  <p className="text-text-muted text-[11px] mt-2">
                     {loc('ينتهي في', 'Ends')} {new Date(multiplier.expires_at).toLocaleDateString()}
                   </p>
                 )}
@@ -479,14 +472,14 @@ export default function Rewards() {
 
             {/* Check-in card */}
             <div className="relative mb-6 mx-1">
-              <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-[28px] transform -rotate-[2deg] translate-y-1 -translate-x-1 shadow-sm"></div>
-              <div className="bg-black rounded-[24px] p-4 shadow-sm relative z-10">
-                <div className="absolute top-5 bottom-5 left-2 flex flex-col justify-between opacity-50">
+              <div className="absolute inset-0 bg-surface-raised border border-border-subtle rounded-2xl transform -rotate-[2deg] translate-y-1 -translate-x-1 shadow-sm"></div>
+              <div className="lv-surface rounded-2xl p-4 relative z-10">
+                <div className="absolute top-5 bottom-5 start-2 flex flex-col justify-between opacity-50">
                   {[...Array(12)].map((_, i) => (
                     <div key={i} className="w-1.5 h-1.5 rounded-full bg-black/50 shadow-inner"></div>
                   ))}
                 </div>
-                <div className="absolute -top-3 right-3 text-zinc-400 transform rotate-[30deg] z-20 drop-shadow-md">
+                <div className="absolute -top-3 end-3 text-text-secondary transform rotate-[30deg] z-20 drop-shadow-md">
                   <Paperclip aria-hidden="true" className="w-6 h-6" strokeWidth={1.5} />
                 </div>
 
@@ -497,7 +490,7 @@ export default function Rewards() {
                       `You've checked in for ${data?.streak ?? 0} day${(data?.streak ?? 0) === 1 ? '' : 's'}`
                     )}
                   </h2>
-                  <p className="text-[11px] text-zinc-400 mb-4">
+                  <p className="text-[11px] text-text-secondary mb-4">
                     {loc(
                       'اليوم يُحدَّد بتوقيت بغداد على خادم المتجر — لا بتوقيت جهازك.',
                       "The day is the store server's Baghdad date — not your device's."
@@ -510,10 +503,10 @@ export default function Rewards() {
                         key={d.day}
                         className={`flex flex-col items-center flex-shrink-0 relative ${
                           d.status === 'today'
-                            ? 'w-[48px] pb-1.5 border border-gold rounded-[14px] bg-zinc-800 transform -translate-y-1 overflow-hidden animate-day-pop'
+                            ? 'w-[48px] pb-1.5 border border-gold rounded-md bg-surface-raised transform -translate-y-1 overflow-hidden animate-day-pop'
                             : d.status === 'checked'
-                              ? 'w-[42px] pt-1 pb-1.5 bg-gradient-to-b from-zinc-900 to-zinc-800 rounded-[14px]'
-                              : 'w-[42px] pt-1 pb-1.5 bg-zinc-900 rounded-[14px]'
+                              ? 'w-[42px] pt-1 pb-1.5 bg-surface-selected rounded-md'
+                              : 'w-[42px] pt-1 pb-1.5 lv-well rounded-md'
                         }`}
                       >
                         {d.status === 'today' ? (
@@ -523,7 +516,7 @@ export default function Rewards() {
                         ) : (
                           <span
                             className={`text-[10px] font-bold tracking-tight mb-1.5 ${
-                              d.status === 'checked' ? 'text-gold' : 'text-zinc-400'
+                              d.status === 'checked' ? 'text-gold' : 'text-text-secondary'
                             }`}
                           >
                             {loc(`يوم ${d.day}`, `Day ${d.day}`)}
@@ -533,7 +526,7 @@ export default function Rewards() {
                         <div className="flex items-center justify-center mb-1 h-[24px]">
                           {d.status === 'checked' ? (
                             <div className="w-[20px] h-[20px] bg-gold rounded-full flex items-center justify-center shadow-sm">
-                              <Check aria-hidden="true" className="w-3.5 h-3.5 text-black" strokeWidth={4} />
+                              <Check aria-hidden="true" className="w-3.5 h-3.5 text-onyx" strokeWidth={4} />
                             </div>
                           ) : (
                             <svg viewBox="0 0 24 24" fill="#BAA369" className="w-[20px] h-[20px]">
@@ -549,13 +542,13 @@ export default function Rewards() {
                         {/* The server's own figure. Nothing is multiplied here. */}
                         <span
                           className={`text-[11px] font-bold ${
-                            d.status === 'today' ? 'text-white' : d.status === 'checked' ? 'text-gold' : 'text-zinc-400'
+                            d.status === 'today' ? 'text-text-primary' : d.status === 'checked' ? 'text-gold' : 'text-text-secondary'
                           }`}
                         >
                           {d.points}
                         </span>
                         {d.points !== d.base_points && (
-                          <span className="text-[8px] text-zinc-500 tabular-nums">{d.base_points}×{multiplier?.label.replace('x', '')}</span>
+                          <span className="text-[8px] text-text-muted tabular-nums">{d.base_points}×{multiplier?.label.replace('x', '')}</span>
                         )}
                       </div>
                     ))}
@@ -564,11 +557,10 @@ export default function Rewards() {
                   <button
                     onClick={handleCheckIn}
                     disabled={!data || data.checked_in_today || isCheckingIn}
-                    className={`w-full min-h-[48px] py-3.5 rounded-[20px] font-bold text-[15px] transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold
-                ${!data || data.checked_in_today ? 'bg-zinc-900 text-zinc-400' : 'bg-gold text-accent-contrast'}`}
+                    className="lv-button lv-button-primary w-full min-h-12 text-[15px]"
                   >
                     {isCheckingIn ? (
-                      <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin mx-auto" />
+                      <Spinner size="sm" delayMs={0} decorative />
                     ) : data?.checked_in_today ? (
                       loc('تم التسجيل اليوم', 'Checked in')
                     ) : (
@@ -581,7 +573,7 @@ export default function Rewards() {
 
             {/* Missions */}
             <div className="mt-8 mb-8">
-              <h2 className="text-[17px] font-bold mb-4 px-1 text-white">{loc('اجمع النقاط', 'Earn Points')}</h2>
+              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points')}</h2>
               <div className="space-y-3 px-1">
                 {!data && !loadError && (
                   <div className="flex justify-center py-6">
@@ -589,7 +581,7 @@ export default function Rewards() {
                   </div>
                 )}
                 {allDailyDone && (
-                  <div className="text-zinc-400 text-center py-4 text-sm">
+                  <div className="text-text-secondary text-center py-4 text-sm">
                     {loc('أنهيت كل مهام اليوم.', "You're all caught up for today!")}
                   </div>
                 )}
@@ -599,10 +591,10 @@ export default function Rewards() {
                     type="button"
                     onClick={handlePushMission}
                     disabled={loadingMission === 'push' || !missions.push.available}
-                    className="w-full text-start bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 transition-colors"
+                    className="lv-surface w-full text-start p-4 flex items-center justify-between hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-60 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                      <div className="size-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
                         {loadingMission === 'push' ? (
                           <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                         ) : (
@@ -610,11 +602,11 @@ export default function Rewards() {
                         )}
                       </div>
                       <div>
-                        <h4 className="text-white font-bold text-[14px] flex items-center gap-2 flex-wrap">
+                        <h4 className="text-text-primary font-bold text-[14px] flex items-center gap-2 flex-wrap">
                           {loc('فعّل الإشعارات', 'Enable Notifications')}
                           {missions.push.verification === 'client_asserted' && <UnverifiedTag proof={missions.push.proof} />}
                         </h4>
-                        <span className="text-zinc-400 font-medium text-[12px]">
+                        <span className="text-text-secondary font-medium text-[12px]">
                           {loc('مرة واحدة لكل حساب', 'Once per account')}
                         </span>
                       </div>
@@ -622,7 +614,7 @@ export default function Rewards() {
                     <div className="text-gold font-bold text-[16px] text-end shrink-0">
                       +{missions.push.points}
                       {breakdown(missions.push.base_points, missions.push.points) && (
-                        <div className="text-[10px] text-zinc-400 font-medium">
+                        <div className="text-[10px] text-text-secondary font-medium">
                           {breakdown(missions.push.base_points, missions.push.points)}
                         </div>
                       )}
@@ -636,12 +628,12 @@ export default function Rewards() {
                     ref={videoTriggerRef}
                     onClick={handleVideoMission}
                     disabled={!missions.video.available || loadingMission === 'video'}
-                    className={`w-full text-start bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors ${
-                      missions.video.available ? 'hover:bg-zinc-800' : 'opacity-60 cursor-not-allowed'
+                    className={`lv-surface w-full text-start p-4 flex items-center justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors ${
+                      missions.video.available ? 'hover:bg-surface-raised active:shadow-press' : 'opacity-60 cursor-not-allowed'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                      <div className="size-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
                         {loadingMission === 'video' ? (
                           <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                         ) : (
@@ -649,11 +641,11 @@ export default function Rewards() {
                         )}
                       </div>
                       <div>
-                        <h4 className="text-white font-bold text-[14px] flex items-center gap-2 flex-wrap">
+                        <h4 className="text-text-primary font-bold text-[14px] flex items-center gap-2 flex-wrap">
                           {loc('شاهد إعلانًا', 'Watch Ad')}
                           <UnverifiedTag proof={missions.video.proof} />
                         </h4>
-                        <span className="text-zinc-400 font-medium text-[12px]">
+                        <span className="text-text-secondary font-medium text-[12px]">
                           {missions.video.available
                             ? loc(
                                 `${missions.video.required_seconds} ثانية على الأقل — يحسبها الخادم`,
@@ -666,7 +658,7 @@ export default function Rewards() {
                     <div className="text-gold font-bold text-[16px] text-end shrink-0">
                       +{missions.video.points}
                       {breakdown(missions.video.base_points, missions.video.points) && (
-                        <div className="text-[10px] text-zinc-400 font-medium">
+                        <div className="text-[10px] text-text-secondary font-medium">
                           {breakdown(missions.video.base_points, missions.video.points)}
                         </div>
                       )}
@@ -679,10 +671,10 @@ export default function Rewards() {
                     type="button"
                     onClick={handleBrowseMission}
                     disabled={loadingMission === 'browse' || !missions.browse.available}
-                    className="w-full text-start bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-60 transition-colors"
+                    className="lv-surface w-full text-start p-4 flex items-center justify-between hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-60 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                      <div className="size-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
                         {loadingMission === 'browse' ? (
                           <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                         ) : (
@@ -690,11 +682,11 @@ export default function Rewards() {
                         )}
                       </div>
                       <div>
-                        <h4 className="text-white font-bold text-[14px] flex items-center gap-2 flex-wrap">
+                        <h4 className="text-text-primary font-bold text-[14px] flex items-center gap-2 flex-wrap">
                           {loc('تصفّح المنتجات', 'Browse Products')}
                           <UnverifiedTag proof={missions.browse.proof} />
                         </h4>
-                        <span className="text-zinc-400 font-medium text-[12px]">
+                        <span className="text-text-secondary font-medium text-[12px]">
                           {loc(
                             `${Math.round(missions.browse.required_seconds / 60)} دقائق`,
                             `${Math.round(missions.browse.required_seconds / 60)} mins`
@@ -707,7 +699,7 @@ export default function Rewards() {
                     <div className="text-gold font-bold text-[16px] text-end shrink-0">
                       +{missions.browse.points}
                       {breakdown(missions.browse.base_points, missions.browse.points) && (
-                        <div className="text-[10px] text-zinc-400 font-medium">
+                        <div className="text-[10px] text-text-secondary font-medium">
                           {breakdown(missions.browse.base_points, missions.browse.points)}
                         </div>
                       )}
@@ -725,17 +717,19 @@ export default function Rewards() {
               the screen instead of only in the database.
             */}
             <div className="mt-8 mb-8">
-              <h2 className="text-[17px] font-bold mb-4 px-1 text-white">{loc('سجلّ النقاط', 'Points History')}</h2>
-              <div className="space-y-3 px-1">
+              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('سجلّ النقاط', 'Points History')}</h2>
+              <div className="px-1">
                 {data && data.history.length === 0 && (
-                  <div className="text-zinc-400 text-center py-4 text-sm">{loc('لا يوجد نشاط بعد', 'No recent activity')}</div>
+                  <div className="text-text-secondary text-center py-4 text-sm">{loc('لا يوجد نشاط بعد', 'No recent activity')}</div>
                 )}
-                {data?.history.map((h, i) => {
+                {data && data.history.length > 0 && (
+                <div className="lv-surface overflow-hidden divide-y divide-border-subtle">
+                {data.history.map((h, i) => {
                   const spend = h.direction === 'spend';
                   return (
-                  <div key={`${h.mission}-${h.day}-${h.awarded_at ?? ''}-${i}`} className="bg-zinc-900 rounded-[20px] p-4 flex items-center justify-between shadow-sm">
+                  <div key={`${h.mission}-${h.day}-${h.awarded_at ?? ''}-${i}`} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${spend ? 'bg-rose-400/10' : 'bg-gold/10'}`}>
+                      <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${spend ? 'bg-rose-400/10' : 'bg-gold/10'}`}>
                         {spend ? (
                           <ShoppingBag aria-hidden="true" className="w-5 h-5 text-rose-300" />
                         ) : (
@@ -743,12 +737,12 @@ export default function Rewards() {
                         )}
                       </div>
                       <div>
-                        <h4 className="text-white font-bold text-[14px]">
+                        <h4 className="text-text-primary font-bold text-[14px]">
                           {/* A ledger movement has no mission; it carries its own wording. */}
                           {missionLabel[h.mission] ?? (h.note || h.mission)}
                           {h.streak_day ? ` · ${loc(`يوم ${h.streak_day}`, `day ${h.streak_day}`)}` : ''}
                         </h4>
-                        <span className="text-zinc-400 font-medium text-[12px]">
+                        <span className="text-text-secondary font-medium text-[12px]">
                           {/* THE INSTANT, NOT THE PERIOD. `day` is the mission's
                               accounting period and for the one-time push mission
                               it is the literal string 'once', which is not a date
@@ -767,6 +761,8 @@ export default function Rewards() {
                   </div>
                   );
                 })}
+                </div>
+                )}
               </div>
             </div>
           </>
@@ -791,14 +787,14 @@ export default function Rewards() {
         panelClassName="w-full max-w-md"
       >
         <div className="p-6 flex flex-col items-center">
-          <h3 id="rewards-video-title" className="text-white font-bold text-lg mb-2">
+          <h3 id="rewards-video-title" className="text-text-primary font-bold text-lg mb-2">
             {loc('شاهد الإعلان لتربح النقاط', 'Watch the ad to earn')}
           </h3>
-          <p className="text-zinc-300 text-sm text-center mb-6">
+          <p className="text-text-secondary text-sm text-center mb-6">
             {loc('شاهد الإعلان كاملًا للحصول على نقاطك.', 'Please watch the entire video to receive your points.')}
           </p>
 
-          <div className="w-full aspect-video bg-black rounded-xl mb-6 relative overflow-hidden flex items-center justify-center border border-white/5">
+          <div className="w-full aspect-video bg-charcoal rounded-lg mb-6 relative overflow-hidden flex items-center justify-center border border-border-subtle">
             <video
               src={data?.missions.video.videoUrl ?? undefined}
               autoPlay
@@ -811,7 +807,7 @@ export default function Rewards() {
 
           {isVideoFinished && adWait <= 0 ? (
             <button
-              className="w-full py-3.5 rounded-xl font-bold bg-gold text-accent-contrast hover:bg-gold/90 transition-colors"
+              className="lv-button lv-button-primary w-full min-h-12"
               onClick={handleVideoClaim}
               disabled={loadingMission === 'video_claim'}
             >
@@ -827,7 +823,7 @@ export default function Rewards() {
                   : loc('الإعلان قيد التشغيل…', 'Video is playing...')}
               </span>
               <button
-                className="px-4 py-2 rounded-lg font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors text-sm"
+                className="lv-button lv-button-ghost"
                 onClick={() => setShowVideoModal(false)}
               >
                 {loc('إغلاق', 'Close')}

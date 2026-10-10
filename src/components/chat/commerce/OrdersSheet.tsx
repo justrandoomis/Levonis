@@ -15,7 +15,7 @@ import { merchantHref } from '../../../lib/merchantRoutes';
 import { statusText } from '../cards/cardWords';
 import { shortDate, toneOf } from '../cards/parts';
 
-const DOT: Record<string, string> = { good: 'bg-emerald-500', wait: 'bg-amber-500', stop: 'bg-red-500', muted: 'bg-zinc-400' };
+const DOT: Record<string, string> = { good: 'bg-emerald-500', wait: 'bg-amber-500', stop: 'bg-red-500', muted: 'bg-text-muted' };
 
 export default function OrdersSheet({ open, onClose, chatId }: { open: boolean; onClose: () => void; chatId: string }) {
   const { lang, loc } = useLanguage();

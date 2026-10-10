@@ -82,7 +82,7 @@ export function CheckoutBar({
 
   const meta = TIER_META[plan.tier];
   const barClass =
-    'fixed inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[min(36rem,calc(100%-1.5rem))] bottom-[calc(var(--nav-stack)+0.25rem)] z-[130] material rounded-2xl border border-border-subtle p-3 shadow-lg lg:sticky lg:mx-0 lg:w-auto lg:bottom-auto lg:top-6 lg:z-auto lg:p-5 lg:rounded-[20px]';
+    'fixed inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[min(36rem,calc(100%-1.5rem))] bottom-[calc(var(--nav-stack)+0.25rem)] z-[130] material rounded-2xl border border-border-subtle p-3 shadow-lg lg:sticky lg:mx-0 lg:w-auto lg:bottom-auto lg:top-6 lg:z-auto lg:p-5';
 
   /**
    * A PAUSED TIER (PRO, migration 0145): «قريبًا… يتم العمل على تطوير
@@ -95,7 +95,7 @@ export function CheckoutBar({
       <aside data-checkout-bar data-plan-summary data-tier-soon aria-label={t('yourSelection')} className={barClass}>
         <p className="hidden lg:block mb-3 text-[12px] font-semibold text-text-muted">{t('yourSelection')}</p>
         <div className="flex items-center gap-3">
-          <CardArt tier={plan.tier} size="xs" className="lg:w-14 lg:h-[35px] lg:rounded-[7px] opacity-80" />
+          <CardArt tier={plan.tier} size="xs" className="lg:w-14 lg:h-[35px] opacity-80" />
           <p className="min-w-0 flex-1 text-[13.5px] font-bold">
             <span className={meta.text} dir="ltr">
               {meta.label}
@@ -193,7 +193,7 @@ export function CheckoutBar({
     >
       <p className="hidden lg:block mb-3 text-[12px] font-semibold text-text-muted">{t('yourSelection')}</p>
       <div className="flex items-center gap-3">
-        <CardArt tier={plan.tier} size="xs" className="lg:w-14 lg:h-[35px] lg:rounded-[7px]" />
+        <CardArt tier={plan.tier} size="xs" className="lg:w-14 lg:h-[35px]" />
         <div className="min-w-0 flex-1">
           <p className="text-[13.5px] font-bold text-text-primary truncate">
             <span className={meta.text} dir="ltr">

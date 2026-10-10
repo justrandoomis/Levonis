@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../../AuthContext';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, isNotConfigured } from '../../lib/api';
+import { StatusChip, type Tone } from '../ui/Badge';
 
 /**
  * Customer PRO identity verification (KYC) + approved-address section.
@@ -221,13 +222,13 @@ interface SavedAddress {
   id: string; label: string; name: string; phone: string; address: string; landmark: string; is_default: number;
 }
 
-const STATE_STYLE: Record<string, string> = {
-  draft: 'bg-zinc-700/40 text-zinc-300',
-  submitted: 'bg-sky-500/15 text-sky-400',
-  reviewing: 'bg-amber-500/15 text-amber-400',
-  changes_requested: 'bg-orange-500/15 text-orange-400',
-  rejected: 'bg-red-500/15 text-red-400',
-  verified: 'bg-emerald-500/15 text-emerald-400',
+const STATE_TONE: Record<string, Tone> = {
+  draft: 'neutral',
+  submitted: 'info',
+  reviewing: 'warning',
+  changes_requested: 'warning',
+  rejected: 'danger',
+  verified: 'success',
 };
 
 export default function KycSection() {
@@ -368,7 +369,7 @@ export default function KycSection() {
     );
   }
   if (!isAuthenticated) {
-    return <p className="text-zinc-500 text-sm text-center py-8">{t.signIn}</p>;
+    return <p className="text-text-muted text-sm text-center py-8">{t.signIn}</p>;
   }
 
   const identity = data?.identity ?? null;
@@ -383,13 +384,13 @@ export default function KycSection() {
         <h2 className="font-bold text-[16px]">{t.title}</h2>
       </div>
 
-      <p className="text-[12px] text-zinc-500 flex gap-2 items-start">
+      <p className="text-[12px] text-text-muted flex gap-2 items-start">
         <Lock className="w-4 h-4 shrink-0 mt-[1px]" />
         {t.privacyNote}
       </p>
 
       {loadError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] rounded-2xl p-3">
+        <div className="lv-alert lv-alert-danger text-[13px] text-text-primary">
           {t.loadError}
           <button onClick={load} className="ms-3 underline font-bold inline-flex items-center gap-1">
             <RefreshCw className="w-3 h-3" /> {t.retry}
@@ -397,30 +398,30 @@ export default function KycSection() {
         </div>
       )}
       {actionError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] rounded-2xl p-3">{actionError}</div>
+        <div className="lv-alert lv-alert-danger text-[13px] text-text-primary">{actionError}</div>
       )}
       {okMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[13px] rounded-2xl p-3">{okMsg}</div>
+        <div className="lv-alert lv-alert-success text-[13px] text-text-primary">{okMsg}</div>
       )}
 
       {notConfigured ? (
-        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[13px] rounded-2xl p-4 flex gap-2">
-          <ShieldAlert className="w-5 h-5 shrink-0" />
+        <div className="lv-alert lv-alert-warning text-[13px] text-text-primary flex gap-2">
+          <ShieldAlert className="w-5 h-5 shrink-0 text-warning" />
           <p>{t.notConfigured}</p>
         </div>
       ) : (
         data && (
           <>
             {/* Phone prerequisite */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+            <div className="lv-surface p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Phone className="w-4 h-4 text-zinc-400" />
+                <Phone className="w-4 h-4 text-text-secondary" />
                 <p className="font-bold text-[14px]">{t.phoneTitle}</p>
               </div>
               {phoneLinked ? (
-                <p className="text-[13px] text-emerald-400">{t.phoneLinked(data.phone.phone_masked || '')}</p>
+                <p className="text-[13px] text-success">{t.phoneLinked(data.phone.phone_masked || '')}</p>
               ) : (
-                <div className="text-[13px] text-zinc-400">
+                <div className="text-[13px] text-text-secondary">
                   <p>{t.phoneMissing}</p>
                   <Link to="/settings" className="text-gold font-bold underline">
                     {t.phoneGo}
@@ -430,29 +431,29 @@ export default function KycSection() {
             </div>
 
             {/* Identity status */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+            <div className="lv-surface p-4">
               <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                 <p className="font-bold text-[14px]">{t.idTitle}</p>
                 {identity ? (
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATE_STYLE[identity.state] || STATE_STYLE.draft}`}>
+                  <StatusChip tone={STATE_TONE[identity.state] || STATE_TONE.draft}>
                     {t.stateNames[identity.state] || identity.state}
-                  </span>
+                  </StatusChip>
                 ) : (
-                  <span className="text-[11px] text-zinc-500">—</span>
+                  <span className="text-[11px] text-text-muted">—</span>
                 )}
               </div>
               {identity?.state === 'verified' && (
-                <p className="text-[13px] text-emerald-400 flex items-center gap-1.5">
+                <p className="text-[13px] text-success flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4" /> {t.verifiedNote}
                 </p>
               )}
               {identity && (identity.state === 'submitted' || identity.state === 'reviewing') && (
-                <p className="text-[13px] text-zinc-400 flex items-center gap-1.5">
+                <p className="text-[13px] text-text-secondary flex items-center gap-1.5">
                   <Clock className="w-4 h-4" /> {t.pendingNote}
                 </p>
               )}
               {identity && identity.reason && (
-                <p className="text-[13px] text-orange-300 mt-2">
+                <p className="text-[13px] text-warning mt-2">
                   <span className="font-bold">{t.reasonLabel}</span> {identity.reason}
                 </p>
               )}
@@ -460,45 +461,42 @@ export default function KycSection() {
 
             {/* Identity submission form */}
             {canSubmit && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+              <div className="lv-surface p-4 space-y-3">
                 <p className="font-bold text-[14px]">
                   {identity && identity.state !== 'draft' ? t.resubmitTitle : t.formTitle}
                 </p>
 
                 <div>
-                  <label className="text-[12px] text-zinc-400 block mb-1">{t.fullName}</label>
+                  <label className="text-[12px] text-text-secondary block mb-1">{t.fullName}</label>
                   <input
+                    className="lv-input text-sm"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gold/50"
                   />
-                  <p className="text-[11px] text-zinc-600 mt-1">{t.fullNameHint}</p>
+                  <p className="text-[11px] text-text-muted mt-1">{t.fullNameHint}</p>
                 </div>
 
                 <div>
-                  <label className="text-[12px] text-zinc-400 block mb-1">{t.dob}</label>
+                  <label className="text-[12px] text-text-secondary block mb-1">{t.dob}</label>
                   <input
+                    className="lv-input text-sm"
                     type="date"
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
-                    className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gold/50"
                   />
-                  <p className="text-[11px] text-zinc-600 mt-1">{t.minAgeNote}</p>
+                  <p className="text-[11px] text-text-muted mt-1">{t.minAgeNote}</p>
                 </div>
 
                 <div>
-                  <label className="text-[12px] text-zinc-400 block mb-2">{t.docType}</label>
+                  <label className="text-[12px] text-text-secondary block mb-2">{t.docType}</label>
                   <div className="flex gap-2">
                     {(['national_id', 'passport'] as const).map((dt) => (
                       <button
                         key={dt}
                         type="button"
                         onClick={() => setDocType(dt)}
-                        className={`flex-1 py-2.5 rounded-xl border text-[13px] font-bold transition-colors ${
-                          docType === dt
-                            ? 'border-gold/60 bg-gold/10 text-gold'
-                            : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-                        }`}
+                        data-selected={docType === dt}
+                        className="lv-choice flex-1 py-2.5 text-[13px] font-bold"
                       >
                         {dt === 'national_id' ? t.nationalId : t.passport}
                       </button>
@@ -507,20 +505,20 @@ export default function KycSection() {
                 </div>
 
                 <div>
-                  <label className="text-[12px] text-zinc-400 block mb-1">{t.docNumber}</label>
+                  <label className="text-[12px] text-text-secondary block mb-1">{t.docNumber}</label>
                   <input
+                    className="lv-input text-sm"
                     value={docNumber}
                     onChange={(e) => setDocNumber(e.target.value)}
                     dir="ltr"
-                    className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gold/50"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[12px] text-zinc-400 block mb-1">{t.evidence}</label>
-                  <p className="text-[11px] text-zinc-600 mb-2">{t.evidenceHint}</p>
+                  <label className="text-[12px] text-text-secondary block mb-1">{t.evidence}</label>
+                  <p className="text-[11px] text-text-muted mb-2">{t.evidenceHint}</p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-[13px] font-bold inline-flex items-center gap-2 cursor-pointer">
+                    <label className="lv-button lv-button-secondary lv-button-sm cursor-pointer">
                       <UploadCloud className="w-4 h-4" />
                       {isUploading ? t.uploading : t.addImages}
                       <input
@@ -538,7 +536,7 @@ export default function KycSection() {
                     {evidenceKeys.map((k, i) => (
                       <span
                         key={k}
-                        className="text-[11px] bg-zinc-800 border border-zinc-700 rounded-full px-2.5 py-1 inline-flex items-center gap-1.5"
+                        className="text-[11px] bg-surface-raised border border-border-subtle rounded-full px-2.5 py-1 inline-flex items-center gap-1.5"
                       >
                         #{i + 1}
                         <button
@@ -546,7 +544,7 @@ export default function KycSection() {
                           onClick={() => setEvidenceKeys((prev) => prev.filter((x) => x !== k))}
                           aria-label="remove"
                         >
-                          <X className="w-3 h-3 text-zinc-500 hover:text-red-400" />
+                          <X className="w-3 h-3 text-text-muted hover:text-danger" />
                         </button>
                       </span>
                     ))}
@@ -556,12 +554,12 @@ export default function KycSection() {
                 <button
                   onClick={submitIdentity}
                   disabled={isSubmitting || isUploading || !phoneLinked || evidenceKeys.length === 0}
-                  className="w-full py-3.5 rounded-2xl bg-olive hover:bg-olive-light text-snow font-bold text-[14px] disabled:opacity-40 transition-colors"
+                  className="lv-button lv-button-primary w-full"
                 >
                   {isSubmitting ? t.submitting : t.submit}
                 </button>
                 {!phoneLinked && (
-                  <p className="text-[12px] text-amber-400 flex items-center gap-1.5">
+                  <p className="text-[12px] text-warning flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4" /> {t.phoneMissing}
                   </p>
                 )}
@@ -569,54 +567,54 @@ export default function KycSection() {
             )}
 
             {/* Approved address */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+            <div className="lv-surface p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-zinc-400" />
+                <MapPin className="w-4 h-4 text-text-secondary" />
                 <p className="font-bold text-[14px]">{t.addrTitle}</p>
               </div>
 
               {data.approved_address ? (
-                <div className="bg-zinc-800/50 border border-gold/20 rounded-xl p-3">
+                <div className="lv-well rounded-md p-3">
                   <p className="text-[12px] text-gold font-bold mb-1 flex items-center gap-1.5">
                     <CheckCircle className="w-3.5 h-3.5" /> {t.addrCurrent(data.approved_address.version)}
                   </p>
                   <p className="text-[13px] font-bold">{data.approved_address.name}</p>
-                  <p className="text-[13px] text-zinc-400">{data.approved_address.address}</p>
+                  <p className="text-[13px] text-text-secondary">{data.approved_address.address}</p>
                   {data.approved_address.landmark && (
-                    <p className="text-[12px] text-zinc-500">{data.approved_address.landmark}</p>
+                    <p className="text-[12px] text-text-muted">{data.approved_address.landmark}</p>
                   )}
-                  <p className="text-[12px] text-zinc-500 mt-1" dir="ltr">
+                  <p className="text-[12px] text-text-muted mt-1" dir="ltr">
                     {data.approved_address.phone_e164}
                   </p>
                   {data.approved_address.matches_saved_address === true && (
-                    <p className="text-[12px] text-emerald-400 mt-2">{t.addrMatches}</p>
+                    <p className="text-[12px] text-success mt-2">{t.addrMatches}</p>
                   )}
                   {data.approved_address.matches_saved_address === false && (
-                    <p className="text-[12px] text-amber-400 mt-2 flex gap-1.5">
+                    <p className="text-[12px] text-warning mt-2 flex gap-1.5">
                       <AlertTriangle className="w-4 h-4 shrink-0" /> {t.addrMismatch}
                     </p>
                   )}
                   {data.approved_address.source_address_id && !data.approved_address.source_address_exists && (
-                    <p className="text-[12px] text-zinc-500 mt-2">{t.addrSourceGone}</p>
+                    <p className="text-[12px] text-text-muted mt-2">{t.addrSourceGone}</p>
                   )}
                 </div>
               ) : (
-                <p className="text-[13px] text-zinc-500">{t.addrNone}</p>
+                <p className="text-[13px] text-text-muted">{t.addrNone}</p>
               )}
 
               {data.pending_address_request ? (
-                <div className="bg-sky-500/5 border border-sky-500/20 rounded-xl p-3">
-                  <p className="text-[12px] text-sky-400 font-bold mb-1 flex items-center gap-1.5">
+                <div className="lv-alert lv-alert-info">
+                  <p className="text-[12px] text-info font-bold mb-1 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" /> {t.addrPending}
                   </p>
                   <p className="text-[13px]">{data.pending_address_request.name}</p>
-                  <p className="text-[13px] text-zinc-400">{data.pending_address_request.address}</p>
+                  <p className="text-[13px] text-text-secondary">{data.pending_address_request.address}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <p className="text-[13px] font-bold">{t.addrNominate}</p>
                   {addresses.length === 0 ? (
-                    <p className="text-[13px] text-zinc-500">
+                    <p className="text-[13px] text-text-muted">
                       {t.addrNoSaved}{' '}
                       <Link to="/addresses" className="text-gold underline font-bold">
                         {t.addrManage}
@@ -624,11 +622,11 @@ export default function KycSection() {
                     </p>
                   ) : (
                     <>
-                      <label className="text-[12px] text-zinc-400 block">{t.addrPick}</label>
+                      <label className="text-[12px] text-text-secondary block">{t.addrPick}</label>
                       <select
+                        className="lv-input text-sm"
                         value={pickedAddressId}
                         onChange={(e) => setPickedAddressId(e.target.value)}
-                        className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gold/50"
                       >
                         <option value="">—</option>
                         {addresses.map((a) => (
@@ -637,18 +635,18 @@ export default function KycSection() {
                           </option>
                         ))}
                       </select>
-                      <label className="text-[12px] text-zinc-400 block">{t.addrReason}</label>
+                      <label className="text-[12px] text-text-secondary block">{t.addrReason}</label>
                       <textarea
+                        className="lv-input text-sm py-2.5 leading-relaxed resize-none"
                         value={addrReason}
                         onChange={(e) => setAddrReason(e.target.value)}
                         placeholder={t.addrReasonPh}
                         rows={2}
-                        className="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-gold/50 resize-none"
                       />
                       <button
                         onClick={nominateAddress}
                         disabled={isNominating || !pickedAddressId || addrReason.trim().length < 5}
-                        className="w-full py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 font-bold text-[13px] disabled:opacity-40 transition-colors"
+                        className="lv-button lv-button-secondary w-full"
                       >
                         {isNominating ? '…' : t.addrSend}
                       </button>
@@ -660,24 +658,24 @@ export default function KycSection() {
 
             {/* Phone change (approved record) */}
             {data.approved_address && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
+              <div className="lv-surface p-4 space-y-2">
                 <p className="font-bold text-[14px]">{t.phoneChangeTitle}</p>
                 {data.phone_change && (data.phone_change.state === 'submitted' || data.phone_change.state === 'reviewing') ? (
-                  <p className="text-[13px] text-sky-400 flex items-center gap-1.5">
+                  <p className="text-[13px] text-info flex items-center gap-1.5">
                     <Clock className="w-4 h-4" /> {t.phoneChangePending(data.phone_change.new_phone_masked)}
                   </p>
                 ) : (
                   <>
-                    <p className="text-[12px] text-zinc-500">{t.phoneChangeNote}</p>
+                    <p className="text-[12px] text-text-muted">{t.phoneChangeNote}</p>
                     {data.phone_change && data.phone_change.reason && (
-                      <p className="text-[12px] text-orange-300">
+                      <p className="text-[12px] text-warning">
                         <span className="font-bold">{t.reasonLabel}</span> {data.phone_change.reason}
                       </p>
                     )}
                     <button
                       onClick={requestPhoneChange}
                       disabled={isRequestingPhone}
-                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-[13px] font-bold disabled:opacity-40"
+                      className="lv-button lv-button-secondary lv-button-sm"
                     >
                       {isRequestingPhone ? '…' : t.phoneChangeBtn}
                     </button>

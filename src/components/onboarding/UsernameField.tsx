@@ -94,15 +94,16 @@ export default function UsernameField({
           : s.usernameHint;
 
   const tone =
-    state === 'free' ? 'text-emerald-400' : state === 'unavailable' ? 'text-red-400' : 'text-zinc-500';
+    state === 'free' ? 'text-success' : state === 'unavailable' ? 'text-danger' : 'text-text-muted';
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
+      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-text-secondary">
         {label ?? s.username}
       </label>
       <div className="relative" dir="ltr">
         <input
+          className={`lv-input min-h-12 py-3 pe-11 text-[15px] disabled:opacity-60 ${state === 'free' ? 'border-success' : ''}`}
           id={id}
           name="username"
           value={value}
@@ -116,18 +117,15 @@ export default function UsernameField({
           autoFocus={autoFocus}
           aria-describedby={`${id}-msg`}
           aria-invalid={state === 'unavailable' ? true : undefined}
-          className={`w-full min-h-[48px] rounded-xl border bg-zinc-950/70 px-4 py-3 pe-11 text-[15px] text-white placeholder-zinc-600 outline-none transition-colors duration-200 focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60 ${
-            state === 'unavailable' ? 'border-red-500/70' : state === 'free' ? 'border-emerald-500/60' : 'border-zinc-800'
-          }`}
           placeholder="username123"
         />
         <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center">
           {state === 'checking' ? (
-            <Loader2 className="h-4 w-4 animate-spin text-zinc-500" aria-hidden />
+            <Loader2 className="h-4 w-4 animate-spin text-text-muted" aria-hidden />
           ) : state === 'free' ? (
-            <Check className="h-4 w-4 text-emerald-400" aria-hidden />
+            <Check className="h-4 w-4 text-success" aria-hidden />
           ) : state === 'unavailable' ? (
-            <X className="h-4 w-4 text-red-400" aria-hidden />
+            <X className="h-4 w-4 text-danger" aria-hidden />
           ) : null}
         </span>
       </div>

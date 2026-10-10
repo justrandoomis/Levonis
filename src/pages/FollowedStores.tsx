@@ -23,6 +23,7 @@ import { useGoBack } from '../lib/useGoBack';
 import { useSignInPrompt } from '../lib/guest';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
 import { toast } from '../components/ui/Toast';
+import { IconButton } from '../components/ui/Button';
 import StoreCard from '../components/community/hub/StoreCard';
 import { StoreListSkeleton } from '../components/community/hub/parts';
 import { communityHubApi, type CommunityStore } from '../components/community/hub/api';
@@ -114,7 +115,7 @@ export default function FollowedStores() {
           <Link
             to="/community?tab=merchants"
             data-followed-browse
-            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-olive px-5 text-[13px] font-semibold text-snow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="lv-button lv-button-primary px-5"
           >
             {loc('تصفّح المتاجر', 'Browse stores')}
           </Link>
@@ -136,18 +137,18 @@ export default function FollowedStores() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-black pb-28 text-zinc-300">
+    <div className="w-full min-h-screen pb-28 text-text-secondary">
       <div className="material scroll-edge sticky top-0 z-40 h-16 px-4">
         <div className="mx-auto flex h-full max-w-6xl items-center gap-3">
-          <button
-            type="button"
-            aria-label={loc('رجوع', 'Back')}
-            onClick={goBack}
-            className="press-scale flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            {dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
-          </button>
-          <h1 className="min-w-0 flex-1 truncate text-[17px] font-bold text-white">
+          <IconButton
+            variant="secondary"
+            label={loc('رجوع', 'Back')}
+            onClick={() => {
+              goBack();
+            }}
+            icon={dir === 'rtl' ? <ArrowRight className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
+          />
+          <h1 className="min-w-0 flex-1 truncate text-[17px] font-bold text-text-primary">
             {loc('متاجر أتابعها', 'Stores you follow', 'شوێنکەوتن')}
           </h1>
           {followingNow > 0 && (
@@ -165,21 +166,21 @@ export default function FollowedStores() {
 function UnavailableCard({ busy, onUnfollow }: { busy: boolean; onUnfollow: () => void }) {
   const { loc } = useLanguage();
   return (
-    <div data-store-unavailable-card className="flex items-center gap-3 rounded-2xl border border-zinc-800/40 bg-zinc-900/30 p-4">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-zinc-700/60 bg-zinc-800/60">
-        <Store className="h-5 w-5 text-zinc-500" aria-hidden="true" />
+    <div data-store-unavailable-card className="flex items-center gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-4">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-raised">
+        <Store className="h-5 w-5 text-text-muted" aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
         {/* OWNER: Sorani to be written by hand. */}
-        <h3 className="truncate text-[14.5px] font-bold text-zinc-400">{loc('متجر غير متاح', 'Store unavailable')}</h3>
-        <p className="truncate text-[12.5px] text-zinc-500">{loc('هذا المتجر غير متاح حاليًا.', 'This store is not available right now.')}</p>
+        <h3 className="truncate text-[14.5px] font-bold text-text-secondary">{loc('متجر غير متاح', 'Store unavailable')}</h3>
+        <p className="truncate text-[12.5px] text-text-muted">{loc('هذا المتجر غير متاح حاليًا.', 'This store is not available right now.')}</p>
       </div>
       <button
         type="button"
         onClick={onUnfollow}
         disabled={busy}
         aria-busy={busy || undefined}
-        className="min-h-11 shrink-0 rounded-full border border-zinc-700 px-4 text-[12.5px] font-medium text-zinc-300 transition-colors hover:bg-zinc-800 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="lv-button lv-button-secondary lv-button-sm shrink-0"
       >
         {/* OWNER: Sorani to be written by hand. */}
         {loc('إلغاء المتابعة', 'Unfollow')}

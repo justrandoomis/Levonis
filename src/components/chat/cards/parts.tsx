@@ -13,7 +13,7 @@ const TONE_DOT: Record<Tone, string> = {
   good: 'bg-emerald-500',
   wait: 'bg-amber-500',
   stop: 'bg-red-500',
-  muted: 'bg-zinc-400',
+  muted: 'bg-text-muted',
 };
 
 export function CardShell({

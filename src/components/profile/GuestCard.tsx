@@ -37,16 +37,16 @@ export default function GuestCard() {
   const s = STRINGS[lang] ?? STRINGS.ar;
 
   return (
-    <div className="rounded-xl p-5 mb-3 shadow-sm text-center bg-zinc-900 text-white">
+    <div className="lv-surface p-5 mb-3 text-center text-text-primary">
       <div className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-3 bg-white/10" aria-hidden="true">
-        <UserRound className="w-7 h-7 text-zinc-500" strokeWidth={1.5} />
+        <UserRound className="w-7 h-7 text-text-muted" strokeWidth={1.5} />
       </div>
       <h2 className="font-bold text-[15px] mb-1">{s.title}</h2>
-      <p className="text-[12px] text-zinc-500 mb-4 leading-relaxed">{s.body}</p>
+      <p className="text-[12px] text-text-muted mb-4 leading-relaxed">{s.body}</p>
       <button
         type="button"
         onClick={() => navigate('/auth?next=%2Fprofile')}
-        className="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-olive text-gold-muted text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-opacity"
+        className="lv-button lv-button-primary w-full"
       >
         <LogIn className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
         {s.signIn}
@@ -54,7 +54,7 @@ export default function GuestCard() {
       <button
         type="button"
         onClick={() => navigate('/support')}
-        className="mt-2 w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl border text-[13px] font-bold active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors border-white/15 text-zinc-300 hover:bg-white/5"
+        className="lv-button lv-button-secondary mt-2 w-full"
       >
         <Headset className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
         {s.support}

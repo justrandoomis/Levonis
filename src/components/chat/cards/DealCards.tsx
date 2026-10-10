@@ -239,11 +239,11 @@ export function PrintRequestCardView({ card, mine }: Props) {
             {files.map((f) => (
               <li key={f.id} className="flex items-center gap-2 text-[12.5px]">
                 {f.inline ? (
-                  <a href={fileUrl(f)} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-md overflow-hidden bg-surface-raised shrink-0">
+                  <a href={fileUrl(f)} target="_blank" rel="noreferrer" className="size-10 rounded-sm overflow-hidden bg-surface-raised shrink-0">
                     <img referrerPolicy="no-referrer" src={fileUrl(f)} alt="" loading="lazy" className="w-full h-full object-cover" />
                   </a>
                 ) : (
-                  <span className="w-10 h-10 rounded-md bg-surface-raised flex items-center justify-center shrink-0">
+                  <span className="size-10 rounded-sm bg-surface-raised flex items-center justify-center shrink-0">
                     {f.kind === 'model' ? <Box className="w-4 h-4 text-text-muted" aria-hidden="true" /> : <FileText className="w-4 h-4 text-text-muted" aria-hidden="true" />}
                   </span>
                 )}

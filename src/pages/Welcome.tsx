@@ -151,7 +151,7 @@ export default function Welcome() {
         <span
           key={i}
           className={`h-1.5 rounded-full transition-all duration-200 ${
-            i === step ? 'w-7 bg-gold' : i < step ? 'w-4 bg-gold/50' : 'w-4 bg-zinc-700'
+            i === step ? 'w-7 bg-gold' : i < step ? 'w-4 bg-gold/50' : 'w-4 bg-border-subtle'
           }`}
         />
       ))}
@@ -163,7 +163,7 @@ export default function Welcome() {
       type="button"
       onClick={() => finish('skipped')}
       disabled={saving}
-      className="inline-flex min-h-[44px] items-center px-1 text-[13px] font-medium text-zinc-400 transition-colors hover:text-gold disabled:opacity-50"
+      className="inline-flex min-h-[44px] items-center px-1 text-[13px] font-medium text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
     >
       {s.skipAll}
     </button>
@@ -175,11 +175,11 @@ export default function Welcome() {
   if (step === 0) {
     body = (
       <>
-        <h1 className="text-[22px] font-bold text-white">{s.stepProfile}</h1>
-        <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{s.stepProfileHint}</p>
+        <h1 className="text-[22px] font-bold text-text-primary">{s.stepProfile}</h1>
+        <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">{s.stepProfileHint}</p>
 
         <div className="mt-5 flex items-center gap-4">
-          <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-[22px] font-bold text-gold">
+          <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-surface-raised text-[22px] font-bold text-gold">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -191,7 +191,7 @@ export default function Welcome() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading || saving}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 text-[13px] font-bold text-white transition-colors duration-200 hover:border-gold/60 disabled:opacity-50"
+              className="lv-button lv-button-secondary lv-button-sm"
             >
               {uploading ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -213,17 +213,17 @@ export default function Welcome() {
 
         <div className="mt-5 space-y-4">
           <div>
-            <label htmlFor="ob-name" className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
+            <label htmlFor="ob-name" className="mb-1.5 block text-[13px] font-semibold text-text-secondary">
               {s.displayName}
             </label>
             <input
+              className="lv-input min-h-12 py-3 text-[15px] disabled:opacity-60"
               id="ob-name"
               name="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="name"
               disabled={saving}
-              className="w-full min-h-[48px] rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-[15px] text-white outline-none transition-colors duration-200 focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60"
             />
           </div>
           <UsernameField
@@ -246,7 +246,7 @@ export default function Welcome() {
               if (u && u !== (user?.username ?? '')) patch.username = u;
               void saveAndAdvance(patch, 1);
             }}
-            className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+            className="lv-button lv-button-primary min-h-12 flex-1"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {saving ? s.saving : s.continue}
@@ -256,7 +256,7 @@ export default function Welcome() {
             type="button"
             onClick={() => setStep(1)}
             disabled={saving}
-            className="inline-flex min-h-[48px] items-center px-3 text-[13px] font-medium text-zinc-400 transition-colors hover:text-gold disabled:opacity-50"
+            className="inline-flex min-h-[48px] items-center px-3 text-[13px] font-medium text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
           >
             {s.skip}
           </button>
@@ -266,20 +266,20 @@ export default function Welcome() {
   } else if (step === 1) {
     body = (
       <>
-        <h1 className="text-[22px] font-bold text-white">{s.stepDetails}</h1>
-        <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{s.stepDetailsHint}</p>
+        <h1 className="text-[22px] font-bold text-text-primary">{s.stepDetails}</h1>
+        <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">{s.stepDetailsHint}</p>
 
         <div className="mt-5 space-y-4">
           <div>
-            <label htmlFor="ob-country" className="mb-1.5 block text-[13px] font-semibold text-zinc-300">
+            <label htmlFor="ob-country" className="mb-1.5 block text-[13px] font-semibold text-text-secondary">
               {s.country}
             </label>
             <select
+              className="lv-input min-h-12 py-3 text-[15px] disabled:opacity-60"
               id="ob-country"
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               disabled={saving}
-              className="w-full min-h-[48px] rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-[15px] text-white outline-none transition-colors duration-200 focus:border-gold/70 focus:ring-1 focus:ring-gold/40 disabled:opacity-60"
             >
               <option value="">{s.countryPlaceholder}</option>
               {common.map((c) => (
@@ -296,7 +296,7 @@ export default function Welcome() {
           </div>
 
           <div>
-            <span className="mb-1.5 block text-[13px] font-semibold text-zinc-300">{s.language}</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-text-secondary">{s.language}</span>
             <div className="grid grid-cols-3 gap-2">
               {(['ar', 'en', 'ckb'] as const).map((code) => (
                 <button
@@ -305,11 +305,7 @@ export default function Welcome() {
                   onClick={() => setLang(code)}
                   disabled={saving}
                   aria-pressed={lang === code}
-                  className={`min-h-[48px] rounded-xl border px-3 text-[13px] font-bold transition-colors duration-200 disabled:opacity-50 ${
-                    lang === code
-                      ? 'border-gold/70 bg-gold/10 text-gold'
-                      : 'border-zinc-800 bg-zinc-950/70 text-zinc-300 hover:border-zinc-700'
-                  }`}
+                  className="lv-choice min-h-12 px-3 text-[13px] font-bold disabled:opacity-50"
                 >
                   {code === 'ar' ? 'العربية' : code === 'en' ? 'English' : 'کوردی'}
                 </button>
@@ -317,8 +313,8 @@ export default function Welcome() {
             </div>
           </div>
 
-          <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-3 text-[12px] leading-relaxed text-zinc-400">
-            <span className="font-semibold text-zinc-300">{s.phone}: </span>
+          <p className="lv-alert lv-alert-info text-[12px] leading-relaxed text-text-secondary">
+            <span className="font-semibold text-text-primary">{s.phone}: </span>
             {s.phoneNote}
           </p>
         </div>
@@ -332,7 +328,7 @@ export default function Welcome() {
               if (country !== (user?.country ?? '')) patch.country = country;
               void saveAndAdvance(patch, 2);
             }}
-            className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+            className="lv-button lv-button-primary min-h-12 flex-1"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {saving ? s.saving : s.continue}
@@ -342,7 +338,7 @@ export default function Welcome() {
             type="button"
             onClick={() => setStep(2)}
             disabled={saving}
-            className="inline-flex min-h-[48px] items-center px-3 text-[13px] font-medium text-zinc-400 transition-colors hover:text-gold disabled:opacity-50"
+            className="inline-flex min-h-[48px] items-center px-3 text-[13px] font-medium text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
           >
             {s.skip}
           </button>
@@ -352,16 +348,16 @@ export default function Welcome() {
   } else {
     body = (
       <>
-        <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+        <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full lv-chip [--chip:var(--color-success)]">
           <Check className="h-6 w-6" aria-hidden />
         </span>
-        <h1 className="text-[22px] font-bold text-white">{s.stepDone}</h1>
-        <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">{s.stepDoneHint}</p>
+        <h1 className="text-[22px] font-bold text-text-primary">{s.stepDone}</h1>
+        <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">{s.stepDoneHint}</p>
         <button
           type="button"
           onClick={() => finish('done')}
           disabled={saving}
-          className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+          className="lv-button lv-button-primary mt-6 min-h-12 w-full"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           {s.finish}
@@ -371,13 +367,13 @@ export default function Welcome() {
   }
 
   return (
-    <div dir={dir} className="min-h-[70vh] w-full bg-black px-4 py-8 text-white">
+    <div dir={dir} className="min-h-[70vh] w-full px-4 py-8 text-text-primary">
       <div className="mx-auto w-full max-w-md">
-        <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-zinc-500">
+        <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
           {step < TOTAL ? s.step.replace('{n}', String(step + 1)).replace('{total}', String(TOTAL)) : s.welcome}
         </p>
         {dots}
-        <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-5 sm:p-6">
+        <div className="lv-surface p-5 sm:p-6">
           {/* Height is not animated and the panel is not absolutely
               positioned: the card grows to its content once, so nothing
               under the thumb moves after a tap. */}
@@ -392,7 +388,7 @@ export default function Welcome() {
               {body}
             </motion.div>
           </AnimatePresence>
-          <p className="mt-3 min-h-[16px] text-xs font-medium text-red-400" role="alert">
+          <p className="mt-3 min-h-[16px] text-xs font-medium text-danger" role="alert">
             {error}
           </p>
         </div>

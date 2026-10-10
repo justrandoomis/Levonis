@@ -97,10 +97,10 @@ export default function Leaderboards() {
                   data-lb-mine={mine || undefined}
                   className={`${PANEL} flex items-center gap-3 px-3 py-2.5 ${mine ? 'border-gold/50 bg-gold/[0.06]' : ''}`}
                 >
-                  <span className={`w-7 text-center font-black tabular-nums text-[14px] ${rank <= 3 ? 'text-gold' : 'text-zinc-500'}`} dir="ltr" aria-label={s.lbRank(rank)}>
+                  <span className={`w-7 text-center font-black tabular-nums text-[14px] ${rank <= 3 ? 'text-gold' : 'text-text-muted'}`} dir="ltr" aria-label={s.lbRank(rank)}>
                     {rank}
                   </span>
-                  <span className="w-9 h-9 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0 flex items-center justify-center text-zinc-300 font-bold text-[13px]">
+                  <span className="w-9 h-9 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-text-secondary font-bold text-[13px]">
                     {row.avatar_key ? <SafeImage src={`/files/${row.avatar_key}`} alt="" aspect="auto" className="w-9 h-9" imgClassName="w-full h-full" /> : initials(row)}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -109,7 +109,7 @@ export default function Leaderboards() {
                       {mine && <span className="ms-2 text-[10px] font-bold text-gold align-middle">{s.lbYou}</span>}
                     </span>
                     {row.username && (
-                      <span className="block text-[11px] text-zinc-500 truncate" dir="ltr">
+                      <span className="block text-[11px] text-text-muted truncate" dir="ltr">
                         @{row.username}
                       </span>
                     )}

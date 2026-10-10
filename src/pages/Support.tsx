@@ -24,6 +24,7 @@ import {
  * would compete with the thing they are trying to send.
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
+import { IconButton } from '../components/ui/Button';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 
 /**
@@ -382,11 +383,15 @@ const STRINGS = {
 
 type SupportStrings = (typeof STRINGS)['en'];
 
+/** The assistant / tickets switch: a raised thumb in a well track (the Segmented recipe). */
+const TAB_ON = 'bg-surface-raised border-border-subtle shadow-1 text-text-primary';
+const TAB_OFF = 'border-transparent text-text-secondary hover:text-text-primary';
+
 const STATE_STYLES: Record<Ticket['state'], string> = {
-  open: 'bg-info/10 text-blue-300',
-  waiting_customer: 'bg-warning/10 text-amber-300',
+  open: 'lv-chip [--chip:var(--color-info)]',
+  waiting_customer: 'lv-chip [--chip:var(--color-warning)]',
   waiting_staff: 'bg-white/[0.06] text-text-secondary',
-  resolved: 'bg-success/10 text-emerald-300',
+  resolved: 'lv-chip [--chip:var(--color-success)]',
 };
 
 function stateLabel(s: SupportStrings, state: Ticket['state']): string {
@@ -467,21 +472,21 @@ function ReplyCard({ card, onNavigate }: { card: AsstCard; onNavigate: (to: stri
           referrerPolicy="no-referrer"
           src={card.image}
           alt=""
-          className="w-12 h-12 rounded-lg object-cover bg-black shrink-0"
+          className="w-12 h-12 rounded-sm object-cover bg-surface-selected shrink-0"
         />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-bold text-white break-words">{card.title}</span>
+          <span className="text-sm font-bold text-text-primary break-words">{card.title}</span>
           {card.badge && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-text-secondary font-bold">{card.badge}</span>}
         </div>
-        {card.subtitle && <div className="text-xs text-zinc-400 mt-0.5 break-words">{card.subtitle}</div>}
+        {card.subtitle && <div className="text-xs text-text-secondary mt-0.5 break-words">{card.subtitle}</div>}
         {card.fields && card.fields.length > 0 && (
           <div className="mt-1.5 space-y-0.5">
             {card.fields.map((f, i) => (
-              <div key={i} className="text-xs text-zinc-400">
-                <span className="text-zinc-500">{f.label}: </span>
-                <span className="text-zinc-300">{f.value}</span>
+              <div key={i} className="text-xs text-text-secondary">
+                <span className="text-text-muted">{f.label}: </span>
+                <span className="text-text-primary">{f.value}</span>
               </div>
             ))}
           </div>
@@ -610,8 +615,8 @@ function TicketForm({
   return (
     <div className="lv-surface p-4 space-y-4" data-support-ticket-form>
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-bold text-sm">{step === 'form' ? s.ticketFormTitle : s.confirmTitle}</h3>
-        <button onClick={onClose} className="text-xs text-zinc-500 hover:text-zinc-300">
+        <h3 className="text-text-primary font-bold text-sm">{step === 'form' ? s.ticketFormTitle : s.confirmTitle}</h3>
+        <button onClick={onClose} className="text-xs text-text-muted hover:text-text-secondary">
           {s.cancel}
         </button>
       </div>
@@ -621,6 +626,7 @@ function TicketForm({
           <div>
             <label htmlFor="support-ticket-subject" className="mb-1.5 block text-xs font-bold text-text-secondary">{s.subject}</label>
             <input
+              className="lv-input text-sm"
               id="support-ticket-subject"
               value={subject}
               onChange={(e) => {
@@ -630,13 +636,13 @@ function TicketForm({
               maxLength={200}
               aria-invalid={!!fieldErrors.subject}
               aria-describedby={fieldErrors.subject ? 'support-ticket-subject-error' : undefined}
-              className="lv-input text-sm"
             />
             {fieldErrors.subject && <p id="support-ticket-subject-error" role="alert" className="lv-field-error">{fieldErrors.subject}</p>}
           </div>
           <div>
             <label htmlFor="support-ticket-message" className="mb-1.5 block text-xs font-bold text-text-secondary">{s.message}</label>
             <textarea
+              className="lv-input min-h-28 resize-y py-2.5 text-sm"
               id="support-ticket-message"
               value={body}
               onChange={(e) => {
@@ -647,17 +653,16 @@ function TicketForm({
               rows={4}
               aria-invalid={!!fieldErrors.body}
               aria-describedby={fieldErrors.body ? 'support-ticket-message-error' : undefined}
-              className="lv-input min-h-28 resize-y py-2.5 text-sm"
             />
             {fieldErrors.body && <p id="support-ticket-message-error" role="alert" className="lv-field-error">{fieldErrors.body}</p>}
           </div>
           <div>
-            <label className="text-xs text-zinc-500 block mb-1">{s.linkOrder}</label>
+            <label className="text-xs font-bold text-text-secondary block mb-1.5">{s.linkOrder}</label>
             <div className="relative">
               <select
+                className="lv-input w-full appearance-none pe-9 text-sm"
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                className="lv-input w-full appearance-none pe-9 text-sm"
               >
                 <option value="">{s.noLink}</option>
                 {orderOptions.map((o) => (
@@ -671,12 +676,12 @@ function TicketForm({
             </div>
           </div>
           <div>
-            <label className="text-xs text-zinc-500 block mb-1">{s.linkDevice}</label>
+            <label className="text-xs font-bold text-text-secondary block mb-1.5">{s.linkDevice}</label>
             <div className="relative">
               <select
+                className="lv-input w-full appearance-none pe-9 text-sm"
                 value={unitId}
                 onChange={(e) => setUnitId(e.target.value)}
-                className="lv-input w-full appearance-none pe-9 text-sm"
               >
                 <option value="">{s.noLink}</option>
                 {deviceOptions.map((d) => (
@@ -688,20 +693,20 @@ function TicketForm({
               <ChevronDown className="w-4 h-4 text-text-muted absolute top-3 end-3 pointer-events-none" />
             </div>
           </div>
-          {error && <div className="text-xs text-red-400">{error}</div>}
+          {error && <div className="text-xs text-danger">{error}</div>}
           <button onClick={goConfirm} className="lv-button lv-button-primary w-full">
             {s.next}
           </button>
         </>
       ) : (
         <>
-          <p className="text-xs text-zinc-400">{s.confirmBody}</p>
-          <div className="rounded-lg bg-black/30 p-3 space-y-1">
-            <div className="text-sm text-white font-bold break-words">{subject}</div>
-            <div className="text-xs text-zinc-400 whitespace-pre-wrap break-words">{body}</div>
-            {orderId && <div className="text-xs text-zinc-500 font-mono">{orderId}</div>}
+          <p className="text-xs text-text-secondary">{s.confirmBody}</p>
+          <div className="lv-well rounded-md p-3 space-y-1">
+            <div className="text-sm text-text-primary font-bold break-words">{subject}</div>
+            <div className="text-xs text-text-secondary whitespace-pre-wrap break-words">{body}</div>
+            {orderId && <div className="text-xs text-text-muted font-mono">{orderId}</div>}
           </div>
-          {error && <div className="text-xs text-red-400">{error}</div>}
+          {error && <div className="text-xs text-danger">{error}</div>}
           <div className="flex gap-2">
             <button
               onClick={() => setStep('form')}
@@ -1108,18 +1113,18 @@ function TicketsTab({
       <div className="flex min-h-0 flex-1 flex-col">
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" data-support-thread>
           <div className="mx-auto max-w-3xl space-y-3">
-            <button onClick={() => setOpen(null)} className="text-xs text-zinc-400 hover:text-white font-bold">
+            <button onClick={() => setOpen(null)} className="text-xs text-text-secondary hover:text-text-primary font-bold">
               ← {s.back}
             </button>
             {threadLoading ? (
-              <div className="text-center py-8 text-zinc-500">{s.loading}</div>
+              <div className="text-center py-8 text-text-muted">{s.loading}</div>
             ) : head ? (
               <>
                 <div className="lv-surface p-3">
                   {head.kind === 'ticket' ? (
                     <>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-bold text-sm break-words">{head.ticket.subject}</span>
+                        <span className="text-text-primary font-bold text-sm break-words">{head.ticket.subject}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATE_STYLES[head.ticket.state]}`}>
                           {stateLabel(s, head.ticket.state)}
                         </span>
@@ -1127,12 +1132,12 @@ function TicketsTab({
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-400">{s.proPriority}</span>
                         )}
                       </div>
-                      {head.ticket.order_id && <div className="text-xs text-zinc-500 font-mono mt-1">{head.ticket.order_id}</div>}
+                      {head.ticket.order_id && <div className="text-xs text-text-muted font-mono mt-1">{head.ticket.order_id}</div>}
                     </>
                   ) : (
                     <>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-bold text-sm">
+                        <span className="text-text-primary font-bold text-sm">
                           {s.complaintLabel}
                           {head.complaint.merchant_name ? ` ${s.complaintOn} ${head.complaint.merchant_name}` : ''}
                         </span>
@@ -1140,7 +1145,7 @@ function TicketsTab({
                           {s.complaintStatus[head.complaint.status] ?? head.complaint.status}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-zinc-400 whitespace-pre-wrap break-words">{head.complaint.description}</p>
+                      <p className="mt-1 text-xs text-text-secondary whitespace-pre-wrap break-words">{head.complaint.description}</p>
                     </>
                   )}
                 </div>
@@ -1152,7 +1157,7 @@ function TicketsTab({
                           m.is_staff ? 'bg-surface text-text-secondary' : 'bg-surface-selected border border-border-subtle text-text-primary'
                         } ${m.pending ? 'opacity-60' : ''}`}
                       >
-                        <div className="text-[10px] text-zinc-500 mb-0.5">
+                        <div className="text-[10px] text-text-muted mb-0.5">
                           {m.is_staff ? s.staff : s.you} · {m.pending && m.kind && m.kind !== 'text' ? s.uploading : fmtDate(m.created_at, lang)}
                         </div>
                         {/* THE WHOLE PHOTOGRAPH, AND A WAY TO OPEN IT. It was
@@ -1165,12 +1170,12 @@ function TicketsTab({
                               referrerPolicy="no-referrer"
                               src={m.file_url}
                               alt=""
-                              className="max-h-[300px] w-full rounded-lg bg-black/30 object-contain"
+                              className="max-h-[300px] w-full rounded-lg bg-surface-selected object-contain"
                             />
                           </a>
                         )}
                         {m.kind === 'video' && m.file_url && (
-                          <video src={m.file_url} controls playsInline preload="metadata" className="mb-1 max-h-[300px] w-full rounded-lg bg-black" />
+                          <video src={m.file_url} controls playsInline preload="metadata" className="mb-1 max-h-[300px] w-full rounded-lg bg-charcoal" />
                         )}
                         {m.body}
                       </div>
@@ -1179,7 +1184,7 @@ function TicketsTab({
                 </div>
               </>
             ) : (
-              <div className="text-center py-8 text-red-400 text-sm">{replyError || s.loadError}</div>
+              <div className="text-center py-8 text-danger text-sm">{replyError || s.loadError}</div>
             )}
           </div>
         </div>
@@ -1188,7 +1193,7 @@ function TicketsTab({
           <div className="z-40 shrink-0 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-support-thread-composer>
             <div className="mx-auto max-w-3xl space-y-2">
               {replyError && (
-                <div role="alert" className="text-xs text-red-400">
+                <div role="alert" className="text-xs text-danger">
                   {replyError}
                 </div>
               )}
@@ -1200,17 +1205,16 @@ function TicketsTab({
                   className="hidden"
                   onChange={onPickFile}
                 />
-                <button
-                  type="button"
+                <IconButton
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading || replyBusy}
-                  aria-label={s.attach}
+                  label={s.attach}
                   title={s.attach}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </button>
+                  variant="secondary"
+                  icon={<Paperclip className="h-4 w-4" />}
+                />
                 <input
+                  className="lv-input flex-1 min-w-0 text-sm"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => {
@@ -1219,7 +1223,6 @@ function TicketsTab({
                   maxLength={4000}
                   placeholder={uploading ? s.uploading : s.replyPlaceholder}
                   aria-label={s.replyPlaceholder}
-                  className="lv-input flex-1 min-w-0 text-sm"
                 />
                 <button
                   onClick={sendReply}
@@ -1245,11 +1248,11 @@ function TicketsTab({
           </button>
         </div>
         {loading ? (
-          <div className="text-center py-8 text-zinc-500">{s.loading}</div>
+          <div className="text-center py-8 text-text-muted">{s.loading}</div>
         ) : error ? (
-          <div className="text-center py-8 text-red-400 text-sm space-y-2">
+          <div className="text-center py-8 text-danger text-sm space-y-2">
             <div>{error}</div>
-            <button onClick={load} className="text-xs text-zinc-400 underline">
+            <button onClick={load} className="text-xs text-text-secondary underline">
               {s.retry}
             </button>
           </div>
@@ -1264,12 +1267,12 @@ function TicketsTab({
                 className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold text-white break-words flex-1 min-w-0">{t.subject}</span>
+                  <span className="text-sm font-bold text-text-primary break-words flex-1 min-w-0">{t.subject}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${STATE_STYLES[t.state]}`}>
                     {stateLabel(s, t.state)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
+                <div className="flex items-center gap-2 mt-1 text-xs text-text-muted flex-wrap">
                   <span>{fmtDate(t.created_at, lang)}</span>
                   {t.priority === 1 && <span className="text-yellow-400 font-bold">{s.proPriority}</span>}
                   {typeof t.message_count === 'number' && (
@@ -1294,7 +1297,7 @@ function TicketsTab({
                     className="w-full rounded-lg bg-surface p-3 text-start transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-white break-words flex-1 min-w-0">
+                      <span className="text-sm font-bold text-text-primary break-words flex-1 min-w-0">
                         {s.complaintLabel}
                         {c.merchant_name ? ` ${s.complaintOn} ${c.merchant_name}` : ''}
                       </span>
@@ -1302,8 +1305,8 @@ function TicketsTab({
                         {s.complaintStatus[c.status] ?? c.status}
                       </span>
                     </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-zinc-400 break-words">{c.description}</p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500 flex-wrap">
+                    <p className="mt-1 line-clamp-2 text-xs text-text-secondary break-words">{c.description}</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-text-muted flex-wrap">
                       <span>{fmtDate(c.created_at, lang)}</span>
                       {typeof c.message_count === 'number' && (
                         <span className="flex items-center gap-1">
@@ -1499,17 +1502,17 @@ export default function Support() {
   const activeChoices = latestAssistant?.reply?.choices ?? [];
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-canvas text-text-secondary" data-support-layout>
+    <div className="flex h-full min-h-0 w-full flex-col text-text-secondary" data-support-layout>
       {/* header */}
       <div className="z-40 flex shrink-0 items-center gap-3 border-b border-border-subtle bg-canvas px-4 py-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label={s.back}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          {dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
-        </button>
+        <IconButton
+          variant="secondary"
+          onClick={() => {
+            navigate(-1);
+          }}
+          label={s.back}
+          icon={dir === 'rtl' ? <ArrowRight className="w-5 h-5" /> : <ArrowLeft className="w-5 h-5" />}
+        />
         <LifeBuoy className="w-5 h-5 shrink-0 text-gold" aria-hidden="true" />
         {/* ONE BAR STAYS ONE BAR AT 320px.
             Fixed chrome in this row is 188px (32 padding + 44 back button +
@@ -1544,7 +1547,7 @@ export default function Support() {
 
       {/* tabs */}
       <div className="shrink-0 px-4 pt-3">
-        <div className="mx-auto flex max-w-3xl rounded-lg bg-surface p-1" role="tablist" aria-label={s.title}>
+        <div className="mx-auto flex max-w-3xl rounded-full lv-well border border-border-subtle p-1" role="tablist" aria-label={s.title}>
           {(['assistant', 'tickets'] as const).map((tabId) => (
             <button
               key={tabId}
@@ -1552,8 +1555,8 @@ export default function Support() {
               role="tab"
               aria-selected={tab === tabId}
               onClick={() => setTab(tabId)}
-              className={`min-h-10 flex-1 rounded-md px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                tab === tabId ? 'bg-white/[0.07] text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary'
+              className={`min-h-10 flex-1 rounded-full border px-3 py-2 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                tab === tabId ? TAB_ON : TAB_OFF
               }`}
             >
               {tabId === 'assistant' ? s.tabAssistant : s.tabTickets}
@@ -1583,7 +1586,7 @@ export default function Support() {
                       m.role === 'user'
                         ? 'bg-surface-selected border border-border-subtle text-text-primary'
                         : m.error
-                          ? 'lv-alert lv-alert-danger text-red-200'
+                          ? 'lv-alert lv-alert-danger text-text-primary'
                           : 'bg-surface text-text-secondary'
                     }`}
                   >
@@ -1656,7 +1659,7 @@ export default function Support() {
               </div>
             ))}
 
-            {busy && <div className="text-xs text-zinc-500 px-1">{s.thinking}</div>}
+            {busy && <div className="text-xs text-text-muted px-1">{s.thinking}</div>}
 
             {showTicketForm && (
               <TicketForm s={s} lang={lang} loc={loc} initial={prefill} onClose={() => setShowTicketForm(false)} onCreated={onTicketCreated} />
@@ -1686,6 +1689,7 @@ export default function Support() {
             )}
             <div className="max-w-3xl mx-auto flex gap-2">
               <input
+                className="lv-input flex-1 min-w-0 text-sm"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1694,7 +1698,6 @@ export default function Support() {
                 maxLength={500}
                 placeholder={s.inputPlaceholder}
                 aria-label={s.inputPlaceholder}
-                className="lv-input flex-1 min-w-0 text-sm"
               />
               <button
                 type="button"

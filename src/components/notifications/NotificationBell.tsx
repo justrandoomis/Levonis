@@ -197,22 +197,22 @@ function Row({ n, asMenu, onOpen, expanded = false }: RowProps) {
     >
       <span
         className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border ${
-          n.read ? 'border-zinc-700/70 bg-zinc-800/60 text-zinc-400' : 'border-gold/30 bg-gold/10 text-gold'
+          n.read ? 'border-border-subtle bg-surface-selected text-text-secondary' : 'border-gold/30 bg-gold/10 text-gold'
         }`}
       >
         <Icon className="h-4 w-4" aria-hidden="true" />
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className={`block text-[13px] leading-5 ${n.read ? 'text-zinc-300' : 'font-bold text-white'}`}>
+        <span className={`block text-[13px] leading-5 ${n.read ? 'text-text-secondary' : 'font-bold text-text-primary'}`}>
           {title}
         </span>
         {body && (
-          <span className={`mt-0.5 text-[12px] leading-5 text-zinc-400 ${expanded ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'}`}>
+          <span className={`mt-0.5 text-[12px] leading-5 text-text-secondary ${expanded ? 'whitespace-pre-wrap break-words' : 'line-clamp-2'}`}>
             {body}
           </span>
         )}
-        <time dateTime={n.created_at} className="mt-1 block text-[11px] text-zinc-500">
+        <time dateTime={n.created_at} className="mt-1 block text-[11px] text-text-muted">
           {relTime(n.created_at, loc)}
         </time>
       </span>
@@ -397,7 +397,7 @@ export default function NotificationBell() {
       className="flex max-h-[70vh] min-h-0 flex-col outline-none sm:max-h-[26rem]"
     >
       <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5">
-        <h2 id={titleId} className="text-[13px] font-bold text-white">
+        <h2 id={titleId} className="text-[13px] font-bold text-text-primary">
           {label}
         </h2>
         <button
@@ -405,16 +405,16 @@ export default function NotificationBell() {
           data-notif="mark-all"
           onClick={markAll}
           disabled={unread === 0}
-          className="flex min-h-[32px] items-center gap-1.5 rounded-full px-2.5 text-[12px] text-zinc-400 transition-colors hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:pointer-events-none disabled:opacity-40"
+          className="flex min-h-[32px] items-center gap-1.5 rounded-full px-2.5 text-[12px] text-text-secondary transition-colors hover:text-text-primary hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:pointer-events-none disabled:opacity-40"
         >
           <CheckCheck className="h-3.5 w-3.5" aria-hidden="true" />
           {loc('تعليم الكل كمقروء', 'Mark all read', 'هەموو وەک خوێندراوە')}
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain divide-y divide-white/[0.06]">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain divide-y divide-border-subtle">
         {loading && rows.length === 0 && (
-          <div className="flex items-center justify-center gap-2 px-3 py-8 text-[12px] text-zinc-500">
+          <div className="flex items-center justify-center gap-2 px-3 py-8 text-[12px] text-text-muted">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             {loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}
           </div>
@@ -422,13 +422,13 @@ export default function NotificationBell() {
 
         {failed && rows.length === 0 && (
           <div className="px-3 py-8 text-center">
-            <p className="text-[12px] text-zinc-400">
+            <p className="text-[12px] text-text-secondary">
               {loc('تعذّر تحميل الإشعارات', 'Couldn’t load notifications', 'نەتوانرا ئاگادارکردنەوەکان باربکرێن')}
             </p>
             <button
               type="button"
               onClick={() => void loadList()}
-              className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-zinc-700 px-3 text-[12px] text-zinc-200 transition-colors hover:border-gold/50 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+              className="lv-button lv-button-secondary lv-button-sm mt-2"
             >
               <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
               {loc('إعادة المحاولة', 'Try again', 'دووبارە هەوڵبدەرەوە')}
@@ -437,7 +437,7 @@ export default function NotificationBell() {
         )}
 
         {!loading && !failed && rows.length === 0 && (
-          <p className="px-3 py-10 text-center text-[12px] text-zinc-500">
+          <p className="px-3 py-10 text-center text-[12px] text-text-muted">
             {loc('لا توجد إشعارات', 'No notifications yet', 'هیچ ئاگادارکردنەوەیەک نییە')}
           </p>
         )}

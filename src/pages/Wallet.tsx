@@ -951,9 +951,9 @@ export default function Wallet() {
   const Back = isRtl ? ChevronRight : ChevronLeft;
 
   return (
-    <div dir={dir} className="w-full bg-black min-h-screen font-sans flex flex-col pb-24">
+    <div dir={dir} className="w-full min-h-screen font-sans flex flex-col pb-24">
       {/* ---------------------------------------------------------- header */}
-      <div data-theme="dark" className="bg-gradient-to-b from-olive to-olive-dark rounded-b-[32px] pt-12 pb-5 px-4 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
+      <div data-theme="dark" className="bg-gradient-to-b from-olive to-olive-dark rounded-b-3xl pt-12 pb-5 px-4 sm:px-8 flex flex-col items-center relative border-b border-gold/10">
         <button
           onClick={() => navigate(-1)}
           aria-label={s.back}
@@ -965,7 +965,7 @@ export default function Wallet() {
           onClick={() => setCurrency(currency === 'USD' ? 'IQD' : 'USD')}
           className="absolute end-5 top-12 bg-olive/80 hover:bg-olive-light px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-gold/20 transition-transform active:scale-95"
         >
-          <div className="bg-gold text-olive-dark rounded-[4px] p-0.5 flex items-center justify-center">
+          <div className="bg-gold text-olive-dark rounded p-0.5 flex items-center justify-center">
             {currency === 'USD' ? (
               <DollarSign className="w-3 h-3" strokeWidth={3} />
             ) : (
@@ -1048,7 +1048,7 @@ export default function Wallet() {
               key={card.key}
               data-wallet-figure={card.key}
               title={card.hint || undefined}
-              className="min-w-0 bg-black/30 border border-white/10 rounded-xl px-2.5 py-2 text-start"
+              className="min-w-0 bg-black/30 shadow-well rounded-lg px-2.5 py-2 text-start"
             >
               <dt className="flex items-center gap-1 min-w-0 text-zinc-400 text-[11px] font-bold leading-4">
                 {/* The icon yields its 16px below 400px, where the longest
@@ -1107,14 +1107,14 @@ export default function Wallet() {
         <button
           onClick={() => openRequest('withdrawal')}
           disabled={loading || !!loadError}
-          className="flex-1 max-w-[240px] min-h-12 bg-zinc-900 border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800 transition-colors text-white rounded-2xl flex items-center justify-center gap-2 font-bold text-[15px] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="lv-button lv-button-secondary flex-1 max-w-[240px] min-h-12 text-[15px]"
         >
           {s.withdraw}
           <ArrowUp className="w-4 h-4" strokeWidth={3} />
         </button>
         <button
           onClick={() => openRequest('deposit')}
-          className="flex-1 max-w-[240px] min-h-12 bg-gold hover:bg-gold-light transition-colors text-accent-contrast rounded-2xl flex items-center justify-center gap-2 font-black text-[15px]"
+          className="lv-button lv-button-primary flex-1 max-w-[240px] min-h-12 text-[15px]"
         >
           <ArrowDown className="w-4 h-4" strokeWidth={3} />
           {s.addFunds}
@@ -1122,12 +1122,12 @@ export default function Wallet() {
       </div>
 
       {banner && (
-        <div role="status" className="mx-5 mb-4 bg-leaf/10 border border-leaf/40 text-sprout text-xs font-medium rounded-2xl p-3 text-center">
+        <div role="status" className="mx-5 mb-4 lv-alert lv-alert-success text-xs font-medium text-text-primary text-center">
           {banner}
         </div>
       )}
       {actionError && (
-        <div role="alert" className="mx-5 mb-4 bg-crimson/10 border border-crimson/40 text-blush text-xs font-medium rounded-2xl p-3 text-center">
+        <div role="alert" className="mx-5 mb-4 lv-alert lv-alert-danger text-xs font-medium text-text-primary text-center">
           {actionError}
         </div>
       )}
@@ -1141,10 +1141,10 @@ export default function Wallet() {
             in the merge, only the second place to look. */}
         <section>
           <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-            <h2 className="text-white font-bold text-[15px]">{s.operations}</h2>
+            <h2 className="text-text-primary font-bold text-[15px]">{s.operations}</h2>
             <button
               onClick={() => void load()}
-              className="text-zinc-400 hover:text-white text-[11px] font-bold flex items-center gap-1.5"
+              className="text-text-secondary hover:text-text-primary text-[11px] font-bold flex items-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" /> {s.refresh}
             </button>
@@ -1197,10 +1197,10 @@ export default function Wallet() {
             />
             <div className="relative shrink-0">
               <select
+                className="lv-input h-9 min-h-9 w-auto appearance-none rounded-full ps-2.5 pe-7 text-[12px] font-bold"
                 aria-label={s.statusAll}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="h-9 appearance-none bg-zinc-900/60 border border-white/10 rounded-xl ps-2.5 pe-7 text-[12px] font-bold text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/70"
               >
                 <option value="all">{s.statusAll}</option>
                 <option value="pending">{s.statusPending}</option>
@@ -1209,7 +1209,7 @@ export default function Wallet() {
               </select>
               <ChevronDown
                 aria-hidden
-                className="w-3.5 h-3.5 text-zinc-500 absolute end-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                className="w-3.5 h-3.5 text-text-muted absolute end-2 top-1/2 -translate-y-1/2 pointer-events-none"
               />
             </div>
             <button
@@ -1218,8 +1218,8 @@ export default function Wallet() {
               aria-label={s.searchPlaceholder}
               aria-expanded={searchOpen || !!search}
               aria-controls="wallet-search"
-              className={`sm:hidden h-9 w-9 shrink-0 rounded-xl border flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 ${
-                searchOpen || search ? 'bg-zinc-800 border-white/20 text-white' : 'bg-zinc-900/60 border-white/10 text-zinc-400'
+              className={`sm:hidden h-9 w-9 shrink-0 rounded-full border border-border-subtle flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                searchOpen || search ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
               }`}
             >
               <Search className="w-4 h-4" />
@@ -1234,14 +1234,14 @@ export default function Wallet() {
               className={`${searchOpen || search ? 'flex' : 'hidden'} sm:flex basis-full sm:basis-auto sm:flex-1 sm:min-w-[160px] items-center`}
             >
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-zinc-500 absolute top-1/2 -translate-y-1/2 start-3" />
+                <Search className="w-3.5 h-3.5 text-text-muted absolute top-1/2 -translate-y-1/2 start-3" />
                 <input
+                  className="lv-input h-10 min-h-10 sm:h-9 sm:min-h-9 rounded-full ps-9 pe-3"
                   type="search"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder={s.searchPlaceholder}
                   aria-label={s.searchPlaceholder}
-                  className="h-10 sm:h-9 w-full bg-zinc-900/60 border border-white/10 rounded-xl ps-9 pe-3 text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
                 />
               </div>
             </form>
@@ -1258,7 +1258,7 @@ export default function Wallet() {
           ) : operations.length === 0 ? (
             <EmptyState title={s.noActivity} description={s.noActivityHint} />
           ) : (
-            <div className="space-y-3">
+            <div className="lv-surface overflow-hidden divide-y divide-border-subtle">
               {operations.map((op) => {
                 const tx = op.tx;
                 const w = op.withdrawal;
@@ -1272,10 +1272,10 @@ export default function Wallet() {
                       text: stateLabel(w.state),
                       tone:
                         w.state === 'paid'
-                          ? 'bg-leaf/15 text-sprout'
+                          ? 'lv-chip [--chip:var(--color-success)]'
                           : w.state === 'rejected' || w.state === 'failed' || w.state === 'cancelled'
-                            ? 'bg-crimson/15 text-blush'
-                            : 'bg-yellow-500/15 text-yellow-400',
+                            ? 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]'
+                            : 'lv-chip [--chip:var(--color-warning)]',
                     }
                   : {
                       text:
@@ -1286,17 +1286,17 @@ export default function Wallet() {
                             : s.statusRejected,
                       tone:
                         tx?.status === 'pending'
-                          ? 'bg-yellow-500/15 text-yellow-400'
+                          ? 'lv-chip [--chip:var(--color-warning)]'
                           : tx?.status === 'approved'
-                            ? 'bg-leaf/15 text-sprout'
-                            : 'bg-crimson/15 text-blush',
+                            ? 'lv-chip [--chip:var(--color-success)]'
+                            : 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]',
                     };
                 return (
-                  <div key={op.key} data-wallet-operation className="bg-zinc-900/60 rounded-2xl p-4 border border-zinc-800">
+                  <div key={op.key} data-wallet-operation className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                          className={`w-10 h-10 rounded-sm flex items-center justify-center shrink-0 ${
                             isDeposit ? 'bg-leaf/15' : 'bg-crimson/15'
                           }`}
                         >
@@ -1307,10 +1307,10 @@ export default function Wallet() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-white font-bold text-[14px] truncate">
+                          <h3 className="text-text-primary font-bold text-[14px] truncate">
                             {tx?.note || (isDeposit ? s.filterDeposit : s.filterWithdrawal)}
                           </h3>
-                          <div className="text-zinc-400 text-[11px] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <div className="text-text-secondary text-[11px] mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span dir="ltr">{tx?.number ?? w?.number}</span>
                             <span>{new Date(op.at).toLocaleDateString()}</span>
                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${badge.tone}`}>
@@ -1320,12 +1320,12 @@ export default function Wallet() {
                               {badge.text}
                             </span>
                             {w?.state === 'approved' && (
-                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300">
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/[0.06] text-text-secondary">
                                 {s.approvedNotSent}
                               </span>
                             )}
                             {tx?.order_kind && (
-                              <span data-wallet-order-kind={tx.order_kind} className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300">
+                              <span data-wallet-order-kind={tx.order_kind} className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/[0.06] text-text-secondary">
                                 {tx.order_kind === 'quick_buy' ? `⚡ ${s.orderQuickBuy}` : `🎁 ${s.orderGift}`}
                               </span>
                             )}
@@ -1334,7 +1334,7 @@ export default function Wallet() {
                                 href={tx.receiptUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-zinc-300 hover:text-white underline text-[10px] font-bold"
+                                className="inline-flex items-center gap-1 text-text-secondary hover:text-text-primary underline text-[10px] font-bold"
                               >
                                 <Receipt className="w-3 h-3" /> {s.receipt}
                               </a>
@@ -1343,7 +1343,7 @@ export default function Wallet() {
                           {/* Everything the separate withdrawals list used to
                               show, kept on the row it belongs to. */}
                           {w && (
-                            <div className="text-zinc-500 text-[11px] mt-1.5 space-y-0.5">
+                            <div className="text-text-muted text-[11px] mt-1.5 space-y-0.5">
                               <div>
                                 {/* The channel by NAME — the raw id («pm_1726…»)
                                     is what this line used to print — and the
@@ -1366,7 +1366,7 @@ export default function Wallet() {
                               {w.outcome_reason && <div>{s.reason}: {w.outcome_reason}</div>}
                             </div>
                           )}
-                          {tx?.adminNote ? <p className="text-zinc-500 text-[11px] mt-1">{tx.adminNote}</p> : null}
+                          {tx?.adminNote ? <p className="text-text-muted text-[11px] mt-1">{tx.adminNote}</p> : null}
                         </div>
                       </div>
                       <div className="text-end shrink-0">
@@ -1379,18 +1379,18 @@ export default function Wallet() {
                             <button
                               onClick={() => onCancelWithdrawal(w.id)}
                               disabled={cancellingId === w.id}
-                              className="text-[10px] font-bold text-blush hover:text-white border border-crimson/40 rounded-lg px-2.5 py-1.5 disabled:opacity-60"
+                              className="text-[10px] font-bold text-blush hover:text-text-primary border border-crimson/40 rounded-sm px-2.5 py-1.5 disabled:opacity-60"
                             >
                               {cancellingId === w.id ? s.cancelling : s.cancelRequest}
                             </button>
                           )}
                           {tx &&
                             (tx.reviewRequested ? (
-                              <span className="text-zinc-500 text-[10px] font-bold">{s.reviewRequested}</span>
+                              <span className="text-text-muted text-[10px] font-bold">{s.reviewRequested}</span>
                             ) : (
                               <button
                                 onClick={() => openReview(tx)}
-                                className="inline-flex items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-bold"
+                                className="inline-flex items-center gap-1 text-text-secondary hover:text-text-primary text-[10px] font-bold"
                               >
                                 <HelpCircle className="w-3 h-3" /> {s.requestReview}
                               </button>
@@ -1399,8 +1399,8 @@ export default function Wallet() {
                       </div>
                     </div>
                     {w?.needs_reconciliation && (
-                      <div className="mt-3 flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-2.5 text-[11px] text-yellow-200">
-                        <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div className="mt-3 flex items-start gap-2 lv-alert lv-alert-warning text-[11px] text-text-primary">
+                        <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-warning" />
                         <span>{s.needsReconciliation}</span>
                       </div>
                     )}
@@ -1461,15 +1461,13 @@ export default function Wallet() {
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-gold/60 text-[10px] font-bold mb-1.5 uppercase tracking-wider">{label}</label>
+      <label className="block text-text-secondary text-[12px] font-semibold mb-1.5">{label}</label>
       {children}
-      {hint ? <p className="text-gold/35 text-[10px] mt-1 leading-snug">{hint}</p> : null}
+      {hint ? <p className="text-text-muted text-[11px] mt-1 leading-snug">{hint}</p> : null}
     </div>
   );
 }
 
-const inputClass =
-  'w-full bg-zinc-900 border border-zinc-700 rounded-2xl px-4 py-3.5 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-gold/60 transition-colors';
 
 /** Owner-authored names for the payout channels. Never machine-translated. */
 const PAYOUT_KIND_LABELS: Record<string, { ar: string; en: string; ckb: string }> = {
@@ -1861,12 +1859,12 @@ function RequestModal({
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="absolute top-4 end-4 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 p-2 rounded-full"
+          className="absolute top-4 end-4 p-2 rounded-full text-text-secondary hover:text-text-primary bg-surface-raised border border-border-subtle shadow-1 transition-colors active:shadow-press"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h2 id="wallet-request-title" className="text-xl font-black text-white mb-1 text-center pe-10">
+        <h2 id="wallet-request-title" className="text-xl font-black text-text-primary mb-1 text-center pe-10">
           {kind === 'deposit' ? s.depositTitle : s.withdrawTitle}
         </h2>
 
@@ -1880,20 +1878,20 @@ function RequestModal({
                   step === i + 1
                     ? 'bg-gold text-accent-contrast'
                     : step > i + 1
-                      ? 'bg-zinc-800 text-zinc-300'
-                      : 'bg-zinc-900 text-zinc-600'
+                      ? 'bg-surface-selected text-text-secondary'
+                      : 'bg-surface text-text-muted'
                 }`}
               >
                 {title}
               </span>
-              {i < 2 && <span className="w-3 h-px bg-zinc-700" />}
+              {i < 2 && <span className="w-3 h-px bg-border-subtle" />}
             </div>
           ))}
         </div>
 
         <form onSubmit={submit} className="space-y-4">
           {error && (
-            <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs font-medium rounded-2xl p-3 text-center">
+            <div role="alert" className="lv-alert lv-alert-danger text-xs font-medium text-text-primary text-center">
               {error}
             </div>
           )}
@@ -1901,11 +1899,11 @@ function RequestModal({
           {/* ------------------------------------------------------ step 1 */}
           {step === 1 && kind === 'deposit' && (
             <div className="space-y-2">
-              <p className="text-zinc-400 text-xs leading-relaxed">{s.chooseChannelHint}</p>
+              <p className="text-text-secondary text-xs leading-relaxed">{s.chooseChannelHint}</p>
               {paymentMethods.length === 0 ? (
                 // No invented account numbers. If the owner has not published
                 // a channel, saying so is the only honest screen.
-                <p className="text-zinc-400 text-xs text-center py-6 bg-zinc-900 rounded-2xl border border-zinc-800">{s.noMethods}</p>
+                <p className="text-text-secondary text-xs text-center py-6 bg-surface rounded-lg border border-border-subtle">{s.noMethods}</p>
               ) : (
                 paymentMethods.map((m) => (
                   <button
@@ -1919,17 +1917,16 @@ function RequestModal({
                       setMethod(m.name);
                       setChannel(m.details);
                     }}
-                    className={`w-full flex justify-between items-center gap-3 p-3.5 rounded-2xl border transition-colors ${
-                      method === m.name ? 'bg-zinc-800 border-gold/60' : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800'
-                    }`}
+                    data-selected={method === m.name}
+                    className="lv-choice w-full flex justify-between items-center gap-3 p-3.5"
                   >
-                    <span className="text-white font-bold text-sm flex items-center gap-1.5 min-w-0 truncate">
+                    <span className="text-text-primary font-bold text-sm flex items-center gap-1.5 min-w-0 truncate">
                       {method === m.name && <CheckCircle className="w-4 h-4 text-gold shrink-0" />}
                       {m.name}
                     </span>
-                    <span dir="ltr" className="text-zinc-300 font-mono bg-black/50 px-2 py-1 rounded-lg text-xs flex items-center gap-1.5 shrink-0">
+                    <span dir="ltr" className="lv-well text-text-secondary font-mono px-2 py-1 rounded-sm text-xs flex items-center gap-1.5 shrink-0">
                       {m.details}
-                      <Copy className="w-3 h-3 text-zinc-500" />
+                      <Copy className="w-3 h-3 text-text-muted" />
                     </span>
                   </button>
                 ))
@@ -1947,11 +1944,8 @@ function RequestModal({
                       type="button"
                       key={ch.id}
                       onClick={() => setDestinationKind(ch.id)}
-                      className={`min-h-11 px-3 py-3 rounded-2xl border text-sm font-bold transition-colors ${
-                        destinationKind === ch.id
-                          ? 'bg-zinc-800 border-gold/60 text-white'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800'
-                      }`}
+                      data-selected={destinationKind === ch.id}
+                      className="lv-choice min-h-11 px-3 py-3 text-sm font-bold"
                     >
                       <span className="block truncate">{ch.name}</span>
                     </button>
@@ -1961,10 +1955,10 @@ function RequestModal({
               {requiresAccount && (
                 <Field label={`${s.accountForChannel} *`} hint={s.destinationFrozen}>
                   <input
+                    className="lv-input py-3 text-sm"
                     dir="ltr"
                     value={destinationAccount}
                     onChange={(e) => setDestinationAccount(e.target.value)}
-                    className={inputClass}
                     autoComplete="off"
                     required
                   />
@@ -1977,11 +1971,11 @@ function RequestModal({
           {step === 2 && (
             <div className="space-y-4">
               {kind === 'withdrawal' && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between">
-                  <span className="text-zinc-400 font-medium text-sm">{s.available}</span>
+                <div className="lv-well rounded-md p-4 flex items-center justify-between">
+                  <span className="text-text-secondary font-medium text-sm">{s.available}</span>
                   {/* The header's own figure — the customer's dinars — not the
                       cents converted back (which read 49,994 for 50,000). */}
-                  <span dir="ltr" className="text-white font-bold text-lg">{availableLabel}</span>
+                  <span dir="ltr" className="text-text-primary font-bold text-lg">{availableLabel}</span>
                 </div>
               )}
               <Field
@@ -1995,13 +1989,13 @@ function RequestModal({
                   value={amount}
                   onChange={onAmountChange}
                   placeholder="0.00"
-                  className={`${inputClass} font-bold text-lg`}
+                  className="lv-input py-3 font-bold text-lg"
                   required
                 />
               </Field>
               {kind === 'withdrawal' && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
-                  <div className="flex justify-between text-xs text-zinc-400">
+                <div className="lv-well rounded-md p-4 space-y-2">
+                  <div className="flex justify-between text-xs text-text-secondary">
                     <span>
                       {s.fee}
                       {feeBps > 0 && <span dir="ltr"> ({feePercentLabel})</span>}
@@ -2012,23 +2006,23 @@ function RequestModal({
                       <span aria-label={s.feeNotConfigured}>—</span>
                     )}
                   </div>
-                  <div className="flex justify-between text-sm text-white font-bold">
+                  <div className="flex justify-between text-sm text-text-primary font-bold">
                     <span>{s.net}</span>
                     <span dir="ltr">{netLabel}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-zinc-400">
+                  <div className="flex justify-between text-xs text-text-secondary">
                     <span>{s.availableAfter}</span>
                     <span dir="ltr">{availableAfterLabel}</span>
                   </div>
                   {/* The rate is stated when there is one and refused when
                       there is not — the old sentence is kept for feeBps === 0
                       rather than deleted, because that is still a real state. */}
-                  <p className="text-zinc-500 text-[10px] leading-snug">
+                  <p className="text-text-muted text-[10px] leading-snug">
                     {feeBps > 0 ? s.feeDeducted : s.feeNotConfigured}
                   </p>
                   {/* Moved here from the page header: this form is the one
                       place a customer might expect points to become cash. */}
-                  <p className="text-zinc-500 text-[10px] leading-snug">{s.pointsNote}</p>
+                  <p className="text-text-muted text-[10px] leading-snug">{s.pointsNote}</p>
                   {overBalance && <p className="text-blush text-[11px] font-bold">{s.insufficient}</p>}
                 </div>
               )}
@@ -2041,8 +2035,8 @@ function RequestModal({
               {kind === 'deposit' && (
                 <Field label={`${s.receiptLabel} *`}>
                   <div
-                    className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all bg-zinc-900 ${
-                      uploading ? 'border-gold/50 cursor-wait' : 'border-zinc-700 hover:border-gold/50 cursor-pointer'
+                    className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors bg-surface ${
+                      uploading ? 'border-gold/50 cursor-wait' : 'border-border-subtle hover:border-gold/50 cursor-pointer'
                     }`}
                   >
                     <input
@@ -2054,17 +2048,17 @@ function RequestModal({
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                     {uploading ? (
-                      <div className="flex flex-col items-center gap-2 text-zinc-300">
+                      <div className="flex flex-col items-center gap-2 text-text-secondary">
                         <Spinner size="md" decorative />
-                        <span className="text-xs font-bold text-white">{s.uploading}</span>
+                        <span className="text-xs font-bold text-text-primary">{s.uploading}</span>
                       </div>
                     ) : receiptKey ? (
                       <div className="flex flex-col items-center gap-2">
                         <CheckCircle className="w-6 h-6 text-sprout" />
-                        <span className="text-xs font-bold text-white">{s.receiptUploaded}</span>
+                        <span className="text-xs font-bold text-text-primary">{s.receiptUploaded}</span>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center gap-1.5 text-zinc-400">
+                      <div className="flex flex-col items-center gap-1.5 text-text-secondary">
                         <Upload className="w-5 h-5" />
                         <span className="text-xs font-medium">{s.receiptUpload}</span>
                       </div>
@@ -2073,36 +2067,36 @@ function RequestModal({
                 </Field>
               )}
 
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-1.5 text-xs">
-                <h3 className="text-white font-bold text-[11px] uppercase tracking-wider mb-1">{s.summary}</h3>
-                <div className="flex justify-between text-zinc-400">
+              <div className="lv-well rounded-md p-4 space-y-1.5 text-xs">
+                <h3 className="text-text-primary font-bold text-[11px] uppercase tracking-wider mb-1">{s.summary}</h3>
+                <div className="flex justify-between text-text-secondary">
                   <span>{kind === 'deposit' ? s.stepChannel : s.destinationKind}</span>
-                  <span className="text-white font-bold">
+                  <span className="text-text-primary font-bold">
                     {kind === 'deposit' ? method || '—' : payoutLabel(destinationKind)}
                   </span>
                 </div>
                 {kind === 'withdrawal' && requiresAccount && (
-                  <div className="flex justify-between text-zinc-400">
+                  <div className="flex justify-between text-text-secondary">
                     <span>{s.destinationAccount}</span>
-                    <span dir="ltr" className="text-white font-mono">{destinationAccount || '—'}</span>
+                    <span dir="ltr" className="text-text-primary font-mono">{destinationAccount || '—'}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-text-secondary">
                   <span>{s.amount}</span>
-                  <span dir="ltr" className="text-white font-bold">{amountLabel}</span>
+                  <span dir="ltr" className="text-text-primary font-bold">{amountLabel}</span>
                 </div>
                 {kind === 'withdrawal' && feeBps > 0 && (
                   <>
-                    <div className="flex justify-between text-zinc-400">
+                    <div className="flex justify-between text-text-secondary">
                       <span>
                         {s.fee}
                         <span dir="ltr"> ({feePercentLabel})</span>
                       </span>
-                      <span dir="ltr" className="text-white font-bold">−{feeLabel}</span>
+                      <span dir="ltr" className="text-text-primary font-bold">−{feeLabel}</span>
                     </div>
-                    <div className="flex justify-between text-zinc-400">
+                    <div className="flex justify-between text-text-secondary">
                       <span>{s.net}</span>
-                      <span dir="ltr" className="text-white font-bold">{netLabel}</span>
+                      <span dir="ltr" className="text-text-primary font-bold">{netLabel}</span>
                     </div>
                   </>
                 )}
@@ -2110,14 +2104,14 @@ function RequestModal({
 
               <Field label={`${s.note} — ${s.optional}`}>
                 <textarea
+                  className="lv-input py-3 text-sm h-20 leading-relaxed resize-none"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={s.notePlaceholder}
-                  className={`${inputClass} h-20 resize-none`}
                 />
               </Field>
 
-              <p className="text-zinc-500 text-[11px] leading-relaxed">
+              <p className="text-text-muted text-[11px] leading-relaxed">
                 {kind === 'deposit' ? s.depositIntro : s.withdrawIntro}
               </p>
             </div>
@@ -2127,7 +2121,7 @@ function RequestModal({
             <button
               type="button"
               onClick={() => (step === 1 ? onClose() : (setError(''), setStep((n) => n - 1)))}
-              className="flex-1 px-4 py-3.5 rounded-2xl font-bold text-zinc-300 hover:text-white hover:bg-zinc-900 border border-zinc-800"
+              className="lv-button lv-button-secondary flex-1 min-h-12"
             >
               {step === 1 ? s.cancel : s.back2}
             </button>
@@ -2135,7 +2129,7 @@ function RequestModal({
               <button
                 type="button"
                 onClick={goNext}
-                className="flex-[2] bg-gold hover:bg-gold-light text-accent-contrast font-black text-sm py-3.5 rounded-2xl transition-colors"
+                className="lv-button lv-button-primary flex-[2] min-h-12"
               >
                 {s.next}
               </button>
@@ -2143,7 +2137,7 @@ function RequestModal({
               <button
                 type="submit"
                 disabled={submitting || uploading}
-                className="flex-[2] bg-gold hover:bg-gold-light text-accent-contrast font-black text-sm py-3.5 rounded-2xl disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+                className="lv-button lv-button-primary flex-[2] min-h-12"
               >
                 {submitting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -2233,37 +2227,37 @@ function ReviewModal({
           type="button"
           onClick={onClose}
           aria-label={s.close}
-          className="absolute top-5 end-5 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 p-2 rounded-full"
+          className="absolute top-5 end-5 p-2 rounded-full text-text-secondary hover:text-text-primary bg-surface-raised border border-border-subtle shadow-1 transition-colors active:shadow-press"
         >
           <X className="w-5 h-5" />
         </button>
-        <h2 id="wallet-review-title" className="text-xl font-black text-white mb-1 text-center pe-10">
+        <h2 id="wallet-review-title" className="text-xl font-black text-text-primary mb-1 text-center pe-10">
           {s.reviewTitle}
         </h2>
-        <p className="text-zinc-400 text-center text-xs mb-4" dir="ltr">
+        <p className="text-text-secondary text-center text-xs mb-4" dir="ltr">
           {tx.number}
         </p>
         <form onSubmit={submit} className="space-y-4">
           {error && (
-            <div role="alert" className="bg-crimson/10 border border-crimson/40 text-blush text-xs rounded-2xl p-3 text-center">
+            <div role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary text-center">
               {error}
             </div>
           )}
           <Field label={s.reviewReason}>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} className={`${inputClass} h-24 resize-none`} />
+            <textarea className="lv-input py-3 text-sm h-24 leading-relaxed resize-none" value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 rounded-2xl font-bold text-zinc-300 hover:text-white border border-zinc-800 hover:bg-zinc-900"
+              className="lv-button lv-button-secondary flex-1"
             >
               {s.cancel}
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-[2] bg-gold hover:bg-gold-light text-accent-contrast font-black text-sm py-3 rounded-2xl disabled:opacity-70 transition-colors"
+              className="lv-button lv-button-primary flex-[2]"
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">

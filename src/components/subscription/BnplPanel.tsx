@@ -13,6 +13,7 @@ import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { formatDate } from '../orders/format';
 import { useMoney } from '../../CurrencyContext';
 import { useBusy } from '../../lib/busy';
+import { StatusChip, type Tone } from '../ui/Badge';
 
 interface Eligibility {
   eligible: boolean;
@@ -180,9 +181,9 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
 
   if (error && !data) {
     return (
-      <div data-bnpl-panel role="alert" className="rounded-[24px] border border-red-500/25 bg-red-500/10 p-5 text-sm text-red-200">
+      <div data-bnpl-panel role="alert" className="lv-alert lv-alert-danger p-5 text-sm text-text-primary">
         <p>{error}</p>
-        <button type="button" onClick={() => void load()} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-red-400/30 px-3 font-bold">
+        <button type="button" onClick={() => void load()} className="lv-button lv-button-secondary lv-button-sm mt-3">
           <RefreshCw className="h-4 w-4" aria-hidden /> {s.retry}
         </button>
       </div>
@@ -197,11 +198,11 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
       : eligibility.account_state === 'suspended'
         ? s.suspended
         : s.setup;
-  const stateClass = eligibility.eligible
-    ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+  const stateTone: Tone = eligibility.eligible
+    ? 'success'
     : eligibility.account_state === 'suspended'
-      ? 'border-red-400/30 bg-red-400/10 text-red-300'
-      : 'border-amber-300/30 bg-amber-300/10 text-amber-200';
+      ? 'danger'
+      : 'warning';
   const canRequest =
     activePro &&
     eligibility.identity_verified &&
@@ -217,15 +218,15 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
       <div className="p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border-subtle bg-surface-raised text-text-primary">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-surface-raised text-text-primary">
               <CreditCard className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0">
-              <h3 className="font-black text-white">{s.title}</h3>
-              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-zinc-400">{s.subtitle}</p>
+              <h3 className="font-black text-text-primary">{s.title}</h3>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-text-secondary">{s.subtitle}</p>
             </div>
           </div>
-          <span className={`rounded-full border px-3 py-1 text-[11px] font-black ${stateClass}`}>{stateLabel}</span>
+          <StatusChip tone={stateTone}>{stateLabel}</StatusChip>
         </div>
 
         {(eligibility.account_state !== 'none' || eligibility.outstanding_iqd > 0) && (
@@ -235,8 +236,8 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
               [s.available, eligibility.available_iqd],
               [s.outstanding, eligibility.outstanding_iqd],
             ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-xl border border-border-subtle bg-surface-raised p-3">
-                <dt className="text-[10px] font-bold text-zinc-500">{label}</dt>
+              <div key={String(label)} className="lv-well rounded-md p-3">
+                <dt className="text-[10px] font-bold text-text-muted">{label}</dt>
                 <dd className="mt-1 text-sm font-bold text-text-primary tabular-nums">{money(Number(value))}</dd>
               </div>
             ))}
@@ -244,45 +245,46 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
         )}
 
         {activePro && !eligibility.eligible && eligibility.account_state !== 'suspended' && (
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="mt-5 rounded-lg bg-surface-raised p-4">
             <div className="grid gap-2 text-xs sm:grid-cols-2">
-              <p className={`flex items-center gap-2 ${eligibility.identity_verified ? 'text-emerald-300' : 'text-amber-200'}`}>
+              <p className={`flex items-center gap-2 ${eligibility.identity_verified ? 'text-success' : 'text-warning'}`}>
                 {eligibility.identity_verified ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : <AlertTriangle className="h-4 w-4" aria-hidden />}
                 {s.identity}
               </p>
-              <p className={`flex items-center gap-2 ${eligibility.approved_address ? 'text-emerald-300' : 'text-amber-200'}`}>
+              <p className={`flex items-center gap-2 ${eligibility.approved_address ? 'text-success' : 'text-warning'}`}>
                 {eligibility.approved_address ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : <AlertTriangle className="h-4 w-4" aria-hidden />}
                 {s.address}
               </p>
             </div>
             {eligibility.account_state === 'requested' ? (
-              <p className="mt-3 flex items-center gap-2 text-xs text-amber-100"><Clock3 className="h-4 w-4" aria-hidden /> {s.requestedNote}</p>
+              <p className="mt-3 flex items-center gap-2 text-xs text-warning"><Clock3 className="h-4 w-4" aria-hidden /> {s.requestedNote}</p>
             ) : canRequest ? (
               <button type="button" disabled={busy !== null} onClick={() => void requestLimit()} className="mt-4 lv-button lv-button-primary lv-button-sm w-full sm:w-auto">
                 {busy === 'request' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ShieldCheck className="h-4 w-4" aria-hidden />}
                 {busy === 'request' ? s.requesting : s.request}
               </button>
             ) : (
-              <p className="mt-3 text-xs text-zinc-400">{eligibility.reason ? refusalText(eligibility.reason, lang, s.requirements) : s.requirements}</p>
+              <p className="mt-3 text-xs text-text-secondary">{eligibility.reason ? refusalText(eligibility.reason, lang, s.requirements) : s.requirements}</p>
             )}
           </div>
         )}
 
         {eligibility.account_state === 'suspended' && (
-          <div className="mt-5 rounded-2xl border border-red-400/25 bg-red-400/10 p-4 text-xs text-red-100">
+          <div className="mt-5 lv-alert lv-alert-danger text-xs text-text-primary">
             <p className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {s.suspendedNote}</p>
-            <Link to="/support" className="mt-3 inline-flex min-h-10 items-center text-red-200 underline underline-offset-4">{s.support}</Link>
+            <Link to="/support" className="mt-3 inline-flex min-h-10 items-center text-text-primary underline underline-offset-4">{s.support}</Link>
           </div>
         )}
 
         {eligibility.outstanding_iqd > 0 && (
-          <div className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4">
-            <h4 className="flex items-center gap-2 text-sm font-black text-white"><WalletCards className="h-4 w-4 text-emerald-300" aria-hidden /> {s.repayTitle}</h4>
-            <p className="mt-1 text-[11px] text-zinc-400">{s.repayHint}</p>
+          <div className="mt-5 rounded-lg bg-surface-raised p-4">
+            <h4 className="flex items-center gap-2 text-sm font-black text-text-primary"><WalletCards className="h-4 w-4 text-success" aria-hidden /> {s.repayTitle}</h4>
+            <p className="mt-1 text-[11px] text-text-secondary">{s.repayHint}</p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <label className="min-w-0 flex-1">
                 <span className="sr-only">{s.amount}</span>
                 <input
+                  className="lv-input text-sm"
                   inputMode="numeric"
                   type="number"
                   min={1}
@@ -290,11 +292,10 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
                   value={amount}
                   onChange={(event) => { repaymentKey.current = null; setAmount(event.target.value); setNote(null); }}
                   placeholder={s.amount}
-                  className="min-h-11 w-full rounded-xl border border-white/10 bg-black/35 px-3 text-sm text-white outline-none focus:border-emerald-400/50"
                   dir="ltr"
                 />
               </label>
-              <button type="button" disabled={busy !== null || !amount} onClick={() => void repay()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 text-xs font-black text-emerald-950 disabled:opacity-50">
+              <button type="button" disabled={busy !== null || !amount} onClick={() => void repay()} className="lv-button lv-button-primary">
                 {busy === 'repay' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <WalletCards className="h-4 w-4" aria-hidden />}
                 {busy === 'repay' ? s.repaying : s.repay}
               </button>
@@ -302,29 +303,29 @@ export function BnplPanel({ activePro }: { activePro: boolean }) {
           </div>
         )}
 
-        {note && <p role={note.ok ? 'status' : 'alert'} className={`mt-4 text-xs font-bold ${note.ok ? 'text-emerald-300' : 'text-red-300'}`}>{note.text}</p>}
+        {note && <p role={note.ok ? 'status' : 'alert'} className={`mt-4 text-xs font-bold ${note.ok ? 'text-success' : 'text-danger'}`}>{note.text}</p>}
       </div>
 
       <details className="border-t border-border-subtle/70 px-5 py-4 sm:px-6">
-        <summary className="cursor-pointer select-none text-xs font-black text-zinc-300">{s.history} ({data.ledger.length})</summary>
+        <summary className="cursor-pointer select-none text-xs font-black text-text-secondary">{s.history} ({data.ledger.length})</summary>
         {data.ledger.length === 0 ? (
-          <p className="py-4 text-xs text-zinc-500">{s.empty}</p>
+          <p className="py-4 text-xs text-text-muted">{s.empty}</p>
         ) : (
-          <ul className="mt-4 space-y-2">
+          <ul className="mt-2 divide-y divide-border-subtle">
             {data.ledger.map((entry) => {
               const signed = entry.kind === 'charge' ? entry.amount_iqd : entry.kind === 'repayment' ? -entry.amount_iqd : entry.amount_iqd;
               const label = entry.kind === 'charge' ? s.purchase : entry.kind === 'repayment' ? s.repayment : s.adjustment;
               return (
-                <li key={entry.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-white/7 bg-white/[0.025] p-3 text-xs">
+                <li key={entry.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-xs">
                   <div>
-                    <p className="font-bold text-zinc-200">{label}</p>
-                    <p className="mt-0.5 text-[10px] text-zinc-500">
+                    <p className="font-bold text-text-primary">{label}</p>
+                    <p className="mt-0.5 text-[10px] text-text-muted">
                       {formatDate(entry.created_at, lang)}
                       {entry.order_id ? ` · ${s.order} ${entry.order_id}` : ''}
                       {entry.due_at ? ` · ${s.due} ${formatDate(entry.due_at, lang)}` : ''}
                     </p>
                   </div>
-                  <span className={`font-black ${signed > 0 ? 'text-red-300' : 'text-emerald-300'}`} dir="ltr">
+                  <span className={`font-black tabular-nums ${signed > 0 ? 'text-danger' : 'text-success'}`} dir="ltr">
                     {signed > 0 ? '+' : '−'}{money(Math.abs(signed))}
                   </span>
                 </li>

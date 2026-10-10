@@ -191,13 +191,13 @@ export default function CompleteProfileSheet() {
           type="button"
           onClick={dismiss}
           aria-label={s.close}
-          className="absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-white"
+          className="absolute end-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press"
         >
           <X className="h-4 w-4" aria-hidden />
         </button>
 
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-gold">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-surface-raised text-gold">
             {user?.avatar_key ? (
               <img src={`/files/${user.avatar_key}`} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -205,16 +205,16 @@ export default function CompleteProfileSheet() {
             )}
           </span>
           <div className="min-w-0">
-            <h2 id="complete-profile-title" className="text-[16px] font-bold text-white">
+            <h2 id="complete-profile-title" className="text-[16px] font-bold text-text-primary">
               {s.completeTitle}
             </h2>
-            <p className="text-[12px] text-zinc-400">
+            <p className="text-[12px] text-text-secondary">
               {s.completePercent.replace('{p}', String(data?.percent ?? 0))}
             </p>
           </div>
         </div>
 
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full lv-well">
           <div
             className="h-full rounded-full bg-gold transition-[width] duration-300"
             style={{ width: `${data?.percent ?? 0}%` }}
@@ -223,7 +223,7 @@ export default function CompleteProfileSheet() {
 
         <ul className="mt-4 space-y-2">
           {items.map((field) => (
-            <li key={field} className="flex items-center gap-2 text-[13px] text-zinc-300">
+            <li key={field} className="flex items-center gap-2 text-[13px] text-text-secondary">
               <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold/70" />
               {missingLabel(s, field)}
             </li>
@@ -234,14 +234,14 @@ export default function CompleteProfileSheet() {
           <button
             type="button"
             onClick={complete}
-            className="min-h-[48px] rounded-xl bg-gold px-5 text-[14px] font-bold text-accent-contrast transition-opacity duration-200 hover:opacity-90"
+            className="lv-button lv-button-primary min-h-12"
           >
             {s.completeNow}
           </button>
           <button
             type="button"
             onClick={dismiss}
-            className="min-h-[44px] rounded-xl px-5 text-[13px] font-medium text-zinc-400 transition-colors duration-200 hover:text-white"
+            className="lv-button lv-button-ghost text-[13px] font-medium"
           >
             {s.later}
           </button>

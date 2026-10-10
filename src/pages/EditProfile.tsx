@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Edit2, Store } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Edit2, Store } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { Switch } from '../components/ui/Switch';
+import { IconButton } from '../components/ui/Button';
 import { useProjectStrings } from '../components/community/projects/strings';
 import { api, uploadFile } from '../lib/api';
 import { COUNTRIES, countryNames, flagOf } from '../components/auth/PhoneField';
@@ -188,14 +189,14 @@ export default function EditProfile() {
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-black text-white w-full font-sans pb-16">
+    <div className="min-h-screen text-text-primary w-full font-sans pb-16">
       {/* THE STORE LIVES IN ONE PLACE (audit 01 B10). This used to be a
           «Merchant Mode» toggle that swapped this page for a second, legacy
           store editor writing products through /api/community/my-store —
           store-less, entitlement-free, any image URL, hard deletes. That API
           now hands every write to the store API, and this is the way there. */}
       {canMerchant && (
-        <div className="flex justify-center pt-8 px-4 bg-black">
+        <div className="flex justify-center pt-8 px-4">
           <Link
             to="/merchant"
             data-edit-profile-store-link
@@ -218,20 +219,21 @@ export default function EditProfile() {
           The character anchor is what stops the shell printing a SECOND strip
           above this bar: MotionCharacterFallbackHeader suppresses itself as
           soon as a page registers an anchor of its own. */}
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-black sticky top-0 z-10 border-b border-zinc-800/50">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Back"
-          className="w-11 h-11 bg-white/5 rounded-full flex items-center justify-center shadow-sm hover:bg-white/10 active:scale-95 transition-all border border-white/5"
-        >
-          <ChevronLeft className="w-6 h-6 text-white rtl:rotate-180" />
-        </button>
-        <h1 className="text-[18px] font-bold text-gold text-center truncate">Edit profile</h1>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 p-4 pt-4 bg-canvas sticky top-0 z-10 border-b border-border-subtle">
+        <IconButton
+          variant="secondary"
+          onClick={() => {
+            navigate(-1);
+          }}
+          label="Back"
+          icon={<ChevronLeft className="w-6 h-6 rtl:rotate-180" />}
+        />
+        <h1 className="text-[18px] font-bold text-text-primary text-center truncate">Edit profile</h1>
         <MotionCharacterHome kind="top-header" compact />
         <button
           onClick={handleSave}
           disabled={isSaving || !user}
-          className={`px-5 py-2.5 rounded-full text-[15px] font-bold shadow-sm transition-all ${saved ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-olive/20 text-gold border border-olive/30 hover:bg-olive/30 active:scale-95'} disabled:opacity-50`}
+          className={`lv-button ${saved ? 'lv-button-secondary text-success' : 'lv-button-accent'} px-5 text-[15px]`}
         >
           {isSaving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
         </button>
@@ -239,7 +241,7 @@ export default function EditProfile() {
 
       {saveError && (
         <div className="max-w-md mx-auto px-4 pt-4">
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-medium rounded-2xl p-3 text-center">
+          <div className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary text-center">
             {saveError}
           </div>
         </div>
@@ -253,7 +255,7 @@ export default function EditProfile() {
               {avatarPreview ? (
                 <img referrerPolicy="no-referrer" src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <div className="text-zinc-800 font-bold text-2xl">{initials}</div>
+                <div className="text-onyx font-bold text-2xl">{initials}</div>
               )}
               {isUploadingAvatar && (
                 <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
@@ -261,8 +263,8 @@ export default function EditProfile() {
                 </div>
               )}
             </div>
-            <button className="absolute bottom-0 right-0 w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center shadow-md active:scale-95 transition-transform border border-zinc-700 pointer-events-none">
-              <Edit2 className="w-4 h-4 text-white" />
+            <button className="absolute bottom-0 end-0 w-8 h-8 bg-surface-raised rounded-full flex items-center justify-center shadow-1 border border-border-subtle pointer-events-none">
+              <Edit2 className="w-4 h-4 text-text-primary" />
             </button>
             <input
               type="file"
@@ -276,19 +278,19 @@ export default function EditProfile() {
 
         {/* Username */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">Username</h3>
-            <span className="text-zinc-500 text-[11px] font-medium">Change once per 14 days</span>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">Username</h3>
+            <span className="text-text-muted text-[11px] font-medium">Change once per 14 days</span>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4 flex items-center justify-between cursor-pointer active:bg-zinc-800">
+          <div className="relative">
             <input
+              className="lv-input min-h-[52px] pe-10 font-bold text-[16px]"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="bg-transparent font-bold text-[16px] text-white w-full outline-none"
               placeholder="Username"
             />
-            <ChevronRight className="w-5 h-5 text-zinc-500 ml-2 shrink-0" />
+            <ChevronRight className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted rtl:rotate-180" />
           </div>
         </div>
 
@@ -296,73 +298,68 @@ export default function EditProfile() {
             it and sends people to this page — a prompt whose CTA leads
             somewhere the field does not exist is worse than no prompt. */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">Country</h3>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">Country</h3>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4">
+          <div className="relative">
             <select
+              className="lv-input min-h-[52px] appearance-none pe-10 font-bold text-[16px]"
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               aria-label="Country"
-              className="bg-transparent font-bold text-[16px] text-white w-full outline-none"
             >
-              <option value="" className="bg-zinc-900">—</option>
+              <option value="" className="bg-surface">—</option>
               {COUNTRIES.map((c) => (
-                <option key={c.iso} value={c.iso} className="bg-zinc-900">
+                <option key={c.iso} value={c.iso} className="bg-surface">
                   {flagOf(c.iso)} {countryLabel(c.iso)}
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           </div>
         </div>
 
         {/* Full name */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">Full name</h3>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">Full name</h3>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4">
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="bg-transparent font-bold text-[16px] text-white w-full outline-none"
-              placeholder="Full name"
-            />
-          </div>
+          <input
+            className="lv-input min-h-[52px] font-bold text-[16px]"
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Full name"
+          />
         </div>
 
         {/* Bio */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">Bio</h3>
-            <span className="text-zinc-300 text-[13px] font-medium">{bio.length}/68</span>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">Bio</h3>
+            <span className="text-text-secondary text-[13px] font-medium tabular-nums">{bio.length}/68</span>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4 min-h-[100px]">
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              maxLength={68}
-              className="bg-transparent font-bold text-[16px] text-white w-full outline-none resize-none"
-              placeholder="Bio"
-            />
-          </div>
+          <textarea
+            className="lv-input min-h-[100px] py-3 font-bold text-[16px] leading-relaxed resize-none"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            maxLength={68}
+            placeholder="Bio"
+          />
         </div>
 
         {/* Website */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">Website</h3>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">Website</h3>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm p-4">
-            <input
-              type="text"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              className="bg-transparent font-bold text-[16px] text-white w-full outline-none"
-              placeholder="Website"
-            />
-          </div>
+          <input
+            className="lv-input min-h-[52px] font-bold text-[16px]"
+            type="text"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="Website"
+          />
         </div>
 
         {/*
@@ -394,11 +391,11 @@ export default function EditProfile() {
 
         {/* The creator page — a choice, off until the person says yes. */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">{projectStrings.creatorPage}</h3>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">{projectStrings.creatorPage}</h3>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-zinc-800">
+          <div className="lv-surface overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-border-subtle">
               <Switch
                 checked={creatorPublic}
                 onChange={setCreatorPublic}
@@ -420,25 +417,25 @@ export default function EditProfile() {
                 id="creator-public"
               />
             </div>
-            <label className="flex flex-col gap-1 p-4 border-b border-zinc-800">
-              <span className="text-zinc-400 text-[12px] font-semibold">{projectStrings.printersYouUse}</span>
+            <label className="flex flex-col gap-1.5 p-4 border-b border-border-subtle">
+              <span className="text-text-secondary text-[12px] font-semibold">{projectStrings.printersYouUse}</span>
               <input
+                className="lv-input font-bold text-[16px] placeholder:font-medium"
                 type="text"
                 value={printers}
                 onChange={(e) => setPrinters(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
                 placeholder="Bambu Lab A1, Ender 3 V3"
                 data-profile-printers
               />
-              <span className="text-zinc-500 text-[11px]">{projectStrings.printersHint}</span>
+              <span className="text-text-muted text-[11px]">{projectStrings.printersHint}</span>
             </label>
-            <label className="flex flex-col gap-1 p-4">
-              <span className="text-zinc-400 text-[12px] font-semibold">{projectStrings.materialsYouUse}</span>
+            <label className="flex flex-col gap-1.5 p-4">
+              <span className="text-text-secondary text-[12px] font-semibold">{projectStrings.materialsYouUse}</span>
               <input
+                className="lv-input font-bold text-[16px] placeholder:font-medium"
                 type="text"
                 value={materials}
                 onChange={(e) => setMaterials(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
                 placeholder="PLA, PETG, TPU"
                 data-profile-materials
               />
@@ -448,48 +445,48 @@ export default function EditProfile() {
 
         {/* Socials */}
         <div>
-          <div className="flex justify-between items-end mb-2 ml-1">
-            <h3 className="text-gold text-[13px] font-bold">Socials</h3>
-            <span className="text-zinc-300 text-[13px] font-medium">Add up to 4 socials</span>
+          <div className="flex justify-between items-end mb-1.5 ms-1">
+            <h3 className="text-text-secondary text-[13px] font-semibold">Socials</h3>
+            <span className="text-text-muted text-[13px] font-medium">Add up to 4 socials</span>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            <div className="flex items-center p-4 border-b border-zinc-800">
-              <InstagramIcon className="w-6 h-6 text-white mr-4 shrink-0" />
+          <div className="lv-surface overflow-hidden flex flex-col">
+            <div className="flex items-center gap-3 p-3 border-b border-border-subtle">
+              <InstagramIcon className="w-6 h-6 text-text-primary shrink-0" />
               <input
+                className="lv-input font-bold text-[16px] placeholder:font-medium"
                 type="text"
                 value={instagram}
                 onChange={(e) => setInstagram(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
                 placeholder="@username"
               />
             </div>
-            <div className="flex items-center p-4 border-b border-zinc-800">
-              <XIcon className="w-5 h-5 text-white mr-4 shrink-0 ml-0.5" />
+            <div className="flex items-center gap-3 p-3 border-b border-border-subtle">
+              <XIcon className="w-5 h-5 mx-0.5 text-text-primary shrink-0" />
               <input
+                className="lv-input font-bold text-[16px] placeholder:font-medium"
                 type="text"
                 value={xAccount}
                 onChange={(e) => setXAccount(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600 ml-0.5"
                 placeholder="@username"
               />
             </div>
-            <div className="flex items-center p-4 border-b border-zinc-800">
-              <TikTokIcon className="w-6 h-6 text-white mr-4 shrink-0" />
+            <div className="flex items-center gap-3 p-3 border-b border-border-subtle">
+              <TikTokIcon className="w-6 h-6 text-text-primary shrink-0" />
               <input
+                className="lv-input font-bold text-[16px] placeholder:font-medium"
                 type="text"
                 value={tiktok}
                 onChange={(e) => setTiktok(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
                 placeholder="@username"
               />
             </div>
-            <div className="flex items-center p-4">
-              <FacebookIcon className="w-6 h-6 text-white mr-4 shrink-0" />
+            <div className="flex items-center gap-3 p-3">
+              <FacebookIcon className="w-6 h-6 text-text-primary shrink-0" />
               <input
+                className="lv-input font-bold text-[16px] placeholder:font-medium"
                 type="text"
                 value={facebook}
                 onChange={(e) => setFacebook(e.target.value)}
-                className="bg-transparent font-bold text-[16px] text-white w-full outline-none placeholder:font-medium placeholder:text-zinc-600"
                 placeholder="Facebook Link"
               />
             </div>

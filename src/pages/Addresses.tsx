@@ -48,6 +48,7 @@ import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { useLanguage } from '../LanguageContext';
 import { GOVERNORATES } from '../lib/governorates';
 import { Overlay } from '../components/ui/Overlay';
+import { IconButton } from '../components/ui/Button';
 import AddressForm from '../components/address/AddressForm';
 
 export default function Addresses() {
@@ -195,16 +196,16 @@ export default function Addresses() {
   const Back = dir === 'rtl' ? ChevronRight : ChevronLeft;
 
   return (
-    <div className="min-h-dvh bg-canvas text-text-primary w-full font-sans flex flex-col">
+    <div className="min-h-dvh text-text-primary w-full font-sans flex flex-col">
       <div className="flex items-center justify-between gap-2 px-4 py-3 sticky top-0 bg-canvas z-10 border-b border-border-subtle">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/[0.05] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <Back aria-hidden="true" className="w-6 h-6" />
-        </button>
+        <IconButton
+          onClick={() => {
+            navigate(-1);
+          }}
+          label={loc('رجوع', 'Back', 'گەڕانەوە')}
+          className="[touch-action:manipulation]"
+          icon={<Back aria-hidden="true" className="w-6 h-6" />}
+        />
         <h1 className="text-[17px] font-bold">{loc('عناويني', 'My addresses', 'ناونیشانەکانم')}</h1>
         {/* Takes the place of the old `w-11` spacer: it still balances the back
             button so the title stays centred, and it registers the page anchor
@@ -214,7 +215,7 @@ export default function Addresses() {
 
       <div className="flex-1 px-4 py-4 mx-auto w-full max-w-[560px]">
         {!isAuthenticated && isLoaded ? (
-          <div className="text-center py-16 text-zinc-500">
+          <div className="text-center py-16 text-text-muted">
             <MapPin aria-hidden="true" className="w-10 h-10 mx-auto mb-3 opacity-40" />
             <p className="font-medium">{loc('سجّل الدخول لإدارة عناوينك', 'Sign in to manage your addresses', 'بچۆ ژوورەوە بۆ بەڕێوەبردنی ناونیشانەکانت')}</p>
             <button
@@ -237,12 +238,12 @@ export default function Addresses() {
             </button>
 
             {actionError ? (
-              <p role="alert" className="lv-alert lv-alert-danger mb-4 text-[13px] text-red-200">
+              <p role="alert" className="lv-alert lv-alert-danger mb-4 text-[13px] text-text-primary">
                 {actionError}
               </p>
             ) : null}
             {listError ? (
-              <p role="alert" className="lv-alert lv-alert-danger mb-4 text-[13px] text-red-200">
+              <p role="alert" className="lv-alert lv-alert-danger mb-4 text-[13px] text-text-primary">
                 {listError}
               </p>
             ) : null}
@@ -253,16 +254,16 @@ export default function Addresses() {
               <div className="space-y-3" aria-busy="true">
                 {[0, 1].map((i) => (
                   <div key={i} className="lv-surface p-4">
-                    <div className="h-4 w-28 rounded bg-zinc-800 animate-pulse" />
-                    <div className="h-3 w-full rounded bg-zinc-800/70 animate-pulse mt-3" />
-                    <div className="h-3 w-2/3 rounded bg-zinc-800/70 animate-pulse mt-2" />
+                    <div className="h-4 w-28 rounded bg-surface-selected animate-pulse" />
+                    <div className="h-3 w-full rounded bg-surface-selected animate-pulse mt-3" />
+                    <div className="h-3 w-2/3 rounded bg-surface-selected animate-pulse mt-2" />
                   </div>
                 ))}
               </div>
             ) : addresses.length === 0 && !listError ? (
-              <div className="text-center py-12 text-zinc-500">
+              <div className="text-center py-12 text-text-muted">
                 <MapPin aria-hidden="true" className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="font-medium text-zinc-300">{loc('لا توجد عناوين محفوظة', 'No saved addresses yet', 'هێشتا هیچ ناونیشانێک پاشەکەوت نەکراوە')}</p>
+                <p className="font-medium text-text-secondary">{loc('لا توجد عناوين محفوظة', 'No saved addresses yet', 'هێشتا هیچ ناونیشانێک پاشەکەوت نەکراوە')}</p>
                 <p className="text-sm mt-1">{loc('أضف عنوان التوصيل الأول من الزر أعلاه.', 'Add your first delivery address with the button above.', 'یەکەم ناونیشانی گەیاندن بە دوگمەی سەرەوە زیاد بکە.')}</p>
               </div>
             ) : (
@@ -278,10 +279,10 @@ export default function Addresses() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <h2 className="font-bold text-[16px] text-white truncate">{addr.label}</h2>
+                          <h2 className="font-bold text-[16px] text-text-primary truncate">{addr.label}</h2>
                           {/* The three fields the courier actually routes on,
                               which the old card hid entirely. */}
-                          <p className="text-[12px] text-zinc-500 mt-0.5">
+                          <p className="text-[12px] text-text-muted mt-0.5">
                             {[governorateName(addr.governorate), addr.area].filter(Boolean).join(' · ') ||
                               loc('لم تُحدَّد المحافظة', 'No governorate set', 'پارێزگا دیاری نەکراوە')}
                           </p>
@@ -302,13 +303,13 @@ export default function Addresses() {
                         </div>
                       </div>
 
-                      <p className="text-zinc-400 text-[13.5px] leading-relaxed mt-2.5">{addr.address}</p>
+                      <p className="text-text-secondary text-[13.5px] leading-relaxed mt-2.5">{addr.address}</p>
                       {addr.landmark ? (
-                        <p className="text-zinc-500 text-[12.5px] mt-1">
+                        <p className="text-text-muted text-[12.5px] mt-1">
                           {loc('نقطة دالة', 'Landmark', 'نیشانە')}: {addr.landmark}
                         </p>
                       ) : null}
-                      <p className="text-[13px] text-zinc-300 mt-1.5">
+                      <p className="text-[13px] text-text-secondary mt-1.5">
                         {addr.name} ·{' '}
                         {/* An LTR number inside RTL prose without isolation
                             reorders around the punctuation beside it. */}
@@ -318,7 +319,7 @@ export default function Addresses() {
                       </p>
 
                       {diverged ? (
-                        <p className="lv-alert lv-alert-warning mt-2.5 flex items-start gap-1.5 text-[12px] text-amber-100">
+                        <p className="lv-alert lv-alert-warning mt-2.5 flex items-start gap-1.5 text-[12px] text-text-primary">
                           <AlertTriangle aria-hidden="true" className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                           {loc(
                             'هذا العنوان لم يعد مطابقًا للعنوان المعتمد لعضوية PRO.',
@@ -418,7 +419,7 @@ export default function Addresses() {
           <h2 id="delete-address-title" className="text-xl font-bold mb-2">
             {loc('حذف العنوان', 'Delete address', 'سڕینەوەی ناونیشان')}
           </h2>
-          <p className="text-zinc-400 mb-6 text-[14px] leading-relaxed">
+          <p className="text-text-secondary mb-6 text-[14px] leading-relaxed">
             {loc(
               'سيُحذف هذا العنوان نهائيًا ولا يمكن التراجع.',
               'This address will be removed permanently. This cannot be undone.',
@@ -465,13 +466,13 @@ export default function Addresses() {
           </h2>
           {approveStep === 1 ? (
             <>
-              <p className="text-zinc-300 text-[14px] leading-relaxed">
+              <p className="text-text-secondary text-[14px] leading-relaxed">
                 {loc(
                   'سيصبح هذا العنوان عنوانك المعتمد لعضوية PRO، وعليه تُطبَّق أسعار PRO والتوصيل المجاني.',
                   'This becomes your approved PRO address — where PRO prices and free delivery apply.'
                 )}
               </p>
-              <p className="lv-alert lv-alert-warning mt-3 mb-6 flex items-start gap-1.5 text-[13px] text-amber-100">
+              <p className="lv-alert lv-alert-warning mt-3 mb-6 flex items-start gap-1.5 text-[13px] text-text-primary">
                 <AlertTriangle aria-hidden="true" className="w-4 h-4 shrink-0 mt-0.5" />
                 {loc(
                   'انتبه: هذه العملية لا يمكن تغييرها لاحقًا. تأكد من الاسم والرقم والعنوان قبل المتابعة.',
@@ -480,7 +481,7 @@ export default function Addresses() {
               </p>
             </>
           ) : (
-            <p className="text-zinc-300 mb-6 text-[14px] leading-relaxed">
+            <p className="text-text-secondary mb-6 text-[14px] leading-relaxed">
               {loc(
                 'بعد الاعتماد لا يمكنك تغيير عنوانك المعتمد بنفسك.',
                 'Once approved, you cannot change your approved address yourself.'
@@ -542,14 +543,12 @@ export default function Addresses() {
         panelClassName="w-full sm:max-w-lg h-[100dvh] sm:h-[calc(100dvh-2rem)] overflow-hidden flex flex-col bg-canvas"
       >
         <div className="flex items-center gap-1 px-3 py-3 sticky top-0 bg-canvas z-10 border-b border-border-subtle">
-          <button
-            type="button"
+          <IconButton
             onClick={() => setEditorOpen(false)}
-            aria-label={loc('إغلاق', 'Close', 'داخستن')}
-            className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/[0.05] transition-colors [touch-action:manipulation] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <Back aria-hidden="true" className="w-6 h-6" />
-          </button>
+            label={loc('إغلاق', 'Close', 'داخستن')}
+            className="[touch-action:manipulation]"
+            icon={<Back aria-hidden="true" className="w-6 h-6" />}
+          />
           <h2 id="address-editor-title" className="text-[17px] font-bold ms-1">
             {editingAddress
               ? loc('تعديل العنوان', 'Edit address', 'دەستکاری ناونیشان')

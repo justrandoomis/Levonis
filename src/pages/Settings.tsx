@@ -437,13 +437,13 @@ function NavRow({
   const content = (
     <>
       <span className="flex items-center gap-3 min-w-0">
-        <span className="text-zinc-300 shrink-0">{icon}</span>
+        <span className="text-text-secondary shrink-0">{icon}</span>
         <span className="min-w-0">
-          <span className="block font-bold text-[15px] text-white truncate">{label}</span>
-          {description ? <span className="block text-[12px] text-zinc-400">{description}</span> : null}
+          <span className="block font-bold text-[15px] text-text-primary truncate">{label}</span>
+          {description ? <span className="block text-[12px] text-text-secondary">{description}</span> : null}
         </span>
       </span>
-      <Chevron aria-hidden="true" className="w-5 h-5 text-zinc-500 shrink-0" />
+      <Chevron aria-hidden="true" className="w-5 h-5 text-text-muted shrink-0" />
     </>
   );
   const cls =
@@ -467,12 +467,12 @@ function DisabledRow({ label, reason, icon, note }: { label: string; reason: str
     <div className="px-4 py-3 opacity-80">
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-3 min-w-0">
-          <span className="text-zinc-500 shrink-0">{icon}</span>
-          <span className="font-bold text-[15px] text-zinc-300 truncate">{label}</span>
+          <span className="text-text-muted shrink-0">{icon}</span>
+          <span className="font-bold text-[15px] text-text-secondary truncate">{label}</span>
         </span>
-        <span className="text-[12px] text-zinc-500 shrink-0">{note}</span>
+        <span className="text-[12px] text-text-muted shrink-0">{note}</span>
       </div>
-      <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{reason}</p>
+      <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{reason}</p>
     </div>
   );
 }
@@ -560,7 +560,7 @@ function SessionsPanel({
 
   return (
     <div className="px-4 py-3" data-settings-sessions>
-      <p className="text-[12px] text-zinc-500 leading-relaxed">{s.sessionsIntro}</p>
+      <p className="text-[12px] text-text-muted leading-relaxed">{s.sessionsIntro}</p>
 
       {error ? (
         <p role="alert" className="lv-alert lv-alert-warning mt-2 text-xs">{error || s.sessionsFailed}</p>
@@ -633,7 +633,7 @@ function SessionsPanel({
       ) : null}
 
       {sessions && others === 0 ? (
-        <p className="mt-2 text-[12px] text-zinc-500">{s.sessionsOnlyThis}</p>
+        <p className="mt-2 text-[12px] text-text-muted">{s.sessionsOnlyThis}</p>
       ) : null}
 
       {sessions && others > 0 ? (
@@ -671,14 +671,14 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-zinc-300 text-[13px] font-bold mb-1">{label}</span>
+      <span className="block text-text-secondary text-[13px] font-bold mb-1">{label}</span>
       <input
+        className="lv-input text-sm"
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
         placeholder={placeholder}
-        className="lv-input text-sm"
       />
     </label>
   );
@@ -1028,17 +1028,17 @@ export default function Settings() {
                   src={avatarUrl}
                   alt=""
                   aria-hidden="true"
-                  className="w-12 h-12 rounded-full object-cover bg-zinc-800 shrink-0"
+                  className="w-12 h-12 rounded-full object-cover bg-surface-selected shrink-0"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold text-[15px] truncate">{user.username || user.name || s.guest}</span>
-                  <span className="block text-[12px] text-zinc-400 truncate">{user.email}</span>
+                  <span className="block text-[12px] text-text-secondary truncate">{user.email}</span>
                 </span>
                 <span className="text-[12px] text-text-secondary font-bold shrink-0">{s.editProfile}</span>
               </Link>
               <div className="px-4 py-3">
-                <p className="text-[12px] text-zinc-400 leading-relaxed">{s.accountRow}</p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.usernameNote}</p>
+                <p className="text-[12px] text-text-secondary leading-relaxed">{s.accountRow}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.usernameNote}</p>
               </div>
             </SectionCard>
 
@@ -1065,10 +1065,10 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-[12px] text-zinc-500">
+                <p className="mt-2 text-[12px] text-text-muted">
                   {s.direction}: {rtl ? s.rtl : s.ltr}
                 </p>
-                {langBusy ? <p className="mt-1 text-[12px] text-zinc-400">{s.saving}</p> : null}
+                {langBusy ? <p className="mt-1 text-[12px] text-text-secondary">{s.saving}</p> : null}
                 {langMsg ? <p className="mt-1 text-[12px] text-emerald-300">{langMsg}</p> : null}
                 {langError ? <p className="mt-1 text-[12px] text-amber-300">{langError}</p> : null}
               </div>
@@ -1081,7 +1081,7 @@ export default function Settings() {
               <div className="px-4 py-3" data-settings-appearance>
                 {/* OWNER: Sorani to be written by hand (the four appearance strings below). */}
                 <p id="settings-appearance" className="font-bold text-[15px] mb-2 flex items-center gap-2">
-                  <SunMoon aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  <SunMoon aria-hidden="true" className="w-4 h-4 text-text-secondary" />
                   {loc('المظهر', 'Appearance')}
                 </p>
                 <Segmented
@@ -1096,7 +1096,7 @@ export default function Settings() {
                     { id: 'system', label: loc('حسب الجهاز', 'Device'), icon: <SunMoon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
                   ]}
                 />
-                <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">
+                <p className="mt-2 text-[12px] text-text-muted leading-relaxed">
                   {themePref === 'system'
                     ? theme === 'dark'
                       ? loc('يتبع إعداد جهازك — داكن الآن.', 'Follows your device — dark right now.')
@@ -1123,7 +1123,7 @@ export default function Settings() {
               */}
               <div className="px-4 py-3">
                 <p className="font-bold text-[15px] flex items-center gap-2">
-                  <Coins aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  <Coins aria-hidden="true" className="w-4 h-4 text-text-secondary" />
                   {s.currency}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -1141,7 +1141,7 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-[12px] text-zinc-500 leading-relaxed">{s.currencyNote}</p>
+                <p className="mt-2 text-[12px] text-text-muted leading-relaxed">{s.currencyNote}</p>
                 {/* THE SHOP'S RATE once the owner has approved one (plan §13):
                     the effective USD/IQD, named as the shop's because it
                     includes the owner's adjustment, and credited to IQWealth
@@ -1157,7 +1157,7 @@ export default function Settings() {
                     the settings are in (before that, no rate is only "not
                     known yet" — FX-1A review #5). */}
                 {rate ? (
-                  <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-rate-source={rate.source}>
+                  <p className="mt-1 text-[12px] text-text-muted leading-relaxed" data-currency-rate-source={rate.source}>
                     {rate.source === 'shop' && rate.attributed !== false ? (
                       <>
                         {s.currencyRateShop(wholeRateText(rate.text))}{' '}
@@ -1166,7 +1166,7 @@ export default function Settings() {
                           target="_blank"
                           rel="noopener noreferrer"
                           data-iqwealth-attribution
-                          className="rounded-sm font-semibold text-zinc-300 underline decoration-zinc-500 underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          className="rounded-sm font-semibold text-text-secondary underline decoration-zinc-500 underline-offset-2 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         >
                           {s.currencyRateLink}
                           <span aria-hidden="true">↗</span>
@@ -1177,7 +1177,7 @@ export default function Settings() {
                     )}
                   </p>
                 ) : currency === 'USD' && settingsLoaded ? (
-                  <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed" data-currency-usd-pending>
+                  <p className="mt-1 text-[12px] text-text-muted leading-relaxed" data-currency-usd-pending>
                     {s.usdPending}
                   </p>
                 ) : null}
@@ -1207,10 +1207,10 @@ export default function Settings() {
               */}
               <div className="px-4 py-3">
                 <p className="font-bold text-[15px] flex items-center gap-2">
-                  <Download aria-hidden="true" className="w-4 h-4 text-zinc-400" />
+                  <Download aria-hidden="true" className="w-4 h-4 text-text-secondary" />
                   {t('pwaInstallTitle')}
                 </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{t('pwaSettingsNote')}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{t('pwaSettingsNote')}</p>
                 {appInstalled ? (
                   <p className="mt-2 text-[12px] text-success">{t('pwaInstallDone')}</p>
                 ) : (
@@ -1237,10 +1237,10 @@ export default function Settings() {
                 dirIsRtl={rtl}
               />
               <div className="px-4 py-3">
-                <p className="text-[12px] text-zinc-300">
+                <p className="text-[12px] text-text-secondary">
                   {addresses ? (addresses.approved_snapshot ? s.approvedYes : s.approvedNo) : s.loading}
                 </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.approvedNote}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.approvedNote}</p>
                 {addressesError ? (
                   <button type="button" onClick={() => void loadAddresses()} className="mt-2 text-[12px] text-gold font-bold min-h-[44px]">
                     {s.retry}
@@ -1272,10 +1272,10 @@ export default function Settings() {
               <div className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-3 min-w-0">
-                    <Mail aria-hidden="true" className="w-5 h-5 text-zinc-300 shrink-0" />
+                    <Mail aria-hidden="true" className="w-5 h-5 text-text-secondary shrink-0" />
                     <span className="min-w-0">
                       <span className="block font-bold text-[15px]">{s.email}</span>
-                      <span className="block text-[12px] text-zinc-400 truncate">{emailStatus?.email ?? user.email}</span>
+                      <span className="block text-[12px] text-text-secondary truncate">{emailStatus?.email ?? user.email}</span>
                     </span>
                   </span>
                   {emailStatus ? (
@@ -1293,7 +1293,7 @@ export default function Settings() {
                       {s.retry}
                     </button>
                   ) : (
-                    <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin text-zinc-500" />
+                    <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin text-text-muted" />
                   )}
                 </div>
 
@@ -1319,7 +1319,7 @@ export default function Settings() {
                     (OWNER_EMAIL_LOCKED), so the form is not offered — the
                     reason is said instead. */}
                 {emailStatus?.emailConfigured && user?.is_owner === true ? (
-                  <p className="mt-3 text-[12px] text-zinc-500">{refusalText('OWNER_EMAIL_LOCKED', lang)}</p>
+                  <p className="mt-3 text-[12px] text-text-muted">{refusalText('OWNER_EMAIL_LOCKED', lang)}</p>
                 ) : emailStatus?.emailConfigured ? (
                   <div className="mt-3">
                     <button
@@ -1340,7 +1340,7 @@ export default function Settings() {
                           onChange={setEmailPassword}
                           autoComplete="current-password"
                         />
-                        <p className="text-[12px] text-zinc-500">{s.changeEmailNote}</p>
+                        <p className="text-[12px] text-text-muted">{s.changeEmailNote}</p>
                         {emailFormError ? (
                           <p role="alert" className="lv-alert lv-alert-danger text-xs">
                             {emailFormError}
@@ -1373,18 +1373,18 @@ export default function Settings() {
                   className="w-full min-h-[44px] flex items-center justify-between gap-3 text-start"
                 >
                   <span className="flex items-center gap-3">
-                    <KeyRound aria-hidden="true" className="w-5 h-5 text-zinc-300" />
+                    <KeyRound aria-hidden="true" className="w-5 h-5 text-text-secondary" />
                     <span className="font-bold text-[15px]">{s.changePassword}</span>
                   </span>
-                  <ChevronRight aria-hidden="true" className={`w-5 h-5 text-zinc-500 transition-transform ${showPwForm ? 'rotate-90' : ''}`} />
+                  <ChevronRight aria-hidden="true" className={`w-5 h-5 text-text-muted transition-transform ${showPwForm ? 'rotate-90' : ''}`} />
                 </button>
                 {showPwForm ? (
                   <div className="mt-2 space-y-2">
                     <Field label={s.currentPassword} type="password" value={pwCurrent} onChange={setPwCurrent} autoComplete="current-password" />
                     <Field label={s.newPassword} type="password" value={pwNext} onChange={setPwNext} autoComplete="new-password" />
                     <Field label={s.confirmPassword} type="password" value={pwConfirm} onChange={setPwConfirm} autoComplete="new-password" />
-                    <p className="text-[12px] text-zinc-500">{s.pwMin}</p>
-                    <p className="text-[12px] text-zinc-500">{s.pwOtherSessions}</p>
+                    <p className="text-[12px] text-text-muted">{s.pwMin}</p>
+                    <p className="text-[12px] text-text-muted">{s.pwOtherSessions}</p>
                     {pwError ? (
                       <p role="alert" className="lv-alert lv-alert-danger text-xs">
                         {pwError}
@@ -1406,7 +1406,7 @@ export default function Settings() {
                     {pwMsg}
                   </p>
                 ) : null}
-                <p className="mt-2 text-[12px] text-zinc-500">{s.forgotPassword}</p>
+                <p className="mt-2 text-[12px] text-text-muted">{s.forgotPassword}</p>
                 {dirty ? <p className="mt-1 text-[12px] text-amber-300">{s.unsaved}</p> : null}
               </div>
 
@@ -1438,10 +1438,10 @@ export default function Settings() {
                   Google subject itself still never leaves the server. */}
               <div className="lv-surface overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-4">
-                  <span className="text-zinc-400" aria-hidden="true">
+                  <span className="text-text-secondary" aria-hidden="true">
                     <Link2 className="w-5 h-5" />
                   </span>
-                  <span className="flex-1 text-[14px] font-semibold text-white">{s.google}</span>
+                  <span className="flex-1 text-[14px] font-semibold text-text-primary">{s.google}</span>
                   {user?.has_google ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-[12px] font-bold text-success">
                       <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -1453,7 +1453,7 @@ export default function Settings() {
                     </span>
                   )}
                 </div>
-                <p className="px-4 pb-3 text-[12px] text-zinc-500 leading-relaxed">
+                <p className="px-4 pb-3 text-[12px] text-text-muted leading-relaxed">
                   {user?.has_google ? s.googleConnectedNote : s.googleConnectHint}
                 </p>
                 <p className="px-4 py-3 text-[12px] text-text-muted leading-relaxed border-t border-border-subtle/70">{s.unlinkNote}</p>
@@ -1487,10 +1487,10 @@ export default function Settings() {
               {whatsappConfigured ? (
                 <div className="lv-surface overflow-hidden" data-linking-whatsapp>
                   <div className="flex items-center gap-3 px-4 py-4">
-                    <span className="text-zinc-400" aria-hidden="true">
+                    <span className="text-text-secondary" aria-hidden="true">
                       <Link2 className="w-5 h-5" />
                     </span>
-                    <span className="flex-1 text-[14px] font-semibold text-white">{s.notifWhatsapp}</span>
+                    <span className="flex-1 text-[14px] font-semibold text-text-primary">{s.notifWhatsapp}</span>
                     <span
                       className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-bold ${
                         user?.has_phone ? 'text-success bg-success/10' : 'text-warning bg-warning/10'
@@ -1499,11 +1499,11 @@ export default function Settings() {
                       {user?.has_phone ? s.waReady : s.waNeedsPhone}
                     </span>
                   </div>
-                  <p className="px-4 pb-3 text-[12px] text-zinc-500 leading-relaxed">
+                  <p className="px-4 pb-3 text-[12px] text-text-muted leading-relaxed">
                     {user?.has_phone ? s.waReadyNote : s.waNeedsPhoneNote}
                   </p>
                   {user?.has_phone ? (
-                    <p className="px-4 pb-4 text-[12px] text-zinc-500" dir="ltr">{user.phone}</p>
+                    <p className="px-4 pb-4 text-[12px] text-text-muted" dir="ltr">{user.phone}</p>
                   ) : null}
                 </div>
               ) : null}
@@ -1514,9 +1514,9 @@ export default function Settings() {
               <div className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-bold text-[15px]">{s.pushTitle}</span>
-                  <span className="text-[12px] text-zinc-400 shrink-0">{pushLabel}</span>
+                  <span className="text-[12px] text-text-secondary shrink-0">{pushLabel}</span>
                 </div>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.pushHonesty}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.pushHonesty}</p>
                 {pushStatus === 'off' ? (
                   <button
                     type="button"
@@ -1552,10 +1552,10 @@ export default function Settings() {
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">
                   {emailStatus && !emailStatus.verified ? s.notifEmailNeedsVerify : s.notifEmailReady}
                 </p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.emailNotifNote}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.emailNotifNote}</p>
                 {/* The SAME action as the security section, offered where the
                     consequence is felt — an unverified address is exactly why
                     notifications do not arrive. */}
@@ -1583,7 +1583,7 @@ export default function Settings() {
                   what the channel is for and takes you to the control. */}
               <div className="px-4 py-3">
                 <p className="font-bold text-[15px]">{s.telegram}</p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.tgNotifNote}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.tgNotifNote}</p>
                 <a href="#settings-linking" className="lv-button lv-button-secondary lv-button-sm mt-2">
                   {s.notifGoTelegram}
                 </a>
@@ -1629,17 +1629,17 @@ export default function Settings() {
                           ? 'text-warning bg-warning/10'
                           : waOn
                             ? 'text-success bg-success/10'
-                            : 'text-zinc-400 bg-white/5'
+                            : 'text-text-secondary bg-white/[0.06]'
                       }`}
                     >
                       {!user?.has_phone ? s.waNeedsPhone : waOn ? s.waReady : s.waOff}
                     </span>
                   </div>
-                  <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">
+                  <p className="mt-1 text-[12px] text-text-muted leading-relaxed">
                     {!user?.has_phone ? s.waNeedsPhoneNote : waOn ? s.waReadyNote : s.waSwitchOffNote}
                   </p>
                   {user?.has_phone ? (
-                    <p className="mt-1 text-[12px] text-zinc-500" dir="ltr">
+                    <p className="mt-1 text-[12px] text-text-muted" dir="ltr">
                       {user.phone}
                     </p>
                   ) : (
@@ -1664,7 +1664,7 @@ export default function Settings() {
                   {user?.has_phone ? (
                     <>
                       <div className="mt-3 flex items-center justify-between gap-3">
-                        <span className="flex-1 text-[13px] text-zinc-300 leading-relaxed">{s.waSwitch}</span>
+                        <span className="flex-1 text-[13px] text-text-secondary leading-relaxed">{s.waSwitch}</span>
                         <button
                           type="button"
                           role="switch"
@@ -1672,13 +1672,13 @@ export default function Settings() {
                           aria-label={s.waSwitch}
                           disabled={waBusy}
                           onClick={() => void toggleWhatsapp()}
-                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                            waOn ? 'bg-success' : 'bg-zinc-700'
+                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
+                            waOn ? 'bg-success border-transparent' : 'lv-well border-[var(--clay-field)]'
                           } ${waBusy ? 'opacity-60' : 'cursor-pointer'}`}
                         >
                           <span
                             aria-hidden="true"
-                            className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
+                            className={`inline-block h-4 w-4 transform rounded-full shadow-1 transition-transform ${waOn ? 'bg-snow' : 'bg-text-secondary'} ${
                               waOn
                                 ? rtl ? '-translate-x-6' : 'translate-x-6'
                                 : rtl ? '-translate-x-1' : 'translate-x-1'
@@ -1686,8 +1686,8 @@ export default function Settings() {
                           />
                         </button>
                       </div>
-                      {waMsg ? <p className="mt-1 text-[12px] text-emerald-300">{waMsg}</p> : null}
-                      {waError ? <p className="mt-1 text-[12px] text-amber-300">{waError}</p> : null}
+                      {waMsg ? <p className="mt-1 text-[12px] text-success">{waMsg}</p> : null}
+                      {waError ? <p className="mt-1 text-[12px] text-warning">{waError}</p> : null}
                     </>
                   ) : null}
                 </div>
@@ -1700,7 +1700,7 @@ export default function Settings() {
               <NavRow label={s.support} icon={<LifeBuoy aria-hidden="true" className="w-5 h-5" />} to="/support" dirIsRtl={rtl} />
               <div className="px-4 py-3">
                 <p className="font-bold text-[15px]">{s.closure}</p>
-                <p className="mt-1 text-[12px] text-zinc-500 leading-relaxed">{s.closureNote}</p>
+                <p className="mt-1 text-[12px] text-text-muted leading-relaxed">{s.closureNote}</p>
               </div>
             </SectionCard>
             </div>

@@ -8,6 +8,8 @@ import { useAuth } from '../AuthContext';
 import { api } from '../lib/api';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState, UnauthorizedState } from '../components/ui/AsyncStates';
+import { IconButton } from '../components/ui/Button';
+import { StatusChip, type Tone } from '../components/ui/Badge';
 
 /**
  * /referrals — the standalone referrals & support-code page (integrated
@@ -195,12 +197,12 @@ const STRINGS = {
   },
 } as const;
 
-const STATE_CLASS: Record<GiftState, string> = {
-  pending_eligibility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-  due: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-  reserved: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
-  paid: 'bg-green-500/10 text-green-400 border-green-500/30',
-  cancelled: 'bg-red-500/10 text-red-400 border-red-500/30',
+const STATE_TONE: Record<GiftState, Tone> = {
+  pending_eligibility: 'warning',
+  due: 'success',
+  reserved: 'info',
+  paid: 'success',
+  cancelled: 'danger',
 };
 
 export default function Referrals() {
@@ -294,17 +296,17 @@ export default function Referrals() {
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="w-full min-h-screen bg-black text-zinc-200 font-sans pb-24">
-      <div className="sticky top-0 z-30 bg-black border-b border-zinc-900 px-4 py-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label={s.back}
-          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-        >
-          <Back className="w-5 h-5" aria-hidden="true" />
-        </button>
-        <h1 className="text-white font-bold text-[17px]">{s.title}</h1>
+    <div className="w-full min-h-screen text-text-primary font-sans pb-24">
+      <div className="sticky top-0 z-30 bg-canvas border-b border-border-subtle px-4 py-3 flex items-center gap-2">
+        <IconButton
+          label={s.back}
+          onClick={() => {
+            navigate(-1);
+          }}
+          className="-ms-2"
+          icon={<Back className="w-5 h-5" aria-hidden="true" />}
+        />
+        <h1 className="text-text-primary font-bold text-[17px]">{s.title}</h1>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 pt-4 flex flex-col gap-4">
@@ -323,21 +325,21 @@ export default function Referrals() {
         ) : (
           <>
             {/* ---------------------------------------------- handle + link */}
-            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
-              <p className="text-[12px] text-zinc-500 mb-1">{s.handle}</p>
+            <section className="lv-surface p-4">
+              <p className="text-[12px] text-text-muted mb-1">{s.handle}</p>
               {handle ? (
                 <>
-                  <p dir="ltr" className="text-white font-bold text-[20px] font-mono text-start break-all">@{handle}</p>
-                  <p className="text-[12px] text-zinc-500 mt-3 mb-1">{s.inviteLink}</p>
-                  <div className="flex flex-wrap items-center gap-2 bg-zinc-900/70 border border-zinc-800 rounded-xl p-2">
-                    <span dir="ltr" className="flex-1 min-w-0 text-[12px] font-mono text-zinc-300 break-all text-start">
+                  <p dir="ltr" className="text-text-primary font-bold text-[20px] font-mono text-start break-all">@{handle}</p>
+                  <p className="text-[12px] text-text-muted mt-3 mb-1">{s.inviteLink}</p>
+                  <div className="flex flex-wrap items-center gap-2 lv-well rounded-lg p-2">
+                    <span dir="ltr" className="flex-1 min-w-0 text-[12px] font-mono text-text-secondary break-all text-start">
                       {inviteLink}
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => copy(inviteLink)}
-                        className="min-h-[44px] px-3 rounded-lg bg-[#ef233c] text-snow text-[13px] font-bold flex items-center gap-1.5 hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="lv-button lv-button-primary lv-button-sm"
                       >
                         {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
                         {copied ? s.copied : s.copy}
@@ -345,32 +347,32 @@ export default function Referrals() {
                       <button
                         type="button"
                         onClick={share}
-                        className="min-h-[44px] px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-200 text-[13px] font-bold flex items-center gap-1.5 hover:bg-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="lv-button lv-button-secondary lv-button-sm"
                       >
                         <Share2 className="w-4 h-4" aria-hidden="true" />
                         {s.share}
                       </button>
                     </div>
                   </div>
-                  {shareNote && <p className="text-[12px] text-amber-400 mt-2">{shareNote}</p>}
+                  {shareNote && <p className="text-[12px] text-warning mt-2">{shareNote}</p>}
                   {data.legacy_code && (
-                    <p className="text-[12px] text-zinc-500 mt-3">
-                      {s.legacyCode}: <span dir="ltr" className="font-mono text-zinc-300">{data.legacy_code}</span>
+                    <p className="text-[12px] text-text-muted mt-3">
+                      {s.legacyCode}: <span dir="ltr" className="font-mono text-text-secondary">{data.legacy_code}</span>
                     </p>
                   )}
-                  <p className="text-[12px] text-zinc-500 mt-3 flex items-center gap-1.5">
+                  <p className="text-[12px] text-text-muted mt-3 flex items-center gap-1.5">
                     <UserPlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                    {s.invites}: <span className="font-bold text-zinc-300">{data.signup_invites}</span>
+                    {s.invites}: <span className="font-bold text-text-secondary">{data.signup_invites}</span>
                   </p>
                 </>
               ) : (
                 <div className="flex flex-col gap-2 items-start">
-                  <p className="text-white font-bold text-[15px]">{s.noHandle}</p>
-                  <p className="text-[13px] text-zinc-400 leading-relaxed">{s.noHandleDesc}</p>
+                  <p className="text-text-primary font-bold text-[15px]">{s.noHandle}</p>
+                  <p className="text-[13px] text-text-secondary leading-relaxed">{s.noHandleDesc}</p>
                   <button
                     type="button"
                     onClick={() => navigate('/edit-profile')}
-                    className="min-h-[44px] px-4 rounded-lg bg-[#ef233c] text-snow text-[13px] font-bold hover:bg-[#d90429] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                    className="lv-button lv-button-primary"
                   >
                     {s.setHandle}
                   </button>
@@ -379,33 +381,33 @@ export default function Referrals() {
             </section>
 
             {/* ------------------------------------- invite vs support code */}
-            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
-              <h2 className="text-white font-bold text-[15px] mb-3 flex items-center gap-2">
+            <section className="lv-surface p-4">
+              <h2 className="text-text-primary font-bold text-[15px] mb-3 flex items-center gap-2">
                 <Info className="w-4 h-4 text-gold" aria-hidden="true" />
                 {s.diffTitle}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-                  <p className="text-[13px] font-bold text-white mb-1 flex items-center gap-1.5">
-                    <UserPlus className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                <div className="rounded-lg bg-surface-raised p-3">
+                  <p className="text-[13px] font-bold text-text-primary mb-1 flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-success" aria-hidden="true" />
                     {s.inviteTitle}
                   </p>
-                  <p className="text-[12.5px] text-zinc-400 leading-relaxed">{s.inviteDesc}</p>
+                  <p className="text-[12.5px] text-text-secondary leading-relaxed">{s.inviteDesc}</p>
                 </div>
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-                  <p className="text-[13px] font-bold text-white mb-1 flex items-center gap-1.5">
-                    <Link2 className="w-4 h-4 text-sky-400" aria-hidden="true" />
+                <div className="rounded-lg bg-surface-raised p-3">
+                  <p className="text-[13px] font-bold text-text-primary mb-1 flex items-center gap-1.5">
+                    <Link2 className="w-4 h-4 text-info" aria-hidden="true" />
                     {s.supportTitle}
                   </p>
-                  <p className="text-[12.5px] text-zinc-400 leading-relaxed">{s.supportDesc}</p>
+                  <p className="text-[12.5px] text-text-secondary leading-relaxed">{s.supportDesc}</p>
                 </div>
               </div>
               {handle && (
-                <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-                  <p className="text-[13px] font-bold text-white mb-1">{s.shareProduct}</p>
-                  <p className="text-[12.5px] text-zinc-400 leading-relaxed">
+                <div className="mt-3 rounded-lg bg-surface-raised p-3">
+                  <p className="text-[13px] font-bold text-text-primary mb-1">{s.shareProduct}</p>
+                  <p className="text-[12.5px] text-text-secondary leading-relaxed">
                     {s.shareProductDesc.split('{param}')[0]}
-                    <code dir="ltr" className="mx-1 px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200 font-mono text-[12px]">
+                    <code dir="ltr" className="mx-1 px-1.5 py-0.5 rounded bg-surface-selected text-text-primary font-mono text-[12px]">
                       {data.product_ref_param}
                     </code>
                     {s.shareProductDesc.split('{param}')[1]}
@@ -415,12 +417,12 @@ export default function Referrals() {
             </section>
 
             {/* ------------------------------------------------- gift claims */}
-            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
-              <h2 className="text-white font-bold text-[15px] mb-1 flex items-center gap-2">
+            <section className="lv-surface p-4">
+              <h2 className="text-text-primary font-bold text-[15px] mb-1 flex items-center gap-2">
                 <Gift className="w-4 h-4 text-scarlet" aria-hidden="true" />
                 {s.giftsTitle}
               </h2>
-              <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3">{s.giftsDesc}</p>
+              <p className="text-[12.5px] text-text-secondary leading-relaxed mb-3">{s.giftsDesc}</p>
 
               {data.support_gifts.length === 0 ? (
                 <EmptyState
@@ -434,64 +436,62 @@ export default function Referrals() {
                   {data.support_gifts.map((g) => (
                     <li
                       key={g.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-raised px-3 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="text-[13px] text-zinc-200 font-bold">
-                          {s.orderRef} <span dir="ltr" className="font-mono text-zinc-400">{g.order_ref}</span>
+                        <p className="text-[13px] text-text-primary font-bold">
+                          {s.orderRef} <span dir="ltr" className="font-mono text-text-secondary">{g.order_ref}</span>
                         </p>
-                        <p className="text-[11px] text-zinc-500">
+                        <p className="text-[11px] text-text-muted">
                           {s.created} {fmtDate(g.created_at)}
                           {g.qualified_at ? ` · ${s.qualified} ${fmtDate(g.qualified_at)}` : ''}
                         </p>
                         {g.state === 'cancelled' && g.outcome_reason && (
-                          <p dir="ltr" className="text-[11px] text-red-400/80 font-mono break-all text-start">{g.outcome_reason}</p>
+                          <p dir="ltr" className="text-[11px] text-danger font-mono break-all text-start">{g.outcome_reason}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {g.needs_review && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                          <StatusChip tone="warning" dot={false}>
                             {s.review}
-                          </span>
+                          </StatusChip>
                         )}
-                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATE_CLASS[g.state]}`}>
+                        <StatusChip tone={STATE_TONE[g.state]}>
                           {s.stateLabels[g.state] ?? g.state}
-                        </span>
+                        </StatusChip>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="text-[11.5px] text-zinc-500 mt-3 flex items-center gap-1.5">
+              <p className="text-[11.5px] text-text-muted mt-3 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                 {s.noPii}
               </p>
             </section>
 
             {/* --------------------------------- the separate legacy program */}
-            <section className="bg-black border border-zinc-900 rounded-2xl p-4">
-              <h2 className="text-white font-bold text-[15px] mb-1">{s.rewardsTitle}</h2>
-              <p className="text-[12.5px] text-zinc-400 leading-relaxed mb-3">{s.rewardsDesc}</p>
+            <section className="lv-surface p-4">
+              <h2 className="text-text-primary font-bold text-[15px] mb-1">{s.rewardsTitle}</h2>
+              <p className="text-[12.5px] text-text-secondary leading-relaxed mb-3">{s.rewardsDesc}</p>
               {data.signup_rewards.length === 0 ? (
-                <p className="text-[12.5px] text-zinc-500 py-2">{s.rewardsEmpty}</p>
+                <p className="text-[12.5px] text-text-muted py-2">{s.rewardsEmpty}</p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {data.signup_rewards.map((r) => (
                     <li
                       key={r.id}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2.5"
+                      className="flex items-center justify-between gap-2 rounded-lg bg-surface-raised px-3 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="text-[13px] text-zinc-200 font-bold truncate">
+                        <p className="text-[13px] text-text-primary font-bold truncate">
                           {r.campaign === 'printer' ? s.printer : s.proSub}
                         </p>
-                        <p className="text-[11px] text-zinc-500">
+                        <p className="text-[11px] text-text-muted">
                           {r.state === 'pending' && r.eligible_at ? fmtDate(r.eligible_at) : fmtDate(r.created_at)}
                         </p>
                       </div>
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border border-zinc-700 bg-zinc-800/60 text-zinc-300">
-                        {r.state}
-                      </span>
+                      <StatusChip>{r.state}</StatusChip>
                     </li>
                   ))}
                 </ul>

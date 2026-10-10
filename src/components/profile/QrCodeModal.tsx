@@ -3,6 +3,7 @@ import { X, Copy, Check, QrCode } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMotion } from '../../lib/motion';
 import { Overlay } from '../ui/Overlay';
+import { IconButton } from '../ui/Button';
 import { qrEncode, qrToSvgPath } from './qr';
 
 /**
@@ -149,7 +150,7 @@ export default function QrCodeModal({
       // Geometry and the opaque ground the QR needs; the padding that used to
       // sit on this box has moved inside, where the primitive's rounding and
       // shadow cannot be fought over.
-      panelClassName="w-full max-w-xs bg-zinc-900 text-white"
+      panelClassName="w-full max-w-xs"
     >
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
@@ -157,15 +158,13 @@ export default function QrCodeModal({
             <QrCode className="w-4 h-4" strokeWidth={2} />
             {s.title}
           </h2>
-          <button
+          <IconButton
             ref={closeRef}
-            type="button"
             onClick={close}
-            aria-label={s.close}
-            className="w-11 h-11 -me-2 flex items-center justify-center rounded-full text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold transition-colors hover:text-white hover:bg-white/10"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            label={s.close}
+            className="-me-2"
+            icon={<X className="w-5 h-5" />}
+          />
         </div>
 
         {qr && link ? (
@@ -182,8 +181,8 @@ export default function QrCodeModal({
                 <path d={qr.path} fill="#000000" />
               </svg>
             </div>
-            <p className="text-[11px] text-zinc-500 text-center mt-3 leading-snug">{s.subtitle}</p>
-            <p dir="ltr" className="text-[10px] font-mono text-center mt-1.5 break-all select-all text-zinc-400">
+            <p className="text-[11px] text-text-muted text-center mt-3 leading-snug">{s.subtitle}</p>
+            <p dir="ltr" className="text-[10px] font-mono text-center mt-1.5 break-all select-all text-text-secondary">
               {link}
             </p>
             <button
@@ -196,7 +195,7 @@ export default function QrCodeModal({
             </button>
           </>
         ) : (
-          <p className="text-[12px] text-zinc-500 text-center py-8 px-2 leading-relaxed" role="status">
+          <p className="text-[12px] text-text-muted text-center py-8 px-2 leading-relaxed" role="status">
             {s.unavailable}
           </p>
         )}

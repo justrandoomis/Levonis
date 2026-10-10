@@ -160,7 +160,7 @@ export function TierCards({
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="shrink-0 w-[82%] md:w-auto aspect-[1.586/1] rounded-[22px] bg-surface border border-border-subtle animate-pulse motion-reduce:animate-none"
+              className="shrink-0 w-[82%] md:w-auto aspect-[1.586/1] rounded-xl bg-surface border border-border-subtle animate-pulse motion-reduce:animate-none"
               aria-hidden
             />
           ))}
@@ -264,7 +264,7 @@ export function TierCards({
         role="radiogroup"
         aria-labelledby="choose-card-title"
         onKeyDown={onKeyDown}
-        className="relative grid w-full max-w-md rounded-full border border-border-subtle bg-surface p-1"
+        className="relative grid w-full max-w-md rounded-full border border-border-subtle lv-well p-1"
         style={{ gridTemplateColumns: `repeat(${tiers.length}, minmax(0, 1fr))` }}
       >
         {tiers.map((tier) => {
@@ -290,8 +290,7 @@ export function TierCards({
                   layoutId="tier-card-ring"
                   data-tier-ring
                   aria-hidden
-                  className="absolute inset-0 -z-10 rounded-full border bg-surface-raised"
-                  style={{ borderColor: `${tm.hex}80` }}
+                  className="absolute inset-0 -z-10 rounded-full border border-border-subtle bg-surface-raised shadow-1"
                   transition={m.reduced ? { duration: 0 } : m.spring('quick')}
                 />
               )}
@@ -338,7 +337,7 @@ export function TierCards({
                   same way in every language, like the plastic in a wallet. */}
               <div
                 dir="ltr"
-                className="relative flex aspect-[1.586/1] flex-col justify-between overflow-hidden rounded-[22px] border p-4 sm:p-5 text-white"
+                className="relative flex aspect-[1.586/1] flex-col justify-between overflow-hidden rounded-xl border p-4 sm:p-5 text-white"
                 data-theme="dark"
                 style={cardMaterial(tier)}
               >

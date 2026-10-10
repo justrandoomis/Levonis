@@ -355,68 +355,68 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
   const stateIndex = (s: string) => (STATES as readonly string[]).indexOf(s);
 
   return (
-    <div dir={dir} className="mt-3 rounded-xl border border-white/10 bg-black overflow-hidden">
+    <div dir={dir} className="mt-3 lv-surface overflow-hidden">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-start hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
       >
-        <span className="flex items-center gap-2 text-sm text-white font-normal">
-          <RotateCcw className="w-4 h-4 text-zinc-400" strokeWidth={1.5} />
+        <span className="flex items-center gap-2 text-sm text-text-primary font-normal">
+          <RotateCcw className="w-4 h-4 text-text-secondary" strokeWidth={1.5} />
           {S.title}
           {cases.length > 0 && (
-            <span className="text-[10px] bg-white/10 rounded-full px-2 py-0.5 text-zinc-300">{cases.length}</span>
+            <span className="text-[10px] bg-white/[0.06] rounded-full px-2 py-0.5 text-text-secondary tabular-nums">{cases.length}</span>
           )}
         </span>
-        <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} strokeWidth={1.5} />
+        <ChevronDown className={`w-4 h-4 text-text-muted transition-transform ${open ? 'rotate-180' : ''}`} strokeWidth={1.5} />
       </button>
 
       {open && (
-        <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
+        <div className="px-4 pb-4 space-y-4 border-t border-border-subtle pt-4">
           {/* Window state — display only; the server judges by request time.
               Unknown is said as unknown, never dressed up as closed. */}
           {orderWindow === 'open' ? (
-            <p className="text-xs text-emerald-400/90 font-light flex items-center gap-2" data-return-window="open">
+            <p className="text-xs text-success flex items-center gap-2" data-return-window="open">
               <Clock className="w-4 h-4 shrink-0" strokeWidth={1.5} />
               {S.daysLeft(orderDaysLeft as number)}
             </p>
           ) : orderWindow === 'closed' ? (
-            <p className="text-xs text-zinc-500 font-light flex items-center gap-2" data-return-window="closed">
+            <p className="text-xs text-text-muted flex items-center gap-2" data-return-window="closed">
               <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
               {S.windowClosed}
             </p>
           ) : (
-            <p className="text-xs text-amber-300/90 font-light flex items-start gap-2" data-return-window="unknown">
+            <p className="text-xs text-warning flex items-start gap-2" data-return-window="unknown">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
               {S.windowUnknown}
             </p>
           )}
-          <p className="text-xs text-zinc-500 font-light">{S.intro}</p>
+          <p className="text-xs text-text-muted">{S.intro}</p>
 
           {/* Existing cases */}
           {loading ? (
-            <p className="text-xs text-zinc-500 font-light">{S.loading}</p>
+            <p className="text-xs text-text-muted">{S.loading}</p>
           ) : loadError ? (
             <div className="flex items-center gap-3">
-              <p className="text-xs text-red-400 font-light">{S.loadError}</p>
-              <button type="button" onClick={load} className="text-xs text-white underline">{S.retry}</button>
+              <p className="text-xs text-danger">{S.loadError}</p>
+              <button type="button" onClick={load} className="text-xs text-text-primary underline">{S.retry}</button>
             </div>
           ) : cases.length === 0 ? (
-            <p className="text-xs text-zinc-600 font-light">{S.noCases}</p>
+            <p className="text-xs text-text-muted">{S.noCases}</p>
           ) : (
             <div className="space-y-3">
               {cases.map((c) => {
                 const idx = stateIndex(c.state);
                 const rejected = c.state === 'rejected';
                 return (
-                  <div key={c.id} className="rounded-lg bg-black border border-white/5 p-3 space-y-3">
+                  <div key={c.id} className="rounded-lg bg-surface-raised p-3 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-xs text-white font-normal truncate">
+                        <p className="text-xs text-text-primary font-normal truncate">
                           {c.item?.name ?? S.caseTitle} × {c.qty}
                         </p>
-                        <p className="text-[11px] text-zinc-500 font-light">
+                        <p className="text-[11px] text-text-muted">
                           {S.reasons[c.reason === 'wrong_item' ? 'wrong_product' : c.reason] ?? c.reason}
                           {' · '}
                           {S.requestedAt}: {formatDate(c.requested_at, lang)}
@@ -425,10 +425,10 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                       <span
                         className={`text-[10px] px-2 py-1 rounded-full shrink-0 ${
                           rejected
-                            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                            ? 'lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)]'
                             : c.state === 'resolved'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-white/5 text-zinc-300 border border-white/10'
+                              ? 'lv-chip [--chip:var(--color-success)]'
+                              : 'bg-white/[0.06] text-text-secondary'
                         }`}
                       >
                         {S.states[c.state] ?? c.state}
@@ -450,15 +450,15 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                       </div>
                     )}
 
-                    {c.within_window && <p className="text-[10px] text-zinc-600 font-light">{S.timely}</p>}
+                    {c.within_window && <p className="text-[10px] text-text-muted">{S.timely}</p>}
                     {c.resolution && (
-                      <p className="text-[11px] text-zinc-300 font-light flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" strokeWidth={1.5} />
+                      <p className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" strokeWidth={1.5} />
                         {S.resolutions[c.resolution] ?? c.resolution}
                       </p>
                     )}
                     {c.admin_note && (
-                      <p className="text-[11px] text-zinc-500 font-light">
+                      <p className="text-[11px] text-text-muted">
                         {S.adminNote}: {c.admin_note}
                       </p>
                     )}
@@ -482,47 +482,47 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                 // component id, and the carve-out would be unreachable.
                 const parts = w.state !== 'closed' ? (it.bundle?.components ?? []) : [];
                 return (
-                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="rounded-lg bg-black border border-white/5 p-3">
+                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="rounded-lg bg-surface-raised p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3">
                         {it.image ? (
-                          <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-white/5 shrink-0" />
+                          <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-border-subtle shrink-0" />
                         ) : (
-                          <div className="w-9 h-9 rounded bg-zinc-900 shrink-0" />
+                          <div className="w-9 h-9 rounded bg-surface-selected shrink-0" />
                         )}
                         <div className="min-w-0">
-                          <p className="text-xs text-white truncate">{it.name}</p>
-                          <p className="text-[10px] text-zinc-500">× {it.qty} · {money(it.line_total_iqd)}</p>
+                          <p className="text-xs text-text-primary truncate">{it.name}</p>
+                          <p className="text-[10px] text-text-muted tabular-nums">× {it.qty} · {money(it.line_total_iqd)}</p>
                           {w.state === 'open' && orderWindow !== 'open' && (
-                            <p className="text-[10px] text-emerald-400/90">{S.daysLeft(w.days as number)}</p>
+                            <p className="text-[10px] text-success">{S.daysLeft(w.days as number)}</p>
                           )}
-                          {w.state === 'closed' && <p className="text-[10px] text-zinc-500">{S.itemClosed}</p>}
+                          {w.state === 'closed' && <p className="text-[10px] text-text-muted">{S.itemClosed}</p>}
                         </div>
                       </div>
                       {w.state !== 'closed' && (
                         <button
                           type="button"
                           onClick={() => startForm(it.id)}
-                          className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                          className="lv-button lv-button-secondary lv-button-sm shrink-0"
                         >
                           {S.request}
                         </button>
                       )}
                     </div>
                     {parts.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5">
-                        <p className="text-[10px] text-zinc-500">{S.faultyPartHint}</p>
+                      <div className="mt-3 pt-3 border-t border-border-subtle space-y-1.5">
+                        <p className="text-[10px] text-text-muted">{S.faultyPartHint}</p>
                         {parts.map((k) => (
                           <div key={k.order_item_id} data-return-component={k.order_item_id} className="flex items-center justify-between gap-3">
-                            <p className="text-[11px] text-zinc-300 truncate min-w-0">
+                            <p className="text-[11px] text-text-secondary truncate min-w-0">
                               {k.name}
-                              {k.variant ? <span className="text-zinc-500"> · {k.variant}</span> : null}
-                              <span className="text-zinc-500"> × {k.qty}</span>
+                              {k.variant ? <span className="text-text-muted"> · {k.variant}</span> : null}
+                              <span className="text-text-muted"> × {k.qty}</span>
                             </p>
                             <button
                               type="button"
                               onClick={() => startForm(k.order_item_id, true)}
-                              className="text-[11px] text-zinc-300 hover:text-white border border-white/10 hover:border-white/20 px-2 py-1 rounded-md shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                              className="lv-button lv-button-secondary lv-button-sm shrink-0"
                             >
                               {S.reportFault}
                             </button>
@@ -538,14 +538,14 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
 
           {/* Request form */}
           {form && (
-            <div className="rounded-lg bg-black border border-white/10 p-3 space-y-3">
+            <div className="rounded-lg bg-surface-raised p-3 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[11px] text-zinc-500 block mb-1">{S.qty}</span>
+                  <span className="text-[11px] font-semibold text-text-secondary block mb-1">{S.qty}</span>
                   <select
+                    className="lv-input text-xs"
                     value={form.qty}
                     onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
-                    className="w-full bg-black border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
                   >
                     {/* The row being claimed is a top-level item OR a bundle
                         component, and components are never in `order.items` —
@@ -560,11 +560,11 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-[11px] text-zinc-500 block mb-1">{S.reasonLabel}</span>
+                  <span className="text-[11px] font-semibold text-text-secondary block mb-1">{S.reasonLabel}</span>
                   <select
+                    className="lv-input text-xs"
                     value={form.reason}
                     onChange={(e) => setForm({ ...form, reason: e.target.value as Reason })}
-                    className="w-full bg-black border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
                   >
                     {(form.component ? COMPONENT_REASONS : REASONS).map((r) => (
                       <option key={r} value={r}>{S.reasons[r]}</option>
@@ -573,27 +573,27 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                 </label>
               </div>
               <label className="block">
-                <span className="text-[11px] text-zinc-500 block mb-1">{S.descLabel}</span>
+                <span className="text-[11px] font-semibold text-text-secondary block mb-1">{S.descLabel}</span>
                 <textarea
+                  className="lv-input py-2 text-xs leading-relaxed resize-y"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder={S.descPlaceholder}
                   rows={3}
                   maxLength={3000}
-                  className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-zinc-600 resize-y"
                 />
               </label>
               <div>
-                <span className="text-[11px] text-zinc-500 block mb-1">{S.evidence}</span>
+                <span className="text-[11px] font-semibold text-text-secondary block mb-1">{S.evidence}</span>
                 <div className="flex items-center gap-2 flex-wrap">
                   {form.evidence.map((k) => (
-                    <span key={k} className="flex items-center gap-1 text-[10px] bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-zinc-300">
+                    <span key={k} className="flex items-center gap-1 text-[10px] bg-surface border border-border-subtle rounded-sm px-2 py-1 text-text-secondary">
                       <Camera className="w-3 h-3" strokeWidth={1.5} />
                       {k.split('/').pop()}
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, evidence: form.evidence.filter((x) => x !== k) })}
-                        className="text-zinc-500 hover:text-white rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="text-text-muted hover:text-text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                         aria-label={S.removePhoto}
                       >
                         <X className="w-3 h-3" strokeWidth={1.5} />
@@ -605,7 +605,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                       type="button"
                       onClick={() => fileRef.current?.click()}
                       disabled={uploadBusy}
-                      className="text-[11px] bg-white/5 hover:bg-white/10 border border-dashed border-white/15 text-zinc-300 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                      className="text-[11px] bg-surface hover:bg-surface-selected border border-dashed border-border-subtle text-text-secondary px-3 py-1.5 rounded-sm disabled:opacity-50"
                     >
                       {uploadBusy ? S.uploading : S.addPhoto}
                     </button>
@@ -624,7 +624,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                 </div>
               </div>
               {submitError && (
-                <p className="text-xs text-red-400 font-light flex items-start gap-2">
+                <p className="text-xs text-danger flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                   {submitError}
                 </p>
@@ -634,7 +634,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                   type="button"
                   onClick={submit}
                   disabled={submitBusy || uploadBusy}
-                  className="flex-1 bg-white text-black text-xs font-normal py-2.5 rounded-lg disabled:opacity-50 hover:bg-zinc-200 transition-colors"
+                  className="lv-button lv-button-primary lv-button-sm flex-1"
                 >
                   {submitBusy ? S.submitting : S.submit}
                 </button>
@@ -642,7 +642,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                   type="button"
                   onClick={() => setForm(null)}
                   disabled={submitBusy}
-                  className="text-xs text-zinc-400 hover:text-white px-3 py-2.5"
+                  className="lv-button lv-button-ghost lv-button-sm"
                 >
                   {S.cancel}
                 </button>
@@ -650,7 +650,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
             </div>
           )}
 
-          <p className="text-[10px] text-zinc-600 font-light">{S.refundNote}</p>
+          <p className="text-[10px] text-text-muted">{S.refundNote}</p>
         </div>
       )}
     </div>

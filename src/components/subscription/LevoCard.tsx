@@ -20,10 +20,10 @@ import { cardNumberFor, maskCardNumber } from './cardNumber';
 import { TIER_META, type PaidTier } from './tierMeta';
 
 const ART_SIZE = {
-  xs: 'w-9 h-[23px] rounded-[5px]',
-  sm: 'w-14 h-[35px] rounded-[7px]',
-  md: 'w-[4.5rem] h-[2.85rem] rounded-[9px]',
-  lg: 'w-44 h-[6.95rem] rounded-[14px]',
+  xs: 'w-9 h-[23px] rounded',
+  sm: 'w-14 h-[35px] rounded',
+  md: 'w-[4.5rem] h-[2.85rem] rounded-sm',
+  lg: 'w-44 h-[6.95rem] rounded-md',
 } as const;
 
 /**
@@ -47,7 +47,7 @@ export function cardMaterial(tier: PaidTier): React.CSSProperties {
       'linear-gradient(160deg, #1c1e21 0%, #0c0d0f 100%)',
     ].join(', '),
     borderColor: `${hex}4d`,
-    boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.12), 0 24px 48px -28px rgb(0 0 0 / 0.85)',
+    boxShadow: 'var(--clay-1)',
   };
 }
 
@@ -61,7 +61,7 @@ export function CardArt({ tier, size = 'sm', className = '' }: { tier: PaidTier;
       data-card-art={tier}
       className={`relative block shrink-0 overflow-hidden border ${ART_SIZE[size]} ${className}`}
       data-theme="dark"
-      style={cardMaterial(tier)}
+      style={{ ...cardMaterial(tier), boxShadow: 'var(--clay-0)' }}
     >
       <meta.Icon className={`absolute ${big ? 'top-3 start-3 w-5 h-5' : 'top-[18%] start-[12%] w-[26%] h-[40%]'}`} style={{ color: meta.hex }} />
       {big && (
@@ -91,7 +91,7 @@ export function LevoCard({ user, tier }: LevoCardProps) {
   return (
     <div
       data-levo-card={tier}
-      className="relative shrink-0 w-[10.5rem] sm:w-[15.5rem] aspect-[1.586/1] rounded-[14px] sm:rounded-[18px] border p-3 sm:p-3.5 flex flex-col justify-between overflow-hidden"
+      className="relative shrink-0 w-[10.5rem] sm:w-[15.5rem] aspect-[1.586/1] rounded-md sm:rounded-lg border p-3 sm:p-3.5 flex flex-col justify-between overflow-hidden"
       data-theme="dark"
       style={cardMaterial(tier)}
     >
