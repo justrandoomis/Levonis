@@ -142,8 +142,19 @@ suites passed alongside independent reviews. Separate
 wallet, membership, print quote, escrow and price-protection tests cover the
 boundaries above. No audit fixture is written to production.
 
-Full release status is maintained in `HANDOFF.md`. Workflow 7 must pass the
-entire unit suite, migration replay, restore-point gate, deployment, matching
-live bundle, current schema and read-only probes before this work is called live.
+Code `1e4084620e0e638b73a2fa9988d3e2baf1a4fcbe` was published successfully through
+[workflow 7 run 38106453316](https://github.com/justrandoomis/Levonis/actions/runs/38106453316).
+The complete unit suites passed 10,484 tests with zero failures and seven
+declared skips; the separate check gate passed 68 boundary tests. The build,
+179-file migration replay, restore-point gate, live migration and deployment
+all passed. The live bundle matched the build; schema was current at 179/179,
+latest `0186_pricing_direct_purchase.sql`; all 14 read-only cost/privacy probes
+and the remaining normal live gates passed. Subsequent direct checks independently
+confirmed the current schema and passed all 14 cost/privacy probes again. Exact
+release evidence is maintained in `HANDOFF.md`.
+
+This verifies the implemented paths with synthetic data and read-only production
+checks; it does not claim a completed reconciliation of every historical row.
+Bounded recovery and explicit reviews retain the evidence requirements above.
 Local browser E2E was unavailable; source/runtime tests and successful frontend
 builds are not described as a browser pass.

@@ -4,9 +4,41 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
-## Latest complete CI verification
+## Published release — 2026-10-11
 
-The tested code is committed on the default branch as
+Code `1e4084620e0e638b73a2fa9988d3e2baf1a4fcbe`, tree
+`5185494f71a0fe94f0614d3d9c806cd14124ad1d`, is live through workflow 7 run
+[`38106453316`](https://github.com/justrandoomis/Levonis/actions/runs/38106453316),
+job `114372910022`. The run completed successfully; all steps 1–35 and cleanup
+succeeded. The exact commit and the complete downloaded log were independently
+checked after completion, rather than inferred from the partial running-log view.
+
+- Complete check gate passed, including the 68/68 boundary tests.
+- Root unit suite: 9,807 tests, 9,806 passed, zero failed, one declared skip.
+  Workspace: 365/365 passed. Studio: 319 tests, 313 passed, zero failed,
+  six declared skips. Combined unit result: 10,484 passed, seven declared skips.
+- Frontend build retained all seven required live markers. Migration replay
+  proved 179 files, 352 tables, zero foreign-key violations and zero orphan
+  catalogues; its second full pass applied zero files.
+- A Time Travel restore point preceded the live migration. Live history moved
+  from 178 to 179 files, applying `0186_pricing_direct_purchase.sql` before code.
+  Existing configuration preservation and deployment gates succeeded.
+- The live `ServicesGrid-CvCxwc_y.js` was byte-identical to the built asset.
+  Schema was current at 179/179, latest `0186_pricing_direct_purchase.sql`,
+  with zero migrations behind. All 14 read-only cost/privacy probes passed;
+  normal live endpoint, origin, admin/cart and configuration checks passed.
+- A subsequent permitted direct `/api/health` assertion independently confirmed
+  status `ok`, schema `current`, 179/179, zero behind and the exact 0186 filename.
+  A separate post-deploy `scripts/live-cost-probes.mjs` run also passed all
+  14 probes with zero failures, including public-product slug discovery.
+
+Verification used synthetic financial fixtures and read-only production checks.
+It did not perform a row-wide historical reconciliation or browser E2E. Missing
+historical evidence still requires review under the implemented rules below.
+
+## Earlier complete CI attempt
+
+The preceding candidate was committed on the default branch as
 `70b3b623c1bbc1882b51f0aeeb9761ca561d3fbf` (tree
 `dffc4209ec9a84682df086601b40c6b86f62b077`). Workflow 7 run
 [`38101412872`](https://github.com/justrandoomis/Levonis/actions/runs/38101412872)
@@ -24,8 +56,8 @@ The final D1/deletion suites pass 9/9, including all placements, cycle-safe
 ancestor depths, rollback, membership amounts and initial-schema compatibility.
 The exact corrected source passes the complete `npm run check` and frontend
 build with all seven required live markers.
-The replacement release must pass the complete unchanged workflow 7 before
-publication is confirmed.
+The corrected release above subsequently passed the complete unchanged
+workflow 7 and its live verification.
 
 ## Current implementation
 
@@ -105,9 +137,8 @@ privacy/bundle/theme/UI/refusal gates. The escaped-JSON native-journal regressio
 also passed after independent review. Separate runs passed 160 wallet/membership/
 print/escrow boundary tests and 44 invoice-related tests. Migration replay passed
 179 files, 352 tables, zero foreign-key violations and zero new files on the
-second pass. All recorded final runs have zero unresolved failures. Workflow 7
-must still pass before claiming the site updated; its final release is recorded
-below after deployment.
+second pass. These local results were followed by the successful complete
+workflow and live verification recorded in the published-release entry above.
 
 CI run `38094004065` for `3c051143` was cancelled during the unit suite after
 an obsolete exact JSX assertion was repaired. Its downloadable log, unlike the
@@ -121,7 +152,8 @@ The repricing suites pass 34/34; the invoice/census suites pass 15/15.
 Run `38098880098` for the first assertion correction `ce987181` was also cancelled
 when the remaining failures became available. Both runs skipped every live phase
 (steps 8–35): no migration, deployment or live write occurred. Neither is a full
-suite pass. The corrected release must pass the complete unchanged workflow 7.
+suite pass. The corrected release above subsequently passed the complete
+unchanged workflow 7.
 
 The remaining CI repairs pass 30 serial/refund/integration tests and 59 product
 deletion/pricing compatibility tests. The previously unfinished root tail passes
@@ -179,15 +211,15 @@ and its full suite passed 3/3. The corrections retain the underlying safety chec
 and add direct-only, unchanged-preorder and idempotent-replay assertions.
 
 These are targeted local gates, not a claim that the entire unit suite ran
-locally. The combined tree is ready for workflow 7's mandatory full suite and
-live rollout; deployment has not yet been confirmed. Do not claim the site is
-updated from a local build or a queued workflow alone.
+locally. The combined tree subsequently passed workflow 7's mandatory full suite
+and live rollout, as recorded above. A local build or queued workflow alone is
+not evidence of publication.
 
 Workflow run `38088439275` for `5e0593f2` was cancelled before any live phase
 after a synthetic regression proved that completeness could wrongly hide a
 directly adopted stock product. All migration/deploy/probe steps were skipped.
 The follow-up fix includes storefront visibility, draft-edit and query-budget
-regressions; its replacement workflow must complete all normal release gates.
+regressions; the final release above completed all normal release gates.
 Its local verification passed 58 focused tests, 282 privacy/bundle/theme/UI
 gates and 12 programme-refusal tests, plus the complete `npm run check`, build,
 and a final test typecheck after the new regressions were stable.
