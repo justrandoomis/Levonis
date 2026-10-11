@@ -1,5 +1,7 @@
-# Claude runs only when the repository owner explicitly mentions @claude.
-# The Anthropic API key stays in GitHub Actions secrets (never in source).
+# Owner-only Claude Code assistant. The official action SDK is currently failing
+# after initialization (issue #48); direct Claude Code CLI was tested successfully.
+# @claude = read-only advice; @claude apply = edit, validate, and publish through
+# the repository's existing full live-deployment gate. Never expose API secrets.
 name: Claude Code - Owner Commands
 
 on:
@@ -11,6 +13,10 @@ on:
     types: [opened]
   pull_request_review:
     types: [submitted]
+
+concurrency:
+  group: levonis-claude-owner
+  cancel-in-progress: false
 
 jobs:
   claude:
@@ -24,65 +30,188 @@ jobs:
         )
       }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     permissions:
       contents: write
-      pull-requests: write
       issues: write
-      id-token: write
-      actions: read
+      pull-requests: write
+      actions: write
+
     steps:
-      - name: Checkout repository
+      - name: Checkout current default branch without exposing push credentials to Claude
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
-      - name: Verify Anthropic API access (no key or response output)
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install tested Claude Code CLI
+        run: npm install --global @anthropic-ai/claude-code@2.1.296 --no-audit --no-fund
+
+      - name: Prepare user request and opt-in mode
+        id: request
         run: |
           set -euo pipefail
-          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-            echo "::error::ANTHROPIC_API_KEY is not set in GitHub Actions secrets"
-            exit 1
+          jq -r '
+            if .comment then .comment.body
+            elif .review then .review.body
+            elif .issue then (.issue.body // "") + "\n" + .issue.title
+            else "" end
+          ' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/claude-task.txt"
+          number=$(jq -r '.issue.number // .pull_request.number // empty' "$GITHUB_EVENT_PATH")
+          test -n "$number"
+          first_line=$(head -n 1 "$RUNNER_TEMP/claude-task.txt")
+          mode=review
+          if [[ "$first_line" =~ ^[[:space:]]*@claude[[:space:]]+apply([[:space:]]|$) ]] && [[ "$GITHUB_EVENT_NAME" == issues || "$GITHUB_EVENT_NAME" == issue_comment ]]; then
+            mode=apply
           fi
-          status=$(curl --silent --show-error --max-time 30 --output "$RUNNER_TEMP/anthropic-preflight.json" --write-out '%{http_code}' --request POST 'https://api.anthropic.com/v1/messages' --header "x-api-key: $ANTHROPIC_API_KEY" --header 'anthropic-version: 2023-06-01' --header 'content-type: application/json' --data '{"model":"claude-sonnet-5-5","max_tokens":64,"messages":[{"role":"user","content":"Reply OK."}]}')
-          if [ "$status" != '200' ]; then
-            error_type=$(jq -r '.error.type // "unknown"' "$RUNNER_TEMP/anthropic-preflight.json" 2>/dev/null || echo unknown)
-            echo "::error::Anthropic API returned HTTP $status ($error_type). Check API key, credits/billing, model access and rate limits."
-            exit 1
-          fi
-          echo 'Anthropic API request succeeded (credential, model and billing verified).'
-          rm -f "$RUNNER_TEMP/anthropic-preflight.json"
-      - name: Run Claude Code
-        id: claude
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          additional_permissions: |
-            actions: read
-          claude_args: |
-            --model claude-sonnet-5-5
-            --max-turns 20
-            --allowedTools "Bash(npm ci:*),Bash(npm run check:*),Bash(npm run test:unit:*),Bash(npm run build:*)"
-      - name: Diagnose Claude Code launch failure (sanitized)
-        if: ${{ failure() && steps.claude.outcome == 'failure' }}
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "Claude mode: $mode (read-only unless explicitly @claude apply)"
+
+      - name: Run Claude Code directly using Anthropic secret
+        id: execute
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
         run: |
-          set +e
-          timeout 45 "$HOME/.local/bin/claude" -p 'Reply OK' --model claude-sonnet-5-5 --max-turns 1 --output-format json > "$RUNNER_TEMP/claude-cli-diagnostic.json" 2> "$RUNNER_TEMP/claude-cli-stderr.txt"
-          code=$?
-          set -e
-          if [ "$code" -eq 0 ] && jq -e '.is_error == false' "$RUNNER_TEMP/claude-cli-diagnostic.json" >/dev/null 2>&1; then
-            echo '::notice::Direct Claude Code CLI succeeded. Only the GitHub action SDK failed.'
+          set -euo pipefail
+          test -n "$ANTHROPIC_API_KEY" || { echo "::error::Missing GitHub Actions secret ANTHROPIC_API_KEY"; exit 1; }
+
+          mode="${{ steps.request.outputs.mode }}"
+          {
+            echo 'Work in the Levonis repository. Follow CLAUDE.md and the repository conventions.'
+            echo 'Never reveal credentials or secrets. Never edit .github/, CLAUDE.md, credential files, or deploy from inside Claude Code.'
+            echo 'Never run git commit or git push: the workflow handles verification and publishing.'
+            if [ "$mode" = apply ]; then
+              echo 'MODE: APPLY. Implement the owner request in workspace files. Do not commit or publish. The workflow will validate changes and publish only if checks pass.'
+            else
+              echo 'MODE: REVIEW ONLY. Do not modify, create, or delete any repository file. Analyze and answer the request using code evidence.'
+            fi
+            echo 'Keep the final answer concise and cite relevant repository file paths.'
+            echo
+            echo 'Owner request:'
+            cat "$RUNNER_TEMP/claude-task.txt"
+          } > "$RUNNER_TEMP/claude-prompt.txt"
+
+          args=(--print --model claude-sonnet-5-5 --max-turns 20 --max-budget-usd 5 --output-format json --permission-mode dontAsk --disallowedTools 'mcp__*')
+          if [ "$mode" = apply ]; then
+            args+=(--tools 'Read,Glob,Grep,Edit,Write,Bash' --allowedTools 'Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(rg:*),Bash(ls:*)')
+          else
+            args+=(--tools 'Read,Glob,Grep' --allowedTools 'Read,Glob,Grep')
+          fi
+
+          # The response JSON stays in the runner and is NOT dumped into logs.
+          claude "${args[@]}" "$(cat "$RUNNER_TEMP/claude-prompt.txt")" > "$RUNNER_TEMP/claude-result.json"
+          python3 - "$RUNNER_TEMP/claude-result.json" "$RUNNER_TEMP/claude-answer.txt" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          result = json.loads(Path(sys.argv[1]).read_text())
+          if result.get("is_error") is not False:
+              raise SystemExit("Claude Code returned an error; no changes will be published.")
+          message = result.get("result") or "(Claude completed without a text summary.)"
+          Path(sys.argv[2]).write_text(str(message)[:16000])
+          PY
+
+      - name: Verify, commit and trigger the existing gated live deploy only on explicit apply
+        id: publish
+        if: steps.request.outputs.mode == 'apply' && steps.execute.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain --untracked-files=all)" ]; then
+            echo 'result=no_changes' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          result=$(jq -r '.result // .error.message // ""' "$RUNNER_TEMP/claude-cli-diagnostic.json" 2>/dev/null || true)
-          diagnostic="$result $(cat "$RUNNER_TEMP/claude-cli-stderr.txt" 2>/dev/null)"
-          case "$diagnostic" in
-            *'Credit balance is too low'*) echo '::error::Claude Code reports insufficient credit or eligibility (the Messages API probe succeeded). Check workspace billing and Claude Code access.' ;;
-            *'API Error: 401'*|*'authentication_failed'*) echo '::error::Claude Code CLI authentication failed. Try a new Anthropic API key.' ;;
-            *'API Error: 404'*|*'model not found'*) echo '::error::Claude Code CLI model not available.' ;;
-            *'rate_limit_error'*|*'API Error: 429'*) echo '::error::Claude Code CLI rate limit reached.' ;;
-            *) echo "::error::Claude Code CLI failed (exit status $code); raw output withheld to protect repository data." ;;
-          esac
+
+          # Refuse to publish anything that could modify the workflow's own
+          # permissions, agent instructions, credentials, or hidden environment.
+          python3 - <<'PY'
+          import subprocess
+          import sys
+          data = subprocess.check_output(
+              ["git", "status", "--porcelain", "-z", "--untracked-files=all"]
+          ).split(b"\0")
+          for value in data:
+              if not value:
+                  continue
+              path = value[3:].decode("utf-8", "replace") if len(value) >= 4 else ""
+              basename = path.rsplit("/", 1)[-1]
+              if (path.startswith(".github/") or path == "CLAUDE.md"
+                  or basename.startswith(".env") or basename.startswith(".dev.vars")
+                  or basename in (".npmrc", ".netrc")):
+                  print("::error::Refusing to publish protected workflow/instruction/credential files.")
+                  sys.exit(1)
+          PY
+
+          npm ci --no-audit --no-fund
+          (cd studio && npm ci --no-audit --no-fund)
+          npm run check
+          npm run test:unit
+
+          # Never overwrite newer owner changes made while Claude was working.
+          git fetch origin "$DEFAULT_BRANCH"
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
+            echo "::error::Default branch changed; refusing to push stale edits."
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'chore: apply owner-requested Claude Code changes [skip ci]'
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin "HEAD:refs/heads/$DEFAULT_BRANCH"
+
+          # GITHUB_TOKEN pushes do not trigger push workflows. The explicit
+          # dispatch runs the repository's existing full verification and
+          # controlled live-deployment workflow instead.
+          gh workflow run deploy-staging-code.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f confirm=DEPLOY-CODE
+          echo "result=pushed" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Post outcome to the owner issue or pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ steps.request.outputs.mode }}
+          NUMBER: ${{ steps.request.outputs.number }}
+          EXECUTE_OUTCOME: ${{ steps.execute.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          PUBLISH_RESULT: ${{ steps.publish.outputs.result }}
+          PUBLISH_COMMIT: ${{ steps.publish.outputs.commit }}
+        run: |
+          set -euo pipefail
+          test -n "$NUMBER" || exit 0
+          {
+            echo '### Claude Code — Levonis'
+            echo
+            if [ "$EXECUTE_OUTCOME" != success ]; then
+              echo 'Claude Code did not finish successfully. No repository changes were published. Review the GitHub Actions job for diagnostic information.'
+            else
+              if [ -f "$RUNNER_TEMP/claude-answer.txt" ]; then
+                cat "$RUNNER_TEMP/claude-answer.txt"
+              fi
+              echo
+              if [ "$MODE" = apply ]; then
+                if [ "$PUBLISH_OUTCOME" != success ]; then
+                  echo '**Verification or publishing failed. Changes were not fully published; check the workflow log before doing anything else.**'
+                elif [ "$PUBLISH_RESULT" = no_changes ]; then
+                  echo '**No file changes were needed or saved.**'
+                elif [ "$PUBLISH_RESULT" = pushed ]; then
+                  echo "**Published commit:** \`$PUBLISH_COMMIT\`."
+                  echo 'The existing full CI and deployment workflow has been requested. Verify its result before treating the site as updated.'
+                fi
+              else
+                echo '**Read-only response. No code or website changes.**'
+                echo 'To implement and publish a change, start your issue comment with \`@claude apply\` followed by your request.'
+              fi
+            fi
+          } > "$RUNNER_TEMP/claude-comment.md"
+          gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/claude-comment.md"
