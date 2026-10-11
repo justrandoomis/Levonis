@@ -1,5 +1,6 @@
 import { badRequest, conflict, notFound } from './http';
 import { counterTarget, type AdjustInput } from './inventoryReceiving';
+import { planMoveUnitOrigins } from './inventoryUnitOrigins';
 
 /** One physical correction: quantity, FIFO layers and its movement commit together. */
 export async function planAtomicAdjustment(db: D1Database, input: AdjustInput & { expectedStock?: number }) {
@@ -50,7 +51,7 @@ export async function planAtomicAdjustment(db: D1Database, input: AdjustInput & 
           await db
             .prepare(
               `SELECT id, qty_remaining, unit_cost_iqd FROM inventory_lots
-    WHERE product_id = ? AND scope = ? AND scope_id = ? AND qty_remaining > 0 ORDER BY received_at, id`,
+    WHERE product_id = ? AND scope = ? AND scope_id = ? AND qty_remaining > 0 ORDER BY received_at, created_at, id`,
             )
             .bind(input.productId, input.scope, scopeId)
             .all<{ id: string; qty_remaining: number; unit_cost_iqd: number | null }>()
@@ -132,11 +133,13 @@ export async function planAtomicAdjustment(db: D1Database, input: AdjustInput & 
         ),
     );
   } else
-    for (const lot of touched)
+    for (const lot of touched) {
+      statements.push(...await planMoveUnitOrigins(db,{lotId:lot.id,qty:lot.take,reason:`adjustment:${input.reason}`}));
       statements.push(
         db
           .prepare('UPDATE inventory_lots SET qty_remaining = qty_remaining - ? WHERE id = ?')
           .bind(lot.take, lot.id),
       );
+    }
   return { already: false, statements, valueIqd };
 }

@@ -32,6 +32,12 @@ type Lot = {
 };
 type Count = { id: string; name: string; status: string; lines: number };
 type CountLine = Selection & { counted_qty: number; note: string };
+type ReturnUnitOrigin = {
+  origin_id: string | null; allocation_id: string; order_item_id: string; unit_index: number;
+  unit_id: string | null; lot_id: string; purchase_name: string; purchase_id: string;
+  supplier_order_no: string; tracking_no: string; serial_norm: string | null; claimed: number;
+};
+const returnUnitKey = (unit: ReturnUnitOrigin) => unit.origin_id ?? unit.unit_id ?? '';
 type Health = {
   product_id: string;
   scope: string;
@@ -59,10 +65,12 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
     [offset, setOffset] = useState(0),
     [returnCase, setReturnCase] = useState(''),
     [returnCases, setReturnCases] = useState<
-      Array<{ id: string; order_id: string; order_item_id: string; name_snapshot: string; qty: number }>
+      Array<{ id: string; order_id: string; order_item_id: string; name_snapshot: string; qty: number; unit_id?: string | null }>
     >([]),
     [returnAllocations, setReturnAllocations] = useState<Array<{ id: string; order_item_id: string; lot_id: string; qty: number; claimed: number; label?: string }>>([]),
     [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({}),
+    [returnUnitOrigins, setReturnUnitOrigins] = useState<ReturnUnitOrigin[]>([]),
+    [selectedReturnUnits, setSelectedReturnUnits] = useState<string[]>([]),
     [trace, setTrace] = useState<
       Array<{
         serial_norm: string;
@@ -113,12 +121,13 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
       setCounts(countRows.counts);
       setLots(locationRows.lots);
     } else if (tab === 'serials') {
-      const r = await api.get<{ returns: typeof returnCases; return_allocations?: typeof returnAllocations; links: typeof trace; lots: Lot[] }>(
+      const r = await api.get<{ returns: typeof returnCases; return_allocations?: typeof returnAllocations; return_unit_origins?: ReturnUnitOrigin[]; links: typeof trace; lots: Lot[] }>(
         `${STOCK}/trace?q=${encodeURIComponent(search)}&offset=${offset}`,
       );
       setLots(r.lots);
       setReturnCases(r.returns);
       setReturnAllocations(r.return_allocations ?? []);
+      setReturnUnitOrigins(r.return_unit_origins ?? []);
       setTrace(r.links);
     } else {
       const r = await api.get<{ locations: Named[]; lots: Lot[] }>(
@@ -138,8 +147,12 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
   };
   const selectedReturn = returnCases.find((r) => r.id === returnCase);
   const returnOrigins = returnAllocations.filter((a) => a.order_item_id === selectedReturn?.order_item_id);
-  const returnEvidence = returnOrigins.map((a) => ({ allocation_id: a.id, qty: returnOrigins.length === 1 ? selectedReturn?.qty ?? 0 : returnQuantities[a.id] ?? 0 })).filter((a) => a.qty > 0);
-  const returnValid = returnOrigins.length === 0 || (returnEvidence.reduce((n, a) => n + a.qty, 0) === selectedReturn?.qty && returnOrigins.every((a) => { const n = returnOrigins.length === 1 ? selectedReturn?.qty ?? 0 : returnQuantities[a.id] ?? 0; return Number.isSafeInteger(n) && n >= 0 && n <= Math.max(0, a.qty - a.claimed); }));
+  const returnUnits = returnUnitOrigins.filter((u) => u.order_item_id === selectedReturn?.order_item_id && (!selectedReturn.unit_id || u.unit_id === selectedReturn.unit_id));
+  const chosenReturnUnits = returnUnits.filter((u) => selectedReturnUnits.includes(returnUnitKey(u)));
+  const returnEvidence = returnOrigins.map((a) => ({ allocation_id: a.id, qty: returnUnits.length ? chosenReturnUnits.filter((u) => u.allocation_id === a.id).length : returnOrigins.length === 1 ? selectedReturn?.qty ?? 0 : returnQuantities[a.id] ?? 0 })).filter((a) => a.qty > 0);
+  const returnValid = returnUnits.length > 0
+    ? chosenReturnUnits.length === selectedReturn?.qty && chosenReturnUnits.every((u) => !u.claimed) && (chosenReturnUnits.every((u) => u.unit_id) || chosenReturnUnits.every((u) => u.origin_id))
+    : returnOrigins.length === 0 || (returnEvidence.reduce((n, a) => n + a.qty, 0) === selectedReturn?.qty && returnOrigins.every((a) => { const n = returnOrigins.length === 1 ? selectedReturn?.qty ?? 0 : returnQuantities[a.id] ?? 0; return Number.isSafeInteger(n) && n >= 0 && n <= Math.max(0, a.qty - a.claimed); }));
   return (
     <div className="inventory-workspace">
       {op.feedback}
@@ -699,7 +712,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
               <Select
                 label={loc('حالة المرتجع المفتوحة', 'Open return case')}
                 value={returnCase}
-                onChange={(v) => { setReturnCase(v); setReturnQuantities({}); setReturnId(crypto.randomUUID()); }}
+                onChange={(v) => { setReturnCase(v); setReturnQuantities({}); setSelectedReturnUnits([]); setReturnId(crypto.randomUUID()); }}
                 empty={loc('اختر المرتجع', 'Choose return')}
                 options={returnCases.map((r) => ({
                   id: r.id,
@@ -718,7 +731,27 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
               />
               <Input label={loc('الملاحظات', 'Notes')} value={note} onChange={setNote} />
             </div>
-            {returnOrigins.length > 0 && <div className="inventory-line mt-4">
+            {returnUnits.length > 0 ? <div className="inventory-line mt-4">
+              <h4 className={`mb-2 font-semibold ${T.text1}`}>{loc('القطع المرتجعة بالتحديد', 'Exact returned pieces')}</h4>
+              <p className={`mb-3 text-sm ${T.text3}`}>{loc('طابق الرقم الداخلي أو التسلسلي ومعلومات المورد مع القطعة المستلمة. بيانات المورد داخلية للأدمن فقط.', 'Match the internal ID or serial and supplier details with the received piece. Supplier details are private to admins.')}</p>
+              <div className="grid gap-2">
+                {returnUnits.map((u) => {
+                  const key = returnUnitKey(u), checked = selectedReturnUnits.includes(key);
+                  return <label key={key} className={`flex items-start gap-3 rounded-xl border border-current/10 p-3 ${u.claimed ? 'opacity-50' : ''}`}>
+                    <input type="checkbox" className="mt-1" checked={checked} disabled={!!u.claimed || (!checked && chosenReturnUnits.length >= (selectedReturn?.qty ?? 0))}
+                      onChange={(event) => setSelectedReturnUnits((old) => event.target.checked ? [...old, key] : old.filter((id) => id !== key))}
+                      aria-label={`${loc('قطعة', 'Piece')} ${u.unit_index} · ${key}`} />
+                    <span className="min-w-0 flex-1 space-y-1 text-sm">
+                      <strong className={`block ${T.text1}`}>{loc('قطعة', 'Piece')} {u.unit_index}{u.serial_norm ? ` · ${u.serial_norm}` : ''}{u.claimed ? ` · ${loc('محددة في مرتجع آخر', 'Claimed by another return')}` : ''}</strong>
+                      <span className={`block break-all ${T.text2}`}>{loc('الرقم الداخلي', 'Internal ID')}: {key}</span>
+                      <span className={`block break-all ${T.text2}`}>{loc('الدفعة', 'Lot')}: {u.lot_id} · {u.purchase_name || u.purchase_id || loc('شراء قديم', 'Historical purchase')}</span>
+                      <span className={`block break-all ${T.text3}`}>{loc('طلب المورد', 'Supplier order')}: {u.supplier_order_no || loc('غير موثق', 'Not recorded')} · {loc('التتبع', 'Tracking')}: {u.tracking_no || loc('غير موثق', 'Not recorded')}</span>
+                    </span>
+                  </label>;
+                })}
+              </div>
+              <p className={`mt-3 text-sm ${T.text2}`}>{loc('المحدد / المطلوب', 'Selected / required')}: {chosenReturnUnits.length} / {selectedReturn?.qty}</p>
+            </div> : returnOrigins.length > 0 && <div className="inventory-line mt-4">
               <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('مصدر القطع المرتجعة', 'Origin of returned units')}</h4>
               {returnOrigins.length > 1 ? <>
                 <p className={`mb-3 text-sm ${T.text3}`}>{loc(`حدد دفعات القطع ${selectedReturn?.qty ?? 0} المرتجعة حتى تُسوّى تكلفة ومستثمر كل قطعة بدقة.`, `Select the origin of all ${selectedReturn?.qty ?? 0} returned units so each unit’s cost and investor are settled accurately.`)}</p>
@@ -740,9 +773,14 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
                       disposition,
                       note,
                       ...(returnOrigins.length > 0 ? { allocations: returnEvidence } : {}),
+                      ...(returnUnits.length > 0 ? {
+                        inventory_origin_ids: chosenReturnUnits.flatMap((u) => u.origin_id ? [u.origin_id] : []),
+                        ...(chosenReturnUnits.every((u) => u.unit_id) ? { unit_ids: chosenReturnUnits.map((u) => u.unit_id!) } : {}),
+                      } : {}),
                     });
                     setReturnId(crypto.randomUUID());
                     setReturnCase('');
+                    setSelectedReturnUnits([]);
                     await load();
                   },
                   loc('تم حفظ الفحص', 'Inspection saved'),

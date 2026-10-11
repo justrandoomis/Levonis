@@ -59,6 +59,7 @@ import { templateRoutes } from '../../worker/routes/template';
 import { adminTaxonomyRoutes } from '../../worker/routes/adminTaxonomy';
 import { adminInventoryRoutes } from '../../worker/routes/adminInventory';
 import { adminProcurementRoutes } from '../../worker/routes/adminProcurement';
+import { adminProcurementOriginSerialRoutes } from '../../worker/routes/adminProcurementOriginSerials';
 import { adminPricingRoutes } from '../../worker/routes/adminPricing';
 import { adminStockOperationsRoutes } from '../../worker/routes/adminStockOperations';
 import { adminImportRoutes } from '../../worker/routes/adminImport';
@@ -66,6 +67,8 @@ import { adminProductRelationsRoutes } from '../../worker/routes/adminProductRel
 import { adminPriceGridRoutes } from '../../worker/routes/adminPriceGrid';
 import { adminOrderPriceRoutes, orderPriceRoutes } from '../../worker/routes/orderPriceAdjust';
 import { adminOrderSerialRoutes } from '../../worker/routes/adminOrderSerials';
+import { adminOrderInventoryOriginRoutes } from '../../worker/routes/adminOrderInventoryOrigins';
+import { adminPreorderOriginRoutes } from '../../worker/routes/adminPreorderOrigins';
 import { adminSerialRulesRoutes } from '../../worker/routes/adminSerialRules';
 import { adminSecurityRoutes } from '../../worker/routes/adminSecurity';
 import { adminMembershipBenefitRoutes } from '../../worker/routes/adminMembershipBenefits';
@@ -166,6 +169,8 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/orders', orderPriceRoutes as Router],
   ['/api/admin/orders', adminOrderPriceRoutes as Router],
   ['/api/admin/orders', adminOrderSerialRoutes as Router],
+  ['/api/admin/orders', adminOrderInventoryOriginRoutes as Router],
+  ['/api/admin/orders', adminPreorderOriginRoutes as Router],
   ['/api/admin/serial-rules', adminSerialRulesRoutes as Router],
   ['/api/trade-in', tradeInRoutes as Router],
   ['/api/admin/trade-in', adminTradeInRoutes as Router],
@@ -204,6 +209,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/taxonomy', adminTaxonomyRoutes as Router],
   ['/api/admin/inventory', adminInventoryRoutes as Router],
   ['/api/admin/procurement', adminProcurementRoutes as Router],
+  ['/api/admin/procurement', adminProcurementOriginSerialRoutes as Router],
   ['/api/admin/pricing', adminPricingRoutes as Router],
   ['/api/admin/stock-operations', adminStockOperationsRoutes as Router],
   ['/api/admin/finance-operations', adminFinanceOperationsRoutes as Router],
@@ -360,6 +366,8 @@ export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
   seedCostlyStock(raw);
   seedCostlyOrder(raw);
   seedCostlyPurchase(raw);
+  raw.exec(`INSERT INTO inventory_unit_origins(id,incoming_id,purchase_line_id,purchase_id,unit_index,supplier_order_no,tracking_no,created_by)
+    VALUES ('rm-origin','inc1','pl1','po1',1,'SUPPLIER-REF','TRACK-REF','usr_owner')`);
   raw.exec(`
     INSERT INTO investment_contracts (id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,
                                       loss_share_bps,created_by,created_at,request_json)

@@ -47,6 +47,7 @@ import { auditStatements } from './audit';
 import { fence } from './operations';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
 import { canMoveMoney, canSeeFullSerial, isOwner } from './adminScope';
+import { unitOriginsInstalled } from './inventoryUnitOrigins';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
@@ -740,6 +741,13 @@ interface LinkContext {
   lastReleased: AssignmentRow | null;
   /** M7: the same device stored under a pre-2026-09-26 key (see `legacyAliases`). */
   legacy: LegacyAlias[];
+  originSchema: boolean;
+  knownOriginId: string | null;
+  pendingOrigins: Map<string, number>;
+  origin: {
+    id: string; origin_id: string; lot_id: string; allocation_id: string;
+    serial_norm: string | null; current_lot_id: string | null; unavailable_reason: string | null; serial_origin_id: string | null;
+  } | null;
 }
 
 export interface LegacyAlias {
@@ -793,7 +801,8 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
   const line = lines.find((l) => l.id === req.orderItemId) ?? null;
   const part = req.part ?? 'device';
   const partIndex = req.partIndex ?? 1;
-  const [asset, boxOwner, boxIsSerial, live, slotLive, binding, receipt, serialLot, lots, variant, ledger, lastReleased, legacy] = await Promise.all([
+  const originSchema = await unitOriginsInstalled(db);
+  const [asset, boxOwner, boxIsSerial, live, slotLive, binding, receipt, serialLot, lots, variant, ledger, lastReleased, legacy, origin, pendingOrigins, knownOriginId] = await Promise.all([
     db
       .prepare('SELECT serial_norm, serial_raw, product_id, variant_id, voided_at, box_sn, source FROM serial_inventory WHERE serial_norm = ?')
       .bind(norm)
@@ -850,6 +859,19 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
       .bind(norm)
       .first<AssignmentRow>(),
     legacyAliases(db, norm),
+    originSchema ? db.prepare(`SELECT a.id,a.origin_id,a.lot_id,a.allocation_id,u.serial_norm,u.current_lot_id,u.unavailable_reason,
+      (SELECT id FROM inventory_unit_origins WHERE serial_norm=?) AS serial_origin_id
+      FROM order_item_inventory_unit_assignments a JOIN inventory_unit_origins u ON u.id=a.origin_id
+      WHERE a.order_id=? AND a.order_item_id=? AND a.unit_index=? AND a.released_at IS NULL`)
+      .bind(norm, req.orderId, req.orderItemId, req.unitIndex).first<NonNullable<LinkContext['origin']>>() : Promise.resolve(null),
+    originSchema ? db.prepare(`SELECT a.lot_id,COUNT(*) AS n FROM order_item_inventory_unit_assignments a
+      WHERE a.order_id=? AND a.order_item_id=? AND a.released_at IS NULL AND NOT EXISTS(
+        SELECT 1 FROM serial_assignments s WHERE s.order_item_id=a.order_item_id AND s.unit_index=a.unit_index
+          AND s.lot_id=a.lot_id AND s.part='device' AND s.part_index=1 AND s.released_at IS NULL)
+      GROUP BY a.lot_id`).bind(req.orderId, req.orderItemId).all<{lot_id:string;n:number}>()
+      .then((r) => new Map((r.results ?? []).map((a) => [a.lot_id, a.n]))) : Promise.resolve(new Map<string,number>()),
+    originSchema ? db.prepare('SELECT id FROM inventory_unit_origins WHERE serial_norm=?').bind(norm)
+      .first<{id:string}>().then((r) => r?.id ?? null) : Promise.resolve(null),
   ]);
   return {
     order,
@@ -868,6 +890,10 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
     ledger,
     lastReleased: lastReleased ?? null,
     legacy,
+    originSchema,
+    origin,
+    pendingOrigins,
+    knownOriginId,
   };
 }
 
@@ -953,10 +979,24 @@ async function classifyLink(
   const slot = ctx.slots.find((s) => s.order_item_id === line.id && s.unit_index === req.unitIndex);
   if (!slot) throw refuse(409, 'SERIAL_NOT_REQUIRED');
 
+  // A provenance slot names one physical purchase unit, even when staff scan
+  // unit 7 before unit 1. Scanning must confirm that allocation, never choose
+  // whichever lot happens to have an unused serial slot first. A known serial
+  // on a returned unit is its identity and cannot be silently replaced.
+  const origin = ctx.origin;
+  if (ctx.knownOriginId && ctx.knownOriginId !== origin?.origin_id)
+    throw refuse(400, 'SERIAL_BATCH_MISMATCH', { reason: 'inventory_origin' });
+  if (origin && (origin.unavailable_reason || origin.current_lot_id !== origin.lot_id ||
+      (origin.serial_norm && origin.serial_norm !== norm) || (origin.serial_origin_id && origin.serial_origin_id !== origin.origin_id))) {
+    throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin.lot_id }], reason: 'inventory_origin' });
+  }
+
   // The same serial already on this very slot: a replay, a double tap, the
   // second device of one account — the answer is the link that exists.
   // (A «change» to the serial the slot already holds is the same answer.)
   const sameSlot = ctx.slotLive && ctx.slotLive.serial_norm === norm ? ctx.slotLive : null;
+  if (sameSlot && origin && sameSlot.lot_id !== origin.lot_id)
+    throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin.lot_id }], reason: 'inventory_origin' });
   if (sameSlot) return { already: sameSlot } as LinkPlan;
 
   // ---- the window (S1) --------------------------------------------------
@@ -1134,9 +1174,22 @@ async function classifyLink(
   const replacing = req.replaceAssignmentId && ctx.slotLive?.id === req.replaceAssignmentId ? ctx.slotLive : null;
   const open = ctx.lots
     .filter((l) => l.net > 0)
-    .map((l) => (replacing?.lot_id && replacing.lot_id === l.lot_id ? { ...l, taken: Math.max(0, l.taken - 1) } : l));
+    .map((l) => ({ ...l,
+      taken: replacing?.lot_id === l.lot_id ? Math.max(0, l.taken - 1) : l.taken,
+      // Unknown/legacy slots cannot take space committed to identified units
+      // that staff have not scanned yet. Completely legacy lines stay as-is.
+      net: origin ? l.net : Math.max(0, l.net - (ctx.pendingOrigins.get(l.lot_id) ?? 0)),
+    }));
   const expected = open.map((l) => ({ id: l.lot_id, received_at: l.received_at, location: l.location }));
-  if (sl) {
+  if (origin) {
+    const exact = open.find((lot) => lot.lot_id === origin.lot_id);
+    if (!exact || exact.taken >= exact.net || (sl && sl.lot_id !== origin.lot_id))
+      throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin.lot_id }], reason: 'inventory_origin' });
+    lotId = origin.lot_id;
+    lotSource = sl ? 'serial_link' : 'allocation';
+    allocationId = origin.allocation_id;
+    lotFence = true;
+  } else if (sl) {
     if (sl.lot_product_id && sl.lot_product_id !== line.product_id && sl.lot_product_id !== usedOf) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'lot' });
     const mine = open.find((l) => l.lot_id === sl.lot_id) ?? null;
     if (open.length && mine && mine.taken < mine.net) {
@@ -1246,6 +1299,24 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
   const id = newId('sa');
   const ov = req.override ?? null;
   const stmts: D1PreparedStatement[] = [];
+
+  // Keep the physical source selection live inside the same transaction as
+  // the serial binding. Return/cancel/reallocation or a concurrent physical
+  // verification must invalidate a plan read before that change.
+  if (ctx.originSchema) {
+    if (ctx.origin) {
+      stmts.push(...fence(db, `EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments a
+        JOIN inventory_unit_origins u ON u.id=a.origin_id
+        WHERE a.id=? AND a.order_id=? AND a.order_item_id=? AND a.unit_index=? AND a.released_at IS NULL
+          AND a.lot_id=? AND u.current_lot_id=a.lot_id AND COALESCE(u.unavailable_reason,'')=''
+          AND (u.serial_norm IS NULL OR u.serial_norm=?)
+          AND NOT EXISTS(SELECT 1 FROM inventory_unit_origins other WHERE other.serial_norm=? AND other.id<>u.id))`,
+      [ctx.origin.id, order.id, line.id, req.unitIndex, plan.lotId, norm, norm]));
+    } else {
+      stmts.push(...fence(db, `NOT EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments WHERE order_id=? AND order_item_id=? AND unit_index=? AND released_at IS NULL)
+        AND NOT EXISTS(SELECT 1 FROM inventory_unit_origins WHERE serial_norm=?)`, [order.id, line.id, req.unitIndex, norm]));
+    }
+  }
 
   // S1 — the window, the line and the unit, re-asserted inside the batch.
   if (plan.staffWindow) {
@@ -1402,6 +1473,14 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
         [line.id, plan.lotId, line.id, plan.lotId]
       )
     );
+    if (ctx.originSchema && !ctx.origin) {
+      stmts.push(...fence(db, `(SELECT COUNT(*) FROM serial_assignments WHERE order_item_id=? AND lot_id=? AND released_at IS NULL)
+        +(SELECT COUNT(*) FROM order_item_inventory_unit_assignments a WHERE a.order_item_id=? AND a.lot_id=? AND a.released_at IS NULL
+          AND NOT EXISTS(SELECT 1 FROM serial_assignments s WHERE s.order_item_id=a.order_item_id AND s.unit_index=a.unit_index
+            AND s.lot_id=a.lot_id AND s.part='device' AND s.part_index=1 AND s.released_at IS NULL))
+        <(SELECT COALESCE(SUM(CASE WHEN released_at IS NULL THEN qty ELSE -qty END),0) FROM order_item_inventory_allocations WHERE order_item_id=? AND lot_id=?)`,
+      [line.id, plan.lotId, line.id, plan.lotId, line.id, plan.lotId]));
+    }
   }
   // S9 — the assignment. The partial UNIQUE indexes and the idempotency key decide races.
   stmts.push(

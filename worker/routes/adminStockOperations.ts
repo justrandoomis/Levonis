@@ -1,5 +1,6 @@
 import { serialAssignmentsInstalled } from '../lib/serialPolicy';
 import { Hono } from 'hono';
+import { assertReturnUnitEvidenceReplay, listReturnUnitOrigins, planReturnUnitEvidence } from '../lib/returnOriginEvidence';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str } from '../lib/http';
 import { projectForAdmin, canWriteCost } from '../lib/adminScope';
@@ -14,6 +15,7 @@ import { counterTarget } from '../lib/inventoryReceiving';
 import type { StockScope } from '../lib/inventory';
 import { investorFinanceInstalled, planInvestorCapitalLoss, planInvestorSources, type InvestmentContract } from '../lib/investorFinance';
 import { effectiveLotCostSql } from '../lib/inventoryLots';
+import { planMoveUnitOrigins } from '../lib/inventoryUnitOrigins';
 import { SPLIT_CHILD_INSERT_SQL, batchSnapshotInstalled, preSnapshotLotSelect } from '../lib/batchSnapshot';
 
 export const adminStockOperationsRoutes = new Hono<AppContext>();
@@ -29,7 +31,7 @@ adminStockOperationsRoutes.get('/locations', async (c) => {
     c.env.DB.prepare(
       `SELECT l.id,l.product_id,l.scope,l.scope_id,l.qty_remaining,${cost} AS unit_cost_iqd,p.name_ar,p.name,loc.location_id,w.name AS location_name
     FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id LEFT JOIN inventory_lot_locations loc ON loc.lot_id=l.id LEFT JOIN stock_locations w ON w.id=loc.location_id
-    WHERE l.qty_remaining>0 AND (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0) ORDER BY l.received_at,l.id LIMIT 200 OFFSET ?`,
+    WHERE l.qty_remaining>0 AND (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0) ORDER BY l.received_at,l.created_at,l.id LIMIT 200 OFFSET ?`,
     )
       .bind(q, q, offset)
       .all(),
@@ -157,6 +159,7 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
           ...(snapshots ? [lotId, lotId] : []),
         ),
     );
+  if(target!==lotId) statements.push(...await planMoveUnitOrigins(db,{lotId,qty,targetLotId:target}));
   if(versioned){
     statements.push(...fence(db,'COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',[lotId,costVersion?.version??0]));
     if(target!==lotId&&costVersion)statements.push(db.prepare('INSERT INTO inventory_lot_cost_versions(lot_id,version,unit_cost_iqd,adjustment_id) VALUES (?,1,?,?)').bind(target,costVersion.unit_cost_iqd,costVersion.adjustment_id));
@@ -430,7 +433,7 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
       .all(),
     db
       .prepare(
-        `SELECT r.id,r.order_id,r.order_item_id,r.qty,r.state,i.name_snapshot FROM return_cases r JOIN order_items i ON i.id=r.order_item_id
+        `SELECT r.id,r.order_id,r.order_item_id,r.unit_id,r.qty,r.state,i.name_snapshot FROM return_cases r JOIN order_items i ON i.id=r.order_item_id
       WHERE r.state NOT IN ('resolved','rejected') AND NOT EXISTS(SELECT 1 FROM stock_return_inspections x WHERE x.return_case_id=r.id) ORDER BY r.requested_at LIMIT 200`,
       )
       .all(),
@@ -441,7 +444,7 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
       FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id
       LEFT JOIN inventory_lot_locations il ON il.lot_id=l.id LEFT JOIN stock_locations w ON w.id=il.location_id
       WHERE l.qty_received>0 AND (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0)
-      ORDER BY l.received_at DESC,l.id LIMIT 200 OFFSET ?`,
+      ORDER BY l.received_at DESC,l.created_at DESC,l.id LIMIT 200 OFFSET ?`,
     )
       .bind(q, q, offset)
       .all(),
@@ -456,6 +459,7 @@ adminStockOperationsRoutes.get('/trace', async (c) => {
       returns: returns.results ?? [],
       lots: lots.results ?? [],
       return_allocations:returnAllocations.results??[],
+      return_unit_origins: await listReturnUnitOrigins(db),
       limit: 200,
       offset,
     }),
@@ -605,6 +609,7 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
   if (prior) {
     if (prior.return_case_id !== b.return_case_id || prior.disposition !== b.disposition)
       throw conflict('عملية الفحص مستخدمة لحالة أو نتيجة مختلفة');
+    await assertReturnUnitEvidenceReplay(db, prior.return_case_id, b.inventory_origin_ids, b.unit_ids);
     if(Array.isArray(b.allocations)&&b.allocations.length&&await investorFinanceInstalled(db)){
       const stored=(await db.prepare('SELECT allocation_id,qty FROM stock_return_lot_evidence WHERE return_case_id=? ORDER BY allocation_id').bind(prior.return_case_id).all<{allocation_id:string;qty:number}>()).results??[];
       const requested=b.allocations.map(v=>{const r=v as Record<string,unknown>;return{allocation_id:text(r.allocation_id,120),qty:whole(r.qty,'الكمية',1,100000)};}).sort((a,b)=>a.allocation_id.localeCompare(b.allocation_id));
@@ -627,9 +632,19 @@ adminStockOperationsRoutes.post('/return-inspections', async (c) => {
     .bind(item)
     .first<{ qty: number }>();
   if (!orderItem) throw notFound('Order line not found');
-  const evidence:D1PreparedStatement[]=[];
+  const unitEvidence = await planReturnUnitEvidence(db, { caseId, itemId: item, qty, caseUnitId: kase.unit_id, originIds: b.inventory_origin_ids, unitIds: b.unit_ids });
+  if (unitEvidence.allocations && b.allocations !== undefined) {
+    if (!Array.isArray(b.allocations)) throw badRequest('أصل المرتجع لا يطابق القطع المحددة', 'RETURN_LOT_MISMATCH');
+    const supplied = b.allocations.map((value) => {
+      const row = value as Record<string, unknown>;
+      return { allocation_id: text(row.allocation_id, 120), qty: whole(row.qty, 'الكمية', 1, 100000) };
+    }).sort((a,b) => a.allocation_id.localeCompare(b.allocation_id));
+    if (JSON.stringify(supplied) !== JSON.stringify([...unitEvidence.allocations].sort((a,b) => a.allocation_id.localeCompare(b.allocation_id))))
+      throw badRequest('أصل المرتجع لا يطابق القطع المحددة', 'RETURN_LOT_MISMATCH');
+  }
+  const evidence:D1PreparedStatement[]=[...unitEvidence.statements];
   if(await investorFinanceInstalled(db)){
-    let requested=Array.isArray(b.allocations)?b.allocations:[];
+    let requested=unitEvidence.allocations ?? (Array.isArray(b.allocations)?b.allocations:[]);
     if(!requested.length&&kase.unit_id&&qty===1){const linked=await db.prepare(`SELECT a.id FROM device_serials d JOIN stock_serial_links s ON s.serial_norm=d.serial_norm JOIN order_item_inventory_allocations a ON a.lot_id=s.lot_id WHERE d.unit_id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>()
       // 0178 §28: the lot the preparation scan verified, recorded on the unit at delivery.
       ??await db.prepare(`SELECT a.id FROM order_item_units u JOIN order_item_inventory_allocations a ON a.lot_id=u.inventory_lot_id WHERE u.id=? AND a.order_item_id=? AND a.released_at IS NULL`).bind(kase.unit_id,item).first<{id:string}>();if(linked)requested=[{allocation_id:linked.id,qty:1}];}
@@ -703,6 +718,7 @@ adminStockOperationsRoutes.post('/lot-counts',async c=>{
   const statements=[...fence(db,`EXISTS(SELECT 1 FROM inventory_lots WHERE id=? AND qty_remaining=?) AND EXISTS(SELECT 1 FROM ${target.table} WHERE id=? AND stock=? AND ${lot.scope==='base'?'stock_reserved':'reserved'}=0) AND COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?`,[lotId,lot.qty_remaining,rowId,s.stock,lotId,lot.cost_version]),db.prepare('INSERT INTO lot_count_events(id,lot_id,expected_qty,counted_qty,delta,actor_id,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,lotId,lot.qty_remaining,counted,delta,user.id,new Date().toISOString())];
   const contracts=lot.incoming_id?(await db.prepare("SELECT * FROM investment_contracts WHERE incoming_id=? AND state='active'").bind(lot.incoming_id).all<InvestmentContract>()).results??[]:[];
   if(delta){
+    if(delta<0) statements.push(...await planMoveUnitOrigins(db,{lotId,qty:-delta,reason:'lot_count'}));
     statements.push(db.prepare('INSERT INTO inventory_ledger(id,product_id,scope,scope_id,kind,qty,idempotency_key,actor_user_id,reason) VALUES (?,?,?,?,?,?,?,?,?)').bind(newId('ilg'),lot.product_id,lot.scope,lot.scope_id,delta>0?'adjust_in':'adjust_out',Math.abs(delta),`lot-count:${id}`,user.id,'count'),db.prepare(`UPDATE ${target.table} SET stock=stock+? WHERE id=?`).bind(delta,rowId),db.prepare('UPDATE inventory_lots SET qty_remaining=? WHERE id=?').bind(counted,lotId));
     if(lot.effective!==null&&lot.effective>0){const value=Math.abs(delta)*lot.effective;
       statements.push(...journalPlan(db,{key:`lot-count:${id}`,day:baghdadDay(),title:'فرق جرد دفعة محددة',source:'lot-count',sourceId:id,actor:user.id},delta<0?[{account:'5300',debit:value},{account:'1200',credit:value}]:[{account:'1200',debit:value},{account:'5300',credit:value}]).statements);

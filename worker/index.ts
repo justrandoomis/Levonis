@@ -62,6 +62,8 @@ import { miscRoutes } from './routes/misc';
 import { adminRoutes } from './routes/admin';
 import { adminOrderPriceRoutes, orderPriceRoutes } from './routes/orderPriceAdjust';
 import { adminOrderSerialRoutes } from './routes/adminOrderSerials';
+import { adminOrderInventoryOriginRoutes } from './routes/adminOrderInventoryOrigins';
+import { adminPreorderOriginRoutes } from './routes/adminPreorderOrigins';
 import { adminSerialRulesRoutes } from './routes/adminSerialRules';
 import { adminTradeInRoutes, tradeInRoutes } from './routes/tradeIn';
 import { adminProductsRoutes } from './routes/adminProducts';
@@ -77,6 +79,7 @@ import { adminFinanceRoutes } from './routes/adminFinance';
 import { adminFinanceReportRoutes } from './routes/adminFinanceReport';
 import { adminInventoryRoutes } from './routes/adminInventory';
 import { adminProcurementRoutes } from './routes/adminProcurement';
+import { adminProcurementOriginSerialRoutes } from './routes/adminProcurementOriginSerials';
 import { adminPricingRoutes } from './routes/adminPricing';
 import { adminStockOperationsRoutes } from './routes/adminStockOperations';
 import { adminFinanceOperationsRoutes } from './routes/adminFinanceOperations';
@@ -398,6 +401,8 @@ app.route('/api/admin/orders', adminOrderPriceRoutes);
 // Serials at preparation (0178): scan / change / unlink / owner override per
 // physical unit of an order (worker/lib/serialAssignments.ts).
 app.route('/api/admin/orders', adminOrderSerialRoutes);
+app.route('/api/admin/orders', adminOrderInventoryOriginRoutes);
+app.route('/api/admin/orders', adminPreorderOriginRoutes);
 // Serial formats by brand and product (0180, owner decision 2): the rules every
 // serial door judges by — read by every admin, written by the owner alone.
 app.route('/api/admin/serial-rules', adminSerialRulesRoutes);
@@ -486,6 +491,7 @@ app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
 // alone (owner decision 2 — full-scope admins included).
 app.route('/api/admin/inventory', adminInventoryRoutes);
 app.route('/api/admin/procurement', adminProcurementRoutes);
+app.route('/api/admin/procurement', adminProcurementOriginSerialRoutes);
 // «التسعير والشحن» (pricing engine MVP, P1): the owner's read-only pricing
 // workspace — today's prices, the minimum profit and Direct Sale Extra the old
 // prices carry, and the what-if calculator. Owner only at its own door

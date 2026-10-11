@@ -6,6 +6,7 @@ import { localeToApi, safeParse } from '../lib/types';
 import { requireAuth, requireAdmin, notFound, badRequest, conflict, str, int, oneOf } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
+import { stripInventoryProvenance } from '../lib/inventoryProvenancePrivacy';
 import { newId } from '../lib/crypto';
 import { isStamped } from '../lib/emailStamp';
 import { enqueue, processOutbox } from '../lib/outbox';
@@ -57,7 +58,7 @@ function invoicePublic(row: InvoiceRow, withSnapshot: boolean) {
     payment_status: row.payment_status,
     issued_at: row.issued_at,
     superseded_by: row.superseded_by,
-    ...(withSnapshot ? { snapshot: safeParse<InvoiceSnapshotV1 | null>(row.snapshot, null) } : {}),
+    ...(withSnapshot ? { snapshot: stripInventoryProvenance(safeParse<InvoiceSnapshotV1 | null>(row.snapshot, null)) } : {}),
   };
 }
 

@@ -55,6 +55,7 @@ import { walletLedgerDinarsReady } from '../lib/walletOps';
 import { planInventory, planReservationFence, chunk, IN_CHUNK } from '../lib/inventory';
 import { restoreMovesForItem } from '../lib/orderInventory';
 import { planLotRestore } from '../lib/inventoryLots';
+import { resolveReturnedOriginIds, planUnsellableOriginReturn, type ReturnedOriginSelection, unitOriginsInstalled } from '../lib/inventoryUnitOrigins';
 import { operationsInstalled, baghdadDay } from '../lib/operations';
 import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
 import { calculateGoods, spread, type GoodsLine } from '../lib/orderProfit';
@@ -631,6 +632,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   }
 
   const nowIso = new Date().toISOString();
+  let returnedOrigins: ReturnedOriginSelection | undefined;
   // Conditional flip: concurrent transitions cannot both pass (same pattern
   // as the order-cancel flow).
   if (to === 'resolved' && resolution === 'refund') {
@@ -639,9 +641,15 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     // 0178 §14: serials scanned at inspection (or explicit unit ids) must be
     // devices of THIS line and THIS buyer — refused before any money moves
     // (critique M6: the customer's own unit pick is never trusted alone).
-    if ((body.serials !== undefined || body.unit_ids !== undefined) && (await serialAssignmentsInstalled(c.env.DB))) {
-      await returnedUnits(c.env.DB, kase, { serials: body.serials, unit_ids: body.unit_ids });
+    if (body.unit_ids === undefined && body.serials === undefined && await unitOriginsInstalled(c.env.DB)) {
+      const storedUnits=(await c.env.DB.prepare('SELECT unit_id FROM stock_return_order_unit_evidence WHERE return_case_id=?').bind(id).all<{unit_id:string}>()).results??[];
+      if(storedUnits.length) body.unit_ids=storedUnits.map(r=>r.unit_id);
     }
+    let verifiedUnits: string[] = [];
+    if ((body.serials !== undefined || body.unit_ids !== undefined) && (await serialAssignmentsInstalled(c.env.DB))) {
+      verifiedUnits = (await returnedUnits(c.env.DB, kase, { serials: body.serials, unit_ids: body.unit_ids })).units;
+    }
+    returnedOrigins = await resolveReturnedOriginIds(c.env.DB,{orderId:kase.order_id,itemId:kase.order_item_id,qty:kase.qty,returnCaseId:id,originIds:body.inventory_origin_ids,unitIds:verifiedUnits});
   }
   const flipStatement = c.env.DB.prepare(
     `UPDATE return_cases SET state = ?, resolution = COALESCE(?, resolution),
@@ -800,8 +808,21 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         note: `Refund for approved return ${id} (order ${kase.order_id})`,
         ref: kase.order_id, nowIso, amountIqd: walletRefundIqd, rate,
       }) : null;
+      // Stock, exact physical origins and the refund decision share one commit.
+      // A stale piece selection must fail before a customer's refund is posted.
+      const restoreMoves = restock ? await restoreMovesForItem(c.env.DB,kase.order_id,kase.order_item_id,kase.qty) : [];
+      const restorePlan = restock && restoreMoves.length ? await planInventory(c.env.DB,restoreMoves,{kind:'restore',operationId:id,orderId:kase.order_id,actorUserId:admin.id,reason:'return'}) : null;
+      const originStatements: D1PreparedStatement[] = [];
+      if (restorePlan) {
+        restorePlan.statements.push(await planReservationFence(c.env.DB,kase.order_id,'restore',restorePlan.plannedLedgerRows));
+        const lots = await planLotRestore(c.env.DB,kase.order_id,{lineIds:[kase.order_item_id],qtyByLine:{[kase.order_item_id]:kase.qty},operation:`return:${id}`,originIds:returnedOrigins?.originIds,allocationQty:returnedOrigins?.allocationQty});
+        restorePlan.statements.push(...lots.statements);
+        if(lots.allocations.length)restoredCost=lots.allocations.some(a=>a.cogs_iqd===null)?null:lots.allocations.reduce((n,a)=>n+(a.cogs_iqd??0),0);
+      } else if (!restock) {
+        originStatements.push(...await planUnsellableOriginReturn(c.env.DB,{orderId:kase.order_id,itemId:kase.order_item_id,qty:kase.qty,reason:`return_unsellable:${id}`,originIds:returnedOrigins?.originIds}));
+      }
       try {
-        await c.env.DB.batch([refundFence, flipStatement, ...(credit ? [credit] : [])]);
+        await c.env.DB.batch([refundFence, flipStatement, ...(credit ? [credit] : []), ...(restorePlan?.statements??[]), ...originStatements]);
       } catch (e) {
         if (/CHECK constraint failed:\s*qty\s*>\s*0/.test(String(e))) {
           throw badRequest(serverMessage('RETURN_RESOLUTION_RETRY'), 'RETURN_RESOLUTION_RETRY');
@@ -809,8 +830,8 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         throw e;
       }
       const credited = credit !== null;
-      // Stock, points and finance updates below retain their existing separate
-      // follow-up behavior. Only the case decision and wallet credit commit here.
+      if (restorePlan) pumpAfter(c.env.DB,restorePlan.eventIds,waitUntilFrom(c));
+      // Points and finance hooks retain their existing follow-up behavior.
       if (credited && eventsEnabled(c.env)) {
         await emitFromRequest(c, RefundCompletedV1, {
           ref_type: 'return', ref_id: id, user_id: kase.user_id,
@@ -867,34 +888,6 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         portionIqd: merchandisePortion,
         sourceRef: id,
       }) as unknown as Record<string, unknown>;
-
-      // Inspected-and-approved refund puts the tracked stock back once (the
-      // conditional flip above guarantees this branch runs a single time) —
-      // THROUGH THE LEDGER, onto the rows the units were actually deducted
-      // from. The raw `UPDATE products SET stock = stock + ?` this replaces
-      // wrote no ledger row, emitted no InventoryChanged, and always credited
-      // the BASE row: already wrong for every OPTION / COLOR /
-      // VARIANT_COMBINATION product. The restore carries its own fence row
-      // (§3.3), so a guard that matched nothing rolls the credit back with it
-      // instead of recording a movement that never happened.
-      const restoreMoves = await restoreMovesForItem(c.env.DB, kase.order_id, kase.order_item_id, kase.qty);
-      if (restoreMoves.length && restock) {
-        const restorePlan = await planInventory(c.env.DB, restoreMoves, {
-          kind: 'restore',
-          operationId: id,
-          orderId: kase.order_id,
-          actorUserId: admin.id,
-          reason: 'return',
-        });
-        restorePlan.statements.push(
-          await planReservationFence(c.env.DB, kase.order_id, 'restore', restorePlan.plannedLedgerRows)
-        );
-        const lots = await planLotRestore(c.env.DB,kase.order_id,{lineIds:[kase.order_item_id],qtyByLine:{[kase.order_item_id]:kase.qty},operation:`return:${id}`});
-        restorePlan.statements.push(...lots.statements);
-        if(lots.allocations.length)restoredCost=lots.allocations.some(a=>a.cogs_iqd===null)?null:lots.allocations.reduce((n,a)=>n+(a.cogs_iqd??0),0);
-        if (restorePlan.statements.length) await c.env.DB.batch(restorePlan.statements);
-        pumpAfter(c.env.DB, restorePlan.eventIds, waitUntilFrom(c));
-      }
     }
   }
 

@@ -497,7 +497,7 @@ export async function loadBatches(db: D1Database, filter: BatchFilter): Promise<
          LEFT JOIN purchase_lines pl ON pl.incoming_id = l.incoming_id
          LEFT JOIN purchase_orders po ON po.id = pl.purchase_id
         WHERE ${where}
-        ORDER BY l.received_at ASC, l.id ASC
+        ORDER BY l.received_at ASC, l.created_at ASC, l.id ASC
         LIMIT ${BATCH_PAGE}`,
     )
     .bind(...args)

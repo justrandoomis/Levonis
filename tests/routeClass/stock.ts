@@ -62,6 +62,8 @@ export default {
         // payment or funding column — the GET sweep walks it for every role.
         'GET /receiving': 'op',
         'GET /receiving/:id': { cls: 'op', path: '/api/admin/procurement/receiving/po1' },
+        'GET /documents/:id/unit-origins': { cls: 'op', path: '/api/admin/procurement/documents/po1/unit-origins' },
+        'PATCH /documents/:id/unit-origins': { cls: 'op', path: '/api/admin/procurement/documents/po1/unit-origins', body: { version: 1, units: [{ id: 'rm-origin', supplier_order_no: 'SUPPLIER-REF', tracking_no: 'TRACK-REF' }] } },
         'POST /documents': 'cost_write',
         'PUT /documents/:id': { cls: 'cost_write', path: '/api/admin/procurement/documents/po1' },
         // «تغيير الاسم» (owner request 2026-10-10): the purchase's name at any status, behind the same `purchase` door as PUT.

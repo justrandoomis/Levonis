@@ -85,6 +85,8 @@ export const ORDER_HISTORY_TABLES = [
   // cancelled order reaches here). Unlinked — order_id and order_item_id
   // cleared, `order_ref` keeps the ORD- id for the timeline — never deleted.
   'serial_assignments',
+  'order_item_inventory_unit_assignments',
+  'order_preorder_unit_origins',
 ] as const;
 
 async function columnsOf(db: OrderDeletionDb, table: string): Promise<Set<string>> {
@@ -98,7 +100,7 @@ type DeletionSchema = { columns: Map<string, Set<string>>; protections: Protecti
 const financialTables = ['finance_order_costs','finance_order_adjustments','finance_workspace_postings','finance_order_calculations',
   'finance_collections','finance_refund_facts','investor_finance_events','finance_investor_earnings','finance_expense_links'] as const;
 const itemEvidenceTables = ['stock_serial_links','stock_return_inspections','trade_in_claims'] as const;
-const allocationEvidenceTables = ['investor_finance_events','investor_allocation_results','lot_cost_adjustment_shares','stock_return_lot_evidence'] as const;
+const allocationEvidenceTables = ['investor_finance_events','investor_allocation_results','lot_cost_adjustment_shares','stock_return_lot_evidence','stock_return_unit_evidence','stock_return_order_unit_evidence'] as const;
 
 /** One schema read set per sweep; absent newer tables are not assumed empty
  * after they have been observed. The same predicates select candidates and
@@ -233,7 +235,7 @@ export async function deleteCancelledOrder(
     if (!columns.has('order_id')) continue;
     const clears = ['"order_id" = NULL'];
     let where = '"order_id" = ?1';
-    if ((table === 'reviews' || table === 'gift_entitlements' || table === 'serial_assignments') && columns.has('order_item_id')) {
+    if ((table === 'reviews' || table === 'gift_entitlements' || table === 'serial_assignments' || table === 'order_item_inventory_unit_assignments' || table === 'order_preorder_unit_origins') && columns.has('order_item_id')) {
       clears.push('"order_item_id" = NULL');
       where += ' OR "order_item_id" IN (SELECT id FROM order_items WHERE order_id = ?1)';
     }

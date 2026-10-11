@@ -25,6 +25,7 @@
  *
  * STATUS IS DERIVED (`STATUS_SQL`), never stored — see the migration.
  */
+import { unitOriginsInstalled } from './inventoryUnitOrigins';
 import { likePattern } from './sqlLike';
 import type { SessionUser } from './types';
 import { badRequest, conflict, HttpError } from './http';
@@ -761,6 +762,10 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
     if (live) return { kind: 'refused', reason: 'reserved', serial_norm: inv.serial_norm };
   }
 
+  const originSchema = await unitOriginsInstalled(db);
+  if(originSchema && await db.prepare('SELECT 1 FROM inventory_unit_origins WHERE serial_norm=?').bind(inv.serial_norm).first())
+    return { kind: 'refused', reason: 'reserved', serial_norm: inv.serial_norm };
+
   // The caller's own delivered, unreplaced unit of this product that carries
   // no serial yet and that no OTHER account holds — the oldest first, so two
   // printers of one order are filled in delivery order.
@@ -784,9 +789,9 @@ export async function linkFromInventory(db: D1Database, userId: string, norm: st
   // unit (PRIMARY KEY) and this unit given another serial (UNIQUE unit_id);
   // and (0178, integrity review #3) a preparation scan that bound this serial
   // after the read above is checked IN the insert. The re-read decides.
-  const unbound = installed
+  const unbound = (installed
     ? ' WHERE NOT EXISTS (SELECT 1 FROM serial_assignments sa WHERE sa.serial_norm = ?1 AND sa.released_at IS NULL)'
-    : ' WHERE 1';
+    : ' WHERE 1') + (originSchema ? ' AND NOT EXISTS (SELECT 1 FROM inventory_unit_origins u WHERE u.serial_norm = ?1)' : '');
   await db
     .prepare(
       `INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by, note) SELECT ?1, ?2, ?3, ?4, 'inventory'${unbound}

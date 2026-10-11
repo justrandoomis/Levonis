@@ -8,6 +8,7 @@ import type { AppContext, Env, SessionUser } from '../lib/types';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
 import { stripFinancials } from '../lib/adminScope';
+import { stripInventoryProvenance } from '../lib/inventoryProvenancePrivacy';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
@@ -872,9 +873,9 @@ export function orderPublic(
         gift_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
         // Read-side projection also protects historical/imported snapshots
         // written before current checkout validation existed.
-        pricing: stripFinancials(safeParse(it.pricing_snapshot, null)),
-        warranty: stripFinancials(safeParse(it.warranty_snapshot, null)),
-        transport: stripFinancials(safeParse(it.transport_snapshot, null)),
+        pricing: stripInventoryProvenance(stripFinancials(safeParse(it.pricing_snapshot, null))),
+        warranty: stripInventoryProvenance(stripFinancials(safeParse(it.warranty_snapshot, null))),
+        transport: stripInventoryProvenance(stripFinancials(safeParse(it.transport_snapshot, null))),
         /**
          * The exact selection that was bought, in the shape POST /api/cart/items
          * accepts — so "buy again" repeats THIS line instead of the product's

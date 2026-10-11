@@ -51,7 +51,7 @@ export async function enrichOrderCostProjections(db: D1Database, bases: OrderPro
       db.prepare('SELECT l.* FROM product_color_option_links l JOIN product_colors c ON c.id=l.color_id WHERE c.product_id IN (SELECT value FROM json_each(?))').bind(ids).all<Row>(),
       db.prepare(`SELECT l.*,CASE WHEN po.id IS NOT NULL AND po.cost_state<>'final' THEN NULL ELSE COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY v.version DESC LIMIT 1),l.unit_cost_iqd) END final_unit_iqd
         FROM inventory_lots l LEFT JOIN purchase_lines pl ON pl.incoming_id=l.incoming_id LEFT JOIN purchase_orders po ON po.id=pl.purchase_id
-        WHERE l.product_id IN (SELECT value FROM json_each(?)) AND l.qty_remaining>0 ORDER BY l.received_at,l.id`).bind(ids).all<Row>(),
+        WHERE l.product_id IN (SELECT value FROM json_each(?)) AND l.qty_remaining>0 ORDER BY l.received_at,l.created_at,l.id`).bind(ids).all<Row>(),
     ]);
     for (const { base, line } of candidates) {
       const product = products.results?.find(row => row.id === line.product_id);

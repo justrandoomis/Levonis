@@ -19,6 +19,8 @@ import OrderStagePanel from './OrderStagePanel';
 import GiniReceiptPanel from './GiniReceiptPanel';
 import OrderStatusCorrection from './OrderStatusCorrection';
 import PriceAdjustPanel from './PriceAdjustPanel';
+import InventoryOriginsPanel from './InventoryOriginsPanel';
+import PreorderOriginsPanel from './PreorderOriginsPanel';
 import SerialsBlockerCard from './serials/SerialsBlockerCard';
 import { serialStrings } from './serials/strings';
 import { slotKey } from './serials/UnitSerialSlots';
@@ -622,6 +624,9 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 })}
               </ul>
             </section>
+
+            <InventoryOriginsPanel key={`inventory-origins-${orderId}`} orderId={orderId} revision={serials} />
+            {detail.shipping_type !== 'direct' && <PreorderOriginsPanel key={`preorder-origins-${orderId}`} orderId={orderId} />}
 
             {/* The warranty paper is issued PER DEVICE, so it sits directly
                 under the goods it belongs to rather than in the print bar:

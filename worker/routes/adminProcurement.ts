@@ -26,6 +26,8 @@ import { parseProcurementDraft } from '../lib/procurementDraft';
 import { engineColumnInstalled } from '../lib/engineInstalled';
 import { batchSnapshotInstalled, purchaseLotSnapshot, type PurchaseFxSource } from '../lib/batchSnapshot';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { unitOriginsInstalled, normalizeUnitOrigins, planCreateUnitOrigins, planReceiveUnitOrigins, unitOriginsByIncoming } from '../lib/inventoryUnitOrigins';
+import { planDraftOriginSerials, originSerialConflict } from '../lib/procurementOriginSerials';
 
 export const adminProcurementRoutes = new Hono<AppContext>();
 adminProcurementRoutes.use('*', requireAdmin);
@@ -141,7 +143,8 @@ async function document(db: D1Database, id: string) {
       .bind(id)
       .all<{ amount_iqd: number }>(),
   ]);
-  const items = lines.results ?? [];
+  const origins = await unitOriginsByIncoming(db, (lines.results ?? []).map((line) => line.id));
+  const items = (lines.results ?? []).map((line) => ({ ...line, unit_origins: origins.get(line.id) ?? [] }));
   const ordered = items.reduce((s, l) => s + (l.purchase_total_iqd ?? l.qty_ordered * l.purchase_unit_iqd) + l.charges_iqd, 0);
   const paid = (payments.results ?? []).reduce((s, pay) => s + pay.amount_iqd, 0);
   return {
@@ -270,6 +273,7 @@ adminProcurementRoutes.get('/documents/:id', async (c) => {
 const AWAITING_RECEIPT = "('ordered','partial')";
 type ReceivingHead = {
   id: string;
+  version: number;
   invoice_no: string;
   status: string;
   purchase_day: string;
@@ -278,13 +282,14 @@ type ReceivingHead = {
   supplier_name: string | null;
   warehouse_name: string | null;
 };
-const RECEIVING_HEAD_SQL = `SELECT p.id,p.invoice_no,p.status,p.purchase_day,p.expected_day,p.cost_state,
+const RECEIVING_HEAD_SQL = `SELECT p.id,p.version,p.invoice_no,p.status,p.purchase_day,p.expected_day,p.cost_state,
     s.name AS supplier_name,w.name AS warehouse_name
   FROM purchase_orders p LEFT JOIN inventory_suppliers s ON s.id=p.supplier_id
   LEFT JOIN stock_locations w ON w.id=p.warehouse_id`;
 /** `ready` says whether the owner has fixed the final cost — receiving waits for it — without saying what it is. */
 const receivingHead = (p: ReceivingHead) => ({
   id: p.id,
+  version: p.version,
   invoice_no: p.invoice_no,
   status: p.status,
   purchase_day: p.purchase_day,
@@ -308,12 +313,13 @@ adminProcurementRoutes.get('/receiving/:id', async (c) => {
     .first<ReceivingHead>();
   if (!head) throw notFound('Purchase not found');
   const { results } = await c.env.DB.prepare(
-    `SELECT l.id AS line_id,l.label,l.rejected_qty,i.product_id,i.scope,i.scope_id,i.qty_ordered,i.qty_received
+    `SELECT l.id AS line_id,i.id AS incoming_id,l.label,l.rejected_qty,i.product_id,i.scope,i.scope_id,i.qty_ordered,i.qty_received
        FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? ORDER BY l.id`,
   )
     .bind(id)
     .all<{
       line_id: string;
+      incoming_id: string;
       label: string;
       rejected_qty: number;
       product_id: string | null;
@@ -322,7 +328,8 @@ adminProcurementRoutes.get('/receiving/:id', async (c) => {
       qty_ordered: number;
       qty_received: number;
     }>();
-  return c.json({ success: true, purchase: receivingHead(head), lines: results ?? [] });
+  const origins = await unitOriginsByIncoming(c.env.DB, (results ?? []).map((line) => line.incoming_id));
+  return c.json({ success: true, purchase: receivingHead(head), lines: (results ?? []).map((line) => ({ ...line, unit_origins: origins.get(line.incoming_id) ?? [] })) });
 });
 
 /**
@@ -374,6 +381,18 @@ async function planDocument(
   // The lines and charges, parsed and computed exactly as the owner's pricing
   // preview reads a draft (worker/lib/procurementDraft.ts).
   const { profile, profileVersion, shippingRate, currency, rate, lines, charges, shares } = await parseProcurementDraft(db, b);
+  // Procurement provenance is deliberately separate from the pricing parser:
+  // supplier order/tracking references never participate in prices or COGS.
+  const rawLines = b.lines as Record<string, unknown>[];
+  const origins = lines.map((line, index) => normalizeUnitOrigins(rawLines[index].unit_origins, line.qty));
+  const serialCount = origins.reduce((sum, units) => sum + units.filter((unit) => unit.serial_no).length, 0);
+  if (serialCount > 50)
+    throw badRequest('سجل حتى 50 سيريالاً مع تأكيد الشراء؛ يمكن مسح بقية الأجهزة وحفظها مباشرة بعد التأكيد', 'PURCHASE_SERIAL_LIMIT');
+  if (origins.reduce((sum, units) => sum + units.length, 0) > 5000)
+    throw badRequest('قسّم الشراء إلى شحنات أصغر لتتبع أكثر من 5000 قطعة', 'UNIT_ORIGINS_LIMIT');
+  const originsInstalled = await unitOriginsInstalled(db);
+  if (origins.some((units) => units.length) && !originsInstalled)
+    throw new HttpError(503, 'لم تُفعّل ميزة تتبع القطع بعد؛ أعد المحاولة بعد تحديث قاعدة البيانات', 'UNIT_ORIGINS_NOT_INSTALLED');
   const day = dateValue(b.purchase_day, baghdadDay());
   const now = new Date().toISOString();
   const supplier = text(b.supplier_id, 60) || null,
@@ -395,6 +414,10 @@ async function planDocument(
   if (attachment && !/^https:\/\//.test(attachment)) throw badRequest('مرفق الفاتورة يجب أن يكون رابط HTTPS');
   const state = b.cost_state === 'final' ? 'final' : 'estimated';
   const status = b.status === 'ordered' ? 'ordered' : 'draft';
+  if (status === 'draft' && serialCount)
+    throw badRequest('أكد أمر الشراء لتسجيل سيريالات الأجهزة؛ تبقى الأرقام في المسودة المحلية حتى التأكيد', 'PURCHASE_SERIAL_REQUIRES_CONFIRM');
+  if (state !== 'final' && serialCount)
+    throw badRequest('أكمل التكلفة النهائية للشحنة قبل تسجيل سيريالات الأجهزة', 'PURCHASE_SERIAL_REQUIRES_FINAL_COST');
   const paid =
     (
       await db
@@ -412,6 +435,14 @@ async function planDocument(
     throw conflict('المجموع الجديد أقل من دفعات المورد؛ سوّ الدفعة أولًا');
   const statements: D1PreparedStatement[] = [];
   if (previous) {
+    // A whole-document edit recreates its incoming lines. Once a physical
+    // serial has been enrolled, that source identity must survive forever.
+    // Supplier references and the purchase name have independent safe edits.
+    if (originsInstalled) {
+      if (await db.prepare('SELECT 1 FROM inventory_unit_origins WHERE purchase_id=? AND serial_norm IS NOT NULL LIMIT 1').bind(id).first())
+        throw conflict('تم تثبيت سيريالات هذه الشحنة؛ استخدم تعديل مراجع القطع أو شحنة جديدة لتغيير البنود', 'PURCHASE_SERIALS_FROZEN');
+      statements.push(...fence(db, 'NOT EXISTS(SELECT 1 FROM inventory_unit_origins WHERE purchase_id=? AND serial_norm IS NOT NULL)', [id]));
+    }
     const investorReady=await investorFinanceInstalled(db);
     if(investorReady&&await db.prepare("SELECT 1 FROM investment_contracts c JOIN purchase_lines l ON l.incoming_id=c.incoming_id WHERE l.purchase_id=? AND c.state='active'").bind(id).first())throw conflict('أبطل اتفاق الاستثمار غير الممول قبل تعديل بنود الشراء؛ الاتفاقات الممولة تحتفظ بأصلها','INVESTMENT_PURCHASE_FROZEN');
     if(investorReady)statements.push(...fence(db,"NOT EXISTS(SELECT 1 FROM investment_contracts c JOIN purchase_lines l ON l.incoming_id=c.incoming_id WHERE l.purchase_id=? AND c.state='active')",[id]));
@@ -431,8 +462,9 @@ async function planDocument(
       ).results ?? [];
     statements.push(
       db.prepare('DELETE FROM purchase_charges WHERE purchase_id=?').bind(id),
-      db.prepare('DELETE FROM purchase_lines WHERE purchase_id=?').bind(id),
     );
+    if (originsInstalled) statements.push(db.prepare('DELETE FROM inventory_unit_origins WHERE purchase_id=? AND received_lot_id IS NULL').bind(id));
+    statements.push(db.prepare('DELETE FROM purchase_lines WHERE purchase_id=?').bind(id));
     for (const l of old){
       if(investorReady)statements.push(db.prepare("UPDATE incoming_inventory SET status='cancelled' WHERE id=? AND EXISTS(SELECT 1 FROM investment_contracts WHERE incoming_id=?)").bind(l.incoming_id,l.incoming_id));
       statements.push(db.prepare(`DELETE FROM incoming_inventory WHERE id=?${investorReady?' AND NOT EXISTS(SELECT 1 FROM investment_contracts WHERE incoming_id=?)':''}`).bind(l.incoming_id,...(investorReady?[l.incoming_id]:[])));
@@ -498,7 +530,7 @@ async function planDocument(
       .bind(rate, shippingRate, actor, now, profile.id, profileVersion));
   }
   const plannedLines:FundedPurchaseLine[]=[];
-  for (const l of lines) {
+  for (const [lineIndex, l] of lines.entries()) {
     const incoming = l.incomingId,
       line = l.lineId;
     plannedLines.push({incoming_id:incoming,total_iqd:l.total+l.charges,label:l.sel.label});
@@ -551,6 +583,14 @@ async function planDocument(
           l.sourceTotal,
         ),
     );
+    statements.push(...planCreateUnitOrigins(db, {
+      incomingId: incoming, purchaseLineId: line, purchaseId: id,
+      units: origins[lineIndex], actorId: actor,
+    }));
+    if (origins[lineIndex].some((unit) => unit.serial_no)) statements.push(...await planDraftOriginSerials(db, {
+      purchaseId: id, incomingId: incoming, productId: l.sel.product_id,
+      scope: l.sel.scope, scopeId: l.sel.scope_id, units: origins[lineIndex], actorId: actor,
+    }));
     if (profile && status === 'ordered') statements.push(db.prepare(`INSERT INTO procurement_selection_cost_defaults(profile_id,product_id,scope,scope_id,source_unit_amount,weight_g,volume_mm3,updated_by,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(profile_id,product_id,scope,scope_id) DO UPDATE SET source_unit_amount=excluded.source_unit_amount,weight_g=excluded.weight_g,volume_mm3=excluded.volume_mm3,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
       .bind(profile.id, l.sel.product_id, l.sel.scope, l.sel.scope_id, l.costMode === 'total' ? exactProcurementUnitDefault(l.sourceTotal!, l.qty) : l.source, l.weight, l.volume, actor, now));
@@ -605,6 +645,10 @@ adminProcurementRoutes.post('/documents', async (c) => {
         throw conflict('رقم العملية مستخدم لمحتوى مختلف', 'IDEMPOTENCY_MISMATCH');
       return c.json({ success: true, id, already: true });
     }
+    const hasSerialInput = Array.isArray(b.lines) && b.lines.some((line) => line && typeof line === 'object' &&
+      Array.isArray(line.unit_origins) && line.unit_origins.some((unit: Record<string, unknown>) => unit && typeof unit.serial_no === 'string' && unit.serial_no.trim()));
+    if ((hasSerialInput && isFenceMiss(error)) || /UNIQUE constraint failed: (inventory_unit_origins.serial_norm|serial_inventory.serial_norm|stock_serial_links.serial_norm)/.test(String(error)))
+      throw originSerialConflict();
     if (b.cost_profile_id && /CHECK constraint/i.test(String(error)))
       throw conflict('تغيرت بيانات الشراء أو أسعار المسار؛ حدّث البيانات وأعد المحاولة', 'COST_PROFILE_CHANGED');
     throw error;
@@ -688,6 +732,65 @@ adminProcurementRoutes.patch('/documents/:id/name', async (c) => {
   }
   return c.json({ success: true, id, name });
 });
+// Operational source references have no financial fields. Assistants may
+// complete a tracking number after receipt without reopening frozen costs.
+adminProcurementRoutes.get('/documents/:id/unit-origins', async (c) => {
+  await requireCapability(c.env, c.get('user')!, 'receive');
+  const id = c.req.param('id');
+  const purchase = await c.env.DB.prepare("SELECT id,invoice_no,version,status,(status IN ('ordered','partial','received') AND cost_state='final') AS serial_enrollment_allowed FROM purchase_orders WHERE id=?").bind(id).first();
+  if (!purchase) throw notFound('Purchase not found');
+  const lines = (await c.env.DB.prepare('SELECT id,incoming_id,label FROM purchase_lines WHERE purchase_id=? ORDER BY id').bind(id).all<{ id: string; incoming_id: string; label: string }>()).results ?? [];
+  const origins = await unitOriginsByIncoming(c.env.DB, lines.map((line) => line.incoming_id));
+  return c.json({ success: true, purchase, lines: lines.map((line) => ({ line_id: line.id, label: line.label, unit_origins: origins.get(line.incoming_id) ?? [] })) });
+});
+adminProcurementRoutes.patch('/documents/:id/unit-origins', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'receive');
+  if (!await unitOriginsInstalled(c.env.DB))
+    throw new HttpError(503, 'لم تُفعّل ميزة تتبع القطع بعد', 'UNIT_ORIGINS_NOT_INSTALLED');
+  const id = c.req.param('id'), body = await bodyOf(c);
+  if (Object.keys(body).some((key) => !['version', 'units'].includes(key)))
+    throw badRequest('هذا الإجراء يحدّث مراجع المورد فقط', 'UNKNOWN_FIELD');
+  const version = whole(body.version, 'إصدار الشراء', 1);
+  const purchase = await c.env.DB.prepare('SELECT id,version FROM purchase_orders WHERE id=?').bind(id).first<{ id: string; version: number }>();
+  if (!purchase) throw notFound('Purchase not found');
+  if (purchase.version !== version) throw conflict('تغير الشراء؛ حدّث البيانات وأعد المحاولة', 'VERSION_CHANGED');
+  if (!Array.isArray(body.units) || !body.units.length || body.units.length > 1000)
+    throw badRequest('اختر بين قطعة واحدة و1000 قطعة', 'INVALID_UNIT_ORIGINS');
+  const seen = new Set<string>();
+  const edits: Array<{ id: string; supplier_order_no: string; tracking_no: string }> = [];
+  const statements = fence(c.env.DB, 'EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND version=?)', [id, version]);
+  for (const value of body.units) {
+    if (!value || typeof value !== 'object') throw badRequest('سجل القطعة غير صحيح', 'INVALID_UNIT_ORIGINS');
+    const row = value as Record<string, unknown>, unitId = str(row.id, 'id', { min: 1, max: 120 });
+    if (Object.keys(row).some((key) => !['id', 'supplier_order_no', 'tracking_no'].includes(key)))
+      throw badRequest('هذا الإجراء يحدّث مراجع المورد فقط', 'UNKNOWN_FIELD');
+    if (seen.has(unitId)) throw badRequest('معرّف قطعة مكرر', 'INVALID_UNIT_ORIGINS');
+    seen.add(unitId);
+    const after = normalizeUnitOrigins([{ unit_index: 1, supplier_order_no: row.supplier_order_no, tracking_no: row.tracking_no }], 1)[0];
+    edits.push({ id: unitId, supplier_order_no: after.supplier_order_no, tracking_no: after.tracking_no });
+  }
+  const wire = JSON.stringify(edits);
+  const count = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM inventory_unit_origins WHERE purchase_id=? AND id IN (SELECT json_extract(value,'$.id') FROM json_each(?))").bind(id, wire).first<{ n: number }>();
+  if (count?.n !== edits.length) throw badRequest('القطعة ليست ضمن هذا الشراء', 'INVALID_UNIT_ORIGINS');
+  // Bulk SQL keeps a 1000-piece document bounded without truncating the
+  // before/after audit record of any piece. The purchase version fences both.
+  statements.push(c.env.DB.prepare(`INSERT INTO audit_log(actor_id,action,target,detail)
+    SELECT ?1,'purchase.unit_origins_updated',u.id,
+      json_object('purchase_id',?2,'id',u.id,'before',json_object('supplier_order_no',u.supplier_order_no,'tracking_no',u.tracking_no),
+        'after',json_object('supplier_order_no',json_extract(j.value,'$.supplier_order_no'),'tracking_no',json_extract(j.value,'$.tracking_no')))
+    FROM json_each(?3) j JOIN inventory_unit_origins u ON u.id=json_extract(j.value,'$.id') WHERE u.purchase_id=?2`).bind(user.id,id,wire));
+  statements.push(c.env.DB.prepare(`UPDATE inventory_unit_origins SET
+    supplier_order_no=(SELECT json_extract(value,'$.supplier_order_no') FROM json_each(?1) WHERE json_extract(value,'$.id')=inventory_unit_origins.id),
+    tracking_no=(SELECT json_extract(value,'$.tracking_no') FROM json_each(?1) WHERE json_extract(value,'$.id')=inventory_unit_origins.id)
+    WHERE purchase_id=?2 AND id IN (SELECT json_extract(value,'$.id') FROM json_each(?1))`).bind(wire,id));
+  statements.push(c.env.DB.prepare('UPDATE purchase_orders SET version=version+1,updated_at=? WHERE id=?').bind(new Date().toISOString(), id));
+  statements.push(...(await auditStatements(c.env.DB, user.id, 'purchase.unit_origins_batch_updated', id, { count: edits.length })).statements);
+  try { await c.env.DB.batch(statements); }
+  catch (error) { if (isFenceMiss(error)) throw conflict('تغير الشراء؛ حدّث البيانات وأعد المحاولة', 'VERSION_CHANGED'); throw error; }
+  return c.json({ success: true, version: version + 1 });
+});
+
 adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'receive');
@@ -737,6 +840,19 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
     const selected = await requireSelection(c.env.DB, line.product_id!, line.scope, line.scope_id);
     const qty = whole(r.qty, 'المستلم', 0, 100000),
       rejected = whole(r.rejected_qty ?? 0, 'المرفوض', 0, 100000);
+    const pendingOrigins = line.unit_origins.filter((unit) => !unit.received_lot_id && !unit.unavailable_reason);
+    let originIds: string[] = [];
+    if (line.unit_origins.length) {
+      if (rejected) throw badRequest('استلم القطع السليمة المحددة فقط، واترك القطع الأخرى معلّقة حتى تسوية الشراء', 'TRACKED_REJECTION_REQUIRES_SELECTION');
+      if (r.unit_origin_ids !== undefined && !Array.isArray(r.unit_origin_ids))
+        throw badRequest('اختر معرّفات القطع المستلمة', 'INVALID_UNIT_ORIGINS');
+      originIds = r.unit_origin_ids === undefined ? pendingOrigins.slice(0, qty).map((unit) => unit.id) : r.unit_origin_ids as string[];
+      const pendingIds = new Set(pendingOrigins.map((unit) => unit.id));
+      if (originIds.length !== qty || new Set(originIds).size !== qty || originIds.some((unitId) => typeof unitId !== 'string' || !pendingIds.has(unitId)))
+        throw badRequest('القطع المحددة لا تطابق الكمية أو سبق استلامها', 'INVALID_UNIT_ORIGINS');
+    } else if (Array.isArray(r.unit_origin_ids) && r.unit_origin_ids.length) {
+      throw badRequest('هذا البند لا يحتوي سجلات قطع منفردة', 'INVALID_UNIT_ORIGINS');
+    }
     if (qty > 0 && selected.stock === null) throw badRequest('فعّل تتبع مخزون النسخة قبل الاستلام');
     if (qty === 0 && rejected === 0) continue;
     changed += qty + rejected;
@@ -776,6 +892,10 @@ adminProcurementRoutes.post('/documents/:id/receive', async (c) => {
           : null,
       });
       statements.push(...plan.statements);
+      if (originIds.length) statements.push(...await planReceiveUnitOrigins(c.env.DB, {
+        incomingId: line.id, lotId: lot, fromIndex: received + 1, qty: segment.qty,
+        originIds: originIds.slice(received - line.qty_received, received - line.qty_received + segment.qty),
+      }));
       for(const share of capitalShares)statements.push(c.env.DB.prepare('INSERT INTO purchase_investor_lot_capital(lot_id,contract_id,unit_principal_iqd,qty) VALUES (?,?,?,?)').bind(lot,share.contract_id,Math.floor(share.principal_iqd/line.qty_ordered)+Number(position<share.principal_iqd%line.qty_ordered),segment.qty));
       if (d.purchase.warehouse_id)
         statements.push(

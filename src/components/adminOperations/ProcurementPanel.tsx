@@ -7,6 +7,9 @@ import { estimateLineKey, purchaseEstimate } from './purchaseEstimate';
 import { changeLineCostProfile, changePurchaseCostMode, cloneCostProfileSnapshot, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
 import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looksLikeFreight, newChargeDraft, type ChargeDraft } from './procurementCharges';
 import PurchaseLineCosts, { type ExtraChargeView } from './PurchaseLineCosts';
+import PurchaseUnitOrigins, { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigins } from './PurchaseUnitOrigins';
+import type { PurchaseSerialResult } from './PurchaseUnitSerial';
+import { copyPurchaseUnits, purchaseReceiptDraft, purchaseReceiptValid, purchaseUnitRows, purchaseUnitsValid, purchaseUnitsWire, type PurchaseReceiptDraft } from './procurementUnitOrigins';
 import PricingSummaryBar from './PricingSummaryBar';
 import BatchSnapshotCard from '../adminInventory/BatchSnapshotCard';
 import ProcurementPricingReview, { SavedPurchasePricing, withProductExtras } from './ProcurementPricingReview';
@@ -195,7 +198,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [operationId, setOperationId] = useState(() => crypto.randomUUID()),
     [receiveId, setReceiveId] = useState(() => crypto.randomUUID()),
     [payId, setPayId] = useState(() => crypto.randomUUID()),
-    [receiving, setReceiving] = useState<Record<string, { qty: number; rejected_qty: number }>>({}),
+    [receiving, setReceiving] = useState<Record<string, PurchaseReceiptDraft>>({}),
     [payment, setPayment] = useState(''),
     [reference, setReference] = useState(''),
     [closeReason, setCloseReason] = useState('');
@@ -229,7 +232,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       Object.fromEntries(
         d.lines.map((l) => [
           l.line_id,
-          { qty: Math.max(0, l.qty_ordered - l.qty_received), rejected_qty: 0 },
+          purchaseReceiptDraft(l),
         ]),
       ),
     );
@@ -252,6 +255,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               d.purchase.invoice_total_iqd == null ? '' : String(d.purchase.invoice_total_iqd),
             invoice_no: clone ? '' : d.purchase.invoice_no,
             purchase_day: clone ? today() : d.purchase.purchase_day,
+            tracking: clone ? '' : d.purchase.tracking,
           }
         : newHeader(),
     );
@@ -265,6 +269,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             cost_source: 'confirmed_purchase',
             source_total_amount: l.purchase_cost_mode === 'total' ? l.source_total_amount ?? (l.purchase_total_iqd == null ? Number(l.source_unit_amount) * l.qty_ordered : l.purchase_total_iqd / (d.purchase.currency === 'IQD' ? 1 : d.purchase.exchange_rate)) : '',
             unit_cost_iqd: l.purchase_unit_iqd,
+            unit_origins: clone ? copyPurchaseUnits(l.unit_origins, l.qty_ordered) : l.unit_origins?.length ? l.unit_origins : undefined,
           }))
         : [],
     );
@@ -289,11 +294,11 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   // The request body of a save — and of the pricing preview, which reads it with
   // the same parser. The old reference selling price is no longer sent: the
   // server fills its column from the catalogue (USD design §4.4).
-  const draftBody = (status: string) => ({
+  const draftBody = (status: string, includeUnitOrigins = true) => ({
     ...header,
     invoice_total_iqd: header.invoice_total_iqd === '' ? null : Number(header.invoice_total_iqd),
     status,
-    lines: lines.map(({ selling_price_iqd: _reference, ...l }) => (void _reference, l)),
+    lines: lines.map(({ selling_price_iqd: _reference, unit_origins, ...l }) => (void _reference, { ...l, ...(includeUnitOrigins && unit_origins ? { unit_origins: purchaseUnitsWire(unit_origins, l.qty_ordered) } : {}) })),
     charges: charges.map(chargeWire),
     funding,
     operation_id: operationId,
@@ -357,7 +362,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     // The two steps are independently idempotent. A failed receipt leaves the
     // confirmed incoming document available to resume from the shipment list.
     if (quickReceive && status === 'ordered') {
-      try { await api.post(`${PROCUREMENT}/documents/${r.id}/receive`, { operation_id: operationId, lines: d.lines.map((l) => ({ line_id: l.line_id, qty: l.qty_ordered, rejected_qty: 0 })) }); }
+      try { await api.post(`${PROCUREMENT}/documents/${r.id}/receive`, { operation_id: operationId, lines: d.lines.map((l) => ({ line_id: l.line_id, ...purchaseReceiptDraft(l) })) }); }
       catch (e) { await open(r.id); await load(); throw e; }
     }
     // «حفظ مسودة» writes no pricing; the confirm applies each kept product after the purchase committed.
@@ -391,6 +396,11 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   };
   const profileValid = !header.cost_profile_id || (!!shippingBasis && Number.isFinite(header.shipping_rate_iqd) && header.shipping_rate_iqd !== null && header.shipping_rate_iqd >= 0 && lines.every((l) => packedMeasureValid(l, shippingBasis)));
   const quantitiesValid = lines.length > 0 && lines.every((l) => Number.isSafeInteger(l.qty_ordered) && l.qty_ordered > 0 && Number.isSafeInteger(l.invoiced_qty) && l.invoiced_qty >= 0);
+  const trackedQuantity = lines.reduce((n, l) => n + (l.unit_origins ? l.qty_ordered : 0), 0);
+  const draftSerialCount = lines.reduce((total, l) => total + (l.unit_origins ? purchaseUnitRows(l.unit_origins, l.qty_ordered).filter((unit) => unit.serial_no?.trim()).length : 0), 0);
+  const hasDraftSerials = draftSerialCount > 0;
+  const draftSerialsValid = draftSerialCount <= 50 && (!hasDraftSerials || header.cost_state === 'final');
+  const originsValid = lines.every((l) => purchaseUnitsValid(l.unit_origins, l.qty_ordered)) && trackedQuantity <= 5000;
   const inputsValid = quantitiesValid && profileValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0));
   const estimates = purchaseEstimate(lines, charges, header.currency === 'IQD' ? 1 : header.exchange_rate, funding.mode === 'investor' ? funding.profit_share_bps : 0, funding.incoming_indexes, header.cost_profile_id && shippingBasis ? { basis: shippingBasis, rate: header.shipping_rate_iqd ?? NaN } : undefined);
   const lineKeys = lines.map(estimateLineKey);
@@ -413,7 +423,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const extrasValid = Object.values(extras).every(extraOnStep);
   const nameValid = purchaseNameFits(header.invoice_no);
   // The card's pricing, live: the server prices the draft as it would be saved (debounced, latest wins).
-  const previewKey = editing && step >= 2 && costsValid && minimumsValid && extrasValid && !pricingOff ? JSON.stringify([draftBody('ordered'), choices, editId]) : '';
+  const previewKey = editing && step >= 2 && costsValid && minimumsValid && extrasValid && !pricingOff ? JSON.stringify([draftBody('ordered', false), choices, editId]) : '';
   useEffect(() => {
     if (!previewKey) return;
     const ctrl = new AbortController();
@@ -500,15 +510,17 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               {recent.length > 0 && <details><summary>{loc('منتجات استخدمتها الآن', 'Recent selections')}</summary><div className="flex flex-wrap gap-2">{recent.map((r) => <button key={`${r.product_id}:${r.scope}:${r.scope_id}`} type="button" className={T.btnGhost} onClick={() => setChoice(r)}>{r.label}</button>)}</div></details>}
             </div>
             {!lines.length && <p className={`py-3 text-sm ${T.text3}`}>{ps.lineHint}</p>}
+            {trackedQuantity > 5000 && <p role="alert" className="py-3 text-sm text-[var(--ap-danger)]">{loc('الحد الأقصى 5000 قطعة بمرجع فردي في أمر الشراء الواحد. وزّع الكمية على أكثر من أمر شراء.', 'A purchase can hold at most 5,000 individually tracked units. Split larger quantities across purchases.', 'هەر کڕینێک زۆرترین 5000 پارچەی شوێنکەوتنکراو دەگرێت. بڕی زیاتر بەسەر چەند کڕینێکدا دابەش بکە.')}</p>}
             <div className="inventory-lines">{lines.map((l, i) => <article key={i} className="inventory-line">
-              <div className="inventory-line-head">{l.image_url && <img src={l.image_url} alt="" className="inventory-thumb" loading="lazy" />}<div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => [...a, { ...l }])}>{loc('تكرار', 'Duplicate')}</button><button type="button" className={T.btnGhost} onClick={() => { setLines((a) => a.filter((_, j) => i !== j)); setFunding((f) => ({...f,incoming_indexes:f.incoming_indexes?.filter(j=>j!==i).map(j=>j>i?j-1:j)})); }}>{loc('حذف', 'Remove')}</button></div>
+              <div className="inventory-line-head">{l.image_url && <img src={l.image_url} alt="" className="inventory-thumb" loading="lazy" />}<div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => [...a, { ...l, unit_origins: copyPurchaseUnits(l.unit_origins, l.qty_ordered) }])}>{loc('تكرار', 'Duplicate')}</button><button type="button" className={T.btnGhost} onClick={() => { setLines((a) => a.filter((_, j) => i !== j)); setFunding((f) => ({...f,incoming_indexes:f.incoming_indexes?.filter(j=>j!==i).map(j=>j>i?j-1:j)})); }}>{loc('حذف', 'Remove')}</button></div>
               <Input label={loc('الكمية المطلوبة', 'Quantity ordered')} type="number" min={1} value={l.qty_ordered} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, qty_ordered: v === '' ? NaN : Number(v), invoiced_qty: x.invoiced_qty === x.qty_ordered ? Number(v) : x.invoiced_qty } : x))} />
               <details className="mt-2"><summary>{loc('كمية الفاتورة مختلفة؟', 'Different invoiced quantity?')}</summary><Input label={loc('كمية الفاتورة', 'Invoice quantity')} type="number" min={0} value={l.invoiced_qty} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, invoiced_qty: Number(v) } : x))} /></details>
+              <PurchaseUnitOrigins qty={l.qty_ordered} value={l.unit_origins} onChange={(unit_origins) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_origins } : x))} />
             </article>)}</div>
             <details><summary>{pn.details}</summary><div className="inventory-fields mt-3">
               <Select label={loc('المستودع / الموقع', 'Warehouse / location')} value={header.warehouse_id} onChange={(v) => update('warehouse_id', v)} empty={loc('غير محدد', 'Unassigned')} options={config.locations.map((x) => ({ id: x.id, name: nameOf(x) }))} />
               <Input label={loc('الوصول المتوقع', 'Expected arrival')} type="date" value={header.expected_day} onChange={(v) => update('expected_day', v)} />
-              <Input label={loc('رقم التتبع', 'Tracking number')} value={header.tracking} onChange={(v) => update('tracking', v)} />
+              <Input label={loc('تتبع الشحنة العام (اختياري)', 'Overall shipment tracking (optional)', 'شوێنکەوتنی گشتی بار (ئارەزوومەندانە)')} value={header.tracking} onChange={(v) => update('tracking', v)} />
             </div></details>
           </>}
           {step === 2 && <>
@@ -618,16 +630,19 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div><dt>{pn.reviewRow}</dt><dd>{header.invoice_no.trim() || pn.fallback}</dd></div>
               <div><dt>{loc('التكلفة', 'Cost status', 'دۆخی تێچوو')}</dt><dd>{header.cost_state === 'final' ? loc('نهائية', 'Final', 'کۆتایی') : loc('تقديرية؛ لا تستلم بعد', 'Estimated; receipt is blocked', 'خەمڵێنراو؛ هێشتا وەرمەگرە')}</dd></div>
             </dl>
-            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span><span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(estimates[i]?.owner_iqd)}</span></div><PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst /></article>)}</div>
+            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}><strong>{l.label}</strong><div className={`mt-2 flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered}</span><span>{loc('تكلفة البند', 'Line cost', 'تێچووی بەند')}: {money(estimates[i]?.total_iqd)}</span><span>{ps.landedRow}: {money(estimates[i]?.unit_iqd)}</span><span>{loc('ربح المستثمر التقديري', 'Estimated investor profit', 'قازانجی خەمڵێنراوی وەبەرهێنەر')}: {money(estimates[i]?.investor_iqd)}</span><span>{loc('ربح المتجر التقديري', 'Estimated store profit', 'قازانجی خەمڵێنراوی فرۆشگا')}: {money(estimates[i]?.owner_iqd)}</span></div><PricingSummaryBar summary={summaryOf(i)} label={l.label} busy={pricingBusy && !summaryOf(i)} notInstalled={pricingOff} directFirst /><SavedPurchaseUnitOrigins value={l.unit_origins ? purchaseUnitRows(l.unit_origins, l.qty_ordered) : undefined} /></article>)}</div>
             {!pricingOff && <ProcurementPricingReview preview={pricing} busy={pricingBusy} usePurchase={usePurchase} prefer={preferValues} onUsePurchase={(id, v) => setUsePurchase((m) => ({ ...m, [id]: v }))} onPrefer={(id, v) => setPreferValues((m) => ({ ...m, [id]: v }))} confirmLarge={confirmLarge} onConfirmLarge={(id, v) => setConfirmLarge((m) => ({ ...m, [id]: v }))} extras={extras} onExtras={(id, entries) => setExtras((m) => withProductExtras(m, id, entries))} />}
             <p className={`text-sm ${T.text3}`}>{loc('احفظ مسودة إن كنت تنتظر تكلفة نهائية. تأكيد الشراء يضيف شحنة قادمة؛ اختر استلام شحنة عند وصولها.', 'Save a draft while waiting for final costs. Confirming creates an incoming shipment; receive it when it arrives.', 'ئەگەر چاوەڕێی تێچووی کۆتایی دەکەیت ڕەشنووس پاشەکەوت بکە. پشتڕاستکردنەوەی کڕین بارێکی چاوەڕوانکراو زیاد دەکات؛ کاتێک گەیشت وەرگرتنی بار هەڵبژێرە.')}</p>
           </>}
           <aside className="inventory-sticky-summary"><div className="inventory-total"><span>{loc('المجموع مع تكاليف الشحنة', 'Total landed cost', 'کۆی گشتی لەگەڵ تێچووەکانی بار')}</span><strong>{money(costsValid ? total : null)}</strong></div>{funding.mode === 'investor' && <dl className="inventory-review"><div><dt>{loc('تمويل مخصص / مستلم', 'Allocated / received', 'پارەدارکردنی تەرخانکراو / وەرگیراو')}</dt><dd>{costMoney(allocated)} / {costMoney(Number(funding.received_iqd))}</dd></div><div><dt>{loc('مساهمة المتجر', 'Store contribution', 'بەشداریی فرۆشگا')}</dt><dd>{costMoney(Math.max(0, total - allocated))}</dd></div>{fundingReturn.return_total_iqd > 0 && <div><dt>{ir.footerRow}{fundingReturn.awaits_cash && <span className={`block text-xs font-normal ${T.text3}`}>{ir.footerCaption}</span>}</dt><dd>{costMoney(fundingReturn.return_total_iqd)}</dd></div>}<div><dt>{loc('تمويل ينتظر الاستلام', 'Funding not yet received', 'پارەدارکردنی چاوەڕێی وەرگرتن')}</dt><dd>{costMoney(Math.max(0, allocated - Number(funding.received_iqd)))}</dd></div></dl>}<p className={`mt-2 text-xs ${T.text3}`}>{(quickReceive ? loc('ستُستلم القطع الموجودة الآن بعد تأكيد التكلفة. الربح تقديري حتى التسليم والتحصيل.', 'On-hand units are received after confirming cost. Profit remains an estimate until delivery and collection.', 'پارچە ئامادەکان دوای پشتڕاستکردنەوەی تێچوو وەردەگیرێن. قازانج خەمڵێنراوە تا گەیاندن و وەرگرتنی پارە.') : loc('الشراء القادم لا يزيد المخزون المتاح. الربح تقديري حتى تسليم الطلب والتحصيل.', 'Incoming purchases do not increase available stock. Profit remains an estimate until delivery and collection.', 'کڕینی چاوەڕوانکراو کۆگای بەردەست زیاد ناکات. قازانج خەمڵێنراوە تا گەیاندنی داواکاری و وەرگرتنی پارە.'))}</p></aside>
           {step === 3 && fundingNeedsFinalCost && <p role="alert" className="text-[13px] text-[var(--ap-danger)]">{COST_REFUSALS.INVESTMENT_NEEDS_FINAL_COST[lang]}</p>}
+          {hasDraftSerials && <p role="status" className={`mt-3 text-sm ${T.text2}`}>{loc('الأرقام التسلسلية تبقى مؤقتًا في مسودة هذه الجلسة ولا تُسجّل حتى تأكيد الشراء. أكمل الكمية والتكاليف أولًا؛ تثبيت الأرقام يمنع إعادة تحريرهما لاحقًا.', 'Serials remain temporarily in this session’s draft until purchase confirmation. Finish quantities and costs first; fixing serials prevents rewriting them later.', 'ژمارەکان تا پشتڕاستکردنەوەی کڕین بە کاتی لە ڕەشنووسی ئەم دانیشتنەدا دەمێننەوە. سەرەتا بڕ و تێچوو تەواو بکە؛ جێگیرکردنی ژمارەکان گۆڕینی دواتری ئەوان ڕادەگرێت.')}</p>}
+          {hasDraftSerials && header.cost_state !== 'final' && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('ثبّت التكلفة النهائية قبل تأكيد شراء يحتوي على أرقام تسلسلية.', 'Set final costs before confirming a purchase with serial numbers.', 'پێش پشتڕاستکردنەوەی کڕین لەگەڵ ژمارەکان تێچووی کۆتایی جێگیر بکە.')}</p>}
+          {draftSerialCount > 50 && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('يمكن تسجيل 50 رقمًا تسلسليًا مع التأكيد. سجّل بقية الأرقام قطعةً قطعةً بعد حفظ الشراء.', 'Register up to 50 serials with confirmation. Add the remaining serials one unit at a time after saving the purchase.', 'لەگەڵ پشتڕاستکردنەوە تا 50 ژمارە تۆمار بکە. دوای پاشەکەوتکردنی کڕین ژمارەکانی تر یەک بە یەک زیاد بکە.')}</p>}
           <div className="inventory-footer">
             {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => setStep((v) => v - 1)}>{loc('رجوع', 'Back', 'گەڕانەوە')}</button>}
-            {step < 3 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !nameValid || !fundingValid(funding) || (step > 0 && !quantitiesValid) || (step === 2 && (!costsValid || !minimumsValid))} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || !costsValid || !minimumsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || (quickReceive && header.cost_state !== 'final')} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed', 'کڕینەکە پشتڕاست کرایەوە'))}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
-            <button type="button" className={T.btnSecondary} disabled={op.busy || !nameValid} onClick={() => { saveLocal(); if (costsValid) op.run(() => save('draft'), loc('تم حفظ المسودة', 'Draft saved', 'ڕەشنووسەکە پاشەکەوت کرا')); }}>{loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
+            {step < 3 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !minimumsValid || !draftSerialsValid))} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || !draftSerialsValid || !originsValid || !costsValid || !minimumsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || (quickReceive && header.cost_state !== 'final')} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed', 'کڕینەکە پشتڕاست کرایەوە'))}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
+            <button type="button" className={T.btnSecondary} disabled={op.busy || !nameValid} onClick={() => { saveLocal(); if (costsValid && originsValid && !hasDraftSerials) op.run(() => save('draft'), loc('تم حفظ المسودة', 'Draft saved', 'ڕەشنووسەکە پاشەکەوت کرا')); }}>{hasDraftSerials ? loc('حفظ مسودة هذه الجلسة', 'Keep this session’s draft', 'هێشتنەوەی ڕەشنووسی ئەم دانیشتنە') : loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
             <button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => setEditing(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</button>
           </div>
         </Card>
@@ -689,7 +704,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               {loc('نسخ لشراء جديد', 'Clone purchase')}
             </button>
             {['draft', 'ordered'].includes(selected.purchase.status) && !selected.matching.received_qty && !selected.funding && (
-              <button type="button" className={T.btnSecondary} onClick={() => start(selected)}>
+              <button type="button" className={T.btnSecondary} disabled={selected.lines.some((line) => line.unit_origins?.some((unit) => unit.serial_norm))} onClick={() => start(selected)}>
                 {loc('تعديل / إكمال المسودة', 'Edit / resume draft')}
               </button>
             )}
@@ -697,6 +712,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               {loc('إغلاق', 'Close')}
             </button>
           </div>
+          {selected.lines.some((line) => line.unit_origins?.some((unit) => unit.serial_norm)) && <p className={`mb-3 text-sm ${T.text3}`}>{loc('الأرقام التسلسلية مثبتة لهذه القطع؛ لا يمكن إعادة تحرير الكميات والتكاليف. يمكنك تعديل اسم الشراء وطلب المورد والتتبع.', 'These units have fixed serials, so quantities and costs cannot be rewritten. The purchase name, supplier order and tracking remain editable.', 'ئەم پارچانە ژمارەی جێگیریان هەیە؛ بڕ و تێچوو ناگۆڕدرێن. ناوی کڕین، داواکاری دابینکەر و شوێنکەوتن هێشتا دەگۆڕدرێن.')}</p>}
           <SavedPurchasePricing preview={savedPricing} purchaseId={selected.purchase.id} failures={applyFailures} choices={choices} confirmLarge={confirmLarge} onDone={async () => { setApplyFailures((f) => f.filter((x) => x.purchase_id !== selected.purchase.id)); await loadSavedPricing(selected.purchase.id, selected.purchase.status); }} />
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
             <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received}</small></div></div>
@@ -718,14 +734,26 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             {savedPricing && <PricingSummaryBar summary={savedPricing.lines.find((x) => x.line_id === l.line_id)?.pricing_summary} label={l.label} readOnlyLabel directFirst />}
             {/* An engine-priced product's price is the engine's (ENGINE_MANAGED): no manual price update. */}
             {savedPricing?.products.find((p) => p.product_id === l.product_id)?.mode !== 'engine' && <button type="button" className={T.btnGhost} onClick={()=>setPriceLine(l)}>{loc('تحديث سعر هذا الخيار في المتجر','Update this selection’s store price', 'نوێکردنەوەی نرخی ئەم هەڵبژاردەیە لە فرۆشگا')}</button>}
+            <SavedPurchaseUnitOrigins key={`${selected.purchase.id}:${l.line_id}`} value={l.unit_origins} serialBlockedHint={selected.purchase.status === 'draft' || selected.purchase.cost_state !== 'final' ? loc('أكمل الكمية والتكاليف النهائية وأكد الشراء قبل تسجيل الأرقام التسلسلية.', 'Finish quantities and final costs, then confirm the purchase before registering serials.', 'بڕ و تێچووی کۆتایی تەواو بکە و کڕین پشتڕاست بکەرەوە پێش تۆمارکردنی ژمارەکان.') : undefined} onSerialSave={selected.purchase.cost_state === 'final' && ['ordered', 'partial', 'received'].includes(selected.purchase.status) ? async (unit, read) => {
+              const result = await api.post<PurchaseSerialResult>(`${PROCUREMENT}/documents/${encodeURIComponent(selected.purchase.id)}/unit-origins/${encodeURIComponent(unit.id!)}/serial`, { ...read, expected_serial_norm: unit.serial_norm ?? null });
+              setSelected((current) => current?.purchase.id === selected.purchase.id ? { ...current, purchase: { ...current.purchase, version: Math.max(current.purchase.version, result.version) }, lines: current.lines.map((line) => line.line_id === l.line_id ? { ...line, unit_origins: line.unit_origins?.map((origin) => origin.id === unit.id ? { ...origin, serial_norm: result.serial_norm } : origin) } : line) } : current);
+              return result;
+            } : undefined} onSave={(units) => op.run(async () => {
+              await api.patch(`${PROCUREMENT}/documents/${encodeURIComponent(selected.purchase.id)}/unit-origins`, {
+                version: selected.purchase.version,
+                units: units.map(({ id, supplier_order_no, tracking_no }) => ({ id, supplier_order_no, tracking_no })),
+              });
+              await open(selected.purchase.id);
+            }, loc('تم حفظ مراجع المورد', 'Supplier references saved', 'زانیاری دابینکەر پاشەکەوت کرا'))} />
+            {l.unit_origins?.length ? <PurchaseUnitReceiveFields origins={l.unit_origins} value={receiving[l.line_id] ?? purchaseReceiptDraft(l)} onChange={(value) => setReceiving((r) => ({ ...r, [l.line_id]: value }))} /> : <>
             <Input label={loc('الكمية التي وصلت الآن', 'Quantity arriving now')} type="number" min={0} value={receiving[l.line_id]?.qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], qty: Number(v) } }))} hint={`${loc('المتبقي للاستلام', 'Remaining to receive')}: ${l.qty_ordered - l.qty_received}`} />
-            <details className="mt-2"><summary>{loc('كمية مرفوضة وتكلفة الشحنة', 'Rejected quantity and charges')}</summary><Input label={loc('المرفوض الآن', 'Rejected now')} type="number" min={0} value={receiving[l.line_id]?.rejected_qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], rejected_qty: Number(v) } }))} /><p className={`mt-2 text-xs ${T.text3}`}>{loc('نصيب البند من الشحنة', 'Line share of shipment charges')}: {money(l.charges_iqd)}</p></details>
+            <details className="mt-2"><summary>{loc('كمية مرفوضة وتكلفة الشحنة', 'Rejected quantity and charges')}</summary><Input label={loc('المرفوض الآن', 'Rejected now')} type="number" min={0} value={receiving[l.line_id]?.rejected_qty ?? 0} onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], rejected_qty: Number(v) } }))} /><p className={`mt-2 text-xs ${T.text3}`}>{loc('نصيب البند من الشحنة', 'Line share of shipment charges')}: {money(l.charges_iqd)}</p></details></>}
           </article>)}</div>
           {['ordered', 'partial'].includes(selected.purchase.status) && (
             <button
               type="button"
               className={`${T.btnPrimary} my-3`}
-              disabled={op.busy || selected.purchase.cost_state !== 'final' || !selected.lines.some((l) => receiving[l.line_id]?.qty > 0) || selected.lines.some((l) => !Number.isInteger(receiving[l.line_id]?.qty) || receiving[l.line_id]?.qty < 0 || receiving[l.line_id]?.qty > l.qty_ordered - l.qty_received)}
+              disabled={op.busy || selected.purchase.cost_state !== 'final' || !selected.lines.some((l) => receiving[l.line_id]?.qty > 0) || selected.lines.some((l) => !purchaseReceiptValid(l, receiving[l.line_id] ?? { qty: 0, rejected_qty: 0 }))}
               onClick={() =>
                 op.run(
                   async () => {

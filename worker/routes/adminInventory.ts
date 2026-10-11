@@ -230,10 +230,10 @@ adminInventoryRoutes.get('/lines', async (c) => {
       `SELECT
          (SELECT ${headCost} FROM inventory_lots
            WHERE scope = ?1 AND scope_id = ?2 AND product_id = ?3 AND qty_remaining > 0
-           ORDER BY received_at ASC, id ASC LIMIT 1) AS oldest,
+           ORDER BY received_at ASC, created_at ASC, id ASC LIMIT 1) AS oldest,
          (SELECT ${headCost} FROM inventory_lots
            WHERE scope = ?1 AND scope_id = ?2 AND product_id = ?3 AND qty_remaining > 0
-           ORDER BY received_at DESC, id DESC LIMIT 1) AS newest`
+           ORDER BY received_at DESC, created_at DESC, id DESC LIMIT 1) AS newest`
     )
       .bind(r.scope, r.scope_id, r.product_id)
       .first<{ oldest: number | null; newest: number | null }>();
@@ -298,7 +298,7 @@ adminInventoryRoutes.get('/lots', async (c) => {
        FROM inventory_lots l
        LEFT JOIN inventory_suppliers s ON s.id = l.supplier_id
       WHERE ${where}
-      ORDER BY l.received_at ASC, l.id ASC
+      ORDER BY l.received_at ASC, l.created_at ASC, l.id ASC
       LIMIT 200`
   )
     .bind(...args)

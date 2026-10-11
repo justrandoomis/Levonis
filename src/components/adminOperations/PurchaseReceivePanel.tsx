@@ -3,6 +3,9 @@ import { api, Card, Input, PROCUREMENT, T, useLabels, useOperation } from './sha
 import '../adminInventory/inventory-workspace.css';
 import { useLanguage } from '../../LanguageContext';
 import { purchaseNameStrings } from './purchaseName';
+import { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigins } from './PurchaseUnitOrigins';
+import type { PurchaseSerialResult } from './PurchaseUnitSerial';
+import { purchaseReceiptDraft, purchaseReceiptValid, type PurchaseReceiptDraft, type PurchaseUnitOrigin } from './procurementUnitOrigins';
 
 /**
  * RECEIVING A SHIPMENT WITHOUT SEEING ITS COST — owner decision 2, step S1.
@@ -17,6 +20,7 @@ import { purchaseNameStrings } from './purchaseName';
  */
 type Head = {
   id: string;
+  version: number;
   invoice_no: string;
   status: string;
   purchase_day: string;
@@ -26,9 +30,9 @@ type Head = {
   /** The owner has fixed the final cost — the receive waits for it. */
   ready: boolean;
 };
-type Line = { line_id: string; label: string; rejected_qty: number; qty_ordered: number; qty_received: number };
+type Line = { line_id: string; label: string; rejected_qty: number; qty_ordered: number; qty_received: number; unit_origins?: PurchaseUnitOrigin[] };
 type Detail = { purchase: Head; lines: Line[] };
-type Draft = Record<string, { qty: number; rejected_qty: number }>;
+type Draft = Record<string, PurchaseReceiptDraft>;
 
 const remaining = (l: Line) => Math.max(0, l.qty_ordered - l.qty_received);
 
@@ -54,7 +58,7 @@ export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => v
   const open = async (id: string) => {
     const d = await api.get<Detail>(`${PROCUREMENT}/receiving/${encodeURIComponent(id)}`);
     setSelected(d);
-    setReceiving(Object.fromEntries(d.lines.map((l) => [l.line_id, { qty: remaining(l), rejected_qty: 0 }])));
+    setReceiving(Object.fromEntries(d.lines.map((l) => [l.line_id, purchaseReceiptDraft(l)])));
     setReceiveId(crypto.randomUUID());
   };
 
@@ -69,13 +73,7 @@ export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => v
     selected.lines.some((l) => (receiving[l.line_id]?.qty ?? 0) > 0 || (receiving[l.line_id]?.rejected_qty ?? 0) > 0) &&
     selected.lines.every((l) => {
       const d = receiving[l.line_id] ?? { qty: 0, rejected_qty: 0 };
-      return (
-        Number.isInteger(d.qty) &&
-        Number.isInteger(d.rejected_qty) &&
-        d.qty >= 0 &&
-        d.rejected_qty >= 0 &&
-        d.qty + d.rejected_qty <= remaining(l)
-      );
+      return purchaseReceiptValid(l, d);
     });
 
   const receive = () =>
@@ -121,6 +119,18 @@ export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => v
                     </small>
                   </div>
                 </div>
+                <SavedPurchaseUnitOrigins key={`${selected.purchase.id}:${l.line_id}`} value={l.unit_origins} serialBlockedHint={!selected.purchase.ready ? loc('بانتظار تثبيت التكلفة النهائية قبل تسجيل الرقم التسلسلي.', 'Finalize costs before registering serial numbers.', 'پێش تۆمارکردنی ژمارەکان تێچووی کۆتایی جێگیر بکە.') : undefined} onSerialSave={selected.purchase.ready ? async (unit, read) => {
+                  const result = await api.post<PurchaseSerialResult>(`${PROCUREMENT}/documents/${encodeURIComponent(selected.purchase.id)}/unit-origins/${encodeURIComponent(unit.id!)}/serial`, { ...read, expected_serial_norm: unit.serial_norm ?? null });
+                  setSelected((current) => current?.purchase.id === selected.purchase.id ? { ...current, purchase: { ...current.purchase, version: Math.max(current.purchase.version, result.version) }, lines: current.lines.map((line) => line.line_id === l.line_id ? { ...line, unit_origins: line.unit_origins?.map((origin) => origin.id === unit.id ? { ...origin, serial_norm: result.serial_norm } : origin) } : line) } : current);
+                  return result;
+                } : undefined} onSave={(units) => op.run(async () => {
+                  await api.patch(`${PROCUREMENT}/documents/${encodeURIComponent(selected.purchase.id)}/unit-origins`, {
+                    version: selected.purchase.version,
+                    units: units.map(({ id, supplier_order_no, tracking_no }) => ({ id, supplier_order_no, tracking_no })),
+                  });
+                  await open(selected.purchase.id);
+                }, loc('تم حفظ مراجع المورد', 'Supplier references saved', 'زانیاری دابینکەر پاشەکەوت کرا'))} />
+                {l.unit_origins?.length ? <PurchaseUnitReceiveFields origins={l.unit_origins} value={receiving[l.line_id] ?? purchaseReceiptDraft(l)} onChange={(value) => setReceiving((r) => ({ ...r, [l.line_id]: value }))} /> : <>
                 <Input
                   label={loc('الكمية التي وصلت الآن', 'Quantity arriving now', 'ئەو بڕەی ئێستا گەیشت')}
                   type="number"
@@ -137,7 +147,7 @@ export default function PurchaseReceivePanel({ onChanged }: { onChanged: () => v
                   decimals={0}
                   value={receiving[l.line_id]?.rejected_qty ?? 0}
                   onChange={(v) => setReceiving((r) => ({ ...r, [l.line_id]: { ...r[l.line_id], rejected_qty: Number(v) } }))}
-                />
+                /></>}
               </article>
             ))}
           </div>

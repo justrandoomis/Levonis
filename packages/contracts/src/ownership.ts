@@ -62,6 +62,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
      * that reads it is the same admin screen that reads the lots.
      */
     'inventory_lots', 'incoming_inventory', 'incoming_inventory_receipts',
+    'inventory_unit_origins',
     'stock_locations', 'inventory_lot_locations', 'stock_transfers', 'purchase_orders', 'purchase_lines',
     'purchase_charges', 'purchase_receiving_notes', 'purchase_receiving_events', 'stock_counts', 'stock_count_lines',
     'inventory_suppliers', 'inventory_reorder_settings',
@@ -120,6 +121,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'cart_items', 'orders', 'order_items', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
     'ops_guards', 'stock_return_inspections',
     'stock_return_lot_evidence',
+    'stock_return_unit_evidence', 'stock_return_order_unit_evidence',
+    'order_item_inventory_unit_assignments',
+    'order_preorder_unit_origins', 'order_preorder_unit_origin_versions',
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
     // 0140 — an admin's proposed new final total and the customer's decision on it.
     'order_price_adjustments',

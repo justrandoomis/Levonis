@@ -38,6 +38,8 @@
 import { newId } from './crypto';
 import type { StockMove, StockScope } from './inventory';
 import { fence } from './operations';
+import { conflict } from './http';
+import { planUnitOriginConsumption, planReleaseUnitOrigins, unitOriginsInstalled } from './inventoryUnitOrigins';
 
 /** Lots exist only for units on a shelf. Capacity scopes are promises. */
 export const LOT_SCOPES: readonly StockScope[] = ['base', 'option', 'color', 'variant'];
@@ -227,10 +229,11 @@ async function appliedAllocationLines(db: D1Database, orderId: string): Promise<
  * would scale its latency linearly for no reason — the same argument
  * `planInventory` makes about reading stock rows.
  *
- * `ORDER BY received_at, id` and not `received_at` alone. Two lots received in
- * the same millisecond must still have ONE order, or two replays of the same
- * consumption could pick different lots and produce two different COGS for one
- * sale. The id is the tiebreak and the index carries it.
+ * `ORDER BY received_at, created_at, id`: procurement receipts record their
+ * chosen receipt day at a shared clock time. Their actual creation time must
+ * break that tie before the random id, so a later receipt on the same day
+ * cannot jump ahead of stock already received. The id remains the final
+ * deterministic tiebreak for rows also created in the same millisecond.
  */
 export async function fifoQueues(
   db: D1Database,
@@ -258,7 +261,7 @@ export async function fifoQueues(
         `SELECT id, product_id, scope, scope_id, qty_remaining, ${versioned ? "COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=inventory_lots.id ORDER BY version DESC LIMIT 1),unit_cost_iqd) AS unit_cost_iqd,COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=inventory_lots.id),0) AS cost_version" : 'unit_cost_iqd'}, received_at
            FROM inventory_lots
           WHERE qty_remaining > 0 AND (${where})
-          ORDER BY received_at ASC, id ASC`
+          ORDER BY received_at ASC, created_at ASC, id ASC`
       )
       .bind(...args)
       .all<LotRow>();
@@ -377,6 +380,8 @@ export async function planLotConsumption(
   for (const [key, lots] of queues) remaining.set(key, lots.map((l) => l.qty_remaining));
 
   const statements: D1PreparedStatement[] = [];
+  const selectedOrigins = new Set<string>();
+  const unitOffsets = new Map<string,number>();
   const allocations: PlannedAllocation[] = [];
   const shortfall: LotPlan['shortfall'] = [];
 
@@ -417,6 +422,9 @@ export async function planLotConsumption(
       allocations.push(alloc);
 
       const idem = `alloc:${orderId}:${move.line_id}:${lot.id}`;
+      const allocationId = `ialloc_${idem.replace(/[^A-Za-z0-9_]/g, '_')}`.slice(0, 120);
+      const unitIndexStart = (unitOffsets.get(move.line_id) ?? 0) + 1;
+      unitOffsets.set(move.line_id, unitIndexStart + take - 1);
       // Another order can consume this lot after planning while enough stock
       // remains in a newer lot. A conditional no-op here would still let the
       // stock deduction commit without its FIFO cost. Fail the whole batch so
@@ -443,7 +451,7 @@ export async function planLotConsumption(
               WHERE EXISTS (SELECT 1 FROM inventory_lots WHERE id = ?4 AND qty_remaining >= ?7)`
           )
           .bind(
-            `ialloc_${idem.replace(/[^A-Za-z0-9_]/g, '_')}`.slice(0, 120),
+            allocationId,
             orderId,
             move.line_id,
             lot.id,
@@ -455,6 +463,7 @@ export async function planLotConsumption(
             idem
           )
       );
+      statements.push(...await planUnitOriginConsumption(db,{orderId,itemId:move.line_id,lotId:lot.id,allocationId,qty:take,unitIndexStart,excluded:selectedOrigins}));
       statements.push(
         db
           .prepare(
@@ -489,7 +498,7 @@ export async function planLotConsumption(
 export async function planLotRestore(
   db: D1Database,
   orderId: string,
-  opts: { lineIds?: readonly string[]; qtyByLine?: Record<string, number>; operation?: string } = {}
+  opts: { lineIds?: readonly string[]; qtyByLine?: Record<string, number>; operation?: string; originIds?: readonly string[]; allocationQty?: Record<string,number> } = {}
 ): Promise<LotPlan> {
   const { results } = await db
     .prepare(
@@ -513,11 +522,18 @@ export async function planLotRestore(
   if (rows.length === 0) return EMPTY;
 
   const operation = opts.operation ?? 'return';
+  let originEvidence: Map<string,number> | null = opts.allocationQty ? new Map(Object.entries(opts.allocationQty)) : null;
+  if (!originEvidence && opts.originIds && await unitOriginsInstalled(db)) {
+    const selected=(await db.prepare('SELECT allocation_id,COUNT(*) AS n FROM order_item_inventory_unit_assignments WHERE order_id=? AND released_at IS NULL AND origin_id IN (SELECT value FROM json_each(?)) GROUP BY allocation_id').bind(orderId,JSON.stringify(opts.originIds)).all<{allocation_id:string;n:number}>()).results??[];
+    originEvidence=new Map(selected.map(r=>[r.allocation_id,r.n]));
+  }
   let evidence:Map<string,number>|null=null;
   if(operation.startsWith('return:')&&await db.prepare("SELECT 1 FROM sqlite_master WHERE name='stock_return_lot_evidence'").first()){
     const found=(await db.prepare('SELECT allocation_id,qty FROM stock_return_lot_evidence WHERE return_case_id=?').bind(operation.slice(7)).all<{allocation_id:string;qty:number}>()).results??[];
     if(found.length)evidence=new Map(found.map(e=>[e.allocation_id,e.qty]));
   }
+  if(originEvidence && evidence && (originEvidence.size!==evidence.size || [...originEvidence].some(([id,n])=>evidence!.get(id)!==n)))
+    throw conflict('القطع المرتجعة لا تطابق إثبات دفعات المرتجع؛ صحح الإثبات قبل رد المبلغ','UNIT_ORIGINS_RETURN_EVIDENCE_MISMATCH');
 
   /**
    * THE RELEASES THIS ORDER HAS ALREADY RECORDED, so a second call plans none
@@ -561,7 +577,7 @@ export async function planLotRestore(
     // travel, so a return and an immediate re-sale leave the shelf where it
     // started.
     const remaining = Math.max(0, r.qty - (returned.get(`${r.order_item_id}:${r.lot_id}`) ?? 0));
-    let give = evidence ? Math.min(remaining,evidence.get(r.id)??0) : remaining;
+    let give = originEvidence ? Math.min(remaining,originEvidence.get(r.id)??0) : evidence ? Math.min(remaining,evidence.get(r.id)??0) : remaining;
     if (opts.qtyByLine) {
       const left = budget.get(r.order_item_id) ?? 0;
       if (left <= 0) continue;
@@ -573,6 +589,7 @@ export async function planLotRestore(
     const idem = `${operation}:${orderId}:${r.id}:${give}`;
     // Already given back. Skipped whole — not re-planned and not re-guarded.
     if (released.has(idem)) continue;
+    statements.push(...await planReleaseUnitOrigins(db,{allocationId:r.id,qty:give,reason:operation,originIds:opts.originIds,restock:true}));
     statements.push(
       db
         .prepare(

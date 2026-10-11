@@ -84,7 +84,7 @@ adminInvestmentFinanceRoutes.get('/contracts/:id',async c=>{
   const summary=await investmentContractSummary(db,id);
   const linked=await db.prepare('SELECT purchase_id FROM purchase_investor_allocations WHERE contract_id=?').bind(id).first<{purchase_id:string}>();
   if(linked)Object.assign(summary.contract,{purchase_id:linked.purchase_id});
-  const [events,lots]=await Promise.all([db.prepare('SELECT * FROM investor_finance_events WHERE contract_id=? ORDER BY created_at,id').bind(id).all(),db.prepare('SELECT * FROM inventory_lots WHERE incoming_id=? ORDER BY received_at,id').bind(summary.contract.incoming_id).all()]);
+  const [events,lots]=await Promise.all([db.prepare('SELECT * FROM investor_finance_events WHERE contract_id=? ORDER BY created_at,id').bind(id).all(),db.prepare('SELECT * FROM inventory_lots WHERE incoming_id=? ORDER BY received_at,created_at,id').bind(summary.contract.incoming_id).all()]);
   const canVoid=!!await db.prepare(`SELECT 1 FROM investment_contracts c WHERE c.id=? AND c.state='active' AND NOT EXISTS(SELECT 1 FROM investor_finance_events e WHERE e.contract_id=c.id) AND NOT EXISTS(SELECT 1 FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id WHERE l.incoming_id=c.incoming_id AND a.released_at IS NULL)`).bind(id).first();
   return c.json({success:true,...summary,can_void:canVoid,events:events.results??[],lots:lots.results??[]});
 });
@@ -96,7 +96,7 @@ adminInvestmentFinanceRoutes.get('/lots',async c=>{
   const lots=(await db.prepare(`SELECT l.*,p.name,p.name_ar,p.sku,loc.location_id,w.name AS location_name,
     COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd) AS effective_unit_cost_iqd,
     pl.purchase_id FROM inventory_lots l LEFT JOIN products p ON p.id=l.product_id LEFT JOIN inventory_lot_locations loc ON loc.lot_id=l.id LEFT JOIN stock_locations w ON w.id=loc.location_id LEFT JOIN purchase_lines pl ON pl.incoming_id=l.incoming_id
-    WHERE (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0) ORDER BY l.received_at,l.id LIMIT 200 OFFSET ?`).bind(q,q,offset).all<Record<string,unknown>>()).results??[];
+    WHERE (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||l.id),lower(?))>0) ORDER BY l.received_at,l.created_at,l.id LIMIT 200 OFFSET ?`).bind(q,q,offset).all<Record<string,unknown>>()).results??[];
   if(!canViewCost(c.env,user))return c.json({success:true,lots:lots.map(l=>({id:l.id,product_id:l.product_id,scope:l.scope,scope_id:l.scope_id,qty_received:l.qty_received,qty_remaining:l.qty_remaining,incoming_id:l.incoming_id,received_at:l.received_at,name:l.name,name_ar:l.name_ar,sku:l.sku,location_id:l.location_id,location_name:l.location_name})),limit:200,offset});
   const contracts=(await db.prepare('SELECT c.*,u.name AS user_name FROM investment_contracts c JOIN users u ON u.id=c.user_id').all<InvestmentContract>()).results??[];
   return c.json({success:true,lots:lots.map(l=>({...l,contracts:contracts.filter(k=>k.incoming_id===l.incoming_id)})),limit:200,offset});

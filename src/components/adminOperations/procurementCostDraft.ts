@@ -1,6 +1,7 @@
 import type { CostProfile } from '../../../packages/contracts/src/procurementCost';
 import { exactProcurementUnitDefault } from '../../../packages/contracts/src/procurementCost';
 import type { Selection } from './shared';
+import type { PurchaseUnitOrigin } from './procurementUnitOrigins';
 
 export type ProcurementDraftLine = Selection & {
   qty_ordered: number;
@@ -9,6 +10,7 @@ export type ProcurementDraftLine = Selection & {
   purchase_cost_mode?: 'unit' | 'total';
   source_total_amount?: number | string;
   unit_conversion_inexact?: boolean;
+  unit_origins?: PurchaseUnitOrigin[];
 };
 
 /** Only the new, explicitly raw supplier defaults are safe to prefill. Historical
@@ -38,6 +40,7 @@ export function changeLineCostProfile(line: ProcurementDraftLine, profile: CostP
     ...replacement,
     invoiced_qty: line.invoiced_qty,
     purchase_cost_mode: line.purchase_cost_mode,
+    unit_origins: line.unit_origins,
   };
 }
 
