@@ -366,8 +366,12 @@ export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
   seedCostlyStock(raw);
   seedCostlyOrder(raw);
   seedCostlyPurchase(raw);
-  raw.exec(`INSERT INTO inventory_unit_origins(id,incoming_id,purchase_line_id,purchase_id,unit_index,supplier_order_no,tracking_no,created_by)
-    VALUES ('rm-origin','inc1','pl1','po1',1,'SUPPLIER-REF','TRACK-REF','usr_owner')`);
+  // The same fixture also runs against pre-0187 databases in deploy-ahead
+  // sweeps. Seed private source evidence only when its table is installed.
+  if (raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='inventory_unit_origins'").get()) {
+    raw.exec(`INSERT INTO inventory_unit_origins(id,incoming_id,purchase_line_id,purchase_id,unit_index,supplier_order_no,tracking_no,created_by)
+      VALUES ('rm-origin','inc1','pl1','po1',1,'SUPPLIER-REF','TRACK-REF','usr_owner')`);
+  }
   raw.exec(`
     INSERT INTO investment_contracts (id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,
                                       loss_share_bps,created_by,created_at,request_json)

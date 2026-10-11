@@ -12,7 +12,7 @@ function InternalUnitId({ id }: { id: string }) {
   const { loc } = useLabels();
   return <label className="mt-2 grid min-w-0 gap-1 text-xs">
     <span>{loc('معرّف القطعة الداخلي — اضغط لتحديده ونسخه', 'Internal unit ID — select to copy', 'ناسنامەی ناوخۆی پارچە — بۆ کۆپیکردن هەڵیبژێرە')}</span>
-    <input aria-label={loc('معرّف القطعة الداخلي', 'Internal unit ID', 'ناسنامەی ناوخۆی پارچە')} readOnly type="text" value={id} dir="ltr" onFocus={(e) => e.target.select()} className={`${T.input} min-w-0 font-mono text-xs`} />
+    <input className="lv-input min-w-0 font-mono text-xs" aria-label={loc('معرّف القطعة الداخلي', 'Internal unit ID', 'ناسنامەی ناوخۆی پارچە')} readOnly type="text" value={id} dir="ltr" onFocus={(e) => e.target.select()} />
   </label>;
 }
 
@@ -54,7 +54,7 @@ export default function PurchaseUnitOrigins({ qty, value, onChange, allowDisable
       {qty > 1 && <div className="mb-4 grid min-w-0 gap-2 rounded-lg border border-[var(--ap-border)] p-3">
         <label className="grid min-w-0 gap-1 text-sm">
           <span className={T.text2}>{loc('رقم طلب المورد المشترك', 'Shared supplier order number', 'ژمارەی هاوبەشی داواکاری دابینکەر')}</span>
-          <input type="text" dir="ltr" className={`${T.input} min-w-0`} maxLength={SUPPLIER_REFERENCE_MAX} value={sharedOrderNo} onChange={(e) => setSharedOrderNo(e.target.value)} autoComplete="off" spellCheck={false} disabled={disabled} />
+          <input type="text" dir="ltr" className="lv-input min-w-0 text-[13px]" maxLength={SUPPLIER_REFERENCE_MAX} value={sharedOrderNo} onChange={(e) => setSharedOrderNo(e.target.value)} autoComplete="off" spellCheck={false} disabled={disabled} />
         </label>
         <p className={`text-xs ${T.text3}`}>{loc('إذا اشتريت عدة قطع بطلب واحد، اكتب رقمه هنا مرة واحدة. يبقى رقم التتبع مستقلًا لكل قطعة، ويمكنك تعديل رقم طلب أي قطعة أدناه.', 'For several units in one supplier order, enter its number once here. Tracking stays separate for each unit, and you can still edit any unit’s order number below.', 'ئەگەر چەند پارچەیەکت بە یەک داواکاری کڕیوە، ژمارەکە لێرە یەک جار بنووسە. شوێنکەوتنی هەر پارچەیەک جیاواز دەمێنێتەوە و دەتوانیت ژمارەی داواکاری هەر پارچەیەک لە خوارەوە بگۆڕیت.')}</p>
         <div className="flex flex-wrap gap-2">
@@ -68,7 +68,7 @@ export default function PurchaseUnitOrigins({ qty, value, onChange, allowDisable
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             {(['supplier_order_no', 'tracking_no'] as const).map((key) => <label key={key} className="grid min-w-0 gap-1 text-sm">
               <span className={T.text2}>{key === 'supplier_order_no' ? loc('رقم طلب المورد', 'Supplier order number', 'ژمارەی داواکاری دابینکەر') : loc('رقم تتبع المورد (اختياري)', 'Supplier tracking number (optional)', 'ژمارەی شوێنکەوتنی دابینکەر (ئارەزوومەندانە)')}</span>
-              <input type="text" dir="ltr" className={`${T.input} min-w-0`} maxLength={SUPPLIER_REFERENCE_MAX} value={row[key]} onChange={(e) => change(row, key, e.target.value)} required={key === 'supplier_order_no'} autoComplete="off" spellCheck={false} disabled={disabled} />
+              <input type="text" dir="ltr" className="lv-input min-w-0 text-[13px]" maxLength={SUPPLIER_REFERENCE_MAX} value={row[key]} onChange={(e) => change(row, key, e.target.value)} required={key === 'supplier_order_no'} autoComplete="off" spellCheck={false} disabled={disabled} />
             </label>)}
           </div>
           {serialEntry && <PurchaseUnitSerial mode="draft" value={row.serial_no ?? ''} disabled={disabled} onChange={(serial) => change(row, 'serial_no', serial)} />}

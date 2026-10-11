@@ -75,7 +75,7 @@ export default function PurchaseUnitSerial({ value = '', mode, disabled = false,
   return <div className="mt-3 min-w-0 border-t border-[var(--ap-border)] pt-3">
     <label className="grid min-w-0 gap-1 text-sm">
       <span className={T.text2}>{loc('الرقم التسلسلي للجهاز (اختياري)', 'Device serial number (optional)', 'ژمارەی زنجیرەیی ئامێر (ئارەزوومەندانە)')}</span>
-      <input type="text" dir="ltr" value={typed} readOnly={locked} disabled={disabled || busy} maxLength={120} autoComplete="off" spellCheck={false} className={`${T.input} min-w-0 font-mono`} onChange={(e) => { setTyped(e.target.value); setNotice(''); setError(''); if (mode === 'draft') onChange?.(e.target.value); }} onKeyDown={(e) => {
+      <input type="text" dir="ltr" value={typed} readOnly={locked} disabled={disabled || busy} maxLength={120} autoComplete="off" spellCheck={false} className="lv-input min-w-0 font-mono text-[13px]" onChange={(e) => { setTyped(e.target.value); setNotice(''); setError(''); if (mode === 'draft') onChange?.(e.target.value); }} onKeyDown={(e) => {
         if (e.key === 'Enter' && mode === 'saved' && !locked) { e.preventDefault(); primeScannerAudio(); void accept({ code: typed, source: 'manual' }); }
       }} />
     </label>
