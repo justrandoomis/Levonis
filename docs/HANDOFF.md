@@ -4,6 +4,29 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
+## Latest complete CI verification
+
+The tested code is committed on the default branch as
+`70b3b623c1bbc1882b51f0aeeb9761ca561d3fbf` (tree
+`dffc4209ec9a84682df086601b40c6b86f62b077`). Workflow 7 run
+[`38101412872`](https://github.com/justrandoomis/Levonis/actions/runs/38101412872)
+completed its full check/unit gate with one failure: the conservative D1 SQL
+source gate required the dynamically assembled placement UNION to have an
+explicit structural bound. Root results were 9,807 tests: 9,805 passed, one
+failed and one declared skip. Workspace tests passed 365/365; Studio passed
+313 with six declared skips. All live phases (steps 8–35) were skipped; this
+run did not migrate or deploy anything.
+
+The capture query now declares exactly three placement branches, preserving
+the same data and atomic operation. The existing D1 gate is unchanged; a runtime
+assertion also checks the fully assembled SQL against the measured limit.
+The final D1/deletion suites pass 9/9, including all placements, cycle-safe
+ancestor depths, rollback, membership amounts and initial-schema compatibility.
+The exact corrected source passes the complete `npm run check` and frontend
+build with all seven required live markers.
+The replacement release must pass the complete unchanged workflow 7 before
+publication is confirmed.
+
 ## Current implementation
 
 The default-branch work now integrates the three commits formerly waiting on

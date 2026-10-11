@@ -942,18 +942,19 @@ export async function deleteProductPermanently(
   ]);
   if (['actor_id', 'action', 'target', 'detail'].every(c => auditColumns.has(c))
     && itemColumns.has('id') && itemColumns.has('product_id')) {
-    const placements: string[] = [];
-    if (placementColumns.has('product_id') && placementColumns.has('catalog_id')) {
-      placements.push('SELECT catalog_id AS id FROM product_catalogs WHERE product_id=?1');
-    }
-    for (const column of ['category_id', 'sub_category_id']) {
-      if (productColumns.has(column)) placements.push(`SELECT ${column} AS id FROM products WHERE id=?1`);
-    }
+    // Exactly three placement sources keep this compound SELECT below D1's
+    // five-term limit; absent schema fields contribute only a NULL row.
+    const placementRows = placementColumns.has('product_id') && placementColumns.has('catalog_id')
+      ? 'SELECT catalog_id AS id FROM product_catalogs WHERE product_id=?1' : 'SELECT NULL AS id WHERE 0';
+    const mainCatalog = productColumns.has('category_id') ? 'category_id' : 'NULL';
+    const subCatalog = productColumns.has('sub_category_id') ? 'sub_category_id' : 'NULL';
     const parents = catalogColumns.has('id') && catalogColumns.has('parent_id')
       ? 'SELECT id,parent_id FROM catalogs' : 'SELECT NULL AS id,NULL AS parent_id WHERE 0';
     statements.push(db.prepare(`WITH RECURSIVE
       catalog_parents(id,parent_id) AS (${parents}),
-      placements(id) AS (${placements.join(' UNION ') || 'SELECT NULL AS id WHERE 0'}),
+      placements(id) AS (${placementRows}
+        UNION SELECT ${mainCatalog} FROM products WHERE id=?1
+        UNION SELECT ${subCatalog} FROM products WHERE id=?1),
       ancestors(id) AS (
         SELECT id FROM placements WHERE id IS NOT NULL AND id<>''
         UNION SELECT c.parent_id FROM catalog_parents c JOIN ancestors a ON c.id=a.id

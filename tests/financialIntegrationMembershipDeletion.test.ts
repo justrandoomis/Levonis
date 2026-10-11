@@ -12,6 +12,7 @@ import { createInvoiceForOrder, type InvoiceSnapshotV1 } from '../worker/lib/inv
 import { baghdadDay } from '../worker/lib/operations';
 import type { Env } from '../worker/lib/types';
 import { DELETED_PRODUCT_FINANCE_SCOPE_ACTION } from '../worker/lib/financeDeletedProductScope';
+import { D1_MAX_UNION_TERMS } from '../worker/lib/storeLayout';
 
 function world() {
   const raw = freshDb(), db = asD1(raw), day = baghdadDay();
@@ -155,6 +156,11 @@ test('deleted wage scope captures all placements and exact cycle-safe ancestor d
     const racing = {
       prepare: w.db.prepare.bind(w.db),
       batch: async <T>(statements: D1PreparedStatement[]) => {
+        const captureSql = statements.map(statement => (statement as unknown as { sql: string }).sql)
+          .find(sql => /INSERT\s+INTO\s+audit_log\b/i.test(sql));
+        assert.ok(captureSql);
+        assert.ok((captureSql.match(/\bUNION\b/gi)?.length ?? 0) + 1 <= D1_MAX_UNION_TERMS,
+          'the fully assembled capture query must fit the measured D1 compound-select limit');
         // A catalogue change after deletion's preliminary reads must be seen
         // by the statement that actually commits the unlink evidence.
         w.raw.exec("UPDATE catalogs SET parent_id='root' WHERE id='secondary'");
