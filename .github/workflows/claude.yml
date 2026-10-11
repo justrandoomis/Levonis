@@ -54,6 +54,7 @@ jobs:
           echo 'Anthropic API request succeeded (credential, model and billing verified).'
           rm -f "$RUNNER_TEMP/anthropic-preflight.json"
       - name: Run Claude Code
+        id: claude
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -63,3 +64,25 @@ jobs:
             --model claude-sonnet-5-5
             --max-turns 20
             --allowedTools "Bash(npm ci:*),Bash(npm run check:*),Bash(npm run test:unit:*),Bash(npm run build:*)"
+      - name: Diagnose Claude Code launch failure (sanitized)
+        if: ${{ failure() && steps.claude.outcome == 'failure' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +e
+          timeout 45 "$HOME/.local/bin/claude" -p 'Reply OK' --model claude-sonnet-5-5 --max-turns 1 --output-format json > "$RUNNER_TEMP/claude-cli-diagnostic.json" 2> "$RUNNER_TEMP/claude-cli-stderr.txt"
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ] && jq -e '.is_error == false' "$RUNNER_TEMP/claude-cli-diagnostic.json" >/dev/null 2>&1; then
+            echo '::notice::Direct Claude Code CLI succeeded. Only the GitHub action SDK failed.'
+            exit 0
+          fi
+          result=$(jq -r '.result // .error.message // ""' "$RUNNER_TEMP/claude-cli-diagnostic.json" 2>/dev/null || true)
+          diagnostic="$result $(cat "$RUNNER_TEMP/claude-cli-stderr.txt" 2>/dev/null)"
+          case "$diagnostic" in
+            *'Credit balance is too low'*) echo '::error::Claude Code reports insufficient credit or eligibility (the Messages API probe succeeded). Check workspace billing and Claude Code access.' ;;
+            *'API Error: 401'*|*'authentication_failed'*) echo '::error::Claude Code CLI authentication failed. Try a new Anthropic API key.' ;;
+            *'API Error: 404'*|*'model not found'*) echo '::error::Claude Code CLI model not available.' ;;
+            *'rate_limit_error'*|*'API Error: 429'*) echo '::error::Claude Code CLI rate limit reached.' ;;
+            *) echo "::error::Claude Code CLI failed (exit status $code); raw output withheld to protect repository data." ;;
+          esac
