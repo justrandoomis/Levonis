@@ -214,4 +214,5 @@ jobs:
               fi
             fi
           } > "$RUNNER_TEMP/claude-comment.md"
+          printf '\n[GitHub Actions run](https://github.com/%s/actions/runs/%s)\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> "$RUNNER_TEMP/claude-comment.md"
           gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/claude-comment.md"
