@@ -107,7 +107,7 @@ jobs:
           fi
 
           # The response JSON stays in the runner and is NOT dumped into logs.
-          claude "${args[@]}" "$(cat "$RUNNER_TEMP/claude-prompt.txt")" > "$RUNNER_TEMP/claude-result.json"
+          claude "${args[@]}" < "$RUNNER_TEMP/claude-prompt.txt" > "$RUNNER_TEMP/claude-result.json"
           python3 - "$RUNNER_TEMP/claude-result.json" "$RUNNER_TEMP/claude-answer.txt" <<'PY'
           import json
           import sys
