@@ -210,7 +210,7 @@ jobs:
                 fi
               else
                 echo '**Read-only response. No code or website changes.**'
-                echo 'To implement and publish a change, start your issue comment with \`@claude apply\` followed by your request.'
+                echo 'To implement and publish a change, start your issue comment with `@claude apply` followed by your request.'
               fi
             fi
           } > "$RUNNER_TEMP/claude-comment.md"
