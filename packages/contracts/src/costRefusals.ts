@@ -296,6 +296,11 @@ export const COST_REFUSALS = {
     en: 'The original sale journal does not match the order snapshot. Review it before reconciling the membership discount.',
     ckb: 'تۆماری فرۆشتنی کۆن لەگەڵ زانیارییە پاشەکەوتکراوەکانی داواکارییەکە ناگونجێت. پێش یەکلاکردنەوەی داشکاندنی ئەندامێتی بیپشکنە.',
   },
+  WAGE_SCOPE_REVIEW_REQUIRED: {
+    ar: 'نطاق أجر منتج محذوف غير مثبت في السجل. راجعه قبل إعادة احتساب الأجر؛ لم تتغير الاستحقاقات أو الدفعات.',
+    en: 'The wage scope of a deleted product is not recorded. Review it before recalculating wages; earnings and payments have not changed.',
+    ckb: 'مەودای کرێی بەرهەمێکی سڕاوە لە تۆماردا دیاری نییە. پێش دووبارە ژماردنەوەی کرێ بیپشکنە؛ مافە داراییەکان و پارەدانەکان نەگۆڕاون.',
+  },
   RETURN_RESOLUTION_RETRY: {
     ar: 'لم يُنفّذ أي جزء من الاسترداد. أعد المحاولة.',
     en: 'No part of the refund was applied. Try again.',

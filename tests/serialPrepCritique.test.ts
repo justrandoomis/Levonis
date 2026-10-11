@@ -277,10 +277,11 @@ test('M1/L14 the scan says what it could not prove: no allocation behind a reser
 
 test('L6/critique-1 #21 a refund resolved on an order delivered before this feature never rewrites that order\'s units', async () => {
   const w = world();
+  // Use the fixture printer's price: a 1 IQD refund at this rate cannot form a wallet cent.
   w.raw.exec(`
     INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at)
-      VALUES ('ORD-PRE','u1','delivered','{}','home','{}','cash',1,1400,1,0,'2026-05-01T00:00:00.000Z');
-    INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd) VALUES ('lpre','ORD-PRE','pA1','A1',1,1,1);
+      VALUES ('ORD-PRE','u1','delivered','{}','home','{}','cash',899000,1400,899000,0,'2026-05-01T00:00:00.000Z');
+    INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd) VALUES ('lpre','ORD-PRE','pA1','A1',1,899000,899000);
     INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index, delivered_at, warranty_start_at, warranty_end_at)
       VALUES ('unit_pre','ORD-PRE','lpre','pA1','u1',1,'2026-05-01T00:00:00.000Z','2026-05-01T00:00:00.000Z','2027-05-01T00:00:00.000Z');
     INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by) VALUES ('${SN}','${SN}','unit_pre','boss');
@@ -288,6 +289,9 @@ test('L6/critique-1 #21 a refund resolved on an order delivered before this feat
   `);
   const res = await json(await post(w.as('adm'), '/api/returns/admin/rc_pre/transition', { to: 'resolved', resolution: 'refund' }));
   assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(res.refund.amount_iqd, 899000);
+  assert.equal(res.refund.credited, true);
+  assert.equal(row(w.raw, "SELECT amount_iqd FROM wallet_transactions WHERE id = 'wtx_ret_rc_pre'")!.amount_iqd, 899000);
   assert.deepEqual(res.serials, { closed: [], unattributed: false }, 'no evidence and no feature binding: nothing is touched');
   assert.equal((await sweepReturnedSerials(w.env, 50)).scanned, 0, 'and the sweep never picks it up');
   assert.equal(row(w.raw, "SELECT warranty_closed_at FROM order_item_units WHERE id = 'unit_pre'")!.warranty_closed_at, null);

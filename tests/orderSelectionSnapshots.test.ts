@@ -80,8 +80,10 @@ test('checkout persists the exact resolved dimensions and invoice/units read the
     /INSERT INTO order_items[^`]*net_weight_g[^`]*package_height_mm[\s\S]*it\.physical_dimensions\.net_weight_g[\s\S]*it\.physical_dimensions\.package_height_mm/
   );
   assert.match(orders, /image:\s*String\(r\.image_snapshot \?\? ''\),/);
-  assert.match(invoices, /SELECT id, product_id, name_snapshot, image_snapshot/);
-  assert.match(invoices, /image:\s*it\.image_snapshot \|\| undefined/);
+  // Older schemas can omit optional benefit columns, so the loader reads the
+  // frozen row and the invoice builder explicitly projects its public fields.
+  assert.match(invoices, /SELECT \* FROM order_items WHERE order_id = \?/);
+  assert.match(invoices, /order_item_id:\s*it\.id,\s*product_id:\s*it\.product_id,\s*name:\s*it\.name_snapshot,\s*image:\s*it\.image_snapshot \|\| undefined/);
 });
 
 test('authored and lexical multi-option order keep one image through Product, cart, checkout, and snapshot', async () => {

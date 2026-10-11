@@ -10,6 +10,7 @@ import { recordFinancialFailure } from './financePostingErrors';
 import { wageVersions } from './financeWageTimeline';
 import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 import { advanceCollectionsSql } from './membershipSaleCorrection';
+import { readDeletedProductFinanceScopes } from './financeDeletedProductScope';
 export { recordFinancialFailure } from './financePostingErrors';
 
 export interface CostRule {
@@ -81,7 +82,7 @@ export async function snapshotFor(
   dayOverride?:string,
 ): Promise<RuleSnapshot> {
   const day = dayOverride??baghdadDay(new Date(at));
-  const [rawRules, catalogs, placements] = await Promise.all([
+  const [rawRules, catalogs, placements, deletedScopes] = await Promise.all([
     rulesOverride?Promise.resolve({results:rulesOverride.map((r)=>({snapshot:JSON.stringify(r)}))}):db
       .prepare(
         `SELECT v.snapshot FROM finance_rule_versions v WHERE v.created_at<=? AND v.version=(SELECT MAX(v2.version) FROM finance_rule_versions v2 WHERE v2.rule_id=v.rule_id AND v2.created_at<=?) ORDER BY v.rule_id LIMIT 500`,
@@ -95,6 +96,7 @@ export async function snapshotFor(
       )
       .bind(...Array(3).fill(JSON.stringify(lines.map((l) => l.product_id).filter(Boolean))))
       .all<{ product_id: string; catalog_id: string | null }>(),
+    readDeletedProductFinanceScopes(db, lines.filter(line => line.product_id === null).map(line => line.id)),
   ]);
   const parents = new Map((catalogs.results ?? []).map((c) => [c.id, c.parent_id]));
   const depth = (id: string) => {
@@ -109,7 +111,9 @@ export async function snapshotFor(
     return n;
   };
   return lines.map((l) => {
-    const ancestors = new Map<string, number>();
+    const deleted = l.product_id === null ? deletedScopes.get(l.id) : undefined;
+    const productId = l.product_id ?? deleted?.productId ?? '';
+    const ancestors = new Map<string, number>(deleted?.catalogDepths);
     for (const p of placements.results ?? []) {
       if (p.product_id !== l.product_id || !p.catalog_id) continue;
       let id: string | null = p.catalog_id;
@@ -125,8 +129,8 @@ export async function snapshotFor(
       .filter((r) => r.active === 1 && r.effective_from <= day && (!r.effective_to || r.effective_to >= day));
     return {
       line_id: l.id,
-      product_id: l.product_id ?? '',
-      rules: matchingRules(rules, l.product_id ?? '', ancestors),
+      product_id: productId,
+      rules: matchingRules(rules, productId, ancestors),
     };
   });
 }

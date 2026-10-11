@@ -151,6 +151,7 @@ const REQUIRED: Record<string, readonly string[]> = {
   'Inventory consistency (owner request 2026-10-10)': ['INCOMING_CHANGED'],
   'Refund consistency (owner request 2026-10-10)': ['RETURN_REFUND_REVIEW_REQUIRED'],
   'Membership accounting consistency (owner request 2026-10-11)': ['MEMBERSHIP_SALE_REVIEW_REQUIRED'],
+  'Deleted-product wage consistency (owner request 2026-10-11)': ['WAGE_SCOPE_REVIEW_REQUIRED'],
   // Owner request 2026-10-10: the investment remainder returns to the investor's «أرباحي».
   'Investment remainder (owner request 2026-10-10)': ['INVESTMENT_NEEDS_FINAL_COST', 'INVESTMENT_AGREEMENT_EXISTS'],
 };

@@ -222,7 +222,7 @@ test('the frozen membership application site prevents an embedded saving from re
       const item = { product_id: '123', membership_rule_id: '456', membership_discount_iqd: 2000 };
       assert.equal(membershipDiscountAtLine({ benefit_snapshot }, item), expected);
       assert.equal(w.raw.prepare(`SELECT (${membershipDiscountAtLineSql()}) discount FROM
-        (SELECT 'o' order_id,'123' product_id,'456' membership_rule_id,2000 membership_discount_iqd) i`).get()!.discount, expected,
+        (SELECT 'item' id,'o' order_id,'123' product_id,'456' membership_rule_id,2000 membership_discount_iqd) i`).get()!.discount, expected,
       'SQLite text affinity must not turn malformed numeric identifiers into evidence');
     }
   } finally { w.raw.close(); }

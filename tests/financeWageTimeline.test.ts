@@ -202,7 +202,7 @@ test('changing a per-order scope counts both removed and newly included units wi
   assert.equal(removed.value.units_count,2);assert.equal(removed.value.delta_iqd,-10000);
 });
 
-for(const oldCalculationVersion of [null,2])test(`a preview made by superseded calculation ${oldCalculationVersion??'legacy'} cannot resume or apply even if source data is unchanged`,async()=>{
+for(const oldCalculationVersion of [null,2,3])test(`a preview made by superseded calculation ${oldCalculationVersion??'legacy'} cannot resume or apply even if source data is unchanged`,async()=>{
   const x=await setup();await x.order('order',1,'2026-09-20T12:00:00Z');await x.drain();
   const p=await x.preview(5000,'2026-09-15');
   x.raw.prepare("UPDATE finance_wage_preview_jobs SET work_json=json_set(work_json,'$.calculation_version',?),result_json=json_set(result_json,'$.calculation_version',?) WHERE id=?").run(oldCalculationVersion,oldCalculationVersion,p.value.preview_job_id);

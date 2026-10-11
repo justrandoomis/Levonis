@@ -103,6 +103,28 @@ was deleted, zeroed, or silently reinterpreted in this work.
     balanced correction to receivable/advance/revenue/shipping in an open period;
     original journal lines, payments and withdrawals remain unchanged. Unexplained
     journal differences require review rather than an invented adjustment.
+15. The new direct-purchase inputs were missing from the product deletion
+    registry. They are current product configuration, so permanent product
+    deletion removes them with their scoped owner guard in the same atomic
+    batch. Actual purchase and received-lot history remains preserved; private
+    configuration counts use the existing neutral `pricing_engine` label.
+16. Clearing a deleted product's catalogue link could erase the identity used
+    to interpret its frozen membership discount. The same deletion transaction
+    now appends the exact order-item-to-product identity to the existing benefit
+    snapshot before unlinking. Shared JavaScript and SQL readers use that saved
+    identity only after the live link is null. Original benefit fields and all
+    money remain unchanged; missing historical evidence is never guessed.
+17. Deleting a product also removed the catalogue facts used to recalculate
+    scoped wages. The deletion transaction now appends exact product and
+    catalogue-ancestor facts to the retained audit log before removing those
+    links. Effective wage versions, priorities and exclusions continue to govern
+    the calculation against that evidence; paid amounts and immutable rule
+    snapshots remain intact. Older deleted lines without that evidence require
+    review before a scoped earned wage can be recalculated, rather than silently
+    turning it into zero. Explicit safe rule changes still compare against the
+    recorded prior entitlement; new targets always pass the strict calculation.
+    Stored previews from older calculation versions must be recomputed before
+    they can resume or apply.
 
 Actual cart → checkout → accepted adjustment → delivery → return regressions
 cover the membership and return findings. They include simultaneous partial

@@ -1,5 +1,7 @@
 import { isSafeMediaKey } from './mediaStorage';
 import { deleteMediaObject, isAnonymousPublicMediaKey } from './mediaStorage';
+import { membershipDiscountAtLineSql, UNLINKED_MEMBERSHIP_PRODUCTS } from './orderMembership';
+import { DELETED_PRODUCT_FINANCE_SCOPE_ACTION } from './financeDeletedProductScope';
 
 /**
  * DELETING A PRODUCT, AND LEAVING NOTHING BEHIND.
@@ -150,6 +152,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   { table: 'pricing_inputs', by: { column: 'product_id' } },
   { table: 'pricing_rules', by: { column: 'product_id' } },
   { table: 'pricing_sku_costs', by: { column: 'product_id' } },
+  // 0186: editable direct-sale purchase inputs, not the actual purchase or
+  // received-lot history. Its owner guard is scoped to the explicit delete
+  // below; unlike the engine guards, removing the state does not disable it.
+  { table: 'pricing_direct_purchase', by: { column: 'product_id' } },
   // 0183 (FX-7): the engine's per-SKU final prices — public figures (a price
   // a guest is charged), the product's own configuration, worthless without
   // it. Deleted after the state row, so its engine guard is already off.
@@ -874,8 +880,8 @@ export async function blockingReferences(db: DeletionDb, productId: string): Pro
  * outlives its product is recoverable (the job retries, the scanner reports it)
  * while a product that outlives a deleted file is a broken catalogue page.
  */
-/** 0181's private engine tables, reported together as `pricing_engine` (never by their own names). */
-const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set(['product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs']);
+/** Private engine tables, reported together as `pricing_engine` (never by their own names). */
+const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set(['product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_direct_purchase']);
 
 export async function deleteProductPermanently(
   db: DeletionDb,
@@ -904,7 +910,7 @@ export async function deleteProductPermanently(
   const jobs = owned.map((key) => ({ id: options.newId(), key, visibility: mediaVisibilityOf(key) }));
 
   const statements: D1PreparedStatement[] = [];
-  const ledger: Array<{ kind: 'job' | 'delete' | 'unlink'; table: string }> = [];
+  const ledger: Array<{ kind: 'job' | 'delete' | 'unlink' | 'guard' | 'preserve'; table: string }> = [];
   // A Worker can be deployed seconds before migration 0072 reaches D1. The
   // product row must still be deletable in that window; the returned in-memory
   // jobs let the route remove R2 objects immediately, while deployments with
@@ -926,11 +932,80 @@ export async function deleteProductPermanently(
     ledger.push({ kind: 'job', table: 'media_cleanup_jobs' });
   }
 
+  // Wage revisions still select their effective rules after a product goes
+  // away. Preserve only the exact applicability facts, before deleting any
+  // catalogue placement. The recursive reads run inside this deletion batch,
+  // so concurrent catalogue edits cannot leave an unfenced stale snapshot.
+  const [auditColumns, itemColumns, productColumns, catalogColumns, placementColumns] = await Promise.all([
+    columnsOf(db, 'audit_log'), columnsOf(db, 'order_items'), columnsOf(db, 'products'),
+    columnsOf(db, 'catalogs'), columnsOf(db, 'product_catalogs'),
+  ]);
+  if (['actor_id', 'action', 'target', 'detail'].every(c => auditColumns.has(c))
+    && itemColumns.has('id') && itemColumns.has('product_id')) {
+    const placements: string[] = [];
+    if (placementColumns.has('product_id') && placementColumns.has('catalog_id')) {
+      placements.push('SELECT catalog_id AS id FROM product_catalogs WHERE product_id=?1');
+    }
+    for (const column of ['category_id', 'sub_category_id']) {
+      if (productColumns.has(column)) placements.push(`SELECT ${column} AS id FROM products WHERE id=?1`);
+    }
+    const parents = catalogColumns.has('id') && catalogColumns.has('parent_id')
+      ? 'SELECT id,parent_id FROM catalogs' : 'SELECT NULL AS id,NULL AS parent_id WHERE 0';
+    statements.push(db.prepare(`WITH RECURSIVE
+      catalog_parents(id,parent_id) AS (${parents}),
+      placements(id) AS (${placements.join(' UNION ') || 'SELECT NULL AS id WHERE 0'}),
+      ancestors(id) AS (
+        SELECT id FROM placements WHERE id IS NOT NULL AND id<>''
+        UNION SELECT c.parent_id FROM catalog_parents c JOIN ancestors a ON c.id=a.id
+          WHERE c.parent_id IS NOT NULL AND c.parent_id<>''),
+      depth_walk(start,id,seen,depth) AS (
+        SELECT id,id,json_array(id),1 FROM ancestors
+        UNION ALL SELECT w.start,c.parent_id,json_insert(w.seen,'$[#]',c.parent_id),w.depth+1
+          FROM depth_walk w JOIN catalog_parents c ON c.id=w.id
+          WHERE c.parent_id IS NOT NULL AND c.parent_id<>''
+            AND NOT EXISTS(SELECT 1 FROM json_each(w.seen) visited WHERE visited.value=c.parent_id)),
+      depths AS (SELECT start,MAX(depth) depth FROM depth_walk GROUP BY start)
+      INSERT INTO audit_log(actor_id,action,target,detail)
+      SELECT NULL,?2,i.id,json_object('version',1,'product_id',i.product_id,
+        'catalog_depths',json((SELECT json_group_object(start,depth) FROM depths)))
+      FROM order_items i WHERE i.product_id=?1`).bind(productId, DELETED_PRODUCT_FINANCE_SCOPE_ACTION));
+    ledger.push({ kind: 'preserve', table: 'audit_log' });
+  }
+
   for (const child of OWNED_TABLES) {
     if (!(await tableExists(db, child.table))) continue;
+    // The direct-purchase store requires an owner token while the product
+    // exists, even in manual mode. Acquire and remove it in this same atomic
+    // batch so explicit deletion works with foreign keys both on and off.
+    const ownerGuard = child.table === 'pricing_direct_purchase' ? `pricing-input-owner:${productId}` : null;
+    if (ownerGuard) {
+      statements.push(db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(ownerGuard));
+      ledger.push({ kind: 'guard', table: 'ops_guards' });
+    }
     const where = 'column' in child.by ? `"${child.by.column}" = ?1` : child.by.sql;
     statements.push(db.prepare(`DELETE FROM "${child.table}" WHERE ${where}`).bind(productId));
     ledger.push({ kind: 'delete', table: child.table });
+    if (ownerGuard) {
+      statements.push(db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(ownerGuard));
+      ledger.push({ kind: 'guard', table: 'ops_guards' });
+    }
+  }
+
+  // The membership snapshot names products, while history below clears live
+  // catalogue links. Preserve the exact item-to-product identity before that
+  // unlink, in this same batch, without changing any original benefit or money.
+  const orderColumns = await columnsOf(db, 'orders');
+  if (orderColumns.has('benefit_snapshot') && itemColumns.has('membership_discount_iqd') && itemColumns.has('membership_rule_id')) {
+    statements.push(db.prepare(`UPDATE orders SET benefit_snapshot=json_set(benefit_snapshot,
+      '$.${UNLINKED_MEMBERSHIP_PRODUCTS}',json_patch(
+        CASE WHEN json_type(benefit_snapshot,'$.${UNLINKED_MEMBERSHIP_PRODUCTS}')='object'
+          THEN json_extract(benefit_snapshot,'$.${UNLINKED_MEMBERSHIP_PRODUCTS}') ELSE '{}' END,
+        (SELECT json_group_object(mi.id,mi.product_id) FROM order_items mi WHERE mi.order_id=orders.id AND mi.product_id=?1)))
+      WHERE CASE WHEN json_valid(benefit_snapshot) THEN json_type(benefit_snapshot)='object' ELSE 0 END
+        AND EXISTS(SELECT 1 FROM order_items mi WHERE mi.order_id=orders.id AND mi.product_id=?1
+          AND mi.membership_discount_iqd>0 AND (${membershipDiscountAtLineSql('mi')})=0)`)
+      .bind(productId));
+    ledger.push({ kind: 'preserve', table: 'orders' });
   }
 
   for (const history of HISTORY_TABLES) {

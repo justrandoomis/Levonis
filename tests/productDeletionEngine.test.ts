@@ -113,6 +113,14 @@ function insert(db: DatabaseSync, table: string, values: Record<string, unknown>
 const count = (db: DatabaseSync, sql: string, ...args: unknown[]) =>
   Number((db.prepare(sql).get(...(args as never[])) as { n: number }).n);
 
+function seedDirectPurchase(db: DatabaseSync, productId: string) {
+  const token = `pricing-input-owner:${productId}`;
+  db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').run(token);
+  db.prepare('INSERT INTO pricing_direct_purchase (product_id, payload_json, updated_at) VALUES (?, ?, ?)')
+    .run(productId, JSON.stringify({ inputs: [{ supplier_cost_amount: '450' }], rules: [], direct_only: true }), '2026-10-11T00:00:00.000Z');
+  db.prepare('DELETE FROM ops_guards WHERE id = ?').run(token);
+}
+
 /** Distinguishes fixtures that are rebuilt inside one test (the re-import case). */
 let fixtureSeq = 0;
 
@@ -226,6 +234,22 @@ function buildFullProduct(db: DatabaseSync, id: string, slug: string, extraKey?:
 test('1. a full product leaves zero owned rows, and its order history survives', async () => {
   const db = freshSchema();
   const built = buildFullProduct(db, 'p-full', 'full-product');
+  seedDirectPurchase(db, 'p-full');
+  insert(db, 'pricing_audit', {
+    id: 'pa-full', entity: 'input', entity_key: 'p-full', product_id: 'p-full',
+    action: 'input_from_purchase', pricing_after_json: '{"supplier_cost_amount":"450"}', created_at: '2026-10-11T00:00:00.000Z',
+  });
+  insert(db, 'inventory_lots', {
+    id: 'lot-full', product_id: 'p-full', scope: 'base', qty_received: 2, qty_remaining: 1,
+    unit_cost_iqd: 700, total_cost_iqd: 1400, cost_basis: 'received', received_at: '2026-10-11T00:00:00.000Z',
+  });
+  insert(db, 'order_item_inventory_allocations', {
+    id: 'alloc-full', order_id: built.orderId, order_item_id: `${built.orderId}-i1`, lot_id: 'lot-full',
+    scope: 'base', qty: 1, unit_cost_iqd: 700, cogs_iqd: 700, idempotency_key: 'alloc-full',
+  });
+  const auditBefore = db.prepare('SELECT * FROM pricing_audit WHERE id = ?').get('pa-full');
+  const allocationBefore = db.prepare('SELECT * FROM order_item_inventory_allocations WHERE id = ?').get('alloc-full');
+  const lotBefore = db.prepare('SELECT * FROM inventory_lots WHERE id = ?').get('lot-full');
   const bucket = new FakeBucket();
   for (const k of built.keys) bucket.put(k);
 
@@ -249,6 +273,7 @@ test('1. a full product leaves zero owned rows, and its order history survives',
     ['product_translations', 'product_id'],
     ['inventory_ledger', 'product_id'],
     ['procurement_selection_cost_defaults', 'product_id'],
+    ['pricing_direct_purchase', 'product_id'],
     ['price_history', 'product_id'],
     ['favorites', 'product_id'],
     ['cart_items', 'product_id'],
@@ -269,6 +294,13 @@ test('1. a full product leaves zero owned rows, and its order history survives',
   assert.equal(item.name_snapshot, 'Product p-full', 'the snapshot is what a receipt reads');
   assert.equal(result.rows_unlinked_by_table.order_items, 1);
   assert.equal(result.rows_deleted_by_table.procurement_selection_cost_defaults, 1);
+  assert.ok(result.rows_deleted_by_table.pricing_engine >= 1, 'private input deletion is counted under the neutral engine name');
+  assert.equal('pricing_direct_purchase' in result.rows_deleted_by_table, false);
+  assert.equal('ops_guards' in result.rows_deleted_by_table, false, 'internal tokens are not reported as deleted product data');
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM ops_guards WHERE id = ?', 'pricing-input-owner:p-full'), 0);
+  assert.deepEqual(db.prepare('SELECT * FROM pricing_audit WHERE id = ?').get('pa-full'), auditBefore, 'pricing audit stays byte-for-byte');
+  assert.deepEqual(db.prepare('SELECT * FROM order_item_inventory_allocations WHERE id = ?').get('alloc-full'), allocationBefore, 'sold-unit COGS stays byte-for-byte');
+  assert.deepEqual({ ...db.prepare('SELECT * FROM inventory_lots WHERE id = ?').get('lot-full') }, { ...lotBefore, product_id: null }, 'actual cost and stock stay; only the catalogue link is cleared');
   assert.equal(count(db, 'SELECT COUNT(*) AS n FROM procurement_cost_profiles'), 3, 'shared supplier profiles survive deleting one product');
 
   // R2: every owned object removed, the vendor URL never queued.
@@ -510,11 +542,40 @@ test('the delete order satisfies the declared foreign keys when they ARE enforce
   insert(db, 'product_color_option_links', { color_id: 'p-fk-c', option_value_id: 'p-fk-o', group_id: 'p-fk-g' });
   insert(db, 'product_images', { id: 'p-fk-i', product_id: 'p-fk', url: '/files/products/catalog/gallery/fk.webp' });
   insert(db, 'product_variants', { id: 'p-fk-v', product_id: 'p-fk', combo_key: 'k' });
+  db.exec("INSERT INTO ops_guards (id, ok) VALUES ('pricing-mode:p-fk', 1); INSERT INTO product_pricing_state (product_id, mode) VALUES ('p-fk', 'engine'); DELETE FROM ops_guards WHERE id = 'pricing-mode:p-fk'");
+  seedDirectPurchase(db, 'p-fk');
 
   const result = await deleteProductPermanently(sqlite(db), 'p-fk', { newId: () => 'job-fk' });
   assert.equal(result.product_deleted, true);
   assert.equal(count(db, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', 'p-fk'), 0);
   assert.equal(count(db, 'SELECT COUNT(*) AS n FROM product_color_option_links WHERE color_id = ?', 'p-fk-c'), 0);
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM pricing_direct_purchase WHERE product_id = ?', 'p-fk'), 0);
+  assert.equal(result.rows_deleted_by_table.pricing_engine, 2, 'engine state and direct inputs are explicitly deleted before the product');
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM ops_guards'), 0);
+});
+
+test('a deployment before 0186 still deletes products without the direct-purchase table', async () => {
+  const db = freshSchema();
+  db.exec('DROP TABLE pricing_direct_purchase');
+  insert(db, 'products', { id: 'p-before-direct', slug: 'before-direct', name: 'Before direct inputs' });
+  const result = await deleteProductPermanently(sqlite(db), 'p-before-direct');
+  assert.equal(result.product_deleted, true);
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM ops_guards'), 0);
+});
+
+test('a failed product delete restores the guarded direct inputs and financial links without leaving an owner token', async () => {
+  const db = freshSchema();
+  const built = buildFullProduct(db, 'p-direct-rollback', 'direct-rollback');
+  seedDirectPurchase(db, built.productId);
+  const directBefore = db.prepare('SELECT * FROM pricing_direct_purchase WHERE product_id = ?').get(built.productId);
+  const itemBefore = db.prepare('SELECT * FROM order_items WHERE order_id = ?').get(built.orderId);
+  db.exec("CREATE TRIGGER refuse_final_product_delete BEFORE DELETE ON products BEGIN SELECT RAISE(ABORT, 'test_delete_failed'); END");
+  await assert.rejects(deleteProductPermanently(sqlite(db), built.productId), /test_delete_failed/);
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM products WHERE id = ?', built.productId), 1);
+  assert.deepEqual(db.prepare('SELECT * FROM pricing_direct_purchase WHERE product_id = ?').get(built.productId), directBefore);
+  assert.deepEqual(db.prepare('SELECT * FROM order_items WHERE order_id = ?').get(built.orderId), itemBefore);
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM ops_guards'), 0);
+  assert.equal(count(db, 'SELECT COUNT(*) AS n FROM media_cleanup_jobs WHERE source_product_id = ?', built.productId), 0);
 });
 
 /**

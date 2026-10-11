@@ -86,14 +86,55 @@ second pass. All recorded final runs have zero unresolved failures. Workflow 7
 must still pass before claiming the site updated; its final release is recorded
 below after deployment.
 
-The full CI run `38094004065` for `3c051143` exposed an obsolete exact JSX
-assertion in `fxRepricing.test.ts`: it expected the overview's `EngineSaveList`
-without the new `reloadKey={reload}` prop. The assertion now verifies that
-refresh connection explicitly; all other checks remain. The focused repricing,
-rates integration, engine strings and admin-pricing suites pass 34/34, and the
-complete `npm run check` passes again. At this checkpoint that CI run is still
-finishing its tests and has not entered any live phase. Its replacement must
-pass the complete unchanged workflow 7 before deployment is confirmed.
+CI run `38094004065` for `3c051143` was cancelled during the unit suite after
+an obsolete exact JSX assertion was repaired. Its downloadable log, unlike the
+partial running-log view, revealed six failures through test 9651. The fixes are:
+the `EngineSaveList` refresh-prop assertion; the invoice snapshot source check;
+the direct-purchase readiness-code census; two serial/refund fixtures that used
+an unpayable 1 IQD refund; and direct-purchase configuration in the product
+deletion registry and atomic owner-guarded delete. All underlying assertions
+remain, and the refund fixtures now verify the actual wallet credit as well.
+The repricing suites pass 34/34; the invoice/census suites pass 15/15.
+Run `38098880098` for the first assertion correction `ce987181` was also cancelled
+when the remaining failures became available. Both runs skipped every live phase
+(steps 8–35): no migration, deployment or live write occurred. Neither is a full
+suite pass. The corrected release must pass the complete unchanged workflow 7.
+
+The remaining CI repairs pass 30 serial/refund/integration tests and 59 product
+deletion/pricing compatibility tests. The previously unfinished root tail passes
+173 tests; workspace tests pass 365/365, and Studio passes 313 with six declared
+skips. The frontend rebuild retains all seven live markers. Independent deletion
+review also found that clearing a catalogue link could lose the frozen membership
+identity. Deletion now appends that exact identity to the benefit snapshot in the
+same transaction before unlinking; original benefit fields and money stay intact.
+The identity tests pass 11/11, the subsequent deletion compatibility run 29/29,
+and the deletion writer/identity tests 6/6. The latest privacy, bundle, theme and
+refusal gate passes 269/269 with `REQUIRE_DIST=1`. Existing financial compatibility
+passes 53/53; bounded recovery remains 636 prepared statements and ten batches
+containing 224 statements for its two-order fixture.
+
+Deletion review also found product/catalogue-scoped wages could fall to zero
+when a later reconciliation no longer found the product. The deletion batch now
+appends exact scope facts to `audit_log` (which ordinary retention does not
+prune), before removing catalogue placements. Effective rule revisions remain
+authoritative, while existing financial snapshots and payments stay immutable.
+Old deleted lines without this evidence use `WAGE_SCOPE_REVIEW_REQUIRED` before
+an ambiguous scoped entitlement can be changed; no product identity or catalogue
+history is inferred from names or a newly reused product ID.
+Explicit universal, inactive or manually overridden rules retain their existing
+policy. A safe proposed rule can use recorded prior earnings for its comparison
+display only after the new targets pass the strict planner. Preview calculation
+version 4 invalidates older stored jobs, including version 3, so a pre-deploy
+preview cannot bypass the new evidence check when resumed or applied.
+
+The final version-4 wage gate passes 52/52 with zero skips: five new deletion,
+legacy-evidence and manual-override regressions; the complete wage timeline
+(including superseded-version-3 preview rejection); earnings, bounded recovery
+and the trilingual refusal census. SQL remains at 26,675 bytes / nesting 17,
+and the two-order recovery fixture retains its 636-prepared-statement budget.
+The exact stable version-4 source also passes the complete `npm run check`
+(including all three embedded runners) and `npm run build` with all seven
+required live markers. The unchanged full workflow 7 remains the release gate.
 
 ## Earlier implementation verification
 

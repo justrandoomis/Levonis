@@ -7,6 +7,8 @@ import { getOrderProfitBase, profitSourceFingerprint, type OrderProfitBase } fro
 import { snapshotFor, costAmount } from './orderFinance';
 import { nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 import { effectiveWageRules, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
+import { readRuleScope } from './financeRuleScopes';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 export interface WageCost {
   id:string;order_item_id:string|null;rule_id:string;staff_id:string;state:string;snapshot:string;
@@ -52,6 +54,25 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     if(index<0)rules.push(preserved);else rules[index]=preserved;
   }
   const snapshots=await snapshotFor(db,base.lines,new Date().toISOString(),rules,day);
+  // An old deletion without captured scope is missing evidence, not evidence
+  // that an earned wage stopped applying. Explicit eligibility/rule endings
+  // and universally applicable rules can still be calculated without it.
+  const unknownLines=new Set(base.lines.filter(line=>line.product_id===null
+    && !snapshots.find(snapshot=>snapshot.line_id===line.id)?.product_id).map(line=>line.id));
+  if(eligible&&unknownLines.size)for(const cost of old){
+    if(cost.manual_iqd!==null)continue;
+    const current=rules.find(rule=>rule.id===cost.rule_id&&rule.active===1&&rule.effective_from<=day&&(!rule.effective_to||rule.effective_to>=day));
+    if(!current)continue;
+    const scope=readRuleScope(current);
+    const universal=scope?!scope.catalog_ids.length&&!scope.product_ids.length&&!scope.excluded_product_ids.length
+      :(!current.scope_json||current.scope_json==='{}')&&current.target_type==='all';
+    if(universal)continue;
+    const saved=JSON.parse(cost.snapshot) as {line_ids?:unknown};
+    const affected=cost.order_item_id?[cost.order_item_id]
+      :Array.isArray(saved.line_ids)&&saved.line_ids.length?saved.line_ids:base.lines.map(line=>line.id);
+    if(affected.some(id=>typeof id==='string'&&unknownLines.has(id)))
+      throw conflict(serverMessage('WAGE_SCOPE_REVIEW_REQUIRED'),'WAGE_SCOPE_REVIEW_REQUIRED');
+  }
   const assignments=(await db.prepare('SELECT group_key,staff_id,completed_at FROM finance_task_assignments WHERE order_id=?').bind(base.order_id).all<{group_key:string;staff_id:string;completed_at:string|null}>()).results??[];
   const groups=new Map<string,{rule:EffectiveWageRule;ids:string[]}>();
   for(const line of snapshots)for(const raw of line.rules){

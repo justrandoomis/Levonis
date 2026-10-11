@@ -41,7 +41,7 @@ async function changeContext(db:D1Database,ruleId:string,input:WageChangeInput,a
 
 // Completed and interrupted previews from an older calculation must be
 // reviewed again after a deploy, even when their source rows did not change.
-const PREVIEW_CALCULATION_VERSION=3;
+const PREVIEW_CALCULATION_VERSION=4;
 type PreviewDetail={order_id:string;earning_day:string;affected:boolean;units:number;previous_iqd:number;corrected_iqd:number|null;delta_iqd:number;manual_overrides:number;pending_costs:number;investor_delta_iqd:number|null;owner_delta_iqd:number|null};
 type PreviewWork={calculation_version:number;projected:ParticipantSource[];detail:PreviewDetail[];affectedCostIds:string[];affectedInvestorIds:string[];pendingTargets:Record<string,number|null>;previous:number;corrected:number;knownCorrected:number;delta:number;units:number;unknown:number;manual:number;investorDelta:number;ownerDelta:number;profitUnknown:number;investorUnknown:number;matched:number;reviewed:number};
 type PreviewPage={cursor:string;work?:PreviewWork};
@@ -78,7 +78,21 @@ export async function previewWageChange(db:D1Database,ruleId:string,input:WageCh
   for(const {id} of scanned){
     const base=await getOrderProfitBase(db,id),targets=await planStaffWages(db,staff,base,[...versions,added]);
     if(!targets.length)continue;
-    const beforeTargets=await planStaffWages(db,staff,base,versions);
+    let beforeTargets:WageTarget[];
+    try { beforeTargets=await planStaffWages(db,staff,base,versions); }
+    catch(error) {
+      if((error as {code?:string}).code!=='WAGE_SCOPE_REVIEW_REQUIRED')throw error;
+      // The proposed targets above already proved their current applicability
+      // (for example, explicit deactivation or an unrestricted scope). The old
+      // scope cannot be recalculated, but its recorded earnings remain exact
+      // evidence for this before/after display. Never use this for new targets.
+      beforeTargets=targets.filter(target=>target.cost).map(target=>{
+        const cost=target.cost!,saved=JSON.parse(cost.snapshot) as {rule:EffectiveWageRule;line_ids?:unknown;qty?:number};
+        return {...target,rule:saved.rule,amount:cost.effective_iqd,qty:Number(saved.qty)||0,
+          line_ids:cost.order_item_id?[cost.order_item_id]
+            :Array.isArray(saved.line_ids)?saved.line_ids.filter((id):id is string=>typeof id==='string'):[]};
+      });
+    }
     const affected=affectedWageLines(ruleId,beforeTargets,targets);
     const oldAmount=targets.reduce((n,t)=>n+(t.cost?.effective_iqd??0),0),pending=targets.filter(t=>t.amount===null).length;
     const newAmount=targets.reduce((n,t)=>n+(t.amount??t.cost?.effective_iqd??0),0);

@@ -130,10 +130,11 @@ test('the library answers «nothing to do» on every entry point — never a thr
 
 test('devices, the serial inventory, receipts and returns behave as at HEAD', async () => {
   const w = before();
+  // Keep this a payable refund even before the serial migration; 1 IQD is below one wallet cent.
   w.raw.exec(`
     INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at)
-      VALUES ('ORD-D','u1','delivered','{}','home','{}','cash',1,1400,1,0,'2026-09-01T00:00:00.000Z');
-    INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd) VALUES ('ld','ORD-D','pA1','A1',1,1,1);
+      VALUES ('ORD-D','u1','delivered','{}','home','{}','cash',899000,1400,899000,0,'2026-09-01T00:00:00.000Z');
+    INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd) VALUES ('ld','ORD-D','pA1','A1',1,899000,899000);
     INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index, delivered_at, warranty_base_months, warranty_start_at, warranty_end_at)
       VALUES ('unit_d','ORD-D','ld','pA1','u1',1,'2026-09-01T00:00:00.000Z',12,'2026-09-01T00:00:00.000Z','2099-09-01T00:00:00.000Z');
   `);
@@ -166,6 +167,9 @@ test('devices, the serial inventory, receipts and returns behave as at HEAD', as
   const ret = await post(w.as('adm'), '/api/returns/admin/rc_0/transition', { to: 'resolved', resolution: 'refund', serials: [SN] });
   const body = await json(ret);
   assert.equal(ret.status, 200, JSON.stringify(body));
+  assert.equal(body.refund.amount_iqd, 899000);
+  assert.equal(body.refund.credited, true);
+  assert.equal(row(w.raw, "SELECT amount_iqd FROM wallet_transactions WHERE id = 'wtx_ret_rc_0'")!.amount_iqd, 899000);
   assert.deepEqual(body.serials ?? { closed: [], unattributed: false }, { closed: [], unattributed: false });
   assert.equal(row(w.raw, "SELECT state FROM return_cases WHERE id = 'rc_0'")!.state, 'resolved');
   // The replacement door.

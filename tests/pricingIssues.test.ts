@@ -48,7 +48,7 @@ const TABLES: Record<string, Readonly<Record<string, PricingLabel>>> = {
   origins: PRICING_ORIGIN_LABELS,
 };
 
-test('the list holds every readiness code of master plan v2 §2.3 (v1, [C2], v2) plus DIRECT_SALE_EXTRA_BLOCKED, once each', () => {
+test('the list holds every readiness code of master plan v2 §2.3 and the writer refusals, once each', () => {
   const v1 = [
     'SUPPLIER_COST_MISSING', 'SUPPLIER_CURRENCY_MISSING', 'SHIPPING_PROFILE_MISSING', 'WEIGHT_MISSING', 'CBM_MISSING',
     'FX_RATE_MISSING', 'SHIPPING_RATE_MISSING', 'TARGET_PROFIT_MISSING', 'DIRECT_SALE_EXTRA_MISSING', 'INPUT_CONFLICT',
@@ -58,7 +58,7 @@ test('the list holds every readiness code of master plan v2 §2.3 (v1, [C2], v2)
   const c2 = ['FX_RATE_UNCONFIRMED', 'SHIPPING_RATE_UNCONFIRMED', 'CHANNEL_INCOMPLETE', 'PRICE_DROP_REVIEW', 'PINNED_BELOW_TARGET', 'PRICING_CATEGORY_DIFFERS', 'RULE_ORPHANED', 'DIRECT_SALE_EXTRA_NOT_ON_STEP'];
   const v2 = ['TARGET_PROFIT_BLOCKED', 'SHIPPING_FIELD_UNRESOLVED', 'SKU_INPUTS_UNREVIEWED', 'INPUT_ORPHANED', 'MEASURE_FROM_PUBLIC_SPEC'];
   const check = ['DIRECT_SALE_EXTRA_BLOCKED']; // master-plan-v2-check (1)7
-  const writer = ['PRICE_SHAPE_UNSUPPORTED', 'FX_DERIVED_STALE', 'PRICING_ENGINE_PAUSED']; // the writer (owner decision 8)
+  const writer = ['PRICE_SHAPE_UNSUPPORTED', 'DIRECT_PURCHASE_PRICE_SHAPE', 'FX_DERIVED_STALE', 'PRICING_ENGINE_PAUSED']; // the writer, including direct-purchase isolation
   assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check, ...writer]);
   assert.equal(new Set(PRICING_ISSUE_CODES).size, PRICING_ISSUE_CODES.length);
   assert.deepEqual(Object.keys(PRICING_ISSUES).sort(), [...PRICING_ISSUE_CODES].sort());
