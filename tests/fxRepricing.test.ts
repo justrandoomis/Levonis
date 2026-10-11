@@ -589,5 +589,5 @@ test('«يُعاد التسعير تلقائياً» on «التسعير وال�
   assert.match(list, /<AutoRepriceLine /);
   assert.match(list, /data-engine-blocked-code/);
   assert.match(readFileSync(join(ROOT, 'src/components/adminPricing/RatesPanel.tsx'), 'utf8'), /<EngineSaveList lang=\{lang\} compact/);
-  assert.match(readFileSync(join(ROOT, 'src/components/adminPricing/AdminPricing.tsx'), 'utf8'), /<EngineSaveList lang=\{lang\} \/>/);
+  assert.match(readFileSync(join(ROOT, 'src/components/adminPricing/AdminPricing.tsx'), 'utf8'), /<EngineSaveList lang=\{lang\} reloadKey=\{reload\} \/>/);
 });

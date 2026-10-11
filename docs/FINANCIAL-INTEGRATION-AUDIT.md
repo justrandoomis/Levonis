@@ -106,16 +106,17 @@ was deleted, zeroed, or silently reinterpreted in this work.
 
 Actual cart → checkout → accepted adjustment → delivery → return regressions
 cover the membership and return findings. They include simultaneous partial
-refunds, exact remainder allocation, rollback on failed wallet credit, Gini,
-bundle components and the accepted-price ceiling. Unknown prior refunds and
+refunds, exact remainder allocation, rollback on failed wallet credit and the
+accepted-price ceiling. Existing Gini and bundle-component compatibility suites
+also pass. Unknown prior refunds and
 positive wallet refunds below one cent stop for explicit review before a case
 is marked resolved. Trade-in and earnings use the same frozen membership evidence.
 
 ## Verification and release
 
 The `tests/financialIntegration*.test.ts` files exercise cross-system paths
-with synthetic values. Each source fix also runs its existing compatibility,
-privacy and query-budget suites and receives an independent review. Separate
+with synthetic values. Relevant existing compatibility, privacy and query-budget
+suites passed alongside independent reviews. Separate
 wallet, membership, print quote, escrow and price-protection tests cover the
 boundaries above. No audit fixture is written to production.
 

@@ -86,6 +86,15 @@ second pass. All recorded final runs have zero unresolved failures. Workflow 7
 must still pass before claiming the site updated; its final release is recorded
 below after deployment.
 
+The full CI run `38094004065` for `3c051143` exposed an obsolete exact JSX
+assertion in `fxRepricing.test.ts`: it expected the overview's `EngineSaveList`
+without the new `reloadKey={reload}` prop. The assertion now verifies that
+refresh connection explicitly; all other checks remain. The focused repricing,
+rates integration, engine strings and admin-pricing suites pass 34/34, and the
+complete `npm run check` passes again. At this checkpoint that CI run is still
+finishing its tests and has not entered any live phase. Its replacement must
+pass the complete unchanged workflow 7 before deployment is confirmed.
+
 ## Earlier implementation verification
 
 Implementation and independent adversarial review are complete. `npm run check`
