@@ -29,4 +29,6 @@ Requested 2026-10-11 for supplier warranty follow-up. Migration `0187_inventory_
 
 Focused tests cover FIFO 2+3+5, same-day ordering, exact cost rounding, partial/out-of-order receiving, retries and races, cancellation/restoration/resale, transfers, write-offs, mixed tracked/legacy returns, preorder preparation and revision history, permissions and public-data leakage. Serial tests exercise registration, normalization, duplicate identity, receipt, allocation and customer-claim protection. Type checks and the production frontend build are also required.
 
+The pre-release migration gate applies all 180 migrations to a throwaway database and replays all 27 statements in 0187. `IF NOT EXISTS` protects each new table, index and trigger; the replay changes no row, value or trigger. The resulting 358 tables pass the foreign-key and orphan-catalog checks.
+
 No production customer or supplier records are seeded. Deploy through the repository's existing guarded workflow: checks, throwaway migration validation, restore point, migrations, code deployment and live probes. A local test result does not verify existing production data. Browser visual validation was unavailable in this session because the Chromium download failed; real camera capture still requires a device check.
