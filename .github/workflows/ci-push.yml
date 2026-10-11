@@ -28,3 +28,21 @@ concurrency:
 jobs:
   check:
     uses: ./.github/workflows/verify-all.yml
+
+  # Temporary development artifact for this branch only; the release CI remains unchanged.
+  source_for_local_review:
+    if: github.ref == 'refs/heads/codex/complete-direct-stock-preorder-discount'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive tracked source only
+        run: git archive --format=tar HEAD | gzip > source-review.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: levonis-source-review
+          path: source-review.tar.gz
+          retention-days: 1
+          if-no-files-found: error
