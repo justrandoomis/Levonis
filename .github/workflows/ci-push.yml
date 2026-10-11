@@ -33,16 +33,24 @@ jobs:
   source_for_local_review:
     if: github.ref == 'refs/heads/codex/complete-direct-stock-preorder-discount'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Archive tracked source only
-        run: git archive --format=tar HEAD | gzip > source-review.tar.gz
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked development dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install locked Studio dependencies
+        working-directory: studio
+        run: npm ci --no-audit --no-fund
+      - name: Package dependencies for isolated local validation
+        run: tar -czf local-deps.tar.gz node_modules studio/node_modules
       - uses: actions/upload-artifact@v4
         with:
-          name: levonis-source-review
-          path: source-review.tar.gz
+          name: levonis-local-dependencies
+          path: local-deps.tar.gz
           retention-days: 1
           if-no-files-found: error
