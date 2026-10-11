@@ -28,6 +28,7 @@ import { buildRequest, decimalOf, emptyDraft, isDecimalComma, wholeOf } from '..
 import { PRICING_UI_STRINGS, readWhole } from '../src/components/adminPricing/strings';
 import PricingProducts from '../src/components/adminPricing/PricingProducts';
 import { ModelSection } from '../src/components/adminPricing/ProductPricingSheet';
+import { PreviewBanner } from '../src/components/adminPricing/parts';
 import type { PricingModel, PricingOverview, PricingProductSummary } from '../src/components/adminPricing/api';
 
 const DIR = 'src/components/adminPricing';
@@ -137,12 +138,21 @@ test('a refusal is said by code: OWNER_EMAIL_UNVERIFIED opens the verification c
   assert.match(codeOf(`${DIR}/ProductPricingSheet.tsx`), /<PricingFailure error=\{error\}/);
 });
 
-test('the preview banner comes first, in the contract’s own words', () => {
+test('the banner distinguishes writable rate settings from the read-only product calculator', () => {
   const root = codeOf(`${DIR}/AdminPricing.tsx`);
   const banner = root.indexOf('<PreviewBanner');
   assert.ok(banner > 0, 'no preview banner');
   assert.ok(banner < root.indexOf('<ProductPricingSheet') && banner < root.indexOf('<PricingProducts'), 'the banner is not above the content');
   assert.match(codeOf(`${DIR}/parts.tsx`), /previewOnlyText\(lang\)/);
+  assert.match(root, /title=\{productId \? undefined : s\.workspaceTitle\}/);
+  assert.match(root, /body=\{productId \? s\.previewBody : s\.workspaceBody\}/);
+  const s = PRICING_UI_STRINGS.en;
+  const workspace = renderToStaticMarkup(createElement(PreviewBanner, { lang: 'en', title: s.workspaceTitle, body: s.workspaceBody }));
+  assert.doesNotMatch(workspace, /Preview only|nothing changes in the store|later update/);
+  assert.match(workspace, /Approving an exchange or shipping rate updates/);
+  const detail = renderToStaticMarkup(createElement(PreviewBanner, { lang: 'en', body: s.previewBody }));
+  assert.match(detail, /Preview only/);
+  assert.match(detail, /what-if calculator/);
 });
 
 test('the what-if request: decimals as text, Iraqi digits read, a half box refused, nothing sent on an error', () => {
@@ -264,11 +274,12 @@ test('touch targets: every disclosure on the pricing screens is at least 44px (r
   assert.match(codeOf(`${DIR}/WhatIfPanel.tsx`), /<StatusChip tone="warning" className="shrink-0">\{s\.notConfirmed\}<\/StatusChip>/);
 });
 
-test('the owner is told the decisions are made in the next update, under «ما يحتاج قرارك» (review finding 13)', () => {
+test('the decision section points to the available product editor and price review', () => {
   const sheet = codeOf(`${DIR}/ProductPricingSheet.tsx`);
   const decision = sheet.slice(sheet.indexOf('data-pricing-decision'), sheet.indexOf('{s.nothingHeld}'));
   assert.ok(decision.indexOf('{s.decisionLater}') > 0 && decision.indexOf('{s.decisionLater}') < decision.indexOf('<ReasonList items={holding}'));
-  assert.match(PRICING_UI_STRINGS.en.decisionLater, /next update/);
+  assert.match(PRICING_UI_STRINGS.en.decisionLater, /product editor/);
+  assert.match(PRICING_UI_STRINGS.en.decisionLater, /review and save the new prices/);
 });
 
 // ------------------------------------------------------------- rendered

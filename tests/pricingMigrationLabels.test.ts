@@ -197,15 +197,15 @@ test('decision 8 on the screen: no string of «التسعير والشحن» spe
     assert.doesNotMatch(ckb, SWITCH_WORDS.ckb, `${key}: «${ckb}»`);
   }
 
-  // The banner on every visit and the note under typed member prices say what the contract's reasons say.
-  assert.deepEqual(
-    (['ar', 'en', 'ckb'] as const).map((l) => PRICING_UI_STRINGS[l].previewBody.split(/(?<=\.) /).pop()),
-    [
-      'تتغير أسعار المتجر فقط عندما تحفظ الأسعار الجديدة لمنتج، في تحديث لاحق.',
-      "Store prices change only when you save a product's new prices, in a later update.",
-      'نرخەکانی فرۆشگا تەنها ئەو کاتە دەگۆڕێن کە نرخە نوێیەکانی بەرهەمێک پاشەکەوت دەکەیت، لە نوێکردنەوەیەکی داهاتوودا.',
-    ]
-  );
+  // Rate saves are live now. Only the product-detail calculator is read-only;
+  // obsolete future-release wording must not obscure the existing save path.
+  assert.match(PRICING_UI_STRINGS.en.previewBody, /read-only previews/);
+  assert.match(PRICING_UI_STRINGS.en.workspaceBody, /updates products already using automatic pricing/);
+  assert.match(PRICING_UI_STRINGS.en.workspaceBody, /Manual products first need complete pricing inputs/);
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const s = PRICING_UI_STRINGS[lang];
+    assert.doesNotMatch([s.previewBody, s.workspaceBody, s.decisionLater, s.nothingHeld].join(' '), /later update|next update|التحديث القادم|تحديث لاحق|نوێکردنەوەیەکی داهاتوو|نوێکردنەوەی داهاتوو/);
+  }
   assert.deepEqual(
     { ar: PRICING_UI_STRINGS.ar.membersDropped, en: PRICING_UI_STRINGS.en.membersDropped, ckb: PRICING_UI_STRINGS.ckb.membersDropped },
     {

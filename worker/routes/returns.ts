@@ -635,6 +635,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   // as the order-cancel flow).
   if (to === 'resolved' && resolution === 'refund') {
     await validateInvestorReturnEvidence(c.env.DB, id);
+    await refuseProtectedReturn(c.env.DB, kase.order_item_id);
     // 0178 §14: serials scanned at inspection (or explicit unit ids) must be
     // devices of THIS line and THIS buyer — refused before any money moves
     // (critique M6: the customer's own unit pick is never trusted alone).
@@ -751,9 +752,10 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
           NOT EXISTS(SELECT 1 FROM return_cases WHERE id=? AND state=?)
           OR (SELECT qty FROM (${priorSql}))<>?
           OR (SELECT amount FROM (${priorSql}))<>?
-          OR ?>?`)
+          OR ?>?
+          OR EXISTS(SELECT 1 FROM price_protection_claims ppc WHERE ppc.order_item_id=? AND ppc.state IN ('approved','credited'))`)
         .bind(newId('return_guard'), kase.order_id, item.id, kase.user_id, id, from,
-          item.id, id, prior.qty, item.id, id, prior.amount, prior.qty + kase.qty, itemQty);
+          item.id, id, prior.qty, item.id, id, prior.amount, prior.qty + kase.qty, itemQty, item.id);
 
       // WE MAY ONLY GIVE BACK MONEY WE ACTUALLY TOOK.
       //
@@ -1060,6 +1062,59 @@ async function claimBasisColumns(db: D1Database): Promise<boolean> {
   return true;
 }
 
+/** The published policy forbids paying both a return and price protection on
+ * the same unit. Old claims do not identify individual units, so an overlap on
+ * a partially returned line needs review; other order lines stay independent. */
+async function refuseProtectedReturn(db: D1Database, itemId: string): Promise<void> {
+  const overlap = await db.prepare("SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state IN ('approved','credited') LIMIT 1")
+    .bind(itemId).first();
+  if (overlap) throw badRequest(serverMessage('PRICE_PROTECTION_RETURN_REVIEW'), 'PRICE_PROTECTION_RETURN_REVIEW');
+}
+async function refuseReturnedProtection(db: D1Database, itemId: string): Promise<void> {
+  const overlap = await db.prepare("SELECT 1 FROM return_cases WHERE order_item_id=? AND state='resolved' AND resolution='refund' LIMIT 1")
+    .bind(itemId).first();
+  if (overlap) throw badRequest(serverMessage('PRICE_PROTECTION_RETURN_REVIEW'), 'PRICE_PROTECTION_RETURN_REVIEW');
+}
+
+/** Customer protection uses the same frozen coupon/points shipping-share
+ * allocation as returns, plus the recorded membership and accepted price
+ * adjustment. It excludes warranty/transport fees and never exceeds the
+ * accepted invoice. Current membership rules and finance report overrides
+ * are not customer payment facts and never enter this calculation. */
+async function protectionPaidUnit(db: D1Database, orderId: string, itemId: string): Promise<{ unit: number; orderTotal: number }> {
+  const [order, result] = await Promise.all([
+    db.prepare('SELECT * FROM orders WHERE id=?').bind(orderId).first<Record<string, unknown>>(),
+    db.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY id').bind(orderId).all<GoodsLine>(),
+  ]);
+  const items = result.results ?? [], item = items.find(line => line.id === itemId);
+  if (!order || !item) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
+  const member = calculateGoods({ ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 },
+    items.map(line => ({ ...line, coupon_discount_iqd: 0 })), []);
+  const accepted = calculateGoods(order, items, []);
+  const coupon = safeParse<{ discount_iqd?: number } | null>(order.coupon_snapshot as string | null, null);
+  const discounts = (coupon ? Number(coupon.discount_iqd) || 0 : 0) + (Number(order.points_discount_iqd) || 0);
+  const invoiceBasis = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
+  const paid = accepted.lines.map(line => {
+    const qty = Math.max(1, Number(line.qty) || 1);
+    const allocation = line.component_alloc_iqd === null || line.component_alloc_iqd === undefined ? null : Number(line.component_alloc_iqd);
+    const merchandise = allocation ?? unitMerchandiseIqd({ qty, unit_price_iqd: Number(line.unit_price_iqd) || 0,
+      pricing_snapshot: line.pricing_snapshot as string | null, warranty_snapshot: line.warranty_snapshot as string | null,
+      transport_snapshot: line.transport_snapshot as string | null }) * qty;
+    const gross = allocation ?? (Number(line.unit_price_iqd) || 0) * qty;
+    const memberLine = member.lines.find(v => v.id === line.id);
+    if (!memberLine) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
+    const membership = Math.max(0, gross - memberLine.net_goods_iqd);
+    const discount = invoiceBasis > 0 ? Math.floor(discounts * gross / invoiceBasis) : 0;
+    return Math.max(0, merchandise - membership - discount + line.price_adjustment_iqd);
+  });
+  const total = paid.reduce((sum, value) => sum + value, 0);
+  const orderTotal = Math.max(0, Number(order.total_iqd) || 0);
+  const capped = total > orderTotal ? spread(orderTotal, paid) : paid;
+  const index = accepted.lines.findIndex(line => line.id === itemId);
+  if (index < 0) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
+  return { unit: Math.floor(capped[index] / Math.max(1, Number(item.qty) || 1)), orderTotal };
+}
+
 /** Prior protection credits already granted for the same order item. */
 async function priorCreditedIqd(db: D1Database, orderItemId: string, excludeClaimId?: string): Promise<number> {
   const row = await db
@@ -1101,6 +1156,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
   }
 
   if (!item.product_id) throw badRequest('This item no longer maps to a product', 'PRODUCT_MISSING');
+  await refuseReturnedProtection(c.env.DB, orderItemId);
 
   // A BUNDLE PARENT IS NOT PRICE-PROTECTED, AND IS TOLD SO (§6.4).
   // `order_items.option_id` on a parent is the `bx_…` composition key, which
@@ -1164,7 +1220,6 @@ priceProtectionRoutes.post('/claims', async (c) => {
   // so a refund and a price-protection credit cannot disagree about what one
   // component cost. `component_value_iqd` stays in `policy_snapshot` as the
   // provenance of the comparison, never as its ceiling.
-  const componentQty = Math.max(1, Number(item.qty) || 1);
   const componentAlloc =
     item.component_alloc_iqd === null || item.component_alloc_iqd === undefined
       ? null
@@ -1173,20 +1228,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
     item.component_value_iqd === null || item.component_value_iqd === undefined
       ? null
       : Number(item.component_value_iqd) || 0;
-  const componentPaidUnit =
-    componentAlloc !== null ? Math.floor(componentAlloc / componentQty) : componentValue;
-  const originalUnit =
-    componentPaidUnit !== null
-      ? componentPaidUnit
-      : pricing && Number.isInteger(pricing.applied_iqd)
-      ? (pricing.applied_iqd as number)
-      : unitMerchandiseIqd({
-          qty: Number(item.qty) || 0,
-          unit_price_iqd: Number(item.unit_price_iqd) || 0,
-          pricing_snapshot: (item.pricing_snapshot as string | null) ?? null,
-          warranty_snapshot: (item.warranty_snapshot as string | null) ?? null,
-          transport_snapshot: (item.transport_snapshot as string | null) ?? null,
-        });
+  const originalUnit = (await protectionPaidUnit(c.env.DB, String(item.order_id), orderItemId)).unit;
 
   // Exact variant: ids persisted at checkout (migration 0008). Legacy items
   // with only a display label cannot be matched reliably → honest support route.
@@ -1439,74 +1481,74 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
     return c.json({ success: true, claim: claimPublic(row!) });
   }
 
-  // Approve: re-derive the credit under the cumulative cap NOW.
-  // Owner decision 6 (integrity H1): a v5 claim credits what it covers, never original − observed.
-  const perUnit = claim.eligible_unit_iqd ?? claim.original_unit_iqd - claim.observed_unit_iqd;
+  if (claim.state !== 'requested') throw badRequest('This claim was already decided');
+  await refuseReturnedProtection(c.env.DB, claim.order_item_id);
+  // Owner decision 6: v5 claims credit their eligible USD-base reduction.
+  // Both this cumulative amount and the absence of a return are checked again
+  // in the same transaction as the decision and actual wallet credit.
+  const paid = await protectionPaidUnit(c.env.DB, claim.order_id, claim.order_item_id);
+  const actualDrop = Math.max(0, Math.min(claim.original_unit_iqd, paid.unit) - claim.observed_unit_iqd);
+  const perUnit = Math.min(claim.eligible_unit_iqd ?? actualDrop, actualDrop);
+  if (perUnit <= 0) throw badRequest('No eligible price drop remains against the amount paid for this item', 'NO_ELIGIBLE_DROP');
   const eligibleTotal = Math.max(0, perUnit * claim.qty);
+  const unresolvedPrior = await c.env.DB.prepare("SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>? LIMIT 1")
+    .bind(claim.order_item_id, id).first();
+  if (unresolvedPrior) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
   const prior = await priorCreditedIqd(c.env.DB, claim.order_item_id, id);
   const credit = Math.max(0, Math.min(eligibleTotal - prior, eligibleTotal));
   if (credit <= 0) {
     throw badRequest('Earlier credits already cover the eligible difference — nothing left to credit', 'ALREADY_COMPENSATED');
   }
-
-  const flip = await c.env.DB.prepare(
-    `UPDATE price_protection_claims SET state = 'approved', decided_by = ?, decided_at = ?
-      WHERE id = ? AND state = 'requested'`
-  )
-    .bind(admin.id, nowIso, id)
-    .run();
-  if (flip.meta.changes === 0) throw badRequest('This claim was already decided');
-
   const order = await c.env.DB.prepare('SELECT exchange_rate FROM orders WHERE id = ?')
-    .bind(claim.order_id)
-    .first<{ exchange_rate: number }>();
+    .bind(claim.order_id).first<{ exchange_rate: number }>();
   const rate = Math.trunc(Number(order?.exchange_rate)) || 1400;
-  // Floored, with the credited dinars recorded beside the cents (0108) — the
-  // same rule as the return refund above, so the customer reads exactly the
-  // compensation that was approved, not its cents converted back.
   const cents = Math.floor((credit * 100) / rate);
-
-  let credited = false;
-  if (cents > 0) {
-    const ledgerDinars = await walletLedgerDinarsReady(c.env.DB);
-    try {
-      await walletCreditStatement(c.env.DB, ledgerDinars, {
-        id: `wtx_pp_${id}`,
-        userId: claim.user_id,
-        cents,
-        note: `Price-protection credit for claim ${id} (order ${claim.order_id})`,
-        ref: claim.order_id,
-        nowIso,
-        amountIqd: credit,
-        rate,
-      }).run();
-      credited = true;
-      if (eventsEnabled(c.env)) {
-        await emitFromRequest(
-          c,
-          RefundCompletedV1,
-          {
-            ref_type: 'price_protection',
-            ref_id: id,
-            user_id: claim.user_id,
-            usd_cents: cents,
-            points: 0,
-            ledger_tx_ids: [`wtx_pp_${id}`],
-            event_key: `wtx_pp_${id}`,
-          },
-          { aggregateId: claim.user_id, actorId: admin.id }
-        );
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!(msg.includes('UNIQUE') || msg.includes('PRIMARY KEY'))) throw e;
-    }
+  if (!Number.isSafeInteger(credit) || !Number.isSafeInteger(cents) || cents <= 0) {
+    throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
   }
-  await c.env.DB.prepare(
-    "UPDATE price_protection_claims SET state = 'credited', credited_iqd = ? WHERE id = ? AND state = 'approved'"
-  )
-    .bind(credit, id)
-    .run();
+  const db = c.env.DB;
+  const ledgerDinars = await walletLedgerDinarsReady(db);
+  // Claims predate ops_guards. Their own state CHECK gives an old-schema-safe
+  // transactional fence. No guard row survives a successful transaction.
+  const guard = db.prepare(`INSERT INTO price_protection_claims
+    (id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
+    SELECT ?,?,?,?,0,0,1,'financial_guard' WHERE
+      NOT EXISTS(SELECT 1 FROM price_protection_claims WHERE id=? AND state='requested')
+      OR (SELECT COALESCE(SUM(credited_iqd),0) FROM price_protection_claims
+        WHERE order_item_id=? AND state IN ('approved','credited') AND id<>?)<>?
+      OR EXISTS(SELECT 1 FROM return_cases WHERE order_item_id=? AND state='resolved' AND resolution='refund')
+      OR EXISTS(SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>?)
+      OR (SELECT total_iqd FROM orders WHERE id=?) IS NOT ?`)
+    .bind(newId('pp_guard'), claim.user_id, claim.order_id, claim.order_item_id,
+      id, claim.order_item_id, id, prior, claim.order_item_id, claim.order_item_id, id, claim.order_id, paid.orderTotal);
+  try {
+    await db.batch([
+      guard,
+      db.prepare(`UPDATE price_protection_claims SET state='credited', credited_iqd=?, decided_by=?, decided_at=?
+        WHERE id=? AND state='requested'`).bind(credit, admin.id, nowIso, id),
+      walletCreditStatement(db, ledgerDinars, {
+        id: `wtx_pp_${id}`, userId: claim.user_id, cents,
+        note: `Price-protection credit for claim ${id} (order ${claim.order_id})`,
+        ref: claim.order_id, nowIso, amountIqd: credit, rate,
+      }),
+    ]);
+  } catch (e) {
+    const message = String(e);
+    if (/CHECK constraint failed:.*state/s.test(message)) {
+      throw badRequest(serverMessage('PRICE_PROTECTION_RETRY'), 'PRICE_PROTECTION_RETRY');
+    }
+    if (/UNIQUE constraint|PRIMARY KEY/.test(message)) {
+      throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
+    }
+    throw e;
+  }
+  const credited = true;
+  if (eventsEnabled(c.env)) {
+    await emitFromRequest(c, RefundCompletedV1, {
+      ref_type: 'price_protection', ref_id: id, user_id: claim.user_id,
+      usd_cents: cents, points: 0, ledger_tx_ids: [`wtx_pp_${id}`], event_key: `wtx_pp_${id}`,
+    }, { aggregateId: claim.user_id, actorId: admin.id });
+  }
 
   await audit(c.env.DB, admin.id, 'price_protection.approve', id, { credited_iqd: credit, usd_cents: cents, reason });
   const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();

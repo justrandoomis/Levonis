@@ -61,7 +61,7 @@ async function stateOf(over: Record<string, unknown> = {}, answerOver: Record<st
   const { emptyDimensions } = await mods();
   const dims = () => ({ ...emptyDimensions() });
   const inputs = { supplier_cost_amount: '899.5', supplier_cost_currency: 'USD', supplier_input_mode: null, original_input_amount: null, conversion_rate_snapshot: null, converted_at: null, shipping_profile: 'CHINA_SEA', shipping_weight_g: null, pricing_weight_g: null, shipping_length_mm: 600, shipping_width_mm: 520, shipping_height_mm: 480, manual_cbm: null, additional_cost_iqd: 15000, source_ref: 'owner' };
-  const scope = (s: 'base' | 'option', id: string, pricing: unknown) => ({ scope: s, scope_id: id, name_ar: id ? 'U1' : '', name_en: id ? 'U1' : '', name_ckb: id ? 'U1' : '', pricing_inputs: pricing, minimum_target_profit_usd: '120', target_profit_iqd: null, target_profit_state: null, direct_sale_extra_iqd: 25000, direct_sale_extra_state: null });
+  const scope = (s: 'base' | 'option', id: string, pricing: unknown) => ({ scope: s, scope_id: id, name_ar: id ? 'U1' : '', name_en: id ? 'U1' : '', name_ckb: id ? 'U1' : '', pricing_inputs: pricing, minimum_target_profit_usd: '120', target_profit_iqd: null, target_profit_state: null, direct_sale_extra_iqd: 25000 as number | null, direct_sale_extra_state: null });
   const summary = { state: 'blocked', issue_codes: ['FX_DERIVED_STALE'], shipping_profile: 'CHINA_SEA', profile_source: 'default', engine_priced: false, option_id: 'm1', rule_level: 'product', minimum_target_profit_usd: '120', target_profit_iqd: null, target_profit_cents: 12_000, current_total_cost_cents: null, final_price_cents: null, preorder_base_iqd: null, direct_sale_extra_iqd: 25_000, direct_sale_price_iqd: null, rounding_added_iqd: 0, supplier_original_amount: '899.5', supplier_original_currency: 'USD', iqd_converted: null, cross_rate: null, supplier_cost_usd: '899.5', supplier_cost_cents: 89_950, basis: 'cbm', effective_weight_g: null, effective_cbm: '0.14976', shipping_rate: null, shipping_cost_iqd: null, shipping_cost_usd: null, shipping_cost_cents: null, additional_cost_iqd: 15000, additional_cost_usd: null, additional_cost_cents: null, excluded_charges: [], current_total_cost_usd: null, final_price_usd: null, usd_iqd_rate: '1600', document_rate: null, store_price_iqd: 1_579_000 };
   const answer = { product_id: 'p1', mode: 'manual', inputs_seq: 3, rates: { usd_iqd_rate: '1600', review_pending: false, derived_stale: false }, scopes: [scope('base', '', inputs), scope('option', 'm1', null)], models: [{ option_id: 'm1', name_ar: 'U1', name_en: 'U1', name_ckb: 'U1', sells_direct: true, pricing_summary: summary }], rows: [], preview_hash: 'a'.repeat(64), ...answerOver };
   const form = { baseDimensions: dims(), optionDimensions: { m1: dims() }, savedBaseDimensions: dims(), savedOptionDimensions: { m1: dims() }, models: [{ id: 'm1', name_en: 'U1', name_ar: 'U1', name_ckb: 'U1', sells_direct: true }], productSellsDirect: true, setMeasure: () => {} };
@@ -254,5 +254,62 @@ test('S9 the product form’s own chrome (section ٨’s summary, the bar) speak
     for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(v(lang).length > 3, `${k} ${lang}`);
     assert.notEqual(v('ckb'), v('ar'), `${k}: ckb copies the Arabic`);
     assert.notEqual(v('en'), v('ar'), `${k}: en copies the Arabic`);
+  }
+});
+
+test('S10 section 8 explains manual versus engine pricing and offers adoption only for complete stored data in all three languages', async () => {
+  const { M, S, createElement, render } = await mods();
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const readyState = await stateOf({}, { adoption: ADOPT });
+    const ready = render(lang, readyState, createElement(M.UsdPricingPreview));
+    assert.ok(text(ready).includes(S[lang].previewNote));
+    assert.ok(text(ready).includes(S[lang].scopeOverrides));
+    assert.match(ready, /data-pricing-readiness="ready"/);
+    assert.ok(text(ready).includes(S[lang].reviewAndAdopt));
+    const engine = text(render(lang, await stateOf({ engine: true }, { mode: 'engine', adoption: { ...ADOPT, kind: 'reprice', needs_write: false } }), createElement(M.UsdPricingPreview)));
+    assert.ok(engine.includes(S[lang].pricesEngine));
+    assert.ok(!engine.includes(S[lang].previewNote), `${lang}: an adopted product never says automatic pricing is disabled`);
+    assert.ok(!engine.includes(S[lang].reviewAndAdopt), `${lang}: unchanged engine prices need no adoption`);
+    const dirty = render(lang, { ...readyState, dirty: true, invalid: true, invalidWhere: 'invalid supplier cost' }, createElement(M.UsdPricingPreview));
+    assert.match(dirty, /<button type="button"[^>]*disabled=""[^>]*data-pricing-save/);
+    assert.ok(text(dirty).includes(S[lang].saveBlocked('invalid supplier cost')));
+    assert.ok(!dirty.includes('data-pricing-review'), 'unsaved inputs never adopt the stale stored preview');
+    const held = render(lang, { ...readyState, review: { stored: true } }, createElement(M.UsdPricingPreview));
+    assert.ok(!held.includes('data-pricing-review'), 'an open review is not duplicated');
+    const later = render(lang, { ...readyState, outcome: { kind: 'ready', tone: 'warn', text: S[lang].savedLater } }, createElement(M.UsdPricingPreview));
+    assert.ok(later.includes('data-pricing-review'), 'choosing later keeps the explicit adoption action available');
+  }
+});
+
+test('S11 a priced preorder and missing direct extra name the blocked model/channel and explain explicit zero without filling it', async () => {
+  const { M, S, createElement, render } = await mods();
+  const { issueText, channelName } = await import('../src/components/adminOperations/procurementPricingStrings');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const row = {
+      option_id: 'm1', name_ar: 'بكرة منخفضة الحرارة', name_en: 'Low temperature spool', name_ckb: 'بەکرەی گەرمی نزم',
+      channel: 'direct_sale', today_prepaid_iqd: 8750, today_cod_iqd: 8750, cod_priced_as_direct: false,
+      computed_price_iqd: null, change_iqd: null, replacement_cost_iqd: null, target_profit_usd: null,
+      target_profit_iqd: null, direct_sale_extra_iqd: null, preorder_base_iqd: null, issue_codes: ['DIRECT_SALE_EXTRA_MISSING'],
+    };
+    const state = await stateOf({}, {
+      rows: [row, { ...row, channel: 'pre_order_sea', computed_price_iqd: 14000, replacement_cost_iqd: 6974, target_profit_usd: '4', preorder_base_iqd: 14000, issue_codes: [] }],
+      adoption: { ...ADOPT, kind: null, complete: false, needs_write: false, missing_codes: ['DIRECT_SALE_EXTRA_MISSING'] },
+    });
+    state.answer.scopes = state.answer.scopes.map((scope) => ({ ...scope, direct_sale_extra_iqd: null }));
+    state.shown = state.answer;
+    const preview = render(lang, state, createElement(M.UsdPricingPreview));
+    assert.match(preview, /data-pricing-readiness="blocked"/);
+    assert.ok(text(preview).includes(S[lang].previewBlocked));
+    assert.ok(text(preview).includes(`${row[`name_${lang}`]} · ${channelName('direct_sale', lang)}: ${issueText('DIRECT_SALE_EXTRA_MISSING', lang)}`));
+    assert.ok(text(preview).includes(S[lang].extraMissing));
+    assert.ok(preview.includes('14,000'), 'the priced preorder remains visible');
+    assert.ok(!preview.includes('data-pricing-review'), 'a single priced channel cannot enable all-channel adoption');
+    const panel = render(lang, state, createElement(M.UsdPricingProductPanel));
+    assert.ok(text(panel).includes(S[lang].extraMissing), 'the direct extra field and blocked status explain the missing value');
+    assert.match(panel, new RegExp(`placeholder="${S[lang].extraUnset}" value=""`), 'missing does not become zero');
+  }
+  for (const k of ['previewNote', 'previewBlocked', 'previewSaveFirst', 'scopeOverrides', 'extraMissing', 'extraUnset', 'pricesEngine'] as const) {
+    assert.notEqual(S.ckb[k], S.ar[k], `${k}: Sorani has its own copy`);
+    assert.notEqual(S.en[k], S.ar[k], `${k}: English has its own copy`);
   }
 });

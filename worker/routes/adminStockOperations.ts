@@ -121,6 +121,7 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
   // parent's purchase-time snapshot in the same INSERT and names its parent.
   // Without 0182 the INSERT is the one before FX-6.
   const snapshots = target !== lotId && (await batchSnapshotInstalled(db));
+  const exactCapital = target !== lotId && !!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='purchase_investor_lot_capital'").first();
   const statements = [
     ...fence(
       db,
@@ -160,6 +161,12 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
     statements.push(...fence(db,'COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',[lotId,costVersion?.version??0]));
     if(target!==lotId&&costVersion)statements.push(db.prepare('INSERT INTO inventory_lot_cost_versions(lot_id,version,unit_cost_iqd,adjustment_id) VALUES (?,1,?,?)').bind(target,costVersion.unit_cost_iqd,costVersion.adjustment_id));
   }
+  // The receipt split at every principal remainder, so each parent's units
+  // share one exact principal amount per contract. A location split inherits
+  // that evidence, including through nested transfers, in the same transaction.
+  // Parent receipt rows stay immutable; balances use each lot's remaining qty.
+  if(exactCapital)statements.push(db.prepare(`INSERT INTO purchase_investor_lot_capital(lot_id,contract_id,unit_principal_iqd,qty)
+    SELECT ?,contract_id,unit_principal_iqd,? FROM purchase_investor_lot_capital WHERE lot_id=?`).bind(target,qty,lotId));
   statements.push(
     db
       .prepare(

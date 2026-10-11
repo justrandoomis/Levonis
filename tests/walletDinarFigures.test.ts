@@ -394,6 +394,12 @@ test('both return-side credits write their dinars beside the cents', async () =>
   const { ROOT } = await import('./fixtures/d1');
   const src = readFileSync(join(ROOT, 'worker/routes/returns.ts'), 'utf8');
   assert.match(src, /walletCreditStatement\(c\.env\.DB, ledgerDinars, \{[\s\S]{0,300}amountIqd: walletRefundIqd,/, 'the return refund');
-  assert.match(src, /walletCreditStatement\(c\.env\.DB, ledgerDinars, \{[\s\S]{0,300}amountIqd: credit,/, 'the price-protection credit');
+  const protection = src.slice(src.indexOf("priceProtectionRoutes.post('/admin/claims/:id/decide'"));
+  assert.match(protection, /const db = c\.env\.DB;/, 'the protection transaction uses the request database');
+  const protectionBatch = protection.match(/await db\.batch\(\[([\s\S]*?)\]\);/)?.[1];
+  assert.ok(protectionBatch, 'price-protection settlement commits in one database batch');
+  assert.match(protectionBatch, /\bguard,/, 'the same batch checks the settlement fence');
+  assert.match(protectionBatch, /UPDATE price_protection_claims SET state='credited'/, 'the claim is marked credited in the wallet transaction');
+  assert.match(protectionBatch, /walletCreditStatement\(db, ledgerDinars, \{[\s\S]{0,300}amountIqd: credit, rate,/, 'the price-protection credit records its actual dinars and historical rate');
   assert.doesNotMatch(src, /Math\.round\(\((walletRefundIqd|credit) \* 100\) \/ rate\)/, 'no rounding up into cents');
 });

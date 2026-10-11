@@ -91,6 +91,11 @@ export interface UsdPricingFormStrings {
   modelSavedLater: string;
   previewTitle: string;
   previewNote: string;
+  previewBlocked: string;
+  previewSaveFirst: string;
+  scopeOverrides: string;
+  extraMissing: string;
+  extraUnset: string;
   previewIncludesDrafts: string;
   previewEmpty: string;
   // ---- the save is never silent (owner report 2026-10-10) ----
@@ -218,7 +223,12 @@ const ar: UsdPricingFormStrings = {
   perSkuNote: 'يُسعَّر هذا المنتج لكل لون ونسخة: صف لكل نسخة وطريقة بيع',
   modelSavedLater: 'موديل جديد: يُحفظ تسعيره بعد حفظ المنتج، ويظهر ملخصه بعدها',
   previewTitle: 'الأسعار الجديدة لكل موديل وطريقة بيع',
-  previewNote: 'معاينة فقط: لا تُكتب أسعار الزبون في هذه المرحلة، ويبقى سعر المتجر كما هو',
+  previewNote: 'التسعير التلقائي غير معتمد لهذا المنتج بعد. أكمل متطلبات جميع طرق البيع، ثم راجع السعر الجديد واعتمده ليتحدّث سعر المتجر.',
+  previewBlocked: 'تعذّر اعتماد الأسعار الجديدة لجميع طرق البيع؛ الأسعار الحالية لم تتغير. أكمل الحقول التالية ثم احفظ التسعير وراجع الأسعار:',
+  previewSaveFirst: 'احفظ بيانات التسعير أولًا لفتح مراجعة الأسعار الجديدة واعتمادها.',
+  scopeOverrides: 'قيم المنتج هي الأساس. قيمة محددة في الخيار أو اللون أو تركيبة الخيارات تتقدّم عليها؛ يعرض الجدول الحد الأدنى للربح الفعلي لكل موديل.',
+  extraMissing: 'الزيادة غير محددة للبيع المباشر. أدخل مبلغًا من مضاعفات 1,000، أو أدخل 0 صراحةً إذا لا تريد زيادة. تركه فارغًا يرث قيمة محددة في مستوى أعلى، ولا يعني صفرًا.',
+  extraUnset: 'غير محددة',
   previewIncludesDrafts: 'تشمل تغييرات التسعير غير المحفوظة',
   previewEmpty: 'لا يوجد موديل معروض للبيع الآن',
   decimalSeparator: 'اكتب الكسر بنقطة (مثل 899.5)، ولا تفصل الآلاف بفاصلة',
@@ -252,7 +262,7 @@ const ar: UsdPricingFormStrings = {
   savedShort: 'محفوظ',
   sheetProductSaved: 'حُفظ المنتج نفسه، أما تغييرات التسعير فلم تُحفظ بعد: هذا المنتج مسعّر تلقائيًا، فتُحفظ مع أسعاره الجديدة معًا عند التأكيد أدناه.',
   adoptNotDone: (m) => `بيانات التسعير محفوظة، ولم يُعتمد السعر الجديد: ${m}`,
-  pricesEngine: 'هذا المنتج مسعّر تلقائيًا: يُكتب سعر المتجر من هذه البيانات، وتُعرض عليك الأسعار الجديدة قبل كل حفظ.',
+  pricesEngine: 'التسعير التلقائي مفعّل لقنوات البيع المعتمدة لهذا المنتج. تُراجع تغييرات المدخلات قبل حفظ الأسعار، وتعيد تحديثات الصرف والشحن المعتمدة تسعير القنوات المرتبطة.',
   iqdAtRate: (rate) => `يُحوَّل عند الحفظ بسعر الدولار المعتمد: ${rate} د.ع للدولار`,
   rateUnseen: (a, u, r) => `سعر الدولار المعتمد الآن ${r} د.ع: ${a} د.ع تصبح $${u}. لم تُحفظ تكلفة المورد بالدينار لأنك لم ترَ هذا السعر قبل الحفظ؛ احفظ مرة أخرى لتُحفظ به.`,
   restSavedWithheld: (m) => `حُفظت بقية بيانات التسعير، ولم تُحفظ تكلفة المورد بالدينار: ${m}`,
@@ -332,7 +342,12 @@ const en: UsdPricingFormStrings = {
   perSkuNote: 'This product is priced per colour and variant: one row per variant and sale channel',
   modelSavedLater: 'A new model: its pricing is saved after the product is saved, and its summary appears then',
   previewTitle: 'New prices per model and sale channel',
-  previewNote: 'Preview only: customer prices are not written at this stage, and the store price stays as it is',
+  previewNote: 'Automatic pricing has not been adopted for this product yet. Complete every sale channel, then review and adopt the new prices to update the store.',
+  previewBlocked: 'The new prices cannot be adopted for every sale channel; current prices are unchanged. Complete these fields, then save pricing and review the prices:',
+  previewSaveFirst: 'Save the pricing data first to review and adopt the new prices.',
+  scopeOverrides: 'Product values are defaults. A value set on a model, colour or variant takes precedence; the table shows each model’s effective minimum profit.',
+  extraMissing: 'Direct Sale Extra is not set. Enter a multiple of 1,000, or explicitly enter 0 if you want no extra. An empty field inherits a configured value from a higher level; it does not mean zero.',
+  extraUnset: 'Not set',
   previewIncludesDrafts: 'Includes unsaved pricing changes',
   previewEmpty: 'No model is on sale now',
   decimalSeparator: 'Write decimals with a point (e.g. 899.5) and no thousands separators',
@@ -366,7 +381,7 @@ const en: UsdPricingFormStrings = {
   savedShort: 'Saved',
   sheetProductSaved: 'The product itself is saved, but the pricing changes are not saved yet: this product is priced automatically, so they are saved together with its new prices when you confirm below.',
   adoptNotDone: (m) => `The pricing data is saved, but the new price was not adopted: ${m}`,
-  pricesEngine: 'This product is priced automatically: its store price is written from this data, and the new prices are shown to you before every save.',
+  pricesEngine: 'Automatic pricing is active for this product’s adopted sale channels. Input changes are reviewed before prices are saved; approved FX and shipping updates reprice the linked channels.',
   iqdAtRate: (rate) => `Converted when saved at the approved dollar rate: ${rate} IQD per dollar`,
   rateUnseen: (a, u, r) => `The approved dollar rate is now ${r} IQD: ${a} IQD becomes $${u}. The supplier cost in dinars was not saved because you had not seen this rate before saving; save again to store it at this rate.`,
   restSavedWithheld: (m) => `The rest of the pricing data is saved; the supplier cost in dinars is not: ${m}`,
@@ -446,7 +461,12 @@ const ckb: UsdPricingFormStrings = {
   perSkuNote: 'ئەم بەرهەمە بۆ هەر ڕەنگ و جۆرێک نرخی بۆ دادەنرێت: ڕیزێک بۆ هەر جۆر و ڕێگایەکی فرۆشتن',
   modelSavedLater: 'مۆدێلی نوێ: نرخدانانەکەی دوای پاشەکەوتکردنی بەرهەمەکە پاشەکەوت دەکرێت و پوختەکەی ئەو کاتە دەردەکەوێت',
   previewTitle: 'نرخە نوێیەکان بۆ هەر مۆدێل و ڕێگایەکی فرۆشتن',
-  previewNote: 'تەنها پێشبینین: لەم قۆناغەدا نرخی کڕیار نانووسرێت و نرخی فرۆشگا وەک خۆی دەمێنێتەوە',
+  previewNote: 'هێشتا نرخدانانی خۆکار بۆ ئەم بەرهەمە پەسەند نەکراوە. داواکارییەکانی هەموو شێوازەکانی فرۆشتن تەواو بکە، پاشان نرخە نوێیەکان ببینە و پەسەندیان بکە تا نرخی فرۆشگا نوێ بێتەوە.',
+  previewBlocked: 'نرخە نوێیەکان بۆ هەموو شێوازەکانی فرۆشتن پەسەند ناکرێن؛ نرخە ئێستاییەکان نەگۆڕاون. ئەم خانانە تەواو بکە، پاشان نرخدانان پاشەکەوت بکە و نرخەکان ببینە:',
+  previewSaveFirst: 'سەرەتا زانیارییەکانی نرخدانان پاشەکەوت بکە تا نرخە نوێیەکان ببینیت و پەسەندیان بکەیت.',
+  scopeOverrides: 'بەهاکانی بەرهەم بنەڕەتن. بەهای دیاریکراوی مۆدێل، ڕەنگ یان ڤاریانت پێشینەیە؛ خشتەکە کەمترین قازانجی کاریگەر بۆ هەر مۆدێلێک پیشان دەدات.',
+  extraMissing: 'زیادەی فرۆشتنی ڕاستەوخۆ دیاری نەکراوە. بڕێک بە چەندەی 1,000 بنووسە، یان ئەگەر زیادەت ناوێت بە ڕوونی 0 بنووسە. خانەی بەتاڵ بەهای دیاریکراوی ئاستی سەرەوە وەردەگرێت؛ بە مانای سفر نییە.',
+  extraUnset: 'دیاری نەکراوە',
   previewIncludesDrafts: 'گۆڕانکارییە پاشەکەوتنەکراوەکانی نرخدانان لەخۆ دەگرێت',
   previewEmpty: 'ئێستا هیچ مۆدێلێک بۆ فرۆشتن پیشان نادرێت',
   decimalSeparator: 'کەرت بە خاڵ بنووسە (وەک 899.5)، و هەزارەکان بە فاریزە جیا مەکەرەوە',
@@ -480,7 +500,7 @@ const ckb: UsdPricingFormStrings = {
   savedShort: 'پاشەکەوت کراوە',
   sheetProductSaved: 'بەرهەمەکە خۆی پاشەکەوت کرا، بەڵام گۆڕانکارییەکانی نرخدانان هێشتا پاشەکەوت نەکراون: ئەم بەرهەمە بە خۆکاری نرخی بۆ دادەنرێت، بۆیە لەگەڵ نرخە نوێیەکانیدا پێکەوە پاشەکەوت دەکرێن کاتێک لە خوارەوە پشتڕاستی دەکەیتەوە.',
   adoptNotDone: (m) => `زانیارییەکانی نرخدانان پاشەکەوت کراون، بەڵام نرخە نوێیەکە پەسەند نەکرا: ${m}`,
-  pricesEngine: 'ئەم بەرهەمە بە خۆکاری نرخی بۆ دادەنرێت: نرخی فرۆشگا لەم زانیارییانەوە دەنووسرێت، و نرخە نوێیەکان پێش هەر پاشەکەوتکردنێک پیشانت دەدرێن.',
+  pricesEngine: 'نرخدانانی خۆکار بۆ شێوازە پەسەندکراوەکانی فرۆشتنی ئەم بەرهەمە چالاکە. گۆڕانکارییەکانی زانیاری پێش پاشەکەوتکردنی نرخەکان پێداچوونەوەیان بۆ دەکرێت؛ نوێکردنەوە پەسەندکراوەکانی دراو و ناردن نرخی شێوازە بەستراوەکان نوێ دەکەنەوە.',
   iqdAtRate: (rate) => `لە کاتی پاشەکەوتکردندا بە نرخی پەسەندکراوی دۆلار دەگۆڕدرێت: ${rate} د.ع بۆ هەر دۆلارێک`,
   rateUnseen: (a, u, r) => `نرخی پەسەندکراوی دۆلار ئێستا ${r} د.ع یە: ${a} د.ع دەبێتە $${u}. تێچووی دابینکەر بە دینار پاشەکەوت نەکرا چونکە پێش پاشەکەوتکردن ئەم نرخەت نەبینیبوو؛ دووبارە پاشەکەوت بکە بۆ ئەوەی بەم نرخە پاشەکەوت بکرێت.`,
   restSavedWithheld: (m) => `باقی زانیارییەکانی نرخدانان پاشەکەوت کران، بەڵام تێچووی دابینکەر بە دینار پاشەکەوت نەکرا: ${m}`,

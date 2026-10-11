@@ -23,9 +23,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiError } from '../src/lib/api';
-import { ctx } from './fixtures/app';
+import { ctx, json, post, put } from './fixtures/app';
+import { pairOf } from './fixtures/fx';
 import { pricingWorld } from './fixtures/procurementPricing';
-import { SNAP, legacyCost, liveLikeWorld, readBack, storePrice, type World } from './fixtures/usdPricingSave';
+import { SNAP, SNAP_MODEL, legacyCost, liveLikeWorld, readBack, storePrice, type World } from './fixtures/usdPricingSave';
 import {
   commitPricing,
   convertedLines,
@@ -139,6 +140,62 @@ test('NORMAL: a complete entry is saved as data and comes back READY (stored) �
   // Nothing typed any more: a second save sends nothing and offers the same review only while one is due.
   const again = await commitPricing(io, SNAP, {}, {});
   assert.equal(again.kind, 'nothing');
+});
+
+test('spool-like mixed product: missing direct extra holds both prices; explicit zero enables adoption, then approved FX and freight update both channels', async () => {
+  const w = pricingWorld();
+  try {
+    const io = ioOf(w);
+    const before = storePrice(w.raw);
+    const blocked = await commitPricing(io, SNAP, {
+      base: { supplier_cost_currency: 'CNY', supplier_cost_amount: '10.75', shipping_profile: 'CHINA_SEA', box: [200, 200, 67], manual_cbm: '0.00268', minimum_target_profit_usd: '1', direct_sale_extra_iqd: null },
+      [`option:${SNAP_MODEL}`]: { minimum_target_profit_usd: '4' },
+    }, {});
+    assert.equal(blocked.kind, 'saved');
+    if (blocked.kind !== 'saved') return;
+    assert.equal(blocked.ready, null);
+    assert.equal(blocked.answer.mode, 'manual');
+    assert.ok(blocked.answer.adoption?.missing_codes.includes('DIRECT_SALE_EXTRA_MISSING'));
+    const direct = blocked.answer.rows.find((r) => r.channel === 'direct_sale')!;
+    const preorder = blocked.answer.rows.find((r) => r.channel === 'pre_order_sea')!;
+    assert.ok(direct.issue_codes.includes('DIRECT_SALE_EXTRA_MISSING'));
+    assert.equal(direct.computed_price_iqd, null);
+    assert.equal(preorder.target_profit_usd, '4', 'the model’s explicit minimum overrides the product’s $1');
+    assert.equal(preorder.computed_price_iqd, 10000, '(10.75 CNY × .14 USD/CNY × 1600 IQD/USD) + (0.00268 × 400000) + (4 × 1600), rounded up to 1000');
+    assert.equal(storePrice(w.raw), before, 'one valid preorder never partially adopts a mixed product');
+
+    const complete = await commitPricing(io, SNAP, { base: { direct_sale_extra_iqd: 0 } }, {});
+    assert.equal(complete.kind, 'saved');
+    if (complete.kind !== 'saved') return;
+    assert.ok(complete.ready);
+    assert.equal(storePrice(w.raw), before, 'explicit zero is still data-only until the owner confirms the review');
+    const review = complete.ready!;
+    assert.deepEqual(review.adoption.rows.map((r) => [r.channel, r.computed_price_iqd]).sort(), [['direct_sale', 10000], ['pre_order_sea', 10000]]);
+    await io.put(inputsPath(SNAP), { ...review.body, preview_hash: review.hash, confirm_large_change: true });
+    const checkStored = async (expected: number) => {
+      const answer = await io.get(inputsPath(SNAP));
+      assert.equal(answer.mode, 'engine');
+      assert.deepEqual(answer.rows.map((r) => [r.channel, r.today_prepaid_iqd]).sort(), [['direct_sale', expected], ['pre_order_sea', expected]]);
+    };
+    await checkStored(10000);
+
+    const fxResponse = await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1800' });
+    const fx = await json(fxResponse);
+    assert.equal(fxResponse.status, 200, JSON.stringify(fx));
+    const changedFx = await put(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { rate: '1800', owner_version: pairOf(w.raw, 'USD_IQD').owner_version, preview_hash: fx.preview.preview_hash, confirm_large_change: true });
+    assert.equal(changedFx.status, 200, JSON.stringify(await json(changedFx.clone())));
+    await checkStored(11000); // 2709 supplier + 1072 freight + 7200 profit = 10981 → 11000.
+
+    const freightResponse = await post(w.app, '/api/admin/pricing/rates/shipping/CHINA_SEA/preview', { rate_iqd: '800000' });
+    const freight = await json(freightResponse);
+    assert.equal(freightResponse.status, 200, JSON.stringify(freight));
+    const version = w.raw.prepare("SELECT version FROM pricing_shipping_rates WHERE profile = 'CHINA_SEA'").get()!.version;
+    const changedFreight = await put(w.app, '/api/admin/pricing/rates/shipping/CHINA_SEA', { rate_iqd: '800000', version, preview_hash: freight.preview.preview_hash, confirm_large_change: true });
+    assert.equal(changedFreight.status, 200, JSON.stringify(await json(changedFreight.clone())));
+    await checkStored(13000); // 2709 supplier + 2144 freight + 7200 profit = 12053 → 13000, freight counted once.
+  } finally {
+    w.raw.close();
+  }
 });
 
 test('NORMAL: dinars with no cached preview — the save previews them itself, carries the conversion hash, stores IQD_CONVERTED and says the conversion', async () => {

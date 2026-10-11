@@ -4,6 +4,68 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
+## Follow-up candidate — pricing visibility and financial edge cases (2026-10-11)
+
+The owner reported that the product editor says “preview only” and that dollar/
+shipping edits leave the store price unchanged. The screenshots show an explicit
+missing Direct Sale Extra on a manual product. The existing all-channel gate is
+correct: one computed preorder row does not make the whole product ready. Zero
+is a valid **explicit owner choice**, not a missing-field default. The product's
+option/colour/SKU rules retain precedence over base values.
+
+This follow-up makes the product's actual manual/automatic state, missing model/
+channel inputs, save and reviewed price adoption visible in the final preview.
+It corrects the global pricing workspace's obsolete “later update” wording and
+refreshes sibling lists after bulk price adoption. Live customer quotes refresh
+on saved product revisions without losing their selection. A connected synthetic
+regression reproduces missing-extra → data-only/manual → explicit zero → reviewed
+adoption → later approved FX/freight repricing; freight is charged once.
+
+Independent financial review reproduced and repaired these additional paths:
+
+- Large stale catalogues could spend the whole repricing read budget before any
+  write, on every tick. An oversized backlog now advances a persistent circular
+  window within the existing budget; each product's price/cost write stays atomic.
+  Deficit priority remains global when the catalogue fits and within the window
+  otherwise. A 951-product regression checks conflicts and subsequent progress.
+- Partial location transfers of procurement-funded lots lost exact principal
+  evidence on the new lot. The transfer transaction now copies the immutable
+  per-unit amount, preserving remainder allocation through nested transfers,
+  sales and later cost corrections. Old funded lots missing principal evidence
+  now display an unknown balance with a review notice, not an understated total.
+  No historic receipt or paid ledger is rewritten.
+- Price-protection decisions could claim a sub-cent credit without a wallet entry,
+  or become stranded after a failed wallet write. Decision and actual wallet credit
+  now commit together with the cumulative-credit fence. Unpayable values and old
+  ambiguous approved claims require review. Reciprocal transaction fences prevent
+  a return and price protection paying twice for the same line, following the
+  existing published policy; ambiguous partial-unit overlap requires review.
+  Protection also caps claims to the frozen amount actually paid: membership,
+  coupon/points and accepted price adjustments are counted once, using the
+  existing return discount allocation and accepted invoice ceiling. Warranty/
+  transport fees are excluded. Pending legacy claims are rechecked; historical
+  paid rows are immutable. The final protection gate passed 51/51, including
+  24 new atomicity/race and actual-checkout regressions, with independent review.
+
+No migration or change to owner rates, profit rules, recorded payments, coupon
+accounting policy, or live product data is part of this follow-up.
+
+Local verification of the final source passed the full `npm run check` (including
+68 boundary cases), the frontend build with all seven live markers, and migration
+replay twice: 179 files, 352 tables, no foreign-key violations or orphan catalogues,
+zero files applied on the second pass. The 86-file affected run had 918 cases:
+917 passed and one obsolete source-shape assertion failed after the atomic wallet
+refactor. That assertion now checks the same dinar/rate invariant inside the
+guarded settlement transaction; its entire 16-case file passed on rerun. The
+separate final protection gate passed 51/51 and the pricing UI gate passed 40/40.
+The new backlog and exact-capital regressions also passed independent review.
+No unresolved local failure remains.
+
+This entry is **not publication evidence**. Workflow 7 and post-deploy verification
+must be recorded before claiming this candidate live. The earlier owner waiver
+of the hours-long duplicate local unit suite remains in force; workflow 7 still
+must pass the unchanged full suite before live deployment.
+
 ## Published release — 2026-10-11
 
 Code `1e4084620e0e638b73a2fa9988d3e2baf1a4fcbe`, tree

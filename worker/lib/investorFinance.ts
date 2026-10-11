@@ -266,14 +266,24 @@ export async function investmentContractSummary(db: D1Database, id: string) {
   const funded = (await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND kind='funding'").bind(id).first<{ n: number }>())?.n ?? 0;
   const inventory = (await db.prepare(`SELECT SUM(l.qty_remaining*COALESCE((SELECT v.unit_cost_iqd FROM inventory_lot_cost_versions v WHERE v.lot_id=l.id ORDER BY version DESC LIMIT 1),l.unit_cost_iqd)) AS n,
     SUM(CASE WHEN l.unit_cost_iqd IS NULL THEN l.qty_remaining ELSE 0 END) AS unknown FROM inventory_lots l WHERE l.incoming_id=?`).bind(contract.incoming_id).first<{ n: number; unknown: number }>());
-  const exactInventory=await db.prepare('SELECT SUM(l.qty_remaining*p.unit_principal_iqd) AS n FROM purchase_investor_lot_capital p JOIN inventory_lots l ON l.id=p.lot_id WHERE p.contract_id=?').bind(id).first<{n:number|null}>();
+  // Old location splits may predate principal inheritance. For an exact
+  // procurement contract, a known subset is not the whole balance and the
+  // historical funding ratio is not a substitute for missing receipt evidence.
+  // Exhausted lots do not obscure the capital still on the shelf; a restored
+  // unevidenced unit makes the next read unknown again.
+  const exactInventory=await db.prepare(`SELECT
+    EXISTS(SELECT 1 FROM purchase_investor_allocations WHERE contract_id=?1) AS exact,
+    COALESCE(SUM(l.qty_remaining*p.unit_principal_iqd),0) AS n,
+    COALESCE(SUM(CASE WHEN p.lot_id IS NULL THEN l.qty_remaining ELSE 0 END),0) AS missing_qty
+    FROM inventory_lots l LEFT JOIN purchase_investor_lot_capital p ON p.lot_id=l.id AND p.contract_id=?1
+    WHERE l.incoming_id=?2 AND l.qty_remaining>0`).bind(id,contract.incoming_id).first<{exact:number;n:number;missing_qty:number}>();
   const sources = (await investorParticipantSources(db, contract.user_id)).filter(s => s.contract_id === id);
   const {participantSources,participantWithdrawableSources}=await import('./financeParticipants');
   const budgets=participantWithdrawableSources(await participantSources(db,contract.user_id));
   const available=(kind:string)=>budgets.get(`${kind==='investor_profit'?'invprofit':'invcapital'}:${id}`)??0;
   const loss = (await db.prepare("SELECT COALESCE(amount_iqd,0) AS n FROM investor_capital_losses WHERE contract_id=?").bind(id).first<{ n: number }>())?.n ?? 0;
   return { contract, summary: { funded_iqd: funded, principal_iqd: contract.principal_iqd,
-    inventory_capital_iqd: exactInventory?.n??(inventory?.unknown ? null : percent(inventory?.n ?? 0, contract.capital_share_bps)),
+    inventory_capital_iqd: exactInventory?.exact ? exactInventory.missing_qty>0?null:exactInventory.n : inventory?.unknown ? null : percent(inventory?.n ?? 0, contract.capital_share_bps),
     accrued_profit_iqd: sources.find(s => s.kind === 'investor_profit')?.accrued_iqd ?? 0,
     available_profit_iqd: available('investor_profit'),available_capital_iqd:available('investor_capital'),
     paid_profit_iqd:sources.find(s=>s.kind==='investor_profit')?.paid_iqd??0,paid_capital_iqd:sources.find(s=>s.kind==='investor_capital')?.paid_iqd??0,

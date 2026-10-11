@@ -192,7 +192,7 @@ test('section ٣ offers the four currencies and the dinar input; section ٨ show
   const preview = withState(stateOf(answer), createElement(UsdPricingPreview));
   for (const h of [P.colReplacement, P.colMinProfit, P.colNewPreorder, P.colExtra, P.colNewDirect, P.colOldNew]) assert.ok(preview.includes(h), h);
   assert.ok(preview.includes('800,000 د.ع') && preview.includes('1,017,000 د.ع') && preview.includes('$120'));
-  assert.ok(preview.includes(S.previewNote), 'this stage writes no customer price');
+  assert.ok(preview.includes(S.previewNote), 'a manual product explains the review and adoption step');
 
   const off = stateOf(answer, { enabled: false });
   for (const el of [createElement(UsdPricingProductPanel), createElement(UsdPricingPreview), createElement(UsdPricingModelRow, { model: { id: 'm1', name_en: 'Model', sells_direct: true } })])

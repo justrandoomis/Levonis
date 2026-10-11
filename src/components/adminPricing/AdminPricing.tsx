@@ -1,9 +1,9 @@
 /**
- * «التسعير والشحن» — THE OWNER'S PRICING WORKSPACE, P1: A PREVIEW
+ * «التسعير والشحن» — THE OWNER'S PRICING WORKSPACE
  * (MVP plan §6 P1; owner decision 2; answer B).
  *
  * What the owner sees:
- *   - a banner, first and always: preview only, nothing changes in the store;
+ *   - a status banner distinguishing confirmed writes from read-only previews;
  *   - every ordinary product with its status (worst first), the counts, a
  *     search and a status filter (PricingProducts);
  *   - one product: today's prices per model × channel with the old route fee
@@ -156,12 +156,12 @@ export default function AdminPricing() {
 
       {/* Approved exchange and shipping rates refresh adopted product prices.
           Manual products keep their prices until the owner applies a preview. */}
-      {!productId && <RatesPanel lang={lang} dir={dir} onChanged={refreshPrices} />}
+      {!productId && <RatesPanel lang={lang} dir={dir} onChanged={refreshPrices} reloadKey={reload} />}
 
-      <PreviewBanner lang={lang} body={s.previewBody} />
+      <PreviewBanner lang={lang} title={productId ? undefined : s.workspaceTitle} body={productId ? s.previewBody : s.workspaceBody} />
 
       {/* Owner decision 8: the products whose new prices wait for one save (stale rates, complete but manual). */}
-      {!productId && <EngineSaveList lang={lang} reloadKey={reload} />}
+      {!productId && <EngineSaveList lang={lang} reloadKey={reload} onChanged={refreshPrices} />}
 
       {productId ? (
         <ProductPricingSheet key={productId} id={productId} lang={lang} dir={dir} s={s} onBack={back} />

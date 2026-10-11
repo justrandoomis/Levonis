@@ -150,6 +150,7 @@ const REQUIRED: Record<string, readonly string[]> = {
   // End-to-end financial consistency audit: a receipt and a concurrent cost edit must not disagree.
   'Inventory consistency (owner request 2026-10-10)': ['INCOMING_CHANGED'],
   'Refund consistency (owner request 2026-10-10)': ['RETURN_REFUND_REVIEW_REQUIRED'],
+  'Price-protection settlement consistency (owner request 2026-10-11)': ['PRICE_PROTECTION_REVIEW_REQUIRED', 'PRICE_PROTECTION_RETRY', 'PRICE_PROTECTION_RETURN_REVIEW'],
   'Membership accounting consistency (owner request 2026-10-11)': ['MEMBERSHIP_SALE_REVIEW_REQUIRED'],
   'Deleted-product wage consistency (owner request 2026-10-11)': ['WAGE_SCOPE_REVIEW_REQUIRED'],
   // Owner request 2026-10-10: the investment remainder returns to the investor's «أرباحي».

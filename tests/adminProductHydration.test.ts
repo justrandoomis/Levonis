@@ -797,8 +797,9 @@ test('ProductForm: loads through hydrateRelations, keeps a stored section/family
   // The stored specs render even when the section has no template.
   assert.match(src, /storedSpecCount > 0\s*\?\s*`\$\{storedSpecCount\} مواصفة محفوظة بلا قالب قسم`/);
   // One source on screen: the price preview lists what sections 5–6 show.
-  assert.match(src, /<PricePreview productId=\{doc\.id\} savedDoc=\{doc\} rel=\{rel\} dirty=\{dirty\} \/>/);
+  assert.match(src, /<PricePreview productId=\{doc\.id\} savedDoc=\{doc\} rel=\{rel\} dirty=\{dirty\} savedRevision=\{baseline\} \/>/);
   assert.match(read('src/components/adminProducts/PricePreview.tsx'), /hasRelationStructure\(rel\)/);
+  assert.match(read('src/components/adminProducts/PricePreview.tsx'), /\[productId, savedRevision, optionId, pickedKey, perGroup, colorId, transport, warrantyId, tier\]/, 'same selection is re-quoted after a saved price or relation changes');
   // Stored placements and the struck-through price the form has no input for.
   assert.match(src, /data-form="catalogs-preserved"/);
   assert.match(src, /data-form="original-price-preserved"/);

@@ -39,7 +39,7 @@ import { fxCount } from './format';
 import EngineSaveList from './EngineSaveList';
 import RatePreviewSheet, { type RateActRequest } from './RatePreview';
 
-export default function RatesPanel({ lang, dir, onChanged }: { lang: Language; dir: 'rtl' | 'ltr'; onChanged?: () => void }) {
+export default function RatesPanel({ lang, dir, onChanged, reloadKey = 0 }: { lang: Language; dir: 'rtl' | 'ltr'; onChanged?: () => void; reloadKey?: number }) {
   const s = fxStrings(lang);
   const titleId = useId();
   const [data, setData] = useState<FxRatesAnswer | null>(null);
@@ -63,7 +63,7 @@ export default function RatesPanel({ lang, dir, onChanged }: { lang: Language; d
         if (!ac.signal.aborted && !isAborted(e)) setError(e);
       });
     return () => ac.abort();
-  }, [reload]);
+  }, [reload, reloadKey]);
 
   const onAnswer = useCallback((answer: FxRatesAnswer) => {
     setData(answer);
@@ -164,7 +164,7 @@ export default function RatesPanel({ lang, dir, onChanged }: { lang: Language; d
       )}
 
       {/* A confirmed rate that moved leaves engine prices behind: their count and the one-click preview + save. */}
-      {data && <EngineSaveList lang={lang} compact reloadKey={ratesSeq} />}
+      {data && <EngineSaveList lang={lang} compact reloadKey={ratesSeq + reloadKey} onChanged={onChanged} />}
 
       <FxReviewSheet
         pair={reviewing && reviewing.pending ? reviewing : null}

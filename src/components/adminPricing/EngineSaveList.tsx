@@ -63,7 +63,7 @@ function AutoRepriceLine({ auto, lang, titled }: { auto: AutoRepriceStatus; lang
   );
 }
 
-export default function EngineSaveList({ lang, compact = false, reloadKey = 0 }: { lang: Language; compact?: boolean; reloadKey?: number }) {
+export default function EngineSaveList({ lang, compact = false, reloadKey = 0, onChanged }: { lang: Language; compact?: boolean; reloadKey?: number; onChanged?: () => void }) {
   const s = engineSaveStrings(lang);
   const [list, setList] = useState<SaveListAnswer | null>(null);
   const [error, setError] = useState('');
@@ -127,6 +127,7 @@ export default function EngineSaveList({ lang, compact = false, reloadKey = 0 }:
       setSheet(null);
       setOutcome([s.savedCount(String(done), String(r.results.length)), ...refused]);
       setReload((n) => n + 1);
+      if (done > 0) onChanged?.();
     } catch (e) {
       setSheetError(e instanceof ApiError && e.code === 'REAUTH_REQUIRED' ? s.reauth : said(e));
     } finally {

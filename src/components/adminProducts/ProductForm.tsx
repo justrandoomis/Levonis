@@ -2219,7 +2219,7 @@ export default function ProductForm({
             dirty rather than showing a stale number as current. */}
         {doc.id && (
           <div className="mt-3">
-            <PricePreview productId={doc.id} savedDoc={doc} rel={rel} dirty={dirty} />
+            <PricePreview productId={doc.id} savedDoc={doc} rel={rel} dirty={dirty} savedRevision={baseline} />
           </div>
         )}
       </SectionCard>

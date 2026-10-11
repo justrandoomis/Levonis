@@ -26,10 +26,13 @@
  * audit_log). A batch that misses its fence (the owner saved, a rate moved)
  * leaves the product stale for the next tick, which prices it afresh.
  *
- * DEFICIT FIRST. Every due product is evaluated from bulk reads (a constant
- * number of statements, the price images read BEFORE the documents), then
- * written in order of how far today's price lies below the new replacement
- * cost + minimum profit — the writer's own figures — largest first.
+ * DEFICIT FIRST. Due products are evaluated from bulk reads (the price images
+ * BEFORE the documents), then written in order of the writer's actual deficit.
+ * When reading the whole backlog would leave no room to write, a circular
+ * window of 50 products is evaluated instead. Its last ID is retained in the
+ * run audit, so a large backlog or an unreadable product cannot starve later
+ * IDs. Deficit ordering is global when the backlog fits and within the window
+ * otherwise. Every price still commits in its own complete atomic batch.
  *
  * THE BUDGET. Every read and every statement of every batch is charged to the
  * invocation's statement budget (fx/budget.ts: 600 for the six-hour run and an
@@ -96,6 +99,9 @@ export const AUTO_REPRICE_STATEMENT_CAP = 200;
  */
 export const PRODUCT_CHUNK = 50;
 export const READS_PER_CHUNK = 10;
+/** Keep room for a normal writer batch instead of spending the tick on reads. */
+const MIN_WRITE_ROOM = 40;
+const candidateReads = (n: number): number => 1 + 1 + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 5 + 1;
 /** The system actor of an automatic write the cron starts. */
 export const SYSTEM_ACTOR = 'system:fx';
 
@@ -260,13 +266,36 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     if (rates.derived_stale) return finish('DERIVED_STALE');
     const stale = staleEngineProducts(states, costs, rates);
     report.stale = stale.length;
-    const due = stale.filter((p) => !blockedAndWaiting(p.state, now));
+    let due = stale.filter((p) => !blockedAndWaiting(p.state, now));
     if (!due.length) return finish('NOTHING_STALE');
+
+    // A full backlog read used to consume (or exceed) the fixed sweep budget
+    // before even one product could be written, on every subsequent tick too.
+    // Reserve the run record before hydrating a bounded, rotating window.
+    let nextProductId: string | null = null;
+    let runRecordReserved = false;
+    if (candidateReads(due.length) + MIN_WRITE_ROOM > budget.remaining() && due.length > PRODUCT_CHUNK) {
+      if (!budget.canSpend(2 + candidateReads(PRODUCT_CHUNK) + MIN_WRITE_ROOM)) return finish('BUDGET');
+      budget.spend(2); // cursor read and the eventual run record
+      runRecordReserved = true;
+      const last = await db.prepare("SELECT summary_json FROM pricing_audit WHERE entity = 'run' AND entity_key = 'auto_reprice' AND action = 'run_finished' ORDER BY created_at DESC, rowid DESC LIMIT 1").first<{ summary_json: string }>();
+      let after: string | null = null;
+      try {
+        const cursor: unknown = last ? (JSON.parse(last.summary_json) as Record<string, unknown>).next_product_id : null;
+        if (typeof cursor === 'string') after = cursor;
+      } catch { /* An older or malformed run record starts at the first product. */ }
+      const first = after === null ? 0 : due.findIndex((p) => p.state.product_id > after!);
+      const offset = first < 0 ? 0 : first;
+      const ordered = [...due.slice(offset), ...due.slice(0, offset)];
+      due = ordered.slice(0, PRODUCT_CHUNK);
+      nextProductId = due[due.length - 1]!.state.product_id;
+      report.deferred.push(...ordered.slice(PRODUCT_CHUNK).map((p) => p.state.product_id));
+    }
 
     // 2. The candidates, in a constant number of reads: the control row, the price images FIRST (every
     //    write is fenced on them), then the documents, the stores and the guest pricing context.
     const ids = due.map((p) => p.state.product_id);
-    if (!budget.spend(1 + 1 + READS_PER_CHUNK * Math.ceil(ids.length / PRODUCT_CHUNK) + 5 + 1)) return finish('BUDGET');
+    if (!budget.spend(candidateReads(ids.length))) return finish('BUDGET');
     const control = await loadEngineControl(db);
     if (control.paused) return finish('PAUSED');
     let images: Map<string, string>;
@@ -411,7 +440,7 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     // 6. The targeted purge (only what moved), the run's record (counts only), the bell.
     if (slugs.length) await purgeCatalogueFromJob(env, slugs, opts.origin ? { origin: opts.origin } : {});
     const worked = report.repriced.length + report.blocked.length + report.conflicts.length + report.deferred.length;
-    if (worked > 0 && budget.spend(1)) {
+    if (worked > 0 && (runRecordReserved || budget.spend(1))) {
       try {
         await pricingAuditStatement(db, {
           entity: 'run',
@@ -427,6 +456,7 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
             conflicts: report.conflicts.length,
             deferred: report.deferred.length,
             remaining: report.stale - report.repriced.length,
+            ...(nextProductId === null ? {} : { next_product_id: nextProductId }),
           },
           actor,
           now: nowIso,

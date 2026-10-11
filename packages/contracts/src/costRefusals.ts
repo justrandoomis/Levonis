@@ -286,6 +286,21 @@ export const COST_REFUSALS = {
     en: 'This order cannot be re-opened: current stock does not cover its items. Update the stock or create a new order.',
     ckb: 'ناتوانرێت داواکارییەکە دووبارە بکرێتەوە: کۆگای ئێستا بەشی بەرهەمەکانی ناکات. کۆگا نوێ بکەرەوە یان داواکارییەکی نوێ دروست بکە.',
   },
+  PRICE_PROTECTION_REVIEW_REQUIRED: {
+    ar: 'يحتاج تعويض حماية السعر إلى مراجعة مالية قبل صرفه. لم يُصرف أي تعويض جديد.',
+    en: 'This price-protection credit needs financial review before payment. No new credit was paid.',
+    ckb: 'پێش پارەدان، قەرەبووی پاراستنی نرخ پێویستی بە پشکنینی دارایی هەیە. هیچ قەرەبوویەکی نوێ نەدراوە.',
+  },
+  PRICE_PROTECTION_RETRY: {
+    ar: 'تغيّرت تسوية هذه القطعة أثناء التنفيذ. حدّث الصفحة وأعد المحاولة؛ لم يُصرف أي تعويض جديد.',
+    en: 'This item’s settlement changed during the operation. Refresh and retry; no new credit was paid.',
+    ckb: 'لە کاتی جێبەجێکردندا یەکلاییکردنەوەی ئەم دانەیە گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدە؛ هیچ قەرەبوویەکی نوێ نەدراوە.',
+  },
+  PRICE_PROTECTION_RETURN_REVIEW: {
+    ar: 'توجد تسوية إرجاع أو حماية سعر لهذه القطعة. راجع التعويض السابق والكميات مع الإدارة قبل صرف مبلغ جديد.',
+    en: 'This item already has a return or price-protection settlement. Ask an administrator to review the previous compensation and quantities before another payment.',
+    ckb: 'ئەم دانەیە یەکلاییکردنەوەی گەڕاندنەوە یان پاراستنی نرخی هەیە. پێش پارەدانێکی نوێ، داوا لە بەڕێوەبەر بکە قەرەبووی پێشوو و ژمارەی دانەکان بپشکنێت.',
+  },
   RETURN_REFUND_REVIEW_REQUIRED: {
     ar: 'يحتاج مبلغ الاسترداد إلى مراجعة مالية قبل تنفيذه. لم يُنفّذ أي استرداد جديد.',
     en: 'This refund amount needs financial review before it can be applied. No new refund was made.',

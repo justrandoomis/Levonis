@@ -35,6 +35,7 @@ export default function PricePreview({
   savedDoc,
   rel,
   dirty,
+  savedRevision = '',
 }: {
   productId: string;
   savedDoc: ProductDocV2;
@@ -47,6 +48,8 @@ export default function PricePreview({
    */
   rel?: RelationsState;
   dirty: boolean;
+  /** Changes only after a successful save/read-back, never for unsaved edits. Keeps the selection while refreshing its quote. */
+  savedRevision?: string;
 }) {
   const fromRel = rel && hasRelationStructure(rel);
   const optionChoices = fromRel
@@ -111,7 +114,7 @@ export default function PricePreview({
     return () => { cancelled = true; clearTimeout(t); };
     // `pickedKey` stands for `pickedValueIds` (a new array on every render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, optionId, pickedKey, perGroup, colorId, transport, warrantyId, tier]);
+  }, [productId, savedRevision, optionId, pickedKey, perGroup, colorId, transport, warrantyId, tier]);
 
   const activeTransports = (savedDoc.preorder_transports ?? []).filter((t) => t.active);
 

@@ -65,7 +65,7 @@ import type { ProductDimensionsV2 } from '../../../lib/productTypes';
 import PricingSummaryBar from '../../adminOperations/PricingSummaryBar';
 import { PricingRowsTable } from '../../adminOperations/ProcurementPricingReview';
 import type { EngineAdoption, PricingPreviewRow, PricingSummary } from '../../adminOperations/procurementPricing';
-import { issueText, procurementPricingStrings, profileName, type ProcurementPricingStrings } from '../../adminOperations/procurementPricingStrings';
+import { channelName, issueText, procurementPricingStrings, profileName, type ProcurementPricingStrings } from '../../adminOperations/procurementPricingStrings';
 import EngineSaveSheet from '../../adminOperations/EngineSaveSheet';
 import { engineSaveStrings } from '../../adminOperations/engineSaveStrings';
 import { money } from '../../adminOperations/shared';
@@ -1642,6 +1642,10 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
   const baseMin = aboveMin ? `$${aboveMin}` : null;
   const aboveExtra = above.find((a) => a.direct_sale_extra_iqd != null)?.direct_sale_extra_iqd ?? null;
   const extraStored = scope.direct_sale_extra_iqd;
+  const extraMissing = sellsDirect && (st.shown?.rows ?? []).some((r) =>
+    r.issue_codes.includes('DIRECT_SALE_EXTRA_MISSING') &&
+    (scope.scope === 'base' || (scope.scope === 'option' ? r.option_id === scope.scope_id : scope.scope === 'color' ? r.color_id === scope.scope_id : r.combo_key === scope.scope_id))
+  );
   const shownInputs = scopeOf(st.shown, scope.scope, scope.scope_id)?.pricing_inputs ?? null;
   const rate = st.shown?.rates.usd_iqd_rate ?? null;
   const inheritedSupplier = inherited
@@ -1731,8 +1735,8 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
         <TextInput inputMode="decimal" value={minProfit} placeholder={ph(baseMin) ?? (scope.target_profit_iqd != null ? `${scope.target_profit_iqd.toLocaleString('en-US')} IQD` : undefined)} onChange={(e) => set({ minimum_target_profit_usd: e.target.value })} />
       </Field>
       {(sellsDirect || extraStored != null || d.direct_sale_extra_iqd != null) && (
-        <Field {...label(s.extra, en.extra)} error={errorOf('direct_sale_extra_iqd')} hint={s.extraHint}>
-          <Money value={d.direct_sale_extra_iqd !== undefined ? d.direct_sale_extra_iqd : extraStored} placeholder={ph(aboveExtra != null ? String(aboveExtra) : null)} onChange={(v) => set({ direct_sale_extra_iqd: v })} />
+        <Field {...label(s.extra, en.extra)} error={errorOf('direct_sale_extra_iqd')} hint={extraMissing ? s.extraMissing : s.extraHint}>
+          <Money value={d.direct_sale_extra_iqd !== undefined ? d.direct_sale_extra_iqd : extraStored} placeholder={ph(aboveExtra != null ? String(aboveExtra) : null) ?? s.extraUnset} onChange={(v) => set({ direct_sale_extra_iqd: v })} />
         </Field>
       )}
     </Grid>
@@ -1808,6 +1812,53 @@ function WhereToFix() {
     <p className="mt-2 text-[11px] leading-relaxed text-amber-300" data-pricing-where>
       {s.centralMissing(list)} <OpenPricing />
     </p>
+  );
+}
+
+/** All-channel adoption can be blocked even when the default route's summary computes a price. */
+function PricingReadiness({ actions = false }: { actions?: boolean }) {
+  const { lang } = useLanguage();
+  const s = usdPricingFormStrings(lang);
+  const st = useUsdPricing()!;
+  const shown = st.shown;
+  if (!shown || st.busy) return null;
+  const blockedRows = (shown.rows ?? []).filter((r) => r.issue_codes.length);
+  const rowCodes = new Set(blockedRows.flatMap((r) => r.issue_codes));
+  const otherCodes = [...new Set(shown.adoption?.missing_codes ?? [])].filter((c) => !rowCodes.has(c));
+  const blocked = shown.adoption?.complete === false || (!shown.adoption && blockedRows.length > 0);
+  const ready = st.productId && !st.dirty && !st.review && readyReview(st.productId, st.answer);
+  return (
+    <>
+      {blocked && (
+        <div className="mt-2 text-[12px] leading-relaxed text-amber-300" role="status" data-pricing-readiness="blocked">
+          <p>{s.previewBlocked}</p>
+          <ul className="mt-1 list-disc ps-5">
+            {blockedRows.map((r) => (
+              <li key={`${r.combo_key ?? r.option_id}:${r.channel}`}>
+                {nameOf(r, lang)} · {channelName(r.channel, lang)}: {[...new Set(r.issue_codes)].map((c) => issueText(c, lang)).join(lang === 'en' ? '; ' : '؛ ')}
+              </li>
+            ))}
+            {otherCodes.map((c) => <li key={c}>{issueText(c, lang)}</li>)}
+          </ul>
+          {(rowCodes.has('DIRECT_SALE_EXTRA_MISSING') || otherCodes.includes('DIRECT_SALE_EXTRA_MISSING')) && <p className="mt-1">{s.extraMissing}</p>}
+        </div>
+      )}
+      {actions && ready && (
+        <div className="mt-3 flex flex-wrap items-center gap-2" data-pricing-readiness="ready">
+          <span className="text-[12px] text-amber-300">{s.readyWaiting}</span>
+          <button type="button" className={btnPrimary} disabled={st.saving || st.reviewBusy} onClick={st.openReview} data-pricing-review>{s.reviewAndAdopt}</button>
+        </div>
+      )}
+      {actions && st.dirty && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[12px] text-text-muted">{s.previewSaveFirst}</span>
+          <button type="button" className={btnPrimary} disabled={st.invalid || st.saving || st.reviewBusy || !!st.review || !st.answer} onClick={() => void st.save()} data-pricing-save>
+            {st.saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Save className="w-4 h-4" aria-hidden="true" />}{s.save}
+          </button>
+          {st.invalid && <span className="text-[11px] text-red-300">{s.saveBlocked(st.invalidWhere)}</span>}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1901,6 +1952,7 @@ export function UsdPricingProductPanel() {
             models.length > 0 && <p className="mt-3 text-[12px] text-text-secondary">{s.modelsSummary(String(ok), String(models.length))}</p>
           )}
           <WhereToFix />
+          <PricingReadiness />
           <p className="mt-2 text-[11px] text-text-muted" data-pricing-prices-note>{st.engine ? s.pricesEngine : s.pricesLater}</p>
           {/* «التكلفة القديمة» and the store price beside this panel do not move with a data save. */}
           <p className="mt-1 text-[11px] text-text-muted" data-pricing-legacy-cost>{s.legacyCostStays}</p>
@@ -2133,11 +2185,13 @@ export function UsdPricingPreview() {
     <section className="ap mt-3 rounded-lg border border-border-subtle p-3" aria-busy={st.busy || undefined} data-form="usd-pricing-preview">
       <Head text={s.previewTitle} english={USD_PRICING_FORM_STRINGS.en.previewTitle} />
       <p className="mt-1 text-[11px] text-text-muted">
-        {s.previewNote}
+        {st.engine ? s.pricesEngine : s.previewNote}
+        <span className="block">{s.scopeOverrides}</span>
         {st.shown.per_sku && <span className="block">{s.perSkuNote}</span>}
         {st.dirty && <span className="block text-amber-300">{s.previewIncludesDrafts}</span>}
       </p>
       {rows.length ? <PricingRowsTable rows={rows} /> : <p className="mt-2 text-[12px] text-text-muted">{s.previewEmpty}</p>}
+      <PricingReadiness actions />
     </section>
   );
 }

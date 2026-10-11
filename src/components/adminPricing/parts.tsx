@@ -46,16 +46,16 @@ export function ValueStateChip({ state, lang }: { state: LegacyValueState; lang:
 }
 
 /**
- * «معاينة فقط — لا يتغير شيء في المتجر.» — the first thing on the screen, in
- * the contract's own words, with what that means in one more sentence. An
- * info alert, not a warning: nothing is wrong, and nothing can go wrong here.
+ * The read-only product detail uses the contract's preview heading. The
+ * workspace supplies its own heading: approved rates and bulk saves there
+ * can change store prices, so it must not claim that the whole page is read-only.
  */
-export function PreviewBanner({ lang, body }: { lang: Language; body: string }) {
+export function PreviewBanner({ lang, body, title }: { lang: Language; body: string; title?: string }) {
   return (
     <div role="note" data-pricing-preview-banner className="lv-alert lv-alert-info flex items-start gap-3">
       <Eye aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-info" />
       <div className="min-w-0">
-        <p className="text-[14px] font-bold leading-relaxed text-text-primary">{previewOnlyText(lang)}</p>
+        <p className="text-[14px] font-bold leading-relaxed text-text-primary">{title ?? previewOnlyText(lang)}</p>
         <p className="mt-0.5 text-[13px] leading-relaxed text-text-secondary">{body}</p>
       </div>
     </div>

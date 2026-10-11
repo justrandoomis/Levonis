@@ -50,6 +50,8 @@ interface UiStrings {
   title: string;
   subtitle: string;
   previewBody: string;
+  workspaceTitle: string;
+  workspaceBody: string;
   productsHeading: string;
   productsCount: Count;
   shownCount: Count;
@@ -156,7 +158,9 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
   ar: {
     title: 'التسعير والشحن',
     subtitle: 'ما يدفعه الزبون اليوم، والحد الأدنى للربح المستخرج من أسعارك القديمة، وكم سيصبح السعر بالتسعير الجديد.',
-    previewBody: 'لا يُحفظ من هذه الصفحة أي سعر أو تكلفة أو إعداد. تتغير أسعار المتجر فقط عندما تحفظ الأسعار الجديدة لمنتج، في تحديث لاحق.',
+    previewBody: 'تفاصيل المنتج وحاسبة «كم سيصبح السعر؟» للمعاينة فقط. لتعديل بيانات التسعير، افتح المنتج من قسم المنتجات واحفظ الأسعار الجديدة بعد مراجعتها.',
+    workspaceTitle: 'ربط أسعار المتجر بالصرف والشحن',
+    workspaceBody: 'اعتماد سعر الصرف أو الشحن يحدّث أسعار المنتجات المعتمدة للتسعير التلقائي. المنتجات اليدوية تحتاج إكمال بيانات التسعير ومراجعة الأسعار واعتمادها أول مرة. تظهر المنتجات المتأخرة أو المتوقفة مع سببها أدناه.',
     productsHeading: 'المنتجات',
     productsCount: (n) => `عدد المنتجات: ${n}`,
     shownCount: (n) => `المنتجات المعروضة: ${n}`,
@@ -175,8 +179,8 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     notLive: 'غير معروض في المتجر',
     back: 'كل المنتجات',
     decisionHeading: 'ما يحتاج قرارك',
-    decisionLater: 'هذه الصفحة تعرض ما يحتاج قرارك فقط؛ تتخذ هذه القرارات هنا في التحديث القادم.',
-    nothingHeld: 'لا شيء يوقف هذا المنتج سوى تكلفة المورد، وتُدخلها في التحديث القادم.',
+    decisionLater: 'أكمل الحقول والقواعد الناقصة في تعديل المنتج، ثم راجع الأسعار الجديدة واعتمدها.',
+    nothingHeld: 'أدخل تكلفة المورد في تعديل المنتج، ثم راجع الأسعار الجديدة واعتمدها.',
     notesHeading: 'للعلم',
     factsSale: 'طريقة البيع',
     factsRoutes: 'مسارات الطلب المسبق',
@@ -260,7 +264,9 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
   en: {
     title: 'Pricing & shipping',
     subtitle: 'What a customer pays today, the minimum profit your old prices carry, and what the new pricing would charge.',
-    previewBody: "Nothing on this page saves a price, a cost or a setting. Store prices change only when you save a product's new prices, in a later update.",
+    previewBody: 'Product details and the what-if calculator are read-only previews. To edit pricing inputs, open the product from Products and save the new prices after reviewing them.',
+    workspaceTitle: 'Store prices follow exchange and shipping rates',
+    workspaceBody: 'Approving an exchange or shipping rate updates products already using automatic pricing. Manual products first need complete pricing inputs and a reviewed price save. Delayed or blocked products and their reasons appear below.',
     productsHeading: 'Products',
     productsCount: (n) => `Products: ${n}`,
     shownCount: (n) => `Products shown: ${n}`,
@@ -279,8 +285,8 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     notLive: 'Not shown in the store',
     back: 'All products',
     decisionHeading: 'What needs your decision',
-    decisionLater: 'This page only shows what needs your decision; you make these choices here in the next update.',
-    nothingHeld: 'Nothing holds this product except the supplier cost, which you enter in the next update.',
+    decisionLater: 'Complete the missing fields and rules in the product editor, then review and save the new prices.',
+    nothingHeld: 'Enter the supplier cost in the product editor, then review and save the new prices.',
     notesHeading: 'For your information',
     factsSale: 'Sold as',
     factsRoutes: 'Pre-order routes',
@@ -364,7 +370,9 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
   ckb: {
     title: 'نرخدانان و ناردنی بەرهەم',
     subtitle: 'ئەوەی کڕیار ئەمڕۆ دەیدات، کەمترین قازانجی دەرهێنراو لە نرخە کۆنەکانت، و نرخ بە نرخدانانی نوێ چەند دەبێت.',
-    previewBody: 'لەم پەڕەیەوە هیچ نرخ، تێچوو یان ڕێکخستنێک پاشەکەوت ناکرێت. نرخەکانی فرۆشگا تەنها ئەو کاتە دەگۆڕێن کە نرخە نوێیەکانی بەرهەمێک پاشەکەوت دەکەیت، لە نوێکردنەوەیەکی داهاتوودا.',
+    previewBody: 'وردەکارییەکانی بەرهەم و ژمێرەری نرخ تەنها بۆ پێشبینینن. بۆ دەستکاریکردنی زانیارییەکانی نرخدانان، بەرهەمەکە لە بەشی بەرهەمەکان بکەرەوە و دوای پێداچوونەوە نرخە نوێیەکان پاشەکەوت بکە.',
+    workspaceTitle: 'بەستنەوەی نرخەکانی فرۆشگا بە ئاڵوگۆڕ و ناردن',
+    workspaceBody: 'پەسەندکردنی نرخی ئاڵوگۆڕ یان ناردن نرخەکانی بەرهەمەکانی نرخدانانی خۆکار نوێ دەکاتەوە. بەرهەمە دەستییەکان سەرەتا پێویستیان بە تەواوکردنی زانیارییەکان و پێداچوونەوە و پاشەکەوتکردنی نرخەکانە. بەرهەمە دواخراو یان ڕاگیراوەکان لەگەڵ هۆکارەکانیان لە خوارەوە دەردەکەون.',
     productsHeading: 'بەرهەمەکان',
     productsCount: (n) => `ژمارەی بەرهەمەکان: ${n}`,
     shownCount: (n) => `بەرهەمە پیشاندراوەکان: ${n}`,
@@ -383,8 +391,8 @@ export const PRICING_UI_STRINGS: Readonly<Record<Lang, UiStrings>> = {
     notLive: 'لە فرۆشگادا پیشان نادرێت',
     back: 'هەموو بەرهەمەکان',
     decisionHeading: 'ئەوەی پێویستی بە بڕیاری تۆیە',
-    decisionLater: 'ئەم پەڕەیە تەنها ئەوە پیشان دەدات کە پێویستی بە بڕیاری تۆیە؛ لە نوێکردنەوەی داهاتوودا لێرەوە ئەم بڕیارانە دەدەیت.',
-    nothingHeld: 'جگە لە تێچووی دابینکەر هیچ شتێک ئەم بەرهەمە ڕاناگرێت، کە لە نوێکردنەوەی داهاتوودا دەینووسیت.',
+    decisionLater: 'خانە و ڕێسا کەمەکان لە دەستکاریکەری بەرهەم تەواو بکە، پاشان نرخە نوێیەکان بپشکنە و پاشەکەوتیان بکە.',
+    nothingHeld: 'تێچووی دابینکەر لە دەستکاریکەری بەرهەم بنووسە، پاشان نرخە نوێیەکان بپشکنە و پاشەکەوتیان بکە.',
     notesHeading: 'بۆ زانیاریت',
     factsSale: 'شێوەی فرۆشتن',
     factsRoutes: 'ڕێگاکانی پێشداواکاری',

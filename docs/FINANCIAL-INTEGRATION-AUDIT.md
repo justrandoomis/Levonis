@@ -158,3 +158,25 @@ checks; it does not claim a completed reconciliation of every historical row.
 Bounded recovery and explicit reviews retain the evidence requirements above.
 Local browser E2E was unavailable; source/runtime tests and successful frontend
 builds are not described as a browser pass.
+
+## Follow-up prompted by the owner screenshots (2026-10-11)
+
+The displayed product was manual and lacked Direct Sale Extra. Its preorder
+calculation alone was insufficient for a complete all-channel adoption. The
+follow-up makes that reason and the save/review actions visible, corrects obsolete
+preview-only language, and refreshes saved quotes and sibling pricing lists.
+A connected CNY/CBM regression verifies both channels after explicit adoption and
+subsequent approved dollar/freight changes, including scoped profit precedence.
+
+Additional synthetic regressions exposed missing exact principal after partial
+funded-lot location transfers, perpetual read-budget deferral on a large repricing
+backlog, and non-atomic/overlapping price-protection payments. These repairs retain
+immutable recorded money, existing profit/discount policies, and per-product/
+per-credit atomic writes. They do not certify every historical production row.
+Price protection now uses frozen membership, coupon/points and accepted price
+adjustments once, following the existing return discount allocation, excluding
+merchandise fees and capping the protected bases to the accepted invoice. Legacy
+pending claims are rechecked without rewriting prior credits. Its final focused
+gate passed 51/51, including 24 new payment-basis and atomicity regressions; an
+independent source review found no remaining blocker in those changes.
+Current release status and the required gates are in `HANDOFF.md`.
