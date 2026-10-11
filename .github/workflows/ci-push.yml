@@ -2,7 +2,7 @@
 # CHECKS EVERY PULL REQUEST AND EVERY PUSH TO ANY OTHER BRANCH.
 #
 # The default branch is checked by workflow 7 itself, which runs these same
-# two commands — `npm run check` and `npm run test:unit`, including the
+# full gates — `npm run check` and all suites from `npm run test:unit`, including the
 # authorization and cost-leak suites (tests/costLeaksPhase0.test.ts,
 # tests/costRoleMatrix.test.ts, …) — before it migrates and deploys. This
 # workflow does not deploy.
@@ -12,7 +12,7 @@
 name: CI - check and unit tests (pull requests and other branches)
 
 on:
-  # Pushes to the default branch run the same two commands inside workflow 7,
+  # Pushes to the default branch use the same complete parallel gate in workflow 7,
   # before it migrates and deploys; this covers what that does not.
   pull_request:
   push:
@@ -27,23 +27,4 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-
-      # `npm run check` typechecks studio/ too and fails when that workspace
-      # is not installed — the same step workflow 7 runs, for the same reason.
-      - name: Install the Studio workspace (npm run check covers it)
-        working-directory: studio
-        run: npm ci --no-audit --no-fund
-
-      - name: Typecheck, lint and unit tests
-        run: |
-          npm run check
-          npm run test:unit
+    uses: ./.github/workflows/verify-all.yml

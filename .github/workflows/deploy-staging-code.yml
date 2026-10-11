@@ -76,8 +76,17 @@ on:
         default: ''
 
 jobs:
+  verify:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    uses: ./.github/workflows/verify-all.yml
+    permissions:
+      contents: read
+
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    # The reusable gate requires check + all eight root shards + workspaces
+    # + Studio. A failure, cancellation or skipped gate cannot deploy.
+    needs: verify
     # Job-level, not workflow-level: a feature-branch push skips this job and
     # must not enter the live deploy lock. Shared with workflows 6 and 51. A
     # newer push supersedes a deploy still waiting; a running one finishes.
@@ -96,25 +105,20 @@ jobs:
             || { echo "::error::type DEPLOY-CODE to confirm"; exit 1; }
 
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      # Parallel checks may finish out of order. Recheck the branch only after
+      # acquiring the live lock, before reading or changing Cloudflare state.
+      - name: Refuse a superseded push before any live operation
+        env:
+          DEPLOY_EVENT: ${{ github.event_name }}
+          DEPLOY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: node scripts/check-deploy-freshness.mjs
       - run: npm ci --no-audit --no-fund
-
-      # `npm run check` now typechecks studio/ too, and it FAILS rather than
-      # skipping when that workspace is not installed — deliberately, because
-      # a check that quietly passes on code it never read is what let an
-      # unbuildable Studio sit in main for a day. So it has to be installed
-      # here. It is a separate workspace with its own lockfile; ~20s.
-      - name: Install the Studio workspace (npm run check covers it)
-        working-directory: studio
-        run: npm ci --no-audit --no-fund
-
-      - name: Typecheck, lint and unit tests
-        run: |
-          npm run check
-          npm run test:unit
 
       # Read the vars the running Worker has RIGHT NOW. If this fails the
       # deploy stops: shipping without them would delete them.

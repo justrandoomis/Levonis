@@ -22,6 +22,14 @@ this order, and stops at the first red step:
     → deploy (existing vars carried forward)
     → live probes
 
+The complete CI gate is `.github/workflows/verify-all.yml`: type/lint checks,
+eight disjoint root-test shards, workspace tests and Studio tests run in
+parallel. Workflow 7's deploy job requires the entire reusable workflow to
+succeed. No shard is optional and a failure does not cancel the other shards.
+Only deployment holds the `staging-deploy` lock; after acquiring it, a push
+must still match the default branch's deployable files (prose-only advances
+are allowed). The default local `npm run test:unit` still runs all three suites.
+
 Cloudflare Workers Builds (the dashboard Git integration) is switched off from
 the repository: its build refuses in `scripts/prepare-deploy-config.mjs`, so
 its deploy command never runs. Workflow 51 is manual only.

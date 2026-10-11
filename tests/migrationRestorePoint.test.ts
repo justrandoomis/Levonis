@@ -80,25 +80,31 @@ printf 'reached-migrations\n' >> "$GITHUB_OUTPUT"
 test('the push path to the live database is workflow 7 alone: tests, then migrations, then deploy (DECISIONS row 184)', () => {
   const deploy = readWorkflow('deploy-staging-code.yml');
   assert.match(deploy, /push:\s*(?:#[^\n]*\n\s*)*branches: \['\*\*'\]/);
-  assert.match(deploy, /deploy:\n\s+if: \$\{\{ github\.event_name == 'workflow_dispatch' \|\| github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/);
+  const liveJob = deploy.split(/^ {2}deploy:\s*$/m)[1];
+  assert.ok(liveJob, 'workflow 7 retains its live deploy job');
+  assert.match(liveJob, /^ {4}if: \$\{\{ github\.event_name == 'workflow_dispatch' \|\| github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}$/m);
+  assert.match(liveJob, /^ {4}needs: (?:verify|\[verify\])$/m,
+    'the live job cannot start until the complete reusable verification workflow succeeds');
+  assert.match(deploy, /^ {2}verify:\s*\n[\s\S]*?^ {4}uses: \.\/\.github\/workflows\/verify-all\.yml$/m);
+  assert.doesNotMatch(liveJob, /^ {4}(?:continue-on-error:|if:.*(?:always\(|!cancelled\(|failure\(|cancelled\())/m,
+    'a failed or cancelled verification cannot be bypassed by the live job');
   assert.match(deploy, /^ {4}concurrency: staging-deploy$/m);
   assert.ok(!/^concurrency:/m.test(deploy), 'a skipped feature-branch job must not enter the workflow-level live deploy lock');
   assert.ok(!/^\s+pull_request:/m.test(deploy), 'pull requests must not deploy or migrate');
-  // The order is the decision: the suite, then the throwaway proof, then the
-  // restore point, then the live migrations, then the deploy.
+  // Tests now finish through the required reusable job above. Keep every
+  // subsequent live safeguard in its original order inside the deploy job.
   const at = (needle: string) => {
     const i = deploy.indexOf(needle);
     assert.ok(i >= 0, `workflow 7 lost: ${needle}`);
     return i;
   };
   const order = [
-    'npm run test:unit',
     'node scripts/migrate-check.mjs --twice',
     '- name: Record a Time Travel bookmark (restore point)',
     'node scripts/apply-remote-migrations.mjs',
     'npx wrangler deploy --env staging',
   ].map(at);
-  assert.deepEqual([...order].sort((a, b) => a - b), order, 'tests → proof → restore point → migrations → deploy');
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'required verification → proof → restore point → migrations → deploy');
 });
 
 test('workflow 51 no longer runs on push — two jobs in the same lock from one push could cancel each other', () => {

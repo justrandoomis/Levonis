@@ -34,6 +34,15 @@ Settings → Build) removes that red check; a build variable
 `LEVONIS_ALLOW_WORKERS_BUILDS=1` re-opens it in an emergency. Workflow 51 is
 manual only. The history below explains why.
 
+Since 2026-10-11, `.github/workflows/verify-all.yml` runs the complete checks,
+eight disjoint root-test shards, workspace tests and Studio tests in parallel.
+All jobs must succeed before workflow 7's deploy job can acquire the live lock.
+The same reusable gate serves pull requests and other branches. The default
+local unit command still runs every suite, and test processes retain the
+network-denial preload. Parallel verification does not parallelize live writes.
+Inside the lock, a push is refused if a newer default-branch commit changed
+deployable files; documentation-only advances do not invalidate tested code.
+
 ### The restore point is not an undo button (critique H6, DECISIONS row 185)
 
 Every run of workflow 7 records a Time Travel bookmark before it migrates, and

@@ -28,39 +28,116 @@
  * never looked at is how a broken Studio once shipped for a day.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const STUDIO = join(ROOT, 'studio');
-// Unit suites may replace fetch with an explicit transport mock. Never let a
-// missing mock reach notification or payment providers from a test process.
-const testEnv = { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${new URL('./test-no-network.mjs', import.meta.url).href}` };
 
-if (!existsSync(join(STUDIO, 'node_modules', 'three-slicer'))) {
-  console.error(
-    'test-all: the Studio workspace is not installed, so its tests were NOT run.\n' +
-      '  Install it first:  (cd studio && npm ci)\n' +
-      '  (Hard failure on purpose — see the note above.)'
-  );
-  process.exit(1);
+/** No flags keeps the full local gate. CI may select one suite, and only the
+ * root suite may be partitioned: --suite root --shard 1/8. --list prints that
+ * root selection without running it. Unknown/duplicate flags are errors. */
+export function parseTestArgs(argv) {
+  const options = { suite: null, shard: null, list: false };
+  const seen = new Set();
+  for (let i = 0; i < argv.length; i++) {
+    const match = /^(--suite|--shard)(?:=(.*))?$/.exec(argv[i]);
+    const flag = match?.[1] ?? argv[i];
+    if (!['--suite', '--shard', '--list'].includes(flag) || seen.has(flag)) throw new Error(`Unknown or duplicate argument: ${argv[i]}`);
+    seen.add(flag);
+    if (flag === '--list') { options.list = true; continue; }
+    const value = match[2] ?? argv[++i];
+    if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
+    if (flag === '--suite') {
+      if (!['root', 'workspaces', 'studio'].includes(value)) throw new Error(`Invalid suite: ${value}`);
+      options.suite = value;
+    } else {
+      const shard = /^([1-9]\d*)\/([1-9]\d*)$/.exec(value);
+      if (!shard) throw new Error('Shard must be positive N/T, for example 1/8');
+      const index = Number(shard[1]), total = Number(shard[2]);
+      if (!Number.isSafeInteger(index) || !Number.isSafeInteger(total) || index > total) throw new Error('Shard must satisfy 1 <= N <= T with safe integers');
+      options.shard = { index, total };
+    }
+  }
+  if ((options.shard || options.list) && options.suite !== 'root') throw new Error('--shard and --list require --suite root');
+  return options;
 }
 
-const runs = [
-  { name: 'root', cmd: process.execPath, args: ['--import', 'tsx', '--test', 'tests/*.test.ts'], shell: true, cwd: ROOT },
-  { name: 'workspaces', cmd: 'node', args: ['scripts/test-workspaces.mjs'], shell: false, cwd: ROOT },
-  { name: 'studio', cmd: process.execPath, args: ['--test', 'tests/*.test.mjs'], shell: true, cwd: STUDIO },
-];
-
-const failed = [];
-for (const run of runs) {
-  const res = spawnSync(run.cmd, run.args, { stdio: 'inherit', shell: run.shell, cwd: run.cwd, env: testEnv });
-  if (res.status !== 0) failed.push(`${run.name} (exit ${res.status ?? 'signal ' + res.signal})`);
+function requireFile(path) {
+  if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`Required file is missing: ${path}`);
 }
 
-if (failed.length > 0) {
-  console.error(`\ntest:unit FAILED — ${failed.join(', ')}. All three suites above ran; read all three.`);
-  process.exit(1);
+function discoverTests(root, suffix) {
+  const directory = join(root, 'tests');
+  if (!existsSync(directory) || !statSync(directory).isDirectory()) throw new Error(`Test directory is missing: ${directory}`);
+  const files = readdirSync(directory).filter((name) => name.endsWith(suffix)).sort().map((name) => `tests/${name}`);
+  if (!files.length) throw new Error(`No ${suffix} test files found in ${directory}`);
+  for (const file of files) requireFile(join(root, file));
+  return files;
 }
-console.log('\ntest:unit: root, workspace and Studio suites all green.');
+
+/** Exactly the old tests/*.test.ts scope, explicitly sorted and shell-free. */
+export const discoverRootTests = (root = ROOT) => discoverTests(root, '.test.ts');
+
+export function selectRootShard(files, shard) {
+  const selected = shard ? files.filter((_, index) => index % shard.total === shard.index - 1) : files;
+  if (!selected.length) throw new Error('The root test shard is empty; refusing to report success without tests');
+  return selected;
+}
+
+/** Dependencies and file discovery are validated before any suite runs. The
+ * injected spawn/log adapters let regression tests prove aggregation without
+ * recursively launching the actual repository suites. */
+export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = spawnSync, log = console.log, error = console.error } = {}) {
+  try {
+    const options = parseTestArgs(argv), studio = join(root, 'studio');
+    requireFile(join(root, 'node_modules', 'tsx', 'package.json'));
+    const studioPackage = join(studio, 'node_modules', 'three-slicer', 'package.json');
+    if (!existsSync(studioPackage) || !statSync(studioPackage).isFile()) throw new Error('The Studio workspace is not installed. Run (cd studio && npm ci); its tests must not be skipped.');
+    const guard = join(root, 'scripts', 'test-no-network.mjs');
+    requireFile(guard);
+    // NODE_OPTIONS is inherited by nested Node children too. Absolute URLs
+    // keep the preload valid when the Studio child changes its cwd.
+    const testEnv = { ...env, NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --import=${pathToFileURL(guard).href}`.trim() };
+    const suites = options.suite ? [options.suite] : ['root', 'workspaces', 'studio'];
+    const runs = suites.map((name) => {
+      if (name === 'root') {
+        const files = selectRootShard(discoverRootTests(root), options.shard);
+        return { name, files, args: ['--import', 'tsx', '--test', ...files], cwd: root };
+      }
+      if (name === 'studio') {
+        const files = discoverTests(studio, '.test.mjs');
+        return { name, files, args: ['--test', ...files], cwd: studio };
+      }
+      const file = 'scripts/test-workspaces.mjs';
+      requireFile(join(root, file));
+      return { name, files: [file], args: [file], cwd: root };
+    });
+    if (options.list) {
+      for (const file of runs[0].files) log(file);
+      return 0;
+    }
+    const failed = [];
+    for (const run of runs) {
+      log(`\ntest:unit: running ${run.name}${options.shard ? ` shard ${options.shard.index}/${options.shard.total}` : ''}`);
+      try {
+        for (const file of run.files) requireFile(join(run.cwd, file));
+        const result = spawn(process.execPath, run.args, { stdio: 'inherit', shell: false, cwd: run.cwd, env: testEnv });
+        if (result.status !== 0 || result.error) failed.push(`${run.name} (${result.error?.message ?? `exit ${result.status ?? `signal ${result.signal}`}`})`);
+      } catch (failure) {
+        failed.push(`${run.name} (${failure instanceof Error ? failure.message : String(failure)})`);
+      }
+    }
+    if (failed.length) {
+      error(`\ntest:unit FAILED — ${failed.join(', ')}. All ${runs.length} selected suites were attempted.`);
+      return 1;
+    }
+    log(`\ntest:unit: ${suites.join(', ')} suites all green.`);
+    return 0;
+  } catch (failure) {
+    error(`test-all: ${failure instanceof Error ? failure.message : String(failure)}`);
+    return 1;
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = runTestSuites(process.argv.slice(2));
