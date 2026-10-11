@@ -175,8 +175,19 @@ immutable recorded money, existing profit/discount policies, and per-product/
 per-credit atomic writes. They do not certify every historical production row.
 Price protection now uses frozen membership, coupon/points and accepted price
 adjustments once, following the existing return discount allocation, excluding
-merchandise fees and capping the protected bases to the accepted invoice. Legacy
-pending claims are rechecked without rewriting prior credits. Its final focused
+warranty/transport fees and capping the protected bases to the accepted invoice.
+Legacy pending claims are rechecked without rewriting prior credits. Its final focused
 gate passed 51/51, including 24 new payment-basis and atomicity regressions; an
 independent source review found no remaining blocker in those changes.
-Current release status and the required gates are in `HANDOFF.md`.
+
+This follow-up was published as code `00d46047d737f272e520d1f8ce457ba060de912d`
+through successful [workflow 7 run 38125838113](https://github.com/justrandoomis/Levonis/actions/runs/38125838113)
+at `2026-10-11T10:19:48Z`. The complete unit suites passed 10,516 tests, zero
+failures and seven declared skips; all check/build/migration/restore-point/deploy
+and live gates passed. No new live migration was needed. Live schema was current
+at 179/179, latest 0186; the verified live bundle matched the build, and all 14
+cost/privacy probes passed. Subsequent independent direct health verification
+and a separate 14-probe run passed again. Exact evidence and the earlier failed
+attempt's corrected stale source assertion are recorded in `HANDOFF.md`.
+These results verify the covered calculation and integration paths; they do not
+replace historical reconciliation or constitute a browser E2E pass.

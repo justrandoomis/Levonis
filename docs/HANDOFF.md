@@ -4,7 +4,7 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
-## Follow-up candidate — pricing visibility and financial edge cases (2026-10-11)
+## Published follow-up — pricing visibility and financial edge cases (2026-10-11)
 
 The owner reported that the product editor says “preview only” and that dollar/
 shipping edits leave the store price unchanged. The screenshots show an explicit
@@ -61,10 +61,38 @@ separate final protection gate passed 51/51 and the pricing UI gate passed 40/40
 The new backlog and exact-capital regressions also passed independent review.
 No unresolved local failure remains.
 
-This entry is **not publication evidence**. Workflow 7 and post-deploy verification
-must be recorded before claiming this candidate live. The earlier owner waiver
-of the hours-long duplicate local unit suite remains in force; workflow 7 still
-must pass the unchanged full suite before live deployment.
+Code `00d46047d737f272e520d1f8ce457ba060de912d`, tree
+`04b77f3666015ccc4bab48a54501d71810361873`, is live through workflow 7
+[run 38125838113](https://github.com/justrandoomis/Levonis/actions/runs/38125838113),
+job `114429901074`. The run completed successfully at `2026-10-11T10:19:48Z`
+(13:19:48 Baghdad); all 38 reported steps succeeded. The exact head, job result
+and complete downloaded log were independently checked after completion.
+
+- The complete check passed, including 68 boundary cases. Units passed **10,516
+  tests, zero failures, seven declared skips**: root 9,838 passed/one skipped,
+  workspaces 365 passed, Studio 313 passed/six skipped. The earlier owner waiver
+  of the hours-long duplicate local unit suite did not change this full CI gate.
+- The frontend build retained all seven required live markers. Migration replay
+  proved 179 files, 352 tables, zero foreign-key violations and zero orphan
+  catalogues. Its second full pass applied zero files; repeating 0186 left the
+  affected tables unchanged.
+- Time Travel bookmark `000015c6-00000176-00005101-d7a9bd1f712405be962018765b13e015`
+  preceded the live migration check. Live history was already current at 179
+  files, so no new migration applied. Worker version is
+  `f94df5a3-756d-4105-84f9-53c5b8d44d6d`; existing vars were preserved.
+- Live `ServicesGrid-BCuhQb06.js` matched the build byte for byte (3,188 bytes).
+  Schema was current at 179/179, latest `0186_pricing_direct_purchase.sql`,
+  zero behind. All 14 read-only cost/privacy probes and the normal live
+  endpoint, cache, origin, admin/cart, sign-in and configuration gates passed.
+- Subsequent permitted direct `/api/health` verification independently confirmed
+  HTTP 200, status `ok`, schema `current`, `expected_count`/`applied_count` 179,
+  zero behind, and both migration filenames equal to 0186. A separate
+  `scripts/live-cost-probes.mjs` run passed all 14 probes with zero failures,
+  including public-product slug discovery.
+
+Verification used synthetic financial fixtures and read-only production checks.
+It did not perform a row-wide historical reconciliation or browser E2E. Old
+records without sufficient evidence still require review under the rules above.
 
 The first full attempt used code `de54666a3150e022e1125fd56958b07adfb8b8f0`,
 tree `2894567eca304f9a030d536de344578ce46b0b5f`, in workflow 7
@@ -76,7 +104,7 @@ the old exact JSX expectation at `tests/engineSaveStrings.test.ts:123`: it
 expected only `ratesSeq` before the sibling-list refresh change. The assertion
 now explicitly requires both revision sources and the workspace callback; no
 production source or financial formula changed. All live steps 8–35 were skipped,
-so this attempt did not migrate or deploy. The full gate must pass on the retry.
+so this attempt did not migrate or deploy. The successful retry is recorded above.
 The corrected assertion and adjacent pricing suites passed 30/30 locally; the
 complete `npm run check` also passed again on the exact retry source.
 
@@ -85,10 +113,10 @@ API uploaded the exact tested blobs, verified the identical root tree, and made
 one non-forced fast-forward on the existing default branch. Workflow 7 remains
 the only deployment path; no branch or pull request was created.
 
-## Published release — 2026-10-11
+## Previous published release — 2026-10-11
 
 Code `1e4084620e0e638b73a2fa9988d3e2baf1a4fcbe`, tree
-`5185494f71a0fe94f0614d3d9c806cd14124ad1d`, is live through workflow 7 run
+`5185494f71a0fe94f0614d3d9c806cd14124ad1d`, was published through workflow 7 run
 [`38106453316`](https://github.com/justrandoomis/Levonis/actions/runs/38106453316),
 job `114372910022`. The run completed successfully; all steps 1–35 and cleanup
 succeeded. The exact commit and the complete downloaded log were independently
