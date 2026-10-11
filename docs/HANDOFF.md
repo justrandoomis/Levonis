@@ -66,6 +66,25 @@ must be recorded before claiming this candidate live. The earlier owner waiver
 of the hours-long duplicate local unit suite remains in force; workflow 7 still
 must pass the unchanged full suite before live deployment.
 
+The first full attempt used code `de54666a3150e022e1125fd56958b07adfb8b8f0`,
+tree `2894567eca304f9a030d536de344578ce46b0b5f`, in workflow 7
+[run 38119889237](https://github.com/justrandoomis/Levonis/actions/runs/38119889237),
+job `114412259631`. Its complete check passed. Units had 10,515 passes, one
+failure and seven declared skips (root: 9,837 passed, one failed, one skipped;
+workspaces: 365 passed; Studio: 313 passed, six skipped). The single failure was
+the old exact JSX expectation at `tests/engineSaveStrings.test.ts:123`: it
+expected only `ratesSeq` before the sibling-list refresh change. The assertion
+now explicitly requires both revision sources and the workspace callback; no
+production source or financial formula changed. All live steps 8–35 were skipped,
+so this attempt did not migrate or deploy. The full gate must pass on the retry.
+The corrected assertion and adjacent pricing suites passed 30/30 locally; the
+complete `npm run check` also passed again on the exact retry source.
+
+Local HTTPS Git push lacked credentials in this session. The connected GitHub
+API uploaded the exact tested blobs, verified the identical root tree, and made
+one non-forced fast-forward on the existing default branch. Workflow 7 remains
+the only deployment path; no branch or pull request was created.
+
 ## Published release — 2026-10-11
 
 Code `1e4084620e0e638b73a2fa9988d3e2baf1a4fcbe`, tree
