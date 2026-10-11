@@ -36,6 +36,23 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+      - name: Verify Anthropic API access (no key or response output)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::ANTHROPIC_API_KEY is not set in GitHub Actions secrets"
+            exit 1
+          fi
+          status=$(curl --silent --show-error --max-time 30 --output "$RUNNER_TEMP/anthropic-preflight.json" --write-out '%{http_code}' --request POST 'https://api.anthropic.com/v1/messages' --header "x-api-key: $ANTHROPIC_API_KEY" --header 'anthropic-version: 2023-06-01' --header 'content-type: application/json' --data '{"model":"claude-sonnet-5-5","max_tokens":64,"messages":[{"role":"user","content":"Reply OK."}]}')
+          if [ "$status" != '200' ]; then
+            error_type=$(jq -r '.error.type // "unknown"' "$RUNNER_TEMP/anthropic-preflight.json" 2>/dev/null || echo unknown)
+            echo "::error::Anthropic API returned HTTP $status ($error_type). Check API key, credits/billing, model access and rate limits."
+            exit 1
+          fi
+          echo 'Anthropic API request succeeded (credential, model and billing verified).'
+          rm -f "$RUNNER_TEMP/anthropic-preflight.json"
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
@@ -43,5 +60,6 @@ jobs:
           additional_permissions: |
             actions: read
           claude_args: |
+            --model claude-sonnet-5-5
             --max-turns 20
             --allowedTools "Bash(npm ci:*),Bash(npm run check:*),Bash(npm run test:unit:*),Bash(npm run build:*)"
