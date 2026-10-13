@@ -16,7 +16,9 @@ localStorage.setItem('levo_lang', ['en', 'ckb'].includes(params.get('lang') ?? '
 const requests: { path: string; method: string; body?: Record<string, unknown> }[] = [];
 Object.assign(window, { procurementRequests: requests });
 
-const profile = { id: 'germany_land', name_ar: 'ألمانيا — شحن بري', name_en: 'Germany · land freight', currency: 'EUR', shipping_basis: 'weight', exchange_rate: 1650, shipping_rate_iqd: 6100, version: 5 };
+// The approved central rate the purchase's rate is prefilled from and checked against (V2-0 F4, DECISIONS row 224): 1.1 × 1,500.
+const approved_rates = [{ currency: 'EUR', rate_iqd: '1650', usd_iqd_rate: '1500', cross_rate: '1.1' }];
+const profile = { id: 'germany_land', name_ar: 'ألمانيا — شحن بري', name_en: 'Germany · land freight', name_ckb: 'ئەڵمانیا — ناردنی وشکانی', currency: 'EUR', shipping_basis: 'weight', exchange_rate: 1650, shipping_rate_iqd: 6100, version: 5 };
 const line = { product_id: 'x2d', scope: 'option', scope_id: 'combo', label: 'X2D Combo', sku: 'X2D-COMBO', stock: 0, reserved: 0, selling_price_iqd: 1800000, cost_source: 'procurement_default', weight_g: 22300, volume_mm3: 0, qty_ordered: 5, invoiced_qty: 5, purchase_cost_mode: 'unit', source_unit_amount: 855, source_total_amount: 4275 };
 const header = { supplier_id: '', warehouse_id: '', invoice_no: '', currency: 'EUR', exchange_rate: 1616.88, cost_profile_id: 'germany_land', cost_profile_version: 4, shipping_basis: 'weight', shipping_rate_iqd: 5944, purchase_day: '2026-10-06', expected_day: '', tracking: '', note: '', attachment_url: '', invoice_total_iqd: '', cost_state: 'final' };
 const manual = { ...header, cost_profile_id: null, cost_profile_version: null, shipping_basis: null, shipping_rate_iqd: null };
@@ -44,7 +46,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
   requests.push({ path, method, body });
   let data: Record<string, unknown> | undefined;
-  if (path === '/api/admin/procurement/config') data = { suppliers: [], locations: [], investors: [], cost_profiles: [profile] };
+  if (path === '/api/admin/procurement/config') data = { suppliers: [], locations: [], investors: [], cost_profiles: [profile], approved_rates };
   else if (path === '/api/admin/procurement/documents' && method === 'GET') data = { purchases: [purchase] };
   else if (path.startsWith('/api/admin/procurement/documents') && (method === 'POST' || method === 'PUT')) data = { id: 'doc-1' };
   else if (path === '/api/admin/procurement/documents/doc-1' && method === 'GET') data = { purchase, funding: null, lines: [saved], charges: charges.map(chargeWire), payments: [], ordered_total_iqd: 7634918, supplier_paid_iqd: 0, supplier_balance_iqd: 7634918, matching: { ordered_qty: 5, received_qty: 0, invoiced_qty: 5, rejected_qty: 0, invoice_difference_iqd: null } };

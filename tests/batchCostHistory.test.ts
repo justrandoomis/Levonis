@@ -150,7 +150,8 @@ test('batch with historical FX snapshot: supplier_cost_usd_at_purchase and histo
 test('a USD document: the batch\'s USD/IQD is the document\'s own rate (source document, no central version)', async () => {
   const { raw, app } = setup();
   seedRates(raw);
-  const id = await orderAndReceive(app, document({ currency: 'USD', exchange_rate: 1500, lines: [{ product_id: 'part', scope: 'base', scope_id: '', qty_ordered: 1, source_unit_amount: 120.5 }] }));
+  // 1,500 is 9.6% below the approved 1,660: the owner confirms it is the rate paid (V2-0 F4, row 224).
+  const id = await orderAndReceive(app, document({ currency: 'USD', exchange_rate: 1500, confirm_rate: true, lines: [{ product_id: 'part', scope: 'base', scope_id: '', qty_ordered: 1, source_unit_amount: 120.5 }] }));
   const [lot] = lotsOf(raw, id);
   assert.equal(lot.unit_cost_iqd, 180750);
   assert.equal(lot.usd_iqd_rate_at_purchase, '1500');

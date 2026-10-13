@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshDb, asD1, stubApp, post, put, get, json, count } from './fixtures/app';
+import { seedApprovedProcurementRates } from './fixtures/approvedRates';
 import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 import { allocateProcurementCharges, procurementSelectionKey, type ProcurementCharge } from '../packages/contracts/src/procurementCost';
 import { purchaseEstimate } from '../src/components/adminOperations/purchaseEstimate';
@@ -140,6 +141,8 @@ function setup() {
     VALUES ('printer','X2D','charges-x2d',2000000,0,0,'OPTION',20000,22300),('part','Part','charges-part',20000,0,0,'BASE',1000,1000);
     INSERT INTO product_option_groups(id,product_id,name_en) VALUES('model','printer','Model');
     INSERT INTO product_option_values(id,product_id,group_id,name_en,stock) VALUES('combo','printer','model','Combo',0);`);
+  // The EUR documents save against an approved central rate (V2-0 F4, row 224).
+  seedApprovedProcurementRates(raw);
   const app = stubApp(asD1(raw), { id: 'owner', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => a.route('/p', adminProcurementRoutes));
   const payload = (extra: Record<string, unknown> = {}) => ({ operation_id: crypto.randomUUID(), currency: 'EUR', exchange_rate: 1616.88,
     cost_profile_id: 'germany_land', cost_profile_version: 1, shipping_rate_iqd: 5944, status: 'ordered', cost_state: 'final',

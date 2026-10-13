@@ -23,6 +23,7 @@ import { planPurchaseFunding, purchaseFundingSummary, receivePurchaseFunding, ty
 import { investorFinanceInstalled } from '../lib/investorFinance';
 import { packedMeasure, procurementProfiles, profileRates, type PurchaseCharge } from '../lib/procurementCosts';
 import { parseProcurementDraft } from '../lib/procurementDraft';
+import { approvedProcurementRates, requireApprovedDocumentRate } from '../lib/pricingEngine/procurementRate';
 import { engineColumnInstalled } from '../lib/engineInstalled';
 import { batchSnapshotInstalled, purchaseLotSnapshot, type PurchaseFxSource } from '../lib/batchSnapshot';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
@@ -247,7 +248,13 @@ adminProcurementRoutes.get('/config', async (c) => {
     c.env.DB.prepare("SELECT p.*,u.name,u.email FROM investment_profiles p JOIN users u ON u.id=p.user_id WHERE p.state='active' AND u.role='admin' AND u.admin_scope='assistant' ORDER BY u.name").all(),
     procurementProfiles(c.env.DB),
   ]);
-  return c.json({ success: true, suppliers: suppliers.results ?? [], locations: locations.results ?? [],investors:investors.results??[], cost_profiles: costProfiles });
+  // V2-0 F4 (DECISIONS row 224): the approved central rates the document's rate
+  // is prefilled from and checked against — the engine's own (pricing_fx_rates).
+  // This answer is the purchase capability's, the owner's only. An unreadable
+  // rate table leaves the list empty: the field stays empty and the save, which
+  // reads the rates again, decides.
+  const approvedRates = await approvedProcurementRates(c.env.DB).catch(() => []);
+  return c.json({ success: true, suppliers: suppliers.results ?? [], locations: locations.results ?? [],investors:investors.results??[], cost_profiles: costProfiles, approved_rates: approvedRates });
 });
 adminProcurementRoutes.put('/cost-profiles/:id', async (c) => {
   const user = c.get('user')!;
@@ -413,6 +420,10 @@ async function planDocument(
   // The lines and charges, parsed and computed exactly as the owner's pricing
   // preview reads a draft (worker/lib/procurementDraft.ts).
   const { profile, profileVersion, shippingRate, currency, rate, lines, charges, shares } = await parseProcurementDraft(db, b);
+  // V2-0 F4 (DECISIONS row 224): the server decides the rate — an approved
+  // central rate must exist for the currency, and one more than 6% away from it
+  // needs the owner's explicit `confirm_rate` (worker/lib/pricingEngine/procurementRate.ts).
+  await requireApprovedDocumentRate(db, currency, rate, b.confirm_rate === true);
   // Procurement provenance is deliberately separate from the pricing parser:
   // supplier order/tracking references never participate in prices or COGS.
   const rawLines = b.lines as Record<string, unknown>[];

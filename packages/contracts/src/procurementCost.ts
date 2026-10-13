@@ -4,6 +4,8 @@ export type CostProfile = {
   id: CostProfileId;
   name_ar: string;
   name_en: string;
+  /** The route's Sorani name (V2-0 F17); optional so an older answer still reads. */
+  name_ckb?: string;
   currency: 'EUR' | 'CNY';
   shipping_basis: 'weight' | 'volume';
   exchange_rate: number | null;

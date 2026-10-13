@@ -18,7 +18,9 @@ localStorage.setItem('levo_lang', ['en', 'ckb'].includes(params.get('lang') ?? '
 const requests: { path: string; method: string; body?: Record<string, unknown> }[] = [];
 Object.assign(window, { procurementRequests: requests });
 
-const profile = { id: 'germany_land', name_ar: 'ألمانيا — شحن بري', name_en: 'Germany · land freight', currency: 'EUR', shipping_basis: 'weight', exchange_rate: 1650, shipping_rate_iqd: 6100, version: 5 };
+// The approved central rate the purchase's rate is prefilled from and checked against (V2-0 F4, DECISIONS row 224): 1.1 × 1,500.
+const approved_rates = [{ currency: 'EUR', rate_iqd: '1650', usd_iqd_rate: '1500', cross_rate: '1.1' }];
+const profile = { id: 'germany_land', name_ar: 'ألمانيا — شحن بري', name_en: 'Germany · land freight', name_ckb: 'ئەڵمانیا — ناردنی وشکانی', currency: 'EUR', shipping_basis: 'weight', exchange_rate: 1650, shipping_rate_iqd: 6100, version: 5 };
 const draftLine = (scope_id: string, label: string, unit: number) => ({ product_id: 'a1', scope: 'option', scope_id, label, sku: `A1-${scope_id}`, stock: 0, reserved: 0, selling_price_iqd: 749000, cost_source: 'procurement_default', weight_g: 9000, volume_mm3: 0, qty_ordered: 7, invoiced_qty: 7, purchase_cost_mode: 'unit', source_unit_amount: unit, source_total_amount: unit * 7 });
 const header = { supplier_id: 'germany', warehouse_id: '', invoice_no: '', currency: 'EUR', exchange_rate: 1650, cost_profile_id: 'germany_land', cost_profile_version: 5, shipping_basis: 'weight', shipping_rate_iqd: 6100, purchase_day: '2026-10-10', expected_day: '', tracking: '', note: '', attachment_url: '', invoice_total_iqd: '', cost_state: 'final' };
 privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines: [draftLine('std', 'A1', 320), draftLine('combo', 'A1 Combo', 445)], charges: [], operationId: 'op-direct-fixture' }));
@@ -84,7 +86,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
   requests.push({ path, method, body });
   let data: Record<string, unknown> | undefined;
-  if (path === '/api/admin/procurement/config') data = { suppliers: [{ id: 'germany', name: 'Germany' }], locations: [], investors: [], cost_profiles: [profile] };
+  if (path === '/api/admin/procurement/config') data = { suppliers: [{ id: 'germany', name: 'Germany' }], locations: [], investors: [], cost_profiles: [profile], approved_rates };
   else if (path === '/api/admin/procurement/documents' && method === 'GET') data = { purchases: [purchase(), { ...purchase(), id: 'doc-2', invoice_no: '', status: 'draft' }] };
   else if (path === '/api/admin/procurement/documents' && method === 'POST') { state.name = String(body?.invoice_no ?? ''); data = { id: 'doc-1' }; }
   else if (path === '/api/admin/procurement/documents/doc-1/name' && method === 'PATCH') { state.name = String(body?.name ?? '').replace(/\s+/g, ' ').trim(); data = { id: 'doc-1', name: state.name }; }

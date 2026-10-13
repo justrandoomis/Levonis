@@ -3,14 +3,16 @@ import { PROCUREMENT_CHARGE_BASES, allocateProcurementCharges, looksLikeFreight,
 import { badRequest } from './http';
 import { decimal, whole } from './operations';
 
-const names: Record<CostProfileId, [string, string]> = {
-  germany_land: ['ألمانيا — شحن بري', 'Germany · land freight'],
-  china_air: ['الصين — شحن جوي', 'China · air freight'],
-  china_sea: ['الصين — شحن بحري', 'China · sea freight'],
+// Each route's name in Arabic, English and Sorani (V2-0 F17, row 183: the
+// Sorani screen never falls back to the Arabic).
+const names: Record<CostProfileId, [string, string, string]> = {
+  germany_land: ['ألمانيا — شحن بري', 'Germany · land freight', 'ئەڵمانیا — ناردنی وشکانی'],
+  china_air: ['الصين — شحن جوي', 'China · air freight', 'چین — ناردنی ئاسمانی'],
+  china_sea: ['الصين — شحن بحري', 'China · sea freight', 'چین — ناردنی دەریایی'],
 };
 export async function procurementProfiles(db: D1Database): Promise<CostProfile[]> {
-  const rows = (await db.prepare('SELECT id,currency,shipping_basis,exchange_rate,shipping_rate_iqd,version FROM procurement_cost_profiles ORDER BY CASE id WHEN \'germany_land\' THEN 0 WHEN \'china_air\' THEN 1 ELSE 2 END').all<Omit<CostProfile, 'name_ar' | 'name_en'>>()).results ?? [];
-  return rows.map(row => ({ ...row, name_ar: names[row.id][0], name_en: names[row.id][1] }));
+  const rows = (await db.prepare('SELECT id,currency,shipping_basis,exchange_rate,shipping_rate_iqd,version FROM procurement_cost_profiles ORDER BY CASE id WHEN \'germany_land\' THEN 0 WHEN \'china_air\' THEN 1 ELSE 2 END').all<Omit<CostProfile, 'name_ar' | 'name_en' | 'name_ckb'>>()).results ?? [];
+  return rows.map(row => ({ ...row, name_ar: names[row.id][0], name_en: names[row.id][1], name_ckb: names[row.id][2] }));
 }
 export function procurementAmount(values: readonly (number | string)[], divisor = 1): number {
   try { return whole(roundProcurementProduct(values, divisor), 'تكلفة الشراء والشحن'); }

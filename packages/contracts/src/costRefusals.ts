@@ -620,6 +620,20 @@ export const COST_REFUSALS = {
     en: 'The purchase name is longer than 120 characters.',
     ckb: 'ناوی کڕینەکە لە 120 پیت درێژترە.',
   },
+  // ---- the purchase document's exchange rate (Pricing V2 V2-0 F4, DECISIONS row 224) ----
+  // `POST|PUT /api/admin/procurement/documents` in USD, EUR or CNY. The rate
+  // is checked against the approved central rate the engine prices at
+  // (worker/lib/pricingEngine/procurementRate.ts); neither sentence names a rate.
+  PURCHASE_RATE_NOT_APPROVED: {
+    ar: 'لا يوجد سعر صرف مركزي معتمد لعملة هذا الشراء؛ اعتمده أولًا من شاشة «التسعير والشحن» ثم احفظ الشراء.',
+    en: 'There is no approved central exchange rate for this purchase’s currency; approve one on the Pricing & Shipping screen first, then save the purchase.',
+    ckb: 'هیچ نرخێکی ناوەندیی پەسەندکراوی ئاڵوگۆڕ بۆ دراوی ئەم کڕینە نییە؛ سەرەتا لە شاشەی «نرخدانان و ناردنی بەرهەم» پەسەندی بکە، پاشان کڕینەکە پاشەکەوت بکە.',
+  },
+  PURCHASE_RATE_CONFIRM_REQUIRED: {
+    ar: 'سعر الصرف المكتوب يبتعد أكثر من 6٪ عن السعر المركزي المعتمد. راجعه، أو أكّد أنه السعر المدفوع فعلًا ثم احفظ مرة أخرى.',
+    en: 'The exchange rate entered is more than 6% away from the approved central rate. Check it, or confirm it is the rate actually paid and save again.',
+    ckb: 'ئەو نرخی ئاڵوگۆڕەی نووسراوە زیاتر لە 6٪ لە نرخی ناوەندیی پەسەندکراو دوورە. بیپشکنەرەوە، یان پشتڕاستی بکەرەوە کە ئەمە ئەو نرخەیە کە بە ڕاستی دراوە و دووبارە پاشەکەوتی بکە.',
+  },
   INCOMING_CHANGED: {
     ar: 'تغيّر سجل الشراء أو الاستلام؛ حدّث الصفحة وراجع البيانات قبل إعادة المحاولة.',
     en: 'The purchase or receipt changed; refresh the page and review it before trying again.',

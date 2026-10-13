@@ -331,5 +331,15 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, TOOL_IMPORT, `${f} reaches no owner tool`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !OWNER_TOOLS.includes(f)), []);
+  // Pricing V2 V2-0 F4 (DECISIONS row 224): the purchase routes — the owner's, behind the `purchase`
+  // capability — read the APPROVED central rate a document's rate is prefilled from and checked against,
+  // through ONE helper that computes no price (it reads the engine's own rate reader and compares).
+  const PURCHASE_RATE: Readonly<Record<string, readonly string[]>> = { 'worker/routes/adminProcurement.ts': ['../lib/pricingEngine/procurementRate'] };
+  for (const [f, helpers] of Object.entries(PURCHASE_RATE)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...helpers].sort(), f);
+  }
+  assert.doesNotMatch(files.find((x) => x.f === 'worker/lib/pricingEngine/procurementRate.ts')!.src, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview)['"]/);
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in PURCHASE_RATE) && !OWNER_TOOLS.includes(f)), []);
 });

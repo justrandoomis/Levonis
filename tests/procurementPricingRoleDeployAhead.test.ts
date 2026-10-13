@@ -16,6 +16,7 @@ import { dbThrough, get, hasColumn, json } from './fixtures/app';
 import { OWNER_ROW_SQL } from './fixtures/fx';
 import { seedLegacyCatalogue, seedProfileRates } from './fixtures/legacyCatalogue';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
+import { seedApprovedProcurementRates } from './fixtures/approvedRates';
 
 const CHARGES = [
   { title: 'شحن محلي', scope: 'unit', unit_amount_iqd: 16_000, basis: 'quantity', applies_to: null },
@@ -28,6 +29,8 @@ test('on a 0179 database a routed purchase with charges saves as today, and the 
   raw.exec(OWNER_ROW_SQL);
   seedLegacyCatalogue(raw);
   seedProfileRates(raw);
+  // The document's EUR rate (1,760) is checked against an approved central rate, which 0179 already holds (V2-0 F4, row 224).
+  seedApprovedProcurementRates(raw, { USD_IQD: '1600', EUR_USD: '1.1', CNY_USD: '0.14' });
   const w = pricingWorld({ raw });
   const id = await w.save(w.draft({ charges: CHARGES }));
   const rows = raw.prepare('SELECT title, amount_iqd FROM purchase_charges WHERE purchase_id = ? ORDER BY position').all(id) as Array<{ title: string; amount_iqd: number }>;
@@ -52,7 +55,7 @@ test('on the migrated database the same save records each charge’s pricing rol
   const manual = await w.save({
     operation_id: 'op_manual_role_00001',
     currency: 'USD',
-    exchange_rate: 1500,
+    exchange_rate: 1600,
     status: 'ordered',
     cost_state: 'final',
     lines: [{ product_id: AMS, scope: 'option', scope_id: `${AMS}_o0`, qty_ordered: 1, source_unit_amount: 300, weight_g: 2500, volume_mm3: 0 }],

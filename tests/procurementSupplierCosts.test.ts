@@ -5,6 +5,7 @@ import type { SqliteStatement } from './fixtures/d1';
 import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 import { productSelections } from '../worker/lib/inventorySelection';
 import { exactProcurementUnitDefault, roundProcurementProduct } from '../packages/contracts/src/procurementCost';
+import { seedApprovedProcurementRates } from './fixtures/approvedRates';
 
 function setup() {
   const raw = freshDb();
@@ -14,6 +15,8 @@ function setup() {
       ('part','Part','procurement-part',20000,12000,0,'BASE',1000,NULL,NULL,NULL,NULL);
     INSERT INTO product_option_groups(id,product_id,name_en) VALUES('model','printer','Model');
     INSERT INTO product_option_values(id,product_id,group_id,name_en,stock) VALUES('combo','printer','model','Combo',0),('solo','printer','model','Solo',0);`);
+  // The EUR and CNY documents save against approved central rates (V2-0 F4, row 224).
+  seedApprovedProcurementRates(raw);
   const real = asD1(raw);
   let gate: { entered: () => void; resumed: Promise<void> } | undefined;
   const db = { prepare: (sql: string) => real.prepare(sql), async batch(statements: SqliteStatement[]) {
@@ -161,7 +164,7 @@ test('assistant cannot see saved raw prices or change procurement defaults', asy
 });
 
 test('source total invoice decimals survive document reads and clones instead of reconstructing from rounded IQD', async () => {
-  const x = setup(), p = await x.create(x.payload({ exchange_rate: 1.5, shipping_rate_iqd: 0,
+  const x = setup(), p = await x.create(x.payload({ exchange_rate: 1.5, confirm_rate: true, shipping_rate_iqd: 0,
     lines: [{ product_id: 'printer', scope: 'option', scope_id: 'combo', qty_ordered: 3, purchase_cost_mode: 'total', source_total_amount: 2.005, weight_g: 22300 }] }));
   assert.equal(p.detail.lines[0].source_total_amount, 2.005);
   assert.equal(p.detail.lines[0].purchase_total_iqd, 3);

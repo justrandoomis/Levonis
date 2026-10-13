@@ -6,12 +6,15 @@ import { adminProcurementRoutes } from '../worker/routes/adminProcurement';
 import { planLotConsumption, planLotRestore } from '../worker/lib/inventoryLots';
 import { operationsReport } from '../worker/lib/operationsReport';
 import type { StockMove } from '../worker/lib/inventory';
+import { seedApprovedProcurementRates } from './fixtures/approvedRates';
 
 function world(through: string | null = null) {
   const raw = through === null ? freshDb() : dbThrough(through);
   raw.exec(`INSERT INTO users(id,email,role,admin_scope) VALUES ('owner','boss@x.co','admin','full');
     INSERT INTO products(id,name,name_ar,slug,price_iqd,stock,inventory_mode)
     VALUES ('fi_stock','Stock','مخزون','fi-stock',900000,0,'BASE');`);
+  // The EUR documents below save against an approved central rate (V2-0 F4, row 224); older databases have none to seed.
+  if (through === null) seedApprovedProcurementRates(raw);
   const real = asD1(raw);
   let beforeReceive: (() => Promise<void>) | null = null;
   let beforeEdit: (() => Promise<void>) | null = null;
