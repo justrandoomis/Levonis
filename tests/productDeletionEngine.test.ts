@@ -49,10 +49,10 @@ import {
  * production. The last test in this file turns enforcement ON to prove the
  * ordering is ALSO valid there.
  */
-function freshSchema(enforceForeignKeys = false): DatabaseSync {
+function freshSchema(enforceForeignKeys = false, before?: string): DatabaseSync {
   const db = new DatabaseSync(':memory:', { enableForeignKeyConstraints: enforceForeignKeys });
   const dir = join(ROOT, 'migrations');
-  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql') && (!before || x < before)).sort()) {
     db.exec(readFileSync(join(dir, f), 'utf8'));
   }
   return db;
@@ -555,8 +555,11 @@ test('the delete order satisfies the declared foreign keys when they ARE enforce
 });
 
 test('a deployment before 0186 still deletes products without the direct-purchase table', async () => {
-  const db = freshSchema();
-  db.exec('DROP TABLE pricing_direct_purchase');
+  // Every migration before 0186, none after: 0188's locks read the
+  // direct-purchase table, so dropping only that table would describe a
+  // database no deploy order produces.
+  const db = freshSchema(false, '0186');
+  assert.equal(count(db, "SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'pricing_direct_purchase'"), 0);
   insert(db, 'products', { id: 'p-before-direct', slug: 'before-direct', name: 'Before direct inputs' });
   const result = await deleteProductPermanently(sqlite(db), 'p-before-direct');
   assert.equal(result.product_deleted, true);

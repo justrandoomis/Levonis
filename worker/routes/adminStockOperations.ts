@@ -15,7 +15,7 @@ import { counterTarget } from '../lib/inventoryReceiving';
 import type { StockScope } from '../lib/inventory';
 import { investorFinanceInstalled, planInvestorCapitalLoss, planInvestorSources, type InvestmentContract } from '../lib/investorFinance';
 import { effectiveLotCostSql } from '../lib/inventoryLots';
-import { planMoveUnitOrigins } from '../lib/inventoryUnitOrigins';
+import { lotUnitChoices, planMoveUnitOrigins } from '../lib/inventoryUnitOrigins';
 import { SPLIT_CHILD_INSERT_SQL, batchSnapshotInstalled, preSnapshotLotSelect } from '../lib/batchSnapshot';
 
 export const adminStockOperationsRoutes = new Hono<AppContext>();
@@ -43,6 +43,15 @@ adminStockOperationsRoutes.get('/locations', async (c) => {
       lots: lots.results ?? [],
     }),
   );
+});
+// The identified pieces of one lot, for transfers and lot counts that must
+// name them (review 2026-10-13, PROV-3). Supplier references only, no cost.
+adminStockOperationsRoutes.get('/lots/:id/units', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'transfer').catch(() => requireCapability(c.env, user, 'count'));
+  const choices = await lotUnitChoices(c.env.DB, text(c.req.param('id'), 60));
+  if (!choices) throw notFound('Lot not found');
+  return c.json(projectForAdmin(c.env, user, { success: true, ...choices }));
 });
 adminStockOperationsRoutes.post('/locations', async (c) => {
   const user = c.get('user')!;
@@ -159,7 +168,8 @@ adminStockOperationsRoutes.post('/transfers', async (c) => {
           ...(snapshots ? [lotId, lotId] : []),
         ),
     );
-  if(target!==lotId) statements.push(...await planMoveUnitOrigins(db,{lotId,qty,targetLotId:target}));
+  // PROV-3: a partial transfer of identified pieces names the cartons that moved.
+  if(target!==lotId) statements.push(...await planMoveUnitOrigins(db,{lotId,qty,lotRemaining:l.qty_remaining,targetLotId:target,originIds:b.unit_origin_ids}));
   if(versioned){
     statements.push(...fence(db,'COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?',[lotId,costVersion?.version??0]));
     if(target!==lotId&&costVersion)statements.push(db.prepare('INSERT INTO inventory_lot_cost_versions(lot_id,version,unit_cost_iqd,adjustment_id) VALUES (?,1,?,?)').bind(target,costVersion.unit_cost_iqd,costVersion.adjustment_id));
@@ -718,7 +728,7 @@ adminStockOperationsRoutes.post('/lot-counts',async c=>{
   const statements=[...fence(db,`EXISTS(SELECT 1 FROM inventory_lots WHERE id=? AND qty_remaining=?) AND EXISTS(SELECT 1 FROM ${target.table} WHERE id=? AND stock=? AND ${lot.scope==='base'?'stock_reserved':'reserved'}=0) AND COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?`,[lotId,lot.qty_remaining,rowId,s.stock,lotId,lot.cost_version]),db.prepare('INSERT INTO lot_count_events(id,lot_id,expected_qty,counted_qty,delta,actor_id,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,lotId,lot.qty_remaining,counted,delta,user.id,new Date().toISOString())];
   const contracts=lot.incoming_id?(await db.prepare("SELECT * FROM investment_contracts WHERE incoming_id=? AND state='active'").bind(lot.incoming_id).all<InvestmentContract>()).results??[]:[];
   if(delta){
-    if(delta<0) statements.push(...await planMoveUnitOrigins(db,{lotId,qty:-delta,reason:'lot_count'}));
+    if(delta<0) statements.push(...await planMoveUnitOrigins(db,{lotId,qty:-delta,lotRemaining:lot.qty_remaining,reason:'lot_count',originIds:b.unit_origin_ids}));
     statements.push(db.prepare('INSERT INTO inventory_ledger(id,product_id,scope,scope_id,kind,qty,idempotency_key,actor_user_id,reason) VALUES (?,?,?,?,?,?,?,?,?)').bind(newId('ilg'),lot.product_id,lot.scope,lot.scope_id,delta>0?'adjust_in':'adjust_out',Math.abs(delta),`lot-count:${id}`,user.id,'count'),db.prepare(`UPDATE ${target.table} SET stock=stock+? WHERE id=?`).bind(delta,rowId),db.prepare('UPDATE inventory_lots SET qty_remaining=? WHERE id=?').bind(counted,lotId));
     if(lot.effective!==null&&lot.effective>0){const value=Math.abs(delta)*lot.effective;
       statements.push(...journalPlan(db,{key:`lot-count:${id}`,day:baghdadDay(),title:'فرق جرد دفعة محددة',source:'lot-count',sourceId:id,actor:user.id},delta<0?[{account:'5300',debit:value},{account:'1200',credit:value}]:[{account:'1200',debit:value},{account:'5300',credit:value}]).statements);

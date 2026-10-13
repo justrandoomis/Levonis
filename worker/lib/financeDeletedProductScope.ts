@@ -35,3 +35,16 @@ export async function readDeletedProductFinanceScopes(db: D1Database, lineIds: s
   }
   return scopes;
 }
+
+/** Lines whose product link was NULL from checkout, by design: a mystery
+ * spool binds NULL (orders.ts, §7.7) and its draw is written to
+ * mystery_allocations in the order's own batch. Such a line never had a
+ * catalogue scope to lose, so it is not deleted-product evidence (review
+ * 2026-10-13, CF-1): its wage keeps the frozen '' product with no ancestors. */
+export async function readNeverLinkedLines(db: D1Database, lineIds: string[]) {
+  if (!lineIds.length) return new Set<string>();
+  const rows = (await db.prepare(`SELECT DISTINCT order_item_id AS id FROM mystery_allocations
+    WHERE order_item_id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(lineIds))
+    .all<{ id: string }>()).results ?? [];
+  return new Set(rows.map((row) => row.id));
+}

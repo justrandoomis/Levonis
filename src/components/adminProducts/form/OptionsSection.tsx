@@ -83,6 +83,7 @@ export function OptionsSection({
   colorExtra,
   comboExtra,
   pricesLocked = false,
+  directPricesLocked,
 }: {
   rel: RelationsState;
   setRel: (fn: (r: RelationsState) => RelationsState) => void;
@@ -108,6 +109,8 @@ export function OptionsSection({
    * and everything else stay editable.
    */
   pricesLocked?: boolean;
+  /** The direct-sale cells alone (a product the engine prices for direct sale only); defaults to pricesLocked. */
+  directPricesLocked?: boolean;
 }) {
   // Every mutation re-derives the inventory source, so the explainer strip,
   // the section summary and the saved wire all tell the same story.
@@ -548,6 +551,7 @@ export function OptionsSection({
                   <FulfillmentEditor
                     value={v}
                     locked={pricesLocked}
+                    directLocked={directPricesLocked ?? pricesLocked}
                     onChange={(fulfillments) => patchValue(g.id, v.id, { fulfillments })}
                     onValueChange={(patch) => patchValue(g.id, v.id, patch)}
                     error={errors[`value_availability:${v.id}`]}
@@ -1156,10 +1160,13 @@ function FulfillmentEditor({
   onValueChange,
   error,
   locked = false,
+  directLocked = locked,
 }: {
   value: FormValue;
   /** The engine prices this product: the direct-sale and route increases are its own, read only. */
   locked?: boolean;
+  /** The direct-sale increase alone (the engine prices direct sale only). */
+  directLocked?: boolean;
   onChange: (next: FormFulfillment[]) => void;
   onValueChange: (patch: Partial<FormValue>) => void;
   error?: string;
@@ -1207,11 +1214,11 @@ function FulfillmentEditor({
               <Field ar="زيادة البيع المباشر" en="Direct Sale Extra" hint="تخص هذا الخيار فقط وتُضاف إلى سعره الأساسي">
                 <Money
                   value={direct.regular_adjust_iqd ?? null}
-                  disabled={locked}
+                  disabled={directLocked}
                   onChange={(regular_adjust_iqd) =>
                     replaceCell({ ...direct, regular_price_iqd: null, regular_adjust_iqd })
                   }
-                  placeholder={locked ? 'سعر محرك التسعير' : 'بلا زيادة'}
+                  placeholder={directLocked ? 'سعر محرك التسعير' : 'بلا زيادة'}
                 />
               </Field>
             </div>

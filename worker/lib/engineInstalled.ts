@@ -119,5 +119,25 @@ export async function productEngineManaged(db: D1Database, productId: string): P
  * where an unchanged price still saves.
  */
 export async function refuseEngineManaged(db: D1Database, productId: string): Promise<void> {
-  if (await productEngineManaged(db, productId)) throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
+  if (await productEngineManaged(db, productId) && !(await productEngineDirectOnly(db, productId)))
+    throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
+}
+
+/**
+ * Does the engine price this product's DIRECT SALE only? A stock purchase
+ * applied to a manual product adopts it that way (pricing_direct_purchase
+ * .direct_only); its model, colour, route and pre-order prices stay the
+ * owner's (review 2026-10-13, DI-2). The old price writers then let the
+ * database's locks decide cell by cell (migration 0188): the direct-sale
+ * cells, the product row, variants and SKU prices refuse ENGINE_MANAGED, the
+ * rest saves. Without 0186 there is no direct-only product: false.
+ */
+export async function productEngineDirectOnly(db: D1Database, productId: string): Promise<boolean> {
+  try {
+    const row = await db.prepare(`SELECT 1 AS x FROM pricing_direct_purchase d JOIN product_pricing_state s ON s.product_id = d.product_id
+      WHERE d.product_id = ? AND s.mode = 'engine' AND json_valid(d.payload_json) AND json_extract(d.payload_json, '$.direct_only') = 1`).bind(productId).first<{ x: number }>();
+    return !!row;
+  } catch {
+    return false;
+  }
 }

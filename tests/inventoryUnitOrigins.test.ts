@@ -36,15 +36,29 @@ test('2 + 3 + 5 FIFO records exact piece provenance across cost layers without c
   assert.equal((await planLotConsumption(ctx.db,'order',[move(7)])).statements.length,0);
  }finally{ctx.raw.close();}
 });
-test('two preplanned sales cannot allocate the same individual unit; loser rolls its batch back',async()=>{
+/* Review 2026-10-13 (PROV-1): no caller retries a rolled-back deduction, so
+ * the slower of two preplanned sales takes the next free piece at commit
+ * instead of losing its whole stock/COGS batch. */
+test('two preplanned sales never allocate the same individual unit; the slower one takes the next free unit',async()=>{
  const ctx=setup();try{
   await received(ctx,'lot1',2,100,'2026-01-01');
   const first=await planLotConsumption(ctx.db,'order',[move(1)]),racing=await planLotConsumption(ctx.db,'other',[move(1,'line2')]);
-  await ctx.db.batch(first.statements);await assert.rejects(()=>ctx.db.batch(racing.statements));
-  assert.equal(ctx.raw.prepare('SELECT qty_remaining FROM inventory_lots WHERE id=?').get('lot1')?.qty_remaining,1);
-  assert.equal(ctx.raw.prepare('SELECT COUNT(*) AS n FROM order_item_inventory_allocations WHERE order_id=?').get('other')?.n,0);
-  await ctx.db.batch((await planLotConsumption(ctx.db,'other',[move(1,'line2')])).statements);
-  assert.equal(ctx.raw.prepare('SELECT COUNT(DISTINCT origin_id) AS n FROM order_item_inventory_unit_assignments').get()?.n,2);
+  await ctx.db.batch(first.statements);await ctx.db.batch(racing.statements);
+  assert.equal(ctx.raw.prepare('SELECT qty_remaining FROM inventory_lots WHERE id=?').get('lot1')?.qty_remaining,0);
+  assert.equal(ctx.raw.prepare('SELECT COUNT(*) AS n FROM order_item_inventory_allocations WHERE order_id=?').get('other')?.n,1);
+  assert.equal(ctx.raw.prepare('SELECT COUNT(DISTINCT origin_id) AS n FROM order_item_inventory_unit_assignments WHERE released_at IS NULL').get()?.n,2);
+  assert.deepEqual(ctx.raw.prepare('SELECT order_id,unit_index,purchase_unit_index FROM order_item_inventory_unit_assignments ORDER BY purchase_unit_index').all().map(r=>({...r})),
+   [{order_id:'order',unit_index:1,purchase_unit_index:1},{order_id:'other',unit_index:1,purchase_unit_index:2}]);
+  // With the lot used up, a third preplanned sale still rolls back on the lot's own fence.
+  await received(ctx,'lot2',1,100,'2026-01-02');
+  ctx.raw.exec(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd)
+   VALUES ('third','buyer','pending','{}','std','{}','cod',2000,1400,2000,2000),('fourth','buyer','pending','{}','std','{}','cod',2000,1400,2000,2000);
+   INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES ('line3','third','product','A1',1,2000,2000),('line4','fourth','product','A1',1,2000,2000);`);
+  const a=await planLotConsumption(ctx.db,'third',[move(1,'line3')]),b=await planLotConsumption(ctx.db,'fourth',[move(1,'line4')]);
+  assert.ok(a.statements.length && b.statements.length,'both sales planned against the last unit');
+  await ctx.db.batch(a.statements);await assert.rejects(()=>ctx.db.batch(b.statements));
+  assert.equal(ctx.raw.prepare("SELECT COUNT(*) AS n FROM order_item_inventory_allocations WHERE order_id='fourth'").get()?.n,0);
+  assert.equal(ctx.raw.prepare("SELECT COUNT(*) AS n FROM order_item_inventory_unit_assignments WHERE order_id='fourth'").get()?.n,0);
  }finally{ctx.raw.close();}
 });
 test('specific returned piece restores its original cost lot; history survives return, replay and resale',async()=>{
@@ -72,11 +86,14 @@ test('out-of-order receiving, transfer, write-off, and unsellable return preserv
   await ctx.db.batch(await planReceiveUnitOrigins(ctx.db,{incomingId:'in',lotId:'lot1',qty:1,originIds:[all[2]]}));
   await ctx.db.batch(await planReceiveUnitOrigins(ctx.db,{incomingId:'in',lotId:'lot1',qty:2,originIds:all.slice(0,2)}));
   await received(ctx,'child',1,100,'2026-01-01',false);
-  await ctx.db.batch(await planMoveUnitOrigins(ctx.db,{lotId:'lot1',qty:1,targetLotId:'child'}));
+  // Review 2026-10-13 (PROV-3): a part of a lot with identified pieces names them; nothing is guessed.
+  await assert.rejects(planMoveUnitOrigins(ctx.db,{lotId:'lot1',qty:1,lotRemaining:3,targetLotId:'child'}),/UNIT_ORIGIN_SELECTION_REQUIRED|حدد/);
+  await assert.rejects(planMoveUnitOrigins(ctx.db,{lotId:'lot1',qty:1,lotRemaining:3,targetLotId:'child',originIds:[all[0],all[1]]}),/عدد القطع/);
+  await ctx.db.batch(await planMoveUnitOrigins(ctx.db,{lotId:'lot1',qty:1,lotRemaining:3,targetLotId:'child',originIds:[all[0]]}));
   ctx.raw.exec("UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id='lot1'");
   assert.equal((await availableLotOrigins(ctx.db,'child'))[0].id,all[0]);
   assert.equal(ctx.raw.prepare('SELECT received_lot_id FROM inventory_unit_origins WHERE id=?').get(all[0])?.received_lot_id,'lot1');
-  await ctx.db.batch(await planMoveUnitOrigins(ctx.db,{lotId:'lot1',qty:1,reason:'damaged'}));
+  await ctx.db.batch(await planMoveUnitOrigins(ctx.db,{lotId:'lot1',qty:1,lotRemaining:2,reason:'damaged',originIds:[all[1]]}));
   assert.equal(ctx.raw.prepare('SELECT unavailable_reason FROM inventory_unit_origins WHERE id=?').get(all[1])?.unavailable_reason,'damaged');
   ctx.raw.exec("UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id='lot1'");
   await ctx.db.batch((await planLotConsumption(ctx.db,'order',[move(2)])).statements);

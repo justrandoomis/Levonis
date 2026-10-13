@@ -82,14 +82,43 @@ jobs:
     permissions:
       contents: read
 
+  # Verification runs outside the live lock and its shards finish out of order,
+  # so deploy jobs no longer reach `staging-deploy` in push order. GitHub keeps
+  # one pending job per concurrency group and a newly queued job cancels it:
+  # an OLDER release finishing verification last would cancel the NEWER
+  # release's pending deploy and then refuse itself as superseded, leaving
+  # neither deployed. This job refuses a superseded release before its deploy
+  # job queues for the lock at all. No secrets, read-only, no live access.
+  fresh:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Refuse a superseded release before it queues for the live lock
+        env:
+          DEPLOY_EVENT: ${{ github.event_name }}
+          DEPLOY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEPLOY_REF: ${{ github.ref }}
+        run: node scripts/check-deploy-freshness.mjs
+
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     # The reusable gate requires check + all eight root shards + workspaces
-    # + Studio. A failure, cancellation or skipped gate cannot deploy.
-    needs: verify
+    # + Studio. A failure, cancellation or skipped gate cannot deploy, and
+    # neither can a release the `fresh` job found superseded.
+    needs: [verify, fresh]
     # Job-level, not workflow-level: a feature-branch push skips this job and
-    # must not enter the live deploy lock. Shared with workflows 6 and 51. A
-    # newer push supersedes a deploy still waiting; a running one finishes.
+    # must not enter the live deploy lock. Shared with workflows 6 and 51. Only
+    # a release still current when it queues (job `fresh`) waits here; a
+    # running deploy finishes, and the check inside the lock refuses one that
+    # a newer release overtook while it waited.
     concurrency: staging-deploy
     runs-on: ubuntu-latest
     env:
@@ -111,12 +140,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # Parallel checks may finish out of order. Recheck the branch only after
-      # acquiring the live lock, before reading or changing Cloudflare state.
-      - name: Refuse a superseded push before any live operation
+      # Parallel checks may finish out of order. Job `fresh` refused a release
+      # already superseded when it queued; recheck after acquiring the live
+      # lock, before reading or changing Cloudflare state.
+      - name: Refuse a superseded release before any live operation
         env:
           DEPLOY_EVENT: ${{ github.event_name }}
           DEPLOY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEPLOY_REF: ${{ github.ref }}
         run: node scripts/check-deploy-freshness.mjs
       - run: npm ci --no-audit --no-fund
 

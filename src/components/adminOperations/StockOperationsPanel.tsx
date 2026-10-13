@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import StockSelection from './StockSelection';
 import LotCountForm from '../adminInventory/LotCountForm';
 import LotScanner from '../adminInventory/LotScanner';
+import LotUnitPicker, { type PieceSelection } from '../adminInventory/LotUnitPicker';
 import '../adminInventory/inventory-workspace.css';
 import {
   api,
@@ -98,6 +99,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
     [target, setTarget] = useState(''),
     [qty, setQty] = useState(1),
     [transferId, setTransferId] = useState(() => crypto.randomUUID()),
+    [transferPieces, setTransferPieces] = useState<PieceSelection>({ required: false, valid: true, ids: [] }),
     [countId, setCountId] = useState(() => crypto.randomUUID()),
     [countName, setCountName] = useState(''),
     [countLines, setCountLines] = useState<CountLine[]>([]),
@@ -380,10 +382,11 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
                 'Transfers preserve cost and FIFO age. Lots linked to device serials move as a whole.',
               )}
             </p>
+            <LotUnitPicker lotId={source} qty={qty} mode="move" onChange={setTransferPieces} />
             <button
               type="button"
               className={T.btnPrimary}
-              disabled={op.busy || !source || !target || !Number.isSafeInteger(qty) || qty < 1 || qty > (lots.find((l) => l.id === source)?.qty_remaining ?? 0)}
+              disabled={op.busy || !source || !target || !Number.isSafeInteger(qty) || qty < 1 || qty > (lots.find((l) => l.id === source)?.qty_remaining ?? 0) || !transferPieces.valid}
               onClick={() =>
                 op.run(
                   async () => {
@@ -393,6 +396,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
                       location_id: target,
                       qty,
                       note,
+                      ...(transferPieces.required ? { unit_origin_ids: transferPieces.ids } : {}),
                     });
                     setTransferId(crypto.randomUUID());
                     setSource('');
@@ -732,25 +736,25 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
               <Input label={loc('الملاحظات', 'Notes')} value={note} onChange={setNote} />
             </div>
             {returnUnits.length > 0 ? <div className="inventory-line mt-4">
-              <h4 className={`mb-2 font-semibold ${T.text1}`}>{loc('القطع المرتجعة بالتحديد', 'Exact returned pieces')}</h4>
-              <p className={`mb-3 text-sm ${T.text3}`}>{loc('طابق الرقم الداخلي أو التسلسلي ومعلومات المورد مع القطعة المستلمة. بيانات المورد داخلية للأدمن فقط.', 'Match the internal ID or serial and supplier details with the received piece. Supplier details are private to admins.')}</p>
+              <h4 className={`mb-2 font-semibold ${T.text1}`}>{loc('القطع المرتجعة بالتحديد', 'Exact returned pieces', 'پارچە گەڕاوەکان بە وردی')}</h4>
+              <p className={`mb-3 text-sm ${T.text3}`}>{loc('طابق الرقم الداخلي أو التسلسلي ومعلومات المورد مع القطعة المستلمة. بيانات المورد داخلية للأدمن فقط.', 'Match the internal ID or serial and supplier details with the received piece. Supplier details are private to admins.', 'ژمارەی ناوخۆیی یان زنجیرەیی و زانیاریی دابینکەر لەگەڵ ئەو پارچەیەی وەرگیراوە بگونجێنە. زانیاریی دابینکەر تەنها بۆ بەڕێوەبەرانە.')}</p>
               <div className="grid gap-2">
                 {returnUnits.map((u) => {
                   const key = returnUnitKey(u), checked = selectedReturnUnits.includes(key);
                   return <label key={key} className={`flex items-start gap-3 rounded-xl border border-current/10 p-3 ${u.claimed ? 'opacity-50' : ''}`}>
                     <input type="checkbox" className="mt-1" checked={checked} disabled={!!u.claimed || (!checked && chosenReturnUnits.length >= (selectedReturn?.qty ?? 0))}
                       onChange={(event) => setSelectedReturnUnits((old) => event.target.checked ? [...old, key] : old.filter((id) => id !== key))}
-                      aria-label={`${loc('قطعة', 'Piece')} ${u.unit_index} · ${key}`} />
+                      aria-label={`${loc('قطعة', 'Piece', 'پارچە')} ${u.unit_index} · ${key}`} />
                     <span className="min-w-0 flex-1 space-y-1 text-sm">
-                      <strong className={`block ${T.text1}`}>{loc('قطعة', 'Piece')} {u.unit_index}{u.serial_norm ? ` · ${u.serial_norm}` : ''}{u.claimed ? ` · ${loc('محددة في مرتجع آخر', 'Claimed by another return')}` : ''}</strong>
-                      <span className={`block break-all ${T.text2}`}>{loc('الرقم الداخلي', 'Internal ID')}: {key}</span>
-                      <span className={`block break-all ${T.text2}`}>{loc('الدفعة', 'Lot')}: {u.lot_id} · {u.purchase_name || u.purchase_id || loc('شراء قديم', 'Historical purchase')}</span>
-                      <span className={`block break-all ${T.text3}`}>{loc('طلب المورد', 'Supplier order')}: {u.supplier_order_no || loc('غير موثق', 'Not recorded')} · {loc('التتبع', 'Tracking')}: {u.tracking_no || loc('غير موثق', 'Not recorded')}</span>
+                      <strong className={`block ${T.text1}`}>{loc('قطعة', 'Piece', 'پارچە')} {u.unit_index}{u.serial_norm ? ` · ${u.serial_norm}` : ''}{u.claimed ? ` · ${loc('محددة في مرتجع آخر', 'Claimed by another return', 'لە گەڕاندنەوەیەکی تردا دیاریکراوە')}` : ''}</strong>
+                      <span className={`block break-all ${T.text2}`}>{loc('الرقم الداخلي', 'Internal ID', 'ژمارەی ناوخۆیی')}: {key}</span>
+                      <span className={`block break-all ${T.text2}`}>{loc('الدفعة', 'Lot', 'وەجبە')}: {u.lot_id} · {u.purchase_name || u.purchase_id || loc('شراء قديم', 'Historical purchase', 'کڕینی کۆن')}</span>
+                      <span className={`block break-all ${T.text3}`}>{loc('طلب المورد', 'Supplier order', 'داواکاریی دابینکەر')}: {u.supplier_order_no || loc('غير موثق', 'Not recorded', 'تۆمار نەکراوە')} · {loc('التتبع', 'Tracking', 'بەدواداچوون')}: {u.tracking_no || loc('غير موثق', 'Not recorded', 'تۆمار نەکراوە')}</span>
                     </span>
                   </label>;
                 })}
               </div>
-              <p className={`mt-3 text-sm ${T.text2}`}>{loc('المحدد / المطلوب', 'Selected / required')}: {chosenReturnUnits.length} / {selectedReturn?.qty}</p>
+              <p className={`mt-3 text-sm ${T.text2}`}>{loc('المحدد / المطلوب', 'Selected / required', 'هەڵبژێردراو / پێویست')}: {chosenReturnUnits.length} / {selectedReturn?.qty}</p>
             </div> : returnOrigins.length > 0 && <div className="inventory-line mt-4">
               <h4 className={`mb-3 font-semibold ${T.text1}`}>{loc('مصدر القطع المرتجعة', 'Origin of returned units')}</h4>
               {returnOrigins.length > 1 ? <>

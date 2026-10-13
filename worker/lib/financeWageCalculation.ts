@@ -8,6 +8,7 @@ import { snapshotFor, costAmount } from './orderFinance';
 import { nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 import { effectiveWageRules, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
 import { readRuleScope } from './financeRuleScopes';
+import { readNeverLinkedLines } from './financeDeletedProductScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 export interface WageCost {
@@ -57,8 +58,11 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
   // An old deletion without captured scope is missing evidence, not evidence
   // that an earned wage stopped applying. Explicit eligibility/rule endings
   // and universally applicable rules can still be calculated without it.
-  const unknownLines=new Set(base.lines.filter(line=>line.product_id===null
-    && !snapshots.find(snapshot=>snapshot.line_id===line.id)?.product_id).map(line=>line.id));
+  // A line NULL from checkout (a mystery spool) never had a scope to lose.
+  const unlinked=base.lines.filter(line=>line.product_id===null
+    && !snapshots.find(snapshot=>snapshot.line_id===line.id)?.product_id).map(line=>line.id);
+  const neverLinked=unlinked.length?await readNeverLinkedLines(db,unlinked):new Set<string>();
+  const unknownLines=new Set(unlinked.filter(id=>!neverLinked.has(id)));
   if(eligible&&unknownLines.size)for(const cost of old){
     if(cost.manual_iqd!==null)continue;
     const current=rules.find(rule=>rule.id===cost.rule_id&&rule.active===1&&rule.effective_from<=day&&(!rule.effective_to||rule.effective_to>=day));

@@ -743,6 +743,8 @@ interface LinkContext {
   legacy: LegacyAlias[];
   originSchema: boolean;
   knownOriginId: string | null;
+  /** The purchase piece this serial is recorded on, with what the owner's batch exception needs to take it instead. */
+  knownOrigin: { id: string; current_lot_id: string | null; received_lot_id: string | null; unavailable_reason: string | null; assigned: number; lot_product_id: string | null } | null;
   pendingOrigins: Map<string, number>;
   origin: {
     id: string; origin_id: string; lot_id: string; allocation_id: string;
@@ -802,7 +804,7 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
   const part = req.part ?? 'device';
   const partIndex = req.partIndex ?? 1;
   const originSchema = await unitOriginsInstalled(db);
-  const [asset, boxOwner, boxIsSerial, live, slotLive, binding, receipt, serialLot, lots, variant, ledger, lastReleased, legacy, origin, pendingOrigins, knownOriginId] = await Promise.all([
+  const [asset, boxOwner, boxIsSerial, live, slotLive, binding, receipt, serialLot, lots, variant, ledger, lastReleased, legacy, origin, pendingOrigins, knownOrigin] = await Promise.all([
     db
       .prepare('SELECT serial_norm, serial_raw, product_id, variant_id, voided_at, box_sn, source FROM serial_inventory WHERE serial_norm = ?')
       .bind(norm)
@@ -870,8 +872,11 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
           AND s.lot_id=a.lot_id AND s.part='device' AND s.part_index=1 AND s.released_at IS NULL)
       GROUP BY a.lot_id`).bind(req.orderId, req.orderItemId).all<{lot_id:string;n:number}>()
       .then((r) => new Map((r.results ?? []).map((a) => [a.lot_id, a.n]))) : Promise.resolve(new Map<string,number>()),
-    originSchema ? db.prepare('SELECT id FROM inventory_unit_origins WHERE serial_norm=?').bind(norm)
-      .first<{id:string}>().then((r) => r?.id ?? null) : Promise.resolve(null),
+    originSchema ? db.prepare(`SELECT u.id,u.current_lot_id,u.received_lot_id,u.unavailable_reason,
+        EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments a WHERE a.origin_id=u.id AND a.released_at IS NULL) AS assigned,
+        (SELECT l.product_id FROM inventory_lots l WHERE l.id=u.current_lot_id) AS lot_product_id
+      FROM inventory_unit_origins u WHERE u.serial_norm=?`).bind(norm)
+      .first<NonNullable<LinkContext['knownOrigin']>>().then((r) => r ?? null) : Promise.resolve(null),
   ]);
   return {
     order,
@@ -893,7 +898,8 @@ async function readLinkContext(db: D1Database, req: LinkRequest, norm: string, b
     originSchema,
     origin,
     pendingOrigins,
-    knownOriginId,
+    knownOriginId: knownOrigin?.id ?? null,
+    knownOrigin,
   };
 }
 
@@ -908,6 +914,13 @@ interface LinkPlan {
   lotSource: 'serial_link' | 'allocation' | null;
   allocationId: string | null;
   lotFence: boolean;
+  /**
+   * The owner's «batch» exception on a tracked slot (review 2026-10-13,
+   * PROV-2): the planned purchase piece is released back to stock and the
+   * piece actually shipped (when its serial is recorded on one) takes the
+   * slot, so stock never shows a shipped piece as available.
+   */
+  repin?: { assignmentId: string; fromOriginId: string; allocationId: string; toOriginId: string | null; toLotId: string | null } | null;
   warnings: string[];
   /** The format rule's warnings on this serial (owner decision 2). */
   format: FormatNote[];
@@ -984,18 +997,32 @@ async function classifyLink(
   // whichever lot happens to have an unused serial slot first. A known serial
   // on a returned unit is its identity and cannot be silently replaced.
   const origin = ctx.origin;
-  if (ctx.knownOriginId && ctx.knownOriginId !== origin?.origin_id)
-    throw refuse(400, 'SERIAL_BATCH_MISMATCH', { reason: 'inventory_origin' });
-  if (origin && (origin.unavailable_reason || origin.current_lot_id !== origin.lot_id ||
-      (origin.serial_norm && origin.serial_norm !== norm) || (origin.serial_origin_id && origin.serial_origin_id !== origin.origin_id))) {
-    throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin.lot_id }], reason: 'inventory_origin' });
+  const knownElsewhere = !!ctx.knownOriginId && ctx.knownOriginId !== origin?.origin_id;
+  const originBroken = !!origin && !!(origin.unavailable_reason || origin.current_lot_id !== origin.lot_id ||
+      (origin.serial_norm && origin.serial_norm !== norm) || (origin.serial_origin_id && origin.serial_origin_id !== origin.origin_id));
+  let repin: LinkPlan['repin'] = null;
+  if (knownElsewhere || originBroken) {
+    // The owner's audited «batch» exception (0178 L11) still applies to a
+    // tracked slot: the planned carton is damaged or missing and the device on
+    // hand ships instead. It is never silent: the planned piece's assignment
+    // is released (it is still in stock) and the shipped piece, when its
+    // serial is recorded on one, takes the slot in the same batch.
+    if (ov !== 'batch' || !origin) {
+      if (knownElsewhere) throw refuse(400, 'SERIAL_BATCH_MISMATCH', { reason: 'inventory_origin' });
+      throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin!.lot_id }], reason: 'inventory_origin' });
+    }
+    const known = knownElsewhere ? ctx.knownOrigin : null;
+    if (known && (!known.received_lot_id || !known.current_lot_id || known.unavailable_reason || Number(known.assigned) === 1))
+      throw refuse(400, 'SERIAL_BATCH_MISMATCH', { reason: 'inventory_origin_unavailable' });
+    repin = { assignmentId: origin.id, fromOriginId: origin.origin_id, allocationId: origin.allocation_id,
+      toOriginId: known?.id ?? null, toLotId: known?.current_lot_id ?? null };
   }
 
   // The same serial already on this very slot: a replay, a double tap, the
   // second device of one account — the answer is the link that exists.
   // (A «change» to the serial the slot already holds is the same answer.)
   const sameSlot = ctx.slotLive && ctx.slotLive.serial_norm === norm ? ctx.slotLive : null;
-  if (sameSlot && origin && sameSlot.lot_id !== origin.lot_id)
+  if (sameSlot && origin && !repin && sameSlot.lot_id !== origin.lot_id)
     throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin.lot_id }], reason: 'inventory_origin' });
   if (sameSlot) return { already: sameSlot } as LinkPlan;
 
@@ -1181,7 +1208,23 @@ async function classifyLink(
       net: origin ? l.net : Math.max(0, l.net - (ctx.pendingOrigins.get(l.lot_id) ?? 0)),
     }));
   const expected = open.map((l) => ({ id: l.lot_id, received_at: l.received_at, location: l.location }));
-  if (origin) {
+  if (repin) {
+    // The shipped piece's own lot is the evidence. Inside the planned
+    // allocation's lot it is an ordinary swap; from another lot the
+    // allocation is not re-pinned, exactly as L11 records an untracked one.
+    const pieceProduct = repin.toOriginId ? ctx.knownOrigin?.lot_product_id ?? null : sl?.lot_product_id ?? null;
+    if (pieceProduct && pieceProduct !== line.product_id && pieceProduct !== usedOf) throw refuse(400, 'SERIAL_PRODUCT_MISMATCH', { via: 'lot' });
+    const evidenceLot = repin.toLotId ?? sl?.lot_id ?? origin!.lot_id;
+    lotId = evidenceLot;
+    if (evidenceLot === origin!.lot_id) {
+      lotSource = repin.toLotId ? 'allocation' : sl ? 'serial_link' : 'allocation';
+      allocationId = origin!.allocation_id;
+      lotFence = true;
+    } else {
+      lotSource = 'serial_link';
+      warnings.push('BATCH_OVERRIDDEN');
+    }
+  } else if (origin) {
     const exact = open.find((lot) => lot.lot_id === origin.lot_id);
     if (!exact || exact.taken >= exact.net || (sl && sl.lot_id !== origin.lot_id))
       throw refuse(400, 'SERIAL_BATCH_MISMATCH', { expected_lots: [{ id: origin.lot_id }], reason: 'inventory_origin' });
@@ -1236,6 +1279,7 @@ async function classifyLink(
     lotSource,
     allocationId,
     lotFence,
+    repin,
     warnings,
     format: formatWarnings,
   };
@@ -1304,7 +1348,27 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
   // the serial binding. Return/cancel/reallocation or a concurrent physical
   // verification must invalidate a plan read before that change.
   if (ctx.originSchema) {
-    if (ctx.origin) {
+    if (plan.repin) {
+      const r = plan.repin;
+      stmts.push(...fence(db, `EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments
+        WHERE id=? AND origin_id=? AND order_id=? AND order_item_id=? AND unit_index=? AND released_at IS NULL)`,
+      [r.assignmentId, r.fromOriginId, order.id, line.id, req.unitIndex]));
+      stmts.push(...(r.toOriginId
+        ? fence(db, `EXISTS(SELECT 1 FROM inventory_unit_origins u WHERE u.id=? AND u.serial_norm=? AND u.current_lot_id=?
+            AND u.received_lot_id IS NOT NULL AND u.unavailable_reason IS NULL
+            AND NOT EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments a WHERE a.origin_id=u.id AND a.released_at IS NULL))`,
+          [r.toOriginId, norm, r.toLotId])
+        : fence(db, 'NOT EXISTS(SELECT 1 FROM inventory_unit_origins WHERE serial_norm=?)', [norm])));
+      stmts.push(db.prepare(`UPDATE order_item_inventory_unit_assignments SET released_at=?, release_reason='batch_override'
+        WHERE id=? AND released_at IS NULL`).bind(now, r.assignmentId));
+      if (r.toOriginId) {
+        stmts.push(db.prepare(`INSERT INTO order_item_inventory_unit_assignments
+          (id,origin_id,allocation_id,order_id,order_ref,order_item_id,order_item_ref,unit_index,lot_id,purchase_id,purchase_line_id,incoming_id,purchase_unit_index,purchase_name,supplier_order_no,tracking_no)
+          SELECT ?1,u.id,?2,?3,?3,?4,?4,?5,u.current_lot_id,u.purchase_id,u.purchase_line_id,u.incoming_id,u.unit_index,COALESCE(p.invoice_no,''),u.supplier_order_no,u.tracking_no
+          FROM inventory_unit_origins u LEFT JOIN purchase_orders p ON p.id=u.purchase_id WHERE u.id=?6`)
+          .bind(newId('iuas'), r.allocationId, order.id, line.id, req.unitIndex, r.toOriginId));
+      }
+    } else if (ctx.origin) {
       stmts.push(...fence(db, `EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments a
         JOIN inventory_unit_origins u ON u.id=a.origin_id
         WHERE a.id=? AND a.order_id=? AND a.order_item_id=? AND a.unit_index=? AND a.released_at IS NULL
@@ -1527,6 +1591,7 @@ export async function linkSerial(env: Env, actor: SerialActor, req: LinkRequest)
           kind: ov.kind, reason: ov.reason, new_assignment: id, previous_assignment: plan.releaseOther?.id ?? previous?.id ?? null,
           other_order_id: plan.releaseOther?.order_id ?? null, prior_unit_id: plan.priorUnitId, warranty_mode: plan.mode,
           order_id: order.id, order_item_id: line.id, unit_index: req.unitIndex,
+          ...(plan.repin ? { origin_repin: { released_assignment: plan.repin.assignmentId, from_origin: plan.repin.fromOriginId, to_origin: plan.repin.toOriginId } } : {}),
         })
       ).statements
     );

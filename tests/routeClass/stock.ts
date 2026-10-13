@@ -89,6 +89,8 @@ export default {
       router: adminStockOperationsRoutes,
       routes: {
         'GET /locations': 'op',
+        // PROV-3: the identified pieces of a lot (supplier references, never a cost) for transfers and lot counts.
+        'GET /lots/:id/units': { cls: 'op', path: '/api/admin/stock-operations/lots/lot1/units' },
         'POST /locations': { cls: 'op', body: { name: 'رف المصفوفة' } },
         'POST /transfers': { cls: 'op', body: { operation_id: 'rm-transfer-1', lot_id: 'lot1', location_id: 'loc1', qty: 1 } },
         'GET /counts': 'op',

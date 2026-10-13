@@ -41,7 +41,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, requireAdmin, badRequest, notFound, int, str, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
 import { emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { RefundCompletedV1 } from '@levonis/contracts/events/v1/RefundCompleted';
 import { rateLimit } from '../lib/ratelimit';
@@ -736,7 +736,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         ? `CAST(w.amount * ${historicRate} / 100 AS INTEGER)` : 'NULL';
       const priorAmount = `COALESCE(
         (SELECT json_extract(a.detail,'$.refund.amount_iqd') FROM audit_log a
-          WHERE a.action='return.transition' AND a.target=r.id AND json_valid(a.detail)
+          WHERE a.action IN ('return.refund_decided','return.transition') AND a.target=r.id AND json_valid(a.detail)
             AND json_extract(a.detail,'$.refund.amount_iqd') IS NOT NULL ORDER BY a.id DESC LIMIT 1),
         (SELECT ${ledgerDinars ? `COALESCE(w.amount_iqd,${oldCreditValue})` : oldCreditValue}
           FROM wallet_transactions w WHERE w.id='wtx_ret_'||r.id AND w.status='approved'))`;
@@ -821,8 +821,16 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       } else if (!restock) {
         originStatements.push(...await planUnsellableOriginReturn(c.env.DB,{orderId:kase.order_id,itemId:kase.order_item_id,qty:kase.qty,reason:`return_unsellable:${id}`,originIds:returnedOrigins?.originIds}));
       }
+      // The refund amount is the cap's evidence for every later refund of this
+      // line. Gini and 0 IQD refunds have no wallet row, so the evidence is
+      // written IN the decision batch (review 2026-10-13, CF-2): the trailing
+      // audit() below runs after other hooks and swallows its own failure.
+      const evidence = await auditStatements(c.env.DB, admin.id, 'return.refund_decided', id, {
+        order_id: kase.order_id, order_item_id: kase.order_item_id, qty: kase.qty,
+        refund: { amount_iqd: refundIqd, credited: credit !== null, channel: settledByGini ? 'gini' : 'wallet' },
+      });
       try {
-        await c.env.DB.batch([refundFence, flipStatement, ...(credit ? [credit] : []), ...(restorePlan?.statements??[]), ...originStatements]);
+        await c.env.DB.batch([refundFence, flipStatement, ...(credit ? [credit] : []), ...(restorePlan?.statements??[]), ...originStatements, ...evidence.statements]);
       } catch (e) {
         if (/CHECK constraint failed:\s*qty\s*>\s*0/.test(String(e))) {
           throw badRequest(serverMessage('RETURN_RESOLUTION_RETRY'), 'RETURN_RESOLUTION_RETRY');
@@ -830,7 +838,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         throw e;
       }
       const credited = credit !== null;
-      if (restorePlan) pumpAfter(c.env.DB,restorePlan.eventIds,waitUntilFrom(c));
+      pumpAfter(c.env.DB,[...(restorePlan?.eventIds??[]),evidence.eventId],waitUntilFrom(c));
       // Points and finance hooks retain their existing follow-up behavior.
       if (credited && eventsEnabled(c.env)) {
         await emitFromRequest(c, RefundCompletedV1, {
@@ -1063,8 +1071,17 @@ async function refuseProtectedReturn(db: D1Database, itemId: string): Promise<vo
     .bind(itemId).first();
   if (overlap) throw badRequest(serverMessage('PRICE_PROTECTION_RETURN_REVIEW'), 'PRICE_PROTECTION_RETURN_REVIEW');
 }
-async function refuseReturnedProtection(db: D1Database, itemId: string): Promise<void> {
-  const overlap = await db.prepare("SELECT 1 FROM return_cases WHERE order_item_id=? AND state='resolved' AND resolution='refund' LIMIT 1")
+/** A return of the line that is still being worked (requested … inspected),
+ * or already refunded, decides the line first (review 2026-10-13, PF-1):
+ * paying the smaller price difference while the unit is on its way back or
+ * already at the store would leave that return unrefundable for good. A
+ * rejected return, or one resolved without a refund, does not block. */
+const RETURN_BLOCKS_PROTECTION_SQL = "(state NOT IN ('rejected','resolved') OR (state='resolved' AND resolution='refund'))";
+async function refuseReturnedProtection(db: D1Database, itemId: string, opts: { openReturns?: boolean } = {}): Promise<void> {
+  // A customer may still file a claim while a return is open; only the
+  // approval (and its in-batch guard) waits for the return to be decided.
+  const blocking = opts.openReturns ? RETURN_BLOCKS_PROTECTION_SQL : "(state='resolved' AND resolution='refund')";
+  const overlap = await db.prepare(`SELECT 1 FROM return_cases WHERE order_item_id=? AND ${blocking} LIMIT 1`)
     .bind(itemId).first();
   if (overlap) throw badRequest(serverMessage('PRICE_PROTECTION_RETURN_REVIEW'), 'PRICE_PROTECTION_RETURN_REVIEW');
 }
@@ -1475,7 +1492,7 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
   }
 
   if (claim.state !== 'requested') throw badRequest('This claim was already decided');
-  await refuseReturnedProtection(c.env.DB, claim.order_item_id);
+  await refuseReturnedProtection(c.env.DB, claim.order_item_id, { openReturns: true });
   // Owner decision 6: v5 claims credit their eligible USD-base reduction.
   // Both this cumulative amount and the absence of a return are checked again
   // in the same transaction as the decision and actual wallet credit.
@@ -1509,7 +1526,7 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
       NOT EXISTS(SELECT 1 FROM price_protection_claims WHERE id=? AND state='requested')
       OR (SELECT COALESCE(SUM(credited_iqd),0) FROM price_protection_claims
         WHERE order_item_id=? AND state IN ('approved','credited') AND id<>?)<>?
-      OR EXISTS(SELECT 1 FROM return_cases WHERE order_item_id=? AND state='resolved' AND resolution='refund')
+      OR EXISTS(SELECT 1 FROM return_cases WHERE order_item_id=? AND ${RETURN_BLOCKS_PROTECTION_SQL})
       OR EXISTS(SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>?)
       OR (SELECT total_iqd FROM orders WHERE id=?) IS NOT ?`)
     .bind(newId('pp_guard'), claim.user_id, claim.order_id, claim.order_item_id,

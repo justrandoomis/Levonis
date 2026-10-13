@@ -83,8 +83,10 @@ test('the push path to the live database is workflow 7 alone: tests, then migrat
   const liveJob = deploy.split(/^ {2}deploy:\s*$/m)[1];
   assert.ok(liveJob, 'workflow 7 retains its live deploy job');
   assert.match(liveJob, /^ {4}if: \$\{\{ github\.event_name == 'workflow_dispatch' \|\| github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}$/m);
-  assert.match(liveJob, /^ {4}needs: (?:verify|\[verify\])$/m,
+  // Review 2026-10-13 (CI-5): also the lock-free freshness refusal, which itself needs verify.
+  assert.match(liveJob, /^ {4}needs: \[verify, fresh\]$/m,
     'the live job cannot start until the complete reusable verification workflow succeeds');
+  assert.match(deploy, /^ {2}fresh:\s*\n[\s\S]*?^ {4}needs: verify$/m, 'the freshness refusal itself waits for verification');
   assert.match(deploy, /^ {2}verify:\s*\n[\s\S]*?^ {4}uses: \.\/\.github\/workflows\/verify-all\.yml$/m);
   assert.doesNotMatch(liveJob, /^ {4}(?:continue-on-error:|if:.*(?:always\(|!cancelled\(|failure\(|cancelled\())/m,
     'a failed or cancelled verification cannot be bypassed by the live job');

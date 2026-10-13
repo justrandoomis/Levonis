@@ -903,7 +903,12 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
   const priced = engine.get(pid);
   if (!preview || !data || !priced) throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE', { reason: 'no_lines' });
   // A replay first (the same purchase, choices and values: never the purchase version, which a receive bumps).
-  const idempotencyKey = `apply:${purchase.purchase_id}:${pid}:${preview.derived_hash}`;
+  // The key also carries the preview the owner confirmed, whose hash names the
+  // stored versions it was computed against (review 2026-10-13, DI-1): a
+  // double-tap of one confirm is still a replay, but re-applying an earlier
+  // choice after a different one (50,000 → 0 → 50,000) is a new apply.
+  const confirmedPreview = typeof body.preview_hash === 'string' ? body.preview_hash : '';
+  const idempotencyKey = `apply:${purchase.purchase_id}:${pid}:${await sha256Hex(`${preview.derived_hash}:${confirmedPreview}`)}`;
   const replay = await db.prepare('SELECT 1 AS hit FROM pricing_audit WHERE idempotency_key = ?').bind(idempotencyKey).first<{ hit: number }>();
   if (replay) return c.json({ success: true, already: true, product_id: pid, rows_changed: 0, priced: false });
   const productPreview = products.find((p) => p.product_id === pid) ?? null;

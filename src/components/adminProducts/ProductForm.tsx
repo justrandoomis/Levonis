@@ -220,6 +220,7 @@ export default function ProductForm({
   const [costLoaded, setCostLoaded] = useState(true);
   // Owner decision 8: the engine prices this product — its price cells are read only (every admin).
   const [engineManaged, setEngineManaged] = useState(false);
+  const [engineDirectOnly, setEngineDirectOnly] = useState(false);
   const costShown = canSeeCost && costLoaded;
 
   const [doc, setDoc] = useState<EditorDoc>(() => blankDoc());
@@ -434,6 +435,7 @@ export default function ProductForm({
     // Both answers, never the first one alone (see `relationsCarryCost`).
     setCostLoaded(carriesCost(p.product) && relationsCarryCost(r));
     setEngineManaged(p.engine_managed === true);
+    setEngineDirectOnly(p.engine_direct_only === true);
     setLoadedUpdatedAt(p.product.updated_at ?? '');
     setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
     setPinnedDismissed(false);
@@ -1944,7 +1946,10 @@ export default function ProductForm({
           canSeeCost={costShown}
           errors={showErrors ? errors : {}}
           // Owner decision 8: an engine-priced product's price cells show the engine's price, read only.
-          pricesLocked={engineManaged || (canSeeCost && pricing.engine)}
+          // A stock purchase prices direct sale only (DI-2): the direct-sale cells stay the engine's,
+          // while model, colour and pre-order prices stay the owner's.
+          pricesLocked={(engineManaged || (canSeeCost && pricing.engine)) && !engineDirectOnly}
+          directPricesLocked={engineManaged || (canSeeCost && pricing.engine)}
           // Each model's own USD pricing (empty = the product's), its computed
           // customer price and its 4-cell summary, inside the model's card.
           valueExtra={

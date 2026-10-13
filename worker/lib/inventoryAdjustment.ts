@@ -1,4 +1,4 @@
-import { badRequest, conflict, notFound } from './http';
+import { HttpError, badRequest, conflict, notFound } from './http';
 import { counterTarget, type AdjustInput } from './inventoryReceiving';
 import { planMoveUnitOrigins } from './inventoryUnitOrigins';
 
@@ -134,7 +134,16 @@ export async function planAtomicAdjustment(db: D1Database, input: AdjustInput & 
     );
   } else
     for (const lot of touched) {
-      statements.push(...await planMoveUnitOrigins(db,{lotId:lot.id,qty:lot.take,reason:`adjustment:${input.reason}`}));
+      // PROV-3: a product-level write-off cannot name pieces. Taking a whole
+      // lot is exact; a part of a lot with identified pieces goes through the
+      // lot count, which names the missing ones.
+      try {
+        statements.push(...await planMoveUnitOrigins(db,{lotId:lot.id,qty:lot.take,lotRemaining:lot.remaining,reason:`adjustment:${input.reason}`}));
+      } catch (error) {
+        if (error instanceof HttpError && error.code === 'UNIT_ORIGIN_SELECTION_REQUIRED')
+          throw new HttpError(409, 'هذه الدفعة فيها قطع معرّفة؛ سجّل النقص من «جرد دفعة محددة» وحدد القطع المفقودة بأرقامها الداخلية', 'UNIT_ORIGIN_LOT_COUNT_REQUIRED', { lot_id: lot.id });
+        throw error;
+      }
       statements.push(
         db
           .prepare('UPDATE inventory_lots SET qty_remaining = qty_remaining - ? WHERE id = ?')

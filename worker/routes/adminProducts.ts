@@ -53,7 +53,7 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { productEngineManaged, refuseEngineManaged } from '../lib/engineInstalled';
+import { productEngineDirectOnly, productEngineManaged, refuseEngineManaged } from '../lib/engineInstalled';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
 import {
   catalogEditRefusal,
@@ -1257,6 +1257,8 @@ adminProductsRoutes.get('/:id', async (c) => {
     // Owner decision 8: the engine prices this product — its price cells are read only in the form
     // (a flag, not a cost: every admin may know it, and the old price writers refuse).
     engine_managed: await productEngineManaged(c.env.DB, id),
+    // DI-2: the engine prices direct sale only; model, colour and pre-order prices stay editable.
+    engine_direct_only: await productEngineDirectOnly(c.env.DB, id),
   });
 });
 

@@ -92,7 +92,10 @@ test('the CSV import names an engine product’s refused row in words, never the
   assert.doesNotMatch(failureReason, /String\(error\)|error instanceof Error \? error\.message/,
     'an unexpected driver error must never be serialized into the report');
   const form = readFileSync(join(ROOT, 'src/components/adminProducts/ProductForm.tsx'), 'utf8');
-  assert.match(form, /pricesLocked=\{engineManaged \|\| \(canSeeCost && pricing\.engine\)\}/);
+  // DI-2 (review 2026-10-13): a product the engine prices for direct sale only keeps its model,
+  // colour and pre-order cells editable; its direct-sale cells stay locked.
+  assert.match(form, /pricesLocked=\{\(engineManaged \|\| \(canSeeCost && pricing\.engine\)\) && !engineDirectOnly\}/);
+  assert.match(form, /directPricesLocked=\{engineManaged \|\| \(canSeeCost && pricing\.engine\)\}/);
   const options = readFileSync(join(ROOT, 'src/components/adminProducts/form/OptionsSection.tsx'), 'utf8');
   assert.match(options, /locked: locked && field !== 'cost'/, 'cost stays editable');
   assert.match(options, /disabled=\{locked\}/);

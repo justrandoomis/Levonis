@@ -3,7 +3,7 @@ import { badRequest, conflict, notFound, str } from './http';
 import { newId } from './crypto';
 import { auditStatements } from './audit';
 import { planInvestorSources, type InvestmentContract } from './investorFinance';
-import { surplusReturnStatements } from './investorSurplus';
+import { LIVE_ALLOCATED_SQL, surplusReturnStatements } from './investorSurplus';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 
 export interface InvestorProfile {user_id:string;state:string;default_profit_share_bps:number;default_capital_share_bps:number;default_loss_share_bps:number;version:number}
@@ -113,16 +113,20 @@ export async function receivePurchaseFunding(db:D1Database,purchaseId:string,bod
 export async function purchaseFundingSummary(db:D1Database,purchaseId:string){
   const agreement=await db.prepare(`SELECT a.*,u.name AS investor_name,
     (SELECT COALESCE(SUM(amount_iqd),0) FROM purchase_investor_receipts WHERE purchase_id=a.purchase_id) AS received_iqd,
-    (SELECT COALESCE(SUM(allocated_iqd),0) FROM purchase_investor_receipts WHERE purchase_id=a.purchase_id) AS allocated_received_iqd
+    (SELECT COALESCE(SUM(allocated_iqd),0) FROM purchase_investor_receipts WHERE purchase_id=a.purchase_id) AS allocated_received_iqd,
+    ${LIVE_ALLOCATED_SQL('a.purchase_id')} AS live_allocated_iqd
     FROM purchase_investor_agreements a JOIN users u ON u.id=a.user_id WHERE purchase_id=?`).bind(purchaseId).first<Record<string,unknown>>();
   if(!agreement)return null;
-  const received=Number(agreement.received_iqd),allocated=Number(agreement.allocated_iqd),cost=Number(agreement.batch_cost_iqd),agreed=Number(agreement.agreed_iqd);
+  // DI-4: a voided contract takes no cash, so every figure below uses the live
+  // allocation; the agreement's immutable split stays as agreement_allocated_iqd.
+  const received=Number(agreement.received_iqd),allocated=Number(agreement.live_allocated_iqd),cost=Number(agreement.batch_cost_iqd),agreed=Number(agreement.agreed_iqd);
   // returned_iqd: received cash no contract took — already the investor's
   // returned capital in «أرباحي». return_total_iqd: what returns once all the
   // cash has arrived (the remainder agreed − allocated, or more when more cash
   // came). unallocated_iqd is kept for older screens (it equals returned_iqd).
   const returned=Math.max(0,received-Number(agreement.allocated_received_iqd)),returnTotal=Math.max(returned,Math.max(agreed,received)-allocated);
-  return {...agreement,unallocated_iqd:returned,returned_iqd:returned,return_total_iqd:returnTotal,return_pending_iqd:Math.max(0,returnTotal-returned),agreed_unallocated_iqd:agreed-allocated,
+  const {live_allocated_iqd:_live,...stored}=agreement;
+  return {...stored,agreement_allocated_iqd:Number(agreement.allocated_iqd),allocated_iqd:allocated,unallocated_iqd:returned,returned_iqd:returned,return_total_iqd:returnTotal,return_pending_iqd:Math.max(0,returnTotal-returned),agreed_unallocated_iqd:agreed-allocated,
     store_contribution_iqd:Math.max(0,cost-allocated),funding_shortfall_iqd:Math.max(0,allocated-received),
     allocations:(await db.prepare('SELECT a.*,c.profit_share_bps,c.capital_share_bps,c.loss_share_bps FROM purchase_investor_allocations a JOIN investment_contracts c ON c.id=a.contract_id WHERE a.purchase_id=? ORDER BY a.incoming_id').bind(purchaseId).all()).results??[],
     receipts:(await db.prepare('SELECT * FROM purchase_investor_receipts WHERE purchase_id=? ORDER BY payment_day,id').bind(purchaseId).all()).results??[]};

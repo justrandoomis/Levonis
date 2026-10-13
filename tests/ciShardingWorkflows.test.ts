@@ -102,7 +102,7 @@ test('live deployment requires successful verification and alone holds the live 
   const source = active(read('deploy-staging-code.yml'));
   const all = jobs(source), deploy = all.get('deploy');
   assert.ok(deploy, 'the live deployment job exists');
-  assert.match(deploy, /^ {4}needs: (?:verify|\[verify\])$/m);
+  assert.match(deploy, /^ {4}needs: \[verify, fresh\]$/m, 'deploy needs both the complete gate and the pre-lock freshness refusal');
   assert.ok(deploy.split('\n').some((line) => line.trim() === `if: ${branchGuard}`),
     'the default success() dependency gate must not be bypassed');
   assert.doesNotMatch(deploy, /^ {4}continue-on-error:/m);
@@ -123,8 +123,30 @@ test('the live lock checks deployment freshness after checkout and before any Cl
   assert.match(deploy.slice(checkout, freshness), /^\s+fetch-depth: 0$/m);
   assert.match(deploy.slice(checkout, freshness), /^\s+DEPLOY_EVENT: \$\{\{ github\.event_name \}\}$/m);
   assert.match(deploy.slice(checkout, freshness), /^\s+DEPLOY_DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}$/m);
+  assert.match(deploy.slice(checkout, freshness), /^\s+DEPLOY_REF: \$\{\{ github\.ref \}\}$/m, 'a dispatch of the default branch is checked like a push');
   const beforeFreshness = deploy.slice(0, freshness);
   assert.doesNotMatch(beforeFreshness, /api\.cloudflare\.com|wrangler\s+(?:deploy|secret|d1)|apply-remote-migrations/);
   const step = beforeFreshness.slice(beforeFreshness.lastIndexOf('      - name:'));
   assert.doesNotMatch(step, /^\s*(?:if:|continue-on-error:)/m, 'the freshness refusal is mandatory');
+});
+
+/* Review 2026-10-13 (CI-5): verification runs outside the lock, so an older
+ * release that finishes verification last would queue for `staging-deploy`,
+ * cancel the newer release's pending deploy (one pending job per group), then
+ * refuse itself. A lock-free job refuses a superseded release before its
+ * deploy job can queue at all. */
+test('a superseded release is refused before its deploy job queues for the live lock', () => {
+  const all = jobs(active(read('deploy-staging-code.yml')));
+  const fresh = all.get('fresh');
+  assert.ok(fresh, 'the pre-lock freshness job exists');
+  assert.match(fresh, /^ {4}needs: verify$/m);
+  assert.ok(fresh.split('\n').some((line) => line.trim() === `if: ${branchGuard}`));
+  assert.doesNotMatch(fresh, /staging-deploy|secrets\.|CLOUDFLARE_|continue-on-error/, 'no lock, no secrets, no bypass');
+  assert.match(fresh, /^ {4}permissions:\s*\n {6}contents: read$/m);
+  assert.match(fresh, /^\s+fetch-depth: 0$/m);
+  assert.match(fresh, /^\s+DEPLOY_EVENT: \$\{\{ github\.event_name \}\}$/m);
+  assert.match(fresh, /^\s+DEPLOY_DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}$/m);
+  assert.match(fresh, /^\s+DEPLOY_REF: \$\{\{ github\.ref \}\}$/m);
+  assert.deepEqual(commands(fresh), ['node scripts/check-deploy-freshness.mjs']);
+  assert.match(all.get('deploy')!, /^ {4}needs: \[verify, fresh\]$/m);
 });

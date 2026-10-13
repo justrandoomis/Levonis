@@ -105,11 +105,44 @@ test('fetch failure and a non-descendant default branch both fail closed', () =>
   }
 });
 
-test('missing push context is refused and explicitly confirmed manual deployment retains its deliberate path', () => {
-  const git: Git = () => { assert.fail('invalid context or manual deployment must not contact Git'); };
+test('missing push context is refused and a manual dispatch of another ref retains its deliberate path', () => {
+  const git: Git = () => { assert.fail('invalid context or a manual dispatch of another ref must not contact Git'); };
   for (const context of [{ event: 'pull_request', branch }, { event: 'push', branch: '' }]) {
     assert.throws(() => assertFreshDeployment({ ...context, expectedSha: 'tested', git }), /Missing push deployment context/);
   }
   assert.throws(() => assertFreshDeployment({ event: 'push', branch, expectedSha: '', git }), /Missing push deployment context/);
-  assert.match(assertFreshDeployment({ event: 'workflow_dispatch', branch, expectedSha: 'tested', git }), /Explicitly confirmed manual/);
+  assert.throws(() => assertFreshDeployment({ event: 'workflow_dispatch', branch: '', expectedSha: 'tested', git }), /Missing push deployment context/);
+  for (const ref of ['refs/heads/rollback-2026-10-13', 'refs/tags/v1']) {
+    assert.match(assertFreshDeployment({ event: 'workflow_dispatch', branch, ref, expectedSha: 'tested', git }), /Explicitly confirmed manual/);
+  }
+});
+
+/* Review 2026-10-13 (CI-1): .github/workflows/claude.yml dispatches workflow 7
+ * after every `@claude apply`, and a re-run keeps the old commit. A dispatch
+ * of the default branch is checked exactly like a push. */
+test('a dispatch of the default branch is refused once a newer code commit superseded it', () => {
+  const repo = repository();
+  try {
+    assert.match(assertFreshDeployment({ event: 'workflow_dispatch', branch, ref: `refs/heads/${branch}`, expectedSha: repo.tested, git: repo.git }), /matches/);
+    repo.write('worker/app.ts', 'export const version = 2;\n'); repo.publish();
+    repo.git(['checkout', '--detach', repo.tested]);
+    for (const ref of [`refs/heads/${branch}`, undefined]) {
+      assert.throws(() => assertFreshDeployment({ event: 'workflow_dispatch', branch, ref, expectedSha: repo.tested, git: repo.git }), /superseded release/);
+    }
+  } finally { repo.cleanup(); }
+});
+
+/* Review 2026-10-13 (CI-6): workflow files are not part of what a release
+ * builds, migrates or deploys, and a [skip ci] commit starts no deploy. */
+test('a newer commit that only edits workflows does not strand the tested release, but workflow-adjacent code still does', () => {
+  const repo = repository();
+  try {
+    repo.write('.github/workflows/claude.yml', 'name: v2\n'); repo.publish();
+    repo.git(['checkout', '--detach', repo.tested]);
+    assert.match(repo.assertFresh(), /workflow-only/);
+    repo.git(['checkout', branch]);
+    repo.write('scripts/check-deploy-freshness.mjs', 'export {};\n'); repo.publish();
+    repo.git(['checkout', '--detach', repo.tested]);
+    assert.throws(repo.assertFresh, /superseded release/);
+  } finally { repo.cleanup(); }
 });

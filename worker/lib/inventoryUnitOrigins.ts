@@ -2,7 +2,7 @@
  * Plans join the caller's stock/FIFO transaction. Missing historical evidence
  * remains missing; only explicitly entered pieces acquire an identity. */
 import { newId } from './crypto';
-import { badRequest, conflict } from './http';
+import { HttpError, badRequest, conflict } from './http';
 import { fence } from './operations';
 
 export interface UnitOriginInput { unit_index: number; supplier_order_no: string; tracking_no: string; serial_no?: string }
@@ -81,23 +81,40 @@ export async function planReceiveUnitOrigins(db:D1Database,input:{incomingId:str
   ];
 }
 
-const AVAILABLE = "u.received_lot_id IS NOT NULL AND u.unavailable_reason IS NULL AND NOT EXISTS (SELECT 1 FROM order_item_inventory_unit_assignments a WHERE a.origin_id=u.id AND a.released_at IS NULL)";
+const availableSql = (alias: string) => `${alias}.received_lot_id IS NOT NULL AND ${alias}.unavailable_reason IS NULL AND NOT EXISTS (SELECT 1 FROM order_item_inventory_unit_assignments a WHERE a.origin_id=${alias}.id AND a.released_at IS NULL)`;
+const AVAILABLE = availableSql('u');
 export async function availableLotOrigins(db:D1Database,lotId:string):Promise<UnitOrigin[]> {
   if (!await unitOriginsInstalled(db)) return [];
   return (await db.prepare(`SELECT u.* FROM inventory_unit_origins u WHERE u.current_lot_id=? AND ${AVAILABLE} ORDER BY u.received_at,u.unit_index,u.id`).bind(lotId).all<UnitOrigin>()).results??[];
 }
+/** Assigns tracked pieces to a sale's order slots inside the sale's own FIFO
+ * batch. The pieces are chosen when the batch COMMITS, not when it is planned
+ * (review 2026-10-13, PROV-1): two confirmations of the same product planned
+ * at the same moment both see the same first free piece, and fencing on those
+ * exact ids rolled the slower confirmation's whole deduction back (stock,
+ * lot and COGS), with no caller retrying it. Now the slower one takes the next
+ * free piece in the same FIFO order. The partial unique index
+ * ux_inventory_origin_assigned still makes a double assignment impossible,
+ * and the lot's own qty fence still refuses a sale the lot cannot cover.
+ * `excluded` only sizes the plan when one batch draws several allocations
+ * from the same lot; the statements themselves run in order and see each
+ * other's assignments. */
 export async function planUnitOriginConsumption(db:D1Database,input:{orderId:string;itemId:string;lotId:string;allocationId:string;qty:number;unitIndexStart:number;excluded:Set<string>}):Promise<D1PreparedStatement[]> {
   const selected=(await availableLotOrigins(db,input.lotId)).filter(u=>!input.excluded.has(u.id)).slice(0,input.qty);
   if (!selected.length) return [];
   selected.forEach(u=>input.excluded.add(u.id));
-  const json=JSON.stringify(selected.map((u,i)=>({id:u.id,slot:input.unitIndexStart+i,assignment:newId('iuas')})));
+  const slots=JSON.stringify(selected.map((_,i)=>({slot:input.unitIndexStart+i,assignment:newId('iuas')})));
   return [
-    ...fence(db,`(SELECT COUNT(*) FROM inventory_unit_origins u WHERE u.current_lot_id=? AND ${AVAILABLE} AND u.id IN (SELECT json_extract(value,'$.id') FROM json_each(?)))=?`,[input.lotId,json,selected.length]),
     db.prepare(`INSERT INTO order_item_inventory_unit_assignments
       (id,origin_id,allocation_id,order_id,order_ref,order_item_id,order_item_ref,unit_index,lot_id,purchase_id,purchase_line_id,incoming_id,purchase_unit_index,purchase_name,supplier_order_no,tracking_no)
       SELECT json_extract(j.value,'$.assignment'),u.id,?1,?2,?2,?3,?3,json_extract(j.value,'$.slot'),?4,u.purchase_id,u.purchase_line_id,u.incoming_id,u.unit_index,COALESCE(p.invoice_no,''),u.supplier_order_no,u.tracking_no
-      FROM json_each(?5) j JOIN inventory_unit_origins u ON u.id=json_extract(j.value,'$.id') LEFT JOIN purchase_orders p ON p.id=u.purchase_id`)
-      .bind(input.allocationId,input.orderId,input.itemId,input.lotId,json),
+      FROM (SELECT c.id, ROW_NUMBER() OVER (ORDER BY c.received_at,c.unit_index,c.id)-1 AS k
+              FROM inventory_unit_origins c WHERE c.current_lot_id=?4 AND ${availableSql('c')}
+             ORDER BY c.received_at,c.unit_index,c.id LIMIT ?6) pick
+      JOIN json_each(?5) j ON j.key=pick.k
+      JOIN inventory_unit_origins u ON u.id=pick.id
+      LEFT JOIN purchase_orders p ON p.id=u.purchase_id`)
+      .bind(input.allocationId,input.orderId,input.itemId,input.lotId,slots,selected.length),
   ];
 }
 
@@ -118,11 +135,32 @@ export async function planReleaseUnitOrigins(db:D1Database,input:{allocationId:s
   ];
 }
 
-/** Transfer/write-off evidence follows the same exact FIFO pieces. Positive
- * counts never invent a supplier origin for newly found, unidentified stock. */
-export async function planMoveUnitOrigins(db:D1Database,input:{lotId:string;qty:number;targetLotId?:string;reason?:string}):Promise<D1PreparedStatement[]> {
-  const selected=(await availableLotOrigins(db,input.lotId)).slice(0,input.qty);
-  if (!selected.length) return [];
+/** Transfers, write-offs and missing-count corrections follow the pieces that
+ * physically moved (review 2026-10-13, PROV-3). Moving or losing a WHOLE lot
+ * takes every piece in it. A PART of a lot that holds identified pieces must
+ * name them: the first pieces in FIFO order are no longer guessed, because
+ * each carton's label, supplier order and tracking number must stay where the
+ * carton is. Unidentified (historical) units of the same lot may make up the
+ * rest of the quantity. Positive counts never invent a supplier origin for
+ * newly found, unidentified stock. */
+export async function planMoveUnitOrigins(db:D1Database,input:{lotId:string;qty:number;lotRemaining:number;targetLotId?:string;reason?:string;originIds?:unknown}):Promise<D1PreparedStatement[]> {
+  const available=await availableLotOrigins(db,input.lotId);
+  if (!available.length) return [];
+  let selected=available;
+  if (input.qty<input.lotRemaining) {
+    if (input.originIds==null)
+      throw new HttpError(409, 'هذه الدفعة فيها قطع معرّفة: حدد بأرقامها الداخلية القطع التي نُقلت أو فُقدت فعلاً', 'UNIT_ORIGIN_SELECTION_REQUIRED',
+        { lot_id: input.lotId, qty: input.qty, identified: available.length, unidentified: Math.max(0, input.lotRemaining-available.length) });
+    const ids=input.originIds;
+    if (!Array.isArray(ids) || ids.some(v=>typeof v!=='string') || new Set(ids).size!==ids.length)
+      throw badRequest('أرقام القطع غير صحيحة', 'UNIT_ORIGINS_INVALID');
+    selected=(ids as string[]).map(id=>available.find(u=>u.id===id)).filter((u):u is UnitOrigin=>!!u);
+    if (selected.length!==ids.length) throw conflict('إحدى القطع المحددة لم تعد متاحة في هذه الدفعة؛ حدّث القائمة', 'UNIT_ORIGINS_CHANGED');
+    const unidentified=Math.max(0,input.lotRemaining-available.length);
+    if (ids.length>input.qty || ids.length<input.qty-unidentified)
+      throw badRequest('عدد القطع المحددة لا يطابق الكمية', 'UNIT_ORIGINS_QTY', { qty: input.qty, unidentified });
+    if (!selected.length) return [];
+  }
   const ids=JSON.stringify(selected.map(u=>u.id));
   return [
     ...fence(db,`(SELECT COUNT(*) FROM inventory_unit_origins u WHERE u.current_lot_id=? AND ${AVAILABLE} AND u.id IN (SELECT value FROM json_each(?)))=?`,[input.lotId,ids,selected.length]),
@@ -130,6 +168,14 @@ export async function planMoveUnitOrigins(db:D1Database,input:{lotId:string;qty:
       ?db.prepare('UPDATE inventory_unit_origins SET current_lot_id=? WHERE id IN (SELECT value FROM json_each(?))').bind(input.targetLotId,ids)
       :db.prepare('UPDATE inventory_unit_origins SET unavailable_reason=? WHERE id IN (SELECT value FROM json_each(?))').bind(input.reason??'stock_adjustment',ids),
   ];
+}
+
+/** The identified pieces still in a lot, for the screens that must name them. */
+export async function lotUnitChoices(db:D1Database,lotId:string) {
+  const lot=await db.prepare('SELECT qty_remaining FROM inventory_lots WHERE id=?').bind(lotId).first<{qty_remaining:number}>();
+  if (!lot) return null;
+  const units=(await availableLotOrigins(db,lotId)).map(u=>({id:u.id,unit_index:u.unit_index,supplier_order_no:u.supplier_order_no,tracking_no:u.tracking_no,serial_norm:u.serial_norm}));
+  return {lot_id:lotId,qty_remaining:lot.qty_remaining,units,unidentified:Math.max(0,lot.qty_remaining-units.length)};
 }
 
 /** A partial return must name its physical pieces. An entire outstanding line

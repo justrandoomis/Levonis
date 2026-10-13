@@ -38,7 +38,7 @@ const refund = (db: D1Database, id = 'ret') => post(adminApp(db), `/api/returns/
 
 /** Both callers finish planning before either money batch starts. D1 then
  * serializes complete transactions; this adapter does not nest SQLite BEGINs. */
-function raceDb(w: ReturnType<typeof world>, first: 'protection' | 'return') {
+function raceDb(w: ReturnType<typeof world>, first: 'protection' | 'return', onFirstWaiting?: () => void) {
   const waiting: Array<{ kind: string; statements: D1PreparedStatement[]; resolve: (value: unknown) => void; reject: (reason: unknown) => void }> = [];
   let released = false;
   return { prepare: w.native.prepare.bind(w.native), batch: (statements: D1PreparedStatement[]) => {
@@ -48,6 +48,7 @@ function raceDb(w: ReturnType<typeof world>, first: 'protection' | 'return') {
     if (!kind || released) return w.db.batch(statements);
     return new Promise((resolve, reject) => {
       waiting.push({ kind, statements, resolve, reject });
+      if (waiting.length === 1) onFirstWaiting?.();
       if (waiting.length === 2) {
         released = true;
         void (async () => {
@@ -109,8 +110,11 @@ test('concurrent protection claims recheck the common cumulative cap in their tr
 });
 
 test('a return after protection requires quantity/compensation review and preserves the earlier credit', async () => {
-  const w = world(); w.claim(); w.returnCase();
+  // The return is opened after protection paid; an open return before the
+  // approval holds the approval instead (review 2026-10-13, PF-1).
+  const w = world(); w.claim();
   assert.equal((await approve(w.db)).status, 200);
+  w.returnCase();
   const res = await refund(w.db);
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'PRICE_PROTECTION_RETURN_REVIEW');
@@ -131,15 +135,25 @@ test('a returned item cannot later receive protection through an existing or a n
   assert.equal(w.creditTotal(), 50000);
 });
 
+/* Since PF-1 (review 2026-10-13) an open return holds the approval before it
+ * plans, so the race that remains is a return that reaches the store after the
+ * approval planned and before its batch commits. The approval's in-batch guard
+ * sees the open (or refunded) return in either order: the return decides the
+ * line and pays, and protection stays requested. */
 for (const first of ['protection', 'return'] as const) {
   test(`a concurrent return and protection cannot both pay when ${first} commits first`, async () => {
-    const w = world(); w.claim(); w.returnCase();
-    const db = raceDb(w, first);
-    const responses = await Promise.all([approve(db), refund(db)]);
-    assert.deepEqual(responses.map(r => r.status), first === 'protection' ? [200, 400] : [400, 200]);
-    assert.equal(w.creditTotal(), first === 'protection' ? 10000 : 50000);
-    assert.equal(row(w.raw, "SELECT state FROM return_cases WHERE id='ret'")!.state, first === 'protection' ? 'inspected' : 'resolved');
-    assert.equal(row(w.raw, "SELECT state FROM price_protection_claims WHERE id='pp'")!.state, first === 'protection' ? 'credited' : 'requested');
+    const w = world(); w.claim();
+    let refunding: ReturnType<typeof refund> | undefined;
+    const db = raceDb(w, first, () => { w.returnCase(); refunding = refund(db); });
+    const approving = approve(db);
+    const approved = await approving;
+    const refunded = await refunding!;
+    assert.deepEqual([approved.status, refunded.status], [400, 200]);
+    assert.equal((await json(approved)).code, 'PRICE_PROTECTION_RETRY');
+    assert.equal(w.creditTotal(), 50000);
+    assert.equal(row(w.raw, "SELECT state FROM return_cases WHERE id='ret'")!.state, 'resolved');
+    assert.equal(row(w.raw, "SELECT state FROM price_protection_claims WHERE id='pp'")!.state, 'requested');
+    assert.equal(row(w.raw, "SELECT COUNT(*) n FROM price_protection_claims WHERE state='financial_guard'")!.n, 0);
   });
 }
 
@@ -149,8 +163,11 @@ test('partial returns require review only on the overlapping item, not another i
     INSERT INTO order_items(id,order_id,product_id,name_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd)
       VALUES('other','ord','p','Other','',1,50000,50000);
     UPDATE orders SET subtotal_iqd=150000,total_iqd=150000 WHERE id='ord';`);
-  w.claim(); w.returnCase('overlap'); w.returnCase('unrelated', 'other');
+  // An open return of another line does not hold this line's protection; a
+  // return of this line opened after protection pays needs review (PF-1).
+  w.claim(); w.returnCase('unrelated', 'other');
   assert.equal((await approve(w.db)).status, 200);
+  w.returnCase('overlap');
   assert.equal((await refund(w.db, 'overlap')).status, 400);
   assert.equal((await refund(w.db, 'unrelated')).status, 200);
   assert.equal(w.creditTotal(), 60000);

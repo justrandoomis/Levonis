@@ -278,7 +278,16 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
       if (!budget.canSpend(2 + candidateReads(PRODUCT_CHUNK) + MIN_WRITE_ROOM)) return finish('BUDGET');
       budget.spend(2); // cursor read and the eventual run record
       runRecordReserved = true;
-      const last = await db.prepare("SELECT summary_json FROM pricing_audit WHERE entity = 'run' AND entity_key = 'auto_reprice' AND action = 'run_finished' ORDER BY created_at DESC, rowid DESC LIMIT 1").first<{ summary_json: string }>();
+      // The newest WINDOWED run holds the cursor. An owner rate act, the FX run
+      // or any tick with room to read the whole backlog records no cursor, and
+      // must not send the rotation back to the lowest ids (review 2026-10-13,
+      // PF-2). Bounded to the latest 200 run records.
+      const last = await db.prepare(`SELECT summary_json FROM (
+          SELECT summary_json, created_at, rowid AS r FROM pricing_audit
+           WHERE entity = 'run' AND entity_key = 'auto_reprice' AND action = 'run_finished'
+           ORDER BY created_at DESC, rowid DESC LIMIT 200)
+         WHERE (CASE WHEN json_valid(summary_json) THEN json_type(summary_json, '$.next_product_id') END) = 'text'
+         ORDER BY created_at DESC, r DESC LIMIT 1`).first<{ summary_json: string }>();
       let after: string | null = null;
       try {
         const cursor: unknown = last ? (JSON.parse(last.summary_json) as Record<string, unknown>).next_product_id : null;

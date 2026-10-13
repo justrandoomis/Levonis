@@ -69,8 +69,15 @@ export const SURPLUS_ROWS_SQL = `SELECT '${SURPLUS_PREFIX}'||a.purchase_id AS id
           FROM purchase_investor_receipts GROUP BY purchase_id) x ON x.purchase_id=a.purchase_id
   WHERE a.user_id=? AND x.surplus>0`;
 
-/** The remainder still waiting for the investor's cash: Σ max(0, agreed − max(received, allocated)). */
-export const PENDING_SURPLUS_SQL = `SELECT COALESCE(SUM(MAX(0,a.agreed_iqd-MAX(a.allocated_iqd,
+/** What the purchase's contracts can still take: the principals of contracts
+ * not voided. receivePurchaseFunding gives a voided contract no cash, so its
+ * principal returns with the next receipt (review 2026-10-13, DI-4); the
+ * agreement's own allocated_iqd is immutable evidence of the original split. */
+export const LIVE_ALLOCATED_SQL = (purchaseId: string) => `(SELECT COALESCE(SUM(pa.principal_iqd),0) FROM purchase_investor_allocations pa
+    JOIN investment_contracts c ON c.id=pa.contract_id WHERE pa.purchase_id=${purchaseId} AND c.state<>'void')`;
+
+/** The remainder still waiting for the investor's cash: Σ max(0, agreed − max(received, live allocated)). */
+export const PENDING_SURPLUS_SQL = `SELECT COALESCE(SUM(MAX(0,a.agreed_iqd-MAX(${LIVE_ALLOCATED_SQL('a.purchase_id')},
     COALESCE((SELECT SUM(r.amount_iqd) FROM purchase_investor_receipts r WHERE r.purchase_id=a.purchase_id),0)))),0) AS n
   FROM purchase_investor_agreements a WHERE a.user_id=?`;
 
