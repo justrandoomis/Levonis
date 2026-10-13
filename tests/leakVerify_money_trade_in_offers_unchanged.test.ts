@@ -1,6 +1,6 @@
 /**
  * LEAK VERIFY (money) — GUARD: the trade-in figures a customer is offered are
- * the same dinar on 10c6541a and on HEAD (DECISIONS row 219 moved the
+ * the same dinar on 10c6541a and on HEAD (DECISIONS row 220 moved the
  * valuation off the phone: rules → server, `publicEstimate`).
  *
  * For the same unit, answers and target, the saved estimate's per-part value,

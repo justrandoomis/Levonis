@@ -82,7 +82,7 @@ test("the owner's example: market 1,660 + market_adjustment_iqd 20 → held at 1
   assert.equal(usd.drift_anchor_rate, '1680', 'the approval is the Confirmed Rate');
   assert.equal(derivedOf(raw).USD!.rate_iqd, '1680');
   const pub = await json(await get(app, '/api/settings/public'));
-  // The public figure is the market base, to the dinar (DECISIONS row 219): 1,680 − 20 would give the
+  // The public figure is the market base, to the dinar (DECISIONS row 220): 1,680 − 20 would give the
   // owner's private adjustment away against the published market sell. Prices still use 1,680.
   assert.equal(pub.settings.displayUsdRate, '1660');
   assert.equal(pub.settings.exchangeRate, 1400, 'the wallet rate is untouched (decision 9)');

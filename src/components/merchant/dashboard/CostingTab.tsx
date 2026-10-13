@@ -587,7 +587,7 @@ function PrinterCard({
           )}
           {/* A machine whose wear the shop has not fully declared is costed
               at no wear at all — never at the platform's own rate or the
-              model card's hours (DECISIONS row 219) — so the shop is told
+              model card's hours (DECISIONS row 220) — so the shop is told
               which of ITS figures is missing: the purchase price, or the
               useful life a declared price is spread over. */}
           {row.because && row.because.machine_iqd_per_hour === 0 && row.because.wear_missing === 'useful_hours' && (

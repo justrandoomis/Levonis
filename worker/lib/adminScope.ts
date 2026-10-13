@@ -619,7 +619,7 @@ export const FINANCIAL_FIELDS = [
   'fx_eur_usd_version_at_purchase',
   'fx_cny_usd_version_at_purchase',
   'actual_landed_total_iqd',
-  // -- The 2026-10-10 leak audit (owner rule «only the final price», DECISIONS row 219): private
+  // -- The 2026-10-10 leak audit (owner rule «only the final price», DECISIONS row 220): private
   // -- values the net did not know by name. The print calculator's machine-hour rate and setup fee
   // -- (printServicePricing, and a merchant costing's `because.machine_iqd_per_hour`); a printer
   // -- model's owner-only economics (the requireCostRead editor); the engine-era order-line and
@@ -649,7 +649,7 @@ export const FINANCIAL_FIELDS = [
   'unit_principal_iqd',
   // -- How many on-hand units sit in lots with NO recorded cost (the inventory overview and
   // -- lines): not a value, but which lots the owner has costed — the fact the lot counts stopped
-  // -- telling staff (DECISIONS row 219). The owner's stock screen reads it beside the values.
+  // -- telling staff (DECISIONS row 220). The owner's stock screen reads it beside the values.
   'unpriced_units',
 ] as const;
 

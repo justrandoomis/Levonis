@@ -381,7 +381,7 @@ app.use('/api/admin/*', securityEventsDoor);
 app.use('/api/cart', noStoreUnlessSet);
 app.use('/api/cart/*', noStoreUnlessSet);
 // EVERY OTHER API ANSWER TOO, unless its route chose a policy (owner rule
-// 2026-10-10, DECISIONS row 219: «Cache» is a channel). About 130 admin routes
+// 2026-10-10, DECISIONS row 220: «Cache» is a channel). About 130 admin routes
 // live under non-admin prefixes (`/api/returns/admin/*`,
 // `/api/price-protection/admin/*`, `/api/devices/admin/*`, …) and the owner's
 // bell (`/api/notifications`) carries owner-only figures; they answered with

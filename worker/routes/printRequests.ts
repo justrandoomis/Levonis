@@ -228,7 +228,7 @@ printRequestRoutes.get('/catalog', (c) => anonymousCached(c, {}, async () => {
     min_job_iqd: cfg.min_job_iqd,
     /**
      * «إكسسوارات ميكر وورد», by name and unit — never the buying price, like
-     * `publicMaterial` (owner rule 2026-10-10, DECISIONS row 219): `cost_iqd`
+     * `publicMaterial` (owner rule 2026-10-10, DECISIONS row 220): `cost_iqd`
      * is what one unit costs the shop, the margin goes on top of it, and two
      * estimates of one job with and without a basket of parts gave away the
      * margin and the job's cost. The parts reach the customer inside the price.
@@ -515,7 +515,7 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E3): the one
   // shape every screen reads, beside the engine's own public fields for one
   // release. No quantity curve: re-runs of the engine at other counts gave the
-  // job's fixed and per-copy cost away (DECISIONS row 219); the customer asks
+  // job's fixed and per-copy cost away (DECISIONS row 220); the customer asks
   // for the count they want and is quoted that.
   const estimate = fromEngineA(quote, { quantity: spec.quantity });
 
@@ -1589,7 +1589,7 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   // The cost breakdown is the platform's, not the merchant's and not the
   // customer's. Everyone sees the range and the confidence; nobody sees how it
   // was built — the one allow-list in requestRevisions.ts, the hardware lines
-  // cut to what and how many (DECISIONS row 219).
+  // cut to what and how many (DECISIONS row 220).
   const estimate = publicEstimate(row.estimate);
 
   return c.json({

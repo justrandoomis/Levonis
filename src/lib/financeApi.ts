@@ -2,7 +2,7 @@
  * THE OWNER'S FINANCE CALLS — the profit report and the expense ledger
  * (`/api/admin/finance/*`, behind `requireCostRead` on the Worker).
  *
- * Moved out of ./api.ts (DECISIONS row 219): every page — the storefront,
+ * Moved out of ./api.ts (DECISIONS row 220): every page — the storefront,
  * the product page, the cart — loads api.ts at first paint, so these route
  * names travelled to every visitor. Only the finance panel imports this
  * file, and it is reached through the admin shell alone. The types stay in

@@ -1,5 +1,5 @@
 /**
- * VARIANT VERIFY (DECISIONS row 219 port, fix/leak-port 5e6f581c) — #20
+ * VARIANT VERIFY (DECISIONS row 220 port, fix/leak-port 5e6f581c) — #20
  * "customer-api supplier source URL on product media".
  *
  * The port blanks `media[].source_url` in every PUBLIC projection
@@ -96,7 +96,7 @@ for (const role of ['guest', 'customer', 'merchant', 'employee', 'investor'] as 
  * for staff.
  */
 const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS row 219): a picture’s supplier link is provenance, not a cost; staff read supplier provenance by upstream rule and their product saves echo the link back';
+  'OWNER RULING NEEDED (DECISIONS row 220): a picture’s supplier link is provenance, not a cost; staff read supplier provenance by upstream rule and their product saves echo the link back';
 
 test('B: every non-owner admin scope receives a product picture’s supplier source URL', { todo: OWNER_RULING }, async () => {
   const found: string[] = [];

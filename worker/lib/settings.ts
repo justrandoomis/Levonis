@@ -571,7 +571,7 @@ export const SETTING_DEFAULTS = {
    * is built from — labour, machine hours, energy, waste, supports, purge,
    * failure risk, complexity, the margin floor and the minimum job.
    *
-   * NOT PUBLIC — and neither, since DECISIONS row 219, is `printServicePricing`
+   * NOT PUBLIC — and neither, since DECISIONS row 220, is `printServicePricing`
    * above: a competitor should not be able to download the owner's cost
    * structure by opening the site.
    */
@@ -722,7 +722,7 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // Which section each square of «تسوق حسب الفئة» opens — the storefront
   // draws the bento from it on the first screen.
   'homeBento',
-  // NOT `printServicePricing` (owner rule 2026-10-10, DECISIONS row 219): its
+  // NOT `printServicePricing` (owner rule 2026-10-10, DECISIONS row 220): its
   // margin, machine-hour rate and setup fee are inputs of the print price, the
   // owner's alone (COST_SETTING_KEYS in worker/routes/admin.ts), and no screen
   // ever read them off the public settings.
@@ -751,7 +751,7 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
  * The owner's print-service rates, read as numbers (a historical numeric
  * string counts; anything else is "not set"). The calculator asks it only
  * whether the service is priced: the rates themselves, like the margin, are
- * inputs of the print price and are never published (DECISIONS row 219).
+ * inputs of the print price and are never published (DECISIONS row 220).
  */
 export function publicPrintServiceRates(value: unknown) {
   const rates = value && typeof value === 'object' && !Array.isArray(value)
@@ -768,7 +768,7 @@ export function publicPrintServiceRates(value: unknown) {
 
 /**
  * The last fence before a public settings payload leaves: `printServicePricing`
- * is not a public key (DECISIONS row 219), and if a later list ever carries
+ * is not a public key (DECISIONS row 220), and if a later list ever carries
  * it again, its rates and margin still never reach a visitor.
  */
 export function projectPublicSettings(settings: Record<string, unknown>): Record<string, unknown> {

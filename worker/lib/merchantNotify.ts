@@ -855,7 +855,7 @@ export async function listMerchantNotifications(
   // The admin finance notice (a withdrawal waiting in /admin?tab=finance) is
   // the platform's, owner-only (owner decision 2), and never a store's: the
   // merchant centre leaves it out for everyone, an admin who also owns a store
-  // included — the owner reads it in the main bell (DECISIONS row 219).
+  // included — the owner reads it in the main bell (DECISIONS row 220).
   const clauses = [`user_id = ?1`, `kind IN (${MERCHANT_KINDS_SQL})`, HIDE_OWNER_FINANCE_NOTICES_SQL];
   if (opts.unreadOnly) clauses.push('read_at IS NULL');
   if (opts.kind) clauses.push('kind = ?4');

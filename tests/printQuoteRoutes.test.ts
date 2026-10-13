@@ -818,7 +818,7 @@ test('a merchant on the platform file calculator reads the platform price: no co
 
   // This door prices no machine of the merchant's: its figures are the
   // platform's own (the owner's machine-hour rate, the platform margin), so a
-  // store owner reads the final price like everyone else (DECISIONS row 219).
+  // store owner reads the final price like everyone else (DECISIONS row 220).
   // Their own machines are costed on /analyses/:id/compare.
   const platform = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, {}));
   assert.equal(platform.success, true, JSON.stringify(platform));

@@ -54,7 +54,7 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  * `money()` divides by `settings.displayUsdRate`: the shop's display USD/IQD —
  * the Iraqi parallel-market sell the shop's rate was last built from, once
  * approved (never the owner's private adjustment on top of it nor a rate he
- * typed, DECISIONS row 219) — as decimal text, converted exactly
+ * typed, DECISIONS row 220) — as decimal text, converted exactly
  * (src/lib/displayRate.ts). The wallet's
  * `exchangeRate` (1 USD = 1,400 IQD) is a different rate with a different
  * job and is NEVER a fallback here: until the owner approves the first value
@@ -144,7 +144,7 @@ export interface DisplayRate {
   /** IQD per 1 USD, exact decimal text. */
   text: string;
   source: DisplayRateSource;
-  /** The shop's rate is the provider's figure (credited to IQWealth) — always so since DECISIONS row 219; false is kept for an older server's typed rate. */
+  /** The shop's rate is the provider's figure (credited to IQWealth) — always so since DECISIONS row 220; false is kept for an older server's typed rate. */
   attributed?: boolean;
 }
 

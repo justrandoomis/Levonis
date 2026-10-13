@@ -556,7 +556,7 @@ test('the expense ledger the owner asked for exists, and calls the endpoints tha
   // migration existed with no screen to reach them, so `operating_expenses`
   // could never receive a row and the net-profit hero subtracted a permanent
   // zero. This asserts the screen is wired, not that it is pretty.
-  // The calls live in src/lib/financeApi.ts, off the first paint (DECISIONS row 219).
+  // The calls live in src/lib/financeApi.ts, off the first paint (DECISIONS row 220).
   const api = read('src/lib/financeApi.ts');
   for (const path of [
     '/api/admin/finance/expense-categories',

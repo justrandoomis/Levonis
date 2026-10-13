@@ -104,7 +104,7 @@ export const ANONYMOUS_CACHE_CONTROL = cacheControlFor(ANONYMOUS_LIFETIME);
  * can carry removed fields even after every route is corrected, and its ETag
  * could otherwise authorize a browser to reuse those bytes. Only entries
  * built by this projection revision may answer. Bump when removing fields.
- * 2026-10-13 (DECISIONS row 219): the print-service rates, the owner's FX
+ * 2026-10-13 (DECISIONS row 220): the print-service rates, the owner's FX
  * adjustment in `displayUsdRate`, a picture's supplier link and the estimate's
  * quantity curve left the public answers. */
 export const PUBLIC_PROJECTION_REVISION = 'cost-privacy-2026-10-13';

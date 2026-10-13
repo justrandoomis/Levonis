@@ -115,7 +115,7 @@ test('owner recheck restores historical pending wages with confirmed checkout co
   // withdrawals stay; the wage costs and the 4,200 payment above are untouched.
   for (const gone of ['movements', 'movement_count', 'history_review_count']) assert.equal(gone in earnings, false, gone);
   // A profit-percent wage reaches the employee folded per day and rule
-  // (DECISIONS row 219): one row per order was that order's profit times a
+  // (DECISIONS row 220): one row per order was that order's profit times a
   // known percentage, and with it the order's private cost. Both sources are
   // still there (one is due, the other approved: two rows), with their
   // amounts and without the order ids.

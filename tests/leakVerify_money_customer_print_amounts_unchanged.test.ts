@@ -1,6 +1,6 @@
 /**
  * LEAK VERIFY (money) — GUARD: every print amount a guest or a customer reads
- * is the same figure on 10c6541a and on HEAD (DECISIONS row 219).
+ * is the same figure on 10c6541a and on HEAD (DECISIONS row 220).
  *
  * The figures below were produced by this file on the base worktree
  * (10c6541a); HEAD must answer the same dinar for the same inputs. Inputs

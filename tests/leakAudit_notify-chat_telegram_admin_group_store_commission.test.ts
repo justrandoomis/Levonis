@@ -81,7 +81,7 @@ function world() {
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,email_verified_at) VALUES
       ('u_buyer','Huda','huda@x.co','h','customer','2026-01-01T00:00:00.000Z');
-    -- The role-matrix seed gives u_m a store of its own (DECISIONS row 219); this world brings its own.
+    -- The role-matrix seed gives u_m a store of its own (DECISIONS row 220); this world brings its own.
     DELETE FROM merchant_printers WHERE merchant_id = 'cm_um';
     DELETE FROM merchant_stores WHERE id = 'st_um';
     DELETE FROM community_merchants WHERE id = 'cm_um';

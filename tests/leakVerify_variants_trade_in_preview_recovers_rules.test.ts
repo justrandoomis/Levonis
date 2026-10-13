@@ -1,5 +1,5 @@
 /**
- * VARIANT VERIFY (DECISIONS row 219 port, fix/leak-port 5e6f581c) — #13
+ * VARIANT VERIFY (DECISIONS row 220 port, fix/leak-port 5e6f581c) — #13
  * "client-bundles trade-in valuation rules shipped to the client".
  *
  * The port stops shipping the rule sets (factor effects, weights, floor, cap,
@@ -69,7 +69,7 @@ const GOOD = { hours: 200, cleanliness: 5, exterior: 5, scratches: 5, accessory_
  * offered or shown, which is the owner's call.
  */
 const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS row 219): a trade-in offer is a public function of the customer’s answers, so two answers that differ in one fault give that fault’s private effect; only coarser offers or no live figure close it';
+  'OWNER RULING NEEDED (DECISIONS row 220): a trade-in offer is a public function of the customer’s answers, so two answers that differ in one fault give that fault’s private effect; only coarser offers or no live figure close it';
 
 test('a customer recovers the owner’s tuned trade-in factor from two preview answers', { todo: OWNER_RULING }, async () => {
   const raw = world();

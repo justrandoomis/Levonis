@@ -428,7 +428,7 @@ export const RM_IDS = {
 } as const;
 
 /**
- * WHAT THE LEAK AUDIT FOUND THE SWEEPS BLIND TO (DECISIONS row 219). Each row
+ * WHAT THE LEAK AUDIT FOUND THE SWEEPS BLIND TO (DECISIONS row 220). Each row
  * below gives a door the sweeps already call something to answer with, so a
  * regression that serves a private value there fails the sweep instead of
  * walking a null, an empty list or a 404:
@@ -584,7 +584,7 @@ export const NOT_A_COST: readonly NotACost[] = [
   {
     path: /^\/api\/(print-quote\/analyses\/[^/]+\/compare|merchant\/workshop\/requests\/[^/]+\/cost)$/,
     leak: /^\$\.(printers\[\d+\]|quote)\.(lines\[\d+\]\.iqd = |(base_cost_iqd|failure_reserve_iqd|true_cost_iqd|profit_iqd|margin_percent|markup_percent|break_even_iqd) |because\.machine_iqd_per_hour )/,
-    why: 'a store owner costing THEIR OWN machines: built only from the economics the merchant declared (their printer, spools, labour) — never the owner’s machine-hour rate, model card or per-kilo price (DECISIONS row 219; tests/leakAudit_*merchant_print_quote*)',
+    why: 'a store owner costing THEIR OWN machines: built only from the economics the merchant declared (their printer, spools, labour) — never the owner’s machine-hour rate, model card or per-kilo price (DECISIONS row 220; tests/leakAudit_*merchant_print_quote*)',
   },
   {
     path: /^\/api\/(admin\/)?farm\/(config|state)$|^\/api\/admin\/settings$/,
@@ -614,7 +614,7 @@ export const PARAM: Readonly<Record<string, string>> = {
   lotId: 'lot1',
   incomingId: 'inc1',
   orderId: 'ord1',
-  // The device unit and the serial seedAuditRows adds (DECISIONS row 219):
+  // The device unit and the serial seedAuditRows adds (DECISIONS row 220):
   // without them the unit and serial readers answer 404 to every sweep.
   unitId: 'unit_rm',
   serial: 'SNRMAUDIT0001',
@@ -714,7 +714,7 @@ export async function call(
     const type = res.headers.get('content-type') ?? '';
     // A ZIP answer (an export) is read the way its reader opens it: every
     // file, as text — a cost inside a deflate stream is a cost all the same
-    // (DECISIONS row 219).
+    // (DECISIONS row 220).
     if (/zip/.test(type)) {
       const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
       const body = Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, new TextDecoder().decode(bytes)]));

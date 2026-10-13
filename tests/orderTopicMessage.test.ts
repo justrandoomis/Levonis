@@ -253,7 +253,7 @@ test('THE MONEY LINES — BNPL replaces the door figure, and a store sale names 
   assert.match(store, /🛒 طلب متجر جديد — ORD-S1/);
   assert.match(store, /المتجر: متجر النور/);
   // The merchant's share beside the total is the platform's commission — never
-  // in a group read by assistants (DECISIONS row 219).
+  // in a group read by assistants (DECISIONS row 220).
   assert.doesNotMatch(store, /يستلم التاجر/);
 });
 

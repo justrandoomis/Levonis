@@ -1,6 +1,6 @@
 /**
  * LEAK VERIFY (money) — the amounts a store owner reads and charges for print
- * work, for the SAME inputs, before and after DECISIONS row 219.
+ * work, for the SAME inputs, before and after DECISIONS row 220.
  *
  * Row 219 changed two merchant money paths in worker/routes/printQuote.ts:
  *
@@ -19,7 +19,7 @@
  *      per-kilo default (`loadMaterialPrices(..., { platformDefaults: false })`).
  *      The port report's «Changed approach» section does not list this one.
  *
- * Both are the STATED policy of row 219 (listed in its «changed approach»
+ * Both are the STATED policy of row 220 (listed in its «changed approach»
  * after this verification): a merchant's numbers come from the merchant's own
  * figures and public constants only, never from the owner's machine-hour
  * rate, model card or per-kilo price, and the platform's calculators answer
@@ -58,7 +58,7 @@ function seed(): Raw {
   raw.prepare(`INSERT INTO community_merchants (id, user_id, name, status) VALUES ('m-shop','u-shop','Shop','approved')`).run();
   raw.prepare(`INSERT INTO merchant_stores (id, merchant_id, user_id, slug, name) VALUES ('st-shop','m-shop','u-shop','shop','Shop')`).run();
   // The platform's own per-kilo price for PLA (owner data) — what an
-  // undeclared spool fell back to before row 219.
+  // undeclared spool fell back to before row 220.
   raw.prepare(`UPDATE print_materials SET default_iqd_per_kg = 22000 WHERE id = 'pla'`).run();
   return raw;
 }

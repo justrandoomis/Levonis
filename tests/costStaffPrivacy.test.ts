@@ -30,7 +30,7 @@ test('staff settings carry none of the print-service pricing: rates and margin a
     assert.equal(response.status, 200);
     const settings = (response.body as { settings: Record<string, unknown> }).settings;
     // The machine-hour rate and the setup fee are inputs of the print price
-    // like the margin (DECISIONS row 219): a cost setting, the owner's alone.
+    // like the margin (DECISIONS row 220): a cost setting, the owner's alone.
     assert.equal(settings.printServicePricing, undefined, role);
     assert.deepEqual(leaks(settings.printServicePricing), [], role);
   }

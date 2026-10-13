@@ -1,6 +1,6 @@
 /**
  * LEAK VERIFY (money) — the dollar reading moves even when the owner has NO
- * adjustment, because DECISIONS row 219 publishes the provider's figure
+ * adjustment, because DECISIONS row 220 publishes the provider's figure
  * rounded to the whole dinar (`Math.round`, worker/lib/fx/displayRate.ts).
  *
  * With `market_adjustment_iqd = '0'` there is nothing private to hide: the
@@ -11,7 +11,7 @@
  *
  * Expected (base): with no adjustment, the public display rate is the applied rate.
  *
- * FIXED (DECISIONS row 219, verification pass): the public figure is the
+ * FIXED (DECISIONS row 220, verification pass): the public figure is the
  * market sell the applied rate was built from, EXACTLY — no rounding — so
  * with no adjustment it is the applied rate to the last decimal again.
  *

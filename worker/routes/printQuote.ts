@@ -358,7 +358,7 @@ printQuoteRoutes.get('/printers', (c) => anonymousCached(c, { perViewer: true },
 /**
  * «إكسسوارات ميكر وورد» — the hardware catalogue the calculator offers.
  *
- * PUBLIC, WITH NO PRICE ON IT (owner rule 2026-10-10, DECISIONS row 219). The
+ * PUBLIC, WITH NO PRICE ON IT (owner rule 2026-10-10, DECISIONS row 220). The
  * row's `cost_iqd` is «What ONE unit costs the shop», and both engines add the
  * margin ON TOP of it — so publishing it handed every visitor the shop's
  * buying price and, with two quotes of one job (with and without a basket of
@@ -896,7 +896,7 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
   const quantity = 1;
 
   // THE PLATFORM'S ESTIMATE, FOR EVERYONE (owner rule 2026-10-10, DECISIONS
-  // row 219). This door prices on the platform's own figures — the owner's
+  // row 220). This door prices on the platform's own figures — the owner's
   // machine-hour rate, the platform labour and power, the platform margin —
   // because no machine of the caller's is involved (`merchantPrinter: null`).
   // It used to answer a store owner with `merchantQuote()`: every cost line of
@@ -963,7 +963,7 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E3): the same
     // shape the request wizard's engine answers in, so one card reads both —
     // without the quantity curve, whose points gave away the job's fixed and
-    // per-copy cost (DECISIONS row 219).
+    // per-copy cost (DECISIONS row 220).
     estimate: fromEngineB(priced.result, {
       analysis: loaded.analysis,
       process: printer.technology,
@@ -1323,7 +1323,7 @@ async function quoteStatedWeight(
     grams_total: Math.round(rows.reduce((sum, r) => sum + r.grams, 0) * 100) / 100,
     // Echoed for the same reason `rows` is: the screen names what the engine
     // priced in. WHAT and HOW MANY only — never the shop's buying price of a
-    // part or of the basket (DECISIONS row 219): the hardware reaches the
+    // part or of the basket (DECISIONS row 220): the hardware reaches the
     // customer inside the final price. `unknown` names the ids the catalogue
     // no longer has, so a stale menu is visible instead of quietly
     // under-quoting.
@@ -1508,14 +1508,14 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
         // that cannot drift from what the merchant was billed (§25). It is the
         // merchant's own declared rate, or 0 when they declared none: a
         // merchant's costing never falls back to the owner's platform rate or
-        // the owner's model card any more (DECISIONS row 219).
+        // the owner's model card any more (DECISIONS row 220).
         machine_iqd_per_hour: Math.round(
           ((priced.snapshot.machine_iqd_per_hour as { value?: unknown } | undefined)?.value as number) ?? 0
         ),
         // WHICH of the merchant's OWN figures the wear still needs, so the
         // screen asks for the right one: no purchase price, or a purchase
         // price without the useful life it is spread over (the model card's
-        // hours are the owner's and never fill the gap — DECISIONS row 219).
+        // hours are the owner's and never fill the gap — DECISIONS row 220).
         // Null when both are declared.
         wear_missing:
           mp.overrides.purchaseIqd === undefined ? 'purchase' : mp.overrides.usefulPrintHours === undefined ? 'useful_hours' : null,
@@ -1580,7 +1580,7 @@ export async function priceForPrinter(
   input: PriceForPrinterInput
 ): Promise<{ result: QuoteResult; pricing: PricingInputs; snapshot: Record<string, unknown> }> {
   // A MERCHANT'S COSTING IS BUILT FROM THE MERCHANT'S OWN FIGURES (owner rule
-  // 2026-10-10, DECISIONS row 219). Where a store owner declared nothing, the
+  // 2026-10-10, DECISIONS row 220). Where a store owner declared nothing, the
   // ladder used to fall through to the OWNER's private inputs — the platform
   // machine-hour rate (`printPricingConfig`, a COST_SETTING_KEY), the model
   // card's purchase / residual / useful hours / maintenance / baseline success

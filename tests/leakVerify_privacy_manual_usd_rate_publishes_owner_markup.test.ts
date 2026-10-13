@@ -1,5 +1,5 @@
 /**
- * PRIVACY VERIFY (DECISIONS row 219 port, fix/leak-port 5e6f581c) — #4 / #9 /
+ * PRIVACY VERIFY (DECISIONS row 220 port, fix/leak-port 5e6f581c) — #4 / #9 /
  * #14 "the public FX display rate lets the owner's adjustment be derived".
  *
  * The port's rule, in its own words (worker/lib/fx/displayRate.ts, and the
@@ -24,11 +24,11 @@
  * admin door; the public figure must still not hand a visitor the owner's
  * markup (public − market sell). It does: 1700 − 1660 = 40.
  *
- * Needs the owner's ruling (DECISIONS row 219 keeps a typed rate public «as it
+ * Needs the owner's ruling (DECISIONS row 220 keeps a typed rate public «as it
  * is»); recorded here because it is the same private quantity the port closed
  * on AUTO, reaching every anonymous visitor through the same field.
  *
- * FIXED (DECISIONS row 219, verification pass): the public figure is read
+ * FIXED (DECISIONS row 220, verification pass): the public figure is read
  * from the FX log — the market sell of the newest rate built as market +
  * adjustment — so a rate the owner types is never published; the reading
  * stays IQWealth's sell (worker/lib/fx/displayRate.ts).

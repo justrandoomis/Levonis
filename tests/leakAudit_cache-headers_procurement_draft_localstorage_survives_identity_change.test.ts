@@ -36,7 +36,7 @@
  * and whenever cost access is gone), and AuthContext removes a legacy copy
  * an older release left at rest on every page load, signed in or not. The
  * cases below seed that legacy copy and prove no non-owner ever finds it; the
- * wiring and the control pin the mechanism that closes it (DECISIONS row 219).
+ * wiring and the control pin the mechanism that closes it (DECISIONS row 220).
  *
  * Run: node --import tsx --test tests/leakAudit_cache-headers_procurement_draft_localstorage_survives_identity_change.test.ts
  */

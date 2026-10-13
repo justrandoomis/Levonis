@@ -3080,7 +3080,7 @@ export { cover as compositionCover };
  * price, is simply not offered rather than guessed at.
  *
  * The service rates are the owner's decision and start unset — and they stay
- * the owner's (owner rule 2026-10-10, DECISIONS row 219): the machine-hour
+ * the owner's (owner rule 2026-10-10, DECISIONS row 220): the machine-hour
  * rate, the setup fee and the margin are inputs of how a print is priced, not
  * a final price, so this answer says only WHETHER they are configured. The
  * filament figures stay: they are the shop's own published sale prices.
@@ -3125,7 +3125,7 @@ productRoutes.get('/print-calculator', async (c) => {
     success: true,
     filaments,
     // Whether the owner priced the service — never the rate, the fee or the
-    // margin themselves (DECISIONS row 219).
+    // margin themselves (DECISIONS row 220).
     rates: {
       configured: rates.machine_iqd_per_hour !== null,
     },

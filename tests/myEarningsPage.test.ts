@@ -50,7 +50,7 @@ test("the owner's views of the same account are unchanged", () => {
   // The staff history sheet reads the account summary; the payout screen reads
   // the account earnings. Both are served by participantOverview, as before —
   // unfolded (`foldProfitShare:false`): the owner keeps every per-order wage row
-  // that the participant reads folded per day (DECISIONS row 219).
+  // that the participant reads folded per day (DECISIONS row 220).
   const routes = codeOf('worker/routes/adminFinancePeople.ts');
   assert.match(routes, /\/staff\/:id\/history'[\s\S]*?participantOverview\(db,person\.user_id,\{foldProfitShare:false\}\)/);
   assert.match(routes, /\/accounts\/:id\/earnings'[\s\S]*?participantOverview\(c\.env\.DB,c\.req\.param\('id'\),\{foldProfitShare:false\}\)/);

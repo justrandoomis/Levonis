@@ -4,7 +4,7 @@
  *
  * The FX programme prices in USD and charges in dinars at the APPLIED rate
  * (`pricing_fx_rates.rate_iqd`, market + the owner's adjustment). Until
- * DECISIONS row 219 the top-bar dollar reading divided by that same rate, so
+ * DECISIONS row 220 the top-bar dollar reading divided by that same rate, so
  * a product the engine priced at $100 read «$100.00». Row 219 publishes the
  * market sell instead (to hide the adjustment), so every dollar reading is
  * now the dinar price at the market rate: with the owner's own example
@@ -52,7 +52,7 @@ test('a product the shop priced at $100 keeps its 168,000 IQD; dollars read at t
 });
 
 const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS row 219): a dollar reading equal to the dollar price the owner set is the applied rate (dinars ÷ dollars), and the applied rate less IQWealth’s public sell is the private adjustment — the reading follows the market until the owner chooses to publish his own rate';
+  'OWNER RULING NEEDED (DECISIONS row 220): a dollar reading equal to the dollar price the owner set is the applied rate (dinars ÷ dollars), and the applied rate less IQWealth’s public sell is the private adjustment — the reading follows the market until the owner chooses to publish his own rate';
 
 test('a product the shop priced at $100 (168,000 IQD at the applied 1,680) reads $100.00 to a dollar reader', { todo: OWNER_RULING }, async () => {
   const { settings } = await world();

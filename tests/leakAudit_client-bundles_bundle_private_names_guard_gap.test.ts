@@ -154,7 +154,7 @@ function guardList(): string[] {
 const ALLOWED = new Set(['direct_sale_extra_iqd']);
 /**
  * Names whose customer-page use is the viewer's own or deliberately public data (see the header).
- * The four printer-economics names joined FINANCIAL_FIELDS with DECISIONS row 219 (so the Worker
+ * The four printer-economics names joined FINANCIAL_FIELDS with DECISIONS row 220 (so the Worker
  * strips the OWNER's model-card economics from every non-owner answer); on a customer page they are
  * the fields a store owner types for THEIR OWN machines (the merchant dashboard's printers and
  * costing tabs), never the owner's.

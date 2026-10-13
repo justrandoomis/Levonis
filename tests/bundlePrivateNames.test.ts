@@ -62,7 +62,7 @@ const NEVER_AT_FIRST_PAINT = [
   '/api/admin/pricing',
   // The owner's profit report and expense ledger (requireCostRead, like
   // /api/admin/pricing): src/lib/financeApi.ts, reached through the admin
-  // shell only (DECISIONS row 219).
+  // shell only (DECISIONS row 220).
   '/api/admin/finance',
   // The completeness list's private entries (TXT keys of the owner's pricing
   // block): packages/contracts/src/productCompleteness.ts, kept out of the

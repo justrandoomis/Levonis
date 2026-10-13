@@ -163,7 +163,7 @@ test('an employee on a profit-percent wage cannot recover any order’s private 
 });
 
 /**
- * Kept, failing, as `todo` (DECISIONS row 219): an investor's own account IS
+ * Kept, failing, as `todo` (DECISIONS row 220): an investor's own account IS
  * the batch's money — the principal the purchase drew from their capital
  * (min(agreed, landed batch cost)), the remainder returned to them, the capital
  * recovered per unit sold, and their profit share per unit — so any figure
@@ -172,7 +172,7 @@ test('an employee on a profit-percent wage cannot recover any order’s private 
  * (or funding batches at the agreed amount, not at cost): the owner decides.
  */
 test('an investor cannot read the landed batch cost from GET /api/finance-earnings', {
-  todo: 'OWNER RULING NEEDED (DECISIONS row 219): the investor’s own principal, unallocated remainder, recovered capital and per-unit share are the landed batch cost by construction',
+  todo: 'OWNER RULING NEEDED (DECISIONS row 220): the investor’s own principal, unallocated remainder, recovered capital and per-unit share are the landed batch cost by construction',
 }, async () => {
   // The real funding path, as tests/fundedProcurement.test.ts drives it: an
   // investor profile (an assistant admin, which eligibleInvestorProfile

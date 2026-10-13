@@ -314,7 +314,7 @@ function freightFindings(w: World, surface: string, answers: ReadonlyArray<{ pat
  * every run, but closing it changes what customers pay — the owner decides.
  */
 const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS row 219): every pre-order route is priced on the same supplier cost, extra cost and profit, so the spread of two published route prices IS the private freight difference — no change short of a different price (or one shared price for all routes, or hiding a route) closes it, and prices are the owner\'s to change';
+  'OWNER RULING NEEDED (DECISIONS row 220): every pre-order route is priced on the same supplier cost, extra cost and profit, so the spread of two published route prices IS the private freight difference — no change short of a different price (or one shared price for all routes, or hiding a route) closes it, and prices are the owner\'s to change';
 
 test('the path is real: the engine prices each route on its own private freight rate and the public package measures', async () => {
   const w = await world();

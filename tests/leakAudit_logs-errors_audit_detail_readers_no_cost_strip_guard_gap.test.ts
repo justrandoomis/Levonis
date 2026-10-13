@@ -247,7 +247,7 @@ test('guard gap: the role-matrix sweep never reads a populated audit history on 
   const readerPaths = getPaths().filter(
     (p) =>
       /^\/api\/gifts\/admin\/grants\/[^/]+(\/audit)?$|^\/api\/devices\/admin\/units\/[^/]+\/history$|^\/api\/devices\/admin\/serial-inventory\/[^/]+$|^\/api\/admin\/warranties\/[^/]+$|^\/api\/merchant\/orders\/[^/]+\/timeline$/.test(p) &&
-      // …or with the unit / serial seedAuditRows adds for them (DECISIONS row 219).
+      // …or with the unit / serial seedAuditRows adds for them (DECISIONS row 220).
       /\/(p_a1|ord1|unit_rm|SNRMAUDIT0001)(\/|$)/.test(p)
   );
   assert.ok(readerPaths.length >= 5, `the matrix lists the readers: ${readerPaths.join(', ')}`);

@@ -348,7 +348,7 @@ adminStockOperationsRoutes.post('/counts/:id/post', async (c) => {
   await db.batch(statements);
   await audit(db, user.id, 'stock.count_posted', id, { unknown_cost_lines: unknown });
   // How many consumed lots carry no recorded cost is a fact about the owner's
-  // costs (DECISIONS row 219): the owner's screen reads it to route the lines
+  // costs (DECISIONS row 220): the owner's screen reads it to route the lines
   // to financial review; every other counter hears the same answer whatever
   // the lots cost.
   return c.json(canViewCost(c.env, user) ? { success: true, unknown_cost_lines: unknown } : { success: true });
@@ -730,7 +730,7 @@ adminStockOperationsRoutes.post('/lot-counts',async c=>{
   if(counted>lot.max_remaining)throw badRequest('الكمية تتجاوز الوحدات المستلمة غير المباعة لهذه الدفعة؛ سجّل شراء أو أصل مستقل للوحدات الجديدة','LOT_COUNT_ORIGIN_LIMIT');
   const s=await requireSelection(db,lot.product_id,lot.scope,lot.scope_id);if(s.stock===null)throw badRequest('المخزون غير متتبع');if(s.reserved>0)throw conflict('أكمل تجهيز الوحدات المحجوزة قبل جرد الدفعة','RESERVED_STOCK');
   const delta=counted-lot.qty_remaining,target=counterTarget(lot.scope)!,rowId=lot.scope==='base'?lot.product_id:lot.scope_id;
-  // AN UPWARD COUNT IS THE OWNER'S TO POST (DECISIONS row 219). Finding units
+  // AN UPWARD COUNT IS THE OWNER'S TO POST (DECISIONS row 220). Finding units
   // books an inventory gain at the lot's private cost and, on an
   // investor-funded purchase, corrects the investor's capital — refused
   // outright when the correction exceeds the documented loss. A refusal that

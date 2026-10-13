@@ -3956,7 +3956,7 @@ const COST_SETTING_KEYS: readonly string[] = [
   'printPricingConfig',
   'printMaterials',
   // The print calculator's margin, machine-hour rate and setup fee (owner rule
-  // 2026-10-10, DECISIONS row 219): a margin plus two inputs of the print
+  // 2026-10-10, DECISIONS row 220): a margin plus two inputs of the print
   // price — the owner's, no longer a «published price list» on the public
   // settings either.
   'printServicePricing',

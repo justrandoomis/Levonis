@@ -167,7 +167,7 @@ async function document(db: D1Database, id: string) {
 }
 /**
  * THE DOCUMENT AS THE OWNER'S SCREEN READS IT — every private figure under a
- * name the cost net knows (DECISIONS row 219). `document()` keeps the column
+ * name the cost net knows (DECISIONS row 220). `document()` keeps the column
  * names its own callers compute with; the answer renames the ones whose column
  * name is generic (`amount_iqd`, `paid_iqd`, `attachment_url` are wallet,
  * store and chat words too, so they can never join FINANCIAL_FIELDS): a

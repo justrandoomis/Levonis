@@ -651,7 +651,7 @@ export const COST_REFUSALS = {
   },
   // A purchase cannot be received until its freight costs are stated (a
   // receipt freezes the lot's cost). WHICH cost is missing — or that it is a
-  // cost at all — is the owner's to read (DECISIONS row 219: the receive
+  // cost at all — is the owner's to read (DECISIONS row 220: the receive
   // preview named the blank boxes to every admin); anyone else who would
   // receive it is told only that it waits for the owner.
   RECEIVE_AWAITS_OWNER: {
@@ -663,7 +663,7 @@ export const COST_REFUSALS = {
   // on an investor-funded purchase, the investor's capital — a correction the
   // owner alone can judge, and one the server refuses outright when it exceeds
   // the documented loss. Refusing that only for an investor-funded lot told a
-  // staff counter the lot was investor-funded and costed (DECISIONS row 219);
+  // staff counter the lot was investor-funded and costed (DECISIONS row 220);
   // posting it for them instead let a staff counter book what the owner is
   // refused. So every upward lot count by anyone but the owner hears this one
   // answer, whatever the lot's cost or funding; a count that finds fewer

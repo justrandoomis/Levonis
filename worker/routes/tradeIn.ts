@@ -149,10 +149,10 @@ tradeInRoutes.get('/eligible', async (c) => {
   return c.json({
     success: true,
     // Never the AMS split or the bases it priced from: on a Combo they carry
-    // the owner's private AMS reference (DECISIONS row 219, `publicUnit`).
+    // the owner's private AMS reference (DECISIONS row 220, `publicUnit`).
     units: units.map(publicUnit),
     // What the wizard asks for each family — never the numbers the answers
-    // are valued with (DECISIONS row 219): the Worker prices the answers
+    // are valued with (DECISIONS row 220): the Worker prices the answers
     // (POST /requests/:id/preview) and the customer reads the final figure.
     questions: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, publicQuestions(book[f])])),
   });

@@ -1618,7 +1618,7 @@ const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
 export function projectPublic(doc: ProductDoc, coarse = false) {
   // `source_url` is where a picture was FETCHED from — the supplier listing or
   // CDN link the owner pasted into «fetch by URL». Supplier identity is the
-  // owner's (DECISIONS row 219; the public API v1 drops it the same way), and
+  // owner's (DECISIONS row 220; the public API v1 drops it the same way), and
   // no storefront screen reads it: the picture is served from our own key.
   const media = canonicalProductMedia(doc.media).map((m) => ({ ...m, source_url: '' }));
   return {

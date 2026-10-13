@@ -2103,7 +2103,7 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
  * Admin price preview: full resolver output INCLUDING cost fields, plus a
  * USD preview at THE SHOP'S rate, never the wallet's `exchangeRate` (owner
  * decision 9: 1,400 is the wallet's own rate). WHICH shop rate depends on who
- * asks (DECISIONS row 219): the OWNER reads the APPLIED USD/IQD the prices are
+ * asks (DECISIONS row 220): the OWNER reads the APPLIED USD/IQD the prices are
  * built at (`getAppliedUsdRate` — market + his adjustment, or the rate he
  * typed), so the dollar figure is the dollar price he set, as it always was;
  * every other admin reads the PUBLIC market figure customers read dollars at

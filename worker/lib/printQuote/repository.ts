@@ -281,7 +281,7 @@ export async function loadMaterialPrices(
   /**
    * `platformDefaults: false` leaves out `print_materials.default_iqd_per_kg`,
    * the platform's own price per kilo — the owner's figure, never a merchant's
-   * (DECISIONS row 219). The public rung (a filament's per-kilo price read off
+   * (DECISIONS row 220). The public rung (a filament's per-kilo price read off
    * the shop's PUBLISHED product price) stays.
    */
   opts: { platformDefaults?: boolean } = {}

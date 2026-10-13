@@ -106,7 +106,7 @@ function world(): DatabaseSync {
               'CHINA_AIR', ${ENGINE.shippingWeightG}, ${ENGINE.extraCostIqd}, 'usr_owner', '${at}');
     INSERT INTO pricing_rules (id, kind, scope, product_id, scope_id, state, amount_usd, source, updated_by, updated_at)
       VALUES ('pr_tp_a1', 'target_profit', 'product', 'p_a1', '', 'ACTIVE', '${ENGINE.targetProfitUsd}', 'OWNER', 'usr_owner', '${at}');
-    -- The role-matrix seed gives u_m a store of its own (DECISIONS row 219); this world brings its own.
+    -- The role-matrix seed gives u_m a store of its own (DECISIONS row 220); this world brings its own.
     DELETE FROM merchant_printers WHERE merchant_id = 'cm_um';
     DELETE FROM merchant_stores WHERE id = 'st_um';
     DELETE FROM community_merchants WHERE id = 'cm_um';

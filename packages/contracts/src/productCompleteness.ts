@@ -164,7 +164,7 @@ export interface CompletenessItem {
 }
 
 // The refusals of the completeness and hide-switch routes live in their own
-// module (DECISIONS row 219): the customer pages render refusals by code, and
+// module (DECISIONS row 220): the customer pages render refusals by code, and
 // importing them from here bundled this whole list — the PRIVATE entries'
 // TXT keys and hints, which spell out the owner's pricing chain — into the
 // chunk every product, cart and checkout page preloads.

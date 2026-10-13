@@ -7,7 +7,7 @@
  * (the calculator's engine). Both return the same shape, and neither copies a
  * cost line, a floor or a margin into it — the shape has nowhere to put one.
  *
- * NO QUANTITY CURVE (owner rule 2026-10-10, DECISIONS row 219). The
+ * NO QUANTITY CURVE (owner rule 2026-10-10, DECISIONS row 220). The
  * contract used to carry the per-piece price at 1, 2, 5 and 10 copies — pure
  * re-runs of the engine. Total(q) is linear in q, so two points gave the job's
  * fixed (setup) and per-copy cost split, and with the margin the costs

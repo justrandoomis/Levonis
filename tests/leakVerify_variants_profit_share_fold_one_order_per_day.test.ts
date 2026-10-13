@@ -1,5 +1,5 @@
 /**
- * VARIANT VERIFY (DECISIONS row 219 port, fix/leak-port 5e6f581c) — #33
+ * VARIANT VERIFY (DECISIONS row 220 port, fix/leak-port 5e6f581c) — #33
  * "staff-api per-order profit share", fixed by folding the employee's
  * profit-percent wage rows «per day and rule without order ids»
  * (worker/lib/financeParticipants.ts `participantEntries`).
@@ -25,7 +25,7 @@
  * sold at the costly product's public price with a DIFFERENT private FIFO
  * cost (costlyProduct.ts sentinels), so a match is that order's cost.
  *
- * A is FIXED (DECISIONS row 219, verification pass): the participant's own
+ * A is FIXED (DECISIONS row 220, verification pass): the participant's own
  * profit-percent rows fold into ONE running line per rule and state (no day
  * of their own, no order id), so a single read never isolates one order. B
  * is pinned for the owner (below).
@@ -124,7 +124,7 @@ test('A: a day with one delivered order folds into a row that IS that order’s 
  * employee is paid, which is the owner's to make.
  */
 const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS row 219): a profit-percent wage paid as it is earned shows each delivery’s share to the employee who reads their balance before and after it; only a different basis or period-end visibility closes it';
+  'OWNER RULING NEEDED (DECISIONS row 220): a profit-percent wage paid as it is earned shows each delivery’s share to the employee who reads their balance before and after it; only a different basis or period-end visibility closes it';
 
 test('B: two orders on one day — reading «أرباحي» before and after the second delivery un-folds it', { todo: OWNER_RULING }, async () => {
   const { raw, env, employee, salePrice } = await world();

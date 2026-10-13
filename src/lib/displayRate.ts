@@ -5,7 +5,7 @@
  * `/api/settings/public` carries `displayUsdRate`: the USD/IQD a dinar price
  * is read in dollars at — the Iraqi parallel-market sell the shop's rate was
  * last built from, exactly (never the owner's adjustment on top of it nor a
- * rate he typed, DECISIONS row 219) — as DECIMAL TEXT ("1703.9167"). It is the
+ * rate he typed, DECISIONS row 220) — as DECIMAL TEXT ("1703.9167"). It is the
  * one FX figure that is public, and this module is the only place the browser
  * reads it.
  *

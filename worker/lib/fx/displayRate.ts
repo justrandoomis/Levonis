@@ -6,7 +6,7 @@
  * figure that is: no adjustment, applied, typed, pending or history value ever
  * reaches `/api/settings/public` or `/api/home`.
  *
- * WHICH RATE (owner rule 2026-10-10, DECISIONS row 219). It used to be the
+ * WHICH RATE (owner rule 2026-10-10, DECISIONS row 220). It used to be the
  * shop's EFFECTIVE rate — the parallel-market sell PLUS the owner's private
  * `market_adjustment_iqd` — credited to IQWealth beside a link to IQWealth's
  * own page. Subtracting the sell IQWealth publishes gave every visitor the
@@ -21,7 +21,7 @@
  * new one, and a rate the owner TYPES carries none at all — `effective −
  * current adjustment` then published a figure that moved with an act that
  * moved no rate, and a typed rate published as it is told every visitor the
- * owner's markup over the market (both found by the verification of row 219).
+ * owner's markup over the market (both found by the verification of row 220).
  * So it is read from the immutable FX log: the newest USD/IQD row that
  * APPLIED a rate built as market + adjustment (`apply`, `review_approved`,
  * `review_cleared` with result APPLIED — each records the adjustment it

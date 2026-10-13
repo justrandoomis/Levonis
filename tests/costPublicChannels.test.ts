@@ -47,7 +47,7 @@ test('configured print rates and margin stay private in the calculator, public s
           const rates = body.rates as Record<string, unknown>;
           // The machine-hour rate and the setup fee are inputs of the print
           // price like the margin: the calculator says only whether the
-          // service is priced (DECISIONS row 219).
+          // service is priced (DECISIONS row 220).
           assert.deepEqual(rates, { configured: true });
         }
       }
@@ -87,7 +87,7 @@ test('historical order snapshots are projected when read, retaining the paid pri
       const res = await get(app, path);
       assert.equal(res.status, 200);
       const body = await json(res);
-      // The matrix seeds more than one order for u1 (the leak-audit rows, DECISIONS row 219): read ord1 by id.
+      // The matrix seeds more than one order for u1 (the leak-audit rows, DECISIONS row 220): read ord1 by id.
       const order = (body.order ?? (body.orders as Array<Record<string, unknown>>).find((o) => o.id === 'ord1')) as Record<string, unknown>;
       const line = (order.items as Array<Record<string, unknown>>)[0]!;
       assert.equal(line.unit_price_iqd, 900000);
@@ -137,7 +137,7 @@ test('grams quotes keep the final hardware-inclusive price and selected quantiti
       const plain = await json(await post(app, '/api/print-quote/grams-quote', input));
       // The public calculators price on the platform's own figures (no machine
       // of the caller's is involved), so a store owner reads the final price
-      // like everyone else — never the platform's cost chain (DECISIONS row 219;
+      // like everyone else — never the platform's cost chain (DECISIONS row 220;
       // a merchant costs their own machines on /analyses/:id/compare).
       assert.ok(!('true_cost_iqd' in plain.quote), `${role}: no cost chain on the public calculator`);
       const res = await post(app, '/api/print-quote/grams-quote', { ...input, accessories: [{ id: 'test-magnet', qty: 1 }] });
@@ -186,7 +186,7 @@ test('a merchant cannot reprice the platform calculators: any requested margin a
       const ownLowMargin = await quote(0.000001);
       const ownHighMargin = await quote(90);
       // A margin the caller names made the platform's price an oracle for the
-      // platform's own cost — with hardware AND without (DECISIONS row 219):
+      // platform's own cost — with hardware AND without (DECISIONS row 220):
       // these doors price no machine of the merchant's, so the margin is the
       // platform's for everyone. Their own machines are costed on /compare.
       assert.equal(ownLowMargin.price_iqd, platformPlain.price_iqd, `${path}: a near-zero margin is not honoured`);

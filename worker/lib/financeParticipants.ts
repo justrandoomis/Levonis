@@ -172,13 +172,13 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
   return { summary, employment, investment, entries: participantEntries(entries, fold), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
 }
 /**
- * What the participant reads of their own sources (DECISIONS row 219). A
+ * What the participant reads of their own sources (DECISIONS row 220). A
  * profit-percent wage is a constant share of one order's PROFIT: one row per
  * order, tied to its order id, lets the employee divide by their own
  * percentage and subtract from the public price to reach that order's private
  * cost. Folding per DAY was not enough — in a small shop most days carry one
  * delivered order, so the day's row was that order's wage (found by the
- * verification of row 219). So those rows fold into ONE running line per rule
+ * verification of row 220). So those rows fold into ONE running line per rule
  * and state, with no order id and no day of its own (`day` is the latest day
  * folded in, for ordering): a single read gives the employee their share of
  * the profit of everything delivered so far, never one order's. Every other

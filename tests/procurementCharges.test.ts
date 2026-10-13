@@ -18,7 +18,7 @@ import type { CostProfile } from '../packages/contracts/src/procurementCost';
 /**
  * A purchase document as the owner's panel reads it: the server answers its
  * private amounts under cost names (adminProcurement.ts `documentWire`,
- * DECISIONS row 219) and the panel maps them back (procurementWire.ts).
+ * DECISIONS row 220) and the panel maps them back (procurementWire.ts).
  */
 const readDoc = async (app: Parameters<typeof get>[0], id: string) =>
   purchaseDocumentFromWire<Awaited<ReturnType<typeof json>>>(await json(await get(app, `/p/documents/${id}`)));

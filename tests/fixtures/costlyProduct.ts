@@ -67,7 +67,7 @@ const snakeOf = (k: string) => k.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}
  * THE STEPS OF A PRICE, by the names the print engines answer them under —
  * not in FINANCIAL_FIELDS (a merchant's own costing carries them by design),
  * but never something a sweep may pass in a non-owner answer without a
- * NOT_A_COST reason (DECISIONS row 219): the failure reserve, the markup, the
+ * NOT_A_COST reason (DECISIONS row 220): the failure reserve, the markup, the
  * break-even. A `lines[]` row of a cost engine (`{ component, iqd }`) is the
  * same: one line of what a job cost.
  */
@@ -76,7 +76,7 @@ const PRICE_CHAIN_KEYS: ReadonlySet<string> = new Set(['failure_reserve_iqd', 'm
 /**
  * Text keys that carry PRIVATE IDENTITY rather than a figure: a picture's
  * `source_url` is the supplier listing the owner fetched it from (the public
- * API v1 drops it; DECISIONS row 219). Flagged when non-empty inside a media
+ * API v1 drops it; DECISIONS row 220). Flagged when non-empty inside a media
  * or image list.
  */
 const PRIVATE_MEDIA_TEXT_KEYS: ReadonlySet<string> = new Set(['source_url']);

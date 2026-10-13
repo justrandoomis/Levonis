@@ -1,5 +1,5 @@
 /**
- * THE PURCHASE DOCUMENT, BACK IN THE PANEL'S OWN NAMES (DECISIONS row 219).
+ * THE PURCHASE DOCUMENT, BACK IN THE PANEL'S OWN NAMES (DECISIONS row 220).
  *
  * `GET /api/admin/procurement/documents[/:id]` answers every private figure
  * under a name the server's cost net knows (worker/routes/adminProcurement.ts

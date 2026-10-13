@@ -1,7 +1,7 @@
 /**
  * «الاستبدال» on the client — the shapes the Worker sends (worker/lib/tradeIn.ts
  * `requestView`, `listEligible`, `listTargets`) and the few pure helpers the
- * screens share. The valuation is NOT run here (DECISIONS row 219): the
+ * screens share. The valuation is NOT run here (DECISIONS row 220): the
  * owner's valuation rules are the calculation behind a price Levonis sets, so
  * the customer's wizard is told only which questions to ask
  * (`TradeInQuestions`) and posts the answers to
@@ -28,7 +28,7 @@ export interface ScopeOption {
   scope: TradeInScope;
   available: boolean;
   reason: string | null;
-  /** A part's base is absent where it would name the shop's own AMS reference (DECISIONS row 219). */
+  /** A part's base is absent where it would name the shop's own AMS reference (DECISIONS row 220). */
   components: Array<{ role: ComponentRole; family: TradeInFamily; base_iqd?: number }>;
   /** What the scope is valued from — null where it would name the shop's own AMS reference. */
   base_iqd: number | null;
@@ -46,7 +46,7 @@ export interface EligibleUnit {
   image: string;
   family: TradeInFamily;
   is_combo: boolean;
-  /** How a Combo's AMS share was found; its base is absent on a `reference` split (the shop's own figure, DECISIONS row 219). */
+  /** How a Combo's AMS share was found; its base is absent on a `reference` split (the shop's own figure, DECISIONS row 220). */
   ams_split: { method: 'option_gap' | 'reference' | 'none'; share_bp: number | null; ams_base_iqd?: number };
   paid_iqd: number;
   ordered_at: string;

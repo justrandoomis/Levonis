@@ -258,7 +258,7 @@ export function bpText(bp: number): string {
 }
 
 /**
- * ONE PART'S ESTIMATED VALUE — the figure alone (DECISIONS row 219). The
+ * ONE PART'S ESTIMATED VALUE — the figure alone (DECISIONS row 220). The
  * per-factor lines between the price paid and this value are the owner's
  * valuation rules at work; the Worker keeps them for the admin screens and
  * the customer reads the final figure.

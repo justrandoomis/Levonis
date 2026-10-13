@@ -8,7 +8,7 @@
  * trunc(-delta × unit cost × loss_share_bps / 10000). When that exceeds the
  * loss actually documented for the lot, 10c6541a refused EVERY counter
  * («لا توجد خسارة موثقة تكفي لتصحيح رأس مال المستثمر», 400) and wrote nothing.
- * DECISIONS row 219 (leak #26, the refusal was an oracle) keeps the refusal for
+ * DECISIONS row 220 (leak #26, the refusal was an oracle) keeps the refusal for
  * the owner only; any other counter now gets 200 — the count posts, the lot
  * and the product stock move, the 1200/5300 journal is written for the full
  * delta × cost, and the investor correction is silently capped at the
@@ -18,7 +18,7 @@
  * who sends it, and the less-privileged caller can post what the owner cannot.
  * Expected (base): owner and assistant get the same outcome.
  *
- * FIXED (DECISIONS row 219, verification pass): an upward lot count is the
+ * FIXED (DECISIONS row 220, verification pass): an upward lot count is the
  * owner's to post — anyone else hears LOT_COUNT_UP_OWNER_ONLY for EVERY
  * upward count, decided before the lot's cost or funding is read, and
  * nothing is written; the owner keeps the investor-capital refusal. Same

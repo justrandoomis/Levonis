@@ -2561,7 +2561,7 @@ const financePath = (path: string, params: Record<string, string | number | unde
 };
 
 // The report calls (summary, products, categories) live in ./financeApi
-// (DECISIONS row 219): every customer page loads this file at first paint, and
+// (DECISIONS row 220): every customer page loads this file at first paint, and
 // the owner-only finance routes are no business of theirs.
 
 // ===========================================================================
@@ -2692,7 +2692,7 @@ export type ReceiveRefusalCode =
   | 'QTY_EXCEEDS_ORDER'
   | 'QTY_INVALID'
   | 'COST_NOT_STATED'
-  /** Anyone but the owner, for a purchase whose freight costs are not stated yet (DECISIONS row 219). */
+  /** Anyone but the owner, for a purchase whose freight costs are not stated yet (DECISIONS row 220). */
   | 'RECEIVE_AWAITS_OWNER';
 
 export interface ReceivePreview {
@@ -2872,5 +2872,5 @@ export interface ExpenseLedgerPage {
   truncated: boolean;
 }
 
-// The expense ledger's calls live in ./financeApi (DECISIONS row 219): the
+// The expense ledger's calls live in ./financeApi (DECISIONS row 220): the
 // owner's finance routes are not named in the first paint.

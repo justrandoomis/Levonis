@@ -47,7 +47,7 @@ async function settingsOf(raw: DatabaseSync) {
   return { pub, home, pubBody: await json(pub), homeBody: await json(home) };
 }
 
-test('displayUsdRate is the market sell the applied rate was built from, exactly (the effective rate less the adjustment it carried, DECISIONS row 219), on both answers — and no other FX key is public', async () => {
+test('displayUsdRate is the market sell the applied rate was built from, exactly (the effective rate less the adjustment it carried, DECISIONS row 220), on both answers — and no other FX key is public', async () => {
   const raw = freshDb();
   // The applied 1,703.9167 was built as the market 1,666.6666 + the owner's 37.2501 (the log row says so).
   raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '37.2501' WHERE pair = 'USD_IQD'");

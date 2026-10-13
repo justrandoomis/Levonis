@@ -1,5 +1,5 @@
 /**
- * VARIANT VERIFY (DECISIONS row 219 port, fix/leak-port 5e6f581c) — the print
+ * VARIANT VERIFY (DECISIONS row 220 port, fix/leak-port 5e6f581c) — the print
  * calculator's FINAL PRICE is a fixed, public function of the owner's private
  * inputs, so two anonymous quotes that differ in one input hand back that
  * input exactly. Variants of:
@@ -61,7 +61,7 @@ import { DEFAULT_FAILURE_FRACTION } from '../worker/lib/printQuote/cost';
  * steps) or no anonymous calculator — what every customer pays changes.
  */
 const OWNER_RULING =
-  'OWNER RULING NEEDED (DECISIONS row 219): the print price is a public function of the accessory cost, the machine-hour rate, the per-kilo price and the margin, so quotes that differ in one input give that input; only a change to the price (or to who may quote) closes it';
+  'OWNER RULING NEEDED (DECISIONS row 220): the print price is a public function of the accessory cost, the machine-hour rate, the per-kilo price and the margin, so quotes that differ in one input give that input; only a change to the price (or to who may quote) closes it';
 
 /** Everything the attacker uses is in the public repository. */
 const KEEP = 1 - PLATFORM_TARGET_MARGIN_PERCENT / 100; // 0.65

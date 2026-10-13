@@ -216,7 +216,7 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
     assert.ok(keys.test(k), `the probe would miss ${k}`);
   }
   // …and not the public ones.
-  // (The print-service rates left the public settings with DECISIONS row 219: forbidden above.)
+  // (The print-service rates left the public settings with DECISIONS row 220: forbidden above.)
   for (const k of ['displayUsdRate', 'exchangeRate', 'currency', 'price_iqd']) assert.equal(keys.test(k), false, k);
 
   for (const withRate of [false, true]) {
@@ -230,7 +230,7 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
       const text = await res.text();
       assert.deepEqual(judge(p, res.status, text), [], `${p.path} (${withRate ? 'a rate' : 'no rate'})`);
       if (p.path === '/api/settings/public' || p.path === '/api/home') {
-        // Not vacuous: the figure is there — the market base to the dinar (DECISIONS row 219), or null before the first approval.
+        // Not vacuous: the figure is there — the market base to the dinar (DECISIONS row 220), or null before the first approval.
         assert.equal(JSON.parse(text).settings.displayUsdRate, withRate ? FX_DISPLAY_RATE : null, p.path);
         for (const v of FX_SENTINELS) assert.equal(text.includes(v), false, `${p.path} carries the private figure ${v}`);
       }
@@ -238,7 +238,7 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
   }
 });
 
-// ------------------------------------------------------------- leaks.json (the 2026-10-10 leak audit, DECISIONS row 219)
+// ------------------------------------------------------------- leaks.json (the 2026-10-10 leak audit, DECISIONS row 220)
 
 const SUPPLIER_LINK = 'https://supplier-secret.example/listing/original.jpg';
 

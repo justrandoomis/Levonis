@@ -2,7 +2,7 @@
  * LEAK VERIFY (features) — a store owner who declared their printer's purchase
  * price is costed with NO wear and told they did not enter it.
  *
- * DECISIONS row 219 builds a merchant's costing from the merchant's own
+ * DECISIONS row 220 builds a merchant's costing from the merchant's own
  * figures: `priceForPrinter` (worker/routes/printQuote.ts) now hands the
  * engine `withoutOwnerEconomics(printer)`, whose `usefulPrintHours` is 0. The
  * depreciation rung for a merchant who declared a purchase price is still
@@ -28,7 +28,7 @@
  * Expected: a purchase price the merchant declared is either charged, or the
  * answer does not read as "no purchase price".
  *
- * FIXED (DECISIONS row 219, verification pass) the second way: the model
+ * FIXED (DECISIONS row 220, verification pass) the second way: the model
  * card's useful life is the OWNER's figure (purchase ÷ the rate charged would
  * hand it to the merchant), so it never fills the gap; instead the costing
  * answer says which of the merchant's own figures the wear still needs

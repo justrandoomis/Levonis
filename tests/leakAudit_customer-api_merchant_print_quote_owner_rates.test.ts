@@ -219,7 +219,7 @@ test('merchant POST /api/print-quote/grams-quote carries none of the owner’s p
   const body = await json(await post(merchant(raw), '/api/print-quote/grams-quote', GRAMS_BODY));
   assert.equal(body.success, true, JSON.stringify(body));
   // The door really priced the job (the platform's estimate, which is all a
-  // store owner reads here since DECISIONS row 219 — their own costing lives
+  // store owner reads here since DECISIONS row 220 — their own costing lives
   // on /compare and the workshop door, door 3 and the staff-api audit).
   assert.ok(Number(body.quote?.price_iqd) > 0, `the door did not price the job: ${JSON.stringify(body.quote)}`);
   assert.equal(body.quote.lines, undefined, 'the platform door answers a store owner the public shape');

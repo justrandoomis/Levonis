@@ -60,7 +60,7 @@
  * real panel autosaves the owner's private draft — into the tab, never into
  * the browser's storage — and that an in-tab sign-out drops it; the cases
  * after them are unchanged: nothing private at rest for anyone who comes
- * next (DECISIONS row 219).
+ * next (DECISIONS row 220).
  *
  * Run: node --import tsx --test tests/leakAudit_client-bundles_purchase_draft_survives_account_change.test.ts
  * Needs Playwright + Chromium (PLAYWRIGHT_MODULE, or `playwright` resolvable).

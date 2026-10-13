@@ -14,7 +14,7 @@ import type { DatabaseSync } from 'node:sqlite';
 export const FX_PUBLIC_RATE = '1703.9167';
 /**
  * What GET /api/settings/public and /api/home publish for these rows since
- * DECISIONS row 219: the market sell the applied rate was built from (the
+ * DECISIONS row 220: the market sell the applied rate was built from (the
  * `apply` row's effective_after less the adjustment it carried), exactly —
  * the effective rate minus the published market sell gave the adjustment
  * away. The effective rate stays the one every IQD price is built on, and is

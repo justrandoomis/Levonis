@@ -211,7 +211,7 @@ export async function loadAdminGift(db: D1Database, id: string): Promise<AdminGi
 /**
  * One gift's audit timeline: every gift.* row about it, oldest first, with the
  * actor's name. `cost` is `canViewCost` of the reader: every other admin reads
- * each detail with FINANCIAL_FIELDS stripped at every depth (DECISIONS row 219).
+ * each detail with FINANCIAL_FIELDS stripped at every depth (DECISIONS row 220).
  */
 export async function giftAuditTimeline(db: D1Database, id: string, cost: boolean) {
   const { results } = await db

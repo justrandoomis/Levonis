@@ -3,7 +3,7 @@
  * edits the adjustment while the USD/IQD pair is on MANUAL, though nothing the
  * shop charges moved.
  *
- * DECISIONS row 219 publishes `displayUsdRate` as `effective_rate −
+ * DECISIONS row 220 publishes `displayUsdRate` as `effective_rate −
  * market_adjustment_iqd` whenever `effective_source` is not 'manual'
  * (worker/lib/fx/displayRate.ts). But «إيقاف» (mode → MANUAL,
  * worker/lib/fx/ownerActs.ts) keeps `effective_source` as it was, and on
@@ -18,7 +18,7 @@
  *
  * Expected: an act that moves no rate moves no public figure.
  *
- * FIXED (DECISIONS row 219, verification pass): the public figure is the
+ * FIXED (DECISIONS row 220, verification pass): the public figure is the
  * market sell of the newest rate the log records as built from market +
  * adjustment (effective_after − the adjustment THAT row carried), so an act
  * that applies no new market reading — a freeze, a typed rate, an adjustment

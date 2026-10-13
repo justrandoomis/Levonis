@@ -200,7 +200,7 @@ export interface RevisionSnapshot {
 
 /**
  * The estimate as a customer and merchant may read it: never the cost lines,
- * never the hardware's buying price (DECISIONS row 219) — its lines keep what
+ * never the hardware's buying price (DECISIONS row 220) — its lines keep what
  * and how many, and lose `unit_iqd` / `iqd` («What ONE unit costs the shop»
  * and that times the count). No quantity curve either: re-runs at other
  * counts gave the job's fixed and per-copy cost away.

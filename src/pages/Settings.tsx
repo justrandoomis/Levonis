@@ -1144,7 +1144,7 @@ export default function Settings() {
                 <p className="mt-2 text-[12px] text-text-muted leading-relaxed">{s.currencyNote}</p>
                 {/* THE SHOP'S RATE once the owner has approved one (plan §13):
                     the market USD/IQD to the dinar (never the owner's
-                    adjustment, DECISIONS row 219), credited to IQWealth
+                    adjustment, DECISIONS row 220), credited to IQWealth
                     with the link its terms ask for — as the menu does
                     (critique L8, Appendix A; FX-1 UX review #9) — but only
                     when it IS the provider's figure: a rate the owner typed

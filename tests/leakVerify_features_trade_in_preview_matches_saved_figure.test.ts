@@ -1,9 +1,9 @@
 /**
  * LEAK VERIFY (features) — the trade-in wizard's live figure, now priced by the
- * Worker (POST /api/trade-in/requests/:id/preview, DECISIONS row 219), is the
+ * Worker (POST /api/trade-in/requests/:id/preview, DECISIONS row 220), is the
  * same figure the request carries once the answers are saved.
  *
- * Before row 219 the wizard ran the engine on the phone over the rules it was
+ * Before row 220 the wizard ran the engine on the phone over the rules it was
  * sent; now `TradeInWizard` posts `{ components: inputs, target }` to the
  * preview door every time an answer changes and shows what it answers. No
  * test exercised the door. This one drives the real routes the way the wizard

@@ -688,7 +688,7 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
 }
 
 /**
- * A UNIT AS ITS CUSTOMER READS IT (DECISIONS row 219). A Combo's AMS share is
+ * A UNIT AS ITS CUSTOMER READS IT (DECISIONS row 220). A Combo's AMS share is
  * worked out from the gap between two PUBLIC option prices (`option_gap`: a
  * share of what the customer paid, theirs to read) or, when that cannot be
  * done, from the owner's private AMS REFERENCE (`ams_reference_iqd`, a
@@ -1218,7 +1218,7 @@ export function estimateFor(
 
 /**
  * WHAT THE CUSTOMER'S WIZARD NEEDS TO ASK — never what an answer is worth
- * (DECISIONS row 219). The trade-in value is a price Levonis sets; its rules
+ * (DECISIONS row 220). The trade-in value is a price Levonis sets; its rules
  * (each factor's effect and weight, the floor and the cap, the resale view
  * and the per-product overrides) are the calculation behind that price, and
  * the owner's rule gives anyone but the owner the final figure alone. So the

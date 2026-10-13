@@ -1,5 +1,5 @@
 /**
- * VARIANT VERIFY (DECISIONS row 219 port, fix/leak-port 5e6f581c) — #26
+ * VARIANT VERIFY (DECISIONS row 220 port, fix/leak-port 5e6f581c) — #26
  * "logs-errors lot-count cost existence oracle".
  *
  * The port's rule, in its own words (worker/routes/adminStockOperations.ts):
@@ -30,7 +30,7 @@
  * private fact reaching them.
  *
  * LOCAL ONLY: role-matrix SQLite copies, the real router, no network.
- * FIXED (DECISIONS row 219, verification pass): `unpriced_units` is now a
+ * FIXED (DECISIONS row 220, verification pass): `unpriced_units` is now a
  * FINANCIAL_FIELD (both lists), so `projectForAdmin` strips it for everyone
  * but the owner; the receive door tells a non-owner only that the purchase
  * waits for the owner (RECEIVE_AWAITS_OWNER), never which cost is missing.

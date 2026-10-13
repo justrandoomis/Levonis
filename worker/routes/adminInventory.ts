@@ -515,7 +515,7 @@ adminInventoryRoutes.patch('/incoming/:id', async (c) => {
 /**
  * A purchase whose freight costs are not stated cannot be received (a receipt
  * freezes the lot's cost). The owner reads WHICH boxes are blank; anyone else
- * reads only that the purchase waits for him (DECISIONS row 219) — the code
+ * reads only that the purchase waits for him (DECISIONS row 220) — the code
  * and the list named the owner's missing costs to every admin.
  */
 function ownerOrAwaiting(

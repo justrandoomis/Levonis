@@ -3,7 +3,7 @@
  * three languages. Split from ./productCompleteness.ts (which re-exports them)
  * so the client's refusal table can import them without the completeness
  * list itself, whose private entries name the owner's pricing data
- * (DECISIONS row 219). Pure data: no imports.
+ * (DECISIONS row 220). Pure data: no imports.
  *
  * Every `ckb` is its own Sorani, never the Arabic pasted across
  * (docs/DECISIONS.md row 183).

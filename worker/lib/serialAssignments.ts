@@ -156,7 +156,7 @@ export interface SerialActor {
    */
   orderRefs: boolean;
   /**
-   * Cost in an audit detail (DECISIONS row 219): `canViewCost` — the verified
+   * Cost in an audit detail (DECISIONS row 220): `canViewCost` — the verified
    * owner. Every other admin reads a history row with FINANCIAL_FIELDS
    * stripped at every depth, so the first `audit()` that records a cost under
    * a device / serial / warranty prefix still reaches the owner alone.

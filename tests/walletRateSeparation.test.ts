@@ -88,7 +88,7 @@ test('an approved market rate of 1,680 leaves the wallet rate at 1,400; the publ
   assert.equal(pub.exchangeRate, WALLET, 'the wallet rate, a number');
   // The public reading is the market sell to the dinar — never the owner's
   // +20 on top of it, which the public figure minus the provider's would
-  // give away (DECISIONS row 219). Prices themselves are applied at 1,680.
+  // give away (DECISIONS row 220). Prices themselves are applied at 1,680.
   assert.equal(pub.displayUsdRate, '1660', 'the market rate, decimal text');
 });
 
@@ -149,14 +149,14 @@ test("the admin price preview reads the shop's rate — null before the first ap
   await approveUsdAt1680(raw);
   const after = await json(await post(asOwner, '/api/admin/products/p_pla/quote', {}));
   // The OWNER reads the dollar price he set: the 1,680 the prices are applied
-  // at (DECISIONS row 219 keeps the owner's view unchanged).
+  // at (DECISIONS row 220 keeps the owner's view unchanged).
   assert.deepEqual(after.quote.usd_preview, {
     exchange_rate_iqd_per_usd: '1680',
     applied_usd: Math.floor((25_000 * 100) / 1680) / 100,
     unit_subtotal_usd: Math.floor((after.quote.unit_subtotal_iqd * 100) / 1680) / 100,
   });
   // Staff read dollars where customers read them: the public market figure
-  // (DECISIONS row 219), carrying nothing private of FX.
+  // (DECISIONS row 220), carrying nothing private of FX.
   const assistant = stubApp(asD1(raw), ASSISTANT, (a) => a.route('/api/admin/products', adminProductsRoutes));
   const res = await post(assistant, '/api/admin/products/p_pla/quote', {});
   assert.equal(res.status, 200);

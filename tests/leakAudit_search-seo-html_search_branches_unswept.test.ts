@@ -172,7 +172,7 @@ const namesCostly = (body: unknown): boolean => {
 
 test('the guard gap is real: the role-matrix sweep sends no search term, and its database has no index and an empty mirror', () => {
   const paths = getPaths();
-  // The export query the matrix sends since DECISIONS row 219 (`?ids=p_a1`) is no search term.
+  // The export query the matrix sends since DECISIONS row 220 (`?ids=p_a1`) is no search term.
   assert.equal(paths.filter((p) => /[?&](q|query|search|term|s)=/.test(p)).length, 0, 'the role matrix now sends search terms — revisit this audit');
   const raw = seedRoleMatrix();
   const tokens = raw.prepare('SELECT COUNT(*) AS n FROM search_tokens').get() as { n: number };

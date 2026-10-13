@@ -177,7 +177,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
   }, [unit, resume]);
   const index = steps.indexOf(step);
 
-  // THE LIVE FIGURE, PRICED BY THE WORKER (DECISIONS row 219): the answers so
+  // THE LIVE FIGURE, PRICED BY THE WORKER (DECISIONS row 220): the answers so
   // far (and the product being looked at) go to the preview door, which
   // answers the final figures only — the valuation rules never reach the
   // phone. Until the first answer the request's own estimate stands.

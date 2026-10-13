@@ -7,7 +7,7 @@
  *       public payload never serialises `cost_`, `floor_`, `margin_` or `lines`
  *   E2  factors are ordinal buckets (≥ 40 % most, ≥ 15 % some, else omitted)
  *       and covers come from the line keys, never the amounts
- *   E4  no quantity curve (DECISIONS row 219): a unit price at 1, 2, 5 and
+ *   E4  no quantity curve (DECISIONS row 220): a unit price at 1, 2, 5 and
  *       10 copies is two equations in the job's fixed and per-copy COST, so
  *       the contract answers the asked quantity's price alone
  *
@@ -190,7 +190,7 @@ test('factors are ordinal buckets of the cost shares: ≥ 40 % most, ≥ 15 % so
   assert.deepEqual(excludesFrom(['machine', 'delivery', 'delivery']), ['delivery', 'machine']);
 });
 
-test('no quantity curve: the contract answers the asked quantity alone (E4, DECISIONS row 219)', () => {
+test('no quantity curve: the contract answers the asked quantity alone (E4, DECISIONS row 220)', () => {
   const q = quotePrint(
     { analysis: cube(30), materialId: 'pla', quality: 'standard', infill: 0.2, quantity: 4, colors: 1, supports: true, post_processing_minutes: 0 },
     DEFAULT_MATERIALS,

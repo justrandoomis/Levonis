@@ -179,7 +179,7 @@ test('every /api/admin mount of worker/index.ts has a classification — and no 
   assert.deepEqual(missing, [], 'add a tests/routeClass/<family>.ts entry for these mounts');
   // A classification may also name a mount outside /api/admin (the routers
   // with admin routes under another prefix, and the customer print doors —
-  // DECISIONS row 219); it is stale only when worker/index.ts mounts it nowhere.
+  // DECISIONS row 220); it is stale only when worker/index.ts mounts it nowhere.
   const live = new Set(allIndexMounts().map(key));
   const stale = [...have].filter((k) => !live.has(k));
   assert.deepEqual(stale, [], 'these classified mounts are no longer in worker/index.ts');

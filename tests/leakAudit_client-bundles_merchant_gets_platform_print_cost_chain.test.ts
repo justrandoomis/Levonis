@@ -267,7 +267,7 @@ test('merchant POST /api/print-quote/analyses/:id/quote (Tools page) carries non
 
   // Prove this exercises the path: the store owner's call priced the same
   // file, at the PLATFORM's price (the door answers everyone the public
-  // estimate since DECISIONS row 219).
+  // estimate since DECISIONS row 220).
   assert.ok(Number(body.quote?.price_iqd) > 0, `the door did not price the file: ${JSON.stringify(body.quote)}`);
   assert.equal(
     body.quote.price_iqd,

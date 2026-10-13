@@ -144,7 +144,7 @@ test('anonymous /api/settings/public and /api/home: displayUsdRate − IQWealth\
     assert.equal(cacheControl, ANONYMOUS_CACHE_CONTROL, `${path}: shared by every visitor through the anonymous edge cache`);
     // The existing scanner is blind to it: no private value or key appears literally.
     assert.deepEqual(leaks(body, { decimals: [PRIVATE_ADJUSTMENT] }), [], `${path}: the literal scan passes`);
-    // Since DECISIONS row 219 the public figure IS IQWealth's own sell, exactly.
+    // Since DECISIONS row 220 the public figure IS IQWealth's own sell, exactly.
     assert.equal(body.settings.displayUsdRate, iqwealthSell, `${path}: the public figure is the market sell`);
     assert.equal(JSON.stringify(body).includes(PRIVATE_ADJUSTMENT), false, `${path}: the adjustment is not spelled out`);
 

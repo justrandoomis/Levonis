@@ -146,7 +146,7 @@ test('precondition: every page boots through WalletProvider, whose mount effect 
     'refreshSettings no longer GETs /api/settings/public'
   );
   assert.match(wallet, /await Promise\.all\(\[refreshSettings\(\), refreshWallet\(\)\]\)/, 'the mount effect no longer runs refreshSettings()');
-  // The fix (DECISIONS row 219): the rates left the public allow-list.
+  // The fix (DECISIONS row 220): the rates left the public allow-list.
   assert.ok(
     !(PUBLIC_SETTING_KEYS as string[]).includes('printServicePricing'),
     'printServicePricing is a public setting key again: every page load would hand it to every visitor'

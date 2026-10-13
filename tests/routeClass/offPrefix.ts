@@ -2,7 +2,7 @@
  * ROUTE CLASSIFICATION — the routers mounted OUTSIDE /api/admin that carry
  * admin routes (wallet, memberships, telegram, invoices, devices and the
  * serial inventory, reviews, gifts, returns, price protection, policies, KYC,
- * support, referrals, and the misc router's /translate). DECISIONS row 219.
+ * support, referrals, and the misc router's /translate). DECISIONS row 220.
  *
  * tests/costRouteClassification.test.ts used to classify only the
  * `/api/admin…` mounts, so about 120 admin routes under another prefix had no
