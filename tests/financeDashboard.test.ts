@@ -556,12 +556,13 @@ test('the expense ledger the owner asked for exists, and calls the endpoints tha
   // migration existed with no screen to reach them, so `operating_expenses`
   // could never receive a row and the net-profit hero subtracted a permanent
   // zero. This asserts the screen is wired, not that it is pretty.
-  const api = read('src/lib/api.ts');
+  // The calls live in src/lib/financeApi.ts, off the first paint (DECISIONS row 219).
+  const api = read('src/lib/financeApi.ts');
   for (const path of [
     '/api/admin/finance/expense-categories',
     '/api/admin/finance/expenses',
   ]) {
-    assert.ok(api.includes(path), `src/lib/api.ts must call ${path}`);
+    assert.ok(api.includes(path), `src/lib/financeApi.ts must call ${path}`);
   }
   const ledger = read(`${DIR}/ExpenseLedger.tsx`);
   for (const fn of ['createExpense', 'fetchExpenses', 'voidExpense', 'restoreExpense', 'createExpenseCategory']) {

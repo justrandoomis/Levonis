@@ -6,8 +6,8 @@
  * The server decides (worker/lib/productCompleteness.ts evaluates every
  * ordinary product against this list and stores CODES only, migration 0184);
  * the product form, the products list and the data-file preview render the
- * codes in the viewer's language from this table. Pure data: no imports, so
- * the Worker, the client and the tests share it.
+ * codes in the viewer's language from this table. Pure data (its one import
+ * is the refusals' own module), so the Worker, the client and the tests share it.
  *
  * PRIVATE CODES. `COST` and `ENGINE_INPUTS` name the owner's private pricing
  * data. The server projects them away for every viewer but the verified owner,
@@ -163,37 +163,14 @@ export interface CompletenessItem {
   option_id: string;
 }
 
-/** The refusals of the completeness and hide-switch routes (the client renders them by code). */
-export const COMPLETENESS_REFUSALS = {
-  COMPLETENESS_NOT_INSTALLED: {
-    ar: 'فحص اكتمال المنتجات غير مثبّت على قاعدة البيانات بعد.',
-    en: 'Product completeness is not installed on the database yet.',
-    ckb: 'پشکنینی تەواوبوونی بەرهەم هێشتا لەسەر بنکەدراوە دانەمەزراوە.',
-  },
-  COMPLETENESS_NOT_READY: {
-    ar: 'بعض المنتجات لم تُفحص بعد — حدّث العدّ ثم فعّل الإخفاء.',
-    en: 'Some products are not checked yet — recount, then turn hiding on.',
-    ckb: 'هەندێک بەرهەم هێشتا نەپشکنراون — دووبارە بژمێرە، پاشان شاردنەوە چالاک بکە.',
-  },
-  HIDE_COUNT_CHANGED: {
-    ar: 'تغيّر عدد المنتجات الناقصة — راجع العدد الجديد ثم أكّد.',
-    en: 'The number of incomplete products changed — review the new count, then confirm.',
-    ckb: 'ژمارەی بەرهەمە ناتەواوەکان گۆڕا — ژمارە نوێیەکە ببینە، پاشان پشتڕاستی بکەرەوە.',
-  },
-  HIDE_SWITCH_ROUTE: {
-    ar: 'مفتاح إخفاء المنتجات الناقصة يُغيَّر من صفحة المنتجات.',
-    en: 'The hide-incomplete switch is changed from the products page.',
-    ckb: 'کلیلی شاردنەوەی بەرهەمە ناتەواوەکان لە پەڕەی بەرهەمەکانەوە دەگۆڕدرێت.',
-  },
-} as const satisfies Record<string, CompletenessText>;
-
-export type CompletenessRefusalCode = keyof typeof COMPLETENESS_REFUSALS;
-
-export const isCompletenessRefusalCode = (code: string): code is CompletenessRefusalCode =>
-  Object.prototype.hasOwnProperty.call(COMPLETENESS_REFUSALS, code);
-
-/** The server's fallback sentence ("ar / en"); the client renders the viewer's language by code. */
-export function completenessMessage(code: CompletenessRefusalCode): string {
-  const t = COMPLETENESS_REFUSALS[code];
-  return `${t.ar} / ${t.en}`;
-}
+// The refusals of the completeness and hide-switch routes live in their own
+// module (DECISIONS row 219): the customer pages render refusals by code, and
+// importing them from here bundled this whole list — the PRIVATE entries'
+// TXT keys and hints, which spell out the owner's pricing chain — into the
+// chunk every product, cart and checkout page preloads.
+export {
+  COMPLETENESS_REFUSALS,
+  completenessMessage,
+  isCompletenessRefusalCode,
+  type CompletenessRefusalCode,
+} from './completenessRefusals';

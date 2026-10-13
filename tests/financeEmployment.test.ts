@@ -114,7 +114,14 @@ test('owner recheck restores historical pending wages with confirmed checkout co
   // «أرباحي» carries no movements log (owner 2026-10-10): balances, sources and
   // withdrawals stay; the wage costs and the 4,200 payment above are untouched.
   for (const gone of ['movements', 'movement_count', 'history_review_count']) assert.equal(gone in earnings, false, gone);
-  assert.deepEqual(earnings.entries.map((e: { order_id: string }) => e.order_id).sort(), ['manual-source', 'pending-source'], 'both wage sources are still listed');
+  // A profit-percent wage reaches the employee folded per day and rule
+  // (DECISIONS row 219): one row per order was that order's profit times a
+  // known percentage, and with it the order's private cost. Both sources are
+  // still there (one is due, the other approved: two rows), with their
+  // amounts and without the order ids.
+  const wages = earnings.entries.filter((e: { kind: string }) => e.kind === 'staff') as Array<{ order_id: string | null; amount_iqd: number }>;
+  assert.deepEqual(wages.map((e) => e.amount_iqd).sort((a, b) => a - b), [3000, 4200], 'both wage sources are still listed');
+  assert.deepEqual(wages.map((e) => e.order_id), [null, null], 'no order id on a profit-share row');
   assert.ok(Array.isArray(earnings.withdrawals));
   assert.ok(earnings.employment && earnings.investment, 'the rest of the page is still served');
   const journalCount = count(raw, 'SELECT COUNT(*) n FROM accounting_entries');

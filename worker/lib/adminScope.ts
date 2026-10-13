@@ -619,6 +619,34 @@ export const FINANCIAL_FIELDS = [
   'fx_eur_usd_version_at_purchase',
   'fx_cny_usd_version_at_purchase',
   'actual_landed_total_iqd',
+  // -- The 2026-10-10 leak audit (owner rule «only the final price», DECISIONS row 219): private
+  // -- values the net did not know by name. The print calculator's machine-hour rate and setup fee
+  // -- (printServicePricing, and a merchant costing's `because.machine_iqd_per_hour`); a printer
+  // -- model's owner-only economics (the requireCostRead editor); the engine-era order-line and
+  // -- price-protection snapshots of 0181 (FINANCIAL_FIELDS had only the inventory_lots spelling
+  // -- `usd_iqd_rate_at_purchase`); and the purchase document's private totals, renamed where the
+  // -- column name was generic (`amount_iqd`, `paid_iqd`, `attachment_url` stay out — F18): the
+  // -- supplier payment amounts, the supplier-paid total and balance, a charge's amounts,
+  // -- the invoice link and total, an investor batch's cost and a lot's per-unit principal.
+  'machine_iqd_per_hour',
+  'setup_fee_iqd',
+  'purchase_iqd',
+  'residual_iqd',
+  'maintenance_iqd_per_hour',
+  'usd_iqd_at_purchase',
+  'base_usd_at_purchase',
+  'base_usd_observed',
+  'invoice_total_iqd',
+  'invoice_attachment_url',
+  'invoice_difference_iqd',
+  'supplier_payment_iqd',
+  'supplier_paid_iqd',
+  'supplier_balance_iqd',
+  'ordered_total_iqd',
+  'charge_amount_iqd',
+  'charge_unit_amount_iqd',
+  'batch_cost_iqd',
+  'unit_principal_iqd',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

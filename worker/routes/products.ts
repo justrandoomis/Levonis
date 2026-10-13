@@ -3079,9 +3079,11 @@ export { cover as compositionCover };
  * the net weight on its own spec sheet. A filament with no net weight, or no
  * price, is simply not offered rather than guessed at.
  *
- * The service rates are the owner's decision and start unset. The calculator
- * shows the material cost either way and says plainly that the rest is not
- * published yet, rather than quietly quoting material-only as a total.
+ * The service rates are the owner's decision and start unset — and they stay
+ * the owner's (owner rule 2026-10-10, DECISIONS row 219): the machine-hour
+ * rate, the setup fee and the margin are inputs of how a print is priced, not
+ * a final price, so this answer says only WHETHER they are configured. The
+ * filament figures stay: they are the shop's own published sale prices.
  */
 productRoutes.get('/print-calculator', async (c) => {
   const L = await listingOf(c.env.DB);
@@ -3122,10 +3124,9 @@ productRoutes.get('/print-calculator', async (c) => {
   return c.json({
     success: true,
     filaments,
-    // Honest nulls, echoed as they are stored. `configured` exists so a screen
-    // does not have to decide what "0" means.
+    // Whether the owner priced the service — never the rate, the fee or the
+    // margin themselves (DECISIONS row 219).
     rates: {
-      ...rates,
       configured: rates.machine_iqd_per_hour !== null,
     },
   });

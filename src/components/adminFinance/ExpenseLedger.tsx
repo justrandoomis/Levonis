@@ -1,18 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ApiError, isAborted, type ExpenseCategory, type ExpenseEntry } from '../../lib/api';
 import {
-  ApiError,
   createExpense,
   createExpenseCategory,
   fetchExpenseCategories,
   fetchExpenses,
-  isAborted,
   restoreExpense,
   updateExpenseCategory,
   voidExpense,
-  type ExpenseCategory,
-  type ExpenseEntry,
-} from '../../lib/api';
+} from '../../lib/financeApi';
 import { countText, money } from './format';
 import { baghdadDay } from './period';
 import { expenseProblem, MAX_REPEAT_MONTHS, type ExpenseDraft, type ExpenseProblem } from './expenseForm';

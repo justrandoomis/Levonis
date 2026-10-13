@@ -64,6 +64,31 @@ const FINANCIAL_KEYS: ReadonlySet<string> = new Set(FINANCIAL_FIELDS as readonly
 const snakeOf = (k: string) => k.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
 
 /**
+ * THE STEPS OF A PRICE, by the names the print engines answer them under —
+ * not in FINANCIAL_FIELDS (a merchant's own costing carries them by design),
+ * but never something a sweep may pass in a non-owner answer without a
+ * NOT_A_COST reason (DECISIONS row 219): the failure reserve, the markup, the
+ * break-even. A `lines[]` row of a cost engine (`{ component, iqd }`) is the
+ * same: one line of what a job cost.
+ */
+const PRICE_CHAIN_KEYS: ReadonlySet<string> = new Set(['failure_reserve_iqd', 'markup_percent', 'break_even_iqd']);
+
+/**
+ * Text keys that carry PRIVATE IDENTITY rather than a figure: a picture's
+ * `source_url` is the supplier listing the owner fetched it from (the public
+ * API v1 drops it; DECISIONS row 219). Flagged when non-empty inside a media
+ * or image list.
+ */
+const PRIVATE_MEDIA_TEXT_KEYS: ReadonlySet<string> = new Set(['source_url']);
+
+/**
+ * Every whole number written in a text: plain digits, or digits grouped by
+ * thousands (`611,111`). A comma that does not group three digits is a CSV
+ * separator, so `900000,,,611111` reads as two numbers, not one.
+ */
+const numbersInText = (v: string): string[] => v.match(/\d{1,3}(?:,\d{3})+(?!\d)|\d{4,}/g) ?? [];
+
+/**
  * Every place a cost reaches, at any depth:
  *   - a key naming cost that carries a number;
  *   - ANY key of FINANCIAL_FIELDS (snake or camel) that carries a value —
@@ -86,17 +111,31 @@ export function leaks(value: unknown, extra: LeakExtra = {}): string[] {
   const walk = (v: unknown, path: string) => {
     if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`));
     else if (v && typeof v === 'object') {
-      for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      const o = v as Record<string, unknown>;
+      // One line of a cost engine: what this part of the job cost.
+      if (typeof o.component === 'string' && /^[A-Z][A-Z_]+$/.test(o.component) && typeof o.iqd === 'number') {
+        out.push(`${path}.iqd = ${o.iqd} (a cost line: ${o.component})`);
+      }
+      for (const [k, x] of Object.entries(o)) {
         if (/cost/i.test(k) && typeof x === 'number') out.push(`${path}.${k} = ${x}`);
         else if ((FINANCIAL_KEYS.has(k) || FINANCIAL_KEYS.has(snakeOf(k))) && x !== null && x !== undefined) {
           out.push(`${path}.${k} ∈ FINANCIAL_FIELDS = ${JSON.stringify(x)?.slice(0, 60)}`);
+        } else if (PRICE_CHAIN_KEYS.has(k) && x !== null && x !== undefined) {
+          out.push(`${path}.${k} = ${JSON.stringify(x)?.slice(0, 60)} (a step of the price)`);
+        } else if (
+          PRIVATE_MEDIA_TEXT_KEYS.has(k) &&
+          typeof x === 'string' &&
+          x.trim() !== '' &&
+          /\.(media|images|gallery)\[\d+\]$/.test(path)
+        ) {
+          out.push(`${path}.${k} = ${x.slice(0, 80)} (a supplier source)`);
         }
         walk(x, `${path}.${k}`);
       }
     } else if (typeof v === 'number' && numbers.has(v)) out.push(`${path} = ${v}`);
     else if (typeof v === 'string' && !isGeneratedId(v)) {
-      for (const n of v.match(/\d[\d,]{3,}/g) ?? []) {
-        if (SENTINELS.has(Number(n.replace(/,/g, '')))) out.push(`${path} ⊃ "${n}"`);
+      for (const n of numbersInText(v)) {
+        if (numbers.has(Number(n.replace(/,/g, '')))) out.push(`${path} ⊃ "${n}"`);
       }
       for (const d of v.match(/\d+\.\d+/g) ?? []) {
         if (decimals.has(d)) out.push(`${path} ⊃ "${d}"`);

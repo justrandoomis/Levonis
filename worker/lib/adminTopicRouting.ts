@@ -269,8 +269,6 @@ export interface OrderAnnouncementInput {
   bnplIqd?: unknown;
   bnplDueAt?: unknown;
   dueOnDeliveryIqd?: unknown;
-  /** Community-store sales only: what the merchant is owed from this order. */
-  merchantReceivableIqd?: unknown;
   lines?: OrderAnnouncementLine[];
 }
 
@@ -415,9 +413,11 @@ export function orderAnnouncement(input: OrderAnnouncementInput = {}): string {
   } else if (input.dueOnDeliveryIqd !== undefined && input.dueOnDeliveryIqd !== null) {
     out.push(`المستحق عند التسليم: ${iqd(input.dueOnDeliveryIqd)}`);
   }
-  if (input.merchantReceivableIqd !== undefined && input.merchantReceivableIqd !== null) {
-    out.push(`يستلم التاجر: ${iqd(input.merchantReceivableIqd)}`);
-  }
+  // NOT what the merchant receives (DECISIONS row 219): beside the total it is
+  // the platform's commission on the sale, a figure the HTTP side keeps from
+  // every admin without money scope — and the group is read by assistants and
+  // by whoever else the owner adds to it. The total is the customer's price;
+  // the split is the owner's, on the community finance screen.
 
   return out.join('\n');
 }

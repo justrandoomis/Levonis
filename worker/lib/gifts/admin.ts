@@ -7,6 +7,7 @@
 import { badRequest, int, str } from '../http';
 import { likePattern, sqlLikeClause } from '../sqlLike';
 import { safeParse } from '../types';
+import { stripFinancials } from '../adminScope';
 import { chosenItemView, giftStatusOf, GIFT_ROW_SELECT, levelViewFrom, loadLevels, type GiftItemView, type GiftMode, type GiftReason, type GiftStatus, type LevelView } from './model';
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v));
@@ -207,8 +208,12 @@ export async function loadAdminGift(db: D1Database, id: string): Promise<AdminGi
   return row ? adminGiftView(row, levels) : null;
 }
 
-/** One gift's audit timeline: every gift.* row about it, oldest first, with the actor's name. */
-export async function giftAuditTimeline(db: D1Database, id: string) {
+/**
+ * One gift's audit timeline: every gift.* row about it, oldest first, with the
+ * actor's name. `cost` is `canViewCost` of the reader: every other admin reads
+ * each detail with FINANCIAL_FIELDS stripped at every depth (DECISIONS row 219).
+ */
+export async function giftAuditTimeline(db: D1Database, id: string, cost: boolean) {
   const { results } = await db
     .prepare(
       `SELECT a.id, a.actor_id, a.action, a.detail, a.created_at, u.name AS actor_name, u.email AS actor_email
@@ -222,7 +227,7 @@ export async function giftAuditTimeline(db: D1Database, id: string) {
     id: Number(r.id),
     action: text(r.action),
     actor: r.actor_id ? { id: text(r.actor_id), name: text(r.actor_name), email: text(r.actor_email) } : null,
-    detail: safeParse<Record<string, unknown>>(text(r.detail) || '{}', {}),
+    detail: ((d) => (cost ? d : stripFinancials(d)))(safeParse<Record<string, unknown>>(text(r.detail) || '{}', {})),
     at: text(r.created_at),
   }));
 }

@@ -41,7 +41,6 @@ import {
   OPTIONAL_PHOTO,
   REQUIRED_PHOTOS,
   blankInputs,
-  checklistOf,
   familyCountsHours,
   missingPhotoAngles,
   warrantyTimeLeft,
@@ -54,13 +53,14 @@ import {
   type PhotoView,
   type RequestView,
   type TargetOption,
+  type EstimateView,
+  type LiveEstimate,
   type TargetView,
-  type TradeInRuleSet,
   type TradeInScope,
   contextOf,
   dateText,
   durationText,
-  liveEstimate,
+  liveFromEstimate,
 } from './model';
 import { Breakdown, Card, Checklist, ChoicePills, FactRow, ScalePicker, SectionTitle, SettlementRows, Stepper, TextArea } from './controls';
 
@@ -142,7 +142,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
   const loadUnits = useCallback(async () => {
     setLoadError('');
     try {
-      const data = await api.get<{ units: EligibleUnit[]; rules: Record<string, TradeInRuleSet> }>('/api/trade-in/eligible');
+      const data = await api.get<{ units: EligibleUnit[] }>('/api/trade-in/eligible');
       setUnits(data.units);
 
       if (initialUnitKey) {
@@ -177,8 +177,29 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
   }, [unit, resume]);
   const index = steps.indexOf(step);
 
-  const productId = req?.source_product_id ?? unit?.product_id ?? '';
-  const live = useMemo(() => (req ? liveEstimate({ ...req, target: quote ?? req.target }, inputs, productId) : null), [req, inputs, quote, productId]);
+  // THE LIVE FIGURE, PRICED BY THE WORKER (DECISIONS row 219): the answers so
+  // far (and the product being looked at) go to the preview door, which
+  // answers the final figures only — the valuation rules never reach the
+  // phone. Until the first answer the request's own estimate stands.
+  const [live, setLive] = useState<LiveEstimate | null>(null);
+  useEffect(() => {
+    if (!req || req.status !== 'draft') {
+      setLive(liveFromEstimate(req?.estimate));
+      return;
+    }
+    let alive = true;
+    const target = quote ? { product_id: quote.product_id, option_value_ids: quote.option_value_ids, color_id: quote.color_id } : undefined;
+    const timer = setTimeout(() => {
+      api
+        .post<{ estimate: EstimateView }>(`/api/trade-in/requests/${req.id}/preview`, { components: inputs, ...(target ? { target } : {}) })
+        .then((d) => alive && setLive(liveFromEstimate(d.estimate)))
+        .catch(() => alive && setLive(null));
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [req, inputs, quote]);
 
   // ---------------------------------------------------------- transitions
   const go = (s: Step) => {
@@ -463,15 +484,16 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
             <Note tone="gold" animate={false} icon={<AlertTriangle className="w-4 h-4" />}>
               <p className="font-bold text-text-primary">{L('تقدير أولي — القيمة النهائية بعد الفحص', 'Preliminary estimate — the final value follows the inspection')}</p>
               <p className="text-text-secondary text-[12.5px] mt-0.5">
-                {L(
-                  'نحسب هذا الرقم بقواعد التقييم المعلنة. بعد الإرسال يفحص فريق LEVONIS الجهاز، وإن تغيّرت القيمة نرسلها لك لتقبلها أو ترفضها.',
-                  'We compute this with the published valuation rules. After you send it, the LEVONIS team inspects the device; if the value changes we send it to you to accept or decline.'
+                {loc(
+                  'تحسب LEVONIS هذا الرقم من إجاباتك. بعد الإرسال يفحص فريق LEVONIS الجهاز، وإن تغيّرت القيمة نرسلها لك لتقبلها أو ترفضها.',
+                  'LEVONIS works this figure out from your answers. After you send it, the LEVONIS team inspects the device; if the value changes we send it to you to accept or decline.',
+                  'LEVONIS ئەم ژمارەیە لە وەڵامەکانت دەردەهێنێت. دوای ناردن تیمی LEVONIS ئامێرەکە دەپشکنێت، و ئەگەر نرخەکە گۆڕا بۆتی دەنێرین تا قبووڵی بکەیت یان ڕەتی بکەیتەوە.'
                 )}
               </p>
             </Note>
             {req.estimate?.components.map((c) => (
               <Card key={c.role}>
-                <Breakdown valuation={c.valuation} title={loc(c.label_ar, c.label_en)} />
+                <Breakdown valuation={c} title={loc(c.label_ar, c.label_en)} />
               </Card>
             ))}
             {req.estimate?.settlement ? (
@@ -548,7 +570,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
               const c = req?.components.find((x) => x.role === p.role);
               return (
                 <div key={p.role} className="mb-3 last:mb-0">
-                  <Breakdown valuation={p.valuation} title={c ? (loc(c.label_ar, c.label_en)) : undefined} />
+                  <Breakdown valuation={p} title={c ? (loc(c.label_ar, c.label_en)) : undefined} />
                 </div>
               );
             })}
@@ -791,16 +813,16 @@ function ConditionStep({
   const { loc } = useLanguage();
   const L = (ar: string, en: string) => loc(ar, en);
   const comp = req.components.find((c) => c.role === role) ?? req.components[0];
-  const rules = comp ? req.rules[comp.family] : undefined;
+  const questions = comp ? req.questions[comp.family] : undefined;
   const value = comp ? inputs[comp.role] : undefined;
-  if (!comp || !rules || !value) return null;
+  if (!comp || !questions || !value) return null;
   const set = (patch: Partial<ComponentInputs>) => setInputs((cur) => ({ ...cur, [comp.role]: { ...(cur[comp.role] as ComponentInputs), ...patch } }));
   const toggle = (key: 'faults' | 'replaced_parts', id: string) =>
     set({ [key]: value[key].includes(id) ? value[key].filter((x) => x !== id) : [...value[key], id] } as Partial<ComponentInputs>);
   const scales = SCALES(L);
-  const faults = checklistOf(rules, 'faults').map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en) }));
-  const parts = checklistOf(rules, 'replaced_parts').map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en) }));
-  const enabled = (id: string) => rules.factors.some((f) => f.factor === id && f.enabled);
+  const faults = questions.faults.map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en) }));
+  const parts = questions.replaced_parts.map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en) }));
+  const enabled = (id: string) => questions.asked.includes(id);
   return (
     <div className="space-y-4" data-condition={comp.role}>
       <RoleTabs req={req} role={comp.role} onRole={onRole} />

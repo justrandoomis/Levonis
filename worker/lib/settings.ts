@@ -571,11 +571,9 @@ export const SETTING_DEFAULTS = {
    * is built from — labour, machine hours, energy, waste, supports, purge,
    * failure risk, complexity, the margin floor and the minimum job.
    *
-   * NOT PUBLIC. `printServicePricing` is in PUBLIC_SETTING_KEYS, but its
-   * contents go through publicPrintServiceRates before reaching a visitor.
-   * Keep private cost inputs here instead of mixing them into the public
-   * tariff: a competitor must not download the owner's cost structure by
-   * opening the site.
+   * NOT PUBLIC — and neither, since DECISIONS row 219, is `printServicePricing`
+   * above: a competitor should not be able to download the owner's cost
+   * structure by opening the site.
    */
   printPricingConfig: DEFAULT_PRICING as PrintPricingConfig,
 
@@ -724,9 +722,10 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // Which section each square of «تسوق حسب الفئة» opens — the storefront
   // draws the bento from it on the first screen.
   'homeBento',
-  // Only the billed service rates are published by projectPublicSettings;
-  // the margin stored beside them remains private.
-  'printServicePricing',
+  // NOT `printServicePricing` (owner rule 2026-10-10, DECISIONS row 219): its
+  // margin, machine-hour rate and setup fee are inputs of the print price, the
+  // owner's alone (COST_SETTING_KEYS in worker/routes/admin.ts), and no screen
+  // ever read them off the public settings.
   // The printer note is customer-facing copy: the product page and the cart
   // read it before any quote exists.
   'printerHomeDeliveryNoteIqd',
@@ -748,7 +747,12 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // printerGiftConfig are intentionally NOT public — internal policy data.
 ];
 
-/** Public service prices; the configured profit margin is never a price. */
+/**
+ * The owner's print-service rates, read as numbers (a historical numeric
+ * string counts; anything else is "not set"). The calculator asks it only
+ * whether the service is priced: the rates themselves, like the margin, are
+ * inputs of the print price and are never published (DECISIONS row 219).
+ */
 export function publicPrintServiceRates(value: unknown) {
   const rates = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : {};
@@ -762,13 +766,14 @@ export function publicPrintServiceRates(value: unknown) {
   };
 }
 
-/** A public setting may contain private siblings; project its contents too. */
+/**
+ * The last fence before a public settings payload leaves: `printServicePricing`
+ * is not a public key (DECISIONS row 219), and if a later list ever carries
+ * it again, its rates and margin still never reach a visitor.
+ */
 export function projectPublicSettings(settings: Record<string, unknown>): Record<string, unknown> {
-  return {
-    ...settings,
-    ...(Object.hasOwn(settings, 'printServicePricing')
-      ? { printServicePricing: publicPrintServiceRates(settings.printServicePricing) } : {}),
-  };
+  const { printServicePricing: _private, ...published } = settings;
+  return published;
 }
 
 /** The serial preparation gate as stored: a switch and its cutover. */

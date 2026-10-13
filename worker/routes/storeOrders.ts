@@ -1204,7 +1204,6 @@ storeOrderRoutes.post('/', async (c) => {
       // above), so the message says so with a zero rather than omitting the
       // line — an absent figure reads as "unknown", which is worse here.
       dueOnDeliveryIqd: 0,
-      merchantReceivableIqd: cart.commission.merchant_receivable_iqd,
       // `PricedLine.variant` is the option and colour by the MERCHANT'S names
       // (`merchantVariant`), never the ids this path stores — an id in a group
       // message is noise, and a missing name prints no variant at all. No

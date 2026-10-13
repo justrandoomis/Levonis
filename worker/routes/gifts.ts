@@ -72,6 +72,7 @@ import {
 } from '../lib/gifts/levels';
 import { GIFT_COPY, notifyGiftGranted, planGrant } from '../lib/gifts/grant';
 import { giftAuditTimeline, listGrants, loadAdminGift, parseGrantFilters } from '../lib/gifts/admin';
+import { canViewCost } from '../lib/adminScope';
 import {
   LEGACY_POOL_FILTER,
   legacyEntitlementView,
@@ -491,14 +492,14 @@ giftRoutes.get('/admin/grants/:id', async (c) => {
   const id = c.req.param('id') ?? '';
   const grant = await loadAdminGift(c.env.DB, id);
   if (!grant) throw notFound('Gift not found');
-  return c.json({ success: true, grant, audit: await giftAuditTimeline(c.env.DB, id) });
+  return c.json({ success: true, grant, audit: await giftAuditTimeline(c.env.DB, id, canViewCost(c.env, c.get('user'))) });
 });
 
 giftRoutes.get('/admin/grants/:id/audit', async (c) => {
   const id = c.req.param('id') ?? '';
   const exists = await c.env.DB.prepare('SELECT 1 AS x FROM gift_entitlements WHERE id = ?').bind(id).first();
   if (!exists) throw notFound('Gift not found');
-  return c.json({ success: true, audit: await giftAuditTimeline(c.env.DB, id) });
+  return c.json({ success: true, audit: await giftAuditTimeline(c.env.DB, id, canViewCost(c.env, c.get('user'))) });
 });
 
 function grantReason(v: unknown): GrantReason {

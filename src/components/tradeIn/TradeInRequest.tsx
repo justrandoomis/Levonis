@@ -322,7 +322,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             {showBreakdown ? (
               <div className="mt-2 space-y-4">
                 {req.estimate.components.map((c) => (
-                  <Breakdown key={c.role} valuation={c.valuation} title={loc(c.label_ar, c.label_en)} />
+                  <Breakdown key={c.role} valuation={c} title={loc(c.label_ar, c.label_en)} />
                 ))}
               </div>
             ) : null}

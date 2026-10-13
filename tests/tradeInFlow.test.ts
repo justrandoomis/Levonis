@@ -31,7 +31,8 @@ import { telegramRoutes } from '../worker/routes/telegram';
 import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
 import { tradeInCallbackData, parseTradeInCallbackData } from '../worker/lib/tradeIn';
-import { DEFAULT_RULE_SETS, REQUIRED_PHOTOS, blankInputs, valuateComponent, wholeMonthsBetween } from '../packages/pricing/src/tradeIn';
+import { REQUIRED_PHOTOS, blankInputs, valuateComponent, wholeMonthsBetween } from '../packages/pricing/src/tradeIn';
+import { DEFAULT_RULE_SETS } from '../packages/pricing/src/tradeInDefaults';
 import { acceptedPolicies } from './lib/policies';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 

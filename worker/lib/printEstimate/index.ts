@@ -7,19 +7,18 @@
  * (the calculator's engine). Both return the same shape, and neither copies a
  * cost line, a floor or a margin into it — the shape has nowhere to put one.
  *
- * The quantity curve is the caller's re-run (see `quantityCurve`), because
- * only the route knows how it built the engine's input. `engineBUnitPriceAt`
- * is the pure re-run for engine B, kept here because it knows one thing a
- * route should not have to: the hardware handed to `priceJob` is already
- * multiplied by the copy count and must be re-scaled per quantity.
+ * NO QUANTITY CURVE (owner rule 2026-10-10, DECISIONS row 219). The
+ * contract used to carry the per-piece price at 1, 2, 5 and 10 copies — pure
+ * re-runs of the engine. Total(q) is linear in q, so two points gave the job's
+ * fixed (setup) and per-copy cost split, and with the margin the costs
+ * themselves; no screen ever drew it. The estimate is now the price of the job
+ * the customer asked for and nothing else.
  */
 import { PRINT_PRICING_VERSION, type Quote as EngineAQuote } from '../printPricing';
-import { priceJob, type PricingInputs } from '../printQuote/cost';
 import { materialTotalGrams, type PrintAnalysis, type QuoteResult } from '../printQuote/model';
 import {
   type Estimate,
   type EstimateConfidence,
-  type EstimateCurvePoint,
   type EstimateExcludeKey,
   type EstimateReasonCode,
   ESTIMATE_REASON_CODES,
@@ -28,7 +27,6 @@ import {
 import { coversFrom, engineAAmounts, engineBAmounts, excludesFrom, factorsFrom } from './explain';
 
 export * from './contract';
-export { quantityCurve } from './explain';
 
 const REASONS = new Set<string>(ESTIMATE_REASON_CODES);
 /** A code the contract does not list is dropped, not forwarded: the client
@@ -44,8 +42,6 @@ const BASE_EXCLUDES: EstimateExcludeKey[] = ['delivery'];
 export interface FromEngineAOptions {
   /** The count the customer asked for — `Quote` does not carry it. */
   quantity: number;
-  /** From `quantityCurve(quantity, (qty) => re-run.unit_price_iqd)`. */
-  curve: EstimateCurvePoint[];
   excludes?: EstimateExcludeKey[];
 }
 
@@ -69,7 +65,6 @@ export function fromEngineA(q: EngineAQuote & { range_basis?: 'materials' }, opt
     factors: factorsFrom(amounts),
     covers: coversFrom(amounts),
     excludes: excludesFrom([...BASE_EXCLUDES, ...(opts.excludes ?? [])]),
-    quantity_curve: opts.curve,
     material_id: q.material_id,
     process: q.process,
     time_minutes: q.total_time_minutes,
@@ -86,7 +81,6 @@ export interface FromEngineBOptions {
   analysis: PrintAnalysis;
   process: Estimate['process'];
   quantity: number;
-  curve: EstimateCurvePoint[];
   excludes?: EstimateExcludeKey[];
 }
 
@@ -127,26 +121,10 @@ export function fromEngineB(r: QuoteResult, opts: FromEngineBOptions): Estimate 
     factors: factorsFrom(amounts),
     covers: coversFrom(amounts),
     excludes: excludesFrom([...BASE_EXCLUDES, ...(opts.excludes ?? [])]),
-    quantity_curve: opts.curve,
     material_id: materialId,
     process: opts.process,
     time_minutes: Math.round(r.machineHours * 60),
     material_grams: Math.round(grams * 10) / 10,
     engine,
   };
-}
-
-/**
- * Engine B's pure re-run at another quantity, for the curve. `priceJob`
- * multiplies every per-job figure by `quantity`, so the only input that must
- * be rebuilt is the hardware, which the route pre-multiplied by the ORIGINAL
- * count (see `PriceForPrinterInput.accessories`). Null when the re-run could
- * not price — the curve leaves that point out.
- */
-export function engineBUnitPriceAt(pricing: PricingInputs, qty: number): number | null {
-  const original = Math.max(1, Math.floor(pricing.quantity ?? 1));
-  const hardware = pricing.hardware ? { ...pricing.hardware, iqd: (pricing.hardware.iqd / original) * qty } : undefined;
-  const r = priceJob({ ...pricing, quantity: qty, hardware });
-  if (r.confidence === 'insufficient' || !(r.recommendedPriceIqd > 0)) return null;
-  return r.recommendedPriceIqd / qty;
 }

@@ -21,6 +21,8 @@ export interface ParticipantSource {
   id: string; kind: EarningKind; title: string; order_id: string | null; day: string;
   amount_iqd: number; accrued_iqd: number; paid_iqd: number; held_iqd: number; available_iqd: number;
   state: string; eligible: boolean; version: number; staff_id?: string; blocked?: number; pending_cost?:number; pending_payment_cover_iqd?:number;
+  /** The wage rule's basis; 'profit_percent' rows are folded per day before they reach the participant. */
+  basis?: string | null;
 }
 export interface WithdrawalRow {
   id: string; user_id: string; amount_iqd: number; paid_iqd: number;
@@ -71,7 +73,8 @@ export async function participantSources(db: D1Database, userId: string, scope: 
     COALESCE(${effectiveStaffCostSql()},0) AS amount_iqd,COALESCE(${effectiveStaffCostSql()},0) AS accrued_iqd,
     ${pendingPaymentCoverSql()} AS pending_payment_cover_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'", 'c.id')} AS held_iqd,c.state,c.staff_id,EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL) AS pending_cost,${staffReconciliationBlockedSql('c.order_id','c.id',!!installed)} AS blocked,
     CASE WHEN c.state IN ('due','approved') THEN 1 ELSE 0 END AS eligible,
-    (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version
+    (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version,
+    CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.rule.basis') END AS basis
     FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND c.state<>'reversed'
     ORDER BY c.cost_day,c.id`).bind(userId).all<ParticipantSource>();
   let sources = staff.results ?? [];
@@ -138,7 +141,14 @@ export function participantSummary(entries: ParticipantSource[],advanceBalance=0
     staff_iqd:sum(s=>s.kind==='staff'?s.accrued_iqd:0),investor_profit_iqd:sum(s=>s.kind==='investor_profit'?s.accrued_iqd:0),capital_iqd:sum(s=>s.kind==='investor_capital'?s.accrued_iqd:0),
   };
 }
-export async function participantOverview(db: D1Database, userId: string) {
+/**
+ * `foldProfitShare` (default true — what a participant reads of their own
+ * account): profit-percent wage rows are folded per day and rule
+ * (`participantEntries`). The owner's own screens (`/api/admin/finance-people`,
+ * requireCostRead) pass false and keep every row.
+ */
+export async function participantOverview(db: D1Database, userId: string, opts: { foldProfitShare?: boolean } = {}) {
+  const fold = opts.foldProfitShare !== false;
   const advance=await participantAdvanceState(db,userId);
   const entries = await participantSources(db, userId);
   const withdrawals = await db.prepare('SELECT * FROM finance_withdrawals WHERE user_id=? ORDER BY created_at DESC LIMIT 200').bind(userId).all<WithdrawalRow>();
@@ -159,7 +169,38 @@ export async function participantOverview(db: D1Database, userId: string) {
   const investment=await investorAccountProgress(db,userId,entries,participantWithdrawableSources(entries,advance.balance));
   // No movements log («سجل الحركات»): the owner removed it from «أرباحي» on
   // 2026-10-10. Balances come from the same sources; no ledger row changed.
-  return { summary, employment, investment, entries: entries.map(({ eligible: _e, version: _v, staff_id: _s, blocked, ...e }) => ({...e,state:blocked?'pending_reconciliation':e.state})), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
+  return { summary, employment, investment, entries: participantEntries(entries, fold), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
+}
+/**
+ * What the participant reads of their own sources (DECISIONS row 219). A
+ * profit-percent wage is a constant share of one order's PROFIT: one row per
+ * order, tied to its order id, lets the employee divide by their own
+ * percentage and subtract from the public price to reach that order's private
+ * cost. Those rows are folded into one line per day and rule, with no order
+ * id; every other wage (per unit, per order, share of revenue) is a figure
+ * the employee may already compute from public prices and keeps its row.
+ */
+export function participantEntries(entries: ParticipantSource[], fold = true) {
+  type Out = Omit<ParticipantSource, 'eligible' | 'version' | 'staff_id' | 'blocked' | 'basis'>;
+  const out: Out[] = [];
+  const folded = new Map<string, Out>();
+  for (const { eligible: _e, version: _v, staff_id: _s, blocked, basis, ...e } of entries) {
+    const row: Out = { ...e, state: blocked ? 'pending_reconciliation' : e.state };
+    if (!fold || e.kind !== 'staff' || basis !== 'profit_percent') { out.push(row); continue; }
+    const key = `${e.day}\u0000${e.title}\u0000${row.state}`;
+    const into = folded.get(key);
+    if (!into) {
+      const first: Out = { ...row, id: `profit_share:${e.day}:${folded.size}`, order_id: null };
+      folded.set(key, first);
+      out.push(first);
+      continue;
+    }
+    into.amount_iqd += e.amount_iqd; into.accrued_iqd += e.accrued_iqd; into.paid_iqd += e.paid_iqd;
+    into.held_iqd += e.held_iqd; into.available_iqd += e.available_iqd;
+    if (e.pending_payment_cover_iqd !== undefined) into.pending_payment_cover_iqd = (into.pending_payment_cover_iqd ?? 0) + e.pending_payment_cover_iqd;
+    if (e.pending_cost) into.pending_cost = 1;
+  }
+  return out;
 }
 /** Allocate the shared ledger budget once, in the same order used by a withdrawal.
  * A contract with earnings cannot hide another contract's already-paid correction. */

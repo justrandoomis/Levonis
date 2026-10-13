@@ -42,7 +42,7 @@
  */
 
 import type { Env } from './types';
-import { notifyStatement, type NotificationInput, type NotificationKind } from './notifications';
+import { HIDE_OWNER_FINANCE_NOTICES_SQL, notifyStatement, type NotificationInput, type NotificationKind } from './notifications';
 import { planNotifyCustomer, reachFor, type CustomerChannel, type CustomerMessage } from './customerNotify';
 import { merchantHref } from '@levonis/contracts/merchantRoutes';
 import { merchantBuckets, orderCredit, payoutFacts } from './merchantLedger';
@@ -852,7 +852,11 @@ export async function listMerchantNotifications(
   const bar = raw.lastIndexOf('|');
   const at = bar === -1 ? raw : raw.slice(0, bar);
   const cid = bar === -1 ? '' : raw.slice(bar + 1);
-  const clauses = [`user_id = ?1`, `kind IN (${MERCHANT_KINDS_SQL})`];
+  // The admin finance notice (a withdrawal waiting in /admin?tab=finance) is
+  // the platform's, owner-only (owner decision 2), and never a store's: the
+  // merchant centre leaves it out for everyone, an admin who also owns a store
+  // included — the owner reads it in the main bell (DECISIONS row 219).
+  const clauses = [`user_id = ?1`, `kind IN (${MERCHANT_KINDS_SQL})`, HIDE_OWNER_FINANCE_NOTICES_SQL];
   if (opts.unreadOnly) clauses.push('read_at IS NULL');
   if (opts.kind) clauses.push('kind = ?4');
   if (at) clauses.push('(created_at < ?2 OR (created_at = ?2 AND id < ?3))');
@@ -879,7 +883,7 @@ export async function merchantUnreadCounts(db: D1Database, userId: string): Prom
   const { results } = await db
     .prepare(
       `SELECT kind, COUNT(*) AS n FROM user_notifications
-        WHERE user_id = ? AND read_at IS NULL AND kind IN (${MERCHANT_KINDS_SQL})
+        WHERE user_id = ? AND read_at IS NULL AND kind IN (${MERCHANT_KINDS_SQL}) AND ${HIDE_OWNER_FINANCE_NOTICES_SQL}
         GROUP BY kind`
     )
     .bind(userId)
@@ -903,14 +907,14 @@ export async function markMerchantRead(db: D1Database, userId: string, id?: stri
     ? await db
         .prepare(
           `UPDATE user_notifications SET read_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-            WHERE user_id = ? AND id = ? AND read_at IS NULL AND kind IN (${MERCHANT_KINDS_SQL})`
+            WHERE user_id = ? AND id = ? AND read_at IS NULL AND kind IN (${MERCHANT_KINDS_SQL}) AND ${HIDE_OWNER_FINANCE_NOTICES_SQL}`
         )
         .bind(userId, id)
         .run()
     : await db
         .prepare(
           `UPDATE user_notifications SET read_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-            WHERE user_id = ? AND read_at IS NULL AND kind IN (${MERCHANT_KINDS_SQL})`
+            WHERE user_id = ? AND read_at IS NULL AND kind IN (${MERCHANT_KINDS_SQL}) AND ${HIDE_OWNER_FINANCE_NOTICES_SQL}`
         )
         .bind(userId)
         .run();

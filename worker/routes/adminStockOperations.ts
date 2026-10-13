@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { assertReturnUnitEvidenceReplay, listReturnUnitOrigins, planReturnUnitEvidence } from '../lib/returnOriginEvidence';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str } from '../lib/http';
-import { projectForAdmin, canWriteCost } from '../lib/adminScope';
+import { projectForAdmin, canViewCost, canWriteCost } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
@@ -346,7 +346,11 @@ adminStockOperationsRoutes.post('/counts/:id/post', async (c) => {
   );
   await db.batch(statements);
   await audit(db, user.id, 'stock.count_posted', id, { unknown_cost_lines: unknown });
-  return c.json({ success: true, unknown_cost_lines: unknown });
+  // How many consumed lots carry no recorded cost is a fact about the owner's
+  // costs (DECISIONS row 219): the owner's screen reads it to route the lines
+  // to financial review; every other counter hears the same answer whatever
+  // the lots cost.
+  return c.json(canViewCost(c.env, user) ? { success: true, unknown_cost_lines: unknown } : { success: true });
 });
 adminStockOperationsRoutes.post('/counts/:id/cancel', async (c) => {
   const user = c.get('user')!;
@@ -724,7 +728,7 @@ adminStockOperationsRoutes.post('/lot-counts',async c=>{
     FROM inventory_lots l WHERE id=?`).bind(lotId).first<{product_id:string;scope:StockScope;scope_id:string;qty_remaining:number;incoming_id:string|null;effective:number|null;max_remaining:number;cost_version:number}>();if(!lot)throw notFound('Lot not found');
   if(counted>lot.max_remaining)throw badRequest('الكمية تتجاوز الوحدات المستلمة غير المباعة لهذه الدفعة؛ سجّل شراء أو أصل مستقل للوحدات الجديدة','LOT_COUNT_ORIGIN_LIMIT');
   const s=await requireSelection(db,lot.product_id,lot.scope,lot.scope_id);if(s.stock===null)throw badRequest('المخزون غير متتبع');if(s.reserved>0)throw conflict('أكمل تجهيز الوحدات المحجوزة قبل جرد الدفعة','RESERVED_STOCK');
-  const delta=counted-lot.qty_remaining,target=counterTarget(lot.scope)!,rowId=lot.scope==='base'?lot.product_id:lot.scope_id;
+  const delta=counted-lot.qty_remaining,target=counterTarget(lot.scope)!,rowId=lot.scope==='base'?lot.product_id:lot.scope_id,capped:string[]=[];
   const statements=[...fence(db,`EXISTS(SELECT 1 FROM inventory_lots WHERE id=? AND qty_remaining=?) AND EXISTS(SELECT 1 FROM ${target.table} WHERE id=? AND stock=? AND ${lot.scope==='base'?'stock_reserved':'reserved'}=0) AND COALESCE((SELECT MAX(version) FROM inventory_lot_cost_versions WHERE lot_id=?),0)=?`,[lotId,lot.qty_remaining,rowId,s.stock,lotId,lot.cost_version]),db.prepare('INSERT INTO lot_count_events(id,lot_id,expected_qty,counted_qty,delta,actor_id,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,lotId,lot.qty_remaining,counted,delta,user.id,new Date().toISOString())];
   const contracts=lot.incoming_id?(await db.prepare("SELECT * FROM investment_contracts WHERE incoming_id=? AND state='active'").bind(lot.incoming_id).all<InvestmentContract>()).results??[]:[];
   if(delta){
@@ -732,8 +736,20 @@ adminStockOperationsRoutes.post('/lot-counts',async c=>{
     statements.push(db.prepare('INSERT INTO inventory_ledger(id,product_id,scope,scope_id,kind,qty,idempotency_key,actor_user_id,reason) VALUES (?,?,?,?,?,?,?,?,?)').bind(newId('ilg'),lot.product_id,lot.scope,lot.scope_id,delta>0?'adjust_in':'adjust_out',Math.abs(delta),`lot-count:${id}`,user.id,'count'),db.prepare(`UPDATE ${target.table} SET stock=stock+? WHERE id=?`).bind(delta,rowId),db.prepare('UPDATE inventory_lots SET qty_remaining=? WHERE id=?').bind(counted,lotId));
     if(lot.effective!==null&&lot.effective>0){const value=Math.abs(delta)*lot.effective;
       statements.push(...journalPlan(db,{key:`lot-count:${id}`,day:baghdadDay(),title:'فرق جرد دفعة محددة',source:'lot-count',sourceId:id,actor:user.id},delta<0?[{account:'5300',debit:value},{account:'1200',credit:value}]:[{account:'1200',debit:value},{account:'5300',credit:value}]).statements);
-      for(const contract of contracts){const amount=Math.trunc(-delta*lot.effective*contract.loss_share_bps/10000);if(!amount)continue;
-        if(amount<0){const known=(await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND lot_id=? AND allocation_id IS NULL AND kind IN ('loss','loss_correction')").bind(contract.id,lotId).first<{n:number}>())?.n??0;if(-amount>known)throw badRequest('لا توجد خسارة موثقة تكفي لتصحيح رأس مال المستثمر');}
+      for(const contract of contracts){let amount=Math.trunc(-delta*lot.effective*contract.loss_share_bps/10000);if(!amount)continue;
+        if(amount<0){const known=(await db.prepare("SELECT COALESCE(SUM(amount_iqd),0) AS n FROM investor_finance_events WHERE contract_id=? AND lot_id=? AND allocation_id IS NULL AND kind IN ('loss','loss_correction')").bind(contract.id,lotId).first<{n:number}>())?.n??0;if(-amount>known){
+          // THE OWNER hears the refusal: they see the contract and the cost.
+          // ANY OTHER COUNTER does not (DECISIONS row 219): a refusal that came
+          // only for an investor-funded lot with a loss share and a cost above
+          // zero told an assistant all three. Their count stands; the investor
+          // correction is limited to the loss actually recorded (nothing to
+          // undo past that), and the owner's audit log says so — by ids, never
+          // by amount.
+          if(canViewCost(c.env,user))throw badRequest('لا توجد خسارة موثقة تكفي لتصحيح رأس مال المستثمر');
+          capped.push(contract.id);
+          amount=-Math.max(0,known);
+          if(!amount)continue;
+        }}
         statements.push(db.prepare('INSERT INTO investor_finance_events(id,event_key,contract_id,kind,amount_iqd,event_day,lot_id,actor_id,snapshot,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').bind(newId('ive'),`lot-count:${id}:${contract.id}`,contract.id,amount>0?'loss':'loss_correction',amount,baghdadDay(),lotId,user.id,JSON.stringify({expected:lot.qty_remaining,counted,unit_cost_iqd:lot.effective}),new Date().toISOString()));
         const loss=await planInvestorCapitalLoss(db,contract,amount,baghdadDay(),user.id);statements.unshift(...loss.guards);statements.push(...loss.post);
       }
@@ -741,5 +757,9 @@ adminStockOperationsRoutes.post('/lot-counts',async c=>{
   }
   statements.push(...contracts.flatMap(c=>planInvestorSources(db,c,baghdadDay())));
   try{await db.batch(statements);}catch(e){if(/ops_guards|CHECK constraint|UNIQUE/i.test(String(e)))throw conflict('تغيرت الدفعة أثناء الجرد؛ حدّث الصفحة');throw e;}
-  return c.json({success:true,delta,unknown_cost:lot.effective===null});
+  if(capped.length)await audit(db,user.id,'stock.lot_count_investor_capped',id,{lot_id:lotId,contracts:capped,delta});
+  // Whether the lot has a recorded cost is the owner's to know (DECISIONS row
+  // 219): every other counter hears the same answer for a priced lot and an
+  // unpriced one.
+  return c.json(canViewCost(c.env,user)?{success:true,delta,unknown_cost:lot.effective===null}:{success:true,delta});
 });

@@ -43,6 +43,11 @@ export interface GramsQuoteRequest {
   accessories?: Array<{ id: string; qty: number }>;
 }
 
+/**
+ * One part the engine priced IN: what and how many. Never what it cost the
+ * shop — the hardware reaches the customer inside the final price only
+ * (DECISIONS row 219).
+ */
 export interface PricedAccessoryLine {
   id: string;
   qty: number;

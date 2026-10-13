@@ -62,12 +62,6 @@ export interface EstimateFactor {
   weight: EstimateFactorWeight;
 }
 
-export interface EstimateCurvePoint {
-  qty: number;
-  /** Per piece at that quantity. */
-  unit_iqd: number;
-}
-
 export interface EstimateEngine {
   name: 'print-pricing' | 'print-quote';
   version: number;
@@ -96,10 +90,6 @@ export interface Estimate {
   covers: EstimateCoverKey[];
   /** What is not in it and might be assumed to be (delivery, until W4). */
   excludes: EstimateExcludeKey[];
-
-  /** Per-piece price at 1, 2, 5, 10 and the requested count, ascending;
-   *  pure re-runs of the engine, never an interpolation. */
-  quantity_curve: EstimateCurvePoint[];
 
   /** '' when the material was left open (`range_basis: 'materials'`). */
   material_id: string;

@@ -12,7 +12,16 @@ import { allocateProcurementCharges, procurementSelectionKey, type ProcurementCh
 import { purchaseEstimate } from '../src/components/adminOperations/purchaseEstimate';
 import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looksLikeFreight, newChargeDraft } from '../src/components/adminOperations/procurementCharges';
 import { cloneCostProfileSnapshot, restoreCostProfileSnapshot } from '../src/components/adminOperations/procurementCostDraft';
+import { purchaseDocumentFromWire } from '../src/components/adminOperations/procurementWire';
 import type { CostProfile } from '../packages/contracts/src/procurementCost';
+
+/**
+ * A purchase document as the owner's panel reads it: the server answers its
+ * private amounts under cost names (adminProcurement.ts `documentWire`,
+ * DECISIONS row 219) and the panel maps them back (procurementWire.ts).
+ */
+const readDoc = async (app: Parameters<typeof get>[0], id: string) =>
+  purchaseDocumentFromWire<Awaited<ReturnType<typeof json>>>(await json(await get(app, `/p/documents/${id}`)));
 
 const PRINTER = 'printer:option:combo', PART = 'part:base:';
 const shipment = (amount_iqd: number, basis: ProcurementCharge['basis'] = 'quantity', applies_to: string[] | null = null): ProcurementCharge => ({ scope: 'shipment', amount_iqd, unit_amount_iqd: null, basis, applies_to });
@@ -141,7 +150,7 @@ function setup() {
 test('server: no extra expense saves 0 extras — the line carries route freight only', async () => {
   const x = setup(), res = await post(x.app, '/p/documents', x.payload()), created = await json(res);
   assert.equal(res.status, 200, JSON.stringify(created));
-  const d = await json(await get(x.app, `/p/documents/${created.id}`));
+  const d = await readDoc(x.app, created.id);
   assert.equal(d.lines[0].purchase_total_iqd, 6912162);
   assert.equal(d.lines[0].auto_shipping_iqd, 662756);
   assert.equal(d.lines[0].charges_iqd, 662756);
@@ -164,7 +173,7 @@ test('server: each extra expense is saved with its scope, coverage and exact sha
   });
   const res = await post(x.app, '/p/documents', body), id = (await json(res)).id;
   assert.equal(res.status, 200);
-  const d = await json(await get(x.app, `/p/documents/${id}`));
+  const d = await readDoc(x.app, id);
   const printer = d.lines.find((l: { product_id: string }) => l.product_id === 'printer'), part = d.lines.find((l: { product_id: string }) => l.product_id === 'part');
   assert.equal(printer.auto_shipping_iqd, 662756);
   assert.equal(part.auto_shipping_iqd, 59440);
@@ -181,7 +190,7 @@ test('server: each extra expense is saved with its scope, coverage and exact sha
   // Reopening and saving the document as it reads back changes nothing.
   const edit = await put(x.app, `/p/documents/${id}`, { ...body, version: 1, cost_profile_version: 2, lines: d.lines, charges: d.charges });
   assert.equal(edit.status, 200, JSON.stringify(await json(edit)));
-  const again = await json(await get(x.app, `/p/documents/${id}`));
+  const again = await readDoc(x.app, id);
   assert.equal(again.ordered_total_iqd, d.ordered_total_iqd);
   assert.deepEqual(again.charges.map((c: Record<string, unknown>) => [c.title, c.amount_iqd, c.unit_amount_iqd]), d.charges.map((c: Record<string, unknown>) => [c.title, c.amount_iqd, c.unit_amount_iqd]));
 });
@@ -213,12 +222,12 @@ test('server: a document saved before shares were stored shows them only when th
   const x = setup();
   const body = x.payload({ lines: [line(5), line(2, { product_id: 'part', scope: 'base', scope_id: '', source_unit_amount: 10, weight_g: 1000 })], charges: [{ title: 'توصيل', amount_iqd: 1001, basis: 'quantity' }] });
   const id = (await json(await post(x.app, '/p/documents', body))).id;
-  const fresh = await json(await get(x.app, `/p/documents/${id}`));
+  const fresh = await readDoc(x.app, id);
   x.raw.exec(`UPDATE purchase_charges SET allocation_json=NULL, position=NULL WHERE purchase_id='${id}'`);
-  const legacy = await json(await get(x.app, `/p/documents/${id}`));
+  const legacy = await readDoc(x.app, id);
   const byLine = (shares: { line_id: string; amount_iqd: number }[]) => Object.fromEntries(shares.map((a) => [a.line_id, a.amount_iqd]));
   assert.deepEqual(byLine(legacy.charges[0].allocations), byLine(fresh.charges[0].allocations));
   x.raw.exec(`UPDATE purchase_lines SET charges_iqd=charges_iqd+1 WHERE purchase_id='${id}' AND label LIKE 'X2D%'`);
-  const drifted = await json(await get(x.app, `/p/documents/${id}`));
+  const drifted = await readDoc(x.app, id);
   assert.equal(drifted.charges[0].allocations, null, 'an unreproducible split is shown as unknown, never guessed');
 });

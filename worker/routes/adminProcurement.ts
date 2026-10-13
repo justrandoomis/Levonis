@@ -165,6 +165,36 @@ async function document(db: D1Database, id: string) {
     },
   };
 }
+/**
+ * THE DOCUMENT AS THE OWNER'S SCREEN READS IT — every private figure under a
+ * name the cost net knows (DECISIONS row 219). `document()` keeps the column
+ * names its own callers compute with; the answer renames the ones whose column
+ * name is generic (`amount_iqd`, `paid_iqd`, `attachment_url` are wallet,
+ * store and chat words too, so they can never join FINANCIAL_FIELDS): a
+ * future route that reused this answer for anyone but the owner would have it
+ * stripped by `projectForAdmin`, not handed over. The panel maps it back
+ * (src/components/adminOperations/procurementWire.ts).
+ */
+type Doc = Awaited<ReturnType<typeof document>>;
+function documentWire(d: Doc) {
+  const { attachment_url, ...purchase } = d.purchase as Purchase & { attachment_url?: unknown };
+  return {
+    purchase: { ...purchase, invoice_attachment_url: attachment_url ?? '' },
+    funding: d.funding,
+    lines: d.lines,
+    charges: d.charges.map(({ amount_iqd, unit_amount_iqd, allocations, ...c }) => ({
+      ...c,
+      charge_amount_iqd: amount_iqd,
+      charge_unit_amount_iqd: unit_amount_iqd,
+      allocations: allocations ? allocations.map((a) => ({ line_id: a.line_id, charge_amount_iqd: a.amount_iqd })) : null,
+    })),
+    payments: d.payments.map(({ amount_iqd, ...pay }) => ({ ...pay, supplier_payment_iqd: amount_iqd })),
+    ordered_total_iqd: d.ordered_total_iqd,
+    supplier_paid_iqd: d.paid_iqd,
+    supplier_balance_iqd: d.balance_iqd,
+    matching: d.matching,
+  };
+}
 adminProcurementRoutes.get('/selections/:id', async (c) =>
   c.json(
     projectForAdmin(c.env, c.get('user'), {
@@ -244,16 +274,18 @@ adminProcurementRoutes.get('/documents', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT p.*,s.name AS supplier_name,
     (SELECT COALESCE(SUM(COALESCE(i.purchase_total_iqd,i.qty_ordered*i.purchase_unit_iqd)+l.charges_iqd),0) FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=p.id) AS total_cost_iqd,
-    (SELECT COALESCE(SUM(amount_iqd),0) FROM supplier_payments WHERE purchase_id=p.id) AS paid_iqd
+    (SELECT COALESCE(SUM(amount_iqd),0) FROM supplier_payments WHERE purchase_id=p.id) AS supplier_paid_iqd
     FROM purchase_orders p LEFT JOIN inventory_suppliers s ON s.id=p.supplier_id ${filter} ORDER BY p.created_at DESC LIMIT 50 OFFSET ?`,
   )
     .bind(offset)
-    .all();
-  return c.json({ success: true, purchases: results ?? [], offset, total:count?.n??0 });
+    .all<Record<string, unknown>>();
+  // The same names as the document's answer (documentWire): the invoice link under its own name.
+  const purchases = (results ?? []).map(({ attachment_url, ...p }) => ({ ...p, invoice_attachment_url: attachment_url ?? '' }));
+  return c.json({ success: true, purchases, offset, total:count?.n??0 });
 });
 adminProcurementRoutes.get('/documents/:id', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
-  return c.json({ success: true, ...(await document(c.env.DB, c.req.param('id'))) });
+  return c.json({ success: true, ...documentWire(await document(c.env.DB, c.req.param('id'))) });
 });
 
 /**

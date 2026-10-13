@@ -8,19 +8,16 @@
  * buckets of a rounded share cannot be subtracted back into a line.
  *
  * Pure throughout: no clock, no database, no settings. That is what lets
- * the adapters be unit-tested on a synthetic quote and lets a route re-run
- * an engine a few times for the quantity curve without a second read.
+ * the adapters be unit-tested on a synthetic quote.
  */
 import type { CostLine as EngineACostLine } from '../printPricing';
 import type { CostComponent as EngineBComponent } from '../printQuote/model';
 import {
-  ESTIMATE_CURVE_QUANTITIES,
   ESTIMATE_EXCLUDE_KEYS,
   ESTIMATE_FACTOR_KEYS,
   FACTOR_MOST_SHARE,
   FACTOR_SOME_SHARE,
   type EstimateCoverKey,
-  type EstimateCurvePoint,
   type EstimateExcludeKey,
   type EstimateFactor,
   type EstimateFactorKey,
@@ -71,34 +68,6 @@ export function excludesFrom(keys: ReadonlyArray<EstimateExcludeKey>): EstimateE
   return [...new Set(keys.filter((k) => EXCLUDE_ORDER.has(k)))].sort(
     (a, b) => EXCLUDE_ORDER.get(a)! - EXCLUDE_ORDER.get(b)!
   );
-}
-
-/**
- * The quantity curve (E4): 1, 2, 5, 10 and the requested count, each priced
- * by a PURE RE-RUN the caller supplies. `unitFor` returns the per-piece price
- * at that quantity, or null when the engine could not price it — an unpriced
- * point is left out rather than drawn at zero. Ascending by quantity, one
- * point per quantity.
- *
- * Not smoothed. The engine's own arithmetic decides the shape: setup shared
- * across copies pulls the unit price down, a failure provision that grows
- * with a long run pushes it up, and the curve shows whichever wins, because
- * it is the same number the wizard would quote at that quantity.
- */
-export function quantityCurve(
-  requested: number,
-  unitFor: (qty: number) => number | null | undefined
-): EstimateCurvePoint[] {
-  const asked = Math.max(1, Math.floor(requested || 1));
-  const quantities = [...new Set<number>([...ESTIMATE_CURVE_QUANTITIES, asked])].sort((a, b) => a - b);
-  const points: EstimateCurvePoint[] = [];
-  for (const qty of quantities) {
-    const unit = unitFor(qty);
-    if (typeof unit === 'number' && Number.isFinite(unit) && unit > 0) {
-      points.push({ qty, unit_iqd: Math.round(unit) });
-    }
-  }
-  return points;
 }
 
 // ------------------------------------------------ each engine's lines, folded

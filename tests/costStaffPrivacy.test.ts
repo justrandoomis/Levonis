@@ -22,15 +22,17 @@ test('an audit write failure logs the event without database values', async (t) 
   assert.match(logged.flat().map(String).join(' '), /audit write failed/);
 });
 
-test('staff settings keep public fees and remove the nested print margin', async () => {
+test('staff settings carry none of the print-service pricing: rates and margin are the owner’s', async () => {
   const raw = seededCopy();
   raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run('printServicePricing', JSON.stringify({ machine_iqd_per_hour: 1500, setup_fee_iqd: 3000, margin_percent: 31.25 }));
   for (const role of ADMIN_ROLES) {
     const response = await call(appFor(raw, ROLES[role], [['/api/admin', adminRoutes]]), 'GET', '/api/admin/settings');
     assert.equal(response.status, 200);
     const settings = (response.body as { settings: Record<string, unknown> }).settings;
-    assert.deepEqual(settings.printServicePricing, { machine_iqd_per_hour: 1500, setup_fee_iqd: 3000 });
-    assert.deepEqual(leaks(settings.printServicePricing), []);
+    // The machine-hour rate and the setup fee are inputs of the print price
+    // like the margin (DECISIONS row 219): a cost setting, the owner's alone.
+    assert.equal(settings.printServicePricing, undefined, role);
+    assert.deepEqual(leaks(settings.printServicePricing), [], role);
   }
   const owner = await call(appFor(raw, OWNER, [['/api/admin', adminRoutes]]), 'GET', '/api/admin/settings');
   assert.equal((owner.body as { settings: { printServicePricing: { margin_percent: number } } }).settings.printServicePricing.margin_percent, 31.25);

@@ -86,7 +86,10 @@ test('an approved market rate of 1,680 leaves the wallet rate at 1,400; the publ
   assert.equal(Number(await getSetting(asD1(raw), 'exchangeRate')), WALLET);
   const pub = (await json(await get(ownerApp(raw), '/api/settings/public'))).settings;
   assert.equal(pub.exchangeRate, WALLET, 'the wallet rate, a number');
-  assert.equal(pub.displayUsdRate, '1680', 'the market rate, decimal text');
+  // The public reading is the market sell to the dinar — never the owner's
+  // +20 on top of it, which the public figure minus the provider's would
+  // give away (DECISIONS row 219). Prices themselves are applied at 1,680.
+  assert.equal(pub.displayUsdRate, '1660', 'the market rate, decimal text');
 });
 
 test('after the 1,680 apply, a deposit typed in dinars and a checkout paid from the wallet both convert at 1,400', async () => {
@@ -145,18 +148,21 @@ test("the admin price preview reads the shop's rate — null before the first ap
   assert.equal(before.quote.usd_preview, null, 'no shop rate yet: no dollar figure (not 1,400)');
   await approveUsdAt1680(raw);
   const after = await json(await post(asOwner, '/api/admin/products/p_pla/quote', {}));
+  // The preview reads dollars where customers read them: the market sell to
+  // the dinar (DECISIONS row 219), not the 1,680 the prices are applied at.
   assert.deepEqual(after.quote.usd_preview, {
-    exchange_rate_iqd_per_usd: '1680',
-    applied_usd: Math.floor((25_000 * 100) / 1680) / 100,
-    unit_subtotal_usd: Math.floor((after.quote.unit_subtotal_iqd * 100) / 1680) / 100,
+    exchange_rate_iqd_per_usd: '1660',
+    applied_usd: Math.floor((25_000 * 100) / 1660) / 100,
+    unit_subtotal_usd: Math.floor((after.quote.unit_subtotal_iqd * 100) / 1660) / 100,
   });
   // The display rate is public by design; the assistant's preview carries it and nothing private of FX.
   const assistant = stubApp(asD1(raw), ASSISTANT, (a) => a.route('/api/admin/products', adminProductsRoutes));
   const res = await post(assistant, '/api/admin/products/p_pla/quote', {});
   assert.equal(res.status, 200);
   const text = await res.text();
-  assert.equal(JSON.parse(text).quote.usd_preview.exchange_rate_iqd_per_usd, '1680');
-  assert.doesNotMatch(text, /market_adjustment_iqd|market_rate|"20"|1660|cost_iqd":\d/, 'no FX private figure, no cost');
+  assert.equal(JSON.parse(text).quote.usd_preview.exchange_rate_iqd_per_usd, '1660');
+  // Not the applied 1,680 either: beside the public 1,660 it is the owner's adjustment.
+  assert.doesNotMatch(text, /market_adjustment_iqd|market_rate|"20"|1680|cost_iqd":\d/, 'no FX private figure, no cost');
 });
 
 // ------------------------------------------------------------- source rules

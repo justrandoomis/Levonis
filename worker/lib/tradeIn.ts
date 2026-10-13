@@ -95,13 +95,13 @@ import { serialAssignmentsInstalled } from './serialPolicy';
 import { MAX_REPLACEMENT_HOPS, liveUnitOfSlot } from './deviceCustody';
 import { benefitFallbackFor, pricingCtxForUser, quoteOptionValueIds, saleAvailability } from '../routes/products';
 import {
-  DEFAULT_RULE_SETS,
   FACTOR_IDS,
   REQUIRED_PHOTOS,
   STATUS_LABELS,
   TRADE_IN_FAMILIES,
   blankInputs,
   canTransition,
+  checklistOf,
   daysBetween,
   isTerminal,
   missingPhotoAngles,
@@ -115,6 +115,7 @@ import {
   type ComponentInputs,
   type ComponentRole,
   type ComponentValuation,
+  type FactorId,
   type FactorRule,
   type TradeInFamily,
   type TradeInRuleSet,
@@ -122,6 +123,7 @@ import {
   type TradeInSettlement,
   type TradeInStatus,
 } from '@levonis/pricing/tradeIn';
+import { DEFAULT_RULE_SETS } from '@levonis/pricing/tradeInDefaults';
 
 // ================================================================= errors
 
@@ -1175,6 +1177,98 @@ export function estimateFor(
   };
 }
 
+// ================================================================= what a customer reads
+
+/**
+ * WHAT THE CUSTOMER'S WIZARD NEEDS TO ASK — never what an answer is worth
+ * (DECISIONS row 219). The trade-in value is a price Levonis sets; its rules
+ * (each factor's effect and weight, the floor and the cap, the resale view
+ * and the per-product overrides) are the calculation behind that price, and
+ * the owner's rule gives anyone but the owner the final figure alone. So the
+ * customer is told which questions are on and the choices of the two
+ * checklists, by id and label; the Worker values the answers.
+ */
+export interface TradeInQuestions {
+  family: TradeInFamily;
+  version: number;
+  /** The factors the owner turned on: which questions the wizard shows. */
+  asked: FactorId[];
+  faults: Array<{ id: string; label_ar: string; label_en: string }>;
+  replaced_parts: Array<{ id: string; label_ar: string; label_en: string }>;
+}
+
+export function publicQuestions(r: TradeInRuleSet): TradeInQuestions {
+  const choices = (factor: 'faults' | 'replaced_parts') =>
+    checklistOf(r, factor).map(({ id, label_ar, label_en }) => ({ id, label_ar, label_en }));
+  return {
+    family: r.family,
+    version: r.version,
+    asked: r.factors.filter((f) => f.enabled).map((f) => f.factor),
+    faults: choices('faults'),
+    replaced_parts: choices('replaced_parts'),
+  };
+}
+
+/** The estimate as a customer reads it: each part's final value, the total and the settlement — no line, floor or cap. */
+export interface PublicEstimate {
+  components: Array<{ role: ComponentRole; family: TradeInFamily; label_ar: string; label_en: string; value_iqd: number }>;
+  total_iqd: number;
+  settlement: TradeInSettlement | null;
+  usage_months: number;
+  warranty_remaining_months: number;
+  computed_at: string;
+}
+
+export function publicEstimate(e: Estimate): PublicEstimate {
+  return {
+    components: e.components.map((c) => ({ role: c.role, family: c.family, label_ar: c.label_ar, label_en: c.label_en, value_iqd: c.valuation.value_iqd })),
+    total_iqd: e.total_iqd,
+    settlement: e.settlement,
+    usage_months: e.usage_months,
+    warranty_remaining_months: e.warranty_remaining_months,
+    computed_at: e.computed_at,
+  };
+}
+
+/**
+ * THE WIZARD'S LIVE FIGURE, PRICED HERE. The wizard used to run the engine on
+ * the phone over the rules it was sent; now it posts the answers so far (and
+ * the product it is looking at) and reads the final figures back. Nothing is
+ * stored: the answers are validated exactly as `saveDraft` validates them, the
+ * target is re-priced for this customer by the server, never taken from the
+ * client.
+ */
+export async function previewDraft(
+  env: Env,
+  userId: string,
+  id: string,
+  body: { components?: unknown; target?: unknown }
+): Promise<PublicEstimate> {
+  const db = env.DB;
+  const req = await ownRequest(db, userId, id);
+  if (req.status !== 'draft') throw refuse('TRADE_IN_NOT_EDITABLE');
+  const [comps, book] = await Promise.all([loadComponents(db, id), loadRuleBook(db)]);
+  const raw = (body.components && typeof body.components === 'object' ? body.components : {}) as Record<string, unknown>;
+  const errors: Record<string, string[]> = {};
+  const answered = comps.map((c) => {
+    if (raw[c.role] === undefined) return c;
+    const checked = validateInputs(raw[c.role], book[c.family]);
+    if (!checked.ok) {
+      errors[c.role] = checked.errors;
+      return c;
+    }
+    return { ...c, inputs_json: JSON.stringify(checked.value) };
+  });
+  if (Object.keys(errors).length) throw refuse('TRADE_IN_INPUTS_INVALID', { errors });
+  let targetPrice = req.target_price_iqd;
+  if (body.target !== undefined && body.target !== null) {
+    const sel = parseTargetSelection(body.target);
+    if (!sel) throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'selection' });
+    targetPrice = (await priceTarget(env, userId, sel)).price_iqd;
+  }
+  return publicEstimate(estimateFor({ ...req, target_price_iqd: targetPrice }, answered, book, new Date().toISOString()).estimate);
+}
+
 // ================================================================= customer edits
 
 /**
@@ -1936,13 +2030,15 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       base_iqd: c.base_iqd,
       inputs: safeParse<Record<string, unknown>>(c.inputs_json, {}),
       value_iqd: c.value_iqd,
-      estimate: safeParse<ComponentValuation | null>(c.estimate_json, null),
+      // The owner's own breakdown for the admin; a customer reads the part's value alone.
+      estimate: ((v) => (audience === 'admin' || !v ? v : { value_iqd: v.value_iqd }))(safeParse<ComponentValuation | null>(c.estimate_json, null)),
       required_angles: REQUIRED_PHOTOS[c.family].map((a) => a.id),
       photos: photos.filter((p) => p.component_role === c.role).map(photoView),
     })),
     // The figure fixed at submit — what the admin reviews. While a draft, the
     // live figure from the current answers (the same engine the page runs).
-    estimate: req.status === 'draft' ? live.estimate : stored,
+    // A request never submitted stores no estimate (`{}`): the customer reads none.
+    estimate: ((e) => (audience === 'admin' || !e ? e : Array.isArray(e.components) ? publicEstimate(e) : null))(req.status === 'draft' ? live.estimate : stored),
     estimated_iqd: req.status === 'draft' ? live.estimate.total_iqd : req.estimated_iqd,
     offer,
     final_value_iqd: req.final_value_iqd,
@@ -1961,7 +2057,10 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       created_at: e.created_at,
       detail: audience === 'admin' ? e.detail : pickPublicDetail(e.detail),
     })),
-    rules: Object.fromEntries(families.map((f) => [f, publicRules(book[f])])),
+    // The rules that price it are the admin's to read; the customer's wizard is told what to ask.
+    ...(audience === 'admin'
+      ? { rules: Object.fromEntries(families.map((f) => [f, publicRules(book[f])])) }
+      : { questions: Object.fromEntries(families.map((f) => [f, publicQuestions(book[f])])) }),
     can: {
       edit: req.status === 'draft',
       submit: req.status === 'draft' && !!blockers && !Object.keys(blockers.inputs).length && !Object.keys(blockers.photos).length && !blockers.target,

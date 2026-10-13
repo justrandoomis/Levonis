@@ -30,12 +30,15 @@
 import type { Hono } from 'hono';
 import { DatabaseSync } from 'node:sqlite';
 import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { unzipSync } from 'fflate';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { OWNER, asD1, freshDb, stubApp, type StubUser } from './app';
 import { resetPolicyCorpusMemo } from '../../worker/lib/policySync';
 import { COST, leaks, seedCostlyOrder, seedCostlyProduct, seedCostlyPurchase, seedCostlyStock, type LeakExtra } from './costlyProduct';
 import type { AppContext } from '../../worker/lib/types';
+import { DEFAULT_PRICING } from '../../worker/lib/printPricing';
+import { baseUsdOf } from '../../worker/lib/pricingEngine/orderBasis';
 
 import { productRoutes, homeRoutes } from '../../worker/routes/products';
 import { bundlesRoutes, adminCompositionAnalyticsRoutes } from '../../worker/routes/bundles';
@@ -390,6 +393,7 @@ export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
     INSERT INTO purchase_investor_receipts (id,purchase_id,amount_iqd,allocated_iqd,payment_day,reference,actor_id,created_at,request_json)
       VALUES ('rcpt_rm','po1',${COST.lotTotal + 146_178},${COST.lotTotal},'2026-09-02','CASH','usr_owner','2026-09-02T00:00:00.000Z','{}');
   `);
+  seedAuditRows(raw);
   // A grant row as delegation would read it: ignored while it is off.
   try {
     raw.exec(`
@@ -401,6 +405,116 @@ export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
     // A database built through 0176 (a deploy-ahead test) has no grants table.
   }
   return raw;
+}
+
+/** The engine-era line of `ord_eng_rm`: the USD/IQD it was priced at and its base USD (both private). */
+export const RM_ENGINE = { rate: '1529.75', regular: 880_000, observedUsd: '563.418112' } as const;
+/** Ids of the rows `seedAuditRows` adds, for PARAM and for the tests that read them. */
+export const RM_IDS = {
+  engineOrder: 'ord_eng_rm',
+  engineLine: 'oi_eng_rm',
+  engineClaim: 'ppc_eng_rm',
+  serviceOrder: 'ord_svc_rm',
+  serviceLine: 'oi_svc_rm',
+  unit: 'unit_rm',
+  serial: 'SNRMAUDIT0001',
+  returnCase: 'rc_rm',
+  warrantyClaim: 'wc_rm',
+  ticket: 'tk_rm',
+  merchant: 'cm_um',
+  store: 'st_um',
+  merchantPrinter: 'mp_um',
+  analysis: 'pa_um',
+} as const;
+
+/**
+ * WHAT THE LEAK AUDIT FOUND THE SWEEPS BLIND TO (DECISIONS row 219). Each row
+ * below gives a door the sweeps already call something to answer with, so a
+ * regression that serves a private value there fails the sweep instead of
+ * walking a null, an empty list or a 404:
+ *   - the owner's print economics: printServicePricing and printPricingConfig
+ *     set, a platform per-kilo price on PLA, the X1C model card's purchase
+ *     economics;
+ *   - the matrix merchant `u_m` owns a store, one printer of its own (no
+ *     economics declared) and one analysed file, so the print doors build
+ *     the merchant payload and the routeClass bodies reach their success path;
+ *   - an engine-priced order line (0181) with a v5 price-protection claim;
+ *   - a delivered service order with a device unit, its serial in the
+ *     inventory, a return case, a warranty claim and a support ticket, for the
+ *     admin routes mounted outside /api/admin;
+ *   - audit rows under the device / serial / warranty / order.status prefixes
+ *     those routes read back (no cost in them: a cost there is a regression
+ *     the sweep must now be able to see);
+ *   - the costly product filed under a templated section, so the catalogue
+ *     export answers with data instead of a 400.
+ * Every id differs from the ids the tests add on top of this seed.
+ */
+function seedAuditRows(raw: DatabaseSync) {
+  const config = JSON.stringify({ ...DEFAULT_PRICING, machine_hour_iqd: { fdm: 6363, resin: 6474 } }).replace(/'/g, "''");
+  const baseUsd = baseUsdOf(RM_ENGINE.regular, RM_ENGINE.rate);
+  const I = RM_IDS;
+  raw.exec(`
+    INSERT INTO admin_settings (key,value) VALUES
+      ('printServicePricing','{"machine_iqd_per_hour":6141,"setup_fee_iqd":6252,"margin_percent":27.75}'),
+      ('printPricingConfig','${config}')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+    UPDATE print_materials SET default_iqd_per_kg = 26500 WHERE id = 'pla';
+    UPDATE printer_models SET purchase_iqd = 2150000, residual_iqd = 350000, useful_print_hours = 6000,
+                              maintenance_iqd_per_hour = 180 WHERE id = 'bbl-x1c';
+
+    INSERT INTO community_merchants (id,user_id,name) VALUES ('${I.merchant}','u_m','Matrix Merchant');
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('${I.store}','${I.merchant}','u_m','matrix-merchant','Matrix Merchant');
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name,technology,build_x_mm,build_y_mm,build_z_mm,materials,quality_max,model_id)
+      VALUES ('${I.merchantPrinter}','${I.merchant}','${I.store}','Matrix A1 mini','fdm',180,180,180,'["PLA"]','fine','bbl-a1m');
+    INSERT INTO print_analyses (id,owner_id,file_name,file_sha256,fingerprint,printer_model_id,provenance,bbox_x_mm,bbox_y_mm,bbox_z_mm,
+                                model_volume_mm3,layer_count,layer_height_mm,print_minutes_per_plate,preparation_minutes)
+      VALUES ('${I.analysis}','u_m','bracket.stl','sha-rm-audit','fp-rm-audit','bbl-a1m','measured',100,80,40,96000,200,0.2,240,8);
+    INSERT INTO print_analysis_materials (id,analysis_id,slot,material_id,material_type,color_hex,model_grams,support_grams)
+      VALUES ('pam_um','${I.analysis}',0,'pla','PLA','#000000',150,12);
+
+    INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+                        subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at)
+      VALUES ('${I.serviceOrder}','u1','delivered','{}','standard','{}','cash',900000,1500,900000,900000,'2026-09-20T10:00:00Z');
+    INSERT INTO order_items (id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd)
+      VALUES ('${I.serviceLine}','${I.serviceOrder}','p_a1','Bambu Lab A1',1,900000,900000);
+
+    INSERT INTO order_item_units (id,order_id,order_item_id,product_id,owner_user_id,unit_index,delivered_at,
+                                  warranty_base_months,warranty_start_at,warranty_end_at,policy_version)
+      VALUES ('${I.unit}','${I.serviceOrder}','${I.serviceLine}','p_a1','u1',1,'2026-09-20T10:00:00Z',12,'2026-09-20T10:00:00Z','2027-09-20T10:00:00Z','v1');
+    INSERT INTO device_serials (serial_norm,serial_raw,unit_id,assigned_by) VALUES ('${I.serial}','${I.serial}','${I.unit}','usr_owner');
+    INSERT INTO serial_inventory (serial_norm,serial_raw,model_code,model_name,product_id,source,created_by)
+      VALUES ('${I.serial}','${I.serial}','A1','Bambu Lab A1','p_a1','manual','usr_owner');
+    INSERT INTO return_cases (id,order_id,order_item_id,unit_id,user_id,qty,reason,description,delivered_at_snapshot,within_window,state)
+      VALUES ('${I.returnCase}','${I.serviceOrder}','${I.serviceLine}','${I.unit}','u1',1,'defective','fan noise','2026-09-20T10:00:00Z',1,'requested');
+    INSERT INTO warranty_claims (id,user_id,order_item_id,product_name,description,unit_id,subject)
+      VALUES ('${I.warrantyClaim}','u1','${I.serviceLine}','Bambu Lab A1','fan noise','${I.unit}','fan');
+    INSERT INTO support_tickets (id,user_id,subject,order_id,unit_id) VALUES ('${I.ticket}','u1','fan noise','${I.serviceOrder}','${I.unit}');
+    INSERT INTO audit_log (actor_id,action,target,detail) VALUES
+      ('usr_owner','device.warranty_months','${I.unit}','{"from":12,"to":12,"reason":"seed"}'),
+      ('usr_owner','serial_inventory.create','${I.serial}','{"product_id":"p_a1","source":"manual"}'),
+      ('usr_owner','order.status','ord1','{"from":"shipped","to":"delivered","stage":"delivered","stage_recorded":true}');
+
+    UPDATE products SET category_id = 'cat_printers', sub_category_id = 'cat_printers_fdm' WHERE id = 'p_a1';
+  `);
+  // The engine-era line and its v5 claim need 0181's columns; a database built
+  // through an earlier migration (a deploy-ahead test) simply has neither.
+  try {
+    raw.exec(`
+      INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+                          subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at)
+        VALUES ('${I.engineOrder}','u1','delivered','{}','standard','{}','cash',${RM_ENGINE.regular},1500,${RM_ENGINE.regular},${RM_ENGINE.regular},'2026-10-05T10:00:00Z');
+      INSERT INTO order_items (id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,option_id,option_value_ids,
+                               price_basis,engine_combo_key,engine_channel,engine_regular_iqd,usd_iqd_at_purchase,base_usd_at_purchase)
+        VALUES ('${I.engineLine}','${I.engineOrder}','p_a1','Bambu Lab A1',1,${RM_ENGINE.regular},${RM_ENGINE.regular},'v_a1','["v_a1"]',
+                'engine','v_a1','direct_sale',${RM_ENGINE.regular},'${RM_ENGINE.rate}','${baseUsd}');
+      INSERT INTO price_protection_claims (id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state,
+                                           policy_snapshot,eligible_unit_iqd,basis,usd_iqd_at_purchase,base_usd_at_purchase,base_usd_observed)
+        VALUES ('${I.engineClaim}','u1','${I.engineOrder}','${I.engineLine}',${RM_ENGINE.regular},862000,1,0,'requested','{}',9000,'usd_base',
+                '${RM_ENGINE.rate}','${baseUsd}','${RM_ENGINE.observedUsd}');
+    `);
+  } catch {
+    raw.exec(`DELETE FROM orders WHERE id = '${I.engineOrder}'`);
+  }
 }
 
 /**
@@ -463,6 +577,16 @@ export const NOT_A_COST: readonly NotACost[] = [
     why: 'a COUNT of the caller’s own wage rows still waiting for an amount — how many, never how much',
   },
   {
+    path: /^\/api\/finance-earnings$/,
+    leak: /\.entries\[\d+\]\.pending_cost = \d+$/,
+    why: 'per wage row, a COUNT (0 or 1) of whether its amount is still waiting — how many, never how much',
+  },
+  {
+    path: /^\/api\/(print-quote\/analyses\/[^/]+\/compare|merchant\/workshop\/requests\/[^/]+\/cost)$/,
+    leak: /^\$\.(printers\[\d+\]|quote)\.(lines\[\d+\]\.iqd = |(base_cost_iqd|failure_reserve_iqd|true_cost_iqd|profit_iqd|margin_percent|markup_percent|break_even_iqd) |because\.machine_iqd_per_hour )/,
+    why: 'a store owner costing THEIR OWN machines: built only from the economics the merchant declared (their printer, spools, labour) — never the owner’s machine-hour rate, model card or per-kilo price (DECISIONS row 219; tests/leakAudit_*merchant_print_quote*)',
+  },
+  {
     path: /^\/api\/(admin\/)?farm\/(config|state)$|^\/api\/admin\/settings$/,
     leak: /\.economy\.(maintenance|repair)\.cost = /,
     why: 'in-game coins of the printer-farm game (worker/lib/farm/config.ts), not dinars',
@@ -490,6 +614,10 @@ export const PARAM: Readonly<Record<string, string>> = {
   lotId: 'lot1',
   incomingId: 'inc1',
   orderId: 'ord1',
+  // The device unit and the serial seedAuditRows adds (DECISIONS row 219):
+  // without them the unit and serial readers answer 404 to every sweep.
+  unitId: 'unit_rm',
+  serial: 'SNRMAUDIT0001',
 };
 
 /** One route pattern filled with seeded ids — and, for the stock routers, with a lot and a purchase too. */
@@ -508,6 +636,12 @@ export function concrete(prefix: string, path: string): string[] {
   // …a purchase document on the procurement document and receiving routes…
   if (prefix.endsWith('/procurement') && (path.startsWith('/documents/:id') || path.startsWith('/receiving/:id'))) {
     alts.add(`${prefix}${fill(path.replace(/:id(\{[^}]*\})?/g, 'po1'))}`);
+  }
+  // …the catalogue export, by the costly product (its section is seeded): a
+  // bare /export is a 400, so without a query no sweep reaches its data…
+  if (`${prefix}${path}` === '/api/admin/import/export') {
+    alts.add(`${full}?ids=p_a1`);
+    alts.add(`${full}?ids=p_a1&format=zip`);
   }
   // …and an order on every order route: `ord1` carries a cost snapshot and a COGS.
   if (/\/orders?(\/|$)/.test(`${prefix}${path}`) && /:(id|orderId|order_id)\b/.test(path)) {
@@ -578,6 +712,14 @@ export async function call(
     }
     const res = await app.request(path, init);
     const type = res.headers.get('content-type') ?? '';
+    // A ZIP answer (an export) is read the way its reader opens it: every
+    // file, as text — a cost inside a deflate stream is a cost all the same
+    // (DECISIONS row 219).
+    if (/zip/.test(type)) {
+      const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
+      const body = Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, new TextDecoder().decode(bytes)]));
+      return { status: res.status, body, headers: res.headers };
+    }
     const text = await res.text();
     let parsed: unknown = text;
     if (type.includes('json')) {

@@ -16,7 +16,7 @@ import React from 'react';
 import { Minus, Plus, Check } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { Money } from '../ui/Money';
-import type { ComponentValuation, TradeInSettlement } from './model';
+import type { TradeInSettlement } from './model';
 
 export function Card({ children, className = '', ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -257,25 +257,20 @@ export function bpText(bp: number): string {
   return `${bp > 0 ? '+' : bp < 0 ? '−' : ''}${s}%`;
 }
 
-export function Breakdown({ valuation, title }: { valuation: ComponentValuation; title?: string }) {
+/**
+ * ONE PART'S ESTIMATED VALUE — the figure alone (DECISIONS row 219). The
+ * per-factor lines between the price paid and this value are the owner's
+ * valuation rules at work; the Worker keeps them for the admin screens and
+ * the customer reads the final figure.
+ */
+export function Breakdown({ valuation, title }: { valuation: { value_iqd: number }; title?: string }) {
   const { loc } = useLanguage();
   return (
     <div data-breakdown>
       {title ? <p className="text-[13px] font-bold text-text-primary mb-1">{title}</p> : null}
       <dl>
-        {valuation.lines.map((l, i) => (
-          <div key={`${l.factor}-${i}`} className={`flex items-baseline justify-between gap-3 py-1.5 ${i === 0 ? '' : 'border-t border-border-subtle'}`}>
-            <dt className={`text-[12.5px] min-w-0 ${i === 0 ? 'text-text-primary font-semibold' : 'text-text-secondary'}`}>
-              {loc(l.label_ar, l.label_en)}
-              {l.effect_bp !== 0 ? <span className="ms-1.5 text-[11px] text-text-muted tabular-nums" dir="ltr">{bpText(l.effect_bp)}</span> : null}
-            </dt>
-            <dd className={`text-[12.5px] shrink-0 ${i === 0 ? 'text-text-primary font-semibold' : l.amount_iqd < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
-              <Money iqd={l.amount_iqd} signed={i !== 0} />
-            </dd>
-          </div>
-        ))}
-        <div className="flex items-baseline justify-between gap-3 pt-2 mt-1 border-t border-border-subtle">
-          <dt className="text-[13px] text-text-primary font-bold">{loc('القيمة', 'Value')}</dt>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-[13px] text-text-primary font-bold">{loc('القيمة', 'Value', 'بەها')}</dt>
           <dd className="text-[14px] text-text-primary font-black">
             <Money iqd={valuation.value_iqd} />
           </dd>

@@ -89,6 +89,11 @@ function legacy(raw: DatabaseSync) {
     { id: 'jc2', name_en: 'Blue', name_ar: 'أزرق', hex: '#0000ff', cost_iqd: 523456, active: true },
   ]);
   raw.prepare(`UPDATE products SET options = ?, colors = ?, sale_types='["direct_sale"]', inventory_mode='BASE' WHERE id='p_a1'`).run(options, colors);
+  // The role matrix files p_a1 on its printer shelf (the leak-audit seed,
+  // DECISIONS row 219). This file's product is the plain document-only one it
+  // always was: on a printer shelf an assistant's save would also be a serial
+  // policy change, refused for a reason that has nothing to do with cost.
+  raw.exec("UPDATE products SET category_id = NULL, sub_category_id = NULL WHERE id = 'p_a1'");
 }
 
 type Costs = Record<string, { cost_iqd: unknown; cost_adjust_iqd: unknown }>;

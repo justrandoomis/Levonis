@@ -277,8 +277,16 @@ export async function loadMerchantPrinters(db: D1Database, merchantId: string): 
 export async function loadMaterialPrices(
   db: D1Database,
   merchantId: string | null,
-  materialIds: string[]
+  materialIds: string[],
+  /**
+   * `platformDefaults: false` leaves out `print_materials.default_iqd_per_kg`,
+   * the platform's own price per kilo — the owner's figure, never a merchant's
+   * (DECISIONS row 219). The public rung (a filament's per-kilo price read off
+   * the shop's PUBLISHED product price) stays.
+   */
+  opts: { platformDefaults?: boolean } = {}
 ): Promise<MaterialPriceSources> {
+  const platformDefaults = opts.platformDefaults !== false;
   const sources: MaterialPriceSources = {};
   if (!materialIds.length) return sources;
   // One json_each parameter for the list: the live D1 refuses > 100 bound (review F1).
@@ -330,7 +338,7 @@ export async function loadMaterialPrices(
     }
     const type = str(row.material_type).trim().toUpperCase();
     if (type) wantedTypes.add(type);
-    const fallback = optNum(row.default_iqd_per_kg);
+    const fallback = platformDefaults ? optNum(row.default_iqd_per_kg) : null;
     if (fallback && fallback > 0 && type) platformByType[type] = fallback;
   }
 

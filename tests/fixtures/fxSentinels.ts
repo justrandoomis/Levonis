@@ -10,6 +10,14 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 export const FX_PUBLIC_RATE = '1703.9167';
+/**
+ * What GET /api/settings/public and /api/home publish for these rows since
+ * DECISIONS row 219: the market base (the effective rate less the owner's
+ * private adjustment), to the whole dinar — the effective rate minus the
+ * published market sell gave the adjustment away. The effective rate stays
+ * the one every IQD price is built on.
+ */
+export const FX_DISPLAY_RATE = '1667';
 
 export const FX_SENTINELS = [
   '1666.6666', // USD/IQD market sell

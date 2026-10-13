@@ -8,8 +8,9 @@
  *   POST   /target-quote                      the server's direct-sale price for one selection
  *   GET    /requests                          «طلباتي للاستبدال»
  *   POST   /requests                          open a draft on one unit (claims its parts)
- *   GET    /requests/:id                      the request, its timeline and the rules that price it
+ *   GET    /requests/:id                      the request, its timeline and what the wizard asks (never the rules)
  *   PATCH  /requests/:id                      save answers / target / note (draft only)
+ *   POST   /requests/:id/preview              the live figure for unsaved answers (draft only, nothing stored)
  *   POST   /requests/:id/photos               one photograph (multipart: file, component, angle)
  *   DELETE /requests/:id/photos/:pid          remove one (draft only)
  *   POST   /requests/:id/submit               send for review — the server enforces answers, photos, target
@@ -64,6 +65,8 @@ import {
   ownRequest,
   parseTargetSelection,
   priceTarget,
+  previewDraft,
+  publicQuestions,
   publicRules,
   requestView,
   ruleSetHistory,
@@ -145,10 +148,10 @@ tradeInRoutes.get('/eligible', async (c) => {
   return c.json({
     success: true,
     units,
-    // The rule sets the preview will need for these units' families — the
-    // same numbers the server prices with, so the first estimate on the phone
-    // is already the real one.
-    rules: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, publicRules(book[f])])),
+    // What the wizard asks for each family — never the numbers the answers
+    // are valued with (DECISIONS row 219): the Worker prices the answers
+    // (POST /requests/:id/preview) and the customer reads the final figure.
+    questions: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, publicQuestions(book[f])])),
   });
 });
 
@@ -197,6 +200,14 @@ tradeInRoutes.patch('/requests/:id', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const req = await run(() => saveDraft(c.env, user.id, id, body));
   return c.json({ success: true, request: await requestView(c.env, req, 'customer') });
+});
+
+/** The live figure for the answers so far — priced here, nothing stored (see `previewDraft`). */
+tradeInRoutes.post('/requests/:id/preview', async (c) => {
+  const user = c.get('user')!;
+  await rateLimit(c, 'trade_in_preview', 600, 3600);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  return c.json({ success: true, estimate: await run(() => previewDraft(c.env, user.id, requestIdOf(c), body)) });
 });
 
 /**

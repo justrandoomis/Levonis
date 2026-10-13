@@ -45,6 +45,12 @@ export interface RouteRule {
   path?: string;
   /** One valid request body for the write sweep; the owner's call must succeed with it. */
   body?: unknown;
+  /**
+   * The role whose call must succeed with `body` when the route is not the
+   * owner's to call — a store owner's own printers (`/api/print-quote/analyses/:id/compare`
+   * answers «Only a merchant can compare their own printers» to anyone without a store).
+   */
+  caller?: 'merchant' | 'customer';
   /** Why this write needs no valid body in the sweep. */
   noBody?: string;
   /** Anything a reviewer should know about the class. */

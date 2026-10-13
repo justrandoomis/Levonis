@@ -47,14 +47,14 @@ async function settingsOf(raw: DatabaseSync) {
   return { pub, home, pubBody: await json(pub), homeBody: await json(home) };
 }
 
-test('displayUsdRate equals the effective USD/IQD, on both answers — and no other FX key is public', async () => {
+test('displayUsdRate is the market USD/IQD base to the dinar (the effective rate less the private adjustment, DECISIONS row 219), on both answers — and no other FX key is public', async () => {
   const raw = freshDb();
   applyRate(raw, 'USD_IQD', '1703.9167');
   applyRate(raw, 'EUR_USD', '1.1186');
   raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '37.2501', market_rate = '1666.6666', pending_market_rate = '1777.7777', pending_effective_rate = '1815.0278', pending_reason = 'ANOMALY', pending_observed_at = '2026-10-08T00:00:00.000Z', status = 'REVIEW_REQUIRED' WHERE pair = 'USD_IQD'");
   const { pubBody, homeBody } = await settingsOf(raw);
-  assert.equal(pubBody.settings.displayUsdRate, '1703.9167');
-  assert.equal(homeBody.settings.displayUsdRate, '1703.9167');
+  assert.equal(pubBody.settings.displayUsdRate, '1667');
+  assert.equal(homeBody.settings.displayUsdRate, '1667');
   for (const body of [pubBody, homeBody]) {
     const bad = keysOf(body.settings).filter((k) => FORBIDDEN_KEY.test(k));
     assert.deepEqual(bad, []);

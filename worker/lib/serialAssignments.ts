@@ -46,7 +46,7 @@ import { newId } from './crypto';
 import { auditStatements } from './audit';
 import { fence } from './operations';
 import { changedExactlyOne, isLostRace } from './gifts/fence';
-import { canMoveMoney, canSeeFullSerial, isOwner } from './adminScope';
+import { canMoveMoney, canSeeFullSerial, canViewCost, isOwner, stripFinancials } from './adminScope';
 import { unitOriginsInstalled } from './inventoryUnitOrigins';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
@@ -155,11 +155,18 @@ export interface SerialActor {
    * by decision 1, which covers serials, not order numbers (option A).
    */
   orderRefs: boolean;
+  /**
+   * Cost in an audit detail (DECISIONS row 219): `canViewCost` — the verified
+   * owner. Every other admin reads a history row with FINANCIAL_FIELDS
+   * stripped at every depth, so the first `audit()` that records a cost under
+   * a device / serial / warranty prefix still reaches the owner alone.
+   */
+  cost: boolean;
 }
 
 export function serialActor(env: Env, user: SessionUser): SerialActor {
   const owner = user.role === 'admin' && isOwner(env, user);
-  return { id: user.id, owner, fullSerial: canSeeFullSerial(env, user), orderRefs: canMoveMoney(env, user) };
+  return { id: user.id, owner, fullSerial: canSeeFullSerial(env, user), orderRefs: canMoveMoney(env, user), cost: canViewCost(env, user) };
 }
 
 const shown = (raw: string, actor: Pick<SerialActor, 'fullSerial'>) => (actor.fullSerial ? raw : maskSerial(raw));
@@ -2793,9 +2800,15 @@ function maskDeep(value: unknown, isSerial: boolean, depth: number, mask: MaskFl
  *     `corrected_serial.{from,to}`, `serial_inventory.update` the box SN
  *     under `from` / `to`.
  */
-export function maskedDetail(detail: Record<string, unknown>, actor: Pick<SerialActor, 'fullSerial' | 'orderRefs'>): Record<string, unknown> {
-  if (actor.fullSerial && actor.orderRefs) return detail;
-  return maskDeep(detail, false, 0, { serials: !actor.fullSerial, orders: !actor.orderRefs }) as Record<string, unknown>;
+export function maskedDetail(
+  detail: Record<string, unknown>,
+  actor: Pick<SerialActor, 'fullSerial' | 'orderRefs'> & Partial<Pick<SerialActor, 'cost'>>
+): Record<string, unknown> {
+  // No cost to anyone but the owner: a viewer that does not say it may read
+  // cost is treated as one that may not.
+  const shown = actor.cost === true ? detail : stripFinancials(detail);
+  if (actor.fullSerial && actor.orderRefs) return shown;
+  return maskDeep(shown, false, 0, { serials: !actor.fullSerial, orders: !actor.orderRefs }) as Record<string, unknown>;
 }
 
 export async function serialStory(env: Env, actor: SerialActor, norm: string) {

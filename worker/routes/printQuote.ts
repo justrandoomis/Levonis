@@ -100,7 +100,7 @@ import {
   type PrintAccessory,
 } from '../lib/printAccessories';
 import { DEFAULT_PRICING } from '../lib/printPricing';
-import { engineBUnitPriceAt, fromEngineB, quantityCurve } from '../lib/printEstimate';
+import { fromEngineB } from '../lib/printEstimate';
 import { DEFAULT_LINK_PROVIDERS, parseModelLink, resolveModelLink, type LinkProviderConfig } from '../lib/externalModels';
 
 export const printQuoteRoutes = new Hono<AppContext>();
@@ -358,8 +358,12 @@ printQuoteRoutes.get('/printers', (c) => anonymousCached(c, { perViewer: true },
 /**
  * «إكسسوارات ميكر وورد» — the hardware catalogue the calculator offers.
  *
- * Choices and units are public. Acquisition prices stay on the server and
- * contribute to the final job quote through the same pricing engine.
+ * PUBLIC, WITH NO PRICE ON IT (owner rule 2026-10-10, DECISIONS row 219). The
+ * row's `cost_iqd` is «What ONE unit costs the shop», and both engines add the
+ * margin ON TOP of it — so publishing it handed every visitor the shop's
+ * buying price and, with two quotes of one job (with and without a basket of
+ * parts), the margin and the job's true cost. The customer picks the parts by
+ * name and unit; what they cost reaches them only inside the final price.
  *
  * Retired rows are filtered out here, so a picker never offers something the
  * quote would then refuse to price.
@@ -891,12 +895,17 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
   // bed is a genuinely different job from 1.
   const quantity = 1;
 
-  const user = c.get('user');
-  // A merchant pricing their own job gets their own economics; everyone else
-  // gets the platform's estimate. `storeForUser` returning null is the ordinary
-  // case for a customer, not an error.
-  const store = user ? await storeForUser(c.env.DB, user.id) : null;
-  const merchantId = store?.merchant?.id ?? null;
+  // THE PLATFORM'S ESTIMATE, FOR EVERYONE (owner rule 2026-10-10, DECISIONS
+  // row 219). This door prices on the platform's own figures — the owner's
+  // machine-hour rate, the platform labour and power, the platform margin —
+  // because no machine of the caller's is involved (`merchantPrinter: null`).
+  // It used to answer a store owner with `merchantQuote()`: every cost line of
+  // the platform's own customer price, the owner's rate spelled in the
+  // DEPRECIATION detail, and a margin the caller could choose (so a price
+  // priced at a 1 % margin was the platform's cost). A merchant costs THEIR
+  // machines on /analyses/:id/compare and the workshop costing, on their own
+  // economics; here everyone reads the final price and nothing behind it.
+  const merchantId: string | null = null;
 
   const printerModelId = loaded.record.printer_model_id ? String(loaded.record.printer_model_id) : '';
   const modelRow = printerModelId
@@ -916,7 +925,9 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
     merchantId,
     merchantPrinter: null,
     quantity,
-    targetMarginPercent: calculatorMargin(merchantId ? merchantMargin(body) : undefined, accessories.total_iqd),
+    // The platform's margin, for every caller: a margin the caller names
+    // turns the price into an oracle for the platform's cost (see above).
+    targetMarginPercent: PLATFORM_TARGET_MARGIN_PERCENT,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     platformMachineHourIqd: await platformMachineHourIqd(c.env.DB, printer.technology),
     accessories,
@@ -945,21 +956,18 @@ printQuoteRoutes.post('/analyses/:id/quote', async (c) => {
   return c.json({
     success: true,
     quote_id: quoteId,
-    // TWO PAYLOADS, NOT ONE WITH A FLAG. The customer's shape physically cannot
-    // carry a cost line, so no future edit can leak one by forgetting a check.
-    quote: calculatorQuote(priced.result, !!merchantId),
-    // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E4): the same
-    // shape the request wizard's engine answers in, so one card reads both.
-    // The curve is `priceJob` re-run, pure, at each quantity.
+    // The customer's shape physically cannot carry a cost line, so no future
+    // edit can leak one by forgetting a check — and it is the only shape this
+    // door answers (see the note above `merchantId`).
+    quote: publicQuote(priced.result),
+    // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E3): the same
+    // shape the request wizard's engine answers in, so one card reads both —
+    // without the quantity curve, whose points gave away the job's fixed and
+    // per-copy cost (DECISIONS row 219).
     estimate: fromEngineB(priced.result, {
       analysis: loaded.analysis,
       process: printer.technology,
       quantity,
-      // Engine B's `qty` counts COPIES OF THE ANALYSED JOB (nine parts on a bed
-      // are one job, `quantity` is pinned to 1 above), and `unit_iqd` is per
-      // copy — the contract says so (contract.ts `EstimateCurvePoint`) until
-      // E10 converges the two engines on what a piece is.
-      curve: quantityCurve(quantity, (qty) => engineBUnitPriceAt(priced.pricing, qty)),
     }),
   });
 });
@@ -1249,8 +1257,6 @@ printQuoteRoutes.post('/grams-quote', async (c) => {
       rows,
       printMinutes,
       accessories: readAccessories(body.accessories),
-      // E5: honoured only once `quoteStatedWeight` knows the caller is a merchant.
-      merchantTargetMarginPercent: merchantMargin(body),
     })),
   });
 });
@@ -1270,15 +1276,17 @@ async function quoteStatedWeight(
     rows: GramsRow[];
     printMinutes: number;
     accessories: AccessorySelection[];
-    /** Applied to the merchant's own no-hardware economics (E5). Platform
-     *  hardware quotes always use the platform selling margin. */
-    merchantTargetMarginPercent?: number;
   }
 ) {
   const { printer, rows, printMinutes } = input;
-  const user = c.get('user');
-  const store = user ? await storeForUser(c.env.DB, user.id) : null;
-  const merchantId = store?.merchant?.id ?? null;
+  // The platform's estimate, for every caller, at the platform's margin — the
+  // same rule as /analyses/:id/quote and for the same reason (DECISIONS row
+  // 219): this door prices no machine of the caller's, so a store owner was
+  // reading the platform's own cost lines here, and a margin the caller could
+  // name made the price an oracle for the platform's cost.
+  const merchantId: string | null = null;
+  const targetMarginPercent = PLATFORM_TARGET_MARGIN_PERCENT;
+
   // The stated grams already describe the whole job, so the accessory counts
   // are taken as stated too — `perPart` of 1, matching the `quantity` below.
   const accessories = await pricedAccessories(c.env.DB, input.accessories, 1);
@@ -1291,7 +1299,7 @@ async function quoteStatedWeight(
     // The stated grams already describe the whole job, so there is nothing left
     // for a quantity to multiply — the same reading the file routes take.
     quantity: 1,
-    targetMarginPercent: calculatorMargin(merchantId ? input.merchantTargetMarginPercent : undefined, accessories.total_iqd),
+    targetMarginPercent,
     minimumJobIqd: await platformMinimumJobIqd(c.env.DB),
     // Read for the same reason the floor is: the file calculator and the grams
     // calculator must never answer the same question with two numbers, and an
@@ -1301,9 +1309,8 @@ async function quoteStatedWeight(
   });
 
   return {
-    // §22 again: the same two shapes, chosen the same way. A merchant asking
-    // the counter question sees their own economics; a customer never does.
-    quote: calculatorQuote(priced.result, !!merchantId),
+    // §22 again: the public shape, the only one this door answers.
+    quote: publicQuote(priced.result),
     // Echoed so the screen can show the rows it priced without adding anything
     // up itself — a total computed in the browser is a total that can disagree
     // with the one the engine charged.
@@ -1314,10 +1321,12 @@ async function quoteStatedWeight(
       grams: Math.round(r.grams * 100) / 100,
     })),
     grams_total: Math.round(rows.reduce((sum, r) => sum + r.grams, 0) * 100) / 100,
-    // Echoed for the same reason `rows` is: the screen prints what the engine
-    // charged for rather than adding anything up itself. `unknown` names the
-    // ids the catalogue no longer has, so a stale menu is visible instead of
-    // quietly under-quoting.
+    // Echoed for the same reason `rows` is: the screen names what the engine
+    // priced in. WHAT and HOW MANY only — never the shop's buying price of a
+    // part or of the basket (DECISIONS row 219): the hardware reaches the
+    // customer inside the final price. `unknown` names the ids the catalogue
+    // no longer has, so a stale menu is visible instead of quietly
+    // under-quoting.
     accessories: accessories.lines.map(publicAccessoryLine),
     accessories_unknown: accessories.unknown,
     print_minutes: printMinutes,
@@ -1494,15 +1503,12 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
         machine_hours: priced.result.machineHours,
         waste_grams: priced.result.wasteGrams,
         change_seconds: MULTI_MATERIAL_DEFAULTS[mp.multiMaterial].secondsPerChange,
-        // THE RATE THAT WAS ACTUALLY CHARGED, not a second calculation of it.
-        // This row used to re-derive the figure from `mp.overrides` and the
-        // model card, which was the same answer only for as long as those were
-        // the engine's only two sources. They are not: a machine with no
-        // purchase economics is now priced at the owner's platform rate, and a
-        // «لماذا» row that re-derived 0 while the quote above it charged 1,200
-        // would be a black box wearing an explanation (§25). So it is read off
-        // the snapshot the price was built from, which is the only figure that
-        // cannot drift from what the merchant was billed.
+        // THE RATE THAT WAS ACTUALLY CHARGED, not a second calculation of it,
+        // read off the snapshot the price was built from — the only figure
+        // that cannot drift from what the merchant was billed (§25). It is the
+        // merchant's own declared rate, or 0 when they declared none: a
+        // merchant's costing never falls back to the owner's platform rate or
+        // the owner's model card any more (DECISIONS row 219).
         machine_iqd_per_hour: Math.round(
           ((priced.snapshot.machine_iqd_per_hour as { value?: unknown } | undefined)?.value as number) ?? 0
         ),
@@ -1524,13 +1530,6 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
 function merchantMargin(body: Record<string, unknown>): number {
   const n = Number(body.target_margin_percent);
   return Number.isFinite(n) && n > 0 && n <= 90 ? n : PLATFORM_TARGET_MARGIN_PERCENT;
-}
-
-/** A merchant may set the margin on their own work, but not on the platform's
- * acquisition costs. A near-zero requested margin otherwise turns the final
- * hardware-price difference into the exact amount the platform paid. */
-function calculatorMargin(requested: number | undefined, platformHardwareIqd: number): number {
-  return platformHardwareIqd > 0 ? PLATFORM_TARGET_MARGIN_PERCENT : requested ?? PLATFORM_TARGET_MARGIN_PERCENT;
 }
 
 export interface PriceForPrinterInput {
@@ -1556,14 +1555,38 @@ export interface PriceForPrinterInput {
   accessories?: { lines: PricedAccessory[]; total_iqd: number; unknown: string[] };
 }
 
+/**
+ * A model card with the OWNER's economics taken off — purchase, residual,
+ * useful hours, maintenance and the baseline success rate, every column of the
+ * requireCostRead printer-economics editor that turns an hour into money. The
+ * physics (flow, layer overhead, warm-up, wattages) stay: they say how long a
+ * job takes and how much power it draws, not what anything cost the shop.
+ */
+function withoutOwnerEconomics(printer: PrinterModel): PrinterModel {
+  return { ...printer, purchaseIqd: 0, residualIqd: 0, usefulPrintHours: 0, maintenanceIqdPerHour: 0, baselineSuccessRate: 0 };
+}
+
 /** Assembles the frozen input set and hands it to the pure engine. Everything
  *  that reads the database happens HERE; `priceJob` never sees a connection. */
 export async function priceForPrinter(
   c: Context<AppContext>,
   input: PriceForPrinterInput
 ): Promise<{ result: QuoteResult; pricing: PricingInputs; snapshot: Record<string, unknown> }> {
+  // A MERCHANT'S COSTING IS BUILT FROM THE MERCHANT'S OWN FIGURES (owner rule
+  // 2026-10-10, DECISIONS row 219). Where a store owner declared nothing, the
+  // ladder used to fall through to the OWNER's private inputs — the platform
+  // machine-hour rate (`printPricingConfig`, a COST_SETTING_KEY), the model
+  // card's purchase / residual / useful hours / maintenance / baseline success
+  // rate (the requireCostRead printer-economics editor) and the platform's own
+  // price per kilo (`print_materials.default_iqd_per_kg`) — and merchantQuote()
+  // printed them back line by line («2.07 h @ 3,917/h»). Now an undeclared
+  // figure is simply not charged (the merchant fills it in on their printer or
+  // spool), and the only shop-wide figures left are public ones: a filament's
+  // per-kilo price read off the shop's own PUBLISHED product price.
+  const ownOnly = input.merchantId !== null;
+  const printer = ownOnly ? withoutOwnerEconomics(input.printer) : input.printer;
   const materialIds = input.analysis.materials.map((m) => m.materialId).filter(Boolean);
-  const materialPrices = await loadMaterialPrices(c.env.DB, input.merchantId, materialIds);
+  const materialPrices = await loadMaterialPrices(c.env.DB, input.merchantId, materialIds, { platformDefaults: !ownOnly });
 
   const calibration = await loadCalibration(c.env.DB, {
     merchantId: input.merchantId,
@@ -1591,7 +1614,7 @@ export async function priceForPrinter(
     ...(hasSupport ? [{ id: 'support_removal', minutes: 8 } as LaborTask] : []),
   ];
 
-  const successRate = resolveSuccessRate(input.printer, {
+  const successRate = resolveSuccessRate(printer, {
     ...overrides,
     successRate: calibration.successRate,
     successRateSamples: calibration.samples,
@@ -1599,7 +1622,7 @@ export async function priceForPrinter(
 
   const pricing: PricingInputs = {
     analysis: input.analysis,
-    printer: input.printer,
+    printer,
     materialPrices,
     electricity,
     laborIqdPerHour: labor,
@@ -1609,25 +1632,32 @@ export async function priceForPrinter(
             machineIqdPerHour({
               purchaseIqd: overrides.purchaseIqd,
               residualIqd: overrides.residualIqd ?? 0,
-              usefulPrintHours: overrides.usefulPrintHours ?? input.printer.usefulPrintHours,
+              usefulPrintHours: overrides.usefulPrintHours ?? printer.usefulPrintHours,
             }),
             'merchant'
           )
-        : // THE LAST RUNG (see `platformMachineHourIqd`). Consulted only when
-          // this merchant has declared nothing AND the model card carries no
-          // purchase economics of its own — which is every seeded machine, and
-          // is why an hour on a printer used to cost nothing and why choosing a
-          // different printer could not move a price. `undefined` here would
-          // leave `cost.ts` to fall back on `machineIqdPerHour(printer)`, which
-          // is 0 without `useful_print_hours`; a real model card still wins,
-          // because this branch is not taken when it has one.
-          machineIqdPerHour(input.printer) > 0
-          ? undefined
-          : sourced(input.platformMachineHourIqd, 'platform'),
+        : ownOnly
+          ? // A merchant who declared no purchase economics: no depreciation,
+            // never the owner's rate or the owner's model card (see above).
+            sourced(0, 'merchant')
+          : // THE LAST RUNG (see `platformMachineHourIqd`), for the platform's
+            // own estimate only. Consulted when the model card carries no
+            // purchase economics of its own — which is every seeded machine,
+            // and is why an hour on a printer used to cost nothing and why
+            // choosing a different printer could not move a price. `undefined`
+            // here would leave `cost.ts` to fall back on
+            // `machineIqdPerHour(printer)`, which is 0 without
+            // `useful_print_hours`; a real model card still wins, because this
+            // branch is not taken when it has one.
+            machineIqdPerHour(printer) > 0
+            ? undefined
+            : sourced(input.platformMachineHourIqd, 'platform'),
     maintenanceIqdPerHourOverride:
       overrides.maintenanceIqdPerHour !== undefined
         ? sourced(overrides.maintenanceIqdPerHour, 'merchant')
-        : undefined,
+        : ownOnly
+          ? sourced(0, 'merchant')
+          : undefined,
     laborTasks,
     risk: {
       successRate,
@@ -1664,7 +1694,7 @@ export async function priceForPrinter(
     pricing,
     snapshot: {
       engine_version: PRICING_ENGINE_VERSION,
-      printer: input.printer,
+      printer,
       material_prices: materialPrices,
       electricity,
       labor,
@@ -1677,7 +1707,7 @@ export async function priceForPrinter(
       // §30 again, and for a line that is now the difference between two
       // printers: the machine-hour rate is an owner setting, so a quote priced
       // at 1,200 is only explainable next month if the row says it was 1,200.
-      machine_iqd_per_hour: pricing.machineIqdPerHourOverride ?? sourced(machineIqdPerHour(input.printer), 'profile'),
+      machine_iqd_per_hour: pricing.machineIqdPerHourOverride ?? sourced(machineIqdPerHour(printer), 'profile'),
       // §30: what the hardware was, not just what it came to. A catalogue the
       // owner reprices next month must not change what this quote meant.
       accessories: input.accessories?.lines ?? [],
@@ -1699,14 +1729,6 @@ function publicQuote(r: QuoteResult) {
     waste_percent: r.wastePercent,
     engine_version: r.engineVersion,
   };
-}
-
-/** Platform hardware belongs to the shop, even when a merchant is using the
- * public calculator. Hiding only its line would leave the acquisition amount
- * recoverable from the cost/profit totals, so those quotes use the final-price
- * shape. The merchant's own no-hardware calculations keep their economics. */
-function calculatorQuote(r: QuoteResult, merchant: boolean) {
-  return merchant && !r.lines.some((line) => line.component === 'HARDWARE') ? merchantQuote(r) : publicQuote(r);
 }
 
 /** What a merchant may see of their own workshop economics. */

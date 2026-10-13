@@ -1,0 +1,72 @@
+{
+  "step": "Leak audit 2026-10-10 (DECISIONS row 219) — a stranger reads final values only: no accessory buying price, no print margin or rate, no printer economics, no supplier picture link",
+  "vars": {
+    "slug": {
+      "from": "/api/products?limit=1",
+      "pick": "products.0.slug"
+    }
+  },
+  "probes": [
+    {
+      "path": "/api/print-quote/accessories",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|iqd|price|margin|markup|profit"
+    },
+    {
+      "path": "/api/marketplace/print/catalog",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|margin|markup|profit|machine|setup_fee|per_hour|per_kg|break_even|failure_reserve|purchase|residual|maintenance|labou?r|electric|unit_iqd|^iqd$"
+    },
+    {
+      "path": "/api/print-quote/printers",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|iqd|purchase|residual|maintenance|useful_print_hours|baseline_success|margin|profit"
+    },
+    {
+      "path": "/api/products/print-calculator",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|margin|markup|profit|machine|setup_fee|per_hour|break_even"
+    },
+    {
+      "path": "/api/settings/public",
+      "status": [
+        200
+      ],
+      "forbidKeys": "^(printServicePricing|printPricingConfig|printMaterials|printAccessories|minMarginPercent)$|margin_percent|setup_fee_iqd|machine_iqd_per_hour|cost_iqd"
+    },
+    {
+      "path": "/api/home",
+      "status": [
+        200
+      ],
+      "forbidKeys": "^(printServicePricing|printPricingConfig|printMaterials|printAccessories|minMarginPercent)$|margin_percent|setup_fee_iqd|machine_iqd_per_hour|cost_iqd"
+    },
+    {
+      "path": "/api/products/{slug}",
+      "status": [
+        200
+      ],
+      "valuePatterns": {
+        "source_url": "^$"
+      }
+    },
+    {
+      "path": "/api/public/v1/products/{slug}",
+      "status": [
+        200
+      ],
+      "valuePatterns": {
+        "source_url": "^$"
+      }
+    }
+  ],
+  "note": "Anonymous GETs only. `source_url` is held to the empty string wherever it appears: a picture's supplier link is the owner's (projectPublic blanks it; the public API v1 drops the key, and an absent key passes). The print-service rates and the accessory buying price left every public answer with DECISIONS row 219."
+}

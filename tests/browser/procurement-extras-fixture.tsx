@@ -25,12 +25,17 @@ if (seed === 'route' || seed === 'manual')
   privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header: seed === 'route' ? header : manual, lines: [line], charges: seed === 'manual' ? [{ title: 'شحن', amount_iqd: 466330, basis: 'quantity' }] : [], operationId: 'op-fixture' }));
 else privateDrafts.removeItem('levonis-purchase-draft-v2');
 
-const purchase = { id: 'doc-1', invoice_no: 'DE-2026-17', supplier_name: '', supplier_id: '', warehouse_id: '', status: 'ordered', cost_state: 'final', total_cost_iqd: 7634918, paid_iqd: 0, version: 1, request_json: '{}', ...header };
+const purchase = { id: 'doc-1', invoice_no: 'DE-2026-17', supplier_name: '', supplier_id: '', warehouse_id: '', status: 'ordered', cost_state: 'final', total_cost_iqd: 7634918, supplier_paid_iqd: 0, version: 1, request_json: '{}', ...header };
 const saved = { ...line, id: 'inc-1', line_id: 'pol-1', qty_received: 0, rejected_qty: 0, purchase_unit_iqd: 1382432, purchase_total_iqd: 6912162, auto_shipping_iqd: 662756, charges_iqd: 662756 + 60000 };
 const charges = [
   { id: 'pch-1', title: 'توصيل محلي', amount_iqd: 50000, basis: 'quantity', scope: 'shipment', unit_amount_iqd: null, applies_to: null, allocations: [{ line_id: 'pol-1', amount_iqd: 50000 }] },
   { id: 'pch-2', title: 'تغليف', amount_iqd: 10000, basis: 'quantity', scope: 'unit', unit_amount_iqd: 2000, applies_to: null, allocations: [{ line_id: 'pol-1', amount_iqd: 10000 }] },
 ];
+// The document as the server sends it (worker/routes/adminProcurement.ts `documentWire`): private amounts under cost names.
+const chargeWire = ({ amount_iqd, unit_amount_iqd, allocations, ...c }: (typeof charges)[number]) => ({
+  ...c, charge_amount_iqd: amount_iqd, charge_unit_amount_iqd: unit_amount_iqd,
+  allocations: allocations.map((a) => ({ line_id: a.line_id, charge_amount_iqd: a.amount_iqd })),
+});
 const realFetch = window.fetch.bind(window);
 window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -42,7 +47,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   if (path === '/api/admin/procurement/config') data = { suppliers: [], locations: [], investors: [], cost_profiles: [profile] };
   else if (path === '/api/admin/procurement/documents' && method === 'GET') data = { purchases: [purchase] };
   else if (path.startsWith('/api/admin/procurement/documents') && (method === 'POST' || method === 'PUT')) data = { id: 'doc-1' };
-  else if (path === '/api/admin/procurement/documents/doc-1' && method === 'GET') data = { purchase, funding: null, lines: [saved], charges, payments: [], ordered_total_iqd: 7634918, paid_iqd: 0, balance_iqd: 7634918, matching: { ordered_qty: 5, received_qty: 0, invoiced_qty: 5, rejected_qty: 0, invoice_difference_iqd: null } };
+  else if (path === '/api/admin/procurement/documents/doc-1' && method === 'GET') data = { purchase, funding: null, lines: [saved], charges: charges.map(chargeWire), payments: [], ordered_total_iqd: 7634918, supplier_paid_iqd: 0, supplier_balance_iqd: 7634918, matching: { ordered_qty: 5, received_qty: 0, invoiced_qty: 5, rejected_qty: 0, invoice_difference_iqd: null } };
   return new Response(JSON.stringify(data ? { success: true, ...data } : { success: false, error: `Fixture missing ${method} ${path}` }), { status: data ? 200 : 404, headers: { 'content-type': 'application/json' } });
 }) as typeof window.fetch;
 

@@ -438,7 +438,7 @@ serialInventoryRoutes.get('/:serial', async (c) => {
             action: h.action,
             created_at: h.created_at,
             actor: h.actor_id ? { id: h.actor_id, email: h.email ?? null, username: h.username ?? null } : null,
-            detail: hideSerial || hideOrders ? maskedDetail(detail, actor) : detail,
+            detail: hideSerial || hideOrders || !actor.cost ? maskedDetail(detail, actor) : detail,
           };
         }),
     ...(story ? { story } : {}),

@@ -2,9 +2,10 @@
  * THE SHOP'S DOLLAR, AS A READING OF A DINAR PRICE (FX programme plan §3,
  * §13 "Rate source" and "Conversion").
  *
- * `/api/settings/public` carries `displayUsdRate`: the effective USD/IQD —
- * the Iraqi parallel-market sell plus the owner's adjustment, once approved —
- * as DECIMAL TEXT ("1703.9167"). It is the one FX figure that is public, and
+ * `/api/settings/public` carries `displayUsdRate`: the USD/IQD a dinar price
+ * is read in dollars at — the Iraqi parallel-market sell to the whole dinar
+ * (never the owner's adjustment on top of it, DECISIONS row 219), or a rate
+ * the owner typed — as DECIMAL TEXT ("1667"). It is the one FX figure that is public, and
  * this module is the only place the browser reads it.
  *
  * NO FLOAT EVER TOUCHES IT. U = n / 10^k is read as two BigInts and a dinar

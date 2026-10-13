@@ -72,7 +72,7 @@ const pricingPreview = (body?: Record<string, unknown>) => {
 
 // ----------------------------------------------------------------- the purchase documents
 const state = { name: 'شحنة قديمة' };
-const purchase = () => ({ id: 'doc-1', invoice_no: state.name, supplier_name: 'Germany', status: 'ordered', cost_state: 'final', total_cost_iqd: 12853822, paid_iqd: 0, version: 2, request_json: '{}', ...header, invoice_no: state.name });
+const purchase = () => ({ id: 'doc-1', invoice_no: state.name, supplier_name: 'Germany', status: 'ordered', cost_state: 'final', total_cost_iqd: 12853822, supplier_paid_iqd: 0, version: 2, request_json: '{}', ...header, invoice_no: state.name });
 const savedLine = (m: (typeof MODELS)[number], i: number) => ({ ...draftLine(m.option_id, m.n, 320), id: `inc-${i}`, line_id: `pol-${i}`, qty_received: 0, rejected_qty: 0, purchase_unit_iqd: 528000, purchase_total_iqd: 3696000, auto_shipping_iqd: 384300, charges_iqd: 384300 });
 const funding = { investor_name: 'Investor', user_id: 'investor', agreed_iqd: 13000000, allocated_iqd: 12853822, received_iqd: 0, unallocated_iqd: 0, store_contribution_iqd: 0, funding_shortfall_iqd: 12853822, profit_share_bps: 3500 };
 
@@ -88,7 +88,7 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   else if (path === '/api/admin/procurement/documents' && method === 'GET') data = { purchases: [purchase(), { ...purchase(), id: 'doc-2', invoice_no: '', status: 'draft' }] };
   else if (path === '/api/admin/procurement/documents' && method === 'POST') { state.name = String(body?.invoice_no ?? ''); data = { id: 'doc-1' }; }
   else if (path === '/api/admin/procurement/documents/doc-1/name' && method === 'PATCH') { state.name = String(body?.name ?? '').replace(/\s+/g, ' ').trim(); data = { id: 'doc-1', name: state.name }; }
-  else if (path === '/api/admin/procurement/documents/doc-1' && method === 'GET') data = { purchase: purchase(), funding, lines: MODELS.map(savedLine), charges: [], payments: [], ordered_total_iqd: 12853822, paid_iqd: 0, balance_iqd: 12853822, matching: { ordered_qty: 14, received_qty: 0, invoiced_qty: 14, rejected_qty: 0, invoice_difference_iqd: null } };
+  else if (path === '/api/admin/procurement/documents/doc-1' && method === 'GET') data = { purchase: purchase(), funding, lines: MODELS.map(savedLine), charges: [], payments: [], ordered_total_iqd: 12853822, supplier_paid_iqd: 0, supplier_balance_iqd: 12853822, matching: { ordered_qty: 14, received_qty: 0, invoiced_qty: 14, rejected_qty: 0, invoice_difference_iqd: null } };
   else if (path === '/api/admin/pricing/procurement/preview') data = pricingPreview(body);
   else if (path === '/api/admin/pricing/products/a1/apply-purchase') data = { already: false, product_id: 'a1', rows_changed: 2, priced: true, entered: true };
   return new Response(JSON.stringify(data ? { success: true, ...data } : { success: false, error: `Fixture missing ${method} ${path}` }), { status: data ? 200 : 404, headers: { 'content-type': 'application/json' } });

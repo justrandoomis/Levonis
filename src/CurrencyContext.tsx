@@ -51,9 +51,10 @@ import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableR
  * THE RATE IS THE SHOP'S, NEVER THE WALLET'S (FX programme plan §13, D7, Q5;
  * owner decision 9, 2026-10-09).
  *
- * `money()` divides by `settings.displayUsdRate`: the effective USD/IQD — the
- * Iraqi parallel-market sell plus the owner's fixed adjustment, once approved
- * — as decimal text, converted exactly (src/lib/displayRate.ts). The wallet's
+ * `money()` divides by `settings.displayUsdRate`: the shop's display USD/IQD —
+ * the Iraqi parallel-market sell to the whole dinar once approved (never the
+ * owner's private adjustment on top of it, DECISIONS row 219), or a rate the
+ * owner typed — as decimal text, converted exactly (src/lib/displayRate.ts). The wallet's
  * `exchangeRate` (1 USD = 1,400 IQD) is a different rate with a different
  * job and is NEVER a fallback here: until the owner approves the first value
  * the server sends null and a dollar reader sees DINARS, with a note that the
@@ -133,7 +134,7 @@ export function formatUsdFromIqd(iqd: number, rate: number): string {
 
 /** Where the rate on screen came from. Never the wallet: its `exchangeRate` is not a market rate (owner decision 9). */
 export type DisplayRateSource =
-  /** The shop's effective USD/IQD (`displayUsdRate`). */
+  /** The shop's display USD/IQD (`displayUsdRate`). */
   | 'shop'
   /** The last shop rate this device showed prices at, before the settings arrive. */
   | 'cache';

@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { fetchFinanceCategories, fetchFinanceProducts, fetchFinanceSummary } from '../../lib/financeApi';
 import {
   ApiError,
-  fetchFinanceCategories,
-  fetchFinanceProducts,
-  fetchFinanceSummary,
   isAborted,
   type FinanceBreakdownRow,
   type FinanceCategoriesReport,

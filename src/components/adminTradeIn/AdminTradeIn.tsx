@@ -30,7 +30,7 @@ import { Modal } from '../adminProducts/ui';
 import { api, ApiError, failureText } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, STATUS_LABELS, TRADE_IN_FAMILIES, checklistOf, tradeInSettlement, type TradeInFamily, type TradeInStatus } from '../../../packages/pricing/src/tradeIn';
-import type { RequestView } from '../tradeIn/model';
+import type { AdminRequestView as RequestView } from '../tradeIn/model';
 import { monthsWords, timeLeftWords, warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 import RulesEditor from './RulesEditor';
 

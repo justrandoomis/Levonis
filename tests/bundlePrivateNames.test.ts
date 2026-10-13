@@ -60,6 +60,15 @@ const NEVER_AT_FIRST_PAINT = [
   'iraqsm',
   '/rates/fx',
   '/api/admin/pricing',
+  // The owner's profit report and expense ledger (requireCostRead, like
+  // /api/admin/pricing): src/lib/financeApi.ts, reached through the admin
+  // shell only (DECISIONS row 219).
+  '/api/admin/finance',
+  // The completeness list's private entries (TXT keys of the owner's pricing
+  // block): packages/contracts/src/productCompleteness.ts, kept out of the
+  // refusal table every page loads (completenessRefusals.ts).
+  'product_cost_iqd',
+  'pricing.rules.',
   'إعدادات الحماية',
   'Safety settings',
   'ڕێکخستنەکانی پاراستن',

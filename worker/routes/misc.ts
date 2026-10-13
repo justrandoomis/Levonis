@@ -41,8 +41,10 @@ miscRoutes.get('/health', async (c) => {
  * every visitor — the request pipeline never loads a session for it and the
  * colo caches it under the anonymous policy (P2a); the settings PUT purges it.
  *
- * `displayUsdRate` (FX programme plan §8, §13): the shop's effective USD/IQD
- * as decimal text — the ONE public FX figure, read beside the settings in the
+ * `displayUsdRate` (FX programme plan §8, §13; DECISIONS row 219): the USD/IQD
+ * the dollar reading converts at — the provider's market sell to the whole
+ * dinar, never the owner's adjusted rate (worker/lib/fx/displayRate.ts) — as
+ * decimal text — the ONE public FX figure, read beside the settings in the
  * same wave — or null until the owner approves the first value (and on a
  * database without migration 0179) — with `displayUsdRateAttributed`, whether
  * that figure is the provider's (credited to IQWealth) or one the owner typed.

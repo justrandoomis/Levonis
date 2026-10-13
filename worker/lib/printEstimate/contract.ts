@@ -102,9 +102,6 @@ export type EstimateReasonCode = (typeof ESTIMATE_REASON_CODES)[number];
 
 export type EstimateConfidence = 'high' | 'medium' | 'low';
 
-/** The quantities every curve carries, plus the one that was asked for (E4). */
-export const ESTIMATE_CURVE_QUANTITIES = [1, 2, 5, 10] as const;
-
 /**
  * Fragments that must never serialise out of a public estimate payload. A
  * test greps the JSON of every public route for them; a builder adding a
@@ -117,18 +114,6 @@ export const ESTIMATE_FORBIDDEN_FRAGMENTS = ['cost_', 'floor_', 'margin_', 'line
 export interface EstimateFactor {
   key: EstimateFactorKey;
   weight: EstimateFactorWeight;
-}
-
-export interface EstimateCurvePoint {
-  qty: number;
-  /**
-   * Per piece at that quantity, so the customer sees what the count buys.
-   * For engine B (`print-quote`, a WHOLE job priced from a file — nine parts
-   * on one bed are one job) a «piece» is one copy of that job: `qty` counts
-   * copies and `unit_iqd` is per copy, until E10 converges the engines on
-   * what a piece is.
-   */
-  unit_iqd: number;
 }
 
 export interface EstimateEngine {
@@ -160,10 +145,6 @@ export interface Estimate {
   covers: EstimateCoverKey[];
   /** What is not, and might be assumed to be. */
   excludes: EstimateExcludeKey[];
-
-  /** Per-piece price at 1, 2, 5, 10 and the requested quantity, ascending.
-   *  Pure re-runs of the same engine — never an interpolation. */
-  quantity_curve: EstimateCurvePoint[];
 
   /** '' when the material was left open (`range_basis: 'materials'`). */
   material_id: string;
@@ -199,7 +180,6 @@ export function unpricedEstimate(
     factors: [],
     covers: [],
     excludes: [],
-    quantity_curve: [],
     material_id: facts.material_id ?? '',
     process: facts.process ?? 'fdm',
     time_minutes: 0,

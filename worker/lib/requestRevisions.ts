@@ -198,13 +198,20 @@ export interface RevisionSnapshot {
   hash: string;
 }
 
-/** The estimate as a customer and merchant may read it: never the cost lines. */
+/**
+ * The estimate as a customer and merchant may read it: never the cost lines,
+ * never the hardware's buying price (DECISIONS row 219) — its lines keep what
+ * and how many, and lose `unit_iqd` / `iqd` («What ONE unit costs the shop»
+ * and that times the count). No quantity curve either: re-runs at other
+ * counts gave the job's fixed and per-copy cost away.
+ */
 export function publicEstimate(raw: unknown): Record<string, unknown> {
   const e = { ...(safeParse<Record<string, unknown>>(raw, {}) ?? {}) };
   delete e.cost_lines;
   delete e.cost_iqd;
   delete e.floor_iqd;
   delete e.margin_percent;
+  delete e.quantity_curve;
   if (Array.isArray(e.accessory_lines)) e.accessory_lines = e.accessory_lines.map(publicAccessoryLine);
   return stripFinancials(e);
 }

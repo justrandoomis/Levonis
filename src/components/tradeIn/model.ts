@@ -1,10 +1,12 @@
 /**
  * «الاستبدال» on the client — the shapes the Worker sends (worker/lib/tradeIn.ts
  * `requestView`, `listEligible`, `listTargets`) and the few pure helpers the
- * screens share. The valuation itself is NOT re-implemented here: the wizard
- * imports the same engine the Worker runs (packages/pricing/src/tradeIn.ts),
- * so the live figure on the phone and the figure the server writes are one
- * function applied to one set of rules.
+ * screens share. The valuation is NOT run here (DECISIONS row 219): the
+ * owner's valuation rules are the calculation behind a price Levonis sets, so
+ * the customer's wizard is told only which questions to ask
+ * (`TradeInQuestions`) and posts the answers to
+ * POST /api/trade-in/requests/:id/preview, which answers the final figures.
+ * The admin screens read the full rules and breakdown (`AdminRequestView`).
  */
 import {
   type ComponentInputs,
@@ -16,8 +18,6 @@ import {
   type TradeInSettlement,
   type TradeInStatus,
   daysBetween,
-  tradeInSettlement,
-  valuateComponent,
   warrantyMonthsLeft,
   wholeMonthsBetween,
 } from '../../../packages/pricing/src/tradeIn';
@@ -75,18 +75,39 @@ export interface ComponentView {
   base_iqd: number;
   inputs: Partial<ComponentInputs>;
   value_iqd: number | null;
-  estimate: ComponentValuation | null;
+  /** The part's estimated value — the figure alone; the breakdown is the admin's (`AdminComponentView`). */
+  estimate: { value_iqd: number } | null;
   required_angles: string[];
   photos: PhotoView[];
 }
 
+export interface AdminComponentView extends Omit<ComponentView, 'estimate'> {
+  estimate: ComponentValuation | null;
+}
+
+/** The estimate as the customer reads it: each part's final value, the total and the settlement. */
 export interface EstimateView {
-  components: Array<{ role: ComponentRole; family: TradeInFamily; label_ar: string; label_en: string; valuation: ComponentValuation }>;
+  components: Array<{ role: ComponentRole; family: TradeInFamily; label_ar: string; label_en: string; value_iqd: number }>;
   total_iqd: number;
   settlement: TradeInSettlement | null;
   usage_months: number;
   warranty_remaining_months: number;
   computed_at: string;
+}
+
+export interface AdminEstimateView extends Omit<EstimateView, 'components'> {
+  components: Array<{ role: ComponentRole; family: TradeInFamily; label_ar: string; label_en: string; valuation: ComponentValuation }>;
+  rule_versions?: Partial<Record<TradeInFamily, number>>;
+}
+
+/** What the wizard asks for one family (worker/lib/tradeIn.ts `publicQuestions`) — never what an answer is worth. */
+export interface TradeInQuestions {
+  family: TradeInFamily;
+  version: number;
+  /** The factors the owner turned on: which questions to show. */
+  asked: string[];
+  faults: Array<{ id: string; label_ar: string; label_en: string }>;
+  replaced_parts: Array<{ id: string; label_ar: string; label_en: string }>;
 }
 
 export interface TargetView {
@@ -149,13 +170,20 @@ export interface RequestView {
   cancel_reason: string;
   blockers: { inputs: Record<string, string[]>; photos: Record<string, string[]>; target: boolean } | null;
   events: TradeInEvent[];
-  rules: Partial<Record<TradeInFamily, TradeInRuleSet>>;
+  questions: Partial<Record<TradeInFamily, TradeInQuestions>>;
   can: { edit: boolean; submit: boolean; cancel: boolean; decide: boolean; pay: boolean };
   created_at: string;
   submitted_at: string | null;
   decided_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
+}
+
+/** The same request as an admin reads it: the rules that price it and the per-factor breakdown. */
+export interface AdminRequestView extends Omit<RequestView, 'components' | 'estimate' | 'questions'> {
+  components: AdminComponentView[];
+  estimate: AdminEstimateView | null;
+  rules: Partial<Record<TradeInFamily, TradeInRuleSet>>;
 }
 
 export interface RequestSummary {
@@ -198,29 +226,16 @@ export function contextOf(source: RequestView['source'], nowIso = new Date().toI
   };
 }
 
-/**
- * THE LIVE FIGURE — the wizard's answers through the server's own rules.
- * Null while a family's rules have not arrived (never a guess).
- */
-export function liveEstimate(
-  req: Pick<RequestView, 'source' | 'components' | 'rules' | 'target'>,
-  inputs: Partial<Record<ComponentRole, ComponentInputs>>,
-  productId: string
-): { total: number; parts: Array<{ role: ComponentRole; valuation: ComponentValuation }>; settlement: TradeInSettlement | null } | null {
-  const ctx = contextOf(req.source);
-  const parts: Array<{ role: ComponentRole; valuation: ComponentValuation }> = [];
-  for (const c of req.components) {
-    const rules = req.rules[c.family];
-    const answers = inputs[c.role];
-    if (!rules || !answers) return null;
-    parts.push({
-      role: c.role,
-      valuation: valuateComponent(rules, { base_iqd: c.base_iqd, usage_months: ctx.usage_months, warranty_remaining_months: ctx.warranty_remaining_months, product_id: productId }, answers),
-    });
-  }
-  const total = parts.reduce((s, p) => s + p.valuation.value_iqd, 0);
-  const price = req.target?.price_iqd ?? null;
-  return { total, parts, settlement: price ? tradeInSettlement(price, total) : null };
+/** The wizard's live figure, as POST /api/trade-in/requests/:id/preview answers it. */
+export interface LiveEstimate {
+  total: number;
+  parts: Array<{ role: ComponentRole; value_iqd: number }>;
+  settlement: TradeInSettlement | null;
+}
+
+export function liveFromEstimate(e: EstimateView | null | undefined): LiveEstimate | null {
+  if (!e) return null;
+  return { total: e.total_iqd, parts: e.components.map((c) => ({ role: c.role, value_iqd: c.value_iqd })), settlement: e.settlement };
 }
 
 /** «14 شهر و 3 أيام» — a duration the customer can picture. */

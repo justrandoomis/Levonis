@@ -177,7 +177,10 @@ test('every /api/admin mount of worker/index.ts has a classification — and no 
   const have = new Set((await classified()).map(key));
   const missing = mounts.filter((m) => !have.has(key(m))).map(key);
   assert.deepEqual(missing, [], 'add a tests/routeClass/<family>.ts entry for these mounts');
-  const live = new Set(mounts.map(key));
+  // A classification may also name a mount outside /api/admin (the routers
+  // with admin routes under another prefix, and the customer print doors —
+  // DECISIONS row 219); it is stale only when worker/index.ts mounts it nowhere.
+  const live = new Set(allIndexMounts().map(key));
   const stale = [...have].filter((k) => !live.has(k));
   assert.deepEqual(stale, [], 'these classified mounts are no longer in worker/index.ts');
 });
@@ -412,7 +415,7 @@ test('every valid write body a classification names is accepted for the owner', 
   assert.ok(withBody.length >= 25, `only ${withBody.length} valid bodies — the write sweep would prove little`);
   const problems: string[] = [];
   for (const e of withBody) {
-    const app = mountApp(e, OWNER);
+    const app = mountApp(e, e.rule.caller ? ROLES[e.rule.caller] : OWNER);
     const res = await call(app, e.method, realPath(e), await resolveBody(app, e.rule.body as WriteBody));
     if (res.status < 200 || res.status >= 300) problems.push(`${e.method} ${realPath(e)}: ${res.status} ${JSON.stringify(res.body).slice(0, 160)}`);
   }

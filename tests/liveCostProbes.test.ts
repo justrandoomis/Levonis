@@ -21,7 +21,7 @@ import { sourceOf } from './fixtures/source';
 import { APEX, asD1, ctx, freshDb } from './fixtures/app';
 import { seedCostlyProduct } from './fixtures/costlyProduct';
 import { LIVE_PRODUCTS, seedLiveCatalog } from './fixtures/liveCatalog';
-import { FX_PUBLIC_RATE, FX_SENTINELS, seedFxSentinels } from './fixtures/fxSentinels';
+import { FX_DISPLAY_RATE, FX_SENTINELS, seedFxSentinels } from './fixtures/fxSentinels';
 import worker from '../worker/index';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
@@ -212,11 +212,12 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
   assert.ok(pub.valuePatterns?.displayUsdRate, 'the public figure is held to decimal text or null');
   // The regex catches every private FX name of the 0179 tables and the rates DTO…
   const keys = new RegExp(pub.forbidKeys!, 'i');
-  for (const k of ['market_rate', 'market_buy', 'adjustment_iqd_per_usd', 'market_adjustment_iqd', 'settings_diff', 'provider', 'pending_effective_rate', 'last_known_good_rate', 'anomaly_threshold_pct', 'drift_anchor_rate', 'bound_min', 'rejected_rate', 'official_rate', 'effective_rate', 'effective_rates_iqd', 'manual_rate', 'cross_rate', 'usd_iqd_rate', 'source_usd_per_eur', 'fx_usd_iqd_at_purchase', 'rate_iqd', 'supplier_cost_amount', 'current_supplier_cost_iqd']) {
+  for (const k of ['margin_percent', 'setup_fee_iqd', 'machine_iqd_per_hour', 'market_rate', 'market_buy', 'adjustment_iqd_per_usd', 'market_adjustment_iqd', 'settings_diff', 'provider', 'pending_effective_rate', 'last_known_good_rate', 'anomaly_threshold_pct', 'drift_anchor_rate', 'bound_min', 'rejected_rate', 'official_rate', 'effective_rate', 'effective_rates_iqd', 'manual_rate', 'cross_rate', 'usd_iqd_rate', 'source_usd_per_eur', 'fx_usd_iqd_at_purchase', 'rate_iqd', 'supplier_cost_amount', 'current_supplier_cost_iqd']) {
     assert.ok(keys.test(k), `the probe would miss ${k}`);
   }
   // …and not the public ones.
-  for (const k of ['displayUsdRate', 'exchangeRate', 'currency', 'price_iqd', 'margin_percent', 'setup_fee_iqd']) assert.equal(keys.test(k), false, k);
+  // (The print-service rates left the public settings with DECISIONS row 219: forbidden above.)
+  for (const k of ['displayUsdRate', 'exchangeRate', 'currency', 'price_iqd']) assert.equal(keys.test(k), false, k);
 
   for (const withRate of [false, true]) {
     const raw = freshDb();
@@ -229,12 +230,99 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
       const text = await res.text();
       assert.deepEqual(judge(p, res.status, text), [], `${p.path} (${withRate ? 'a rate' : 'no rate'})`);
       if (p.path === '/api/settings/public' || p.path === '/api/home') {
-        // Not vacuous: the figure is there — the effective rate, or null before the first approval.
-        assert.equal(JSON.parse(text).settings.displayUsdRate, withRate ? FX_PUBLIC_RATE : null, p.path);
+        // Not vacuous: the figure is there — the market base to the dinar (DECISIONS row 219), or null before the first approval.
+        assert.equal(JSON.parse(text).settings.displayUsdRate, withRate ? FX_DISPLAY_RATE : null, p.path);
         for (const v of FX_SENTINELS) assert.equal(text.includes(v), false, `${p.path} carries the private figure ${v}`);
       }
     }
   }
+});
+
+// ------------------------------------------------------------- leaks.json (the 2026-10-10 leak audit, DECISIONS row 219)
+
+const SUPPLIER_LINK = 'https://supplier-secret.example/listing/original.jpg';
+
+test('leaks.json: each probe flags the value the audit found leaking, and passes the public shape', () => {
+  const leaksFile = files.find((f) => f.file === 'leaks.json');
+  assert.ok(leaksFile, 'scripts/live-cost-probes.d/leaks.json exists');
+  const at = (path: string) => leaksFile!.spec.probes.find((p) => p.path === path)!;
+  for (const path of ['/api/print-quote/accessories', '/api/marketplace/print/catalog', '/api/print-quote/printers', '/api/products/print-calculator', '/api/settings/public', '/api/home', '/api/products/{slug}', '/api/public/v1/products/{slug}']) {
+    assert.ok(at(path), `leaks.json probes ${path}`);
+    assert.deepEqual(at(path).status, [200], path);
+  }
+  const acc = at('/api/print-quote/accessories');
+  assert.deepEqual(judge(acc, 200, JSON.stringify({ accessories: [{ id: 'magnet-6x3', name_en: 'Magnet', unit: 'piece', category: 'magnet' }] })), []);
+  assert.match(judge(acc, 200, JSON.stringify({ accessories: [{ id: 'magnet-6x3', cost_iqd: 250 }] })).join('\n'), /forbidden key cost_iqd/);
+  const cat = at('/api/marketplace/print/catalog');
+  assert.deepEqual(judge(cat, 200, JSON.stringify({ min_job_iqd: 5000, accessories: [{ id: 'a', unit: 'piece' }] })), [], 'the published minimum job stays');
+  assert.match(judge(cat, 200, JSON.stringify({ accessories: [{ id: 'a', cost_iqd: 250 }] })).join('\n'), /forbidden key cost_iqd/);
+  const printers = at('/api/print-quote/printers');
+  for (const k of ['purchase_iqd', 'residual_iqd', 'maintenance_iqd_per_hour', 'useful_print_hours', 'baseline_success_rate', 'machine_iqd_per_hour']) {
+    assert.match(judge(printers, 200, JSON.stringify({ printers: [{ id: 'bbl-a1', [k]: 1 }] })).join('\n'), new RegExp(`forbidden key ${k}`), k);
+  }
+  assert.deepEqual(judge(printers, 200, JSON.stringify({ printers: [{ id: 'bbl-a1', price_group: 'f1', untimed_price_group: 'u1' }] })), [], 'a price GROUP label is not a figure');
+  const calc = at('/api/products/print-calculator');
+  assert.deepEqual(judge(calc, 200, JSON.stringify({ filaments: [{ price_iqd: 25000, iqd_per_gram: 25 }], rates: { configured: true } })), [], 'the filament sale prices stay');
+  for (const k of ['margin_percent', 'setup_fee_iqd', 'machine_iqd_per_hour']) {
+    assert.match(judge(calc, 200, JSON.stringify({ rates: { [k]: 1, configured: true } })).join('\n'), new RegExp(`forbidden key ${k}`), k);
+  }
+  for (const path of ['/api/settings/public', '/api/home']) {
+    const p = at(path);
+    assert.match(judge(p, 200, JSON.stringify({ settings: { printServicePricing: null } })).join('\n'), /forbidden key printServicePricing/, path);
+    assert.match(judge(p, 200, JSON.stringify({ settings: { x: { margin_percent: 30 } } })).join('\n'), /forbidden key margin_percent/, path);
+    assert.deepEqual(judge(p, 200, JSON.stringify({ settings: { displayUsdRate: '1667', printerHomeDeliveryNoteIqd: 5000 } })), [], path);
+  }
+  const page = at('/api/products/{slug}');
+  assert.deepEqual(judge(page, 200, JSON.stringify({ product: { media: [{ key: 'k', source_url: '' }] } })), []);
+  const leak = judge(page, 200, JSON.stringify({ product: { media: [{ key: 'k', source_url: SUPPLIER_LINK }] } })).join('\n');
+  assert.match(leak, /source_url \(at product\.media\[0\]\.source_url\) does not match/);
+  assert.doesNotMatch(leak, /supplier-secret/, 'a failure line never carries the value');
+});
+
+test('leaks.json against the local Worker with every private print figure set and a supplier link on the probed product: every probe passes', async () => {
+  const leaksFile = files.find((f) => f.file === 'leaks.json')!;
+  const raw = freshDb();
+  raw.exec('PRAGMA foreign_keys = OFF;');
+  seedCostlyProduct(raw);
+  seedLiveCatalog(raw);
+  // The owner's private print figures, all set (the audit found the sweeps reading nulls).
+  raw.exec(`
+    INSERT INTO admin_settings (key,value) VALUES
+      ('printServicePricing','{"machine_iqd_per_hour":6141,"setup_fee_iqd":6252,"margin_percent":27.75}')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+    UPDATE printer_models SET purchase_iqd = 2150000, residual_iqd = 350000, useful_print_hours = 6000, maintenance_iqd_per_hour = 180;
+  `);
+  const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+  const get = async (path: string) => {
+    const res = await worker.fetch(new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    return { status: res.status, text: await res.text() };
+  };
+  const vars: Record<string, string> = {};
+  for (const [name, def] of Object.entries(leaksFile.spec.vars ?? {})) vars[name] = pick(JSON.parse((await get(def.from)).text), def.pick);
+  assert.ok(vars.slug, 'the probed slug resolves');
+  // A picture fetched by URL from a supplier, on the very product the probes read.
+  const key = `products/x/gallery/${'d4'.repeat(32)}.webp`;
+  raw.prepare('UPDATE products SET images = ? WHERE slug = ?').run(
+    JSON.stringify([{ id: 'img_sup', url: `/files/${key}`, key, role: 'gallery', alt_ar: 'صورة', alt_en: 'Picture', alt_ckb: 'وێنە', order: 0, primary: true, width: 800, height: 800, source_url: SUPPLIER_LINK, option_value_id: '', color_id: '', variant_id: '' }]),
+    vars.slug
+  );
+  const failures: string[] = [];
+  const bodies = new Map<string, string>();
+  for (const p of leaksFile.spec.probes) {
+    const path = fillPath(p.path, vars);
+    const { status, text } = await get(path);
+    bodies.set(p.path, text);
+    failures.push(...(judge(p, status, text) as string[]).map((f) => `${path}: ${f}`));
+  }
+  assert.deepEqual(failures, []);
+  // Not vacuous: the lists are there, the picture is served, and its supplier link is blanked.
+  assert.ok(JSON.parse(bodies.get('/api/print-quote/accessories')!).accessories.length > 0, 'the accessory catalogue answered');
+  assert.ok(JSON.parse(bodies.get('/api/print-quote/printers')!).printers.length > 0, 'the printer list answered');
+  assert.equal(JSON.parse(bodies.get('/api/products/print-calculator')!).rates.configured, true, 'the calculator says the owner priced the service');
+  const pageText = bodies.get('/api/products/{slug}')!;
+  assert.ok(pageText.includes(key), 'the product page serves the picture');
+  assert.ok(pageText.includes('"source_url":""'), 'with its supplier link blanked');
+  for (const text of bodies.values()) assert.equal(text.includes('supplier-secret'), false);
 });
 
 // ------------------------------------------------------------- the workflow

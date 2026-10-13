@@ -583,6 +583,18 @@ function PrinterCard({
               {loc('هدر', 'waste')}
             </p>
           )}
+          {/* A machine with no purchase economics declared is costed at no
+              wear at all — never at the platform's own rate (DECISIONS row
+              219) — so the shop is told where the figure comes from. */}
+          {row.because && row.because.machine_iqd_per_hour === 0 && (
+            <p className="px-3.5 pb-2 text-text-muted text-[10.5px] leading-relaxed" data-costing-no-wear>
+              {loc(
+                'لم تُدخل سعر شراء هذه الطابعة، فاهتلاكها غير محسوب في الكلفة.',
+                'This printer’s purchase price is not entered, so its wear is not in the cost.',
+                'نرخی کڕینی ئەم چاپکەرە نەنووسراوە، بۆیە سووانی لە تێچووەکەدا نییە.'
+              )}
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -29,7 +29,7 @@
  */
 import { COST_REFUSALS, isCostRefusalCode } from '../../packages/contracts/src/costRefusals';
 import { DATA_FILE_REFUSALS, isDataFileRefusalCode } from '../../packages/contracts/src/dataFileRefusals';
-import { COMPLETENESS_REFUSALS, isCompletenessRefusalCode } from '../../packages/contracts/src/productCompleteness';
+import { COMPLETENESS_REFUSALS, isCompletenessRefusalCode } from '../../packages/contracts/src/completenessRefusals';
 
 export interface RefusalStrings {
   ar: string;

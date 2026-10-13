@@ -6,6 +6,7 @@ import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, typ
 import { estimateLineKey, purchaseEstimate } from './purchaseEstimate';
 import { changeLineCostProfile, changePurchaseCostMode, cloneCostProfileSnapshot, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
 import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looksLikeFreight, newChargeDraft, type ChargeDraft } from './procurementCharges';
+import { purchaseDocumentFromWire, purchaseRowFromWire } from './procurementWire';
 import PurchaseLineCosts, { type ExtraChargeView } from './PurchaseLineCosts';
 import PurchaseUnitOrigins, { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigins } from './PurchaseUnitOrigins';
 import type { PurchaseSerialResult } from './PurchaseUnitSerial';
@@ -208,7 +209,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       api.get<{ purchases: Purchase[] }>(`${PROCUREMENT}/documents?offset=${offset}&awaiting=${receiveOnly ? '1' : '0'}`),
     ]);
     setConfig({ ...cfg, investors: cfg.investors ?? [], cost_profiles: cfg.cost_profiles ?? [] });
-    setPurchases(r.purchases);
+    setPurchases(r.purchases.map((p) => purchaseRowFromWire<Purchase>(p)));
   }, [offset, receiveOnly]);
   const { run } = op;
   useEffect(() => { if (!editing || (!lines.length && funding.mode === 'store')) return; const timer = setTimeout(() => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive })); setDraftAvailable(true); }, 600); return () => clearTimeout(timer); }, [editing, header, lines, charges, funding, editId, editVersion, operationId, quickReceive]);
@@ -223,7 +224,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     catch (e) { if (e instanceof ApiError && e.code === 'PRICING_NOT_INSTALLED') setPricingOff(true); }
   };
   const open = async (id: string) => {
-    const d = await api.get<Detail>(`${PROCUREMENT}/documents/${id}`);
+    const d = purchaseDocumentFromWire<Detail>(await api.get<unknown>(`${PROCUREMENT}/documents/${id}`));
     setSelected(d);
     setRenaming(null);
     void loadSavedPricing(id, d.purchase.status);
@@ -358,7 +359,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     // Cached picker rows belong to the completed draft. A future purchase must
     // fetch the just-saved supplier defaults, not reuse its pre-save snapshot.
     setRecent([]);
-    const d = await api.get<Detail>(`${PROCUREMENT}/documents/${r.id}`);
+    const d = purchaseDocumentFromWire<Detail>(await api.get<unknown>(`${PROCUREMENT}/documents/${r.id}`));
     // The two steps are independently idempotent. A failed receipt leaves the
     // confirmed incoming document available to resume from the shipment list.
     if (quickReceive && status === 'ordered') {

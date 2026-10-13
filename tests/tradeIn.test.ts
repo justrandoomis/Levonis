@@ -12,7 +12,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_RULE_SETS,
   FACTOR_IDS,
   REQUIRED_PHOTOS,
   TRADE_IN_FAMILIES,
@@ -32,6 +31,7 @@ import {
   type FactorRule,
   type TradeInRuleSet,
 } from '../packages/pricing/src/tradeIn';
+import { DEFAULT_RULE_SETS } from '../packages/pricing/src/tradeInDefaults';
 import { amsSplit, loadRuleBook, paidPerUnit } from '../worker/lib/tradeIn';
 import { asD1, freshDb } from './fixtures/app';
 

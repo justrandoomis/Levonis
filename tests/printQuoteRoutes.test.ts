@@ -804,7 +804,7 @@ test('a public caller cannot choose the margin: target_margin_percent in the bod
   assert.equal(raised.quote.price_iqd, plain.quote.price_iqd);
 });
 
-test('a merchant may still price their own job at their own margin, within reason', async () => {
+test('a merchant on the platform file calculator reads the platform price: no cost chain, no margin of their own', async () => {
   const raw = freshDb();
   seedMerchant(raw, 'm-2', 'u-merchant-2');
   raw.prepare(`UPDATE print_materials SET default_iqd_per_kg = 22000 WHERE id = 'pla'`).run();
@@ -816,19 +816,21 @@ test('a merchant may still price their own job at their own margin, within reaso
   const analysed = await json(await post(a, `/api/print-quote/analyses/${id}`, analyseBody()));
   assert.equal(analysed.success, true, JSON.stringify(analysed));
 
+  // This door prices no machine of the merchant's: its figures are the
+  // platform's own (the owner's machine-hour rate, the platform margin), so a
+  // store owner reads the final price like everyone else (DECISIONS row 219).
+  // Their own machines are costed on /analyses/:id/compare.
   const platform = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, {}));
   assert.equal(platform.success, true, JSON.stringify(platform));
-  // Their own economics — this is the merchant payload — at the platform margin.
-  assert.ok(Math.abs(platform.quote.margin_percent - 35) < 1, `${platform.quote.margin_percent}%`);
+  for (const key of ['lines', 'base_cost_iqd', 'true_cost_iqd', 'profit_iqd', 'margin_percent']) {
+    assert.equal(key in platform.quote, false, `the merchant read ${key} off the platform calculator`);
+  }
 
-  const own = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, { target_margin_percent: 60 }));
-  assert.ok(own.quote.price_iqd > platform.quote.price_iqd, 'a higher margin is a higher price, for the merchant');
-  assert.ok(Math.abs(own.quote.margin_percent - 60) < 1, `${own.quote.margin_percent}%`);
-  // The estimate follows the merchant's own price too — it is their card.
-  assert.equal(own.estimate.price_iqd, own.quote.price_iqd);
-
-  // A margin that is not a margin (99 % is a division by nearly nothing) is
-  // not honoured; the platform's applies.
-  const absurd = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, { target_margin_percent: 99 }));
-  assert.equal(absurd.quote.price_iqd, platform.quote.price_iqd);
+  // A margin the caller names would turn the price into an oracle for the
+  // platform's cost: none is honoured, whatever it is.
+  for (const margin of [1, 60, 99]) {
+    const named = await json(await post(a, `/api/print-quote/analyses/${id}/quote`, { target_margin_percent: margin }));
+    assert.equal(named.quote.price_iqd, platform.quote.price_iqd, `${margin}% was honoured`);
+    assert.equal(named.estimate.price_iqd, named.quote.price_iqd);
+  }
 });

@@ -608,7 +608,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
                   onClick={() =>
                     op.run(
                       async () => {
-                        const r = await api.post<{ unknown_cost_lines: number }>(
+                        const r = await api.post<{ unknown_cost_lines?: number }>(
                           `${STOCK}/counts/${countDetails.count.id}/post`,
                           {},
                         );

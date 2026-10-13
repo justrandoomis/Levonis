@@ -7,7 +7,7 @@ import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting } from '../lib/settings';
 import { anonymousCached } from '../lib/edgePolicy';
-import { fromEngineA, quantityCurve } from '../lib/printEstimate';
+import { fromEngineA } from '../lib/printEstimate';
 import {
   MAX_ACCESSORY_QTY,
   publicAccessory,
@@ -226,6 +226,13 @@ printRequestRoutes.get('/catalog', (c) => anonymousCached(c, {}, async () => {
       .map(([id, cap]) => ({ id, ...cap })),
     // The wizard shows this so a customer knows what "more detail" buys them.
     min_job_iqd: cfg.min_job_iqd,
+    /**
+     * «إكسسوارات ميكر وورد», by name and unit — never the buying price, like
+     * `publicMaterial` (owner rule 2026-10-10, DECISIONS row 219): `cost_iqd`
+     * is what one unit costs the shop, the margin goes on top of it, and two
+     * estimates of one job with and without a basket of parts gave away the
+     * margin and the job's cost. The parts reach the customer inside the price.
+     */
     accessories: accs.map(publicAccessory),
   });
 }));
@@ -505,21 +512,12 @@ printRequestRoutes.post('/quote', requireAuth, async (c) => {
   };
   const quote = estimateFor(spec, choices, input, mats, cfg);
 
-  // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E4): the one
+  // THE ESTIMATE CONTRACT (docs/MERCHANT_PLATFORM_V2.md §4.1 E1–E3): the one
   // shape every screen reads, beside the engine's own public fields for one
-  // release. The quantity curve is this same engine re-run at 1, 2, 5, 10 and
-  // the asked-for count — pure, no read — so the curve's figure for a quantity
-  // is exactly what this route would answer for it.
-  const estimate = fromEngineA(quote, {
-    quantity: spec.quantity,
-    curve: quantityCurve(spec.quantity, (qty) => {
-      const at =
-        qty === spec.quantity
-          ? quote
-          : estimateFor({ ...spec, quantity: qty }, choices, { ...input, quantity: qty }, mats, cfg);
-      return at.priced ? at.unit_price_iqd : null;
-    }),
-  });
+  // release. No quantity curve: re-runs of the engine at other counts gave the
+  // job's fixed and per-copy cost away (DECISIONS row 219); the customer asks
+  // for the count they want and is quoted that.
+  const estimate = fromEngineA(quote, { quantity: spec.quantity });
 
   // The cost breakdown is the shop's business, not the customer's. What the
   // customer gets is the range, the confidence and why. `accessory_lines` goes
@@ -1590,7 +1588,8 @@ printRequestRoutes.get('/requests/:id', async (c) => {
   const analysis = parseJson<ModelAnalysis | null>(row.analysis, null);
   // The cost breakdown is the platform's, not the merchant's and not the
   // customer's. Everyone sees the range and the confidence; nobody sees how it
-  // was built.
+  // was built — the one allow-list in requestRevisions.ts, the hardware lines
+  // cut to what and how many (DECISIONS row 219).
   const estimate = publicEstimate(row.estimate);
 
   return c.json({

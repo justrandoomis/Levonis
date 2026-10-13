@@ -29,7 +29,7 @@ test('public service tariffs only accept numeric scalars, including historical n
     { machine_iqd_per_hour: null, setup_fee_iqd: null });
 });
 
-test('configured print margin stays private in the calculator, public settings and home for every caller', async () => {
+test('configured print rates and margin stay private in the calculator, public settings and home for every caller', async () => {
   const raw = seededCopy();
   try {
     raw.prepare('INSERT OR REPLACE INTO admin_settings (key,value) VALUES (?,?)').run('printServicePricing', JSON.stringify({
@@ -45,9 +45,10 @@ test('configured print margin stays private in the calculator, public settings a
         problems.push(...leaks(body).map((leak) => `${role} ${path}: ${leak}`));
         if (path.endsWith('/print-calculator')) {
           const rates = body.rates as Record<string, unknown>;
-          assert.equal(rates.machine_iqd_per_hour, 2500, 'published service price remains usable');
-          assert.equal(rates.setup_fee_iqd, 1500);
-          assert.equal(rates.configured, true);
+          // The machine-hour rate and the setup fee are inputs of the print
+          // price like the margin: the calculator says only whether the
+          // service is priced (DECISIONS row 219).
+          assert.deepEqual(rates, { configured: true });
         }
       }
     }
@@ -86,7 +87,8 @@ test('historical order snapshots are projected when read, retaining the paid pri
       const res = await get(app, path);
       assert.equal(res.status, 200);
       const body = await json(res);
-      const order = (body.order ?? (body.orders as unknown[])[0]) as Record<string, unknown>;
+      // The matrix seeds more than one order for u1 (the leak-audit rows, DECISIONS row 219): read ord1 by id.
+      const order = (body.order ?? (body.orders as Array<Record<string, unknown>>).find((o) => o.id === 'ord1')) as Record<string, unknown>;
       const line = (order.items as Array<Record<string, unknown>>)[0]!;
       assert.equal(line.unit_price_iqd, 900000);
       assert.equal((line.pricing as Record<string, unknown>).applied_iqd, 900000);
@@ -124,7 +126,8 @@ test('grams quotes keep the final hardware-inclusive price and selected quantiti
   const raw = seededCopy();
   try {
     raw.exec("UPDATE print_materials SET default_iqd_per_kg=22000 WHERE id='pla'");
-    raw.exec("INSERT INTO community_merchants (id,user_id,name) VALUES ('hardware-merchant','u_m','Hardware Workshop'); INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('hardware-store','hardware-merchant','u_m','hardware-workshop','Hardware Workshop')");
+    // The matrix may already give u_m a store (the leak-audit seed): a merchant either way.
+    raw.exec("INSERT OR IGNORE INTO community_merchants (id,user_id,name) VALUES ('hardware-merchant','u_m','Hardware Workshop'); INSERT OR IGNORE INTO merchant_stores (id,merchant_id,user_id,slug,name) SELECT 'hardware-store',id,'u_m','hardware-workshop','Hardware Workshop' FROM community_merchants WHERE user_id = 'u_m'");
     raw.prepare('INSERT OR REPLACE INTO admin_settings (key,value) VALUES (?,?)').run('printAccessories', JSON.stringify([
       { id: 'test-magnet', name_ar: 'مغناطيس', name_en: 'Magnet', name_ckb: 'ماگنێت', unit: 'piece', category: 'magnet', active: true, cost_iqd: COST.product },
     ]));
@@ -132,7 +135,11 @@ test('grams quotes keep the final hardware-inclusive price and selected quantiti
     for (const role of ['guest', 'customer', 'merchant'] as const) {
       const app = appFor(raw, ROLES[role], [['/api/print-quote', printQuoteRoutes]]);
       const plain = await json(await post(app, '/api/print-quote/grams-quote', input));
-      if (role === 'merchant') assert.ok('true_cost_iqd' in plain.quote, 'own no-hardware economics remain available');
+      // The public calculators price on the platform's own figures (no machine
+      // of the caller's is involved), so a store owner reads the final price
+      // like everyone else — never the platform's cost chain (DECISIONS row 219;
+      // a merchant costs their own machines on /analyses/:id/compare).
+      assert.ok(!('true_cost_iqd' in plain.quote), `${role}: no cost chain on the public calculator`);
       const res = await post(app, '/api/print-quote/grams-quote', { ...input, accessories: [{ id: 'test-magnet', qty: 1 }] });
       assert.equal(res.status, 200);
       const body = await json(res);
@@ -153,11 +160,12 @@ test('published and historical estimates retain selected accessories without the
   assert.deepEqual(leaks(projected), []);
 });
 
-test('a merchant controls their own margin but cannot reprice platform hardware at acquisition cost', async () => {
+test('a merchant cannot reprice the platform calculators: any requested margin answers the platform price, with or without hardware', async () => {
   const raw = seededCopy();
   try {
     raw.exec("UPDATE print_materials SET default_iqd_per_kg=22000 WHERE id='pla'");
-    raw.exec("INSERT INTO community_merchants (id,user_id,name) VALUES ('hardware-merchant','u_m','Hardware Workshop'); INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('hardware-store','hardware-merchant','u_m','hardware-workshop','Hardware Workshop')");
+    // The matrix may already give u_m a store (the leak-audit seed): a merchant either way.
+    raw.exec("INSERT OR IGNORE INTO community_merchants (id,user_id,name) VALUES ('hardware-merchant','u_m','Hardware Workshop'); INSERT OR IGNORE INTO merchant_stores (id,merchant_id,user_id,slug,name) SELECT 'hardware-store',id,'u_m','hardware-workshop','Hardware Workshop' FROM community_merchants WHERE user_id = 'u_m'");
     raw.exec("INSERT INTO print_analyses (id,owner_id,file_sha256,fingerprint,printer_model_id,print_minutes_per_plate) VALUES ('hardware-analysis','u_m','hardware-hash','hardware-fingerprint','bbl-a1m',60)");
     raw.exec("INSERT INTO print_analysis_materials (id,analysis_id,material_id,material_type,model_grams) VALUES ('hardware-material','hardware-analysis','pla','PLA',100)");
     const app = appFor(raw, ROLES.merchant, [['/api/print-quote', printQuoteRoutes]]);
@@ -174,9 +182,15 @@ test('a merchant controls their own margin but cannot reprice platform hardware 
         return body.quote;
       };
       const platformHardware = await quote(undefined, true);
+      const platformPlain = await quote(undefined);
       const ownLowMargin = await quote(0.000001);
       const ownHighMargin = await quote(90);
-      assert.ok(ownHighMargin.price_iqd > ownLowMargin.price_iqd, 'the merchant still chooses their own no-hardware selling margin');
+      // A margin the caller names made the platform's price an oracle for the
+      // platform's own cost — with hardware AND without (DECISIONS row 219):
+      // these doors price no machine of the merchant's, so the margin is the
+      // platform's for everyone. Their own machines are costed on /compare.
+      assert.equal(ownLowMargin.price_iqd, platformPlain.price_iqd, `${path}: a near-zero margin is not honoured`);
+      assert.equal(ownHighMargin.price_iqd, platformPlain.price_iqd, `${path}: nor is a high one`);
       for (const margin of [0, 0.000001, 10, 90]) {
         const hardware = await quote(margin, true);
         assert.notEqual(hardware.price_iqd - ownLowMargin.price_iqd, COST.product,

@@ -61,7 +61,7 @@ async function refreshNow(raw: DatabaseSync, sell: number) {
   return runFxScheduler(fxEnv(raw), { now: new Date() }, { trigger: 'refresh', pairs: ['USD_IQD'], fetchImpl: m.f.fetch, actorId: 'usr_owner' });
 }
 
-test("the owner's example: market 1,660 + market_adjustment_iqd 20 → held at 1,680; approved, the pair, pricing_fx_rates and displayUsdRate all read 1,680", async () => {
+test("the owner's example: market 1,660 + market_adjustment_iqd 20 → held at 1,680; approved, the pair and pricing_fx_rates read 1,680, the public displayUsdRate the market 1,660", async () => {
   const { raw, app } = world();
   // The owner types the adjustment before the first value arrives (the first value is always held).
   const typed = await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: ownerVersion(raw), market_adjustment_iqd: '20' });
@@ -82,7 +82,9 @@ test("the owner's example: market 1,660 + market_adjustment_iqd 20 → held at 1
   assert.equal(usd.drift_anchor_rate, '1680', 'the approval is the Confirmed Rate');
   assert.equal(derivedOf(raw).USD!.rate_iqd, '1680');
   const pub = await json(await get(app, '/api/settings/public'));
-  assert.equal(pub.settings.displayUsdRate, '1680');
+  // The public figure is the market base, to the dinar (DECISIONS row 219): 1,680 − 20 would give the
+  // owner's private adjustment away against the published market sell. Prices still use 1,680.
+  assert.equal(pub.settings.displayUsdRate, '1660');
   assert.equal(pub.settings.exchangeRate, 1400, 'the wallet rate is untouched (decision 9)');
 
   // The owner's panel shows the sum, and that it holds.

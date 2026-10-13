@@ -249,11 +249,12 @@ test('THE MONEY LINES — BNPL replaces the door figure, and a store sale names 
     storeName: 'متجر النور',
     totalIqd: 60_000,
     dueOnDeliveryIqd: 0,
-    merchantReceivableIqd: 54_000,
   });
   assert.match(store, /🛒 طلب متجر جديد — ORD-S1/);
   assert.match(store, /المتجر: متجر النور/);
-  assert.match(store, /يستلم التاجر: 54,000 د\.ع/);
+  // The merchant's share beside the total is the platform's commission — never
+  // in a group read by assistants (DECISIONS row 219).
+  assert.doesNotMatch(store, /يستلم التاجر/);
 });
 
 test('A STORE SALE names the option and colour by the MERCHANT\u2019S words — never an id', () => {

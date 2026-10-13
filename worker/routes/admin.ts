@@ -3951,10 +3951,20 @@ adminRoutes.delete('/coupons/:id', async (c) => {
  *                       readable by every admin.
  * The rest of the settings (home, ads, shipping text…) stay with every admin.
  */
-const COST_SETTING_KEYS: readonly string[] = ['minMarginPercent', 'printPricingConfig', 'printMaterials'];
-// Mixed documents keep their public labels/fees readable, but changing the
-// whole value also changes its private margin or acquisition costs.
-const COST_WRITE_SETTING_KEYS: readonly string[] = [...COST_SETTING_KEYS, 'printServicePricing', 'printAccessories'];
+const COST_SETTING_KEYS: readonly string[] = [
+  'minMarginPercent',
+  'printPricingConfig',
+  'printMaterials',
+  // The print calculator's margin, machine-hour rate and setup fee (owner rule
+  // 2026-10-10, DECISIONS row 219): a margin plus two inputs of the print
+  // price — the owner's, no longer a «published price list» on the public
+  // settings either.
+  'printServicePricing',
+];
+// A mixed document keeps its labels readable by every admin (its cost field is
+// stripped by projectForAdmin: `printAccessories[].cost_iqd`, «what ONE unit
+// costs the shop»), but writing the whole value also writes that cost field.
+const COST_WRITE_SETTING_KEYS: readonly string[] = [...COST_SETTING_KEYS, 'printAccessories'];
 const MONEY_SETTING_KEYS: readonly string[] = [
   ...COST_SETTING_KEYS,
   'exchangeRate',

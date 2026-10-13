@@ -380,6 +380,15 @@ app.use('/api/admin/*', noStoreUnlessSet);
 app.use('/api/admin/*', securityEventsDoor);
 app.use('/api/cart', noStoreUnlessSet);
 app.use('/api/cart/*', noStoreUnlessSet);
+// EVERY OTHER API ANSWER TOO, unless its route chose a policy (owner rule
+// 2026-10-10, DECISIONS row 219: «Cache» is a channel). About 130 admin routes
+// live under non-admin prefixes (`/api/returns/admin/*`,
+// `/api/price-protection/admin/*`, `/api/devices/admin/*`, …) and the owner's
+// bell (`/api/notifications`) carries owner-only figures; they answered with
+// no Cache-Control at all, so a shared browser kept them on disk after
+// sign-out. A route that is deliberately public sets its own header
+// (`anonymousCached`, the public API, the edge-cached catalogue) and keeps it.
+app.use('/api/*', noStoreUnlessSet);
 
 app.route('/api/auth', authRoutes);
 app.route('/api/products', productRoutes);

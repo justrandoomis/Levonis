@@ -7,9 +7,9 @@
  *       public payload never serialises `cost_`, `floor_`, `margin_` or `lines`
  *   E2  factors are ordinal buckets (≥ 40 % most, ≥ 15 % some, else omitted)
  *       and covers come from the line keys, never the amounts
- *   E4  the quantity curve carries 1, 2, 5, 10 and the requested count, is
- *       ascending, and its unit price does not rise with the count on a
- *       plain part — each point a pure re-run, never an interpolation
+ *   E4  no quantity curve (DECISIONS row 219): a unit price at 1, 2, 5 and
+ *       10 copies is two equations in the job's fixed and per-copy COST, so
+ *       the contract answers the asked quantity's price alone
  *
  * Real migrations and the real routers through the D1 adapter; only the
  * session lookup is stubbed.
@@ -22,13 +22,11 @@ import type { AppContext } from '../worker/lib/types';
 import { analyseModel, type ModelAnalysis } from '../worker/lib/modelGeometry';
 import { DEFAULT_MATERIALS, DEFAULT_PRICING, quotePrint, type Quote } from '../worker/lib/printPricing';
 import {
-  ESTIMATE_CURVE_QUANTITIES,
   ESTIMATE_EXCLUDE_KEYS,
   ESTIMATE_FACTOR_KEYS,
   ESTIMATE_FORBIDDEN_FRAGMENTS,
   ESTIMATE_REASON_CODES,
   fromEngineA,
-  quantityCurve,
   type Estimate,
 } from '../worker/lib/printEstimate';
 import { coversFrom, excludesFrom, factorsFrom } from '../worker/lib/printEstimate/explain';
@@ -69,7 +67,7 @@ const cube = (mm: number): ModelAnalysis => analyseModel(cubeBytes(mm), 'c.stl')
 
 const CONTRACT_KEYS = [
   'priced', 'price_iqd', 'price_low_iqd', 'price_high_iqd', 'unit_price_iqd', 'quantity',
-  'confidence', 'reasons', 'factors', 'covers', 'excludes', 'quantity_curve',
+  'confidence', 'reasons', 'factors', 'covers', 'excludes',
   'material_id', 'process', 'time_minutes', 'material_grams', 'engine',
 ].sort();
 const OPTIONAL_KEYS = new Set(['reason', 'range_basis']);
@@ -97,24 +95,15 @@ function assertNoLeak(payload: unknown, label: string) {
   }
 }
 
-function assertCurve(e: Estimate, requested: number, label: string) {
-  const qtys = e.quantity_curve.map((p) => p.qty);
-  for (const q of [...ESTIMATE_CURVE_QUANTITIES, requested]) assert.ok(qtys.includes(q), `${label}: curve lacks ×${q}`);
-  assert.deepEqual(qtys, [...qtys].sort((a, b) => a - b), `${label}: curve ascending`);
-  assert.equal(new Set(qtys).size, qtys.length, `${label}: one point per quantity`);
-  for (let i = 1; i < e.quantity_curve.length; i++) {
-    assert.ok(
-      e.quantity_curve[i].unit_iqd <= e.quantity_curve[i - 1].unit_iqd,
-      `${label}: unit price rose from ×${qtys[i - 1]} to ×${qtys[i]} (${JSON.stringify(e.quantity_curve)})`
-    );
-  }
-  const asked = e.quantity_curve.find((p) => p.qty === requested)!;
-  assert.equal(asked.unit_iqd, e.unit_price_iqd, `${label}: the curve's point at the asked count IS the unit price`);
+/** E4: the estimate carries no quantity curve — only the asked quantity's price. */
+function assertCurve(e: Estimate, _requested: number, label: string) {
+  assert.equal((e as unknown as Record<string, unknown>).quantity_curve, undefined, `${label}: the estimate carries a quantity curve`);
+  assert.ok(e.unit_price_iqd >= 0, `${label}: the unit price is there`);
 }
 
 // --------------------------------------------------------- the pure adapters
 
-test('engine A folds into the contract: the shape, the curve, and not one cost figure', () => {
+test('engine A folds into the contract: the shape, no curve, and not one cost figure', () => {
   const run = (quantity: number) =>
     quotePrint(
       { analysis: cube(50), materialId: 'pla', quality: 'standard', infill: 0.2, quantity, colors: 1, supports: true, post_processing_minutes: 0 },
@@ -122,7 +111,7 @@ test('engine A folds into the contract: the shape, the curve, and not one cost f
       DEFAULT_PRICING
     );
   const q = run(3);
-  const e = fromEngineA(q, { quantity: 3, curve: quantityCurve(3, (n) => run(n).unit_price_iqd) });
+  const e = fromEngineA(q, { quantity: 3 });
 
   assertContractShape(e, 'A');
   assertNoLeak(e, 'A');
@@ -151,14 +140,14 @@ test('an unpriced quote is an unpriced estimate with its reason, and still leaks
     DEFAULT_MATERIALS,
     DEFAULT_PRICING
   );
-  const e = fromEngineA(q, { quantity: 2, curve: [] });
+  const e = fromEngineA(q, { quantity: 2 });
   assertContractShape(e, 'unpriced');
   assertNoLeak(e, 'unpriced');
   assert.equal(e.priced, false);
   assert.equal(e.reason, 'MATERIAL_UNKNOWN');
   assert.deepEqual(e.reasons, ['MATERIAL_UNKNOWN']);
   assert.equal(e.price_iqd, 0);
-  assert.deepEqual(e.quantity_curve, []);
+  assert.equal((e as unknown as Record<string, unknown>).quantity_curve, undefined);
   assert.deepEqual(e.factors, []);
 });
 
@@ -178,7 +167,7 @@ test('factors are ordinal buckets of the cost shares: ≥ 40 % most, ≥ 15 % so
     price_low_iqd: 1250, price_high_iqd: 1750, floor_iqd: 1250, margin_percent: 33, confidence: 'high',
     confidence_reasons: [], unit_price_iqd: 1500, accessory_lines: [], accessories_unknown: [],
   };
-  const e = fromEngineA(q, { quantity: 1, curve: [{ qty: 1, unit_iqd: 1500 }] });
+  const e = fromEngineA(q, { quantity: 1 });
   assert.deepEqual(e.factors, [
     { key: 'material', weight: 'most' },
     { key: 'machine', weight: 'some' },
@@ -201,21 +190,17 @@ test('factors are ordinal buckets of the cost shares: ≥ 40 % most, ≥ 15 % so
   assert.deepEqual(excludesFrom(['machine', 'delivery', 'delivery']), ['delivery', 'machine']);
 });
 
-test('the quantity curve is 1, 2, 5, 10 and the asked count, ascending, one point each (E4)', () => {
-  assert.deepEqual(
-    quantityCurve(5, (q) => 100 - q).map((p) => p.qty),
-    [1, 2, 5, 10]
+test('no quantity curve: the contract answers the asked quantity alone (E4, DECISIONS row 219)', () => {
+  const q = quotePrint(
+    { analysis: cube(30), materialId: 'pla', quality: 'standard', infill: 0.2, quantity: 4, colors: 1, supports: true, post_processing_minutes: 0 },
+    DEFAULT_MATERIALS,
+    DEFAULT_PRICING
   );
-  assert.deepEqual(
-    quantityCurve(7, (q) => 100 - q).map((p) => p.qty),
-    [1, 2, 5, 7, 10]
-  );
-  // A quantity the engine could not price is left out, never drawn at zero.
-  assert.deepEqual(
-    quantityCurve(1, (q) => (q === 5 ? null : 50)).map((p) => p.qty),
-    [1, 2, 10]
-  );
-  assert.deepEqual(quantityCurve(0, () => 10)[0], { qty: 1, unit_iqd: 10 });
+  const e = fromEngineA(q, { quantity: 4 });
+  assert.equal((e as unknown as Record<string, unknown>).quantity_curve, undefined);
+  assert.ok(!JSON.stringify(e).includes('quantity_curve'));
+  assert.equal(e.quantity, 4);
+  assert.equal(e.unit_price_iqd, q.unit_price_iqd);
 });
 
 // ------------------------------------------------- the routes, end to end
