@@ -332,8 +332,12 @@ test('A — the cost-touching writes (return refund that restores the costly lot
 
     // The claim is decided on a world of its own: a price-protection payout on
     // an item whose return was just refunded is refused before any money moves
-    // (PRICE_PROTECTION_RETURN_REVIEW), and this case is about each write's answer.
-    const pp = await send(await world(), role, 'POST', `/api/price-protection/admin/claims/${IDS.claim}/decide`, { decision: 'approved' });
+    // (PRICE_PROTECTION_RETURN_REVIEW), and so is one while the line's return
+    // is still open (review 2026-10-13, PF-1). This case is about each write's
+    // answer, so the claim's world closes the return without a refund first.
+    const claimWorld = await world();
+    claimWorld.prepare("UPDATE return_cases SET state='rejected' WHERE id=?").run(IDS.returnCase);
+    const pp = await send(claimWorld, role, 'POST', `/api/price-protection/admin/claims/${IDS.claim}/decide`, { decision: 'approved' });
     assert.equal(pp.status, 200, `${role}: the claim approval did not run: ${JSON.stringify(pp.body).slice(0, 400)}`);
     assert.deepEqual(filteredLeaks('/api/price-protection/admin/claims/decide', pp.body), [], `${role}: the claim decision carries a cost`);
 
