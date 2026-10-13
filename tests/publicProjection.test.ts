@@ -100,16 +100,40 @@ test('the public projection carries no cost field at any level', () => {
   );
 });
 
-test('and it still carries the selling prices and adjustments it should', () => {
+/**
+ * FINAL NUMBERS ONLY (Pricing V2 V2-0, C5; DECISIONS row 225). This test used
+ * to pin the opposite — that an option's own selling price and adjustment
+ * survive "for the resolver downstream". Nothing downstream resolves a price
+ * from this payload: every figure a customer sees is resolved on the server
+ * (`price_levels`, `pricing_modes`, the quote). The ladder was the arithmetic
+ * of the final price, and on a product priced per SKU not even a price anyone
+ * pays. The chooser's facts stay; every rung of the ladder goes.
+ */
+test('and it carries what a chooser draws, never the ladder beneath the price', () => {
   const out = projectPublic(docWithCosts()) as unknown as {
     options: Array<Record<string, unknown>>;
     colors: Array<Record<string, unknown>>;
-  };
-  // The stripper must remove cost, not everything: an option's own selling
-  // price and its ADJUSTMENT are what the resolver needs downstream.
-  assert.equal(out.options[0].regular_price_iqd, 100_000);
-  assert.equal(out.options[0].regular_adjust_iqd, 5_000);
-  assert.equal(out.colors[0].pro_price_iqd, 90_000);
+    preorder_transports: Array<Record<string, unknown>>;
+  } & Record<string, unknown>;
+  const ladder = /^(regular|prime|pro)_(price|adjust)_iqd$|^surcharge_iqd$|^commission_iqd$|^direct_surcharge_iqd$/;
+  const levels = [
+    ...out.options,
+    ...out.colors,
+    ...out.options.flatMap((o) => (o.fulfillments as Array<Record<string, unknown>>) ?? []),
+    ...out.options.flatMap((o) =>
+      ((o.fulfillments as Array<Record<string, unknown>>) ?? []).flatMap((f) => (f.transports as Array<Record<string, unknown>>) ?? [])
+    ),
+    ...out.preorder_transports,
+  ];
+  assert.deepEqual(levels.flatMap((l) => Object.keys(l).filter((k) => ladder.test(k))), []);
+  assert.equal('direct_surcharge_iqd' in out, false);
+  // …and the facts a chooser needs are still there.
+  assert.equal(out.options[0].id, 'o1');
+  assert.equal(out.options[0].name_en, 'A');
+  assert.equal(out.colors[0].hex, '#000000');
+  const cell = (out.options[0].fulfillments as Array<Record<string, unknown>>)[0];
+  assert.equal(cell.fulfillment_type, 'pre_order');
+  assert.deepEqual((cell.transports as Array<Record<string, unknown>>).map((t) => [t.method, t.enabled]), [['land', true]]);
 });
 
 function media(id: string, order: number, primary = false): MediaV2 {

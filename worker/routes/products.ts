@@ -23,6 +23,7 @@ import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, pu
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
 import { parseProductRow, projectPublic, projectAdmin } from '../lib/productModel';
+import { customerAvailability, customerLinePrice } from '../lib/customerPricing';
 import type { ProductDoc } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallback } from '../lib/pricing';
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
@@ -2034,11 +2035,27 @@ export function membershipPreview(
   return { prime: null, pro: ctx.proPaused ? null : forTier('pro') };
 }
 
-/** Resolver output for public consumers — cost stripped, everything else kept. */
-function publicQuote(r: ResolvedPrice) {
-  const { cost_iqd, ...rest } = r;
-  void cost_iqd;
-  return rest;
+/**
+ * A LIVE OFFER, APPLIED EXACTLY AS THE CART AND THE CHECKOUT APPLY IT (Pricing
+ * V2 step V2-0, C2; DECISIONS row 225).
+ *
+ * The level grid and the card priced a live window; the quote, the pills and
+ * the public API `purchase` block called the resolver bare. So during an offer
+ * the page first painted the offer price from the grid and then, the moment
+ * the quote landed, replaced it with the HIGHER ladder price — a number the
+ * cart did not charge. Every customer price on this route now goes through this
+ * one rule, which is the cart's (`resolveCartLine`): an ordinary product, a
+ * window the viewer may take (`offerEligible`), `applyOfferToResolved`.
+ */
+export function withLiveOffer(
+  r: ResolvedPrice,
+  doc: ProductDoc,
+  ctx: PricingCtx,
+  offer: OfferView | null | undefined,
+  now: number
+): ResolvedPrice {
+  if (!offer || (doc.composition ?? '') !== '' || !offerEligible(ctx.tierStatus, offer, now).ok) return r;
+  return applyOfferToResolved(r, offer, ctx.tier, ctx.tierActive, now).resolved;
 }
 
 /**
@@ -2053,13 +2070,13 @@ function publicQuote(r: ResolvedPrice) {
  */
 export interface PricingModes {
   /** A direct sale of this selection, or null when the line cannot be fulfilled from stock. */
-  direct: { unit_subtotal_iqd: number; direct: ResolvedPrice['direct'] } | null;
+  direct: { unit_subtotal_iqd: number } | null;
   preorder: Array<{
     method: string;
     /** Paid in advance: the configured pre-order price. null = commission unconfigured. */
-    prepaid: { unit_subtotal_iqd: number; transport: ResolvedPrice['transport'] } | null;
+    prepaid: { unit_subtotal_iqd: number } | null;
     /** Paid cash on delivery: priced as a direct sale WHEN the product has a direct premium. */
-    cod: { unit_subtotal_iqd: number; direct: ResolvedPrice['direct']; pricing_basis: ResolvedPrice['pricing_basis'] } | null;
+    cod: { unit_subtotal_iqd: number } | null;
     /** The two figures above differ. */
     cod_reprices: boolean;
   }>;
@@ -2067,14 +2084,22 @@ export interface PricingModes {
   cod_reprices: boolean;
 }
 
+/**
+ * FINAL NUMBERS ONLY (V2-0, C5): each way to buy carries its unit price and
+ * nothing it was built from — the premium, the route commission and the rule
+ * that priced a cash-on-delivery line stay on the server. A LIVE OFFER prices
+ * every one of them (C2), so a pill can never read higher than the cart.
+ */
 export function pricingModes(
   doc: ProductDoc,
   ctx: PricingCtx,
   sel: { optionId: string | null; colorId: string | null; optionValueIds?: readonly string[] },
-  isPrinter: boolean
+  isPrinter: boolean,
+  offer?: OfferView | null,
+  now: number = Date.now()
 ): PricingModes {
   const resolve = (transportMethod: string | null, preorderPricing: 'prepaid' | 'cod') =>
-    resolveUnitPrice({
+    withLiveOffer(resolveUnitPrice({
       product: doc,
       optionId: sel.optionId,
       optionValueIds: sel.optionValueIds,
@@ -2087,9 +2112,9 @@ export function pricingModes(
       memberFallback: benefitFallbackFor(ctx, doc),
       preorderPricing,
       isPrinter,
-    });
+    }), doc, ctx, offer, now);
   const d = resolve(null, 'prepaid');
-  const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd, direct: d.direct };
+  const direct = d.errors.includes('TRANSPORT_REQUIRED') ? null : { unit_subtotal_iqd: d.unit_subtotal_iqd };
   const unusable = new Set(['TRANSPORT_NOT_APPLICABLE', 'TRANSPORT_NOT_OFFERED', 'TRANSPORT_COMMISSION_UNCONFIGURED']);
   const preorder: PricingModes['preorder'] = [];
   /**
@@ -2115,8 +2140,8 @@ export function pricingModes(
     const cod = resolve(t.method, 'cod');
     preorder.push({
       method: t.method,
-      prepaid: { unit_subtotal_iqd: prepaid.unit_subtotal_iqd, transport: prepaid.transport },
-      cod: { unit_subtotal_iqd: cod.unit_subtotal_iqd, direct: cod.direct, pricing_basis: cod.pricing_basis },
+      prepaid: { unit_subtotal_iqd: prepaid.unit_subtotal_iqd },
+      cod: { unit_subtotal_iqd: cod.unit_subtotal_iqd },
       cod_reprices: cod.unit_subtotal_iqd !== prepaid.unit_subtotal_iqd,
     });
   }
@@ -2299,9 +2324,7 @@ export function levelPrice(
     transportDefaults: ctx.transportDefaults,
     memberFallback: benefitFallbackFor(ctx, doc),
   });
-  if (offer && (doc.composition ?? '') === '' && offerEligible(ctx.tierStatus, offer, now).ok) {
-    r = applyOfferToResolved(r, offer, ctx.tier, ctx.tierActive, now).resolved;
-  }
+  r = withLiveOffer(r, doc, ctx, offer, now);
   return {
     applied_iqd: r.applied_iqd,
     regular_iqd: r.regular_iqd,
@@ -2385,14 +2408,64 @@ export function lowestSkuLevel(
   priced: ReadonlyArray<{ sku: SkuLevelSelection; level: PriceLevel }>,
   optionId: string
 ): { level: PriceLevel; from: boolean } | null {
+  return lowestSkuLevelWhere(priced, (sku) => sku.option_value_ids.includes(optionId));
+}
+
+/** The same rule for any slice of the rung — an option's SKUs, or a colour's. */
+function lowestSkuLevelWhere(
+  priced: ReadonlyArray<{ sku: SkuLevelSelection; level: PriceLevel }>,
+  belongs: (sku: SkuLevelSelection) => boolean
+): { level: PriceLevel; from: boolean } | null {
   let low: PriceLevel | null = null;
   let high = 0;
   for (const { sku, level } of priced) {
-    if (!sku.option_value_ids.includes(optionId)) continue;
+    if (!belongs(sku)) continue;
     if (!low || level.unit_subtotal_iqd < low.unit_subtotal_iqd) low = level;
     high = Math.max(high, level.unit_subtotal_iqd);
   }
   return low ? { level: low, from: high > low.unit_subtotal_iqd } : null;
+}
+
+/**
+ * EVERY OPTION'S AND EVERY COLOUR'S «FROM» FIGURE ON A PRODUCT PRICED PER SKU
+ * (Pricing V2 step V2-0, C3; the "from lowest" rule of DECISIONS row 202).
+ *
+ * An option alone resolves to the ladder beneath the rung, which holds its
+ * model's HIGHEST SKU; a colour alone resolves to the product's base, which the
+ * engine writes as the lowest price across every channel — another colour's sea
+ * pre-order. Neither is a price of that option or colour. So each is priced the
+ * way the card and the comparison already price a model: every SKU it is part
+ * of, read through the rung exactly as the cart reads that line (offer
+ * included), the LOWEST shown, and `from` when they differ. Empty maps on a
+ * product priced per model or a database without 0183 — callers then keep the
+ * single-level figure, which is exact there.
+ */
+export interface LowestSkuLevels {
+  option: Record<string, { level: PriceLevel; from: boolean }>;
+  color: Record<string, { level: PriceLevel; from: boolean }>;
+}
+
+export function lowestSkuLevels(
+  doc: ProductDoc,
+  view: ProductRelationsView | undefined,
+  ctx: PricingCtx,
+  offer: OfferView | null | undefined,
+  now: number
+): LowestSkuLevels {
+  const out: LowestSkuLevels = { option: {}, color: {} };
+  const priced = skuLevelSelections(doc, view).map((sku) => ({ sku, level: levelPrice(doc, ctx, offer, sku.option_id, sku.color_id, now, sku) }));
+  if (!priced.length) return out;
+  for (const o of doc.options) {
+    if (o.active === false) continue;
+    const low = lowestSkuLevelWhere(priced, (sku) => sku.option_value_ids.includes(o.id));
+    if (low) out.option[o.id] = low;
+  }
+  for (const c of doc.colors) {
+    if (c.active === false) continue;
+    const low = lowestSkuLevelWhere(priced, (sku) => sku.color_id === c.id);
+    if (low) out.color[c.id] = low;
+  }
+  return out;
 }
 
 export async function resolveVariantPricing(
@@ -3665,8 +3738,14 @@ export async function catalogProductDetail(
   db: D1Database,
   row: Record<string, unknown>,
   parsed: ProductDoc,
-  ctxPromise: Promise<PricingCtx>
-): Promise<{ ctx: PricingCtx; body: Record<string, unknown> }> {
+  ctxPromise: Promise<PricingCtx>,
+  /**
+   * `lowestSku`: also answer each option's and each colour's «from» figure on a
+   * product priced per SKU (`lowestSkuLevels`) — the public API v1 asks; the
+   * storefront page does not, and pays nothing for it.
+   */
+  opts: { lowestSku?: boolean } = {}
+): Promise<{ ctx: PricingCtx; body: Record<string, unknown>; lowestSku?: LowestSkuLevels }> {
   // EVERYTHING THAT NEEDS ONLY THE ROW'S ID GOES OUT TOGETHER (P2a): the
   // pool membership, the offer window and the «يناسب» links used to be three
   // more awaits AFTER this wave — three dependent D1 round trips on every
@@ -3772,6 +3851,7 @@ export async function catalogProductDetail(
   const initialOptionValueIds = initialSelection?.option_value_ids ?? [];
   const initialOptionId = initialOptionValueIds[0] ?? null;
   const initialColorId = initialSelection?.color_id ?? null;
+  const now = Date.now();
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: initialOptionId,
@@ -3785,6 +3865,9 @@ export async function catalogProductDetail(
     memberFallback: benefitFallbackFor(ctx, doc),
     isPrinter,
   });
+  // C2: the page seeds its first quote with this answer, so it carries the
+  // live offer the cart will charge — never the higher ladder price.
+  const openingPrice = withLiveOffer(resolved, doc, ctx, offer, now);
   const out = publicWithDisplayPrice(row, ctx, relations, undefined, offer, poolMember);
   // A fact about the product, not a price: the storefront renders the
   // home-delivery note beside a printer's price block from this flag.
@@ -3811,6 +3894,7 @@ export async function catalogProductDetail(
 
   return {
     ctx,
+    ...(opts.lowestSku ? { lowestSku: lowestSkuLevels(doc, relations, ctx, offer, now) } : {}),
     body: {
     product: out,
     source: 'catalog',
@@ -3856,7 +3940,8 @@ export async function catalogProductDetail(
           fulfillment_type: 'direct_sale' as const,
         }
       : null,
-    pricing: publicQuote(resolved), // opening-selection resolver result, cost-free
+    // The opening selection's price, final numbers only (V2-0, C5).
+    pricing: customerLinePrice(openingPrice),
     // §8/§9: the opening selection's member prices, from the live rules, so the
     // page can state the benefit on first paint rather than waiting for the
     // debounced quote to say what a membership is worth here.
@@ -3869,15 +3954,18 @@ export async function catalogProductDetail(
     // EVERY SELECTION THE CHOOSERS CAN REACH, PRICED HERE (see `priceLevels`).
     // The page paints the exact figure on the same frame as the tap, and the
     // debounced quote becomes a confirmation rather than a prerequisite.
-    price_levels: priceLevels(doc, ctx, offer, Date.now()),
+    price_levels: priceLevels(doc, ctx, offer, now),
     // The final price of every way to get the opening selection (the quote
     // re-computes them per selection) — the page's fulfilment pills and
-    // transport rows read these, and compute nothing.
+    // transport rows read these, and compute nothing. A live offer prices
+    // them exactly as it prices the cart (C2).
     pricing_modes: pricingModes(
       doc,
       ctx,
       { optionId: initialOptionId, colorId: initialColorId, optionValueIds: initialOptionValueIds },
-      isPrinter
+      isPrinter,
+      offer,
+      now
     ),
     // §7.2 — the sale mode the page may DEFAULT to, derived from the real
     // stock model and the admin pre-order policy (never from the browser).
@@ -3890,14 +3978,15 @@ export async function catalogProductDetail(
     // quote below answers with the real counter the moment a model is
     // tapped, and the cart and the checkout re-derive it server-side
     // regardless of what this block said.
-    availability:
+    availability: customerAvailability(
       initialSelection?.availability ??
-      saleAvailability(doc, {
-        coarseStock: poolMember,
-        transportDefaults: ctx.transportDefaults,
-        inventory,
-        links: relations.links,
-      }),
+        saleAvailability(doc, {
+          coarseStock: poolMember,
+          transportDefaults: ctx.transportDefaults,
+          inventory,
+          links: relations.links,
+        })
+    ),
     viewer_tier: viewerTier(ctx),
   },
   };
@@ -4117,12 +4206,18 @@ productRoutes.post('/:slug/quote', async (c) => {
   // as the detail endpoint reads them. Quoting from the bare row made every
   // option saved through the current admin form (whose structure lives ONLY
   // in the tables) answer OPTION_NOT_FOUND, and per-colour stock invisible.
-  const [relations, ctx, isPrinter] = await Promise.all([
+  const [relations, ctx, isPrinter, offer] = await Promise.all([
     loadRelationsView(c.env.DB, String(row.id), row.inventory_mode),
     pricingCtx(c), // tier ONLY from the session, never the body
     isPrinterProduct(c.env.DB, String(row.id)),
+    // C2: the window the cart and the checkout price this line under. Absent
+    // `offer_windows` (before 0060) means no offer is running.
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, [subjectOf(String(row.id))]), EMPTY_OFFERS()).then(
+      (m) => m.get(offerKey(subjectOf(String(row.id))))
+    ),
   ]);
   const doc = applyRelations(parseProductRow(row), relations);
+  const now = Date.now();
 
   const rawOptionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
   /**
@@ -4180,13 +4275,17 @@ productRoutes.post('/:slug/quote', async (c) => {
   if (warrantyPlanId && !isPrinter && !resolved.errors.includes(WARRANTY_NOT_PRINTER)) {
     resolved.errors.push(WARRANTY_NOT_PRINTER);
   }
+  // C2: priced under the live offer exactly as the cart line will be, so the
+  // figure that lands here is never higher than the one the cart charges.
+  const priced = withLiveOffer(resolved, doc, ctx, offer, now);
 
   return c.json({
     success: true,
+    // C5: the final numbers only — no components, no fee, no rule.
     quote: {
-      ...publicQuote(resolved),
+      ...customerLinePrice(priced),
       qty,
-      line_total_iqd: resolved.unit_subtotal_iqd * qty,
+      line_total_iqd: priced.unit_subtotal_iqd * qty,
     },
     // §8/§9: what PREMIUM and PRO pay for THIS selection, from the live rules.
     // The page shows the viewer's own line as a price, and the other tier's as
@@ -4195,7 +4294,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     // The final price of every way to get THIS selection — direct, and each
     // pre-order journey paid in advance or cash on delivery — so the page's
     // pills show the server's numbers and never their own arithmetic.
-    pricing_modes: pricingModes(doc, ctx, { optionId, colorId, optionValueIds }, isPrinter),
+    pricing_modes: pricingModes(doc, ctx, { optionId, colorId, optionValueIds }, isPrinter, offer, now),
     // Every extended-warranty option priced for THIS selection's regular price
     // (an option surcharge moves a percent fee), so the chooser can show the
     // exact dinar of each plan before one is picked.
@@ -4203,7 +4302,8 @@ productRoutes.post('/:slug/quote', async (c) => {
     // Availability for THIS selection — changing option/color re-checks it,
     // against the REAL inventory snapshot and colour links, and asking for a
     // transport is asking for the pre-order journey (same rule as the cart).
-    availability: saleAvailability(doc, {
+    // The routes and whether each is priced — never the route fee (C5).
+    availability: customerAvailability(saleAvailability(doc, {
       coarseStock: (await degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [String(row.id)]), new Set<string>())).size > 0,
       optionValueIds,
       colorId,
@@ -4229,7 +4329,7 @@ productRoutes.post('/:slug/quote', async (c) => {
       // ambiguity the door would raise.
       capacity: capacityFrom(relations, optionValueIds),
       transportMethod,
-    }),
+    })),
     viewer_tier: viewerTier(ctx),
   });
 });

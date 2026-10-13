@@ -190,7 +190,7 @@ async function contextDocument(routes: readonly PublicRoute[], req: PublicReques
         'Texts are objects { "ar", "en", "ckb" } — Arabic (the source language), English and Central Kurdish (Sorani). A language is "" where the shop has not written that text; fall back to Arabic, then English.',
       currency: 'All prices are whole Iraqi dinars (IQD). Delivery is not included in product prices; see /site for delivery methods.',
       prices:
-        'A price is what a signed-out customer pays for one unit today, offers applied. `member_price` is the PRO price the site advertises to visitors. Items marked members_only show no price to visitors.',
+        'A price is what a signed-out customer pays for one unit today, offers applied — the same number the cart charges, and nothing it is made of (no cost, fee or formula is ever published). `member_price` is the PRO price the site advertises to visitors. Items marked members_only show no price to visitors. A price with `from: true` is the lowest of several (the site says «from»): a product whose options differ in price, or an option or colour whose variants do.',
       identifiers:
         'Items are identified by their slug (a shop by the first label of its address, <slug>.levonis-iq.com). Every item carries `url` (its page on the website) and `api_url` (its full record here). Internal database identifiers are never published; a print request is identified by the reference in its public web address.',
       pagination: `Lists take \`limit\` (1–${MAX_LIMIT}, default ${DEFAULT_LIMIT}) and \`cursor\`. Follow \`links.next\` until it is null.`,

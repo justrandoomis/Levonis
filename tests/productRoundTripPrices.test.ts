@@ -104,6 +104,26 @@ async function pricingProduct(a: App, slug: string): Promise<PricingProduct> {
   return pub.product as PricingProduct;
 }
 
+/**
+ * The document the charges are resolved from, read where the ladder still
+ * lives: the OWNER's product document. The storefront no longer publishes the
+ * ladder (Pricing V2 V2-0, C5; DECISIONS row 225) — a customer receives final
+ * prices only, resolved on the server — so the customer's own view of the
+ * same product is compared separately, through its server-resolved levels.
+ */
+async function ownerPricingProduct(a: App, id: string): Promise<PricingProduct> {
+  const p = await json(await get(a, `/api/admin/products-v2/${id}`));
+  assert.ok(p.product, JSON.stringify(p));
+  return p.product as PricingProduct;
+}
+
+/** What the storefront itself quotes for every reachable selection (server-resolved, final numbers). */
+async function storefrontLevels(a: App, slug: string): Promise<unknown> {
+  const pub = await json(await get(a, `/api/products/${slug}`));
+  assert.ok(pub.price_levels, JSON.stringify(pub).slice(0, 300));
+  return pub.price_levels;
+}
+
 /** Every price a customer could be charged on this product, as a flat map. */
 function everyCharge(p: PricingProduct): Record<string, number | null> {
   const out: Record<string, number | null> = {};
@@ -172,7 +192,8 @@ test('10 — export → import changes no price the customer can be charged', as
   const id = (await apply(app, TXT)).body.product_id as string;
   raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
 
-  const before = everyCharge(await pricingProduct(app, 'roundtrip-a1'));
+  const before = everyCharge(await ownerPricingProduct(app, id));
+  const levelsBefore = await storefrontLevels(app, 'roundtrip-a1');
   // The base ladder is real, so the comparison has something to protect.
   assert.equal(before['free/opt_combo/-'], 899_000);
   assert.equal(before['prime/opt_combo/-'], 885_000);
@@ -186,8 +207,9 @@ test('10 — export → import changes no price the customer can be charged', as
   const back = await apply(app, text, { mode: 'update', id });
   assert.equal(back.status, 200, JSON.stringify(back.body));
 
-  const after = everyCharge(await pricingProduct(app, 'roundtrip-a1'));
+  const after = everyCharge(await ownerPricingProduct(app, id));
   assert.deepEqual(after, before, 'a round trip through the export moved a price');
+  assert.deepEqual(await storefrontLevels(app, 'roundtrip-a1'), levelsBefore, 'nor any price the storefront quotes');
 });
 
 test('10 — and the images and their links come back identical too', async () => {
@@ -229,10 +251,13 @@ test('10 — a round trip does not convert an adjustment into a frozen price', a
   // And it still follows the base: raise the base, the Combo moves with it.
   raw.prepare('UPDATE products SET price_iqd = 800000 WHERE id = ?').run(id);
   raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
-  const p = await pricingProduct(app, 'roundtrip-a1');
+  const p = await ownerPricingProduct(app, id);
   assert.equal(
     resolveUnitPrice({ product: p, optionId: 'opt_combo', tier: 'free', tierActive: false }).applied_iqd,
     974_000,
     'the surcharge followed the new base'
   );
+  // …and the storefront quotes the same, from the server.
+  const levels = (await storefrontLevels(app, 'roundtrip-a1')) as { option: Record<string, { applied_iqd: number }> };
+  assert.equal(levels.option.opt_combo.applied_iqd, 974_000);
 });

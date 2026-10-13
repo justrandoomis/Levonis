@@ -369,7 +369,11 @@ test('one shipping type per cart holds for a gift, and replaceCart empties the c
   const preItem = (added.items as Array<J>).find((i) => i.kind === 'gift')!;
   assert.equal(preItem.availability.mode, 'preorder');
   assert.equal(preItem.transport_method, 'air');
-  assert.equal(preItem.breakdown.transport.commission_iqd, 0, 'the route commission is part of the gift');
+  // The route commission is part of the gift: the line's final figure is 0,
+  // and the route travels by name only — no fee is published (V2-0 C5).
+  assert.equal(preItem.unit_price_iqd, 0, 'the route commission is part of the gift');
+  assert.equal(preItem.breakdown.unit_subtotal_iqd, 0);
+  assert.deepEqual(preItem.breakdown.transport, { method: 'air' });
 
   // «Empty the cart and add this»: the paid line AND the other gift's line go.
   const replaced = await json(await addGiftToCart(a.buyer, direct, { replaceCart: true }));

@@ -160,12 +160,11 @@ interface CheckoutQuoteLineDto {
   /** A GIFT line (0175): priced 0 by the server, which names the gift and its value. */
   kind?: string;
   gift?: { id: string; level: number; value_iqd: number } | null;
+  /** Final numbers only (worker/lib/customerPricing.ts, V2-0 C5). */
   breakdown?: {
     applied_iqd: number;
     unit_subtotal_iqd: number;
-    direct?: { surcharge_iqd: number; waived: boolean } | null;
-    transport?: { method: string; commission_iqd: number; waived: boolean; waived_by?: string } | null;
-    pricing_basis?: 'direct' | 'preorder';
+    transport?: { method: string } | null;
   };
 }
 

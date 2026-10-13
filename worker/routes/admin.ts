@@ -2223,7 +2223,7 @@ adminRoutes.get('/orders', async (c) => {
             },
           }
         : {}),
-      ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery),
+      ...orderPublic(o, byOrder.get(String(o.id)) ?? [], undefined, adminMystery, 'admin'),
       email: o.email,
       username: o.username,
       user_id: o.user_id,
@@ -2434,7 +2434,7 @@ adminRoutes.get('/orders/:id', async (c) => {
   return c.json({
     success: true,
     order: {
-      ...orderPublic(o, items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'admin')),
+      ...orderPublic(o, items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'admin'), 'admin'),
       admin_note: o.admin_note ?? '',
       customer: {
         id: o.user_id,

@@ -463,10 +463,8 @@ interface ProductDetail {
   display_from?: boolean;
   /**
    * The scheduled window on this product (worker/routes/products.ts
-   * `projectProduct`). `price_source: 'offer'` means a LIVE, eligible window
-   * is what set the regular price of every level — read here only to know
-   * whether a membership is the whole reason a price fell (see
-   * `memberSavingIqd`), never to price anything.
+   * `publicWithDisplayPrice`). Carried for the record; the page prices
+   * nothing from it — every figure already includes a live window.
    */
   offer?: { schedule_state?: string; price_source?: 'ladder' | 'offer'; locked?: boolean } | null;
 }
@@ -494,7 +492,8 @@ interface RelationsPayload {
   }>;
 }
 
-interface TransportView { method: string; commission_iqd: number | null; configured: boolean }
+/** A route the server offers for this selection, and whether it is priced — never its fee (V2-0, C5). */
+interface TransportView { method: string; configured: boolean }
 
 /**
  * 0075 — THE PRE-ORDER COUNTER FOR ONE ROUTE, AS THE SERVER RESOLVED IT.
@@ -552,16 +551,19 @@ interface Availability {
   qty_ok: boolean;
 }
 
+/**
+ * The server's price for one selection — FINAL NUMBERS ONLY
+ * (worker/lib/customerPricing.ts `customerLinePrice`): no fee, no component,
+ * no rule. The struck `regular_iqd` is the only saving it carries.
+ */
 interface Quote {
-  regular_iqd: number; pro_iqd: number | null; prime_iqd: number | null; applied_iqd: number;
-  applied_tier: 'regular' | 'pro' | 'prime'; price_source: string;
-  transport: { method: string; commission_iqd: number; waived: boolean; waived_by?: string } | null;
-  /** The direct-sale premium that applies; `waived` = an active PRO pays 0 of it. */
-  direct?: { surcharge_iqd: number; waived: boolean } | null;
-  pricing_basis?: 'direct' | 'preorder';
+  regular_iqd: number; applied_iqd: number;
+  applied_tier: 'regular' | 'pro' | 'prime';
+  fulfillment?: { type: 'direct_sale' | 'pre_order'; lead_time_text: string; lead_time_min_days: number | null; lead_time_max_days: number | null } | null;
+  transport: { method: string } | null;
   warranty: {
     plan_id: string; title_ar: string; fee_iqd: number; duration_months: number; duration_kind: string;
-    fee_percent?: number | null; total_months?: number | null; base_months?: number | null;
+    total_months?: number | null; base_months?: number | null;
   } | null;
   unit_subtotal_iqd: number; errors: string[]; qty: number; line_total_iqd: number;
 }
@@ -574,11 +576,11 @@ interface Quote {
  * exemptions are already applied exactly as the checkout applies them.
  */
 interface PricingModes {
-  direct: { unit_subtotal_iqd: number; direct: { surcharge_iqd: number; waived: boolean } | null } | null;
+  direct: { unit_subtotal_iqd: number } | null;
   preorder: Array<{
     method: string;
     prepaid: { unit_subtotal_iqd: number } | null;
-    cod: { unit_subtotal_iqd: number; pricing_basis?: 'direct' | 'preorder' } | null;
+    cod: { unit_subtotal_iqd: number } | null;
     cod_reprices: boolean;
   }>;
   cod_reprices: boolean;
@@ -2404,25 +2406,16 @@ export default function Product() {
     shownPrice && (shownPrice.tier === 'pro' || shownPrice.tier === 'prime') ? shownPrice.tier : null;
   const appliedMemberLabel = appliedMemberTier ? tierLabel(appliedMemberTier) : '';
   /**
-   * ...AND NOT WHILE A SCHEDULED OFFER IS ALSO MOVING THE PRICE.
-   *
-   * `regular - applied` is the membership's whole saving only while the
-   * membership is the only thing that lowered this line. It is not, under a
-   * live window: `price_levels` prices through `resolveOfferPrice` and the
-   * `/quote` route does not (worker/routes/products.ts — `levelPrice` calls
-   * `applyOfferToResolved`, the quote handler's `resolveUnitPrice` is bare),
-   * so the same selection carries the offer's regular before the quote lands
-   * and the ladder's regular after it. A member would be told they saved the
-   * offer's discount too — a number the store could not stand behind on the
-   * invoice, and one that would change on screen as the quote arrived.
-   *
-   * The struck regular price and the tier badge still appear. Only the dinar
-   * ATTRIBUTION is withheld, because attributing it is exactly what the page
-   * cannot currently do.
+   * UNDER A LIVE OFFER TOO. The quote, the opening price and `price_levels`
+   * all price the same window the cart charges (worker/routes/products.ts
+   * `withLiveOffer`, Pricing V2 V2-0 C2), so `regular` is the offer's price for
+   * everyone and `regular - applied` is exactly what the membership took off
+   * it — the same figure before and after the quote lands. The page used to
+   * withhold this attribution during an offer because the quote ignored the
+   * window; that gap is closed at the server.
    */
-  const offerPricesThisLine = product.offer?.price_source === 'offer';
   const memberSavingIqd =
-    shownPrice && appliedMemberTier !== null && !offerPricesThisLine && shownPrice.regular > shownPrice.applied
+    shownPrice && appliedMemberTier !== null && shownPrice.regular > shownPrice.applied
       ? shownPrice.regular - shownPrice.applied
       : null;
 

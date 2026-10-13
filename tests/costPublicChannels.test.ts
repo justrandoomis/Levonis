@@ -2,12 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { appFor, ROLES, OWNER, seededCopy } from './fixtures/roleMatrix';
-import { COST, leaks } from './fixtures/costlyProduct';
-import { get, json, post } from './fixtures/app';
+import { COST, arithmeticLeaks, leaks } from './fixtures/costlyProduct';
+import { asD1, get, json, post } from './fixtures/app';
 import { productRoutes, homeRoutes } from '../worker/routes/products';
 import { miscRoutes } from '../worker/routes/misc';
 import { orderRoutes } from '../worker/routes/orders';
+import { cartRoutes } from '../worker/routes/cart';
 import { parseProductRow, projectPublic } from '../worker/lib/productModel';
+import { applyRelations, loadRelationsView } from '../worker/lib/productOverlay';
 import { publicPrintServiceRates } from '../worker/lib/settings';
 import { printQuoteRoutes } from '../worker/routes/printQuote';
 import { printRequestRoutes } from '../worker/routes/printRequests';
@@ -199,5 +201,77 @@ test('a merchant cannot reprice the platform calculators: any requested margin a
           'a merchant margin cannot override the platform selling margin on platform hardware');
       }
     }
+  } finally { raw.close(); }
+});
+
+/**
+ * V2-0 C5 (DECISIONS row 225): the same public channels carry FINAL NUMBERS
+ * ONLY — no cost (above) and no arithmetic either: no resolver `components`,
+ * `price_source`, `member_rule` or `pricing_basis`, no fee by name, no raw
+ * ladder on any option, colour, order-type cell or route. The costly product
+ * has a priced air route (`surcharge_iqd` 25,000) on its model, and its order
+ * line is given the resolver's whole answer as a stored snapshot, so every
+ * removed key has something to leak. Only the paths a customer screen still
+ * renders are allowed through (`CUSTOMER_DEFERRED_ARITHMETIC`, V2-7).
+ */
+test('customer channels carry final numbers, never the arithmetic of a price, for every caller', async () => {
+  const raw = seededCopy();
+  try {
+    raw.prepare("UPDATE products SET direct_surcharge_iqd = 40000, preorder_transports = ? WHERE id = 'p_a1'").run(
+      JSON.stringify([{ method: 'air', commission_iqd: 15000, active: true }])
+    );
+    raw.prepare('UPDATE order_items SET pricing_snapshot = ?, transport_snapshot = ?, warranty_snapshot = ? WHERE id = ?').run(
+      JSON.stringify({
+        regular_iqd: 900000, applied_iqd: 900000, applied_tier: 'regular', unit_subtotal_iqd: 900000, prime_iqd: null, pro_iqd: null,
+        price_source: 'option', member_rule: { pro: 'rule_x', prime: null }, pricing_basis: 'direct',
+        components: { base_iqd: 900000, option_iqd: 900000, fulfillment_iqd: 900000, transport_iqd: 900000, color_iqd: 900000,
+          membership_adjustment_iqd: 0, transport_fee_iqd: 0, direct_fee_iqd: 0, warranty_fee_iqd: 0 },
+        direct: { surcharge_iqd: 0, waived: false }, transport: null,
+        offer: { offer_id: 'ofw', offer_price_mode: 'discount_percent', offer_discount_percent: 10, price_source: 'offer' },
+        fulfillment: { type: 'direct_sale', source: 'stated', from_option_cell: true, variant_key: 'a1', lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null },
+        warranty: { plan_id: 'coverage', fee_iqd: 0, fee_percent: 7.5, basis_iqd: 900000, duration_months: 12, duration_kind: 'total' },
+        errors: [],
+      }),
+      JSON.stringify({ method: 'air', commission_iqd: 0, waived: false, source: 'components', components: [{ product_id: 'p_a1', fee_iqd: 0 }] }),
+      JSON.stringify({ plan_id: 'coverage', duration_months: 12, duration_kind: 'total', fee_iqd: 0, fee_percent: 7.5, basis_iqd: 900000 }),
+      'oi1'
+    );
+    // The scanner is not vacuous: the overlaid document a customer is NOT
+    // sent carries the ladder, and the walk sees it.
+    const row = raw.prepare("SELECT * FROM products WHERE id = 'p_a1'").get() as Record<string, unknown>;
+    const doc = applyRelations(parseProductRow(row), await loadRelationsView(asD1(raw), 'p_a1', 'BASE'));
+    assert.ok(arithmeticLeaks({ options: doc.options }).some((l) => l.includes('surcharge_iqd')), 'the walk sees a route fee');
+
+    const mounts = [...publicMounts, ['/api/cart', cartRoutes], ['/api/orders', orderRoutes]] as const;
+    const problems: string[] = [];
+    for (const role of ['guest', 'customer', 'merchant', 'employee', 'investor'] as const) {
+      const app = appFor(raw, ROLES[role], mounts);
+      const answers: Array<[string, Response]> = [
+        ['GET /api/products/a1', await get(app, '/api/products/a1')],
+        ['GET /api/products', await get(app, '/api/products')],
+        ['GET /api/home', await get(app, '/api/home')],
+        ['POST /api/products/a1/quote', await post(app, '/api/products/a1/quote', { qty: 1, optionValueIds: ['v_a1'], colorId: 'c_blk' })],
+        ['POST /api/products/a1/quote air', await post(app, '/api/products/a1/quote', { qty: 1, optionValueIds: ['v_a1'], colorId: 'c_blk', fulfillmentType: 'pre_order', transportMethod: 'air' })],
+      ];
+      if (role === 'customer') {
+        answers.push(['GET /api/cart', await get(app, '/api/cart')]);
+        answers.push(['GET /api/orders', await get(app, '/api/orders')]);
+        answers.push(['GET /api/orders/ord1', await get(app, '/api/orders/ord1')]);
+      }
+      for (const [at, res] of answers) {
+        assert.equal(res.status, 200, `${role} ${at}`);
+        problems.push(...arithmeticLeaks(await json(res)).map((l) => `${role} ${at}: ${l}`));
+      }
+    }
+    assert.deepEqual(problems, []);
+
+    // The order line keeps its final figures and, until V2-7, the facts its screen renders.
+    const app = appFor(raw, ROLES.customer, mounts);
+    type Line = { pricing: Record<string, unknown>; transport: unknown; warranty: Record<string, unknown> };
+    const line = ((await json(await get(app, '/api/orders/ord1'))).order.items as Line[])[0]!;
+    assert.equal(line.pricing.unit_subtotal_iqd, 900000);
+    assert.equal(line.pricing.pricing_basis, 'direct');
+    assert.deepEqual(line.transport, { method: 'air', commission_iqd: 0, waived: false });
+    assert.deepEqual(line.warranty.duration_months, 12);
   } finally { raw.close(); }
 });

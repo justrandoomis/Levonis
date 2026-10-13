@@ -47,6 +47,7 @@ import { SETTING_DEFAULTS, PUBLIC_SETTING_KEYS, printerNoteIqdFrom } from '../wo
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
+import { arithmeticLeaks } from './fixtures/costlyProduct';
 
 // ------------------------------------------------------------------ fixture
 
@@ -235,8 +236,10 @@ test('a pre-order cart quotes the configured price with no method or the wallet,
   const cart = await json(await a.request('/api/cart'));
   assert.equal(cart.shipping_type, 'preorder_sea');
   assert.equal(cart.items[0].unit_price_iqd, 115_000);
-  assert.equal(cart.items[0].breakdown.pricing_basis, 'preorder');
-  assert.equal(cart.items[0].breakdown.direct, null);
+  // The line carries its route by name and its final number; the fee that
+  // applies stays inside that number (V2-0 C5, DECISIONS row 225).
+  assert.deepEqual(cart.items[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(cart.items[0]), []);
   assert.equal(cart.items[0].is_printer, false);
 
   // No method chosen yet: prepaid pricing, and the two methods on offer.
@@ -255,8 +258,8 @@ test('a pre-order cart quotes the configured price with no method or the wallet,
   assert.equal(wallet.lines[0].unit_price_iqd, 115_000);
   assert.equal(wallet.subtotal_iqd, 115_000);
   assert.equal(wallet.pricing_basis, 'preorder');
-  assert.deepEqual(wallet.lines[0].breakdown.transport, { method: 'sea', commission_iqd: 15_000, waived: false });
-  assert.equal(wallet.lines[0].breakdown.direct, null);
+  assert.deepEqual(wallet.lines[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(wallet.lines[0]), []);
   assert.equal(wallet.wallet.required_advance_iqd, 120_000, 'the whole payable total, 115,000 + 5,000 delivery');
   assert.equal(wallet.due_on_delivery_iqd, 0);
 
@@ -267,13 +270,10 @@ test('a pre-order cart quotes the configured price with no method or the wallet,
   assert.equal(cash.subtotal_iqd, 150_000);
   assert.equal(cash.pricing_basis, 'direct');
   assert.equal(cash.shipping_type, 'preorder_sea', 'priced as direct, still a pre-order');
-  assert.deepEqual(cash.lines[0].breakdown.direct, { surcharge_iqd: 50_000, waived: false });
-  assert.deepEqual(cash.lines[0].breakdown.transport, {
-    method: 'sea',
-    commission_iqd: 15_000,
-    waived: true,
-    waived_by: 'cod_direct_pricing',
-  });
+  // 150,000 = base + the direct premium: the rule lives in that number and in
+  // the quote's own `pricing_basis`; the line names only its journey (C5).
+  assert.deepEqual(cash.lines[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(cash.lines[0]), []);
   assert.equal(cash.total_iqd, 155_000);
   assert.equal(cash.due_on_delivery_iqd, 155_000);
   assert.equal(cash.wallet.required_advance_iqd, 0);
@@ -301,8 +301,8 @@ test('a pre-order with NO direct premium keeps its commission under cash on deli
     assert.equal(q.total_iqd, 120_000);
     assert.equal(q.pricing_basis, 'preorder', '"priced as a direct sale" needs a direct premium to price with');
     assert.equal(q.shipping_type, 'preorder_sea');
-    assert.deepEqual(q.lines[0].breakdown.transport, { method: 'sea', commission_iqd: 15_000, waived: false });
-    assert.equal(q.lines[0].breakdown.direct, null);
+    assert.deepEqual(q.lines[0].breakdown.transport, { method: 'sea' });
+    assert.deepEqual(arithmeticLeaks(q.lines[0]), []);
     assert.equal(q.cod_reprices, false, 'nothing to explain: the method changes no dinar here');
   }
   assert.equal(cash.due_on_delivery_iqd, 120_000, 'the door is never cheaper than the wallet');
@@ -335,7 +335,8 @@ test('a pre-order with NO direct premium keeps its commission under cash on deli
   const proCash = (await json(await post(appAs(db, 'pro'), '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote;
   assert.equal(proCash.lines[0].unit_price_iqd, 100_000);
   assert.equal(proCash.pricing_basis, 'preorder');
-  assert.equal(proCash.lines[0].breakdown.transport.waived_by, 'pro');
+  // 100,000: the PRO waiver is inside the number; the line names the route only (C5).
+  assert.deepEqual(proCash.lines[0].breakdown.transport, { method: 'sea' });
   await Promise.allSettled(pending);
 });
 
@@ -356,8 +357,8 @@ test('cash + a wallet that covers the whole total is a PREPAID pre-order: pre-or
   assert.equal(cashAll.total_iqd, 120_000);
   assert.equal(cashAll.wallet.applied_iqd, 120_000);
   assert.equal(cashAll.prepaid_by_wallet, true, 'the note the checkout renders');
-  assert.deepEqual(cashAll.lines[0].breakdown.transport, { method: 'sea', commission_iqd: 15_000, waived: false });
-  assert.equal(cashAll.lines[0].breakdown.direct, null);
+  assert.deepEqual(cashAll.lines[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(cashAll.lines[0]), []);
   assert.equal(cashAll.shipping_type, 'preorder_sea');
   // The plain wallet quote is what it always was.
   assert.equal(wallet.pricing_basis, 'preorder');
@@ -388,7 +389,7 @@ test('cash + a wallet that covers the whole total is a PREPAID pre-order: pre-or
   assert.equal(partial.wallet.applied_iqd, 70_000);
   assert.equal(partial.due_on_delivery_iqd, 85_000);
   assert.equal(partial.prepaid_by_wallet, false);
-  assert.deepEqual(partial.lines[0].breakdown.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.deepEqual(arithmeticLeaks(partial.lines[0]), []);
   await Promise.allSettled(pending);
 });
 
@@ -401,8 +402,8 @@ test('an active PRO whose default address is NOT approved pays the surcharge on 
 
   // The product page: detail, quote and the per-mode figures.
   const detail = await json(await a.request('/api/products/a1'));
-  assert.equal(detail.pricing.unit_subtotal_iqd, 150_000);
-  assert.deepEqual(detail.pricing.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.equal(detail.pricing.unit_subtotal_iqd, 150_000, 'the premium is charged: base 100,000 + 50,000');
+  assert.deepEqual(arithmeticLeaks(detail.pricing), [], 'and only the final number is published (C5)');
   assert.deepEqual(detail.viewer_tier, { tier: 'pro', active: true, pricing_active: false, pro_benefits_context: false });
   assert.equal(detail.pricing_modes.direct.unit_subtotal_iqd, 150_000);
   const pq = await json(await post(a, '/api/products/a1/quote', { qty: 1 }));
@@ -415,7 +416,7 @@ test('an active PRO whose default address is NOT approved pays the surcharge on 
   // The cart.
   const cart = await json(await a.request('/api/cart'));
   assert.equal(cart.items[0].unit_price_iqd, 150_000);
-  assert.deepEqual(cart.items[0].breakdown.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.deepEqual(arithmeticLeaks(cart.items[0]), []);
   assert.equal(cart.tierActive, false, 'PRO, but not for pricing');
   // The checkout, at that very address.
   const quote = (await json(await post(a, '/api/orders/quote', quoteBody('addr_p2', 'cash')))).quote;
@@ -429,7 +430,7 @@ test('an active PRO whose default address is NOT approved pays the surcharge on 
   const pDetail = await json(await p.request('/api/products/a1'));
   assert.equal(pDetail.pricing.unit_subtotal_iqd, 100_000);
   assert.deepEqual(pDetail.viewer_tier, { tier: 'pro', active: true, pricing_active: true, pro_benefits_context: true });
-  assert.deepEqual(pDetail.pricing_modes.direct, { unit_subtotal_iqd: 100_000, direct: { surcharge_iqd: 50_000, waived: true } });
+  assert.deepEqual(pDetail.pricing_modes.direct, { unit_subtotal_iqd: 100_000 }, 'the waiver is inside the final number (C5)');
   const pModes = (await json(await post(p, '/api/products/a1/quote', { qty: 1 }))).pricing_modes;
   assert.deepEqual(
     pModes.preorder.map((m: QuoteMode) => [m.prepaid!.unit_subtotal_iqd, m.cod!.unit_subtotal_iqd, m.cod_reprices]),
@@ -523,15 +524,16 @@ test('PRO at the approved address: prepaid pre-order waives the commission and e
   assert.equal(prepaid.tier.pro_benefits_context, true);
   assert.equal(prepaid.lines[0].unit_price_iqd, 100_000);
   assert.equal(prepaid.pricing_basis, 'preorder');
-  assert.deepEqual(prepaid.lines[0].breakdown.transport, { method: 'sea', commission_iqd: 15_000, waived: true, waived_by: 'pro' });
+  assert.deepEqual(prepaid.lines[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(prepaid.lines[0]), []);
   assert.equal(prepaid.shipping.total_iqd, 0);
 
   // Cash: priced as direct → the premium APPLIES but PRO is exempt → base only.
   const cash = (await json(await post(a, '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote;
   assert.equal(cash.lines[0].unit_price_iqd, 100_000);
   assert.equal(cash.pricing_basis, 'direct');
-  assert.deepEqual(cash.lines[0].breakdown.direct, { surcharge_iqd: 50_000, waived: true });
-  assert.equal(cash.lines[0].breakdown.transport.waived_by, 'cod_direct_pricing');
+  assert.deepEqual(cash.lines[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(cash.lines[0]), []);
 
   // Place the prepaid one: the gift is frozen on the order.
   const placed = await json(await post(a, '/api/orders', orderBody('addr_p', 'wallet', { useWallet: true })));
@@ -594,7 +596,7 @@ test('a direct cart: cash and wallet are both allowed, the premium is charged (n
   assert.equal(cash.pricing_basis, 'direct');
   assert.equal(cash.lines[0].unit_price_iqd, 150_000);
   assert.equal(cash.lines[0].breakdown.transport, null);
-  assert.deepEqual(cash.lines[0].breakdown.direct, { surcharge_iqd: 50_000, waived: false });
+  assert.deepEqual(arithmeticLeaks(cash.lines[0]), []);
   assert.deepEqual(cash.allowed_payment_methods, ['wallet', 'cash', 'gini']);
 
   const wallet = (await json(await post(buyer, '/api/orders/quote', quoteBody('addr_b', 'wallet', { useWallet: true })))).quote;
@@ -612,7 +614,7 @@ test('a direct cart: cash and wallet are both allowed, the premium is charged (n
   // PRO: exempt from the premium on a direct line too.
   const pro = (await json(await post(appAs(db, 'pro'), '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote;
   assert.equal(pro.lines[0].unit_price_iqd, 100_000);
-  assert.deepEqual(pro.lines[0].breakdown.direct, { surcharge_iqd: 50_000, waived: true });
+  assert.deepEqual(arithmeticLeaks(pro.lines[0]), []);
   await Promise.allSettled(pending);
 });
 

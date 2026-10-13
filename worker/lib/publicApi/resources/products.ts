@@ -21,6 +21,7 @@ import {
   catalogProductDetail,
   listCatalogProducts,
   pricingCtxForUser,
+  type LowestSkuLevels,
 } from '../../../routes/products';
 import { LISTING_SORTS, SALE_FILTERS } from '@levonis/catalog/discovery';
 import {
@@ -123,8 +124,13 @@ const OPTION_SCHEMA = object(
     group: string('The option group the choice belongs to (e.g. a nozzle size), \'\' when the product has one list of options.'),
     name: localizedSchema(),
     image: nullable(url('The choice\'s own picture, when it has one.')),
-    price: nullable(integer('The price with this choice, for a visitor, offers applied.')),
-    regular_price: nullable(integer('The regular price with this choice.')),
+    price: nullable(
+      integer(
+        'The price with this choice, for a visitor, offers applied. When the product is priced per variant (each colour or combination its own price) this is the LOWEST price of any variant with this choice — the figure the site shows «from» — and `from` is true when its variants differ.'
+      )
+    ),
+    regular_price: nullable(integer('The regular price of the same variant as `price`.')),
+    from: boolean('True when variants with this choice cost different amounts and `price` is the lowest of them (the site says «from»). False when `price` is the exact price of this choice.'),
     available: nullable(boolean('Whether this choice can be bought now; null when the site does not say.')),
     sale_mode: nullable(enumOf(['direct_sale', 'pre_order'], 'Set when this choice is sold only one way.')),
   },
@@ -136,8 +142,13 @@ const COLOR_SCHEMA = object(
     name: localizedSchema(),
     hex: nullable(string('The colour as #RRGGBB, when given.')),
     image: nullable(url('A picture in this colour, when there is one.')),
-    price: nullable(integer('The price in this colour, for a visitor.')),
-    regular_price: nullable(integer('The regular price in this colour.')),
+    price: nullable(
+      integer(
+        'The price in this colour, for a visitor, offers applied. When the product is priced per variant this is the LOWEST price of any variant in this colour — the figure the site shows «from» — and `from` is true when its variants differ.'
+      )
+    ),
+    regular_price: nullable(integer('The regular price of the same variant as `price`.')),
+    from: boolean('True when variants in this colour cost different amounts and `price` is the lowest of them (the site says «from»). False when `price` is the exact price in this colour.'),
     available: nullable(boolean('Whether this colour can be bought now; null when the site does not say.')),
     only_with: array(localizedSchema(), 'The options this colour is sold with; empty when it goes with any.'),
   },
@@ -162,7 +173,7 @@ const PRODUCT_SCHEMA = object(
     offer: nullable(ref('Offer')),
     purchase: object(
       {
-        direct_sale: nullable(integer('The unit price when bought from stock in Iraq (the opening choice).')),
+        direct_sale: nullable(integer('The unit price when bought from stock in Iraq (the opening choice), offers applied.')),
         pre_order: array(
           object(
             {
@@ -172,7 +183,7 @@ const PRODUCT_SCHEMA = object(
             },
             'One way to pre-order.'
           ),
-          'The ways to pre-order and their unit prices (the opening choice).'
+          'The ways to pre-order and their unit prices (the opening choice), offers applied.'
         ),
       },
       'How the product can be bought and what each way costs.'
@@ -352,11 +363,25 @@ function httpsOrNull(v: unknown): string | null {
   return typeof v === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(v.trim()) ? v.trim() : null;
 }
 
+/**
+ * One option's or colour's figure: on a product priced per SKU, the lowest of
+ * its SKUs with `from` (DECISIONS row 202's rule, the card's and the
+ * comparison's — Pricing V2 V2-0, C3); otherwise the single-level price, which
+ * is exact there. An option alone used to answer its model's HIGHEST SKU and a
+ * colour alone the product's global minimum — another colour's pre-order.
+ */
+function levelFigure(levels: Rec, lowest: LowestSkuLevels | undefined, key: 'option' | 'color', id: string) {
+  const sku = lowest?.[key][id];
+  const level = sku ? (sku.level as unknown as Rec) : lvl(levels, key, id);
+  return { price: int(level.applied_iqd), regular_price: int(level.regular_iqd), from: sku?.from === true };
+}
+
 function productDetailDto(
   body: Rec,
   row: Rec,
   sections: ReturnType<typeof sectionRef>[],
-  urls: PublicUrls
+  urls: PublicUrls,
+  lowest?: LowestSkuLevels
 ) {
   const product = asRec(body.product);
   const slug = String(row.slug);
@@ -365,14 +390,12 @@ function productDetailDto(
 
   const options = asList(product.options).map((o) => {
     const id = String(o.id ?? '');
-    const level = lvl(levels, 'option', id);
     const mode = o.availability_type === 'direct_sale' || o.availability_type === 'pre_order' ? o.availability_type : null;
     return {
       group: typeof o.group_en === 'string' ? o.group_en : '',
       name: nameOf(o),
       image: urls.media(o.image),
-      price: int(level.applied_iqd),
-      regular_price: int(level.regular_iqd),
+      ...levelFigure(levels, lowest, 'option', id),
       available: availableBy.get(id) ?? null,
       sale_mode: mode as 'direct_sale' | 'pre_order' | null,
     };
@@ -380,14 +403,12 @@ function productDetailDto(
   const optionName = new Map(asList(product.options).map((o) => [String(o.id ?? ''), nameOf(o)]));
   const colors = asList(product.colors).map((col) => {
     const id = String(col.id ?? '');
-    const level = lvl(levels, 'color', id);
     const linked = Array.isArray(col.option_ids) && col.option_ids.length > 0 ? col.option_ids : col.option_id ? [col.option_id] : [];
     return {
       name: nameOf(col),
       hex: typeof col.hex === 'string' && /^#[0-9a-f]{6}$/i.test(col.hex) ? col.hex : null,
       image: urls.media(col.image),
-      price: int(level.applied_iqd),
-      regular_price: int(level.regular_iqd),
+      ...levelFigure(levels, lowest, 'color', id),
       available: availableBy.get(id) ?? null,
       only_with: (linked as unknown[]).map((oid) => optionName.get(String(oid))).filter((n): n is Localized => !!n),
     };
@@ -528,8 +549,8 @@ async function getProduct(req: PublicRequest) {
   const slug = req.path.slug;
   const row = await activeProductRow(db, slug);
   const parsed = parseProductRow(row);
-  const [{ body }, idx] = await Promise.all([
-    catalogProductDetail(db, row, parsed, pricingCtxForUser(db, null)),
+  const [{ body, lowestSku }, idx] = await Promise.all([
+    catalogProductDetail(db, row, parsed, pricingCtxForUser(db, null), { lowestSku: true }),
     catalogIndexFor(db).catch(() => null),
   ]);
   // The brand block of the page carries no slug; one read on its primary key.
@@ -540,7 +561,7 @@ async function getProduct(req: PublicRequest) {
   const leaf = parsed.sub_category_id || parsed.category_id;
   const sections = leaf && idx?.byId.has(leaf) ? idx.branch(leaf).slice().reverse().map((r) => sectionRef(idx, r.id, urls)) : [];
   return {
-    data: productDetailDto(body, row, sections, urls),
+    data: productDetailDto(body, row, sections, urls, lowestSku),
     web: urls.web(`/product/${encodeURIComponent(slug)}`),
   };
 }

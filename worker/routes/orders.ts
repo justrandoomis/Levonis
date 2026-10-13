@@ -9,6 +9,7 @@ import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
 import { stripFinancials } from '../lib/adminScope';
 import { stripInventoryProvenance } from '../lib/inventoryProvenancePrivacy';
+import { customerOrderPricing, customerOrderTransport, customerWarranty } from '../lib/customerPricing';
 import { requireAuth, badRequest, conflict, notFound, str, int, unavailable, HttpError } from '../lib/http';
 import { cartLineSelect } from '../lib/cartLineProjection';
 import { newId, newOrderId } from '../lib/crypto';
@@ -700,7 +701,14 @@ export function orderPublic(
   o: Record<string, unknown>,
   items: Record<string, unknown>[],
   snap?: OrderPointsSnapshot,
-  mystery?: MysteryView
+  mystery?: MysteryView,
+  /**
+   * WHO READS THIS ORDER. A customer (the default — fail closed) receives each
+   * line's price as final numbers only (`customerOrderPricing`, V2-0 C5); the
+   * admin order screens keep the whole stored snapshot, as before. The stored
+   * row is never rewritten either way.
+   */
+  audience: 'customer' | 'admin' = 'customer'
 ) {
   const coupon = safeParse<Record<string, unknown> | null>(o.coupon_snapshot, null);
   const shippingType = typeForTransport(
@@ -873,9 +881,21 @@ export function orderPublic(
         gift_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
         // Read-side projection also protects historical/imported snapshots
         // written before current checkout validation existed.
-        pricing: stripInventoryProvenance(stripFinancials(safeParse(it.pricing_snapshot, null))),
-        warranty: stripInventoryProvenance(stripFinancials(safeParse(it.warranty_snapshot, null))),
-        transport: stripInventoryProvenance(stripFinancials(safeParse(it.transport_snapshot, null))),
+        // A customer reads the line's final numbers, its gift and — DEFERRED to
+        // V2-7, because OrderDetail and PaymentBreakdown render them today —
+        // `pricing_basis`, the direct-sale premium and the route commission.
+        // No components, no rule ids, no offer arithmetic (V2-0, C5).
+        ...(audience === 'admin'
+          ? {
+              pricing: stripInventoryProvenance(stripFinancials(safeParse(it.pricing_snapshot, null))),
+              warranty: stripInventoryProvenance(stripFinancials(safeParse(it.warranty_snapshot, null))),
+              transport: stripInventoryProvenance(stripFinancials(safeParse(it.transport_snapshot, null))),
+            }
+          : {
+              pricing: customerOrderPricing(safeParse(it.pricing_snapshot, null)),
+              warranty: customerWarranty(safeParse<Record<string, unknown> | null>(it.warranty_snapshot, null)),
+              transport: customerOrderTransport(safeParse(it.transport_snapshot, null)),
+            }),
         /**
          * The exact selection that was bought, in the shape POST /api/cart/items
          * accepts — so "buy again" repeats THIS line instead of the product's
@@ -1311,16 +1331,12 @@ function priceCompositionLine(
         applied_iqd: 0,
         applied_tier: 'regular',
         regular_iqd: 0,
-        prime_iqd: null,
-        pro_iqd: null,
-        transport: null,
-        direct: null,
-        pricing_basis: basis,
-        warranty: null,
         unit_subtotal_iqd: 0,
-        price_source: 'offer',
+        fulfillment: null,
+        transport: null,
+        warranty: null,
         errors: [],
-      } as unknown as ReturnType<typeof publicBreakdown>,
+      } satisfies ReturnType<typeof publicBreakdown>,
       is_printer: printerIds.has(cand.product_id),
       pricing_basis: basis,
       bundle_parent_item_id: parentId,
@@ -1566,8 +1582,6 @@ function priceCompositionLine(
       // composition block is where that rung is named.
       applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
       regular_iqd: b.pricing.regular_iqd,
-      prime_iqd: b.pricing.prime_iqd,
-      pro_iqd: b.pricing.pro_iqd,
       unit_subtotal_iqd: unit,
     },
     // A bundle holding a printer must still fire the checkout's printer

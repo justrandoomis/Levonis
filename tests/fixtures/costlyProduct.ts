@@ -7,6 +7,11 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import { FINANCIAL_FIELDS } from '../../worker/lib/adminScope';
+import {
+  CUSTOMER_ARITHMETIC_KEYS,
+  CUSTOMER_DEFERRED_ARITHMETIC,
+  CUSTOMER_WARRANTY_ARITHMETIC_KEYS,
+} from '../../worker/lib/customerPricing';
 
 /** Sentinel costs — numbers no price, stock, timestamp or id in the fixture can equal. */
 export const COST = {
@@ -143,6 +148,53 @@ export function leaks(value: unknown, extra: LeakExtra = {}): string[] {
     }
   };
   walk(value, '$');
+  return out;
+}
+
+/**
+ * THE ARITHMETIC OF A PRICE ON A CUSTOMER CHANNEL (Pricing V2 V2-0, C5;
+ * DECISIONS row 225). `leaks` above finds COST; this finds the STEPS of a
+ * price that a customer payload must not carry either — the resolver's
+ * `components`, `price_source`, `member_rule`, `pricing_basis`, a fee by name
+ * (`commission_iqd`, `surcharge_iqd`, `direct_surcharge_iqd`), the raw ladder
+ * (`regular_price_iqd`, every `*_adjust_iqd`) and a chosen warranty's formula.
+ * The key names come from the worker's own list
+ * (`worker/lib/customerPricing.ts`), so a key added there is scanned here.
+ *
+ * Presence is the leak, whatever the value: a `regular_adjust_iqd: null`
+ * still publishes the shape of the ladder. Three discriminations keep a
+ * same-named fact that is NOT arithmetic out of the net:
+ *   - `components` is the resolver's OBJECT; the shipping breakdown and a
+ *     bundle's contents are ARRAYS of rendered rows;
+ *   - `price_source` under `offer` is the card's offer state ('ladder' |
+ *     'offer'), which the public API reads to say «on offer»;
+ *   - `fee_percent` / `basis_iqd` are flagged on a line's `warranty` only —
+ *     the plan catalogue and the free-delivery threshold are other questions.
+ * The paths still RENDERED today are `CUSTOMER_DEFERRED_ARITHMETIC` (V2-7).
+ */
+export function arithmeticLeaks(value: unknown, opts: { allow?: readonly RegExp[] } = {}): string[] {
+  const banned = new Set<string>(CUSTOMER_ARITHMETIC_KEYS);
+  const warrantyOnly = new Set<string>(CUSTOMER_WARRANTY_ARITHMETIC_KEYS);
+  const allow = [...CUSTOMER_DEFERRED_ARITHMETIC, ...(opts.allow ?? [])];
+  const out: string[] = [];
+  const walk = (v: unknown, path: string, parentKey: string) => {
+    if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`, parentKey));
+    else if (v && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+        const at = `${path}.${k}`;
+        const flagged =
+          (banned.has(k) &&
+            !(k === 'components' && Array.isArray(x)) &&
+            !(k === 'price_source' && parentKey === 'offer')) ||
+          (warrantyOnly.has(k) && parentKey === 'warranty');
+        if (flagged && !allow.some((re) => re.test(at.replace(/\[\d+\]/g, '[n]')))) {
+          out.push(`${at} = ${JSON.stringify(x)?.slice(0, 60)}`);
+        }
+        walk(x, at, k);
+      }
+    }
+  };
+  walk(value, '$', '');
   return out;
 }
 

@@ -505,10 +505,6 @@ export interface ApiProduct {
    *  option/colour combinations. Omitted when the count is intentionally
    *  hidden; cards render the edge only when this is greater than zero. */
   direct_stock_available?: number;
-  /** Availability premium charged on direct-priced lines (a direct sale, or a
-   *  pre-order paid cash on delivery); waived for an active PRO. Folded into
-   *  the quote's final price server-side, shown only as the final number. */
-  direct_surcharge_iqd?: number | null;
   /** The owner's catalog flag (catalogs.is_printer_catalog) — the printer
    *  home-delivery note keys off this, never off a fee mapping. */
   is_printer?: boolean;
@@ -615,17 +611,11 @@ export interface CartItem {
     applied_iqd: number;
     applied_tier: 'regular' | 'pro' | 'prime';
     regular_iqd: number;
-    prime_iqd: number | null;
-    pro_iqd?: number | null;
-    transport?: OrderItemTransport | null;
-    /** The direct-sale premium that applies; `waived` = an active PRO pays 0. */
-    direct?: { surcharge_iqd: number; waived: boolean } | null;
-    /** Which availability fee priced the line. */
-    pricing_basis?: 'direct' | 'preorder';
+    /** The route this line travels on — the method only; the fee is inside the final price (V2-0, C5). */
+    transport?: { method: string } | null;
     /** The extended-warranty plan on this line, as the resolver priced it. */
     warranty?: CartWarrantySnapshot | null;
     unit_subtotal_iqd: number;
-    price_source: string;
     errors: string[];
   };
   /** The chosen extended-warranty plan id ('' = none). One plan per line,

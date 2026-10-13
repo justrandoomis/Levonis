@@ -898,6 +898,13 @@ export function capacityFrom(
  * deterministically. Admins read the exact counts through
  * `adminRelations`, which this function is not.
  */
+/**
+ * The relational structure as a customer receives it. No level carries its
+ * ladder price (`regular_/prime_/pro_price_iqd`): every figure a customer sees
+ * is resolved on the server for the whole selection, and a value's or a
+ * colour's own rung is the arithmetic of that figure, not a price anyone pays
+ * on a product priced per SKU (Pricing V2 V2-0, C5; DECISIONS row 225).
+ */
 export function publicRelations(view: ProductRelationsView, coarse = false) {
   if (!view.has_relations) return null;
   const linksByColor = new Map<string, ColorLinkRow[]>();
@@ -944,9 +951,6 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
             ...parsePhysicalDimensions(v as unknown as Record<string, unknown>),
             available: availableOf(v.stock, v.reserved),
             ...(coarse ? { stock_state: stateOf(v.stock, v.reserved, v.low_stock_threshold) } : {}),
-            regular_price_iqd: v.regular_price_iqd,
-            prime_price_iqd: v.prime_price_iqd,
-            pro_price_iqd: v.pro_price_iqd,
           })),
       })),
     colors: view.colors
@@ -966,9 +970,6 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
         })),
         available: availableOf(x.stock, x.reserved),
         ...(coarse ? { stock_state: stateOf(x.stock, x.reserved, x.low_stock_threshold) } : {}),
-        regular_price_iqd: x.regular_price_iqd,
-        prime_price_iqd: x.prime_price_iqd,
-        pro_price_iqd: x.pro_price_iqd,
       })),
     variants: view.variants
       .filter((v) => truthy(v.active))
@@ -981,9 +982,6 @@ export function publicRelations(view: ProductRelationsView, coarse = false) {
         // remainder (or a coarse state for mystery products), never counters.
         available: availableOf(v.stock, v.reserved),
         ...(coarse ? { stock_state: stateOf(v.stock, v.reserved, v.low_stock_threshold) } : {}),
-        regular_price_iqd: v.regular_price_iqd,
-        prime_price_iqd: v.prime_price_iqd,
-        pro_price_iqd: v.pro_price_iqd,
       })),
     images: view.images.filter(isCanonicalProductMedia).map((i) => ({
       id: i.id,

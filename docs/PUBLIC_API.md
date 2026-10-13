@@ -44,7 +44,12 @@ Owner's request (2026-09-28): «Public Read-Only API متكامل لموقع Lev
 Every answer except `/`, `/context` and `/openapi.json` is
 `{ "data", "meta": { "version", "pagination" }, "links": { "self", "next", "web" } }`.
 Texts are `{ "ar", "en", "ckb" }`; prices are whole IQD; items are identified
-by slug and carry `url` (website) and `api_url`. A shop's slug is the first
+by slug and carry `url` (website) and `api_url`. Every price is the final
+price the cart charges, live offers applied (the `purchase` block included);
+no cost, fee or formula is published. On a product priced per variant, each
+`options[].price` and `colors[].price` is the LOWEST variant with that choice
+or colour, and `from: true` says the variants differ (DECISIONS rows 202 and
+225 — the card's and the comparison's «from» rule). A shop's slug is the first
 label of its address (`<slug>.levonis-iq.com`); a print request is identified
 by the reference in its web address (`/requests/<reference>`, the request's
 own page since Community Phase 5; the older `/requests?request=<reference>`

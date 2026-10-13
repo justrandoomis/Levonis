@@ -33,7 +33,8 @@ import { newId } from '../lib/crypto';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { AddToCartV1 } from '@levonis/contracts/events/v1/AddToCart';
 import { getSettings } from '../lib/settings';
-import { parseProductRow, stripCostFields, type ProductDoc } from '../lib/productModel';
+import { parseProductRow, publicColor, publicOption, publicPreorderRoutes, type ProductDoc } from '../lib/productModel';
+import { customerAvailability, customerLinePrice, type CustomerLinePrice } from '../lib/customerPricing';
 import {
   applyRelations,
   capacityFrom,
@@ -459,42 +460,30 @@ export function resolveCartLine(
   };
 }
 
-/** Public per-line breakdown — cost fields NEVER cross this boundary. */
-export function publicBreakdown(r: ResolvedPrice) {
-  return {
-    applied_iqd: r.applied_iqd,
-    applied_tier: r.applied_tier,
-    // Compare-at is gone (mandate §4): no strikethrough price is derived from
-    // the retired original_price_iqd column anywhere.
-    regular_iqd: r.regular_iqd,
-    prime_iqd: r.prime_iqd,
-    pro_iqd: r.pro_iqd,
-    transport: r.transport,
-    // The direct-sale premium, named — with `waived` for a PRO — so a cart or
-    // checkout line can explain its final number instead of folding the
-    // premium silently into unit_subtotal_iqd.
-    direct: r.direct,
-    /** Which availability fee priced the line: commission or direct premium. */
-    pricing_basis: r.pricing_basis,
-    warranty: r.warranty,
-    unit_subtotal_iqd: r.unit_subtotal_iqd,
-    price_source: r.price_source,
-    errors: r.errors,
-  };
+/**
+ * Public per-line breakdown — the cart line's and the checkout line's.
+ *
+ * FINAL NUMBERS ONLY (Pricing V2 step V2-0, C5; DECISIONS row 225): the shared
+ * customer allow-list (`customerLinePrice`). This used to send the route
+ * commission, the direct-sale premium, `pricing_basis`, `price_source` and the
+ * member prices beside the final figure; no cart or checkout screen rendered
+ * any of them, and together they were the arithmetic of the line. Compare-at
+ * is gone (mandate §4): the struck `regular_iqd` is the only saving shown.
+ */
+export function publicBreakdown(r: ResolvedPrice): CustomerLinePrice {
+  return customerLinePrice(r);
 }
 
 /**
- * The storefront's own cost strip, not a local one.
+ * The storefront's own option and colour projection, not a local one.
  *
- * This used to remove `cost_iqd` from the option or colour object and stop.
- * `applyRelations` objects also carry `cost_adjust_iqd`, and since 0073 every
- * option holds `fulfillments[]` and every fulfilment `transports[]`, each with
- * its own `cost_iqd`/`cost_adjust_iqd` — so any signed-in customer could add
- * a product to the cart and read its per-model and per-route landed cost.
- * `stripCostFields` is the recursion `projectPublic` already uses, written
- * against one list of cost keys.
+ * This used to remove `cost_iqd` from the option or colour object and stop;
+ * then it reused `stripCostFields`, which still let the whole ladder through —
+ * every rung's selling prices, adjustments and a route's surcharge. It is now
+ * the allow-list `projectPublic` uses (`publicOption` / `publicColor`): names,
+ * pictures, order types, routes, lead times and stock — never a price step
+ * (V2-0, C5).
  */
-const stripCost = stripCostFields;
 
 /** §8.2 row 18 at option-value and colour level: a pool member's per-level
  *  counters are not published, in the cart any more than in the catalogue. */
@@ -660,10 +649,7 @@ function compositionCartItem(
       applied_iqd: b.pricing.applied_iqd,
       applied_tier: b.pricing.applied_tier === 'plus' ? 'regular' : b.pricing.applied_tier,
       regular_iqd: b.pricing.regular_iqd,
-      prime_iqd: b.pricing.prime_iqd,
-      pro_iqd: b.pricing.pro_iqd,
       unit_subtotal_iqd: unit,
-      price_source: b.pricing.source,
       errors: b.pricing.errors,
     },
     stock: null,
@@ -1008,19 +994,20 @@ async function loadCart(c: Context<AppContext>) {
       // is a customer payload like any other (§8.2 row 18).
       stock: coarseStock ? null : row.stock,
       low_stock_threshold: coarseStock ? null : ((row.low_stock_threshold as number | null) ?? null),
-      availability,
+      availability: customerAvailability(availability),
       selection_errors: selectionErrors,
       option_value_ids: sel.optionValueIds ?? [],
       relations: publicRelations(view ?? EMPTY_RELATIONS, coarseStock),
-      options: doc.options.filter((o) => o.active).map(stripCost).map((o) => coarseLevel(o, coarseStock)),
-      colors: doc.colors.filter((col) => col.active).map(stripCost).map((col) => coarseLevel(col, coarseStock)),
+      options: doc.options.filter((o) => o.active).map(publicOption).map((o) => coarseLevel(o, coarseStock)),
+      colors: doc.colors.filter((col) => col.active).map(publicColor).map((col) => coarseLevel(col, coarseStock)),
       // The extended-warranty options for THIS line, each with its fee already
       // resolved against the line's regular price (a percent plan) and the
       // total it yields — what the cart's "Extended Warranty" disclosure
       // shows before the customer picks one. Printers only; the cart refuses
       // a plan on anything else (WARRANTY_NOT_PRINTER).
       warranty_plans: pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
-      preorder_transports: doc.preorder_transports.filter((t) => t.active),
+      // Which routes exist — never their commission (V2-0, C5).
+      preorder_transports: publicPreorderRoutes(doc.preorder_transports),
       shipping_methods: safeParse(row.shipping_methods, []), // legacy UI compatibility
       delivery_options: doc.delivery_options ?? null,
       delivery_availability: {
@@ -1852,7 +1839,7 @@ function giftCartItem(
       },
       stock: input.coarseStock ? null : row.stock,
       low_stock_threshold: input.coarseStock ? null : ((row.low_stock_threshold as number | null) ?? null),
-      availability,
+      availability: customerAvailability(availability),
       selection_errors: facts.selectionErrors,
       option_value_ids: sel.optionValueIds,
       relations: null,

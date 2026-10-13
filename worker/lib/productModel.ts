@@ -1598,6 +1598,60 @@ export const stripCostFields = <T extends PriceFields>(x: T) => {
   return rest as Omit<T, (typeof COST_KEYS)[number]>;
 };
 
+/**
+ * AN OPTION, A COLOUR, AN ORDER-TYPE CELL AND A ROUTE AS A CUSTOMER RECEIVES
+ * THEM — BY ALLOW-LIST (Pricing V2 step V2-0, C5; DECISIONS row 225).
+ *
+ * `stripCostFields` above removes cost and stops, so the rest of the LADDER
+ * still went to every visitor: each rung's `regular_/prime_/pro_price_iqd`,
+ * every `*_adjust_iqd`, a route's `surcharge_iqd`. On a product priced per
+ * SKU these are not even prices anyone pays — an option's `regular_price_iqd`
+ * is its model's HIGHEST route — and on any product they are the arithmetic
+ * the final number was built from. No storefront screen reads them: every
+ * price a customer sees is resolved on the server (`price_levels`,
+ * `pricing_modes`, the quote). What leaves is what a chooser draws: names,
+ * pictures, order types, lead times, routes, stock, dimensions.
+ */
+const pick = (x: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (x[k] !== undefined) out[k] = x[k];
+  return out;
+};
+const LEAD_TIME_KEYS = ['lead_time_text', 'lead_time_text_ar', 'lead_time_text_ckb', 'lead_time_min_days', 'lead_time_max_days'] as const;
+const PUBLIC_ROUTE_KEYS = ['method', 'enabled', 'capacity', ...LEAD_TIME_KEYS] as const;
+const PUBLIC_CELL_KEYS = ['fulfillment_type', 'enabled', 'capacity', ...LEAD_TIME_KEYS] as const;
+const PUBLIC_OPTION_KEYS = [
+  'id', 'name_ar', 'name_en', 'name_ckb', 'image', 'order', 'active',
+  'availability_type', ...LEAD_TIME_KEYS, 'variant_key', 'variant_label', 'merged_into',
+  'group_en', 'stock', 'low_stock_threshold', ...DIMENSION_FIELDS,
+] as const;
+const PUBLIC_COLOR_KEYS = [
+  'id', 'name_ar', 'name_en', 'name_ckb', 'hex', 'image', 'option_id', 'option_ids', 'order', 'active',
+  'stock', 'low_stock_threshold', ...DIMENSION_FIELDS,
+] as const;
+
+export function publicOption(o: OptionV2): Record<string, unknown> {
+  const out = pick(o as unknown as Record<string, unknown>, PUBLIC_OPTION_KEYS);
+  if (Array.isArray(o.fulfillments)) {
+    out.fulfillments = o.fulfillments.map((f) => {
+      const cell = pick(f as unknown as Record<string, unknown>, PUBLIC_CELL_KEYS);
+      if (Array.isArray(f.transports)) {
+        cell.transports = f.transports.map((t) => pick(t as unknown as Record<string, unknown>, PUBLIC_ROUTE_KEYS));
+      }
+      return cell;
+    });
+  }
+  return out;
+}
+
+export function publicColor(c: ColorV2): Record<string, unknown> {
+  return pick(c as unknown as Record<string, unknown>, PUBLIC_COLOR_KEYS);
+}
+
+/** The product's pre-order routes as a customer reads them: which routes exist, never their fee. */
+export const publicPreorderRoutes = (routes: readonly TransportOffer[]) =>
+  routes.filter((t) => t.active).map((t) => ({ method: t.method, active: t.active }));
+
 /** The per-level stock counters a coarse projection blanks (§8.2 row 18). */
 const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
   ({ ...x, stock: null, low_stock_threshold: null }) as T;
@@ -1637,9 +1691,10 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     composition: doc.composition,
     selling_type: doc.selling_type,
     sale_types: doc.sale_types,
-    preorder_transports: doc.preorder_transports.filter((t) => t.active),
-    // A price component (availability premium), not a cost — safe to show.
-    direct_surcharge_iqd: doc.direct_surcharge_iqd,
+    // The routes, never their commission; and no `direct_surcharge_iqd`: both
+    // are the arithmetic of a final price the server already folds into
+    // `pricing_modes` and the quote (V2-0, C5).
+    preorder_transports: publicPreorderRoutes(doc.preorder_transports),
     stock: coarse ? null : doc.stock,
     low_stock_threshold: coarse ? null : doc.low_stock_threshold,
     brand_id: doc.brand_id,
@@ -1660,13 +1715,13 @@ export function projectPublic(doc: ProductDoc, coarse = false) {
     images: media.map((m) => m.url), // legacy string[] compatibility
     options: doc.options
       .filter((o) => o.active)
-      .map(stripCostFields)
-      .map((o) => ({ ...o, image: canonicalProductMediaUrl(o.image) }))
+      .map(publicOption)
+      .map((o) => ({ ...o, image: canonicalProductMediaUrl(String(o.image ?? '')) }))
       .map((o) => (coarse ? coarseLevel(o) : o)),
     colors: doc.colors
       .filter((c) => c.active)
-      .map(stripCostFields)
-      .map((c) => ({ ...c, image: canonicalProductMediaUrl(c.image) }))
+      .map(publicColor)
+      .map((c) => ({ ...c, image: canonicalProductMediaUrl(String(c.image ?? '')) }))
       .map((c) => (coarse ? coarseLevel(c) : c)),
     /**
      * The hand-typed groups first, then the family's own filled-in fields

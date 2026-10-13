@@ -24,6 +24,7 @@ import worker from '../worker/index';
 import { APEX, asD1, ctx } from './fixtures/app';
 import { OWNER, ROLES, seededCopy, sweepGets, type SweepResult } from './fixtures/roleMatrix';
 import { BATCH_SENTINELS, FX_DISPLAY_RATE, FX_SENTINELS, seedBatchSentinels, seedFxSentinels } from './fixtures/fxSentinels';
+import { arithmeticLeaks } from './fixtures/costlyProduct';
 
 const seed = () => {
   const raw = seededCopy();
@@ -60,9 +61,18 @@ test('S1: the public answers carry the display rate and nothing else of FX; the 
   };
   const settings = JSON.parse((await fetchText('/api/settings/public')).text);
   assert.equal(settings.settings.displayUsdRate, FX_DISPLAY_RATE, 'the exception: the market sell the applied USD/IQD was built from, exactly, is public (DECISIONS row 220)');
-  for (const path of ['/', '/p/a1', '/api/settings/public', '/api/home', '/api/home/sections', '/api/products', '/api/products/a1', '/api/public/v1/products']) {
+  for (const path of ['/', '/p/a1', '/api/settings/public', '/api/home', '/api/home/sections', '/api/products', '/api/products/a1', '/api/public/v1/products', '/api/public/v1/products/a1']) {
     const { text } = await fetchText(path);
     for (const s of SENTINELS) assert.equal(text.includes(s), false, `${path} carries ${s}`);
     assert.doesNotMatch(text, /market_rate|adjustment_iqd_per_usd|market_adjustment_iqd|settings_diff|pending_effective|last_known_good|drift_anchor|iqwealth|rate_iqd"/, path);
+    // V2-0 C5 (DECISIONS row 225): final numbers only — no step of a price
+    // either. A JSON answer is walked key by key; a document is searched for
+    // the names that can mean nothing else.
+    if (path.startsWith('/api/')) assert.deepEqual(arithmeticLeaks(JSON.parse(text)), [], path);
+    else assert.doesNotMatch(text, ARITHMETIC_ONLY_KEYS, path);
   }
 });
+
+/** Key names that are the arithmetic of a price and nothing else, as they would appear in serialized JSON. */
+const ARITHMETIC_ONLY_KEYS =
+  /"(member_rule|regular_price_iqd|regular_adjust_iqd|prime_adjust_iqd|pro_adjust_iqd|direct_surcharge_iqd|surcharge_iqd|commission_iqd|membership_adjustment_iqd|transport_fee_iqd|direct_fee_iqd|warranty_fee_iqd)"\s*:/;

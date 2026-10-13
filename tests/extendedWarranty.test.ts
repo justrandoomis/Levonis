@@ -384,8 +384,10 @@ test('cart: a printer line takes a plan, is priced with it, and PATCH sets, chan
   assert.equal(line.warranty_plan_id, 'wp_ext12');
   assert.equal(line.unit_price_iqd, 899_000 + 67_425, 'the fee sits on every unit of the line');
   assert.equal(line.breakdown.warranty.fee_iqd, 67_425);
-  assert.equal(line.breakdown.warranty.fee_percent, 7.5);
-  assert.equal(line.breakdown.warranty.basis_iqd, 899_000);
+  // The fee's FORMULA stays on the server: the line carries the plan and what
+  // it costs, never the percent or the price it was taken of (V2-0 C5, row 225).
+  assert.equal('fee_percent' in line.breakdown.warranty, false);
+  assert.equal('basis_iqd' in line.breakdown.warranty, false);
   assert.equal(line.breakdown.warranty.total_months, 24);
   // The disclosure's options: every plan priced for THIS line, with its total.
   assert.deepEqual(
@@ -529,6 +531,8 @@ test('checkout freezes the plan (percent, basis, 24 total) into the snapshot; no
   const item = order.items[0];
   assert.equal(item.unit_price_iqd, 966_425);
   assert.equal(item.line_total_iqd, 1_932_850);
+  // The buyer reads the plan and its fee — final numbers only (V2-0 C5, row
+  // 225); the percent and the basis stay frozen on the stored row below.
   assert.deepEqual(item.warranty, {
     plan_id: 'wp_ext12',
     title_ar: 'ضمان ممدد +12 شهرًا',
@@ -536,8 +540,6 @@ test('checkout freezes the plan (percent, basis, 24 total) into the snapshot; no
     fee_iqd: 67_425,
     duration_months: 12,
     duration_kind: 'extension',
-    fee_percent: 7.5,
-    basis_iqd: 899_000,
     base_months: 12,
     total_months: 24,
   });
@@ -548,7 +550,7 @@ test('checkout freezes the plan (percent, basis, 24 total) into the snapshot; no
   const snapshotOf = () =>
     (raw.prepare('SELECT warranty_snapshot FROM order_items WHERE order_id = ?').get(order.id) as { warranty_snapshot: string }).warranty_snapshot;
   const frozen = snapshotOf();
-  assert.deepEqual(JSON.parse(frozen), item.warranty);
+  assert.deepEqual(JSON.parse(frozen), { ...item.warranty, fee_percent: 7.5, basis_iqd: 899_000 }, 'the stored promise keeps percent and basis');
 
   // The customer view reads the frozen promise back.
   const view = await json(await get(a, `/api/orders/${order.id}`));
