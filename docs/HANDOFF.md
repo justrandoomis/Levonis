@@ -4,6 +4,44 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
+## Release of 2026-10-13 — review fixes, sixteen CI shards, the cost-leak audit
+
+`ae3d8b2e` on the default branch carries, in order:
+
+- `72c55c37` — 18 confirmed findings from the review of the 25 commits of
+  Oct 10–11 (DECISIONS 219): workflow 7 freshness (`fresh` job), the
+  least-privilege @claude action, tracked-piece provenance, refund evidence in
+  the decision batch, protection waits on an open return (PF-1), migration
+  0188 (direct-sale-only engine products free their pre-order, option, colour
+  and route prices).
+- `fc8a219f`, `279d0f8a` — root tests in sixteen shards balanced by measured
+  time (`scripts/test-timings.json`, refresh with
+  `scripts/update-test-timings.mjs`); the @claude action verifies with the
+  same parts. A full gate takes about 7 minutes.
+- `35ae630c`, `8f872e97`, `f7f44ca2`, `ae3d8b2e` — the local cost-leak audit
+  (DECISIONS 220): 33 proven leaks closed, the verifier's findings closed,
+  `store_contribution_iqd` (batch cost less the investor's share) owner-only.
+  `tests/leakAudit_*.test.ts` and `tests/leakVerify_*.test.ts` hold them.
+  Eleven `# TODO OWNER RULING NEEDED` tests stay open by design: route price
+  spreads, the investor's own principal, the exact dollar reading, and print
+  prices as a public function of private inputs. Each needs a price decision
+  from the owner, not code.
+
+Behaviour that changed for staff and customers: the public dollar figure is
+IQWealth's market rate (no adjustment, no typed rate); `printServicePricing`
+is owner-only; merchants get the platform quote on public calculators; a
+non-owner cannot raise a lot count (`LOT_COUNT_UP_OWNER_ONLY`); receiving
+awaits the owner where a cost is needed (`RECEIVE_AWAITS_OWNER`).
+
+Work in flight on 2026-10-13 (local worktrees, not pushed):
+
+- Clay polish (`feat/clay-polish`): critique → plan → three build batches.
+- Images (`feat/image-pipeline`): right-sized, compressed variants with
+  `srcset`; card images measured at 1254×1254 and 100–170 KB.
+- Pricing V2 and Services V2 (trade-in, offers/gifts/roulette, warranty,
+  price protection): survey and design first; building starts only after
+  the owner answers the money decisions.
+
 ## Published follow-up — pricing visibility and financial edge cases (2026-10-11)
 
 The owner reported that the product editor says “preview only” and that dollar/
