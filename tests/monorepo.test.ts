@@ -70,6 +70,10 @@ const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
   // A minimum profit in USD (owner brief 2026-10-09) is ranked and converted
   // (amount × U) with the same exact arithmetic: the same edge, one module.
   'packages/pricing/src/ruleResolution.ts': ['@levonis/contracts/procurementCost'],
+  // Pricing V2 (docs/PRICING-V2.md, spec V2-1): the same exact arithmetic and the same
+  // readiness-code list, and the reproduce-at-migration helpers on the same arithmetic.
+  'packages/pricing/src/priceV2.ts': ['@levonis/contracts/procurementCost', '@levonis/contracts/pricingIssues'],
+  'packages/pricing/src/priceV2Migration.ts': ['@levonis/contracts/procurementCost'],
 };
 
 test('the pricing engine maths declares its one contracts dependency', () => {

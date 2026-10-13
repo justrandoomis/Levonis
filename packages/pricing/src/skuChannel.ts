@@ -98,6 +98,28 @@ export function channelOfShippingType(type: ShippingType): SkuChannel {
 /** The combo key of the product itself (no option, no colour). */
 export const PRODUCT_COMBO_KEY = '';
 
+/**
+ * Pricing V2 (spec C-3): the key an option-less product's own price row is STORED
+ * under in `product_sku_prices`. The 0183 CHECK (`length BETWEEN 3 AND 400 AND
+ * (GLOB 'o:?*' OR GLOB 'c:?*')`) refuses `''` but accepts `'o:*'`, so no table is
+ * rebuilt; a trigger reserves the option id `*`. Only two places see the stored
+ * form — the overlay read and the engine write — through the two functions below.
+ * Everywhere else the key stays canonical `''` (`skuComboKey` is unchanged). An
+ * older Worker cannot match `'o:*'` to any selection, so it falls back to the
+ * ladder, which holds the highest price (0183's rollback rule).
+ */
+export const PRODUCT_SKU_ROW_KEY = 'o:*';
+
+/** Canonical combo key → the key stored in `product_sku_prices` (`''` → `'o:*'`). */
+export function storedSkuKey(comboKey: string): string {
+  return comboKey === PRODUCT_COMBO_KEY ? PRODUCT_SKU_ROW_KEY : comboKey;
+}
+
+/** A stored `product_sku_prices` key → the canonical combo key (`'o:*'` → `''`). */
+export function skuKeyOfStored(storedKey: string): string {
+  return storedKey === PRODUCT_SKU_ROW_KEY ? PRODUCT_COMBO_KEY : storedKey;
+}
+
 export interface SkuSelection {
   option_value_ids: readonly string[];
   color_id: string | null | undefined;

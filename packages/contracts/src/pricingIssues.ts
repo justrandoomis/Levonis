@@ -83,6 +83,17 @@ export const PRICING_ISSUE_CODES = [
   'DIRECT_PURCHASE_PRICE_SHAPE',
   'FX_DERIVED_STALE',
   'PRICING_ENGINE_PAUSED',
+  // Pricing V2 (docs/PRICING-V2.md §1, owner decisions A1, B1, C1; spec V2-1).
+  'V2_PRICE_MISSING',
+  'V2_DISCOUNT_TOO_LARGE',
+  'V2_ROUTE_BELOW_COST',
+  'V2_SCOPE_INVALID',
+  'V2_POINT_CONFLICT',
+  'V2_DISCOUNT_IGNORED',
+  'V2_DISCOUNT_WITHDRAWN',
+  'V2_LIFTED_TO_COST',
+  'V2_DIRECT_MIN_PROFIT',
+  'V2_BELOW_COST',
 ] as const;
 
 export type PricingIssueCode = (typeof PRICING_ISSUE_CODES)[number];
@@ -376,6 +387,87 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ar: 'التسعير التلقائي متوقف مؤقتًا',
       en: 'Automatic pricing is paused',
       ckb: 'نرخدانانی خۆکار بۆ ماوەیەک ڕاگیراوە',
+    },
+  },
+  // Pricing V2. Errors keep that SKU × channel unpriced; the warnings never block a price.
+  V2_PRICE_MISSING: {
+    severity: 'error',
+    label: {
+      ar: 'سعر البيع المباشر بالدولار غير محدد، أو تجعله الفروق صفرًا أو أقل',
+      en: 'The direct-sale price in dollars is not set, or the differences bring it to zero or below',
+      ckb: 'نرخی فرۆشتنی ڕاستەوخۆ بە دۆلار دانەنراوە، یان جیاوازییەکان دەیگەیەننە سفر یان کەمتر',
+    },
+  },
+  V2_DISCOUNT_TOO_LARGE: {
+    severity: 'error',
+    label: {
+      ar: 'خصم الطلب المسبق يساوي سعر البيع المباشر أو يزيد عليه',
+      en: 'The pre-order discount equals or exceeds the direct-sale price',
+      ckb: 'داشکاندنی پێشداواکاری یەکسانە بە نرخی فرۆشتنی ڕاستەوخۆ یان لێی زیاترە',
+    },
+  },
+  V2_ROUTE_BELOW_COST: {
+    severity: 'error',
+    label: {
+      ar: 'تكلفة هذا المسار أعلى من سعر البيع المباشر؛ أُوقف الطلب المسبق عبره',
+      en: "This route's cost is above the direct-sale price; pre-order by this route is stopped",
+      ckb: 'تێچووی ئەم ڕێگایە لە نرخی فرۆشتنی ڕاستەوخۆ زیاترە؛ پێشداواکاری بەم ڕێگایە ڕاگیراوە',
+    },
+  },
+  V2_SCOPE_INVALID: {
+    severity: 'error',
+    label: {
+      ar: 'سعر أو فرق أو خصم في مستوى لا يقبله؛ راجع مكان إدخاله',
+      en: 'A price, a difference or a discount is set at a level that does not take it; check where it was entered',
+      ckb: 'نرخ یان جیاوازی یان داشکاندنێک لە ئاستێکدا دانراوە کە وەری ناگرێت؛ سەیری شوێنی نووسینەکەی بکە',
+    },
+  },
+  V2_POINT_CONFLICT: {
+    severity: 'error',
+    label: {
+      ar: 'قيمتان مختلفتان للمستوى نفسه (سعر أو فرق أو خصم)',
+      en: 'Two values were given for the same level (a price, a difference or a discount)',
+      ckb: 'دوو بەها بۆ هەمان ئاست دراون (نرخ یان جیاوازی یان داشکاندن)',
+    },
+  },
+  V2_DISCOUNT_IGNORED: {
+    severity: 'warning',
+    label: {
+      ar: 'هذه التركيبة تُباع بالطلب المسبق فقط، فلا خصم عليها؛ كل مساراتها بسعر البيع المباشر',
+      en: 'This SKU is sold by pre-order only, so no discount applies; every route sells at the direct-sale price',
+      ckb: 'ئەم SKU-یە تەنها بە پێشداواکاری دەفرۆشرێت، بۆیە داشکاندنی لەسەر نییە؛ هەموو ڕێگاکانی بە نرخی فرۆشتنی ڕاستەوخۆ دەفرۆشرێن',
+    },
+  },
+  V2_DISCOUNT_WITHDRAWN: {
+    severity: 'warning',
+    label: {
+      ar: 'الخصم أكبر من ربح هذا المسار؛ يُباع بسعر البيع المباشر',
+      en: "The discount is larger than this route's profit; it sells at the direct-sale price",
+      ckb: 'داشکاندنەکە لە قازانجی ئەم ڕێگایە گەورەترە؛ بە نرخی فرۆشتنی ڕاستەوخۆ دەفرۆشرێت',
+    },
+  },
+  V2_LIFTED_TO_COST: {
+    severity: 'warning',
+    label: {
+      ar: 'الخصم أكبر من ربح هذا المسار؛ رُفع سعره إلى تكلفته',
+      en: "The discount is larger than this route's profit; its price was raised to its cost",
+      ckb: 'داشکاندنەکە لە قازانجی ئەم ڕێگایە گەورەترە؛ نرخەکەی بەرز کرایەوە بۆ تێچووەکەی',
+    },
+  },
+  V2_DIRECT_MIN_PROFIT: {
+    severity: 'warning',
+    label: {
+      ar: 'سعر البيع المباشر كان أقل من التكلفة مع الحد الأدنى للربح؛ رُفع إليهما',
+      en: 'The direct-sale price was below the cost plus the minimum target profit; it was raised to them',
+      ckb: 'نرخی فرۆشتنی ڕاستەوخۆ لە تێچوو و کەمترین قازانجی مەبەست کەمتر بوو؛ بەرز کرایەوە بۆیان',
+    },
+  },
+  V2_BELOW_COST: {
+    severity: 'warning',
+    label: {
+      ar: 'السعر أقل من التكلفة المعروفة لمسار البيع هذا',
+      en: 'The price is below the known cost of this sale route',
+      ckb: 'نرخەکە لە تێچووی زانراوی ئەم ڕێگای فرۆشتنە کەمترە',
     },
   },
 };
