@@ -647,6 +647,10 @@ export const FINANCIAL_FIELDS = [
   'charge_unit_amount_iqd',
   'batch_cost_iqd',
   'unit_principal_iqd',
+  // -- How many on-hand units sit in lots with NO recorded cost (the inventory overview and
+  // -- lines): not a value, but which lots the owner has costed — the fact the lot counts stopped
+  // -- telling staff (DECISIONS row 219). The owner's stock screen reads it beside the values.
+  'unpriced_units',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

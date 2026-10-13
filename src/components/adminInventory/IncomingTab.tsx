@@ -25,12 +25,13 @@
  * was written.
  */
 import StockSelection from '../adminOperations/StockSelection';
-import { type Selection, money } from '../adminOperations/shared';
+import { type Selection, costRefusalText, money } from '../adminOperations/shared';
 import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, PackagePlus, Plus, RefreshCw, TrendingUp, Truck } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import { Modal } from '../adminProducts/ui';
 import {
+  ApiError,
   createIncoming,
   fetchIncoming,
   fetchProfitPreview,
@@ -341,7 +342,7 @@ function ReceiveDialog({
   onClose: () => void;
   onDone: (text: string) => void;
 }) {
-  const { latin } = useLoc();
+  const { latin, lang } = useLoc();
   const count = useCount();
   const [qty, setQty] = useState<number | null>(row.qty_outstanding);
   const [preview, setPreview] = useState<ReceivePreview | null>(null);
@@ -375,7 +376,7 @@ function ReceiveDialog({
       const r = await receiveIncoming(row.id, receiptId, qty);
       onDone(r.already ? (r.message ?? s.common.saved) : s.common.saved);
     } catch (e) {
-      setErr(errMsg(e, s.common.failed, s.common.failed, latin));
+      setErr(costRefusalText(e instanceof ApiError ? e.code : null, lang, errMsg(e, s.common.failed, s.common.failed, latin)));
     } finally {
       setBusy(false);
     }
@@ -413,7 +414,7 @@ function ReceiveDialog({
         {/* THE SERVER'S REFUSAL, IN ITS OWN WORDS. It says what to enter next;
             a generic failure would say nothing. */}
         {blocked && preview?.message && (
-          <Notice state={{ tone: 'error', text: preview.message }} onClose={() => undefined} />
+          <Notice state={{ tone: 'error', text: costRefusalText(preview.code, lang, preview.message) }} onClose={() => undefined} />
         )}
 
         {cost && (

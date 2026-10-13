@@ -362,7 +362,7 @@ test('#9: the panel shows a rejection only while it is remembered — 24 hours',
 
 // ------------------------------------------------------------- correctness #10
 
-test('#10: the public settings say whether the USD rate is the provider\'s (credited to IQWealth) or one the owner typed', async () => {
+test('#10: the public settings credit IQWealth for the provider\'s rate; a rate the owner types is never published (DECISIONS row 219)', async () => {
   const raw = freshDb();
   raw.exec(OWNER_ROW_SQL);
   const pub = stubApp(asD1(raw), null, (a) => {
@@ -381,8 +381,11 @@ test('#10: the public settings say whether the USD rate is the provider\'s (cred
   }
   const owner = world({ raw });
   assert.equal((await put(owner.app, `${BASE}/rates/fx/USD_IQD/manual`, { owner_version: ownerVersion(raw), rate: '1650' })).status, 200);
+  // The typed 1,650 prices everything, but beside IQWealth's public sell it is
+  // the owner's markup: the public reading stays the market the shop's rate was
+  // last built from — still IQWealth's figure, still credited.
   for (const s of await settings()) {
-    assert.equal(s.displayUsdRate, '1650');
-    assert.equal(s.displayUsdRateAttributed, false, 'a typed rate is not IQWealth data');
+    assert.equal(s.displayUsdRate, '1660');
+    assert.equal(s.displayUsdRateAttributed, true, 'the published figure is IQWealth data');
   }
 });

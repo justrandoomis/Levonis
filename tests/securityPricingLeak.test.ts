@@ -59,7 +59,7 @@ test('S1: the public answers carry the display rate and nothing else of FX; the 
     return { status: res.status, text: await res.text() };
   };
   const settings = JSON.parse((await fetchText('/api/settings/public')).text);
-  assert.equal(settings.settings.displayUsdRate, FX_DISPLAY_RATE, 'the exception: the market USD/IQD base, to the dinar, is public (DECISIONS row 219)');
+  assert.equal(settings.settings.displayUsdRate, FX_DISPLAY_RATE, 'the exception: the market sell the applied USD/IQD was built from, exactly, is public (DECISIONS row 219)');
   for (const path of ['/', '/p/a1', '/api/settings/public', '/api/home', '/api/home/sections', '/api/products', '/api/products/a1', '/api/public/v1/products']) {
     const { text } = await fetchText(path);
     for (const s of SENTINELS) assert.equal(text.includes(s), false, `${path} carries ${s}`);

@@ -28,7 +28,10 @@ export interface ScopeOption {
   scope: TradeInScope;
   available: boolean;
   reason: string | null;
-  components: Array<{ role: ComponentRole; family: TradeInFamily; base_iqd: number }>;
+  /** A part's base is absent where it would name the shop's own AMS reference (DECISIONS row 219). */
+  components: Array<{ role: ComponentRole; family: TradeInFamily; base_iqd?: number }>;
+  /** What the scope is valued from — null where it would name the shop's own AMS reference. */
+  base_iqd: number | null;
 }
 
 export interface EligibleUnit {
@@ -43,7 +46,8 @@ export interface EligibleUnit {
   image: string;
   family: TradeInFamily;
   is_combo: boolean;
-  ams_split: { method: 'option_gap' | 'reference' | 'none'; share_bp: number | null; ams_base_iqd: number };
+  /** How a Combo's AMS share was found; its base is absent on a `reference` split (the shop's own figure, DECISIONS row 219). */
+  ams_split: { method: 'option_gap' | 'reference' | 'none'; share_bp: number | null; ams_base_iqd?: number };
   paid_iqd: number;
   ordered_at: string;
   delivered_at: string | null;
@@ -72,7 +76,8 @@ export interface ComponentView {
   family: TradeInFamily;
   label_ar: string;
   label_en: string;
-  base_iqd: number;
+  /** The base the part is valued from — the admin's answer only (on a Combo it can be the shop's AMS reference). */
+  base_iqd?: number;
   inputs: Partial<ComponentInputs>;
   value_iqd: number | null;
   /** The part's estimated value — the figure alone; the breakdown is the admin's (`AdminComponentView`). */
@@ -81,7 +86,8 @@ export interface ComponentView {
   photos: PhotoView[];
 }
 
-export interface AdminComponentView extends Omit<ComponentView, 'estimate'> {
+export interface AdminComponentView extends Omit<ComponentView, 'estimate' | 'base_iqd'> {
+  base_iqd: number;
   estimate: ComponentValuation | null;
 }
 

@@ -148,14 +148,15 @@ test("the admin price preview reads the shop's rate — null before the first ap
   assert.equal(before.quote.usd_preview, null, 'no shop rate yet: no dollar figure (not 1,400)');
   await approveUsdAt1680(raw);
   const after = await json(await post(asOwner, '/api/admin/products/p_pla/quote', {}));
-  // The preview reads dollars where customers read them: the market sell to
-  // the dinar (DECISIONS row 219), not the 1,680 the prices are applied at.
+  // The OWNER reads the dollar price he set: the 1,680 the prices are applied
+  // at (DECISIONS row 219 keeps the owner's view unchanged).
   assert.deepEqual(after.quote.usd_preview, {
-    exchange_rate_iqd_per_usd: '1660',
-    applied_usd: Math.floor((25_000 * 100) / 1660) / 100,
-    unit_subtotal_usd: Math.floor((after.quote.unit_subtotal_iqd * 100) / 1660) / 100,
+    exchange_rate_iqd_per_usd: '1680',
+    applied_usd: Math.floor((25_000 * 100) / 1680) / 100,
+    unit_subtotal_usd: Math.floor((after.quote.unit_subtotal_iqd * 100) / 1680) / 100,
   });
-  // The display rate is public by design; the assistant's preview carries it and nothing private of FX.
+  // Staff read dollars where customers read them: the public market figure
+  // (DECISIONS row 219), carrying nothing private of FX.
   const assistant = stubApp(asD1(raw), ASSISTANT, (a) => a.route('/api/admin/products', adminProductsRoutes));
   const res = await post(assistant, '/api/admin/products/p_pla/quote', {});
   assert.equal(res.status, 200);

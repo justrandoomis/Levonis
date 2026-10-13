@@ -176,9 +176,17 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
  * profit-percent wage is a constant share of one order's PROFIT: one row per
  * order, tied to its order id, lets the employee divide by their own
  * percentage and subtract from the public price to reach that order's private
- * cost. Those rows are folded into one line per day and rule, with no order
- * id; every other wage (per unit, per order, share of revenue) is a figure
- * the employee may already compute from public prices and keeps its row.
+ * cost. Folding per DAY was not enough — in a small shop most days carry one
+ * delivered order, so the day's row was that order's wage (found by the
+ * verification of row 219). So those rows fold into ONE running line per rule
+ * and state, with no order id and no day of its own (`day` is the latest day
+ * folded in, for ordering): a single read gives the employee their share of
+ * the profit of everything delivered so far, never one order's. Every other
+ * wage (per unit, per order, share of revenue) is a figure the employee may
+ * already compute from public prices and keeps its row. (Reading the running
+ * total before and after one delivery still gives that delivery's share: a
+ * share of profit paid as it is earned is that by construction — pinned for
+ * the owner's ruling.)
  */
 export function participantEntries(entries: ParticipantSource[], fold = true) {
   type Out = Omit<ParticipantSource, 'eligible' | 'version' | 'staff_id' | 'blocked' | 'basis'>;
@@ -187,14 +195,15 @@ export function participantEntries(entries: ParticipantSource[], fold = true) {
   for (const { eligible: _e, version: _v, staff_id: _s, blocked, basis, ...e } of entries) {
     const row: Out = { ...e, state: blocked ? 'pending_reconciliation' : e.state };
     if (!fold || e.kind !== 'staff' || basis !== 'profit_percent') { out.push(row); continue; }
-    const key = `${e.day}\u0000${e.title}\u0000${row.state}`;
+    const key = `${e.title}\u0000${row.state}`;
     const into = folded.get(key);
     if (!into) {
-      const first: Out = { ...row, id: `profit_share:${e.day}:${folded.size}`, order_id: null };
+      const first: Out = { ...row, id: `profit_share:${folded.size}`, order_id: null };
       folded.set(key, first);
       out.push(first);
       continue;
     }
+    if (String(e.day ?? '') > String(into.day ?? '')) into.day = e.day;
     into.amount_iqd += e.amount_iqd; into.accrued_iqd += e.accrued_iqd; into.paid_iqd += e.paid_iqd;
     into.held_iqd += e.held_iqd; into.available_iqd += e.available_iqd;
     if (e.pending_payment_cover_iqd !== undefined) into.pending_payment_cover_iqd = (into.pending_payment_cover_iqd ?? 0) + e.pending_payment_cover_iqd;

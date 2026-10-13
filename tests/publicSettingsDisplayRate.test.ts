@@ -47,19 +47,22 @@ async function settingsOf(raw: DatabaseSync) {
   return { pub, home, pubBody: await json(pub), homeBody: await json(home) };
 }
 
-test('displayUsdRate is the market USD/IQD base to the dinar (the effective rate less the private adjustment, DECISIONS row 219), on both answers — and no other FX key is public', async () => {
+test('displayUsdRate is the market sell the applied rate was built from, exactly (the effective rate less the adjustment it carried, DECISIONS row 219), on both answers — and no other FX key is public', async () => {
   const raw = freshDb();
+  // The applied 1,703.9167 was built as the market 1,666.6666 + the owner's 37.2501 (the log row says so).
+  raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '37.2501' WHERE pair = 'USD_IQD'");
   applyRate(raw, 'USD_IQD', '1703.9167');
   applyRate(raw, 'EUR_USD', '1.1186');
-  raw.exec("UPDATE fx_rate_pairs SET market_adjustment_iqd = '37.2501', market_rate = '1666.6666', pending_market_rate = '1777.7777', pending_effective_rate = '1815.0278', pending_reason = 'ANOMALY', pending_observed_at = '2026-10-08T00:00:00.000Z', status = 'REVIEW_REQUIRED' WHERE pair = 'USD_IQD'");
+  raw.exec("UPDATE fx_rate_pairs SET market_rate = '1666.6666', pending_market_rate = '1777.7777', pending_effective_rate = '1815.0278', pending_reason = 'ANOMALY', pending_observed_at = '2026-10-08T00:00:00.000Z', status = 'REVIEW_REQUIRED' WHERE pair = 'USD_IQD'");
   const { pubBody, homeBody } = await settingsOf(raw);
-  assert.equal(pubBody.settings.displayUsdRate, '1667');
-  assert.equal(homeBody.settings.displayUsdRate, '1667');
+  assert.equal(pubBody.settings.displayUsdRate, '1666.6666');
+  assert.equal(homeBody.settings.displayUsdRate, '1666.6666');
   for (const body of [pubBody, homeBody]) {
     const bad = keysOf(body.settings).filter((k) => FORBIDDEN_KEY.test(k));
     assert.deepEqual(bad, []);
     const text = JSON.stringify(body);
-    for (const sentinel of ['1666.6666', '37.2501', '1777.7777', '1815.0278', '1906.']) assert.equal(text.includes(sentinel), false, sentinel);
+    // The applied rate, the adjustment, the held market and candidate, the EUR dinar rate: none is public.
+    for (const sentinel of ['1703.9167', '37.2501', '1777.7777', '1815.0278', '1906.']) assert.equal(text.includes(sentinel), false, sentinel);
   }
 });
 

@@ -79,8 +79,9 @@ function RowLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) 
 /**
  * Under the currency row: what the choice does («للعرض فقط»), and — while
  * dollars are chosen and a rate is known — the rate itself, named as THE
- * SHOP'S rate (critique L8); since DECISIONS row 219 it is the market sell to
- * the dinar, never the owner's adjustment on top of it. The
+ * SHOP'S rate (critique L8); since DECISIONS row 219 it is the market sell the
+ * shop's rate was last built from, never the owner's adjustment on top of it
+ * nor a rate he typed. The
  * IQWealth attribution is given only when the rate really is the provider's
  * figure (`displayUsdRateAttributed`); a rate the owner typed, and the shop
  * rate this device remembered from its last visit, are «a rate set by the

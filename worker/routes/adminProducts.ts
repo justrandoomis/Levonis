@@ -41,7 +41,7 @@ import { optionValueIdsInRelationOrder } from '../lib/cartSelectionIdentity';
 import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '../lib/pinnedPrices';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
-import { getDisplayUsdRate, iqdToUsdCentsAtRate } from '../lib/fx/displayRate';
+import { getAppliedUsdRate, getDisplayUsdRate, iqdToUsdCentsAtRate } from '../lib/fx/displayRate';
 import { transportDefaultsFrom } from './products';
 import {
   attemptedFinancialWrites,
@@ -2101,12 +2101,16 @@ adminProductsRoutes.put('/:id/catalogs', async (c) => {
 
 /**
  * Admin price preview: full resolver output INCLUDING cost fields, plus a
- * USD preview at THE SHOP'S display rate — the effective USD/IQD customers
- * read dollars at (`getDisplayUsdRate`, public by design), never the wallet's
- * `exchangeRate` (owner decision 9: 1,400 is the wallet's own rate). Before
- * the owner approves a first USD/IQD value `usd_preview` is null. `tier` may
- * be supplied to preview what a member of that tier would pay (server data
- * only otherwise).
+ * USD preview at THE SHOP'S rate, never the wallet's `exchangeRate` (owner
+ * decision 9: 1,400 is the wallet's own rate). WHICH shop rate depends on who
+ * asks (DECISIONS row 219): the OWNER reads the APPLIED USD/IQD the prices are
+ * built at (`getAppliedUsdRate` — market + his adjustment, or the rate he
+ * typed), so the dollar figure is the dollar price he set, as it always was;
+ * every other admin reads the PUBLIC market figure customers read dollars at
+ * (`getDisplayUsdRate`) — beside it the applied rate would be the adjustment.
+ * Before the owner approves a first USD/IQD value `usd_preview` is null.
+ * `tier` may be supplied to preview what a member of that tier would pay
+ * (server data only otherwise).
  */
 adminProductsRoutes.post('/:id/quote', async (c) => {
   const id = c.req.param('id');
@@ -2125,9 +2129,10 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
   const tier: Tier =
     body.tier === 'plus' || body.tier === 'pro' || body.tier === 'prime' ? body.tier : 'free';
 
+  const owner = canViewCost(c.env, c.get('user'));
   const [settings, displayRate] = await Promise.all([
     getSettings(c.env.DB, ['proPricingPolicy', 'preorderTransportDefaults']),
-    getDisplayUsdRate(c.env.DB),
+    owner ? getAppliedUsdRate(c.env.DB) : getDisplayUsdRate(c.env.DB),
   ]);
   // FX-7 (0183): the WHOLE selection, one value per option group, names the exact SKU whose stored
   // engine price the cart charges — ordered as the cart orders it (the model first). A product
@@ -2160,7 +2165,7 @@ adminProductsRoutes.post('/:id/quote', async (c) => {
 
   // §11: cost is financial data. An assistant admin gets the same quote with
   // it removed — the check is here, on the server, not in the panel.
-  const quoteResolved = canViewCost(c.env, c.get('user'))
+  const quoteResolved = owner
     ? resolved
     : { ...resolved, cost_iqd: undefined };
   return c.json({

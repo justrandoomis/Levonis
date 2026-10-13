@@ -2691,7 +2691,9 @@ export type ReceiveRefusalCode =
   | 'CANCELLED'
   | 'QTY_EXCEEDS_ORDER'
   | 'QTY_INVALID'
-  | 'COST_NOT_STATED';
+  | 'COST_NOT_STATED'
+  /** Anyone but the owner, for a purchase whose freight costs are not stated yet (DECISIONS row 219). */
+  | 'RECEIVE_AWAITS_OWNER';
 
 export interface ReceivePreview {
   ok: boolean;

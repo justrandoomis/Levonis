@@ -53,6 +53,7 @@ import {
   createDraft,
   decideValue,
   listEligible,
+  publicUnit,
   listMine,
   listTargets,
   loadComponents,
@@ -147,7 +148,9 @@ tradeInRoutes.get('/eligible', async (c) => {
   const book = await loadRuleBook(c.env.DB);
   return c.json({
     success: true,
-    units,
+    // Never the AMS split or the bases it priced from: on a Combo they carry
+    // the owner's private AMS reference (DECISIONS row 219, `publicUnit`).
+    units: units.map(publicUnit),
     // What the wizard asks for each family — never the numbers the answers
     // are valued with (DECISIONS row 219): the Worker prices the answers
     // (POST /requests/:id/preview) and the customer reads the final figure.

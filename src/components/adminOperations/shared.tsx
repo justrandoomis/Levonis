@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { COST_REFUSALS, isCostRefusalCode } from '../../../packages/contracts/src/costRefusals';
 import * as T from '../adminProducts/theme';
 import { NumberInput } from '../ui/NumberInput';
 import type { ProcurementSelectionDefault } from '../../../packages/contracts/src/procurementCost';
@@ -41,7 +42,24 @@ export type Selection = {
   option_id?: string;
   color_id?: string;
 };
+/**
+ * A refusal in the reader's language. The cost contract's refusals
+ * (`packages/contracts/src/costRefusals.ts`) carry all three sentences, and the
+ * server's own text is only its «ar / en» fallback — so a cost code is read by
+ * CODE (Sorani included); every other refusal keeps the server's sentence.
+ */
+export function costRefusalText(code: unknown, lang: string, fallback: string): string {
+  if (!isCostRefusalCode(code)) return fallback;
+  const entry = COST_REFUSALS[code];
+  return lang === 'ckb' ? entry.ckb : lang === 'ar' ? entry.ar : entry.en;
+}
+export function operationErrorText(e: unknown, lang: string): string {
+  const said = e instanceof Error ? e.message : String(e);
+  return e instanceof ApiError ? costRefusalText(e.code, lang, said) : said;
+}
+
 export function useOperation() {
+  const { lang } = useLanguage();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState('');
@@ -54,12 +72,12 @@ export function useOperation() {
       if (success) setNotice(success);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(operationErrorText(e, lang));
       return false;
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [lang]);
   return {
     busy,
     error,

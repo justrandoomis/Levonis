@@ -687,6 +687,43 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
   return out;
 }
 
+/**
+ * A UNIT AS ITS CUSTOMER READS IT (DECISIONS row 219). A Combo's AMS share is
+ * worked out from the gap between two PUBLIC option prices (`option_gap`: a
+ * share of what the customer paid, theirs to read) or, when that cannot be
+ * done, from the owner's private AMS REFERENCE (`ams_reference_iqd`, a
+ * rule-set value) — and then `ams_split.ams_base_iqd` and each component's
+ * `base_iqd` carried that reference word for word (and paid − reference
+ * beside it). So on a `reference` split the customer reads the method alone:
+ * no AMS base, no part base. Every scope also carries one `base_iqd` — what it
+ * values from — or null where that figure would name the reference (any part
+ * scope of a `reference` split; the whole device is always what they paid).
+ * Each part's final value comes from the estimate. The admin view keeps it all.
+ */
+export type PublicEligibleUnit = Omit<EligibleUnit, 'ams_split' | 'scopes'> & {
+  ams_split: Omit<AmsSplit, 'ams_base_iqd'> & { ams_base_iqd?: number };
+  scopes: Array<
+    Omit<ScopeOption, 'components'> & {
+      components: Array<{ role: ComponentRole; family: TradeInFamily; base_iqd?: number }>;
+      /** The scope's base, or null when it would name the owner's AMS reference. */
+      base_iqd: number | null;
+    }
+  >;
+};
+export function publicUnit(u: EligibleUnit): PublicEligibleUnit {
+  const { ams_split: split, scopes, ...rest } = u;
+  const reference = split.method === 'reference';
+  return {
+    ...rest,
+    ams_split: reference ? { method: split.method, share_bp: null } : split,
+    scopes: scopes.map((sc) => ({
+      ...sc,
+      components: reference ? sc.components.map(({ role, family }) => ({ role, family })) : sc.components,
+      base_iqd: reference && sc.scope !== 'whole' ? null : sc.components.reduce((n, c) => n + c.base_iqd, 0),
+    })),
+  };
+}
+
 /** «طلباتك السابقة» — every device line of this customer's delivered orders, eligible or with the reason it is not. */
 export async function listEligible(env: Env, userId: string, nowIso = new Date().toISOString()): Promise<EligibleUnit[]> {
   const { results } = await env.DB.prepare(`${LINE_SQL} AND o.status = 'delivered' ORDER BY COALESCE(o.delivered_at, o.created_at) DESC LIMIT 200`)
@@ -2001,6 +2038,8 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
         }
       : null;
   const families = [...new Set(comps.map((c) => c.family))];
+  const source = safeParse<Record<string, unknown>>(req.source_snapshot_json, {});
+  const referenceSplit = (source.ams_split as { method?: unknown } | undefined)?.method === 'reference';
   return {
     id: req.id,
     status: req.status,
@@ -2012,7 +2051,9 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
     order_item_id: req.order_item_id,
     unit_index: req.unit_index,
     source_product_id: req.source_product_id,
-    source: safeParse<Record<string, unknown>>(req.source_snapshot_json, {}),
+    // On a `reference` split the snapshot's `ams_split` names the owner's AMS
+    // reference (see `publicUnit`): the customer reads the method alone.
+    source: referenceSplit && audience !== 'admin' ? { ...source, ams_split: { method: 'reference', share_bp: null } } : source,
     target:
       req.target_product_id
         ? {
@@ -2027,7 +2068,9 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       family: c.family,
       label_ar: c.label_ar,
       label_en: c.label_en,
-      base_iqd: c.base_iqd,
+      // The base a part is valued from — on a `reference` split, the owner's
+      // AMS reference or paid − it: then the admin's alone.
+      ...(audience === 'admin' || !referenceSplit ? { base_iqd: c.base_iqd } : {}),
       inputs: safeParse<Record<string, unknown>>(c.inputs_json, {}),
       value_iqd: c.value_iqd,
       // The owner's own breakdown for the admin; a customer reads the part's value alone.

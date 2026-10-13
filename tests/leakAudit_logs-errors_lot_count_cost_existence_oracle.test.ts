@@ -48,7 +48,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { adminStockOperationsRoutes } from '../worker/routes/adminStockOperations';
 import { count } from './fixtures/app';
 import { COST } from './fixtures/costlyProduct';
-import { ROLES, appFor, call, leaks, seededCopy, type MountSpec, type Router } from './fixtures/roleMatrix';
+import { OWNER, ROLES, appFor, call, leaks, seededCopy, type MountSpec, type Router } from './fixtures/roleMatrix';
 
 const PREFIX = '/api/admin/stock-operations';
 const MOUNTS: readonly MountSpec[] = [[PREFIX, adminStockOperationsRoutes as Router]];
@@ -89,12 +89,15 @@ function world(kind: World): DatabaseSync {
   return raw;
 }
 
-/** The assistant's lot count: one unit found on a shelf that said one (delta +1). */
-async function lotCount(raw: DatabaseSync) {
-  const res = await call(appFor(raw, ASSISTANT, MOUNTS), 'POST', `${PREFIX}/lot-counts`, {
+/**
+ * A lot count by `who` (the assistant unless named): `counted` units on a shelf
+ * that said one — 2 finds a unit (delta +1), 0 loses one (delta −1).
+ */
+async function lotCount(raw: DatabaseSync, counted = 2, who = ASSISTANT) {
+  const res = await call(appFor(raw, who, MOUNTS), 'POST', `${PREFIX}/lot-counts`, {
     operation_id: 'audit-lot-count-0001',
     lot_id: 'lot_audit',
-    counted_qty: 2,
+    counted_qty: counted,
   });
   return { status: res.status, body: res.body };
 }
@@ -117,15 +120,16 @@ async function countSession(raw: DatabaseSync) {
 test('lot count: the assistant\'s answer does not depend on whether the lot\'s private cost is recorded', async () => {
   const pricedDb = world('priced'),
     unpricedDb = world('unpriced');
-  const priced = await lotCount(pricedDb),
-    unpriced = await lotCount(unpricedDb);
+  // A count that LOSES a unit (an upward count is the owner's alone — the next test).
+  const priced = await lotCount(pricedDb, 0),
+    unpriced = await lotCount(unpricedDb, 0);
 
   // Positive controls: the real route ran and wrote the count in both worlds.
   assert.equal(priced.status, 200, JSON.stringify(priced.body));
   assert.equal(unpriced.status, 200, JSON.stringify(unpriced.body));
   for (const raw of [pricedDb, unpricedDb]) {
     assert.equal(count(raw, "SELECT COUNT(*) n FROM lot_count_events WHERE id='audit-lot-count-0001'"), 1);
-    assert.equal(count(raw, "SELECT qty_remaining n FROM inventory_lots WHERE id='lot_audit'"), 2);
+    assert.equal(count(raw, "SELECT qty_remaining n FROM inventory_lots WHERE id='lot_audit'"), 0);
   }
   // The priced world posted a valuation journal (the cost WAS used) — the unpriced one did not.
   assert.ok(count(pricedDb, "SELECT COUNT(*) n FROM accounting_lines l JOIN accounting_entries e ON e.id=l.entry_id WHERE e.source_type='lot-count'") > 0);
@@ -148,36 +152,24 @@ test('lot count: the assistant\'s answer does not reveal that a lot is investor-
   const plainDb = world('priced'),
     investorDb = world('investorPriced'),
     investorUnpricedDb = world('investorUnpriced');
+  // UP: one unit found. Only the owner posts an upward count (DECISIONS row
+  // 219, LOT_COUNT_UP_OWNER_ONLY) — every other counter hears one refusal,
+  // decided before the lot's cost or funding is read, and nothing is written.
   const plain = await lotCount(plainDb),
     investor = await lotCount(investorDb),
     investorUnpriced = await lotCount(investorUnpricedDb);
-
-  // Positive controls: the plain and the unpriced investor lot were counted;
-  // the priced investor lot reached the investor-loss branch — which, for a
-  // counter who is not the owner, now records the count, caps the investor
-  // correction at the loss actually recorded (none here) and tells the owner's
-  // audit log by ids (DECISIONS row 219) instead of refusing.
-  assert.equal(plain.status, 200, JSON.stringify(plain.body));
-  assert.equal(investorUnpriced.status, 200, JSON.stringify(investorUnpriced.body));
-  assert.equal(count(investorDb, "SELECT COUNT(*) n FROM lot_count_events WHERE id='audit-lot-count-0001'"), 1);
-  assert.equal(count(investorDb, "SELECT qty_remaining n FROM inventory_lots WHERE id='lot_audit'"), 2);
-  assert.equal(
-    count(investorDb, "SELECT COUNT(*) n FROM audit_log WHERE action='stock.lot_count_investor_capped' AND target='audit-lot-count-0001'"),
-    1,
-    'the investor-loss branch was reached (the owner is told the correction was capped)',
-  );
-  assert.equal(count(investorUnpricedDb, "SELECT COUNT(*) n FROM audit_log WHERE action='stock.lot_count_investor_capped'"), 0);
-
-  // The scanner sees nothing in any answer.
+  for (const [r, raw] of [[plain, plainDb], [investor, investorDb], [investorUnpriced, investorUnpricedDb]] as const) {
+    assert.equal(r.status, 400, JSON.stringify(r.body));
+    assert.equal((r.body as { code?: string }).code, 'LOT_COUNT_UP_OWNER_ONLY', JSON.stringify(r.body));
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM lot_count_events"), 0, 'a refused count writes nothing');
+    assert.equal(count(raw, "SELECT qty_remaining n FROM inventory_lots WHERE id='lot_audit'"), 1);
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM investor_finance_events"), 0);
+  }
   for (const r of [plain, investor, investorUnpriced]) assert.deepEqual(leaks(r.body), []);
-
-  // THE CHECK: whether the lot's purchase is investor-funded (owner-only) and
-  // whether its private cost × loss share is above zero must not change what
-  // the assistant hears.
   assert.deepEqual(
     investor,
     plain,
-    'LEAK: POST /lot-counts refuses an assistant only when the lot is investor-funded with a loss share and a cost above zero ' +
+    'LEAK: POST /lot-counts answers an assistant differently when the lot is investor-funded with a loss share and a cost above zero ' +
       `(plain lot → ${plain.status} ${JSON.stringify(plain.body)}, investor lot → ${investor.status} ${JSON.stringify(investor.body)})`,
   );
   assert.deepEqual(
@@ -186,6 +178,27 @@ test('lot count: the assistant\'s answer does not reveal that a lot is investor-
     'LEAK: on an investor-funded lot the assistant\'s answer flips on whether the private cost is recorded ' +
       `(cost recorded → ${investor.status} ${JSON.stringify(investor.body)}, no cost → ${investorUnpriced.status} ${JSON.stringify(investorUnpriced.body)})`,
   );
+
+  // Positive controls, the owner: the same upward count posts on the plain lot
+  // and meets the investor-capital rule on the funded one (he sees both).
+  const ownerPlain = await lotCount(world('priced'), 2, OWNER),
+    ownerInvestor = await lotCount(world('investorPriced'), 2, OWNER);
+  assert.equal(ownerPlain.status, 200, JSON.stringify(ownerPlain.body));
+  assert.equal(ownerInvestor.status, 400, JSON.stringify(ownerInvestor.body));
+
+  // DOWN: one unit lost — the assistant's count posts on every lot, and the
+  // answer is the same whether the lot is investor-funded or costed.
+  const downPlainDb = world('priced'),
+    downInvestorDb = world('investorPriced'),
+    downInvestorUnpricedDb = world('investorUnpriced');
+  const downPlain = await lotCount(downPlainDb, 0),
+    downInvestor = await lotCount(downInvestorDb, 0),
+    downInvestorUnpriced = await lotCount(downInvestorUnpricedDb, 0);
+  assert.equal(downPlain.status, 200, JSON.stringify(downPlain.body));
+  assert.ok(count(downInvestorDb, "SELECT COUNT(*) n FROM investor_finance_events WHERE contract_id='ic_audit'") > 0, 'the investor loss branch ran');
+  for (const r of [downPlain, downInvestor, downInvestorUnpriced]) assert.deepEqual(leaks(r.body), []);
+  assert.deepEqual(downInvestor, downPlain, 'LEAK: a downward count answers an assistant differently on an investor-funded lot');
+  assert.deepEqual(downInvestor, downInvestorUnpriced, 'LEAK: a downward count answers an assistant differently on an unpriced investor lot');
 });
 
 test('count post: the assistant\'s answer does not reveal whether the consumed FIFO lot has a private cost', async () => {

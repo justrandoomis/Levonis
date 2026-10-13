@@ -710,7 +710,7 @@ function ScopeStep({ unit, scope, onScope }: { unit: EligibleUnit; scope: TradeI
       ) : null}
       {unit.scopes.map((s) => {
         const on = s.scope === scope;
-        const base = s.components.reduce((n, c) => n + c.base_iqd, 0);
+        const base = s.base_iqd;
         return (
           <button
             key={s.scope}
@@ -724,9 +724,11 @@ function ScopeStep({ unit, scope, onScope }: { unit: EligibleUnit; scope: TradeI
           >
             <span className="flex items-center justify-between gap-3">
               <span className="text-text-primary font-bold text-[15px]">{label[s.scope].title}</span>
-              <span className="text-[13px] text-text-secondary">
-                <Money iqd={base} />
-              </span>
+              {base !== null ? (
+                <span className="text-[13px] text-text-secondary">
+                  <Money iqd={base} />
+                </span>
+              ) : null}
             </span>
             <span className="block text-[12.5px] leading-5 text-text-muted mt-1">{label[s.scope].hint}</span>
             {!s.available ? <span className="block text-[12px] text-amber-300 mt-1">{L('غير متاح لهذا الجهاز', 'Not available for this device')}</span> : null}

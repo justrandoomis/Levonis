@@ -1512,6 +1512,13 @@ printQuoteRoutes.post('/analyses/:id/compare', requireAuth, async (c) => {
         machine_iqd_per_hour: Math.round(
           ((priced.snapshot.machine_iqd_per_hour as { value?: unknown } | undefined)?.value as number) ?? 0
         ),
+        // WHICH of the merchant's OWN figures the wear still needs, so the
+        // screen asks for the right one: no purchase price, or a purchase
+        // price without the useful life it is spread over (the model card's
+        // hours are the owner's and never fill the gap — DECISIONS row 219).
+        // Null when both are declared.
+        wear_missing:
+          mp.overrides.purchaseIqd === undefined ? 'purchase' : mp.overrides.usefulPrintHours === undefined ? 'useful_hours' : null,
       },
     });
   }

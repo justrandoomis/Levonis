@@ -649,6 +649,30 @@ export const COST_REFUSALS = {
     en: 'This purchase already has a saved funding agreement; create a new purchase to change the funding.',
     ckb: 'ئەم کڕینە ڕێککەوتنی پارەدارکردنی پاشەکەوتکراوی هەیە؛ بۆ گۆڕینی پارەدارکردن کڕینێکی نوێ دروست بکە.',
   },
+  // A purchase cannot be received until its freight costs are stated (a
+  // receipt freezes the lot's cost). WHICH cost is missing — or that it is a
+  // cost at all — is the owner's to read (DECISIONS row 219: the receive
+  // preview named the blank boxes to every admin); anyone else who would
+  // receive it is told only that it waits for the owner.
+  RECEIVE_AWAITS_OWNER: {
+    ar: 'هذا الشراء بانتظار الأدمن الرئيسي قبل استلامه؛ اطلب منه إكماله.',
+    en: 'This purchase is waiting for the main admin before it can be received; ask them to complete it.',
+    ckb: 'ئەم کڕینە چاوەڕێی بەڕێوەبەری سەرەکییە پێش ئەوەی وەربگیرێت؛ داوای لێبکە تەواوی بکات.',
+  },
+  // A lot count that FINDS units (goes up) moves the inventory journal and,
+  // on an investor-funded purchase, the investor's capital — a correction the
+  // owner alone can judge, and one the server refuses outright when it exceeds
+  // the documented loss. Refusing that only for an investor-funded lot told a
+  // staff counter the lot was investor-funded and costed (DECISIONS row 219);
+  // posting it for them instead let a staff counter book what the owner is
+  // refused. So every upward lot count by anyone but the owner hears this one
+  // answer, whatever the lot's cost or funding; a count that finds fewer
+  // units posts as before.
+  LOT_COUNT_UP_OWNER_ONLY: {
+    ar: 'جرد دفعة يجد وحدات أكثر مما تسجّله الدفعة يثبّته الأدمن الرئيسي فقط؛ اطلب منه تثبيته.',
+    en: 'A lot count that finds more units than the lot records is posted by the main admin only; ask them to post it.',
+    ckb: 'ژماردنی وەجبەیەک کە یەکەی زیاتر لە تۆمارەکەی وەجبەکە دەدۆزێتەوە تەنها بەڕێوەبەری سەرەکی تۆماری دەکات؛ داوای لێبکە تۆماری بکات.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

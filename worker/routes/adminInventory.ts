@@ -512,6 +512,21 @@ adminInventoryRoutes.patch('/incoming/:id', async (c) => {
   return c.json({ success: true, changed: sets.length - 1 });
 });
 
+/**
+ * A purchase whose freight costs are not stated cannot be received (a receipt
+ * freezes the lot's cost). The owner reads WHICH boxes are blank; anyone else
+ * reads only that the purchase waits for him (DECISIONS row 219) — the code
+ * and the list named the owner's missing costs to every admin.
+ */
+function ownerOrAwaiting(
+  env: AppContext['Bindings'],
+  user: AppContext['Variables']['user'],
+  check: ReturnType<typeof readyToReceive>
+): ReturnType<typeof readyToReceive> | { ok: false; code: 'RECEIVE_AWAITS_OWNER'; message: string } {
+  if (check.ok || check.code !== 'COST_NOT_STATED' || canViewCost(env, user)) return check;
+  return { ok: false, code: 'RECEIVE_AWAITS_OWNER', message: serverMessage('RECEIVE_AWAITS_OWNER') };
+}
+
 /** The confirmation sheet's figures, computed by the SERVER so the dialog and
  *  the commit cannot disagree (§59, §77). */
 adminInventoryRoutes.get('/incoming/:id/receive-preview', async (c) => {
@@ -519,7 +534,7 @@ adminInventoryRoutes.get('/incoming/:id/receive-preview', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM incoming_inventory WHERE id = ?').bind(id).first<IncomingRow>();
   if (!row) throw notFound('Purchase not found');
   const qty = int(c.req.query('qty'), 'qty', { min: 1, max: 1_000_000, def: Math.max(1, row.qty_ordered - row.qty_received) });
-  const check = readyToReceive(row, qty);
+  const check = ownerOrAwaiting(c.env, c.get('user'), readyToReceive(row, qty));
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
       success: true,
@@ -559,7 +574,7 @@ adminInventoryRoutes.post('/incoming/:id/receive', async (c) => {
   }
 
   const qty = int(body.qty, 'qty', { min: 1, max: 1_000_000, def: row.qty_ordered - row.qty_received });
-  const check = readyToReceive(row, qty);
+  const check = ownerOrAwaiting(c.env, user, readyToReceive(row, qty));
   if (!check.ok) {
     throw badRequest(check.message, check.code, 'missing' in check ? { missing: check.missing } : undefined);
   }

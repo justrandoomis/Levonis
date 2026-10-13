@@ -72,6 +72,8 @@ interface PrinterRow {
     waste_grams: number;
     change_seconds: number;
     machine_iqd_per_hour: number;
+    /** Which of the shop's own figures the wear still needs (null: both declared). */
+    wear_missing?: 'purchase' | 'useful_hours' | null;
   };
 }
 
@@ -583,11 +585,22 @@ function PrinterCard({
               {loc('هدر', 'waste')}
             </p>
           )}
-          {/* A machine with no purchase economics declared is costed at no
-              wear at all — never at the platform's own rate (DECISIONS row
-              219) — so the shop is told where the figure comes from. */}
-          {row.because && row.because.machine_iqd_per_hour === 0 && (
-            <p className="px-3.5 pb-2 text-text-muted text-[10.5px] leading-relaxed" data-costing-no-wear>
+          {/* A machine whose wear the shop has not fully declared is costed
+              at no wear at all — never at the platform's own rate or the
+              model card's hours (DECISIONS row 219) — so the shop is told
+              which of ITS figures is missing: the purchase price, or the
+              useful life a declared price is spread over. */}
+          {row.because && row.because.machine_iqd_per_hour === 0 && row.because.wear_missing === 'useful_hours' && (
+            <p className="px-3.5 pb-2 text-text-muted text-[10.5px] leading-relaxed" data-costing-no-wear="useful_hours">
+              {loc(
+                'أدخلت سعر شراء هذه الطابعة دون عمرها بساعات الطباعة، فاهتلاكها غير محسوب في الكلفة؛ أضف العمر في «طابعاتي».',
+                'You entered this printer’s purchase price but not its useful life in print hours, so its wear is not in the cost; add the life under «My printers».',
+                'نرخی کڕینی ئەم چاپکەرەت نووسیوە بەڵام تەمەنی بە کاتژمێری چاپ نا، بۆیە سووانی لە تێچووەکەدا نییە؛ تەمەنەکە لە «چاپکەرەکانم» زیاد بکە.'
+              )}
+            </p>
+          )}
+          {row.because && row.because.machine_iqd_per_hour === 0 && row.because.wear_missing !== 'useful_hours' && (
+            <p className="px-3.5 pb-2 text-text-muted text-[10.5px] leading-relaxed" data-costing-no-wear="purchase">
               {loc(
                 'لم تُدخل سعر شراء هذه الطابعة، فاهتلاكها غير محسوب في الكلفة.',
                 'This printer’s purchase price is not entered, so its wear is not in the cost.',

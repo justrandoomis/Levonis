@@ -155,6 +155,10 @@ const REQUIRED: Record<string, readonly string[]> = {
   'Deleted-product wage consistency (owner request 2026-10-11)': ['WAGE_SCOPE_REVIEW_REQUIRED'],
   // Owner request 2026-10-10: the investment remainder returns to the investor's «أرباحي».
   'Investment remainder (owner request 2026-10-10)': ['INVESTMENT_NEEDS_FINAL_COST', 'INVESTMENT_AGREEMENT_EXISTS'],
+  // The verification of the cost-leak audit (DECISIONS row 219): an upward lot
+  // count is the owner's to post, and the receive door tells anyone else only
+  // that a purchase waits for him — one answer each, whatever the cost data.
+  'DECISIONS row 219 verification': ['LOT_COUNT_UP_OWNER_ONLY', 'RECEIVE_AWAITS_OWNER'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

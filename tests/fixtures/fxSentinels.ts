@@ -1,26 +1,29 @@
 /**
  * FX SENTINELS (FX programme plan §14.2 S1): every private field of the 0179
- * tables seeded with a value no public number can equal — the market sell
- * 1666.6666, the owner's adjustment 37.2501 (and the 29.8642 it replaced, in a
- * settings_change row's old → new), held and rejected candidates, the drift
- * anchor, the ECB figures, the derived EUR/CNY dinar rates, a shipping rate
- * and the history. The ONE public figure is the effective USD/IQD
- * (1703.9167 = 1666.6666 + 37.2501): the top bar's `displayUsdRate`.
+ * tables seeded with a value no public number can equal — the owner's
+ * adjustment 37.2501 (and the 29.8642 it replaced, in a settings_change row's
+ * old → new), held and rejected candidates, the drift anchor, the ECB figures, the derived
+ * EUR/CNY dinar rates, a shipping rate and the history. Since DECISIONS row
+ * 219 the ONE public figure is the market sell the applied rate was built
+ * from, 1666.6666 — IQWealth's own number, exactly: the top bar's
+ * `displayUsdRate` — so it is not a sentinel. The effective (applied) rate
+ * 1703.9167 = 1666.6666 + 37.2501 is `FX_PUBLIC_RATE` by its old name.
  */
 import type { DatabaseSync } from 'node:sqlite';
 
 export const FX_PUBLIC_RATE = '1703.9167';
 /**
  * What GET /api/settings/public and /api/home publish for these rows since
- * DECISIONS row 219: the market base (the effective rate less the owner's
- * private adjustment), to the whole dinar — the effective rate minus the
- * published market sell gave the adjustment away. The effective rate stays
- * the one every IQD price is built on.
+ * DECISIONS row 219: the market sell the applied rate was built from (the
+ * `apply` row's effective_after less the adjustment it carried), exactly —
+ * the effective rate minus the published market sell gave the adjustment
+ * away. The effective rate stays the one every IQD price is built on, and is
+ * itself private now.
  */
-export const FX_DISPLAY_RATE = '1667';
+export const FX_DISPLAY_RATE = '1666.6666';
 
 export const FX_SENTINELS = [
-  '1666.6666', // USD/IQD market sell
+  // Not '1666.6666', the USD/IQD market sell: it IS the public display rate (above).
   '1650.165', // market buy
   '1310.1313', // CBI official
   '37.2501', // the owner's adjustment (market_adjustment_iqd)
