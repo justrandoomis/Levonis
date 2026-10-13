@@ -1,4 +1,4 @@
-name: CI - complete checks with eight root test shards
+name: CI - complete checks with sixteen root test shards
 
 on:
   workflow_call:
@@ -28,15 +28,20 @@ jobs:
       - name: Typecheck, lint and boundaries
         run: npm run check
 
+  # Sixteen shards balanced by measured time (scripts/test-timings.json, LPT
+  # in scripts/test-all.mjs): about 5.5 min of tests each, against 14 min for
+  # the slowest of the eight name-ordered shards in run 38144865240. 16 shards
+  # + the three jobs above and below = 19 jobs, inside the 20 concurrent jobs
+  # GitHub's free plan runs at once. Every root file is in exactly one shard.
   root_tests:
-    name: Root tests (${{ matrix.shard }}/8)
+    name: Root tests (${{ matrix.shard }}/16)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,7 +57,7 @@ jobs:
         working-directory: studio
         run: npm ci --no-audit --no-fund
       - name: Run every root file assigned to this shard
-        run: node scripts/test-all.mjs --suite root --shard '${{ matrix.shard }}/8'
+        run: node scripts/test-all.mjs --suite root --shard '${{ matrix.shard }}/16'
 
   workspace_tests:
     runs-on: ubuntu-latest

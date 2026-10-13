@@ -110,7 +110,7 @@ jobs:
 
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    # The reusable gate requires check + all eight root shards + workspaces
+    # The reusable gate requires check + every root shard + workspaces
     # + Studio. A failure, cancellation or skipped gate cannot deploy, and
     # neither can a release the `fresh` job found superseded.
     needs: [verify, fresh]

@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { discoverRootTests, parseTestArgs, runTestSuites, selectRootShard } from '../scripts/test-all.mjs';
+import { discoverRootTests, parseTestArgs, planRootShards, readRootTimings, runTestSuites, selectRootShard } from '../scripts/test-all.mjs';
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'levonis suite-'));
@@ -14,6 +14,7 @@ function fixture() {
   put('studio/node_modules/three-slicer/package.json', '{}');
   put('scripts/test-workspaces.mjs');
   put('scripts/test-no-network.mjs', readFileSync(new URL('../scripts/test-no-network.mjs', import.meta.url), 'utf8'));
+  put('scripts/test-file-timings.mjs', readFileSync(new URL('../scripts/test-file-timings.mjs', import.meta.url), 'utf8'));
   put('studio/tests/z.test.mjs'); put('studio/tests/a.test.mjs');
   for (let index = 0; index < 17; index++) put(`tests/root-${String(index).padStart(2, '0')}.test.ts`);
   put('tests/nested/not-root.test.ts'); put('tests/not-root.test.mjs');
@@ -21,18 +22,34 @@ function fixture() {
 }
 const quiet = { log: () => {}, error: () => {} };
 
-test('root shard manifests partition every discovered real root file exactly once for four and eight workers', () => {
+test('root shard manifests partition every discovered real root file exactly once, at every shard count CI could use', () => {
   const files = discoverRootTests();
   assert.ok(files.length > 800);
   assert.deepEqual(files, [...files].sort());
-  for (const total of [4, 8]) {
-    const shards = Array.from({ length: total }, (_, index) => selectRootShard(files, { index: index + 1, total }));
+  const timings = readRootTimings();
+  for (const total of [1, 4, 8, 12, 16, 17, 20, 32]) {
+    const shards = Array.from({ length: total }, (_, index) => selectRootShard(files, { index: index + 1, total }, timings));
     const combined = shards.flat();
-    assert.ok(shards.every((shard) => shard.length > 0));
-    assert.equal(new Set(combined).size, files.length, 'no root file may run in two shards');
-    assert.deepEqual(combined.sort(), files, 'no existing or newly added root file may be omitted');
-    assert.deepEqual(selectRootShard(files, { index: 3, total }), shards[2]);
+    assert.ok(shards.every((shard) => shard.length > 0), `${total}: no shard may be empty`);
+    assert.equal(combined.length, files.length, `${total}: no root file may run in two shards`);
+    assert.equal(new Set(combined).size, files.length, `${total}: no root file may run in two shards`);
+    assert.deepEqual([...combined].sort(), files, `${total}: no existing or newly added root file may be omitted`);
+    assert.ok(shards.every((shard) => shard.join('\n') === [...shard].sort().join('\n')), `${total}: each shard lists its files in name order`);
+    assert.deepEqual(planRootShards(files, total, timings).map((shard) => shard.files), shards, `${total}: the manifest is the plan`);
+    assert.deepEqual(selectRootShard(files, { index: Math.min(3, total), total }), shards[Math.min(3, total) - 1], `${total}: the default timings are the checked-in ones`);
   }
+});
+
+test('a new root file the timings have never seen still runs in exactly one shard, and a deleted one is ignored', () => {
+  const before = discoverRootTests(), files = [...before, 'tests/zzzBrandNewFile.test.ts'].sort();
+  const timings = readRootTimings();
+  const gone = { ...timings, files: { ...timings.files, 'tests/aaaDeletedLongAgo.test.ts': 9999 } };
+  const plan = planRootShards(files, 16, gone);
+  assert.deepEqual(plan.flatMap((shard) => shard.files).sort(), files);
+  assert.equal(plan.filter((shard) => shard.files.includes('tests/zzzBrandNewFile.test.ts')).length, 1);
+  const unmeasured = (shards: Array<{ unmeasured: number }>) => shards.reduce((sum, shard) => sum + shard.unmeasured, 0);
+  assert.equal(unmeasured(plan), unmeasured(planRootShards(before, 16, gone)) + 1, 'the new file is counted as unmeasured');
+  assert.ok(!plan.some((shard) => shard.files.includes('tests/aaaDeletedLongAgo.test.ts')), 'a timing never adds a file');
 });
 
 test('strict argument parsing refuses typos, duplicate flags and invalid or ambiguous shards', () => {
@@ -69,6 +86,24 @@ test('default runner attempts all three isolated suites even after failures or s
     assert.deepEqual(attempted[1].args, ['scripts/test-workspaces.mjs']);
     assert.deepEqual(attempted[2], { args: ['--test', 'tests/a.test.mjs', 'tests/z.test.mjs'], cwd: join(f.root, 'studio') });
     assert.match(failures.join('\n'), /root \(exit 7\).*workspaces \(Simulated spawn failure\).*All 3 selected suites were attempted/s);
+  } finally { f.cleanup(); }
+});
+
+test('a sharded root run adds the per-file timing reporter beside TAP and runs exactly its planned files', () => {
+  const f = fixture();
+  try {
+    const plan = planRootShards(discoverRootTests(f.root), 4, readRootTimings(f.root));
+    const lines: string[] = [];
+    let args: string[] = [];
+    assert.equal(runTestSuites(['--suite', 'root', '--shard', '2/4'], { root: f.root, error: () => {}, log: (line) => lines.push(line), spawn: (_command, spawned) => { args = spawned; return { status: 0 }; } }), 0);
+    const reporter = pathToFileURL(join(f.root, 'scripts/test-file-timings.mjs')).href;
+    assert.deepEqual(args, ['--import', 'tsx', '--test', '--test-reporter=tap', '--test-reporter-destination=stdout', `--test-reporter=${reporter}`, '--test-reporter-destination=stdout', ...plan[1].files]);
+    assert.match(lines.join('\n'), /running root shard 2\/4 \(\d+ files, about \d+ s predicted \(no scripts\/test-timings\.json: balanced by file count\)\)/);
+    rmSync(join(f.root, 'scripts/test-file-timings.mjs'));
+    assert.equal(runTestSuites(['--suite', 'root', '--shard', '2/4'], { root: f.root, ...quiet, spawn: () => assert.fail('a shard without its timing reporter must not start') }), 1);
+    f.put('scripts/test-file-timings.mjs');
+    f.put('scripts/test-timings.json', '{"files": {"tests/root-00.test.ts": -1}}');
+    assert.equal(runTestSuites(['--suite', 'root', '--shard', '2/4'], { root: f.root, ...quiet, spawn: () => assert.fail('malformed timings must not start a shard') }), 1);
   } finally { f.cleanup(); }
 });
 

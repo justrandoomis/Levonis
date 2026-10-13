@@ -35,7 +35,10 @@ Settings → Build) removes that red check; a build variable
 manual only. The history below explains why.
 
 Since 2026-10-11, `.github/workflows/verify-all.yml` runs the complete checks,
-eight disjoint root-test shards, workspace tests and Studio tests in parallel.
+disjoint root-test shards, workspace tests and Studio tests in parallel. Since
+2026-10-13 there are sixteen root shards, balanced by each file's measured
+seconds (`scripts/test-timings.json`, regenerated from a run's logs with
+`scripts/update-test-timings.mjs`) instead of by name order.
 All jobs must succeed before workflow 7's deploy job can acquire the live lock.
 The same reusable gate serves pull requests and other branches. The default
 local unit command still runs every suite, and test processes retain the

@@ -28,14 +28,14 @@
  * never looked at is how a broken Studio once shipped for a day.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** No flags keeps the full local gate. CI may select one suite, and only the
- * root suite may be partitioned: --suite root --shard 1/8. --list prints that
+ * root suite may be partitioned: --suite root --shard 1/16. --list prints that
  * root selection without running it. Unknown/duplicate flags are errors. */
 export function parseTestArgs(argv) {
   const options = { suite: null, shard: null, list: false };
@@ -79,10 +79,98 @@ function discoverTests(root, suffix) {
 /** Exactly the old tests/*.test.ts scope, explicitly sorted and shell-free. */
 export const discoverRootTests = (root = ROOT) => discoverTests(root, '.test.ts');
 
-export function selectRootShard(files, shard) {
-  const selected = shard ? files.filter((_, index) => index % shard.total === shard.index - 1) : files;
-  if (!selected.length) throw new Error('The root test shard is empty; refusing to report success without tests');
-  return selected;
+/** Measured seconds per root file, checked in so every CI shard computes the
+ * same plan without talking to anything. Regenerate it from a run's logs with
+ * scripts/update-test-timings.mjs. */
+export const ROOT_TIMINGS_FILE = 'scripts/test-timings.json';
+const TIMING_KEY = /^tests\/[^/]+\.test\.ts$/;
+
+/** A missing file only costs balance, never coverage: every file then weighs
+ * the same. A file that is present but malformed is an error, because a typo
+ * there would silently skew every shard. */
+export function readRootTimings(root = ROOT) {
+  const path = join(root, ROOT_TIMINGS_FILE);
+  if (!existsSync(path)) return { concurrency: 3, files: {}, missing: true };
+  let data;
+  try { data = JSON.parse(readFileSync(path, 'utf8')); } catch (failure) {
+    throw new Error(`${ROOT_TIMINGS_FILE} is not valid JSON (${failure instanceof Error ? failure.message : String(failure)})`);
+  }
+  if (!data || typeof data !== 'object' || !data.files || typeof data.files !== 'object' || Array.isArray(data.files)) throw new Error(`${ROOT_TIMINGS_FILE} must hold a "files" object`);
+  const concurrency = data.concurrency ?? 3;
+  if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > 64) throw new Error(`${ROOT_TIMINGS_FILE}: concurrency must be an integer from 1 to 64`);
+  const files = {};
+  for (const [file, seconds] of Object.entries(data.files)) {
+    if (!TIMING_KEY.test(file)) throw new Error(`${ROOT_TIMINGS_FILE}: "${file}" is not a root test file (tests/<name>.test.ts)`);
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0 || seconds > 86400) throw new Error(`${ROOT_TIMINGS_FILE}: "${file}" needs a positive number of seconds`);
+    files[file] = seconds;
+  }
+  return { concurrency, files, missing: false };
+}
+
+const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** How long one shard takes: `node --test` sorts its files by name and runs
+ * `concurrency` of them at a time, each next file taking the first free slot.
+ * On run 38144865240 it predicted all eight old shards to within about 4%. */
+function shardFinishMs(sortedFiles, weightMs, concurrency) {
+  const slots = new Array(concurrency).fill(0);
+  for (const file of sortedFiles) {
+    let free = 0;
+    for (let slot = 1; slot < concurrency; slot++) if (slots[slot] < slots[free]) free = slot;
+    slots[free] += weightMs.get(file);
+  }
+  return Math.max(...slots);
+}
+
+/** Duration-weighted, deterministic partition of the root files.
+ *
+ * Longest-processing-time first: files are taken heaviest first (ties by
+ * name) and each goes to the shard that would then FINISH soonest, the finish
+ * being simulated the way node --test schedules a shard (name order,
+ * `concurrency` at a time) — so a heavy file is never parked at the end of a
+ * shard where it would run alone. Ties go to the lighter shard, then the lower
+ * index. A file with no measurement weighs the median of the measured ones.
+ * Weights are whole milliseconds, so the plan is the same on every machine.
+ *
+ * Exact cover is checked, not assumed: every input file lands in exactly one
+ * shard, and the union of the shards is the unsharded set. */
+export function planRootShards(files, total, timings = readRootTimings()) {
+  if (!Number.isSafeInteger(total) || total < 1) throw new Error('The shard count must be a positive integer');
+  if (new Set(files).size !== files.length) throw new Error('The root test list contains a duplicate');
+  const concurrency = timings.concurrency ?? 3;
+  const measured = timings.files ?? {};
+  const known = files.filter((file) => Object.hasOwn(measured, file)).map((file) => Math.max(1, Math.round(measured[file] * 1000))).sort((a, b) => a - b);
+  const middle = known.length >> 1;
+  const median = !known.length ? 1000 : known.length % 2 ? known[middle] : Math.round((known[middle - 1] + known[middle]) / 2);
+  const weightMs = new Map(files.map((file) => [file, Object.hasOwn(measured, file) ? Math.max(1, Math.round(measured[file] * 1000)) : median]));
+  const shards = Array.from({ length: total }, () => ({ files: [], sumMs: 0, finishMs: 0 }));
+  for (const file of [...files].sort((a, b) => weightMs.get(b) - weightMs.get(a) || byName(a, b))) {
+    let best = -1, bestFinish = Infinity;
+    shards.forEach((shard, index) => {
+      const candidate = [...shard.files, file].sort(byName);
+      const finish = shardFinishMs(candidate, weightMs, concurrency);
+      if (finish < bestFinish || (finish === bestFinish && shard.sumMs < shards[best].sumMs)) { best = index; bestFinish = finish; }
+    });
+    const chosen = shards[best];
+    chosen.files.push(file);
+    chosen.files.sort(byName);
+    chosen.sumMs += weightMs.get(file);
+    chosen.finishMs = bestFinish;
+  }
+  const placed = shards.flatMap((shard) => shard.files), placedSet = new Set(placed);
+  if (placed.length !== files.length || placedSet.size !== files.length || !files.every((file) => placedSet.has(file))) {
+    throw new Error('The shard plan does not cover every root test file exactly once');
+  }
+  return shards.map((shard) => ({ files: shard.files, seconds: shard.finishMs / 1000, unmeasured: shard.files.filter((file) => !Object.hasOwn(measured, file)).length }));
+}
+
+function nonEmpty(files) {
+  if (!files.length) throw new Error('The root test shard is empty; refusing to report success without tests');
+  return files;
+}
+
+export function selectRootShard(files, shard, timings = readRootTimings()) {
+  return nonEmpty(shard ? planRootShards(files, shard.total, timings)[shard.index - 1].files : files);
 }
 
 /** Dependencies and file discovery are validated before any suite runs. The
@@ -102,8 +190,20 @@ export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = sp
     const suites = options.suite ? [options.suite] : ['root', 'workspaces', 'studio'];
     const runs = suites.map((name) => {
       if (name === 'root') {
-        const files = selectRootShard(discoverRootTests(root), options.shard);
-        return { name, files, args: ['--import', 'tsx', '--test', ...files], cwd: root };
+        if (!options.shard) {
+          const files = discoverRootTests(root);
+          return { name, files, args: ['--import', 'tsx', '--test', ...files], cwd: root };
+        }
+        const timings = readRootTimings(root);
+        const plan = planRootShards(discoverRootTests(root), options.shard.total, timings)[options.shard.index - 1];
+        const files = nonEmpty(plan.files);
+        // A sharded run also prints each file's measured seconds, the input of
+        // scripts/update-test-timings.mjs. A second reporter replaces node's
+        // default, so TAP (its default without a terminal, as in CI) is named.
+        const reporter = join(root, 'scripts', 'test-file-timings.mjs');
+        requireFile(reporter);
+        const note = `${files.length} files, about ${Math.round(plan.seconds)} s predicted${timings.missing ? ` (no ${ROOT_TIMINGS_FILE}: balanced by file count)` : ''}`;
+        return { name, files, note, cwd: root, args: ['--import', 'tsx', '--test', '--test-reporter=tap', '--test-reporter-destination=stdout', `--test-reporter=${pathToFileURL(reporter).href}`, '--test-reporter-destination=stdout', ...files] };
       }
       if (name === 'studio') {
         const files = discoverTests(studio, '.test.mjs');
@@ -119,7 +219,7 @@ export function runTestSuites(argv, { root = ROOT, env = process.env, spawn = sp
     }
     const failed = [];
     for (const run of runs) {
-      log(`\ntest:unit: running ${run.name}${options.shard ? ` shard ${options.shard.index}/${options.shard.total}` : ''}`);
+      log(`\ntest:unit: running ${run.name}${options.shard ? ` shard ${options.shard.index}/${options.shard.total}` : ''}${run.note ? ` (${run.note})` : ''}`);
       try {
         for (const file of run.files) requireFile(join(run.cwd, file));
         const result = spawn(process.execPath, run.args, { stdio: 'inherit', shell: false, cwd: run.cwd, env: testEnv });

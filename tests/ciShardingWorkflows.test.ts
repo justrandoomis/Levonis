@@ -46,7 +46,7 @@ function commands(job: string): string[] {
 const reusable = './.github/workflows/verify-all.yml';
 const branchGuard = "${{ github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}";
 
-test('reusable verification runs all four required groups, with eight complete root shards', () => {
+test('reusable verification runs all four required groups, with every root shard of one plan', () => {
   const source = active(read('verify-all.yml'));
   assert.match(source, /^on:\s*\n {2}workflow_call:\s*(?:\{\})?\s*$/m);
   const all = jobs(source);
@@ -59,14 +59,21 @@ test('reusable verification runs all four required groups, with eight complete r
     assert.doesNotMatch(job, /^\s*(?:if:|continue-on-error:)/m, `${name} must run and its failures must fail verification`);
   }
   const root = all.get('root_tests')!;
-  assert.match(root, /^\s+fail-fast: false$/m, 'one failed shard must not cancel the other seven');
-  assert.match(root, /^\s+max-parallel: 8$/m);
+  // One shard count, written in four places that must agree: the job name,
+  // max-parallel, the matrix and the command each shard runs.
+  const named = /^ {4}name: Root tests \(\$\{\{ matrix\.shard \}\}\/(\d+)\)$/m.exec(root);
+  assert.ok(named, 'each root job names its shard out of the total');
+  const total = Number(named[1]);
+  assert.ok(total >= 8, 'the owner asked for eight parts or more');
+  assert.ok(total + all.size - 1 <= 20, 'every shard and the other verify jobs fit in the 20 jobs GitHub\'s free plan runs at once');
+  assert.match(root, /^\s+fail-fast: false$/m, 'one failed shard must not cancel the others');
+  assert.match(root, new RegExp(`^\\s+max-parallel: ${total}$`, 'm'));
   const shard = /^\s+shard: \[([^\]]+)\]$/m.exec(root);
   assert.ok(shard, 'root matrix must enumerate its shards');
-  assert.deepEqual(shard[1].split(',').map((part) => Number(part.trim())), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(shard[1].split(',').map((part) => Number(part.trim())), Array.from({ length: total }, (_, index) => index + 1));
   assert.doesNotMatch(root, /^\s+(?:exclude|include):/m, 'matrix edits cannot omit or duplicate a shard');
   const shardCommands = commands(root).filter((line) => line.includes('scripts/test-all.mjs'));
-  assert.deepEqual(shardCommands, ["node scripts/test-all.mjs --suite root --shard '${{ matrix.shard }}/8'"]);
+  assert.deepEqual(shardCommands, [`node scripts/test-all.mjs --suite root --shard '\${{ matrix.shard }}/${total}'`]);
   assert.ok(commands(all.get('checks')!).includes('npm run check'), 'the complete type/lint/boundary gate remains');
   for (const [job, suite] of [['workspace_tests', 'workspaces'], ['studio_tests', 'studio']] as const) {
     assert.deepEqual(commands(all.get(job)!).filter((line) => line.includes('scripts/test-all.mjs')), [`node scripts/test-all.mjs --suite ${suite}`]);
