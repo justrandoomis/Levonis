@@ -9,7 +9,7 @@
  * trap, focus coming back, Escape reaching only the top layer, the menu and
  * tab keyboards, one DataList layout mounted, the live regions).
  *
- *   /tests/browser/ui-kit.html?lang=ar|en[&density=compact]
+ *   /tests/browser/ui-kit.html?lang=ar|en|ckb[&density=compact]
  *
  * Only utilities that already exist in the app are used here: Tailwind scans
  * this folder too, and a fixture must not grow the store's stylesheet.
@@ -41,7 +41,8 @@ import '../../src/index.css';
 
 const params = new URLSearchParams(location.search);
 try {
-  localStorage.setItem('levo_lang', params.get('lang') === 'en' ? 'en' : 'ar');
+  const lang = params.get('lang');
+  localStorage.setItem('levo_lang', lang === 'en' || lang === 'ckb' ? lang : 'ar');
 } catch {
   /* storage blocked: Arabic, the default */
 }

@@ -8,6 +8,14 @@
  * the real routes) at 390 and 1280 px, Arabic (English spot-checks), light and
  * dark, written to $THEME_SHOTS_DIR as <page>-<width>-<lang>-<theme>.png.
  *
+ * LANGUAGES. By default every screen is Arabic, with four English spot-checks
+ * at 390 px. THEME_SHOTS_LANGS=ckb (or ar,ckb, or en) instead photographs every
+ * screen in each listed language — ar, en or ckb — and drops the spot-checks.
+ * The language is set the way the app keeps it: `localStorage['levo_lang']`
+ * (src/LanguageContext.tsx), read before the first render; the two fixtures
+ * take it as `?lang=`. Each shot also checks that <html lang> came out as asked,
+ * so a screen that fell back to Arabic is a failure, not a mislabelled picture.
+ *
  * DATA. Catalogue reads are the live shop's PUBLIC read-only GETs (the same
  * rule as scripts/e2e-home-v2-shots.mjs): only GET, only /api/* and /files/*,
  * no cookie. Everything a signed-in screen needs is answered here from small
@@ -20,8 +28,11 @@
  *   node scripts/e2e-theme-shots.mjs
  *   THEME_SHOTS_ONLY=home,settings THEME_SHOTS_THEMES=light node scripts/e2e-theme-shots.mjs
  *
+ *   THEME_SHOTS_LANGS=ckb THEME_SHOTS_WIDTHS=390 node scripts/e2e-theme-shots.mjs
+ *
  * Env: THEME_SHOTS_ORIGIN (default https://levonis-iq.com), THEME_SHOTS_DIR
- * (default /tmp/claude-0/shots/theme), THEME_SHOTS_URL (reuse a running Vite).
+ * (default /tmp/claude-0/shots/theme), THEME_SHOTS_URL (reuse a running Vite),
+ * THEME_SHOTS_LANGS (default: ar, plus the English spot-checks).
  *
  * Besides the pictures it asserts what a picture hides: the first frame is
  * already the chosen theme (no flash), the whole page agrees with <html>, and
@@ -39,6 +50,16 @@ const ORIGIN = process.env.THEME_SHOTS_ORIGIN || 'https://levonis-iq.com';
 const OUT = process.env.THEME_SHOTS_DIR || '/tmp/claude-0/shots/theme';
 const PORT = 4183;
 let BASE = process.env.THEME_SHOTS_URL || '';
+
+/** The app's three languages and the browser locale each shot runs under. */
+const LOCALES = { ar: 'ar-IQ', en: 'en-US', ckb: 'ckb-IQ' };
+const LANGS_ENV = (process.env.THEME_SHOTS_LANGS || '').split(',').map((l) => l.trim()).filter(Boolean);
+for (const l of LANGS_ENV) {
+  if (!(l in LOCALES)) throw new Error(`THEME_SHOTS_LANGS: unknown language "${l}" (use ar, en, ckb)`);
+}
+/** Languages photographed on every screen, and the English spot-check (default run only). */
+const FULL_LANGS = LANGS_ENV.length ? [...new Set(LANGS_ENV)] : ['ar'];
+const SPOT_EN = !LANGS_ENV.length;
 
 let chromium;
 try {
@@ -88,10 +109,10 @@ async function ensureServer() {
 // ------------------------------------------------------------ fixed data
 const now = Date.now();
 const iso = (days) => new Date(now - days * 86_400_000).toISOString();
-const USER = (role) => ({
+const USER = (role, lang = 'ar') => ({
   id: 'u_theme', email: 'reader@example.com', username: 'reader', name: role === 'admin' ? 'Levonis Admin' : 'علي حسن',
   role, isAdmin: role === 'admin', is_investor: false, subscription_plan: 'free', membership_tier: 'plus',
-  admin_scope: role === 'admin' ? 'full' : null, can_view_financials: role === 'admin', subscription_expiry: 0, locale: 'ar',
+  admin_scope: role === 'admin' ? 'full' : null, can_view_financials: role === 'admin', subscription_expiry: 0, locale: lang,
   avatar_key: null, bio: '', website: '', profile: {}, country: 'IQ', phone: '+9647******567', has_phone: true,
   notify_whatsapp: true, has_google: false, onboarding: 'done', completion: { percent: 100, complete: true, missing: [] },
   checkin_streak: 3, last_checkin_day: null, created_at: iso(200),
@@ -184,7 +205,7 @@ async function newContext(browser, { width, lang, theme }) {
     // The OS says the OPPOSITE of the chosen theme, so a screen that followed
     // the phone instead of the choice shows up at once.
     colorScheme: theme === 'light' ? 'dark' : 'light',
-    locale: lang === 'en' ? 'en-US' : 'ar-IQ',
+    locale: LOCALES[lang],
   });
   await context.addInitScript(
     ([l, t]) => {
@@ -201,7 +222,7 @@ async function newContext(browser, { width, lang, theme }) {
   return context;
 }
 
-async function wire(page, as) {
+async function wire(page, as, lang) {
   page.on('pageerror', (e) => console.log(`  page error: ${e.message.slice(0, 160)}`));
   await page.route('**/files/**', async (route) => {
     const url = new URL(route.request().url());
@@ -213,7 +234,7 @@ async function wire(page, as) {
     const url = new URL(req.url());
     const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     const p = url.pathname;
-    if (p === '/api/auth/me') return json({ success: true, user: as ? USER(as) : null });
+    if (p === '/api/auth/me') return json({ success: true, user: as ? USER(as, lang) : null });
     if (p === '/api/storefront/resolve') return json({ success: true, kind: 'main', store: null });
     if (p === '/api/community/access') return json({ success: true, closed: false, admin: false, may_enter: true });
     // The community lists as a signed-in member sees them, with nothing in them
@@ -252,6 +273,7 @@ async function facts(page) {
     const bg = getComputedStyle(document.body).backgroundColor;
     return {
       theme: root.getAttribute('data-theme'),
+      lang: root.getAttribute('lang'),
       scheme: getComputedStyle(root).colorScheme,
       meta: document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null,
       bodyBg: bg,
@@ -275,7 +297,7 @@ async function shootSpa(browser, spec, combo) {
   const { width, lang, theme } = combo;
   const context = await newContext(browser, combo);
   const page = await context.newPage();
-  await wire(page, spec.as);
+  await wire(page, spec.as, lang);
   const path = spec.path === 'PRODUCT' ? productPath : spec.path;
   const name = `${spec.name}-${width}-${lang}-${theme}`;
   // The FIRST frame: the attribute must already be there when the DOM is parsed.
@@ -289,6 +311,7 @@ async function shootSpa(browser, spec, combo) {
   if (spec.settle) await page.waitForTimeout(spec.settle);
   const f = await facts(page);
   check(`${name}: <html data-theme> is ${theme} from the first frame`, first === theme && f.theme === theme, `first=${first} now=${f.theme}`);
+  check(`${name}: <html lang> is ${lang}`, f.lang === lang, `lang=${f.lang}`);
   check(`${name}: browser chrome follows (${f.meta}, ${f.scheme})`, f.meta === (theme === 'light' ? '#e3dacb' : '#0b0c0f') && f.scheme === theme);
   const l = lum(f.bodyBg);
   check(`${name}: the page ground is ${theme}`, theme === 'light' ? l > 0.7 : l < 0.05, f.bodyBg);
@@ -312,6 +335,7 @@ async function shootWorkspace(browser, spec, combo) {
   await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
   await page.waitForTimeout(3500);
   const f = await facts(page);
+  check(`${name}: <html lang> is ${lang}`, f.lang === lang, `lang=${f.lang}`);
   check(`${name}: the page ground is ${theme}`, theme === 'light' ? lum(f.bodyBg) > 0.7 : lum(f.bodyBg) < 0.05, f.bodyBg);
   check(`${name}: no horizontal scroll`, f.overflow <= 1, `${f.overflow}px`);
   await page.screenshot({ path: join(OUT, `${name}.png`) });
@@ -324,7 +348,7 @@ async function shootKit(browser, spec, combo) {
   const page = await context.newPage();
   page.on('pageerror', (e) => console.log(`  page error: ${e.message.slice(0, 160)}`));
   const name = `${spec.name}-${width}-${lang}-${theme}`;
-  await page.goto(`${BASE}/tests/browser/ui-kit.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/tests/browser/ui-kit.html?lang=${lang}`, { waitUntil: 'domcontentloaded' });
   await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
   await page.waitForTimeout(1500);
   if (spec.open) {
@@ -336,6 +360,7 @@ async function shootKit(browser, spec, combo) {
     await page.waitForTimeout(700);
   }
   const f = await facts(page);
+  check(`${name}: <html lang> is ${lang}`, f.lang === lang, `lang=${f.lang}`);
   check(`${name}: the page ground is ${theme}`, theme === 'light' ? lum(f.bodyBg) > 0.7 : lum(f.bodyBg) < 0.05, f.bodyBg);
   await page.screenshot({ path: join(OUT, `${name}.png`) });
   await context.close();
@@ -352,12 +377,15 @@ async function main() {
   const pick = (s) => !only.length || only.includes(s.name);
   try {
     for (const theme of themes) {
-      for (const width of widths) {
-        console.log(`\n${theme} ${width} ar`);
-        for (const spec of SPA.filter(pick)) await shootSpa(browser, spec, { width, lang: 'ar', theme });
-        for (const spec of WORKSPACE.filter(pick)) await shootWorkspace(browser, spec, { width, lang: 'ar', theme });
-        if (width < 700) for (const spec of KIT.filter(pick)) await shootKit(browser, spec, { width, lang: 'ar', theme });
+      for (const lang of FULL_LANGS) {
+        for (const width of widths) {
+          console.log(`\n${theme} ${width} ${lang}`);
+          for (const spec of SPA.filter(pick)) await shootSpa(browser, spec, { width, lang, theme });
+          for (const spec of WORKSPACE.filter(pick)) await shootWorkspace(browser, spec, { width, lang, theme });
+          if (width < 700) for (const spec of KIT.filter(pick)) await shootKit(browser, spec, { width, lang, theme });
+        }
       }
+      if (!SPOT_EN) continue;
       console.log(`\n${theme} 390 en (spot-check)`);
       for (const spec of SPA.filter((s) => ['home', 'settings', 'product', 'admin-orders'].includes(s.name)).filter(pick)) {
         await shootSpa(browser, spec, { width: 390, lang: 'en', theme });
