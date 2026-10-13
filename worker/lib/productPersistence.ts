@@ -733,6 +733,10 @@ export async function planRelationsWriteFrom(
       // by a client that does not know these fields still groups correctly.
       const effectiveLabel = label.trim() || variantLabelFallback(name);
       const id = typeof v.id === 'string' && v.id ? v.id : newId('ov');
+      // Migration 0189 (Pricing V2, C-3): '*' is the option-less product's
+      // stored SKU key ('o:*'), so no option value may take it. The database
+      // refuses it too (v2_reserved_option_id, OPTION_ID_RESERVED).
+      if (id === '*') errors.push(`${where}.id: "*" is reserved (OPTION_ID_RESERVED)`);
       const legacyImage = str(v.image, `${where}.image`, { max: 500, required: false }) ?? '';
       if (legacyImage.trim()) {
         errors.push(

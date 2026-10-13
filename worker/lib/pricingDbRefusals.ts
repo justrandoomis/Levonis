@@ -27,6 +27,11 @@ export const ENGINE_DB_REFUSALS = [
   'PRICING_MODE_ENGINE_ONLY',
   'PRICING_PREVIEW_REQUIRED',
   'ORDER_SNAPSHOT_IMMUTABLE',
+  // Migration 0189 (Pricing V2): a fee on a dollar-priced product, the reserved
+  // option id '*', and a change to the append-only legacy snapshot.
+  'PRICING_V2_FEES_RETIRED',
+  'OPTION_ID_RESERVED',
+  'PRICING_SNAPSHOT_IMMUTABLE',
 ] as const satisfies readonly CostRefusalCode[];
 
 export type EngineDbRefusalCode = (typeof ENGINE_DB_REFUSALS)[number];

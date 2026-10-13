@@ -36,6 +36,7 @@ import { join } from 'node:path';
 import { OWNER, asD1, freshDb, stubApp, type StubUser } from './app';
 import { resetPolicyCorpusMemo } from '../../worker/lib/policySync';
 import { COST, leaks, seedCostlyOrder, seedCostlyProduct, seedCostlyPurchase, seedCostlyStock, type LeakExtra } from './costlyProduct';
+import { seedV2Sentinels } from './fxSentinels';
 import type { AppContext } from '../../worker/lib/types';
 import { DEFAULT_PRICING } from '../../worker/lib/printPricing';
 import { baseUsdOf } from '../../worker/lib/pricingEngine/orderBasis';
@@ -394,6 +395,12 @@ export function seedRoleMatrix(raw: DatabaseSync = freshDb()): DatabaseSync {
       VALUES ('rcpt_rm','po1',${COST.lotTotal + 146_178},${COST.lotTotal},'2026-09-02','CASH','usr_owner','2026-09-02T00:00:00.000Z','{}');
   `);
   seedAuditRows(raw);
+  // Pricing V2 (0189; spec §8): the costly product's private V2 stores — price
+  // points, pre-order discount, V2 results and the legacy snapshot — carry
+  // V2_SENTINELS, so the first door that serves one to a non-owner fails the
+  // sweeps that list them (tests/securityPricingLeak.test.ts). A database built
+  // through an earlier migration (a deploy-ahead sweep) has no V2 tables.
+  seedV2Sentinels(raw);
   // A grant row as delegation would read it: ignored while it is off.
   try {
     raw.exec(`

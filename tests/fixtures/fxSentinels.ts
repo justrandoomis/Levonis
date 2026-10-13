@@ -9,6 +9,7 @@
  * `displayUsdRate` — so it is not a sentinel. The effective (applied) rate
  * 1703.9167 = 1666.6666 + 37.2501 is `FX_PUBLIC_RATE` by its old name.
  */
+import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 export const FX_PUBLIC_RATE = '1703.9167';
@@ -111,4 +112,77 @@ export function seedBatchSentinels(raw: DatabaseSync, productId = 'p_a1'): void 
          '2026-10-06T00:00:00.000Z', 'central', '432.104321', '2026-10-07T00:00:00.000Z')`
     )
     .run(BATCH_SENTINEL_LOT, productId);
+}
+
+/**
+ * PRICING V2 (migration 0189; spec §8): every private V2 store seeded with a
+ * sentinel no public number can equal — the dollar price points (the
+ * product's fixed price, a model's difference, a colour's difference, an
+ * SKU's fixed price), the pre-order discount and a model's exception, the V2
+ * results' exact IQD and rounded USD, the replacement cost and the minimum
+ * profit, and a legacy cost inside the migration snapshot. Nothing serves
+ * them yet (V2-3 and V2-3b add the readers); the role matrix seeds them on its
+ * costly product so the first door that does is swept from day one.
+ *
+ * A model difference is stored signed ('-43.21'); the scanners read decimals
+ * without their sign, so its magnitude is listed too.
+ */
+export const V2_SENTINELS = [
+  '987.65', // the product's fixed USD price (price-first anchor)
+  '-43.21', // a model's USD difference, as stored
+  '43.21', // …and as a scanner reads it out of text
+  '7.77', // a colour's USD difference
+  '1234.56', // an SKU's fixed USD price
+  '61.73', // the product's pre-order discount
+  '13.79', // a model's discount exception (not '0.97': the farm's public printer reliability is 0.97)
+  '1543210.987654', // a V2 result's exact IQD
+  '987.654321', // a V2 result's USD, ceil to 6 places
+  '765432', // a V2 result's replacement cost
+  '313.13', // a V2 result's minimum profit in USD
+  '654321', // a legacy cost inside the migration snapshot's payload
+] as const;
+
+/** The legacy snapshot's payload (its SHA-256 is stored beside it, as V2-5 will). */
+export const V2_SENTINEL_SNAPSHOT_PAYLOAD = JSON.stringify({ product: { price_iqd: 900000, product_cost_iqd: 654321 } });
+
+/**
+ * Seeds the V2 stores of `productId` (default: the role matrix's costly product
+ * `p_a1`, model `v_a1`, colour `c_blk`) with V2_SENTINELS, inside the engine's
+ * own token as the V2 writer will. The product is NOT made V2: no code reads
+ * these rows before V2-3, and a V2 state here would hand today's V1 doors a
+ * product shape they never meet. A database without 0189 is left untouched.
+ */
+export function seedV2Sentinels(raw: DatabaseSync, productId = 'p_a1', model = 'v_a1', colour = 'c_blk'): void {
+  const installed = raw.prepare("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'pricing_v2_sku_results'").get();
+  if (!installed) return;
+  const at = '2026-10-13T12:00:00.000Z';
+  const sku = `o:${model}|c:${colour}`;
+  const sha = createHash('sha256').update(V2_SENTINEL_SNAPSHOT_PAYLOAD).digest('hex');
+  const token = `engine-price:${productId}`;
+  raw.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').run(token);
+  const point = raw.prepare('INSERT INTO pricing_price_points (product_id, scope, scope_id, kind, amount_usd, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  point.run(productId, 'product', '', 'fixed', '987.65', 'usr_owner', at);
+  point.run(productId, 'option', model, 'delta', '-43.21', 'usr_owner', at);
+  point.run(productId, 'color', colour, 'delta', '7.77', 'usr_owner', at);
+  point.run(productId, 'sku', sku, 'fixed', '1234.56', 'usr_owner', at);
+  const discount = raw.prepare('INSERT INTO pricing_preorder_discounts (product_id, scope, scope_id, amount_usd, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)');
+  discount.run(productId, 'product', '', '61.73', 'usr_owner', at);
+  discount.run(productId, 'option', model, '13.79', 'usr_owner', at);
+  const result = raw.prepare(
+    `INSERT INTO pricing_v2_sku_results (product_id, combo_key, channel, method, anchor, final_price_iqd, exact_iqd, direct_price_iqd,
+       direct_exact_iqd, usd_ceil6, deltas_usd, discount_usd, discount_scope, discount_scope_id, floor, shipping_profile, supplier_currency,
+       fx_rate, fx_version, shipping_rate, shipping_version, replacement_exact, replacement_cost_iqd, target_profit_usd, target_rule_id,
+       target_rule_version, usd_iqd_rate, usd_fx_version, inputs_seq, config_version, write_seq, computed_at)
+     VALUES (?, ?, ?, 'cost', 'cost', ?, ?, 1544000, '1543210.987654', ?, '-35.44', ?, ?, ?, 'none', 'CHINA_SEA', 'USD',
+       '1562.5', 1, '9.5', 1, '765432', 765432, '313.13', 'rule_v2_sentinel', 1, '1562.5', 1, 0, 0, 1, ?)`
+  );
+  result.run(productId, sku, 'direct_sale', 1544000, '1543210.987654', '987.654321', null, null, null, at);
+  result.run(productId, sku, 'pre_order_sea', 1447000, '1446758.3', '925.925312', '61.73', 'product', '', at);
+  raw.prepare('DELETE FROM ops_guards WHERE id = ?').run(token);
+  raw
+    .prepare(
+      `INSERT INTO pricing_legacy_snapshots (id, product_id, reason, captured_at, usd_iqd_rate, fx_version, actor, payload_json, payload_sha256)
+       VALUES (?, ?, 'v2_migration', ?, '1562.5', 1, 'usr_owner', ?, ?)`
+    )
+    .run(`v2snap_${productId}`, productId, at, V2_SENTINEL_SNAPSHOT_PAYLOAD, sha);
 }

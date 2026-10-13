@@ -23,7 +23,7 @@ import assert from 'node:assert/strict';
 import worker from '../worker/index';
 import { APEX, asD1, ctx } from './fixtures/app';
 import { OWNER, ROLES, seededCopy, sweepGets, type SweepResult } from './fixtures/roleMatrix';
-import { BATCH_SENTINELS, FX_DISPLAY_RATE, FX_SENTINELS, seedBatchSentinels, seedFxSentinels } from './fixtures/fxSentinels';
+import { BATCH_SENTINELS, FX_DISPLAY_RATE, FX_SENTINELS, V2_SENTINELS, seedBatchSentinels, seedFxSentinels } from './fixtures/fxSentinels';
 import { arithmeticLeaks } from './fixtures/costlyProduct';
 
 const seed = () => {
@@ -33,7 +33,10 @@ const seed = () => {
   seedBatchSentinels(raw);
   return raw;
 };
-const SENTINELS = [...FX_SENTINELS, ...BATCH_SENTINELS];
+// Pricing V2 (0189): the role matrix seeds its costly product's V2 stores with
+// V2_SENTINELS (seedV2Sentinels). No door serves them before V2-3b, whose owner
+// routes add the not-vacuous check for them (spec §8).
+const SENTINELS = [...FX_SENTINELS, ...BATCH_SENTINELS, ...V2_SENTINELS];
 const extra = { decimals: SENTINELS, numbers: SENTINELS.map(Number) };
 
 let sweep: Promise<Record<string, SweepResult>> | null = null;

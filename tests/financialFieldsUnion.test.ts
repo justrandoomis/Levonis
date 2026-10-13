@@ -131,6 +131,15 @@ const AREAS: Record<string, readonly string[]> = {
     'final_price_cents', 'pricing_summary', 'legacy_amount_iqd', 'legacy_usd_iqd_rate', 'actual_purchase_cost_iqd',
     'actual_additional_costs_iqd',
   ],
+  // Pricing V2 (DECISIONS rows 221, 233; migration 0189): the owner-only DTO
+  // keys of the V2 stages, reserved before any route serves them, all `v2_`
+  // prefixed so none collides with a public name (F18).
+  PRICING_V2: [
+    'v2_points', 'v2_discounts', 'v2_direct_usd', 'v2_price_usd', 'v2_discount_usd', 'v2_delta_usd', 'v2_fixed_usd',
+    'v2_exact_iqd', 'v2_usd_ceil6', 'v2_floor', 'v2_below_cost', 'v2_cost_usd', 'v2_profit_usd', 'v2_profit_iqd',
+    'v2_replacement_iqd', 'v2_rate', 'v2_cost_inputs', 'v2_proposal', 'v2_legacy_snapshot', 'v2_legacy_payload',
+    'v2_discount_scope',
+  ],
 };
 
 /**
