@@ -22,20 +22,23 @@ test('the dark system is semantic and selection uses a small cue rather than a g
   assert.match(css, /--color-warning:/);
   assert.match(css, /--color-danger:/);
   assert.match(css, /\.lv-choice\[aria-pressed='true'\]/);
-  assert.match(css, /box-shadow:\s*inset 2px 0 0 var\(--color-gold\)/);
   assert.doesNotMatch(css, /\.lv-choice\[aria-pressed='true'\][\s\S]{0,300}background-color:\s*var\(--color-gold\)/);
-  // Selection is a press (docs/DECISIONS.md row 207): the chosen option sinks
-  // in, in both directions — the gold bar stays the one secondary cue, first.
+  // Selection is a press (docs/DECISIONS.md row 207, amended by the clay polish):
+  // the chosen option sinks in, and ONE secondary cue says which — a straight gold
+  // bar on the inline-start edge (logical, so one rule serves RTL and LTR), or the
+  // option's own check where it has one. Never all three.
   assert.match(
     css,
-    /\.lv-choice\[data-selected='true'\] \{[^}]*box-shadow:\s*inset 2px 0 0 var\(--color-gold\),\s*var\(--clay-press\);/,
-    'the selected lv-choice is pressed in (LTR)'
+    /\.lv-choice\[data-selected='true'\] \{[^}]*box-shadow:\s*var\(--clay-press\);/,
+    'the selected lv-choice is pressed in'
   );
   assert.match(
     css,
-    /\[dir='rtl'\] \.lv-choice\[data-selected='true'\] \{[^}]*box-shadow:\s*inset -2px 0 0 var\(--color-gold\),\s*var\(--clay-press\);/,
-    'the RTL mirror is pressed in too'
+    /\.lv-choice:is\(\[aria-pressed='true'\], \[aria-checked='true'\], \[data-selected='true'\]\)::before \{[^}]*inset-inline-start:\s*0;[^}]*background-color:\s*var\(--color-gold\);/,
+    'the selected lv-choice has its gold start bar, on the logical start edge'
   );
+  assert.match(css, /\.lv-choice:has\(\.lv-choice-mark\)::before \{ content: none; \}/, 'an option with a check shows the bar too (three cues)');
+  assert.doesNotMatch(css, /\[dir='rtl'\] \.lv-choice\[/, 'a physical RTL copy of the selection is back');
   // No border swap on selection: one cue fewer (the press carries it).
   assert.doesNotMatch(css, /\.lv-choice\[data-selected='true'\] \{[^}]*border-color/);
 });

@@ -25,7 +25,7 @@ import { serialStrings } from '../../adminOrders/serials/strings';
 type Mode = 'single' | 'bulk';
 
 const TEXTAREA =
-  'w-full min-h-[160px] rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors hover:border-[var(--ap-border-hover)] focus:outline-none focus:border-[var(--ap-accent)] focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]';
+  'ap-field w-full min-h-[160px] rounded-[var(--ap-radius-md)] lv-well border border-[var(--clay-field)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors focus:outline-none focus-within:border-focus';
 
 export const OUTCOME_TONE: Record<PreviewOutcome | 'checking' | 'error', string> = {
   new: 'text-[var(--ap-success)] bg-[var(--ap-success-bg)] border-[var(--ap-success-border)]',

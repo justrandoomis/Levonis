@@ -26,9 +26,10 @@ export const inputCls = `lv-input ${inputSize}`;
 // 36px, which is still a comfortable tap target. They are the clay buttons
 // of the app (`lv-button`: resting clay, a dent while pressed, the focus
 // ring, disabled and busy states) at that admin height; the primary keeps
-// the violet admin fill on the rim and base of a primary.
+// the violet admin fill (`iris` from the theme) on the rim and base of a
+// primary, only while it can be pressed (disabled is flat, src/index.css).
 export const btnPrimary =
-  'lv-button lv-button-primary min-h-9 gap-1.5 px-3 py-1.5 text-[13px] bg-[#6B46FF] hover:bg-iris-deep text-snow';
+  'lv-button lv-button-primary min-h-9 gap-1.5 px-3 py-1.5 text-[13px] enabled:bg-iris enabled:hover:bg-iris-deep enabled:text-snow';
 export const btnSecondary =
   'lv-button lv-button-secondary min-h-9 gap-1.5 px-3 py-1.5 text-[13px]';
 export const btnGhostDanger =

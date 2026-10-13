@@ -102,7 +102,8 @@ export interface LiveSearchProps {
   onPick?: () => void;
   /** 50px field, or the 44px one the scrolled header and the results bar use. */
   size?: 'regular' | 'compact';
-  /** The Home header's glass field, or the results page's pill. */
+  /** Where the field sits: the Home header, or the bar of the results page. Both
+      draw the same well with the same focus halo; the caller still says which. */
   tone?: 'header' | 'bar';
   /** Reopen the panel when the field is focused with text already in it. */
   openOnFocus?: boolean;
@@ -115,7 +116,6 @@ export default function LiveSearch({
   onSubmit,
   onPick,
   size = 'regular',
-  tone = 'header',
   openOnFocus = true,
   className = '',
 }: LiveSearchProps) {
@@ -333,10 +333,8 @@ export default function LiveSearch({
   // A search field is a pill WELL in clay (docs/DECISIONS.md row 209): sunk
   // into whatever it sits on, with the 3:1 field line, and focus keeps the
   // well (the line turns to the focus ink, plus the halo). Both tones are the
-  // same well; `bar` only drops the halo.
-  const fieldSkin = `rounded-full lv-well border border-[var(--clay-field)] focus-within:border-focus ${
-    tone === 'bar' ? '' : 'focus-within:ring-2 focus-within:ring-focus/20'
-  }`;
+  // same well with the same halo: on cream the line alone was too faint a cue.
+  const fieldSkin = 'rounded-full lv-well border border-[var(--clay-field)] focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20';
 
   const announcement = !panelShown
     ? ''

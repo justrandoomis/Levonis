@@ -203,7 +203,7 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
       testId="serial-detail"
       panelClassName="sm:max-w-xl sm:h-[min(85dvh,44rem)]"
     >
-      <div className="min-h-full bg-canvas px-4 py-4 space-y-5" dir={dir} data-serial-detail>
+      <div className="min-h-full px-4 py-4 space-y-5" dir={dir} data-serial-detail>
         {loading && !data ? (
           <div className="flex justify-center py-16" role="status" aria-label={s.loading}>
             <Spinner size="md" />

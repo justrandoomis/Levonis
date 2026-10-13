@@ -15,6 +15,7 @@ import { api } from '../../../lib/api';
 import { useLanguage } from '../../../LanguageContext';
 import { useAuth } from '../../../AuthContext';
 import { Switch } from '../../ui/Switch';
+import { input as kitInput } from '../../adminProducts/theme';
 import { useToast } from '../../ui/Toast';
 import { serialStrings } from '../../adminOrders/serials/strings';
 import { serialRefusal, shortDate } from '../../adminOrders/serials/serialsApi';
@@ -104,7 +105,7 @@ export default function SerialGateCard() {
               dir="ltr"
               value={day}
               onChange={(e) => setDay(e.target.value)}
-              className="h-10 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] px-3 text-[13px] text-[var(--ap-text-1)] focus:outline-none focus:border-[var(--ap-accent)]"
+              className={kitInput}
             />
           </div>
         )

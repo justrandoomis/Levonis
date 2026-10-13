@@ -1867,3 +1867,39 @@ and `image_variant_failed` / sweep pauses in the Workers logs.
 | CSS (11 files) | 62,708 B | 62,708 B | — |
 
 The storefront has 63 bytes left: the next storefront change needs bytes freed first.
+
+## 2026-10-13 — clay polish, batch 1: the system level (DECISIONS row 229)
+
+The owner's «أريد اكمال التطوير في التصميم ولجعله افضل اكثر», batch 1 of the clay polish plan: the dark
+clay's rim and base, the workbench light (stronger, and an ellipse that covers the first screen) carried
+through the four top bars that rest at the scroller's top, gold as the only focus ring (a base-layer
+`:focus-visible` fallback, the admin kit's fields on the `.lv-input` focus rule), no continuous decorative
+motion in the header, a flat disabled primary, the selection's second cue as a straight logical `::before`
+bar, and the dark Segmented thumb on the selected fill. Measured locally against a build of `30aa30d0`
+(this batch's base) with the same toolchain.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (`30aa30d0`, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 42,994 B | **43,004 B (+10 B)** | — |
+| `theme-*.css` (admin products kit) | 1,185 B | **1,188 B (+3 B)** | — |
+| CSS, public files (8) | 55,470 B | **55,483 B (+13 B)**; local headroom 5,957 B | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,238 B | 7,238 B (untouched); headroom 442 B | 7.5 KB = 7,680 B, **not raised** |
+| entry chunk | 65,425 B | **65,234 B (−191 B)** | 72 KB |
+| initial payload (4 files) | 184,858 B | **184,667 B (−191 B)** | 200 KB |
+| merchant workspace shell closure | 32,716 B | 32,711 B (no shell source changed; chunk-hash noise); headroom 57 B | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: added — the base `:focus-visible` rule, the `.ap-field:focus-visible` selector, the
+flat disabled-primary rule, the `::before` selection bar and its `:has(.lv-choice-mark)` opt-out, the dark
+Segmented thumb rule, the forced-colours focus selectors on a chosen option, and three `enabled:` iris
+utilities on the admin primaries. Removed — the RTL copy of the selected rule, `@keyframes rainbow`, the
+`animate-spin`/`w-[300%]`/`h-[300%]`/`w-[200%]` utilities, and the arbitrary purple focus utilities
+(`focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]`, `focus:border-[var(--ap-accent)]`,
+`focus-within:border-[var(--ap-accent)]`, `focus-visible:ring-iris(/60)`). The entry lost the spinning
+conic ring and the seven-stop animated gradient of the header.
+
+Paint: the scroll trace owed since row 210 was run — home and `/products`, 360 × 800, CPU ×4, three screens of
+scroll, both themes, local Vite: no Paint or raster task over 16 ms (paint max 7.9 ms, raster max 12.5 ms).
+Home shows a few style recalculations over 16 ms while its lazy sections mount; none is a shadow. A resting
+card still paints one blurred layer; the selection bar is a 3 px solid box, not a shadow.

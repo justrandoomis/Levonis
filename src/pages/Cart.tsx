@@ -1423,8 +1423,10 @@ export default function Cart() {
     <div className="w-full max-w-full overflow-x-clip pt-16 pb-[calc(var(--nav-stack)+148px)] sm:pb-[calc(var(--nav-stack)+92px)] text-text-secondary min-h-dvh flex flex-col font-sans">
       {/* Header */}
       {/* Solid clay, not glass (docs/DECISIONS.md row 208): an opaque bar like
-          every other one, so no frame re-blurs what scrolls under it. */}
-      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle bg-canvas px-4 py-3">
+          every other one, so no frame re-blurs what scrolls under it. It rests
+          at the top of the shell, so it paints the workbench light of the shell
+          (lv-canvas) and the light runs on through it instead of stopping. */}
+      <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle lv-canvas px-4 py-3">
         <button type="button" onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>

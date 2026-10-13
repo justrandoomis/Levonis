@@ -468,7 +468,6 @@ export function numOrNull(value: string): number | null {
  * so the control recipe is restated here without the height.
  */
 export const textareaCls =
-  'min-w-0 w-full rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] border border-[var(--ap-border)] ' +
+  'ap-field min-w-0 w-full rounded-[var(--ap-radius-md)] lv-well border border-[var(--clay-field)] ' +
   'text-[var(--ap-text-1)] text-[13px] px-3 py-2 leading-relaxed placeholder:text-[var(--ap-text-3)] ' +
-  'transition-colors duration-150 hover:border-[var(--ap-border-hover)] focus:outline-none ' +
-  'focus:border-[var(--ap-accent)] focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]';
+  'transition-colors duration-150 focus:outline-none focus-within:border-focus';

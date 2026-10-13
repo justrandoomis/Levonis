@@ -222,23 +222,17 @@ export default function Header() {
 
           {/* Subscription Button — the plans page is browsable signed out now,
               so a guest goes straight to it. Sending them through /auth first
-              asked for an account before showing what it costs. */}
+              asked for an account before showing what it costs. A paid tier
+              draws a STILL ring in its own colours (the 1.5px padding shows
+              this gradient around the pill): no continuous decorative motion
+              (apple-design §9), so nothing spins in the corner of the page. */}
           <Link
             to="/subscription"
             className={`relative rounded-full overflow-hidden flex items-center h-11 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
               subTier !== 'free' ? 'p-[1.5px]' : 'border border-border-subtle'
             }`}
+            style={tierMeta ? { background: `linear-gradient(135deg, ${tierMeta.accentDeep}, ${tierMeta.hex})` } : undefined}
           >
-            {tierMeta && (
-              <div
-                className="absolute top-1/2 left-1/2 w-[300%] h-[300%] -translate-x-1/2 -translate-y-1/2 animate-spin pointer-events-none"
-                style={{
-                  backgroundImage: `conic-gradient(from 0deg, transparent 70%, ${tierMeta.accentDeep} 85%, ${tierMeta.hex} 100%)`,
-                  animationDuration: '3s'
-                }}
-              />
-            )}
-            
             <div className={`relative h-full px-4 rounded-full flex items-center gap-1.5 z-10 w-full transition-colors ${
               subTier !== 'free' 
                 ? 'bg-surface hover:bg-surface-raised'
@@ -275,19 +269,14 @@ export default function Header() {
         className={`w-full max-w-4xl mx-auto pointer-events-auto transition-[margin] duration-500 ease-in-out ${isScrolled ? 'mt-0' : 'mt-1'}`}
       />
 
-      {/* Subscription-based border line when scrolled */}
+      {/* The line under the scrolled header: the hairline, or a still 2px bar
+          in the tier colour of the member. It never moves (no continuous decorative
+          motion, apple-design §9). */}
       <div className={`absolute bottom-0 left-0 right-0 h-[2px] w-full overflow-hidden transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`}>
          {!tierMeta ? (
            <div className="w-full h-full bg-border-subtle" />
          ) : (
-           <div
-             className="w-[200%] h-full"
-             style={{
-               background: `linear-gradient(to right, ${tierMeta.hex}, ${tierMeta.accentLight}, ${tierMeta.accentDeep}, ${tierMeta.hex}, ${tierMeta.accentDeep}, ${tierMeta.accentLight}, ${tierMeta.hex})`,
-               backgroundSize: '50% 100%',
-               animation: 'rainbow 3s linear infinite'
-             }}
-           />
+           <div className="w-full h-full" style={{ background: tierMeta.hex }} />
          )}
       </div>
     </header>

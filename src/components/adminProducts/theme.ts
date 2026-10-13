@@ -71,9 +71,11 @@ export const btnFilter =
   `${btnBase} ${btnText} h-10 px-3 text-[var(--ap-text-2)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:border-[var(--ap-border-hover)] enabled:active:bg-[var(--ap-surface-3)] aria-pressed:text-[var(--ap-accent-text)] aria-pressed:bg-[var(--ap-accent-soft)] aria-pressed:border-[var(--ap-accent-border)]`;
 
 /** A FIELD IS A WELL (clay): sunk into its card (`lv-well`) behind the 3:1
-    field line; no hover change. While focused, the accent line and halo say so. */
+    field line; no hover change. Focus keeps the well and adds the app's gold
+    line and halo (`.ap-field:focus-visible`, src/index.css, the `.lv-input`
+    rule): gold is the only focus colour, never the purple accent. */
 const control =
-  'h-10 min-w-0 rounded-[var(--ap-radius-md)] lv-well border border-[var(--clay-field)] text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors duration-150 focus:outline-none focus:border-[var(--ap-accent)] focus:shadow-[0_0_0_3px_var(--ap-accent-soft)]';
+  'ap-field h-10 min-w-0 rounded-[var(--ap-radius-md)] lv-well border border-[var(--clay-field)] text-[var(--ap-text-1)] placeholder:text-[var(--ap-text-3)] transition-colors duration-150 focus:outline-none focus-within:border-focus';
 export const input = `${control} text-[13px] px-3`;
 export const select = `${control} text-[13px] ap-select`;
 export const selectSm = `${control} text-[12px] ap-select`;

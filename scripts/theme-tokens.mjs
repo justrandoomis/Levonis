@@ -279,8 +279,9 @@ export function buildBlock() {
   //   well-bg   the fill of a well (inputs, tracks), between the page and a card
   //   field     the 3:1 boundary of a text-entry well
   //   wash      the workbench light on the shell's canvas (.lv-canvas); its peak
-  //             stays under a card (light L .910 < PAPER .921), so a card still
-  //             reads as the higher, lighter thing
+  //             stays under a card (light L .914 < PAPER .921; a gap of ΔL ≥ .005
+  //             in both themes is pinned), so a card still reads as the higher,
+  //             lighter thing
   // `--lv-shadow-ink` stays: the dark .scroll-edge fade reads it.
   const lightShadows = [
     '--lv-shadow-ink:58 46 28',
@@ -292,19 +293,19 @@ export function buildBlock() {
     '--clay-sink:rgb(58 46 28/.16)',
     '--clay-well-bg:#e2d9c9',
     '--clay-field:#7c715c',
-    '--clay-wash:rgb(255 248 235/.2)',
+    '--clay-wash:rgb(255 248 235/.25)',
   ];
   const darkShadows = [
     '--lv-shadow-ink:0 0 0',
-    '--clay-rim:rgb(255 255 255/.06)',
-    '--clay-base:rgb(0 0 0/.32)',
+    '--clay-rim:rgb(255 255 255/.10)',
+    '--clay-base:rgb(0 0 0/.45)',
     '--clay-contact:rgb(0 0 0/.4)',
     '--clay-ambient:rgb(0 0 0/.55)',
     '--clay-deep:rgb(0 0 0/.75)',
     '--clay-sink:rgb(0 0 0/.5)',
     '--clay-well-bg:#0e1013',
     '--clay-field:#6a707b',
-    '--clay-wash:rgb(196 188 166/.03)',
+    '--clay-wash:rgb(196 188 166/.04)',
   ];
   return [
     BEGIN,

@@ -490,7 +490,7 @@ export default function Orders() {
 
   return (
     <div className="w-full pb-24 text-text-secondary min-h-screen">
-      <div className="sticky top-0 z-40 bg-canvas border-b border-border-subtle">
+      <div className="sticky top-0 z-40 lv-canvas border-b border-border-subtle">
         <div className="px-4 py-2 flex items-center gap-3">
           <IconButton
             variant="secondary"

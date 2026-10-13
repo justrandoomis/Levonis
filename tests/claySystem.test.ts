@@ -235,6 +235,16 @@ test('the Tier-1 surfaces write their shadow into --tw-shadow, so a ring compose
   const disabled = css.search(/\.lv-button\[aria-disabled='true'\] \{/);
   const busy = css.search(/\.lv-button\[data-busy\] \{[^}]*--tw-shadow:\s*var\(--clay-press\)/);
   assert.ok(disabled > 0 && busy > disabled, 'the busy press must follow the disabled rule (equal specificity)');
+  // Disabled is flat (not pressable, so not raised): the primary takes the well's fill and the
+  // muted ink at full opacity instead of a 45% slab, and busy is excluded. A fill utility on a
+  // primary is gated on `enabled:`, or it would outrank this rule and look live.
+  assert.match(
+    css,
+    /\.lv-button-primary:is\(:disabled, \[aria-disabled='true'\]\):not\(\[data-busy\]\) \{[^}]*opacity:\s*1;[^}]*color:\s*var\(--color-text-muted\);[^}]*background-color:\s*var\(--clay-well-bg\);/
+  );
+  for (const f of ['src/components/adminProducts/form/formUi.tsx', 'src/components/adminProducts/ui.tsx']) {
+    assert.doesNotMatch(read(f), /lv-button-primary[^'`"]*(?<![:\w-])bg-/, `${f}: an unconditional fill on a primary outranks the disabled rule`);
+  }
   assert.match(css, /\.lv-button:not\(:disabled\):not\(\[aria-disabled='true'\]\):active \{[^}]*--tw-shadow:\s*var\(--clay-press\)/);
   // A field is a well with a 3:1 line, and focus keeps the well.
   assert.match(css, /\n\s*\.lv-input \{[^}]*background-color:\s*var\(--clay-well-bg\);[^}]*border:\s*1px solid var\(--clay-field\);[^}]*box-shadow:\s*var\(--clay-well\);/);
@@ -247,8 +257,21 @@ test('the Tier-1 surfaces write their shadow into --tw-shadow, so a ring compose
   assert.match(app, /h-\[100dvh\] flex flex-col lv-canvas[^"]*overflow-hidden/);
   assert.match(app, /id="main-scroll-container" className="flex-1 flex flex-col overflow-y-auto"/, 'the main scroller is painted again and hides the light');
   assert.match(css, /\.lv-canvas \{[^}]*var\(--clay-wash\)[^}]*var\(--color-canvas\)/);
+  // A bar that rests at the scroller's top continues the light instead of cutting it off with a
+  // flat fill; a page's own scroller stays transparent over it.
+  for (const [file, bar] of [
+    ['src/pages/Orders.tsx', /sticky top-0 z-40 lv-canvas border-b/],
+    ['src/pages/Products.tsx', /sticky top-0 z-40 lv-canvas border-b/],
+    ['src/pages/Cart.tsx', /fixed inset-x-0 top-0 z-40 [^"]*\blv-canvas\b/],
+    ['src/pages/Settings.tsx', /sticky top-0 z-20 lv-canvas /],
+  ] as const) {
+    assert.match(read(file), bar, `${file}: the top bar does not carry the workbench light (lv-canvas)`);
+  }
+  assert.doesNotMatch(read('src/pages/Settings.tsx'), /overflow-y-auto bg-canvas/, 'the Settings scroller paints over the light');
   // Forced colours drop every box-shadow: the pressed selection gets an outline.
   assert.match(css, /@media \(forced-colors: active\) \{[^@]*\.lv-choice:is\(\[aria-pressed='true'\]/);
+  // …and a focused CHOSEN option still shows the focus ring there: as specific as the selection, after it.
+  assert.match(css, /@media \(forced-colors: active\) \{[^@]*\.lv-choice:is\([^@]*:focus-visible,\s*\.lv-choice:focus-visible,\s*\[data-clay-dimple\]:focus-visible \{\s*outline: 2px solid CanvasText;/);
 });
 
 // ---------------------------------------------------------------------- 4
@@ -268,6 +291,8 @@ test('the contrast of the final set (plan §3.9): 4.5:1 for text, 3:1 for bounda
     const peak = over(v['clay-wash'], canvas);
     // The light stays under a card in both themes: higher means lighter.
     assert.ok(lightness(peak) < lightness(surface), `${theme}: the wash peak is lighter than a card`);
+    // …by a visible step: a peak that crowds the card erases «higher means lighter» at the top of a page.
+    assert.ok(lightness(surface) - lightness(peak) >= 0.005, `${theme}: the wash peak sits ${(lightness(surface) - lightness(peak)).toFixed(4)} under a card (min .005)`);
     assert.ok(lightness(peak) >= lightness(canvas), `${theme}: the wash darkens the page`);
     const grounds: [string, string | Rgb][] = [['canvas', canvas], ['the wash peak', peak], ['surface', surface], ['raised', raised], ['the well', well], ['surface-selected', selected]];
     // Text on the well, on the wash peak, on the selected fill (and every other ground).
@@ -454,6 +479,17 @@ test('the foundation QA: one raised container per stack, focus that shows on cre
   // On cream the field line (#7c715c) and the focus ink (#6f592b) are a near
   // match: focus adds a solid 1px ring, not only a colour swap and a halo.
   assert.match(css, /\.lv-input:focus-visible \{[^}]*box-shadow:\s*var\(--clay-well\),\s*0 0 0 1px var\(--color-focus\),/);
+  // GOLD IS THE ONLY FOCUS RING: a base-layer fallback for anything without its own
+  // focus style (the browser's blue ring otherwise), the admin kit's fields share the
+  // well's focus, and the results-bar search shows the halo too.
+  const baseFocus = [...css.matchAll(/@layer base \{([\s\S]*?)\n\}/g)].some((m) =>
+    /(^|\n)\s*:focus-visible \{\s*outline: 2px solid var\(--color-focus\);\s*outline-offset: 2px;\s*\}/.test(m[1])
+  );
+  assert.ok(baseFocus, 'no gold :focus-visible fallback in a base layer');
+  assert.match(css, /\.ap-field:focus-visible,\s*\.lv-input:focus-visible \{/, 'the admin kit field lost the well focus');
+  assert.match(read('src/components/adminProducts/theme.ts'), /const control =\s*'ap-field /);
+  assert.doesNotMatch(read('src/components/adminProducts/theme.ts'), /focus:shadow-\[/, 'a purple halo replaces the well on focus');
+  assert.doesNotMatch(read('src/components/search/LiveSearch.tsx'), /tone === 'bar' \? ''/, 'the results-bar search lost its focus halo');
   // The stepper's bare figure shows its own keyboard focus (QuantityInput's recipe).
   assert.match(
     read('src/components/ui/NumberInput.tsx'),
@@ -471,6 +507,18 @@ test('the foundation QA: one raised container per stack, focus that shows on cre
     assert.match(src, /focus-visible:ring-2/, `${f} lost its focus ring`);
     assert.doesNotMatch(src.replace(/focus-visible:ring-inset/g, ''), /(^|[\s'"`])ring-inset\b/, `${f}: a resting ring-inset hides the focus ring under the photo`);
   }
+  // The dark Segmented thumb stands off its well by its fill, not only by its hairline: the selected
+  // fill, unlayered (the thumb's own fill is a utility), and never through the `dark:` variant.
+  assert.match(css, /(^|\n)\[data-theme='dark'\] \[data-segmented-indicator\] \{\s*background-color:\s*var\(--color-surface-selected\);\s*\}/);
+  assert.ok(
+    ratio(T('surface-selected', 'dark'), V.dark['clay-well-bg']) > ratio(T('surface-raised', 'dark'), V.dark['clay-well-bg']),
+    'the dark thumb fill is no further off the track than the raised fill'
+  );
+  // No continuous decorative motion in the header (apple-design §9): the paid-tier ring and the
+  // scrolled underline are still.
+  const header = read('src/components/Header.tsx');
+  assert.doesNotMatch(header, /animate-spin|animation:/, 'the header animates a decoration again');
+  assert.doesNotMatch(css, /@keyframes rainbow/);
   // The admin tab wrapper is a flat tray: the cards inside it are the raised things.
   assert.doesNotMatch(read('src/pages/Admin.tsx'), /rounded-2xl p-4 md:p-5 shadow-/);
   // A horizontal scroller of clay buttons leaves room for their cast (overflow-x clips y too).

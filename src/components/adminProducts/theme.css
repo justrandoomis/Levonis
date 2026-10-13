@@ -23,7 +23,7 @@
   --ap-accent-text: #aca4ff;
   --ap-accent-soft: rgb(101 88 224 / 0.16);
   --ap-accent-border: rgb(101 88 224 / 0.45);
-  --ap-ring: #8f85f0;
+  --ap-ring: var(--color-focus);
   --ap-success: #66c992;
   --ap-success-bg: rgb(63 168 107 / 0.14);
   --ap-success-border: rgb(63 168 107 / 0.28);
@@ -74,7 +74,7 @@
   --ap-accent-text: #4a3fc0;
   --ap-accent-soft: rgb(90 77 210 / 0.1);
   --ap-accent-border: rgb(90 77 210 / 0.4);
-  --ap-ring: #5a4dd2;
+  --ap-ring: var(--color-focus);
   --ap-success: #1b7046;
   --ap-success-bg: rgb(27 112 70 / 0.1);
   --ap-success-border: rgb(27 112 70 / 0.3);

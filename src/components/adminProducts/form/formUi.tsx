@@ -45,10 +45,13 @@ export const area = `lv-input ${areaSize}`;
 /**
  * The clay buttons of the app (`lv-button`: resting clay, a dent while pressed,
  * the focus ring, the disabled and busy states) at the 36px admin height.
- * The primary keeps the violet admin fill on the rim and base of a primary.
+ * The primary keeps the violet admin fill (`iris` from the theme) on the rim and
+ * base of a primary — only while it can be pressed: a utility outranks the
+ * components layer, so an unconditional fill would leave a disabled button
+ * looking live under the flat disabled rule (src/index.css, DISABLED IS FLAT).
  */
 export const btn = 'lv-button min-h-0 h-9 gap-1.5 px-3 text-[13px] shrink-0';
-export const btnPrimary = `${btn} lv-button-primary bg-[#6B46FF] hover:bg-iris-deep text-snow`;
+export const btnPrimary = `${btn} lv-button-primary enabled:bg-iris enabled:hover:bg-iris-deep enabled:text-snow`;
 export const btnGhost = `${btn} lv-button-secondary`;
 export const btnDanger = `${btn} lv-button-danger`;
 /** A small round icon button, matched to the 36px button row: flat, dimpled while pressed. */
@@ -434,7 +437,7 @@ export function TierPriceDisclosure({
         className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-h-9 max-w-full min-w-0 py-1 rounded
                    text-[11px] leading-snug font-medium text-text-secondary text-start
                    underline-offset-4 hover:text-text-primary hover:underline transition-colors
-                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris"
+                   focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         {/* A ChevronDown that only ever rotates 180° — vertical, so it is
             direction-neutral and cannot point the wrong way in RTL the way a

@@ -284,7 +284,7 @@ export default function AdminUsers() {
                         setDetailUserId(u.id);
                       }}
                       aria-label={`${s.openMember}: ${u.name || u.username || u.email}`}
-                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-surface-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-iris/60"
+                      className="flex w-full items-center gap-3 text-start rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                     >
                       <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border border-border-subtle">
                         {u.role === 'admin' ? <Shield className="w-5 h-5 text-iris" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-gilt" /> : <User className="w-5 h-5 text-text-secondary" />}
