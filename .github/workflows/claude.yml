@@ -11,7 +11,7 @@
 #             change leaves this job only as a patch, built with a git directory
 #             created after Claude finished, and checked by
 #             scripts/claude-publish-gate.py.
-#   verify  - the same complete gate as workflow 7 (check + eight root shards +
+#   verify  - the same complete gate as workflow 7 (check + every root shard +
 #             workspaces + Studio), in parallel, on the base commit plus the
 #             patch: minutes, not the hour one unsharded job took. Read-only
 #             token, no secrets: Claude-written code (npm lifecycle scripts,
@@ -299,9 +299,9 @@ jobs:
       contents: read
     strategy:
       fail-fast: false
-      max-parallel: 11
+      max-parallel: 19
       matrix:
-        part: ['checks', 'root 1/8', 'root 2/8', 'root 3/8', 'root 4/8', 'root 5/8', 'root 6/8', 'root 7/8', 'root 8/8', 'workspaces', 'studio']
+        part: ['checks', 'root 1/16', 'root 2/16', 'root 3/16', 'root 4/16', 'root 5/16', 'root 6/16', 'root 7/16', 'root 8/16', 'root 9/16', 'root 10/16', 'root 11/16', 'root 12/16', 'root 13/16', 'root 14/16', 'root 15/16', 'root 16/16', 'workspaces', 'studio']
     steps:
       - uses: actions/checkout@v4
         with:
