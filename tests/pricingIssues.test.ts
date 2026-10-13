@@ -59,7 +59,11 @@ test('the list holds every readiness code of master plan v2 §2.3 and the writer
   const v2 = ['TARGET_PROFIT_BLOCKED', 'SHIPPING_FIELD_UNRESOLVED', 'SKU_INPUTS_UNREVIEWED', 'INPUT_ORPHANED', 'MEASURE_FROM_PUBLIC_SPEC'];
   const check = ['DIRECT_SALE_EXTRA_BLOCKED']; // master-plan-v2-check (1)7
   const writer = ['PRICE_SHAPE_UNSUPPORTED', 'DIRECT_PURCHASE_PRICE_SHAPE', 'FX_DERIVED_STALE', 'PRICING_ENGINE_PAUSED']; // the writer, including direct-purchase isolation
-  assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check, ...writer]);
+  const pricingV2 = [
+    'V2_PRICE_MISSING', 'V2_DISCOUNT_TOO_LARGE', 'V2_ROUTE_BELOW_COST', 'V2_SCOPE_INVALID', 'V2_POINT_CONFLICT',
+    'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_LIFTED_TO_COST', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST',
+  ]; // Pricing V2 (docs/PRICING-V2.md, spec V2-1 §1.1)
+  assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check, ...writer, ...pricingV2]);
   assert.equal(new Set(PRICING_ISSUE_CODES).size, PRICING_ISSUE_CODES.length);
   assert.deepEqual(Object.keys(PRICING_ISSUES).sort(), [...PRICING_ISSUE_CODES].sort());
   assert.equal(isPricingIssueCode('RULE_TIE'), true);
@@ -72,8 +76,11 @@ test('severity: only the never-blocking notices are warnings', () => {
   // CHANNEL_INCOMPLETE is the owner-only notice that one route is unavailable while the
   // product stays live [C2-R10]; MEASURE_FROM_PUBLIC_SPEC: "readiness warns" [C1-G11]
   // (the opt-in's measures_confirmed gate refuses, R1/L4).
+  // Pricing V2: an ignored, withdrawn or lifted discount, a lifted direct price and a price-first
+  // price below its known cost are the owner's notices; the SKU stays priced.
   assert.deepEqual(warnings, [
     'CHANNEL_INCOMPLETE', 'INPUT_ORPHANED', 'MEASURE_FROM_PUBLIC_SPEC', 'PINNED_BELOW_TARGET', 'PRICE_DROP_REVIEW', 'PRICING_CATEGORY_DIFFERS', 'RULE_ORPHANED', 'RULE_TIE',
+    'V2_BELOW_COST', 'V2_DIRECT_MIN_PROFIT', 'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_LIFTED_TO_COST',
   ]);
   for (const c of PRICING_ISSUE_CODES) assert.ok(['error', 'warning'].includes(PRICING_ISSUES[c].severity), c);
 });
@@ -197,6 +204,23 @@ test('pricingMissingEntriesOf: one engine issue → its missing_json entries (ba
   const odd = pricingMissingEntriesOf({ code: 'SHIPPING_RATE_MISSING', profile: 'toString', field: 'hasOwnProperty' }, { combo_key: '' });
   assert.equal(odd[0].label_en, 'The shipping rate is not set');
   for (const e of [...conflict, ...baseLevel, ...rateIssue, ...productItself]) for (const v of Object.values(e)) assert.equal(typeof v, 'string');
+});
+
+test('Pricing V2 codes (spec V2-1 §1.1): each in ar, en and real Sorani, no number in any label, the route ones name no cost', () => {
+  const errors = ['V2_PRICE_MISSING', 'V2_DISCOUNT_TOO_LARGE', 'V2_ROUTE_BELOW_COST', 'V2_SCOPE_INVALID', 'V2_POINT_CONFLICT'] as const;
+  const warnings = ['V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_LIFTED_TO_COST', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST'] as const;
+  for (const code of [...errors, ...warnings]) {
+    assert.ok(isPricingIssueCode(code), code);
+    const label = PRICING_ISSUES[code].label;
+    assert.equal(PRICING_ISSUES[code].severity, (errors as readonly string[]).includes(code) ? 'error' : 'warning', code);
+    assert.match(label.ckb, SORANI_ONLY, `${code}: ckb has a Sorani-only letter`);
+    assert.notEqual(label.ckb, label.ar, `${code}: ckb is not the Arabic`);
+    for (const lang of PRICING_LANGS) assert.doesNotMatch(label[lang], /[0-9٠-٩]/, `${code}.${lang}: codes and names only, never a number`);
+    assert.deepEqual(pricingIssueParams(code), [], `${code}: no placeholder`);
+  }
+  // The owner's own words for the B1 floor (PRICING-V2.md §1.3): «الخصم أكبر من ربح هذا المسار».
+  assert.match(PRICING_ISSUES.V2_DISCOUNT_WITHDRAWN.label.ar, /^الخصم أكبر من ربح هذا المسار/);
+  assert.match(PRICING_ISSUES.V2_LIFTED_TO_COST.label.ar, /^الخصم أكبر من ربح هذا المسار/);
 });
 
 test('codes are plain SCREAMING_SNAKE identifiers a client can switch on', () => {
