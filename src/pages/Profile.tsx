@@ -22,6 +22,8 @@ import DirectStockEdge from '../components/DirectStockEdge';
 import InstallAppButton from '../components/pwa/InstallAppButton';
 import { useMoney } from '../CurrencyContext';
 import { useCommunityAccess } from './community/access';
+import VariantImg from '../components/ui/VariantImg';
+import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
 
 interface FavoriteItem {
   id: string;
@@ -356,7 +358,7 @@ export default function Profile() {
         <div className="flex items-center gap-2 min-w-0">
            <div className="w-7 h-7 rounded-full bg-surface overflow-hidden border border-border-subtle shrink-0 flex items-center justify-center">
              {avatarUrl ? (
-               <img referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
+               <VariantImg sizes="28px" referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
              ) : (
                <UserRound className="w-4 h-4 text-text-muted" aria-hidden="true" />
              )}
@@ -374,7 +376,7 @@ export default function Profile() {
           <div className="flex w-full min-w-0 items-center gap-3">
             <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 bg-surface-raised ring-white/10">
               {avatarUrl ? (
-                <img referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                <VariantImg sizes="56px" referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 <UserRound className="h-7 w-7 text-text-muted" aria-hidden="true" />
               )}
@@ -625,7 +627,7 @@ export default function Profile() {
             <button type="button" onClick={() => navigate('/orders')} className="w-full rounded-lg p-2.5 mt-2 flex items-center gap-2 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus bg-surface-raised hover:bg-surface-selected">
               <div className="w-8 h-8 rounded shrink-0 overflow-hidden bg-surface-selected">
                 {latestOrder.items[0].image && (
-                  <img referrerPolicy="no-referrer" src={latestOrder.items[0].image} alt={latestOrder.items[0].name} className="w-full h-full object-cover" />
+                  <VariantImg sizes="32px" referrerPolicy="no-referrer" src={latestOrder.items[0].image} alt={latestOrder.items[0].name} className="w-full h-full object-cover" />
                 )}
               </div>
               <div className="flex items-center gap-2 text-[12px] min-w-0">
@@ -726,7 +728,7 @@ export default function Profile() {
                 <button key={bundle.id} type="button" onClick={() => navigate(bundle.product_slug ? `/bundles/${bundle.product_slug}` : '/bundles')} className="min-w-[85px] w-[85px] border rounded-lg p-1.5 flex flex-col shrink-0 text-start active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus bg-red-950 border-red-900">
                   <div className="w-full aspect-square rounded mb-1.5 overflow-hidden bg-surface-selected">
                     {bundle.image && (
-                      <img referrerPolicy="no-referrer" src={bundle.image} alt={bundle.name} className="w-full h-full object-cover" />
+                      <VariantImg sizes="(min-width: 640px) 160px, 33vw" referrerPolicy="no-referrer" src={bundle.image} alt={bundle.name} className="w-full h-full object-cover" />
                     )}
                   </div>
                   <span className="text-[9px] font-bold line-clamp-2 leading-tight mb-1 text-snow">{bundle.name}</span>
@@ -785,7 +787,7 @@ export default function Profile() {
               return (
                 <button type="button" onClick={() => navigate('/product/' + p.slug)} key={p.id} className="relative rounded-xl overflow-hidden flex flex-col text-start border shadow-sm pb-2 transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus bg-surface border-border-subtle">
                   <div className="relative aspect-square overflow-hidden w-full bg-surface-selected">
-                    {firstImage && <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />}
+                    {firstImage && <VariantImg sizes={IMAGE_SIZES.card} referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />}
                   </div>
                   <div className="p-2.5 flex flex-col flex-1 w-full text-text-primary">
                     <h3 className="font-medium text-[13px] line-clamp-2 mb-2 leading-[1.3]">{name}</h3>
@@ -838,7 +840,7 @@ export default function Profile() {
                    return (
                      <button type="button" key={item.id} onClick={() => navigate(`/product/${item.slug}`)} className="lv-surface p-2.5 flex gap-3 relative text-start transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                        <div className="w-[110px] h-[110px] rounded-md overflow-hidden shrink-0 bg-surface-selected">
-                         {item.image && <img referrerPolicy="no-referrer" src={item.image} alt={name} className="w-full h-full object-cover" />}
+                         {item.image && <VariantImg sizes="110px" referrerPolicy="no-referrer" src={item.image} alt={name} className="w-full h-full object-cover" />}
                        </div>
                        <div className="flex flex-col flex-1 min-w-0">
                          <h3 className="font-bold text-[13px] leading-[1.3] mb-1.5 line-clamp-2 text-text-primary">

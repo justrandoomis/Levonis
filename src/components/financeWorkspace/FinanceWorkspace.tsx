@@ -12,6 +12,7 @@ import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
 import ReportDeductions from './ReportDeductions';
 import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
+import VariantImg from '../ui/VariantImg';
 
 const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
 const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
@@ -294,7 +295,7 @@ function Products({ data, onOpenOrders }: { data: FinanceSummary; onOpenOrders: 
     <div className="fw-filter-pills"><button type="button" className="fw-pill" aria-pressed={view === 'products'} onClick={() => setView('products')}>{loc('المنتجات', 'Products')}</button><button type="button" className="fw-pill" aria-pressed={view === 'categories'} onClick={() => setView('categories')}>{loc('الأقسام', 'Categories')}</button></div>
     {currency === 'USD' && <UsdBasisNote available={!!data.display_usd?.available} atTimeCount={data.display_usd?.at_time_count} todayCount={data.display_usd?.today_count} todayRate={data.display_usd?.today_rate} batchLines={data.display_usd?.batch_cost_lines} />}
     {rows.length ? <div className="fw-list">{rows.map((p) => { const pc = rowCents(p); const pcs = (field: string) => centsAt(pc, field); return <Surface key={`${p.level ?? 'product'}:${p.id}`} className="fw-line-item"><div className="fw-line-heading">
-      {p.product_image || p.image_url ? <img className="fw-product-image" src={p.product_image || p.image_url} alt="" loading="lazy" /> : <span className="fw-order-icon"><Package size={20} /></span>}
+      {p.product_image || p.image_url ? <VariantImg sizes="48px" className="fw-product-image" src={p.product_image || p.image_url} alt="" loading="lazy" /> : <span className="fw-order-icon"><Package size={20} /></span>}
       <div><h3>{p.name}</h3><p>{p.qty} {loc('قطعة مباعة', 'units sold')}{p.level === 'sub' ? ` · ${loc('قسم فرعي', 'Subsection')}` : p.level === 'main' ? ` · ${loc('قسم رئيسي', 'Main section')}` : ''}</p></div></div>
       <div className="fw-line-metrics"><div className="fw-line-metric"><span>{loc('صافي البيع', 'Net sales')}</span><DisplayMoney iqd={p.net_goods_iqd} cents={pcs('net_goods_iqd')} /></div><div className="fw-line-metric"><span>{loc('تكلفة البضاعة', 'Goods cost')}</span><DisplayMoney iqd={p.cogs_iqd} cents={pcs('cogs_iqd')} /></div><div className="fw-line-metric"><span>{loc('الأجور والمواد', 'Wages and materials')}</span><DisplayMoney iqd={p.wages_iqd == null || p.materials_iqd == null ? null : p.wages_iqd + p.materials_iqd} cents={pc ? (pcs('wages_iqd') == null || pcs('materials_iqd') == null ? null : pcs('wages_iqd')! + pcs('materials_iqd')!) : undefined} /></div><div className="fw-line-metric"><span>{loc('نصيب الترويج', 'Promotion share')}</span><DisplayMoney iqd={p.promotion_iqd} cents={pcs('promotion_iqd')} /></div></div>
       <Row label={loc('حصة المستثمر', 'Investor share')} value={<DisplayMoney iqd={p.investor_iqd} cents={pcs('investor_iqd')} />} />

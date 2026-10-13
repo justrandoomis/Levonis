@@ -28,6 +28,7 @@ import { Loader2, ImagePlus, Trash2, RefreshCw } from 'lucide-react';
 import { ApiError, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { refusalText } from '../../lib/refusalStrings';
+import VariantImg from '../ui/VariantImg';
 
 /** Kept in step with the server's sniffer. */
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
@@ -114,7 +115,7 @@ export function ImagePicker({
       <div className={`flex gap-3 ${shape === 'wide' ? 'flex-col' : 'items-start'}`}>
         <div className={`${box} rounded-lg lv-well overflow-hidden shrink-0 relative`}>
           {value ? (
-            <img src={value} alt="" className="w-full h-full object-cover" />
+            <VariantImg sizes="(min-width: 640px) 240px, 50vw" src={value} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <ImagePlus className="w-5 h-5 text-text-muted" />
@@ -240,7 +241,7 @@ export function ImageGallery({
       <div className="flex flex-wrap gap-2">
         {value.map((url, i) => (
           <div key={url} className="relative w-20 h-20 rounded-lg overflow-hidden lv-well">
-            <img src={url} alt="" className="w-full h-full object-cover" />
+            <VariantImg sizes="80px" src={url} alt="" className="w-full h-full object-cover" />
             {i === 0 && (
               <span className="absolute top-1 start-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-black/70 text-gold">
                 {loc('الغلاف', 'Cover', 'بەرگ')}

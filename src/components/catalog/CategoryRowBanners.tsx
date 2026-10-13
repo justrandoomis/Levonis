@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 import CropPhoto from './CropPhoto';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 import { ArrowGlyph } from '../home/v2/SectionHead';
 import { prefetchProps } from '../../lib/catalog/prefetch';
 import { nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
@@ -91,6 +92,7 @@ export function CategoryRowBanner({
           crop={photo.productPhoto}
           frame={false}
           size={cover ? 1200 : 420}
+          sizes={cover ? IMAGE_SIZES.full : IMAGE_SIZES.cropBanner}
           eager={eager}
           className={cover ? 'inset-0' : 'lv-fade-start inset-y-0 end-0 aspect-[2/1] sm:aspect-[5/2] lg:aspect-[3/1]'}
         />

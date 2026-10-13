@@ -339,7 +339,7 @@ export default function ReviewSheet({
             <ul className="mt-3 flex flex-col gap-1.5" aria-hidden="true">
               {placeholder.map((p) => (
                 <li key={p.id} className={`${rowBase} opacity-50`}>
-                  <SafeImage src={p.image} alt="" aspect="square" className="w-10 h-10 rounded-sm shrink-0" bgClassName="bg-black" fallbackIconClassName="w-4 h-4" />
+                  <SafeImage sizes="40px" src={p.image} alt="" aspect="square" className="w-10 h-10 rounded-sm shrink-0" bgClassName="bg-black" fallbackIconClassName="w-4 h-4" />
                   <span className="min-w-0 flex-1 text-[13px] text-text-secondary truncate">{p.name}</span>
                   {p.reviewed && <CheckCircle2 className="w-4 h-4 text-emerald-400/60 shrink-0" />}
                 </li>
@@ -422,7 +422,7 @@ export default function ReviewSheet({
                       data-review-state={l.state}
                       className={`${rowBase} ${!selected && !isOpen(l) ? 'opacity-70' : ''}`}
                     >
-                      <SafeImage
+                      <SafeImage sizes="40px"
                         src={l.image}
                         alt=""
                         aspect="square"

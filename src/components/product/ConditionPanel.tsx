@@ -167,7 +167,7 @@ export default function ConditionPanel({
           <p className="mb-2 text-[11px] text-text-muted">{s.photos}</p>
           <div className="flex gap-2 overflow-x-auto hide-scrollbar">
             {condition.unit_images.map((src, i) => (
-              <SafeImage
+              <SafeImage sizes="80px"
                 key={`${src}-${i}`}
                 src={src}
                 alt=""

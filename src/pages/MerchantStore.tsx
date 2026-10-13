@@ -11,6 +11,8 @@ import PremiumMemberBadge from '../components/merchant/PremiumMemberBadge';
 import {
   ArrowLeft, ArrowRight, Star, Store as StoreIcon, BadgeCheck, Box
 } from 'lucide-react';
+import VariantImg from '../components/ui/VariantImg';
+import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
 
 interface StoreMerchant {
   id: string;
@@ -189,7 +191,7 @@ export default function MerchantStore() {
         <div className="flex items-center gap-4 mb-4">
           <div className="w-20 h-20 rounded-full overflow-hidden bg-surface border border-border-subtle flex items-center justify-center shrink-0">
             {merchant.avatarUrl ? (
-              <img referrerPolicy="no-referrer" src={merchant.avatarUrl} alt={merchant.name} className="w-full h-full object-cover" />
+              <VariantImg sizes="80px" referrerPolicy="no-referrer" src={merchant.avatarUrl} alt={merchant.name} className="w-full h-full object-cover" />
             ) : (
               <StoreIcon className="w-8 h-8 text-text-muted" />
             )}
@@ -275,7 +277,7 @@ export default function MerchantStore() {
                     <Link to={`/product/${p.slug}`} key={p.id} className="bg-surface rounded-xl border border-border-subtle overflow-hidden flex flex-col group shadow-sm hover:bg-surface-raised active:shadow-press transition-colors">
                       <div className="relative aspect-square overflow-hidden bg-surface-raised">
                         {firstImage ? (
-                          <img referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />
+                          <VariantImg sizes={IMAGE_SIZES.card} referrerPolicy="no-referrer" src={firstImage} alt={name} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-text-muted">
                             <Box className="w-10 h-10" />

@@ -42,6 +42,7 @@ import {
   type Named,
   type Selection,
 } from './shared';
+import VariantImg from '../ui/VariantImg';
 
 /** A saved extra charge and the dinars it put on each line it covers;
  * `allocations` is null for an older document whose split was never saved. */
@@ -542,7 +543,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             {!lines.length && <p className={`py-3 text-sm ${T.text3}`}>{ps.lineHint}</p>}
             {trackedQuantity > 5000 && <p role="alert" className="py-3 text-sm text-[var(--ap-danger)]">{loc('الحد الأقصى 5000 قطعة بمرجع فردي في أمر الشراء الواحد. وزّع الكمية على أكثر من أمر شراء.', 'A purchase can hold at most 5,000 individually tracked units. Split larger quantities across purchases.', 'هەر کڕینێک زۆرترین 5000 پارچەی شوێنکەوتنکراو دەگرێت. بڕی زیاتر بەسەر چەند کڕینێکدا دابەش بکە.')}</p>}
             <div className="inventory-lines">{lines.map((l, i) => <article key={i} className="inventory-line">
-              <div className="inventory-line-head">{l.image_url && <img src={l.image_url} alt="" className="inventory-thumb" loading="lazy" />}<div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => [...a, { ...l, unit_origins: copyPurchaseUnits(l.unit_origins, l.qty_ordered) }])}>{loc('تكرار', 'Duplicate', 'دووبارەکردنەوە')}</button><button type="button" className={T.btnGhost} onClick={() => { setLines((a) => a.filter((_, j) => i !== j)); setFunding((f) => ({...f,incoming_indexes:f.incoming_indexes?.filter(j=>j!==i).map(j=>j>i?j-1:j)})); }}>{loc('حذف', 'Remove', 'سڕینەوە')}</button></div>
+              <div className="inventory-line-head">{l.image_url && <VariantImg sizes="48px" src={l.image_url} alt="" className="inventory-thumb" loading="lazy" />}<div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => [...a, { ...l, unit_origins: copyPurchaseUnits(l.unit_origins, l.qty_ordered) }])}>{loc('تكرار', 'Duplicate', 'دووبارەکردنەوە')}</button><button type="button" className={T.btnGhost} onClick={() => { setLines((a) => a.filter((_, j) => i !== j)); setFunding((f) => ({...f,incoming_indexes:f.incoming_indexes?.filter(j=>j!==i).map(j=>j>i?j-1:j)})); }}>{loc('حذف', 'Remove', 'سڕینەوە')}</button></div>
               <Input label={loc('الكمية المطلوبة', 'Quantity ordered', 'بڕی داواکراو')} type="number" min={1} value={l.qty_ordered} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, qty_ordered: v === '' ? NaN : Number(v), invoiced_qty: x.invoiced_qty === x.qty_ordered ? Number(v) : x.invoiced_qty } : x))} />
               <details className="mt-2"><summary>{loc('كمية الفاتورة مختلفة؟', 'Different invoiced quantity?', 'بڕی پسوولە جیاوازە؟')}</summary><Input label={loc('كمية الفاتورة', 'Invoice quantity', 'بڕی پسوولە')} type="number" min={0} value={l.invoiced_qty} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, invoiced_qty: Number(v) } : x))} /></details>
               <PurchaseUnitOrigins qty={l.qty_ordered} value={l.unit_origins} onChange={(unit_origins) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_origins } : x))} />

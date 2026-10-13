@@ -33,6 +33,7 @@ import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, STATUS_LABELS, TRADE_IN
 import type { AdminRequestView as RequestView } from '../tradeIn/model';
 import { monthsWords, timeLeftWords, warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 import RulesEditor from './RulesEditor';
+import VariantImg from '../ui/VariantImg';
 
 interface Row {
   id: string;
@@ -212,7 +213,7 @@ function Requests({ lang }: { lang: string }) {
               <li key={r.id}>
                 <button type="button" onClick={() => setOpen(r.id)} data-row={r.id} className={`${T.surface} w-full text-start p-3 flex items-center gap-3 hover:border-[var(--ap-border-hover)] transition-colors`}>
                   <span className="w-12 h-12 shrink-0 rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-3)] overflow-hidden">
-                    {r.image ? <img src={r.image} alt="" className="w-full h-full object-cover" loading="lazy" /> : null}
+                    {r.image ? <VariantImg sizes="48px" src={r.image} alt="" className="w-full h-full object-cover" loading="lazy" /> : null}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13.5px] font-semibold truncate">{r.name}</span>
@@ -380,7 +381,7 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
               <section className={`${T.surface} p-4`}>
                 <div className="flex items-center gap-3">
                   <span className="w-14 h-14 shrink-0 rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-3)] overflow-hidden">
-                    {r.source.image ? <img src={r.source.image} alt="" className="w-full h-full object-cover" /> : null}
+                    {r.source.image ? <VariantImg sizes="56px" src={r.source.image} alt="" className="w-full h-full object-cover" /> : null}
                   </span>
                   <div className="min-w-0">
                     <p className="text-[15px] font-bold">{r.source.name}</p>

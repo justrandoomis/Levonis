@@ -57,8 +57,9 @@ import { isActiveProductImageRow, type ImageRow } from './productOverlay';
 import { logoSourceKey, readStoreIconsQuietly, servableStoreIcons } from './storeIcons';
 import { cleanIdentityText, storeDescription } from './webManifest';
 import { DOCUMENT_CACHE_CONTROL } from './securityPolicy';
-import { IMAGE_VARIANT_WIDTHS, variantSourceMime } from './imageConvert';
-import { PRODUCT_GALLERY_SIZES } from '../../packages/contracts/src/imageSizing';
+import { variantSourceMime } from './imageConvert';
+import { STORE_GALLERY_SIZES, STORE_HERO_SIZES, variantSrcSet } from '../../packages/contracts/src/imageSizing';
+import { mediaAspect, productGallerySizes } from '../../packages/contracts/src/imageSizes';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -289,6 +290,8 @@ interface PreviewRow {
 interface ProductPreview extends Pick<SocialPreview, 'title' | 'description' | 'image'> {
   /** null explicitly suppresses a speculative catalogue preload; absent preserves merchant behaviour. */
   preloadImage?: string | null;
+  /** The preloaded picture's stored size (its `product_images` row), which Product.tsx reads from the same row. */
+  preloadMedia?: { width: number | null; height: number | null } | null;
 }
 
 /** Arabic first — the store's own default language — then English, then any. */
@@ -415,12 +418,16 @@ async function previewFrom(
   const preloadImage = image && !selectionCanChangeImage && (!lightImage || lightImage === image)
     ? image
     : null;
+  // The same row the page's media JSON is built from (worker/lib/productOverlay.ts),
+  // so the preload's candidates and `sizes` are the ones the lead picture renders.
+  const leadRow = preloadImage ? images.find((entry) => entry.url === preloadImage) : undefined;
+  const preloadMedia = leadRow ? { width: leadRow.width ?? null, height: leadRow.height ?? null } : null;
 
   return {
     title,
     description: shortDescription(pickText(row.description_ar, row.description, row.description_en)),
     image: absoluteImageUrl(image, origin),
-    ...(product ? { preloadImage } : {}),
+    ...(product ? { preloadImage, preloadMedia } : {}),
   };
 }
 
@@ -809,21 +816,49 @@ export interface DocumentPreloads {
   styles: string[];
   /** The one image preloaded at high priority, or null. */
   image: string | null;
-  /** The same candidates/sizes the product gallery renders; absent for a store's cover. */
+  /** The same candidates/sizes the page's lead picture renders (`productImagePreload`, `storeImagePreload`). */
   imageSrcSet?: string;
   imageSizes?: string;
   /** The anonymous resolve answer, or null when the document must not carry one. */
   resolve: unknown | null;
 }
 
-/** Public still pictures only. A private key, GIF or pre-existing query keeps its original preload. */
-export function productImagePreload(image: string | null): Pick<DocumentPreloads, 'imageSrcSet' | 'imageSizes'> {
-  if (!image || image.includes('?') || !image.startsWith('/files/') || !variantSourceMime(image.slice('/files/'.length))) return {};
-  if (!preloadImagePath(image)) return {};
-  return {
-    imageSrcSet: IMAGE_VARIANT_WIDTHS.map((w) => `${image}?w=${w} ${w}w`).join(', '),
-    imageSizes: PRODUCT_GALLERY_SIZES,
-  };
+/** A public still `/files/` picture a preload may name as copies, else null. */
+function resizablePreload(image: string | null): string | null {
+  if (!image || image.includes('?') || !image.startsWith('/files/') || !variantSourceMime(image.slice('/files/'.length))) return null;
+  return preloadImagePath(image) ? image : null;
+}
+
+/**
+ * THE PRODUCT PAGE'S LEAD PICTURE, AS THE PAGE WILL ASK FOR IT. Product.tsx
+ * renders it with `variantSrcSet(url, { width })` and
+ * `productGallerySizes(width / height)` from the same media row; a preload
+ * that differed by one candidate would be a second download, not a head
+ * start (tests/documentPreloads.test.ts holds the two together). Public still
+ * pictures only: a private key, GIF or pre-existing query keeps its original
+ * preload.
+ */
+export function productImagePreload(
+  image: string | null,
+  media?: { width?: number | null; height?: number | null } | null
+): Pick<DocumentPreloads, 'imageSrcSet' | 'imageSizes'> {
+  const path = resizablePreload(image);
+  if (!path) return {};
+  const imageSrcSet = variantSrcSet(path, { width: media?.width ?? null });
+  return imageSrcSet ? { imageSrcSet, imageSizes: productGallerySizes(mediaAspect(media)) } : {};
+}
+
+/**
+ * A STORE'S LEAD PICTURE — its home's hero cover (storefront/blocks/Hero.tsx,
+ * `STORE_HERO_SIZES`) or its product page's first picture
+ * (catalog/ProductGallery.tsx, `STORE_GALLERY_SIZES`) — as the page asks for
+ * it: the same copies, the same `sizes`. Before this the store preloaded the
+ * ORIGINAL cover while nothing else on the page could use a small one.
+ */
+export function storeImagePreload(image: string | null, kind: 'hero' | 'gallery'): Pick<DocumentPreloads, 'imageSrcSet' | 'imageSizes'> {
+  const path = resizablePreload(image);
+  const imageSrcSet = path ? variantSrcSet(path) : undefined;
+  return imageSrcSet ? { imageSrcSet, imageSizes: kind === 'hero' ? STORE_HERO_SIZES : STORE_GALLERY_SIZES } : {};
 }
 
 /**

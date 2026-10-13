@@ -62,7 +62,7 @@ export function DeviceCard({
   return (
     <article className={`${CARD} p-4`} data-unit-id={device.unit_id}>
       <div className="flex gap-3">
-        <SafeImage
+        <SafeImage sizes="64px"
           src={device.product.image}
           alt=""
           aspect="auto"

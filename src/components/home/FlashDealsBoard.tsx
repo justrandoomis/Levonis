@@ -54,7 +54,7 @@ export default function FlashDealsBoard({ products }: { products: ApiProduct[] }
             }`}
           >
             <div className={`relative overflow-hidden bg-black ${index === 0 ? 'aspect-[2/1]' : 'aspect-square'}`}>
-              <SafeImage
+              <SafeImage sizes="(min-width: 1024px) 400px, 50vw"
                 src={productPrimaryImage(p)}
                 alt={p.name}
                 aspect="auto"

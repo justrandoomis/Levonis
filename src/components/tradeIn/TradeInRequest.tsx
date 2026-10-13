@@ -186,7 +186,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             {loc(req.status_label.ar, req.status_label.en)}
           </span>
           <div className="flex items-center gap-3 mt-3">
-            <SafeImage src={req.source.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface-raised" />
+            <SafeImage sizes="56px" src={req.source.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface-raised" />
             <div className="min-w-0 flex-1">
               <p className="text-text-primary font-bold text-[15px] leading-6 line-clamp-2">{req.source.name}</p>
               <p className="text-[12px] text-text-muted">

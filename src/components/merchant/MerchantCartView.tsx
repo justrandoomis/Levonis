@@ -22,6 +22,7 @@ import { QuantityInput } from '../ui/QuantityInput';
 import { IconButton } from '../ui/Button';
 import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
+import VariantImg from '../ui/VariantImg';
 
 export default function MerchantCartView() {
   const { loc, dir, lang } = useLanguage();
@@ -195,7 +196,7 @@ export default function MerchantCartView() {
               {cart.items.map((l) => (
                 <div key={l.cart_item_id} className="lv-surface p-2.5 flex gap-3">
                   <div className="w-[72px] h-[72px] rounded-lg bg-surface-raised overflow-hidden shrink-0">
-                    {l.images[0] && <img src={l.images[0]} alt="" className="w-full h-full object-cover" />}
+                    {l.images[0] && <VariantImg sizes="72px" src={l.images[0]} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1 flex flex-col">
                     <p className="text-text-primary text-[12.5px] font-semibold line-clamp-2 leading-snug">{l.name}</p>

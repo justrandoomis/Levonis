@@ -26,6 +26,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { refusalText } from '../../../lib/refusalStrings';
 import { UploadTile } from '../../upload/UploadTile';
 import { useProjectStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 export interface PickedMedia {
   key: string;
@@ -192,7 +193,7 @@ export function ProjectMediaPicker({
             {m.kind === 'video' ? (
               <video src={m.url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
             ) : (
-              <img src={m.url} alt="" className="h-full w-full object-cover" />
+              <VariantImg sizes="(min-width: 640px) 160px, 33vw" src={m.url} alt="" className="h-full w-full object-cover" />
             )}
             {m.kind === 'video' && (
               <span aria-hidden="true" className="absolute start-1.5 top-1.5 rounded-full bg-onyx/70 p-1 text-snow">

@@ -1,6 +1,8 @@
 import React from 'react';
 import { useTheme } from '../../lib/theme';
 import { PHONE_MEDIA, themedFiles } from '../../lib/catalog/sectionPictures';
+import { variantSrcSet } from '../../../packages/contracts/src/imageSizing';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 
 /**
  * A photograph in a ZONE of a dark banner — the home bento's `PromoPhoto`
@@ -25,6 +27,13 @@ import { PHONE_MEDIA, themedFiles } from '../../lib/catalog/sectionPictures';
  * photograph in both themes (the category row banners), so the light-theme
  * window would only be a card inside a card.
  *
+ * SMALL COPIES (owner 2026-10-13). Both the `<source>` and the `<img>` carry
+ * the `srcset` of the server's copies (packages/contracts/src/imageSizing.ts)
+ * and `sizes` — the `cropBanner` preset unless the caller knows better — so a
+ * 230 px phone banner downloads the 800 px copy, not a 1254–1600 px original
+ * (measured: `/categories` on a phone went from 512 KB of pictures to ~180).
+ * A GIF or any other source keeps its own file.
+ *
  * A failed load removes the picture; the banner under it is already a
  * designed surface.
  */
@@ -38,6 +47,7 @@ export default function CropPhoto({
   size,
   eager = false,
   frame = true,
+  sizes = IMAGE_SIZES.cropBanner,
 }: {
   src: string;
   lightSrc?: string;
@@ -53,6 +63,8 @@ export default function CropPhoto({
   eager?: boolean;
   /** Frame a dark catalogue photograph on the light theme (default), or not. */
   frame?: boolean;
+  /** How wide the photograph is drawn (`sizes` grammar). */
+  sizes?: string;
 }) {
   const { theme } = useTheme();
   const { large: shown, phone } = themedFiles({ src, lightSrc, mobileSrc, lightMobileSrc }, theme);
@@ -64,12 +76,16 @@ export default function CropPhoto({
   // Only a catalogue photograph is known to be a dark studio shot; an owner's
   // own picture keeps the edge fade it was designed with.
   const ground = frame && crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
+  const largeSet = variantSrcSet(shown);
+  const phoneSet = variantSrcSet(phone);
   return (
     <div aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
       <picture>
-        {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phone} /> : null}
+        {phone !== shown ? <source media={PHONE_MEDIA} srcSet={phoneSet ?? phone} sizes={phoneSet ? sizes : undefined} /> : null}
         <img
           src={shown}
+          srcSet={largeSet}
+          sizes={largeSet ? sizes : undefined}
           alt=""
           width={size}
           height={size}

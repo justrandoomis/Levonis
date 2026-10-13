@@ -171,7 +171,7 @@ function BannerSlide({
   const body = (
     <>
       {banner.image ? (
-        <SafeImage src={banner.image} alt={title} aspect="auto" eager className="w-full h-full" />
+        <SafeImage sizes="100vw" src={banner.image} alt={title} aspect="auto" eager className="w-full h-full" />
       ) : (
         // Text-only banner: the owner wrote a headline but uploaded no
         // picture. Rendering the brand gradient beats rendering a grey box.

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, WandSparkles } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import CropPhoto from './CropPhoto';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 import { compareHref, compareTray } from '../../lib/compareTray';
 import { isPrinterNode, nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
 import { countWord, nounKindFor } from '../../lib/catalog/copy';
@@ -73,6 +74,7 @@ const CategoryHero = forwardRef<HTMLElement, {
           crop={photo.productPhoto}
           frame={false}
           size={band ? 1200 : 480}
+          sizes={band ? IMAGE_SIZES.full : IMAGE_SIZES.cropBanner}
           eager
           className={`lv-hero-blend -z-10 ${
             band ? 'inset-y-0 -inset-x-4 sm:-inset-x-6 lg:inset-x-0' : 'inset-y-0 -end-4 w-[42%] sm:-end-6 sm:w-[38%] lg:end-0 lg:w-[34%]'

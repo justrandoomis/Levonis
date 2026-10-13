@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import { api, Field, PROCUREMENT, Select, T, money, useLabels, type Selection } from './shared';
+import VariantImg from '../ui/VariantImg';
 
 export default function StockSelection({
   value,
@@ -74,7 +75,7 @@ export default function StockSelection({
           }))}
         />
       )}
-      {value?.image_url && <img src={value.image_url} alt="" className="inventory-thumb" loading="lazy" />}
+      {value?.image_url && <VariantImg sizes="48px" src={value.image_url} alt="" className="inventory-thumb" loading="lazy" />}
       {value && (
         <p className={`text-xs ${T.text3}`}>
           {loc('المتاح', 'Available', 'بەردەست')}: {value.stock === null ? '∞' : value.stock - value.reserved} ·{' '}

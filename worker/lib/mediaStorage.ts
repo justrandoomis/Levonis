@@ -1,5 +1,6 @@
 import type { Env } from './types';
-import { convertToWebp, extensionFor, isConvertibleToWebp } from './imageConvert';
+import { convertToWebp, extensionFor, isConvertibleToWebp, variantSourceMime } from './imageConvert';
+import { deleteVariantsIn } from './variantKeys';
 
 export type MediaVisibility = 'public' | 'private';
 export type MediaDomain =
@@ -296,6 +297,28 @@ export async function deleteMediaObject(
       error: describeError(outcome.reason),
     });
     failure ??= { reason: outcome.reason };
+  }
+  /**
+   * AND ITS SMALL COPIES (worker/lib/imageVariants.ts). A public still
+   * picture's copies live under `variants/v<n>/<key>/` in the public bucket;
+   * without this, `/files/<deleted key>?w=640` would keep answering with a
+   * stored copy of a picture the owner removed. Attempted even when the
+   * original's delete failed, and a failure here is a failure of the delete.
+   */
+  if (visibility === 'public' && variantSourceMime(key) && isAnonymousPublicMediaKey(key)) {
+    try {
+      await deleteVariantsIn(mediaBucket(env, 'public'), key);
+    } catch (error) {
+      reportMediaFallback({
+        reason: 'primary_unavailable',
+        operation: 'delete',
+        visibility,
+        binding: mediaBindingName(env, 'public'),
+        key: `variants of ${key}`,
+        error: describeError(error),
+      });
+      failure ??= { reason: error };
+    }
   }
   // No fake success. A caller told the object is gone has to be right about it.
   if (failure) throw failure.reason;
@@ -668,6 +691,38 @@ export async function deleteMediaObjectIfCreated(
  */
 export function isRewritableMediaKey(key: string): boolean {
   return /^ui(?:ux)?\//i.test(key) || key.startsWith('brands/') || key.startsWith('services/');
+}
+
+export const IMMUTABLE_PUBLIC_CACHE = 'public, max-age=31536000, immutable';
+export const REVALIDATED_PUBLIC_CACHE = 'public, max-age=300, must-revalidate';
+
+/**
+ * A NAME THIS APPLICATION MINTED INSIDE THE BRAND FOLDER: a home photo or brand
+ * mark (`mintSiteMediaObject`, `<slot>-<16 characters>.webp`) or a section
+ * picture (`mintCatalogImageObject`, `catalog-<id>-<16 characters>.webp`),
+ * both under `UiUx/MainPage/`. Their bytes never change — a new upload is a
+ * new name — so `immutable` is true of them, and their R2 objects say so.
+ */
+export function isMintedSiteMediaKey(key: string): boolean {
+  return /^UiUx\/MainPage\/[A-Za-z0-9-]+-[a-z0-9]{16}\.webp$/.test(key);
+}
+
+/**
+ * THE CACHE POLICY OF A PUBLIC FILE (and of its small copies).
+ *
+ * Minted keys are `immutable`. The brand folder revalidates every five
+ * minutes, because the owner replaces its fixed names by hand
+ * (`isRewritableMediaKey`) — EXCEPT a name the application minted there whose
+ * R2 object itself carries `immutable` (what `mintSiteMediaObject` and
+ * `mintCatalogImageObject` write): both conditions, not either, so a hand
+ * upload that happens to look minted, or a minted-looking name uploaded by
+ * hand without that metadata, still revalidates. Before this, every home
+ * photo, brand mark and section picture cost each visitor a conditional
+ * request every five minutes for bytes that can never change.
+ */
+export function publicMediaCacheControl(key: string, storedCacheControl?: string | null): string {
+  if (!isRewritableMediaKey(key)) return IMMUTABLE_PUBLIC_CACHE;
+  return isMintedSiteMediaKey(key) && /\bimmutable\b/i.test(storedCacheControl ?? '') ? IMMUTABLE_PUBLIC_CACHE : REVALIDATED_PUBLIC_CACHE;
 }
 
 export function isAnonymousPublicMediaKey(key: string): boolean {

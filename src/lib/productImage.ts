@@ -32,6 +32,9 @@ export interface ProductGalleryMedia {
   option_value_id?: string | null;
   color_id?: string | null;
   variant_id?: string | null;
+  /** The stored picture's size, when the media row carries it (the gallery's `sizes` and srcset follow it). */
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface ProductGalleryBinding {

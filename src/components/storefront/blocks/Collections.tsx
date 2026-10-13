@@ -11,7 +11,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import type { CollectionData } from '../../../../packages/storeLayout/src/data';
 import { useStorefrontRuntime } from '../runtime';
-import { BlockHeading, Column, Loading, useText } from '../parts';
+import { BlockHeading, Column, Loading, storeImgProps, useText } from '../parts';
 import { useBlockRows } from '../useBlockRows';
 import { collectionName } from './ProductsGrid';
 import type { BlockProps } from '../types';
@@ -81,7 +81,7 @@ export default function CollectionsBlock({ block, data }: BlockProps<'collection
               // fade the hero uses, so a cover reads as part of the page.
               <Link key={s.id} to={rt.collectionHref(s.id)} className="sf-tile press-scale" data-collection-cover={s.id}>
                 <div className="sf-media sf-well overflow-hidden relative">
-                  <img src={s.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img {...storeImgProps(s.image_url, '(min-width: 768px) 280px, 50vw')} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   <div className="absolute inset-0 sf-cover-fade" />
                   <div className="absolute inset-x-0 bottom-0 p-3 flex flex-col gap-0.5">
                     <span className="text-white text-[13.5px] font-semibold truncate" dir="auto">

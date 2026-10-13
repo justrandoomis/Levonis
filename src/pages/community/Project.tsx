@@ -36,6 +36,7 @@ import { useProjectStrings } from '../../components/community/projects/strings';
 import ActionRow from '../../components/community/social/ActionRow';
 import FollowUserButton from '../../components/community/social/FollowUserButton';
 import { LinkRow } from '../../components/community/links/LinkCard';
+import VariantImg from '../../components/ui/VariantImg';
 
 /** «قد يعجبك» — other pieces on the same material, printer or tags (Phase 3), a lazy rail below the doors. */
 const RecommendRail = React.lazy(() => import('../../components/community/search/RecommendRail'));
@@ -324,7 +325,7 @@ function Byline({ post }: { post: Post }) {
   const inner = (
     <>
       <span aria-hidden="true" className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-surface-selected">
-        {post.author.avatarUrl && <img src={post.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
+        {post.author.avatarUrl && <VariantImg sizes="36px" src={post.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
       </span>
       <span className="min-w-0">
         <span className="block truncate text-[14px] font-semibold text-text-primary">

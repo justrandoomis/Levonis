@@ -47,6 +47,7 @@ import {
 } from '../../lib/api';
 import { Empty, IqdField, Loading, Money, Notice, TableFrame, errMsg, useCount, useLoc, type NoticeState } from './shared';
 import type { InvStrings } from './strings';
+import VariantImg from '../ui/VariantImg';
 
 const STATUS_SKIN: Record<IncomingStatus, string> = {
   draft: T.badge.hidden,
@@ -129,7 +130,7 @@ export function IncomingTab({ s, onChanged, onNewPurchase }: { s: InvStrings; on
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     {r.product_image ? (
-                      <img src={r.product_image} alt="" className={T.thumb} loading="lazy" />
+                      <VariantImg sizes="48px" src={r.product_image} alt="" className={T.thumb} loading="lazy" />
                     ) : (
                       <span className={`flex h-9 w-9 items-center justify-center rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] ${T.text3}`}>
                         <Truck size={15} />

@@ -55,7 +55,8 @@ import { useFreshOnReturn } from '../lib/useFreshOnReturn';
 import { setCartCount, countCartItems } from '../lib/cartCount';
 import { giniLinkOf } from '../lib/giniLink';
 import { takePrimedJson } from '../lib/bootFetch';
-import { PRODUCT_GALLERY_SIZES } from '../../packages/contracts/src/imageSizing';
+import { mediaAspect, productGallerySizes } from '../../packages/contracts/src/imageSizes';
+
 import SafeImage from '../components/ui/SafeImage';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
@@ -98,6 +99,11 @@ import { quickBuyChrome } from '../components/quickBuy/chromeStrings';
 import type { QuickBuySheetMode } from '../components/quickBuy/quickBuyActions';
 import type { QuickBuyPrinterAcceptance, QuickBuyPrinterPolicy } from '../lib/quickBuy';
 import { afterCriticalPaint, allowsSpeculativeLoads } from '../lib/afterCriticalPaint';
+
+/** The pictures of a step: a 3–4 column grid in the left column. */
+const STEP_IMAGE_SIZES = '(min-width: 1024px) 180px, (min-width: 640px) 25vw, 33vw';
+/** The pictures of the description: a 2–3 column grid in the left column. */
+const DESCRIPTION_IMAGE_SIZES = '(min-width: 1024px) 300px, (min-width: 640px) 33vw, 50vw';
 
 /** Its own chunk: only a printer page with maintenance parts ever draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
@@ -383,6 +389,8 @@ type ProductSource = 'catalog' | 'community';
 interface MediaItem {
   id?: string; url: string; alt_ar?: string; alt_en?: string; alt_ckb?: string;
   order?: number; primary?: boolean;
+  /** The size of the stored picture (product_images.width/height): the `sizes` and srcset of the lead follow it. */
+  width?: number | null; height?: number | null;
   option_value_id?: string | null; color_id?: string | null; variant_id?: string | null;
 }
 interface OptionItem extends ProductDimensionOverridesV2 {
@@ -2116,7 +2124,8 @@ export default function Product() {
     // selection has moved it; every other picture is the same in both themes.
     const primaryUrl = base[0]?.url;
     const light = theme === 'light' ? (product.light_image ?? '').trim() : '';
-    return light && primaryUrl ? ordered.map((m) => (m.url === primaryUrl ? { ...m, url: light } : m)) : ordered;
+    // The light picture is another file: the stored size of the primary does not describe it.
+    return light && primaryUrl ? ordered.map((m) => (m.url === primaryUrl ? { ...m, url: light, width: null, height: null } : m)) : ordered;
   })();
   const optionImage = (id: string): string =>
     mediaBindings.find((image) => image.option_value_id === id)?.url ?? '';
@@ -3788,7 +3797,11 @@ export default function Product() {
                   aspect="auto"
                   fit="contain"
                   eager={galleryIndex === 0}
-                  sizes={PRODUCT_GALLERY_SIZES}
+                  // The drawn picture, not the frame (productGallerySizes), and the
+                  // copies up to the stored size — the document preload names the
+                  // same pair from the same media row (worker/lib/socialPreview.ts).
+                  sizes={productGallerySizes(mediaAspect(activeMedia))}
+                  naturalWidth={activeMedia?.width}
                   className="w-full h-full"
                   bgClassName="bg-surface"
                   imgClassName="p-3"
@@ -4079,6 +4092,7 @@ export default function Product() {
                                           alt={pick(lang as Lang, st.title_ar, st.title, st.title_ckb)}
                                           aspect="square"
                                           fit="cover"
+                                          sizes={STEP_IMAGE_SIZES}
                                           className="rounded-lg border border-border-subtle"
                                           bgClassName="bg-surface-raised"
                                         />
@@ -4214,6 +4228,7 @@ export default function Product() {
                           alt=""
                           aspect="square"
                           fit="contain"
+                          sizes={DESCRIPTION_IMAGE_SIZES}
                           className="rounded-xl border border-border-subtle"
                           bgClassName="bg-surface-raised"
                         />

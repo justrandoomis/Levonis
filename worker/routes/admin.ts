@@ -36,8 +36,9 @@ import {
   SITE_MEDIA_MAX_BYTES,
   SITE_MEDIA_MIME,
 } from '../lib/siteMedia';
-import { convertToWebp, isConvertibleToWebp } from '../lib/imageConvert';
+import { capStoredWebp, convertToWebp, isConvertibleToWebp } from '../lib/imageConvert';
 import { putMediaObject } from '../lib/mediaStorage';
+import { scheduleVariantWarm } from '../lib/imageVariants';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
@@ -4041,6 +4042,9 @@ adminRoutes.post('/site-media/:slot', async (c) => {
       'SITE_MEDIA_NOT_WEBP'
     );
   }
+  // The stored-picture limit (worker/lib/imageConvert.ts STORED_MAX_PIXELS): a
+  // WebP over it is re-encoded smaller; at or under it, kept byte for byte.
+  buf = (await capStoredWebp(c.env, buf)).bytes;
   if (buf.byteLength > storedCap) throw tooLarge(storedCap);
   const dimensions = rasterDimensions(buf, kind.mime);
   if (!validRasterDimensions(dimensions)) {
@@ -4069,6 +4073,8 @@ adminRoutes.post('/site-media/:slot', async (c) => {
     buf,
     { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
   );
+  // Its small copies, after the answer (worker/lib/imageVariants.ts).
+  scheduleVariantWarm(() => c.executionCtx, c.env, { key, bytes: buf, width: dimensions?.width ?? null });
 
   const stored = normalizeSiteMedia(await getSetting(c.env.DB, 'mainPageMedia'));
   const previous = stored[slot.slot] ?? '';

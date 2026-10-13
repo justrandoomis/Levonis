@@ -29,6 +29,7 @@ import { Avatar, HubLink } from '../hub/parts';
 import { timeAgo } from '../hub/copy';
 import { useHubStrings } from '../hub/strings';
 import { LinkRow } from '../links/LinkCard';
+import { IMAGE_SIZES } from '../../../../packages/contracts/src/imageSizes';
 
 const CHIP =
   'lv-hit relative z-10 inline-flex min-h-8 max-w-full items-center gap-1 truncate rounded-full border border-border-subtle/60 bg-surface px-2.5 text-[11.5px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus';
@@ -91,7 +92,7 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
 
       {p.cover && (
         <div className={`relative -mx-4 overflow-hidden sm:mx-0 sm:rounded-xl ${portrait ? 'aspect-[4/5]' : 'aspect-[4/3]'}`}>
-          <SafeImage src={p.cover.url} alt="" aspect="auto" eager={eager} className="h-full w-full" bgClassName="bg-surface-selected" />
+          <SafeImage sizes={IMAGE_SIZES.feedCover} src={p.cover.url} alt="" aspect="auto" eager={eager} className="h-full w-full" bgClassName="bg-surface-selected" />
           {p.cover.kind === 'video' && (
             <span className="absolute start-3 top-3 flex size-8 items-center justify-center rounded-full bg-onyx/80 text-snow">
               <Play aria-hidden="true" className="h-3.5 w-3.5 fill-current" />

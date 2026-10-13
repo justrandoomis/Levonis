@@ -162,7 +162,7 @@ export default function VerdictBand({
               style={{ borderColor: tone.edge }}
             >
               <div className="flex items-start gap-3">
-                <SafeImage
+                <SafeImage sizes="56px"
                   src={product.image}
                   alt=""
                   aspect="square"

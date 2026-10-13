@@ -431,7 +431,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         {step === 'summary' && source && facts && (
           <Card data-trade-in-summary>
             <div className="flex gap-3 items-center mb-3">
-              <SafeImage src={source.image} alt="" aspect="square" className="w-16 h-16 rounded-md shrink-0" bgClassName="bg-surface" />
+              <SafeImage sizes="64px" src={source.image} alt="" aspect="square" className="w-16 h-16 rounded-md shrink-0" bgClassName="bg-surface" />
               <div className="min-w-0">
                 <p className="text-text-primary font-bold text-[15px] leading-6 line-clamp-2">{source.name}</p>
                 {source.variant ? <p className="text-[12.5px] text-text-muted">{source.variant}</p> : null}
@@ -672,7 +672,7 @@ function DeviceStep({
             data-unit={u.key}
             className="lv-choice w-full text-start flex gap-3 items-center rounded-lg p-3 disabled:opacity-55"
           >
-            <SafeImage src={u.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface" />
+            <SafeImage sizes="56px" src={u.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface" />
             <span className="min-w-0 flex-1">
               <span className="block text-text-primary text-[14px] font-bold leading-5 line-clamp-2">{u.name}</span>
               <span className="block text-[12px] text-text-muted truncate">
@@ -1043,7 +1043,7 @@ function TargetStep({
               data-target={t.product_id}
               className="lv-choice text-start rounded-lg p-2.5"
             >
-              <SafeImage src={t.image} alt="" aspect="square" className="w-full rounded-sm" bgClassName="bg-surface" />
+              <SafeImage sizes="(min-width: 640px) 160px, 45vw" src={t.image} alt="" aspect="square" className="w-full rounded-sm" bgClassName="bg-surface" />
               <span className="block mt-2 text-text-primary text-[13px] font-bold leading-5 line-clamp-2">{loc(t.name_ar, t.name)}</span>
               <span className="block text-[11.5px] text-text-muted">{loc(FAMILY_LABELS[t.family].ar, FAMILY_LABELS[t.family].en)}</span>
             </button>

@@ -6,6 +6,7 @@ import SectionHeader from './SectionHeader';
 import { itemCountLabel } from '../orders/format';
 import { productPrimaryImage } from '../../lib/productImage';
 import { useRail } from '../../lib/useRail';
+import VariantImg from '../ui/VariantImg';
 
 /**
  * THE SHOP'S OWN DEPARTMENTS — one heading per main section, with the
@@ -137,7 +138,8 @@ function CoverPlate({
   return (
     <span className={`block overflow-hidden bg-black ${className}`}>
       {cover ? (
-        <img
+        <VariantImg
+          sizes="(min-width: 1024px) 300px, 50vw"
           // `key` remounts the element when the candidate changes, so the new
           // src gets a fresh load cycle rather than inheriting the error state
           // of the one it replaced.

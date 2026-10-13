@@ -20,6 +20,7 @@ import { Button, IconButton } from '../../ui/Button';
 import { Field, Input } from '../../ui/Field';
 import type { CatalogMedia } from './catalogApi';
 import type { CatalogStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const VIDEO_TYPES = ['video/mp4', 'video/webm'];
@@ -116,7 +117,7 @@ export function MediaEditor({
                     <Play className="h-6 w-6 text-text-primary" aria-hidden="true" />
                   </span>
                 ) : (
-                  <img src={m.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <VariantImg sizes="(min-width: 640px) 160px, 33vw" src={m.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                 )}
               </button>
               {i === 0 && (

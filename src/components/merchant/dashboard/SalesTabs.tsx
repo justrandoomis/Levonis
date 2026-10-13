@@ -39,6 +39,7 @@ import { couponPhase, dayToIso, isoToDay, windowProblem } from './couponDates';
 import { WorkspaceContext } from '../shell/context';
 import { merchantHref } from '../../../lib/merchantRoutes';
 import { fill, useCustomOrderStrings } from '../orders/strings';
+import VariantImg from '../../ui/VariantImg';
 
 /** The custom order's own screen (Phase 5d): a lazy chunk, opened for one row or for the id the address names. */
 const CustomOrderScreen = lazy(() => import('../orders/CustomOrderScreen'));
@@ -537,7 +538,7 @@ function OrderDetail({ id }: { id: string }) {
         {data.items.map((it) => (
           <div key={String(it.id)} className="flex items-center gap-2.5 text-[12px]">
             <div className="w-9 h-9 rounded-sm lv-well overflow-hidden shrink-0">
-              {!!it.image_snapshot && <img src={String(it.image_snapshot)} alt="" className="w-full h-full object-cover" />}
+              {!!it.image_snapshot && <VariantImg sizes="36px" src={String(it.image_snapshot)} alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-text-primary truncate">{String(it.name_snapshot)}</p>

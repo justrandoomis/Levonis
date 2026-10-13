@@ -85,7 +85,7 @@ export default function MyProjectsTab() {
               to={p.url}
               className="flex items-center gap-3 rounded-2xl border border-border-subtle/60 bg-surface p-2 pe-3 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              <SafeImage src={p.cover?.url ?? null} alt="" aspect="square" className="size-14 shrink-0 overflow-hidden rounded-xl" bgClassName="bg-surface-selected" />
+              <SafeImage sizes="56px" src={p.cover?.url ?? null} alt="" aspect="square" className="size-14 shrink-0 overflow-hidden rounded-xl" bgClassName="bg-surface-selected" />
               <span className="min-w-0 flex-1">
                 <span dir="auto" className="block truncate text-start text-[14px] font-semibold text-text-primary">
                   {p.title}

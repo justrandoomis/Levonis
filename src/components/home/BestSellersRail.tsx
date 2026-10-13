@@ -7,6 +7,7 @@ import CardPrice from '../CardPrice';
 import SectionHeader from './SectionHeader';
 import { productPrimaryImage } from '../../lib/productImage';
 import { useRail } from '../../lib/useRail';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 
 /**
  * THE ALSO-RAN PROBLEM, AND WHY THIS SHELF LOOKS LIKE A CHART.
@@ -48,7 +49,7 @@ export default function BestSellersRail({ products }: { products: ApiProduct[] }
               className="group relative flex w-[168px] sm:w-[196px] flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <div className="relative aspect-square overflow-hidden bg-black">
-                <SafeImage
+                <SafeImage sizes={IMAGE_SIZES.card}
                   src={productPrimaryImage(p)}
                   alt={p.name}
                   aspect="auto"

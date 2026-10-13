@@ -124,7 +124,9 @@ async function tick(raw: DatabaseSync) {
   console.error = (...args: unknown[]) => void errors.push(args);
   try {
     worker.scheduled(event(), env, ctx);
-    assert.equal(waited.length, 4, 'four jobs handed to waitUntil');
+    // Five: the fifth is the image-copy sweep (DECISIONS row 226), which lists R2
+    // and runs no D1 statement — every count below is unchanged by it.
+    assert.equal(waited.length, 5, 'five jobs handed to waitUntil');
     await Promise.all(waited);
   } finally {
     console.error = original;

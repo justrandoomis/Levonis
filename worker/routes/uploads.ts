@@ -3,6 +3,7 @@ import {
   IMAGE_VARIANT_WIDTHS,
   convertToWebp,
   extensionFor,
+  isAnimatedWebp,
   isConvertibleToWebp,
   negotiateVariantFormat,
   parseVariantWidth,
@@ -12,6 +13,8 @@ import {
   type ImageVariantFormat,
   type ImageVariantWidth,
 } from '../lib/imageConvert';
+import { bareEtag, readStoredVariant, scheduleVariantWarm, storeVariant, variantEtag } from '../lib/imageVariants';
+import { VARIANT_STORE_VERSION, isVariantStoreKey } from '../lib/variantKeys';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from '../lib/http';
@@ -35,6 +38,7 @@ import {
   isAnonymousPublicMediaKey,
   isRewritableMediaKey,
   isSafeMediaKey,
+  publicMediaCacheControl,
   putMediaObject,
   type MediaDomain,
   type MediaVisibility,
@@ -445,6 +449,9 @@ uploadRoutes.post('/', async (c) => {
         cleanup_grace_minutes: PRODUCT_MEDIA_FORM_STAGING_GRACE_MINUTES,
       });
       await recordPurpose(c.env.DB, stored.key, purpose);
+      // Its small copies, cut after the answer has left (worker/lib/imageVariants.ts):
+      // the first visitor reads them from R2. A picture this shop already held has them.
+      if (stored.created_new) scheduleVariantWarm(() => c.executionCtx, c.env, { key: stored.key, width: stored.width });
       return c.json({
         success: true,
         ...stored,
@@ -597,6 +604,10 @@ uploadRoutes.post('/', async (c) => {
     { httpMetadata: { contentType: storedMime, cacheControl } }
   );
   await recordPurpose(c.env.DB, key, purpose);
+  // A public picture's small copies, after the answer (worker/lib/imageVariants.ts).
+  if (target.visibility === 'public' && storedMime.startsWith('image/')) {
+    scheduleVariantWarm(() => c.executionCtx, c.env, { key, bytes: buf, width: dimensions?.width ?? null });
+  }
 
   return c.json({
     success: true,
@@ -752,23 +763,21 @@ export function answerRangeFromFull(full: Response, rangeHeader: string, ifRange
   return new Response(sliceStream(full.body, parsed.offset, parsed.length), { status: 206, headers });
 }
 
-/** The delivery headers every public file answer carries, cached or not. */
-function publicFileCacheControl(key: string): string {
-  return isRewritableMediaKey(key) ? 'public, max-age=300, must-revalidate' : 'public, max-age=31536000, immutable';
-}
-
 /**
  * THE CACHE ENTRY OF ONE SIZED VARIANT: the plain URL plus the canonical
- * `w` and the NEGOTIATED format, so the AVIF a Chrome asked for is never
- * handed to a browser that sent `Accept: image/webp`. Any other query the
- * caller carried is dropped from the key — the answer does not depend on it.
- * Rewritable keys carry the generation as the original does.
+ * `w`, the NEGOTIATED format and the copy store's version, so the AVIF a
+ * Chrome asked for is never handed to a browser that sent `Accept:
+ * image/webp`. Any other query the caller carried (`q=`, `x=`) is dropped
+ * from the key — the answer does not depend on it, and a visitor cannot
+ * mint cache entries with it. Rewritable keys carry the generation as the
+ * original does.
  */
 export function imageVariantCacheKey(request: Request, key: string, width: ImageVariantWidth, format: ImageVariantFormat): Request {
   const url = new URL(request.url);
   url.search = '';
   url.searchParams.set('w', String(width));
   url.searchParams.set('f', format.slice('image/'.length));
+  url.searchParams.set('v', String(VARIANT_STORE_VERSION));
   return edgeCacheKey(new Request(url.toString(), { method: 'GET' }), key);
 }
 
@@ -799,7 +808,7 @@ async function loadPublicOriginal(
   obj.writeHttpMetadata(headers);
   headers.set('etag', obj.httpEtag);
   headers.set('Content-Length', String(obj.size));
-  headers.set('Cache-Control', publicFileCacheControl(key));
+  headers.set('Cache-Control', publicMediaCacheControl(key, obj.httpMetadata?.cacheControl));
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
   headers.set('Accept-Ranges', 'bytes');
@@ -814,21 +823,89 @@ async function loadPublicOriginal(
   return res;
 }
 
+/** The headers every copy carries, whichever of the three places it came from. */
+function variantHeaders(format: ImageVariantFormat, etag: string, cacheControl: string): Headers {
+  const headers = new Headers();
+  headers.set('Content-Type', format);
+  headers.set('etag', etag);
+  headers.set('Cache-Control', cacheControl);
+  headers.set('Vary', 'Accept');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  return headers;
+}
+
+/** The same response, saying where the copy came from (`edge`, `r2` or `render`) — a harmless diagnostic the post-deploy check reads. */
+function fromSource(res: Response, source: 'edge' | 'r2' | 'render'): Response {
+  const out = new Response(res.body, res);
+  out.headers.set('X-Variant-Source', source);
+  return out;
+}
+
 /**
- * `GET /files/<key>?w=<width>` — ONE SIZED VARIANT OF A PUBLIC PICTURE
- * (plan §B.1 #5; the widths and the negotiation live in
- * worker/lib/imageConvert.ts).
+ * The first bytes of a stream without losing them: `head` holds at least `n`
+ * bytes (or the whole stream when shorter), and `stream` replays everything.
+ */
+async function peekStream(stream: ReadableStream<Uint8Array>, n: number): Promise<{ head: Uint8Array; stream: ReadableStream<Uint8Array> }> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let ended = false;
+  while (total < n) {
+    const next = await reader.read();
+    if (next.done) {
+      ended = true;
+      break;
+    }
+    if (next.value?.byteLength) {
+      chunks.push(next.value);
+      total += next.value.byteLength;
+    }
+  }
+  const head = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    head.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  const replay = new ReadableStream<Uint8Array>({
+    start(controller) {
+      if (head.byteLength) controller.enqueue(head);
+      if (ended) controller.close();
+    },
+    async pull(controller) {
+      const next = await reader.read();
+      if (next.done) controller.close();
+      else controller.enqueue(next.value);
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  });
+  return { head, stream: replay };
+}
+
+/**
+ * `GET /files/<key>?w=<width>` — ONE SIZED COPY OF A PUBLIC PICTURE
+ * (the widths: packages/contracts/src/imageSizing.ts; the copies:
+ * worker/lib/imageVariants.ts).
  *
  * The caller has already established that the key is a public still image
- * and the width is on the list. From here: the variant's own cache entry
- * first; then the ORIGINAL (edge cache, else R2 once); a 304 when the
- * browser already holds this exact variant — decided from the original's
- * ETag, before a pixel is touched; then the binding cuts the width and the
- * format and the result streams to the visitor and into the cache at once.
+ * and the width is on the list. Three places, cheapest first:
  *
- * NOTHING HERE CAN FAIL FOR THE VISITOR: without the binding, or when it
- * refuses the picture, the original is served exactly as `/files/<key>`
- * would have — which is what every card got before this route existed.
+ *   1. this data centre's edge cache;                     X-Variant-Source: edge
+ *   2. the copy stored in R2 — made once, by an earlier request, the upload's
+ *      warm-up or the quarter-hour sweep — one R2 GET, then the edge;
+ *      a fixed name in the brand folder is HEADed first, and a copy of a
+ *      picture the owner has since replaced is never served;  X-Variant-Source: r2
+ *   3. cut now from the original by the `IMAGES` binding, answered, and
+ *      stored in R2 and the edge after the response.     X-Variant-Source: render
+ *
+ * A 304 is decided from the ETag before any pixel is touched. NOTHING HERE
+ * CAN FAIL FOR THE VISITOR: without the binding, for an animated WebP, an
+ * original too large for the binding, or when the binding refuses or answers
+ * with anything but a verified copy no wider than asked, the original is
+ * served exactly as `/files/<key>` would have — and nothing is stored.
  */
 async function serveImageVariant(
   c: Context<AppContext>,
@@ -840,6 +917,16 @@ async function serveImageVariant(
   const format = negotiateVariantFormat(c.req.header('Accept'), sourceMime);
   const cacheKey = imageVariantCacheKey(c.req.raw, key, width, format);
   const ifNoneMatch = c.req.header('If-None-Match');
+  const cachePut = (res: Response) => {
+    if (!cache) return;
+    try {
+      c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+    } catch {
+      // No execution context: serve the copy, skip the cache write.
+    }
+  };
+
+  // 1. The edge.
   if (cache) {
     const hit = await cache.match(cacheKey);
     if (hit) {
@@ -848,44 +935,95 @@ async function serveImageVariant(
         void hit.body?.cancel().catch(() => undefined);
         return new Response(null, { status: 304, headers: hit.headers });
       }
-      return hit;
+      return fromSource(hit, 'edge');
     }
   }
 
+  // 2. The copy kept in R2.
+  let stale = false;
+  const stored = await readStoredVariant(c.env, key, width, format);
+  if (stored) {
+    const sourceEtag = stored.customMetadata?.src_etag ?? '';
+    let usable = sourceEtag !== '';
+    let policy = publicMediaCacheControl(key);
+    if (isRewritableMediaKey(key)) {
+      // A fixed name the owner replaces by hand: the copy must be of the bytes there NOW.
+      const head = await headMediaObject(c.env, 'public', key);
+      if (!head) {
+        void stored.body.cancel().catch(() => undefined);
+        throw notFound();
+      }
+      usable &&= bareEtag(head.httpEtag) === sourceEtag;
+      policy = publicMediaCacheControl(key, head.httpMetadata?.cacheControl);
+    }
+    if (usable) {
+      const headers = variantHeaders(format, variantEtag(sourceEtag, width, format), policy);
+      headers.set('Content-Length', String(stored.size));
+      if (ifNoneMatch && ifNoneMatch === headers.get('etag')) {
+        void stored.body.cancel().catch(() => undefined);
+        return new Response(null, { status: 304, headers });
+      }
+      headers.set('X-Variant-Source', 'r2');
+      const res = new Response(stored.body, { headers });
+      cachePut(res);
+      return res;
+    }
+    stale = true;
+    void stored.body.cancel().catch(() => undefined);
+  }
+
+  // 3. Cut it now.
   const original = await loadPublicOriginal(c, key, cache);
   if (!original) throw notFound();
   // Without the binding there is no variant to cut: the original IS the answer.
   if (!webpConversionAvailable(c.env)) return original;
 
-  const sourceEtag = (original.headers.get('etag') ?? '').replace(/^W\//, '').replace(/^"|"$/g, '');
-  const headers = new Headers();
-  headers.set('Content-Type', format);
-  headers.set('etag', `"${sourceEtag}-w${width}-${format.slice('image/'.length)}"`);
-  headers.set('Cache-Control', publicFileCacheControl(key));
-  headers.set('Vary', 'Accept');
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  const sourceEtag = bareEtag(original.headers.get('etag'));
+  const policy = original.headers.get('Cache-Control') ?? publicMediaCacheControl(key);
+  const headers = variantHeaders(format, variantEtag(sourceEtag, width, format), policy);
   if (ifNoneMatch && ifNoneMatch === headers.get('etag')) {
     void original.body?.cancel().catch(() => undefined);
     return new Response(null, { status: 304, headers });
   }
+  // More than the binding takes in one call: the original, untouched.
+  if (Number(original.headers.get('Content-Length')) > IMAGES_MAX_INPUT_BYTES || !original.body) return original;
+  let body = original.body as ReadableStream<Uint8Array>;
+  if (sourceMime === 'image/webp') {
+    // An animated WebP keeps its frames: a resize would keep one.
+    const peeked = await peekStream(body, 32);
+    body = peeked.stream;
+    if (isAnimatedWebp(peeked.head)) {
+      const whole = new Response(body, { headers: original.headers });
+      cachePut(whole);
+      return whole;
+    }
+  }
 
-  const rendered = await renderImageVariant(c.env, original.body as ReadableStream<Uint8Array>, { width, format });
+  const rendered = await renderImageVariant(c.env, body, { width, format });
   if (!rendered.ok) {
     // The picture defeated the converter (or the binding is gone mid-flight):
-    // serve the stored file. The first read was consumed by the attempt.
+    // serve the stored file. The first read was consumed by the attempt. No
+    // key and no metadata in the log line — a reason, a width and a format.
+    console.warn('image_variant_failed', JSON.stringify({ reason: rendered.reason, w: width, fmt: format.slice('image/'.length) }));
     const again = await loadPublicOriginal(c, key, cache);
     if (!again) throw notFound();
     return again;
   }
-  const res = new Response(rendered.body, { headers });
-  if (cache) {
+  headers.set('Content-Length', String(rendered.bytes.byteLength));
+  headers.set('X-Variant-Source', 'render');
+  const res = new Response(rendered.bytes, { headers });
+  if (sourceEtag) {
     try {
-      c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()));
+      c.executionCtx.waitUntil(
+        storeVariant(c.env, { key, width, format, out: rendered, sourceEtag, cacheControl: policy, replace: stale }).catch((error) => {
+          console.warn('image_variant_store_failed', error instanceof Error ? error.name : 'unknown');
+        })
+      );
     } catch {
-      // No execution context: serve the variant, skip the cache write.
+      // No execution context: the copy is cut again next time.
     }
   }
+  cachePut(res);
   return res;
 }
 
@@ -898,6 +1036,10 @@ export const fileRoutes = new Hono<AppContext>();
 fileRoutes.get('/*', async (c) => {
   const key = c.req.path.replace(/^\/files\//, '');
   if (!isSafeMediaKey(key)) throw notFound();
+  // The small copies (`variants/…`, worker/lib/variantKeys.ts) have no address
+  // of their own: a copy is only ever answered as `/files/<original>?w=`, after
+  // the ORIGINAL passed the public check below. Nobody may list or name them.
+  if (isVariantStoreKey(key)) throw notFound();
   const user = c.get('user');
 
   const publicPrefix = isAnonymousPublicMediaKey(key);
@@ -1031,13 +1173,14 @@ fileRoutes.get('/*', async (c) => {
     typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default ?? null : null;
 
   /**
-   * `?w=160|320|480|640|1080` — A SIZED VARIANT, for public still images only (plan
-   * §B.1 #5; `serveImageVariant` above). A width off the list, a private
-   * key or anything that is not a still picture is refused outright rather
-   * than quietly answered with the original: the client (`SafeImage`) only
-   * ever asks for what this list allows, so a stray value is a mistake to
-   * surface, and an open parameter would let one visitor mint a thousand
-   * cache entries and transformations per picture.
+   * `?w=<one of IMAGE_VARIANT_WIDTHS>` — A SIZED COPY, for public still images
+   * only (`serveImageVariant` above). A width off the list, a private key or
+   * anything that is not a still picture is refused outright rather than
+   * quietly answered with the original: the pages (`variantSrcSet`) only ever
+   * ask for what this list allows, so a stray value is a mistake to surface,
+   * and an open parameter would let one visitor mint a thousand cache entries,
+   * stored copies and transformations per picture. There is no quality
+   * parameter; any other query is ignored.
    */
   const variantWidth = parseVariantWidth(c.req.query('w'));
   if (variantWidth === 'invalid') throw badRequest(`Unknown image width — use ${IMAGE_VARIANT_WIDTHS.map((width) => `w=${width}`).join(', ')}`, 'IMAGE_VARIANT_WIDTH');
@@ -1123,30 +1266,26 @@ fileRoutes.get('/*', async (c) => {
     /**
      * `immutable` IS A PROMISE, AND IT WAS BEING MADE FOR KEYS THAT BREAK IT.
      *
-     * The comment that stood here asserted that media keys are
-     * content-addressed, so a URL's bytes never change. That is true of every
-     * key this application MINTS — a digest, or `mintSiteMediaObject`'s
-     * per-upload token — and false of the brand folder, whose whole purpose is
-     * fixed names (`UiUx/Logo/Logo.webp`) that the owner replaces in place so
-     * every existing reference keeps working.
+     * Media keys outside the brand folder are content-addressed or carry a
+     * per-upload token, so a URL's bytes never change. The brand folder is
+     * different: its purpose is fixed names (`UiUx/Logo/Logo.webp`) the owner
+     * replaces in place so every existing reference keeps working.
      *
      * `immutable` does not merely cache: it tells the browser and the edge not
      * to ASK again. So a replaced logo stayed replaced-in-R2 and old-on-screen.
-     * Measured on the live site before this change: `cf-cache-status: HIT`,
+     * Measured on the live site before that was fixed: `cf-cache-status: HIT`,
      * `age: 45821`, a cached body of 70,084 bytes against the 51,518 actually
      * stored. For a year, with nothing wrong but a promise.
      *
-     * Rewritable keys therefore revalidate. Five minutes of edge cache, then
-     * one conditional request — and the 304 below makes that cost a header
-     * rather than a body, because the ETag is R2's own. The minted keys keep
-     * `immutable`, where it is true.
+     * So a fixed name revalidates — five minutes of edge cache, then one
+     * conditional request, which the 304 below makes cost a header. But the
+     * folder ALSO holds names this application mints (home photos, brand
+     * marks, section pictures: `<slot>-<token>.webp`), whose bytes never
+     * change and whose R2 objects say `immutable`; those are `immutable`
+     * again (`publicMediaCacheControl`, worker/lib/mediaStorage.ts — both the
+     * minted shape and the stored metadata, not either).
      */
-    headers.set(
-      'Cache-Control',
-      isRewritableMediaKey(key)
-        ? 'public, max-age=300, must-revalidate'
-        : 'public, max-age=31536000, immutable'
-    );
+    headers.set('Cache-Control', publicMediaCacheControl(key, obj.httpMetadata?.cacheControl));
     // The size travels with the whole file, so a ranged read of the cached
     // entry — here or at the edge — knows where the end is.
     headers.set('Content-Length', String(obj.size));

@@ -46,6 +46,7 @@ import {
   type NoticeState,
   type TemplateFamily,
 } from './shared';
+import VariantImg from '../ui/VariantImg';
 
 interface Props {
   catalogs: CatalogNode[];
@@ -165,7 +166,7 @@ export function SectionsTab({ catalogs, reload, notify }: Props) {
               the owner catch. */}
           <span className="w-9 h-9 shrink-0 rounded-lg bg-black border border-[var(--ap-border)] grid place-items-center overflow-hidden">
             {c.image_url ? (
-              <img src={c.image_url} alt="" width={36} height={36} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              <VariantImg sizes="36px" src={c.image_url} alt="" width={36} height={36} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (
               <ImageIcon className="w-4 h-4 text-[var(--ap-text-3)]" aria-hidden />
             )}
@@ -980,7 +981,7 @@ function PictureSlot({
         } ${spec.theme === 'dark' ? 'lv-plate-dark' : 'lv-plate-light'}`}
       >
         {shown ? (
-          <img src={shown} alt="" loading="lazy" decoding="async" className={`w-full h-full object-cover ${url ? '' : 'opacity-40'}`} />
+          <VariantImg sizes="(min-width: 768px) 320px, 50vw" src={shown} alt="" loading="lazy" decoding="async" className={`w-full h-full object-cover ${url ? '' : 'opacity-40'}`} />
         ) : (
           <ImageIcon className="w-5 h-5 text-[var(--ap-text-3)]" aria-hidden />
         )}

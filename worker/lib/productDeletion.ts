@@ -1,5 +1,6 @@
 import { isSafeMediaKey } from './mediaStorage';
 import { deleteMediaObject, isAnonymousPublicMediaKey } from './mediaStorage';
+import { deleteVariantsIn } from './variantKeys';
 import { membershipDiscountAtLineSql, UNLINKED_MEMBERSHIP_PRODUCTS } from './orderMembership';
 import { DELETED_PRODUCT_FINANCE_SCOPE_ACTION } from './financeDeletedProductScope';
 
@@ -1521,6 +1522,9 @@ export async function scanProductOrphans(
       try {
         await bucket.delete(obj.key);
         removedKeys.push(obj.key);
+        // Its small copies (worker/lib/variantKeys.ts) go with it, or
+        // `/files/<key>?w=` would keep answering for a removed picture.
+        await deleteVariantsIn(bucket, obj.key);
       } catch {
         // Reported by the next scan; never fails the sweep.
       }

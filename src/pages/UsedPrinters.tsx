@@ -54,6 +54,7 @@ import { productMainImage } from '../lib/productImage';
 import { useTheme } from '../lib/theme';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import { useMoney } from '../CurrencyContext';
+import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
 
 /** 'all' plus the three kinds the server can actually store. */
 type KindFilter = 'all' | ConditionKind;
@@ -307,7 +308,7 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
       className="relative flex h-full flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-sm transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus min-w-0"
     >
       <div className="relative aspect-square overflow-hidden bg-surface-raised">
-        <SafeImage src={productMainImage(p, theme)} alt={p.name} aspect="square" className="w-full h-full" />
+        <SafeImage sizes={IMAGE_SIZES.card} src={productMainImage(p, theme)} alt={p.name} aspect="square" className="w-full h-full" />
         {condition ? (
           /* The ONE tinted element on the card, because the grade is the whole
              reason this row is not an ordinary listing. */

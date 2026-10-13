@@ -506,7 +506,7 @@ export default function StockAlerts() {
                       aria-hidden="true"
                       className="shrink-0 rounded-lg overflow-hidden"
                     >
-                      <SafeImage
+                      <SafeImage sizes="64px"
                         src={a.image}
                         alt={pick(a.name, l)}
                         aspect="auto"

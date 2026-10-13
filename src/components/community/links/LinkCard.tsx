@@ -43,6 +43,7 @@ import { MotionFeatures } from '../../../lib/motionFeatures';
 import type { ChatLink, LinkCard as LinkCardData, LinkCardKind } from './api';
 import { hostLine, useLinkStrings } from './strings';
 import { firstLink, useLinkCard } from './useLinkCard';
+import VariantImg from '../../ui/VariantImg';
 
 /** What the card needs — a stored card, or the copy a chat message carries. */
 export type LinkCardLike = Pick<LinkCardData, 'url' | 'host' | 'title' | 'description' | 'image_url' | 'kind'> | ChatLink;
@@ -94,10 +95,10 @@ export function LinkCard({ card, variant = 'compact', className = '', printDoor 
         data-link-open
         className={`flex min-w-0 transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${full ? 'flex-col' : 'items-center gap-3 p-2.5'}`}
       >
-        {full && image && <img src={image} alt="" loading="lazy" decoding="async" className="aspect-video max-h-56 w-full object-cover" />}
+        {full && image && <VariantImg sizes="(min-width: 640px) 480px, 100vw" src={image} alt="" loading="lazy" decoding="async" className="aspect-video max-h-56 w-full object-cover" />}
         {!full &&
           (image ? (
-            <img src={image} alt="" loading="lazy" decoding="async" className="size-12 shrink-0 rounded-md object-cover" />
+            <VariantImg sizes="48px" src={image} alt="" loading="lazy" decoding="async" className="size-12 shrink-0 rounded-md object-cover" />
           ) : (
             <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-md bg-surface-raised text-text-secondary">
               <Glyph className="h-5 w-5" strokeWidth={1.5} />

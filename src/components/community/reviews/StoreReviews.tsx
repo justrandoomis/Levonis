@@ -24,6 +24,7 @@ import { useAuth } from '../../../AuthContext';
 import { api, ApiError, uploadFile } from '../../../lib/api';
 import { keyOf, ofKind, reviewTarget, type EligibleReview } from './eligible';
 import { reviewFormStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 const MAX_BODY = 3000;
 /** The server keeps at most six of the reviewer's own uploads (worker/routes/merchantReviews.ts `ownedMediaUrls`). */
@@ -211,7 +212,7 @@ export function StoreReviewCard({ item, onDone }: { item: EligibleReview; onDone
             <div className="flex flex-wrap items-center gap-2">
               {photos.map((src, i) => (
                 <span key={src} className="relative h-14 w-14 overflow-hidden rounded-sm border border-border-subtle">
-                  <img src={src} alt={rs.photoAlt(i + 1)} className="h-full w-full object-cover" />
+                  <VariantImg sizes="56px" src={src} alt={rs.photoAlt(i + 1)} className="h-full w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => setPhotos((p) => p.filter((x) => x !== src))}

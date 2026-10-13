@@ -22,7 +22,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { isRewritableMediaKey, isAnonymousPublicMediaKey } from '../worker/lib/mediaStorage';
+import {
+  IMMUTABLE_PUBLIC_CACHE,
+  REVALIDATED_PUBLIC_CACHE,
+  isAnonymousPublicMediaKey,
+  isMintedSiteMediaKey,
+  isRewritableMediaKey,
+  publicMediaCacheControl,
+} from '../worker/lib/mediaStorage';
+import { mintCatalogImageObject, mintSiteMediaObject } from '../worker/lib/siteMedia';
 
 const ROUTE = readFileSync(new URL('../worker/routes/uploads.ts', import.meta.url), 'utf8');
 
@@ -72,20 +80,42 @@ test('every rewritable key is also a publicly servable one', () => {
 
 // ------------------------------------------------------ what the route emits
 
-test('the route branches its Cache-Control on rewritability, and never promises immutable to a rewritable key', () => {
+test('the route takes its public Cache-Control from ONE helper, which never promises immutable to a fixed name', () => {
   // Source-text assertions rather than a rendered response, because what is
   // being guarded is the DECISION — a future edit that collapses the branch
   // back to one header is exactly the regression, and it would still return a
-  // perfectly valid response.
+  // perfectly valid response. The decision lives in `publicMediaCacheControl`
+  // (worker/lib/mediaStorage.ts) since the small copies (`?w=`, DECISIONS row
+  // 226) inherit the same policy as their original: one place, not two.
   assert.match(ROUTE, /isRewritableMediaKey\(key\)/);
-  assert.match(ROUTE, /public, max-age=300, must-revalidate/);
-  assert.match(ROUTE, /public, max-age=31536000, immutable/);
+  assert.match(ROUTE, /headers\.set\('Cache-Control', publicMediaCacheControl\(key, obj\.httpMetadata\?\.cacheControl\)\)/);
+  assert.equal(REVALIDATED_PUBLIC_CACHE, 'public, max-age=300, must-revalidate');
+  assert.equal(IMMUTABLE_PUBLIC_CACHE, 'public, max-age=31536000, immutable');
 
-  // The ternary must put the SHORT policy on the rewritable side. Asserting
-  // both strings exist would pass with the arms swapped — which is the same
-  // bug wearing the fix's clothes.
-  const branch = /isRewritableMediaKey\(key\)\s*\?\s*'public, max-age=300, must-revalidate'\s*:\s*'public, max-age=31536000, immutable'/;
-  assert.match(ROUTE.replace(/\s+/g, ' '), new RegExp(branch.source.replace(/\\s\*/g, ' *'), 's'));
+  // The SHORT policy sits on the rewritable side. Asserting both strings exist
+  // would pass with the arms swapped — which is the same bug wearing the fix's
+  // clothes — so the helper's answers are pinned key by key.
+  const STORED_IMMUTABLE = 'public, max-age=31536000, immutable';
+  assert.equal(publicMediaCacheControl('products/prd_abc123/gallery/logo-7f3a91.webp'), IMMUTABLE_PUBLIC_CACHE);
+  for (const key of ['UiUx/Logo/Logo.webp', 'UIUx/Logo/Logo.webp', 'ui/MainPage/Compare.webp', 'UiUx/MainPage/bambu-lab.webp', 'brands/creality.webp', 'services/studio.webp']) {
+    // A fixed name revalidates even when its object claims `immutable`.
+    assert.equal(publicMediaCacheControl(key), REVALIDATED_PUBLIC_CACHE, key);
+    assert.equal(publicMediaCacheControl(key, STORED_IMMUTABLE), REVALIDATED_PUBLIC_CACHE, key);
+  }
+
+  // A name the application MINTED in the brand folder never changes bytes —
+  // a new upload is a new name — and its R2 object says `immutable`. Both
+  // conditions, not either: the minted shape without that metadata (a hand
+  // upload) still revalidates.
+  const minted = `UiUx/MainPage/${mintSiteMediaObject('home-hero', '0123456789abcdef0123')}`;
+  const section = `UiUx/MainPage/${mintCatalogImageObject('cat_printers_fdm', 'fedcba98765432100000')}`;
+  for (const key of [minted, section]) {
+    assert.equal(isMintedSiteMediaKey(key), true, key);
+    assert.equal(publicMediaCacheControl(key, STORED_IMMUTABLE), IMMUTABLE_PUBLIC_CACHE, key);
+    assert.equal(publicMediaCacheControl(key), REVALIDATED_PUBLIC_CACHE, key);
+    assert.equal(publicMediaCacheControl(key, 'public, max-age=300'), REVALIDATED_PUBLIC_CACHE, key);
+  }
+  assert.equal(isMintedSiteMediaKey('UIUx/MainPage/home-hero-0123456789abcdef.webp'), false, 'another spelling of the folder is a hand upload');
 });
 
 test('the false premise is gone from the comment that made the defect invisible', () => {

@@ -10,6 +10,7 @@ import { orderFinancePresentation, projectedLineCost, visibleOrderReviewReasons 
 import { PA_STRINGS, tri } from './displayCurrencyStrings';
 import ReportDeductions from './ReportDeductions';
 import { DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency } from './displayCurrency';
+import VariantImg from '../ui/VariantImg';
 
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
 
@@ -175,7 +176,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
       {data.order.status === 'delivered' && <ReportDeductions totals={data.totals} net={data.totals.net_after_report_adjustments_iqd} cents={usd ? { coupon: orderCents('coupon_iqd'), credit: orderCents('price_protection_iqd'), net: orderCents('net_after_report_adjustments_iqd') } : undefined} />}
       {data.lines.map((line) => <Surface className="fw-line-item" key={line.id}>
         <div className="fw-line-heading">
-          {line.image_snapshot || line.product_image || line.image_url ? <img className="fw-product-image" src={line.image_snapshot || line.product_image || line.image_url} alt="" /> : <span className="fw-order-icon"><Package size={20} /></span>}
+          {line.image_snapshot || line.product_image || line.image_url ? <VariantImg sizes="48px" className="fw-product-image" src={line.image_snapshot || line.product_image || line.image_url} alt="" /> : <span className="fw-order-icon"><Package size={20} /></span>}
           <div><h3>{line.name_snapshot}</h3><p>{[line.option_snapshot, line.color_snapshot, line.sku_snapshot].filter(Boolean).join(' · ')}</p>
             <p>{loc('الكمية', 'Quantity')}: {line.qty}{line.returned_qty > 0 ? ` · ${loc('مرتجع', 'Returned')}: ${line.returned_qty}` : ''}</p></div>
         </div>

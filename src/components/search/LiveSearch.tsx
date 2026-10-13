@@ -463,7 +463,7 @@ export default function LiveSearch({
                         i === activeRow ? 'bg-white/[0.10]' : 'hover:bg-white/[0.05]'
                       }`}
                     >
-                      <SafeImage
+                      <SafeImage sizes="48px"
                         src={productMainImage(p, theme)}
                         alt=""
                         aspect="auto"

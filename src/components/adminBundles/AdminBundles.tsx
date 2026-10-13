@@ -60,6 +60,7 @@ import {
 } from '../adminProducts/form/formUi';
 import { TriText } from '../adminProducts/ui';
 import ProductPicker from '../adminProducts/form/ProductPicker';
+import VariantImg from '../ui/VariantImg';
 
 // ------------------------------------------------------------------- types
 
@@ -588,7 +589,7 @@ export default function AdminBundles() {
                 <article key={b.id} className={`${T.surface} p-3 min-w-0`} data-bundle={b.id}>
                   <div className="flex flex-wrap items-start gap-3 min-w-0">
                     {b.image ? (
-                      <img src={b.image} alt="" className={T.thumb} loading="lazy" />
+                      <VariantImg sizes="64px" src={b.image} alt="" className={T.thumb} loading="lazy" />
                     ) : (
                       <span className={`${T.thumb} grid place-items-center text-[var(--ap-text-3)]`} aria-hidden>
                         <Boxes className="w-4 h-4" />

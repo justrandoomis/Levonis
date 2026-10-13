@@ -15,6 +15,7 @@ import {
   heroCoverFrom,
   injectDocumentPreloads,
   productImagePreload,
+  storeImagePreload,
   injectSocialPreview,
   MANIFEST_PATH,
   preloadImagePath,
@@ -56,6 +57,7 @@ import { linkCardRoutes } from './routes/linkCards';
 import { profileRoutes } from './routes/profile';
 import { uploadRoutes, fileRoutes } from './routes/uploads';
 import { uploadSessionRoutes, sweepExpiredUploadSessions } from './routes/uploadSessions';
+import { sweepImageVariants } from './lib/imageVariants';
 import { storeIconRoute, webManifestRoute } from './routes/manifest';
 import { robotsRoute, sitemapRoute } from './routes/seo';
 import { miscRoutes } from './routes/misc';
@@ -945,12 +947,17 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     const image = product
       ? preloadImagePath(routeKey === 'src/pages/Product.tsx' && product.preloadImage !== undefined ? product.preloadImage : product.image)
       : storeHome ? heroCoverFrom(resolve) : null;
+    // The lead picture is preloaded as the page will ask for it: the same
+    // small copies (`imagesrcset`) and the same `sizes` as its <img>
+    // (packages/contracts/src/imageSizing.ts), or the preload is a second
+    // download instead of a head start.
     html = injectDocumentPreloads(html, {
       ...chunks, image, resolve,
       ...(routeKey === 'src/pages/Product.tsx' ? {
-        ...productImagePreload(image),
+        ...productImagePreload(image, product?.preloadMedia),
         fetches: [`/api/products/${encodeURIComponent(slug!)}`],
-      } : {}),
+      } : routeKey === 'src/pages/StorefrontProduct.tsx' ? storeImagePreload(image, 'gallery')
+        : !product && storeHome ? storeImagePreload(image, 'hero') : {}),
     });
 
     const headers = new Headers(asset.headers);
@@ -1248,6 +1255,15 @@ export default {
       console.error('scheduled upload-session sweep rejected:', error);
     });
     ctx.waitUntil(uploads);
+    // The small copies of every public picture already in R2 (owner
+    // 2026-10-13, worker/lib/imageVariants.ts): a bounded step — 24 cuts, 150
+    // R2 operations, 20 s — that lists R2 itself and runs NO D1 statement, so
+    // it takes nothing from the shared budget above. Never throws.
+    ctx.waitUntil(
+      sweepImageVariants(env).catch((error) => {
+        console.error('scheduled image copy sweep rejected:', error instanceof Error ? error.name : 'unknown');
+      })
+    );
     // Once the jobs above have settled, two passes that spend from what they
     // left, each charging every statement before it sends it:
     //  - the search-index catch-up (the durable jobs' step 3b, fifty products

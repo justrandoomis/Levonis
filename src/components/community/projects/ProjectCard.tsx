@@ -13,6 +13,7 @@ import SafeImage from '../../ui/SafeImage';
 import { useLanguage } from '../../../LanguageContext';
 import { creatorHref, type PostCard } from './api';
 import { printTimeLabel, useProjectStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 export default function ProjectCard({
   post: p,
@@ -34,7 +35,7 @@ export default function ProjectCard({
       className={`group relative flex flex-col gap-2 ${width} has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus rounded-xl`}
     >
       <div className="relative overflow-hidden rounded-xl border border-border-subtle/60 shadow-sm">
-        <SafeImage
+        <SafeImage sizes="(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
           src={p.cover?.url ?? null}
           alt=""
           aspect="auto"
@@ -62,7 +63,7 @@ export default function ProjectCard({
         </h3>
         <p className="mt-1 flex items-center gap-1.5 text-[12px] text-text-muted">
           <span aria-hidden="true" className="size-4 shrink-0 overflow-hidden rounded-full bg-surface-selected">
-            {p.author.avatarUrl && <img src={p.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
+            {p.author.avatarUrl && <VariantImg sizes="24px" src={p.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
           </span>
           {author ? (
             <Link to={author} className="relative z-10 min-w-0 truncate hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded">

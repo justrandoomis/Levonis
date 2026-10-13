@@ -12,6 +12,7 @@ import { Skeleton, SkeletonGroup } from '../../ui/Skeleton';
 import { ArrowGlyph } from '../../home/v2/SectionHead';
 import { isExternal } from './api';
 import { sectionNumber, useHubStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 type AnchorProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>;
 
@@ -49,7 +50,7 @@ export function StoreMark({ src, size = 'md', className = '' }: { src?: string |
       className={`${box} shrink-0 overflow-hidden rounded-full border border-border-subtle/60 bg-surface-selected flex items-center justify-center ${className}`}
     >
       {src ? (
-        <img src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+        <VariantImg sizes="48px" src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
       ) : (
         <Store className={size === 'xs' ? 'h-2.5 w-2.5 text-text-muted' : 'h-5 w-5 text-text-muted'} />
       )}
@@ -61,7 +62,7 @@ export function StoreMark({ src, size = 'md', className = '' }: { src?: string |
 export function Avatar({ src, className = 'h-9 w-9' }: { src?: string | null; className?: string }) {
   return (
     <span aria-hidden="true" className={`${className} block shrink-0 overflow-hidden rounded-full bg-surface-selected`}>
-      {src && <img src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
+      {src && <VariantImg sizes="40px" src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
     </span>
   );
 }

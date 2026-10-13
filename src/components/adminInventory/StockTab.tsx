@@ -36,6 +36,7 @@ import {
 } from '../../lib/api';
 import { Empty, IqdField, Loading, Money, Notice, TableFrame, daysSince, errMsg, useCount, useLoc, type NoticeState } from './shared';
 import type { InvStrings } from './strings';
+import VariantImg from '../ui/VariantImg';
 
 const PAGE = 50;
 
@@ -139,7 +140,7 @@ export function StockTab({ s, onChanged }: { s: InvStrings; onChanged: () => voi
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                       {l.product_image ? (
-                        <img src={l.product_image} alt="" className={T.thumb} loading="lazy" />
+                        <VariantImg sizes="48px" src={l.product_image} alt="" className={T.thumb} loading="lazy" />
                       ) : (
                         <span className={`flex h-9 w-9 items-center justify-center rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] ${T.text3}`}>
                           <Boxes size={15} />

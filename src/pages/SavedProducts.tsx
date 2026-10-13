@@ -20,6 +20,7 @@ import { api, ApiError } from '../lib/api';
 import { communityFavoritesApi, type SavedProduct } from '../lib/merchant';
 import { useCommunityAccess } from './community/access';
 import { ArrowLeft, ArrowRight, ShoppingBag, Heart } from 'lucide-react';
+import VariantImg from '../components/ui/VariantImg';
 
 export default function SavedProducts() {
   const navigate = useNavigate();
@@ -128,7 +129,7 @@ export default function SavedProducts() {
             >
               <div className="w-14 h-14 rounded-md overflow-hidden bg-surface-raised border border-border-subtle flex items-center justify-center shrink-0">
                 {p.image ? (
-                  <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                  <VariantImg sizes="56px" src={p.image} alt={p.name} className="w-full h-full object-cover" />
                 ) : (
                   <ShoppingBag className="w-5 h-5 text-text-muted" />
                 )}

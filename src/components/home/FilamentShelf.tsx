@@ -51,7 +51,7 @@ export default function FilamentShelf({ products }: { products: ApiProduct[] }) 
               className="group flex flex-col gap-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg"
             >
               <span className="block aspect-square overflow-hidden rounded-lg bg-black border border-border-subtle group-hover:border-info/50 transition-colors">
-                <SafeImage
+                <SafeImage sizes="(min-width: 1024px) 160px, 30vw"
                   src={productPrimaryImage(p)}
                   alt={p.name}
                   aspect="auto"

@@ -33,6 +33,7 @@ import type { PostFile, PostFileInput } from '../../components/community/files/a
 import { POST_KINDS, projectsApi, type Post, type PostInput, type PostKind, type PostVisibility } from '../../components/community/projects/api';
 import { useProjectStrings } from '../../components/community/projects/strings';
 import { warmLinksOnPaste } from '../../components/community/links/useLinkCard';
+import VariantImg from '../../components/ui/VariantImg';
 
 type Draft = {
   title: string;
@@ -536,7 +537,7 @@ function CataloguePick({
     return (
       <Field label={label} optional>
         <div className="lv-well flex items-center gap-2 rounded-md border border-[var(--clay-field)] px-3 py-2">
-          {picked?.images?.[0] && <img src={picked.images[0]} alt="" className="size-8 rounded-lg object-cover" />}
+          {picked?.images?.[0] && <VariantImg sizes="32px" src={picked.images[0]} alt="" className="size-8 rounded-lg object-cover" />}
           <span className="min-w-0 flex-1 truncate text-[13.5px]" dir="auto">
             {picked ? productName(picked, lang) : value.id}
           </span>

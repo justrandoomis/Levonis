@@ -23,7 +23,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { Segmented } from '../../ui/Segmented';
 import type { ReviewsData } from '../../../../packages/storeLayout/src/data';
 import { useStorefrontRuntime, type ReviewQuery } from '../runtime';
-import { BlockHeading, Column, Empty, Loading, useText } from '../parts';
+import { BlockHeading, Column, Empty, Loading, storeImgProps, useText } from '../parts';
 import { storefrontStrings } from '../strings';
 import type { BlockProps } from '../types';
 
@@ -256,7 +256,7 @@ function ReviewPhotos({ images, alt }: { images: string[]; alt: (n: number) => s
     <div className="mt-2 grid grid-cols-4 gap-1 sf-r-sm overflow-hidden" data-review-photos={images.length}>
       {images.map((src, i) => (
         <a key={src} href={src} target="_blank" rel="noopener noreferrer" className="block aspect-square sf-well overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-          <img src={src} alt={alt(i + 1)} className="w-full h-full object-cover" loading="lazy" />
+          <img {...storeImgProps(src, '(min-width: 768px) 192px, 25vw')} alt={alt(i + 1)} className="w-full h-full object-cover" loading="lazy" decoding="async" />
         </a>
       ))}
     </div>

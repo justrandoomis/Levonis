@@ -15,6 +15,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { useMotion } from '../../../lib/motion';
 import { useRail } from '../../../lib/useRail';
 import type { PostMedia } from './api';
+import VariantImg from '../../ui/VariantImg';
 
 export default function MediaStrip({ media, title }: { media: PostMedia[]; title: string }) {
   const { loc, dir } = useLanguage();
@@ -71,7 +72,8 @@ export default function MediaStrip({ media, title }: { media: PostMedia[]; title
             {item.kind === 'video' ? (
               <Video src={item.url} visible={i === active} />
             ) : (
-              <img
+              <VariantImg
+                sizes="(min-width: 1024px) 720px, 100vw"
                 src={item.url}
                 alt={i === 0 ? title : ''}
                 loading={i === 0 ? 'eager' : 'lazy'}

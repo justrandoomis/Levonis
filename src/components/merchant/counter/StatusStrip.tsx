@@ -26,6 +26,7 @@ import { useWorkspace } from '../shell/context';
 import { storeStatus } from '../shell/status';
 import { say } from '../shell/strings';
 import { fill, useCounterStrings, type CounterLang, type CounterStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 /** The two hour fields the server adds to the store shape (worker/routes/merchant.ts `storePublicShape`). */
 export type StoreHoursState = Pick<MerchantStore, 'business_hours'> & { open_now?: boolean | null; next_change_at?: string | null };
@@ -78,7 +79,7 @@ export function openStateSentence(s: CounterStrings, store: StoreHoursState, lan
 function StoreMark({ store }: { store: MerchantStore }) {
   return (
     <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-raised">
-      {store.logoUrl ? <img src={store.logoUrl} alt="" className="h-full w-full object-cover" /> : <Store aria-hidden="true" className="h-4 w-4 text-gold" />}
+      {store.logoUrl ? <VariantImg sizes="36px" src={store.logoUrl} alt="" className="h-full w-full object-cover" /> : <Store aria-hidden="true" className="h-4 w-4 text-gold" />}
     </span>
   );
 }

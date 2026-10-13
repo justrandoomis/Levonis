@@ -922,7 +922,7 @@ export function ImgSlot({
           {/* SafeImage, not a bare <img>: an option thumbnail whose host stops
               answering shows an explicit "failed" glyph with a retry, instead
               of the browser's broken-file icon that reads as "no image set". */}
-          <SafeImage
+          <SafeImage sizes="40px"
             src={url}
             alt={label}
             aspect="auto"

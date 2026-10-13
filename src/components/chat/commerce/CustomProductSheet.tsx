@@ -22,6 +22,7 @@ import { ApiError, uploadFile } from '../../../lib/api';
 import { toast } from '../../../lib/toastStore';
 import { chatCommerceApi } from '../../../lib/chatCommerceApi';
 import type { CustomProductPrefill } from '../cards/cardContext';
+import VariantImg from '../../ui/VariantImg';
 
 interface Form {
   name: string;
@@ -190,7 +191,7 @@ export default function CustomProductSheet({
             }}
           />
           <div className="w-20 h-20 rounded-xl overflow-hidden bg-surface-raised flex items-center justify-center shrink-0">
-            {image ? <img src={image.url} alt="" className="w-full h-full object-cover" /> : <ImagePlus className="w-6 h-6 text-text-muted" aria-hidden="true" />}
+            {image ? <VariantImg sizes="80px" src={image.url} alt="" className="w-full h-full object-cover" /> : <ImagePlus className="w-6 h-6 text-text-muted" aria-hidden="true" />}
           </div>
           <div className="flex flex-col gap-1.5">
             <Button variant="secondary" size="sm" loading={uploading} onClick={() => fileRef.current?.click()}>

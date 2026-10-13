@@ -18,6 +18,7 @@ import GiftsEntry from '../components/orders/GiftsEntry';
 import { asLang } from '../components/orders/format';
 import ChunkBoundary from '../components/ChunkBoundary';
 import { isQuickBuyNotSubmitted, refreshQuickBuySession, useQuickBuySnapshot } from '../lib/quickBuyStore';
+import VariantImg from '../components/ui/VariantImg';
 
 /**
  * «شراء سريع — قيد التجميع» (docs/GIFTS_QUICK_BUY.md §3.5): the open Quick Buy
@@ -211,7 +212,7 @@ function OrderStoreLine({ store, label }: { store: NonNullable<ApiOrder['store']
   const inner = (
     <>
       {store.logo_url ? (
-        <img src={store.logo_url} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" loading="lazy" />
+        <VariantImg sizes="20px" src={store.logo_url} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" loading="lazy" />
       ) : (
         <Store className="h-4 w-4 shrink-0" aria-hidden="true" />
       )}

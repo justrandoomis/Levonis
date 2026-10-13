@@ -131,7 +131,7 @@ export default function StickyColumns({
                 {/* Three or four columns on a phone leave ~75 px each: the
                     price is worth more than a 28 px thumbnail there. */}
                 {dense ? null : (
-                  <SafeImage src={imageOf(p)} alt="" aspect="square" fit="cover" className="w-9 shrink-0 overflow-hidden rounded-lg" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" />
+                  <SafeImage sizes="36px" src={imageOf(p)} alt="" aspect="square" fit="cover" className="w-9 shrink-0 overflow-hidden rounded-lg" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" />
                 )}
                 <span className="min-w-0 flex-1">
                   <span className="flex min-w-0 items-center gap-1">
@@ -163,7 +163,7 @@ export default function StickyColumns({
             <div key={p.id} data-compare-column={i} className={`lv-surface relative flex min-w-0 flex-col pb-1 ${dense ? 'p-1' : 'p-1.5'}`}>
               <div className="relative overflow-hidden rounded-lg bg-charcoal">
                 <Link to={`/product/${p.slug}`} tabIndex={-1} aria-hidden="true" className="block aspect-[6/5]">
-                  <SafeImage src={imageOf(p)} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_8%]" />
+                  <SafeImage sizes="(min-width: 1024px) 240px, 33vw" src={imageOf(p)} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_8%]" />
                 </Link>
                 <button
                   type="button"

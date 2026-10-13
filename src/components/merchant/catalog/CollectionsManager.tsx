@@ -28,6 +28,7 @@ import { useToast } from '../../ui/Toast';
 import { catalogApi, type CatalogProduct, type Collection, type CollectionKind } from './catalogApi';
 import { catalogStrings, type Loc } from './strings';
 import { readRefusal } from './parts';
+import VariantImg from '../../ui/VariantImg';
 
 /** The picture types the picker offers — spelled out, as the catalogue's MediaEditor does (a source-level `/*` reads as a comment to the pins). */
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif';
@@ -115,7 +116,7 @@ function CoverControl({
         {busy ? (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         ) : collection.image_url ? (
-          <img src={collection.image_url} alt="" className="h-full w-full object-cover" />
+          <VariantImg sizes="96px" src={collection.image_url} alt="" className="h-full w-full object-cover" />
         ) : (
           <ImagePlus className="h-4 w-4" aria-hidden="true" />
         )}

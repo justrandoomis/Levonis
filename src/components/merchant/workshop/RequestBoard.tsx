@@ -27,6 +27,7 @@ import { formatFigure } from '../../../lib/localeNumber';
 import { offersLabel } from '../../community/hub/copy';
 import { iqdUnit } from '../../../lib/money';
 import { workshopApi, type BoardFilters, type BoardRequest } from './api';
+import VariantImg from '../../ui/VariantImg';
 
 export interface BoardMaterial {
   id: string;
@@ -215,7 +216,7 @@ export default function RequestBoard({
                 >
                   <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-raised">
                     {r.thumb_url ? (
-                      <img src={r.thumb_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                      <VariantImg sizes="64px" src={r.thumb_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : (
                       <Box aria-hidden="true" className="h-6 w-6 text-text-muted" />
                     )}

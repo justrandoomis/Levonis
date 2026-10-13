@@ -39,6 +39,7 @@ import ReportSheet from '../../components/community/social/ReportSheet';
 import { useSocial } from '../../components/community/social/SocialContext';
 import { followersLabel, socialLang, useSocialStrings } from '../../components/community/social/strings';
 import { dateLocale } from '../../components/orders/format';
+import VariantImg from '../../components/ui/VariantImg';
 
 const TABS = ['projects', 'posts', 'about'] as const;
 type Tab = (typeof TABS)[number];
@@ -192,7 +193,7 @@ export default function CreatorPage() {
             <header className="flex items-start gap-4 pt-6 text-start">
               <span className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border-subtle/60 bg-surface-selected">
                 {creator.avatarUrl ? (
-                  <img src={creator.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                  <VariantImg sizes="80px" src={creator.avatarUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                 ) : (
                   <span className="flex h-full w-full items-center justify-center text-text-muted">
                     <UserRound className="h-10 w-10" />

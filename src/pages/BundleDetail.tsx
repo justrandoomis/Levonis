@@ -21,6 +21,7 @@ import { tierLabel } from '../components/subscription/tierMeta';
 import { StateChip, type BundleCard } from '../components/bundles/BundleTile';
 import { authPathWithSupportRef } from '../lib/supportRef';
 import { useMoney } from '../CurrencyContext';
+import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
 
 /**
  * ONE BUNDLE OR MYSTERY OFFER (docs/BUNDLES_MYSTERY.md §10, §13).
@@ -490,7 +491,7 @@ export default function BundleDetail() {
       {header}
 
       <div className="relative bg-black">
-        <SafeImage src={bundle.image} alt={bundle.name} aspect="auto" className="w-full h-64 sm:h-80 object-cover" />
+        <SafeImage sizes={IMAGE_SIZES.full} src={bundle.image} alt={bundle.name} aspect="auto" className="w-full h-64 sm:h-80 object-cover" />
         {bundle.locked && (
           <span className="absolute inset-0 bg-black/60 grid place-items-center">
             <Lock aria-hidden className="w-8 h-8 text-gold" />
@@ -569,7 +570,7 @@ export default function BundleDetail() {
                     className="relative w-12 h-12 rounded-md overflow-hidden bg-surface-raised border border-border-subtle shrink-0"
                   >
                     {c.image ? (
-                      <SafeImage src={c.image} alt={c.name} aspect="auto" className="w-full h-full" />
+                      <SafeImage sizes="48px" src={c.image} alt={c.name} aspect="auto" className="w-full h-full" />
                     ) : (
                       <Package aria-hidden className="w-4 h-4 text-text-muted m-auto" />
                     )}

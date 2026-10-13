@@ -41,6 +41,7 @@ import { orderDetailApi, type OrderRecord, type OrderTimeline } from './api';
 import { ORDER_FLOW, orderStatusLabel, orderStatusTone } from './labels';
 import { eventText, ledgerLineText } from './timelineText';
 import './orderPrint.css';
+import VariantImg from '../../ui/VariantImg';
 
 type Lang = 'ar' | 'en' | 'ckb';
 
@@ -210,7 +211,7 @@ export default function OrderDetailScreen({ id }: { id: string }) {
               {story.items.map((it) => (
                 <li key={it.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-raised">
-                    {it.image && <img src={it.image} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                    {it.image && <VariantImg sizes="48px" src={it.image} alt="" className="h-full w-full object-cover" loading="lazy" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13.5px] font-semibold text-text-primary">{it.name}</p>

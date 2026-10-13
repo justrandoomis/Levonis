@@ -50,6 +50,7 @@ import { useStore } from '../StoreContext';
 import { trackStoreEvent } from '../lib/storeBeacon';
 import { useBusy } from '../lib/busy';
 import { mascot } from '../lib/mascot';
+import VariantImg from '../components/ui/VariantImg';
 
 const GOVERNORATE_IDS = new Set(GOVERNORATES.map((g) => g.id));
 
@@ -502,7 +503,7 @@ export default function StoreCheckout() {
                 {summary.lines.map((l) => (
                   <div key={l.cart_item_id} className="flex items-center gap-2.5 text-[12.5px]">
                     <div className="w-10 h-10 rounded-lg bg-black/40 overflow-hidden shrink-0">
-                      {l.image && <img src={l.image} alt="" width={40} height={40} className="w-full h-full object-cover" />}
+                      {l.image && <VariantImg sizes="40px" src={l.image} alt="" width={40} height={40} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-zinc-200 truncate">{l.name}</p>

@@ -65,6 +65,7 @@ import { SEARCH_TYPES, cleanTerm, hasAnyRow, searchApi, useTrending, type Catalo
 import { clearRecent, forgetRecent, readRecent, rememberRecent, type RecentTerm } from './recent';
 import { SEARCH_LIST_ID } from './useSearchBox';
 import { boundedCount, fillIn, useSearchStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 export interface SearchOverlayProps {
   open: boolean;
@@ -453,7 +454,7 @@ export default function SearchOverlay({ open, value, onChange, onSubmit, onClose
               const id = `${SEARCH_LIST_ID}-${type}-${row.id}`;
               return (
                 <Link key={id} to={row.href} {...chipState(id)} tabIndex={-1} data-search-pick="" className={CHIP}>
-                  {row.imageUrl && <img src={row.imageUrl} alt="" loading="lazy" decoding="async" className="h-5 w-5 rounded-full object-cover" />}
+                  {row.imageUrl && <VariantImg sizes="20px" src={row.imageUrl} alt="" loading="lazy" decoding="async" className="h-5 w-5 rounded-full object-cover" />}
                   <bdi>{productName(row, lang)}</bdi>
                 </Link>
               );

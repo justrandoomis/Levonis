@@ -11,6 +11,7 @@ import Countdown from '../ui/Countdown';
 import BundleSavingLine from './BundleSavingLine';
 import { tierLabel } from '../subscription/tierMeta';
 import { useMoney } from '../../CurrencyContext';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 
 /**
  * THE BUNDLE CARD, AND THE CARD-STATE VOCABULARY (docs/BUNDLES_MYSTERY.md §13).
@@ -120,7 +121,7 @@ export default function BundleTile({
       className={`bg-surface rounded-xl border border-border-subtle overflow-hidden flex flex-col group shadow-sm hover:bg-surface-raised active:shadow-press transition-colors min-w-0 ${className}`}
     >
       <div className="relative aspect-square overflow-hidden bg-surface-raised">
-        <SafeImage
+        <SafeImage sizes={IMAGE_SIZES.card}
           src={b.image}
           alt={b.name}
           aspect="auto"
@@ -163,7 +164,7 @@ export default function BundleTile({
                 className="relative w-8 h-8 rounded-sm overflow-hidden lv-well shrink-0 grid place-items-center"
               >
                 {m.image ? (
-                  <SafeImage src={m.image} alt={m.name} aspect="auto" className="w-full h-full" />
+                  <SafeImage sizes="32px" src={m.image} alt={m.name} aspect="auto" className="w-full h-full" />
                 ) : (
                   <Package aria-hidden className="w-3.5 h-3.5 text-text-muted" />
                 )}

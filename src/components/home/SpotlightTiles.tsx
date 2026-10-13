@@ -142,7 +142,7 @@ function Slot({ p }: { p: ApiProduct }) {
       className="group flex flex-col gap-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg"
     >
       <span className="block aspect-square overflow-hidden rounded-lg bg-surface-raised">
-        <SafeImage
+        <SafeImage sizes="(min-width: 1024px) 200px, 40vw"
           src={productPrimaryImage(p)}
           alt={p.name}
           aspect="auto"

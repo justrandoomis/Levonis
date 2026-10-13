@@ -8,6 +8,9 @@ import { loadPhotoPool } from '../../lib/catalog/data';
 import { prefetchProps } from '../../lib/catalog/prefetch';
 import type { CatalogTreeNode } from '../../lib/catalog/types';
 
+/** A tile is a third of the row; the cropped studio photograph is drawn ~1.4× its tile (index.css `.lv-promo-photo[data-crop]`). */
+const RELATED_TILE_SIZES = '(min-width: 1024px) 320px, (min-width: 640px) 220px, 160px';
+
 /**
  * «يكمّل طابعتك» (§6 item 6): the other departments, as three small dark tiles
  * with a photograph each — links to their pages, not products. The sections
@@ -58,7 +61,7 @@ export default function RelatedCategories({ nodes }: { nodes: CatalogTreeNode[] 
               data-related={n.slug}
               className="group relative isolate block h-[118px] overflow-hidden rounded-2xl shadow-sm bg-charcoal text-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:h-[168px]"
             >
-              {photo ? <CropPhoto src={photo.src} lightSrc={photo.lightSrc} mobileSrc={photo.mobileSrc} lightMobileSrc={photo.lightMobileSrc} crop={photo.productPhoto} size={240} className="lv-fade-top inset-x-0 bottom-0 top-[30%]" /> : null}
+              {photo ? <CropPhoto src={photo.src} lightSrc={photo.lightSrc} mobileSrc={photo.mobileSrc} lightMobileSrc={photo.lightMobileSrc} crop={photo.productPhoto} size={240} sizes={RELATED_TILE_SIZES} className="lv-fade-top inset-x-0 bottom-0 top-[30%]" /> : null}
               <span className="relative block p-2.5 text-[12px] font-extrabold leading-[17px] lg:p-4 lg:text-[15px] lg:leading-6">{nodeName(n, lang)}</span>
             </Link>
           </li>

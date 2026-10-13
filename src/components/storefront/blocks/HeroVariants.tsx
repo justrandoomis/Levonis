@@ -8,7 +8,7 @@
 import { BadgeCheck } from 'lucide-react';
 import ProMerchantBadge from '../../merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
-import { Column, useText } from '../parts';
+import { Column, STORE_HERO_SIZES, storeImgProps, useText } from '../parts';
 import { HeroVideoButton, HeroVideoStage } from '../BackgroundLayer';
 import { Avatar, HeroCta, ProfileRows, RatingLine, type HeroProps } from './Hero';
 
@@ -31,7 +31,7 @@ function CoverHero({ block, store, data, cover, name }: VariantProps) {
   return (
     <div className="relative">
       <div className="relative h-60 @min-[40rem]:h-80 w-full overflow-hidden bg-white/[0.03]">
-        {cover && <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
+        {cover && <img {...storeImgProps(cover, STORE_HERO_SIZES)} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
         <HeroVideoStage video={s.video} poster={cover} onPhone={s.video_on_phone} />
         <div className="absolute inset-0 sf-cover-fade" />
         <div className="absolute inset-x-0 bottom-0">
@@ -73,7 +73,7 @@ function SplitHero({ block, store, data, cover, name }: VariantProps) {
     <Column className="pt-5">
       <div className="grid gap-5 @min-[48rem]:grid-cols-2 @min-[48rem]:items-center">
         <div className="relative sf-r-lg overflow-hidden bg-white/[0.03] aspect-[4/3]">
-          {cover && <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
+          {cover && <img {...storeImgProps(cover, STORE_HERO_SIZES)} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
           <HeroVideoStage video={s.video} poster={cover} onPhone={s.video_on_phone} />
           <HeroVideoButton video={s.video} onPhone={s.video_on_phone} />
         </div>

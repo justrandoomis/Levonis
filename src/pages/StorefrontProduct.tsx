@@ -45,7 +45,7 @@ import { scheduleStoreVitals, trackStoreEvent } from '../lib/storeBeacon';
 import StoreTheme from '../components/storefront/StoreTheme';
 import '../components/storefront/styles';
 import type { StorefrontStore } from '../components/storefront/types';
-import { deliveryToYou } from '../components/storefront/parts';
+import { deliveryToYou, storeImgProps } from '../components/storefront/parts';
 import { VariantPicker } from '../components/catalog/VariantPicker';
 import { ProductGallery, type GalleryItem } from '../components/catalog/ProductGallery';
 import { ProductFactsSkeleton, StoreProductPageSkeleton, factRows } from '../components/storefront/skeletons';
@@ -356,7 +356,7 @@ export default function StorefrontProduct() {
           >
             <div className="w-9 h-9 rounded-xl bg-olive/30 overflow-hidden flex items-center justify-center shrink-0">
               {store.logoUrl ? (
-                <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
+                <img {...storeImgProps(store.logoUrl, '36px')} alt="" className="w-full h-full object-cover" decoding="async" />
               ) : (
                 <Store className="w-4 h-4 text-gold" />
               )}

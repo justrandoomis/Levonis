@@ -41,7 +41,7 @@ import type { StoreBackground } from '../../../packages/storeLayout/src/schema';
 import { useStorefrontRuntime } from './runtime';
 import { storefrontStrings } from './strings';
 import { dimClass } from './theme';
-import { Column } from './parts';
+import { Column, storeImgProps } from './parts';
 
 const StoreVideo = lazy(() => import('./StoreVideo'));
 
@@ -300,7 +300,7 @@ export function BackgroundLayer({ background, stopped }: { background: StoreBack
   return (
     <div aria-hidden="true" data-sf-background={background.kind} className={`${live ? 'fixed' : 'absolute'} inset-0 z-0 pointer-events-none`}>
       <div className={live ? 'relative h-full w-full' : 'sticky top-0 h-dvh max-h-full w-full'}>
-        {still && <img src={still} alt="" className="w-full h-full object-cover" loading="eager" decoding="async" />}
+        {still && <img {...storeImgProps(still, '100vw')} alt="" className="w-full h-full object-cover" loading="eager" decoding="async" />}
         {frame && <GifStill src={frame} />}
         {wanted && idle && (
           <Suspense fallback={null}>

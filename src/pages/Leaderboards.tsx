@@ -101,7 +101,7 @@ export default function Leaderboards() {
                     {rank}
                   </span>
                   <span className="w-9 h-9 rounded-full overflow-hidden bg-surface-raised border border-border-subtle shrink-0 flex items-center justify-center text-text-secondary font-bold text-[13px]">
-                    {row.avatar_key ? <SafeImage src={`/files/${row.avatar_key}`} alt="" aspect="auto" className="w-9 h-9" imgClassName="w-full h-full" /> : initials(row)}
+                    {row.avatar_key ? <SafeImage sizes="36px" src={`/files/${row.avatar_key}`} alt="" aspect="auto" className="w-9 h-9" imgClassName="w-full h-full" /> : initials(row)}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-white font-bold text-[13.5px] truncate">

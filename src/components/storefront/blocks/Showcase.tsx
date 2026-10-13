@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 import { useLanguage } from '../../../LanguageContext';
 import type { ShowcaseData } from '../../../../packages/storeLayout/src/data';
 import { useStorefrontRuntime } from '../runtime';
-import { BlockHeading, Column, Loading, useText } from '../parts';
+import { BlockHeading, Column, Loading, storeImgProps, useText } from '../parts';
 import { useBlockRows } from '../useBlockRows';
 import type { BlockProps } from '../types';
 
@@ -48,7 +48,7 @@ export function ShowcaseView({ items, kinds = ['work', 'printer', 'material'] }:
                   {group.map((it) => (
                     <div key={it.id} className="sf-row p-2.5 flex items-center gap-2.5">
                       <div className="w-12 h-12 rounded-lg sf-well overflow-hidden shrink-0 flex items-center justify-center">
-                        {it.imageUrl ? <img src={it.imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" /> : g.icon}
+                        {it.imageUrl ? <img {...storeImgProps(it.imageUrl, '48px')} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" /> : g.icon}
                       </div>
                       <div className="min-w-0">
                         <p className="text-white text-[12.5px] font-semibold truncate" dir="ltr">
@@ -70,7 +70,7 @@ export function ShowcaseView({ items, kinds = ['work', 'printer', 'material'] }:
 function WorkTile({ it }: { it: ShowcaseData }) {
   return (
     <div className="sf-row overflow-hidden">
-      <div className="aspect-square sf-well">{it.imageUrl && <img src={it.imageUrl} alt={it.title} className="w-full h-full object-cover" loading="lazy" />}</div>
+      <div className="aspect-square sf-well">{it.imageUrl && <img {...storeImgProps(it.imageUrl, '(min-width: 768px) 280px, 50vw')} alt={it.title} className="w-full h-full object-cover" loading="lazy" decoding="async" />}</div>
       <div className="p-2">
         <p className="text-white text-[11.5px] font-semibold truncate">{it.title}</p>
         {it.details && <p className="text-zinc-500 text-[10.5px] line-clamp-2">{it.details}</p>}

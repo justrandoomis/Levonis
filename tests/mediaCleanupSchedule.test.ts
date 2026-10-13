@@ -214,12 +214,13 @@ test('the cron entrypoint really drains the queue — scheduled → runDurableJo
 
   worker.scheduled(cronEvent(), env, ctx);
 
-  // Four steps: staff reconciliation, durable jobs and the upload-session
-  // sweep (since 0166), and — once those have settled — the search-index
-  // catch-up followed by the engine repricing sweep (FX-5), each with its own
-  // error boundary and statement budget. The bucket assertion below proves
-  // that the media drain still runs.
-  assert.equal(waited.length, 4, 'every scheduled step must be registered with waitUntil, not merely started');
+  // Five steps: staff reconciliation, durable jobs and the upload-session
+  // sweep (since 0166), the image copy sweep (2026-10-13, R2 only, no D1),
+  // and — once the first three have settled — the search-index catch-up
+  // followed by the engine repricing sweep (FX-5), each with its own error
+  // boundary and statement budget. The bucket assertion below proves that the
+  // media drain still runs.
+  assert.equal(waited.length, 5, 'every scheduled step must be registered with waitUntil, not merely started');
   await Promise.all(waited);
 
   assert.deepEqual(bucket.deleted, ['products/eeee5555.jpg'], 'the cron must reach R2, not just the report');

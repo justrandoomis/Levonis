@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
+import VariantImg from './ui/VariantImg';
 
 /**
  * Admin: review/reward queue with eligibility facts and evidence viewing and
@@ -497,7 +498,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                               <video key={m.url} src={m.url} controls preload="none" className="h-24 rounded-lg border border-border-subtle shrink-0" />
                             ) : (
                               <a key={m.url} href={m.url} target="_blank" rel="noreferrer" className="shrink-0">
-                                <img src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-border-subtle" />
+                                <VariantImg sizes="96px" src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-border-subtle" />
                               </a>
                             )
                           )}

@@ -9,6 +9,7 @@ import { useProjectStrings } from '../components/community/projects/strings';
 import { api, uploadFile } from '../lib/api';
 import { COUNTRIES, countryNames, flagOf } from '../components/auth/PhoneField';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
+import VariantImg from '../components/ui/VariantImg';
 
 const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -253,7 +254,7 @@ export default function EditProfile() {
           <div className="relative cursor-pointer" onClick={triggerFileInput}>
             <div className="w-[100px] h-[100px] rounded-full overflow-hidden bg-gradient-to-tr from-olive via-[#A1B58B] to-gold border border-olive/50 flex items-center justify-center">
               {avatarPreview ? (
-                <img referrerPolicy="no-referrer" src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
+                <VariantImg sizes="112px" referrerPolicy="no-referrer" src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <div className="text-onyx font-bold text-2xl">{initials}</div>
               )}

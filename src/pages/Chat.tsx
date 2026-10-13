@@ -34,6 +34,7 @@ import { Link2 } from 'lucide-react';
 import LinkCard from '../components/community/links/LinkCard';
 import { postChatLink, type ChatLink } from '../components/community/links/api';
 import { useLinkStrings } from '../components/community/links/strings';
+import VariantImg from '../components/ui/VariantImg';
 
 // The commerce sheets load when first opened — a plain conversation never pays for them.
 const ProductPickerSheet = React.lazy(() => import('../components/chat/ProductPickerSheet'));
@@ -741,7 +742,7 @@ export default function Chat() {
               className="w-9 h-9 rounded-full overflow-hidden bg-surface-raised flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {thread.store.logoUrl
-                ? <img referrerPolicy="no-referrer" src={thread.store.logoUrl} alt="" className="w-full h-full object-cover" />
+                ? <VariantImg sizes="40px" referrerPolicy="no-referrer" src={thread.store.logoUrl} alt="" className="w-full h-full object-cover" />
                 : <StoreIcon className="w-4 h-4 text-text-muted" strokeWidth={1.5} aria-hidden="true" />}
             </button>
           )}

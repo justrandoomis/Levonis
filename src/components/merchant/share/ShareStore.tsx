@@ -42,6 +42,7 @@ import {
   type StoreQr,
 } from './shareStoreModel';
 import { iconStateLine, shareStrings, type ShareStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 export interface ShareStoreProps {
   /** A kit the caller already holds (the storefront menu fetched one to know the viewer owns the store). */
@@ -292,7 +293,8 @@ function LinkPreview({ card, address, caption, note }: { card: StoreShareCard; a
       <div className="flex items-stretch gap-3 rounded-lg border border-border-subtle bg-surface-raised p-2.5">
         <div className="w-16 h-16 shrink-0 overflow-hidden rounded-md lv-well flex items-center justify-center">
           {card.image && !broken ? (
-            <img
+            <VariantImg
+              sizes="64px"
               src={card.image}
               alt=""
               width={64}

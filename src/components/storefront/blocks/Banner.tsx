@@ -6,7 +6,7 @@
 import { useLanguage } from '../../../LanguageContext';
 import { mediaSrc } from '../../../../packages/storeLayout/src/refs';
 import { useStoreTheme } from '../StoreTheme';
-import { Column, hasLink, LinkTo, useText } from '../parts';
+import { Column, hasLink, LinkTo, storeImgProps, useText } from '../parts';
 import type { BlockProps } from '../types';
 
 const HEIGHT = {
@@ -31,7 +31,7 @@ export default function BannerBlock({ block, store, data }: BlockProps<'banner'>
 
   const body = (
     <div className={`relative ${HEIGHT[s.height]} overflow-hidden bg-white/[0.03] ${inset ? 'sf-r-lg' : ''}`} lang={lang}>
-      {img && <img src={img} alt={title ? '' : store.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
+      {img && <img {...storeImgProps(img, '100vw')} alt={title ? '' : store.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" decoding="async" />}
       {words && s.overlay === 'dim' && <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" aria-hidden="true" />}
       {words && (
         <div className="absolute inset-x-0 bottom-0 p-4 @min-[40rem]:p-6">

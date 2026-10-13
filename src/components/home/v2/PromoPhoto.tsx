@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTheme } from '../../../lib/theme';
 import { PHONE_MEDIA, themedFiles } from '../../../lib/catalog/sectionPictures';
-import { variantSrcSet } from '../../ui/SafeImage';
+import { variantSrcSet } from '../../../../packages/contracts/src/imageSizing';
 
 /**
  * A photograph placed in a ZONE of a tile (absolutely positioned by the
@@ -33,9 +33,19 @@ import { variantSrcSet } from '../../ui/SafeImage';
  * the theme — the window exists for a photograph sharing a cream tile with
  * ink type, and a bled tile has no cream left to protect.
  *
+ * SMALL COPIES, CAPPED AT 1080 (owner 2026-10-13). With `sizes` the picture
+ * carries the server's copies (packages/contracts/src/imageSizing.ts); the
+ * ladder gained 800, so a desktop tile drawn at 700 px takes the 800 copy
+ * instead of 1080, and it gained 1280/1600 — which the home's tiles do not
+ * take (`maxVariant`, 1080 by default): the first screen never asks for more
+ * than it did before.
+ *
  * A failed load removes the picture; the tile underneath is already a
  * designed surface, so nothing is left broken.
  */
+/** The home tiles' ceiling: what the first screen downloaded before the ladder grew past 1080. */
+export const PROMO_MAX_VARIANT = 1080;
+
 export default function PromoPhoto({
   src,
   lightSrc = '',
@@ -48,6 +58,7 @@ export default function PromoPhoto({
   bleed = false,
   eager = false,
   sizes,
+  maxVariant = PROMO_MAX_VARIANT,
 }: {
   src: string;
   lightSrc?: string;
@@ -66,6 +77,8 @@ export default function PromoPhoto({
   eager?: boolean;
   /** Actual rendered width, including the middle-band crop for studio photos. */
   sizes?: string;
+  /** The widest copy a tile may ask for. */
+  maxVariant?: number;
 }) {
   const { theme } = useTheme();
   const { large: shown, phone } = themedFiles({ src, lightSrc, mobileSrc, lightMobileSrc }, theme);
@@ -75,8 +88,8 @@ export default function PromoPhoto({
   // Only a catalogue photograph is known to be a dark studio shot; an owner's
   // own picture keeps the edge fade it was designed with.
   const ground = !bleed && crop && theme === 'light' && shown !== lightSrc ? 'dark' : undefined;
-  const largeSet = sizes ? variantSrcSet(shown) : undefined;
-  const phoneSet = sizes ? variantSrcSet(phone) : undefined;
+  const largeSet = sizes ? variantSrcSet(shown, { max: maxVariant }) : undefined;
+  const phoneSet = sizes ? variantSrcSet(phone, { max: maxVariant }) : undefined;
   return (
     <div aria-hidden="true" data-ground={ground} className={`lv-promo-zone absolute ${className}`}>
       <picture>

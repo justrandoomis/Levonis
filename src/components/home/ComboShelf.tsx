@@ -100,7 +100,7 @@ export default function ComboShelf() {
                     {i > 0 && <span aria-hidden className="text-zinc-600 text-sm font-bold shrink-0">+</span>}
                     <span className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden bg-black border border-border-subtle shrink-0 grid place-items-center">
                       {m.image ? (
-                        <SafeImage src={m.image} alt={m.name} aspect="auto" className="w-full h-full" />
+                        <SafeImage sizes="56px" src={m.image} alt={m.name} aspect="auto" className="w-full h-full" />
                       ) : (
                         <Package aria-hidden className="w-4 h-4 text-zinc-700" />
                       )}

@@ -23,7 +23,7 @@ import { useStorefrontRuntime } from '../runtime';
 import { useStoreTheme } from '../StoreTheme';
 // P5 (storefront L3): the cover's video — offered with a tap, never on its own; the lazy <video> lives in ../StoreVideo.tsx.
 import { HeroVideoButton, HeroVideoStage } from '../BackgroundLayer';
-import { Column, factsWithFallback, hasLink, joinedLine, LinkTo, linkPillLabel, useText } from '../parts';
+import { Column, factsWithFallback, hasLink, joinedLine, LinkTo, linkPillLabel, STORE_HERO_SIZES, storeImgProps, useText } from '../parts';
 import type { BlockProps, StorefrontStore } from '../types';
 
 export type HeroProps = BlockProps<'hero'>;
@@ -130,7 +130,8 @@ export default function HeroBlock({ block, store, data }: HeroProps) {
  * same URL and the browser serves it from the request already in flight.
  */
 function VariantFrame({ variant, cover }: { variant: HeroProps['block']['variant']; cover: string }) {
-  const img = cover ? <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" /> : null;
+  // The same copies and `sizes` as the variant draws, and as the document preloads (worker/lib/socialPreview.ts `storeImagePreload`).
+  const img = cover ? <img {...storeImgProps(cover, STORE_HERO_SIZES)} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" /> : null;
   if (variant === 'cover') {
     return (
       <div className="relative h-60 @min-[40rem]:h-80 w-full overflow-hidden bg-white/[0.03]">
@@ -167,7 +168,7 @@ function ProfileHero({ block, store, data, cover, name }: HeroProps & { cover: s
       {/* 1 — Cover. The way back and the ⋯ menu float over it (the header). */}
       {s.show_cover && (
         <div className="h-36 @min-[40rem]:h-48 w-full overflow-hidden bg-white/[0.03] relative">
-          {cover && <img src={cover} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
+          {cover && <img {...storeImgProps(cover, STORE_HERO_SIZES)} alt="" className="w-full h-full object-cover" loading="eager" fetchPriority="high" />}
           <HeroVideoStage video={s.video} poster={cover} onPhone={s.video_on_phone} />
           <div className="absolute inset-0 sf-cover-fade" />
           <HeroVideoButton video={s.video} onPhone={s.video_on_phone} />
@@ -183,7 +184,7 @@ function ProfileHero({ block, store, data, cover, name }: HeroProps & { cover: s
           <div className="relative shrink-0">
             <div className={`w-[72px] h-[72px] rounded-full sf-bg border-2 ${accent.ring} overflow-hidden flex items-center justify-center`}>
               {store.logoUrl ? (
-                <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
+                <img {...storeImgProps(store.logoUrl, '72px')} alt="" className="w-full h-full object-cover" decoding="async" />
               ) : (
                 <Store className="w-7 h-7 text-gold" strokeWidth={1.5} aria-hidden="true" />
               )}
@@ -360,7 +361,7 @@ export function Avatar({ store, size }: { store: StorefrontStore; size: string }
   return (
     <div className={`${size} rounded-full sf-bg border-2 ${accent.ring} overflow-hidden flex items-center justify-center shrink-0`}>
       {store.logoUrl ? (
-        <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
+        <img {...storeImgProps(store.logoUrl, '72px')} alt="" className="w-full h-full object-cover" decoding="async" />
       ) : (
         <Store className="w-7 h-7 text-gold" strokeWidth={1.5} aria-hidden="true" />
       )}

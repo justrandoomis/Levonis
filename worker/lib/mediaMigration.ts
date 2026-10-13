@@ -1,6 +1,7 @@
 import type { Env } from './types';
 import { isAnonymousPublicMediaKey, isSafeMediaKey, mediaBucket, type MediaDomain, type MediaVisibility } from './mediaStorage';
 import { isSiteMediaObject, siteMediaKey } from './siteMedia';
+import { isVariantStoreKey } from './variantKeys';
 
 export type LegacyMediaAction = 'copy' | 'convert_webp' | 'orphan_candidate' | 'manual_review';
 
@@ -299,7 +300,9 @@ export async function inventoryLegacyMedia(env: Env, cursor?: string, limit = 25
   const degraded = failed.length > 0;
   const page = await env.BUCKET.list({ cursor, limit: Math.min(500, Math.max(1, limit)), include: ['httpMetadata'] });
   return {
-    objects: page.objects.map((object) => {
+    // The small copies (worker/lib/variantKeys.ts) are derived files, not media
+    // to migrate: they live in BUCKET only where R2_PUBLIC is unbound.
+    objects: page.objects.filter((object) => !isVariantStoreKey(object.key)).map((object) => {
       const plan = planLegacyMediaKey(object.key, refs.has(object.key));
       return {
         ...plan,

@@ -83,6 +83,7 @@ import { motion } from 'motion/react';
  */
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
+import VariantImg from '../components/ui/VariantImg';
 
 /** Its own chunk: fetched only after an order is placed, drawn only for a printer with parts. */
 const PlacedOrderParts = React.lazy(() => import('../components/product/PlacedOrderParts'));
@@ -2453,7 +2454,7 @@ export default function Checkout() {
                 <div key={line.key} data-checkout-line={line.key} className="group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0">
                   <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0">
                     {line.image ? (
-                      <img referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
+                      <VariantImg sizes="64px" referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full bg-surface-raised" />
                     )}

@@ -31,6 +31,8 @@ import { findHashtagRow, hashtagKey, hashtagUsage, normalizeHashtag, rewriteHash
 import { catalogTreeWithCounts } from '../lib/catalogMembership';
 import { putMediaObject } from '../lib/mediaStorage';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
+import { capStoredWebp } from '../lib/imageConvert';
+import { scheduleVariantWarm } from '../lib/imageVariants';
 import { sniff } from './uploads';
 import {
   SITE_MEDIA_MAX_BYTES,
@@ -916,7 +918,7 @@ adminTaxonomyRoutes.post(`/catalogs/:id/${segment}`, async (c) => {
   // owner's rule is that site artwork is WebP; a `.webp` extension on a PNG
   // would satisfy a name check and then be served with the wrong type for a
   // year under an `immutable` header.
-  const buf = new Uint8Array(await file.arrayBuffer());
+  let buf = new Uint8Array(await file.arrayBuffer());
   const kind = sniff(buf);
   if (!kind || kind.mime !== SITE_MEDIA_MIME) {
     throw badRequest(
@@ -924,6 +926,9 @@ adminTaxonomyRoutes.post(`/catalogs/:id/${segment}`, async (c) => {
       'SITE_MEDIA_NOT_WEBP'
     );
   }
+  // The stored-picture limit (worker/lib/imageConvert.ts STORED_MAX_PIXELS):
+  // over it, re-encoded smaller; a 2400 × 300 banner (0.7 MP) is kept as it is.
+  buf = (await capStoredWebp(c.env, buf)).bytes;
   const dimensions = rasterDimensions(buf, kind.mime);
   if (!validRasterDimensions(dimensions)) {
     throw badRequest('The image has invalid or unsupported dimensions', 'BAD_IMAGE_DIMENSIONS');
@@ -953,6 +958,8 @@ adminTaxonomyRoutes.post(`/catalogs/:id/${segment}`, async (c) => {
     buf,
     { httpMetadata: { contentType: kind.mime, cacheControl: 'public, max-age=31536000, immutable' } }
   );
+  // Its small copies, after the answer (worker/lib/imageVariants.ts).
+  scheduleVariantWarm(() => c.executionCtx, c.env, { key, bytes: buf, width: dimensions?.width ?? null });
 
   const previous = String((row as unknown as Record<string, unknown>)[pic.column] ?? '');
   await c.env.DB.prepare(`UPDATE catalogs SET ${pic.column} = ? WHERE id = ?`).bind(key, id).run();

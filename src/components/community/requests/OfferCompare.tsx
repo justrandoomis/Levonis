@@ -36,6 +36,7 @@ import { offersApi } from '../offers/types';
 import { offersV2Api, type CatalogMaterial, type OfferFileV2, type OfferHistoryEntryV2, type OfferV2 } from './api';
 import { FileGlyph } from './OfferComposer';
 import { daysLabel, fill, fillNodes, handoverLabel, jobsLabel, offerStateWords, requestLang, shortDay, useRequestStrings, type RequestLang, type RequestStrings } from './strings';
+import VariantImg from '../../ui/VariantImg';
 
 type Sort = 'price' | 'time' | 'rating';
 
@@ -250,7 +251,7 @@ export function OfferFiles({ files, label }: { files: OfferFileV2[]; label: stri
             className="lv-button lv-button-secondary lv-button-sm max-w-full justify-start pe-3 ps-1.5 text-[12px] font-medium text-text-secondary hover:text-text-primary"
             data-offer-file={f.kind}
           >
-            {f.kind === 'image' ? <img src={f.url!} alt="" loading="lazy" decoding="async" className="size-8 shrink-0 rounded-lg object-cover" /> : <FileGlyph kind={f.kind} />}
+            {f.kind === 'image' ? <VariantImg sizes="32px" src={f.url!} alt="" loading="lazy" decoding="async" className="size-8 shrink-0 rounded-lg object-cover" /> : <FileGlyph kind={f.kind} />}
             <bdi className="truncate">{f.name}</bdi>
           </a>
         </li>

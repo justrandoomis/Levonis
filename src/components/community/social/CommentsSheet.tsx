@@ -37,6 +37,7 @@ import ReportSheet from './ReportSheet';
 import { commentsLabel, replyToLabel, socialLang, useSocialStrings } from './strings';
 import { LinkRow } from '../links/LinkCard';
 import { warmLinksOnPaste } from '../links/useLinkCard';
+import VariantImg from '../../ui/VariantImg';
 
 export interface CommentsSheetProps {
   postId: string;
@@ -326,7 +327,7 @@ function Row({ c, onReply, onRemove, onReport }: { c: Comment; onReply: (c: Comm
   return (
     <article data-comment={c.id} className={`flex items-start gap-2.5 ${c.pending ? 'opacity-60' : ''}`} aria-busy={c.pending || undefined}>
       <span aria-hidden="true" className="mt-0.5 size-8 shrink-0 overflow-hidden rounded-full bg-surface-selected">
-        {c.author.avatarUrl && <img src={c.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
+        {c.author.avatarUrl && <VariantImg sizes="32px" src={c.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-baseline gap-2 text-[12.5px]">

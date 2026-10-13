@@ -31,6 +31,7 @@ import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderStatusLabel, statusStyle } from '../components/orders/format';
 import { useMoney } from '../CurrencyContext';
 import type { Claim } from '../components/warranty/types';
+import VariantImg from '../components/ui/VariantImg';
 
 /** Its own chunk: only an order with a printer that has parts draws it. */
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
@@ -189,7 +190,7 @@ function OrderStoreStrip({ store, label, cta }: { store: NonNullable<ApiOrder['s
   const inner = (
     <>
       {store.logo_url ? (
-        <img src={store.logo_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+        <VariantImg sizes="36px" src={store.logo_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
       ) : (
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised text-text-muted" aria-hidden="true">
           <Truck className="h-4 w-4" />
@@ -703,7 +704,7 @@ export default function OrderDetail() {
                       return (
                         <li key={it.id} data-order-item={it.id} className="p-3">
                           <div className="flex gap-3">
-                            <SafeImage src={it.image} alt="" aspect="square" className="w-16 h-16 rounded-md shrink-0" bgClassName="bg-black" />
+                            <SafeImage sizes="64px" src={it.image} alt="" aspect="square" className="w-16 h-16 rounded-md shrink-0" bgClassName="bg-black" />
                             <div className="min-w-0 flex-1">
                               {it.product_slug ? (
                                 <Link

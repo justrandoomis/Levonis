@@ -9,6 +9,7 @@ import { productPrimaryImage } from '../../lib/productImage';
 import { conditionKindLabel, conditionGradeLabel, type ConditionEntry } from '../../lib/condition';
 import { useRail } from '../../lib/useRail';
 import { useMoney } from '../../CurrencyContext';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 
 /**
  * OPEN BOX, USED AND REFURBISHED — the shelf.
@@ -63,7 +64,7 @@ function OpenBoxCard({ p, lang }: { p: ApiProduct; lang: string }) {
       className="w-[160px] relative shrink-0 snap-start overflow-hidden flex flex-col bg-surface rounded-xl border border-border-subtle hover:bg-surface-raised transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       <div className="relative aspect-square overflow-hidden bg-black">
-        <SafeImage src={productPrimaryImage(p)} alt={p.name} aspect="square" className="w-full h-full" />
+        <SafeImage sizes={IMAGE_SIZES.card} src={productPrimaryImage(p)} alt={p.name} aspect="square" className="w-full h-full" />
         {condition ? (
           <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-full lv-chip [--chip:var(--color-info)] px-2 py-1 text-[10px] font-bold">
             <PackageOpen aria-hidden="true" className="w-3 h-3" />

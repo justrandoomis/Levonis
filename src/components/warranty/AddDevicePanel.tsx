@@ -277,7 +277,7 @@ export function AddDevicePanel({
                   const disabled = u.linked_elsewhere || rowBusy === u.unit_id;
                   return (
                     <li key={u.unit_id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" data-unit-id={u.unit_id}>
-                      <SafeImage src={u.product.image} alt="" aspect="auto" className="w-12 h-12 rounded-md border border-border-subtle shrink-0" bgClassName="bg-surface-raised" />
+                      <SafeImage sizes="48px" src={u.product.image} alt="" aspect="auto" className="w-12 h-12 rounded-md border border-border-subtle shrink-0" bgClassName="bg-surface-raised" />
                       <div className="min-w-0 flex-1">
                         <div className={`text-[14px] font-bold truncate ${u.linked_elsewhere ? 'text-text-secondary' : 'text-text-primary'}`}>
                           {productName(u.product, lang)}

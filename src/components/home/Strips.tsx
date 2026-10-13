@@ -6,6 +6,7 @@ import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
 import Marquee from './Marquee';
 import { useRail } from '../../lib/useRail';
+import VariantImg from '../ui/VariantImg';
 
 /**
  * The shared shelf scroller: a snap rail on phones that relaxes into a
@@ -36,7 +37,7 @@ function ItemCard({ item }: { item: HomeSectionItem }) {
     <>
       <div className="aspect-[4/3] bg-surface-raised overflow-hidden">
         {item.image ? (
-          <SafeImage src={item.image} alt={item.title} aspect="auto" className="w-full h-full" />
+          <SafeImage sizes="(min-width: 1024px) 300px, 60vw" src={item.image} alt={item.title} aspect="auto" className="w-full h-full" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-olive-dark to-olive" />
         )}
@@ -212,7 +213,8 @@ function BrandLogo({ entry }: { entry: MarqueeEntry }) {
     );
   }
   return (
-    <img
+    <VariantImg
+      sizes="112px"
       src={entry.image}
       /* THE LINK'S ONLY NAME. There is no caption any more and no wrapper to
          hide this from assistive tech, so `alt=""` would leave a screen
@@ -265,7 +267,8 @@ function MarqueeMark({
         className={`w-14 h-14 rounded-full shrink-0 flex items-center justify-center overflow-hidden border ${plate}`}
       >
         {entry.image ? (
-          <img
+          <VariantImg
+            sizes="56px"
             src={entry.image}
             alt=""
             width={56}

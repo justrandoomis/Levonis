@@ -48,3 +48,26 @@ export function validRasterDimensions(dimensions: RasterDimensions | null): dime
   return Number.isInteger(width) && Number.isInteger(height) && width >= 1 && height >= 1 && width <= 12_000 && height <= 12_000 && width * height <= 48_000_000;
 }
 
+/**
+ * An AVIF's canvas size, read from its `ispe` (image spatial extents)
+ * properties — header-only, like `rasterDimensions`, and kept apart from it so
+ * no existing caller starts measuring AVIF uploads it never measured before.
+ *
+ * Layout of one property: u32 size, `ispe`, u8 version + u24 flags, u32 width,
+ * u32 height. A picture with an alpha plane or a grid carries several; the
+ * widest is the canvas. Only the header is scanned (the `meta` box sits before
+ * the pixel data), so a truncated or lying file reads as null, never as a
+ * megabyte of pixels taken for boxes.
+ */
+export function avifDimensions(bytes: Uint8Array): RasterDimensions | null {
+  const end = Math.min(bytes.length, 16 * 1024) - 16;
+  let best: RasterDimensions | null = null;
+  for (let i = 4; i <= end; i++) {
+    if (bytes[i] !== 0x69 || bytes[i + 1] !== 0x73 || bytes[i + 2] !== 0x70 || bytes[i + 3] !== 0x65) continue; // 'ispe'
+    const width = u32be(bytes, i + 8);
+    const height = u32be(bytes, i + 12);
+    if (width >= 1 && height >= 1 && (!best || width > best.width)) best = { width, height };
+  }
+  return best;
+}
+

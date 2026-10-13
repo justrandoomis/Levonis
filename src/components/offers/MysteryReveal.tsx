@@ -99,7 +99,7 @@ export default function MysteryReveal({
         </div>
         {cover && (
           <div className="mt-2 h-16 w-16 overflow-hidden rounded-lg bg-surface-selected" dir={dir}>
-            <SafeImage src={cover} alt="" className="h-full w-full object-cover" />
+            <SafeImage sizes="64px" src={cover} alt="" className="h-full w-full object-cover" />
           </div>
         )}
       </div>
@@ -131,7 +131,7 @@ export default function MysteryReveal({
         {picks.map((p) => (
           <li key={`${p.spool_index}-${p.product_id}`} className="flex items-center gap-2">
             <div className="size-10 shrink-0 overflow-hidden rounded-sm bg-surface-selected">
-              <SafeImage src={p.image} alt="" className="h-full w-full object-cover" />
+              <SafeImage sizes="40px" src={p.image} alt="" className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0">
               {/* Product names stay English in every language (§13.3), and

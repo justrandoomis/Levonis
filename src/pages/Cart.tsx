@@ -36,6 +36,7 @@ import {
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
+import VariantImg from '../components/ui/VariantImg';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -1332,7 +1333,7 @@ export default function Cart() {
           className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-surface-raised cursor-pointer"
           onClick={() => navigate(`/product/${item.slug}`)}
         >
-          <SafeImage src={item.image} alt={itemName(item)} aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
+          <SafeImage sizes="100px" src={item.image} alt={itemName(item)} aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
         </div>
 
         <div className="min-w-0 max-w-full flex-1 flex flex-col justify-between">
@@ -1548,7 +1549,7 @@ export default function Cart() {
                   className="w-[72px] h-[72px] min-[390px]:w-[80px] min-[390px]:h-[80px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-md overflow-hidden bg-surface-raised cursor-pointer"
                   onClick={() => navigate(`/product/${item.slug}`)}
                 >
-                  <SafeImage
+                  <SafeImage sizes="100px"
                     src={item.image}
                     alt={itemName(item)}
                     aspect="auto"
@@ -2596,7 +2597,7 @@ export default function Cart() {
             <div className="flex items-start justify-between">
               <div className="flex gap-4">
                 {variantView.image ? (
-                  <img referrerPolicy="no-referrer" src={variantView.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-snow" />
+                  <VariantImg sizes="80px" referrerPolicy="no-referrer" src={variantView.image} alt="" className="w-20 h-20 rounded-lg object-cover bg-snow" />
                 ) : (
                   <div className="w-20 h-20 rounded-lg bg-surface-selected" />
                 )}

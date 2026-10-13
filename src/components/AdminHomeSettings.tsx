@@ -16,6 +16,7 @@ import {
 } from '../lib/homeSections';
 import { BENTO_DEFAULTS, BENTO_POSITIONS } from '../lib/homeLayout';
 import { encodeProductRasterAsWebp, prepareProductImage } from '../lib/imagePreprocess';
+import VariantImg from './ui/VariantImg';
 
 /**
  * «إعدادات الصفحة الرئيسية».
@@ -843,7 +844,7 @@ function HomePhotoPairs({
                         className="lv-preview-plate relative aspect-[16/10] overflow-hidden rounded-xl border"
                       >
                         {m.url ? (
-                          <img src={m.url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+                          <VariantImg sizes="(min-width: 768px) 320px, 50vw" src={m.url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                         ) : (
                           <span className="absolute inset-0 grid place-items-center text-[11px]">
                             {rtl ? 'تلقائي' : 'Automatic'}
@@ -951,7 +952,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
     }
     setBusySlot(slot);
     try {
-      if (photo) file = (await prepareProductImage(file, (f) => encodeProductRasterAsWebp(f, HOME_PHOTO_EDGE))).file;
+      if (photo) file = (await prepareProductImage(file, (f) => encodeProductRasterAsWebp(f, HOME_PHOTO_EDGE), HOME_PHOTO_EDGE)).file;
       const form = new FormData();
       form.append('file', file);
       form.append('originalName', file.name);
@@ -1090,7 +1091,7 @@ function SiteMediaSettings({ dir }: { dir: string }) {
                       that fixes it is two centimetres away. */}
                   <span className="w-12 h-12 shrink-0 rounded-sm lv-well border border-border-subtle grid place-items-center overflow-hidden">
                     {m.url
-                      ? <img src={m.url} alt="" width={48} height={48} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />
+                      ? <VariantImg sizes="48px" src={m.url} alt="" width={48} height={48} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />
                       : <ImageIcon className="w-5 h-5 text-text-muted" aria-hidden="true" />}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -1198,7 +1199,7 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
           <div key={b.id} className="rounded-lg bg-surface-raised p-4 flex flex-col md:flex-row gap-4">
             <div className="w-32 h-20 bg-surface-selected border border-border-subtle rounded-md overflow-hidden flex items-center justify-center shrink-0">
               {b.image ? (
-                <img src={b.image || undefined} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                <VariantImg sizes="128px" src={b.image || undefined} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
               ) : (
                 <ImageIcon className="w-8 h-8 text-text-muted" />
               )}

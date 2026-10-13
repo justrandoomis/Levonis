@@ -5,7 +5,7 @@
  */
 import { mediaSrc } from '../../../../packages/storeLayout/src/refs';
 import { useStoreTheme } from '../StoreTheme';
-import { Column, hasLink, LinkTo, useText } from '../parts';
+import { Column, hasLink, LinkTo, storeImgProps, useText } from '../parts';
 import { Paragraphs } from './Text';
 import type { BlockProps } from '../types';
 
@@ -23,7 +23,7 @@ export default function ImageTextBlock({ block, data }: BlockProps<'image_text'>
       <div className="grid gap-4 @min-[40rem]:grid-cols-2 @min-[40rem]:items-center">
         {img && (
           <div className={`sf-r-lg overflow-hidden sf-well aspect-[4/3] ${block.variant === 'image_end' ? '@min-[40rem]:order-last' : ''}`}>
-            <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+            <img {...storeImgProps(img, '(min-width: 768px) 50vw, 100vw')} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
           </div>
         )}
         <div className="min-w-0">

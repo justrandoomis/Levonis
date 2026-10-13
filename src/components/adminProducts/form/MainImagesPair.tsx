@@ -81,7 +81,7 @@ export function MainImagesPair({
         </figcaption>
         <div className="aspect-[6/5] overflow-hidden rounded-lg bg-charcoal">
           {darkUrl ? (
-            <SafeImage src={darkUrl} alt="" aspect="auto" fit="contain" className="h-full w-full" bgClassName="bg-charcoal" />
+            <SafeImage sizes="(min-width: 768px) 280px, 45vw" src={darkUrl} alt="" aspect="auto" fit="contain" className="h-full w-full" bgClassName="bg-charcoal" />
           ) : (
             <p className="grid h-full place-items-center px-3 text-center text-[12px] text-snow/60">لا صورة رئيسية بعد</p>
           )}
@@ -100,7 +100,7 @@ export function MainImagesPair({
             whatever theme the admin panel itself is in. */}
         <div className="aspect-[6/5] overflow-hidden rounded-lg border" style={LIGHT_PREVIEW}>
           {lightUrl ? (
-            <SafeImage src={lightUrl} alt="" aspect="auto" fit="contain" className="h-full w-full" bgClassName="bg-transparent" />
+            <SafeImage sizes="(min-width: 768px) 280px, 45vw" src={lightUrl} alt="" aspect="auto" fit="contain" className="h-full w-full" bgClassName="bg-transparent" />
           ) : (
             <p className="grid h-full place-items-center px-3 text-center text-[12px]">
               اختيارية — بدونها تُعرض الصورة الداكنة في الوضعين

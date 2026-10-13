@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import LangThemeButton from './LangThemeSheet';
 import LiveSearch from './search/LiveSearch';
+import { variantSrcSet } from '../../packages/contracts/src/imageSizing';
 
 /**
  * WHAT THE HEADER DOWNLOADS BEFORE THE FIRST PAINT, AND WHAT IT DOES NOT
@@ -62,6 +63,9 @@ export default function Header() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { isAuthenticated, user } = useAuth();
+  const avatarSrc = user?.avatar_key
+    ? `/files/${user.avatar_key}`
+    : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user?.username || user?.name || 'Levonis')}`;
 
   // Admin visibility comes exclusively from the server-side role.
   const isAdminUser = !!user?.isAdmin;
@@ -165,10 +169,14 @@ export default function Header() {
               {isAuthenticated ? (
                  <img
                    referrerPolicy="no-referrer"
-                   src={user?.avatar_key
-                     ? `/files/${user.avatar_key}`
-                     : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user?.username || user?.name || 'Levonis')}`}
+                   src={avatarSrc}
+                   // A 32 px face: the 160 px copy, not the stored original (2026-10-13).
+                   // The builder directly rather than ui/VariantImg — the header is in
+                   // every visitor's first download (tests/bundleBudget.test.ts).
+                   srcSet={variantSrcSet(avatarSrc)}
+                   sizes="32px"
                    alt="Avatar"
+                   decoding="async"
                    className="w-full h-full object-cover"
                  />
               ) : (

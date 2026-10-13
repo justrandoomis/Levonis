@@ -7,6 +7,7 @@ import { useLanguage } from '../../LanguageContext';
 import { Sheet } from '../ui/Overlay';
 import { onboardingStrings, missingLabel } from '../onboarding/strings';
 import { isQuietRoute, setProfileStep } from '../../lib/firstRun';
+import VariantImg from '../ui/VariantImg';
 
 /**
  * "Complete your profile" — ONCE, right after the account is created.
@@ -199,7 +200,7 @@ export default function CompleteProfileSheet() {
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-surface-raised text-gold">
             {user?.avatar_key ? (
-              <img src={`/files/${user.avatar_key}`} alt="" className="h-full w-full object-cover" />
+              <VariantImg sizes="48px" src={`/files/${user.avatar_key}`} alt="" className="h-full w-full object-cover" />
             ) : (
               <UserRound className="h-5 w-5" aria-hidden />
             )}

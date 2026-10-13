@@ -29,7 +29,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import PromoPhoto from '../src/components/home/v2/PromoPhoto';
+import PromoPhoto, { PROMO_MAX_VARIANT } from '../src/components/home/v2/PromoPhoto';
 import { variantSrcSet } from '../src/components/ui/SafeImage';
 import { APEX, asD1, ctx, dbThrough, freshDb, get, hasColumn, json, row, stubApp } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
@@ -371,7 +371,7 @@ test('the renderers pick the theme in script and the screen with <source media>'
     const src = code(file);
     assert.match(src, /themedFiles\(\{ src, lightSrc, mobileSrc, lightMobileSrc \}, theme\)/, `${file}: one resolver for the pair`);
     if (file.endsWith('/CropPhoto.tsx')) {
-      assert.match(src, /<source media=\{PHONE_MEDIA\} srcSet=\{phone\} \/>/, `${file}: the phone file through <source>`);
+      assert.match(src, /<source media=\{PHONE_MEDIA\} srcSet=\{phoneSet \?\? phone\} sizes=\{phoneSet \? sizes : undefined\} \/>/, `${file}: the phone file through <source>, as small copies`);
     }
     assert.match(src, /phone !== shown \?/, `${file}: no <source> when the phone draws the same file`);
   }
@@ -394,7 +394,9 @@ test('the promo phone source keeps its themed file through responsive candidates
   const render = (over: Partial<typeof props> & { sizes?: string } = {}) => renderToStaticMarkup(createElement(PromoPhoto, { ...props, ...over }));
   const phone = (html: string) => html.match(/<source[^>]*>/)?.[0] ?? '';
   const responsive = render({ sizes: '400px' });
-  assert.equal(phone(responsive), `<source media="${PHONE_MEDIA}" srcSet="${variantSrcSet(props.lightMobileSrc)}" sizes="400px"/>`);
+  // The home tiles keep today's 1080 ceiling (PROMO_MAX_VARIANT) though the ladder now reaches 1600.
+  assert.equal(phone(responsive), `<source media="${PHONE_MEDIA}" srcSet="${variantSrcSet(props.lightMobileSrc, { max: PROMO_MAX_VARIANT })}" sizes="400px"/>`);
+  assert.doesNotMatch(responsive, /\?w=1280|\?w=1600/);
   assert.doesNotMatch(responsive, /phone-dark\.webp|\/dark\.webp/);
   assert.match(responsive, /<img[^>]*src="\/files\/products\/light\.webp"/);
   const original = render();

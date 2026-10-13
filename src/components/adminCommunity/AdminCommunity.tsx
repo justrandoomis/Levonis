@@ -46,6 +46,7 @@ import {
   type CommunityOverview, type AdminMerchantRow, type AdminMerchantProduct, type AdminComplaintRow,
   type AdminRequestRow, type AdminReviewRow, type AdminReputation, type AdminComplaintMessage,
 } from '../../lib/merchant';
+import VariantImg from '../ui/VariantImg';
 
 type Section =
   | 'overview' | 'merchants' | 'board' | 'disputes' | 'finance' | 'reputation' | 'settings' | 'print';
@@ -701,7 +702,7 @@ function MerchantProducts({ merchantId, t }: { merchantId: string; t: T }) {
           {rows.map((p) => (
             <li key={p.id} className="flex items-center gap-3 min-w-0">
               {p.image ? (
-                <img src={p.image} alt="" width={40} height={40} loading="lazy" className="w-10 h-10 rounded-sm object-cover bg-surface-selected shrink-0" />
+                <VariantImg sizes="40px" src={p.image} alt="" width={40} height={40} loading="lazy" className="w-10 h-10 rounded-sm object-cover bg-surface-selected shrink-0" />
               ) : (
                 <span className="w-10 h-10 rounded-sm bg-surface-selected shrink-0" aria-hidden="true" />
               )}

@@ -159,7 +159,7 @@ const REASON_KEY: Record<string, GiftStringKey> = {
 function Thumb({ src, alt, size }: { src: string; alt: string; size: 'sm' | 'lg' }) {
   return (
     <div className={`${size === 'lg' ? 'w-20 h-20 rounded-lg' : 'w-14 h-14 rounded-md'} shrink-0 overflow-hidden bg-surface-raised`}>
-      <SafeImage src={src} alt={alt} aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
+      <SafeImage sizes="80px" src={src} alt={alt} aspect="auto" className="w-full h-full" bgClassName="bg-surface-raised" fallbackClassName="text-text-muted" />
     </div>
   );
 }

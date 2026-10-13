@@ -37,7 +37,8 @@
 
 import type { Env } from './types';
 import { GuardedFetchError, readResponseBytes } from './fetchGuard';
-import { rasterDimensions, validRasterDimensions, type RasterDimensions } from './imageMetadata';
+import { avifDimensions, rasterDimensions, validRasterDimensions, type RasterDimensions } from './imageMetadata';
+import { IMAGE_VARIANT_WIDTHS, type ImageVariantWidth } from '../../packages/contracts/src/imageSizing';
 
 /** What the Images binding will accept in one call. */
 export const IMAGES_MAX_INPUT_BYTES = 20 * 1024 * 1024;
@@ -71,6 +72,56 @@ export const IMAGE_SOURCE_CAP_MB = IMAGE_SOURCE_CAP / (1024 * 1024);
 /** Quality: high enough that a product photo survives a pinch-zoom, low enough
  *  that the file is a fraction of the camera original. */
 const WEBP_QUALITY = 85;
+
+/**
+ * THE LARGEST PICTURE THIS SHOP STORES — FOR NEW UPLOADS (owner 2026-10-13).
+ *
+ * Until now the limits were on BYTES only, so a 1600 × 1600 vendor photo or a
+ * 12 MP phone picture was kept at its full size, and so was every WebP that
+ * arrived already compressed. Nothing on the site is drawn wider than a
+ * desktop hero, and the small copies (`?w=`, worker/lib/imageVariants.ts) are
+ * what the pages download; the stored original only has to be good enough for
+ * the zoom and for every copy cut from it.
+ *
+ * AN AREA, NOT ONLY AN EDGE. 2048 × 2048 (4.2 MP) caps a square or a 4:3
+ * photograph (12 MP → 2364 × 1773), while a section banner drawn at 8:1 —
+ * 2400 × 300 is 0.7 MP — keeps every pixel it needs on a desktop at DPR 2.
+ * The edge limit, 3072, bounds the extreme strips. Pictures already stored are
+ * never touched; a product key is the digest of the stored bytes, so only a
+ * new upload above the limit gets a new (smaller) key.
+ */
+export const STORED_MAX_PIXELS = 2048 * 2048;
+export const STORED_MAX_EDGE = 3072;
+
+/**
+ * The square box a `fit: 'scale-down'` transform needs to bring `width ×
+ * height` inside both limits, or null when it already fits. A square box,
+ * because a JPEG's header size is BEFORE its EXIF rotation: whichever way the
+ * binding turns the picture, the long edge lands at the same length.
+ */
+export function storedCapBox(width: number, height: number): number | null {
+  if (!(width > 0 && height > 0)) return null;
+  const long = Math.max(width, height);
+  const scale = Math.min(1, Math.sqrt(STORED_MAX_PIXELS / (width * height)), STORED_MAX_EDGE / long);
+  if (scale >= 1) return null;
+  return Math.max(1, Math.floor(long * scale + 1e-6));
+}
+
+/** An animated WebP (VP8X with the animation flag). A resize keeps one frame, so these are never resized. */
+export function isAnimatedWebp(bytes: Uint8Array): boolean {
+  return (
+    bytes.byteLength >= 21 &&
+    byteString(bytes, 0, 4) === 'RIFF' &&
+    byteString(bytes, 8, 4) === 'WEBP' &&
+    byteString(bytes, 12, 4) === 'VP8X' &&
+    (bytes[20] & 0x02) !== 0
+  );
+}
+
+/** Header dimensions for every still format this module reads, AVIF included. */
+function headerDimensions(bytes: Uint8Array, mime: string): RasterDimensions | null {
+  return mime === 'image/avif' ? avifDimensions(bytes) : rasterDimensions(bytes, mime);
+}
 
 const byteString = (bytes: Uint8Array, start: number, length: number): string =>
   String.fromCharCode(...bytes.subarray(start, start + length));
@@ -245,7 +296,12 @@ export async function convertToWebp(
     // whole array would hold two copies of a 20 MB image in an isolate that has
     // 128 MB for everything.
     const stream = new Blob([bytes]).stream();
-    const result = await images.input(stream).output({ format: 'image/webp', quality: WEBP_QUALITY });
+    // Above the stored-picture limit, the same call also scales it down.
+    const source = rasterDimensions(bytes, mime);
+    const box = source ? storedCapBox(source.width, source.height) : null;
+    const input = images.input(stream);
+    const result = await (box ? input.transform({ width: box, height: box, fit: 'scale-down' }) : input)
+      .output({ format: 'image/webp', quality: WEBP_QUALITY });
     const response = result.response();
     if (!response.ok) {
       return { ok: false, reason: 'failed', detail: `the converter returned HTTP ${response.status}` };
@@ -298,6 +354,10 @@ export async function productImageToWebp(
   const images = env.IMAGES;
   if (!images) return { ok: false, reason: 'unavailable' };
 
+  // The stored-picture limit (STORED_MAX_PIXELS / STORED_MAX_EDGE): a square
+  // box to scale into, or null when the picture already fits. An animated WebP
+  // is never resized — one frame would be all that is left of it.
+  let box: number | null = null;
   if (sniffed.mime === 'image/webp') {
     if (bytes.byteLength > IMAGE_OUTPUT_CAP) return { ok: false, reason: 'too_large' };
     // RIFF/WEBP magic and a plausible VP8 header are not proof that compressed
@@ -316,14 +376,19 @@ export async function productImageToWebp(
         if ((decodedFormat !== 'image/webp' && decodedFormat !== 'webp') || !validRasterDimensions(dimensions)) {
           return { ok: false, reason: 'failed', detail: 'The WebP could not be decoded or has unsupported dimensions' };
         }
-        return {
-          ok: true,
-          bytes,
-          mime: 'image/webp',
-          width: dimensions.width,
-          height: dimensions.height,
-          converted: false,
-        };
+        box = isAnimatedWebp(bytes) ? null : storedCapBox(dimensions.width, dimensions.height);
+        // At or under the limit the WebP is kept byte for byte, as it always
+        // was — the product key is the digest of these exact bytes.
+        if (box === null) {
+          return {
+            ok: true,
+            bytes,
+            mime: 'image/webp',
+            width: dimensions.width,
+            height: dimensions.height,
+            converted: false,
+          };
+        }
       } catch (error) {
         return {
           ok: false,
@@ -333,10 +398,16 @@ export async function productImageToWebp(
       }
     }
   }
+  if (box === null && !isAnimatedWebp(bytes)) {
+    const source = headerDimensions(bytes, sniffed.mime);
+    box = source ? storedCapBox(source.width, source.height) : null;
+  }
 
   try {
     const stream = new Blob([bytes]).stream();
-    const result = await images.input(stream).output({ format: 'image/webp', quality: WEBP_QUALITY });
+    const input = images.input(stream);
+    const result = await (box ? input.transform({ width: box, height: box, fit: 'scale-down' }) : input)
+      .output({ format: 'image/webp', quality: WEBP_QUALITY });
     const response = result.response();
     if (!response.ok) {
       return { ok: false, reason: 'failed', detail: `the converter returned HTTP ${response.status}` };
@@ -367,6 +438,45 @@ export async function productImageToWebp(
   }
 }
 
+export type CapOutcome = { bytes: Uint8Array; width: number; height: number; resized: boolean };
+
+/**
+ * THE STORED-PICTURE LIMIT FOR THE DOORS THAT ACCEPT WEBP ONLY — a brand mark
+ * or service icon (`POST /api/admin/site-media/:slot`) and a section picture
+ * (`POST /api/admin/taxonomy/catalogs/:id/<slot>`). They store the owner's
+ * WebP byte for byte, which stays true at or under the limit; above it the
+ * picture is re-encoded at the converter's quality, scaled into the limit.
+ *
+ * It never fails an upload that works today: without the binding, for an
+ * animated WebP, or when the binding cannot do it, the bytes are kept as
+ * they arrived (and the copies the pages download are small either way).
+ */
+export async function capStoredWebp(env: Pick<Env, 'IMAGES'>, bytes: Uint8Array): Promise<CapOutcome> {
+  const source = rasterDimensions(bytes, 'image/webp');
+  const unchanged: CapOutcome = { bytes, width: source?.width ?? 0, height: source?.height ?? 0, resized: false };
+  if (!source || !validRasterDimensions(source) || isAnimatedWebp(bytes)) return unchanged;
+  const box = storedCapBox(source.width, source.height);
+  const images = env.IMAGES;
+  if (box === null || !images) return unchanged;
+  try {
+    const result = await images
+      .input(new Blob([bytes]).stream())
+      .transform({ width: box, height: box, fit: 'scale-down' })
+      .output({ format: 'image/webp', quality: WEBP_QUALITY });
+    const response = result.response();
+    if (!response.ok) throw new Error(`the converter returned HTTP ${response.status}`);
+    const out = await readResponseBytes(response, { maxBytes: IMAGE_OUTPUT_CAP });
+    const dimensions = sniffImageBytes(out)?.mime === 'image/webp' ? rasterDimensions(out, 'image/webp') : null;
+    if (!validRasterDimensions(dimensions) || Math.max(dimensions.width, dimensions.height) > box) {
+      throw new Error('the converter returned no valid WebP inside the limit');
+    }
+    return { bytes: out, width: dimensions.width, height: dimensions.height, resized: true };
+  } catch (error) {
+    console.warn('stored_image_cap_skipped', error instanceof Error ? error.message.slice(0, 200) : 'unknown');
+    return unchanged;
+  }
+}
+
 /** The file extension that must accompany a mime, so a key never lies. */
 export function extensionFor(mime: string): string {
   switch (mime) {
@@ -385,34 +495,32 @@ export function extensionFor(mime: string): string {
 /**
  * A CARD DOES NOT NEED THE PHOTOGRAPH THE CAMERA TOOK.
  *
- * Every picture on the site is stored once, at up to 3000 px on its long
- * edge (`src/lib/imagePreprocess.ts`), and until this existed it was
- * DELIVERED at that size to a 174 px card on a phone: a twenty-tile rail was
- * twenty full-size downloads for a screen that could show a tenth of the
- * pixels. `GET /files/<key>?w=<width>` (worker/routes/uploads.ts) answers a
- * public still image at one of the widths below through the same `IMAGES`
- * binding that converts uploads, and in the format the browser's `Accept`
- * header says it can decode — AVIF before WebP before the stored format.
+ * Every picture on the site is stored once, at its full size, and until the
+ * variant route existed it was DELIVERED at that size to a 174 px card on a
+ * phone. `GET /files/<key>?w=<width>` (worker/routes/uploads.ts) answers a
+ * public still image at one of the widths of
+ * packages/contracts/src/imageSizing.ts through the same `IMAGES` binding
+ * that converts uploads, in the format the browser's `Accept` header says it
+ * can decode — AVIF before WebP before the stored format — and since
+ * 2026-10-13 each copy is cut ONCE and kept in R2 (worker/lib/imageVariants.ts)
+ * instead of once per data centre.
  *
- * FIVE WIDTHS, NOT A FREE PARAMETER. Each width × format is a separate
- * transformation billed once per object and a separate entry in the edge
- * cache; an open `?w=` would let one visitor mint a thousand of both. The
- * client's `srcset` (`src/components/ui/SafeImage.tsx`) names exactly these
- * five, and tests/imageVariants.test.ts pins the two lists to each other.
- *   160  a 36–64 CSS px thumbnail at DPR 2;
- *   320  a card in a 2–3 column grid at DPR 1–2 (148–174 CSS px);
- *   480  a wider phone card at DPR 2, without a jump from 320 to 640;
- *   640  the same card at DPR 3, or a 2-up tile on a wide phone;
- *   1080 a full-width picture on a phone at DPR 3, or a card on desktop.
+ * THE WIDTHS ARE NOT WRITTEN HERE. They live in the contracts package, which
+ * the pages import too; this module re-exports them for the Worker
+ * (tests/imageVariants.test.ts fails if any file declares its own list).
  * `fit: scale-down` never enlarges: a 500 px original asked for at 1080
  * comes back at 500 px, which is the honest answer.
  */
-export const IMAGE_VARIANT_WIDTHS = [160, 320, 480, 640, 1080] as const;
-export type ImageVariantWidth = (typeof IMAGE_VARIANT_WIDTHS)[number];
+export { IMAGE_VARIANT_WIDTHS, type ImageVariantWidth };
 
-/** The `w` query value, or null when it is absent, or 'invalid' when it names a width not on the list. */
+/**
+ * The `w` query value, or null when it is absent, or 'invalid' when it names a
+ * width not on the list. Only the canonical decimal spelling counts: `1e3`,
+ * `0640` or `640.0` are not a way to mint another cache entry for a width.
+ */
 export function parseVariantWidth(raw: string | null | undefined): ImageVariantWidth | null | 'invalid' {
   if (raw === null || raw === undefined || raw === '') return null;
+  if (!/^[1-9][0-9]{0,4}$/.test(raw)) return 'invalid';
   const n = Number(raw);
   return (IMAGE_VARIANT_WIDTHS as readonly number[]).includes(n) ? (n as ImageVariantWidth) : 'invalid';
 }
@@ -452,55 +560,94 @@ export function negotiateVariantFormat(accept: string | null | undefined, source
   return source;
 }
 
+/** The file extension of a copy in this format (`variants/v1/<key>/w640.avif`). */
+export function variantExtension(format: ImageVariantFormat): 'avif' | 'webp' | 'jpg' | 'png' {
+  return format === 'image/avif' ? 'avif' : format === 'image/webp' ? 'webp' : format === 'image/jpeg' ? 'jpg' : 'png';
+}
+
 /**
- * Quality per output format. WebP keeps the converter's own 85, so a variant
- * is never a lower grade than the stored picture; AVIF's scale is not WebP's
- * — the same visual grade sits lower on it — and 75 is the value the plan
- * takes until the owner's own zone measures it (docs/PERFORMANCE_LOG.md P2c
- * records that this pair was NOT measured in the lab, which has no encoder).
+ * QUALITY PER OUTPUT FORMAT — FIXED, never a request parameter.
+ *
+ * Measured (docs/PERFORMANCE_LOG.md «Images R2»: luma SSIM against a lanczos3
+ * resize of the stored original, 24 live copies): the binding's AVIF at 75 is
+ * today's grade (SSIM 0.9777), and WebP at 75 reaches the same grade (0.9775)
+ * — the 85 it used to share with the converter cost about 30 % more bytes for
+ * nothing a visitor could see. A JPEG copy (a browser that takes neither)
+ * keeps 85; a PNG keeps its lossless encoding.
  */
 export const VARIANT_QUALITY: Record<ImageVariantFormat, number | undefined> = {
   'image/avif': 75,
-  'image/webp': WEBP_QUALITY,
+  'image/webp': 75,
   'image/jpeg': WEBP_QUALITY,
   'image/png': undefined,
 };
 
+/** No copy is larger than this; a 1600 px copy is 100–300 KB. */
+export const VARIANT_MAX_BYTES = 4 * 1024 * 1024;
+
 export type VariantOutcome =
-  | { ok: true; body: ReadableStream<Uint8Array>; mime: ImageVariantFormat }
+  | { ok: true; bytes: Uint8Array; mime: ImageVariantFormat; width: number; height: number }
   /** No binding on this deployment: the caller serves the original. */
   | { ok: false; reason: 'unavailable' }
   /** The binding is there and the image defeated it: the caller serves the original. */
   | { ok: false; reason: 'failed'; detail: string };
 
 /**
- * Cut one variant. The output is a STREAM, not bytes: the route hands it to
- * the client and to the edge cache and never holds a whole picture in the
- * isolate. Failure is never an error for the visitor — the route falls back
- * to the stored file, which is exactly what they got before this existed.
+ * The size of a copy, read from its own bytes — or null when the bytes are not
+ * the format they were asked for. A copy is kept only when this answers.
+ */
+export function verifyVariantBytes(bytes: Uint8Array, format: ImageVariantFormat): RasterDimensions | null {
+  if (bytes.byteLength < 12) return null;
+  if (format === 'image/avif') {
+    if (!declaresAvif(bytes)) return null;
+  } else if (sniffImageBytes(bytes)?.mime !== format) {
+    return null;
+  }
+  const dimensions = headerDimensions(bytes, format);
+  return validRasterDimensions(dimensions) ? dimensions : null;
+}
+
+/**
+ * Cut one copy, verified. The output is BYTES (a 640 px copy is 5–60 KB): the
+ * route stores it in R2, which needs a known length, and hands the same bytes
+ * to the visitor. A copy is refused — and the caller serves the original — when
+ * the binding answers with anything but the requested format, or with a
+ * picture wider than was asked for or than its original (`sourceWidth`, when
+ * the caller knows it). Failure is never an error for the visitor.
  */
 export async function renderImageVariant(
   env: Pick<Env, 'IMAGES'>,
-  source: ReadableStream<Uint8Array>,
-  variant: { width: ImageVariantWidth; format: ImageVariantFormat }
+  source: ReadableStream<Uint8Array> | Uint8Array,
+  variant: { width: ImageVariantWidth; format: ImageVariantFormat; sourceWidth?: number | null }
 ): Promise<VariantOutcome> {
   const images = env.IMAGES;
   if (!images) {
     // Nobody is listening; let the source go rather than leak a stream.
-    await source.cancel().catch(() => undefined);
+    if (!(source instanceof Uint8Array)) await source.cancel().catch(() => undefined);
     return { ok: false, reason: 'unavailable' };
   }
   try {
     const quality = VARIANT_QUALITY[variant.format];
+    const input = source instanceof Uint8Array ? new Blob([source]).stream() : source;
     const result = await images
-      .input(source)
+      .input(input)
       .transform({ width: variant.width, fit: 'scale-down' })
       .output(quality === undefined ? { format: variant.format } : { format: variant.format, quality });
     const response = result.response();
     if (!response.ok || !response.body) {
       return { ok: false, reason: 'failed', detail: `the converter returned HTTP ${response.status}` };
     }
-    return { ok: true, body: response.body as ReadableStream<Uint8Array>, mime: variant.format };
+    const bytes = await readResponseBytes(response, {
+      maxBytes: VARIANT_MAX_BYTES,
+      tooLargeMessage: `A copy exceeds the ${VARIANT_MAX_BYTES} byte limit`,
+    });
+    const dimensions = verifyVariantBytes(bytes, variant.format);
+    if (!dimensions) return { ok: false, reason: 'failed', detail: `the converter returned no valid ${variant.format}` };
+    const limit = Math.min(variant.width, variant.sourceWidth && variant.sourceWidth > 0 ? variant.sourceWidth : Infinity);
+    if (dimensions.width > limit) {
+      return { ok: false, reason: 'failed', detail: `the copy is ${dimensions.width} px wide, over ${limit}` };
+    }
+    return { ok: true, bytes, mime: variant.format, width: dimensions.width, height: dimensions.height };
   } catch (error) {
     return { ok: false, reason: 'failed', detail: error instanceof Error ? error.message : String(error) };
   }

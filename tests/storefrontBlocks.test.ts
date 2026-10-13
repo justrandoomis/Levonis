@@ -213,6 +213,10 @@ const ALLOWED_IMPORTS = [
   // are the app's one segmented control — a radio group already in the entry
   // chunk (the language/theme sheet), so a store visit downloads nothing new.
   /^src\/components\/ui\/Segmented$/,
+  // 2026-10-13 (owner: «ضغط الصور»): the one list of picture widths and the
+  // srcset builder — a pure module with no imports, already in the entry chunk
+  // (ui/SafeImage), so a store visit downloads nothing new for its small copies.
+  /^packages\/contracts\/src\/imageSizing$/,
 ];
 
 function importsOf(rel: string): string[] {

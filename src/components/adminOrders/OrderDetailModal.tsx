@@ -26,6 +26,7 @@ import { serialStrings } from './serials/strings';
 import { slotKey } from './serials/UnitSerialSlots';
 import { serialsApi } from './serials/serialsApi';
 import type { GateMissing, OrderSerials } from './serials/types';
+import VariantImg from '../ui/VariantImg';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
@@ -557,7 +558,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                     >
                       <div className="w-14 h-14 shrink-0 rounded-lg bg-black/50 overflow-hidden flex items-center justify-center">
                         {it.image ? (
-                          <img src={it.image} alt="" width={56} height={56} loading="lazy" decoding="async" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <VariantImg sizes="56px" src={it.image} alt="" width={56} height={56} loading="lazy" decoding="async" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         ) : (
                           <Package className="w-5 h-5 text-text-muted" />
                         )}

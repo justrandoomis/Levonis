@@ -95,7 +95,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
         {strip.length > 0 && (
           <div aria-hidden="true" className="grid grid-cols-3 gap-1">
             {strip.map((w) => (
-              <SafeImage key={w.id} src={w.imageUrl} alt="" aspect="square" className="overflow-hidden rounded-lg" bgClassName="bg-surface-selected" />
+              <SafeImage sizes="(min-width: 640px) 120px, 30vw" key={w.id} src={w.imageUrl} alt="" aspect="square" className="overflow-hidden rounded-lg" bgClassName="bg-surface-selected" />
             ))}
           </div>
         )}

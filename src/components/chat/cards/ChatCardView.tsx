@@ -24,6 +24,7 @@ import { CardButton, CardShell, StatusLine } from './parts';
 import { useAddToCart } from './useAddToCart';
 import { CustomProductCardView, PrintRequestCardView, QuoteCardView } from './DealCards';
 import { CustomOrderCardView, StoreOrderCardView } from './OrderCards';
+import VariantImg from '../../ui/VariantImg';
 
 interface CardProps {
   card: ChatCard;
@@ -69,7 +70,7 @@ function ProductCardView({ card, mine }: CardProps) {
   return (
     <CardShell mine={mine} kind="product" label={loc(`منتج: ${name}`, `Product: ${name}`)}>
       {snap.image ? (
-        <img referrerPolicy="no-referrer" src={snap.image} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover bg-surface-raised" />
+        <VariantImg sizes="320px" referrerPolicy="no-referrer" src={snap.image} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover bg-surface-raised" />
       ) : (
         <div className="aspect-[4/3] w-full bg-surface-raised flex items-center justify-center">
           <ShoppingBag className="w-7 h-7 text-text-muted" strokeWidth={1.5} aria-hidden="true" />
@@ -129,7 +130,7 @@ function StoreCardView({ card, mine }: CardProps) {
       <div className="p-3 flex items-center gap-3">
         <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-raised flex items-center justify-center shrink-0">
           {snap.logo ? (
-            <img referrerPolicy="no-referrer" src={snap.logo} alt="" className="w-full h-full object-cover" />
+            <VariantImg sizes="48px" referrerPolicy="no-referrer" src={snap.logo} alt="" className="w-full h-full object-cover" />
           ) : (
             <StoreIcon className="w-5 h-5 text-text-muted" strokeWidth={1.5} aria-hidden="true" />
           )}

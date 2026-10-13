@@ -9,7 +9,7 @@ import { useLanguage } from '../../../LanguageContext';
 import { iqd } from '../../../lib/storefrontApi';
 import type { ServiceData } from '../../../../packages/storeLayout/src/data';
 import { useStorefrontRuntime } from '../runtime';
-import { BlockHeading, Column, Loading, useText } from '../parts';
+import { BlockHeading, Column, Loading, storeImgProps, useText } from '../parts';
 import { useBlockRows } from '../useBlockRows';
 import type { BlockProps } from '../types';
 
@@ -29,7 +29,7 @@ function ServiceCard({ s }: { s: ServiceData }) {
     <div className="sf-card overflow-hidden">
       {s.imageUrl && (
         <div className="aspect-[3/1] sf-well">
-          <img src={s.imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img {...storeImgProps(s.imageUrl, '(min-width: 768px) 384px, 100vw')} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
         </div>
       )}
       <div className="p-3">

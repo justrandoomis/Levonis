@@ -629,7 +629,7 @@ export function ImagesSection({
                   notice a broken PRIMARY. object-contain keeps §8's promise
                   that the stored original is never cropped.
                 */}
-                <SafeImage
+                <SafeImage sizes="(min-width: 1024px) 200px, 45vw"
                   src={img.url}
                   alt={img.alt_en || ''}
                   aspect="auto"

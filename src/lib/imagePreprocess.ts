@@ -20,7 +20,13 @@ export const PRODUCT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const PRODUCT_IMAGE_MAX_SOURCE_BYTES = 64 * 1024 * 1024;
 /** Mirrors `VIDEO_MAX` in `worker/routes/uploads.ts`. */
 export const PRODUCT_VIDEO_MAX_BYTES = 40 * 1024 * 1024;
-export const PRODUCT_IMAGE_MAX_EDGE = 3_000;
+/**
+ * 2048 (was 3000): nothing on the site is drawn wider than a desktop hero, and
+ * the server keeps no picture above 2048 × 2048 worth of pixels anyway
+ * (worker/lib/imageConvert.ts STORED_MAX_PIXELS) — sending 3000 px from a
+ * phone on Iraqi mobile data was paying for pixels the server then threw away.
+ */
+export const PRODUCT_IMAGE_MAX_EDGE = 2_048;
 /**
  * A CANVAS THAT IS TOO BIG DOES NOT THROW — IT RETURNS NOTHING.
  *
@@ -34,7 +40,7 @@ export const PRODUCT_IMAGE_MAX_EDGE = 3_000;
  * than any box the storefront puts a product image in, so the fallback costs
  * detail nobody sees and saves an upload that would otherwise be lost.
  */
-export const ENCODE_EDGE_LADDER = [PRODUCT_IMAGE_MAX_EDGE, 2_048, 1_600, 1_200] as const;
+export const ENCODE_EDGE_LADDER = [PRODUCT_IMAGE_MAX_EDGE, 1_600, 1_200] as const;
 /**
  * AN AVATAR IS NEVER SHOWN LARGE.
  *
@@ -50,6 +56,30 @@ export const ENCODE_EDGE_LADDER = [PRODUCT_IMAGE_MAX_EDGE, 2_048, 1_600, 1_200] 
  */
 export const AVATAR_IMAGE_MAX_EDGE = 512;
 export const PRODUCT_IMAGE_MAX_PIXELS = 48_000_000;
+
+/**
+ * A STILL WebP's size from its header, or null for anything else — an animated
+ * WebP (VP8X with the animation flag) included, because a canvas redraw keeps
+ * one frame. The same three chunk layouts the server reads
+ * (worker/lib/imageMetadata.ts `rasterDimensions`).
+ */
+export function stillWebpDimensions(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes.length < 30) return null;
+  const tag = (at: number) => String.fromCharCode(bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]);
+  if (tag(0) !== 'RIFF' || tag(8) !== 'WEBP') return null;
+  const chunk = tag(12);
+  const u24 = (at: number) => bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16);
+  if (chunk === 'VP8X') {
+    if ((bytes[20] & 0x02) !== 0) return null; // animated
+    return { width: 1 + u24(24), height: 1 + u24(27) };
+  }
+  if (chunk === 'VP8 ') return { width: (bytes[26] | (bytes[27] << 8)) & 0x3fff, height: (bytes[28] | (bytes[29] << 8)) & 0x3fff };
+  if (chunk === 'VP8L') {
+    const bits = (bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24)) >>> 0;
+    return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  return null;
+}
 
 /** Detect bytes, never an extension or browser-declared MIME. */
 export function detectConvertibleRaster(bytes: Uint8Array): ConvertibleRaster | null {
@@ -270,7 +300,7 @@ export async function prepareAvatarImage(
   file: File,
   encoder: WebpEncoder = (f) => encodeProductRasterAsWebp(f, AVATAR_IMAGE_MAX_EDGE)
 ): Promise<PreparedProductImage> {
-  return prepareProductImage(file, encoder);
+  return prepareProductImage(file, encoder, AVATAR_IMAGE_MAX_EDGE);
 }
 
 /**
@@ -308,15 +338,42 @@ export const UPLOAD_MAX_EDGE: Record<string, number> = {
  */
 export async function prepareUploadImage(file: File, purpose: string): Promise<PreparedProductImage> {
   const edge = UPLOAD_MAX_EDGE[purpose] ?? PRODUCT_IMAGE_MAX_EDGE;
-  return prepareProductImage(file, (f) => encodeProductRasterAsWebp(f, edge));
+  return prepareProductImage(file, (f) => encodeProductRasterAsWebp(f, edge), edge);
 }
 
 function megabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export async function prepareProductImage(file: File, encoder: WebpEncoder = encodeProductRasterAsWebp): Promise<PreparedProductImage> {
-  const signature = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+export async function prepareProductImage(
+  file: File,
+  encoder: WebpEncoder = encodeProductRasterAsWebp,
+  maxEdge: number = PRODUCT_IMAGE_MAX_EDGE
+): Promise<PreparedProductImage> {
+  const signature = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+
+  /**
+   * A STILL WebP LARGER THAN ITS PURPOSE IS REDRAWN SMALLER (owner 2026-10-13).
+   * WebP used to travel untouched at any size — a 4000 px export went up whole
+   * on mobile data and was stored whole. Above the purpose's edge it now goes
+   * through the same canvas ladder as a PNG or a JPEG. A browser that cannot
+   * encode WebP (Safari's canvas) hands back the original file unchanged —
+   * never relabelled — and the server applies its own limit
+   * (worker/lib/imageConvert.ts STORED_MAX_PIXELS). An animated WebP is
+   * never redrawn: one frame is all a canvas keeps.
+   */
+  const webp = stillWebpDimensions(signature);
+  if (webp && Math.max(webp.width, webp.height) > maxEdge && file.size <= PRODUCT_IMAGE_MAX_SOURCE_BYTES) {
+    const result = await encoder(file).catch(() => null);
+    if (result && result.blob !== file && result.blob.type === 'image/webp' && result.blob.size > 0) {
+      return {
+        file: new File([result.blob], webpFilename(file.name), { type: 'image/webp', lastModified: file.lastModified }),
+        converted: true,
+        width: result.width,
+        height: result.height,
+      };
+    }
+  }
 
   // Prefer the optimised result. When the runtime has no WebP encoder, the
   // encoder may safely return PNG/JPEG or the original itself; the 8 MB

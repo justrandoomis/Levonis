@@ -197,6 +197,87 @@ NOT done by the move workflow, because it has to rewrite `settings` rows in the
 same D1 batch. `POST /api/admin/media/migration/apply` does that, one object at
 a time, and already exists.
 
+## Small copies — `variants/` (DECISIONS row 226)
+
+Every public still picture (`.webp`, `.jpg`/`.jpeg`, `.png` under a PUBLIC
+prefix above) has one address for each of its small copies:
+`/files/<original key>?w=<W>`, with `W` from the closed list
+`IMAGE_VARIANT_WIDTHS = [160, 320, 480, 640, 800, 1080, 1280, 1600]`
+(`packages/contracts/src/imageSizing.ts`, the only copy of the list). Any other
+width is a 400; any other query parameter (`q=`, …) is ignored and is in
+neither the cache key nor the storage key. A copy is never wider than its
+original.
+
+**Where a copy lives.** In the PUBLIC bucket (`R2_PUBLIC` on live), under
+
+```
+variants/v1/<original key>/w<W>.avif     (made ahead of time and on demand)
+variants/v1/<original key>/w<W>.webp     (made on demand only)
+variants/v1/<original key>/w<W>.jpg|png  (on demand, for a browser that takes neither AVIF nor WebP)
+variants/v1/<original key>/done          (0 bytes: every AVIF rung exists)
+variants/_state/sweep-v1.json            (the backfill sweep's cursor)
+```
+
+`v1` is `VARIANT_STORE_VERSION` (`worker/lib/variantKeys.ts`). Raising it (a
+quality change, say) makes new copies lazily and the sweep deletes the old
+prefix. Copies are written put-if-absent
+(`onlyIf: { etagDoesNotMatch: '*' }`), so two first requests cannot overwrite
+each other.
+
+**What a copy carries — and what it never does.** `httpMetadata` is
+`{contentType, cacheControl}`; `customMetadata` is exactly
+`{src, src_etag, w, width, height, fmt, q, ver}`. Nothing is copied from the
+original's metadata or from D1: no `source_url`, no `original_name`, no owner or
+uploader id (the cost-privacy rule, DECISIONS row 220).
+
+**Why `variants/` is not a public prefix.** `isAnonymousPublicMediaKey` stays
+false for it, and `GET /files/variants/…` is a 404 before any bucket is read
+(`isVariantStoreKey`, `worker/routes/uploads.ts`). A copy therefore has exactly
+one public address, the `?w=` one: the edge cache, the browser cache and the
+`ETag` (`"<original etag>-w<W>-<fmt>"`) all key on it, nobody can list or
+address copies directly, and a copy can only ever be derived from an original
+that passed the public check first.
+
+**How copies are made — no manual step.**
+
+1. *On first request* (`serveImageVariant`): edge cache → stored copy in R2 →
+   resize through the `IMAGES` binding (AVIF q75 / WebP q75, `fit:
+   'scale-down'`), answer, and store in `waitUntil`. `X-Variant-Source:
+   edge | r2 | render` says which. Any failure (no binding, `9422`, wrong or
+   too-wide output, an original over 20 MB, an animated WebP) serves the
+   original, as before, and stores nothing.
+2. *At upload*: the product door, the generic public purposes, site media
+   (`admin.ts`) and section pictures (`adminTaxonomy.ts`) cut the AVIF rungs up
+   to the original's width in `waitUntil` from the bytes already in memory
+   (`warmImageVariants`, concurrency 2). A failure is logged, never a refused
+   upload.
+3. *For pictures already stored*: `sweepImageVariants` runs inside the existing
+   quarter-hour cron tick (no new cron string, no D1 statement). It lists R2
+   itself — `products/` first, then `UiUx/`, `UIUx/`, `ui/`, `brands/`,
+   `services/`, `merchants/`, `users/`, `link-cards/`, `community/`,
+   `avatars/` — at most 24 transforms, 150 R2 operations and 20 s a tick,
+   pauses 6 h after five failed cuts in a row, and starts a new (cheap) pass
+   7 days after the last one finished.
+
+**Fixed-name pictures** (`UiUx/…` replaced by hand in the R2 dashboard): a
+stored copy records `src_etag`; for a rewritable key the route HEADs the
+original and re-cuts the copy when the etag moved. Minted site-media names
+(`UiUx/MainPage/<slug>-<16 hex>.webp`, written with `immutable`) are now served
+immutable; a hand-uploaded fixed name still revalidates every 5 minutes.
+
+**Deleting.** `deleteMediaObject(env, 'public', key)` deletes the picture's
+`variants/v<n>/<key>/` prefixes too (current and earlier versions), and the
+product orphan sweep does the same; otherwise `?w=` would keep serving a copy
+of a deleted picture. `mediaMigration.ts` and `routes/media.ts` skip
+`variants/` keys.
+
+**New originals are capped** (existing ones are not touched): at most
+2048 × 2048 worth of pixels (4.2 MP) and 3072 px on the long edge on the server
+(`STORED_MAX_PIXELS`/`STORED_MAX_EDGE`, `worker/lib/imageConvert.ts`), and a
+2048 px product edge in the browser (`src/lib/imagePreprocess.ts`). A WebP at
+or under the limit is still stored byte for byte; an animated WebP is never
+re-encoded.
+
 ## Moving `levonis-files-staging` into the two media buckets
 
 Workflow **`38 - Move legacy media into the public/private buckets`**.

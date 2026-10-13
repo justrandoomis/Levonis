@@ -42,6 +42,7 @@ import './adminProducts/theme.css';
 import { useAuth } from '../AuthContext';
 import { COMPLETENESS_UI, tri } from './adminProducts/completeness';
 import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncompleteCard';
+import VariantImg from './ui/VariantImg';
 
 // The rebuilt eight-section form (product-form mandate §1). The previous
 // ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
@@ -1027,7 +1028,7 @@ export default function AdminProducts() {
               <div key={p.id} data-product-id={p.id} className={`${T.surface} overflow-hidden group`}>
                 <div className="aspect-square bg-[var(--ap-surface-3)] relative flex items-center justify-center">
                   {p.image ? (
-                    <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />
+                    <VariantImg sizes="(min-width: 1024px) 220px, 45vw" referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <ImageOff className="w-6 h-6 text-[var(--ap-text-3)]" />
                   )}
@@ -1474,7 +1475,7 @@ function Thumb({ p, size }: { p: ListingItem; size: string }) {
   return (
     <div className={`${T.thumb} ${size} flex items-center justify-center`}>
       {p.image ? (
-        <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />
+        <VariantImg sizes="64px" referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" />
       ) : (
         <ImageOff className="w-4 h-4 text-[var(--ap-text-3)]" />
       )}
@@ -1652,7 +1653,7 @@ function QuickFind({
                   className={`w-full flex items-center gap-3 px-3 h-11 text-start ${i === idx ? 'bg-[var(--ap-surface-3)]' : ''}`}
                 >
                   <span className={`${T.thumb} w-7 h-7 flex items-center justify-center`}>
-                    {p.image ? <img referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" /> : <ImageOff className="w-3 h-3 text-[var(--ap-text-3)]" />}
+                    {p.image ? <VariantImg sizes="32px" referrerPolicy="no-referrer" src={p.image} alt="" className="w-full h-full object-cover" /> : <ImageOff className="w-3 h-3 text-[var(--ap-text-3)]" />}
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-[13px] font-medium truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</span>

@@ -16,6 +16,7 @@ import {
 import { IMAGE_SOURCE_CAP, IMAGE_SOURCE_CAP_MB, productImageToWebp } from '../lib/imageConvert';
 import { currentMediaReferences, hasDedicatedBucket, inventoryLegacyMedia, planLegacyMediaKey } from '../lib/mediaMigration';
 import { newId } from '../lib/crypto';
+import { isVariantStoreKey } from '../lib/variantKeys';
 import {
   cleanupCreatedProductMedia,
   ingestProductMediaBytes,
@@ -349,6 +350,8 @@ mediaRoutes.get('/migration/status', requireAdmin, async (c) => {
   const objects: Array<{ key: string; size: number; visibility: string; copied: boolean }> = [];
   let pendingBytes = 0;
   for (const object of page.objects) {
+    // A small copy (worker/lib/variantKeys.ts) is derived, never migrated.
+    if (isVariantStoreKey(object.key)) continue;
     const plan = planLegacyMediaKey(object.key, true);
     // The destination key is the SOURCE key: `buildMediaKey` deliberately does
     // not encode visibility into the path, so a copy between buckets keeps

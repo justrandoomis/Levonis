@@ -26,6 +26,7 @@ import {
 import ChannelNudge from '../components/notify/ChannelNudge';
 import { IconButton } from '../components/ui/Button';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
+import VariantImg from '../components/ui/VariantImg';
 
 /**
  * Guided, deterministic (non-AI) support assistant + real support tickets.
@@ -468,7 +469,8 @@ function ReplyCard({ card, onNavigate }: { card: AsstCard; onNavigate: (to: stri
   return (
     <div className="lv-surface flex items-start gap-3 p-3">
       {card.image && (
-        <img
+        <VariantImg
+          sizes="48px"
           referrerPolicy="no-referrer"
           src={card.image}
           alt=""

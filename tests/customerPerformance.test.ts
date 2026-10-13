@@ -23,7 +23,7 @@ import { bootRequests, clearPrimedRequests, navigationDataPath, primeGet, takePr
 import { clearPageCache, writePageCache } from '../src/lib/pageCache';
 import Products from '../src/pages/Products';
 import { productImagePreload, injectDocumentPreloads } from '../worker/lib/socialPreview';
-import { PRODUCT_GALLERY_SIZES } from '../packages/contracts/src/imageSizing';
+import { PRODUCT_GALLERY_SIZES } from '../packages/contracts/src/imageSizes';
 import { ROOT } from './fixtures/d1';
 
 const originalFetch = globalThis.fetch;

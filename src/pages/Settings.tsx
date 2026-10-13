@@ -83,6 +83,7 @@ import InstallAppButton from '../components/pwa/InstallAppButton';
 import { Segmented } from '../components/ui/Segmented';
 import { setThemePreference, useTheme, type ThemePreference } from '../lib/theme';
 import ChunkBoundary from '../components/ChunkBoundary';
+import VariantImg from '../components/ui/VariantImg';
 
 /**
  * «الشراء السريع» — its own lazy chunk (docs/GIFTS_QUICK_BUY.md §3.5): the
@@ -1023,7 +1024,8 @@ export default function Settings() {
                 to="/edit-profile"
                 className="flex items-center gap-3 px-4 py-4 hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus transition-colors"
               >
-                <img
+                <VariantImg
+                  sizes="48px"
                   referrerPolicy="no-referrer"
                   src={avatarUrl}
                   alt=""

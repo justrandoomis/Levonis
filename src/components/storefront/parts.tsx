@@ -14,6 +14,7 @@ import type { ProfileWidget } from '../../lib/merchant';
 import { safeExternalUrl, type LinkTarget } from '../../../packages/storeLayout/src/refs';
 import { pickText, type LocalizedText } from '../../../packages/storeLayout/src/text';
 import type { BlockData } from '../../../packages/storeLayout/src/data';
+import { variantSrcSet } from '../../../packages/contracts/src/imageSizing';
 import { useSavedIds, useStorefrontRuntime } from './runtime';
 import { useStoreTheme } from './StoreTheme';
 import { gridClasses } from './theme';
@@ -114,19 +115,23 @@ export function Column({ children, className = '' }: { children: ReactNode; clas
 // ----------------------------------------------------------------- products
 
 /**
- * The server's sized variants of a `/files/` still picture (`?w=`,
- * worker/lib/imageConvert.ts IMAGE_VARIANT_WIDTHS) — the same five widths
- * `ui/SafeImage` names, repeated here rather than imported because a store
- * visit must not carry that component's icons and strings for one line
- * (tests/storefrontBlocks.test.ts allow-list; tests/imageVariants.test.ts
- * pins the two lists equal). Anything that is not such a picture — an
- * external URL, a GIF, a URL with its own query — gets no srcset.
+ * THE STORE'S PICTURES ARE SMALL COPIES (owner 2026-10-13). `storeImgProps`
+ * gives a block's `<img>` the same `src` it always had plus the `srcset` of
+ * the server's copies (`?w=`, packages/contracts/src/imageSizing.ts — the one
+ * list the Worker and every page share; a pure module with no imports, so a
+ * store visit carries nothing else for it) and the `sizes` the block knows
+ * it is drawn at. A function, not a component: no wrapper, no React cost.
+ * Anything that is not a `/files/` still picture — a GIF, a video poster, an
+ * external URL — keeps its own file.
  */
-const VARIANT_WIDTHS = [160, 320, 480, 640, 1080] as const;
-// A store's pictures are the relative `/files/<key>` the upload answered with.
-function variantSrcSet(src: string): string | undefined {
-  return /^\/files\/[^?#]+\.(?:webp|jpe?g|png)$/i.test(src) ? VARIANT_WIDTHS.map((w) => `${src}?w=${w} ${w}w`).join(', ') : undefined;
+export function storeImgProps(src: string | null | undefined, sizes: string): { src: string | undefined; srcSet: string | undefined; sizes: string | undefined } {
+  const srcSet = src ? variantSrcSet(src) : undefined;
+  return { src: src || undefined, srcSet, sizes: srcSet && sizes };
 }
+
+/** A store tile: 2 or 3 across on a phone and up to 5 across on a wide theme (theme.ts gridClasses). */
+export const STORE_TILE_SIZES = '(min-width: 1024px) 20vw, (min-width: 640px) 25vw, 50vw';
+export { STORE_HERO_SIZES, STORE_GALLERY_SIZES } from '../../../packages/contracts/src/imageSizing';
 
 export function ProductCard({ product, storeOpen, legacyLink = false }: { product: CardProduct; storeOpen: boolean; legacyLink?: boolean }) {
   const { loc, lang } = useLanguage();
@@ -163,12 +168,11 @@ export function ProductCard({ product, storeOpen, legacyLink = false }: { produc
           // wide theme (theme.ts gridClasses); the srcset lets the browser
           // take the 320/640 px cut instead of the stored original.
           <img
-            src={image}
-            srcSet={variantSrcSet(image)}
-            sizes="(min-width: 1024px) 20vw, (min-width: 640px) 25vw, 50vw"
+            {...storeImgProps(image, STORE_TILE_SIZES)}
             alt={name}
             className="w-full h-full object-cover"
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

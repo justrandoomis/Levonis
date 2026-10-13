@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { StatusChip } from '../ui/Badge';
+import VariantImg from '../ui/VariantImg';
 
 /**
  * Product-page review section (mandate §5): submit + public list.
@@ -714,7 +715,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
                     />
                   ) : (
                     <a key={m.url} href={m.url} target="_blank" rel="noreferrer" className="shrink-0">
-                      <img src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-border-subtle" />
+                      <VariantImg sizes="96px" src={m.url} alt="" loading="lazy" className="h-24 w-24 object-cover rounded-lg border border-border-subtle" />
                     </a>
                   )
                 )}

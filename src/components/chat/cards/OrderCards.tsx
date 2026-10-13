@@ -21,6 +21,7 @@ import { useConfirm } from '../../ui/ConfirmDialog';
 import { useCardActions } from './cardContext';
 import { daysText, statusText } from './cardWords';
 import { CardActions, CardButton, CardKicker, CardShell, StatusLine, toneOf } from './parts';
+import VariantImg from '../../ui/VariantImg';
 
 interface Props {
   card: ChatCard;
@@ -80,7 +81,7 @@ export function StoreOrderCardView({ card, mine }: Props) {
     <CardShell mine={mine} kind="order" label={loc(`طلب ${orderId}`, `Order ${orderId}`)}>
       <div className="p-3 flex gap-3">
         {typeof s.image === 'string' && s.image && (
-          <img referrerPolicy="no-referrer" src={s.image} alt="" loading="lazy" className="w-14 h-14 rounded-lg object-cover bg-surface-raised shrink-0" />
+          <VariantImg sizes="56px" referrerPolicy="no-referrer" src={s.image} alt="" loading="lazy" className="w-14 h-14 rounded-lg object-cover bg-surface-raised shrink-0" />
         )}
         <div className="min-w-0 flex-1 flex flex-col gap-1.5">
           <CardKicker icon={Receipt}>{loc('طلب من المتجر', 'Store order')}</CardKicker>

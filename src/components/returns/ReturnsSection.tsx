@@ -5,6 +5,7 @@ import { useLanguage } from '../../LanguageContext';
 import { asLang, daysLeftLabel, formatDate } from '../orders/format';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { useMoney } from '../../CurrencyContext';
+import VariantImg from '../ui/VariantImg';
 
 /**
  * Returns section for ONE order (final-phase §6.2) — wired into the Orders
@@ -486,7 +487,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3">
                         {it.image ? (
-                          <img referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-border-subtle shrink-0" />
+                          <VariantImg sizes="36px" referrerPolicy="no-referrer" src={it.image} alt="" className="w-9 h-9 rounded object-cover border border-border-subtle shrink-0" />
                         ) : (
                           <div className="w-9 h-9 rounded bg-surface-selected shrink-0" />
                         )}

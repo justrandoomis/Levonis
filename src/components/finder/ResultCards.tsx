@@ -88,7 +88,7 @@ export function ResultHero({ result, lang, saved, saveBusy, onSave }: ResultCard
       className="lv-surface overflow-hidden shadow-2"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-charcoal">
-        <SafeImage
+        <SafeImage sizes="(min-width: 1024px) 480px, 100vw"
           src={image}
           alt=""
           aspect="auto"
@@ -161,7 +161,7 @@ export function ResultRow({ result, lang, saved, saveBusy, onSave }: ResultCardP
     >
       <div className="flex gap-3.5">
         <div className="relative size-[92px] shrink-0 overflow-hidden rounded-md bg-charcoal">
-          <SafeImage src={image} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_10%]" />
+          <SafeImage sizes="92px" src={image} alt="" aspect="auto" className="h-full w-full" bgClassName="bg-charcoal" fallbackClassName="text-snow/35" imgClassName="object-[50%_10%]" />
           <span
             aria-hidden="true"
             className="absolute end-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-ivory text-[12px] font-extrabold tabular-nums text-ink"

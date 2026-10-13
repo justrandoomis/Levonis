@@ -419,10 +419,10 @@ export default function QuickBuyOrderCard() {
               <li key={item.id} className={`flex gap-3 py-3 ${busyRow ? 'opacity-50' : ''}`} data-quick-buy-item={item.id}>
                 {href ? (
                   <Link to={href} tabIndex={-1} aria-hidden="true" className="shrink-0">
-                    <SafeImage src={item.image} alt="" className="h-16 w-16 rounded-lg" fit="contain" />
+                    <SafeImage sizes="64px" src={item.image} alt="" className="h-16 w-16 rounded-lg" fit="contain" />
                   </Link>
                 ) : (
-                  <SafeImage src={item.image} alt="" className="h-16 w-16 shrink-0 rounded-lg" fit="contain" />
+                  <SafeImage sizes="64px" src={item.image} alt="" className="h-16 w-16 shrink-0 rounded-lg" fit="contain" />
                 )}
                 <div className="min-w-0 flex-1">
                   {/* The name and the line's total on one line, the way a bag

@@ -198,7 +198,7 @@ export default function OrderCard({
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex shrink-0" aria-hidden="true">
               {stack.map((it, i) => (
-                <SafeImage
+                <SafeImage sizes="48px"
                   key={it.id}
                   src={it.image}
                   alt=""

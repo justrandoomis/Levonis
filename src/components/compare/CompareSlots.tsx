@@ -84,7 +84,7 @@ export default function CompareSlots({
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: tone.color }}
               />
-              <SafeImage
+              <SafeImage sizes="40px"
                 src={product.image}
                 alt=""
                 aspect="square"

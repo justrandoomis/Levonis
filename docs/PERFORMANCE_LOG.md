@@ -1739,3 +1739,80 @@ Paint: nothing in kind — no element blurs what is behind it (the operations sh
 last, held by `tests/claySystem.test.ts` item 5 now walking the three operations sheets), a card nested in a
 card, a dialog or a sheet stays flush, and the admin orders board is one tray per day with flat rows instead of
 a card per order. The scroll trace on a ×4-throttled 360 × 800 phone (plan §8) is still owed.
+
+## 2026-10-13 — Images R2: small copies kept in R2, the right size everywhere (DECISIONS row 226)
+
+Owner request: «أريد تحويل الصور كلها وضغطها بتكون بحجم صغير وليس بحجمها الأصلي الكبير».
+Layout and rules of the stored copies: `docs/MEDIA_STORAGE.md` «Small copies — `variants/`».
+
+### What was wrong (read-only public GETs of the live site, 2026-10-13)
+
+- A small copy (`/files/<key>?w=`) lived only in one data centre's `caches.default`, so every
+  cold data centre resized it again: time to first byte 0.85–2.34 s, against 0.20–0.27 s for
+  the original.
+- `CropPhoto` (category hero, row banners, related categories) and most `<img>`/`SafeImage`
+  sites downloaded the stored original — a 1254² photo into a 192–495 px box; 814 of the
+  1,350 KB of phone image bytes on the six pages below.
+- The ladder jumped 640 → 1080, so a 700 px desktop promo or a 558 px product photo took 1080.
+- Stored originals had no pixel limit.
+
+### Quality (luma SSIM, Gaussian 11×11 σ 1.5, against a lanczos3 resize of the original; 24 live copies)
+
+| Encoding at the same widths | Bytes | vs live | Mean SSIM |
+|---|--:|--:|--:|
+| live `IMAGES` AVIF q75 (today, kept) | 656,545 | 1.00 | 0.9777 |
+| sharp WebP q75 | 579,248 | 0.88 | 0.9775 |
+| sharp WebP q80 | 695,916 | 1.06 | 0.9819 |
+| sharp AVIF q50 / q55 / q60 | 378,453 / 437,854 / 522,294 | 0.58 / 0.67 / 0.80 | 0.9755 / 0.9787 / 0.9826 |
+
+The binding's WebP is ≈ 1.14× sharp's at the same quality, so its WebP q75 and AVIF q75
+cost the same bytes at today's grade: AVIF q75 stays, WebP drops from q85 to q75 (≈ −30 %
+for browsers without AVIF). A lower AVIF setting needs billed live transforms to judge —
+not done here.
+
+### Image bytes per page — local lab, before (`f7f44ca2`) and after, same server
+
+Method: both local builds served by one lab server (`scratchpad/images-perf/scripts/server-build.mjs`):
+the build's own `index.html` (no Worker preload injection, so both builds equally), API answers
+from fixtures of live public GETs, `/files/<key>` the live stored original, and every `?w=W`
+copy cut by the same stand-in encoder (sharp, width `min(W, original)`, WebP q75 — the live
+binding's AVIF q75 is ≈ 1.13× these bytes, the same for both columns). Playwright Chromium,
+phone 390×844 at DPR 3, desktop 1280×800 at DPR 1, page loaded then scrolled to the end;
+bytes are every distinct `/files/` response.
+
+| Page | Phone before | Phone after | Desktop before | Desktop after | What moved |
+|---|--:|--:|--:|--:|---|
+| `/` | 162,112 B | **140,084 B** (−14 %) | 218,182 B | **184,140 B** (−16 %) | desktop promo photos 1080 → 800; on the phone a tile reuses the hero's copy already in cache |
+| `/products` | 189,098 | 189,098 | 72,216 | 72,216 | already right-sized |
+| `/product/esun-pla-plus` | 49,280 | 49,280 | 19,372 | 19,372 | the original is small: the srcset now stops at its own width (480) instead of asking for a "1080" that is the same file |
+| `/product/bambu-lab-round-magnet` | 83,068 | 83,068 | 73,654 | **51,548** (−30 %) | `productGallerySizes(aspect)`: the 558 px photo takes 800, not 1080 |
+| `/categories` | 524,150 | **160,770** (−69 %) | 524,150 | **116,516** (−78 %) | `CropPhoto` originals → 800 (phone) / 640 (desktop) |
+| `/categories/printing-materials` | 342,932 | **123,318** (−64 %) | 321,470 | **65,660** (−80 %) | same |
+| **All six** | **1,350,640** | **745,618 (−45 %)** | **1,229,044** | **509,452 (−59 %)** | |
+
+Not in the table: the store pages and `/community` (closed live), and the ~140 other sites
+(cart, account, chat cards, compare, community feed, back office) that downloaded originals
+and now take thumbnail rungs — a 512 px avatar drawn at 32 px becomes a 160 px copy.
+
+### Latency (what the change removes; to be confirmed live)
+
+Every copy cut once is kept in R2 and read from there by every data centre afterwards
+(`X-Variant-Source: r2`), at about the original's first-byte time instead of a fresh resize
+(0.85–2.34 s). The AVIF rungs of a new upload are cut in `waitUntil` at upload; pictures
+already stored are cut by the quarter-hour sweep (≤ 24 transforms a tick, ≈ 1,800 once,
+inside a day). Only a WebP copy nobody asked for before pays one resize, once in its life.
+Live checks after deploy: `?w=640` twice from two data centres (`render` once, then `r2`/`edge`),
+`GET /files/variants/v1/…` → 404, `/categories` HTML with `?w=800` in the `CropPhoto` srcset,
+and `image_variant_failed` / sweep pauses in the Workers logs.
+
+### Bytes of code (gzip −9, the gate's method; `vite build`, tests/bundleBudget.test.ts green, no budget raised)
+
+| | before (`f7f44ca2`, built locally) | after | gate |
+|---|--:|--:|--:|
+| entry chunk | 65,425 B | 65,904 B (+479 B: the one width list and the srcset builder) | 72 KB |
+| initial payload | 184,858 B | 185,337 B | 200 KB |
+| storefront app payload | 238,931 B | 239,436 B; headroom 180 B | 234 KB = 239,616 B, **not raised** |
+| merchant workspace shell closure | 32,751 B | 32,751 B (the shell's logo keeps its plain `<img>`) | 32 KB = 32,768 B, **not raised** |
+| CSS (11 files) | 62,708 B | 62,708 B | — |
+
+The storefront's last 180 bytes are now spoken for: the next storefront change needs funding first.

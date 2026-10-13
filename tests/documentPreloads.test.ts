@@ -40,8 +40,11 @@ import {
   preloadImagePath,
   productImagePreload,
   routeModuleFor,
+  storeImagePreload,
   type ViteManifest,
 } from '../worker/lib/socialPreview';
+import { STORE_GALLERY_SIZES, STORE_HERO_SIZES, variantSrcSet } from '../packages/contracts/src/imageSizing';
+import { productGallerySizes } from '../packages/contracts/src/imageSizes';
 import { DOCUMENT_CACHE_CONTROL } from '../worker/lib/securityPolicy';
 import { ARABIC_FONT_PRELOAD as SCRIPT_FONT, earlyHintsLink as scriptEarlyHintsLink, entryStylesheets as scriptEntryStylesheets, withEarlyHints } from '../scripts/write-asset-headers.mjs';
 import { HOME_PATH, RESOLVE_PATH, bootRequests } from '../src/lib/bootFetch';
@@ -309,8 +312,10 @@ test("a store's home carries its chunk, its cover, the anonymous resolve answer,
   // The route's chunk and what it shares with other lazy pages, not the entry's.
   assert.deepEqual(links(html, 'modulepreload'), ['/assets/vendor-react-r1.js', '/assets/Storefront-s1.js', '/assets/vendor-icons-i1.js', '/assets/theme-t1.js']);
   assert.ok(html.includes('<link rel="preload" as="style" crossorigin href="/assets/Storefront-s1.css">'));
-  // The cover, as the page will ask for it.
-  assert.ok(html.includes('<link rel="preload" as="image" fetchpriority="high" href="/files/merchants/owner/covers/cover.webp">'));
+  // The cover, as the page will ask for it: the same small copies and `sizes` as
+  // storefront/blocks/Hero.tsx renders (STORE_HERO_SIZES, 2026-10-13).
+  const cover = '/files/merchants/owner/covers/cover.webp';
+  assert.ok(html.includes(`<link rel="preload" as="image" fetchpriority="high" href="${cover}" imagesrcset="${variantSrcSet(cover)}" imagesizes="${STORE_HERO_SIZES}">`));
   // The anonymous resolve answer: the same shape the route gives a visitor with no session.
   const data = inline(html);
   assert.ok(data, 'no data block');
@@ -380,8 +385,9 @@ test("the platform's product page carries its chunk, its lead image and the apex
   const pHtml = await p.text();
   assert.equal((inline(pHtml)!.store as { slug: string }).slug, 'ali3d');
   assert.ok(pHtml.includes('href="/assets/StorefrontProduct-sp1.js"'));
-  assert.ok(pHtml.includes('as="image" fetchpriority="high" href="/files/merchants/owner/public/aaaa1111.webp"'));
-  assert.doesNotMatch(pHtml, /imagesrcset=|imagesizes=/, 'the merchant gallery still requests its original image; no variant may preload ahead of it');
+  // The store product's lead picture: the copies catalog/ProductGallery.tsx renders, with its sizes (2026-10-13).
+  const storeLead = '/files/merchants/owner/public/aaaa1111.webp';
+  assert.ok(pHtml.includes(`as="image" fetchpriority="high" href="${storeLead}" imagesrcset="${variantSrcSet(storeLead)}" imagesizes="${STORE_GALLERY_SIZES}"`));
   const communityOnProduct = await (await call(APEX, '/product/ali3d-bracket')).text();
   assert.match(communityOnProduct, /as="image" fetchpriority="high" href="\/files\/merchants\/owner\/public\/aaaa1111\.webp"/,
     'absent catalogue metadata preserves the existing community-on-product route');
@@ -418,6 +424,38 @@ test('an identical light override keeps the unambiguous responsive preload', asy
   const html = await (await call(APEX, '/product/filament-pla')).text();
   const responsive = productImagePreload(lead);
   assert.ok(html.includes(`href="${lead}" imagesrcset="${responsive.imageSrcSet}" imagesizes="${responsive.imageSizes}"`));
+});
+
+test('a lead with a stored size preloads the trimmed copies and the drawn width — what Product.tsx renders from the same row', async () => {
+  const { call, raw } = realWorker();
+  raw.prepare('UPDATE product_images SET width = 1254, height = 1254 WHERE id = ?').run('pi1');
+  const lead = '/files/products/filament-pla/main.webp';
+  const html = await (await call(APEX, '/product/filament-pla')).text();
+  const srcset = variantSrcSet(lead, { width: 1254 })!;
+  assert.ok(srcset.endsWith('?w=1280 1254w'), 'stops at the stored size');
+  assert.ok(html.includes(`href="${lead}" imagesrcset="${srcset}" imagesizes="${productGallerySizes(1)}"`));
+  assert.deepEqual(productImagePreload(lead, { width: 1254, height: 1254 }), { imageSrcSet: srcset, imageSizes: productGallerySizes(1) });
+  // Product.tsx's lead picture names the same pair from the media row.
+  const page = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  assert.match(page, /sizes=\{productGallerySizes\(mediaAspect\(activeMedia\)\)\}\s*naturalWidth=\{activeMedia\?\.width\}/);
+  // And each store page renders the pair its preload names.
+  assert.match(readFileSync(join(ROOT, 'src/components/storefront/blocks/Hero.tsx'), 'utf8'), /storeImgProps\(cover, STORE_HERO_SIZES\)/);
+  assert.match(readFileSync(join(ROOT, 'src/components/storefront/blocks/HeroVariants.tsx'), 'utf8'), /storeImgProps\(cover, STORE_HERO_SIZES\)/);
+  assert.match(readFileSync(join(ROOT, 'src/components/catalog/ProductGallery.tsx'), 'utf8'), /storeImgProps\(current\.url, STORE_GALLERY_SIZES\)/);
+});
+
+test('every image preload of a public /files/ still picture carries its srcset; a private or animated one is left alone', () => {
+  for (const kind of ['hero', 'gallery'] as const) {
+    assert.deepEqual(storeImagePreload('/files/merchants/owner/public/a.gif', kind), {});
+    assert.deepEqual(storeImagePreload('/files/chat/c1/attachments/a.webp', kind), {});
+    assert.ok(storeImagePreload('/files/merchants/owner/covers/a.webp', kind).imageSrcSet);
+  }
+  assert.deepEqual(productImagePreload('/files/products/a.webp?token=x', { width: 1, height: 1 }), {});
+  // The worker passes the media row and the store kinds through (worker/index.ts).
+  const index = readFileSync(join(ROOT, 'worker/index.ts'), 'utf8');
+  assert.match(index, /productImagePreload\(image, product\?\.preloadMedia\)/);
+  assert.match(index, /storeImagePreload\(image, 'gallery'\)/);
+  assert.match(index, /storeImagePreload\(image, 'hero'\)/);
 });
 
 test('a bound gallery omits a speculative hero for both empty and automatic opening selections', async () => {

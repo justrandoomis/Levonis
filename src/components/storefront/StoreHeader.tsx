@@ -26,7 +26,7 @@ import type { FooterLink, FooterVariant, HeaderVariant, StoreHeader as StoreHead
 import { pickText } from '../../../packages/storeLayout/src/text';
 import { useStorefrontRuntime } from './runtime';
 import { useStoreTheme } from './StoreTheme';
-import { Column, hasLink, LinkTo, sinceLine, useText } from './parts';
+import { Column, hasLink, LinkTo, sinceLine, storeImgProps, useText } from './parts';
 import { storefrontStrings } from './strings';
 import type { StorefrontStore } from './types';
 
@@ -56,7 +56,7 @@ export function StoreHeader({
             </div>
             <div className={`w-8 h-8 rounded-full sf-bg border ${accent.ring} overflow-hidden flex items-center justify-center shrink-0`}>
               {store.logoUrl ? (
-                <img src={store.logoUrl} alt="" className="w-full h-full object-cover" />
+                <img {...storeImgProps(store.logoUrl, '32px')} alt="" className="w-full h-full object-cover" decoding="async" />
               ) : (
                 <Store className="w-4 h-4 text-gold" strokeWidth={1.5} aria-hidden="true" />
               )}

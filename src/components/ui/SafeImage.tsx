@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ImageOff, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { IMAGE_VARIANT_WIDTHS, variantSrcSet } from '../../../packages/contracts/src/imageSizing';
 
 /**
  * Image with a reserved box so nothing jumps (no CLS), lazy loading by
@@ -17,29 +18,21 @@ const STRINGS = {
 } as const;
 
 /**
- * THE WIDTHS THE SERVER WILL CUT — `GET /files/<key>?w=` answers exactly
- * these (worker/lib/imageConvert.ts IMAGE_VARIANT_WIDTHS; the two lists are
- * pinned equal by tests/imageVariants.test.ts). A card that says how wide it
- * is (`sizes`) lets the browser pick the smallest that covers its pixels,
- * in the format it decodes best (AVIF/WebP by `Accept`), instead of the
- * 3000 px file the camera produced.
+ * THE SERVER'S SMALL COPIES (`GET /files/<key>?w=`, kept in R2 once cut —
+ * worker/lib/imageVariants.ts). The widths and the srcset builder live in
+ * packages/contracts/src/imageSizing.ts, the one list the Worker, the
+ * storefront and the document preloads share; they are re-exported here for
+ * the pages that already import them from SafeImage.
  */
-export const IMAGE_VARIANT_WIDTHS = [160, 320, 480, 640, 1080] as const;
-
-/** A same-origin `/files/` still picture with no query of its own — the only source a variant can be cut from. */
-const VARIANT_SOURCE = /^(?:https?:\/\/[^/?#]+)?\/files\/[^?#]+\.(?:webp|jpe?g|png)$/i;
+export { IMAGE_VARIANT_WIDTHS, variantSrcSet };
 
 /**
- * The `srcset` for a `/files/` picture, or undefined when the source is
- * anything else (an external URL, a GIF, a data URI, a URL that already
- * carries a query) — those pass through exactly as before. `src` stays the
- * original: it is the fallback candidate and the address every other reader
- * (the document's image preload, the compare tray) still names.
+ * A lazy picture whose caller did not say how wide it is drawn: Chrome measures
+ * the laid-out box (`auto`, which is only allowed with `loading="lazy"`); every
+ * other browser takes half the viewport, which is still far smaller than an
+ * original.
  */
-export function variantSrcSet(src: string): string | undefined {
-  if (!VARIANT_SOURCE.test(src)) return undefined;
-  return IMAGE_VARIANT_WIDTHS.map((w) => `${src}?w=${w} ${w}w`).join(', ');
-}
+export const LAZY_AUTO_SIZES = 'auto, 50vw';
 
 export default function SafeImage({
   src,
@@ -54,6 +47,7 @@ export default function SafeImage({
   fallbackIconClassName = 'w-6 h-6',
   referrerPolicy = 'no-referrer',
   sizes,
+  naturalWidth,
   onStatus,
 }: {
   src?: string | null;
@@ -71,14 +65,21 @@ export default function SafeImage({
   referrerPolicy?: React.HTMLAttributeReferrerPolicy;
   /**
    * How wide this picture is drawn, in the `sizes` grammar (`(min-width:
-   * 1024px) 20vw, 50vw`). Given, AND when `src` is a `/files/` still image,
-   * the element carries a `srcset` of the server's sized variants and the
-   * browser downloads the smallest that covers the slot. Opt-in on purpose:
-   * a full-bleed hero the document already preloads at its original address
-   * (worker/lib/socialPreview.ts) must keep requesting that address, or the
-   * preload becomes a second download.
+   * 1024px) 20vw, 50vw`, or a preset of IMAGE_SIZES). When `src` is a
+   * `/files/` still picture the element ALWAYS carries a `srcset` of the
+   * server's small copies (owner 2026-10-13) and the browser downloads the
+   * smallest that covers the slot. A lazy picture without `sizes` gets
+   * `LAZY_AUTO_SIZES`; an EAGER one must say its size — it is the page's
+   * largest paint, and its document preload (worker/lib/socialPreview.ts)
+   * names the same srcset and sizes (tests/imageRenderSites.test.ts).
    */
   sizes?: string;
+  /**
+   * The stored original's width (media JSON `width`): the srcset stops at the
+   * original's own size, so no two candidates name the same file. (The box is
+   * reserved by the wrapper, so no width/height attributes are needed.)
+   */
+  naturalWidth?: number | null;
   /**
    * Told whenever this image settles, so a PARENT can act on the fact that a
    * picture is broken. The admin image grid uses it to notice that the primary
@@ -128,7 +129,8 @@ export default function SafeImage({
 
   const aspectCls = aspect === 'square' ? 'aspect-square' : aspect === 'video' ? 'aspect-video' : '';
   const showFallback = !cleanSrc || status === 'error';
-  const srcSet = sizes && cleanSrc ? variantSrcSet(cleanSrc) : undefined;
+  const srcSet = cleanSrc ? variantSrcSet(cleanSrc, { width: naturalWidth }) : undefined;
+  const shownSizes = srcSet ? sizes || (eager ? undefined : LAZY_AUTO_SIZES) : undefined;
   /**
    * NO FADE ON AN EAGER PICTURE. The 300 ms opacity ramp is a courtesy for a
    * lazy card scrolling into view; on the above-the-fold picture it is 300 ms
@@ -146,8 +148,8 @@ export default function SafeImage({
           key={`${cleanSrc}#${attempt}`}
           ref={imgRef}
           src={cleanSrc}
-          srcSet={srcSet}
-          sizes={srcSet ? sizes : undefined}
+          srcSet={shownSizes && srcSet}
+          sizes={shownSizes}
           alt={alt}
           referrerPolicy={referrerPolicy}
           loading={eager ? 'eager' : 'lazy'}

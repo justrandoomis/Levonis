@@ -14,6 +14,7 @@ import {
   type TrayItem,
 } from '../../lib/compareTray';
 import { traySubline, trayTitle } from './trayStrings';
+import VariantImg from '../ui/VariantImg';
 
 /**
  * THE COMPARE TRAY (docs/ux/CATALOG_DISCOVERY.md §10.4, mockup 03a).
@@ -242,7 +243,8 @@ function Thumb({ item, size }: { item: TrayItem; size: 'sm' | 'md' }) {
   return (
     <span className={`relative block shrink-0 overflow-hidden bg-charcoal ${box}`} title={size === 'md' ? item.name : undefined}>
       {item.image ? (
-        <img
+        <VariantImg
+          sizes="96px"
           src={item.image}
           alt={size === 'md' ? item.name : ''}
           loading="lazy"

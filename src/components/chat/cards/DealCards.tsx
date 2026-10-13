@@ -24,6 +24,7 @@ import { useCardActions } from './cardContext';
 import { daysText, deliveryText, statusText } from './cardWords';
 import { CardActions, CardButton, CardKicker, CardShell, Fact, StatusLine, shortDate, toneOf } from './parts';
 import { useAddToCart } from './useAddToCart';
+import VariantImg from '../../ui/VariantImg';
 
 interface Props {
   card: ChatCard;
@@ -310,7 +311,7 @@ export function CustomProductCardView({ card, mine }: Props) {
   return (
     <CardShell mine={mine} kind="custom_product" label={loc(`منتج خاص: ${name}`, `Private product: ${name}`)}>
       {typeof s.image === 'string' && s.image ? (
-        <img referrerPolicy="no-referrer" src={s.image} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover bg-surface-raised" />
+        <VariantImg sizes="320px" referrerPolicy="no-referrer" src={s.image} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover bg-surface-raised" />
       ) : (
         <div className="aspect-[4/3] w-full bg-surface-raised flex items-center justify-center">
           <ImageIcon className="w-7 h-7 text-text-muted" strokeWidth={1.5} aria-hidden="true" />

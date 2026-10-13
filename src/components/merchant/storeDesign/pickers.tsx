@@ -40,6 +40,7 @@ import {
   tooHeavyText,
   type LibraryItem,
 } from './MediaLibrary';
+import VariantImg from '../../ui/VariantImg';
 
 // ------------------------------------------------------------ ref names
 
@@ -286,7 +287,7 @@ export function RefPicker({
                   >
                     {kind === 'product' && (
                       <span className="size-10 shrink-0 overflow-hidden rounded-sm bg-surface-raised">
-                        {it.image ? <img src={it.image} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
+                        {it.image ? <VariantImg sizes="40px" src={it.image} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
                       </span>
                     )}
                     <span className="min-w-0 flex-1">
@@ -335,7 +336,7 @@ export function MediaThumb({ value, kind, className = '', onDuration }: { value:
       onLoadedMetadata={onDuration ? (e) => onDuration(e.currentTarget.duration) : undefined}
     />
   ) : (
-    <img src={src} alt="" className={`block object-cover ${className}`} loading="lazy" />
+    <VariantImg sizes="(min-width: 640px) 160px, 33vw" src={src} alt="" className={`block object-cover ${className}`} loading="lazy" />
   );
 }
 

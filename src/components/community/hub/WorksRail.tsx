@@ -51,7 +51,7 @@ export default function WorksRail() {
             data-community-work={w.id}
             className="group w-[148px] shrink-0 snap-start focus-visible:outline-none sm:w-[168px]"
           >
-            <SafeImage
+            <SafeImage sizes="(min-width: 640px) 168px, 148px"
               src={w.imageUrl}
               alt=""
               aspect="auto"

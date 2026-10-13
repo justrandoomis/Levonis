@@ -200,7 +200,7 @@ export function CandidateGrid({
             onClick={() => (card.options?.length ? setAsking(card) : onPick(card, null))}
             className="lv-choice flex w-full items-center gap-3 p-2 text-start"
           >
-            <SafeImage
+            <SafeImage sizes="48px"
               src={card.image}
               alt=""
               aspect="square"

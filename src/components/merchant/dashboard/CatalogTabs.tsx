@@ -23,6 +23,7 @@ import { useConfirm } from '../../ui/ConfirmDialog';
 import { useToast } from '../../ui/Toast';
 import { merchantRefusal } from '../shell/refusal';
 import { ErrorState } from '../../ui/AsyncStates';
+import VariantImg from '../../ui/VariantImg';
 
 // ---------------------------------------------------------------- sections
 
@@ -131,7 +132,7 @@ export function ServicesTab({ canSell }: { canSell: boolean }) {
           <div className="flex gap-3">
             <div className="w-12 h-12 rounded-md lv-well overflow-hidden shrink-0 flex items-center justify-center">
               {s.imageUrl ? (
-                <img src={s.imageUrl} alt="" className="w-full h-full object-cover" />
+                <VariantImg sizes="48px" src={s.imageUrl} alt="" className="w-full h-full object-cover" />
               ) : (
                 <Hammer className="w-4 h-4 text-text-muted" />
               )}
@@ -459,7 +460,7 @@ export function ShowcaseTab() {
               {group.map((it) => (
                 <div key={it.id} className="lv-surface overflow-hidden">
                   <div className="aspect-[3/2] bg-surface-raised">
-                    {it.imageUrl && <img src={it.imageUrl} alt="" className="w-full h-full object-cover" />}
+                    {it.imageUrl && <VariantImg sizes="(min-width: 1024px) 280px, 50vw" src={it.imageUrl} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <div className="p-2">
                     <p className="text-text-primary text-[12px] font-semibold truncate">{it.title}</p>

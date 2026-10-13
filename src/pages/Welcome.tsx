@@ -9,6 +9,7 @@ import { sanitizeNextPath } from '../components/auth/nextPath';
 import UsernameField, { type UsernameState } from '../components/onboarding/UsernameField';
 import { onboardingStrings } from '../components/onboarding/strings';
 import { COUNTRIES, countryNames, flagOf, COMMON_ISO } from '../components/auth/PhoneField';
+import VariantImg from '../components/ui/VariantImg';
 
 /**
  * Account setup, in short steps that can all be skipped.
@@ -181,7 +182,7 @@ export default function Welcome() {
         <div className="mt-5 flex items-center gap-4">
           <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-subtle bg-surface-raised text-[22px] font-bold text-gold">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              <VariantImg sizes="80px" src={avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               initials
             )}

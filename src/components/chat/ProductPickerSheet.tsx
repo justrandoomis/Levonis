@@ -14,6 +14,7 @@ import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
 import { api } from '../../lib/api';
 import { productName, type PickerProduct } from '../../lib/chatCards';
+import VariantImg from '../ui/VariantImg';
 
 export default function ProductPickerSheet({
   open,
@@ -126,7 +127,7 @@ export default function ProductPickerSheet({
             >
               <span className="w-14 h-14 shrink-0 overflow-hidden rounded-lg bg-surface-raised flex items-center justify-center">
                 {p.image ? (
-                  <img referrerPolicy="no-referrer" src={p.image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  <VariantImg sizes="56px" referrerPolicy="no-referrer" src={p.image} alt="" loading="lazy" className="w-full h-full object-cover" />
                 ) : (
                   <ShoppingBag className="w-5 h-5 text-text-muted" strokeWidth={1.5} aria-hidden="true" />
                 )}

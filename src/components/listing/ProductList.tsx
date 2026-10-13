@@ -9,6 +9,7 @@ import { useTheme } from '../../lib/theme';
 import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
 import type { ApiProduct } from '../../lib/api';
 import '../../styles/catalog.css';
+import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 
 /**
  * The list view (§7 item 4): one 96 px photograph per row beside the name,
@@ -38,7 +39,7 @@ export default function ProductList({ products }: { products: ApiProduct[] }) {
               className={`group relative flex min-w-0 gap-3 rounded-xl border border-border-subtle bg-surface p-2.5 transition-colors hover:bg-surface-raised has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-focus ${i >= 10 ? 'lv-cv-row' : ''}`}
             >
               <div className={`relative size-24 shrink-0 overflow-hidden rounded-sm ${lightShown ? 'bg-surface-selected' : 'bg-charcoal'}`}>
-                <SafeImage
+                <SafeImage sizes={IMAGE_SIZES.thumb96}
                   src={image}
                   alt=""
                   aspect="auto"

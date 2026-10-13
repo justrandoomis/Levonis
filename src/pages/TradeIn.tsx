@@ -218,7 +218,7 @@ export default function TradeIn() {
                             data-request={r.id}
                             className="w-full text-start flex items-center gap-3 p-3 transition-colors hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                           >
-                            <SafeImage src={r.image} alt="" aspect="square" className="w-12 h-12 rounded-md shrink-0" bgClassName="bg-surface" />
+                            <SafeImage sizes="48px" src={r.image} alt="" aspect="square" className="w-12 h-12 rounded-md shrink-0" bgClassName="bg-surface" />
                             <span className="min-w-0 flex-1">
                               <span className="block text-text-primary text-[14px] font-bold leading-5 truncate">{r.name}</span>
                               <span className={`block text-[12px] font-semibold ${waiting ? 'text-gold' : 'text-text-muted'}`}>
