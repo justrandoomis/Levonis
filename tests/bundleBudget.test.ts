@@ -310,6 +310,9 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // here so a regression that re-eagers either one fails loudly.
     'Bundles', 'BundleDetail',
     'Chat', 'Chats', 'Warranty', 'WarrantyVerify', 'LegacyInvestmentRedirect', 'Tools', 'Rewards', 'Referrals',
+    // The page for an unknown address (clay polish batch 2): lazy, so the
+    // entry carries only its import line.
+    'NotFound',
     'AdminProducts', 'AdminBundles', 'AdminTaxonomy', 'AdminWarranties', 'AdminAds', 'AdminHomeSettings',
     'AdminOverview', 'AdminUsers', 'AdminWalletRequests', 'AdminWalletSettings', 'AdminStoreSettings',
     'AdminSerials', 'AdminReviews', 'AdminKyc', 'AdminMemberships', 'AdminCoupons', 'AdminDelivery',

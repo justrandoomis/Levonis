@@ -513,7 +513,8 @@ export default function Compare() {
                 description={s.pickNoneHint}
                 compact
                 action={
-                  <Link to="/products" className="lv-button lv-button-primary lv-button-sm">
+                  // Secondary: «أضف منتجًا» above is this screen's one primary.
+                  <Link to="/products" className="lv-button lv-button-secondary lv-button-sm">
                     {s.browse}
                   </Link>
                 }

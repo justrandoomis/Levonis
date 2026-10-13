@@ -24,6 +24,7 @@ import { useMoney } from '../CurrencyContext';
 import { useCommunityAccess } from './community/access';
 import VariantImg from '../components/ui/VariantImg';
 import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
+import { initialOf } from '../lib/initials';
 
 interface FavoriteItem {
   id: string;
@@ -100,6 +101,8 @@ export default function Profile() {
   const [scrolled, setScrolled] = useState(false);
   const [mine, setMine] = useState<MembershipMine | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
+  // The avatar key whose picture failed to load; that key then shows the initial.
+  const [avatarFailedKey, setAvatarFailedKey] = useState('');
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const { t, dir, lang, loc } = useLanguage();
   const navigate = useNavigate();
@@ -264,12 +267,14 @@ export default function Profile() {
    */
   const balanceIqd = walletBalanceIqd || usdCentsToIqd(balanceUsdCents, exchangeRate);
   // Fabricating an avatar for a guest would suggest a signed-in identity —
-  // guests get a neutral placeholder icon instead.
-  const avatarUrl = isAuthenticated
-    ? (user?.avatar_key
-        ? `/files/${user.avatar_key}`
-        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'Levonis'}&backgroundColor=fde047`)
+  // guests get a neutral placeholder icon instead. A member without a picture
+  // (or whose picture fails to load) gets their initial on the olive disc, as
+  // in the header: never a third-party avatar service, which received the
+  // username with every visit.
+  const avatarUrl = isAuthenticated && user?.avatar_key && avatarFailedKey !== user.avatar_key
+    ? `/files/${user.avatar_key}`
     : '';
+  const avatarInitial = isAuthenticated ? initialOf(user?.username || user?.name) : '';
 
   const displayName = isAuthenticated
     ? (user?.username || user?.name || user?.email || '')
@@ -358,7 +363,9 @@ export default function Profile() {
         <div className="flex items-center gap-2 min-w-0">
            <div className="w-7 h-7 rounded-full bg-surface overflow-hidden border border-border-subtle shrink-0 flex items-center justify-center">
              {avatarUrl ? (
-               <VariantImg sizes="28px" referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
+               <VariantImg sizes="28px" referrerPolicy="no-referrer" src={avatarUrl} alt="" onError={() => setAvatarFailedKey(user?.avatar_key ?? '')} className="w-full h-full object-cover" />
+             ) : avatarInitial ? (
+               <span className="w-full h-full bg-olive text-snow text-[12px] font-bold flex items-center justify-center" aria-hidden="true">{avatarInitial}</span>
              ) : (
                <UserRound className="w-4 h-4 text-text-muted" aria-hidden="true" />
              )}
@@ -376,7 +383,9 @@ export default function Profile() {
           <div className="flex w-full min-w-0 items-center gap-3">
             <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 bg-surface-raised ring-white/10">
               {avatarUrl ? (
-                <VariantImg sizes="56px" referrerPolicy="no-referrer" src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                <VariantImg sizes="56px" referrerPolicy="no-referrer" src={avatarUrl} alt="" onError={() => setAvatarFailedKey(user?.avatar_key ?? '')} className="w-full h-full object-cover" />
+              ) : avatarInitial ? (
+                <span className="w-full h-full bg-olive text-snow text-[22px] font-bold flex items-center justify-center" aria-hidden="true">{avatarInitial}</span>
               ) : (
                 <UserRound className="h-7 w-7 text-text-muted" aria-hidden="true" />
               )}
@@ -444,8 +453,8 @@ export default function Profile() {
             className="lv-surface mb-3 flex min-h-14 w-full items-center gap-3 p-3 text-start text-text-primary transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <Wallet className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">{loc('أرباحي', 'My earnings')}</span>
-              <span className="block text-xs leading-5 text-text-secondary">{loc('المستحقات وطلبات السحب', 'Earnings and withdrawal requests')}</span>
+              <span className="block text-sm font-semibold">{loc('أرباحي', 'My earnings', 'قازانجەکانم')}</span>
+              <span className="block text-xs leading-5 text-text-secondary">{loc('المستحقات وطلبات السحب', 'Earnings and withdrawal requests', 'شایستەکان و داواکارییەکانی کێشانەوە')}</span>
             </span>
             {dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </button>
@@ -469,12 +478,12 @@ export default function Profile() {
               {dir === 'rtl' ? <ChevronLeft className="w-3 h-3 text-text-secondary shrink-0" aria-hidden="true" /> : <ChevronRight className="w-3 h-3 text-text-secondary shrink-0" aria-hidden="true" />}
             </button>
             <div className="flex gap-2 shrink-0">
-              <button type="button" onClick={() => navigate('/subscription')} className="flex flex-col items-center justify-center relative rtl:pl-2 ltr:pr-2 min-h-[44px] after:content-[''] after:absolute rtl:after:left-0 ltr:after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-[1px] after:h-4 after:bg-zinc-700 hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg">
-                <span className="text-flame font-bold text-[9px] whitespace-nowrap">{loc('مركز الأعضاء', 'Member Center', 'ناوەندی ئەندامان')}</span>
+              <button type="button" onClick={() => navigate('/subscription')} className="flex flex-col items-center justify-center relative rtl:pl-2 ltr:pr-2 min-h-[44px] after:content-[''] after:absolute rtl:after:left-0 ltr:after:right-0 after:top-1/2 after:-translate-y-1/2 after:w-[1px] after:h-4 after:bg-border-subtle hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg">
+                <span className="text-gold font-bold text-[9px] whitespace-nowrap">{loc('مركز الأعضاء', 'Member Center', 'ناوەندی ئەندامان')}</span>
                 <span className="text-[8px] text-text-muted whitespace-nowrap">{loc('استكشف المزايا', 'Explore benefits', 'سوودەکان ببینە')}</span>
               </button>
               <button type="button" onClick={() => navigate('/points')} className="flex flex-col items-center justify-center shrink-0 min-h-[44px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg px-1">
-                <span className="text-flame font-bold text-[9px] whitespace-nowrap">{loc('المكافآت', 'Rewards', 'خەڵاتەکان')}</span>
+                <span className="text-gold font-bold text-[9px] whitespace-nowrap">{loc('المكافآت', 'Rewards', 'خەڵاتەکان')}</span>
                 <span className="text-[8px] text-text-muted whitespace-nowrap">{loc('اكسب النقاط', 'Earn points', 'خاڵ بەدەست بهێنە')}</span>
               </button>
             </div>
@@ -534,7 +543,7 @@ export default function Profile() {
               onClick={() => navigate('/referrals')}
               className="lv-surface min-w-0 p-3 flex items-center gap-2.5 min-h-[56px] text-start transition-colors hover:bg-surface-raised active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus text-text-primary"
             >
-              <Gift className="w-5 h-5 text-flame shrink-0" strokeWidth={2} aria-hidden="true" />
+              <Gift className="w-5 h-5 text-gold shrink-0" strokeWidth={2} aria-hidden="true" />
               <span className="flex-1 min-w-0">
                 <span className="block font-bold text-[13px] leading-4 truncate">{t('referralProgram')}</span>
                 {mine?.referral?.code ? (
@@ -569,8 +578,13 @@ export default function Profile() {
 
         {/* Second Card: quick actions. Real destinations; guests are routed
             through /auth with the destination preserved. Aligned like the
-            header grid: fixed icon box + consistent label area. */}
-        <div className="lv-surface px-2 py-3 mb-3 grid grid-flow-col auto-cols-fr items-start text-text-primary">
+            header grid: fixed icon box + consistent label area.
+            A FLEX ROW, NOT EQUAL GRID COLUMNS: each cell grows from zero but
+            never below its longest word (a flex item's automatic minimum), so
+            «پاشەکەوتەکان» (66px at 11px) takes the room it needs at 360px and
+            its neighbours give it up — no word is clipped or split, in any
+            language, and the type is not shrunk. */}
+        <div className="lv-surface px-2 py-3 mb-3 flex items-start text-text-primary">
           {[
             { key: 'shipping', icon: Package, label: loc('الشحن', 'Shipping', 'گەیاندن'), onClick: () => go('/orders?status=to_ship') },
             { key: 'favorites', icon: Star, label: loc('المفضلة', 'Favorites', 'دڵخوازەکان'), onClick: showFavoritesTab },
@@ -586,12 +600,12 @@ export default function Profile() {
               key={a.key}
               type="button"
               onClick={a.onClick}
-              className="flex flex-col items-center min-h-[56px] px-1 py-1 rounded-lg transition-colors hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="flex-1 flex flex-col items-center min-h-[56px] px-1 py-1 rounded-lg transition-colors hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <span className="h-7 w-7 flex items-center justify-center shrink-0" aria-hidden="true">
                 <a.icon className="w-6 h-6" strokeWidth={1.5} />
               </span>
-              <span className="mt-1 w-full text-[11px] leading-[13px] min-h-[26px] text-center line-clamp-2 break-words">{a.label}</span>
+              <span className="mt-1 w-full text-[11px] leading-[1.3] min-h-[26px] text-center line-clamp-2">{a.label}</span>
             </button>
           ))}
         </div>
@@ -618,7 +632,7 @@ export default function Profile() {
                     </span>
                   )}
                 </span>
-                <span className="mt-1 w-full text-[9px] sm:text-[10px] leading-[12px] min-h-[24px] text-center line-clamp-2 break-words">{item.label}</span>
+                <span className="mt-1 w-full text-[11px] leading-[1.3] min-h-[26px] text-center line-clamp-2">{item.label}</span>
               </button>
             ))}
           </div>
@@ -667,7 +681,7 @@ export default function Profile() {
                  "My Orders" — it replaces a "coming soon" placeholder, so no
                  working button was removed and the five-cell grid keeps its
                  sizes, spacing and alignment exactly as before. */
-              { icon: UserPlus, label: loc('الإحالات', 'Referrals', 'بانگهێشتکردن'), color: 'text-sky-500', bg: 'bg-sky-900/30', to: '/referrals' },
+              { icon: UserPlus, label: loc('الإحالات', 'Referrals', 'بانگهێشتکردن'), to: '/referrals' },
               /* The Printer Farm is the real game behind the former "Collect
                  Coins" placeholder: Farm Coins are earned there, on the server. */
               /* `soon` marks a destination the app will not actually serve
@@ -675,10 +689,10 @@ export default function Profile() {
                  is bounced by FarmGate, so tapping either used to look like a
                  dead button. The tile says so up front instead. Points and
                  missions stay live — they pay real balances today. */
-              { icon: Coins, label: loc('مزرعة الطباعة', 'Printer Farm', 'کێڵگەی چاپکەر'), color: 'text-yellow-500', bg: 'bg-yellow-900/30', to: '/games/printer-farm', soon: true },
-              { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), color: 'text-red-500', bg: 'bg-red-900/30', to: '/points', soon: false },
-              { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), color: 'text-purple-500', bg: 'bg-purple-900/30', to: '/games', soon: true },
-              { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), color: 'text-orange-500', bg: 'bg-orange-900/30', to: '/points', soon: false },
+              { icon: Coins, label: loc('مزرعة الطباعة', 'Printer Farm', 'کێڵگەی چاپکەر'), to: '/games/printer-farm', soon: true },
+              { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), to: '/points', soon: false },
+              { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), to: '/games', soon: true },
+              { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), to: '/points', soon: false },
             ].map((game, i) => (
               <button
                 key={i}
@@ -691,8 +705,8 @@ export default function Profile() {
                 }`}
               >
                 <span className="relative" aria-hidden="true">
-                  <span className={`w-[44px] h-[44px] rounded-full flex items-center justify-center ${game.bg} ${game.soon ? 'opacity-45' : ''}`}>
-                    <game.icon className={`w-[22px] h-[22px] ${game.color}`} strokeWidth={2} />
+                  <span className={`lv-well w-[44px] h-[44px] rounded-full flex items-center justify-center ${game.soon ? 'opacity-45' : ''}`}>
+                    <game.icon className="w-[22px] h-[22px] text-text-secondary" strokeWidth={2} />
                   </span>
                 </span>
                 <span className="flex flex-col items-center gap-1">
@@ -748,7 +762,7 @@ export default function Profile() {
         )}
 
         {/* Tabs for Bottom Section */}
-        <div ref={tabsRef} role="tablist" className="flex items-center gap-4 mt-4 mb-3 sticky top-[48px] z-40 py-1 px-1 scroll-mt-14 bg-canvas">
+        <div ref={tabsRef} role="tablist" className="flex items-center gap-4 mt-4 mb-3 sticky top-[48px] z-40 py-1 px-1 scroll-mt-14 bg-canvas overflow-x-auto hide-scrollbar">
           {[
             { id: 'suggested', label: loc('المنتجات المقترحة', 'Suggested', 'بەرهەمە پێشنیارکراوەکان') },
             { id: 'collection', label: loc('مجموعتي', 'My Collection', 'کۆکراوەکانم') },
@@ -761,7 +775,7 @@ export default function Profile() {
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`font-bold text-[14px] relative transition-colors min-h-[44px] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg ${activeTab === tab.id ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`shrink-0 whitespace-nowrap font-bold text-[14px] relative transition-colors min-h-[44px] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg ${activeTab === tab.id ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
             >
               {tab.label}
               {activeTab === tab.id && (
@@ -793,7 +807,7 @@ export default function Profile() {
                     <h3 className="font-medium text-[13px] line-clamp-2 mb-2 leading-[1.3]">{name}</h3>
 
                     <div className="mt-auto flex items-baseline justify-between">
-                       <span className="text-flame font-bold text-[15px] flex items-baseline gap-0.5">
+                       <span className="text-text-primary font-bold text-[15px] flex items-baseline gap-0.5">
                          {money(p.price_iqd || 0)}
                        </span>
                        {p.display_regular_iqd != null && p.display_regular_iqd > (p.display_price_iqd ?? p.price_iqd) && (

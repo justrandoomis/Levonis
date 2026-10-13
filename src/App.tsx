@@ -100,6 +100,8 @@ const Referrals = React.lazy(() => import('./pages/Referrals'));
  * with the storefront. `tests/bundleBudget.test.ts` pins both chunks.
  */
 const Bundles = React.lazy(() => import('./pages/Bundles'));
+// An unknown address: a lazy chunk, so the entry carries only this line.
+const NotFound = React.lazy(() => import('./pages/NotFound'));
 const BundleDetail = prefetchable(() => import('./pages/BundleDetail'));
 
 /**
@@ -437,7 +439,7 @@ const CategoryListing = React.lazy(() => import('./pages/CategoryListing'));
  * «طابعات مستعملة» and «استبدل القديمة بجديدة» are cards on the services rail
  * (src/components/home/ServicesGrid.tsx) and rows in the owner's icon list
  * (worker/lib/siteMedia.ts). A card is a promise; without these two routes the
- * promise resolved to the `*` fallback — the bare «Under Construction» panel
+ * promise resolved to the `*` fallback — a bare English placeholder panel (now the NotFound page)
  * at the bottom of this table, with no header, no back button and nothing in
  * the customer's own language. tests/serviceSlots.test.ts now fails the build
  * if any service slot names a path this table does not serve, so the rail and
@@ -1033,7 +1035,7 @@ function AppContent() {
               group under "My orders" in the profile (never the bottom nav). */}
           <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
           <Route path="/gifts" element={<ProtectedRoute><div className="p-4"><MyGifts /></div></ProtectedRoute>} />
-          <Route path="*" element={<div className="p-8 text-white text-center">Under Construction</div>} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </SocialProvider>
         </Suspense>

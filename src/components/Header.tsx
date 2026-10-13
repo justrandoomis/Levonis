@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 import LangThemeButton from './LangThemeSheet';
 import LiveSearch from './search/LiveSearch';
 import { variantSrcSet } from '../../packages/contracts/src/imageSizing';
+import { initialOf } from '../lib/initials';
 
 /**
  * WHAT THE HEADER DOWNLOADS BEFORE THE FIRST PAINT, AND WHAT IT DOES NOT
@@ -58,14 +59,16 @@ function useTierMeta(needed: boolean): TierMetaModule | null {
 }
 
 export default function Header() {
-  const { t, dir } = useLanguage();
+  const { t, loc } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { isAuthenticated, user } = useAuth();
-  const avatarSrc = user?.avatar_key
-    ? `/files/${user.avatar_key}`
-    : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user?.username || user?.name || 'Levonis')}`;
+  // The member's own picture, or their initial on the olive disc when there is
+  // none or it fails to load. Never a third-party avatar service.
+  const avatarKey = user?.avatar_key;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => setAvatarFailed(false), [avatarKey]);
 
   // Admin visibility comes exclusively from the server-side role.
   const isAdminUser = !!user?.isAdmin;
@@ -164,26 +167,33 @@ export default function Header() {
         <div className="flex items-center gap-2">
           {/* The account pill is flush clay (the rim alone): it sits on the
               hero and carries its own opaque ground. */}
-          <Link to={isAuthenticated ? "/profile" : "/auth"} className="flex min-w-0 shrink items-center gap-2.5 rounded-xl bg-surface shadow-xs p-1.5 pe-3.5 text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-            <div className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-snow font-bold text-sm shadow-inner overflow-hidden">
-              {isAuthenticated ? (
-                 <img
-                   referrerPolicy="no-referrer"
-                   src={avatarSrc}
-                   // A 32 px face: the 160 px copy, not the stored original (2026-10-13).
-                   // The builder directly rather than ui/VariantImg — the header is in
-                   // every visitor's first download (tests/bundleBudget.test.ts).
-                   srcSet={variantSrcSet(avatarSrc)}
-                   sizes="32px"
-                   alt="Avatar"
-                   decoding="async"
-                   className="w-full h-full object-cover"
-                 />
-              ) : (
-                 <span>SU</span>
-              )}
-            </div>
-            <span className="text-white text-[13px] font-bold tracking-tight truncate">
+          <Link to={isAuthenticated ? "/profile" : "/auth"} className={`flex min-w-0 shrink items-center gap-2.5 rounded-xl bg-surface shadow-xs text-text-primary transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${isAuthenticated ? 'p-1.5 pe-3.5' : 'px-3.5 py-3'}`}>
+            {/* A guest has no disc: the pill is its label alone, never an
+                invented «SU» monogram. */}
+            {isAuthenticated && (
+              <span className="w-8 h-8 rounded-full shrink-0 bg-olive flex items-center justify-center text-snow font-bold text-sm shadow-inner overflow-hidden" aria-hidden="true">
+                {avatarKey && !avatarFailed ? (
+                  <img
+                    referrerPolicy="no-referrer"
+                    src={`/files/${avatarKey}`}
+                    // A 32 px face: the 160 px copy, not the stored original (2026-10-13).
+                    // The builder directly rather than ui/VariantImg — the header is in
+                    // every visitor's first download (tests/bundleBudget.test.ts).
+                    srcSet={variantSrcSet(`/files/${avatarKey}`)}
+                    sizes="32px"
+                    alt=""
+                    decoding="async"
+                    onError={() => setAvatarFailed(true)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initialOf(user?.username || user?.name)
+                )}
+              </span>
+            )}
+            {/* 44px either way: the 32px disc and its 6px padding, or (a
+                guest) this 20px line and 12px above and below. */}
+            <span className="text-white text-[13px] leading-5 font-bold tracking-tight truncate">
               {isAuthenticated ? (user?.username || 'User') : t('signUp')}
             </span>
           </Link>
@@ -195,10 +205,10 @@ export default function Header() {
             <Link
               to="/admin"
               className="flex items-center gap-1.5 bg-gold-fill text-onyx px-3.5 py-1.5 rounded-full text-xs font-bold shadow-1 no-press active:shadow-press shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-              title={dir === 'rtl' ? 'لوحة التحكم بالإدارة' : 'Admin Dashboard'}
+              title={loc('لوحة التحكم بالإدارة', 'Admin Dashboard', 'داشبۆردی بەڕێوەبردن')}
             >
               <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-              <span className="text-[11px] sm:text-xs font-bold">{dir === 'rtl' ? 'لوحة الأدمن' : 'Admin'}</span>
+              <span className="text-[11px] sm:text-xs font-bold">{loc('لوحة الأدمن', 'Admin', 'بەڕێوەبردن')}</span>
             </Link>
           )}
         </div>
@@ -238,10 +248,10 @@ export default function Header() {
                 ? 'bg-surface hover:bg-surface-raised'
                 : 'bg-surface/95 hover:bg-surface-raised'
             }`}>
-              <span className={`text-[13px] tracking-wide capitalize ${
+              <span className={`text-[13px] tracking-wide ${
                 subTier !== 'free' ? 'text-text-primary font-bold' : 'text-text-secondary font-medium'
               }`}>
-                {subTier === 'free' || !tiers ? 'free' : tiers.tierLabel(subTier)}
+                {subTier === 'free' || !tiers ? loc('مجاني', 'Free', 'بەخۆڕایی') : tiers.tierLabel(subTier)}
               </span>
               {tierMeta && <Check className="w-4 h-4" style={{ color: tierMeta.hex }} strokeWidth={3} aria-hidden="true" />}
             </div>

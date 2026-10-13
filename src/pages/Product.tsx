@@ -3862,8 +3862,12 @@ export default function Product() {
               ) : null}
             </section>
 
-            {/* Title + store, shown once (the panel repeats no heading). */}
+            {/* Title + store, in reading order. From 1024px the buy column
+                beside the gallery starts with the same two lines, so this pair
+                is visually hidden there (still read, still the page's one
+                h1) — see the top of the <aside> below. */}
             <div className="mt-5">
+              <div className="lg:sr-only">
               <h1 className="text-xl sm:text-2xl font-bold text-text-primary leading-snug">{name}</h1>
               <p className="mt-2 text-[12px] text-text-muted flex items-center gap-1.5">
                 <Store aria-hidden="true" className="w-3.5 h-3.5" />
@@ -3871,8 +3875,9 @@ export default function Product() {
                   <>
                     {s.communityStore} · {product.merchant.name}
                     {/* The in-site store page is behind the community wall;
-                        while it is shut this goes to the store's own site. */}
-                    <CommunityStoreLink id={product.merchant.id} className="underline underline-offset-2 ms-1">
+                        while it is shut this goes to the store's own site.
+                        From 1024px the visible link is the buy column's. */}
+                    <CommunityStoreLink id={product.merchant.id} className="underline underline-offset-2 ms-1 lg:hidden">
                       {s.visitStore}
                     </CommunityStoreLink>
                   </>
@@ -3880,6 +3885,7 @@ export default function Product() {
                   <>{s.officialStore} · Levonis</>
                 )}
               </p>
+              </div>
               {/*
                 THE THREE SIGNALS A SHOPPER WEIGHS BEFORE THE PRICE.
 
@@ -4374,6 +4380,25 @@ export default function Product() {
               maxHeight: 'calc(100dvh - var(--app-header-height, 68px) - 1.5rem)',
             }}
           >
+            {/* THE BUY COLUMN STARTS WITH WHAT IT IS (apple-design §4:
+                identity, price, choice, action). A sighted copy of the left
+                column's h1 and store line, hidden from readers, who already
+                heard them there; only the store link is real here, because
+                the left one is display:none at this width. */}
+            <div className="px-1" data-product-buy-identity>
+              <p aria-hidden="true" className="text-xl font-bold text-text-primary leading-snug">{name}</p>
+              <p className="mt-1 text-[12px] text-text-muted flex items-center gap-1.5">
+                <Store aria-hidden="true" className="w-3.5 h-3.5" />
+                <span aria-hidden="true">
+                  {source === 'community' && product.merchant ? `${s.communityStore} · ${product.merchant.name}` : `${s.officialStore} · Levonis`}
+                </span>
+                {source === 'community' && product.merchant ? (
+                  <CommunityStoreLink id={product.merchant.id} className="underline underline-offset-2 ms-1">
+                    {s.visitStore}
+                  </CommunityStoreLink>
+                ) : null}
+              </p>
+            </div>
             {priceBlock}
             {selectionBlocks}
             <div className="lv-surface space-y-3 p-4">

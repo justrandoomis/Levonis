@@ -508,7 +508,7 @@ export default function Orders() {
             className="lv-button lv-button-secondary lv-button-sm shrink-0"
           >
             <Repeat className="w-4 h-4" aria-hidden="true" />
-            {loc('الاستبدال', 'Trade-in')}
+            {loc('الاستبدال', 'Trade-in', 'گۆڕینەوە')}
           </Link>
         </div>
 
@@ -609,7 +609,15 @@ export default function Orders() {
         ) : error ? (
           <ErrorState error={error} onRetry={loadFirst} />
         ) : orders.length === 0 ? (
-          <EmptyState title={filter === 'All' ? s.empty : s.emptyFiltered} />
+          // No orders at all: the next step is the shop, in the cart's own words.
+          <EmptyState
+            title={filter === 'All' ? s.empty : s.emptyFiltered}
+            action={filter === 'All' ? (
+              <Link to="/products" className="lv-button lv-button-primary mt-1">
+                {loc('تسوق الآن', 'Shop now', 'ئێستا بکڕە')}
+              </Link>
+            ) : undefined}
+          />
         ) : nothingLeftToReview ? (
           // Not «لا نتائج مطابقة»: nothing failed to match. The customer rated
           // everything, which deserves saying — and the way back with it, or

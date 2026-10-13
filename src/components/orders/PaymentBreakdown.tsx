@@ -135,7 +135,7 @@ function Row({ label, value, strong = false, muted = false, negative = false }: 
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <dt className={`text-[13px] min-w-0 ${strong ? 'text-text-primary font-bold' : muted ? 'text-text-muted' : 'text-text-secondary'}`}>{label}</dt>
-      <dd className={`text-[13px] tabular-nums shrink-0 ${strong ? 'text-gold font-bold text-[15px]' : negative ? 'text-emerald-300' : 'text-text-primary'}`}>
+      <dd className={`text-[13px] tabular-nums shrink-0 ${strong ? 'text-text-primary font-bold text-[15px]' : negative ? 'text-emerald-300' : 'text-text-primary'}`}>
         {negative ? '- ' : ''}
         {value}
       </dd>

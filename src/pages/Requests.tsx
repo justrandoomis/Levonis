@@ -23,7 +23,7 @@ import { Plus, Loader2, PackageSearch, MapPin, Search, X } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { iqd, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
 import { GOVERNORATE_LABELS } from '../lib/governorates';
 import MyRequestsList from '../components/print/MyRequestsList';
@@ -94,7 +94,7 @@ interface RequestRow {
 type View = 'board' | 'mine' | 'orders' | 'new';
 
 export default function Requests() {
-  const { loc } = useLanguage();
+  const { loc, t } = useLanguage();
   const { user } = useAuth();
   const { signIn } = useSignInPrompt();
   /**
@@ -139,6 +139,14 @@ export default function Requests() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [me, setMe] = useState<MerchantMe | null>(null);
+  /**
+   * THE BOARD SAID THE COMMUNITY IS SHUT (503 COMMUNITY_CLOSED). The route
+   * gate can let the page through on a verdict it has not refreshed, and the
+   * board then shows the maintenance card — while «طلب جديد» stayed a live
+   * primary that opened a wizard whose publish would be refused. It stays on
+   * the page, flat and described by the notice, and opens nothing.
+   */
+  const [closed, setClosed] = useState(false);
 
   /**
    * ONE REQUEST HAS ONE ADDRESS — /requests/<id>, its own route
@@ -202,12 +210,24 @@ export default function Requests() {
           ))}
           {(
             <button
-              onClick={() => (user ? setView('new') : signIn())}
+              type="button"
+              onClick={() => {
+                if (closed) return;
+                if (user) setView('new');
+                else signIn();
+              }}
+              aria-disabled={closed || undefined}
+              aria-describedby={closed ? 'requests-closed-note' : undefined}
               className="lv-button lv-button-primary lv-button-sm ms-auto shrink-0 gap-1.5"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4" aria-hidden="true" />
               {loc('طلب جديد', 'New', 'نوێ')}
             </button>
+          )}
+          {closed && (
+            <span id="requests-closed-note" className="sr-only">
+              {loc('ليفو كوميونيتي تحت الصيانة', 'Levo Community is under maintenance', `${t('community')} — ${t('maintenanceMain')}`)}
+            </span>
           )}
         </div>
 
@@ -237,7 +257,7 @@ export default function Requests() {
         ) : (
           // A PLUS member with no store yet has no workshop: «مناسب لي» is the
           // workshop's board, and it answered them 404.
-          <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} />
+          <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} onClosed={setClosed} />
         )}
       </div>
     </div>
@@ -250,7 +270,7 @@ export default function Requests() {
  * route carrying the estimate and the chosen merchant — data this component
  * deliberately never receives.
  */
-function RequestList({ onOpen, canOffer = false }: { onOpen: (r: RequestRow) => void; canOffer?: boolean }) {
+function RequestList({ onOpen, canOffer = false, onClosed }: { onOpen: (r: RequestRow) => void; canOffer?: boolean; onClosed?: (closed: boolean) => void }) {
   const { loc, lang } = useLanguage();
   // A workshop that can offer lands on the requests it can MAKE; the whole
   // board stays one tap away (docs/MERCHANT_PLATFORM.md §2 decision 5).
@@ -287,7 +307,7 @@ function RequestList({ onOpen, canOffer = false }: { onOpen: (r: RequestRow) => 
           onOpen={(r) => onOpen({ ...r, customer_name: null } as unknown as RequestRow)}
         />
       ) : (
-        <AllRequests onOpen={onOpen} loc={loc} lang={lang} />
+        <AllRequests onOpen={onOpen} loc={loc} lang={lang} onClosed={onClosed} />
       )}
     </>
   );
@@ -298,10 +318,13 @@ function AllRequests({
   onOpen,
   loc,
   lang,
+  onClosed,
 }: {
   onOpen: (r: RequestRow) => void;
   loc: ReturnType<typeof useLanguage>['loc'];
   lang: ReturnType<typeof useLanguage>['lang'];
+  /** Told whether the last board read was refused as COMMUNITY_CLOSED. */
+  onClosed?: (closed: boolean) => void;
 }) {
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -310,6 +333,9 @@ function AllRequests({
   const [moreError, setMoreError] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    onClosed?.(loadError instanceof ApiError && loadError.code === 'COMMUNITY_CLOSED');
+  }, [loadError, onClosed]);
   // Searched on the server (title and description), like the community page's
   // requests: a filter over the twenty rows on screen would miss page two.
   const [draft, setDraft] = useState('');

@@ -305,7 +305,7 @@ function DefaultHero({ loading = false }: { loading?: boolean }) {
             <Link
               to="/products"
               data-hero-cta="shop"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-white text-black text-sm sm:text-base font-bold hover:bg-zinc-200 transition-colors shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-primary min-h-12 px-6 rounded-full text-sm sm:text-base"
             >
               <ShoppingBag aria-hidden="true" className="w-4 h-4" />
               {t('heroShop')}
@@ -319,7 +319,7 @@ function DefaultHero({ loading = false }: { loading?: boolean }) {
               target="_blank"
               rel="noopener noreferrer"
               data-hero-cta="studio"
-              className="inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-black/55 border border-white/25 text-white text-sm sm:text-base font-bold hover:bg-black/65 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              className="lv-button lv-button-secondary min-h-12 px-6 rounded-full text-sm sm:text-base"
             >
               <Layers aria-hidden="true" className="w-4 h-4" />
               {t('heroStudio')}

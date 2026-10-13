@@ -5,6 +5,7 @@ import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { StatusChip } from '../ui/Badge';
 import VariantImg from '../ui/VariantImg';
+import { EmptyState } from '../ui/AsyncStates';
 
 /**
  * Product-page review section (mandate §5): submit + public list.
@@ -677,7 +678,7 @@ export default function ReviewSection({ productId }: { productId: string }) {
         </div>
       )}
       {!listError && reviews.length === 0 && !listLoading && (
-        <div className="text-[13px] text-text-muted text-center py-6">{S.empty}</div>
+        <EmptyState compact icon={<Star aria-hidden="true" className="w-6 h-6" />} title={S.empty} />
       )}
       <div className="space-y-3">
         {reviews.map((r) => (

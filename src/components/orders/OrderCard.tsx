@@ -259,7 +259,7 @@ export default function OrderCard({
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] text-text-muted">{s.total}</p>
-            <p className="text-gold font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
+            <p className="text-text-primary font-bold text-[15px] tabular-nums">{money(order.total_iqd)}</p>
             {due > 0 && (
               <p className="text-[11.5px] text-text-secondary tabular-nums">
                 {s.due}: {money(due)}
@@ -308,14 +308,14 @@ export default function OrderCard({
             <Truck className="w-4 h-4 shrink-0" aria-hidden />
             <span className="truncate">{trackingOpen ? s.hideTrack : s.track}</span>
           </button>
-          {/* Details is the card's primary path — it opens the whole order —
-              so it carries the one filled treatment in the group. Everything
-              else is a tinted or neutral surface, which keeps a LIST of order
-              cards visually quiet instead of a column of competing fills. */}
+          {/* A LIST OF CARDS HAS NO PRIMARY: each card is a row, so Details
+              is raised clay like Track, never a column of competing gold fills
+              down the page. Cancel is a quiet ghost in the danger ink — the
+              sheet it opens asks before anything happens. */}
           <Link
             to={`/orders/${encodeURIComponent(order.id)}`}
             aria-label={s.open(order.id)}
-            className={`${ACTION} lv-button-primary`}
+            className={`${ACTION} lv-button-secondary`}
           >
             <span className="truncate">{s.details}</span>
             <ChevronRight className="w-4 h-4 shrink-0 rtl:rotate-180" aria-hidden />
@@ -325,7 +325,7 @@ export default function OrderCard({
               type="button"
               data-cancel-order={order.id}
               onClick={(e) => onCancel(order, e.currentTarget)}
-              className={`${ACTION} lv-button-danger`}
+              className={`${ACTION} lv-button-ghost text-danger`}
             >
               <XCircle className="w-4 h-4 shrink-0" aria-hidden />
               <span className="truncate">{s.cancel}</span>

@@ -2057,7 +2057,7 @@ export default function Checkout() {
           {/* Section: Address */}
           <section>
             <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
-              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">1</span>
+              <span className="w-6 h-6 rounded-full lv-well text-text-secondary flex items-center justify-center text-xs font-semibold tabular-nums">1</span>
               {loc('عنوان التوصيل', 'Shipping Address', 'ناونیشانی گەیاندن')}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2123,7 +2123,7 @@ export default function Checkout() {
           {/* Section: Delivery Method */}
           <section>
             <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
-              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">2</span>
+              <span className="w-6 h-6 rounded-full lv-well text-text-secondary flex items-center justify-center text-xs font-semibold tabular-nums">2</span>
               {loc('طريقة الشحن', 'Delivery Method', 'شێوازی گەیاندن')}
             </h2>
             {/* A PRO member quoted outside their PRO context is charged the
@@ -2313,7 +2313,7 @@ export default function Checkout() {
           {/* Section: Payment Method */}
           <section>
             <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
-              <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">3</span>
+              <span className="w-6 h-6 rounded-full lv-well text-text-secondary flex items-center justify-center text-xs font-semibold tabular-nums">3</span>
               {loc('طريقة الدفع', 'Payment Method', 'شێوازی پارەدان')}
             </h2>
             <div className="grid grid-cols-1 gap-3">

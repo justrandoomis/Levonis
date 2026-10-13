@@ -33,13 +33,12 @@ export default function CoverStory({ cover }: { cover: Cover }) {
   const s = useHubStrings();
   if (cover.kind === 'typeset') {
     return (
+      // NO COVER PROJECT YET: the page's own h1 already says «مجتمع ليفو»
+      // (with the kicker above it), so this block does not say it a third
+      // time, nor call itself a «cover project» it is not. It says what the
+      // community is for, in the page's display type.
       <div data-community-cover="typeset" className="-mx-4 bg-surface px-4 py-8 lg:mx-0 lg:rounded-2xl lg:p-10">
-        <p className="flex items-center gap-2 text-[11px] font-semibold text-gold">
-          <span aria-hidden="true" className="h-px w-4 bg-gold" />
-          {s.coverKicker}
-        </p>
-        <p className="mt-2 text-balance text-[36px] font-black leading-tight text-text-primary">{s.title}</p>
-        <p className="mt-2 max-w-2xl text-balance text-[14.5px] leading-relaxed text-text-secondary">{s.dek}</p>
+        <p className="max-w-2xl text-balance text-[24px] font-black leading-tight text-text-primary">{s.dek}</p>
       </div>
     );
   }

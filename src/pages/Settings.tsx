@@ -84,6 +84,7 @@ import { Segmented } from '../components/ui/Segmented';
 import { setThemePreference, useTheme, type ThemePreference } from '../lib/theme';
 import ChunkBoundary from '../components/ChunkBoundary';
 import VariantImg from '../components/ui/VariantImg';
+import { initialOf } from '../lib/initials';
 
 /**
  * «الشراء السريع» — its own lazy chunk (docs/GIFTS_QUICK_BUY.md §3.5): the
@@ -709,6 +710,7 @@ export default function Settings() {
   const whatsappConfigured = useCapabilities()?.whatsappOtp ?? false;
 
   const [signingOut, setSigningOut] = useState(false);
+  const [avatarFailedKey, setAvatarFailedKey] = useState('');
 
   // ---- email / verification (real reads)
   const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null);
@@ -946,9 +948,9 @@ export default function Settings() {
           ? s.pushGranted
           : s.pushOff;
 
-  const avatarUrl = user?.avatar_key
-    ? `/files/${user.avatar_key}`
-    : `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user?.username || user?.name || 'guest')}`;
+  // The member's own picture, or their initial on the olive disc when there is
+  // none or it fails to load: never a third-party avatar service.
+  const avatarUrl = user?.avatar_key && avatarFailedKey !== user.avatar_key ? `/files/${user.avatar_key}` : '';
 
   const defaultAddress = addresses?.addresses.find((a) => a.is_default) ?? null;
 
@@ -1024,14 +1026,21 @@ export default function Settings() {
                 to="/edit-profile"
                 className="flex items-center gap-3 px-4 py-4 hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus transition-colors"
               >
-                <VariantImg
-                  sizes="48px"
-                  referrerPolicy="no-referrer"
-                  src={avatarUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className="w-12 h-12 rounded-full object-cover bg-surface-selected shrink-0"
-                />
+                {avatarUrl ? (
+                  <VariantImg
+                    sizes="48px"
+                    referrerPolicy="no-referrer"
+                    src={avatarUrl}
+                    alt=""
+                    aria-hidden="true"
+                    onError={() => setAvatarFailedKey(user.avatar_key ?? '')}
+                    className="w-12 h-12 rounded-full object-cover bg-surface-selected shrink-0"
+                  />
+                ) : (
+                  <span aria-hidden="true" className="w-12 h-12 rounded-full bg-olive text-snow text-[18px] font-bold flex items-center justify-center shrink-0">
+                    {initialOf(user.username || user.name) || <User className="w-5 h-5" />}
+                  </span>
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block font-bold text-[15px] truncate">{user.username || user.name || s.guest}</span>
                   <span className="block text-[12px] text-text-secondary truncate">{user.email}</span>

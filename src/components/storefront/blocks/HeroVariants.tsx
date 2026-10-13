@@ -43,7 +43,7 @@ function CoverHero({ block, store, data, cover, name }: VariantProps) {
               </h1>
               {store.merchant.pro_badge && <ProMerchantBadge compact />}
               {store.merchant.premium_badge && <PremiumMemberBadge compact />}
-              {store.merchant.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-white fill-sky-500" aria-hidden="true" />}
+              {store.merchant.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-snow fill-info" aria-hidden="true" />}
             </div>
             {line && (
               <p className="text-zinc-300 text-[13px] leading-snug line-clamp-2 max-w-xl" dir="auto">
@@ -124,7 +124,7 @@ function MinimalHero({ block, store, data, name }: VariantProps) {
           </h1>
           {store.merchant.pro_badge && <ProMerchantBadge compact />}
               {store.merchant.premium_badge && <PremiumMemberBadge compact />}
-          {store.merchant.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-white fill-sky-500" aria-hidden="true" />}
+          {store.merchant.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-snow fill-info" aria-hidden="true" />}
         </div>
         {line && (
           <p className="text-zinc-400 text-[13px] leading-snug line-clamp-2 max-w-xl" dir="auto">

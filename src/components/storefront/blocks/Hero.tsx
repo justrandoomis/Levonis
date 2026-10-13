@@ -190,7 +190,7 @@ function ProfileHero({ block, store, data, cover, name }: HeroProps & { cover: s
               )}
             </div>
             {store.merchant.verified && (
-              <BadgeCheck className="absolute -bottom-0.5 -right-0.5 w-5 h-5 text-white fill-sky-500" aria-hidden="true" />
+              <BadgeCheck className="absolute -bottom-0.5 -right-0.5 w-5 h-5 text-snow fill-info" aria-hidden="true" />
             )}
           </div>
           <div className="min-w-0 flex-1 pt-2.5">

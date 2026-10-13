@@ -160,7 +160,7 @@ const SPA = [
   { name: 'categories', path: '/categories' },
   { name: 'printer-finder', path: '/printer-finder' },
   { name: 'tools', path: '/tools' },
-  { name: 'rewards', path: '/rewards', as: 'customer' },
+  { name: 'rewards', path: '/points', as: 'customer' },
   { name: 'games', path: '/games', as: 'customer' },
   { name: 'subscription', path: '/subscription' },
   { name: 'auth', path: '/auth', settle: 4000 },

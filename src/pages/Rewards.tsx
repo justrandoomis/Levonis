@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, Bell, PlayCircle, Paperclip, Check, Star, ShoppingBag, ShieldAlert, Sparkles } from 'lucide-react';
+import { ChevronLeft, Bell, PlayCircle, Check, Star, ShoppingBag, ShieldAlert, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
 import { useSignInPrompt } from '../lib/guest';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
+import { refusalLang, refusalText } from '../lib/refusalStrings';
+import { formatFigure } from '../lib/localeNumber';
+import { EmptyState } from '../components/ui/AsyncStates';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
@@ -30,11 +33,11 @@ import Spinner from '../components/ui/Spinner';
  *    multiplier — rather than from the wallet's free-text notes dated by a UTC
  *    clock that disagrees with the day the award belongs to.
  *
- * Arabic is the source language and every string is written ar-first, then
- * English, then Sorani (ckb). The Sorani is written, never the Arabic copied
- * into its slot (DECISIONS row 183, which replaced the old «the owner writes
- * the Kurdish by hand» rule this header used to state); a native speaker's
- * review is welcome.
+ * Arabic is the source language and every string is written ar-first, with
+ * its Sorani (ckb) beside it. A ckb slot never carries a copy of the Arabic
+ * (docs/DECISIONS.md row 183, which replaced the old «the owner writes the
+ * Kurdish by hand» rule for this screen); the Kurdish uses the app's own
+ * vocabulary («خاڵ», «ئەرک», «ڕیکلام») and a native review is welcome.
  */
 
 interface MissionView {
@@ -115,7 +118,7 @@ export default function Rewards() {
   const navigate = useNavigate();
   const { pointBalance, refreshWallet } = useWallet();
   const { isAuthenticated, isLoaded: authLoaded } = useAuth();
-  const { loc, lang, dir } = useLanguage();
+  const { loc, dir, lang } = useLanguage();
   const { signIn } = useSignInPrompt();
 
   const [data, setData] = useState<RewardsData | null>(null);
@@ -136,9 +139,15 @@ export default function Rewards() {
       setData(res);
       setLoadError('');
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : loc('تعذّر تحميل صفحة النقاط', 'Failed to load rewards', 'پەڕەی خاڵەکان بار نەکرا'));
+      // The refusal table's sentence for a code it knows, else ours — never
+      // the server's raw English («Authentication required»).
+      const code = err instanceof ApiError ? err.code : undefined;
+      setLoadError(
+        refusalText(code, refusalLang(lang)) ||
+          loc('تعذّر تحميل صفحة النقاط', 'Couldn’t load your points', 'نەتوانرا پەڕەی خاڵەکان بار بکرێت')
+      );
     }
-  }, [loc]);
+  }, [loc, lang]);
 
   useEffect(() => {
     if (!authLoaded || !isAuthenticated) return;
@@ -218,8 +227,7 @@ export default function Rewards() {
         «مُفعّل» for a channel that cannot yet send. The sentence now says what
         actually happened.
         
-        Two arguments, so Sorani reads the Arabic by the documented fallback
-        (LanguageContext) exactly as it did before. No Kurdish is invented.
+        Sorani says the same thing in its own words (DECISIONS row 183).
       */
       say('good', awardMessage(res, loc('تم منح إذن الإشعارات في هذا المتصفح', 'Notification permission granted in this browser', 'ڕێگەپێدانی ئاگادارکردنەوە لەم وێبگەڕەدا درا')));
       await Promise.all([loadRewards(), refreshWallet()]);
@@ -329,7 +337,7 @@ export default function Rewards() {
   const UnverifiedTag = ({ proof }: { proof: string }) => (
     <span
       title={proof}
-      className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300/90 bg-amber-400/10 rounded-full px-2 py-0.5"
+      className="lv-chip [--chip:var(--color-warning)] inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5"
     >
       <ShieldAlert aria-hidden="true" className="w-3 h-3" />
       {loc('غير مُتحقَّق منه', 'Not verifiable', 'پشتڕاست نەکراوەتەوە')}
@@ -353,14 +361,15 @@ export default function Rewards() {
       <div className="flex items-center px-4 py-4 sticky top-0 z-10 relative">
         {/* A ghost back arrow: no resting or pressed fill (the clay ratchet
             counts filled hand-drawn buttons), and no shared IconButton import,
-            which would add to the storefront bundle. */}
+            which would add to the storefront bundle. The arrow is ink — gold is
+            the focus cue, not a decoration. */}
         <button
           type="button"
           onClick={() => navigate(-1)}
           aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
           className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full hover:opacity-80 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition"
         >
-          <ChevronLeft aria-hidden="true" className="w-6 h-6 text-gold rtl:rotate-180" strokeWidth={2.5} />
+          <ChevronLeft aria-hidden="true" className="w-6 h-6 rtl:rotate-180" strokeWidth={2.5} />
         </button>
         <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions', 'خاڵ و ئەرکەکان')}</h1>
         {/* Registers this page's own character anchor, so the shell stops
@@ -410,21 +419,18 @@ export default function Rewards() {
             <div className="flex justify-between items-center mb-6 relative">
               <div className="pt-2">
                 <div className="text-[14px] text-gold mb-0.5 font-medium">{loc('رصيدي', 'My Balance', 'باڵانسەکەم')}</div>
-                <div aria-live="polite" className="text-[56px] leading-[1.1] font-black tracking-tight tabular-nums">
-                  {(data?.point_balance ?? pointBalance).toLocaleString()}
+                <div aria-live="polite" className="text-[56px] leading-[1.1] font-bold tracking-tight tabular-nums">
+                  {formatFigure(data?.point_balance ?? pointBalance ?? 0, lang)}
                 </div>
               </div>
-              <div className="relative end-2">
-                <div className="w-24 h-24 rounded-full relative z-10 transform -rotate-12">
-                  <div className="absolute inset-0 rounded-full bg-[#6b5f3c] transform translate-x-[3px] translate-y-[4px]"></div>
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#BAA369] to-[#ffe55c] border-[4px] border-gold-light flex items-center justify-center shadow-well">
-                    <div className="text-black drop-shadow-md relative top-[-1px]">
-                      <svg viewBox="0 0 24 24" fill="white" className="w-[44px] h-[44px] transform rotate-12">
-                        <path d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
+              {/* THE COIN: one raised gold disc lit from above, the star in ink.
+                  It was three stacked layers — a sideways hard shadow, a hex
+                  gradient and a 4px rim, tilted — a second light source on a
+                  page that has one. */}
+              <div aria-hidden="true" className="w-24 h-24 rounded-full bg-gold-fill shadow-1 grid place-items-center text-onyx shrink-0">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-[44px] h-[44px]">
+                  <path d="M12 0C12 6.627 17.373 12 24 12C17.373 12 12 17.373 12 24C12 17.373 6.627 12 0 12C6.627 12 12 6.627 12 0Z" />
+                </svg>
               </div>
             </div>
 
@@ -480,20 +486,14 @@ export default function Rewards() {
               </div>
             )}
 
-            {/* Check-in card */}
-            <div className="relative mb-6 mx-1">
-              <div className="absolute inset-0 bg-surface-raised border border-border-subtle rounded-2xl transform -rotate-[2deg] translate-y-1 -translate-x-1 shadow-sm"></div>
-              <div className="lv-surface rounded-2xl p-4 relative z-10">
-                <div className="absolute top-5 bottom-5 start-2 flex flex-col justify-between opacity-50">
-                  {[...Array(12)].map((_, i) => (
-                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-black/50 shadow-inner"></div>
-                  ))}
-                </div>
-                <div className="absolute -top-3 end-3 text-text-secondary transform rotate-[30deg] z-20 drop-shadow-md">
-                  <Paperclip aria-hidden="true" className="w-6 h-6" strokeWidth={1.5} />
-                </div>
-
-                <div className="ps-3">
+            {/* Check-in card: the screen's one focal card, a single raised slab.
+                It was a notebook page — a rotated under-layer, binder holes and
+                a paperclip — three objects pretending to be one. Hidden while
+                the page could not load, rather than claiming a 0-day streak. */}
+            {(data || !loadError) && (
+            <div className="mb-6">
+              <div className="lv-surface-raised p-4">
+                <div>
                   <h2 className="text-[16px] font-bold mb-1">
                     {loc(
                       `سجّلت دخولك ${data?.streak ?? 0} ${(data?.streak ?? 0) === 1 ? 'يومًا' : 'أيام'} متتالية`,
@@ -582,6 +582,7 @@ export default function Rewards() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Missions */}
             <div className="mt-8 mb-8">
@@ -591,6 +592,19 @@ export default function Rewards() {
                   <div className="flex justify-center py-6">
                     <div className="w-6 h-6 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
                   </div>
+                )}
+                {/* The page could not load: say so under the heading, with a
+                    way to try again, rather than leaving it empty. */}
+                {!data && loadError && (
+                  <EmptyState
+                    compact
+                    title={loc('لا توجد طرق لكسب النقاط الآن', 'No ways to earn points right now', 'ئێستا هیچ ڕێگایەک بۆ کۆکردنەوەی خاڵ نییە')}
+                    action={
+                      <button type="button" onClick={loadRewards} className="lv-button lv-button-secondary mt-1">
+                        {loc('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}
+                      </button>
+                    }
+                  />
                 )}
                 {allDailyDone && (
                   <div className="text-text-secondary text-center py-4 text-sm">
@@ -730,22 +744,27 @@ export default function Rewards() {
               the figure — so "why was this 8 and that one 5" is answerable on
               the screen instead of only in the database.
             */}
+            {data && (
             <div className="mt-8 mb-8">
               <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('سجلّ النقاط', 'Points History', 'مێژووی خاڵەکان')}</h2>
               <div className="px-1">
-                {data && data.history.length === 0 && (
-                  <div className="text-text-secondary text-center py-4 text-sm">{loc('لا يوجد نشاط بعد', 'No recent activity', 'هێشتا هیچ چالاکییەک نییە')}</div>
+                {data.history.length === 0 && (
+                  <EmptyState
+                    compact
+                    icon={<Star aria-hidden="true" className="w-6 h-6" />}
+                    title={loc('لا حركات على نقاطك بعد', 'No points activity yet', 'هێشتا هیچ جووڵەیەک لە خاڵەکانتدا نییە')}
+                  />
                 )}
-                {data && data.history.length > 0 && (
+                {data.history.length > 0 && (
                 <div className="lv-surface overflow-hidden divide-y divide-border-subtle">
                 {data.history.map((h, i) => {
                   const spend = h.direction === 'spend';
                   return (
                   <div key={`${h.mission}-${h.day}-${h.awarded_at ?? ''}-${i}`} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${spend ? 'bg-rose-400/10' : 'bg-gold/10'}`}>
+                      <div className={`size-10 rounded-full flex items-center justify-center shrink-0 ${spend ? 'lv-well' : 'bg-gold/10'}`}>
                         {spend ? (
-                          <ShoppingBag aria-hidden="true" className="w-5 h-5 text-rose-300" />
+                          <ShoppingBag aria-hidden="true" className="w-5 h-5 text-text-secondary" />
                         ) : (
                           <Star aria-hidden="true" className="w-5 h-5 text-gold" fill="currentColor" />
                         )}
@@ -769,7 +788,7 @@ export default function Rewards() {
                         </span>
                       </div>
                     </div>
-                    <div className={`font-bold text-[16px] shrink-0 ${spend ? 'text-rose-300' : 'text-gold'}`}>
+                    <div className={`font-bold text-[16px] shrink-0 tabular-nums ${spend ? 'text-text-primary' : 'text-gold'}`}>
                       {spend ? '−' : '+'}{h.points} {loc('نقطة', 'pts', 'خاڵ')}
                     </div>
                   </div>
@@ -779,6 +798,7 @@ export default function Rewards() {
                 )}
               </div>
             </div>
+            )}
           </>
         )}
       </div>

@@ -1903,3 +1903,36 @@ Paint: the scroll trace owed since row 210 was run — home and `/products`, 360
 scroll, both themes, local Vite: no Paint or raster task over 16 ms (paint max 7.9 ms, raster max 12.5 ms).
 Home shows a few style recalculations over 16 ms while its lazy sections mount; none is a shadow. A resting
 card still paints one blurred layer; the selection bar is a 3 px solid box, not a shadow.
+
+## 2026-10-13 — clay polish, batch 2: the customer screens (DECISIONS row 230)
+
+Batch 2 of the clay polish plan: the profile in Sorani (no sideways scroll, readable labels, one colour), a
+real not-found page, the points page (honest error, readable balance, one raised coin and one raised check-in
+slab), no third-party avatars, the phone cart as clay trays with one raised summary (two columns from 1024 px),
+calm order lists with ink totals, clay hero buttons, the buy column that starts with its identity, empty states
+with a next step, quiet checkout step numbers, «طلب جديد» that opens nothing while the community is shut, and
+Sorani for every string on the points page, the cart and the profile. Measured locally against the batch-1
+build with the same toolchain.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (batch 1, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 43,004 B | **42,544 B (−460 B)** | — |
+| CSS, public files (8) | 55,483 B | **55,023 B (−460 B)**; local headroom 6,417 B | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,238 B | 7,238 B (untouched); headroom 442 B | 7.5 KB = 7,680 B, **not raised** |
+| entry chunk | 65,234 B | **65,368 B (+134 B)** | 72 KB |
+| initial payload (4 files) | 184,667 B | **184,801 B (+134 B)** | 200 KB |
+| `NotFound-*.js` (new, lazy) | — | 785 B | 250 KB per chunk |
+| merchant workspace shell closure | 32,711 B | 32,712 B (no shell source changed; ±3 B import-hash noise in Button, Menu, Overlay, Segmented, Sheet, money); headroom 56 B | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: removed — the profile's ten one-off tile colours (`text-sky-500` … `bg-orange-900/30`),
+`text-flame`, `after:bg-zinc-700`, the label sizes `text-[9px] sm:text-[10px] leading-[12px] min-h-[24px]`;
+the points coin's hex layers, tilts and offsets (`bg-[#6b5f3c]`, the `#BAA369 → #ffe55c` gradient,
+`border-[4px]`, `-rotate-12`, `translate-x-[3px]`, `translate-y-[4px]`), the check-in card's rotated
+under-layer, binder holes and paperclip, the spend row's rose tint; the cart's `sm:mx-4 sm:mt-4 sm:rounded-xl`
+bands; the hero's private white/black button utilities; `fill-sky-500`; the typeset cover's 36 px title.
+Added — `lg:sr-only` (the product title, visually hidden only from 1024 px) and `fill-info`. Everything else
+reuses classes already in the sheet (the trade-in form's `lg:grid-cols-[minmax(0,1fr)_340px]` grid,
+`lv-surface`, `lv-surface-raised`, `lv-well`, `top-20`). The entry gained the initials helper, the header's
+avatar-failure state and the lazy `NotFound` import, and lost the third-party avatar URL.

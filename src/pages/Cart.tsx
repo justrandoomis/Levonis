@@ -547,21 +547,23 @@ export default function Cart() {
    * answers (come back tomorrow versus buy it now instead). The decoded
    * sentence is never rewritten; the counter is named after it.
    *
-   * The Kurdish is deliberately absent rather than invented: `loc` falls back
-   * to the Arabic sentence, which is the documented behaviour of this app's
-   * translator, and the owner writes the Sorani by hand.
+   * Sorani has its own sentence, in the words of the quota refusal itself
+   * («پشکی پێشداواکاری», «فرۆشتنی ڕاستەوخۆ»): a ckb slot never carries the
+   * Arabic (docs/DECISIONS.md row 183).
    */
   const counterNamed = useCallback(
     (code: string): string =>
       code === 'PREORDER_CAPACITY_EXHAUSTED'
         ? loc(
             'العدّاد: حصة الطلب المسبق لهذا الاختيار — وليس مخزون البيع المباشر.',
-            'The counter: this selection’s pre-order quota — not direct-sale stock.'
+            'The counter: this selection’s pre-order quota — not direct-sale stock.',
+            'ژمێرەر: پشکی پێشداواکاری بۆ ئەم هەڵبژاردەیە — نەک کۆگای فرۆشتنی ڕاستەوخۆ.'
           )
         : code === 'OUT_OF_STOCK' || code === 'QTY_UNAVAILABLE'
           ? loc(
               'العدّاد: مخزون البيع المباشر لهذا الاختيار.',
-              'The counter: direct-sale stock for this selection.'
+              'The counter: direct-sale stock for this selection.',
+              'ژمێرەر: کۆگای فرۆشتنی ڕاستەوخۆ بۆ ئەم هەڵبژاردەیە.'
             )
           : '',
     [loc]
@@ -1480,8 +1482,14 @@ export default function Cart() {
             </button>
           </div>
         ) : (
-        <>
-        <div className="bg-surface pb-3 sm:mx-4 sm:mt-4 sm:rounded-xl">
+        // THE PHONE CART IS CLAY: the lines, the offers and the support code
+        // are each one flush tray on the canvas (mx-4), and the summary is the
+        // screen's one raised card. From 1024px the trays keep the left
+        // column and the summary rides beside them, sticky under the fixed
+        // bar (the trade-in form's two-column grid, class for class).
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        <div className="min-w-0">
+        <div className="lv-surface mx-4 mt-4 pb-3 overflow-hidden">
           {/* Group Header */}
           <div className="px-4 py-3 flex items-center gap-2">
             <span className="text-text-secondary text-[15px] font-medium">
@@ -1948,7 +1956,8 @@ export default function Cart() {
                               {rem.preorder
                                 ? loc(
                                     `بقي ${rem.left} من حصة الطلب المسبق`,
-                                    `${rem.left} left in the pre-order quota`
+                                    `${rem.left} left in the pre-order quota`,
+                                    `${rem.left} لە پشکی پێشداواکاری ماوە`
                                   )
                                 : loc(`متبقي ${rem.left} فقط`, `Only ${rem.left} left`, `تەنها ${rem.left} ماوە`)}
                             </span>
@@ -1971,7 +1980,7 @@ export default function Cart() {
         </div>
 
         {/* Deals Row */}
-        <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
+        <div className="lv-surface mx-4 mt-3 flex flex-col overflow-hidden">
           <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-surface-selected transition-colors">
             <div className="flex items-center gap-2">
               <svg viewBox="0 0 24 24" className="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2055,7 +2064,7 @@ export default function Cart() {
             §3.3: separate from the discount coupon and from points, shown
             automatically when a share link brought one, removable for good,
             enterable by hand, and with ZERO effect on any amount below. */}
-        <div className="mt-2 flex flex-col bg-surface sm:mx-4 sm:rounded-xl">
+        <div className="lv-surface mx-4 mt-3 flex flex-col overflow-hidden">
           <button
             type="button"
             onClick={() => setSupportOpen((v) => !v)}
@@ -2213,8 +2222,10 @@ export default function Cart() {
           </div>
         </div>
 
+        </div>
+
         {/* Summary Details */}
-        <div className="mt-2 bg-surface p-4 mb-4 flex flex-col gap-3 sm:mx-4 sm:rounded-xl">
+        <div className="lv-surface-raised mx-4 mt-3 mb-4 p-4 flex flex-col gap-3 lg:mt-4 lg:sticky top-20">
           <h3 className="text-text-primary font-bold text-[16px] mb-1">{loc('ملخص الطلب', 'Order Summary', 'کورتەی داواکاری')}</h3>
 
           <div className="flex justify-between items-center">
@@ -2295,7 +2306,8 @@ export default function Cart() {
                     )
                   : loc(
                       `عضوية ${memberLabel} تغطي حتى ${money(deliveryBenefit.subsidy)} من أجرة التوصيل`,
-                      `Your ${memberLabel} membership covers up to ${money(deliveryBenefit.subsidy)} of the delivery fee`
+                      `Your ${memberLabel} membership covers up to ${money(deliveryBenefit.subsidy)} of the delivery fee`,
+                      `ئەندامێتی ${memberLabel} تا ${money(deliveryBenefit.subsidy)} لە کرێی گەیاندن دەگرێتە ئەستۆ`
                     )
                 : loc(
                     `أضف ${money(deliveryBenefit.shortBy)} ليصبح التوصيل مجانيًا بعضوية ${memberLabel}`,
@@ -2303,17 +2315,17 @@ export default function Cart() {
                     `${money(deliveryBenefit.shortBy)} زیاد بکە بۆ گەیاندنی بێبەرامبەری ${memberLabel}`
                   )}
               {deliveryBenefit.methodNames.length > 0 &&
-                ` (${deliveryBenefit.methodNames.join(loc('، ', ', '))})`}
+                ` (${deliveryBenefit.methodNames.join(loc('، ', ', ', '، '))})`}
             </p>
           )}
 
           {/* §4: the cash-on-delivery tax is still calculated on every order
               and then waived, so this says what happens rather than promising
-              there is no tax. No Sorani equivalent exists for the waiver, so
-              it reads in Arabic there rather than in invented Kurdish. */}
+              there is no tax. Sorani names the tax as the checkout does
+              («باجی پارەدان لە کاتی گەیاندن»; DECISIONS row 183). */}
           {activeMembership?.cod_tax_exempt && memberLabel && (
             <p className="-mt-1 text-[12px] leading-relaxed text-gold/90" data-cart-member-cod>
-              {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
+              {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax', 'لە باجی پارەدان لە کاتی گەیاندن بەخشراویت')}
             </p>
           )}
 
@@ -2346,7 +2358,7 @@ export default function Cart() {
             <span className="text-text-primary font-bold text-[17px]">{money(total)}</span>
           </div>
         </div>
-        </>
+        </div>
         )}
       </div>
 
