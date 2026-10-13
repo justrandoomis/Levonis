@@ -47,7 +47,7 @@ export default function StockSelection({
   const chosen = value?.product_id === product ? `${value.scope}:${value.scope_id}` : '';
   return (
     <div className="grid gap-3">
-      <Field label={loc('ابحث عن المنتج أو امسح SKU', 'Find product or scan SKU')}>
+      <Field label={loc('ابحث عن المنتج أو امسح SKU', 'Find product or scan SKU', 'بەرهەم بدۆزەوە یان کۆدی SKU سکان بکە')}>
         <ProductPicker
           value={product}
           onChange={(id) => {
@@ -56,7 +56,7 @@ export default function StockSelection({
           }}
         />
       </Field>
-      {busy && <p className={`text-sm ${T.text3}`}>{loc('جاري تحميل الخيارات…', 'Loading selections…')}</p>}
+      {busy && <p className={`text-sm ${T.text3}`}>{loc('جاري تحميل الخيارات…', 'Loading selections…', 'هەڵبژاردەکان باردەکرێن…')}</p>}
       {error && (
         <p role="alert" className="text-sm text-red-600">
           {error}
@@ -64,10 +64,10 @@ export default function StockSelection({
       )}
       {rows.length > 0 && rows[0].product_id === product && (
         <Select
-          label={loc('الخيار واللون / النسخة', 'Option and colour / variant')}
+          label={loc('الخيار واللون / النسخة', 'Option and colour / variant', 'هەڵبژاردە و ڕەنگ / جۆر')}
           value={chosen}
           onChange={(id) => onChange(rows.find((r) => `${r.scope}:${r.scope_id}` === id) ?? null)}
-          empty={loc('حدد المنتج الدقيق', 'Choose exact selection')}
+          empty={loc('حدد المنتج الدقيق', 'Choose exact selection', 'هەڵبژاردەی ورد دیاری بکە')}
           options={rows.map((r) => ({
             id: `${r.scope}:${r.scope_id}`,
             name: `${r.label}${r.sku ? ` · ${r.sku}` : ''}`,
@@ -77,17 +77,17 @@ export default function StockSelection({
       {value?.image_url && <img src={value.image_url} alt="" className="inventory-thumb" loading="lazy" />}
       {value && (
         <p className={`text-xs ${T.text3}`}>
-          {loc('المتاح', 'Available')}: {value.stock === null ? '∞' : value.stock - value.reserved} ·{' '}
-          {loc('سعر البيع المرجعي', 'Selling reference')}: {money(value.selling_price_iqd)}
+          {loc('المتاح', 'Available', 'بەردەست')}: {value.stock === null ? '∞' : value.stock - value.reserved} ·{' '}
+          {loc('سعر البيع المرجعي', 'Selling reference', 'نرخی فرۆشتنی ئاماژە')}: {money(value.selling_price_iqd)}
           {showPurchaseReference && value.purchase_unit_iqd !== undefined && (
             <>
               {' '}
-              · {loc('تكلفة الشراء المرجعية', 'Purchase reference')}: {value.purchase_unit_iqd == null ? loc('تحتاج إدخالًا', 'Needs input') : money(value.purchase_unit_iqd)} (
+              · {loc('تكلفة الشراء المرجعية', 'Purchase reference', 'تێچووی کڕینی ئاماژە')}: {value.purchase_unit_iqd == null ? loc('تحتاج إدخالًا', 'Needs input', 'پێویستی بە تێخستنە') : money(value.purchase_unit_iqd)} (
               {['latest_purchase', 'confirmed_purchase'].includes(value.cost_source)
-                ? loc('آخر شراء لنفس النسخة', 'Latest purchase')
+                ? loc('آخر شراء لنفس النسخة', 'Latest purchase', 'دوایین کڕینی هەمان جۆر')
                 : value.cost_source === 'catalogue'
-                  ? loc('بطاقة المنتج', 'Catalogue')
-                  : loc('غير معروفة', 'Unknown')}
+                  ? loc('بطاقة المنتج', 'Catalogue', 'کارتی بەرهەم')
+                  : loc('غير معروفة', 'Unknown', 'نەزانراو')}
               ){value.cost_date ? ` · ${value.cost_date.slice(0, 10)}` : ''}
             </>
           )}

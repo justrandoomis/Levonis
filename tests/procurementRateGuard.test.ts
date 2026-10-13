@@ -9,9 +9,10 @@
  * a save without an approved rate is refused, and a rate more than 6% away
  * needs `confirm_rate: true` — decided by the server.
  *
- * F17: the owner's finance screens (the purchase panel, the selection price
- * dialog, the legacy investment register) carry their own Sorani for every
- * `loc()` call instead of falling back to the Arabic (row 183).
+ * F17: the owner's finance screens (the purchase panel with its funding and
+ * product steps, the selection price dialog, the legacy investment register)
+ * carry their own Sorani for every `loc()` call instead of falling back to the
+ * Arabic (row 183).
  *
  * Run: node --import tsx --test tests/procurementRateGuard.test.ts
  */
@@ -198,6 +199,16 @@ test('the purchase panel never seeds 1 for a foreign currency; it prefills, bloc
   assert.match(panel, /data-purchase-rate="far"/);
 });
 
+test('«Keep this session’s draft» (serials, local only) shows no rate refusal; the server draft save still waits for the rate', () => {
+  const panel = src('src/components/adminOperations/ProcurementPanel.tsx');
+  const handler = panel.match(/onClick=\{\(\) => \{ saveLocal\(\);([^\n]*?)\}\}>\{hasDraftSerials/)?.[1];
+  assert.ok(handler, 'the draft button handler');
+  // The rate refusal sits inside the branch that sends the draft to the server…
+  assert.match(handler, /^ if \(costsValid && originsValid && !hasDraftSerials\) \{ if \(!rateReady\) \{ op\.setError\([^;]*\); return; \} op\.run\(\(\) => save\('draft'\)/);
+  // …so a local-only keep (a draft with serials) never reaches it.
+  assert.equal(handler.indexOf('!rateReady') > handler.indexOf('!hasDraftSerials'), true);
+});
+
 /** Every `loc()` call of a file: its argument texts (null for a non-literal) and its line. */
 function locCalls(path: string) {
   const sf = ts.createSourceFile(path, src(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -220,6 +231,9 @@ function locCalls(path: string) {
 test('F17: the owner finance screens give every loc() its own Sorani — never the Arabic fallback (row 183)', () => {
   for (const path of [
     'src/components/adminOperations/ProcurementPanel.tsx',
+    // The panel's funding step (step 0) and product step (step 1).
+    'src/components/adminOperations/PurchaseFundingFields.tsx',
+    'src/components/adminOperations/StockSelection.tsx',
     'src/components/adminOperations/SelectionPriceUpdate.tsx',
     'src/components/financePeople/LegacyInvestmentHistory.tsx',
   ]) {
