@@ -186,7 +186,7 @@ const PRODUCT_SCHEMA = object(
           'The ways to pre-order and their unit prices (the opening choice), offers applied.'
         ),
       },
-      'How the product can be bought and what each way costs.'
+      'How the product can be bought and what the cart charges per unit for each way. These are the prices to quote as what a customer pays; `price` is the item price, which a way to buy can exceed.'
     ),
     options: array(OPTION_SCHEMA),
     colors: array(COLOR_SCHEMA),

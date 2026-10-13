@@ -40,13 +40,14 @@ import { arithmeticLeaks } from './fixtures/costlyProduct';
 import { pricingWorld } from './fixtures/procurementPricing';
 import { legacyProductId } from './fixtures/legacyCatalogue';
 import { loadPreviewContext, loadProducts } from '../worker/lib/pricingEngine/load';
+import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 
 // ------------------------------------------------------------------ fixture
 
 const SEA = JSON.stringify([{ method: 'sea', commission_iqd: 15_000, active: true }]);
 const OFF = 10_000;
 
-function setup(offer: { required_tiers?: string[] } | null = {}) {
+function setup(offer: { required_tiers?: string[]; discount_iqd?: number } | null = {}) {
   resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
@@ -76,7 +77,7 @@ function setup(offer: { required_tiers?: string[] } | null = {}) {
                                     discount_percent,discount_iqd,plus_price_iqd,locked_preview,active)
          VALUES ('product','p_a1','ofw_a1',NULL,NULL,?,'discount_iqd',NULL,NULL,?,NULL,1,1)`
       )
-      .run(JSON.stringify(offer.required_tiers ?? []), OFF);
+      .run(JSON.stringify(offer.required_tiers ?? []), offer.discount_iqd ?? OFF);
   }
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
@@ -218,6 +219,53 @@ test('C2: with no window the figures are the ladder ones, unchanged (no price mo
   const quote = await json(await post(buyer, '/api/products/a1/quote', { qty: 1, fulfillmentType: 'direct_sale' }));
   assert.equal(quote.quote.unit_subtotal_iqd, 150_000);
   assert.deepEqual(modesOf(quote.pricing_modes), { direct: 150_000, routes: [['sea', 115_000, 150_000]] });
+});
+
+test('C2: a window priced below its floor reaches the customer as the cart\'s own refusal (OFFER_INACTIVE), never as the floor\'s internal code', async () => {
+  // 150,000 off a 100,000 product: `applyOfferToResolved` refuses the window
+  // (DERIVED_PRICE_BELOW_FLOOR + OFFER_INACTIVE). The page prints every code
+  // its opening price and its quote carry, so only the one the door refuses
+  // with — and the page has a sentence for — may reach it.
+  const { db } = setup({ discount_iqd: 150_000 });
+  const buyer = appAs(db, 'buyer');
+  const detail = await json(await buyer.request('/api/products/a1'));
+  assert.deepEqual(detail.pricing.errors, ['OFFER_INACTIVE'], 'the opening price');
+  const quote = await json(await post(buyer, '/api/products/a1/quote', { qty: 1, fulfillmentType: 'direct_sale' }));
+  assert.deepEqual(quote.quote.errors, ['OFFER_INACTIVE'], 'the quote');
+  assert.equal(JSON.stringify([detail, quote]).includes('DERIVED_PRICE_BELOW_FLOOR'), false);
+  // The door says the same thing.
+  const added = await json(await post(buyer, '/api/cart/items', { productId: 'p_a1', qty: 1, fulfillmentType: 'direct_sale' }));
+  assert.equal(added.code, 'OFFER_INACTIVE', JSON.stringify(added).slice(0, 300));
+  // …and the product page has the sentence in all three languages (the
+  // refusal table's own wording), so `reasonText` never prints the code.
+  const page = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    assert.ok(page.includes(`OFFER_INACTIVE: '${REFUSAL_STRINGS.OFFER_INACTIVE[lang]}'`), `Product.tsx STRINGS.${lang}.OFFER_INACTIVE`);
+  }
+  assert.equal(page.match(/^\s+OFFER_INACTIVE: '/gm)?.length, 3, 'one sentence per language');
+  assert.notEqual(REFUSAL_STRINGS.OFFER_INACTIVE.ckb, REFUSAL_STRINGS.OFFER_INACTIVE.ar);
+  await Promise.allSettled(pending);
+});
+
+test('C2: the public API says which figure the cart charges — `price` is the item price, `purchase` the price of each way to buy', async () => {
+  const { db } = setup();
+  // The fixture is the case the wording must survive: item 90,000, cart 140,000 direct / 105,000 by sea.
+  const api = await publicProduct(db, 'a1');
+  assert.equal(api.price.amount, 100_000 - OFF);
+  assert.equal(api.purchase.direct_sale, DIRECT);
+  const env = { DB: db, STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+  const res = await worker.fetch(
+    new Request(`https://${APEX}/api/public/v1/context`, { headers: { Host: APEX, 'CF-Connecting-IP': '9.9.9.9' } }),
+    env as never,
+    workerCtx
+  );
+  const prices = String(((await json(res)) as J).conventions.prices);
+  assert.doesNotMatch(prices, /same number the cart charges/, 'the item price is not what the cart charges for every way to buy');
+  assert.match(prices, /item price/);
+  assert.match(prices, /`purchase`[^.]*what the cart charges/);
+  const doc = readFileSync(join(ROOT, 'docs/PUBLIC_API.md'), 'utf8');
+  assert.doesNotMatch(doc, /Every price is the final\s+price the cart charges/);
+  assert.match(doc, /`purchase` block carries what the cart charges/);
 });
 
 // ------------------------------------------------------------------- C5

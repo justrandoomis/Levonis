@@ -220,6 +220,7 @@ const STRINGS = {
     TRANSPORT_NOT_APPLICABLE: 'وسيلة النقل لا تنطبق على البيع المباشر.',
     WARRANTY_PLAN_NOT_FOUND: 'خطة الضمان غير متاحة.',
     REGULAR_PRICE_INVALID: 'سعر هذا المنتج غير صالح — تواصل مع الدعم.',
+    OFFER_INACTIVE: 'هذا العرض غير متاح حاليًا.',
   },
   en: {
     compareCta: 'Compare', cheaperCta: 'Found it cheaper', giniCta: 'Want it in instalments?',
@@ -286,6 +287,7 @@ const STRINGS = {
     TRANSPORT_NOT_APPLICABLE: 'Transport does not apply to a direct sale.',
     WARRANTY_PLAN_NOT_FOUND: 'That warranty plan is unavailable.',
     REGULAR_PRICE_INVALID: 'This product has an invalid price — please contact support.',
+    OFFER_INACTIVE: 'This offer is not available right now.',
   },
   ckb: {
     compareCta: 'بەراورد', cheaperCta: 'لە شوێنێکی هەرزانتر دۆزیمەوە', giniCta: 'بە قیست دەتەوێت؟',
@@ -368,6 +370,7 @@ const STRINGS = {
     TRANSPORT_NOT_APPLICABLE: 'گواستنەوە بۆ فرۆشتنی ڕاستەوخۆ ناگونجێت.',
     WARRANTY_PLAN_NOT_FOUND: 'ئەم پلانی گەرەنتییە بەردەست نییە.',
     REGULAR_PRICE_INVALID: 'نرخی ئەم بەرهەمە دروست نییە — پەیوەندی بە پشتگیری بکە.',
+    OFFER_INACTIVE: 'ئەم ئۆفەرە ئێستا بەردەست نییە.',
   },
 } as const;
 
@@ -3793,17 +3796,20 @@ export default function Product() {
                   fallbackClassName="text-text-muted"
                 />
                 {activeMedia?.url ? (
-                  <button
-                    type="button"
-                    ref={(el) => {
-                      zoomBtnRef.current = el;
-                    }}
-                    onClick={() => setLightbox(true)}
-                    aria-label={s.zoom}
-                    className="absolute bottom-2 end-2 w-11 h-11 rounded-full bg-onyx/80 flex items-center justify-center text-snow transition-colors"
-                  >
-                    <ZoomIn aria-hidden="true" className="w-5 h-5" />
-                  </button>
+                  /* The house round button: a 44px target around a 36px
+                     raised disc. IconButton positions itself relative, so
+                     the corner placement lives on this wrapper. */
+                  <span className="absolute bottom-2 end-2">
+                    <IconButton
+                      variant="secondary"
+                      ref={(el: HTMLButtonElement | null) => {
+                        zoomBtnRef.current = el;
+                      }}
+                      onClick={() => setLightbox(true)}
+                      label={s.zoom}
+                      icon={<ZoomIn aria-hidden="true" className="w-5 h-5" />}
+                    />
+                  </span>
                 ) : null}
               </div>
 
@@ -4461,14 +4467,14 @@ export default function Product() {
         testId="product-lightbox"
         panelClassName="bg-black max-w-full max-h-[calc(100dvh-2rem)] overflow-hidden"
       >
-        <button
-          type="button"
-          onClick={() => setLightbox(false)}
-          aria-label={s.close}
-          className="absolute top-4 end-4 z-10 w-11 h-11 rounded-full bg-surface-raised border border-border-subtle flex items-center justify-center text-text-primary"
-        >
-          <X aria-hidden="true" className="w-5 h-5" />
-        </button>
+        <span className="absolute top-4 end-4 z-10">
+          <IconButton
+            variant="secondary"
+            onClick={() => setLightbox(false)}
+            label={s.close}
+            icon={<X aria-hidden="true" className="w-5 h-5" />}
+          />
+        </span>
         <img
           src={activeMedia?.url}
           alt={pick(lang as Lang, activeMedia?.alt_ar, activeMedia?.alt_en, activeMedia?.alt_ckb) || name}

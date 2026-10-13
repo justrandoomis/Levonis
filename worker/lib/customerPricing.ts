@@ -136,6 +136,17 @@ export interface CustomerLinePrice {
   errors: string[];
 }
 
+/**
+ * Error codes that describe HOW a price failed, not what the customer can do
+ * about it — the owner's diagnosis, never a customer sentence. A live window
+ * whose price falls below its floor (`applyOfferToResolved`) reports
+ * `DERIVED_PRICE_BELOW_FLOOR` beside `OFFER_INACTIVE`; the cart refuses with
+ * `OFFER_INACTIVE` alone (`offerPriceRefusal`), and the product page prints
+ * every code it receives. So the customer gets the refusal the door gives —
+ * «هذا العرض غير متاح حاليًا» — and the floor stays on the server.
+ */
+const CUSTOMER_HIDDEN_ERRORS: ReadonlySet<string> = new Set(['DERIVED_PRICE_BELOW_FLOOR']);
+
 export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
   const f = r.fulfillment as ResolvedPrice['fulfillment'] | null | undefined;
   return {
@@ -153,7 +164,7 @@ export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
       : null,
     transport: r.transport ? { method: r.transport.method } : null,
     warranty: customerWarranty(r.warranty),
-    errors: [...r.errors],
+    errors: r.errors.filter((e) => !CUSTOMER_HIDDEN_ERRORS.has(e)),
   };
 }
 

@@ -181,7 +181,7 @@ export const PRICE_SCHEMA = object(
     currency: enumOf(['IQD'], 'Iraqi dinar. Every amount is a whole number of dinars.'),
     amount: nullable(
       integer(
-        'What a signed-out customer pays for one unit today, offers applied; the lowest option\'s price when `from` is true. Null when the price is shown only to members.'
+        'The item price a signed-out customer sees for one unit today, offers applied; the lowest option\'s price when `from` is true. A way to buy can cost more: the `purchase` block of the full product record gives what the cart charges for each. Null when the price is shown only to members.'
       )
     ),
     regular: nullable(integer('The regular price the amount is compared with (equal to `amount` when nothing is discounted).')),

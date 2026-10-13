@@ -44,9 +44,14 @@ Owner's request (2026-09-28): «Public Read-Only API متكامل لموقع Lev
 Every answer except `/`, `/context` and `/openapi.json` is
 `{ "data", "meta": { "version", "pagination" }, "links": { "self", "next", "web" } }`.
 Texts are `{ "ar", "en", "ckb" }`; prices are whole IQD; items are identified
-by slug and carry `url` (website) and `api_url`. Every price is the final
-price the cart charges, live offers applied (the `purchase` block included);
-no cost, fee or formula is published. On a product priced per variant, each
+by slug and carry `url` (website) and `api_url`. A product's `price`,
+`options[].price`, `colors[].price` and `combinations[].price` are the ITEM
+price, live offers applied — not always what the cart charges, because a way
+to buy can cost more (buying from stock in Iraq, or a pre-order route). The
+product's `purchase` block carries what the cart charges per unit for each way
+to buy it as its page opens (`direct_sale`; each `pre_order` route `prepaid`
+and `cash_on_delivery`), live offers applied. Only final prices are published;
+no cost, fee or formula. On a product priced per variant, each
 `options[].price` and `colors[].price` is the LOWEST variant with that choice
 or colour, and `from: true` says the variants differ (DECISIONS rows 202 and
 225 — the card's and the comparison's «from» rule). A shop's slug is the first
