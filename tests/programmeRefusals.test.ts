@@ -159,6 +159,24 @@ const REQUIRED: Record<string, readonly string[]> = {
   // count is the owner's to post, and the receive door tells anyone else only
   // that a purchase waits for him — one answer each, whatever the cost data.
   'DECISIONS row 220 verification': ['LOT_COUNT_UP_OWNER_ONLY', 'RECEIVE_AWAITS_OWNER'],
+  // Pricing V2 (DECISIONS rows 221, 222): migration 0189's three database
+  // refusals and the V2-3 / V2-5 codes of the spec (§3.10), all landed with
+  // 0189 so no later V2 stage ships one in a single language. §3.10's
+  // customer code PRICE_NOT_READY is NOT here: §6.1 dropped it (DROPPED below).
+  'Pricing V2 spec §2.8, §3.10 (0189)': [
+    'PRICING_V2_MANAGED',
+    'PRICING_V2_OWNER_ONLY',
+    'PRICING_V2_FEES_RETIRED',
+    'PRICING_V2_NO_MANUAL',
+    'PRICING_V2_PURCHASE_LATER',
+    'PRICING_V2_DISCOUNT_TOO_LARGE',
+    'PRICING_V2_PRICE_MISSING',
+    'PRICING_V2_SCOPE_INVALID',
+    'PRICING_V2_NOT_MIGRATED',
+    'PRICING_V2_MIGRATION_STALE',
+    'OPTION_ID_RESERVED',
+    'PRICING_SNAPSHOT_IMMUTABLE',
+  ],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

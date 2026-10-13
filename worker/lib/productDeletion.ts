@@ -160,6 +160,16 @@ export const OWNED_TABLES: OwnedTable[] = [
   // a guest is charged), the product's own configuration, worthless without
   // it. Deleted after the state row, so its engine guard is already off.
   { table: 'product_sku_prices', by: { column: 'product_id' } },
+  // 0189 (Pricing V2): the dollar price points, the pre-order discount, the
+  // V2 results and the legacy snapshot — the product's own private pricing,
+  // worthless without it. The results' guard is off once the state row is
+  // gone (as 0183's); the points, the discounts and the append-only snapshot
+  // stay guarded while the product exists, so their deletes hold a token
+  // inside this batch (DELETION_GUARDS below).
+  { table: 'pricing_price_points', by: { column: 'product_id' } },
+  { table: 'pricing_preorder_discounts', by: { column: 'product_id' } },
+  { table: 'pricing_v2_sku_results', by: { column: 'product_id' } },
+  { table: 'pricing_legacy_snapshots', by: { column: 'product_id' } },
   // 0184: the product's verdict against the required-field list and its
   // «hide incomplete» hold — derived from the product alone, codes only,
   // worthless without it (the FK cascades too; listed so the registry stays
@@ -881,7 +891,28 @@ export async function blockingReferences(db: DeletionDb, productId: string): Pro
  * while a product that outlives a deleted file is a broken catalogue page.
  */
 /** Private engine tables, reported together as `pricing_engine` (never by their own names). */
-const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set(['product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_direct_purchase']);
+const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set([
+  'product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_direct_purchase',
+  'pricing_price_points', 'pricing_preorder_discounts', 'pricing_v2_sku_results', 'pricing_legacy_snapshots',
+]);
+
+/**
+ * The guard token an explicit delete of a table must hold while the product
+ * still exists, acquired and removed around that one DELETE in this same
+ * atomic batch (so a failed deletion leaves no token behind):
+ *   - the direct-purchase store (0186) needs the owner-input token even on a
+ *     manual product;
+ *   - the V2 price points and discount (0189) need the engine's price token,
+ *     which their guards ask for whatever the product's mode;
+ *   - the V2 legacy snapshot (0189) is append-only and refuses a delete while
+ *     the product exists unless this deletion says so ('product-delete:').
+ */
+const DELETION_GUARDS: ReadonlyMap<string, (productId: string) => string> = new Map([
+  ['pricing_direct_purchase', (id: string) => `pricing-input-owner:${id}`],
+  ['pricing_price_points', (id: string) => `engine-price:${id}`],
+  ['pricing_preorder_discounts', (id: string) => `engine-price:${id}`],
+  ['pricing_legacy_snapshots', (id: string) => `product-delete:${id}`],
+]);
 
 export async function deleteProductPermanently(
   db: DeletionDb,
@@ -975,10 +1006,10 @@ export async function deleteProductPermanently(
 
   for (const child of OWNED_TABLES) {
     if (!(await tableExists(db, child.table))) continue;
-    // The direct-purchase store requires an owner token while the product
-    // exists, even in manual mode. Acquire and remove it in this same atomic
-    // batch so explicit deletion works with foreign keys both on and off.
-    const ownerGuard = child.table === 'pricing_direct_purchase' ? `pricing-input-owner:${productId}` : null;
+    // A guarded private store (DELETION_GUARDS) refuses a delete while the
+    // product exists, even in manual mode. Acquire and remove its token in this
+    // same atomic batch so explicit deletion works with foreign keys both on and off.
+    const ownerGuard = DELETION_GUARDS.get(child.table)?.(productId) ?? null;
     if (ownerGuard) {
       statements.push(db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(ownerGuard));
       ledger.push({ kind: 'guard', table: 'ops_guards' });

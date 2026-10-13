@@ -65,12 +65,44 @@ export async function skuPricesInstalled(db: D1Database): Promise<boolean> {
   }
 }
 
-/** The columns 0181 adds to live tables, the only ones this helper answers for. */
+/**
+ * Pricing V2 (0189): the method column on the engine state and the four V2
+ * stores (price points, the pre-order discount, the private V2 results, the
+ * legacy snapshot). One statement names them all, so a database that lacks
+ * any one of them answers "no" and every V2 path keeps today's behaviour: no
+ * product is V2, nothing reads or writes the V2 tables. Remembered only when
+ * present, like the checks above.
+ */
+export async function pricingV2Installed(db: D1Database): Promise<boolean> {
+  if (remembered(db, 'pricing_v2')) return true;
+  try {
+    await db
+      .prepare(
+        `SELECT (SELECT pricing_method FROM product_pricing_state LIMIT 1) AS m,
+                (SELECT 1 FROM pricing_price_points LIMIT 1) AS p,
+                (SELECT 1 FROM pricing_preorder_discounts LIMIT 1) AS d,
+                (SELECT 1 FROM pricing_v2_sku_results LIMIT 1) AS r,
+                (SELECT 1 FROM pricing_legacy_snapshots LIMIT 1) AS s`
+      )
+      .first<{ m: string | null }>();
+    remember(db, 'pricing_v2');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The columns the engine migrations add to live tables, the only ones this
+ * helper answers for: 0181's, plus 0189's method and first-V2-write stamp on
+ * `product_pricing_state`.
+ */
 export const ENGINE_CORE_COLUMNS = {
   purchase_charges: ['pricing_role'],
   order_items: ['price_basis', 'engine_combo_key', 'engine_channel', 'engine_regular_iqd', 'usd_iqd_at_purchase', 'base_usd_at_purchase'],
   price_history: ['usd_iqd_rate', 'price_source'],
   price_protection_claims: ['eligible_unit_iqd', 'basis', 'usd_iqd_at_purchase', 'base_usd_at_purchase', 'base_usd_observed'],
+  product_pricing_state: ['pricing_method', 'v2_since'],
 } as const;
 
 export type EngineCoreTable = keyof typeof ENGINE_CORE_COLUMNS;

@@ -84,6 +84,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0183 (FX plan §4.4, FX-7) — the per-SKU final price rung the cart's
     // resolver reads after the colour: written only by the engine's writer.
     'product_sku_prices',
+    // 0189 (Pricing V2, DECISIONS row 222) — the V2 writer's own private
+    // stores: the dollar price points, the one pre-order discount, the
+    // computed figures per SKU and channel, and the legacy snapshot taken at
+    // the owner's migration confirm. Catalogue owns them for the reason
+    // above: the writer is the act of pricing a catalogue product.
+    'pricing_price_points', 'pricing_preorder_discounts', 'pricing_v2_sku_results', 'pricing_legacy_snapshots',
     // 0184 (owner brief 2026-10-10) — each catalogue product's verdict against
     // the one central list of required fields, and the owner's «hide
     // incomplete» hold. Derived from the product row and its pricing data, and

@@ -673,6 +673,76 @@ export const COST_REFUSALS = {
     en: 'A lot count that finds more units than the lot records is posted by the main admin only; ask them to post it.',
     ckb: 'ژماردنی وەجبەیەک کە یەکەی زیاتر لە تۆمارەکەی وەجبەکە دەدۆزێتەوە تەنها بەڕێوەبەری سەرەکی تۆماری دەکات؛ داوای لێبکە تۆماری بکات.',
   },
+  // ---- Pricing V2 (docs/PRICING-V2.md; DECISIONS rows 221, 222; spec §2.8, §3.10) ----
+  // Landed whole with migration 0189 so no later V2 stage ships a refusal in one
+  // language. Every one carries `details.section` (3 or 5) and, where there is
+  // one, the scope and id it names — never a value. The three database codes
+  // (fees, the reserved option id, the legacy snapshot) cross as a 409 through
+  // worker/lib/pricingDbRefusals.ts.
+  PRICING_V2_MANAGED: {
+    ar: 'هذا المنتج يُسعَّر بالدولار — عدّل من قسم الأسعار',
+    en: 'This product is priced in US dollars — edit it in the Prices section',
+    ckb: 'ئەم بەرهەمە بە دۆلار نرخ دەدرێت — لە بەشی نرخەکانەوە دەستکاری بکە',
+  },
+  PRICING_V2_OWNER_ONLY: {
+    ar: 'أسعار هذا المنتج تُحسب من التكلفة؛ يعدّلها المالك فقط',
+    en: 'This product is priced from cost; only the owner can change it',
+    ckb: 'نرخی ئەم بەرهەمە لە تێچووەوە دەژمێردرێت؛ تەنها خاوەن دەستکاری دەکات',
+  },
+  PRICING_V2_FEES_RETIRED: {
+    ar: 'لا توجد زيادات أو عمولات على منتج مسعّر بالدولار',
+    en: 'Dollar-priced products carry no surcharge or commission',
+    ckb: 'هیچ زیادە و کۆمیسیۆنێک لەسەر بەرهەمی نرخدراو بە دۆلار نییە',
+  },
+  PRICING_V2_NO_MANUAL: {
+    ar: 'لا يعود منتج مسعّر بالدولار إلى التسعير اليدوي',
+    en: 'A dollar-priced product cannot return to manual pricing',
+    ckb: 'بەرهەمی نرخدراو بە دۆلار ناگەڕێتەوە بۆ نرخدانانی دەستی',
+  },
+  PRICING_V2_PURCHASE_LATER: {
+    ar: 'سُجّلت الدفعة؛ حدّث تكلفة المنتج من قسم الأسعار',
+    en: "Stock recorded; update the product's cost in the Prices section",
+    ckb: 'وەجبەکە تۆمارکرا؛ تێچووی بەرهەمەکە لە بەشی نرخەکانەوە نوێ بکەرەوە',
+  },
+  PRICING_V2_DISCOUNT_TOO_LARGE: {
+    ar: 'خصم الطلب المسبق أكبر من سعر البيع المباشر',
+    en: 'The pre-order discount is larger than the direct-sale price',
+    ckb: 'داشکاندنی پێشداواکردن لە نرخی فرۆشتنی ڕاستەوخۆ زیاترە',
+  },
+  PRICING_V2_PRICE_MISSING: {
+    ar: 'لا يوجد سعر بعد — أكمل قسم الأسعار',
+    en: 'No price yet — complete the Prices section',
+    ckb: 'هێشتا نرخ نییە — بەشی نرخەکان تەواو بکە',
+  },
+  PRICING_V2_SCOPE_INVALID: {
+    ar: 'هذا الاستثناء لا يخص هذا المنتج',
+    en: 'This exception does not belong to this product',
+    ckb: 'ئەم حاڵەتە تایبەتە هی ئەم بەرهەمە نییە',
+  },
+  PRICING_V2_NOT_MIGRATED: {
+    ar: 'هذا المنتج لم يُنقل بعد إلى التسعير بالدولار',
+    en: 'This product has not been moved to dollar pricing yet',
+    ckb: 'ئەم بەرهەمە هێشتا نەگوازراوەتەوە بۆ نرخدانان بە دۆلار',
+  },
+  PRICING_V2_MIGRATION_STALE: {
+    ar: 'تغيّرت أسعار هذا المنتج منذ المعاينة؛ راجعها مرة أخرى',
+    en: 'This product changed since the preview; review it again',
+    ckb: 'ئەم بەرهەمە لە دوای پێشبینینەوە گۆڕاوە؛ دووبارە پێیدا بچۆرەوە',
+  },
+  // Migration 0189's reserved option id: '*' is the option-less product's
+  // stored SKU key ('o:*'), so no option value may take it.
+  OPTION_ID_RESERVED: {
+    ar: 'هذا المعرّف محجوز للنظام؛ اختر معرّفًا آخر للخيار',
+    en: 'This id is reserved by the system; choose another id for the option',
+    ckb: 'ئەم ناسنامەیە بۆ سیستەم پارێزراوە؛ ناسنامەیەکی تر بۆ هەڵبژاردنەکە هەڵبژێرە',
+  },
+  // Migration 0189's legacy snapshot: the old prices kept at the move to dollar
+  // pricing are append-only (never edited, replaced or deleted while the product exists).
+  PRICING_SNAPSHOT_IMMUTABLE: {
+    ar: 'الأسعار القديمة المحفوظة عند النقل إلى الدولار ثابتة ولا تتغير.',
+    en: 'The old prices saved at the move to dollar pricing are fixed and never change.',
+    ckb: 'ئەو نرخە کۆنانەی لە کاتی گواستنەوە بۆ دۆلار پاشەکەوت کران جێگیرن و هەرگیز ناگۆڕێن.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;
