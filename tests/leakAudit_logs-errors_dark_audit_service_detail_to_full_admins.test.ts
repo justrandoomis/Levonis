@@ -213,7 +213,11 @@ async function producerHashes(core: DatabaseSync): Promise<string[]> {
 }
 
 /** Digits inside text that spell any private figure (the shared scanner only spells the fixed sentinels in text). */
-function figuresInText(text: string, figures: { numbers: number[]; decimals: string[] }): string[] {
+function figuresInText(raw: string, figures: { numbers: number[]; decimals: string[] }): string[] {
+  // A SHA-256 digest (the audit chain's hash / prev_hash) is random hex that
+  // can spell a four-digit figure by chance; it is never a cost, so it is
+  // blanked before the scan (a figure anywhere else is still found).
+  const text = raw.replace(/\b[0-9a-f]{64}\b/gi, '#');
   const nums = new Set(figures.numbers.map((n) => String(n)));
   const out: string[] = [];
   for (const m of text.match(/\d[\d,]{3,}(?:\.\d+)?/g) ?? []) {

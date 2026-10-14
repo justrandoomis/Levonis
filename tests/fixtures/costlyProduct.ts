@@ -57,11 +57,13 @@ export interface LeakExtra {
  * A generated id — newId's 20 hex characters behind an optional prefix
  * (`pol_3f6333ab…`), an `ORD-` order id, or a UUID — is random text that can
  * spell a four-digit sentinel by chance (measured: about 1 in 130 sweeps of the
- * 54 policy documents). It is never a cost, so the digit scan skips a string
- * that is exactly such an id. A cost inside any other text is still caught.
+ * 54 policy documents). So is a digest: the audit chain's `hash`/`prev_hash`
+ * are 64 hex characters, and one spelled a sentinel in a workflow 7 run on
+ * 2026-10-14. Neither is ever a cost, so the digit scan skips a string that is
+ * exactly such an id or digest. A cost inside any other text is still caught.
  */
 const GENERATED_ID =
-  /^(?:[A-Za-z][A-Za-z0-9]*[_-])?(?:[0-9A-Fa-f]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^(?:[A-Za-z][A-Za-z0-9]*[_-])?(?:[0-9A-Fa-f]{10,32}|[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64}|[0-9A-Fa-f]{128}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 export const isGeneratedId = (s: string): boolean =>
   GENERATED_ID.test(s) && /[A-Fa-f]/.test(s.replace(/^[A-Za-z][A-Za-z0-9]*[_-]/, ''));
 
