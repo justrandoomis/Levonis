@@ -186,7 +186,7 @@ export default function AdminSecurity() {
         <ShieldAlert className="mt-1 h-6 w-6 shrink-0 text-amber-400" aria-hidden="true" />
         <div>
           <h2 className="text-lg font-semibold">{s('tab')}</h2>
-          <p className="text-sm text-zinc-400">{s('subtitle')}</p>
+          <p className="text-sm text-text-muted">{s('subtitle')}</p>
         </div>
       </header>
 
@@ -209,7 +209,7 @@ export default function AdminSecurity() {
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`min-h-[40px] flex-1 rounded-lg px-3 text-sm ${tab === t ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+            className={`min-h-[40px] flex-1 rounded-lg px-3 text-sm ${tab === t ? 'bg-surface-raised font-semibold text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
           >
             {s(t === 'blocks' ? 'tabBlocks' : t === 'log' ? 'tabLog' : 'tabScores')}
           </button>
@@ -228,26 +228,26 @@ export default function AdminSecurity() {
 
       {tab === 'blocks' && (
         <section className="space-y-2">
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-text-secondary">
             <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
             {s('showAll')}
           </label>
-          {blocks && blocks.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{s('empty')}</p>}
+          {blocks && blocks.length === 0 && <p className="py-8 text-center text-sm text-text-muted">{s('empty')}</p>}
           <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {(blocks ?? []).map((b) => (
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs">{s(KIND_KEY[b.actor_kind])}</span>
+                    <span className="rounded-md bg-surface-selected px-2 py-0.5 text-xs">{s(KIND_KEY[b.actor_kind])}</span>
                     <span className="truncate font-medium">{actorText(b)}</span>
-                    {!b.active && <span className="text-xs text-zinc-500">{b.lifted_at ? s('lifted') : s('expired')}</span>}
+                    {!b.active && <span className="text-xs text-text-muted">{b.lifted_at ? s('lifted') : s('expired')}</span>}
                   </div>
-                  <div className="mt-1 text-xs text-zinc-400">
+                  <div className="mt-1 text-xs text-text-muted">
                     {s(REASON_KEY[b.reason])} · <bdi className="font-mono">{b.reference}</bdi> · {when(b.created_at, lang)} · {s('until')} {when(b.expires_at, lang)} · {s('hits')}: {b.hits}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => openIncident(b.incident_id)} className="min-h-[36px] rounded-lg border border-zinc-700 px-3 text-sm">
+                  <button onClick={() => openIncident(b.incident_id)} className="lv-button lv-button-secondary lv-button-sm">
                     {s('details')}
                   </button>
                   {b.active && (
@@ -260,7 +260,7 @@ export default function AdminSecurity() {
             ))}
           </ul>
           {blocksNext && (
-            <button onClick={() => loadBlocks(blocksNext).catch(() => undefined)} className="w-full rounded-lg border border-zinc-700 py-2 text-sm">
+            <button onClick={() => loadBlocks(blocksNext).catch(() => undefined)} className="lv-button lv-button-secondary w-full">
               {s('more')}
             </button>
           )}
@@ -269,15 +269,15 @@ export default function AdminSecurity() {
 
       {tab === 'log' && (
         <section className="space-y-2">
-          {events && events.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{s('emptyLog')}</p>}
+          {events && events.length === 0 && <p className="py-8 text-center text-sm text-text-muted">{s('emptyLog')}</p>}
           <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {(events ?? []).map((e) => (
               <li key={e.id} className="p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">{eventCodeText(e.code, lang)}</span>
-                  <span className="text-xs text-zinc-400">{when(e.last_at, lang)} · ×{e.count}</span>
+                  <span className="text-xs text-text-muted">{when(e.last_at, lang)} · ×{e.count}</span>
                 </div>
-                <div className="mt-1 text-xs text-zinc-400">
+                <div className="mt-1 text-xs text-text-muted">
                   <bdi className="font-mono">
                     {e.method} {e.route}
                   </bdi>{' '}
@@ -293,7 +293,7 @@ export default function AdminSecurity() {
             ))}
           </ul>
           {eventsNext && (
-            <button onClick={() => loadEvents(eventsNext).catch(() => undefined)} className="w-full rounded-lg border border-zinc-700 py-2 text-sm">
+            <button onClick={() => loadEvents(eventsNext).catch(() => undefined)} className="lv-button lv-button-secondary w-full">
               {s('more')}
             </button>
           )}
@@ -302,14 +302,14 @@ export default function AdminSecurity() {
 
       {tab === 'scores' && (
         <section className="space-y-2">
-          {scores && scores.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">{s('emptyScores')}</p>}
+          {scores && scores.length === 0 && <p className="py-8 text-center text-sm text-text-muted">{s('emptyScores')}</p>}
           <ul className="lv-surface divide-y divide-border-subtle overflow-hidden">
             {(scores ?? []).map((r, i) => (
               <li key={`${r.actor_kind}-${i}`} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                 <div>
-                  <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs">{s(KIND_KEY[r.actor_kind])}</span>{' '}
+                  <span className="rounded-md bg-surface-selected px-2 py-0.5 text-xs">{s(KIND_KEY[r.actor_kind])}</span>{' '}
                   <span>{r.actor.name || r.actor.user_id || `${r.actor.tag ?? ''}…`}</span>
-                  <div className="mt-1 text-xs text-zinc-400">
+                  <div className="mt-1 text-xs text-text-muted">
                     {Object.entries(r.signals)
                       .map(([k, v]) => `${eventCodeText(k, lang)} ×${v}`)
                       .join(' · ')}
@@ -336,16 +336,16 @@ export default function AdminSecurity() {
               <h3 className="text-base font-semibold">
                 {s('incident')} · <bdi className="font-mono">{incident.reference}</bdi>
               </h3>
-              <button onClick={() => setIncident(null)} aria-label={s('close')} className="rounded-lg p-2 hover:bg-zinc-800">
+              <button onClick={() => setIncident(null)} aria-label={s('close')} className="rounded-lg p-2 hover:bg-surface-selected">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-sm text-zinc-300">
+            <p className="text-sm text-text-secondary">
               {s(REASON_KEY[incident.reason])} · {when(incident.created_at, lang)}
             </p>
             <ul className="mt-3 space-y-2">
               {incident.blocks.map((b) => (
-                <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800 p-2 text-sm">
+                <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg border border-border-subtle p-2 text-sm">
                   <span>
                     {s(KIND_KEY[b.actor_kind])} · {actorText(b)} · {b.active ? `${s('until')} ${when(b.expires_at, lang)}` : b.lifted_at ? s('lifted') : s('expired')}
                   </span>
@@ -367,13 +367,13 @@ export default function AdminSecurity() {
               {Object.entries(incident.blocks[0]?.evidence ?? {})
                 .filter(([, v]) => v)
                 .map(([k, v]) => (
-                  <span key={k} className="rounded-md bg-zinc-800 px-2 py-0.5 font-mono text-xs">
+                  <span key={k} className="rounded-md bg-surface-selected px-2 py-0.5 font-mono text-xs">
                     {k}: {v}
                   </span>
                 ))}
             </div>
             <h4 className="mt-4 text-sm font-semibold">{s('timeline')}</h4>
-            <ul className="mt-1 space-y-1 text-xs text-zinc-300">
+            <ul className="mt-1 space-y-1 text-xs text-text-secondary">
               {incident.events.map((e) => (
                 <li key={e.id}>
                   {when(e.last_at, lang)} · {eventCodeText(e.code, lang)} · <bdi className="font-mono">{e.route}</bdi>
@@ -383,7 +383,7 @@ export default function AdminSecurity() {
             {incident.batch && (
               <>
                 <h4 className="mt-4 text-sm font-semibold">{s('batch')}</h4>
-                <p className="text-xs text-zinc-300">
+                <p className="text-xs text-text-secondary">
                   <bdi className="font-mono">{incident.batch.batch_id}</bdi> · {s('firstUsed')}: {incident.batch.first_used_at ? when(incident.batch.first_used_at, lang) : s('notUsed')} · {s('uses')}:{' '}
                   {incident.batch.use_count}
                 </p>
@@ -392,8 +392,8 @@ export default function AdminSecurity() {
             {incident.preview && (
               <>
                 <h4 className="mt-4 text-sm font-semibold">{s('given')}</h4>
-                <p className="text-xs text-zinc-400">{s('givenNote')}</p>
-                <pre dir="ltr" className="mt-1 max-h-80 overflow-auto rounded-lg border border-zinc-800 bg-black p-2 text-[11px] leading-relaxed text-zinc-300">
+                <p className="text-xs text-text-muted">{s('givenNote')}</p>
+                <pre dir="ltr" className="mt-1 max-h-80 overflow-auto rounded-lg border border-border-subtle lv-well p-2 text-[11px] leading-relaxed text-text-secondary">
                   {incident.preview.join('\n')}
                 </pre>
               </>
@@ -406,11 +406,11 @@ export default function AdminSecurity() {
         <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4">
           <div role="alertdialog" aria-modal="true" className="w-full max-w-sm rounded-2xl border border-border-subtle bg-surface-raised p-4 shadow-2xl" dir={dir}>
             <p className="text-sm">{s('liftConfirm')}</p>
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-text-muted">
               {confirm.whole ? s('liftIncident') : `${s(KIND_KEY[confirm.block.actor_kind])} · ${actorText(confirm.block)}`} · <bdi className="font-mono">{confirm.block.reference}</bdi>
             </p>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setConfirm(null)} className="min-h-[40px] rounded-lg border border-zinc-700 px-4 text-sm" disabled={busy}>
+              <button onClick={() => setConfirm(null)} className="lv-button lv-button-secondary" disabled={busy}>
                 {s('cancel')}
               </button>
               <button onClick={lift} className="min-h-[40px] rounded-lg bg-amber-500 px-4 text-sm text-black" disabled={busy}>

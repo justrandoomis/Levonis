@@ -180,7 +180,9 @@ export default function CommunityStorePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      // The shell's canvas (and its light) until the store's own island
+      // arrives: `bg-black` here was the same colour with the light painted out.
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-gold animate-spin" />
       </div>
     );

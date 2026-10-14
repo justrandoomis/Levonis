@@ -275,7 +275,8 @@ export function StoreSettingsTab({
   const shareKey = `${store.slug}|${store.name}|${store.tagline}|${store.logoUrl ?? ''}|${store.accent}`;
 
   return (
-    <div className="space-y-3" ref={formRef} data-store-settings>
+    // One reading column: at 1280 the fields ran the full workspace width.
+    <div className="space-y-3 max-w-[720px]" ref={formRef} data-store-settings>
       <Card title={loc('هوية المتجر', 'Store identity', 'ناسنامەی فرۆشگا')}>
         <div className="space-y-4">
           <Input
@@ -336,7 +337,13 @@ export function StoreSettingsTab({
                 >
                   <AccentSample accent={a.id} />
                   {loc(a.ar, a.en)}
-                  {f.accent === a.id && <Check aria-hidden="true" className="h-3.5 w-3.5" />}
+                  {/* The check is the chip's one cue with the press (lv-choice-mark
+                      drops the start bar), not a third mark beside the bar. */}
+                  {f.accent === a.id && (
+                    <span aria-hidden="true" className="lv-choice-mark">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { LifeBuoy, MessageCircle, Scale } from 'lucide-react';
 import TicketsDesk from './TicketsDesk';
 import MessagesDesk from './MessagesDesk';
 import { consoleStrings } from './strings';
+import { Segmented } from '../ui/Segmented';
 import { useSupportCounts } from './supportCounts';
 
 /**
@@ -52,32 +53,30 @@ export default function SupportQueue() {
 
   return (
     <div className="space-y-3" data-support-console>
-      <div className="lv-well flex gap-1 overflow-x-auto rounded-xl border border-border-subtle p-1 hide-scrollbar" role="tablist" aria-label={cs.consoleLabel}>
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={desk === t.id}
-            data-support-desk={t.id}
-            onClick={() => setDesk(t.id)}
-            className={`flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-2 text-[13px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus sm:gap-2 sm:px-3 ${
-              desk === t.id ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            {/* At phone width the three words and their counts are what fit;
-                the glyphs join them from `sm` up. */}
-            <t.icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden />
-            <span>{t.label}</span>
-            {t.count > 0 && (
+      {/* The app's one-of-N control (as «الأعضاء / صلاحية المساعد / تيليجرام»
+          in the users panel): a well with one lifted thumb that travels.
+          Choosing a desk changes what this screen is doing, so a radio group.
+          At phone width the three words and their counts are what fit; the
+          glyphs join them from `sm` up. */}
+      <Segmented
+        group="support-desk"
+        label={cs.consoleLabel}
+        dataAttr="data-support-desk"
+        value={desk}
+        onChange={(id) => setDesk(id as Desk)}
+        items={tabs.map((t) => ({
+          id: t.id,
+          label: t.label,
+          icon: <t.icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden />,
+          badge:
+            t.count > 0 ? (
               <span className="lv-chip min-w-5 rounded-full px-1.5 text-center text-[11px] font-black tabular-nums [--chip:var(--color-info)]">
                 <span className="sr-only">{cs.waiting}: </span>
                 {t.count.toLocaleString(lang === 'en' ? 'en' : 'ar')}
               </span>
-            )}
-          </button>
-        ))}
-      </div>
+            ) : undefined,
+        }))}
+      />
 
       {desk === 'tickets' && <TicketsDesk />}
       {desk === 'messages' && <MessagesDesk />}

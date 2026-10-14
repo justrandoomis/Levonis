@@ -40,7 +40,7 @@ export const text3 = 'text-[var(--ap-text-3)]';
 
 /** Resting clay (`--clay-1` of the theme, through `--ap-shadow-1`), dented while pressed. */
 export const btnPrimary =
-  `${btnBase} ${btnText} h-9 px-3.5 text-white bg-[var(--ap-accent)] enabled:hover:bg-[var(--ap-accent-hover)] enabled:active:bg-[var(--ap-accent-active)] shadow-[var(--ap-shadow-1)] active:shadow-press`;
+  `${btnBase} ${btnText} h-9 px-3.5 text-snow bg-[var(--ap-accent)] enabled:hover:bg-[var(--ap-accent-hover)] enabled:active:bg-[var(--ap-accent-active)] shadow-[var(--ap-shadow-1)] active:shadow-press`;
 export const btnSecondary =
   `${btnBase} ${btnText} h-9 px-3 text-[var(--ap-text-1)] bg-[var(--ap-surface-2)] border border-[var(--ap-border-strong)] enabled:hover:bg-[var(--ap-surface-3)] enabled:hover:border-[var(--ap-border-hover)] enabled:active:bg-[var(--ap-surface-4)]`;
 const ghostColours =
@@ -63,12 +63,15 @@ export const btnIconDanger =
 export const btnIconGhost =
   `${iconBase} h-8 w-8 text-[var(--ap-text-2)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:bg-[rgb(255_255_255_/_0.07)] enabled:active:bg-[rgb(255_255_255_/_0.11)]`;
 
-/** Toggle chip (aria-pressed drives the lit state). */
+/** SELECTION IS A PRESS (clay): a pressed or current chip, filter or page
+    number sinks into the well (`.ap-chip`, theme.css) — one cue, no purple
+    text, tint or border swap on top of it. */
+/** Toggle chip (aria-pressed drives the pressed state). */
 export const chip =
-  `${btnBase} text-[12px] font-medium h-8 px-3 rounded-full text-[var(--ap-text-2)] border border-[var(--ap-border)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:border-[var(--ap-border-hover)] aria-pressed:text-[var(--ap-accent-text)] aria-pressed:bg-[var(--ap-accent-soft)] aria-pressed:border-[var(--ap-accent-border)]`;
-/** The filter-row toggle at the 40px control height (aria-pressed lit). */
+  `ap-chip ${btnBase} text-[12px] font-medium h-8 px-3 rounded-full text-[var(--ap-text-2)] border border-[var(--ap-border)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:border-[var(--ap-border-hover)]`;
+/** The filter-row toggle at the 40px control height (aria-pressed: pressed). */
 export const btnFilter =
-  `${btnBase} ${btnText} h-10 px-3 text-[var(--ap-text-2)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:border-[var(--ap-border-hover)] enabled:active:bg-[var(--ap-surface-3)] aria-pressed:text-[var(--ap-accent-text)] aria-pressed:bg-[var(--ap-accent-soft)] aria-pressed:border-[var(--ap-accent-border)]`;
+  `ap-chip ${btnBase} ${btnText} h-10 px-3 text-[var(--ap-text-2)] border border-[var(--ap-border)] bg-[var(--ap-surface-2)] enabled:hover:text-[var(--ap-text-1)] enabled:hover:border-[var(--ap-border-hover)] enabled:active:bg-[var(--ap-surface-3)]`;
 
 /** A FIELD IS A WELL (clay): sunk into its card (`lv-well`) behind the 3:1
     field line; no hover change. Focus keeps the well and adds the app's gold
@@ -160,9 +163,9 @@ export const segmented = {
   item: `inline-flex items-center justify-center h-8 w-8 rounded-[var(--ap-radius-sm)] text-[var(--ap-text-3)] transition-colors duration-150 enabled:hover:text-[var(--ap-text-2)] aria-pressed:text-[var(--ap-text-1)] aria-pressed:bg-[var(--ap-surface-4)] aria-pressed:shadow-1 ${focusInset}`,
 };
 
-/** Page number (aria-current="page" lights the current one). */
+/** Page number (aria-current="page" presses the current one, `.ap-chip`). */
 export const pageBtn =
-  `${btnBase} text-[12px] font-semibold min-w-8 h-8 px-2 rounded-[var(--ap-radius-sm)] text-[var(--ap-text-2)] border border-[var(--ap-border)] enabled:hover:border-[var(--ap-border-hover)] enabled:hover:text-[var(--ap-text-1)] disabled:opacity-30 aria-[current=page]:text-[var(--ap-accent-text)] aria-[current=page]:bg-[var(--ap-accent-soft)] aria-[current=page]:border-[var(--ap-accent-border)]`;
+  `ap-chip ${btnBase} text-[12px] font-semibold min-w-8 h-8 px-2 rounded-[var(--ap-radius-sm)] text-[var(--ap-text-2)] border border-[var(--ap-border)] enabled:hover:border-[var(--ap-border-hover)] enabled:hover:text-[var(--ap-text-1)] disabled:opacity-30`;
 
 export const thumb =
   'rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-3)] border border-[var(--ap-border)] overflow-hidden shrink-0';

@@ -120,6 +120,25 @@ export function useUsersStrings() {
     // sees no cost, so the badge says both halves (security spec §6).
     fullBadge: loc('كامل (بلا تكاليف)', 'Full (no costs)', 'تەواو (بەبێ تێچوون)'),
 
+    // ------------------------------------------------------ the members table
+    // The column heads and the role and plan words were English capitals in
+    // an Arabic panel (USER INFO, ROLE, …, «merchant», «plus»).
+    colUser: loc('المستخدم', 'User', 'بەکارهێنەر'),
+    colPlan: loc('الخطة', 'Plan', 'پلان'),
+    colJoined: loc('تاريخ الانضمام', 'Joined', 'ڕێکەوتی بەشداربوون'),
+    colActions: loc('إجراءات', 'Actions', 'کردارەکان'),
+    unnamed: loc('مستخدم بلا اسم', 'Unnamed user', 'بەکارهێنەری بێ ناو'),
+    roleCustomer: loc('زبون', 'Customer', 'کڕیار'),
+    roleMerchant: loc('تاجر', 'Merchant', 'بازرگان'),
+    roleAdmin: loc('أدمن', 'Admin', 'بەڕێوەبەر'),
+    planFree: loc('مجاني', 'Free', 'بەخۆڕایی'),
+
+    // ------------------------------------------------------- the edit window
+    editTitle: loc('تعديل المستخدم', 'Edit user', 'دەستکاری بەکارهێنەر'),
+    fName: loc('الاسم', 'Name', 'ناو'),
+    fPlan: loc('خطة الاشتراك', 'Subscription plan', 'پلانی بەشداریکردن'),
+    saveFailed: loc('تعذّر حفظ التغييرات', 'Failed to update user', 'نەتوانرا گۆڕانکارییەکان پاشەکەوت بکرێن'),
+
     // ------------------------------------------- balance & points by hand
     // «خصم رصيد وإضافة رصيد يدوي أو خصم النقاط وإضافة نقاط». Sentences carry
     // no Sorani on purpose — `loc` falls back to the Arabic; only the short

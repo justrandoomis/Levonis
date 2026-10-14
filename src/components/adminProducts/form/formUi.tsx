@@ -129,7 +129,7 @@ export function Field({
     >
       <div className="flex items-center gap-1.5 mb-1 min-w-0">
         <label htmlFor={id} className="text-[12px] font-bold text-text-secondary truncate">
-          {ar} <span className="text-[10px] font-medium text-text-muted">{en}</span>
+          {ar} <span className="hidden xl:inline text-[11px] font-medium text-text-muted">{en}</span>
           {required && <span className="text-red-400 ms-1">*</span>}
         </label>
         {tip && (
@@ -152,8 +152,8 @@ export function Field({
             missing ? { id, 'aria-invalid': true, 'aria-describedby': missingId } : { id }
           )
         : children}
-      {hint && !error && !missing && <p className="mt-1 text-[11px] text-text-muted truncate">{hint}</p>}
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
+      {hint && !error && !missing && <p className="mt-1 text-[12px] text-text-muted truncate">{hint}</p>}
+      {error && <p className="mt-1 text-[12px] text-red-400">{error}</p>}
       {need && <MissingNote id={missingId} code={need} optionId={needOption ?? ''} />}
     </div>
   );
@@ -206,7 +206,7 @@ export function MirrorNote({
         : `محسوب من «${where}» — للقراءة فقط هنا`;
   return (
     <p
-      className="mt-1 flex items-start gap-1 text-[11px] leading-snug text-text-muted"
+      className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-text-muted"
       data-mirror={kind}
     >
       <Link2 className="w-3 h-3 mt-[3px] shrink-0 text-text-muted" aria-hidden="true" />
@@ -656,12 +656,12 @@ export function Toggle({
     >
       <span className="min-w-0 truncate">
         {label}
-        {sub && <span className="text-[11px] text-text-muted ms-1.5">{sub}</span>}
+        {sub && <span className="text-[12px] text-text-muted ms-1.5">{sub}</span>}
       </span>
       {/* The platform switch: a well track with a lifted knob when off, the
           violet admin track when on. */}
       <span
-        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${checked ? 'bg-[#6B46FF]' : 'lv-well'}`}
+        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${checked ? 'bg-iris' : 'lv-well'}`}
       >
         <span
           className={`absolute top-0.5 w-4 h-4 rounded-full shadow-1 transition-all ${checked ? 'start-[18px] bg-snow' : 'start-0.5 bg-text-secondary'}`}
@@ -713,7 +713,7 @@ export function CheckCard({
         </span>
         <span className="text-[13px] font-bold text-text-primary truncate">{title}</span>
       </span>
-      {sub && <span className="block mt-0.5 text-[10px] text-text-muted truncate">{sub}</span>}
+      {sub && <span className="block mt-0.5 text-[11px] text-text-muted truncate">{sub}</span>}
     </button>
   );
 }
@@ -772,7 +772,7 @@ export function SectionCard({
       >
         <span
           className={`shrink-0 w-5 h-5 rounded-md grid place-items-center text-[10px] font-black ${
-            open ? 'bg-[#6B46FF] text-snow' : 'bg-surface-selected text-text-secondary'
+            open ? 'lv-well text-text-primary' : 'bg-surface-selected text-text-secondary'
           }`}
         >
           {n}
@@ -785,7 +785,7 @@ export function SectionCard({
                 the Arabic title already identify the section. */}
             <span className="hidden sm:inline text-[10px] font-medium text-text-muted"> {en}</span>
           </span>
-          {!open && summary && <span className="block text-[10px] text-text-muted truncate">{summary}</span>}
+          {!open && summary && <span className="block text-[11px] text-text-muted truncate">{summary}</span>}
         </span>
         {(missing ?? 0) > 0 && (
           <span

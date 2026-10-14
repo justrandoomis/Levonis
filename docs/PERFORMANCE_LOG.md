@@ -1936,3 +1936,52 @@ Added — `lg:sr-only` (the product title, visually hidden only from 1024 px) an
 reuses classes already in the sheet (the trade-in form's `lg:grid-cols-[minmax(0,1fr)_340px]` grid,
 `lv-surface`, `lv-surface-raised`, `lv-well`, `top-20`). The entry gained the initials helper, the header's
 avatar-failure state and the lazy `NotFound` import, and lost the third-party avatar URL.
+
+## 2026-10-13 — clay polish, batch 3: admin, merchant workspace and auth leftovers (DECISIONS row 231)
+
+Batch 3 of the clay polish plan: the admin-kit primary legible in light (snow ink) and one purple (`iris`); the
+finance workspace on the app's own tokens (wells, gold focus, no dark copy); the admin tabs on the canvas
+instead of a same-colour panel; kit selection as a press (`.ap-chip`); the overview's queue tiles as real raised
+buttons and its statuses as words; the users panel in three languages; one raised action per order row; the
+inventory tabs as one scrolling row with neutral stat icons and raised doors; the USD panel as a flat group;
+11 px sidebar labels; one store-colour swatch, governorate-first order rows and a 720 px settings column in the
+merchant workspace (lazy screens only); the support desks as a `Segmented`; the security panel, the theme
+preview and `SafeImage` on semantic tokens; the /auth copy row as a well; the clay ratchet lowered. Measured
+locally against the batch-2 build with the same toolchain.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (batch 2, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 42,544 B | **42,433 B (−111 B)** | — |
+| admin-kit `theme-*.css` | 1,188 B | 1,239 B (+51 B: the `.ap-chip` press rule) | — |
+| CSS, public files (8) | 55,023 B | **54,961 B (−62 B)**; local headroom 6,479 B | 60 KB = 61,440 B, **not raised** |
+| `FinanceWorkspace-*.css` | 3,903 B | **3,756 B (−147 B)** | — |
+| `AdminInventory-*.css` | 1,301 B | 1,317 B (+16 B: the raised doors) | — |
+| CSS, private operations (3) | 7,238 B | **7,107 B (−131 B)**; headroom 573 B | 7.5 KB = 7,680 B, **not raised** |
+| entry chunk | 65,368 B | 65,340 B (−28 B) | 72 KB |
+| initial payload (4 files) | 184,801 B | 184,773 B (−28 B) | 200 KB |
+| merchant workspace shell closure | 32,712 B | 32,710 B (no shell source changed; import-hash noise); headroom 58 B | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: removed — finance's private palette and its dark copy, the slate focus ring, the
+`--fw-*` hex values; the admin panel frame (`rounded-2xl p-4 md:p-5` on a `bg-surface` panel), the kit's
+`aria-pressed:`/`aria-[current=page]:` purple text, tint and border utilities, `bg-[#6B46FF]`, the farm bar's
+`rounded-[28px]`, AdminSecurity's zinc borders and fills, `uppercase tracking-[0.12em]` and `text-[9px]`.
+Added — the `.ap-chip` press rule, the inventory doors' clay cast and press, the /auth copy row's well, and a few
+utilities already in the sheet (`text-snow`, `bg-iris`, `bg-surface-selected/60`, `max-w-[720px]`).
+
+### The clay ratchet (tests/claySystem.test.ts 7)
+
+| count | before | after |
+|---|---|---|
+| legacy cards | 0 | 0 |
+| ad-hoc buttons | 13 (ceiling 14) | **10** |
+| raw inputs | 172 | **29** |
+| arbitrary radii | 2 | **0** |
+| zinc utilities (new key) | 40 | **19** |
+| canvas wrappers (new key) | 6 | **5** |
+
+The census gained four documented refinements, each pinned by a test that also proves a hand-drawn control
+still counts: a field or fill named in a comment is not code; a skeleton bar is not a button; an arrow function
+inside a tag does not end it; a house well (`lv-input`, the kit's `ap-field` recipes `T.input`/`T.select`/
+`T.selectSm`, `lv-well`, `fw-input`/`fw-select`, the /auth wells) is styled.

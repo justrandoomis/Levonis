@@ -200,19 +200,20 @@ export default function OrderBoardRow({
             because the status «قيد التجهيز» contains «تجهيز», and a loose
             match there picks a control that is not this one.
 
-            SECONDARY, THOUGH IT IS THE ONLY ACTION. It repeats on every row,
-            and thirty cream fills down a dark list is the same mistake as a
-            header of coloured chips: weight that marks everything marks
-            nothing. The earlier note about a tinted button reading as disabled
-            was about a 15%-opacity ghost sitting next to a full-width
-            dropdown — both of which are gone.
+            A GHOST: ONE RAISED ACTION PER ROW (clay — raised means
+            pressable, and a row of two raised buttons has no first one). It
+            repeats on every row, and thirty raised fills down a list is the
+            same mistake as a header of coloured chips: weight that marks
+            everything marks nothing. The raised one is the quick move below,
+            the row's actual next step; «تجهيز» opens the order, which the
+            whole row also says.
           */}
           <button
             type="button"
             data-action="prepare"
             data-order-id={order.id}
             onClick={() => onOpen(order.id)}
-            className="lv-button lv-button-secondary lv-button-sm press-scale"
+            className="lv-button lv-button-ghost lv-button-sm press-scale"
           >
             {loc('تجهيز', 'Prepare', 'ئامادەکردن')}
           </button>

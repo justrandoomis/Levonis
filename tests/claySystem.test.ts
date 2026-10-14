@@ -30,9 +30,11 @@
  *     grid's `content-visibility` never sits on a wrapper that would clip the
  *     card's cast;
  *  7. THE RATCHET: the hand-drawn styling the tokens cannot reach (legacy
- *     cards, ad-hoc buttons, raw inputs, arbitrary radii), counted by the
- *     same code as `node scripts/clay-census.mjs`, never rises above the
- *     numbers checked in here. Each family push lowers them;
+ *     cards, ad-hoc buttons, raw inputs, arbitrary radii, zinc utilities,
+ *     canvas wrappers), counted by the same code as
+ *     `node scripts/clay-census.mjs`, never rises above the numbers checked
+ *     in here. Each family push lowers them, and the census's refinements
+ *     only remove what it was miscounting;
  *  8. what the foundation's screenshot QA found (row 210): a card dropped
  *     into a card, a dialog or a sheet sits flush; a focused field shows a
  *     solid focus line on cream, where the 3:1 field line and the focus ink
@@ -51,7 +53,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBlock, contrast, parseColor, rgbToOklch, SEMANTIC, FIXED, IVORY, PAPER } from '../scripts/theme-tokens.mjs';
-import { census, RATCHET, sourceFiles, type RatchetKey } from '../scripts/clay-census.mjs';
+import { blankComments, census, isAdHocButton, RATCHET, scanSource, sourceFiles, type RatchetKey } from '../scripts/clay-census.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -439,11 +441,22 @@ test('the product card is clay a scrolling list can afford, and content-visibili
  */
 const CEILING: Record<RatchetKey, number> = {
   // Phase 3 (docs/DECISIONS.md row 211): the nine page families swept —
-  // 422 / 159 / 461 / 100 at the foundation, these after.
+  // 422 / 159 / 461 / 100 at the foundation, 0 / 14 / 172 / 2 after.
+  // Clay polish batch 3 (2026-10-13): the support desks are a Segmented
+  // (btn −1), two skeleton bars stop counting as buttons (−2); the finance
+  // fields are wells and the census reads a house well — the admin kit's
+  // `ap-field` recipes, `fw-input`, the /auth wells — as styled, crosses an
+  // arrow function inside a tag and skips a field named in a comment
+  // (rawIn 172 → 29: what is left is hand-drawn); the farm bar's radii are
+  // the role radius (arbR 0). Zinc and the canvas wrappers join the ratchet:
+  // 42 / 8 at the polish plan, these after (the wrappers left are the store
+  // grounds, which keep their own black).
   legacy: 0,
-  btn: 14,
-  rawIn: 172,
-  arbR: 2,
+  btn: 10,
+  rawIn: 29,
+  arbR: 0,
+  zinc: 19,
+  wrap: 5,
 };
 
 test('the ratchet: hand-drawn styling the clay tokens cannot reach never grows', () => {
@@ -465,6 +478,44 @@ test('the ratchet: hand-drawn styling the clay tokens cannot reach never grows',
   assert.deepEqual(over, [], over.join('\n'));
   // The census only reads: it is a suggestion generator, never a codemod.
   assert.doesNotMatch(read('scripts/clay-census.mjs'), /writeFile|appendFile|rmSync|unlink|renameSync|copyFile/, 'the census writes to the tree');
+});
+
+test('the census refinements remove false positives only: a hand-drawn field, button or zinc fill still counts', () => {
+  // 1. A field or a fill named in a comment is not code — and a real one beside it still counts.
+  const commented = scanSource('/* a `<select>` with no option, once `bg-zinc-100` */\n// <input value={x} />\n<input value={y} />\n<div className="bg-zinc-800" />');
+  assert.equal(commented.rawIn.length, 1);
+  assert.equal(commented.rawIn[0]!.line, 3, 'line numbers survive the blanking');
+  assert.equal(commented.zinc, 1);
+  assert.equal(blankComments('a /* b\nc */ d').split('\n').length, 2, 'newlines are kept');
+  assert.equal(blankComments("const u = 'https://x.y/z';"), "const u = 'https://x.y/z';", 'a URL is not a comment');
+  // 2. A skeleton bar is not a button; the same string without the pulse is.
+  assert.equal(isAdHocButton('h-11 animate-pulse rounded-xl bg-surface-selected'), false);
+  assert.equal(isAdHocButton('h-11 rounded-xl bg-surface-selected'), true);
+  // 3. An arrow inside the tag does not hide its house class; a bare field after one still counts.
+  assert.equal(scanSource('<input onChange={(e) => go(e)} className="lv-input" />').rawIn.length, 0);
+  assert.equal(scanSource('<input onChange={(e) => go(e)} className="bg-black rounded" />').rawIn.length, 1);
+  assert.equal(scanSource('<input onChange={(e) => go(e)} type="checkbox" />').rawIn.length, 0);
+  // 4. A house well is styled: a kit recipe, a file constant built from one; a hand-drawn constant is not.
+  assert.equal(scanSource('<select className={`${T.select} w-full`} />').rawIn.length, 0);
+  assert.equal(scanSource('const DESC = `${T.input} h-auto`;\n<textarea className={DESC} />').rawIn.length, 0);
+  assert.equal(scanSource("const RAW = 'bg-zinc-900 rounded-md';\n<textarea className={RAW} />").rawIn.length, 1);
+  assert.equal(scanSource('<input className="fw-input" />').rawIn.length, 0);
+  // …and each house field the census trusts really is a well.
+  const kit = read('src/components/adminProducts/theme.ts');
+  const control = /const control =\s*'([^']+)'/.exec(kit)?.[1] ?? '';
+  assert.match(control, /\bap-field\b/);
+  assert.match(control, /\blv-well\b/, 'the kit field recipe is no longer a well');
+  for (const r of ['input', 'select', 'selectSm']) assert.match(kit, new RegExp(`export const ${r} = \`\\$\\{control\\}`), `T.${r} is not built on the well`);
+  // `T` is the kit wherever a field reads `T.input`: imported from it, or from the operations re-export of it.
+  for (const file of sourceFiles()) {
+    const src = read(file);
+    if (!/\bT\.(?:input|select|selectSm)\b/.test(src)) continue;
+    assert.match(src, /import \* as T from '[./]*(?:adminProducts\/)?theme'|import \{[^}]*\bT\b[^}]*\} from '\.\/shared'/, `${file}: T is not the admin kit`);
+  }
+  const fw = read('src/components/financeWorkspace/finance-workspace.css');
+  assert.match(fw, /\.fw-input,\.fw-select\{[^}]*border:1px solid var\(--clay-field\);[^}]*background:var\(--clay-well-bg\);box-shadow:var\(--clay-well\)/, 'a finance field is not a well');
+  assert.match(read('src/components/auth/authLeave.css'), /\.lv-copyrow__value \{[^}]*border: 1px solid var\(--clay-field\);[^}]*box-shadow: var\(--clay-well\);/, 'the /auth copy row is not a well');
+  assert.match(read('src/components/auth/auth.css'), /\.lv-cpick__search \{[^}]*box-shadow:\s*var\(--clay-well\);/, 'the country search is not a well');
 });
 
 // ---------------------------------------------------------------------- 8
@@ -523,6 +574,42 @@ test('the foundation QA: one raised container per stack, focus that shows on cre
   assert.doesNotMatch(read('src/pages/Admin.tsx'), /rounded-2xl p-4 md:p-5 shadow-/);
   // A horizontal scroller of clay buttons leaves room for their cast (overflow-x clips y too).
   assert.match(read('src/components/merchant/counter/QuickDock.tsx'), /data-quick-dock className="[^"]*-my-2[^"]*overflow-x-auto[^"]*py-2/);
+});
+
+test('the admin and the merchant workspace speak the clay grammar: a press is the one cue, one purple, the tab on the canvas, raised only where it presses', () => {
+  // The admin kit: a pressed chip, filter or page number sinks into the well — no purple ink, tint or border swap.
+  const kit = read('src/components/adminProducts/theme.ts');
+  for (const r of ['chip', 'btnFilter', 'pageBtn']) {
+    const recipe = new RegExp(`export const ${r} =\\s*\`([^\`]+)\``).exec(kit)?.[1] ?? '';
+    assert.match(recipe, /^ap-chip /, `${r} lost the press marker`);
+    assert.doesNotMatch(recipe, /aria-(?:pressed|\[current=page\]):/, `${r} lights its selection with purple again`);
+  }
+  const kitCss = stripCssComments(read('src/components/adminProducts/theme.css'));
+  assert.match(kitCss, /\.ap-chip:is\(\[aria-pressed='true'\], \[aria-current='page'\]\) \{\s*color: var\(--ap-text-1\);\s*background-color: var\(--clay-well-bg\);\s*box-shadow: var\(--clay-press\);\s*\}/);
+  // One purple: the kit's accent is the app's `iris`, the primary's ink is snow (2.90:1 → 5.52:1 in light), no hex fill is left.
+  assert.match(kitCss, /\.ap \{[^}]*--ap-accent: var\(--color-iris\);\s*--ap-accent-hover: var\(--color-iris-deep\);/);
+  assert.doesNotMatch(kitCss.slice(kitCss.indexOf("[data-theme='light'] .ap")), /--ap-accent:/, 'the light block pins its own purple again');
+  assert.match(kit, /export const btnPrimary =\s*`[^`]*\btext-snow\b/);
+  for (const f of ['src/components/adminProducts/form/formUi.tsx', 'src/components/adminProducts/form/ImagesSection.tsx']) assert.doesNotMatch(read(f), /#6B46FF/i, `${f}: a hex purple`);
+  // The admin tabs sit on the canvas: no same-colour panel around trays.
+  assert.doesNotMatch(read('src/pages/Admin.tsx'), /bg-surface border border-border-subtle rounded-2xl p-4 md:p-5/);
+  // The overview: only the tiles that open a queue are raised, and they are real buttons; statuses are words.
+  const overview = read('src/components/AdminOverview.tsx');
+  assert.match(overview, /<button\s+type="button"\s+onClick=\{onClick\}\s+className="min-w-0 text-start rounded-xl no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"/);
+  assert.match(overview, /'h-full shadow-xs'/, 'an information tile is raised again');
+  assert.match(overview, /\{statusLabel\(lang, o\.status\)\}/);
+  assert.doesNotMatch(overview, /\{o\.status\}|\{req\.type\}/, 'an API code is printed as a word');
+  // One raised action per order row: «تجهيز» is a ghost beside the quick move.
+  assert.match(read('src/components/adminOrders/OrderBoardRow.tsx'), /data-action="prepare"[\s\S]{0,120}className="lv-button lv-button-ghost lv-button-sm press-scale"/);
+  // Finance joins the app: its tokens are the app's, no dark copy, focus is gold.
+  const fw = read('src/components/financeWorkspace/finance-workspace.css');
+  assert.doesNotMatch(fw, /\.dark \.fw|\[data-theme="dark"\] \.fw|color-scheme/);
+  assert.match(fw, /--fw-surface:var\(--color-surface\)/);
+  assert.match(fw, /outline:2px solid var\(--color-focus\)/);
+  // The merchant colour chip: one swatch in the store island, no black capsule.
+  const sample = read('src/components/merchant/AccentSample.tsx');
+  assert.doesNotMatch(sample, /bg-canvas/);
+  assert.match(sample, /data-store-theme=""/);
 });
 
 // ---------------------------------------------------------------------- 9

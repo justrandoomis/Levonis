@@ -48,7 +48,7 @@ function MiniPage({ theme }: { theme: Theme }) {
     <span data-theme={theme} className="absolute inset-0 flex flex-col gap-1.5 bg-black p-2">
       <span className="flex items-center justify-between">
         <span className="h-1.5 w-7 rounded-full bg-white/80" />
-        <span className="h-2.5 w-2.5 rounded-full bg-zinc-800" />
+        <span className="h-2.5 w-2.5 rounded-full bg-surface-selected" />
       </span>
       <span className="flex h-7 items-end rounded-md bg-surface-raised p-1.5 ring-1 ring-white/[0.06]">
         <span className="h-1.5 w-8 rounded-full bg-gold" />
@@ -57,12 +57,12 @@ function MiniPage({ theme }: { theme: Theme }) {
         <span className="h-6 rounded-md bg-surface ring-1 ring-white/[0.06]" />
         <span className="h-6 rounded-md bg-surface ring-1 ring-white/[0.06]" />
       </span>
-      <span className="h-1 w-3/4 rounded-full bg-zinc-700" />
-      <span className="h-1 w-1/2 rounded-full bg-zinc-700" />
+      <span className="h-1 w-3/4 rounded-full bg-border-subtle" />
+      <span className="h-1 w-1/2 rounded-full bg-border-subtle" />
       <span className="mt-auto flex h-3 items-center justify-center gap-1.5 self-center rounded-full bg-surface-raised px-2 ring-1 ring-white/[0.06]">
         <span className="h-1 w-1 rounded-full bg-gold" />
-        <span className="h-1 w-1 rounded-full bg-zinc-600" />
-        <span className="h-1 w-1 rounded-full bg-zinc-600" />
+        <span className="h-1 w-1 rounded-full bg-text-muted" />
+        <span className="h-1 w-1 rounded-full bg-text-muted" />
       </span>
     </span>
   );

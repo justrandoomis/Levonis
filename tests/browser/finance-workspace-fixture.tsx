@@ -95,6 +95,8 @@ window.fetch = async (input, init) => {
     else { promo = { ...promo, ...body, exchange_rate: body.exchange_rate ?? 1500, amount_iqd: body.amount * (body.currency === 'USD' ? body.exchange_rate ?? 1500 : 1), enabled: 1, version: promo.version + 1 }; summary.promotions = [promo]; }
     return json({ promotion: promo });
   }
+  // The participants' panel (ParticipantCharts): without it the fixture showed a 404 note where the charts sit.
+  if (url.pathname.endsWith('/participant-report')) return json({ participants: [{ kind: 'staff', earned_iqd: 420000, paid_iqd: 300000 }, { kind: 'investor', earned_iqd: 610000, paid_iqd: 450000 }], adjustments: [{ day: `${month}-04`, positive_iqd: 25000, negative_iqd: -10000 }], capital: { received_iqd: 4800000, recovered_iqd: 3100000, remaining_iqd: 1700000, paid_iqd: 2900000, period_recovered_iqd: 640000, period_paid_iqd: 500000 }, batches: [{ id: 'b1', name: 'A1 mini', received_qty: 15, remaining_qty: 12, sold_qty: 3 }, { id: 'b2', name: 'PLA Basic', received_qty: 40, remaining_qty: 24, sold_qty: 16 }] });
   if (url.pathname.endsWith('/expense-categories')) return json({ categories: [] });
   if (url.pathname.endsWith('/expenses')) return json({ expenses: [] });
   return json({ error: `Fixture endpoint not configured: ${url.pathname}` }, 404);

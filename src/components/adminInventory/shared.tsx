@@ -117,14 +117,18 @@ export function errMsg(e: unknown, fallbackAr: string, fallbackEn: string, latin
   return latin ? fallbackEn : fallbackAr;
 }
 
-/** A labelled figure in the summary strip. */
+/**
+ * A labelled figure in the summary strip. The icon is neutral: four tinted
+ * squares (blue, green, amber, purple) read as four alarms, and the figure is
+ * the one loud thing on a tile. A warning lives in the figure (the ageing
+ * band), not in the icon's colour.
+ */
 export function Stat({
-  label, value, sub, tint = 'purple', icon,
+  label, value, sub, icon,
 }: {
   label: string;
   value: ReactNode;
   sub?: ReactNode;
-  tint?: 'purple' | 'blue' | 'green' | 'amber' | 'red';
   icon?: ReactNode;
 }) {
   return (
@@ -132,7 +136,7 @@ export function Stat({
       <div className="flex items-start justify-between gap-2">
         <span className={`text-[11.5px] font-semibold ${T.text3}`}>{label}</span>
         {icon && (
-          <span className={`flex h-7 w-7 items-center justify-center rounded-[var(--ap-radius-sm)] ${T.statCard.tints[tint].box}`}>
+          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] ${T.text2}`}>
             {icon}
           </span>
         )}

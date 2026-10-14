@@ -640,7 +640,7 @@ export function ImagesSection({
                   onStatus={(st) => noteStatus(img.id, st)}
                 />
                 {img.is_primary && (
-                  <span className="absolute top-1 start-1 bg-[#6B46FF] text-snow text-[10px] font-bold px-1.5 py-0.5 rounded">
+                  <span className="absolute top-1 start-1 bg-iris text-snow text-[10px] font-bold px-1.5 py-0.5 rounded">
                     رئيسية
                   </span>
                 )}

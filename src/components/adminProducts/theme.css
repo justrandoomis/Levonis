@@ -17,8 +17,10 @@
   --ap-text-1: #eceef2;
   --ap-text-2: #a3a8b6;
   --ap-text-3: #9399a8;
-  --ap-accent: #6558e0;
-  --ap-accent-hover: #6e62ea;
+  /* ONE PURPLE: the app's own `iris` (snow on it 4.79:1 dark, 5.84:1 light),
+     resolved per theme, so the light block needs no copy. */
+  --ap-accent: var(--color-iris);
+  --ap-accent-hover: var(--color-iris-deep);
   --ap-accent-active: #5a4dd2;
   --ap-accent-text: #aca4ff;
   --ap-accent-soft: rgb(101 88 224 / 0.16);
@@ -68,20 +70,20 @@
   --ap-text-1: #16181b;
   --ap-text-2: #45484e;
   --ap-text-3: #5f6268;
-  --ap-accent: #5a4dd2;
-  --ap-accent-hover: #5044c4;
   --ap-accent-active: #463ab4;
   --ap-accent-text: #4a3fc0;
   --ap-accent-soft: rgb(90 77 210 / 0.1);
   --ap-accent-border: rgb(90 77 210 / 0.4);
   --ap-ring: var(--color-focus);
-  --ap-success: #1b7046;
+  /* The status inks are the app's own (AA-pinned on cream, docs/DECISIONS.md
+     row 207): the kit's slightly lighter copies read 4.38:1 in a badge. */
+  --ap-success: var(--color-success);
   --ap-success-bg: rgb(27 112 70 / 0.1);
   --ap-success-border: rgb(27 112 70 / 0.3);
-  --ap-warning: #92590c;
+  --ap-warning: var(--color-warning);
   --ap-warning-bg: rgb(146 89 12 / 0.1);
   --ap-warning-border: rgb(146 89 12 / 0.3);
-  --ap-danger: #b3343a;
+  --ap-danger: var(--color-danger);
   --ap-danger-bg: rgb(179 52 58 / 0.08);
   --ap-danger-border: rgb(179 52 58 / 0.3);
   --ap-danger-bg-hover: rgb(179 52 58 / 0.14);
@@ -113,6 +115,16 @@
 .ap .ap-quick-scroll {
   scrollbar-color: var(--ap-border-strong) transparent;
   scrollbar-width: thin;
+}
+
+/* SELECTION IS A PRESS (clay, docs/DECISIONS.md row 207): a pressed chip or
+   filter, or the current page number, sinks into the well. The press is the
+   one cue — no purple ink, tint or border swap with it. Unlayered, so it
+   outranks the recipe's own ground utility (`btnFilter`). */
+.ap-chip:is([aria-pressed='true'], [aria-current='page']) {
+  color: var(--ap-text-1);
+  background-color: var(--clay-well-bg);
+  box-shadow: var(--clay-press);
 }
 
 @media (prefers-reduced-motion: reduce) {

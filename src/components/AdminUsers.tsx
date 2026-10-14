@@ -10,6 +10,7 @@ import AssistantAccess from './adminUsers/AssistantAccess';
 import MemberDetailModal from './adminUsers/MemberDetailModal';
 import TelegramIdentities from './adminUsers/TelegramIdentities';
 import { useUsersStrings } from './adminUsers/strings';
+import { tierLabel } from './subscription/tierMeta';
 import type { AdminScope } from './adminUsers/types';
 
 interface AdminUserRow {
@@ -50,6 +51,10 @@ export default function AdminUsers() {
   // decision 2): the checkbox is offered — and the field sent — by the owner only.
   const mayFlagInvestor = viewer?.is_owner === true;
   const s = useUsersStrings();
+  // The words for a role and a plan, never the API's lowercase codes.
+  const roleWord = (role: string) =>
+    role === 'admin' ? s.roleAdmin : role === 'merchant' ? s.roleMerchant : role === 'customer' ? s.roleCustomer : role;
+  const planWord = (tier: string | null | undefined) => (tier && tier !== 'free' ? tierLabel(tier) : s.planFree);
   const [view, setView] = useState<UsersView>('members');
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -157,7 +162,7 @@ export default function AdminUsers() {
       setEditingUser(null);
     } catch (err) {
       // By code, in the admin's own language — never the raw "ar / en" sentence.
-      setSaveError(err instanceof ApiError ? apiRefusal(err, lang, err.message) : 'Failed to update user');
+      setSaveError(err instanceof ApiError ? apiRefusal(err, lang, err.message) : s.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -215,9 +220,11 @@ export default function AdminUsers() {
         value={view}
         onChange={(id) => setView(id as UsersView)}
         items={[
-          { id: 'members', label: s.tabMembers, icon: <User className="w-4 h-4" /> },
-          { id: 'assistant', label: s.tabAssistant, icon: <Lock className="w-4 h-4" /> },
-          { id: 'telegram', label: s.tabTelegram, icon: <Link2 className="w-4 h-4" /> },
+          // The glyphs join the words from `sm` up: at 390px three Arabic
+          // labels and three icons did not fit one row.
+          { id: 'members', label: s.tabMembers, icon: <User className="hidden sm:block w-4 h-4" /> },
+          { id: 'assistant', label: s.tabAssistant, icon: <Lock className="hidden sm:block w-4 h-4" /> },
+          { id: 'telegram', label: s.tabTelegram, icon: <Link2 className="hidden sm:block w-4 h-4" /> },
         ]}
       />
 
@@ -251,18 +258,18 @@ export default function AdminUsers() {
           <table className="w-full text-start border-collapse min-w-[900px] [&_tr>*:last-child]:sticky [&_tr>*:last-child]:end-0 [&_tr>*:last-child]:z-[1] [&_tbody_tr>*:last-child]:bg-surface [&_thead_tr>*:last-child]:bg-surface-raised">
             <thead>
               <tr className="bg-surface-raised border-b border-border-subtle">
-                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">User Info</th>
-                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Role</th>
-                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Plan</th>
-                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Investor</th>
-                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider">Joined</th>
-                <th className="py-4 px-6 text-xs font-bold text-text-secondary uppercase tracking-wider text-end">Actions</th>
+                <th className="py-3 px-4 text-start text-xs font-bold text-text-secondary">{s.colUser}</th>
+                <th className="py-3 px-4 text-start text-xs font-bold text-text-secondary">{s.fRole}</th>
+                <th className="py-3 px-4 text-start text-xs font-bold text-text-secondary">{s.colPlan}</th>
+                <th className="py-3 px-4 text-start text-xs font-bold text-text-secondary">{s.fInvestor}</th>
+                <th className="py-3 px-4 text-start text-xs font-bold text-text-secondary">{s.colJoined}</th>
+                <th className="py-3 px-4 text-xs font-bold text-text-secondary text-end">{s.colActions}</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((u) => (
                 <tr key={u.id} className="border-b border-border-subtle hover:bg-surface-raised transition-colors">
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4">
                     {/*
                       «عند الضغط على مستخدم» — pressing the USER is what opens
                       the profile, so the identity itself is the control.
@@ -290,15 +297,15 @@ export default function AdminUsers() {
                         {u.role === 'admin' ? <Shield className="w-5 h-5 text-iris" /> : u.role === 'merchant' ? <Store className="w-5 h-5 text-gilt" /> : <User className="w-5 h-5 text-text-secondary" />}
                       </div>
                       <div className="min-w-0">
-                        <div dir="auto" className="font-bold text-text-primary truncate">{u.name || u.username || 'Unnamed User'}</div>
+                        <div dir="auto" className="font-bold text-text-primary truncate">{u.name || u.username || s.unnamed}</div>
                         <div dir="auto" className="text-sm text-text-muted font-medium truncate">{u.email}</div>
                       </div>
                     </button>
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${ROLE_STYLES[u.role] || ROLE_STYLES.customer}`}>
-                        {u.role}
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${ROLE_STYLES[u.role] || ROLE_STYLES.customer}`}>
+                        {roleWord(u.role)}
                       </span>
                       {/*
                         WHO OWNS THE SHOP, AND WHO CAN MOVE MONEY, on the row.
@@ -327,25 +334,25 @@ export default function AdminUsers() {
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-4 h-4 text-text-muted" />
-                      <span className="text-sm font-bold text-text-secondary capitalize">{u.membership_tier || 'free'}</span>
+                      <span className="text-sm font-bold text-text-secondary">{planWord(u.membership_tier)}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-3 px-4">
                     {u.is_investor ? (
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-success">
-                        <TrendingUp className="w-3.5 h-3.5" /> Yes
+                        <TrendingUp className="w-3.5 h-3.5" /> {s.yes}
                       </span>
                     ) : (
                       <span className="text-xs text-text-muted font-medium">—</span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-xs text-text-muted whitespace-nowrap">
+                  <td className="py-3 px-4 text-xs text-text-muted whitespace-nowrap">
                     {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                   </td>
-                  <td className="py-4 px-6 text-end">
+                  <td className="py-3 px-4 text-end">
                     <button
                       type="button"
                       aria-label={`${s.editMember}: ${u.name || u.username || u.email}`}
@@ -451,11 +458,11 @@ export default function AdminUsers() {
         >
           {/* The old inner padding lives on a plain div inside, where it belongs. */}
           <div className="p-6">
-            <h3 id="admin-edit-user-title" className="text-xl font-bold text-text-primary mb-6">Edit User</h3>
+            <h3 id="admin-edit-user-title" className="text-xl font-bold text-text-primary mb-6">{s.editTitle}</h3>
 
             <div className="space-y-4 mb-8">
               <div>
-                <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Name</label>
+                <label className="block text-xs font-bold text-text-muted mb-2">{s.fName}</label>
                 <input
                   type="text"
                   value={editorUser.name || editorUser.username || ''}
@@ -465,40 +472,46 @@ export default function AdminUsers() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Role</label>
+                <label className="block text-xs font-bold text-text-muted mb-2">{s.fRole}</label>
                 <div className="grid grid-cols-3 gap-3">
                   <button
+                    type="button"
+                    aria-pressed={editorUser.role === 'customer'}
                     onClick={() => setEditingUser({...editorUser, role: 'customer'})}
                     className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'customer' ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'}`}
                   >
-                    <User className="w-4 h-4" /> Customer
+                    <User className="w-4 h-4" /> {s.roleCustomer}
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={editorUser.role === 'merchant'}
                     onClick={() => setEditingUser({...editorUser, role: 'merchant'})}
                     className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'merchant' ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'}`}
                   >
-                    <Store className="w-4 h-4" /> Merchant
+                    <Store className="w-4 h-4" /> {s.roleMerchant}
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={editorUser.role === 'admin'}
                     onClick={() => setEditingUser({...editorUser, role: 'admin'})}
                     className={`py-3 rounded-xl font-bold border flex items-center justify-center gap-2 transition-colors text-sm ${editorUser.role === 'admin' ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press' : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'}`}
                   >
-                    <Shield className="w-4 h-4" /> Admin
+                    <Shield className="w-4 h-4" /> {s.roleAdmin}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Subscription Plan</label>
+                <label className="block text-xs font-bold text-text-muted mb-2">{s.fPlan}</label>
                 <select
-                  className="lv-input appearance-none font-medium capitalize"
+                  className="lv-input appearance-none font-medium"
                   value={editorUser.membership_tier || 'free'}
                   onChange={(e) => setEditingUser({...editorUser, membership_tier: e.target.value as AdminUserRow['membership_tier']})}
                 >
-                  <option value="free">Free Plan</option>
-                  <option value="plus">Plus Plan</option>
-                  <option value="prime">LEVO PRIME</option>
-                  <option value="pro">Pro Plan</option>
+                  <option value="free">{s.planFree}</option>
+                  <option value="plus">{tierLabel('plus')}</option>
+                  <option value="prime">{tierLabel('prime')}</option>
+                  <option value="pro">{tierLabel('pro')}</option>
                 </select>
               </div>
 
@@ -511,7 +524,7 @@ export default function AdminUsers() {
                     className="w-5 h-5 rounded accent-gold"
                   />
                   <span className="text-text-primary font-medium flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-success" /> Investor
+                    <TrendingUp className="w-4 h-4 text-success" /> {s.fInvestor}
                   </span>
                 </label>
               )}
@@ -529,14 +542,14 @@ export default function AdminUsers() {
                 disabled={saving}
                 className="lv-button lv-button-ghost"
               >
-                Cancel
+                {s.cancel}
               </button>
               <button
                 onClick={() => handleSaveUser(editorUser)}
                 disabled={saving}
                 className="lv-button lv-button-primary"
               >
-                <Check className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Changes'}
+                <Check className="w-4 h-4" /> {saving ? s.saving : s.save}
               </button>
             </div>
           </div>

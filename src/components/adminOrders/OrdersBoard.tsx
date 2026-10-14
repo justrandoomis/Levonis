@@ -608,8 +608,12 @@ export default function OrdersBoard() {
           the phone. */}
       {groups.map((g) => (
         <section key={g.id} data-order-group={g.id} className="min-w-0">
+          {/* On the canvas now (the admin's same-colour panel is gone), so
+              the header is the flat canvas: it rests mid-page and sticks over
+              plain canvas once the page's light has scrolled away — the
+              wash (lv-canvas) would restart the light at its own top. */}
           <h3
-            className="sticky top-0 z-10 mb-2 flex items-baseline gap-1.5 bg-surface px-2 py-2 text-[13px] leading-[1.5] font-black text-text-secondary"
+            className="sticky top-0 z-10 mb-2 flex items-baseline gap-1.5 bg-canvas px-2 py-2 text-[13px] leading-[1.5] font-black text-text-secondary"
           >
             {loc(g.ar, g.en, g.ckb)}
             <span className="tabular-nums text-text-muted">({countText(groupCount(g.id), latin)})</span>

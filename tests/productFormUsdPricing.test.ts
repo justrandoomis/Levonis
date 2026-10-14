@@ -280,7 +280,8 @@ test('a save’s outcome stays in the panel when a preview lands; a blocked save
   assert.ok(blocked.includes(S.saveBlocked(where)), 'the save row says why it is disabled');
   assert.match(blocked, /data-pricing-blocked/);
   assert.match(blocked, /<button type="button"[^>]*disabled=""[^>]*data-pricing-save/);
-  assert.ok(blocked.includes(`<p class="mt-1 text-[11px] text-red-400">${S.decimalSeparator}</p>`), 'under the field itself');
+  // 12px: the kit's hint and error line (clay polish batch 3; 11px read as a footnote).
+  assert.ok(blocked.includes(`<p class="mt-1 text-[12px] text-red-400">${S.decimalSeparator}</p>`), 'under the field itself');
   // The server's word on one field of this scope takes that field's place.
   const server = withState(stateOf(answer, { serverField: { key: 'base', field: 'minimum_target_profit_usd', text: 'SERVER-SAID' } }), createElement(UsdPricingProductPanel));
   assert.ok(server.includes('SERVER-SAID'));

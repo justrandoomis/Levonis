@@ -13,10 +13,19 @@ import { ACCENTS } from '../storefront/theme';
 
 export function AccentSample({ accent }: { accent: string }) {
   const a = ACCENTS[accent] ?? ACCENTS.default;
+  // ONE SWATCH, not a black capsule holding two: the button fill, wearing the
+  // dot at its centre — the fill tells the three gold-dotted presets apart,
+  // the dot tells «Levonis» from «blue» (both fill near-white). The store
+  // island stays on the swatch itself; its 1px line is the island's own
+  // border, so a near-white fill still has an edge on cream.
   return (
-    <span data-store-theme="" aria-hidden="true" data-accent-sample={accent} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-canvas p-1">
-      <span className={`h-3.5 w-3.5 rounded-full ${a.indicator}`} />
-      <span className={`h-3.5 w-5 rounded ${a.btn}`} />
+    <span
+      data-store-theme=""
+      aria-hidden="true"
+      data-accent-sample={accent}
+      className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border border-border-subtle ${a.btn}`}
+    >
+      <span className={`h-2 w-2 rounded-full ${a.indicator}`} />
     </span>
   );
 }

@@ -57,7 +57,10 @@ export default function OwnerRatesCard({ onOpen }: { onOpen?: () => void }) {
   }, []);
 
   if (failed) return null;
-  const waiting = data ? data.pairs.filter((p) => p.status === 'REVIEW_REQUIRED').length : 0;
+  // `pairs` read defensively: an older Worker (or a partial answer) without the
+  // list must render the card, not throw the whole overview into its boundary.
+  const pairs = data?.pairs ?? [];
+  const waiting = pairs.filter((p) => p.status === 'REVIEW_REQUIRED').length;
   const Arrow = dir === 'rtl' ? ArrowLeft : ArrowRight;
 
   return (
@@ -77,7 +80,7 @@ export default function OwnerRatesCard({ onOpen }: { onOpen?: () => void }) {
         </div>
       ) : (
         <ul className="mt-3 divide-y divide-border-subtle/60">
-          {data.pairs.map((p) => {
+          {pairs.map((p) => {
             const [from, to] = UNITS[p.pair];
             const f = p.effective_rate ? shownFigure(p.effective_rate, SHOWN_PLACES[p.pair]) : null;
             return (

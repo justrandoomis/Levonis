@@ -1697,7 +1697,7 @@ function ScopeFields({ scope, sellsDirect, summary }: { scope: ScopeAnswer; sell
         </Select>
       </Field>
       {/* The weight or box fields appear for the route that prices by them: no route anywhere, no measure. */}
-      {!route && <p className="min-w-0 self-end pb-1 text-[11px] leading-relaxed text-amber-300" data-pricing-route-first>{s.routeFirst}</p>}
+      {!route && <p className="min-w-0 self-end pb-1 text-[11px] leading-relaxed text-amber-300 md:col-span-2 xl:col-span-3" data-pricing-route-first>{s.routeFirst}</p>}
       {(iqd || storedIqd) && (
         <div className="min-w-0 text-[11px] leading-relaxed text-text-secondary md:col-span-2 xl:col-span-3" data-usd-iqd={keyOf(scope.scope, scope.scope_id)}>
           {/* What the save stores: the server's conversion of the typed dinars (the preview), or the stored snapshot. */}
@@ -1927,7 +1927,7 @@ export function UsdPricingProductPanel() {
   const st = useUsdPricing();
   if (!st || !st.enabled) return null;
   const head = <Head text={s.formTitle} english={USD_PRICING_FORM_STRINGS.en.formTitle} />;
-  if (st.notInstalled) return <div className="ap mt-4 rounded-lg border border-border-subtle p-3" data-form="usd-pricing">{head}<p className="mt-1 text-[12px] text-text-muted">{ps.notInstalled}</p></div>;
+  if (st.notInstalled) return <div className="ap mt-4 border-t border-border-subtle pt-3" data-form="usd-pricing">{head}<p className="mt-1 text-[12px] text-text-muted">{ps.notInstalled}</p></div>;
   const base = scopeOf(st.answer, 'base', '');
   const models = st.shown?.models ?? [];
   // A product with one model shows that model's bar here; several models show theirs in their cards.
@@ -1935,7 +1935,7 @@ export function UsdPricingProductPanel() {
   const ok = models.filter((m) => m.pricing_summary.state === 'ok').length;
   const sellsDirect = st.form.productSellsDirect || models.some((m) => m.sells_direct);
   return (
-    <div className="ap mt-4 rounded-lg border border-border-subtle p-3" data-form="usd-pricing">
+    <div className="ap mt-4 border-t border-border-subtle pt-3" data-form="usd-pricing">
       {head}
       <p className="mt-1 mb-3 text-[12px] text-text-muted">{s.formIntro}</p>
       <Status />

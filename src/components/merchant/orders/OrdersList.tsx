@@ -100,7 +100,8 @@ export function orderColumns(
     {
       id: 'gov',
       header: s.colGovernorate,
-      cell: (r) => [itemCountLabel(r.item_count, lang), r.governorate ? governorateName(r.governorate, lang) : ''].filter(Boolean).join(' · '),
+      // Where first (the column is the governorate), then how much.
+      cell: (r) => [r.governorate ? governorateName(r.governorate, lang) : '', itemCountLabel(r.item_count, lang)].filter(Boolean).join(' · '),
       card: 'meta',
     },
     { id: 'total', header: s.colAmount, cell: (r) => <Money iqd={r.total_iqd} />, numeric: true },

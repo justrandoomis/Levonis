@@ -175,7 +175,7 @@ test('mapLimit: at most N in flight, answers in order, a failure as null', async
 
 // ----------------------------------------------------------------- render
 
-test('THE COLUMNS as a card or a table cell draws them: number LTR, customer, lines · governorate, money, status chip, since', () => {
+test('THE COLUMNS as a card or a table cell draws them: number LTR, customer, governorate · lines, money, status chip, since', () => {
   const s = ORDERS_STRINGS.ar;
   const chip = (r: OrderListRow) => createElement('span', { 'data-chip': r.status }, r.status);
   const cols = orderColumns(s, 'ar', (ar: string) => ar, chip);
@@ -186,7 +186,8 @@ test('THE COLUMNS as a card or a table cell draws them: number LTR, customer, li
   const cell = (i: number) => html(cols[i].cell(r));
   assert.equal(cell(0), '<bdi dir="ltr">ORD-A1F3</bdi>');
   assert.equal(cell(1), 'نور محمد');
-  assert.equal(cell(2), '3 منتجات · بغداد');
+  // The column is «المحافظة»: where first, then how much (clay polish batch 3).
+  assert.equal(cell(2), 'بغداد · 3 منتجات');
   assert.match(cell(3), /data-money/);
   assert.match(cell(3), /45[,٬.]?000|٤٥/, 'the amount');
   assert.equal(cell(4), '<span data-chip="pending">pending</span>');

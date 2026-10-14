@@ -42,8 +42,8 @@ export default function SafeImage({
   eager = false,
   className = '',
   imgClassName = '',
-  bgClassName = 'bg-zinc-900',
-  fallbackClassName = 'text-zinc-600',
+  bgClassName = 'bg-surface',
+  fallbackClassName = 'text-text-muted',
   fallbackIconClassName = 'w-6 h-6',
   referrerPolicy = 'no-referrer',
   sizes,
@@ -165,7 +165,7 @@ export default function SafeImage({
       {cleanSrc && status === 'loading' && (
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-zinc-800/40 animate-pulse motion-reduce:animate-none"
+          className="absolute inset-0 bg-surface-selected/60 animate-pulse motion-reduce:animate-none"
         />
       )}
       {showFallback && (

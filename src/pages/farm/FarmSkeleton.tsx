@@ -22,7 +22,7 @@ export default function FarmSkeleton() {
           <Skeleton className="h-14 w-full rounded-2xl" />
         </div>
         <div className="mt-auto px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" aria-hidden="true">
-          <Skeleton className="h-[60px] w-full rounded-[28px]" />
+          <Skeleton className="h-[60px] w-full rounded-3xl" />
         </div>
       </SkeletonGroup>
     </div>

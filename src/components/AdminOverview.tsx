@@ -5,6 +5,7 @@ import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { KpiTile } from './ui/KpiTile';
 import { StatusChip, type Tone } from './ui/Badge';
+import { statusLabel } from './orders/format';
 import {
   Users,
   ShoppingCart,
@@ -89,7 +90,9 @@ const ORDER_STATUS_TONES: Record<string, Tone> = {
 };
 
 export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
-  const { dir } = useLanguage();
+  // `loc(ar, en, ckb)`, never `dir === 'rtl' ? ar : en`: Kurdish is right-to-left too,
+  // and the direction test served it Arabic.
+  const { dir, lang, loc } = useLanguage();
   /**
    * THE ADMIN READS DINARS — «اجعله يكون العملة هي العملة العراقية بالافتراضي».
    *
@@ -124,7 +127,8 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       setPendingWalletRequests(data.pending_wallet_requests);
       setRecentOrders(data.recent_orders);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to load the overview');
+      // '' = failed without a server sentence; the words are chosen at render, in the reader's language.
+      setError(e instanceof ApiError ? e.message : '');
     } finally {
       setLoading(false);
     }
@@ -150,12 +154,12 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       const required = !!wd || isDeposit;
       const note = window.prompt(
         required
-          ? (dir === 'rtl' ? 'سبب الرفض (مطلوب):' : 'Rejection reason (required):')
-          : (dir === 'rtl' ? 'سبب الرفض (اختياري):' : 'Rejection reason (optional):')
+          ? loc('سبب الرفض (مطلوب):', 'Rejection reason (required):', 'هۆکاری ڕەتکردنەوە (پێویستە):')
+          : loc('سبب الرفض (اختياري):', 'Rejection reason (optional):', 'هۆکاری ڕەتکردنەوە (ئارەزوومەندانە):')
       );
       if (note === null) return; // cancelled
       if (required && note.trim().length < 3) {
-        setActionError({ id: req.id, message: dir === 'rtl' ? 'اكتب سبب الرفض (3 أحرف على الأقل)' : 'Write the rejection reason (at least 3 characters)' });
+        setActionError({ id: req.id, message: loc('اكتب سبب الرفض (3 أحرف على الأقل)', 'Write the rejection reason (at least 3 characters)', 'هۆکاری ڕەتکردنەوە بنووسە (لانیکەم 3 پیت)') });
         return;
       }
       adminNote = note || undefined;
@@ -176,22 +180,25 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
       }
       await fetchOverviewData();
     } catch (e) {
-      setActionError({ id: req.id, message: e instanceof ApiError ? e.message : 'Action failed' });
+      setActionError({ id: req.id, message: e instanceof ApiError ? e.message : loc('تعذّر تنفيذ الإجراء', 'Action failed', 'کردارەکە سەرنەکەوت') });
     } finally {
       setLoadingActionId(null);
     }
   };
 
-  // KPI TILES (build plan §5): a neutral resting surface on the canvas, a
-  // quiet label, the figure as the one loud thing — no per-tile tint. A tile
-  // that opens a queue keeps its click and answers a pointer with a fill step.
+  // KPI TILES (build plan §5): a neutral surface on the canvas, a quiet
+  // label, the figure as the one loud thing — no per-tile tint.
+  // RAISED MEANS PRESSABLE (clay): only a tile that opens a queue is resting
+  // clay, and it is a real <button> — reachable by keyboard, announced as a
+  // control, dented while pressed. A tile that only informs sits flush (the
+  // rim alone), so the four doors are the raised things on the screen.
   const statCard = (
     label: string,
     value: React.ReactNode,
     icon: React.ReactNode,
     onClick?: () => void
-  ) => (
-    <div onClick={onClick} className="min-w-0">
+  ) => {
+    const tile = (
       <KpiTile
         // The tile truncates its label; an Arabic label here is a sentence
         // («تعبئة المحفظة (الموافق عليها)»), so it wraps instead of losing words.
@@ -199,10 +206,21 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         value={value}
         icon={icon}
         loading={loading}
-        className={onClick ? 'h-full cursor-pointer transition-colors hover:bg-surface-raised' : 'h-full'}
+        className={onClick ? 'h-full transition-colors hover:bg-surface-raised active:shadow-press' : 'h-full shadow-xs'}
       />
-    </div>
-  );
+    );
+    return onClick ? (
+      <button
+        type="button"
+        onClick={onClick}
+        className="min-w-0 text-start rounded-xl no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+      >
+        {tile}
+      </button>
+    ) : (
+      <div className="min-w-0">{tile}</div>
+    );
+  };
 
   return (
     <div className="space-y-4 text-text-primary pb-10 font-sans" dir={dir}>
@@ -215,10 +233,10 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           </div>
           <div>
             <h1 className="text-base font-black text-text-primary flex items-center gap-2">
-              {dir === 'rtl' ? 'لوحة القيادة والإحصائيات' : 'Executive Overview Dashboard'}
+              {loc('لوحة القيادة والإحصائيات', 'Executive Overview Dashboard', 'داشبۆرد و ئامارەکان')}
             </h1>
             <p className="text-[11px] text-text-secondary font-medium">
-              {dir === 'rtl' ? 'إحصائيات حقيقية من قاعدة البيانات' : 'Live figures straight from the database'}
+              {loc('إحصائيات حقيقية من قاعدة البيانات', 'Live figures straight from the database', 'ئاماری ڕاستەقینە ڕاستەوخۆ لە بنکەدراوەوە')}
             </p>
           </div>
         </div>
@@ -228,17 +246,17 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             onClick={fetchOverviewData}
             disabled={loading}
             className="lv-button lv-button-secondary lv-button-sm"
-            title={dir === 'rtl' ? 'تحديث البيانات' : 'Refresh Data'}
+            title={loc('تحديث البيانات', 'Refresh data', 'نوێکردنەوەی داتاکان')}
           >
             <Zap className="w-4 h-4" />
-            {loading ? (dir === 'rtl' ? 'جارٍ التحديث...' : 'Refreshing...') : dir === 'rtl' ? 'تحديث' : 'Refresh'}
+            {loading ? loc('جارٍ التحديث...', 'Refreshing...', 'نوێ دەکرێتەوە...') : loc('تحديث', 'Refresh', 'نوێکردنەوە')}
           </button>
         </div>
       </div>
 
-      {error && (
+      {error !== null && (
         <div className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">
-          {error}
+          {error || loc('تعذّر تحميل النظرة العامة', 'Failed to load the overview', 'نەتوانرا پوختەکە بار بکرێت')}
         </div>
       )}
 
@@ -247,50 +265,50 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           2-column xl-gated grid stacked 11 cards into six huge rows there. */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
         {statCard(
-          dir === 'rtl' ? 'إجمالي الإيرادات' : 'Total Revenue',
+          loc('إجمالي الإيرادات', 'Total revenue', 'کۆی داهات'),
           formatIqd(stats.revenue_iqd),
           <TrendingUp className="w-4 h-4" />
         )}
         {statCard(
-          dir === 'rtl' ? 'إجمالي الطلبات' : 'Total Orders',
+          loc('إجمالي الطلبات', 'Total orders', 'کۆی داواکارییەکان'),
           stats.orders_total.toLocaleString(),
           <ShoppingCart className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('orders') : undefined
         )}
         {statCard(
-          dir === 'rtl' ? 'طلبات قيد الانتظار' : 'Pending Orders',
+          loc('طلبات قيد الانتظار', 'Pending orders', 'داواکارییە چاوەڕوانەکان'),
           stats.orders_pending.toLocaleString(),
           <Clock className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('orders') : undefined
         )}
         {statCard(
-          dir === 'rtl' ? 'طلبات مكتملة' : 'Delivered Orders',
+          loc('طلبات مكتملة', 'Delivered orders', 'داواکارییە گەیەندراوەکان'),
           stats.orders_delivered.toLocaleString(),
           <CheckCircle2 className="w-4 h-4" />
         )}
         {statCard(
-          dir === 'rtl' ? 'المستخدمون' : 'Total Users',
+          loc('المستخدمون', 'Users', 'بەکارهێنەران'),
           stats.users_total.toLocaleString(),
           <Users className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('users') : undefined
         )}
         {statCard(
-          dir === 'rtl' ? 'مشتركو Pro / Plus' : 'Pro / Plus Subscribers',
+          loc('مشتركو Pro / Plus', 'Pro / Plus subscribers', 'بەشداربووانی Pro / Plus'),
           `${stats.pro_subscribers.toLocaleString()} / ${stats.plus_subscribers.toLocaleString()}`,
           <Crown className="w-4 h-4" />
         )}
         {statCard(
-          dir === 'rtl' ? 'تعبئة المحفظة (الموافق عليها)' : 'Wallet Top-ups (approved)',
+          loc('تعبئة المحفظة (الموافق عليها)', 'Wallet top-ups (approved)', 'پڕکردنەوەی جزدان (پەسەندکراو)'),
           formatWalletIqd(stats.incoming_usd_cents, exchangeRate),
           <ArrowUpRight className="w-4 h-4" />
         )}
         {statCard(
-          dir === 'rtl' ? 'السحوبات (الموافق عليها)' : 'Wallet Payouts (approved)',
+          loc('السحوبات (الموافق عليها)', 'Wallet payouts (approved)', 'کێشانەوەکان (پەسەندکراو)'),
           formatWalletIqd(stats.outgoing_usd_cents, exchangeRate),
           <ArrowDownRight className="w-4 h-4" />
         )}
         {statCard(
-          dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests',
+          loc('طلبات المحفظة المعلقة', 'Pending wallet requests', 'داواکارییە هەڵپەسێردراوەکانی جزدان'),
           stats.pending_wallet_requests.toLocaleString(),
           <Wallet className="w-4 h-4" />,
           onNavigateTab ? () => onNavigateTab('wallet_requests') : undefined
@@ -304,7 +322,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
             waiting customer "nothing waiting". The number is the SUM of the
             same three counts the sidebar badge shows. */}
         {statCard(
-          dir === 'rtl' ? 'بانتظار رد الدعم' : 'Awaiting a support reply',
+          loc('بانتظار رد الدعم', 'Awaiting a support reply', 'چاوەڕێی وەڵامی پشتگیری'),
           (
             (stats.support_tickets_waiting || 0) +
             (stats.support_chats_unread || 0) +
@@ -314,12 +332,12 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
           onNavigateTab ? () => onNavigateTab('support') : undefined
         )}
         {statCard(
-          dir === 'rtl' ? 'طلبات المجتمع المفتوحة' : 'Open Community Requests',
+          loc('طلبات المجتمع المفتوحة', 'Open community requests', 'داواکارییە کراوەکانی کۆمەڵگە'),
           stats.open_community_requests.toLocaleString(),
           <MessageSquare className="w-4 h-4" />
         )}
         {statCard(
-          dir === 'rtl' ? 'المستثمرون' : 'Investors',
+          loc('المستثمرون', 'Investors', 'وەبەرهێنەران'),
           stats.investors.toLocaleString(),
           <Users className="w-4 h-4" />
         )}
@@ -337,24 +355,24 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         {/* Pending wallet requests — real list with working actions */}
         <div className="lv-surface p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[12px] font-black uppercase tracking-wider text-text-secondary">
-              {dir === 'rtl' ? 'طلبات المحفظة المعلقة' : 'Pending Wallet Requests'}
+            <h3 className="text-[13px] font-bold text-text-secondary">
+              {loc('طلبات المحفظة المعلقة', 'Pending wallet requests', 'داواکارییە هەڵپەسێردراوەکانی جزدان')}
             </h3>
             {onNavigateTab && (
               <button
                 onClick={() => onNavigateTab('wallet_requests')}
                 className="text-[11px] font-bold text-gold hover:text-wheat transition-colors"
               >
-                {dir === 'rtl' ? 'عرض الكل' : 'View all'}
+                {loc('عرض الكل', 'View all', 'هەموو ببینە')}
               </button>
             )}
           </div>
 
           {loading && pendingWalletRequests.length === 0 ? (
-            <div className="text-center text-text-muted py-10 text-sm">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>
+            <div className="text-center text-text-muted py-10 text-sm">{loc('جارٍ التحميل...', 'Loading...', 'بارکردن...')}</div>
           ) : pendingWalletRequests.length === 0 ? (
             <div className="text-center text-text-muted py-10 text-sm border border-dashed border-border-subtle rounded-lg">
-              {dir === 'rtl' ? 'لا توجد طلبات معلقة' : 'No pending requests'}
+              {loc('لا توجد طلبات معلقة', 'No pending requests', 'هیچ داواکارییەکی هەڵپەسێردراو نییە')}
             </div>
           ) : (
             <div className="divide-y divide-border-subtle">
@@ -363,7 +381,8 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-bold text-text-primary text-sm truncate flex items-center gap-2">
-                        <span className="capitalize">{req.type}</span>
+                        {/* The wallet's own words (Wallet.tsx filters), not the API's type code. */}
+                        <span>{req.type === 'deposit' ? loc('إيداع', 'Deposit', 'دانان') : req.type === 'withdrawal' ? loc('سحب', 'Withdrawal', 'کێشانەوە') : req.type}</span>
                         {/* EITHER KIND PRINTS WHAT THE CUSTOMER TYPED — a
                         withdrawal from its own row (migration 0106), a deposit
                         from `wallet_deposit_meta` (0105), both joined by this
@@ -403,10 +422,16 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                         // next step needs a payout reference — Wallet Requests.
                         <button
                           onClick={() => onNavigateTab?.('wallet_requests')}
-                          className="text-[11px] font-bold text-gold hover:text-wheat transition-colors capitalize"
+                          className="text-[11px] font-bold text-gold hover:text-wheat transition-colors"
                           title={req.withdrawal.state}
                         >
-                          {req.withdrawal.state} →
+                          {/* The customer wallet's own state words (Wallet.tsx `stateLabel`). */}
+                          {req.withdrawal.state === 'approved'
+                            ? loc('موافق على المعالجة', 'Approved for processing', 'پەسەندکراو بۆ پرۆسە')
+                            : req.withdrawal.state === 'processing'
+                              ? loc('قيد المعالجة', 'Processing', 'لە پرۆسەدا')
+                              : req.withdrawal.state}{' '}
+                          →
                         </button>
                       ) : (
                       <>
@@ -415,8 +440,8 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                         disabled={!!loadingActionId}
                         className="lv-button lv-button-primary w-11 px-0"
                         title={req.type === 'withdrawal' && req.withdrawal
-                          ? (dir === 'rtl' ? 'موافقة للمعالجة (لا يُدفع هنا)' : 'Approve for processing (no payout here)')
-                          : (dir === 'rtl' ? 'موافقة' : 'Approve')}
+                          ? loc('موافقة للمعالجة (لا يُدفع هنا)', 'Approve for processing (no payout here)', 'پەسەندکردن بۆ پرۆسە (لێرە پارە نادرێت)')
+                          : loc('موافقة', 'Approve', 'پەسەندکردن')}
                       >
                         <Check className="w-4 h-4 stroke-[3]" />
                       </button>
@@ -424,7 +449,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                         onClick={() => decideWallet(req, 'rejected')}
                         disabled={!!loadingActionId}
                         className="lv-button lv-button-secondary w-11 px-0 hover:text-danger"
-                        title={dir === 'rtl' ? 'رفض' : 'Reject'}
+                        title={loc('رفض', 'Reject', 'ڕەتکردنەوە')}
                       >
                         <X className="w-4 h-4 stroke-[3]" />
                       </button>
@@ -444,24 +469,24 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
         {/* Recent orders — real list */}
         <div className="lv-surface p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[12px] font-black uppercase tracking-wider text-text-secondary">
-              {dir === 'rtl' ? 'أحدث الطلبات' : 'Recent Orders'}
+            <h3 className="text-[13px] font-bold text-text-secondary">
+              {loc('أحدث الطلبات', 'Recent orders', 'دوایین داواکارییەکان')}
             </h3>
             {onNavigateTab && (
               <button
                 onClick={() => onNavigateTab('orders')}
                 className="text-[11px] font-bold text-gold hover:text-wheat transition-colors"
               >
-                {dir === 'rtl' ? 'عرض الكل' : 'View all'}
+                {loc('عرض الكل', 'View all', 'هەموو ببینە')}
               </button>
             )}
           </div>
 
           {loading && recentOrders.length === 0 ? (
-            <div className="text-center text-text-muted py-10 text-sm">{dir === 'rtl' ? 'جارٍ التحميل...' : 'Loading...'}</div>
+            <div className="text-center text-text-muted py-10 text-sm">{loc('جارٍ التحميل...', 'Loading...', 'بارکردن...')}</div>
           ) : recentOrders.length === 0 ? (
             <div className="text-center text-text-muted py-10 text-sm border border-dashed border-border-subtle rounded-lg">
-              {dir === 'rtl' ? 'لا توجد طلبات بعد' : 'No orders yet'}
+              {loc('لا توجد طلبات بعد', 'No orders yet', 'هێشتا هیچ داواکارییەک نییە')}
             </div>
           ) : (
             <div className="divide-y divide-border-subtle">
@@ -476,7 +501,7 @@ export default function AdminOverview({ onNavigateTab }: { onNavigateTab?: (tab:
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-sm font-bold text-text-primary whitespace-nowrap tabular-nums">{formatIqd(o.total_iqd)}</span>
-                    <StatusChip tone={ORDER_STATUS_TONES[o.status] ?? 'neutral'}>{o.status}</StatusChip>
+                    <StatusChip tone={ORDER_STATUS_TONES[o.status] ?? 'neutral'}>{statusLabel(lang, o.status)}</StatusChip>
                   </div>
                 </div>
               ))}

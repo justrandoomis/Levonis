@@ -18,12 +18,33 @@
  * applies and reviews each one. IT NEVER WRITES A SOURCE FILE.
  *
  * THE RATCHET. tests/claySystem.test.ts imports `census()` from here and
- * fails when any of the four ratchet counts (legacy cards, ad-hoc buttons,
- * raw inputs, arbitrary radii) is above the number checked into the test. A
- * family push lowers the numbers in the same commit, so they never rise.
+ * fails when any of the six ratchet counts (legacy cards, ad-hoc buttons,
+ * raw inputs, arbitrary radii, zinc utilities, canvas wrappers) is above the
+ * number checked into the test. A family push lowers the numbers in the same
+ * commit, so they never rise.
  *
- * The regexes are the judge's census (`families.mjs`, build plan §0) unchanged,
- * so the numbers here are the numbers the plan was written against.
+ * The regexes are the judge's census (`families.mjs`, build plan §0), with
+ * four refinements (clay polish batch 3, 2026-10-13). Each one removes a
+ * false positive — none hides a hand-drawn control — and each is pinned by
+ * tests/claySystem.test.ts:
+ *   1. A COMMENT IS NOT A FIELD OR A FILL. A `<select>` or a `bg-zinc-100`
+ *      named in a comment («this used to be `bg-zinc-100`») is blanked before
+ *      the field and zinc scans (newlines kept, so line numbers hold). The
+ *      quoted-string scan (cards, buttons, wrappers) reads the source as the
+ *      judge's census did, unchanged.
+ *   2. A SKELETON IS NOT A BUTTON. A string carrying `animate-pulse` is a
+ *      loading bar the height of a button (`h-11 animate-pulse rounded-xl
+ *      bg-surface-selected`), not a hand-drawn control.
+ *   3. AN ARROW DOES NOT END A TAG. `onChange={(e) => …}` holds a `>`; the
+ *      field scan read it as the end of the tag and missed the `lv-input`
+ *      after it.
+ *   4. A HOUSE WELL IS STYLED. A field whose class names a house field —
+ *      `lv-input`, the admin kit's `ap-field` and its recipes (`T.input`,
+ *      `T.select`, `T.selectSm`, built on `ap-field lv-well`), an `lv-well`,
+ *      the finance sheet's `fw-input` / `fw-select`, or the sign-in screen's
+ *      `lv-field__input`, `lv-otp__box`, `lv-copyrow__value` and the input of
+ *      the `lv-cpick__search` well (`lv-cpick__input`) — all wells, all pinned
+ *      — or a constant of the same file built from one, is styled.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -31,12 +52,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The four counts the ratchet holds down, by key and by name. */
+/** The six counts the ratchet holds down, by key and by name. */
 export const RATCHET = {
   legacy: 'legacy card strings',
   btn: 'ad-hoc button strings',
   rawIn: 'raw unstyled inputs',
   arbR: 'arbitrary radii (rounded-[Npx])',
+  zinc: 'zinc utilities',
+  wrap: 'canvas wrappers',
 };
 
 /** The page family a file belongs to (build plan §6 Phase 3). */
@@ -65,13 +88,36 @@ const PAGE_WRAPPER = /\bmin-h-(screen|\[100dvh\]|full|dvh)/;
 const ARB_RADIUS = /rounded(?:-[a-z]{1,2})?-\[\d+(?:\.\d+)?(?:px|rem)\]/g;
 const ARB_SHADOW = /shadow-\[[^\]\s"'`]*\]/g;
 const SHADOW_KEEPERS = /200vmax|0_0_0_3px|inset_0_0_0_1px|--ap-shadow|0_0_0_1px_var\(--color-text-primary\)/;
-const RAW_INPUT = /<(input|select|textarea)\b(?![^>]*lv-input)(?![^>]*type=["'](?:checkbox|radio|hidden|file|range|color)["'])/g;
+/** The class names of the house fields (refinement 4): every one is a well. */
+const HOUSE_FIELD = 'lv-input|ap-field|lv-well|fw-input|fw-select|lv-field__input|lv-otp__box|lv-cpick__input|lv-copyrow__value';
+/** The admin kit's field recipes (src/components/adminProducts/theme.ts), `ap-field lv-well` each. */
+const KIT_FIELD = 'T\\.(?:input|select|selectSm)';
+/** A field tag that names none of the house fields (refinements 3 and 4). `=>` is crossed, a bare `>` ends the tag. */
+const rawInputRe = (styled) =>
+  new RegExp(`<(input|select|textarea)\\b(?!(?:=>|[^>])*?\\b(?:${styled})\\b)(?!(?:=>|[^>])*?type=["'](?:checkbox|radio|hidden|file|range|color)["'])`, 'g');
 const ZINC = /\b(bg|border|ring|divide)-zinc-\d{2,3}(\/\d+)?\b/g;
 
 /** Is this quoted class string a hand-drawn card (radius + border + ground, no semantic class)? */
 export const isLegacyCard = (s) => HAS_RADIUS.test(s) && HAS_BORDER.test(s) && HAS_GROUND.test(s) && !SEMANTIC_CARD.test(s);
-/** Is this quoted class string a hand-drawn 40–44px button (height + fill + radius, not lv-button)? */
-export const isAdHocButton = (s) => BUTTON_HEIGHT.test(s) && /\bbg-/.test(s) && /\brounded/.test(s) && !/lv-button/.test(s);
+/** Is this quoted class string a hand-drawn 40–44px button (height + fill + radius, not lv-button, not a skeleton bar)? */
+export const isAdHocButton = (s) =>
+  BUTTON_HEIGHT.test(s) && /\bbg-/.test(s) && /\brounded/.test(s) && !/lv-button/.test(s) && !/\banimate-pulse\b/.test(s);
+
+/** Refinement 1: block and line comments blanked, every newline kept (so line numbers hold). */
+export function blankComments(src) {
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  return src.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/(^|[\s{(;,])\/\/[^\n]*/g, (m, lead) => lead + blank(m.slice(lead.length)));
+}
+
+/** Refinement 4: the house-field pattern for one file, with the file's own constants built from a house field. */
+function styledFieldPattern(src) {
+  const names = [];
+  const marker = new RegExp(`\\b(?:${HOUSE_FIELD}|${KIT_FIELD})\\b`);
+  for (const m of src.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(['"`])((?:(?!\2)[^\\]|\\.)*)\2/g)) {
+    if (marker.test(m[3])) names.push(m[1]);
+  }
+  return [HOUSE_FIELD, KIT_FIELD, ...names].join('|');
+}
 
 /** A function from a character offset to its 1-based line number. */
 function lineIndex(src) {
@@ -91,6 +137,7 @@ function lineIndex(src) {
 
 /** The findings of one file's source, each with its line and its text. */
 export function scanSource(src) {
+  const code = blankComments(src);
   const lineAt = lineIndex(src);
   const found = { legacy: [], btn: [], rawIn: [], arbR: [], arbS: [], blur: [], wrap: [], zinc: 0 };
   for (const m of src.matchAll(STRING)) {
@@ -104,8 +151,8 @@ export function scanSource(src) {
   for (const m of src.matchAll(ARB_RADIUS)) found.arbR.push({ line: lineAt(m.index), text: m[0] });
   for (const m of src.matchAll(ARB_SHADOW)) if (!SHADOW_KEEPERS.test(m[0])) found.arbS.push({ line: lineAt(m.index), text: m[0] });
   for (const m of src.matchAll(/backdrop-blur/g)) found.blur.push({ line: lineAt(m.index), text: m[0] });
-  for (const m of src.matchAll(RAW_INPUT)) found.rawIn.push({ line: lineAt(m.index), text: src.slice(m.index, m.index + 120).split('\n')[0] });
-  found.zinc = (src.match(ZINC) || []).length;
+  for (const m of code.matchAll(rawInputRe(styledFieldPattern(code)))) found.rawIn.push({ line: lineAt(m.index), text: src.slice(m.index, m.index + 120).split('\n')[0] });
+  found.zinc = (code.match(ZINC) || []).length;
   return found;
 }
 
@@ -213,7 +260,7 @@ function main(argv) {
   const lines = [];
   lines.push('CLAY CENSUS (read-only) — src/**/*.tsx');
   lines.push(`ratchet: ${Object.entries(RATCHET).map(([k, name]) => `${name} ${totals[k]}`).join(' · ')}`);
-  lines.push(`also: arbitrary shadows ${totals.arbS} · backdrop blur ${totals.blur} · canvas wrappers ${totals.wrap} · zinc utilities ${totals.zinc}`);
+  lines.push(`also: arbitrary shadows ${totals.arbS} · backdrop blur ${totals.blur}`);
   const byFamily = new Map();
   for (const r of rows) {
     if (!byFamily.has(r.family)) byFamily.set(r.family, []);

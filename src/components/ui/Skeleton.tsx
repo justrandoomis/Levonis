@@ -228,10 +228,11 @@ export function ProductDetailSkeleton() {
   );
 }
 
-/** Mirrors the Cart list: group header + item rows (checkbox, 100px image, lines). */
+/** Mirrors the Cart list — the clay lines tray on the canvas (Cart.tsx, `lv-surface mx-4 mt-4`):
+    group header + item rows (checkbox, 100px image, lines). */
 export function CartSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <SkeletonGroup className="bg-black border-y border-zinc-900/50 pb-4">
+    <SkeletonGroup className="lv-surface mx-4 mt-1 overflow-hidden pb-4">
       <div className="px-4 py-3" aria-hidden="true">
         <Skeleton className="h-5 w-28" />
       </div>

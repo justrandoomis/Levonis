@@ -337,7 +337,11 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <Toaster />
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'pricing' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' || activeTab === 'price_protection' ? '' : 'bg-surface border border-border-subtle rounded-2xl p-4 md:p-5'}`}>
+      {/* EVERY TAB SITS ON THE CANVAS (clay): its own cards are the raised
+          things. The surface-coloured panel that framed most tabs was the
+          same colour as the cards inside it, so each card in it read as a
+          card in a card. Every tab draws its own trays. */}
+      <div className="max-w-[1280px] mx-auto text-white">
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (

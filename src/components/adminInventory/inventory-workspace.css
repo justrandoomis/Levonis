@@ -1,7 +1,9 @@
 .inventory-workspace { min-width: 0; }
 .inventory-workspace .inventory-start { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
-.inventory-workspace .inventory-action { display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 16px; text-align: start; border: 1px solid var(--ap-border); border-radius: var(--ap-radius-lg); color: var(--ap-text-1); background: var(--ap-surface-1); transition: background 150ms, border-color 150ms; }
-.inventory-workspace .inventory-action svg { flex-shrink: 0; color: var(--ap-accent-text); }
+/* The four ways in are doors: resting clay, dented while pressed; their glyphs are neutral (four purple icons above four tinted stats was chrome louder than content). */
+.inventory-workspace .inventory-action { display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 16px; text-align: start; border: 1px solid var(--ap-border); border-radius: var(--ap-radius-lg); color: var(--ap-text-1); background: var(--ap-surface-1); box-shadow: var(--ap-shadow-1); transition: background 150ms, border-color 150ms; }
+.inventory-workspace .inventory-action:active { box-shadow: var(--clay-press); }
+.inventory-workspace .inventory-action svg { flex-shrink: 0; color: var(--ap-text-2); }
 .inventory-workspace .inventory-action strong { display: block; font-size: 14px; }
 .inventory-workspace .inventory-action small { display: block; margin-top: 5px; color: var(--ap-text-3); font-size: 12px; }
 .inventory-workspace .inventory-action:hover { background: var(--ap-surface-2); border-color: var(--ap-border-hover); }

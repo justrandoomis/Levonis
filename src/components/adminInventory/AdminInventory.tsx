@@ -141,7 +141,6 @@ export default function AdminInventory() {
             label={s.stats.onHand}
             value={count(overview.on_hand_units)}
             sub={`${s.stats.lots}: ${count(overview.active_lots)}`}
-            tint="blue"
             icon={<Boxes size={15} />}
           />
           {showsCosts && (
@@ -153,22 +152,22 @@ export default function AdminInventory() {
                   ? s.stats.unpriced(count(overview.unpriced_units))
                   : s.stats.valueHint
               }
-              tint="green"
-              icon={<Layers size={15} />}
+                icon={<Layers size={15} />}
             />
           )}
           <Stat
             label={s.stats.incoming}
             value={count(overview.incoming_units)}
             sub={`${s.tabs.incoming}: ${count(overview.incoming_purchases)}`}
-            tint="amber"
             icon={<Truck size={15} />}
           />
           <Stat
             label={s.stats.aging}
             value={
-              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[14px]">
-                {/* The day ranges in the digits of their counts: one card, one digit system. */}
+              <span className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[14px]">
+                {/* The day ranges in the digits of their counts: one card, one digit system.
+                    Two by two, so a band never breaks across lines between its
+                    count and its range. */}
                 <Age n={count(overview.aging_units.d0_30)} tag={`${count(0)}–${count(30)}`} ok />
                 <Age n={count(overview.aging_units.d31_90)} tag={`${count(31)}–${count(90)}`} ok />
                 <Age n={count(overview.aging_units.d91_180)} tag={`${count(91)}–${count(180)}`} />
@@ -176,14 +175,18 @@ export default function AdminInventory() {
               </span>
             }
             sub={s.stats.agingHint}
-            tint="purple"
             icon={<CalendarClock size={15} />}
           />
         </div>
       )}
 
-      {/* ------------------------------------------------- 2. THE TABS */}
-      <div className="mb-5 flex flex-wrap gap-1.5" role="tablist">
+      {/* ------------------------------------------------- 2. THE TABS
+          ONE ROW THAT SCROLLS, not three that wrap: at 390px seven chips
+          wrapped into three rows and pushed the content a screen down. The
+          row bleeds to the gutter (-mx-4 px-4) so a chip is cut at the screen
+          edge, which is the cue that it scrolls; py-1 leaves the pressed
+          chip's inset room. */}
+      <div className="mb-5 flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 py-1" role="tablist">
         {tabs.map((x) => (
           <button
             key={x.id}
@@ -191,7 +194,7 @@ export default function AdminInventory() {
             role="tab"
             aria-selected={tab === x.id}
             aria-current={tab === x.id ? 'page' : undefined}
-            className={T.chip}
+            className={`${T.chip} shrink-0`}
             aria-pressed={tab === x.id}
             onClick={() => setTab(x.id)}
           >
@@ -222,9 +225,11 @@ export default function AdminInventory() {
  */
 function Age({ n, tag, ok, warn }: { n: string; tag: string; ok?: boolean; warn?: boolean }) {
   return (
-    <span className="inline-flex items-baseline gap-1">
+    <span className="inline-flex items-baseline gap-1 min-w-0">
       <span className={`font-bold tabular-nums ${warn ? 'text-[var(--ap-warning)]' : ok ? T.text1 : T.text2}`}>{n}</span>
-      <span className={`text-[10.5px] ${T.text3}`}>{tag}</span>
+      {/* A range is a number run («٣١–٩٠»): isolated, so the bidi algorithm
+          cannot reorder it against the Arabic around it. */}
+      <bdi className={`text-[11px] whitespace-nowrap ${T.text3}`}>{tag}</bdi>
     </span>
   );
 }

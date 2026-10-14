@@ -325,7 +325,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
           {navSections.map((section, sectionIndex) => (
             <div key={section.id} className={sectionIndex > 0 && collapsed ? 'border-t border-border-subtle pt-3' : ''}>
               {!collapsed && section.label && (
-                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                <p className="px-3 pb-1.5 text-[11px] font-semibold text-text-muted">
                   {section.label}
                 </p>
               )}
@@ -630,7 +630,7 @@ function MobileDrawer({
           {sidebarSections(items).map((section) => (
             <div key={section.id}>
               {section.label && (
-                <p className="px-3 pb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                <p className="px-3 pb-1.5 text-[11px] font-semibold text-text-muted">
                   {section.label}
                 </p>
               )}

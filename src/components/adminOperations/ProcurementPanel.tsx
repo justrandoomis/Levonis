@@ -505,7 +505,9 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       {priceLine && <SelectionPriceUpdate line={priceLine} onClose={()=>setPriceLine(null)}/>}
       {investmentFor && <Suspense fallback={<p role="status">{loc('جارٍ تحميل اتفاق التمويل…', 'Loading funding agreement…', 'ڕێککەوتنی پارەدارکردن باردەکرێت…')}</p>}><InvestorContractForm initialIncomingId={investmentFor} onClose={() => setInvestmentFor('')} onSaved={() => { setInvestmentFor(''); onChanged(); }} /></Suspense>}
       <div className="mb-4 flex flex-wrap gap-2">
-        <button type="button" className={T.btnPrimary} onClick={() => start(undefined, false, true)}>{loc('إضافة مخزون موجود', 'Add stock on hand', 'زیادکردنی کۆگای ئامادە')}</button>
+        {/* ONE PRIMARY PER TOOLBAR: «شراء قادم» is the screen's job; adding
+            stock already on the shelf is the second way in. */}
+        <button type="button" className={T.btnSecondary} onClick={() => start(undefined, false, true)}>{loc('إضافة مخزون موجود', 'Add stock on hand', 'زیادکردنی کۆگای ئامادە')}</button>
         {draftAvailable && <><button type="button" className={T.btnSecondary} onClick={restoreLocal}>{loc('استكمال مسودة هذه الجلسة', 'Resume this session’s draft', 'بەردەوامبوون لە ڕەشنووسی ئەم دانیشتنە')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => { setEditing(false); privateDrafts.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false); }}>{loc('حذف مسودة الجلسة', 'Discard session draft', 'سڕینەوەی ڕەشنووسی دانیشتن')}</button></>}
         <button type="button" className={T.btnPrimary} onClick={() => start()}>
           {loc('شراء قادم', 'Incoming purchase', 'کڕینی چاوەڕوانکراو')}

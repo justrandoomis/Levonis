@@ -73,7 +73,7 @@ export default function FarmTabBar({
       <nav
         role="tablist"
         aria-label={s.tabsLabel}
-        className="flex items-stretch bg-zinc-950/95 border border-white/10 rounded-[28px] p-1 max-w-2xl mx-auto"
+        className="flex items-stretch bg-zinc-950/95 border border-white/10 rounded-3xl p-1 max-w-2xl mx-auto"
       >
         {FARM_TABS.map((tab) => {
           const Icon = ICONS[tab];

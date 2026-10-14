@@ -92,8 +92,11 @@
   height: 40px;
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid var(--lv-panel-line);
-  background: var(--lv-panel);
+  /* A field is a well (clay), even a read-only one: the link sits in the
+     card, under its 3:1 line, like every other /auth field. */
+  border: 1px solid var(--clay-field);
+  background: var(--lv-ground-2);
+  box-shadow: var(--clay-well);
   color: var(--lv-text-1);
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
