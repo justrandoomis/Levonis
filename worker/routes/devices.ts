@@ -179,14 +179,20 @@ export const CLOSED_CLAIM_SQL = closedClaimSql('wc');
 
 /**
  * An OPEN return case on a device (Services V2 plan §1.3: «one door per
- * defect»), in SQL: a case on the unit itself, or a case that names no device
- * on its line (it answers for every device of the line). `line` and `unit`
- * are the parameter markers to compare with.
+ * defect»), in SQL: a case on the unit itself; or a case that names no device
+ * on its line when it cannot be another device (review R2) — the line's open
+ * cases and its devices on the repair desk (this one included) needing more
+ * devices than the line holds. `line` and `unit` are the parameter markers.
  */
 function openReturnOnUnitSql(line: string, unit: string): string {
-  return `EXISTS (SELECT 1 FROM return_cases rc
-     WHERE rc.state NOT IN ('rejected','resolved')
-       AND (rc.unit_id = ${unit} OR (rc.unit_id IS NULL AND rc.order_item_id = ${line})))`;
+  const open = `rc.state NOT IN ('rejected','resolved')`;
+  return `(EXISTS (SELECT 1 FROM return_cases rc WHERE ${open} AND rc.unit_id = ${unit})
+    OR (EXISTS (SELECT 1 FROM return_cases rc WHERE ${open} AND rc.unit_id IS NULL AND rc.order_item_id = ${line})
+        AND (SELECT COALESCE(SUM(rc.qty), 0) FROM return_cases rc WHERE ${open} AND rc.order_item_id = ${line})
+          + (SELECT COUNT(DISTINCT u.unit_index) FROM order_item_units u
+              WHERE u.order_item_id = ${line}
+                AND (u.id = ${unit} OR EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.unit_id = u.id AND NOT ${CLOSED_CLAIM_SQL})))
+          > (SELECT qty FROM order_items WHERE id = ${line})))`;
 }
 /** W-4: a closed claim's thread takes no more messages. The client shows its own copy by code. */
 const CLAIM_CLOSED = () =>

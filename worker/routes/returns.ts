@@ -166,21 +166,6 @@ interface ReturnCaseRow extends Record<string, unknown> {
 }
 
 /**
- * ONE MONEY PROCESS PER UNIT (Services V2 plan §1.3) — what a return case
- * touches. A case that names its device answers for that device; one that
- * does not answers for every device of the line, and for a legacy claim
- * filed on the line itself. Positional binds: `claimTargetBinds`.
- */
-function claimTargetSql(byUnit: boolean): string {
-  return byUnit
-    ? 'wc.unit_id = ?'
-    : '(wc.unit_id IN (SELECT id FROM order_item_units WHERE order_item_id = ?) OR (wc.unit_id IS NULL AND wc.order_item_id = ?))';
-}
-function claimTargetBinds(kase: { unit_id?: string | null; order_item_id: string }): string[] {
-  return kase.unit_id ? [kase.unit_id] : [kase.order_item_id, kase.order_item_id];
-}
-
-/**
  * An OPEN warranty claim on what a NEW return case covers: the device it
  * names (`?1` = the unit id), or every device of its lines and a legacy claim
  * filed on one of them (`?1` = the line ids, JSON). One predicate for the
@@ -193,6 +178,38 @@ function openClaimOnCaseSql(byUnit: boolean): string {
          WHERE (wc.unit_id IN (SELECT id FROM order_item_units WHERE order_item_id IN (SELECT value FROM json_each(?1)))
                 OR (wc.unit_id IS NULL AND wc.order_item_id IN (SELECT value FROM json_each(?1))))
            AND NOT ${closedClaimSql('wc')})`;
+}
+
+/**
+ * ONE DOOR PER DEFECT, COUNTED (review R2). A case that names NO device (the
+ * customer's return screen never names one) collides with the repair desk
+ * only when it cannot be another device of the line: a legacy claim filed on
+ * the line itself, or the devices on the repair desk (one per slot), the
+ * units the line's cases already hold or were refunded (this case included
+ * once it is written) and `?` more together exceeding the line — the same
+ * count the door applies to trade-ins. Positional binds, in order: the line
+ * id four times, then the extra units.
+ */
+function lineCaseClaimSql(): string {
+  const open = `NOT ${closedClaimSql('wc')}`;
+  return `(EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.unit_id IS NULL AND wc.order_item_id = ? AND ${open})
+    OR (SELECT COUNT(DISTINCT u.unit_index) FROM warranty_claims wc JOIN order_item_units u ON u.id = wc.unit_id
+         WHERE u.order_item_id = ? AND ${open})
+       + (SELECT COALESCE(SUM(rc.qty), 0) FROM return_cases rc
+           WHERE rc.order_item_id = ? AND rc.state <> 'rejected' AND (rc.resolution IS NULL OR rc.resolution = 'refund'))
+       + ? > (SELECT qty FROM order_items WHERE id = ?))`;
+}
+const lineCaseClaimBinds = (line: string, extra: number): unknown[] => [line, line, line, extra, line];
+
+/**
+ * An open warranty claim a case's REFUND would collide with: the device it
+ * names, or — for a case naming none — the count rule above (the case itself
+ * already counted). Positional binds.
+ */
+function refundClaimSql(kase: { unit_id?: string | null; order_item_id: string }): { sql: string; binds: unknown[] } {
+  return kase.unit_id
+    ? { sql: `EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.unit_id = ? AND NOT ${closedClaimSql('wc')})`, binds: [kase.unit_id] }
+    : { sql: lineCaseClaimSql(), binds: lineCaseClaimBinds(kase.order_item_id, 0) };
 }
 
 /**
@@ -553,11 +570,17 @@ returnRoutes.post('/', async (c) => {
   // turns it into a return when that is the remedy).
   // The device the case names, or every device of the lines it covers.
   const claimScope = { unitId: unitId || null, lineIds: JSON.stringify(quotaTargets.map((t) => t.id)) };
+  // A single line's case that names no device is judged by the count rule
+  // (review R2): a return of one printer while the other is on the repair
+  // desk is not the same device. A bundle keeps the whole-line rule.
+  const countedLine = !claimScope.unitId && bundleChildren.length === 0;
   const warrantyClaimOpen = () =>
     conflict('This device has an open warranty request. Follow it from Warranty & maintenance; our team turns it into a return if needed.', 'WARRANTY_CLAIM_OPEN');
-  const claimOpenNow = await c.env.DB.prepare(`SELECT ${openClaimOnCaseSql(!!claimScope.unitId)} AS open`)
-    .bind(claimScope.unitId ?? claimScope.lineIds)
-    .first<{ open: number }>();
+  const claimOpenNow = countedLine
+    ? await c.env.DB.prepare(`SELECT ${lineCaseClaimSql()} AS open`).bind(...lineCaseClaimBinds(orderItemId, qty)).first<{ open: number }>()
+    : await c.env.DB.prepare(`SELECT ${openClaimOnCaseSql(!!claimScope.unitId)} AS open`)
+        .bind(claimScope.unitId ?? claimScope.lineIds)
+        .first<{ open: number }>();
   if (claimOpenNow?.open) throw warrantyClaimOpen();
   // A trade-in of the same device: before its credit is spent, THE RETURN
   // WINS and the trade-in is cancelled in the same batch as the case; once a
@@ -622,9 +645,11 @@ returnRoutes.post('/', async (c) => {
    * aborts the whole batch, and nothing is written; otherwise it touches no
    * row. One statement whatever the bundle's size.
    */
-  const claimFence = c.env.DB.prepare(
-    `UPDATE return_cases SET qty = -1 WHERE id = ?2 AND ${openClaimOnCaseSql(!!claimScope.unitId)}`
-  ).bind(claimScope.unitId ?? claimScope.lineIds, id);
+  const claimFence = countedLine
+    ? c.env.DB.prepare(`UPDATE return_cases SET qty = -1 WHERE id = ? AND ${lineCaseClaimSql()}`).bind(id, ...lineCaseClaimBinds(orderItemId, 0))
+    : c.env.DB.prepare(
+        `UPDATE return_cases SET qty = -1 WHERE id = ?2 AND ${openClaimOnCaseSql(!!claimScope.unitId)}`
+      ).bind(claimScope.unitId ?? claimScope.lineIds, id);
   try {
     await c.env.DB.batch([...cases.map((k) => k.statement), claimFence, ...cancels]);
   } catch (e) {
@@ -632,9 +657,11 @@ returnRoutes.post('/', async (c) => {
     // Nothing was written. A warranty request opened on the device meanwhile:
     // the repair desk has it. Otherwise a trade-in moved (its credit spent, or
     // cancelled by its owner): try again.
-    const open = await c.env.DB.prepare(`SELECT ${openClaimOnCaseSql(!!claimScope.unitId)} AS open`)
-      .bind(claimScope.unitId ?? claimScope.lineIds)
-      .first<{ open: number }>();
+    const open = countedLine
+      ? await c.env.DB.prepare(`SELECT ${lineCaseClaimSql()} AS open`).bind(...lineCaseClaimBinds(orderItemId, qty)).first<{ open: number }>()
+      : await c.env.DB.prepare(`SELECT ${openClaimOnCaseSql(!!claimScope.unitId)} AS open`)
+          .bind(claimScope.unitId ?? claimScope.lineIds)
+          .first<{ open: number }>();
     if (open?.open) throw warrantyClaimOpen();
     if (cancels.length) {
       throw conflict('The trade-in on this device changed while the return was being opened. Refresh and try again.', 'TRADE_IN_STALE');
@@ -786,8 +813,8 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     // ONE MONEY PROCESS PER UNIT (plan §1.3): no refund for a device that is
     // on the repair desk, or that a trade-in still holds (its credit spent or
     // the exchange done) — the same questions the refund batch asks again.
-    if (await c.env.DB.prepare(`SELECT 1 FROM warranty_claims wc WHERE ${claimTargetSql(!!kase.unit_id)} AND NOT ${closedClaimSql('wc')} LIMIT 1`)
-      .bind(...claimTargetBinds(kase)).first()) {
+    const refundClaim = refundClaimSql(kase);
+    if ((await c.env.DB.prepare(`SELECT ${refundClaim.sql} AS open`).bind(...refundClaim.binds).first<{ open: number }>())?.open) {
       throw badRequest('This device has an open warranty request. Close it before refunding the return.', 'WARRANTY_CLAIM_OPEN');
     }
     if (await refundTakesTradedUnit(c.env.DB, kase)) {
@@ -933,11 +960,11 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
           OR (SELECT amount FROM (${priorSql}))<>?
           OR ?>?
           OR EXISTS(SELECT 1 FROM price_protection_claims ppc WHERE ppc.order_item_id=? AND ppc.state IN ('approved','credited'))
-          OR EXISTS(SELECT 1 FROM warranty_claims wc WHERE ${claimTargetSql(!!kase.unit_id)} AND NOT ${closedClaimSql('wc')})
+          OR ${refundClaimSql(kase).sql}
           OR ${tradedUnitsSql(await tradeInInstalled(c.env.DB))}+?>?`)
         .bind(newId('return_guard'), kase.order_id, item.id, kase.user_id, id, from,
           item.id, id, prior.qty, item.id, id, prior.amount, prior.qty + kase.qty, itemQty, item.id,
-          ...claimTargetBinds(kase), item.id, prior.qty + kase.qty, itemQty);
+          ...refundClaimSql(kase).binds, item.id, prior.qty + kase.qty, itemQty);
 
       // WE MAY ONLY GIVE BACK MONEY WE ACTUALLY TOOK.
       //
@@ -1256,6 +1283,23 @@ async function protectionPaidUnit(db: D1Database, orderId: string, itemId: strin
 }
 
 /** Units of a line held by a trade-in (draft to complete): each slot counts once, whatever part was claimed. */
+/** The slots (unit indexes) of a line a trade-in holds. */
+async function tradedSlotsOnLine(db: D1Database, orderItemId: string): Promise<number[]> {
+  if (!(await tradeInInstalled(db))) return [];
+  const { results } = await db
+    .prepare('SELECT DISTINCT unit_index FROM trade_in_claims WHERE order_item_id = ?')
+    .bind(orderItemId)
+    .all<{ unit_index: number }>();
+  return (results ?? []).map((r) => Number(r.unit_index)).filter((n) => Number.isSafeInteger(n) && n > 0);
+}
+
+/** Slots 1..lineQty no trade-in holds. */
+function untradedSlots(lineQty: number, traded: readonly number[]): number[] {
+  const out: number[] = [];
+  for (let i = 1; i <= Math.min(Math.max(0, lineQty), 500); i++) if (!traded.includes(i)) out.push(i);
+  return out;
+}
+
 async function tradedUnitsOnLine(db: D1Database, orderItemId: string): Promise<number> {
   const row = await db.prepare(`SELECT ${tradedUnitsSql(await tradeInInstalled(db))} AS n`).bind(orderItemId).first<{ n: number }>();
   return Number(row?.n) || 0;
@@ -1943,6 +1987,12 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
   }
 
   const { coveredQty, tradedUnits, paid, prior, credit } = await decisionFigures(db, claim, id);
+  // Which units this credit is FOR (review F7): a unit in a trade-in now
+  // received none of it, and its trade-in value must not give back a share.
+  const tradedSlots = tradedUnits > 0 ? await tradedSlotsOnLine(db, claim.order_item_id) : [];
+  const coveredSlots = tradedSlots.length
+    ? untradedSlots(Number((await db.prepare('SELECT qty FROM order_items WHERE id = ?').bind(claim.order_item_id).first<{ qty: number }>())?.qty) || 1, tradedSlots)
+    : null;
   const grant = assertMoneyAuthority(c, {
     act: 'price_protection_decide',
     amountIqd: credit,
@@ -1972,8 +2022,14 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
   try {
     await db.batch([
       guard,
-      db.prepare(`UPDATE price_protection_claims SET state='credited', credited_iqd=?, decided_by=?, decided_at=?
-        WHERE id=? AND state='requested'`).bind(credit, admin.id, nowIso, id),
+      db.prepare(`UPDATE price_protection_claims SET state='credited', credited_iqd=?, decided_by=?, decided_at=?,
+          policy_snapshot = json_set(CASE WHEN json_valid(policy_snapshot) THEN policy_snapshot ELSE '{}' END,
+            '$.covered_qty', ?, '$.covered_unit_indexes', json(?))
+        WHERE id=? AND state='requested'`).bind(
+        credit, admin.id, nowIso, coveredQty,
+        coveredSlots ? JSON.stringify(coveredSlots) : 'null',
+        id
+      ),
       walletCreditStatement(db, ledgerDinars, {
         id: `wtx_pp_${id}`, userId: claim.user_id, cents,
         note: `Price-protection credit for claim ${id} (order ${claim.order_id})`,

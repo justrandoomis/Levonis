@@ -58,16 +58,29 @@ export function historyFieldsOf(cls: BuyerClass): string[] {
 }
 
 export interface LineChannel {
-  /** Stated only for a pre-order line; a direct line keeps the resolver's own inference. */
-  fulfillmentType: 'pre_order' | null;
+  /**
+   * Stated for a pre-order line and for a line whose snapshot says it was sold
+   * directly; a line whose snapshot says neither keeps the resolver's own
+   * inference.
+   */
+  fulfillmentType: 'pre_order' | 'direct_sale' | null;
   transportMethod: string | null;
   preorderPricing: 'prepaid' | 'cod';
 }
 
 /**
- * The channel the line was priced on, from its snapshots. A direct line (and
- * any line whose snapshot does not say) is resolved exactly as before: no
- * stated type, no route.
+ * The channel the line was priced on, from its snapshots (PP-B3).
+ *
+ * A DIRECT LINE STATES ITS CHANNEL TOO. Unstated, the resolver infers a
+ * direct sale but raises no «not offered» for it, so a model whose direct
+ * cell was removed (product save deletes a cell the form no longer sends)
+ * walked past the missing cell to the model's own price — another channel's
+ * figure — and a direct buyer was compared with a price nobody charges on
+ * their channel. Stated, a removed or disabled direct cell is a closed
+ * channel: no price today, the window's history still counts. A product with
+ * no cells at all is unaffected (the resolver asks about cells only when the
+ * model publishes some). A line whose snapshot says neither keeps the old
+ * inference.
  */
 export function lineChannelOf(
   pricing: { pricing_basis?: unknown; fulfillment?: { type?: unknown } | null } | null | undefined,
@@ -75,8 +88,12 @@ export function lineChannelOf(
 ): LineChannel {
   const method = typeof transport?.method === 'string' ? transport.method.trim() : '';
   const preOrder = pricing?.fulfillment?.type === 'pre_order' || pricing?.pricing_basis === 'preorder' || transport?.waived_by === 'cod_direct_pricing';
-  if (!preOrder || !method) return { fulfillmentType: null, transportMethod: null, preorderPricing: 'prepaid' };
-  return { fulfillmentType: 'pre_order', transportMethod: method, preorderPricing: transport?.waived_by === 'cod_direct_pricing' ? 'cod' : 'prepaid' };
+  if (preOrder) {
+    if (!method) return { fulfillmentType: null, transportMethod: null, preorderPricing: 'prepaid' };
+    return { fulfillmentType: 'pre_order', transportMethod: method, preorderPricing: transport?.waived_by === 'cod_direct_pricing' ? 'cod' : 'prepaid' };
+  }
+  const direct = pricing?.fulfillment?.type === 'direct_sale' || pricing?.pricing_basis === 'direct';
+  return { fulfillmentType: direct ? 'direct_sale' : null, transportMethod: null, preorderPricing: 'prepaid' };
 }
 
 /** The resolver's answers that mean «this channel is not sold today», not «this variant is gone». */

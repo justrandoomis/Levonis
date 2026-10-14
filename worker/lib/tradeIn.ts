@@ -600,18 +600,19 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       .all<{ unit_id: string; user_id: string }>(),
     // «ما دفعه فعلاً» — the whole order, by the shared rule (plan §3.2).
     loadOrdersPaidNet(db, orderIds),
-    // Price protection on these lines: what was already credited (it comes
-    // off what was paid — no trade-in on the original price after a credit),
-    // and whether a claim is still being decided (no trade-in until it is).
+    // Price protection on these lines, claim by claim: what each credited and
+    // over which units (it comes off what those units were paid — no trade-in
+    // on the original price after a credit), and whether a claim is still
+    // being decided (no trade-in until it is).
     db
       .prepare(
-        `SELECT order_item_id,
-                COALESCE(SUM(CASE WHEN state IN ('approved','credited') THEN credited_iqd ELSE 0 END), 0) AS credited,
-                COALESCE(SUM(CASE WHEN state IN ('requested','approved') THEN 1 ELSE 0 END), 0) AS open
-           FROM price_protection_claims WHERE order_item_id IN (SELECT value FROM json_each(?1)) GROUP BY order_item_id`
+        `SELECT order_item_id, state, credited_iqd, qty,
+                CASE WHEN json_valid(policy_snapshot) THEN json_extract(policy_snapshot, '$.covered_qty') END AS covered_qty,
+                CASE WHEN json_valid(policy_snapshot) THEN json_extract(policy_snapshot, '$.covered_unit_indexes') END AS covered_units
+           FROM price_protection_claims WHERE order_item_id IN (SELECT value FROM json_each(?1))`
       )
       .bind(itemIds)
-      .all<{ order_item_id: string; credited: number; open: number }>(),
+      .all<{ order_item_id: string; state: string; credited_iqd: number | null; qty: number | null; covered_qty: number | null; covered_units: string | null }>(),
     // Devices on the repair desk: an OPEN warranty claim on a unit of these
     // lines (or a legacy claim on the line itself). The trade-in waits for it.
     db
@@ -624,7 +625,7 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       .bind(itemIds)
       .all<{ unit_id: string | null; order_item_id: string | null }>(),
   ]);
-  const protectionOf = new Map((protection.results ?? []).map((r) => [r.order_item_id, r]));
+  const protectionOf = protectionByLine(protection.results ?? []);
   const claimedUnits = new Set((serviceClaims.results ?? []).map((r) => r.unit_id).filter((x): x is string => !!x));
   const claimedLines = new Set((serviceClaims.results ?? []).filter((r) => !r.unit_id && r.order_item_id).map((r) => String(r.order_item_id)));
   const holderOf = new Map((links.results ?? []).map((l) => [l.unit_id, l.user_id]));
@@ -663,26 +664,27 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
     const isCombo = (family === 'fdm' || family === 'resin') && (comboValue !== null || COMBO_RE.test(`${line.option_snapshot} ${line.name_snapshot}`));
     const facts = paidNet.get(line.order_id);
     const pp = protectionOf.get(line.item_id);
-    const credited = Math.max(0, Number(pp?.credited) || 0);
-    // What the unit cost, by the shared rule, less its share of every
-    // protection credit already paid on the line (rounded against the store).
-    const paid = Math.max(
-      0,
-      (facts ? paidNetPerUnit(facts.order, facts.lines, line.item_id) ?? 0 : 0) - Math.ceil(credited / Math.max(1, Number(line.qty) || 1))
-    );
-    const protectionOpen = (Number(pp?.open) || 0) > 0;
-    const split = isCombo
-      ? amsSplit({
-          paidIqd: paid,
-          combo: comboValue,
-          siblings: productValues,
-          productPriceIqd: Number(line.price_iqd) || 0,
-          referenceIqd: rules.ams.ams_reference_iqd,
-        })
-      : { method: 'none' as const, share_bp: null, ams_base_iqd: 0 };
+    // What one unit cost, by the shared rule; each unit then gives back the
+    // protection IT received (below).
+    const paidLine = facts ? paidNetPerUnit(facts.order, facts.lines, line.item_id) ?? 0 : 0;
+    const protectionOpen = pp?.open ?? false;
     const opsMonths = effectiveBaseMonths(parseOpsPolicy(line.ops_policy).base_months, printers.has(line.product_id));
     const qty = Math.min(Math.max(1, Number(line.qty) || 1), MAX_UNITS_PER_LINE);
     for (let unitIndex = 1; unitIndex <= qty; unitIndex++) {
+      // What this unit was paid less the protection credited FOR IT (review
+      // F7): each claim's credit over the units it covered — a unit already
+      // in a trade-in when a claim was decided received none of it — rounded
+      // against the store.
+      const paid = Math.max(0, paidLine - protectionDeduction(pp, unitIndex));
+      const split = isCombo
+        ? amsSplit({
+            paidIqd: paid,
+            combo: comboValue,
+            siblings: productValues,
+            productPriceIqd: Number(line.price_iqd) || 0,
+            referenceIqd: rules.ams.ams_reference_iqd,
+          })
+        : { method: 'none' as const, share_bp: null, ams_base_iqd: 0 };
       const unit = (units.results ?? []).find((u) => u.order_item_id === line.item_id && u.unit_index === unitIndex) ?? null;
       const receipt =
         (receipts.results ?? []).find((r) => r.order_item_id === line.item_id && unit && r.unit_id === unit.id) ??
@@ -990,7 +992,20 @@ const isAbort = (e: unknown) => /NOT NULL|constraint|UNIQUE/i.test(e instanceof 
  * desk or whose price is being compensated. `?2` the line, `?3` the slot's
  * unit ids (JSON).
  */
-const RETURN_OPEN_SQL = `EXISTS (SELECT 1 FROM return_cases rc WHERE rc.order_item_id = ?2 AND rc.state <> 'rejected')`;
+/**
+ * An OPEN return case holding the slot's device (review R1): a case that names
+ * one of the slot's devices; or a case that names no device of the line when
+ * the line's open cases and its traded slots (this one included) need more
+ * devices than the line holds — the return door's own count rule. A finished
+ * case (resolved, rejected) holds nothing, and a case on ANOTHER device of
+ * the line does not hold this one.
+ */
+const RETURN_OPEN_SQL = `(EXISTS (SELECT 1 FROM return_cases rc
+     WHERE rc.order_item_id = ?2 AND rc.state NOT IN ('rejected','resolved') AND rc.unit_id IN (SELECT value FROM json_each(?3)))
+  OR (EXISTS (SELECT 1 FROM return_cases rc WHERE rc.order_item_id = ?2 AND rc.state NOT IN ('rejected','resolved') AND rc.unit_id IS NULL)
+      AND (SELECT COALESCE(SUM(rc.qty), 0) FROM return_cases rc WHERE rc.order_item_id = ?2 AND rc.state NOT IN ('rejected','resolved'))
+        + (SELECT COUNT(DISTINCT tc.unit_index) FROM trade_in_claims tc WHERE tc.order_item_id = ?2)
+        > (SELECT qty FROM order_items WHERE id = ?2)))`;
 const SERVICE_OPEN_SQL = `EXISTS (SELECT 1 FROM warranty_claims wc
    WHERE (wc.unit_id IN (SELECT value FROM json_each(?3)) OR (wc.unit_id IS NULL AND wc.order_item_id = ?2))
      AND NOT ${closedClaimSql('wc')})`;
@@ -1822,6 +1837,44 @@ export function tradeInCreditFence(db: D1Database, couponId: string, userId: str
 /** Whether a failed order batch was refused by `tradeInCreditFence`. */
 export const isTradeInCreditFenceAbort = (e: unknown): boolean =>
   /NOT NULL constraint failed: trade_in_requests\.status/i.test(e instanceof Error ? e.message : String(e));
+
+/** Price protection on one line, as the trade-in valuation reads it. */
+interface LineProtection {
+  /** A claim is still being decided: no trade-in until it is. */
+  open: boolean;
+  /** Each credited claim: its credit per covered unit, and the units it covered (null: every unit). */
+  credits: Array<{ perUnit: number; units: ReadonlySet<number> | null }>;
+}
+
+/**
+ * The protection on each line, claim by claim (review F7). A claim decided
+ * since S-P0 records how many units it credited (`covered_qty`) and, when a
+ * unit was in a trade-in, which units (`covered_unit_indexes`); an older one
+ * is spread over the units it was filed for (`qty`), on every unit.
+ */
+function protectionByLine(rows: ReadonlyArray<{ order_item_id: string; state: string; credited_iqd: number | null; qty: number | null; covered_qty: number | null; covered_units: string | null }>): Map<string, LineProtection> {
+  const out = new Map<string, LineProtection>();
+  for (const r of rows) {
+    const e = out.get(r.order_item_id) ?? { open: false, credits: [] };
+    if (r.state === 'requested' || r.state === 'approved') e.open = true;
+    const credited = Math.max(0, Number(r.credited_iqd) || 0);
+    if ((r.state === 'approved' || r.state === 'credited') && credited > 0) {
+      const listed = safeParse<unknown[] | null>(r.covered_units, null);
+      const units = Array.isArray(listed) ? new Set(listed.map((x) => Number(x)).filter((x) => Number.isSafeInteger(x) && x > 0)) : null;
+      const over = Math.max(1, Math.trunc(Number(r.covered_qty) || 0) || Math.trunc(Number(r.qty) || 0) || 1);
+      e.credits.push({ perUnit: Math.ceil(credited / over), units: units && units.size ? units : null });
+    }
+    out.set(r.order_item_id, e);
+  }
+  return out;
+}
+
+/** What unit `unitIndex` of a line received in protection credits. */
+function protectionDeduction(pp: LineProtection | undefined, unitIndex: number): number {
+  let total = 0;
+  for (const c of pp?.credits ?? []) if (!c.units || c.units.has(unitIndex)) total += c.perUnit;
+  return total;
+}
 
 /** A trade-in holding units of one line, as the return door sees it (plan §1.3). */
 export interface LineTradeIn {
