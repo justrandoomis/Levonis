@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Paperclip, Send, X } from 'lucide-react';
 import type { Language } from '../../translations';
 import { api, ApiError, uploadTimeoutMs } from '../../lib/api';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { Overlay } from '../ui/Overlay';
 import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { ErrorState } from '../ui/AsyncStates';
 import { ClaimProgress, PriorityBadge } from './ClaimCard';
 import type { ClaimDetail, ClaimMessage } from './types';
-import { fmtDate, fmtDateTime, isVideoUrl } from './types';
+import { claimOpen, fmtDate, fmtDateTime, isVideoUrl } from './types';
 import type { WarrantyStrings } from './strings';
 import { ERROR_BOX, FOCUS } from './ui';
 
@@ -92,6 +93,16 @@ export function ClaimThreadOverlay({
     else await refresh();
   };
 
+  /**
+   * A refusal in the reader's language, by code. CLAIM_CLOSED (W-4) means the
+   * team closed the claim while this window was open: the thread is reloaded,
+   * so the reply box gives way to the closed note below.
+   */
+  const refused = async (e: unknown) => {
+    setReplyError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
+    if (e instanceof ApiError && e.code === 'CLAIM_CLOSED') await refresh().catch(() => undefined);
+  };
+
   const send = async () => {
     if (!claimId || replyBusy || !replyText.trim()) return;
     setReplyBusy(true);
@@ -103,7 +114,7 @@ export function ClaimThreadOverlay({
       setReplyText('');
       await appendOrRefresh(res);
     } catch (e) {
-      setReplyError(e instanceof ApiError ? e.message : s.error);
+      await refused(e);
     } finally {
       setReplyBusy(false);
     }
@@ -130,13 +141,15 @@ export function ClaimThreadOverlay({
       setReplyText('');
       await appendOrRefresh(res);
     } catch (e) {
-      setReplyError(e instanceof ApiError ? e.message : s.error);
+      await refused(e);
     } finally {
       setReplyBusy(false);
     }
   };
 
   const facts = detail?.warranty_facts;
+  // W-4: a rejected, replaced or resolved claim is read, not written in.
+  const closed = !!detail && !claimOpen(detail.claim);
 
   return (
     <Overlay
@@ -270,11 +283,16 @@ export function ClaimThreadOverlay({
       </div>
 
       <div className="p-4 border-t border-border-subtle">
-        {replyError && (
+        {replyError && !closed && (
           <div role="alert" className={`${ERROR_BOX} mb-2`}>
             {replyError}
           </div>
         )}
+        {closed ? (
+          <p className="text-text-secondary text-[13px] leading-relaxed" role="status" data-claim-thread-closed>
+            {s.threadClosed}
+          </p>
+        ) : (
         <div className="flex items-center gap-2">
           <label
             htmlFor="warranty-thread-file"
@@ -320,6 +338,7 @@ export function ClaimThreadOverlay({
             <Send aria-hidden="true" className={`w-4 h-4 ${lang === 'en' ? '' : '-scale-x-100'}`} />
           </button>
         </div>
+        )}
       </div>
     </Overlay>
   );

@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import {
   Barcode, RefreshCw, Search, ShieldCheck, AlertTriangle, Repeat, CalendarClock,
-  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown, History, ExternalLink,
+  MessageSquare, Send, ChevronDown, ChevronUp, PackageCheck, Unlink, X, Crown, History, ExternalLink, Paperclip,
 } from 'lucide-react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, uploadTimeoutMs } from '../lib/api';
 import { apiRefusal, refusalLang } from '../lib/refusalStrings';
+import { useOptionalAuth } from '../AuthContext';
 import { Overlay } from './ui/Overlay';
 import { dateLocale } from './orders/format';
 import UnitHistory from './adminWarranty/UnitHistory';
+import { isVideoUrl } from './warranty/types';
 
 // The §16 serial / warranty page (serial scan, 0178), opened from a unit's serial.
 const SerialDetail = React.lazy(() => import('./adminWarranty/serial/SerialDetail'));
@@ -44,14 +46,21 @@ const STRINGS = {
     assign: 'تعيين',
     serialPlaceholder: 'أدخل الرقم كما هو على الملصق',
     reassignConfirm: 'هذا الرقم/الوحدة معيّن مسبقًا. إعادة التعيين إجراء مُدقَّق يتطلب سببًا. المتابعة؟',
-    reasonPrompt: 'السبب (سيُسجَّل في سجل التدقيق):',
     reasonRequired: 'السبب مطلوب (5 أحرف على الأقل).',
     delivered: 'تاريخ التسليم',
     correctDelivery: 'تصحيح',
-    deliveryPrompt: 'تاريخ/وقت التسليم الصحيح لهذه الوحدة (ISO مثل 2026-08-20T14:00:00Z):',
+    deliveryTitle: 'تصحيح تاريخ التسليم',
+    deliveryBody: 'نافذة الضمان تتحرك مع تاريخ التسليم. تاريخ أبكر يقصّر الضمان؛ وتاريخ أحدث يطيله، وهذا قرار المالك وحده.',
+    deliveryLabel: 'تاريخ ووقت التسليم الصحيح (بتوقيت جهازك)',
+    deliveryCurrent: 'التاريخ الحالي',
+    deliveryLaterOwner: 'هذا التاريخ أحدث من الحالي فيطيل الضمان — لا يحفظه إلا المالك.',
+    deliveryInvalid: 'اختر تاريخًا ووقتًا صحيحين.',
+    saveDelivery: 'حفظ التاريخ',
+    deliverySaved: 'تم تصحيح تاريخ التسليم.',
     warrantyEnd: 'نهاية الضمان',
     replace: 'استبدال',
-    replaceNote: 'الاستبدال يحمل تاريخ نهاية الضمان الأصلي (قاعدة "المتبقي مقابل الجديد" بانتظار قرار المالك).',
+    replaceNote: 'الجهاز البديل يحمل تاريخ نهاية ضمان الجهاز الأصلي: الضمان لا يُعاد بدؤه أبدًا (قرار المالك).',
+    replacedOk: 'سُجّل الجهاز البديل، وهو يحمل تاريخ نهاية ضمان الجهاز الأصلي.',
     reassignTitle: 'إعادة تعيين الرقم التسلسلي؟',
     confirmReassign: 'إعادة التعيين',
     replaceTitle: 'استبدال هذا الجهاز؟',
@@ -118,6 +127,30 @@ const STRINGS = {
     awaitingStaff: 'الزبون ينتظر الرد',
     messagesN: (n: number) => `${n} رسالة`,
     compatibleParts: (n: number) => `قطع الغيار المتوافقة (${n})`,
+    stageLabels: {
+      received: 'مُستلَمة',
+      diagnosing: 'قيد الفحص',
+      approved: 'مقبولة',
+      rejected: 'مرفوضة',
+      repairing: 'قيد الإصلاح',
+      replaced: 'استُبدل الجهاز',
+      resolved: 'منتهية',
+    } as Record<string, string>,
+    decisionLabels: { repair: 'إصلاح', replace: 'استبدال', reject: 'رفض', misuse: 'سوء استخدام' } as Record<string, string>,
+    decision: 'القرار',
+    moveTitle: (stage: string) => `نقل المطالبة إلى «${stage}»`,
+    decisionPick: 'اختر القرار',
+    decisionRequired: 'اختر القرار قبل النقل.',
+    reasonToCustomer: 'السبب (يصل للزبون مع الإشعار ويُسجَّل، 5 أحرف على الأقل)',
+    noteToCustomer: 'ملاحظة للزبون (اختيارية، تصله مع الإشعار)',
+    financialOnly: 'قبول المطالبة أو رفضها أو تسجيل الاستبدال يحتاج الصلاحية المالية. يمكنك الفحص والرد ونقل المطالبة المقبولة إلى الإصلاح وإغلاقها.',
+    replacedFirst: 'سجّل الجهاز البديل أولاً من زر «استبدال» في تبويب الوحدات، ثم اختر هذه المرحلة.',
+    confirmMove: 'نقل المطالبة',
+    threadClosed: 'المطالبة مغلقة، فلا يكتب فيها الزبون ولا الفريق. كلمة الفريق الأخيرة هي السبب المكتوب عند إغلاقها.',
+    threadReopen: 'المطالبة مرفوضة ومغلقة. أعِدها إلى «قيد الفحص» لمراسلة الزبون من جديد.',
+    attachFile: 'إرفاق صورة أو فيديو',
+    uploading: 'جارٍ الرفع…',
+    video: 'فيديو',
   },
   en: {
     title: 'Serials & Devices',
@@ -141,14 +174,21 @@ const STRINGS = {
     assign: 'Assign',
     serialPlaceholder: 'Enter exactly as printed on the label',
     reassignConfirm: 'This serial/unit is already assigned. Reassignment is an audited action that requires a reason. Continue?',
-    reasonPrompt: 'Reason (recorded in the audit trail):',
     reasonRequired: 'A reason is required (min 5 characters).',
     delivered: 'Delivered',
     correctDelivery: 'Correct',
-    deliveryPrompt: 'Correct delivery timestamp for THIS unit (ISO, e.g. 2026-08-20T14:00:00Z):',
+    deliveryTitle: 'Correct the delivery date',
+    deliveryBody: 'The warranty window moves with the delivery date. An earlier date shortens the warranty; a later one lengthens it, which is the owner’s decision alone.',
+    deliveryLabel: 'Correct delivery date and time (your device’s time)',
+    deliveryCurrent: 'Current date',
+    deliveryLaterOwner: 'This date is later than the current one, so it lengthens the warranty — only the owner can save it.',
+    deliveryInvalid: 'Choose a valid date and time.',
+    saveDelivery: 'Save the date',
+    deliverySaved: 'Delivery date corrected.',
     warrantyEnd: 'Warranty end',
     replace: 'Replace',
-    replaceNote: 'The replacement carries the ORIGINAL warranty end date (remaining-vs-new rule pending owner decision).',
+    replaceNote: 'The replacement carries the ORIGINAL warranty end date: a warranty is never restarted (owner decision).',
+    replacedOk: 'Replacement recorded. It carries the original device’s warranty end date.',
     reassignTitle: 'Reassign this serial?',
     confirmReassign: 'Reassign',
     replaceTitle: 'Replace this device?',
@@ -215,6 +255,30 @@ const STRINGS = {
     awaitingStaff: 'Customer waiting for a reply',
     messagesN: (n: number) => (n === 1 ? '1 message' : `${n} messages`),
     compatibleParts: (n: number) => `Compatible spare parts (${n})`,
+    stageLabels: {
+      received: 'Received',
+      diagnosing: 'Diagnosing',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      repairing: 'Repairing',
+      replaced: 'Replaced',
+      resolved: 'Resolved',
+    } as Record<string, string>,
+    decisionLabels: { repair: 'Repair', replace: 'Replace', reject: 'Reject', misuse: 'Misuse' } as Record<string, string>,
+    decision: 'Decision',
+    moveTitle: (stage: string) => `Move the claim to “${stage}”`,
+    decisionPick: 'Choose the decision',
+    decisionRequired: 'Choose the decision first.',
+    reasonToCustomer: 'Reason (sent to the customer with the notice and recorded; at least 5 characters)',
+    noteToCustomer: 'Note to the customer (optional, sent with the notice)',
+    financialOnly: 'Approving, rejecting or recording a replacement needs the financial scope. You can diagnose, reply, move an approved claim into repair, and close it.',
+    replacedFirst: 'Record the replacement unit first with “Replace” on the units tab, then choose this stage.',
+    confirmMove: 'Move the claim',
+    threadClosed: 'The claim is closed: neither the customer nor the team can write in it. The team’s last word is the reason given when it was closed.',
+    threadReopen: 'The claim is rejected and closed. Move it back to “Diagnosing” to write to the customer again.',
+    attachFile: 'Attach a photo or video',
+    uploading: 'Uploading…',
+    video: 'Video',
   },
   ckb: {
     title: 'ئامێرەکان و ژمارە زنجیرەییەکان',
@@ -238,14 +302,21 @@ const STRINGS = {
     assign: 'دیاریکردن',
     serialPlaceholder: 'وەک لەسەر لەیبڵەکە نووسراوە بینووسە',
     reassignConfirm: 'ئەم ژمارە/یەکەیە پێشتر دیاریکراوە. گۆڕینەوە کردارێکی وردبینیکراوە و هۆکاری دەوێت. بەردەوامبوون؟',
-    reasonPrompt: 'هۆکار (لە تۆماری وردبینیدا تۆماردەکرێت):',
     reasonRequired: 'هۆکار پێویستە (لانیکەم ٥ پیت).',
     delivered: 'گەیاندن',
     correctDelivery: 'ڕاستکردنەوە',
-    deliveryPrompt: 'کاتی گەیاندنی ڕاست بۆ ئەم یەکەیە (ISO وەک 2026-08-20T14:00:00Z):',
+    deliveryTitle: 'ڕاستکردنەوەی بەرواری گەیاندن',
+    deliveryBody: 'ماوەی گەرەنتی لەگەڵ بەرواری گەیاندن دەجووڵێت. بەروارێکی زووتر گەرەنتی کورت دەکاتەوە؛ بەروارێکی درەنگتر درێژی دەکاتەوە، و ئەوە تەنها بڕیاری خاوەنە.',
+    deliveryLabel: 'بەروار و کاتی ڕاستی گەیاندن (بە کاتی ئامێرەکەت)',
+    deliveryCurrent: 'بەرواری ئێستا',
+    deliveryLaterOwner: 'ئەم بەروارە لە بەرواری ئێستا درەنگترە و گەرەنتی درێژ دەکاتەوە — تەنها خاوەن دەتوانێت پاشەکەوتی بکات.',
+    deliveryInvalid: 'بەروار و کاتێکی دروست هەڵبژێرە.',
+    saveDelivery: 'پاشەکەوتکردنی بەروار',
+    deliverySaved: 'بەرواری گەیاندن ڕاستکرایەوە.',
     warrantyEnd: 'کۆتایی گەرەنتی',
     replace: 'گۆڕینەوە',
-    replaceNote: 'گۆڕینەوەکە هەمان بەرواری کۆتایی گەرەنتی ڕەسەن هەڵدەگرێت (یاسای "ماوە بەرامبەر نوێ" چاوەڕوانی بڕیاری خاوەنە).',
+    replaceNote: 'ئامێرە جێگرەوەکە هەمان بەرواری کۆتایی گەرەنتی ئامێرە ڕەسەنەکە هەڵدەگرێت: گەرەنتی هەرگیز لە سەرەتاوە دەست پێناکاتەوە (بڕیاری خاوەن).',
+    replacedOk: 'ئامێرە جێگرەوەکە تۆمارکرا، و هەمان بەرواری کۆتایی گەرەنتی ئامێرە ڕەسەنەکە هەڵدەگرێت.',
     reassignTitle: 'ئەم ژمارە زنجیرەییە دووبارە دیاری بکرێت؟',
     confirmReassign: 'دووبارە دیاریکردن',
     replaceTitle: 'ئەم ئامێرە بگۆڕدرێتەوە؟',
@@ -311,15 +382,39 @@ const STRINGS = {
     carriedEnd: 'هذه وحدة بديلة تحمل تاريخ نهاية الجهاز الأصلي — عدّل ضمان الوحدة الأصلية.', // OWNER: Sorani to be written by hand.
     cancel: 'هەڵوەشاندنەوە',
     close: 'داخستن',
-    // OWNER: the six labels below carry the ARABIC text on purpose, like the
-    // warranty-duration block above — Sorani to be written by hand.
-    warrantyStart: 'البداية', // OWNER: Sorani to be written by hand.
-    history: 'سجل التعديلات', // OWNER: Sorani to be written by hand.
-    hideHistory: 'إخفاء السجل', // OWNER: Sorani to be written by hand.
-    loadMore: 'عرض المزيد', // OWNER: Sorani to be written by hand.
-    awaitingStaff: 'الزبون ينتظر الرد', // OWNER: Sorani to be written by hand.
-    messagesN: (n: number) => `${n} رسالة`, // OWNER: Sorani to be written by hand.
-    compatibleParts: (n: number) => `قطع الغيار المتوافقة (${n})`, // OWNER: Sorani to be written by hand.
+    // Sorani of its own, never the Arabic (DECISIONS row 183), in the words
+    // this table already uses.
+    warrantyStart: 'سەرەتا',
+    history: 'مێژووی گۆڕانکارییەکان',
+    hideHistory: 'شاردنەوەی مێژوو',
+    loadMore: 'زیاتر پیشان بدە',
+    awaitingStaff: 'کڕیار چاوەڕێی وەڵامە',
+    messagesN: (n: number) => `${n} نامە`,
+    compatibleParts: (n: number) => `پارچە یەدەگە گونجاوەکان (${n})`,
+    stageLabels: {
+      received: 'وەرگیراوە',
+      diagnosing: 'لە پشکنیندایە',
+      approved: 'پەسەندکراوە',
+      rejected: 'ڕەتکراوەتەوە',
+      repairing: 'لە چاککردنەوەدایە',
+      replaced: 'ئامێرەکە گۆڕدراوەتەوە',
+      resolved: 'تەواوبووە',
+    } as Record<string, string>,
+    decisionLabels: { repair: 'چاککردنەوە', replace: 'گۆڕین', reject: 'ڕەتکردنەوە', misuse: 'خراپ بەکارهێنان' } as Record<string, string>,
+    decision: 'بڕیار',
+    moveTitle: (stage: string) => `گواستنەوەی داواکارییەکە بۆ «${stage}»`,
+    decisionPick: 'بڕیارەکە هەڵبژێرە',
+    decisionRequired: 'سەرەتا بڕیارەکە هەڵبژێرە.',
+    reasonToCustomer: 'هۆکار (لەگەڵ ئاگادارکردنەوەکە بۆ کڕیار دەنێردرێت و تۆمار دەکرێت، لانیکەم ٥ پیت)',
+    noteToCustomer: 'تێبینی بۆ کڕیار (ئارەزوومەندانە، لەگەڵ ئاگادارکردنەوەکە دەنێردرێت)',
+    financialOnly: 'پەسەندکردن، ڕەتکردنەوە یان تۆمارکردنی گۆڕین پێویستی بە دەسەڵاتی دارایی هەیە. دەتوانیت پشکنین بکەیت، وەڵام بدەیتەوە، داواکارییە پەسەندکراوەکە بگوازیتەوە بۆ چاککردنەوە و دایبخەیت.',
+    replacedFirst: 'سەرەتا ئامێرە جێگرەوەکە بە دوگمەی «گۆڕینەوە» لە تابی یەکەکان تۆمار بکە، پاشان ئەم قۆناغە هەڵبژێرە.',
+    confirmMove: 'گواستنەوەی داواکارییەکە',
+    threadClosed: 'داواکارییەکە داخراوە: نە کڕیار و نە تیم ناتوانن تێیدا بنووسن. دوایین قسەی تیم ئەو هۆکارەیە کە لە کاتی داخستندا نووسراوە.',
+    threadReopen: 'داواکارییەکە ڕەتکراوەتەوە و داخراوە. بیگەڕێنەوە بۆ «لە پشکنیندایە» بۆ ئەوەی دووبارە نامە بۆ کڕیار بنێریت.',
+    attachFile: 'هاوپێچکردنی وێنە یان ڤیدیۆ',
+    uploading: 'بارکردن…',
+    video: 'ڤیدیۆ',
   },
 } as const;
 
@@ -356,7 +451,27 @@ interface AdminDevice {
 type PendingUnitAction =
   | { kind: 'reassign'; device: AdminDevice; serial: string; detail: string }
   | { kind: 'replace'; device: AdminDevice }
-  | { kind: 'warranty'; device: AdminDevice };
+  | { kind: 'warranty'; device: AdminDevice }
+  | { kind: 'delivery'; device: AdminDevice };
+
+/**
+ * An ISO instant as the value a `datetime-local` field takes, in the browser's
+ * own time zone (the admin's — Baghdad for the shop), and back. The field
+ * replaces a hand-typed ISO timestamp in a browser prompt, which an admin on a
+ * phone had to type to the second.
+ */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fromLocalInput(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
 
 interface AdminAccount {
   id: string;
@@ -385,6 +500,8 @@ interface AdminClaim {
   stage: string;
   decision: string | null;
   decision_reason: string;
+  /** The server's one answer to «still open» (W-5); a closed claim's thread takes no messages (W-4). */
+  open?: boolean;
   created_at: string;
   serial: string | null;
   email: string | null;
@@ -416,6 +533,23 @@ interface ClaimMessage {
 }
 
 const CLAIM_STAGES = ['received', 'diagnosing', 'approved', 'rejected', 'repairing', 'replaced', 'resolved'] as const;
+/** Closed at these stages (worker/lib/deviceOps.ts CLOSED_CLAIM_STAGES) — read only when the server sends no `open`. */
+const CLOSED_STAGES: ReadonlySet<string> = new Set(['rejected', 'replaced', 'resolved']);
+const claimIsOpen = (cl: Pick<AdminClaim, 'open' | 'stage'>) => (typeof cl.open === 'boolean' ? cl.open : !CLOSED_STAGES.has(cl.stage));
+/**
+ * THE DECISION EACH MOVE RECORDS (G-3, worker/routes/devices.ts DECISIONS_AT):
+ * an accepted claim is repaired or replaced, a rejected one is rejected or
+ * misuse. The desk now SENDS it — it never did, so every desk decision was
+ * stored empty.
+ */
+const DECISION_OPTIONS: Record<string, readonly string[]> = {
+  approved: ['repair', 'replace'],
+  rejected: ['reject', 'misuse'],
+};
+/** A recorded reason, told to the customer, is required on these moves. */
+const REASON_STAGES: ReadonlySet<string> = new Set(['approved', 'rejected', 'replaced', 'resolved']);
+/** The moves that DECIDE a claim — the financial scope's (owner decision 3). */
+const MONEY_STAGES: ReadonlySet<string> = new Set(['approved', 'rejected', 'replaced']);
 const CLAIM_NEXT: Record<string, string[]> = {
   received: ['diagnosing', 'approved', 'rejected'],
   diagnosing: ['approved', 'rejected'],
@@ -476,6 +610,11 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
 export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {}) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
+  // SERVER HINTS, NEVER THE GATE (src/lib/api.ts): the routes refuse
+  // regardless. They only decide what this screen offers and explains.
+  const auth = useOptionalAuth();
+  const canDecide = auth?.user?.can_move_money === true;
+  const isOwner = auth?.user?.is_owner === true;
 
   const [tabState, setTab] = useState<'units' | 'claims'>(view ?? 'units');
   const tab = view ?? tabState;
@@ -521,6 +660,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   const [pendingBase, setPendingBase] = useState('');
   const [pendingExt, setPendingExt] = useState('');
   const [pendingShorter, setPendingShorter] = useState(false);
+  // The corrected delivery instant, as the `datetime-local` field holds it.
+  const [pendingDelivery, setPendingDelivery] = useState('');
 
   const loadBySerial = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -673,6 +814,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
     setPendingShorter(false);
     setPendingBase(action.device.warranty.base_months !== null ? String(action.device.warranty.base_months) : '');
     setPendingExt(String(action.device.warranty.ext_months ?? 0));
+    setPendingDelivery(toLocalInput(action.device.delivered_at));
   };
 
   const confirmPending = async () => {
@@ -710,12 +852,24 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
           confirm_shorter: pendingShorter || undefined,
         });
         setUnitsNotice(s.warrantySaved);
+      } else if (pending.kind === 'delivery') {
+        const deliveredAt = fromLocalInput(pendingDelivery);
+        if (!deliveredAt) {
+          setPendingError(s.deliveryInvalid);
+          return;
+        }
+        // A later date is the owner's (G-2, OWNER_REQUIRED): the refusal reads
+        // in the admin's language below.
+        await api.patch(`/api/devices/admin/units/${pending.device.unit_id}/delivery`, { delivered_at: deliveredAt, reason });
+        setUnitsNotice(s.deliverySaved);
       } else {
-        const res = await api.post<{ note: string }>(`/api/devices/admin/units/${pending.device.unit_id}/replace`, {
+        await api.post(`/api/devices/admin/units/${pending.device.unit_id}/replace`, {
           new_serial: pendingSerial.trim() || undefined,
           reason,
         });
-        setUnitsNotice(res.note);
+        // The screen's own sentence, in the admin's language (the route's
+        // `note` is one English line).
+        setUnitsNotice(s.replacedOk);
       }
       setPending(null);
       refreshCurrent();
@@ -731,27 +885,10 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
     }
   };
 
-  const correctDelivery = async (device: AdminDevice) => {
-    const ts = window.prompt(s.deliveryPrompt, device.delivered_at ?? '');
-    if (!ts) return;
-    const reason = window.prompt(s.reasonPrompt) || '';
-    if (reason.trim().length < 5) {
-      setUnitsError(s.reasonRequired);
-      return;
-    }
-    setBusyUnit(device.unit_id);
-    setUnitsError('');
-    try {
-      await api.patch(`/api/devices/admin/units/${device.unit_id}/delivery`, { delivered_at: ts.trim(), reason: reason.trim() });
-      refreshCurrent();
-    } catch (e) {
-      // A later date is the owner's (OWNER_REQUIRED): the refusal reads in the admin's language.
-      setUnitsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
-    } finally {
-      setBusyUnit(null);
-    }
-  };
-
+  // The delivery correction is a sheet with a date-and-time field and the
+  // reason, like every other audited unit action here — never two browser
+  // prompts asking for an ISO timestamp typed by hand.
+  const correctDelivery = (device: AdminDevice) => openPending({ kind: 'delivery', device });
   const replaceUnit = (device: AdminDevice) => openPending({ kind: 'replace', device });
   const editWarranty = (device: AdminDevice) => openPending({ kind: 'warranty', device });
 
@@ -772,6 +909,13 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   const [threadLoading, setThreadLoading] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [claimBusy, setClaimBusy] = useState(false);
+  // The stage move, in a sheet: the decision the move records (G-3), and the
+  // reason the customer is told — never a browser prompt.
+  const [claimMove, setClaimMove] = useState<{ claim: AdminClaim; to: string } | null>(null);
+  const [moveDecision, setMoveDecision] = useState('');
+  const [moveReason, setMoveReason] = useState('');
+  const [moveBusy, setMoveBusy] = useState(false);
+  const [moveError, setMoveError] = useState('');
 
   const loadClaims = useCallback(async (after: string | null = null) => {
     setClaimsLoading(true);
@@ -816,44 +960,81 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
     }
   };
 
-  const moveClaim = async (claim: AdminClaim, next: string) => {
-    const needsReason = ['approved', 'rejected', 'replaced', 'resolved'].includes(next);
-    let reason = '';
-    if (needsReason) {
-      reason = window.prompt(s.decisionReason) || '';
-      if (reason.trim().length < 5) {
-        setClaimsError(s.reasonRequired);
-        return;
-      }
+  const openMove = (claim: AdminClaim, to: string) => {
+    const options = DECISION_OPTIONS[to] ?? [];
+    setClaimMove({ claim, to });
+    // The decision already on the claim, when it still fits the move; else
+    // none, so a decision is always a deliberate choice.
+    setMoveDecision(claim.decision && options.includes(claim.decision) ? claim.decision : '');
+    setMoveReason('');
+    setMoveError('');
+  };
+
+  const confirmMove = async () => {
+    if (!claimMove || moveBusy) return;
+    const { claim, to } = claimMove;
+    const reason = moveReason.trim();
+    const options = DECISION_OPTIONS[to] ?? [];
+    if (options.length > 0 && !options.includes(moveDecision)) {
+      setMoveError(s.decisionRequired);
+      return;
     }
-    setClaimBusy(true);
-    setClaimsError('');
+    if (REASON_STAGES.has(to) && reason.length < 5) {
+      setMoveError(s.reasonRequired);
+      return;
+    }
+    setMoveBusy(true);
+    setMoveError('');
     try {
-      await api.patch(`/api/devices/admin/claims/${claim.id}`, { stage: next, reason: reason.trim() || undefined });
+      await api.patch(`/api/devices/admin/claims/${encodeURIComponent(claim.id)}`, {
+        stage: to,
+        reason: reason || undefined,
+        // G-3: what the decision is, sent with the move that makes it.
+        decision: options.length > 0 ? moveDecision : undefined,
+      });
+      setClaimMove(null);
       await loadClaims(null);
     } catch (e) {
-      // A decision needs the financial scope; «replaced» needs the replacement first — said in the admin's language.
-      setClaimsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
+      // A decision needs the financial scope; «replaced» needs the replacement
+      // first; a decision must fit its stage — said in the admin's language.
+      setMoveError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
     } finally {
-      setClaimBusy(false);
+      setMoveBusy(false);
     }
   };
 
-  const sendReply = async (claimId: string) => {
-    if (!replyText.trim()) return;
+  /**
+   * A STAFF REPLY MAY CARRY A PHOTO OR A VIDEO. The route always took a
+   * `file_key` from staff (their own `claims/<staffId>/…` upload, which the
+   * claimant may open through their claim); the desk only ever sent text.
+   */
+  const postReply = async (claimId: string, file?: File) => {
+    const text = replyText.trim();
+    if (!text && !file) return;
     setClaimBusy(true);
     setClaimsError('');
     try {
-      await api.post(`/api/devices/claims/${claimId}/messages`, { body: replyText.trim() });
+      let fileKey: string | undefined;
+      if (file) {
+        const form = new FormData();
+        form.append('file', file);
+        const up = await api.post<{ key: string }>('/api/devices/claims/upload', form, { timeoutMs: uploadTimeoutMs(file.size) });
+        fileKey = up.key;
+      }
+      await api.post(`/api/devices/claims/${encodeURIComponent(claimId)}/messages`, { body: text, file_key: fileKey });
       setReplyText('');
-      const data = await api.get<{ messages: ClaimMessage[] }>(`/api/devices/claims/${claimId}`);
+      const data = await api.get<{ messages: ClaimMessage[] }>(`/api/devices/claims/${encodeURIComponent(claimId)}`);
       setThread(data.messages);
     } catch (e) {
-      setClaimsError(e instanceof ApiError ? e.message : s.error);
+      // CLAIM_CLOSED (W-4): the claim was closed meanwhile — the queue is
+      // reloaded, so its thread shows as closed.
+      setClaimsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
+      if (e instanceof ApiError && e.code === 'CLAIM_CLOSED') await loadClaims(null);
     } finally {
       setClaimBusy(false);
     }
   };
+  const sendReply = (claimId: string) => postReply(claimId);
 
   const renderUnitsTable = (units: AdminDevice[]) => (
     <div className="lv-surface overflow-hidden">
@@ -1248,7 +1429,13 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
           </button>
           <div className="pe-10">
             <h3 id="admin-unit-action-title" className="text-text-primary text-base font-bold">
-              {pending?.kind === 'replace' ? s.replaceTitle : pending?.kind === 'warranty' ? s.warrantyTitle : s.reassignTitle}
+              {pending?.kind === 'replace'
+                ? s.replaceTitle
+                : pending?.kind === 'warranty'
+                  ? s.warrantyTitle
+                  : pending?.kind === 'delivery'
+                    ? s.deliveryTitle
+                    : s.reassignTitle}
             </h3>
             {pending && (
               <p className="text-text-secondary text-[12px] mt-1">
@@ -1268,7 +1455,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               ? `${s.replaceBody} ${s.replaceNote}`
               : pending?.kind === 'warranty'
                 ? s.warrantyBody
-                : s.reassignConfirm}
+                : pending?.kind === 'delivery'
+                  ? s.deliveryBody
+                  : s.reassignConfirm}
           </p>
           {/* The paper is a snapshot by design; moving the clock never
               rewrites a receipt already handed over. Saying so here is the
@@ -1295,6 +1484,38 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 dir="ltr"
                 disabled={pendingBusy}
               />
+            </div>
+          )}
+          {/* THE DELIVERY CORRECTION: a date-and-time field in the admin's own
+              time zone, sent as an ISO instant. Later than today's date
+              lengthens the warranty — said before saving, refused by the
+              server for anyone but the owner (G-2). */}
+          {pending?.kind === 'delivery' && (
+            <div className="space-y-2">
+              <label htmlFor="admin-unit-delivery-at" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.deliveryLabel}</label>
+              <input
+                className="lv-input text-sm"
+                id="admin-unit-delivery-at"
+                type="datetime-local"
+                dir="ltr"
+                min="2015-01-01T00:00"
+                max={toLocalInput(new Date(Date.now() + 48 * 3600_000).toISOString())}
+                value={pendingDelivery}
+                onChange={(e) => setPendingDelivery(e.target.value)}
+                required
+                disabled={pendingBusy}
+                data-unit-delivery-input
+              />
+              <p className="text-[12px] text-text-muted">
+                {s.deliveryCurrent}: <span className="text-text-secondary">{fmtDate(pending.device.delivered_at, lang)}</span>
+              </p>
+              {!isOwner &&
+                !!pending.device.delivered_at &&
+                (fromLocalInput(pendingDelivery) ?? '') > new Date(pending.device.delivered_at).toISOString() && (
+                  <div className="lv-alert lv-alert-warning text-[12px] text-text-primary" data-unit-delivery-later>
+                    {s.deliveryLaterOwner}
+                  </div>
+                )}
             </div>
           )}
           {pending?.kind === 'warranty' && (
@@ -1383,9 +1604,126 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     ? pendingShorter
                       ? s.shorterConfirm
                       : s.saveWarranty
-                    : s.confirmReassign}
+                    : pending?.kind === 'delivery'
+                      ? s.saveDelivery
+                      : s.confirmReassign}
             </button>
           </div>
+        </div>
+      </Overlay>
+
+      {/* THE CLAIM MOVE — the next stage, the decision it records (G-3: the
+          desk never sent one, so every desk decision was stored empty) and the
+          reason the customer is told, in one in-app sheet instead of a
+          browser prompt. Deciding is the financial scope's (owner decision
+          3); the server refuses regardless of what this sheet offers. */}
+      <Overlay
+        open={!!claimMove}
+        onClose={() => { if (!moveBusy) setClaimMove(null); }}
+        labelledBy="admin-claim-move-title"
+        dismissOnScrim={!moveBusy}
+        dismissOnEscape={!moveBusy}
+        z={60}
+        testId="admin-claim-move"
+        panelClassName="w-full max-w-md"
+      >
+        <div className="p-6 space-y-4">
+          <button
+            type="button"
+            onClick={() => setClaimMove(null)}
+            disabled={moveBusy}
+            aria-label={s.close}
+            className="absolute top-4 end-4 p-2 text-text-muted hover:text-text-primary hover:bg-white/[0.06] rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+          {claimMove && (
+            <>
+              <div className="pe-10">
+                <h3 id="admin-claim-move-title" className="text-text-primary text-base font-bold">
+                  {s.moveTitle(s.stageLabels[claimMove.to] ?? claimMove.to)}
+                </h3>
+                <p className="text-text-secondary text-[12px] mt-1" dir="auto">
+                  {claimMove.claim.subject} · {claimMove.claim.product_name}
+                  {claimMove.claim.serial ? <> · <span className="font-mono" dir="ltr">{claimMove.claim.serial}</span></> : null}
+                </p>
+              </div>
+              {MONEY_STAGES.has(claimMove.to) && !canDecide && (
+                <div className="lv-alert lv-alert-warning text-[12px] text-text-primary leading-relaxed" data-claim-move-financial>
+                  {s.financialOnly}
+                </div>
+              )}
+              {claimMove.to === 'replaced' && (
+                <p className="text-text-muted text-[12px] leading-relaxed">{s.replacedFirst}</p>
+              )}
+              {(DECISION_OPTIONS[claimMove.to] ?? []).length > 0 && (
+                <fieldset disabled={moveBusy} data-claim-move-decision>
+                  <legend className="text-[12px] text-text-secondary mb-1.5 font-medium">{s.decisionPick}</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(DECISION_OPTIONS[claimMove.to] ?? []).map((d) => (
+                      <label
+                        key={d}
+                        className={`lv-button ${moveDecision === d ? 'lv-button-primary' : 'lv-button-secondary'} cursor-pointer focus-within:ring-2 focus-within:ring-gold`}
+                      >
+                        <input
+                          type="radio"
+                          name="admin-claim-decision"
+                          value={d}
+                          checked={moveDecision === d}
+                          onChange={() => setMoveDecision(d)}
+                          className="sr-only"
+                        />
+                        {s.decisionLabels[d] ?? d}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              <div>
+                <label htmlFor="admin-claim-move-reason" className="text-[12px] text-text-secondary mb-1.5 block font-medium">
+                  {REASON_STAGES.has(claimMove.to) ? s.reasonToCustomer : s.noteToCustomer}
+                </label>
+                <textarea
+                  className="lv-input py-2.5 text-sm resize-none"
+                  id="admin-claim-move-reason"
+                  value={moveReason}
+                  onChange={(e) => setMoveReason(e.target.value)}
+                  minLength={REASON_STAGES.has(claimMove.to) ? 5 : undefined}
+                  maxLength={1000}
+                  rows={3}
+                  required={REASON_STAGES.has(claimMove.to)}
+                  disabled={moveBusy}
+                />
+              </div>
+              {moveError && (
+                <div role="alert" className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">{moveError}</div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClaimMove(null)}
+                  disabled={moveBusy}
+                  className="lv-button lv-button-secondary"
+                >
+                  {s.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmMove()}
+                  disabled={
+                    moveBusy ||
+                    (MONEY_STAGES.has(claimMove.to) && !canDecide) ||
+                    (REASON_STAGES.has(claimMove.to) && moveReason.trim().length < 5) ||
+                    ((DECISION_OPTIONS[claimMove.to] ?? []).length > 0 && !moveDecision)
+                  }
+                  className="lv-button lv-button-primary"
+                  data-claim-move-confirm
+                >
+                  {moveBusy ? s.working : s.confirmMove}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Overlay>
 
@@ -1397,9 +1735,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 <button
                   key={st}
                   onClick={() => setStageFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize whitespace-nowrap transition-colors ${stageFilter === st ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${stageFilter === st ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
                 >
-                  {st === 'all' ? s.all : st}
+                  {st === 'all' ? s.all : s.stageLabels[st] ?? st}
                   {claimCounts && claimCounts[st] !== undefined && (
                     <span className="ms-1.5 tabular-nums text-text-muted" data-claims-count={st}>
                       {claimCounts[st]}
@@ -1464,23 +1802,33 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         {s.priorityBadge}
                       </span>
                     )}
-                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold capitalize ${STAGE_CLS[cl.stage] ?? STAGE_CLS.received}`}>{cl.stage}</span>
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold ${STAGE_CLS[cl.stage] ?? STAGE_CLS.received}`}>{s.stageLabels[cl.stage] ?? cl.stage}</span>
+                    {/* Choosing the next stage opens the move sheet — the
+                        decision and the reason are asked there, never in a
+                        browser prompt. */}
                     {(CLAIM_NEXT[cl.stage] ?? []).length > 0 && (
                       <select
                         className="lv-input w-auto min-h-9 px-2 py-1.5 text-xs disabled:opacity-50"
                         value=""
-                        disabled={claimBusy}
-                        onChange={(e) => { if (e.target.value) moveClaim(cl, e.target.value); }}
+                        disabled={claimBusy || moveBusy}
+                        aria-label={s.moveTo}
+                        data-claim-move={cl.id}
+                        onChange={(e) => { if (e.target.value) openMove(cl, e.target.value); }}
                       >
                         <option value="" disabled>{s.moveTo}</option>
                         {(CLAIM_NEXT[cl.stage] ?? []).map((st) => (
-                          <option key={st} value={st} className="capitalize">{st}</option>
+                          <option key={st} value={st}>{s.stageLabels[st] ?? st}</option>
                         ))}
                       </select>
                     )}
                   </div>
                 </div>
                 <p className="text-text-secondary text-sm mt-2 whitespace-pre-wrap">{cl.description}</p>
+                {cl.decision && (
+                  <p className="text-[12px] text-text-secondary mt-1" data-claim-decision={cl.id}>
+                    {s.decision}: <span className="font-bold text-text-primary">{s.decisionLabels[cl.decision] ?? cl.decision}</span>
+                  </p>
+                )}
                 {cl.decision_reason && (
                   <p className="text-[12px] text-text-muted mt-1">{s.decisionReason} {cl.decision_reason}</p>
                 )}
@@ -1488,7 +1836,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {cl.evidence.map((ev) => (
                       <a key={ev.key} href={ev.url} target="_blank" rel="noreferrer" className="block w-16 h-16 rounded-sm overflow-hidden border border-border-subtle bg-surface-selected">
-                        <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        {isVideoUrl(ev.key) || isVideoUrl(ev.url) ? (
+                          <span className="w-full h-full flex items-center justify-center text-[10px] font-bold text-text-secondary">{s.video}</span>
+                        ) : (
+                          <img src={ev.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        )}
                       </a>
                     ))}
                   </div>
@@ -1509,28 +1861,62 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                         {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
                         {m.file_url && (
                           <a href={m.file_url} target="_blank" rel="noreferrer" className="block mt-1">
-                            <img src={m.file_url} alt="" className="max-h-40 rounded-lg" loading="lazy" />
+                            {isVideoUrl(m.file_url) ? (
+                              <video src={m.file_url} controls preload="none" className="max-h-40 rounded-lg" />
+                            ) : (
+                              <img src={m.file_url} alt="" className="max-h-40 rounded-lg" loading="lazy" />
+                            )}
                           </a>
                         )}
-                        <div className="text-[10px] text-text-muted mt-1">{new Date(m.created_at).toLocaleString()}</div>
+                        <div className="text-[10px] text-text-muted mt-1">{new Date(m.created_at).toLocaleString(dateLocale(lang))}</div>
                       </div>
                     ))}
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        className="lv-input flex-1 text-sm"
-                        value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
-                        placeholder={s.reply}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(cl.id); } }}
-                      />
-                      <button
-                        onClick={() => sendReply(cl.id)}
-                        disabled={claimBusy || !replyText.trim()}
-                        className="lv-button lv-button-primary shrink-0 px-3"
-                      >
-                        <Send className="w-4 h-4" />{s.send}
-                      </button>
-                    </div>
+                    {/* W-4: a closed claim's thread takes no messages from
+                        either side. A rejected claim can be reopened for
+                        another look, which opens its thread again. */}
+                    {!claimIsOpen(cl) ? (
+                      <p className="text-[12px] text-text-muted leading-relaxed pt-1" data-claim-thread-closed={cl.id}>
+                        {cl.stage === 'rejected' ? s.threadReopen : s.threadClosed}
+                      </p>
+                    ) : (
+                      <div className="flex gap-2 pt-1">
+                        <label
+                          className={`lv-button lv-button-secondary w-11 px-0 shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-gold ${claimBusy ? 'opacity-50 pointer-events-none' : ''}`}
+                          title={s.attachFile}
+                        >
+                          <Paperclip className="w-4 h-4" aria-hidden="true" />
+                          <span className="sr-only">{claimBusy ? s.uploading : s.attachFile}</span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
+                            className="sr-only"
+                            disabled={claimBusy}
+                            data-claim-reply-file={cl.id}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = '';
+                              if (file) void postReply(cl.id, file);
+                            }}
+                          />
+                        </label>
+                        <input
+                          className="lv-input flex-1 min-w-0 text-sm"
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder={s.reply}
+                          aria-label={s.reply}
+                          maxLength={3000}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendReply(cl.id); } }}
+                        />
+                        <button
+                          onClick={() => void sendReply(cl.id)}
+                          disabled={claimBusy || !replyText.trim()}
+                          className="lv-button lv-button-primary shrink-0 px-3"
+                        >
+                          <Send className="w-4 h-4" />{s.send}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

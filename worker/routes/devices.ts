@@ -104,6 +104,7 @@ import {
   stageToLegacyStatus,
   CLAIM_STAGES,
   CLAIM_TRANSITIONS,
+  claimIsOpen,
   closedClaimSql,
   type ClaimStage,
   type UnitRow,
@@ -169,8 +170,12 @@ export function receiptNoFrom(input: string): string | null {
   return RECEIPT_NO_RE.test(s) ? s : null;
 }
 
-/** A claim at one of these stages is closed and no longer binds the device to its holder. */
-export const CLOSED_CLAIM_SQL = closedClaimSql();
+/**
+ * A closed claim on the `wc` alias (`closedClaimSql`, the one definition the
+ * desk, the device and every money fence share — W-5). It no longer binds
+ * the device to its holder.
+ */
+export const CLOSED_CLAIM_SQL = closedClaimSql('wc');
 
 /**
  * An OPEN return case on a device (Services V2 plan §1.3: «one door per
@@ -183,6 +188,12 @@ function openReturnOnUnitSql(line: string, unit: string): string {
      WHERE rc.state NOT IN ('rejected','resolved')
        AND (rc.unit_id = ${unit} OR (rc.unit_id IS NULL AND rc.order_item_id = ${line})))`;
 }
+/** W-4: a closed claim's thread takes no more messages. The client shows its own copy by code. */
+const CLAIM_CLOSED = () =>
+  conflict(
+    'هذه المطالبة مغلقة ولا تُضاف إليها رسائل. إن عادت المشكلة فافتح مطالبة جديدة من الجهاز. / This claim is closed and takes no more messages. If the problem comes back, open a new claim from the device.',
+    'CLAIM_CLOSED'
+  );
 const RETURN_CASE_OPEN = () =>
   conflict(
     'على هذا الجهاز طلب إرجاع مفتوح؛ يُعالَج العيب هناك. / This device has an open return case; the fault is handled there.',
@@ -530,6 +541,10 @@ function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
     product_name: row.product_name,
     description: row.description,
     stage: effectiveClaimStage(row.stage, row.status),
+    // Whether the claim is still open (W-5): the server's one answer, so a
+    // screen never keeps its own list of closed stages. A closed claim's
+    // thread takes no more messages (W-4).
+    open: claimIsOpen(row.stage, row.status),
     legacy_status: row.status,
     decision: row.decision ?? null,
     decision_reason: row.decision_reason ?? '',
@@ -886,10 +901,12 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   const description = str(body.description, 'description', { min: 10, max: 5000 });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80, required: false });
 
+  // 0178: the unit's warranty was closed by a return (null before it applied).
+  const closedCol = (await serialAssignmentsInstalled(c.env.DB)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
   const unit = await c.env.DB.prepare(
     `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
-            u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at,
+            u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at, ${closedCol},
             r.revoked_at AS reg_revoked, r.user_id AS reg_user, ${tradedInSql('u')} AS traded_in_at,
             oi.name_snapshot, p.name AS p_name, p.name_ar AS p_name_ar
        FROM order_item_units u
@@ -899,15 +916,18 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
       WHERE u.id = ?`
   )
     .bind(unitId)
-    .first<UnitRow & { reg_revoked: string | null; reg_user: string | null; traded_in_at: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
+    .first<UnitRow & { warranty_closed_at: string | null; reg_revoked: string | null; reg_user: string | null; traded_in_at: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
   // The account that HOLDS the device (its active registration) may claim on
   // it; the buyer who has not linked it yet is told to link it first; anyone
   // else sees nothing.
   const holds = !!unit && unit.reg_user === user.id && !unit.reg_revoked;
   if (!unit || (!holds && unit.owner_user_id !== user.id)) throw notFound('Device not found on your account');
   // Owner decision 3: a device traded in to Levonis is not claimed from the
-  // account that traded it — its warranty goes on with the device.
-  if (unit.traded_in_at) throw DEVICE_NOT_WITH_CUSTOMER();
+  // account that traded it — its warranty goes on with the device. A device
+  // RETURNED to Levonis (its warranty closed) is not claimed either, and its
+  // buyer is told so (W-6): «register it first» sent them to the register
+  // door, which refuses a returned device with this same answer — a loop.
+  if (unit.traded_in_at || unit.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
   if (!holds) {
     throw badRequest('Register this device first (Warranty → Add device), then open the claim from it.', 'NOT_REGISTERED');
   }
@@ -1125,17 +1145,33 @@ deviceRoutes.post('/claims/:id/messages', async (c) => {
     fileKey = k;
   }
   if (!text && !fileKey) throw badRequest('Write a message or attach a file');
+  /**
+   * A CLOSED CLAIM'S THREAD IS CLOSED (W-4). A customer kept writing into a
+   * resolved claim: «🔥 Customer replied» fired to the staff group and no
+   * queue showed it, because the claim was resolved. Closed means the one
+   * definition the desk and the device share (`claimIsOpen`): rejected,
+   * replaced or resolved. Both sides are refused — the desk's last word is the
+   * reason it gives when it closes the claim, and a rejected claim reopened
+   * for another look (policy 5.9) takes messages again. A customer whose
+   * problem comes back opens a new request from the device.
+   */
+  if (!claimIsOpen(claim.stage, claim.status)) throw CLAIM_CLOSED();
 
   const id = newId('cm');
   // Stamped here rather than by the column default so the row this answers
   // with is the row that was stored, to the millisecond, and the thread can
   // append it instead of reloading itself.
   const createdAt = new Date().toISOString();
-  await c.env.DB.prepare(
-    'INSERT INTO claim_messages (id, claim_id, sender_id, is_staff, body, file_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  // Asked again INSIDE the insert, so a claim closed between the read above
+  // and this write still refuses the message.
+  const written = await c.env.DB.prepare(
+    `INSERT INTO claim_messages (id, claim_id, sender_id, is_staff, body, file_key, created_at)
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+      WHERE EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.id = ?2 AND NOT ${closedClaimSql('wc')})`
   )
     .bind(id, claim.id, user.id, isAdmin ? 1 : 0, text, fileKey, createdAt)
     .run();
+  if (written.meta.changes === 0) throw CLAIM_CLOSED();
   /**
    * THE CUSTOMER'S SIDE OF THE CLAIM THREAD ONLY.
    *
@@ -2074,7 +2110,9 @@ deviceRoutes.post('/admin/units/:unitId/replace', requireMoneyAuthority('warrant
     new_unit_id: newUnitId,
     warranty_rule: 'carried_original_end',
     format: format ? { ...format, warnings: formatWarnings } : null,
-    note: 'The replacement carries the ORIGINAL warranty end date. The remaining-vs-new coverage rule after replacement is pending an owner decision (decision register) — no reset period is invented.',
+    // Owner decision 3 (DECISIONS row 193): a warranty is never restarted; the
+    // replacement runs on to the original device's end date.
+    note: 'The replacement carries the ORIGINAL warranty end date: a warranty is never restarted (owner decision 3).',
   });
 });
 

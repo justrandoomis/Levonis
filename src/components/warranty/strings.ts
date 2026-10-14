@@ -133,6 +133,10 @@ export interface WarrantyStrings {
   description: string;
   descriptionPh: string;
   attachments: string;
+  /** What warranty policy 5.7 asks a claim to carry — said plainly instead of «optional». */
+  evidenceHint: string;
+  /** The upload limits the route enforces (8 MB an image, 40 MB a video). */
+  evidenceLimits: string;
   uploading: string;
   submit: string;
   submitting: string;
@@ -160,6 +164,8 @@ export interface WarrantyStrings {
   newReply: string;
   /** One line at the top of the thread: who is on the other side. */
   threadIntro: string;
+  /** In place of the reply box once the claim is closed (rejected, replaced or resolved). */
+  threadClosed: string;
 }
 
 const ar: WarrantyStrings = {
@@ -273,7 +279,10 @@ const ar: WarrantyStrings = {
   subjectPh: 'مثال: توقّف السخان عن العمل',
   description: 'وصف المشكلة',
   descriptionPh: 'صف المشكلة بالتفصيل (10 أحرف على الأقل)…',
-  attachments: 'صور / فيديو (اختياري، حتى 6)',
+  attachments: 'الصور والفيديو (حتى 6 ملفات)',
+  evidenceHint:
+    'لقبول المطالبة تطلب سياسة الضمان (المادة 5.7): صورة للطابعة كاملة، وصورة للقطعة المعطلة، وصورة لملصق الرقم التسلسلي، وفيديو قصيرًا يُظهر العطل وقت حدوثه. ما لا ترفقه الآن أرسله لاحقًا في محادثة المطالبة.',
+  evidenceLimits: 'الصورة حتى 8 ميغابايت والفيديو حتى 40 ميغابايت — صوّر لحظة حدوث العطل فقط.',
   uploading: 'جارٍ الرفع…',
   submit: 'إرسال المطالبة',
   submitting: 'جارٍ الإرسال…',
@@ -309,6 +318,7 @@ const ar: WarrantyStrings = {
   },
   newReply: 'رد جديد من الفريق',
   threadIntro: 'هنا تتحدث مع فريق الضمان، ويصلك إشعار عند كل رد منهم.',
+  threadClosed: 'هذه المطالبة مغلقة، فلا تُضاف إليها رسائل. إن عادت المشكلة فافتح مطالبة جديدة من بطاقة الطابعة.',
 };
 
 const en: WarrantyStrings = {
@@ -417,7 +427,10 @@ const en: WarrantyStrings = {
   subjectPh: 'e.g. Heater stopped working',
   description: 'Problem description',
   descriptionPh: 'Describe the issue in detail (at least 10 characters)…',
-  attachments: 'Photos / video (optional, up to 6)',
+  attachments: 'Photos and video (up to 6 files)',
+  evidenceHint:
+    'To accept a claim, the warranty policy (article 5.7) asks for a photo of the whole printer, a photo of the faulty part, a photo of the serial-number label, and a short video showing the fault as it happens. Anything you do not attach now can be sent later in the claim’s conversation.',
+  evidenceLimits: 'Images up to 8 MB, video up to 40 MB — film only the moment the fault happens.',
   uploading: 'Uploading…',
   submit: 'Submit claim',
   submitting: 'Submitting…',
@@ -447,6 +460,7 @@ const en: WarrantyStrings = {
   messagesCount: (n, f) => (n === 0 ? 'No messages yet' : n === 1 ? '1 message' : `${f} messages`),
   newReply: 'New reply from the team',
   threadIntro: 'This is your conversation with the warranty team; you are notified of every reply.',
+  threadClosed: 'This claim is closed, so no more messages can be added. If the problem comes back, open a new claim from the printer’s card.',
 };
 
 const ckb: WarrantyStrings = {
@@ -559,7 +573,10 @@ const ckb: WarrantyStrings = {
   subjectPh: 'نموونە: گەرمکەرەوەکە لە کارکەوت',
   description: 'وەسفی کێشەکە',
   descriptionPh: 'کێشەکە بە وردی باس بکە (لانیکەم ١٠ پیت)…',
-  attachments: 'وێنە / ڤیدیۆ (ئارەزوومەندانە، تا ٦)',
+  attachments: 'وێنە و ڤیدیۆ (تا ٦ فایل)',
+  evidenceHint:
+    'بۆ وەرگرتنی داواکاری، سیاسەتی گەرەنتی (ماددەی 5.7) ئەمانە داوا دەکات: وێنەیەکی هەموو پرینتەرەکە، وێنەیەکی پارچە تێکچووەکە، وێنەیەکی لەیبڵی ژمارە زنجیرەییەکە، و ڤیدیۆیەکی کورت کە تێکچوونەکە لە کاتی ڕوودانیدا نیشان بدات. ئەوەی ئێستا هاوپێچی ناکەیت، دواتر لە گفتوگۆی داواکارییەکەدا بینێرە.',
+  evidenceLimits: 'وێنە تا ٨ میگابایت و ڤیدیۆ تا ٤٠ میگابایت — تەنها ئەو ساتە تۆمار بکە کە تێکچوونەکە ڕوودەدات.',
   uploading: 'بارکردن…',
   submit: 'ناردنی داواکاری',
   submitting: 'ناردن…',
@@ -582,19 +599,17 @@ const ckb: WarrantyStrings = {
   },
   decisionStep: 'بڕیار',
   submittedAt: 'بەرواری پێشکەشکردن',
-  // OWNER: the sentence that follows «داواکارییەکە نێردرا.» (where the
-  // conversation lives) carries the ARABIC text until the Sorani is written by
-  // hand — without it a Sorani reader never learns where the reply will be.
-  claimSubmitted: 'داواکارییەکە نێردرا. محادثتها مع فريق الضمان في «مطالباتي» أدناه — اضغط على المطالبة لفتحها، ويصلك إشعار عند كل رد.',
-  // OWNER: the three sentences below carry the ARABIC text on purpose — no
-  // Sorani prose is generated here. Sorani to be written by hand.
-  claimReplayNotice: 'هذه المطالبة مسجّلة من قبل، ولم تُحفظ تعديلاتك الأخيرة عليها. أضف الصور أو التصحيح في المحادثة المفتوحة الآن.',
-  claimsHint: 'اضغط على المطالبة لفتح المحادثة مع فريق الضمان — هناك تصلك ردودهم، ومنها ترسل الصور والتوضيحات.',
-  threadIntro: 'هنا تتحدث مع فريق الضمان، ويصلك إشعار عند كل رد منهم.',
+  // Sorani of its own, never the Arabic (DECISIONS row 183): the sentences
+  // that say where the claim's conversation lives, written with this table's
+  // own words («داواکارییەکانم», «گفتوگۆ», «تیمی گەرەنتی»).
+  claimSubmitted: 'داواکارییەکە نێردرا. گفتوگۆکەی لەگەڵ تیمی گەرەنتی لە «داواکارییەکانم» لە خوارەوەیە — کرتە لە داواکارییەکە بکە بۆ کردنەوەی، و بۆ هەر وەڵامێک ئاگادار دەکرێیتەوە.',
+  claimReplayNotice: 'ئەم داواکارییە پێشتر تۆمارکراوە، و دوایین گۆڕانکارییەکانت تێیدا پاشەکەوت نەکران. وێنەکان یان ڕاستکردنەوەکە لەو گفتوگۆیەی ئێستا کراوەیە زیاد بکە.',
+  claimsHint: 'کرتە لە داواکارییەک بکە بۆ کردنەوەی گفتوگۆکەی لەگەڵ تیمی گەرەنتی — وەڵامەکانیان لەوێ دەگات، و دەتوانیت وێنە و ڕوونکردنەوە لەوێوە بنێریت.',
+  threadIntro: 'ئێرە گفتوگۆی تۆیە لەگەڵ تیمی گەرەنتی؛ بۆ هەر وەڵامێکیان ئاگادار دەکرێیتەوە.',
+  threadClosed: 'ئەم داواکارییە داخراوە، بۆیە نامەی تر زیاد ناکرێت. ئەگەر کێشەکە گەڕایەوە، لە کارتی پرینتەرەکەوە داواکارییەکی نوێ بکەرەوە.',
   openThread: 'کردنەوەی گفتوگۆ',
-  // Zero reads the Arabic «no messages yet» (OWNER: Sorani to be written by
-  // hand) rather than «0 نامە».
-  messagesCount: (n, f) => (n === 0 ? 'لا توجد رسائل بعد' : `${f} نامە`),
+  // Zero says «no messages yet» rather than «0 نامە».
+  messagesCount: (n, f) => (n === 0 ? 'هێشتا هیچ نامەیەک نییە' : `${f} نامە`),
   newReply: 'وەڵامی نوێ',
 };
 

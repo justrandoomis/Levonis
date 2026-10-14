@@ -1324,6 +1324,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The decision does not match the stage: approved means repair or replace; rejected means reject or misuse.',
     ckb: 'بڕیارەکە لەگەڵ قۆناغەکە ناگونجێت: «پەسەندکراو» واتە چاککردنەوە یان گۆڕین، و «ڕەتکراوە» واتە ڕەتکردنەوە یان خراپ بەکارهێنان.',
   },
+  // W-4: a rejected, replaced or resolved claim takes no more messages (the desk can reopen a rejected one).
+  CLAIM_CLOSED: {
+    ar: 'هذه المطالبة مغلقة ولا تُضاف إليها رسائل. إن عادت المشكلة فافتح مطالبة جديدة من بطاقة الجهاز.',
+    en: 'This claim is closed and takes no more messages. If the problem comes back, open a new claim from the device card.',
+    ckb: 'ئەم داواکارییە داخراوە و نامەی تر وەرناگرێت. ئەگەر کێشەکە گەڕایەوە، لە کارتی ئامێرەکەوە داواکارییەکی نوێ بکەرەوە.',
+  },
   CLAIM_REPLACEMENT_REQUIRED: {
     ar: 'سجّل الجهاز البديل أولاً من «استبدال الوحدة»، ثم اختر مرحلة «استُبدل».',
     en: 'Record the replacement unit first (Replace unit), then set the stage to replaced.',

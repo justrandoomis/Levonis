@@ -606,34 +606,54 @@ export const CLAIM_TRANSITIONS: Record<ClaimStage, ClaimStage[]> = {
 };
 
 /**
- * A CLOSED claim, in SQL, on `alias` (or unqualified with ''). Closed claims
- * no longer bind the device to its holder (worker/routes/devices.ts) and no
- * longer hold a money process on the unit (Services V2 plan §1.3): a device
- * with an OPEN claim is on the repair desk, and a trade-in waits for it.
- *
- * ALWAYS TRUE OR FALSE, NEVER NULL. A legacy row (stage NULL) still in
- * review made `stage IN (…)` NULL, so `NOT closed` was NULL too and the open
- * claim counted as neither open nor closed: a device at the repair desk read
- * «no open claim». The COALESCEs keep the answer two-valued.
+ * THE STAGES AT WHICH A CLAIM IS CLOSED — the ONE definition of «open» (W-5).
+ * A closed claim no longer binds the device to its holder (unlink, transfer),
+ * no longer holds a money process on the unit (Services V2 plan §1.3: a
+ * device with an open claim is on the repair desk, and a trade-in or a refund
+ * waits for it), and its thread takes no more messages (W-4). The desk can
+ * still reopen a rejected claim for another look (policy 5.9), which makes it
+ * open again; a replaced claim can still be marked resolved.
  */
-export function closedClaimSql(alias = ''): string {
-  const a = alias ? `${alias}.` : '';
-  return `(COALESCE(${a}stage, '') IN ('rejected','replaced','resolved') OR (${a}stage IS NULL AND COALESCE(${a}status, '') IN ('rejected','approved')))`;
-}
+export const CLOSED_CLAIM_STAGES: readonly ClaimStage[] = ['rejected', 'replaced', 'resolved'];
 
-/** Effective stage for rows that predate the stage column. */
+/**
+ * Effective stage for rows that predate the stage column (0006). Before
+ * stages existed a claim was submitted, reviewed, then approved or rejected
+ * — and «approved» was the end of it. It reads as `resolved` (W-5): the desk
+ * listed it as an approved claim with moves left while the device counted it
+ * closed, so one claim was open on one screen and closed on the other.
+ */
 export function effectiveClaimStage(stage: unknown, legacyStatus: unknown): ClaimStage {
   if (typeof stage === 'string' && (CLAIM_STAGES as readonly string[]).includes(stage)) return stage as ClaimStage;
   switch (legacyStatus) {
     case 'in_review':
       return 'diagnosing';
     case 'approved':
-      return 'approved';
+      return 'resolved';
     case 'rejected':
       return 'rejected';
     default:
       return 'received';
   }
+}
+
+/** Whether a claim is open — the same answer `closedClaimSql` gives in the database. */
+export function claimIsOpen(stage: unknown, legacyStatus: unknown): boolean {
+  return !CLOSED_CLAIM_STAGES.includes(effectiveClaimStage(stage, legacyStatus));
+}
+
+/**
+ * A CLOSED claim, in SQL, on `alias` (or unqualified with ''): the effective
+ * stage below compared with `CLOSED_CLAIM_STAGES`, so the database and
+ * `claimIsOpen` cannot drift apart.
+ *
+ * ALWAYS TRUE OR FALSE, NEVER NULL. A legacy row (stage NULL) once made
+ * `stage IN (…)` NULL, so `NOT closed` was NULL too and the open claim
+ * counted as neither open nor closed. The CASE always yields a stage.
+ */
+export function closedClaimSql(alias = ''): string {
+  const closed = CLOSED_CLAIM_STAGES.map((s) => `'${s}'`).join(',');
+  return `(${effectiveClaimStageSql(alias)} IN (${closed}))`;
 }
 
 /**
@@ -648,11 +668,12 @@ export function effectiveClaimStage(stage: unknown, legacyStatus: unknown): Clai
  * another. Built from `CLAIM_STAGES` so the two cannot drift apart.
  */
 export function effectiveClaimStageSql(alias: string): string {
+  const a = alias ? `${alias}.` : '';
   const known = CLAIM_STAGES.map((s) => `'${s}'`).join(',');
-  return `(CASE WHEN ${alias}.stage IN (${known}) THEN ${alias}.stage
-       WHEN ${alias}.status = 'in_review' THEN 'diagnosing'
-       WHEN ${alias}.status = 'approved' THEN 'approved'
-       WHEN ${alias}.status = 'rejected' THEN 'rejected'
+  return `(CASE WHEN ${a}stage IN (${known}) THEN ${a}stage
+       WHEN ${a}status = 'in_review' THEN 'diagnosing'
+       WHEN ${a}status = 'approved' THEN 'resolved'
+       WHEN ${a}status = 'rejected' THEN 'rejected'
        ELSE 'received' END)`;
 }
 

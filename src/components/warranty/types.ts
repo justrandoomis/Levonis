@@ -91,6 +91,8 @@ export interface Claim {
   product_name: string;
   description: string;
   stage: ClaimStage | (string & {});
+  /** The server's one answer to «is this claim still open» (absent from an older server — see `claimOpen`). */
+  open?: boolean;
   legacy_status: string | null;
   decision: string | null;
   decision_reason: string;
@@ -196,6 +198,15 @@ export function isVideoUrl(u: string): boolean {
 
 /** Stages during which the server treats a claim as open (blocks unlinking). */
 export const OPEN_STAGES: ReadonlySet<string> = new Set(['received', 'diagnosing', 'approved', 'repairing']);
+
+/**
+ * Whether a claim is open: the server's `open` flag (W-5, one definition for
+ * the desk and the device), or its stage on a server that predates the flag.
+ * A closed claim's thread takes no more messages (W-4).
+ */
+export function claimOpen(claim: Pick<Claim, 'open' | 'stage'>): boolean {
+  return typeof claim.open === 'boolean' ? claim.open : OPEN_STAGES.has(claim.stage);
+}
 
 /** Where a stage sits on the received → diagnosing → decision → repair → resolved line. */
 export function stageStep(stage: string): number {

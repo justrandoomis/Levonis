@@ -257,9 +257,16 @@ export function DeviceClaimOverlay({
             <span id="warranty-claim-attachments-label" className="text-[12px] text-text-secondary mb-1.5 block font-medium">
               {s.attachments}
             </span>
+            {/* HONEST, NOT «OPTIONAL» (warranty policy 5.7): the photos and the
+                video are what a claim is accepted on. The form still sends
+                without them, because they can follow in the conversation. */}
+            <p id="warranty-claim-evidence-hint" className="text-[12px] text-text-muted leading-relaxed mb-1" data-claim-evidence-hint>
+              {s.evidenceHint}
+            </p>
+            <p className="text-[11px] text-text-muted leading-relaxed mb-2">{s.evidenceLimits}</p>
             <label
               htmlFor="warranty-claim-files"
-              aria-describedby="warranty-claim-attachments-label"
+              aria-describedby="warranty-claim-attachments-label warranty-claim-evidence-hint"
               className={`lv-button lv-button-secondary cursor-pointer focus-within:ring-2 focus-within:ring-gold ${
                 uploadBusy || attachments.length >= MAX_ATTACHMENTS ? 'opacity-60 pointer-events-none' : ''
               }`}

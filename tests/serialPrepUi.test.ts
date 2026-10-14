@@ -358,7 +358,7 @@ test('owner decision 1, review fixes: a revoked «الاستلام» is refused 
   assert.equal(
     (units.match(/apiRefusal\(e, refusalLang\(lang\), e\.message\)/g) ?? []).length,
     4,
-    'the assign, the replace / reassign window, the delivery correction and the claim stage move'
+    'the assign, the unit-action window (replace, reassign, warranty months, delivery date), the claim move sheet and the claim reply'
   );
   assert.match(read('src/components/adminWarranty/WarrantySection.tsx'), /apiRefusal\(e, rl, e\.message\)/);
 });
