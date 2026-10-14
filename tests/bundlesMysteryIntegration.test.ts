@@ -40,7 +40,6 @@
  *    one instant: what was reserved at checkout is what is released at
  *    cancellation, row for row, and the fence rows prove both landed.
  */
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, stubApp, post, get, json, all, row, count, type App, type StubUser } from './fixtures/app';
@@ -56,6 +55,7 @@ import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { eligibleMerchandiseIqd } from '../worker/lib/pointsOps';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { POOL_PRODUCTS, forbiddenTokens } from './lib/mysteryOffer';
+import { q7Test } from './fixtures/q7';
 
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
@@ -112,7 +112,7 @@ const reservedEverywhere = (raw: DatabaseSync) => ({
 // JOURNEY ONE — a bundle, from the admin panel to the cancelled order
 // =====================================================================
 
-test('a bundle walks the whole mandate: composed, listed, gated, carted, reserved, snapshotted, cancelled', async () => {
+q7Test('a bundle walks the whole mandate: composed, listed, gated, carted, reserved, snapshotted, cancelled', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
 
@@ -441,7 +441,7 @@ function seedFilaments(raw: DatabaseSync): void {
   }
 }
 
-test('a mystery offer walks the whole mandate: pooled, published, bought, permanent, packed, revealed on time', async () => {
+q7Test('a mystery offer walks the whole mandate: pooled, published, bought, permanent, packed, revealed on time', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -656,7 +656,7 @@ test('a mystery offer walks the whole mandate: pooled, published, bought, perman
 // The seam the two journeys share: one refusal vocabulary, one gate
 // =====================================================================
 
-test('the composition surface refuses the same way everywhere: the panel, the shop and the door agree', async () => {
+q7Test('the composition surface refuses the same way everywhere: the panel, the shop and the door agree', async () => {
   const raw = seedCatalogue();
   const db = asD1(raw);
 

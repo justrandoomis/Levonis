@@ -9,6 +9,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import worker from '../../worker/index';
 import { sha256Hex } from '../../worker/lib/crypto';
 import { APEX, asD1, ctx, dbThrough, freshDb, pending } from './app';
+import { fetchPublished } from './autoPublish';
 
 export const ATTACKER_IP = '203.0.113.7';
 export const NEIGHBOUR_IP = ATTACKER_IP;
@@ -106,7 +107,7 @@ export async function deceptionWorld(opts: { through?: string | null; env?: Reco
     const payload = o.rawBody !== undefined ? o.rawBody : o.body === undefined ? undefined : JSON.stringify(o.body);
     const req = new Request(`https://${host}${path}`, { method, headers, body: payload });
     if (o.cf) Object.defineProperty(req, 'cf', { value: o.cf });
-    const res = await worker.fetch(req, env as never, (o.withCtx === false ? undefined : ctx) as never);
+    const res = await fetchPublished(worker, req, env as never, (o.withCtx === false ? undefined : ctx) as never);
     await drain();
     return res;
   };

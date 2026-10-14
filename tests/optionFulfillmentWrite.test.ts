@@ -278,30 +278,5 @@ test('an INACTIVE row is not a model, so it cannot make a duplicate', () => {
   );
 });
 
-// ---------------------------------------------------- THE PREFIX IS NOT OBVIOUS
-
-test('the panel calls the prefix the fulfilment router is actually mounted on', () => {
-  /**
-   * TWO ROUTERS SHARE ONE FEATURE AND DO NOT SHARE A PREFIX.
-   *
-   *   app.route('/api/admin/products-v2', adminProductsRoutes)     // list, save, delete
-   *   app.route('/api/admin/products',    adminProductRelationsRoutes) // relations, stock,
-   *                                                                   // price-grid, fulfillment
-   *
-   * The first version of the panel called `products-v2/:id/fulfillment` — a
-   * plausible guess that would have 404'd in the admin's face, silently, on a
-   * screen with no other way to reach the data. Nothing about the code makes
-   * the split visible from the client, so this asserts it instead.
-   */
-  const index = readFileSync(join(ROOT, 'worker/index.ts'), 'utf8');
-  const mount = /app\.route\('(\/api\/admin\/products(?:-v2)?)', adminProductRelationsRoutes\)/.exec(index);
-  assert.ok(mount, 'adminProductRelationsRoutes must be mounted somewhere findable');
-  const prefix = mount![1];
-
-  const panel = readFileSync(join(ROOT, 'src/components/adminProducts/QuickPricePanel.tsx'), 'utf8');
-  const calls = [...panel.matchAll(/`(\/api\/admin\/[^`$]*)\$\{productId\}\/fulfillment`/g)].map((m) => m[1]);
-  assert.ok(calls.length >= 1, 'the synchronized quick editor must write fulfilment changes');
-  for (const call of calls) {
-    assert.equal(call, `${prefix}/`, `the panel calls ${call}\${productId}/fulfillment, but the router is mounted at ${prefix}`);
-  }
-});
+// (The quick price panel that called `…/fulfillment` was deleted with the old client by the clean
+// start, spec addendum A.6; no client calls the route, so its prefix test went with it.)

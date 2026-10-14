@@ -22,7 +22,7 @@ import { seedCostlyProduct, seedCostlyStock, COST } from './fixtures/costlyProdu
 import { resolveGoogleIdentity } from '../worker/routes/auth';
 import { publicUser, type Env, type SessionUser } from '../worker/lib/types';
 import { adminRoutes } from '../worker/routes/admin';
-import { adminPriceGridRoutes } from '../worker/routes/adminPriceGrid';
+import { adminPricingRoutes } from '../worker/routes/adminPricing';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 import { adminFinanceRoutes } from '../worker/routes/adminFinance';
 import { adminFinanceReportRoutes } from '../worker/routes/adminFinanceReport';
@@ -51,7 +51,7 @@ const ownerApp = (raw: DatabaseSync, owner: SessionUser) =>
     a.route('/api/admin/inventory', adminInventoryRoutes);
     a.route('/api/admin/wallet-adjust', adminWalletAdjustRoutes);
     a.route('/api/admin', adminRoutes);
-    a.route('/api/admin/products', adminPriceGridRoutes);
+    a.route('/api/admin/pricing', adminPricingRoutes);
     a.route('/api/admin/finance', adminFinanceRoutes);
     a.route('/api/admin/finance/report', adminFinanceReportRoutes);
   });
@@ -74,7 +74,7 @@ async function assertWholeOwner(raw: DatabaseSync, owner: SessionUser) {
     '/api/admin/investment-finance/profiles',
     '/api/admin/investment-finance/contracts',
     '/api/admin/procurement/config',
-    '/api/admin/products/p_a1/price-history',
+    '/api/admin/pricing/overview', // the price history read is a closed V1 door since the clean start (A.6)
     '/api/admin/finance/expenses',
     '/api/admin/finance/report/summary',
     '/api/admin/wallet-adjust/rounding-drift',

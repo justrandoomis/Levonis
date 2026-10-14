@@ -20,7 +20,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import {
   rowCells,
   rowLadder,
@@ -28,11 +27,7 @@ import {
   rowCharges,
   type GridProductInput,
 } from '../worker/lib/priceGrid';
-import { resolveUnitPrice, priceMode, type PricingProduct, type PriceFields } from '../worker/lib/pricing';
-import { freshDb, asD1, stubApp, get, json, row, type App } from './fixtures/app';
-import { adminProductsRoutes } from '../worker/routes/adminProducts';
-import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
-import { hydrateRelations, type RelationsResponse } from '../src/components/adminProducts/form/model';
+import { resolveUnitPrice, type PricingProduct, type PriceFields } from '../worker/lib/pricing';
 
 // ------------------------------------------------- the A1, exactly as stored
 
@@ -234,138 +229,6 @@ test('a null row (no prices object at all) resolves to the values beneath', () =
 // while both are set, so the stale adjustment is invisible — right up until
 // someone clears the fixed price to make the row inherit again, at which point
 // a delta nobody typed starts moving the price.
-
-const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
-
-const mount = (a: Parameters<Parameters<typeof stubApp>[2]>[0]) => {
-  a.route('/api/admin/products-v2', adminProductsRoutes);
-  a.route('/api/admin/products', adminProductRelationsRoutes);
-};
-
-const put = (a: App, path: string, body: unknown) =>
-  a.request(path, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-    body: JSON.stringify(body),
-  });
-
-test('9 — a save carrying BOTH a fixed price and an adjustment stores only the fixed price', async () => {
-  const raw = freshDb();
-  const db = asD1(raw);
-  const app = stubApp(db, OWNER, mount);
-
-  const made = await json(
-    await app.request('/api/admin/products-v2', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-      body: JSON.stringify({
-        name_en: 'A1', name_ar: 'إيه1', price_iqd: A1_BASE.regular,
-        prime_price_iqd: A1_BASE.prime, pro_price_iqd: A1_BASE.pro, status: 'draft',
-      }),
-    })
-  );
-  assert.equal(made.success, true, JSON.stringify(made));
-  const id = made.product.id as string;
-
-  // Exactly the contradiction: the row already priced as base+174,000, and a
-  // client that pins 899,000 without clearing the delta.
-  const res = await put(app, `/api/admin/products/${id}/relations`, {
-    inventory_mode: 'BASE',
-    groups: [
-      {
-        id: 'g1', name_en: 'Model', sort: 0, active: true,
-        values: [
-          {
-            id: 'v_combo', name_en: 'A1 Combo', sort: 0, active: true,
-            regular_price_iqd: 899_000, regular_adjust_iqd: 174_000,
-            cost_iqd: 689_008, cost_adjust_iqd: 253_070,
-          },
-        ],
-      },
-    ],
-    colors: [], variants: [], images: [],
-  });
-  assert.equal(res.status, 200, await res.text());
-
-  const stored = row<{ regular_price_iqd: number | null; regular_adjust_iqd: number | null; cost_iqd: number | null; cost_adjust_iqd: number | null }>(
-    raw,
-    'SELECT regular_price_iqd, regular_adjust_iqd, cost_iqd, cost_adjust_iqd FROM product_option_values WHERE id = ?',
-    'v_combo'
-  );
-  assert.ok(stored, 'the option value was written');
-  assert.equal(stored.regular_price_iqd, 899_000);
-  assert.equal(stored.regular_adjust_iqd, null, 'the contradicting delta was dropped, not stored beside it');
-  assert.equal(stored.cost_iqd, 689_008);
-  assert.equal(stored.cost_adjust_iqd, null);
-
-  // And the mode is unambiguous rather than "fixed, but with a landmine".
-  assert.equal(priceMode(stored, 'regular_price_iqd'), 'fixed');
-
-  // Clearing the fixed price later returns the row to plain inheritance — the
-  // failure this collapse prevents is that it would return to base + 174,000.
-  const cleared = await put(app, `/api/admin/products/${id}/relations`, {
-    inventory_mode: 'BASE',
-    groups: [
-      {
-        id: 'g1', name_en: 'Model', sort: 0, active: true,
-        values: [{ id: 'v_combo', name_en: 'A1 Combo', sort: 0, active: true }],
-      },
-    ],
-    colors: [], variants: [], images: [],
-  });
-  assert.equal(cleared.status, 200, await cleared.text());
-  const after = row<{ regular_price_iqd: number | null; regular_adjust_iqd: number | null }>(
-    raw,
-    'SELECT regular_price_iqd, regular_adjust_iqd FROM product_option_values WHERE id = ?',
-    'v_combo'
-  );
-  assert.deepEqual({ ...after }, { regular_price_iqd: null, regular_adjust_iqd: null });
-
-  // The form now reads that row back as plain inheritance at the base price —
-  // through `hydrateRelations`, the transform ProductForm actually runs over
-  // the GET, not over a hand-shaped stand-in for it.
-  const p = await json(await get(app, `/api/admin/products-v2/${id}`));
-  const rel = hydrateRelations(await json(await get(app, `/api/admin/products/${id}/relations`)) as unknown as RelationsResponse, p.product);
-  const value = rel.groups[0].values[0];
-  assert.equal(value.regular_price_iqd, null, 'the form state carries no fixed price');
-  assert.equal(value.regular_adjust_iqd ?? null, null, 'and no resurrected delta');
-  assert.equal(rowCells(value as PriceFields, A1_BASE).regular.effective, A1_BASE.regular);
-});
-
-test('an adjustment ALONE survives the same round trip untouched', async () => {
-  // The collapse must not be a quiet migration to fixed prices: the
-  // base+adjustment shape is the intended one, and this is what proves the
-  // rule only fires on a genuine contradiction.
-  const raw = freshDb();
-  const db = asD1(raw);
-  const app = stubApp(db, OWNER, mount);
-  const made = await json(
-    await app.request('/api/admin/products-v2', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-      body: JSON.stringify({ name_en: 'A1', name_ar: 'إيه1', price_iqd: A1_BASE.regular, status: 'draft' }),
-    })
-  );
-  const id = made.product.id as string;
-  const res = await put(app, `/api/admin/products/${id}/relations`, {
-    inventory_mode: 'BASE',
-    groups: [
-      {
-        id: 'g1', name_en: 'Model', sort: 0, active: true,
-        values: [{ id: 'v_combo', name_en: 'A1 Combo', sort: 0, active: true, regular_adjust_iqd: 174_000 }],
-      },
-    ],
-    colors: [], variants: [], images: [],
-  });
-  assert.equal(res.status, 200, await res.text());
-  const stored = row<{ regular_price_iqd: number | null; regular_adjust_iqd: number | null }>(
-    raw,
-    'SELECT regular_price_iqd, regular_adjust_iqd FROM product_option_values WHERE id = ?',
-    'v_combo'
-  );
-  assert.deepEqual({ ...stored }, { regular_price_iqd: null, regular_adjust_iqd: 174_000 });
-  assert.equal(rowCells(stored as PriceFields, A1_BASE).regular.effective, 899_000);
-});
 
 
 // ==================== the exhaustive cross-check against the real resolver
@@ -601,13 +464,4 @@ test('the colour spread is the set of prices the colour really takes', () => {
   // customer is charged only when option A happens to be picked, with nothing
   // on screen saying so.
   assert.notEqual(under(optionA), under(optionB), 'the two differ, which is what the warning is for');
-});
-
-test('a direct option adjustment clears its twin absolute price in quick edit', () => {
-  const src = readFileSync(new URL('../src/components/adminProducts/QuickPricePanel.tsx', import.meta.url), 'utf8');
-  assert.match(
-    src,
-    /setCell\(value, \{ \.\.\.direct, regular_price_iqd: null, regular_adjust_iqd \}\)/,
-    'the synchronized quick editor must not persist an absolute price and an adjustment together'
-  );
 });

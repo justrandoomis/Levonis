@@ -33,6 +33,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1 } from './fixtures/app';
 import { loadAlertContexts, resolveWish, armRefusal, contextDegraded } from '../worker/lib/stockAlertResolve';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 /** A product with two models, one of them in stock — an alert on it should FIRE. */
 function seed(raw: DatabaseSync) {
@@ -75,6 +76,7 @@ const WISH = { kind: 'option_value' as const, option_value_id: 'v_big', color_id
 test('with every read working, the wish resolves and is buyable', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const ctx = (await loadAlertContexts(asD1(raw), ['p1'])).get('p1')!;
   assert.ok(ctx, 'the product loaded');
   assert.equal(contextDegraded(ctx), false);
@@ -91,6 +93,7 @@ test('THE BUG: one failed read used to answer TARGET_REMOVED — permanently', a
   // Exactly the reviewer's injection: the option-values read fails, the other
   // five succeed, and the `products` read (which is deliberately NOT soft)
   // succeeds — so the sweep's `contexts.size === 0` guard does not fire.
+  await publishSeededV2(raw);
   const db = failingOn(asD1(raw), 'FROM product_option_values');
   const ctx = (await loadAlertContexts(db, ['p1'])).get('p1')!;
   assert.ok(ctx, 'the product still loads — which is why the empty-map guard misses this');
@@ -117,6 +120,7 @@ test('every soft read is covered, not just the one that was reported', async () 
   ]) {
     const raw = freshDb();
     seed(raw);
+    await publishSeededV2(raw);
     const ctx = (await loadAlertContexts(failingOn(asD1(raw), needle), ['p1'])).get('p1')!;
     assert.equal(contextDegraded(ctx), true, `${needle}: the context knows it is degraded`);
     const v = resolveWish(ctx, WISH);
@@ -131,6 +135,7 @@ test('the door refuses transiently rather than arming a promise it cannot check'
   // degraded context produces none, and silence would read as consent.
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const ctx = (await loadAlertContexts(failingOn(asD1(raw), 'FROM product_option_values'), ['p1'])).get('p1')!;
 
   assert.equal(armRefusal(ctx, WISH), null, 'no PERMANENT refusal exists — that is the trap');
@@ -140,6 +145,7 @@ test('the door refuses transiently rather than arming a promise it cannot check'
 test('a genuinely deleted model is still TARGET_REMOVED — the fix does not blunt the real answer', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const ctx = (await loadAlertContexts(asD1(raw), ['p1'])).get('p1')!;
   const gone = resolveWish(ctx, { kind: 'option_value', option_value_id: 'v_never', color_id: '' });
   assert.equal(gone.dead, 'TARGET_REMOVED', 'a read that SUCCEEDED and found nothing is a real answer');

@@ -31,6 +31,7 @@ import { communitySocialRoutes } from '../worker/routes/communitySocial';
 import { cacheKeyUrl, communitySearchRoutes } from '../worker/routes/communitySearch';
 import { toSearchDoc } from '../worker/lib/search/document';
 import { planSearchIndex } from '../worker/lib/search/store';
+import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 
 const SARA: StubUser = { id: 'sara', role: 'customer', email: 'sara@x.co', username: 'sara' };
 const EVE: StubUser = { id: 'eve', role: 'customer', email: 'eve@x.co', username: 'evedragon' };
@@ -543,7 +544,7 @@ test('the cache key is canonical: the origin, the path and the route\'s own para
     for (let i = 0; i < 5; i += 1) await get(as(raw, null), `/api/community/trending?x=${i}`);
     await Promise.all(pending);
     assert.equal(cache.store.size, 1, 'five unknown parameters, one entry');
-    assert.deepEqual([...cache.store.keys()], ['http://localhost/api/community/trending']);
+    assert.deepEqual([...cache.store.keys()], [withCacheEpoch('http://localhost/api/community/trending')]);
     assert.equal((await get(as(raw, null), '/api/community/trending?utm_source=x')).headers.get('CF-Cache-Status'), 'HIT');
 
     await get(as(raw, null), '/api/community/search/suggest?q=Dra&foo=1');
@@ -555,10 +556,10 @@ test('the cache key is canonical: the origin, the path and the route\'s own para
     assert.deepEqual(
       [...cache.store.keys()].sort(),
       [
-        'http://localhost/api/community/recommend?for=post%3Apo_sara&limit=6',
-        'http://localhost/api/community/search/suggest?q=Dra',
-        'http://localhost/api/community/search?limit=3&q=Dragon&types=brands',
-        'http://localhost/api/community/trending',
+        withCacheEpoch('http://localhost/api/community/recommend?for=post%3Apo_sara&limit=6'),
+        withCacheEpoch('http://localhost/api/community/search/suggest?q=Dra'),
+        withCacheEpoch('http://localhost/api/community/search?limit=3&q=Dragon&types=brands'),
+        withCacheEpoch('http://localhost/api/community/trending'),
       ]
     );
     // A different declared value is a different answer, and a different entry.

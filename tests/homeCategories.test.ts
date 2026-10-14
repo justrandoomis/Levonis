@@ -32,6 +32,7 @@ import {
 import { printerProductIds } from '../worker/lib/printerIdentity';
 import { planSearchIndex } from '../worker/lib/search/store';
 import { toSearchDoc } from '../worker/lib/search/document';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 type Raw = ReturnType<typeof freshDb>;
 
@@ -98,6 +99,7 @@ test('a MAIN section counts what is filed under its children — the roll-up', a
   fileProduct(raw, 'p2', 'A1', 'cat_printers', 'cat_printers_fdm');
   fileProduct(raw, 'p3', 'Saturn', 'cat_printers', 'cat_printers_resin');
 
+  await publishSeededV2(raw);
   const tree = await homeCategoryTree(asD1(raw));
   const printers = tree.find((c) => c.id === 'cat_printers');
   assert.ok(printers, 'Printers must be on the page');
@@ -115,6 +117,7 @@ test('a MAIN section counts what is filed under its children — the roll-up', a
 test('«الأقسام الفرعية التي فيها المنتجات» — an EMPTY sub-section is not offered', async () => {
   const raw = freshDb();
   fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
+  await publishSeededV2(raw);
   const tree = await homeCategoryTree(asD1(raw));
   const printers = tree.find((c) => c.id === 'cat_printers')!;
   const ids = printers.children!.map((c) => c.id);
@@ -134,6 +137,7 @@ test('a DRAFT product fills no shelf', async () => {
   const raw = freshDb();
   fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
   raw.prepare("UPDATE products SET status = 'draft' WHERE id = 'p1'").run();
+  await publishSeededV2(raw);
   assert.deepEqual(await homeCategoryTree(asD1(raw)), []);
 });
 
@@ -145,6 +149,7 @@ test('a BUNDLE row does not inflate a category count', async () => {
   fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
   fileProduct(raw, 'b1', 'Starter bundle', 'cat_printers', 'cat_printers_fdm');
   raw.prepare("UPDATE products SET composition = 'bundle' WHERE id = 'b1'").run();
+  await publishSeededV2(raw);
   const tree = await homeCategoryTree(asD1(raw));
   assert.equal(tree.find((c) => c.id === 'cat_printers')!.product_count, 1);
 });
@@ -269,6 +274,7 @@ test('a search that matches nothing STILL names the category — the early retur
   // through the bottom like everything else. So one product is indexed first.
   const raw = freshDb();
   fileProduct(raw, 'p1', 'X2D', 'cat_printers', 'cat_printers_fdm');
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch(planSearchIndex(db, toSearchDoc({ id: 'p1', name: 'Bambu Lab X2D' })));
 
@@ -322,6 +328,7 @@ test('THE MONEY BUG: the backfill is what makes a printer a printer again', asyn
   const raw = freshDb();
   fileProduct(raw, 'p_x2d', 'Bambu Lab X2D', 'cat_printers', 'cat_printers_fdm');
 
+  await publishSeededV2(raw);
   const before = await printerProductIds(asD1(raw), ['p_x2d']);
   assert.equal(before.has('p_x2d'), false, 'the state the live database is in');
 
@@ -404,6 +411,7 @@ test('a laser machine is a printer for every rule that pays out; its shelves are
   raw.prepare(
     `INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_laser', 'cat_laser_machines', 1)`
   ).run();
+  await publishSeededV2(raw);
   const ids = await printerProductIds(asD1(raw), ['p_laser']);
   assert.equal(ids.has('p_laser'), true, 'a laser cutter must resolve as a printer to printerIdentity');
 });

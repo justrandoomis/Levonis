@@ -7,7 +7,7 @@ import { chainOf } from '../worker/lib/pricingEngine/store';
 import { asD1, dbThrough, stubApp } from './fixtures/app';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
 import { templateRoutes } from '../worker/routes/template';
-import { apply, download, edit, preview, OWNER } from './fixtures/dataFile';
+import { download, edit, preview, OWNER } from './fixtures/dataFile';
 
 function convertedStore(): ProductPricingData {
   const input: StoredInputRow = {
@@ -78,7 +78,7 @@ test('an older schema reads ordinary inputs with no direct overlay; transient ov
   await assert.rejects(loadProductPricing(failing, 'missing-product'), /temporarily unavailable/);
 });
 
-test('data-only product-file updates prune direct supplier patches in the same fenced batch and never revive them', async () => {
+test('the overlay is fenced, owner-only, and the product file can no longer touch it (the clean start: the V1 TXT pricing block is refused, spec addendum A.6)', async () => {
   const w = pricingWorld();
   const app = stubApp(w.db, OWNER, a => a.route('/api/admin/template', templateRoutes));
   const empty = await loadProductPricing(w.db, AMS);
@@ -91,14 +91,11 @@ test('data-only product-file updates prune direct supplier patches in the same f
   await assert.rejects(w.db.batch(staleWrite), /CHECK|UNIQUE/, 'a concurrent old snapshot cannot overwrite the overlay');
   assert.throws(() => w.raw.prepare('UPDATE pricing_direct_purchase SET payload_json=? WHERE product_id=?').run('{}', AMS), /pricing_owner_required/);
   assert.throws(() => w.raw.prepare('DELETE FROM pricing_direct_purchase WHERE product_id=?').run(AMS), /pricing_owner_required/);
-  for (const amount of ['130', '100']) {
-    const text = edit(await download(app, AMS), 'pricing.base.supplier_cost_amount', amount);
-    const [p] = await preview(app, text, AMS);
-    assert.equal(p.pricing?.kind, 'data');
-    const result = await apply(app, text, p);
-    assert.equal(result.status, 200, await result.clone().text());
-    const live = await loadProductPricing(w.db, AMS);
-    assert.equal(directPurchaseStore(live).inputs[0]!.supplier_cost_amount, amount);
-    assert.equal(live.direct_purchase?.inputs.length, 0);
-  }
+  const overlayBefore = (await loadProductPricing(w.db, AMS)).direct_purchase;
+  const text = edit(await download(app, AMS), 'pricing.base.supplier_cost_amount', '130');
+  const [p] = await preview(app, text, AMS);
+  const line = p.fields.find((f) => f.key === 'pricing.base.supplier_cost_amount');
+  assert.equal(line?.status, 'INVALID_VALUE', JSON.stringify(line));
+  assert.notEqual(p.pricing?.kind, 'data');
+  assert.deepEqual((await loadProductPricing(w.db, AMS)).direct_purchase, overlayBefore, 'the preview moved nothing');
 });

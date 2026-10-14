@@ -60,6 +60,7 @@ import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import { hydrateRelations, relationsToWire } from '../src/components/adminProducts/form/model';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 const MOUNTS: readonly MountSpec[] = [
   ['/api/products', productRoutes as Router],
@@ -312,6 +313,7 @@ function adminApp(raw: DatabaseSync) {
     await loadSessionUser(c);
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.use('/api/admin/*', requireMainHost);
   a.route('/api/admin/products-v2', adminProductsRoutes);
   a.route('/api/admin/products', adminProductRelationsRoutes);

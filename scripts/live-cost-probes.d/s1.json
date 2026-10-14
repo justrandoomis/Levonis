@@ -3,7 +3,8 @@
   "vars": {
     "slug": {
       "from": "/api/products?limit=1",
-      "pick": "products.0.slug"
+      "pick": "products.0.slug",
+      "optional": true
     }
   },
   "probes": [

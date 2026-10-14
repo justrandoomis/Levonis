@@ -1754,8 +1754,9 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
    * A product that has never been given a transport row exported nothing at
    * all here — no keys, no section, no hint — so «خيارات الشحن» could not be
    * turned on by editing the file, which is half of what the owner asked for.
-   * A method the product does not carry is written with an empty commission
-   * and `active=false`: importing it back changes nothing, and switching the
+   * A method the product does not carry is written with commission 0 (the
+   * clean start, DECISIONS row 222: a route is born with no fee) and
+   * `active=false`: importing it back changes nothing, and switching the
    * flag is now a one-word edit.
    */
   const METHOD_ORDER: Array<'air' | 'sea' | 'land'> = ['air', 'sea', 'land'];
@@ -1764,7 +1765,7 @@ export function docToEntries(doc: ProductDoc, opts: ExportOpts = {}): Entry[] {
     ...doc.preorder_transports,
     ...METHOD_ORDER.filter((m) => !declared.has(m)).map((method) => ({
       method,
-      commission_iqd: null,
+      commission_iqd: 0,
       active: false,
     })),
   ];
@@ -2190,7 +2191,7 @@ export function effectiveNotes(doc: ProductDoc, opts: ExportOpts): Map<string, s
     ...doc.preorder_transports,
     ...(['air', 'sea', 'land'] as const)
       .filter((m) => !declaredMethods.has(m))
-      .map((method) => ({ method, commission_iqd: null as number | null })),
+      .map((method) => ({ method, commission_iqd: 0 as number | null })),
   ];
   transportRows.forEach((t, i) => {
     if (t.commission_iqd !== null) return;

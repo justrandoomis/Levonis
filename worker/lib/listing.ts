@@ -45,7 +45,7 @@
  * tables lists NOTHING (the clause becomes `AND 0`) and `unlistedIds` holds
  * every id back — a Worker ahead of its migration never shows a legacy price.
  */
-import { pricingV2Installed } from './engineInstalled';
+import { pricingV2Installed, rememberPricingV2Present } from './engineInstalled';
 
 
 const PRESENT = new WeakMap<object, true>();
@@ -152,6 +152,8 @@ export async function runListed<T>(db: D1Database, sql: string, exec: (sql: stri
     try {
       const out = await exec(current);
       if (withoutHeld(current) !== current) PRESENT.set(db, true);
+      // The V2 clause ran: 0189 is there, and the probe-based readers of this isolate ask nothing.
+      if (withoutV2(current) !== current) rememberPricingV2Present(db);
       return out;
     } catch (err) {
       if (attempt >= 2) throw err;
@@ -217,8 +219,8 @@ const HELD_CHUNK = 200;
 
 /** The listing predicate of this database. One probe the first time per binding, none after. */
 export async function listing(db: D1Database): Promise<Listing> {
-  const installed = await completenessInstalled(db);
-  const v2 = await pricingV2Installed(db);
+  // Both probes in one wave (each is asked once per binding, and not at all after an optimistic read).
+  const [installed, v2] = await Promise.all([completenessInstalled(db), pricingV2Installed(db)]);
   const unlisted = (ids: readonly string[]) => unlistedIdsOf(db, installed, v2, ids);
   return {
     installed,

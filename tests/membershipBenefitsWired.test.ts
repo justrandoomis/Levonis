@@ -34,6 +34,7 @@ import type { ShippingConfig } from '../packages/shipping/src/shipping';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 // ------------------------------------------------------------------ fixture
 
@@ -102,6 +103,7 @@ function appAs(db: D1Database, userId: string, role: 'admin' | 'customer') {
     c.env = { DB: db } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
   a.route('/api/orders', orderRoutes);
   a.route('/api/cart', cartRoutes);
@@ -828,35 +830,34 @@ test('the recommended starting values are a starting point, not a decision', asy
 /* --------------------------------- the rule is credited only where it paid */
 
 /**
- * A TYPED MEMBER PRICE BEATS A RULE — AND THE RULE MUST NOT TAKE THE CREDIT.
+ * A TYPED MEMBER PRICE IS RETIRED — THE RULE SETS THE PRICE AND TAKES EXACTLY
+ * THE GAP AS ITS CREDIT.
  *
- * `resolveUnitPrice` applies an explicit `pro_price_iqd` and ignores the rule
- * entirely, which is the documented precedence. The resolver used to recompute
- * the rule's arithmetic anyway, so a product with a typed PRO price of 950,000
- * and a store-wide 10% rule reported a 100,000 saving beside a 50,000 gap: the
- * cart said one thing, the subtotal said another, and the order snapshot froze
- * the wrong one.
+ * Before the clean start `resolveUnitPrice` applied an explicit `pro_price_iqd`
+ * and ignored the rule. Since DECISIONS row 222 (addendum A.6) no writer types a
+ * dinar price: a V2 product's member prices come from `membership_benefit_rules`
+ * only, so a legacy typed PRO price left on the row is never read. What stays
+ * is the invariant this test was written for: the reported saving and the gap
+ * on screen are the same number, and the rule that set the price is credited.
  */
-test('a typed member price is the saving, and a rule that did not set it is credited with nothing', async () => {
+test('a typed member price is retired: the rule sets the price, and the saving it is credited with IS the gap', async () => {
   const { raw, db } = setup();
   const admin = appAs(db, 'boss', 'admin');
   await send(admin, 'POST', '/api/admin/membership-benefits', {
     tier: 'pro', benefit_type: 'product_discount', scope: 'global', discount_mode: 'percent', percent: 10,
   });
-  // 1,850,000 with a typed PRO price of 1,800,000. The rule would have given
-  // 185,000; the owner's own number gives 50,000, and the owner's wins.
+  // A legacy typed PRO price of 1,800,000 on a 1,850,000 product: never read.
   raw.exec("UPDATE products SET pro_price_iqd = 1800000 WHERE id = 'p_a1';");
 
   cartLine(raw, 'ci_typed', 'promem', 'p_a1', 1);
   const cart = await json(await send(appAs(db, 'promem', 'customer'), 'GET', '/api/cart'));
-  assert.equal(cart.items[0].unit_price_iqd, 1_800_000, 'the typed price is what is charged');
-  assert.equal(cart.membership.discount_total_iqd, 50_000, 'and 50,000 is what the customer actually saved');
-  assert.equal(cart.membership.lines[0].rule_id, null, 'no rule set this price, so none is credited');
+  assert.equal(cart.items[0].unit_price_iqd, 1_665_000, 'the 10% rule is what is charged, not the typed number');
+  assert.equal(cart.membership.discount_total_iqd, 185_000, 'and 185,000 is what the customer actually saved');
+  assert.equal(typeof cart.membership.lines[0].rule_id, 'string', 'the rule set this price, so it is credited');
 
   const quote = await json(await send(appAs(db, 'promem', 'customer'), 'POST', '/api/orders/quote', checkoutBody('a_pro')));
-  assert.equal(quote.quote.membership_benefits.discount_total_iqd, 50_000);
-  // The whole point: the reported saving and the gap on screen are the same
-  // number, whichever of the two set the price.
+  assert.equal(quote.quote.membership_benefits.discount_total_iqd, 185_000);
+  // The whole point: the reported saving and the gap on screen are the same number.
   assert.equal(
     quote.quote.membership_benefits.discount_total_iqd,
     1_850_000 - quote.quote.lines[0].unit_price_iqd,

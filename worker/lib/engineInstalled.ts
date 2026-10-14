@@ -93,6 +93,15 @@ export async function pricingV2Installed(db: D1Database): Promise<boolean> {
 }
 
 /**
+ * A statement that named 0189's tables (the listing predicate's V2 clause) just
+ * succeeded on this binding: the migration is there, so `pricingV2Installed`
+ * asks nothing more in this isolate (the optimistic read already paid for it).
+ */
+export function rememberPricingV2Present(db: object): void {
+  remember(db, 'pricing_v2');
+}
+
+/**
  * The clean start (0190, DECISIONS row 222): the purchase price reviews (D1),
  * the order lines' frozen cost estimate and the allocations' link kind (V2-6).
  * One statement names them all; a database without 0190 answers "no" and the

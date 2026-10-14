@@ -11,6 +11,7 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import { APEX, asD1, ctx, freshDb, stubApp, type StubUser } from './app';
+import { publishSeededV2 } from './autoPublish';
 import worker from '../../worker/index';
 import { adminProductsRoutes } from '../../worker/routes/adminProducts';
 import { templateRoutes } from '../../worker/routes/template';
@@ -92,8 +93,10 @@ export function world(opts: { raw?: DatabaseSync } = {}) {
   };
   let ip = 0;
   /** A signed-out shopper on the apex, through the real Worker (a fresh address a call: no rate limit trips). */
-  const guest = (path: string, init: { method?: string; body?: unknown } = {}) =>
-    worker.fetch(
+  // The clean start (A.12.1): a seeded product is V2-published before a customer reads it.
+  const guest = async (path: string, init: { method?: string; body?: unknown } = {}) => {
+    await publishSeededV2(raw);
+    return worker.fetch(
       new Request(`https://${APEX}${path}`, {
         method: init.method ?? 'GET',
         headers: { Host: APEX, 'CF-Connecting-IP': `198.51.100.${(ip++ % 250) + 1}`, ...(init.body ? { 'content-type': 'application/json' } : {}) },
@@ -102,6 +105,7 @@ export function world(opts: { raw?: DatabaseSync } = {}) {
       env as never,
       ctx
     );
+  };
   return { raw, db, admin, shopper, guest, env };
 }
 

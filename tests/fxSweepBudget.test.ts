@@ -34,7 +34,7 @@ import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { asD1, count, json, post, row, stubApp } from './fixtures/app';
+import { asD1, count, json, post, stubApp } from './fixtures/app';
 import { applyRate } from './fixtures/fx';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
 import { SqliteD1, type SqliteStatement } from './fixtures/d1';
@@ -51,6 +51,7 @@ import { drainStaffReconciliations } from '../worker/lib/financeStaffAccrual';
 import { INDEX_FAILED_MARK, INDEX_STAMP, backfillSearchIndex } from '../worker/lib/search/store';
 import { resetEventBus } from '../worker/lib/eventBus';
 import type { Env } from '../worker/lib/types';
+import { writeV2 } from './fixtures/pricingV2';
 
 // ------------------------------------------------------------- counting at the binding
 
@@ -143,27 +144,26 @@ async function tick(raw: DatabaseSync) {
 
 // ------------------------------------------------------------- the world, every job at its bound
 
-const usdDraft = (usd: number) => ({
-  inputs: [{ scope: 'base', supplier_cost_amount: String(usd), supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '20' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 15_000 },
-  ],
-});
-
-/** Engine-priced products through the owner's own completing save (409 with the preview, then the save with its hash). */
+/**
+ * Engine-priced products — since the clean start (spec addendum A.6) V2 products, the only ones the
+ * automatic run selects: cost-first through the V2 writer (USD supplier cost, Germany land 1 kg, a $20
+ * minimum profit), skipping a census product this shape cannot price.
+ */
 async function adoptProducts(w: ReturnType<typeof pricingWorld>, n: number): Promise<string[]> {
   const out: string[] = [];
-  const seqOf = (pid: string) => row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', pid)?.s ?? 0;
   for (const p of await listPricedProducts(w.db)) {
     if (out.length === n) break;
     if (p.id === AMS) continue;
-    const draft = usdDraft(100 + out.length * 50);
-    const first = await w.putInputs(p.id, { inputs_seq: seqOf(p.id), ...draft });
-    const hash = first.body.details?.preview?.preview_hash;
-    if (first.status !== 409 || typeof hash !== 'string') continue;
-    const saved = await w.putInputs(p.id, { inputs_seq: seqOf(p.id), ...draft, preview_hash: hash, confirm_large_change: true });
-    if (saved.status === 200 && saved.body.mode === 'engine') out.push(p.id);
+    try {
+      await writeV2(w.db, p.id, {
+        method: 'cost',
+        inputs: { supplier_cost_amount: String(100 + out.length * 50), supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 },
+        minimumProfitUsd: '20',
+      });
+      out.push(p.id);
+    } catch {
+      /* not this product */
+    }
   }
   assert.equal(out.length, n, 'enough census products adopt');
   return out;
@@ -262,7 +262,7 @@ async function copies(opts: { steady: boolean; staff?: boolean }): Promise<{ sta
   const current = await open();
   // A confirmed USD/IQD move (+6.25%): every engine product is stale in one copy, none in the other.
   applyRate(stale, 'USD_IQD', '1700');
-  if (!engine.length) engine = (stale.prepare("SELECT product_id FROM product_pricing_state WHERE mode = 'engine'").all() as Array<{ product_id: string }>).map((r) => r.product_id);
+  if (!engine.length) engine = (stale.prepare("SELECT product_id FROM product_pricing_state WHERE mode = 'engine' AND pricing_method IS NOT NULL").all() as Array<{ product_id: string }>).map((r) => r.product_id);
   return { stale, current, engine };
 }
 
@@ -271,7 +271,7 @@ process.on('exit', () => {
 });
 
 /** Engine products whose stored figures were computed at the old USD/IQD (1,600) — the sweep's work. */
-const staleCount = (raw: DatabaseSync) => count(raw, "SELECT COUNT(DISTINCT product_id) AS n FROM pricing_sku_costs WHERE usd_iqd_rate <> '1700'");
+const staleCount = (raw: DatabaseSync) => count(raw, "SELECT COUNT(DISTINCT product_id) AS n FROM pricing_v2_sku_results WHERE usd_iqd_rate <> '1700'");
 
 // ------------------------------------------------------------- the tests
 
@@ -305,7 +305,7 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   // The completeness catch-up (0184) after the sweep, within its own share of what the sweep left.
   const completenessShare = quarterHourCompletenessBudget(withSweep.jobs + withSweep.sweep);
   assert.ok(withSweep.completeness <= completenessShare && completenessShare <= COMPLETENESS_TICK_BUDGET, `the completeness catch-up spent ${withSweep.completeness} of its ${completenessShare}`);
-  const lateSweep = withSweep.log.slice(withSweep.jobs + withSweep.sweep).filter((sql) => /(?:INSERT INTO|UPDATE) pricing_sku_costs|upload_sessions|FROM outbox|search_tokens/.test(sql));
+  const lateSweep = withSweep.log.slice(withSweep.jobs + withSweep.sweep).filter((sql) => /(?:INSERT INTO|UPDATE) pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens/.test(sql));
   assert.deepEqual(lateSweep, [], 'nothing of the sweep or the jobs after the completeness catch-up began');
   console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), completeness ${withSweep.completeness} (share ${completenessShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
@@ -397,7 +397,7 @@ test('nothing is lost to the pacing: tick after tick the staff recalculations, t
   );
   same('SELECT staff_id, revision, state, processed_orders, adjusted_orders, error FROM finance_staff_reconciliations ORDER BY staff_id', 'the same recalculations');
   same('SELECT product_id, token, weight FROM search_tokens ORDER BY product_id, token', 'the same search index');
-  same('SELECT product_id, combo_key, channel, usd_iqd_rate, replacement_cost_iqd, computed_price_iqd FROM pricing_sku_costs ORDER BY product_id, combo_key, channel', 'the same engine figures');
+  same('SELECT product_id, combo_key, channel, usd_iqd_rate, replacement_cost_iqd, final_price_iqd FROM pricing_v2_sku_results ORDER BY product_id, combo_key, channel', 'the same engine figures');
   same('SELECT id, price_iqd FROM products ORDER BY id', 'the same prices');
   console.log(`paced to completion in ${totals.length} ticks, the largest ${Math.max(...totals)} statements (D1 allows ${D1_INVOCATION_STATEMENT_LIMIT})`);
 });

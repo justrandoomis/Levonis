@@ -25,9 +25,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asD1, dbThrough, get, json, post, put } from './fixtures/app';
+import { asD1, dbThrough, freshDb, get, json, post, put } from './fixtures/app';
 import { ASSISTANT, CUSTOMER, FULL_ADMIN, OWNER, recount, seedCatalog, seedProduct, world, type World } from './fixtures/completeness';
-import { listedWithoutHeld, listing, optimisticListed, runListed, withoutHeld } from '../worker/lib/listing';
+import { listedWithoutHeld, listedWithoutV2, listing, optimisticListed, runListed, withoutHeld, withoutV2 } from '../worker/lib/listing';
 
 const slugsOf = (body: Record<string, unknown>): string[] => {
   const list = (body.products ?? (body.data as unknown[]) ?? []) as Array<{ slug?: string }>;
@@ -51,6 +51,16 @@ async function surfaces(w: World) {
   const apiDetail = (await w.guest('/api/public/v1/products/gap-printer')).status;
   const sitemap = await (await w.guest('/sitemap.xml')).text();
   return { listingAll, search, homeLatest, detail, quote, apiList, apiDetail, sitemap };
+}
+
+/**
+ * The clean start (DECISIONS row 222): a listed product is V2-published, and the fixture publishes price-first,
+ * which needs no cost (productCompleteness.ts, PRICING-V2 A1) — so a missing COST no longer holds a listed
+ * product, and the data file cannot write a dinar cost anyway. The hiding mechanics are proved here with a
+ * gap every product is asked: the packaged weight.
+ */
+function weightGap(w: World): void {
+  w.raw.exec("UPDATE products SET product_cost_iqd = 70000, package_weight_g = NULL WHERE id = 'p_gap'");
 }
 
 async function setSwitch(w: World, enabled: boolean, user = OWNER) {
@@ -148,10 +158,14 @@ test('ON: the incomplete product is gone from every customer surface — and eve
 
 test('a cart line already holding it drops out of the cart view while the switch is on, and comes back', async () => {
   const w = world();
+  weightGap(w);
   await recount(w);
   assert.equal((await post(w.shopper(), '/api/cart/items', { productId: 'p_gap', qty: 1 })).status, 200);
   const before = await json(await get(w.shopper(), '/api/cart'));
   assert.equal((before.items as unknown[]).length, 1);
+  // The first customer request published the fixture catalogue in dollars (a write the verdict notices):
+  // the owner recounts before the switch, as the switch itself asks.
+  await recount(w);
   await setSwitch(w, true);
   const during = await json(await get(w.shopper(), '/api/cart'));
   assert.equal((during.items as unknown[]).length, 0, 'held: read as a hidden product');
@@ -163,19 +177,20 @@ test('a cart line already holding it drops out of the cart view while the switch
 
 test('completing the product (the data file, a real write) shows it again at once; turning the switch off restores everything', async () => {
   const w = world();
+  weightGap(w);
   await recount(w);
   await setSwitch(w, true);
   assert.equal((await w.guest('/api/products/gap-printer')).status, 404);
 
-  // The owner's data file: the preview names what would still be missing, then the apply writes the cost.
+  // The owner's data file: the preview names what would still be missing, then the apply writes the weight.
   const file = await (await get(w.admin(), '/api/admin/template/data-export/p_gap')).text();
   const unchanged = await json(await post(w.admin(), '/api/admin/template/data-preview', { text: file, product_id: 'p_gap' }));
-  assert.deepEqual(unchanged.products[0].completeness.after.map((i: { code: string }) => i.code), ['COST'], 'still missing: the cost');
-  const edited = file.replace(/^product_cost_iqd=.*$/m, 'product_cost_iqd=65000');
+  assert.deepEqual(unchanged.products[0].completeness.after.map((i: { code: string }) => i.code), ['PACKAGE_WEIGHT'], 'still missing: the weight');
+  const edited = file.replace(/^package_weight_g=.*$/m, 'package_weight_g=1200');
   assert.notEqual(edited, file);
   const pv = await json(await post(w.admin(), '/api/admin/template/data-preview', { text: edited, product_id: 'p_gap' }));
   const card = pv.products[0];
-  assert.deepEqual(card.completeness.before.map((i: { code: string }) => i.code), ['COST']);
+  assert.deepEqual(card.completeness.before.map((i: { code: string }) => i.code), ['PACKAGE_WEIGHT']);
   assert.deepEqual(card.completeness.after, [], 'complete after the apply');
   const applied = await post(w.admin(), '/api/admin/template/data-apply', { text: edited, product_id: 'p_gap', token: card.token });
   assert.equal(applied.status, 200, await applied.clone().text());
@@ -186,7 +201,7 @@ test('completing the product (the data file, a real write) shows it again at onc
   assert.ok((await listingSlugs(w)).includes('gap-printer'));
 
   // Break it again, then switch off: shown whatever its state.
-  w.raw.exec("UPDATE products SET product_cost_iqd = NULL, updated_at = '2026-10-02T00:00:00.000Z' WHERE id = 'p_gap'");
+  w.raw.exec("UPDATE products SET package_weight_g = NULL, updated_at = '2026-10-02T00:00:00.000Z' WHERE id = 'p_gap'");
   await recount(w);
   assert.equal((await w.guest('/api/products/gap-printer')).status, 404);
   assert.equal((await setSwitch(w, false)).status, 200);
@@ -228,33 +243,37 @@ test('the flags: the owner reads the private field by name; any other admin read
   assert.equal(full.complete, true);
 });
 
-test('a database without 0184 lists exactly as before (the predicate falls back; no completeness route breaks a read)', async () => {
+test('a database without 0184 (and so without 0189) lists nothing and breaks no read; the completeness routes answer as before', async () => {
   const raw = dbThrough('0183');
   seedCatalog(raw);
   seedProduct(raw, { id: 'p_old', slug: 'old-printer' });
   const db = asD1(raw);
   const L = await listing(db);
   assert.equal(L.installed, false);
-  assert.equal(L.listed('p'), "p.status = 'active'");
-  assert.equal((await L.heldIds(['p_old'])).size, 0);
-  // The first screen's optimistic reads: the held clause refused for the missing table, run again without it.
+  // The clean start (spec addendum A.4.1): before 0189 no product is V2-published — the predicate lists
+  // nothing (fail closed), never a legacy price.
+  assert.equal(L.v2, false);
+  assert.equal(L.listed('p'), "p.status = 'active' AND 0");
+  assert.equal((await L.heldIds(['p_old'])).size, 1);
+  // The first screen's optimistic reads: refused for each missing table, run again without it — no read breaks.
   const optimistic = `SELECT slug FROM products p WHERE ${optimisticListed(db, 'p')}`;
   assert.match(optimistic, /product_completeness/);
-  assert.equal(withoutHeld(optimistic), "SELECT slug FROM products p WHERE p.status = 'active'");
+  assert.equal(withoutV2(withoutHeld(optimistic)), "SELECT slug FROM products p WHERE p.status = 'active' AND 0");
   const rows = await runListed(db, optimistic, (q) => db.prepare(q).all<{ slug: string }>());
-  assert.deepEqual(rows.results.map((r) => r.slug), ['old-printer']);
-  assert.equal(listedWithoutHeld(db), true, 'remembered for a minute: the next read builds today\'s SQL');
-  assert.equal(optimisticListed(db, 'p'), "p.status = 'active'");
+  assert.deepEqual(rows.results.map((r) => r.slug), []);
+  assert.equal(listedWithoutHeld(db), true, 'remembered for a minute: the next read builds the older SQL');
+  assert.equal(listedWithoutV2(db), true);
+  assert.equal(optimisticListed(db, 'p'), "p.status = 'active' AND 0");
   // A migrated database never prepares the retry.
-  const fresh = asD1(dbThrough('0184'));
+  const fresh = asD1(freshDb());
   const statements: string[] = [];
   await runListed(fresh, `SELECT id FROM products WHERE ${optimisticListed(fresh)}`, (q) => (statements.push(q), fresh.prepare(q).all()));
   assert.equal(statements.length, 1);
   assert.equal(listedWithoutHeld(fresh), false);
   const w = world({ raw: dbThrough('0183') });
   const s = await surfaces(w);
-  assert.ok(s.listingAll.includes('gap-printer'));
-  assert.equal(s.detail, 200);
+  assert.ok(!s.listingAll.includes('gap-printer') && !s.listingAll.includes('full-printer'));
+  assert.equal(s.detail, 404);
   const flags = await json(await get(w.admin(), '/api/admin/products-v2/p_gap/completeness'));
   assert.equal(flags.installed, false);
   // The owner's summary is a read: it answers as on 0184 (200), saying not installed; only the acts refuse.

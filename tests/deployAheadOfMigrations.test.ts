@@ -76,7 +76,8 @@ test('HOME SURVIVES a database that has not had migration 0085 applied', async (
   assert.equal(b.success, true);
   // The strips that had nothing to do with the missing column still answer.
   assert.equal(Array.isArray(b.latest), true);
-  assert.equal(b.latest.length, 1, 'the products are still there');
+  // The clean start (A.12.4 item 6): a database without 0189 knows no V2 price, so it lists nothing — fail closed.
+  assert.equal(b.latest.length, 0, 'a database without the V2 tables lists nothing, never a legacy price');
   assert.equal(Array.isArray(b.categories), true);
   assert.equal(Array.isArray(b.brands), true);
   assert.ok(b.settings, 'and so are the settings the page is laid out from');
@@ -121,7 +122,9 @@ test('a DIFFERENT missing column still fails loudly — the repair is not a blan
   // data — a PRO member's live discount rules, a price. Only `condition_doc`
   // is repaired here, and only because its declared DEFAULT makes the empty
   // answer exact.
-  const raw = dbThrough(BEFORE_CONDITION);
+  // Every migration (the clean start's V2 tables included): a database without 0189 lists nothing and
+  // reads no strip at all, so only a fully migrated one can prove the strip still fails loudly.
+  const raw = freshDb();
   /**
    * Rebuild products WITH condition_doc but WITHOUT a column another strip
    * names. The shelf is now readable; that other strip is not.
@@ -137,10 +140,9 @@ test('a DIFFERENT missing column still fails loudly — the repair is not a blan
   const cols = (raw.prepare('PRAGMA table_info(products)').all() as { name: string }[]).map((r) => r.name);
   assert.ok(cols.includes(MISSING), 'the column this test removes must exist first');
   const kept = cols.filter((c) => c !== MISSING);
-  raw.exec('PRAGMA foreign_keys = OFF;');
+  raw.exec('PRAGMA foreign_keys = OFF; PRAGMA legacy_alter_table = ON;');
   raw.exec(`CREATE TABLE products_x AS SELECT ${kept.join(', ')} FROM products;`);
   raw.exec('DROP TABLE products; ALTER TABLE products_x RENAME TO products;');
-  raw.exec("ALTER TABLE products ADD COLUMN condition_doc TEXT NOT NULL DEFAULT '{}';");
   assert.equal(hasColumn(raw, 'products', 'condition_doc'), true);
   assert.equal(hasColumn(raw, 'products', MISSING), false);
 
@@ -246,7 +248,8 @@ test('SAVING a graded product through the admin route actually stores the grade'
       slug: 'used-x2d',
       name_en: 'X2D Combo (open box)',
       name_ar: 'X2D كومبو (علبة مفتوحة)',
-      price_iqd: 1_200_000,
+      // No dinar price: the clean start (DECISIONS row 222) refuses legacy money on the product save;
+      // the product is born hidden and is priced in dollars in section ٣.
       condition,
     }),
   }, undefined, ctx);
@@ -288,7 +291,7 @@ test('and an ordinary product still stores the column\'s declared default, never
   const res = await a.request('/api/admin/products-v2', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-    body: JSON.stringify({ slug: 'plain-filament', name_en: 'PLA Basic', name_ar: 'PLA أساسي', price_iqd: 25_000 }),
+    body: JSON.stringify({ slug: 'plain-filament', name_en: 'PLA Basic', name_ar: 'PLA أساسي' }),
   }, undefined, ctx);
   const body = await json(res);
   assert.equal(res.status, 200, JSON.stringify(body));
@@ -324,15 +327,15 @@ test('AN ORDINARY PRODUCT SAVE still works on a database without condition_doc',
   const create = await a.request('/api/admin/products-v2', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
-    body: JSON.stringify({ slug: 'pla-basic', name_en: 'PLA Basic', name_ar: 'PLA أساسي', price_iqd: 25_000 }),
+    body: JSON.stringify({ slug: 'pla-basic', name_en: 'PLA Basic', name_ar: 'PLA أساسي' }), // born without a dinar price (the clean start, A.6)
   }, undefined, ctx);
   const body = await json(create);
   assert.equal(create.status, 200, `the owner must still be able to file a product: ${JSON.stringify(body)}`);
 
   const id = String((body.product as { id?: unknown } | undefined)?.id ?? body.id ?? '');
   assert.ok(id);
-  const stored = raw.prepare('SELECT price_iqd FROM products WHERE id = ?').get(id) as { price_iqd: number };
-  assert.equal(stored.price_iqd, 25_000, 'and the row is really there');
+  const stored = raw.prepare('SELECT price_iqd FROM products WHERE id = ?').get(id) as { price_iqd: number } | undefined;
+  assert.equal(stored?.price_iqd, 0, 'and the row is really there, born at 0 until its first V2 write');
 });
 
 // =========================================================================
@@ -419,7 +422,7 @@ test('A PRODUCT SAVE still works on a database without the search index', async 
   const create = await a.request('/api/admin/products-v2', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.9' },
-    body: JSON.stringify({ slug: 'x2d-combo', name_en: 'Bambu Lab X2D Combo', name_ar: 'بامبو لاب X2D كومبو', price_iqd: 2_400_000 }),
+    body: JSON.stringify({ slug: 'x2d-combo', name_en: 'Bambu Lab X2D Combo', name_ar: 'بامبو لاب X2D كومبو' }), // born without a dinar price (A.6)
   }, undefined, ctx);
   const body = await json(create);
   assert.equal(create.status, 200, `the save must survive a missing index: ${JSON.stringify(body)}`);
@@ -434,9 +437,11 @@ test('A PRODUCT SAVE still works on a database without the search index', async 
   const found = await pub.request('/api/products?search=Bambu', undefined, undefined, ctx);
   const fb = await json(found);
   assert.equal(found.status, 200, JSON.stringify(fb));
+  // The clean start (spec addendum A.6): before 0189 no product can be V2-published, so the listing fails
+  // closed — the search answers (no crash on the missing index), and lists nothing.
   assert.deepEqual(
     (fb.products as Array<{ id: string }>).map((p) => p.id),
-    [id],
-    'the LIKE fallback answers while the index does not exist'
+    [],
+    'the LIKE fallback answers while the index does not exist, and a database before 0189 lists nothing'
   );
 });

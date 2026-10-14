@@ -18,13 +18,14 @@ test('legacy USD cents and forecasts remain historical; investor account sees on
  const appSource=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');assert.ok(!appSource.includes("import('./pages/Invest')"));assert.ok(!appSource.includes("import('./pages/InvestAdmin')"));assert.equal((appSource.match(/path="\/invest" element={<ProtectedRoute><LegacyInvestmentRedirect \/>/g)||[]).length,2);
 });
 
-test('a reference selling price updates only the chosen option, records price history and rejects stale edits',async()=>{
+test('the clean start (spec addendum A.6): the reference selling price door is closed — 409 PRICING_V2_MANAGED (section 5) for the owner, the cost gate first for an assistant, nothing written',async()=>{
  const raw=freshDb();raw.exec(`INSERT INTO users(id,email,role,admin_scope) VALUES ('boss','boss@x.co','admin','full'),('helper','helper@x.co','admin','assistant');
  INSERT INTO products(id,name,slug,price_iqd,stock,inventory_mode,options) VALUES('p','Printer','price-option',100000,0,'OPTION','[{"id":"a","regular_price_iqd":120000},{"id":"b","regular_price_iqd":150000}]');
  INSERT INTO product_option_groups(id,product_id,name_en) VALUES('g','p','Model');
  INSERT INTO product_option_values(id,product_id,group_id,name_en,regular_price_iqd,stock) VALUES('a','p','g','Combo',120000,0),('b','p','g','Basic',150000,0);`);
- const db=asD1(raw),app=(helper=false)=>stubApp(db,{id:helper?'helper':'boss',email:helper?'helper@x.co':'boss@x.co',role:'admin',admin_scope:helper?'assistant':'full'},a=>a.route('/p',adminProductsRoutes));
- const body={scope:'option',scope_id:'a',expected_price_iqd:120000,price_iqd:130000};const response=await post(app(),'/p/p/selection-price',body);assert.equal(response.status,200,JSON.stringify(await json(response)));
- assert.equal(count(raw,"SELECT regular_price_iqd n FROM product_option_values WHERE id='a'"),130000);assert.equal(count(raw,"SELECT regular_price_iqd n FROM product_option_values WHERE id='b'"),150000);assert.equal(JSON.parse(String(row(raw,"SELECT options FROM products WHERE id='p'")!.options))[0].regular_price_iqd,130000);assert.equal(count(raw,'SELECT COUNT(*) n FROM price_history'),1);
- assert.equal((await post(app(),'/p/p/selection-price',{...body,price_iqd:140000})).status,409);assert.equal((await post(app(true),'/p/p/selection-price',body)).status,403);
+ const db=asD1(raw),app=(helper=false)=>stubApp(db,{id:helper?'helper':'boss',email:helper?'helper@x.co':'boss@x.co',role:'admin',admin_scope:helper?'assistant':'full'},a=>a.route('/p',adminProductsRoutes),{publishV2:false});
+ const body={scope:'option',scope_id:'a',expected_price_iqd:120000,price_iqd:130000};const response=await post(app(),'/p/p/selection-price',body);const answer=await json(response);
+ assert.equal(response.status,409,JSON.stringify(answer));assert.equal(answer.code,'PRICING_V2_MANAGED');assert.equal(answer.details.section,5);
+ assert.equal(count(raw,"SELECT regular_price_iqd n FROM product_option_values WHERE id='a'"),120000);assert.equal(JSON.parse(String(row(raw,"SELECT options FROM products WHERE id='p'")!.options))[0].regular_price_iqd,120000);assert.equal(count(raw,'SELECT COUNT(*) n FROM price_history'),0);
+ assert.equal((await post(app(true),'/p/p/selection-price',body)).status,403);
 });

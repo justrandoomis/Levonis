@@ -34,6 +34,7 @@ import { resolveCartLine, cartRoutes } from '../worker/routes/cart';
 import { routeOfChannel, skuPriceHistoryKey } from '@levonis/pricing/skuChannel';
 import type { V2Evaluation } from '../worker/lib/pricingEngine/v2/evaluate';
 import type { PricingContext } from '../worker/routes/cart';
+import { stageV1Engine } from './fixtures/v1Engine';
 
 type World = ReturnType<typeof pricingWorld>;
 
@@ -107,21 +108,16 @@ const imageOf = (w: World, ids: readonly string[]) =>
     ])
   );
 
-const seqOf = (w: World, pid: string) => row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', pid)?.s ?? 0;
 
-/** A V1 engine product through the owner's own V1 door (409 with the preview, then the save with its hash). */
+/** A V1 engine product as the cut-over found it (tests/fixtures/v1Engine.ts: the V1 doors are closed since the clean start). */
 async function adoptV1(w: World, pid: string) {
-  const draft = {
+  await stageV1Engine(w.db, pid, {
     inputs: [{ scope: 'base', supplier_cost_amount: '200', supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 }],
     rules: [
       { kind: 'target_profit', scope: 'product', amount_usd: '30' },
       { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 15_000 },
     ],
-  };
-  const first = await w.putInputs(pid, { inputs_seq: seqOf(w, pid), ...draft });
-  assert.equal(first.status, 409, JSON.stringify(first.body));
-  const saved = await w.putInputs(pid, { inputs_seq: seqOf(w, pid), ...draft, preview_hash: first.body.details.preview.preview_hash, confirm_large_change: true });
-  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  });
 }
 
 test('every shape made V2 is charged exactly its V2 prices: prepaid, COD = D, fees 0, P ≤ D, never less for an older Worker', async () => {

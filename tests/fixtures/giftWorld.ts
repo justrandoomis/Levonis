@@ -102,7 +102,8 @@ export const mountGifts: Mount = (a) => {
   a.route('/api/admin', adminRoutes);
 };
 
-export const appAs = (db: D1Database, user: StubUser | null = BUYER) => stubApp(db, user, mountGifts);
+// The clean start (A.12.1): a gift level names a sellable product, so the admin's door publishes the seeded rows too.
+export const appAs = (db: D1Database, user: StubUser | null = BUYER) => stubApp(db, user, mountGifts, { publishV2: 'always' });
 
 export interface Apps {
   db: D1Database;

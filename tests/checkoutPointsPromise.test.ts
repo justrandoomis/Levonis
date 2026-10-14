@@ -41,6 +41,7 @@ import { HttpError } from '../worker/lib/http';
 import { orderRoutes } from '../worker/routes/orders';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 function setup() {
   // A NEW DATABASE IS A NEW ARCHIVE. `ensurePolicyCorpus` memoises a COMPLETED
@@ -97,6 +98,7 @@ function appAs(db: D1Database, userId: string) {
     c.env = { DB: db } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.route('/api/orders', orderRoutes);
   a.onError((err, c) => {
     if (err instanceof HttpError) {

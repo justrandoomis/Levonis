@@ -329,10 +329,9 @@ test('the product form never shows, or saves, the blanks of a document read with
   assert.match(code, /\{canSeeCost && !costLoaded && <CostOpensAfterSave \/>\}/);
 });
 
-test('the quick price panel and print pricing: a read without cost is never saved as one, and the prompt shows there too', () => {
-  const quick = codeOf('src/components/adminProducts/QuickPricePanel.tsx');
-  assert.match(quick, /\.\.\.\(data\.can_view_cost \? \{\} : \{ cost_loaded: false \}\)/);
-  assert.match(quick, /\{!data\.can_view_cost && user\?\.owner_email_unverified === true && <OwnerCostVerifyCard compact \/>\}/);
+// The quick price panel is gone with the clean start (DECISIONS row 222, addendum A.6); the print pricing
+// screen and the server's cost-blind save keep the rule.
+test('print pricing: a read without cost is never saved as one, and the prompt shows there too', () => {
   const print = codeOf(SCREENS.printPricing);
   assert.match(print, /\{user\?\.owner_email_unverified === true && <OwnerCostVerifyCard compact \/>\}/);
   assert.match(print, /if \(only === 'cost'\) return \{ \.\.\.cur, pricing: next\.pricing, materials: next\.materials \};/);

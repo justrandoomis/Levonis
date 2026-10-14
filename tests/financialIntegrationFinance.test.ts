@@ -40,7 +40,7 @@ function world() {
     a.route('/expenses', adminFinanceRoutes); a.route('/ops', adminFinanceOperationsRoutes);
     a.route('/workspace', adminFinanceWorkspaceRoutes); a.route('/report', adminFinanceReportRoutes);
     a.route('/investment', adminInvestmentFinanceRoutes);
-  });
+  }, { publishV2: false }); // finance only: the catalogue product stays as the cut-over left it
   const postOk = async (path: string, body: Record<string, unknown>) => {
     const response = await post(app, path, body), data = await json(response);
     assert.equal(response.status, 200, `${path}: ${JSON.stringify(data)}`);

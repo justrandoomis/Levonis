@@ -108,7 +108,9 @@ test('price, sale, offer and member filters read the viewer-resolved card', asyn
   const open = await json(await get(app, `${FDM}&price=-750000`));
   assert.deepEqual(ids(open).sort(), [P.A1MINI, P.A1].sort());
   const member = await json(await get(app, `${FDM}&member=1`));
-  assert.equal(member.total, 10, 'every printer has a PRIME/PRO rung below the guest price');
+  // The clean start (DECISIONS row 222): the first V2 price clears every typed PRIME/PRO rung, and the
+  // live data has no benefit rule — so no printer has a member price below the guest's.
+  assert.equal(member.total, 0, 'no typed member rung survives the first V2 price');
   const offer = await json(await get(app, `${FDM}&offer=1`));
   assert.equal(offer.total, 0, 'no SALE price and no offer window in the live data');
   const pre = await json(await get(app, '/api/products?category=cat_makers&sale=preorder'));

@@ -40,6 +40,7 @@ import {
   seedForLine,
 } from '../worker/lib/mysteryDraw';
 import { planInventory, planReservationFence, type StockMove } from '../worker/lib/inventory';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 function seed(raw: DatabaseSync) {
   raw.exec(`
@@ -123,6 +124,7 @@ async function place(
 test('the seed is the offer SECRET and the server-written draw salt — nothing else', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
 
@@ -168,6 +170,7 @@ test('no value the client chooses is a seed input — the idempotency key least 
 test('the three priceLines passes and the quote all draw the same filament', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);
@@ -186,6 +189,7 @@ test('the three priceLines passes and the quote all draw the same filament', asy
 test('the QUOTE draws nothing and writes nothing', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
 
@@ -205,6 +209,7 @@ test('the QUOTE draws nothing and writes nothing', async () => {
 test('the allocation is written once and is identical on every re-read', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);
@@ -254,6 +259,7 @@ test('a mystery pick freezes the exact variant image instead of legacy selector 
       ('img_color','p_a','/files/products/p_a/gallery/color.webp','products/p_a/gallery/color.webp','image/webp',2,0,NULL,'clr_a',NULL),
       ('img_variant','p_a','/files/products/p_a/gallery/exact.webp','products/p_a/gallery/exact.webp','image/webp',3,0,NULL,NULL,'var_a');
   `);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
 
@@ -291,6 +297,7 @@ test('a base mystery pick freezes the product primary even when gallery order pu
       ('img_side','p_a','/files/products/p_a/gallery/side.webp','products/p_a/gallery/side.webp','image/webp',0,0),
       ('img_primary','p_a','/files/products/p_a/gallery/primary.webp','products/p_a/gallery/primary.webp','image/webp',5,1);
   `);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
 
@@ -320,6 +327,7 @@ test('a base mystery pick freezes the product primary even when gallery order pu
 test('a replay that re-enters the write path collides on the primary key and aborts the whole batch', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);
@@ -339,6 +347,7 @@ test('a replay that re-enters the write path collides on the primary key and abo
 test('a second checkout under the same idempotency key cannot commit a second order', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);
@@ -352,6 +361,7 @@ test('a second checkout under the same idempotency key cannot commit a second or
 test('twenty concurrent attempts on one cart line produce exactly one allocation', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);
@@ -376,6 +386,7 @@ test('twenty concurrent attempts on one cart line produce exactly one allocation
 test('any past draw is reproducible years later from its seed and its candidate snapshot', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);
@@ -412,6 +423,7 @@ test('any past draw is reproducible years later from its seed and its candidate 
 test('a cancelled order keeps its allocation for audit while its reservation is released', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   await db.batch([ensureOfferSecretStatement(db, 'p_offer')]);
   const salt = String(row<{ draw_salt: string }>(raw, 'SELECT draw_salt FROM cart_items WHERE id = ?', 'ci_1')!.draw_salt);

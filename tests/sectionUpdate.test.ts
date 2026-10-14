@@ -10,6 +10,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, get, row } from './fixtures/app';
 import { templateRoutes } from '../worker/routes/template';
 import {
@@ -22,10 +23,12 @@ import {
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
+const rawOf = new WeakMap<object, DatabaseSync>();
 function setup() {
   const raw = freshDb();
   const db = asD1(raw);
   const app = stubApp(db, OWNER, (a) => a.route('/api/admin/template', templateRoutes));
+  rawOf.set(app, raw);
   return { raw, db, app };
 }
 
@@ -44,10 +47,17 @@ content_blocks.1.body_ar=نص تعريفي
 
 type App = ReturnType<typeof setup>['app'];
 
+/**
+ * The product as the cut-over found it: created through the template (born without a dinar price
+ * since the clean start, spec addendum A.6 — the planner pins legacy money), then given the stored
+ * 25,000 an older release had written (a fixture write).
+ */
 async function create(app: App): Promise<string> {
   const res = await post(app, '/api/admin/template/apply', { text: PRODUCT, mode: 'draft', confirm: true });
   const body = (await res.json()) as { product_id?: string };
   assert.equal(res.status, 200, JSON.stringify(body));
+  const raw = rawOf.get(app)!;
+  raw.prepare('UPDATE products SET price_iqd = 25000 WHERE id = ?').run(body.product_id!);
   return body.product_id!;
 }
 

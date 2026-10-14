@@ -35,6 +35,7 @@ import worker from '../worker/index';
 import { sha256Hex } from '../worker/lib/crypto';
 import { ALL_ROUTES } from '../worker/lib/publicApi/meta';
 import type { PublicRoute } from '../worker/lib/publicApi/types';
+import { fetchPublished } from './fixtures/autoPublish';
 
 const ORIGIN = `https://${APEX}`;
 const IP = '203.0.113.7';
@@ -245,7 +246,7 @@ async function world(opts: { communityOpen?: boolean } = {}) {
   };
   const call = (path: string, init: { method?: string; headers?: Record<string, string>; host?: string } = {}) => {
     const host = init.host ?? APEX;
-    return worker.fetch(
+    return fetchPublished(worker, 
       new Request(`https://${host}${path}`, {
         method: init.method ?? 'GET',
         headers: { Host: host, 'CF-Connecting-IP': IP, ...(init.headers ?? {}) },
@@ -453,6 +454,8 @@ test('an admin session cookie changes nothing, and no session is even read', asy
 
 test('every write method is refused with 405 and changes nothing', async () => {
   const { call, raw, first } = await world();
+  // The clean start: the first read publishes the fixture catalogue in dollars (a test fixture, A.12.1); after it, nothing moves.
+  await call('/api/public/v1/products?limit=1');
   const before = JSON.stringify(raw.prepare('SELECT COUNT(*) AS n, SUM(price_iqd) AS s FROM products').get());
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
     for (const path of ['/api/public/v1/products', `/api/public/v1/products/${first.slug}`, '/api/public/v1/anything']) {

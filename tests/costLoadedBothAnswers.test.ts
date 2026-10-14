@@ -146,42 +146,15 @@ test('product form: a verification between the two answers leaves the form "read
   assertKept(before, stored(raw));
 });
 
-test('…and the old first-answer rule would have written the blanks as NULL (the defect this closes)', async () => {
+test('…and the old first-answer rule\'s blanks (the defect this closed) are now refused by name — the clean start, spec addendum A.6: every row cost stays', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE product_option_values SET stock = 2 WHERE id = 'v_a1'");
   const before = stored(raw);
   assert.notEqual(before.option?.cost_iqd ?? null, null, 'the fixture has an option cost to lose');
   const { a, cookie, body } = await mixedRead(raw);
   const save = await call(a, cookie, 'POST', '/api/admin/products-v2', body);
-  assert.equal(save.status, 200, save.text.slice(0, 400));
-  assert.throws(() => assertKept(before, stored(raw)), 'a stored row cost was blanked');
-});
-
-test('quick price panel: grid after the stamp, relations before — the AND sends cost_loaded:false and every cell and route cost stays', async () => {
-  const raw = seededCopyUnverifiedOwner();
-  const a = app(raw);
-  const cookie = await sessionFor(raw, 'usr_owner');
-  const before = stored(raw);
-  const rel = await call(a, cookie, 'GET', '/api/admin/products/p_a1/relations');
-  raw.exec(VERIFY);
-  const grid = await call(a, cookie, 'GET', '/api/admin/products/p_a1/price-grid');
-  // The panel's rule (QuickPricePanel `load`): the AND of the two answers.
-  const canViewCost = grid.json.can_view_cost === true && rel.json.can_view_cost === true;
-  assert.equal(grid.json.can_view_cost, true);
-  assert.equal(rel.json.can_view_cost, false);
-  assert.equal(canViewCost, false);
-  const fulfillments = ((rel.json.fulfillments as Array<Record<string, unknown>>) ?? []).map((f) => ({
-    option_id: f.option_id, fulfillment_type: f.fulfillment_type, enabled: true, sort: f.sort ?? 0,
-    cost_iqd: f.cost_iqd ?? null, cost_adjust_iqd: f.cost_adjust_iqd ?? null,
-    transports: ((f.transports as Array<Record<string, unknown>>) ?? []).map((t) => ({ method: t.method, enabled: true, sort: 0, surcharge_iqd: t.surcharge_iqd, cost_iqd: t.cost_iqd ?? null, cost_adjust_iqd: t.cost_adjust_iqd ?? null })),
-  }));
-  const put = await call(a, cookie, 'PUT', '/api/admin/products/p_a1/fulfillment', {
-    fulfillments,
-    direct_stock: [{ scope: 'option', id: 'v_a1', stock: 2, low_stock_threshold: null }],
-    inventory_mode: 'OPTION',
-    ...(canViewCost ? {} : { cost_loaded: false }),
-  });
-  assert.equal(put.status, 200, put.text.slice(0, 300));
+  assert.equal(save.status, 409, save.text.slice(0, 400));
+  assert.match(save.text, /PRICING_V2_MANAGED/);
   assertKept(before, stored(raw));
 });
 
@@ -212,12 +185,4 @@ test('ProductForm: the re-read after verifying is a background read that never s
   // Every new baseline bumps the generation: a load or swap, and a save.
   assert.match(apply, /baselineGeneration\.current \+= 1;/);
   assert.match(code, /baselineGeneration\.current \+= 1;\s*setBaseline\(JSON\.stringify\(\{ d: freshDoc, rs: savedRel \}\)\);/);
-});
-
-test('QuickPricePanel: can_view_cost is the AND of the grid and the relations answers, and the read-back keeps it', () => {
-  const code = codeOf('src/components/adminProducts/QuickPricePanel.tsx');
-  assert.match(code, /setData\(\{ \.\.\.res, can_view_cost: res\.can_view_cost === true && relResponse\.can_view_cost === true \}\);/);
-  assert.match(code, /can_view_cost: d\.can_view_cost && freshRead\.can_view_cost === true/);
-  assert.match(code, /\.\.\.\(data\.can_view_cost \? \{\} : \{ cost_loaded: false \}\)/);
-  assert.doesNotMatch(code, /setData\(res\);/);
 });

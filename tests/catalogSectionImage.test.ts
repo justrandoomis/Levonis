@@ -39,6 +39,7 @@ import {
   mintCatalogImageObject,
 } from '../worker/lib/siteMedia';
 import { isAnonymousPublicMediaKey, isSafeMediaKey } from '../worker/lib/mediaStorage';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 type Raw = ReturnType<typeof freshDb>;
 
@@ -307,6 +308,7 @@ test('the tree still answers on a database that has not had migration 0100 appli
   // The exact shape of the deploy window: the code is live, the column is not.
   raw.exec('ALTER TABLE catalogs DROP COLUMN image_key');
 
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const rows = await catalogTreeWithCounts(db as never);
   assert.ok(rows.length >= 2, 'the departments must still be there');

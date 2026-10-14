@@ -40,6 +40,7 @@ import {
 } from '../src/components/adminProducts/form/model';
 import { applyFailure, applyOutcome, summarizeApply, verificationLine } from '../src/components/adminProducts/applyResult';
 import { productMediaFixtureEnv } from './fixtures/productMedia';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const ASSISTANT = { id: 'usr_assist', role: 'admin' as const, email: 'helper@x.co', admin_scope: 'assistant' };
@@ -297,7 +298,9 @@ test('TEST A: a TXT create fills EVERY section the file wrote, read back through
   assert.equal(base.sku_part, 'A1');
   assert.equal(base.active, true);
   const combo = allValues(rel).find((v) => v.id === 'opt_combo')!;
-  assert.equal(combo.regular_adjust_iqd, 150000, 'a +N option price must reach the form as an adjustment');
+  // The clean start (DECISIONS row 222, A.6): a file writes no dinar price — the planner pins every legacy
+  // money cell (a new product's are empty) and names what it kept; prices are the V2 writer's.
+  assert.equal(combo.regular_adjust_iqd, null, 'a +N option price in a file is pinned, never written');
   assert.equal(combo.stock, 3);
   assert.equal(allValues(rel).find((v) => v.id === 'opt_n06')!.active, false);
 
@@ -307,7 +310,7 @@ test('TEST A: a TXT create fills EVERY section the file wrote, read back through
   assert.equal(rel.colors[0].name_ckb, 'ڕەش');
   assert.equal(rel.colors[0].hex, '#000000');
   assert.equal(rel.colors[0].sku_part, 'BLK');
-  assert.equal(rel.colors[0].regular_adjust_iqd, 5000);
+  assert.equal(rel.colors[0].regular_adjust_iqd, null, 'a colour price in a file is pinned too');
   assert.deepEqual([...rel.colors[0].option_value_ids].sort(), ['opt_base', 'opt_combo']);
 
   assert.deepEqual(rel.images.map((i) => i.id), ['img_front', 'img_combo', 'img_black']);
@@ -345,16 +348,18 @@ test('TEST A: a TXT create fills EVERY section the file wrote, read back through
   assert.deepEqual(doc.catalog_ids, ['cat_printers', 'cat_printers_fdm']);
   assert.equal(doc.stock, 9);
   assert.equal(doc.low_stock_threshold, 2);
-  assert.equal(doc.original_price_iqd, 650000);
-  assert.equal(doc.pro_price_iqd, 450000);
-  assert.equal(doc.prime_price_iqd, 480000);
+  // The file's ladder is legacy money: pinned (a new product has none).
+  assert.equal(doc.original_price_iqd, null);
+  assert.equal(doc.pro_price_iqd, null);
+  assert.equal(doc.prime_price_iqd, null);
   assert.deepEqual(doc.hashtags, ['bambu', 'parity']);
   assert.deepEqual(doc.payment_options, ['cod', 'card', 'wallet']);
   assert.deepEqual([...doc.sale_types].sort(), ['direct_sale', 'pre_order'], 'selling_type=mixed must reach the form as both sale types');
-  assert.equal(doc.direct_surcharge_iqd, 15000);
+  // Fees are legacy money too (addendum A.6): a new product is born with none — the routes stay, at commission 0.
+  assert.equal(doc.direct_surcharge_iqd, null);
   assert.deepEqual(
     doc.preorder_transports.filter((t) => t.active).map((t) => [t.method, t.commission_iqd]),
-    [['air', 25000], ['sea', 9000]]
+    [['air', 0], ['sea', 0]]
   );
   assert.deepEqual(doc.spec_fields, { technology: 'FDM', model: 'A1', build_volume: '256 x 256 x 256' });
   assert.equal(doc.spec_groups.length, 1);
@@ -462,7 +467,6 @@ test('TEST B: a TXT update gives a legacy product with NO relations its first op
     await post(app, '/api/admin/products-v2', {
       name_en: 'Legacy',
       name_ar: 'قديم',
-      price_iqd: 200000,
       status: 'draft',
       sku: 'LEGACY-1',
       hashtags: ['legacy'],
@@ -488,7 +492,8 @@ test('TEST B: a TXT update gives a legacy product with NO relations its first op
     ['opt_s', 'Small', 'صغير', 6],
     ['opt_l', 'Large', 'كبير', 2],
   ]);
-  assert.equal(rel.groups[0].values[1].regular_adjust_iqd, 40000);
+  // The file's option money is legacy (addendum A.6): a new option is born with none.
+  assert.equal(rel.groups[0].values[1].regular_adjust_iqd ?? null, null);
   assert.deepEqual(rel.colors.map((c) => [c.id, c.name_en, c.hex, c.option_value_ids]), [['col_red', 'Red', '#ff0000', ['opt_s']]]);
   assert.deepEqual(rel.images.map((i) => [i.id, i.is_primary]), [['img_legacy', true], ['img_legacy2', false]]);
   // Stock is stated on the options, so the tracked level follows them.
@@ -562,13 +567,14 @@ test('TEST C: create from TXT → export → parse → apply as update loses and
   assert.deepEqual(after.wireRel, before.wireRel);
 
   // Every transport the file declared survived with its own numbers, and the
-  // entries the export added are inactive with no commission — semantically
-  // the same as being absent, never a silent change to a live offer.
+  // entries the export added are inactive with no commission (0: a route with
+  // no stored twin is born with no fee, addendum A.6) — semantically the same
+  // as being absent, never a silent change to a live offer.
   const byMethod = (o: Wire) => new Map((o.preorder_transports as Wire[]).map((t) => [t.method as string, t]));
   const [was, now] = [byMethod(before.wireDoc), byMethod(after.wireDoc)];
   for (const [method, t] of was) assert.deepEqual(now.get(method), t, `transport "${method}" changed on the round trip`);
   for (const [method, t] of now) {
-    if (!was.has(method)) assert.deepEqual(t, { method, commission_iqd: null, active: false });
+    if (!was.has(method)) assert.deepEqual(t, { method, commission_iqd: 0, active: false });
   }
 
   // A second round trip is a FIXED POINT: identical text in, identical
@@ -840,7 +846,7 @@ test('semantics: __NULL__ on a field that cannot be null is refused, and nothing
 });
 
 test('semantics: an assistant admin cannot write cost from a file — on create or update, row, rows or mirror', async () => {
-  const { raw, app, assistant } = setup();
+  const { raw, assistant } = setup();
   const withCost = A_TXT.replace('price_iqd=500000', 'price_iqd=500000\nproduct_cost_iqd=333000')
     .replace('options.1.sku_part=A1', 'options.1.sku_part=A1\noptions.1.cost_iqd=111000')
     .replace('colors.1.sku_part=BLK', 'colors.1.sku_part=BLK\ncolors.1.cost_iqd=222000');
@@ -865,9 +871,9 @@ test('semantics: an assistant admin cannot write cost from a file — on create 
   // The assistant's own response carries no cost number at all.
   assert.ok(!JSON.stringify(body).includes('333000'));
 
-  // The owner then sets a real cost, and a later assistant update keeps it.
-  const owned = await apply(app, `template_version=2\nproduct_id=${id}\nproduct_cost_iqd=300000\n`, 'update');
-  assert.equal(owned.status, 200, JSON.stringify(owned.body));
+  // A stored cost (since the clean start no file writes a legacy cost — the owner's included — so it is
+  // seeded the way an older save left it), and a later assistant update keeps it.
+  raw.prepare('UPDATE products SET product_cost_iqd = 300000 WHERE id = ?').run(id);
   const second = await apply(assistant, `template_version=2\nproduct_id=${id}\nproduct_cost_iqd=1\nstock=5\n`, 'update');
   assert.equal(second.status, 200, JSON.stringify(second.body));
   assert.equal(
@@ -918,7 +924,7 @@ options.1.stock=0
 // =========================================================================
 
 test('root cause 4 (client): the document, the relation rows and the storefront all describe the same product', async () => {
-  const { app } = setup();
+  const { app, raw } = setup();
   const { body } = await apply(app, A_TXT);
   const id = body.product_id as string;
   const { doc, rel, wireDoc } = await formState(app, id);
@@ -948,6 +954,8 @@ test('root cause 4 (client): the document, the relation rows and the storefront 
     headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
     body: JSON.stringify({ status: 'active' }),
   });
+  // The clean start (A.4): the customer sees the product once its dollar price is published.
+  await publishV2(raw, id, { usd: usdReproducing(725_000, FIXTURE_U) });
   const pub = await json(await get(app, `/api/products/${doc.slug}`));
   assert.equal(pub.success, true, JSON.stringify(pub));
   assert.equal(pub.relations.option_groups.length, rel.groups.length);
@@ -1013,7 +1021,7 @@ test('root cause 15: the form save and the TXT apply leave the SAME shape behind
 
   // Product two: the same structure written by the form's own two requests.
   const created = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'By Form', name_ar: 'بالنموذج', price_iqd: 500000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'By Form', name_ar: 'بالنموذج', status: 'draft' })
   );
   const formId = created.product.id as string;
   // Row ids belong to one product each (the writer refuses a borrowed id), so

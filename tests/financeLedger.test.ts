@@ -31,6 +31,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { q7Test } from './fixtures/q7';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, stubApp, post, patch, get, send, json, all, row, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
@@ -81,9 +82,10 @@ const itemCosts = (raw: DatabaseSync, orderId: string) =>
 
 // ═══════════════════════════════════════════ 1 & 2 — the snapshot, and the leak
 
-test('the unit cost at the moment of sale is written onto the order item, and does not move afterwards', async () => {
+// The clean start (DECISIONS row 222, addendum A.9): a new line never takes the legacy product cost. Its
+// cost is FIFO when stock is allocated, else the frozen V2 estimate, else unknown — never `product_cost_iqd`.
+test('the clean start: a new line takes no legacy cost — NULL and `unpriced`, and the product row moving later changes nothing', async () => {
   const raw = seedCatalogue();
-  // 25,000 sells for a cost of 9,000 today. Tomorrow the supplier price moves.
   raw.exec("UPDATE products SET product_cost_iqd = 9000 WHERE id = 'p_pla'");
   const db = asD1(raw);
 
@@ -95,15 +97,12 @@ test('the unit cost at the moment of sale is written onto the order item, and do
 
   const before = itemCosts(raw, orderId);
   assert.equal(before.length, 1);
-  assert.equal(before[0].cost_iqd, 9000, 'the resolved cost must be frozen onto the row');
-  assert.equal(before[0].cost_basis, COST_BASIS.snapshot);
+  assert.equal(before[0].cost_iqd, null, 'the legacy product cost is never frozen onto a new line');
+  assert.equal(before[0].cost_basis, COST_BASIS.unpriced);
 
-  // THE CATALOGUE MOVES UNDER THE SOLD ORDER — the exact event that used to
-  // rewrite last month's profit.
-  raw.exec("UPDATE products SET product_cost_iqd = 27000, price_iqd = 90000 WHERE id = 'p_pla'");
-  const after = itemCosts(raw, orderId);
-  assert.equal(after[0].cost_iqd, 9000, 'a supplier price edited today must not rewrite a sale already made');
-  assert.equal(after[0].cost_basis, COST_BASIS.snapshot);
+  // The legacy cost moving afterwards reaches no sold line either.
+  raw.exec("UPDATE products SET product_cost_iqd = 27000 WHERE id = 'p_pla'");
+  assert.deepEqual(itemCosts(raw, orderId), before);
 });
 
 test('the stored cost never reaches the customer — not in the order payload, not in the snapshot', async () => {
@@ -117,8 +116,8 @@ test('the stored cost never reaches the customer — not in the order payload, n
   assert.equal(placed.success, true, JSON.stringify(placed));
   const orderId = placed.order.id as string;
 
-  // It IS on the row…
-  assert.equal(itemCosts(raw, orderId)[0].cost_iqd, 7431);
+  // Since the clean start it is not even on the row (A.9)…
+  assert.equal(itemCosts(raw, orderId)[0].cost_iqd, null);
 
   // …and it is in NONE of the three customer surfaces: the checkout response,
   // the order detail, and the order list.
@@ -198,7 +197,7 @@ test('costSnapshot refuses a cost that is not whole dinars rather than storing o
 
 // ═════════════════════════════════════════ a bundle: goods on the components
 
-test('a bundle records its cost on the COMPONENT rows and zero on the parent, so nothing is counted twice', async () => {
+q7Test('a bundle records its cost on the COMPONENT rows and zero on the parent, so nothing is counted twice', async () => {
   const raw = seedCatalogue();
   raw.exec(`
     UPDATE products SET product_cost_iqd = 200000 WHERE id = 'p_printer';
@@ -497,9 +496,11 @@ test('the cost projection track B embeds runs, and tells a fact from an estimate
   assert.equal(byId.get('oi_old_priced')!.unit_cost_iqd, 9000, "an estimate is the product's cost TODAY");
   assert.equal(byId.get('oi_old_free')!.cost_confidence, 'unknown');
   assert.equal(byId.get('oi_old_free')!.unit_cost_iqd, null);
+  // A sale since the clean start (spec addendum A.9) snapshots no legacy product cost: it is `unpriced`
+  // until FIFO or its frozen V2 estimate says (a price-first product has none) — never the catalogue's cell.
   const sold = rows.find((r) => r.id !== 'oi_old_priced' && r.id !== 'oi_old_free')!;
-  assert.equal(sold.cost_confidence, 'recorded');
-  assert.equal(sold.unit_cost_iqd, 9000);
+  assert.equal(sold.cost_confidence, 'unknown');
+  assert.equal(sold.unit_cost_iqd, null);
 
   // THE POINT OF THE WHOLE TRACK: move the catalogue, and only the ESTIMATE
   // moves. The recorded sale does not.
@@ -513,7 +514,7 @@ test('the cost projection track B embeds runs, and tells a fact from an estimate
   );
   const afterById = new Map(after.map((r) => [r.id, r]));
   assert.equal(afterById.get('oi_old_priced')!.unit_cost_iqd, 21000, 'an estimate follows the catalogue');
-  assert.equal(afterById.get(sold.id)!.unit_cost_iqd, 9000, 'a recorded sale never does');
+  assert.equal(afterById.get(sold.id)!.unit_cost_iqd, null, 'a post-cut-over sale never takes it');
 
   // THE TS TWIN IS CHECKED AGAINST THE SQL THAT RAN, ROW BY ROW.
   //
@@ -582,7 +583,7 @@ test('a Worker deployed AHEAD of migration 0095 refuses checkout honestly instea
 
 // ══════════════════════════════════════ the gap 0096 CLOSED
 
-test('a mystery spool freezes the drawn filament\u2019s cost at the draw, and still hides the pick', async () => {
+q7Test('a mystery spool freezes the drawn filament\u2019s cost at the draw, and still hides the pick', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
   // Every pool member has a real cost, and migration 0096 now freezes it onto

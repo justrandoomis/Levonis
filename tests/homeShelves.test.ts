@@ -28,6 +28,7 @@ import {
   SHUFFLE_BUCKET_MS,
 } from '../worker/lib/homeShelves';
 import { SOLD_STATES, SOLD_STATES_SQL } from '../worker/lib/soldStates';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 type Raw = ReturnType<typeof freshDb>;
 
@@ -69,6 +70,7 @@ test('best sellers ranks by units actually sold, most first', async () => {
   product(raw, 'p_many');
   sale(raw, 'o1', 'delivered', 'p_few', 1);
   sale(raw, 'o2', 'confirmed', 'p_many', 5);
+  await publishSeededV2(raw);
   assert.deepEqual(await bestSellerIds(asD1(raw)), ['p_many', 'p_few']);
 });
 
@@ -85,6 +87,7 @@ test('an order whose stock has NOT moved does not make a best seller', async () 
   product(raw, 'p1');
   sale(raw, 'o1', 'pending', 'p1', 9);
   sale(raw, 'o2', 'cancelled', 'p1', 9);
+  await publishSeededV2(raw);
   assert.deepEqual(await bestSellerIds(asD1(raw)), []);
 });
 
@@ -102,6 +105,7 @@ test('best sellers can be scoped to a department, descendants included', async (
   product(raw, 'p_filament', { category_id: 'cat_materials', sub_category_id: 'cat_materials_fdm' });
   sale(raw, 'o1', 'delivered', 'p_printer', 2);
   sale(raw, 'o2', 'delivered', 'p_filament', 9);
+  await publishSeededV2(raw);
   assert.deepEqual(
     await bestSellerIds(asD1(raw), { catalogId: 'cat_printers' }),
     ['p_printer'],
@@ -116,6 +120,7 @@ test('a bundle row is not ranked beside ordinary products', async () => {
   product(raw, 'b1', { composition: 'bundle' });
   sale(raw, 'o1', 'delivered', 'b1', 50);
   sale(raw, 'o2', 'delivered', 'p1', 1);
+  await publishSeededV2(raw);
   assert.deepEqual(await bestSellerIds(asD1(raw)), ['p1']);
 });
 
@@ -149,6 +154,7 @@ test('flash deals are live, priced windows — ending soonest first', async () =
   product(raw, 'p_soon');
   offerWindow(raw, 'ofw_late', 'p_late', { ends_at: '2026-06-09T00:00:00.000Z' });
   offerWindow(raw, 'ofw_soon', 'p_soon', { ends_at: '2026-06-02T00:00:00.000Z' });
+  await publishSeededV2(raw);
   assert.deepEqual(await flashDealIds(asD1(raw), NOW), ['p_soon', 'p_late']);
 });
 
@@ -158,6 +164,7 @@ test('a window that changes no price is a schedule, not a deal', async () => {
   const raw = freshDb();
   product(raw, 'p1');
   offerWindow(raw, 'ofw_1', 'p1', { offer_price_mode: '', discount_percent: null });
+  await publishSeededV2(raw);
   assert.deepEqual(await flashDealIds(asD1(raw), NOW), []);
 });
 
@@ -169,6 +176,7 @@ test('an expired, a not-yet-started and an inactive window are all absent', asyn
   offerWindow(raw, 'ofw_over', 'p_over', { ends_at: '2026-05-01T00:00:00.000Z' });
   offerWindow(raw, 'ofw_future', 'p_future', { starts_at: '2026-07-01T00:00:00.000Z' });
   offerWindow(raw, 'ofw_off', 'p_off', { active: 0 });
+  await publishSeededV2(raw);
   assert.deepEqual(await flashDealIds(asD1(raw), NOW), []);
 });
 
@@ -182,6 +190,7 @@ test('a MEMBERS-ONLY deal is still selected — eligibility is not an SQL filter
   const raw = freshDb();
   product(raw, 'p1');
   offerWindow(raw, 'ofw_1', 'p1', { required_tiers: '["plus"]' });
+  await publishSeededV2(raw);
   assert.deepEqual(await flashDealIds(asD1(raw), NOW), ['p1']);
 });
 
@@ -194,6 +203,7 @@ test('the filament pool is the materials branch and everything under it', async 
   product(raw, 'p_pla', { category_id: 'cat_materials', sub_category_id: 'cat_materials_fdm' });
   product(raw, 'p_resin', { category_id: 'cat_materials', sub_category_id: 'cat_materials_resin' });
   product(raw, 'p_printer', { category_id: 'cat_printers', sub_category_id: 'cat_printers_fdm' });
+  await publishSeededV2(raw);
   const pool = await filamentCandidateIds(asD1(raw), 'cat_materials');
   assert.deepEqual(pool.sort(), ['p_pla', 'p_resin'], 'a printer is not a filament');
 });
@@ -222,6 +232,7 @@ test('super deals is the owner’s own featured flag', async () => {
   const raw = freshDb();
   product(raw, 'p_plain');
   product(raw, 'p_push', { is_featured: 1 });
+  await publishSeededV2(raw);
   assert.deepEqual(await featuredIds(asD1(raw)), ['p_push']);
 });
 
@@ -231,6 +242,7 @@ test('super deals is the owner’s own featured flag', async () => {
 
 test('/api/home/sections answers every shelf, and an empty shop is not an error', async () => {
   const raw = freshDb();
+  await publishSeededV2(raw);
   const a = stubApp(asD1(raw) as never, null, (x) => x.route('/api/home', homeRoutes), {
     host: APEX,
     env: { DB: asD1(raw), INITIAL_ADMIN_EMAIL: 'b@x.co', EXTRA_ALLOWED_ORIGINS: '' },
@@ -253,6 +265,7 @@ test('the endpoint keeps each shelf’s own ranking — IN (...) does not', asyn
   product(raw, 'p_b');
   sale(raw, 'o1', 'delivered', 'p_b', 10);
   sale(raw, 'o2', 'delivered', 'p_a', 1);
+  await publishSeededV2(raw);
   const a = stubApp(asD1(raw) as never, null, (x) => x.route('/api/home', homeRoutes), {
     host: APEX,
     env: { DB: asD1(raw), INITIAL_ADMIN_EMAIL: 'b@x.co', EXTRA_ALLOWED_ORIGINS: '' },

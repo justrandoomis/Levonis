@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { freshDb, asD1 } from './fixtures/app';
+import { publishSeededV2 } from './fixtures/autoPublish';
 import { ROOT } from './fixtures/d1';
 import { previewStoreRef, resolveProductPreview } from '../worker/lib/socialPreview';
 
@@ -39,7 +40,9 @@ function seed() {
 const STORE = 'https://ali3d.levonis-iq.com';
 
 test('B15: on a store\'s host only THAT store\'s published product is a card', async () => {
-  const db = asD1(seed());
+  const seeded = seed();
+  await publishSeededV2(seeded); // the clean start (A.12.1): the catalogue product is V2-published
+  const db = asD1(seeded);
   const own = await resolveProductPreview(db, 'ali3d-bracket', STORE, { storeSlug: 'ali3d' });
   assert.equal(own?.title, 'حامل رف');
   assert.equal(own?.image, `${STORE}/files/merchants/owner/public/aaaa1111.webp`, 'the picture is addressed on the store\'s own host');
@@ -59,7 +62,9 @@ test('B15: /community/store/<ref>/p/<slug> is scoped like its page — by slug, 
   assert.equal(previewStoreRef('/p/ali3d-bracket'), null);
   assert.equal(previewStoreRef('/community/store/%E0%A4/p/x'), null, 'malformed percent-encoding is no scope, not a crash');
 
-  const db = asD1(seed());
+  const seeded = seed();
+  await publishSeededV2(seeded); // the clean start (A.12.1): the catalogue product is V2-published
+  const db = asD1(seeded);
   for (const ref of ['ali3d', 's1', 'm1']) {
     assert.equal((await resolveProductPreview(db, 'ali3d-bracket', 'https://levonis-iq.com', { storeRef: ref }))?.title, 'حامل رف', ref);
   }

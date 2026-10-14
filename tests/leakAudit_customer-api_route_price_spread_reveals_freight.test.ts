@@ -65,6 +65,7 @@ import { pricingWorld } from './fixtures/procurementPricing';
 import { legacyProductId } from './fixtures/legacyCatalogue';
 import { leaks } from './fixtures/costlyProduct';
 import worker from '../worker/index';
+import { fetchPublished } from './fixtures/autoPublish';
 
 type World = ReturnType<typeof pricingWorld>;
 type Route = 'air' | 'sea' | 'land';
@@ -165,7 +166,7 @@ function anonymousFetch(w: World) {
     ASSETS: { fetch: async () => new Response('spa') },
   };
   return async (path: string, body?: unknown) => {
-    const res = await worker.fetch(
+    const res = await fetchPublished(worker, 
       new Request(`https://${APEX}${path}`, {
         method: body === undefined ? 'GET' : 'POST',
         headers: { Host: APEX, 'CF-Connecting-IP': '203.0.113.9', ...(body === undefined ? {} : { 'content-type': 'application/json', Origin: `https://${APEX}` }) },
@@ -315,8 +316,14 @@ function freightFindings(w: World, surface: string, answers: ReadonlyArray<{ pat
  */
 const OWNER_RULING =
   'OWNER RULING NEEDED (DECISIONS row 220): every pre-order route is priced on the same supplier cost, extra cost and profit, so the spread of two published route prices IS the private freight difference — no change short of a different price (or one shared price for all routes, or hiding a route) closes it, and prices are the owner\'s to change';
+/**
+ * The clean start (DECISIONS row 222, addendum A.6) closed the V1 engine doors this world adopts its products
+ * through (PUT …/pricing/products/:id/inputs answers PRICING_V2_MANAGED). The route-spread audit has to move to a
+ * V2 cost-first product (R_route per channel) before its precondition runs again.
+ */
+const CLEAN_START_V1 = 'the V1 engine adoption is closed by the clean start; the audit moves to V2 cost-first routes';
 
-test('the path is real: the engine prices each route on its own private freight rate and the public package measures', async () => {
+test('the path is real: the engine prices each route on its own private freight rate and the public package measures', { todo: CLEAN_START_V1 }, async () => {
   const w = await world();
   for (const p of CATALOGUE) {
     const pid = legacyProductId(p.slug);

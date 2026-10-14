@@ -34,6 +34,7 @@ import {
   type MysteryCandidate,
 } from '../worker/lib/mysteryDraw';
 import { planInventory, planReservationFence, type StockMove } from '../worker/lib/inventory';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 const SEED = 'a1b2c3d4'.repeat(8);
 
@@ -214,6 +215,7 @@ async function buyThreeSpools(db: D1Database, opts: { orderId: string; key: stri
 test('three spools produce three allocations and three reserve ledger rows, in one batch', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const picked = await buyThreeSpools(db, { orderId: 'ORD-1', key: 'k1' });
 

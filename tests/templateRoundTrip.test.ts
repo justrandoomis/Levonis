@@ -635,7 +635,7 @@ test('a usage step with neither title nor body is warned about, not silently dro
 test('the transport surcharge may be written with the word the form uses', () => {
   const doc = applyRelations(parseProductRow(baseRow()), view(), { includeInactive: true });
   const text = exportProduct(doc, { includeCost: true })
-    .replace(/^transports\.3\.commission_iqd=__NULL__$/m, 'transports.3.surcharge_iqd=15000')
+    .replace(/^transports\.3\.commission_iqd=0$/m, 'transports.3.surcharge_iqd=15000')
     .replace(/^transports\.3\.active=false$/m, 'transports.3.active=true');
   const parsed = parseTemplate(text);
   assert.deepEqual(parsed.errors, []);

@@ -6,7 +6,7 @@
  * ENGINE_MANAGED lock already covers it. Proves, on a V2 product:
  *   - every V1 pricing door answers PRICING_V2_MANAGED with its section
  *     (inputs, preview, rules, targets adopt, the price grid's and the
- *     selection price's guard), the exit to manual PRICING_V2_NO_MANUAL, the
+ *     selection price's guard), the exit to manual (closed by the clean start), the
  *     purchase apply PRICING_V2_MANAGED (D1: the purchase becomes a price review) — and V1's own evaluation
  *     refuses to plan it, so V1's bulk save reports it refused;
  *   - a structure edit (a new model with a direct cell) through the V2 save
@@ -54,7 +54,8 @@ test('every V1 door of a V2 product refuses with its code and section; V1 never 
     ['POST preview', () => post(w.app, `/api/admin/pricing/products/${AMS}/preview`, { draft: {} }), 'PRICING_V2_MANAGED'],
     ['PUT rules', () => put(w.app, `/api/admin/pricing/products/${AMS}/rules`, { rules: [] }), 'PRICING_V2_MANAGED'],
     ['POST targets/adopt', () => post(w.app, `/api/admin/pricing/products/${AMS}/targets/adopt`, { legacy_hash: 'a'.repeat(64) }), 'PRICING_V2_MANAGED'],
-    ['POST manual', () => post(w.app, `/api/admin/pricing/products/${AMS}/manual`, { write_seq: seq.w }), 'PRICING_V2_NO_MANUAL'],
+    // The clean start (spec addendum A.6): the «back to manual» door is closed for every product.
+    ['POST manual', () => post(w.app, `/api/admin/pricing/products/${AMS}/manual`, { write_seq: seq.w }), 'PRICING_V2_MANAGED'],
     ['POST apply-purchase', () => post(w.app, `/api/admin/pricing/products/${AMS}/apply-purchase`, { purchase_id: 'pur_12345678', preview_hash: 'b'.repeat(64) }), 'PRICING_V2_MANAGED'],
   ];
   // One request at a time (the test binding runs one transaction at a time).
@@ -73,17 +74,17 @@ test('every V1 door of a V2 product refuses with its code and section; V1 never 
   const c = await v2Context(w.db, AMS);
   const ev = await evaluateEngineWrite({ loaded: c.loaded, stored: c.stored, ctx: c.ctx, rates: c.rates, control: c.control, inputs: c.stored.inputs, inputWrites: [], ruleWrites: [], image: c.image, storedCosts: [] });
   assert.deepEqual([ev.kind, ev.complete, ev.hash, ev.codes], [null, false, null, ['PRICING_V2_MANAGED']]);
-  // V1's bulk save reports it refused (never "unchanged", never written).
-  const bulk = await json(await post(w.app, '/api/admin/pricing/products/save-bulk', { items: [{ product_id: AMS, preview_hash: 'c'.repeat(64) }] }));
-  assert.deepEqual(bulk.results, [{ product_id: AMS, status: 'refused', code: 'PRICING_V2_MANAGED' }]);
-  // The old panel's read never fails on a V2 product: it says the product is V2's and offers no V1 save.
-  const inputs = await w.getInputs(AMS);
-  assert.equal(inputs.status, 200, JSON.stringify(inputs.body).slice(0, 300));
-  assert.equal((inputs.body as { v2?: unknown }).v2, true, 'the old panel reads v2 and hides itself');
-  assert.doesNotMatch(JSON.stringify(inputs.body), /"preview_hash":"[0-9a-f]{64}"/, 'no V1 hash for a V2 product');
-  // V1's stale and ready lists never list a V2 product.
-  const list = await json(await (await import('./fixtures/app')).get(w.app, '/api/admin/pricing/save-list'));
-  assert.equal([...list.stale.items, ...list.ready.items].some((i: { product_id: string }) => i.product_id === AMS), false);
+  // The clean start (spec addendum A.6): V1's bulk save, the inputs read and the stale list are closed doors —
+  // 409 PRICING_V2_MANAGED, never a V1 hash or a V2 product listed.
+  for (const res of [
+    await post(w.app, '/api/admin/pricing/products/save-bulk', { items: [{ product_id: AMS, preview_hash: 'c'.repeat(64) }] }),
+    await (await import('./fixtures/app')).get(w.app, `/api/admin/pricing/products/${AMS}/inputs`),
+    await (await import('./fixtures/app')).get(w.app, '/api/admin/pricing/save-list'),
+  ]) {
+    const body = await json(res);
+    assert.deepEqual([res.status, body.code], [409, 'PRICING_V2_MANAGED']);
+    assert.doesNotMatch(JSON.stringify(body), /"preview_hash":"[0-9a-f]{64}"/, 'no V1 hash for a V2 product');
+  }
 });
 
 test('a new model through the V2 save commits structure, prices and results in one batch; without the token it is ENGINE_MANAGED', async () => {

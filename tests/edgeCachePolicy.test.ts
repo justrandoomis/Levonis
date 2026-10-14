@@ -61,6 +61,7 @@ import {
 } from '../worker/lib/edgePolicy';
 import { DOCUMENT_SHARED_CACHE_CONTROL } from '../worker/lib/socialPreview';
 import { SESSION_COOKIE_NAME, hasSessionCookie, sessionFreePublicGet } from '../worker/lib/session';
+import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 
 const ENV = { STORE_ROOT_DOMAIN: 'levonis-iq.com' };
 const HOST = `${SLUG}.levonis-iq.com`;
@@ -273,7 +274,7 @@ test('the colo cache: a guest miss is stored once, the hit leaves with the route
     await settle();
     assert.equal(cache.store.size, 1);
     const key = [...cache.store.keys()][0];
-    assert.equal(key, 'https://localhost/api/home', 'host + path, nothing else');
+    assert.equal(key, withCacheEpoch('https://localhost/api/home'), 'host + path and the catalogue epoch, nothing else');
 
     const hit = await get(w.guest, '/api/home');
     assert.equal(hit.headers.get('CF-Cache-Status'), 'HIT');
@@ -301,7 +302,7 @@ test('the key is canonical: declared parameters sorted, unknown ones ignored, on
       assert.equal((await get(w.guest, `/api/products${q}`)).status, 200);
     }
     await settle();
-    assert.deepEqual([...cache.store.keys()], ['https://localhost/api/products?limit=5&offset=0']);
+    assert.deepEqual([...cache.store.keys()], [withCacheEpoch('https://localhost/api/products?limit=5&offset=0')]);
     // A different DECLARED parameter is a different entry.
     assert.equal((await get(w.guest, '/api/products?limit=6')).status, 200);
     await settle();
@@ -310,12 +311,12 @@ test('the key is canonical: declared parameters sorted, unknown ones ignored, on
     assert.equal((await hostGet(w.guestHost, '/api/storefront/resolve')).status, 200);
     assert.equal((await get(w.guest, '/api/storefront/resolve')).status, 200);
     await settle();
-    assert.ok(cache.store.has(`https://${HOST}/api/storefront/resolve`));
-    assert.ok(cache.store.has('https://localhost/api/storefront/resolve'));
+    assert.ok(cache.store.has(withCacheEpoch(`https://${HOST}/api/storefront/resolve`)));
+    assert.ok(cache.store.has(withCacheEpoch('https://localhost/api/storefront/resolve')));
   });
-  assert.equal(canonicalKey('https://a.b/api/x?z=1&a=2&nope=3', ['a', 'z']).url, 'https://a.b/api/x?a=2&z=1');
-  assert.equal(canonicalKey('http://a.b/api/x/?a=1', []).url, 'https://a.b/api/x', 'one scheme, whatever the request saw');
-  assert.equal(canonicalKey('http://localhost/api/x', [], 'Shop.Levonis-IQ.com').url, 'https://shop.levonis-iq.com/api/x', 'the Host header wins');
+  assert.equal(canonicalKey('https://a.b/api/x?z=1&a=2&nope=3', ['a', 'z']).url, withCacheEpoch('https://a.b/api/x?a=2&z=1'));
+  assert.equal(canonicalKey('http://a.b/api/x/?a=1', []).url, withCacheEpoch('https://a.b/api/x'), 'one scheme, whatever the request saw');
+  assert.equal(canonicalKey('http://localhost/api/x', [], 'Shop.Levonis-IQ.com').url, withCacheEpoch('https://shop.levonis-iq.com/api/x'), 'the Host header wins');
 });
 
 test('never stored: a HEAD, a refusal, a session answer', async () => {
@@ -345,7 +346,7 @@ test('the settings PUT purges the public settings, the first screen and the shel
     assert.equal(cache.store.size, 4);
     const res = await put(w.admin, '/api/admin/settings/homeSections', { value: [{ id: 'best' }] });
     assert.equal(res.status, 200, await res.text());
-    assert.deepEqual([...cache.store.keys()], ['https://localhost/api/community/access'], 'the community verdict is not a setting');
+    assert.deepEqual([...cache.store.keys()], [withCacheEpoch('https://localhost/api/community/access')], 'the community verdict is not a setting');
     assert.deepEqual(pathsChangedBySetting('homeBanners').sort(), ['/api/home', '/api/home/sections', '/api/settings/public']);
     assert.deepEqual(pathsChangedBySetting('printAccessories').sort(), [
       '/api/marketplace/print/catalog', '/api/print-quote/accessories', '/api/print-quote/materials', '/api/settings/public',
@@ -495,7 +496,7 @@ test('P2 review: the site-media routes purge the first screen and the public set
     assert.equal(cache.store.size, 4);
     const res = await w.admin.request('/api/admin/site-media/brand-bambulab', { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } });
     assert.equal(res.status, 200, await res.text());
-    assert.deepEqual([...cache.store.keys()], ['https://localhost/api/products'], 'home, sections and settings are gone; the listing does not carry the media');
+    assert.deepEqual([...cache.store.keys()], [withCacheEpoch('https://localhost/api/products')], 'home, sections and settings are gone; the listing does not carry the media');
     // The upload route: the same seam, before the audit — pinned in the source (the
     // route needs a bucket and the image service, which the stand-in has not).
     const admin = readFileSync(join(ROOT, 'worker/routes/admin.ts'), 'utf8');
@@ -512,7 +513,7 @@ test('P2 review: the PRO pause purges the priced answers, as the settings PUT do
     assert.equal(cache.store.size, 5);
     const res = await post(w.admin, '/api/memberships/admin/pro-pause', { paused: true, confirm: 'PAUSE' });
     assert.equal(res.status, 200, await res.text());
-    assert.deepEqual([...cache.store.keys()].sort(), [`https://localhost/api/products/${LIVE_PRODUCTS[0].slug}`, 'https://localhost/api/community/access'].sort(), 'the parameter-less priced answers are gone; the product pages age out within s-maxage, the verdict is untouched');
+    assert.deepEqual([...cache.store.keys()].sort(), [withCacheEpoch(`https://localhost/api/products/${LIVE_PRODUCTS[0].slug}`), withCacheEpoch('https://localhost/api/community/access')].sort(), 'the parameter-less priced answers are gone; the product pages age out within s-maxage, the verdict is untouched');
     assert.deepEqual(pathsChangedBySetting('proPause').sort(), ['/api/home', '/api/home/sections', '/api/products', '/api/settings/public']);
   });
 });
@@ -529,7 +530,7 @@ test('P2 review: an admin product write and a benefit rule purge the listing, th
     await warm();
     const hidden = await patch(w.admin, `/api/admin/products-v2/${LIVE_PRODUCTS[0].id}/status`, { status: 'hidden' });
     assert.equal(hidden.status, 200, await hidden.text());
-    assert.deepEqual([...cache.store.keys()], ['https://localhost/api/settings/public'], 'the slug was found from the path');
+    assert.deepEqual([...cache.store.keys()], [withCacheEpoch('https://localhost/api/settings/public')], 'the slug was found from the path');
     assert.equal((await get(w.guest, `/api/products/${slug}`)).status, 404, 'and the guest no longer sees the hidden product');
     assert.equal((await patch(w.admin, `/api/admin/products-v2/${LIVE_PRODUCTS[0].id}/status`, { status: 'active' })).status, 200);
     // A refused write purges nothing.
@@ -541,7 +542,7 @@ test('P2 review: an admin product write and a benefit rule purge the listing, th
       tier: 'pro', benefit_type: 'product_discount', scope: 'global', discount_mode: 'percent', percent: 5, max_discount_iqd: 50_000, cap_scope: 'per_unit', label: 'PRO 5%',
     });
     assert.equal(rule.status, 200, await rule.text());
-    assert.deepEqual([...cache.store.keys()].sort(), ['https://localhost/api/settings/public', `https://localhost/api/products/${slug}`].sort());
+    assert.deepEqual([...cache.store.keys()].sort(), [withCacheEpoch('https://localhost/api/settings/public'), withCacheEpoch(`https://localhost/api/products/${slug}`)].sort());
     assert.deepEqual(cataloguePaths(['a', '']), ['/api/home', '/api/home/sections', '/api/products', '/api/products/a']);
   });
 });

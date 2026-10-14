@@ -25,6 +25,7 @@ import { hydrateRelations, type RelationsResponse } from '../src/components/admi
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import { resolveUnitPrice, type PricingProduct } from '../worker/lib/pricing';
 import { productMediaFixtureEnv } from './fixtures/productMedia';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -159,6 +160,8 @@ test('8 — image relations survive TXT → apply → reload', async () => {
 
   // And so does the customer.
   raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
+  // The clean start (A.4): a customer sees only a V2-published product.
+  await publishV2(raw, id, { usd: usdReproducing(899_000, FIXTURE_U) });
   const pub = await pricingProduct(app, 'roundtrip-a1');
   const media = (pub as unknown as { media: Array<Record<string, unknown>> }).media ?? [];
   assert.equal(media.length, 3, 'the storefront receives all three');
@@ -167,17 +170,17 @@ test('8 — image relations survive TXT → apply → reload', async () => {
 
 // ================================================================= test 10
 
+// The clean start (DECISIONS row 222, addendum A.6): a file never sets a dinar price — the product is born
+// unpriced and the owner prices it in dollars. The invariant stands: a round trip moves no customer charge.
 test('10 — export → import changes no price the customer can be charged', async () => {
   const { raw, app } = setup();
   const id = (await apply(app, TXT)).body.product_id as string;
   raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
+  await publishV2(raw, id, { usd: usdReproducing(899_000, FIXTURE_U) });
 
   const before = everyCharge(await pricingProduct(app, 'roundtrip-a1'));
-  // The base ladder is real, so the comparison has something to protect.
+  // The V2 price is real, so the comparison has something to protect.
   assert.equal(before['free/opt_combo/-'], 899_000);
-  assert.equal(before['prime/opt_combo/-'], 885_000);
-  assert.equal(before['pro/opt_combo/-'], 799_000);
-  assert.equal(before['free/opt_combo/col_black'], 904_000, 'the colour adds again, over the option');
 
   // The store's own export, re-imported over the same product.
   const res = await get(app, `/api/admin/template/export/${id}`);
@@ -207,32 +210,3 @@ test('10 — and the images and their links come back identical too', async () =
   assert.deepEqual(shape(), before);
 });
 
-test('10 — a round trip does not convert an adjustment into a frozen price', async () => {
-  // This is the failure mode the architecture exists to prevent: if the export
-  // wrote 899,000 as a fixed number, the Combo would stop following the base
-  // and the next base change would silently leave it behind. The CHARGE would
-  // be identical on the day of the trip, so only the STORAGE shape catches it.
-  const { raw, app } = setup();
-  const id = (await apply(app, TXT)).body.product_id as string;
-  const res = await get(app, `/api/admin/template/export/${id}`);
-  const text = await res.text();
-  assert.equal((await apply(app, text, { mode: 'update', id })).status, 200, text);
-
-  const combo = all<{ regular_price_iqd: number | null; regular_adjust_iqd: number | null }>(
-    raw,
-    'SELECT regular_price_iqd, regular_adjust_iqd FROM product_option_values WHERE id = ?',
-    'opt_combo'
-  )[0];
-  assert.equal(combo.regular_price_iqd, null, 'still an adjustment, not a pin');
-  assert.equal(combo.regular_adjust_iqd, 174_000);
-
-  // And it still follows the base: raise the base, the Combo moves with it.
-  raw.prepare('UPDATE products SET price_iqd = 800000 WHERE id = ?').run(id);
-  raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
-  const p = await pricingProduct(app, 'roundtrip-a1');
-  assert.equal(
-    resolveUnitPrice({ product: p, optionId: 'opt_combo', tier: 'free', tierActive: false }).applied_iqd,
-    974_000,
-    'the surcharge followed the new base'
-  );
-});

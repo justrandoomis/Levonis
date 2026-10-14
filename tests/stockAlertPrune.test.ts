@@ -52,6 +52,7 @@ import {
 } from '../worker/lib/stockAlerts';
 import { runDurableJobs } from '../worker/lib/jobs';
 import type { Env } from '../worker/lib/types';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 // A fixed instant, so "thirty-one days ago" means the same thing on every run
 // and a test that passes today cannot fail at midnight.
@@ -123,6 +124,7 @@ test('a finished row is erased AFTER the retention window, and not one day befor
   alert(raw, 'fresh_notified', 'notified', daysAgo(1));
   alert(raw, 'edge_notified', 'notified', daysAgo(29));
 
+  await publishSeededV2(raw);
   const report = await pruneFinishedStockAlerts(asD1(raw), NOW, FINISHED_RETENTION_DAYS, PRUNE_RUN_LIMIT);
 
   assert.equal(report.deleted, 3, 'all three finished states are erased, and only past the window');
@@ -140,6 +142,7 @@ test('an armed row is never erased — not at ninety days, not at four hundred',
   // Retention ZERO — the harshest setting the knob allows. Even then the live
   // promise is untouchable: the alert has no deadline, only an end, and it has
   // not ended.
+  await publishSeededV2(raw);
   const report = await pruneFinishedStockAlerts(asD1(raw), NOW, 0, PRUNE_RUN_LIMIT);
 
   assert.equal(report.deleted, 1);
@@ -156,6 +159,7 @@ test('a firing row is never erased — its message is still in flight', async ()
   // learn which.
   alert(raw, 'firing_stale', 'firing', daysAgo(365));
 
+  await publishSeededV2(raw);
   const report = await pruneFinishedStockAlerts(asD1(raw), NOW, 0, PRUNE_RUN_LIMIT);
 
   assert.equal(report.deleted, 0);
@@ -173,6 +177,7 @@ test('the DELETE names the three finished states rather than negating the live o
     alert(raw, `s_${state}`, state, daysAgo(200));
   }
 
+  await publishSeededV2(raw);
   await pruneFinishedStockAlerts(asD1(raw), NOW, FINISHED_RETENTION_DAYS, PRUNE_RUN_LIMIT);
 
   assert.deepEqual(idsLeft(raw), ['s_armed', 's_firing']);
@@ -223,6 +228,7 @@ test('a finished row with no recorded finish instant is left alone, not erased i
   seed(raw);
   alert(raw, 'undated', 'notified', '');
 
+  await publishSeededV2(raw);
   const report = await pruneFinishedStockAlerts(asD1(raw), NOW, 0, PRUNE_RUN_LIMIT);
 
   assert.equal(report.deleted, 0);
@@ -236,6 +242,7 @@ test('the run is bounded, says so, and the leftovers are cleared by the next tic
   seed(raw);
   for (let i = 0; i < 5; i += 1) alert(raw, `n${i}`, 'notified', daysAgo(100));
 
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const first = await pruneFinishedStockAlerts(db, NOW, FINISHED_RETENTION_DAYS, 2);
   assert.equal(first.deleted, 2, 'the budget is a ceiling, not a suggestion');
@@ -262,6 +269,7 @@ test('the bound the cron actually passes is the exported one, and it holds', asy
   const total = PRUNE_RUN_LIMIT + 3;
   for (let i = 0; i < total; i += 1) alert(raw, `b${String(i).padStart(4, '0')}`, 'notified', daysAgo(90));
 
+  await publishSeededV2(raw);
   const report = await pruneFinishedStockAlerts(asD1(raw), NOW, FINISHED_RETENTION_DAYS, PRUNE_RUN_LIMIT);
 
   assert.equal(report.deleted, PRUNE_RUN_LIMIT, 'one invocation never exceeds its budget');
@@ -317,6 +325,7 @@ test('a prune that throws never costs a customer their «رجع!» — the sweep
     .run(daysAgo(95));
   // And a finished row the prune would have erased if it could.
   alert(raw, 'history', 'notified', daysAgo(200), 'v_small');
+  await publishSeededV2(raw);
 
   const env = { DB: brokenDeleteDb(raw) } as unknown as Env;
 

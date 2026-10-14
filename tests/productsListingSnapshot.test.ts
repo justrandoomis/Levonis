@@ -62,6 +62,30 @@ function withoutPremiumTeasers(body: any): any {
   return out;
 }
 
+/**
+ * THE CLEAN START (DECISIONS row 222, addendum A.12.1), also applied to the baseline rather than regenerated
+ * over it: every product is priced in dollars, so each dinar price is its old one reproduced at the fixture
+ * rate — an off-step price moves up to the next 1,000 — and no typed PRO rung survives the first V2 price
+ * (the live catalogue has no PRO rule, so no card carries a PRO teaser). Order, paging and every other field
+ * are still held to the captured answer.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function asCleanStart(body: any): any {
+  if (!body || typeof body !== 'object') return body;
+  const out = { ...body };
+  const step = (v: unknown) => (typeof v === 'number' && v > 0 ? Math.ceil(v / 1000) * 1000 : v);
+  if (Array.isArray(out.products)) {
+    out.products = out.products.map((p: Record<string, unknown>) => ({
+      ...p,
+      ...('price_iqd' in p ? { price_iqd: step(p.price_iqd) } : {}),
+      ...('display_price_iqd' in p ? { display_price_iqd: step(p.display_price_iqd) } : {}),
+      ...('display_regular_iqd' in p ? { display_regular_iqd: step(p.display_regular_iqd) } : {}),
+      ...('display_pro_iqd' in p ? { display_pro_iqd: null } : {}),
+    }));
+  }
+  return out;
+}
+
 test('every plain listing request answers what it answered before, minus the new card fields', async () => {
   const baseline = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/snapshots/productsListing.baseline.json'), 'utf8')) as Record<string, unknown>;
   // The PRO teaser is compared as it reads while PRO is sold; the pause that
@@ -72,7 +96,7 @@ test('every plain listing request answers what it answered before, minus the new
   assert.ok(Object.keys(baseline).length >= 6);
   for (const [path, expected] of Object.entries(baseline)) {
     const body = await json(await get(app, path));
-    assert.deepEqual(withoutNewFields(body), withoutPremiumTeasers(expected), path);
+    assert.deepEqual(withoutNewFields(body), asCleanStart(withoutPremiumTeasers(expected)), path);
   }
 });
 

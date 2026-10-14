@@ -93,8 +93,9 @@ test('2 — every GET answers on 0176 exactly as on the migrated database, for t
   const fullLeaks: string[] = [];
   const reached = new Set<string>();
   for (const [name, user] of [['owner', OWNER], ['full', ROLES.full]] as const) {
-    const ahead = appFor(seedRoleMatrix(freshDb()), user);
-    const behind = appFor(seedRoleMatrix(dbThrough('0176')), user);
+    // Neither side publishes (the clean start): before 0189 nothing can be, so a product hidden on both is the equal answer.
+    const ahead = appFor(seedRoleMatrix(freshDb()), user, undefined, { publishV2: false });
+    const behind = appFor(seedRoleMatrix(dbThrough('0176')), user, undefined, { publishV2: false });
     for (const path of paths) {
       const a = await call(ahead, 'GET', path);
       const b = await call(behind, 'GET', path);

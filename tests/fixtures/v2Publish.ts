@@ -172,6 +172,10 @@ export async function publishV2(raw: DatabaseSync, productId: string, o: Publish
   const set = o.usd
     ? { points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: o.usd }] as V2PricePoint[], discounts: o.discountUsd ? ([{ scope: 'product', scope_id: '', usd: o.discountUsd }] as V2Discount[]) : [] }
     : await reproducedSet(raw, productId, u);
+  const first0 = !raw.prepare("SELECT 1 AS x FROM product_pricing_state WHERE product_id = ? AND mode = 'engine' AND pricing_method IS NOT NULL").get(productId);
+  // The owner's first V2 write is a product save, and that save retires the fees in the same batch
+  // (`pinV2PriceFields`: no direct surcharge, every route's commission 0 — 0189's fee trigger).
+  if (first0) zeroLegacyFees(raw, productId);
   const c = await v2Context(db, productId);
   const first = !(c.stored.state?.mode === 'engine' && c.stored.state.pricing_method);
   const ev = await evaluateV2Write({
@@ -201,6 +205,24 @@ export async function publishV2(raw: DatabaseSync, productId: string, o: Publish
   return ev;
 }
 
+/** What the first V2 save does to the legacy fee columns (worker/lib/pricingEngine/v2/draft.ts `pinV2PriceFields`). */
+function zeroLegacyFees(raw: DatabaseSync, productId: string): void {
+  const row = raw.prepare('SELECT direct_surcharge_iqd AS s, preorder_transports AS t FROM products WHERE id = ?').get(productId) as { s: number | null; t: string | null } | undefined;
+  if (!row) return;
+  let routes: unknown = null;
+  try {
+    routes = row.t ? JSON.parse(row.t) : null;
+  } catch {
+    routes = null;
+  }
+  const zeroed = Array.isArray(routes) ? routes.map((r) => (r && typeof r === 'object' && !Array.isArray(r) ? { ...(r as Record<string, unknown>), commission_iqd: 0 } : r)) : routes;
+  const t = Array.isArray(routes) ? JSON.stringify(zeroed) : row.t;
+  if (t !== row.t) raw.prepare('UPDATE products SET preorder_transports = ? WHERE id = ?').run(t, productId);
+  // A V1 engine product's surcharge sits under 0181's price lock: it stays (the V2 resolver reads no fee).
+  const v1 = raw.prepare("SELECT 1 AS x FROM product_pricing_state WHERE product_id = ? AND mode = 'engine'").get(productId);
+  if (row.s !== null && !v1) raw.prepare('UPDATE products SET direct_surcharge_iqd = NULL WHERE id = ?').run(productId);
+}
+
 /** Is this product V2-published (the listing predicate's clause)? */
 export function isV2Published(raw: DatabaseSync, productId: string): boolean {
   return !!raw
@@ -227,4 +249,13 @@ export async function publishAllV2(raw: DatabaseSync, o: PublishOptions & { ids?
     done.push(id);
   }
   return done;
+}
+
+/**
+ * A price change after the clean start: a V2-published product is repriced
+ * through the real writer (one dollar price reproducing `iqd` at the fixture
+ * U), never by an UPDATE of the legacy columns — the engine locks refuse that.
+ */
+export function repriceV2(raw: DatabaseSync, productId: string, iqd: number, o: Omit<PublishOptions, 'usd'> = {}): Promise<V2Evaluation> {
+  return publishV2(raw, productId, { ...o, usd: usdReproducing(iqd, o.u ?? FIXTURE_U) });
 }

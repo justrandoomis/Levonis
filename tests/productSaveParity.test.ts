@@ -35,6 +35,7 @@ import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { adminTaxonomyRoutes } from '../worker/routes/adminTaxonomy';
 import { productRoutes } from '../worker/routes/products';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import {
   hydrateRelations,
@@ -167,7 +168,6 @@ test('a quarantined legacy image survives an unchanged form save, stays off the 
     await post(app, '/api/admin/products-v2', {
       name_en: 'Quarantine Save',
       name_ar: 'صورة معزولة',
-      price_iqd: 100000,
       status: 'draft',
     })
   );
@@ -215,6 +215,8 @@ test('a quarantined legacy image survives an unchanged form save, stays off the 
   );
 
   raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
+  // The clean start (A.4): a new product is born unpriced; the customer sees it once it is V2-published.
+  await publishV2(raw, id, { usd: usdReproducing(25_000, FIXTURE_U) });
   const publicRead = await json(await get(app, '/api/products/quarantine-save'));
   assert.equal(publicRead.success, true, JSON.stringify(publicRead));
   assert.deepEqual(publicRead.product.media, []);
@@ -268,7 +270,6 @@ test('a rolling URL-only local row echoed by GET survives an unchanged form save
     slug: 'legacy-url-only-keep',
     name_en: 'Legacy URL Keep',
     name_ar: 'صورة قديمة محفوظة',
-    price_iqd: 100000,
     status: 'draft',
   }));
   const id = made.product.id as string;
@@ -309,7 +310,6 @@ test('explicitly removing a rolling URL-only quarantine deletes its row and queu
     slug: 'legacy-url-only-remove',
     name_en: 'Legacy URL Remove',
     name_ar: 'حذف صورة قديمة',
-    price_iqd: 100000,
     status: 'draft',
   }));
   const id = made.product.id as string;
@@ -364,7 +364,6 @@ test('the same structure leaves the same `products` row whether it came from a T
     await post(app, '/api/admin/products-v2', {
       name_en: 'By Form',
       name_ar: 'بالنموذج',
-      price_iqd: 100000,
       status: 'draft',
       relations: {
         inventory_mode: 'BASE',
@@ -397,7 +396,6 @@ test('a form CREATE is ONE batch: a refused colour leaves no product row behind'
   const res = await post(app, '/api/admin/products-v2', {
     name_en: 'Half Saved',
     name_ar: 'نصف محفوظ',
-    price_iqd: 100000,
     status: 'draft',
     relations: {
       inventory_mode: 'BASE',
@@ -573,7 +571,7 @@ colors.1.stock=5
 test('VARIANT_COMBINATION is judged on what REMAINS: a save that deletes the last combination is refused', async () => {
   const { raw, app } = setup();
   const made = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'Combo', name_ar: 'تركيبة', price_iqd: 100000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Combo', name_ar: 'تركيبة', status: 'draft' })
   );
   const id = made.product.id as string;
   const structure = {
@@ -650,7 +648,6 @@ sku=DUP-1
   const form = await post(app, '/api/admin/products-v2', {
     name_en: 'Three',
     name_ar: 'ثلاثة',
-    price_iqd: 100000,
     status: 'draft',
     sku: 'DUP-1',
   });
@@ -663,7 +660,7 @@ sku=DUP-1
 test('a hundred option values and a hundred images save through D1s 100-parameter limit', async () => {
   const { raw, app } = setup();
   const made = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'Wide', name_ar: 'عريض', price_iqd: 100000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Wide', name_ar: 'عريض', status: 'draft' })
   );
   const id = made.product.id as string;
   const values = Array.from({ length: 120 }, (_, i) => ({ id: `ov_${i}`, name_en: `V${i}`, sort: i, active: true }));
@@ -967,7 +964,7 @@ test('an omitted collection in a relations body is a full replacement with an em
 test('a legacy JSON-only product keeps an Arabic name equal to its English one through its first form save', async () => {
   const { raw, app } = setup();
   const made = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'Legacy', name_ar: 'قديم', price_iqd: 100000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Legacy', name_ar: 'قديم', status: 'draft' })
   );
   const id = made.product.id as string;
   // A JSON-only product, exactly as migration 0022 left the ones it could not

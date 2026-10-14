@@ -29,6 +29,7 @@ import { refusalIssues } from '../src/components/adminProducts/applyResult';
 import type { ApplyVerifyFailure } from '../src/components/adminProducts/types';
 import { MYSTERY_REFUSALS } from '../worker/lib/mystery/issues';
 import { fixtureWebp, productMediaFixtureEnv } from './fixtures/productMedia';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const mount: Mount = (a) => a.route('/api/admin/mystery', adminMysteryRoutes);
@@ -132,7 +133,8 @@ test('the generator expands options and colours ON THE SERVER, one entry per rea
 });
 
 test('the eligible preview computes probabilities and the distinct-choice count server-side', async () => {
-  const { app } = setup();
+  const { app, raw } = setup();
+  await publishSeededV2(raw); // the clean start (A.12.1): a pool draws only from V2-published spools
   const id = await makePool(app);
   await post(app, `/api/admin/mystery/pools/${id}/entries/generate`, { product_ids: ['p_color'], weight: 1 });
   await post(app, `/api/admin/mystery/pools/${id}/entries/generate`, { product_ids: ['p_base'], weight: 2 });
@@ -152,7 +154,8 @@ test('the eligible preview computes probabilities and the distinct-choice count 
 });
 
 test('POOL_TOO_SMALL_FOR_FORBID names the count for the ADMIN — and no customer refusal ever does', async () => {
-  const { app } = setup();
+  const { app, raw } = setup();
+  await publishSeededV2(raw); // the clean start (A.12.1): a pool draws only from V2-published spools
   const id = await makePool(app);
   await post(app, `/api/admin/mystery/pools/${id}/entries/generate`, { product_ids: ['p_base'], weight: 1 });
 

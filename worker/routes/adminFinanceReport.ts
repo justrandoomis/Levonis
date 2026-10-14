@@ -136,7 +136,10 @@ adminFinanceReportRoutes.use('*', limitByMethod(['finance-read', 600], ['finance
  * is a cheap price for a screen that starts telling the truth the moment the
  * migration does.
  */
-let schemaMemo: SchemaFacts | null = null;
+// Keyed by the database binding: one isolate serves one database, but a memo
+// taken on one database must never answer for another (a test process, or a
+// binding swapped by a redeploy, reads two schemas side by side).
+let schemaMemo = new WeakMap<object, SchemaFacts>();
 
 async function columnsOf(db: D1Database, table: string): Promise<Set<string>> {
   // The canonical PRAGMA form with a literal, validated name: D1 deployments
@@ -159,7 +162,8 @@ async function columnsOf(db: D1Database, table: string): Promise<Set<string>> {
  * one column rather than three tables keeps this to a single read.
  */
 export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
-  if (schemaMemo) return schemaMemo;
+  const memo = schemaMemo.get(db);
+  if (memo) return memo;
   // 0098's witness is its own, read in parallel: a database can have 0095 and
   // not 0098 (every database did, until 0098 ran), so one flag cannot stand in
   // for the other. `columnsOf` answers an empty set for a table that is not
@@ -180,13 +184,13 @@ export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
   // MEMOISED ONLY WHEN BOTH ARE TRUE. Caching a `hasFifo: false` taken during
   // the minute between the deploy and its migration would keep this isolate
   // reporting snapshot costs long after the lots were there to read.
-  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments && facts.hasLineEstimates) schemaMemo = facts;
+  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments && facts.hasLineEstimates) schemaMemo.set(db, facts);
   return facts;
 }
 
 /** Test-only: forget the probe so one process can exercise both schemas. */
 export function resetFinanceSchemaMemo(): void {
-  schemaMemo = null;
+  schemaMemo = new WeakMap<object, SchemaFacts>();
 }
 
 // ---------------------------------------------------------------- the input

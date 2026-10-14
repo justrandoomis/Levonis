@@ -72,6 +72,7 @@ import { acceptedPolicies } from './lib/policies';
 import { processOutbox } from '../worker/lib/outbox';
 import { canViewCost } from '../worker/lib/adminScope';
 import type { Env } from '../worker/lib/types';
+import { repriceV2 } from './fixtures/v2Publish';
 
 const GROUP = '-1005550001111';
 const THREADS: Record<string, number> = {
@@ -361,8 +362,9 @@ test('every message channel a real order life writes carries no private cost to 
       ok(await act(full, 'PATCH', `/api/admin/orders/${claimOrder}`, { status }), `full admin → ${status} (claim order)`);
     }
     const claimItem = row<{ id: string }>(raw, 'SELECT id FROM order_items WHERE order_id = ?', claimOrder)!;
+    // The clean start: the owner lowers the price through the V2 writer (the engine locks refuse a raw UPDATE).
+    await repriceV2(raw, 'p_a1', 850_000);
     raw.exec(`
-      UPDATE products SET price_iqd = 850000 WHERE id = 'p_a1';
       INSERT INTO price_history (product_id, variant_key, field, old_iqd, new_iqd, changed_by)
         VALUES ('p_a1', '', 'regular', 900000, 850000, 'usr_owner');
     `);
@@ -434,13 +436,16 @@ test('every message channel a real order life writes carries no private cost to 
     const bell = all(raw, 'SELECT user_id, kind FROM user_notifications');
     assert.ok(bell.some((n) => n.user_id === 'u1'), 'the customer has bell rows');
     // There WAS something to leak: the run wrote private figures.
-    assert.ok(Number(item.cost_iqd) > 0, 'the delivered line carries a cost snapshot');
+    // Since the clean start (spec addendum A.9) a new line snapshots no legacy product cost: its private
+    // figure is the FIFO cost it drew from the lot (the actual cost replaces any estimate).
+    const unitCost = Number(row<{ c: number | null }>(raw, 'SELECT MAX(unit_cost_iqd) AS c FROM order_item_inventory_allocations WHERE order_item_id = ?', item.id)?.c ?? item.cost_iqd ?? 0);
+    assert.ok(unitCost > 0, 'the delivered line carries a cost (its FIFO draw)');
     const figures = privateFigures(raw);
-    // …and the scan knows it: this line's own cost snapshot, printed the way a message prints money, is caught.
+    // …and the scan knows it: this line's own cost, printed the way a message prints money, is caught.
     assert.notDeepEqual(
-      digitLeaks({ text: `الكلفة ${Number(item.cost_iqd).toLocaleString('en-US')} د.ع` }, figures),
+      digitLeaks({ text: `الكلفة ${unitCost.toLocaleString('en-US')} د.ع` }, figures),
       [],
-      'the digit scan recognises the delivered line’s real cost snapshot'
+      'the digit scan recognises the delivered line’s real cost'
     );
 
     // ---------------------------------------------------------------- the scan

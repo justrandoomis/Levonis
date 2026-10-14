@@ -73,6 +73,7 @@ import {
   PRINTER_EXTENSION_MONTHS as FORM_EXTENSION_MONTHS,
   FEE_PERCENT_HINT as FORM_FEE_HINT,
 } from '../src/components/adminProducts/form/model';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 // ------------------------------------------------------------------ fixture
 
@@ -150,6 +151,7 @@ function appAs(db: D1Database, userId: string, role: 'customer' | 'admin' = 'cus
     c.env = { DB: db, APP_ORIGIN: 'https://levonis-iq.com', STORE_ROOT_DOMAIN: 'levonis-iq.com', INITIAL_ADMIN_EMAIL: 'owner@x.co' } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.route('/api/cart', cartRoutes);
   a.route('/api/orders', orderRoutes);
   a.route('/api/products', productRoutes);

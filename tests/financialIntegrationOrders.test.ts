@@ -10,6 +10,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { adminOrderPriceRoutes, orderPriceRoutes } from '../worker/routes/orderPriceAdjust';
 import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
 import { seedCatalogue, orderBody } from './lib/bundles';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 for (const [schema, create] of [['current', freshDb], ['before cost versions', () => dbThrough('0164')], ['before operations', () => dbThrough('0161')]] as const) {
 test(`concurrent confirmations cannot lose FIFO cost on ${schema} schema`, async () => {
@@ -76,6 +77,7 @@ async function checkout(member: 'none' | 'unit' | 'line' = 'none', discounts: { 
       VALUES ('refund-lot','p_pla','base','',6,6,10000,'received','2026-01-01T00:00:00Z');`);
   if (discounts.coupon) raw.prepare("INSERT INTO coupons(id,code,kind,value,min_total_iqd,active) VALUES ('integration-coupon','INTEGRATION','fixed_iqd',?,0,1)").run(discounts.coupon);
   if (discounts.points) raw.prepare("INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status) VALUES ('integration-points',?,'deposit','POINT',?,'approved')").run(buyer, discounts.points);
+  await publishSeededV2(raw); // the clean start (A.12.1): the serialising wrapper hides the raw rows from stubApp
   const customer = stubApp(db, { id: buyer, role: 'customer', email: memberOn ? 'r@x.co' : 's@x.co' }, a => {
     a.route('/api/cart', cartRoutes); a.route('/api/orders', orderRoutes);
     a.route('/api/orders', orderPriceRoutes); a.route('/api/returns', returnRoutes);

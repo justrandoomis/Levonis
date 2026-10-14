@@ -21,6 +21,7 @@ import { finalizeDueQuickBuySessions, releaseSession } from '../worker/lib/quick
 import { liveItems, sessionView } from '../worker/lib/quickBuy/session';
 import { QUICK_BUY_FINALIZE_MAX_ATTEMPTS, type QuickBuySessionRow } from '../worker/lib/quickBuy/model';
 import type { Env } from '../worker/lib/types';
+import { repriceV2 } from './fixtures/v2Publish';
 
 const RATE = 1400;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rows are read field by field
@@ -386,7 +387,7 @@ test('price and delivery changes after the add: the customer never pays more tha
   const held = session(raw).held_iqd;
   assert.equal(held, 50_000, 'filament from the wallet: free delivery');
   // The owner raises the price and switches the free delivery off mid-session.
-  raw.exec(`UPDATE products SET price_iqd = 40000 WHERE id = 'p_pla'`);
+  await repriceV2(raw, 'p_pla', 40_000); // the clean start: a price moves through the V2 writer
   const admin = as(raw, 'boss', 'admin');
   const off = await put(admin, '/api/admin/settings/walletFreeDelivery', {
     value: { enabled: false, require_full_wallet: true, methods: ['standard'], rules: [] },
@@ -406,7 +407,7 @@ test('a lower price at the end is honoured, and the address is the one frozen at
   const raw = world();
   await activate(raw);
   await json(await add(raw, 'p_pla', 1));
-  raw.exec(`UPDATE products SET price_iqd = 20000 WHERE id = 'p_pla'`);
+  await repriceV2(raw, 'p_pla', 20_000); // the clean start: a price moves through the V2 writer
   const moved = await json(await put(as(raw), '/api/quick-buy/profile', { addressId: 'addr2', idempotencyKey: key() }));
   assert.equal(moved.profile.address.id, 'addr2');
   expire(raw);

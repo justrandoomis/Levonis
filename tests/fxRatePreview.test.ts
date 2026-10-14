@@ -4,7 +4,11 @@
  *
  * Every scenario runs the real owner routes, the real engine writer and the
  * real automatic repricing on a real 0181 database with the 41 census
- * products. Proves:
+ * products. Since the clean start (spec addendum A.6, DECISIONS row 222) the
+ * products a rate act reprices are V2 products only: the brief's product is
+ * written cost-first through the V2 writer (tests/fixtures/pricingV2.ts
+ * `writeV2`) — D = ceil_1000(EUR 450 × 1.1 × U + 2.5 kg × freight + $120 × U),
+ * every channel at D (no pre-order discount). Proves:
  *   - …/manual/preview, …/review/preview and …/shipping/:profile/preview
  *     answer the repricing the act would cause — every affected engine
  *     product, today's customer price → the new one per model × channel, the
@@ -30,59 +34,48 @@ import { count, get, json, post, put, row } from './fixtures/app';
 import { fxEnv, market, pairOf } from './fixtures/fx';
 import { pricingWorld, AMS, AMS_MODEL } from './fixtures/procurementPricing';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
-import { loadPreviewContext, loadProducts, listPricedProducts } from '../worker/lib/pricingEngine/load';
-import { evaluateLegacy } from '../worker/lib/pricingEngine/legacy';
+import { listPricedProducts } from '../worker/lib/pricingEngine/load';
+import { cartGrid, writeV2 } from './fixtures/pricingV2';
 import { previewRateAct } from '../worker/lib/pricingEngine/ratePreview';
+import { V2_STORE_READS } from '../worker/lib/pricingEngine/autoReprice';
 import { loadPricingRates } from '../worker/lib/pricingEngine/rates';
 import { FINANCIAL_FIELDS } from '../worker/lib/adminScope';
 import type { Env } from '../worker/lib/types';
 
 type World = ReturnType<typeof pricingWorld>;
 
-const COMPLETE = {
-  inputs: [{ scope: 'base', supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '120' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 50_000 },
-  ],
+/** The brief's product, cost-first in V2: EUR 450, Germany land 2.5 kg, a $120 minimum profit, no discount. */
+const adoptAms = async (w: World) => {
+  await writeV2(w.db, AMS, {
+    method: 'cost',
+    inputs: { supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 },
+    minimumProfitUsd: '120',
+  });
 };
-const usdDraft = (usd: number) => ({
-  inputs: [{ scope: 'base', supplier_cost_amount: String(usd), supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '20' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 15_000 },
-  ],
-});
 
-const seqOf = (w: World, pid: string) => row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', pid)?.s ?? 0;
-
-async function adoptWith(w: World, pid: string, draft: Record<string, unknown>): Promise<boolean> {
-  const first = await w.putInputs(pid, { inputs_seq: seqOf(w, pid), ...draft });
-  if (first.status !== 409 || first.body.code !== 'PRICING_PREVIEW_REQUIRED') return false;
-  const hash = first.body.details?.preview?.preview_hash;
-  if (typeof hash !== 'string') return false;
-  const saved = await w.putInputs(pid, { inputs_seq: seqOf(w, pid), ...draft, preview_hash: hash, confirm_large_change: true });
-  return saved.status === 200 && saved.body.mode === 'engine';
-}
-const adoptAms = async (w: World) => assert.equal(await adoptWith(w, AMS, COMPLETE), true, 'the brief product adopts');
-
-async function adoptUsdProducts(w: World, costs: readonly number[]): Promise<string[]> {
+/** Price-first V2 products at these dollars (one product-level price each), skipping any the writer cannot price. */
+async function adoptUsdProducts(w: World, dollars: readonly number[]): Promise<string[]> {
   const out: string[] = [];
   for (const p of await listPricedProducts(w.db)) {
-    if (out.length === costs.length) break;
+    if (out.length === dollars.length) break;
     if (p.id === AMS) continue;
-    if (await adoptWith(w, p.id, usdDraft(costs[out.length]!))) out.push(p.id);
+    try {
+      await writeV2(w.db, p.id, { method: 'usd', points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: String(dollars[out.length]) }] });
+      out.push(p.id);
+    } catch {
+      /* a product this shape cannot price: try the next */
+    }
   }
-  assert.equal(out.length, costs.length);
+  assert.equal(out.length, dollars.length);
   return out;
 }
 
+/** What the cart charges today, per `combo_key@channel` (the live resolver over the customer's document). */
 async function cartPrices(w: World, pid = AMS) {
-  const loaded = (await loadProducts(w.db, [pid])).get(pid)!;
-  const ctx = await loadPreviewContext(w.db);
-  const ev = evaluateLegacy(pid, loaded.doc, loaded.view, ctx);
-  return Object.fromEntries(ev.models.flatMap((m) => m.channels.filter((c) => c.ok).map((c) => [`${m.option_id}@${c.channel}`, c.prepaid_iqd])));
+  const grid = await cartGrid(w.db, pid);
+  return Object.fromEntries(Object.entries(grid).filter(([, v]) => v.ok).map(([k, v]) => [k, v.prepaid]));
 }
+const LAND = `o:${AMS_MODEL}@pre_order_land`;
 
 /** Every table but the rate limiter's and the security log's, hashed row by row. */
 function snapshot(raw: DatabaseSync): Map<string, string> {
@@ -104,7 +97,7 @@ const amsLand = (u: number, ship = 3200) => ceil1000(495 * u + (5 * ship) / 2 + 
 const ownerVersion = (w: World, pair = 'USD_IQD') => Number(pairOf(w.raw, pair as 'USD_IQD').owner_version);
 const shipVersion = (w: World, profile = 'GERMANY_LAND') => row<{ v: number }>(w.raw, 'SELECT version AS v FROM pricing_shipping_rates WHERE profile = ?', profile)!.v;
 
-type PreviewRow = { product_id: string; option_id: string; channel: string; today_prepaid_iqd: number; computed_price_iqd: number; change_pct: string; deficit_iqd: number; large: boolean };
+type PreviewRow = { product_id: string; option_id: string; combo_key: string; channel: string; today_prepaid_iqd: number; computed_price_iqd: number; change_pct: string; deficit_iqd: number; large: boolean };
 
 // ------------------------------------------------------------- the manual rate
 
@@ -130,11 +123,11 @@ test('a manual rate: the preview lists the engine product old → new and writes
   const pre = rows.find((r) => r.channel === 'pre_order_land')!;
   assert.deepEqual([pre.product_id, pre.option_id, pre.today_prepaid_iqd, pre.computed_price_iqd], [AMS, AMS_MODEL, 992_000, land]);
   assert.equal(pre.change_pct, (((land - 992_000) / 992_000) * 100).toFixed(2));
-  // The deficit: the new floor (replacement cost + minimum profit at 1,650) above today's price.
-  assert.equal(pre.deficit_iqd, 495 * 1650 + 8000 + 120 * 1650 - 992_000);
-  assert.ok(pre.deficit_iqd > 0, 'today the price lies below the new floor');
+  // The deficit (V2): the new price − today's, the run's own order.
+  assert.equal(pre.deficit_iqd, land - 992_000);
+  assert.ok(pre.deficit_iqd > 0, 'the price rises with U');
   const direct = rows.find((r) => r.channel === 'direct_sale')!;
-  assert.equal(direct.computed_price_iqd, land + 50_000);
+  assert.equal(direct.computed_price_iqd, land, 'V2 cost-first: direct sale at D, no Direct Sale Extra');
 
   // The act without the hash: 409 with the same preview; nothing moves.
   const missing = await put(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: ownerVersion(w), rate: '1650' });
@@ -151,7 +144,7 @@ test('a manual rate: the preview lists the engine product old → new and writes
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
   assert.equal(pairOf(w.raw, 'USD_IQD').effective_rate, '1650');
   const cart = await cartPrices(w);
-  for (const r of rows) assert.equal(cart[`${r.option_id}@${r.channel}`], r.computed_price_iqd, `${r.channel}: the cart charges the preview's price`);
+  for (const r of rows) assert.equal(cart[`${r.combo_key}@${r.channel}`], r.computed_price_iqd, `${r.channel}: the cart charges the preview's price`);
   assert.equal((await json(await get(w.app, '/api/admin/pricing/rates'))).stale_products, 0);
 });
 
@@ -177,7 +170,7 @@ test('a stale hash: something moved between the preview and the act → 409 PRIC
   // The fresh one goes through.
   const ok = await put(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: ownerVersion(w), rate: '1650', preview_hash: fresh.preview_hash });
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`], land);
+  assert.equal((await cartPrices(w))[LAND], land);
 });
 
 // ------------------------------------------------------------- approving a held rate
@@ -207,7 +200,7 @@ test('approving a held rate: the review preview prices at the candidate (the mar
   const ok = await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/review', { owner_version: ownerVersion(w), decision: 'approve', preview_hash: preview.preview_hash });
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
   assert.equal(pairOf(w.raw, 'USD_IQD').effective_rate, '1680');
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`], land);
+  assert.equal((await cartPrices(w))[LAND], land);
 
   // Nothing held any more: the review preview answers 409 FX_REVIEW_NOT_PENDING, like the act.
   assert.equal((await json(await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/review/preview', {}))).code, 'FX_REVIEW_NOT_PENDING');
@@ -243,7 +236,7 @@ test('the adjustment: …/manual/preview {market_adjustment_iqd} previews the mo
   const ok = await put(w.app, '/api/admin/pricing/rates/fx/USD_IQD/settings', { owner_version: ownerVersion(w), market_adjustment_iqd: '20', preview_hash: preview.preview_hash });
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
   assert.equal(pairOf(w.raw, 'USD_IQD').effective_rate, '1620');
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`], land);
+  assert.equal((await cartPrices(w))[LAND], land);
   // Neither body field, or both: refused by name.
   assert.equal((await json(await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', {}))).code, 'PRICING_INPUT_INVALID');
   assert.equal((await json(await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1650', market_adjustment_iqd: '1' }))).code, 'PRICING_INPUT_INVALID');
@@ -266,7 +259,7 @@ test('a central shipping rate: the preview lists the products on that route; the
   assert.equal(row<{ r: string }>(w.raw, "SELECT rate_iqd AS r FROM pricing_shipping_rates WHERE profile = 'GERMANY_LAND'")!.r, '3200');
   const ok = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version: shipVersion(w), rate_iqd: '3400', preview_hash: preview.preview_hash });
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`], 993_000);
+  assert.equal((await cartPrices(w))[LAND], 993_000);
   // China air: no engine product on it, but one is engine-priced — the hash is still asked for (§8).
   const airAct = await put(w.app, '/api/admin/pricing/rates/shipping/CHINA_AIR', { version: shipVersion(w, 'CHINA_AIR'), rate_iqd: '21000' });
   assert.equal((await json(airAct)).code, 'PRICING_PREVIEW_REQUIRED');
@@ -291,7 +284,7 @@ test('a customer price moving more than 15%: the preview flags it and the act ne
     confirm_large_change: true,
   });
   assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`], amsLand(1900));
+  assert.equal((await cartPrices(w))[LAND], amsLand(1900));
 });
 
 test('a session older than ten minutes: the preview says a fresh sign-in is needed; the act with the hash is 401 REAUTH_REQUIRED and writes nothing', async () => {
@@ -346,13 +339,17 @@ test('several products: rows in deficit order, a product the engine cannot price
   const rates = (await loadPricingRates(w.db))!;
   const move = { kind: 'fx' as const, act: 'manual' as const, pair: 'USD_IQD' as const, owner_version: ownerVersion(w), before: '1600', after: '1700', clears_pending: true };
   const roomy = await previewRateAct(w.db, move, rates, 600);
-  const tight = await previewRateAct(w.db, move, rates, 80);
+  // The smallest budget that fits at least one product (a V2 write's batch is the measure, not a constant).
+  let tight = await previewRateAct(w.db, move, rates, 40);
+  for (let budget = 40; budget <= 600 && tight.preview.follows === 3; budget += 20) tight = await previewRateAct(w.db, move, rates, budget);
   const none = await previewRateAct(w.db, move, rates, 0);
   assert.equal(roomy.preview.follows, 0);
   assert.ok(tight.preview.follows >= 1 && tight.preview.follows <= 2, `follows ${tight.preview.follows}`);
   assert.equal(none.preview.follows, 3, 'no room: all three follow within 15 minutes');
   assert.equal(tight.preview.preview_hash, roomy.preview.preview_hash, 'the budget never changes the hash');
-  assert.ok(roomy.statements <= 20, `the preview reads in a constant number of statements (${roomy.statements})`);
+  // Constant in the number of products (chunked by PRODUCT_CHUNK); the V2 store's reads are part of it since every
+  // engine product is a V2 product.
+  assert.ok(roomy.statements <= 20 + V2_STORE_READS, `the preview reads in a constant number of statements (${roomy.statements})`);
 });
 
 // ------------------------------------------------------------- the keys

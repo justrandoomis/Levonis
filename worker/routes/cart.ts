@@ -2140,7 +2140,12 @@ cartRoutes.post('/items', async (c) => {
     throw badRequest('Choose a shipping method for this pre-order', 'TRANSPORT_REQUIRED');
   }
   // Pricing V2 strict (spec C-13): a SKU × channel not priced yet is not for sale — the page speaks this code.
-  if (resolved.errors.includes(SKU_STRICT_ERROR)) throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
+  // An incomplete selection has no SKU row either: «choose an option» is the truer answer there, and since
+  // the clean start every ordinary product is strict, so the selection guard speaks first.
+  if (resolved.errors.includes(SKU_STRICT_ERROR)) {
+    refuseIncompleteSelection(saleAvailability(doc, { optionValueIds, colorId: colorId || null, qty: 1 }));
+    throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
+  }
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
@@ -2605,7 +2610,10 @@ cartRoutes.patch('/items/:id', async (c) => {
   if (offerPriceRefusal(resolved.errors)) {
     throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
   }
-  if (resolved.errors.includes(SKU_STRICT_ERROR)) throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
+  if (resolved.errors.includes(SKU_STRICT_ERROR)) {
+    refuseIncompleteSelection(saleAvailability(doc, { optionValueIds, colorId: colorId || null, qty: 1 }));
+    throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
+  }
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }

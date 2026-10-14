@@ -30,6 +30,11 @@
  *      figure itself is never written here (any encoding of a 7-digit
  *      multiple of 1,000 below a public price is trivially reversible).
  *
+ * THE CLEAN START (spec addendum A.6, A.12.2; DECISIONS row 222): the V1
+ * routes and writers this file proved are closed — 409 PRICING_V2_MANAGED for
+ * the owner (tests/pricingV2LegacyDoorsRefused.test.ts) — and their tests went
+ * with them. What stays here still holds on the closed doors.
+ *
  * Run: node --import tsx --test tests/usdPricingSavePrivacy.test.ts
  */
 import { test } from 'node:test';
@@ -37,158 +42,10 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DatabaseSync } from 'node:sqlite';
-import { all, count, freshDb, type StubUser } from './fixtures/app';
-import { pricingWorld } from './fixtures/procurementPricing';
+import { all, freshDb } from './fixtures/app';
 import { seedLegacyCatalogue } from './fixtures/legacyCatalogue';
-import { OWNER_BASE, OWNER_RULES, SNAP, SNAP_MODEL, liveLikeWorld, persisted, storePrice } from './fixtures/usdPricingSave';
-import { stripFinancials } from '../worker/lib/adminScope';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-/** The owner's typed dinars on the model (an IQD convenience entry) — 1,234,000 IQD → $771.25 at 1,600. */
-const MODEL_IQD = 1_234_000;
-const MODEL_ENTRY = { scope: 'option', scope_id: SNAP_MODEL, supplier_cost_iqd: MODEL_IQD };
-/** Every value the owner stores below, as it could appear in a body, a log line or an audit row. */
-const VALUES = ['899', '1234000', '1,234,000', '771.25', '15000', '15,000', '25000', '25,000'];
-const HASH_KEYS = ['conversion_hash', 'preview_hash', '"preview"', 'pricing_inputs', 'supplier_cost', 'adoption'];
-
-/** Every caller that sees no cost (tests/fixtures/roleMatrix.ts ROLES, inlined: that fixture mounts every router). */
-const NON_OWNERS: Record<string, StubUser | null> = {
-  guest: null,
-  customer: { id: 'u1', role: 'customer', email: 's@x.co' },
-  merchant: { id: 'u_m', role: 'merchant', email: 'm@x.co' },
-  employee: { id: 'usr_emp', role: 'customer', email: 'emp@x.co' },
-  investor: { id: 'usr_inv', role: 'customer', email: 'inv@x.co', is_investor: 1 },
-  assistant: { id: 'usr_asst', role: 'admin', email: 'asst@x.co', admin_scope: 'assistant' },
-  full: { id: 'usr_full', role: 'admin', email: 'full@x.co', admin_scope: 'full' },
-  legacy_null: { id: 'usr_legacy', role: 'admin', email: 'legacy@x.co', admin_scope: null },
-  grantee_off: { id: 'usr_grant', role: 'admin', email: 'grant@x.co', admin_scope: 'full', private_grants: ['PRICING_PRIVATE_READ', 'PRICING_PRIVATE_WRITE'] },
-  owner_unverified: { id: 'usr_owner', role: 'admin', email: 'boss@x.co', email_verified_at: null },
-};
-
-/** Collects every console line a block prints (the Worker's only log sink). */
-async function captureConsole<T>(fn: () => Promise<T>): Promise<{ out: T; lines: string[] }> {
-  const lines: string[] = [];
-  const methods = ['log', 'info', 'warn', 'error', 'debug'] as const;
-  const saved = methods.map((m) => console[m]);
-  for (const m of methods) console[m] = (...args: unknown[]) => void lines.push(args.map((a) => (a instanceof Error ? `${a.message} ${a.stack}` : typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
-  try {
-    return { out: await fn(), lines };
-  } finally {
-    methods.forEach((m, i) => (console[m] = saved[i]!));
-  }
-}
-
-const noValue = (where: string, text: string) => {
-  for (const v of VALUES) assert.ok(!text.includes(v), `${where} carries «${v}»: ${text.slice(0, 400)}`);
-};
-
-/** The owner stores a complete entry plus typed dinars on the model, data only, at the conversion shown. */
-async function ownerStores(raw?: DatabaseSync) {
-  const w = raw ? pricingWorld({ raw }) : pricingWorld();
-  const pv = await w.previewInputs(SNAP, { inputs: [OWNER_BASE, MODEL_ENTRY], rules: OWNER_RULES });
-  assert.equal(pv.status, 200, JSON.stringify(pv.body));
-  assert.match(pv.body.conversion_hash, /^[0-9a-f]{64}$/);
-  const r = await w.putInputs(SNAP, { inputs_seq: 0, inputs: [OWNER_BASE, MODEL_ENTRY], rules: OWNER_RULES, data_only: true, preview_hash: pv.body.conversion_hash });
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal(r.body.mode, 'manual');
-  return { w, pv, saved: r };
-}
-
-/** Everything a request could have written: the owner rows, the audit trails, the store price. */
-const snapshot = (raw: DatabaseSync) =>
-  JSON.stringify({
-    p: persisted(raw),
-    audit: count(raw, 'SELECT COUNT(*) AS n FROM audit_log'),
-    paudit: count(raw, 'SELECT COUNT(*) AS n FROM pricing_audit'),
-    price: storePrice(raw),
-  });
-
-test('1. no non-owner reaches the changed routes: one generic refusal, the same bytes for a real and an invented id, with or without data_only — no value, no hash, nothing written', async () => {
-  const { w, pv, saved } = await ownerStores();
-  const before = snapshot(w.raw);
-  const seq = saved.body.inputs_seq as number;
-  for (const [name, user] of Object.entries(NON_OWNERS)) {
-    const as = pricingWorld({ raw: w.raw, user });
-    const { out: answers, lines } = await captureConsole(async () => [
-      ['GET inputs', await as.getInputs(SNAP)],
-      ['GET inputs (invented id)', await as.getInputs('zz-no-such-product')],
-      ['POST preview (dinars)', await as.previewInputs(SNAP, { inputs: [OWNER_BASE, MODEL_ENTRY], rules: OWNER_RULES })],
-      ['PUT data_only', await as.putInputs(SNAP, { inputs_seq: seq, inputs: [OWNER_BASE], rules: OWNER_RULES, data_only: true })],
-      ['PUT data_only + the owner’s conversion hash', await as.putInputs(SNAP, { inputs_seq: seq, inputs: [OWNER_BASE, MODEL_ENTRY], data_only: true, preview_hash: pv.body.conversion_hash })],
-      ['PUT data_only + adopt (contradiction)', await as.putInputs(SNAP, { inputs_seq: seq, inputs: [OWNER_BASE], data_only: true, adopt: true })],
-      ['PUT data_only of a wrong type', await as.putInputs(SNAP, { inputs_seq: seq, inputs: [OWNER_BASE], data_only: 'yes' })],
-      ['PUT without data_only (invented id)', await as.putInputs('zz-no-such-product', { inputs_seq: 0, inputs: [OWNER_BASE] })],
-    ] as Array<[string, { status: number; body: Record<string, unknown> }]>);
-    // The guest is asked to sign in, a non-admin is turned away at the admin door, an admin at the cost door.
-    const expected =
-      name === 'guest' ? ['UNAUTHORIZED'] : name === 'owner_unverified' ? ['OWNER_EMAIL_UNVERIFIED'] : user?.role === 'admin' ? ['COST_ACCESS_DENIED'] : ['FORBIDDEN', 'COST_ACCESS_DENIED'];
-    for (const [what, r] of answers) {
-      assert.equal(r.status, name === 'guest' ? 401 : 403, `${name} · ${what}: ${JSON.stringify(r.body)}`);
-      assert.ok(expected.includes(String(r.body.code)), `${name} · ${what}: ${String(r.body.code)}`);
-      const text = JSON.stringify(r.body);
-      noValue(`${name} · ${what}`, text);
-      for (const k of HASH_KEYS) assert.ok(!text.includes(k), `${name} · ${what} carries ${k}`);
-      assert.equal(r.body.details, undefined, `${name} · ${what}: a read or write refusal names nothing`);
-    }
-    // No oracle: the refusal is the same bytes whatever the target, whatever the body.
-    const bodies = new Set(answers.map(([, r]) => JSON.stringify(r.body)));
-    assert.equal(bodies.size, 1, `${name}: ${[...bodies].join(' | ')}`);
-    for (const l of lines) noValue(`${name} · console`, l);
-  }
-  assert.equal(snapshot(w.raw), before, 'no non-owner request wrote anything');
-});
-
-test('2a. the owner’s refusals name a field and ids only — never the typed amount; no console line carries a value', async () => {
-  const live = liveLikeWorld();
-  const { out, lines } = await captureConsole(async () => [
-    // No approved dollar rate: the dinars cannot convert (the new details: field, scope, scope_id).
-    ['FX missing (model)', await live.putInputs(SNAP, { inputs_seq: 0, inputs: [OWNER_BASE, MODEL_ENTRY], rules: OWNER_RULES, data_only: true })],
-    ['FX missing (preview)', await live.previewInputs(SNAP, { inputs: [MODEL_ENTRY] })],
-    // A thousands separator and a trailing point, refused by field.
-    ['separator', await live.putInputs(SNAP, { inputs_seq: 0, inputs: [{ ...OWNER_BASE, supplier_cost_amount: '1,234,000' }], data_only: true })],
-    ['trailing point', await live.putInputs(SNAP, { inputs_seq: 0, inputs: [{ ...OWNER_BASE, supplier_cost_amount: '771.25.' }], data_only: true })],
-  ] as Array<[string, { status: number; body: Record<string, unknown> }]>);
-  const [fx, fxPreview, sep, point] = out;
-  assert.equal(fx![1].status, 409);
-  assert.equal(fx![1].body.code, 'PRICING_FX_RATE_MISSING');
-  assert.deepEqual(fx![1].body.details, { field: 'supplier_cost_iqd', scope: 'option', scope_id: SNAP_MODEL });
-  assert.equal(fxPreview![1].status, 409);
-  assert.deepEqual(fxPreview![1].body.details, { field: 'supplier_cost_iqd', scope: 'option', scope_id: SNAP_MODEL });
-  for (const r of [sep, point]) {
-    assert.equal(r![1].status, 400, JSON.stringify(r![1].body));
-    assert.deepEqual(r![1].body.details, { field: 'supplier_cost_amount' });
-  }
-  for (const [what, r] of out) noValue(`owner · ${what}`, JSON.stringify(r.body));
-  for (const l of lines) noValue('owner refusals · console', l);
-  assert.deepEqual(persisted(live.raw), { inputs: [], rules: [], state: null });
-
-  // A stale conversion hash (the rate the owner was shown moved): a code, never the conversion.
-  const normal = pricingWorld();
-  const stale = await captureConsole(() =>
-    normal.putInputs(SNAP, { inputs_seq: 0, inputs: [MODEL_ENTRY], data_only: true, preview_hash: 'a'.repeat(64) })
-  );
-  assert.equal(stale.out.status, 409);
-  assert.equal(stale.out.body.code, 'PRICING_PREVIEW_STALE');
-  noValue('owner · stale hash', JSON.stringify(stale.out.body));
-  for (const l of stale.lines) noValue('owner stale · console', l);
-});
-
-test('2b. the owner’s data-only save: audit_log carries counts only, no console line carries a value; the second net strips conversion_hash and every value', async () => {
-  const { out, lines } = await captureConsole(() => ownerStores());
-  const { w, pv } = out;
-  for (const l of lines) noValue('owner save · console', l);
-  // What a staff reader of the audit trail sees (created_at left out: its milliseconds are any three digits).
-  const audits = all<Record<string, unknown>>(w.raw, 'SELECT action, target, detail FROM audit_log');
-  assert.ok(audits.length >= 1, 'the save is audited');
-  for (const a of audits) noValue(`audit_log ${String(a.action)}`, JSON.stringify(a));
-  // conversion_hash is an oracle over (product, dinars, rate) — the rate is public in the top bar.
-  const stripped = JSON.stringify(stripFinancials(pv.body));
-  for (const k of ['conversion_hash', 'preview_hash']) assert.ok(!stripped.includes(k), k);
-  assert.ok(!stripped.includes(String(pv.body.conversion_hash)), 'the hash value itself');
-  noValue('stripFinancials(preview)', stripped);
-});
 
 // ------------------------------------------------------------------ 3. the public repository
 

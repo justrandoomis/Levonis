@@ -454,6 +454,24 @@ jobs:
             }
           node scripts/check-live-store-slugs.mjs /tmp/slugs.json
 
+      # THE CLEAN START (DECISIONS row 222, spec addendum A.4.6). One active
+      # ordinary product that is NOT V2-published yet, read-only, so the probes
+      # after the deploy can prove the live site neither shows, finds nor
+      # searches it (scripts/live-cost-probes.d/cleanstart.json). Once every
+      # product is published there is none: the var stays empty and those
+      # probes skip with a notice. A failed read is the same empty var — the
+      # predicate's own tests, not this read, are what gate the deploy.
+      - name: Read one product still waiting for its V2 price (read-only)
+        run: |
+          npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
+            --command "SELECT slug FROM products p WHERE COALESCE(p.composition, '') = '' AND p.status = 'active' AND NOT EXISTS (SELECT 1 FROM product_pricing_state pv2 WHERE pv2.product_id = p.id AND pv2.mode = 'engine' AND pv2.pricing_method IS NOT NULL AND EXISTS (SELECT 1 FROM pricing_v2_sku_results rv2 WHERE rv2.product_id = p.id)) LIMIT 1" \
+            > /tmp/hidden_slug.json 2>/tmp/hidden_slug.err || {
+              echo "::warning::could not read a product waiting for its V2 price — the clean-start probes will skip"
+              echo '[]' > /tmp/hidden_slug.json
+            }
+          slug=$(jq -r '.[0].results[0].slug // empty' /tmp/hidden_slug.json 2>/dev/null || true)
+          if [ -n "$slug" ]; then echo "one product still waits for its V2 price: the clean-start probes will check it is hidden"; else echo "every product is V2-published (or none could be read): the clean-start probes will skip"; fi
+
       - name: Deploy, carrying every existing var forward
         run: |
           set -e
@@ -726,7 +744,13 @@ jobs:
       # the storefront's product answers must carry their integer prices and
       # no cost, supplier, rate or profit key. No cookie, no write.
       - name: Cost-privacy probes, read-only
-        run: node scripts/live-cost-probes.mjs --base https://levonis-iq.com
+        run: |
+          hidden=$(jq -r '.[0].results[0].slug // empty' /tmp/hidden_slug.json 2>/dev/null || true)
+          if [ -n "$hidden" ]; then
+            node scripts/live-cost-probes.mjs --base https://levonis-iq.com --var "hidden_slug=$hidden"
+          else
+            node scripts/live-cost-probes.mjs --base https://levonis-iq.com
+          fi
 
       # The two failures the first production verification found, checked on
       # every deploy from now on. Both were invisible to `npm run check`.

@@ -37,7 +37,7 @@ import { OTHER_IP, SCRIPT, TOOL, blocks, deceptionEvents, deceptionWorld, setCoo
 import { LINKABLE_CAP, THRESHOLD, WEIGHTS, bumpScore, decayed, injectionIn, priceFieldsIn, tamperParams } from '../worker/lib/deception/signals';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
-const { fillPath, loadProbeFiles, pick } = probesScript;
+const { fillPath, loadProbeFiles, pick, planProbe } = probesScript;
 
 const score = (w: World, key: string) => (w.raw.prepare('SELECT score FROM security_scores WHERE actor_key = ?').get(key) as { score: number } | undefined)?.score ?? 0;
 
@@ -221,7 +221,9 @@ test('THE LIVE PROBES NEVER BLOCK: workflow 7\'s anonymous probes and verify pat
   w.raw.exec('PRAGMA foreign_keys = OFF;');
   seedCostlyProduct(w.raw);
   seedLiveCatalog(w.raw);
-  const files = loadProbeFiles(join(ROOT, 'scripts/live-cost-probes.d')) as Array<{ spec: { probes: Array<{ path: string; status: number[] }>; vars?: Record<string, { from: string; pick: string }> } }>;
+  const files = loadProbeFiles(join(ROOT, 'scripts/live-cost-probes.d')) as Array<{
+    spec: { probes: Array<{ path: string; status: number[] }>; vars?: Record<string, { from?: string; pick?: string; optional?: boolean }> };
+  }>;
   const ua = { 'User-Agent': 'levonis-live-cost-probes/1 (read-only)', accept: 'application/json' };
   const ip = '140.82.112.3';
   const verify: Array<[string, number]> = [['/api/health', 200], ['/api/home', 200], ['/api/products?limit=3', 200], ['/api/memberships/plans', 200]];
@@ -234,8 +236,14 @@ test('THE LIVE PROBES NEVER BLOCK: workflow 7\'s anonymous probes and verify pat
     }
     for (const { spec } of files) {
       const vars: Record<string, string> = {};
-      for (const [name, def] of Object.entries(spec.vars ?? {})) vars[name] = pick(JSON.parse(await (await w.call(def.from, { ip, headers: ua })).text()), def.pick);
+      for (const [name, def] of Object.entries(spec.vars ?? {})) {
+        if (!def.from) continue; // a workflow var (--var), e.g. the clean start's hidden slug: its probes skip here
+        const v = pick(JSON.parse(await (await w.call(def.from, { ip, headers: ua })).text()), def.pick!);
+        if (typeof v === 'string' && v) vars[name] = v;
+      }
       for (const p of spec.probes) {
+        const plan = planProbe(p, vars, spec.vars ?? {});
+        if (plan.skip) continue;
         const res = await w.call(fillPath(p.path, vars), { ip, headers: ua });
         assert.ok(p.status.includes(res.status), `round ${round}: ${p.path} answered ${res.status}, want ${p.status}`);
       }

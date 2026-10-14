@@ -50,6 +50,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { APEX, asD1, ctx, freshDb, json, stubApp, proOnSale } from './fixtures/app';
 import { discountedWhere, homeRoutes, productRoutes, shelfDiscountRules } from '../worker/routes/products';
 import type { PricingCtx } from '../worker/routes/products';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 type Raw = DatabaseSync;
 
@@ -190,20 +191,20 @@ test('with no rule and no typed price the shelves stay empty — the fix invents
 /* THE OLD QUESTION IS KEPT, NOT REPLACED                                   */
 /* ====================================================================== */
 
-test('a TYPED tier price below the regular one keeps its badge with no rules at all', async () => {
+// The clean start (DECISIONS row 222, addendum A.6): a typed PRO/PRIME dinar price is legacy money. The first
+// V2 price write clears it (member prices come from the benefit rules only), so it badges nothing any more.
+test('the clean start: a TYPED tier price does not survive the first V2 price — it badges nothing', async () => {
   const raw = proOnSale(freshDb());
-  // The owner's own number on one product — it outranks any rule and must
-  // never have been traded away for them.
   product(raw, 'typed-pro', { price: 100_000, pro: 90_000 });
   product(raw, 'typed-prime', { price: 100_000, prime: 95_000 });
   product(raw, 'typed-but-not-lower', { price: 100_000, pro: 100_000 });
 
   const { home, listing } = await shelves(raw);
-  assert.deepEqual(home, ['typed-pro', 'typed-prime'].sort());
-  assert.deepEqual(listing, ['typed-pro', 'typed-prime'].sort());
+  assert.deepEqual(home, []);
+  assert.deepEqual(listing, []);
 });
 
-test('the predicate is a UNION — typed prices and rules both land on the shelf', async () => {
+test('the predicate is a UNION — a rule lands on the shelf; a typed price no longer does (the clean start)', async () => {
   const raw = proOnSale(freshDb());
   catalog(raw, 't_printers', null);
   catalog(raw, 't_toys', null);
@@ -213,8 +214,8 @@ test('the predicate is a UNION — typed prices and rules both land on the shelf
   rule(raw, 'printers', { tier: 'prime', scope: 'category', category_id: 't_printers', percent: 5 });
 
   const { home, listing } = await shelves(raw);
-  assert.deepEqual(home, ['ruled', 'typed']);
-  assert.deepEqual(listing, ['ruled', 'typed']);
+  assert.deepEqual(home, ['ruled']);
+  assert.deepEqual(listing, ['ruled']);
 });
 
 /* ====================================================================== 3 */
@@ -332,15 +333,15 @@ test('the card and the product page quote the SAME membership numbers', async ()
   assert.equal(page.membership_preview.pro.unit_iqd, card.display_pro_iqd);
 });
 
-test('a TYPED member price is never overwritten by a rule-derived teaser', async () => {
+test('the clean start: a typed member price is gone with the first V2 price — the rule-derived teaser is the card’s number', async () => {
   const raw = proOnSale(freshDb());
-  // The owner typed 600,000 for PRO on this product. A global 10% rule would
-  // compute 607,500 — the typed number wins, here as in `memberPrice`.
+  // The owner once typed 600,000 for PRO on this product. Since the clean start the V2 price write clears
+  // typed member prices, so the global 10% rule quotes the card: 675,000 × 0.9 = 607,500.
   product(raw, 'a1', { price: 675_000, pro: 600_000 });
   rule(raw, 'pro-pct', { tier: 'pro', scope: 'global', percent: 10 });
 
   const card = (await json(await get(app(raw), '/api/home'))).discounted[0] as Record<string, unknown>;
-  assert.equal(card.display_pro_iqd, 600_000);
+  assert.equal(card.display_pro_iqd, 607_500);
 });
 
 test('an order-conditional rule cannot badge a product, because no card could quote it', async () => {
@@ -427,7 +428,9 @@ test('the shelf costs the same number of statements with twelve products as with
     return raw;
   };
   const run = async (count: number) => {
-    const c = counting(build(count));
+    const built = build(count);
+    await publishSeededV2(built); // the clean start (A.12.1); the counting wrapper is the route's only door
+    const c = counting(built);
     const a = stubApp(c.db as never, null, (x) => x.route('/api/home', homeRoutes), {
       host: APEX,
       env: { DB: c.db, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '' },

@@ -17,6 +17,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import { ROOT, SqliteD1 } from './fixtures/d1';
+import { autoPublishMiddleware } from './fixtures/autoPublish';
 import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { cartRoutes, refuseIncompleteSelection } from '../worker/routes/cart';
@@ -25,6 +26,7 @@ import { parseProductRow } from '../worker/lib/productModel';
 
 function app(db: D1Database) {
   const a = new Hono<AppContext>();
+  a.use('*', autoPublishMiddleware(db));
   a.use('*', async (c, next) => {
     c.set('user', { id: 'u1', role: 'customer', email: 'a@x.co' } as never);
     c.env = { DB: db } as never;
@@ -44,6 +46,13 @@ const OPTIONS = JSON.stringify([
 ]);
 const COLORS = JSON.stringify([{ id: 'c_black', name: 'Black', name_ar: 'أسود', hex: '#000000', active: true }]);
 
+/**
+ * The clean start (A.12.1): a product is sold only once V2-published, and V2
+ * publishes a product whose options live in the relation tables — the shape
+ * the editor saves. The JSON columns mirror them, so the route's selection
+ * guard sees exactly what it saw before; the cart's middleware publishes the
+ * product through the real writer at the fixture rate.
+ */
 function setup(opts: { options?: string; colors?: string } = {}) {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
@@ -56,6 +65,15 @@ function setup(opts: { options?: string; colors?: string } = {}) {
        VALUES ('p1','plain','Plain','بسيط',100000,'active',10,?,?,'direct_sale','["direct_sale"]')`
     )
     .run(opts.options ?? '[]', opts.colors ?? '[]');
+  const options = JSON.parse(opts.options ?? '[]') as Array<{ id: string; name: string; name_ar: string; regular_adjust_iqd?: number }>;
+  if (options.length) raw.exec(`INSERT INTO product_option_groups (id,product_id,name_en,sort,active) VALUES ('g_size','p1','Size',0,1);`);
+  options.forEach((o, i) =>
+    raw
+      .prepare('INSERT INTO product_option_values (id,product_id,group_id,name_en,name_ar,sort,active,stock,regular_adjust_iqd) VALUES (?,?,?,?,?,?,1,10,?)')
+      .run(o.id, 'p1', 'g_size', o.name, o.name_ar, i, o.regular_adjust_iqd ?? null)
+  );
+  for (const [i, c] of (JSON.parse(opts.colors ?? '[]') as Array<{ id: string; name: string; name_ar: string; hex: string }>).entries())
+    raw.prepare('INSERT INTO product_colors (id,product_id,name_en,name_ar,hex,sort,active) VALUES (?,?,?,?,?,?,1)').run(c.id, 'p1', c.name, c.name_ar, c.hex, i);
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };
 }
 
@@ -65,7 +83,7 @@ const post = (a: ReturnType<typeof app>, path: string, body: unknown) =>
 const patch = (a: ReturnType<typeof app>, path: string, body: unknown) =>
   a.request(path, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-test('a JSON-column product with options refuses a line that chose none', async () => {
+test('a product with options refuses a line that chose none', async () => {
   const { db } = setup({ options: OPTIONS });
   const res = await post(app(db), '/api/cart/items', { productId: 'p1', qty: 1 });
   assert.equal(res.status, 400);

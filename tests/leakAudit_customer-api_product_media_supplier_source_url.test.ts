@@ -46,6 +46,7 @@ import { seedLiveCatalog, P } from './fixtures/liveCatalog';
 import { leaks } from './fixtures/costlyProduct';
 import { ROLES, appFor, call, seededCopy, type RoleName } from './fixtures/roleMatrix';
 import worker from '../worker/index';
+import { fetchPublished } from './fixtures/autoPublish';
 
 /** Three distinct supplier links, one per way a picture is stored. */
 const SUPPLIER_JSON = 'https://supplier-secret-json.example/listing/x2d/original.jpg';
@@ -120,7 +121,7 @@ function liveWorld() {
     ASSETS: { fetch: async () => new Response('spa') },
   };
   const fetchAnon = (path: string) =>
-    worker.fetch(
+    fetchPublished(worker, 
       new Request(`https://${APEX}${path}`, { headers: { Host: APEX, 'CF-Connecting-IP': '203.0.113.9' } }),
       env as never,
       ctx

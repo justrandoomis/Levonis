@@ -36,6 +36,13 @@ import { loadMaterialPrices, productMaterialType } from '../worker/lib/printQuot
 import { resolveMaterialPrice } from '../worker/lib/printQuote/cost';
 import type { Hono } from 'hono';
 import type { AppContext } from '../worker/lib/types';
+import { publishSeededV2 } from './fixtures/autoPublish';
+
+/** The clean start (A.12.1): the shelf's spools are V2-published (at their seeded price) before the rates read them. */
+const pricesOf = async (raw: Parameters<typeof publishSeededV2>[0], merchantId: string | null, ids: string[]) => {
+  await publishSeededV2(raw);
+  return loadMaterialPrices(asD1(raw), merchantId, ids);
+};
 
 const mount = (a: Hono<AppContext>) => a.route('/api/print-quote', printQuoteRoutes);
 const bucket = { put: async () => ({}), get: async () => null, head: async () => null, delete: async () => undefined };
@@ -89,7 +96,7 @@ test('a shop that sells PLA can price PLA, with no hand-linked product and no in
 
   // BEFORE: the seeded database prices nothing. This is not a hypothetical —
   // it is the state a real deployment is in, and it is what the owner met.
-  const bare = await loadMaterialPrices(asD1(raw), null, ['pla']);
+  const bare = await pricesOf(raw, null, ['pla']);
   assert.equal(
     resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, bare),
     null,
@@ -99,7 +106,7 @@ test('a shop that sells PLA can price PLA, with no hand-linked product and no in
   // 1 kg of PLA on the shelf at 25,000 د.ع.
   sellFilament(raw, { id: 'fil_pla', type: 'PLA', priceIqd: 25000, netWeight: '1000' });
 
-  const sources = await loadMaterialPrices(asD1(raw), null, ['pla']);
+  const sources = await pricesOf(raw, null, ['pla']);
   const price = resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources);
   assert.ok(price, 'the shop sells PLA, so PLA has a price per kilo');
   assert.equal(price.iqdPerKg, 25000);
@@ -136,7 +143,7 @@ test('the cheapest spool on the shelf sets the rate, and an inactive one sets no
   // Draft and hidden products are not on sale, so they are not evidence of a price.
   sellFilament(raw, { id: 'fil_pla_c', type: 'PLA', priceIqd: 9000, netWeight: '1000', status: 'draft' });
 
-  const sources = await loadMaterialPrices(asD1(raw), null, ['pla']);
+  const sources = await pricesOf(raw, null, ['pla']);
   assert.equal(resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources)!.iqdPerKg, 24000);
 });
 
@@ -144,7 +151,7 @@ test('a half-kilo spool is priced per kilo, not per package', async () => {
   const { raw } = shopThatSellsFilament();
   sellFilament(raw, { id: 'fil_petg', type: 'PETG', priceIqd: 14000, netWeight: '500 g' });
 
-  const sources = await loadMaterialPrices(asD1(raw), null, ['petg']);
+  const sources = await pricesOf(raw, null, ['petg']);
   assert.equal(resolveMaterialPrice({ materialId: 'petg', materialType: 'PETG' }, sources)!.iqdPerKg, 28000);
 });
 
@@ -153,7 +160,7 @@ test('a filament with no net weight or no price is not evidence of anything', as
   sellFilament(raw, { id: 'fil_no_weight', type: 'PLA', priceIqd: 25000, netWeight: '' });
   sellFilament(raw, { id: 'fil_zero', type: 'PLA', priceIqd: 0, netWeight: '1000' });
 
-  const sources = await loadMaterialPrices(asD1(raw), null, ['pla']);
+  const sources = await pricesOf(raw, null, ['pla']);
   assert.equal(
     resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources),
     null,
@@ -192,7 +199,7 @@ test('a PLA on the shelf does not put a price on PLA-CF', async () => {
   const { raw } = shopThatSellsFilament();
   sellFilament(raw, { id: 'fil_pla', type: 'PLA', priceIqd: 25000, netWeight: '1000' });
 
-  const sources = await loadMaterialPrices(asD1(raw), null, ['pla', 'pla-cf']);
+  const sources = await pricesOf(raw, null, ['pla', 'pla-cf']);
   assert.ok(resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources));
   assert.equal(
     resolveMaterialPrice({ materialId: 'pla-cf', materialType: 'PLA-CF' }, sources),
@@ -221,7 +228,7 @@ test('a merchant spool still outranks the shelf price', async () => {
     )
     .run();
 
-  const sources = await loadMaterialPrices(asD1(raw), 'm1', ['pla']);
+  const sources = await pricesOf(raw, 'm1', ['pla']);
   const price = resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources)!;
   assert.equal(price.iqdPerKg, 18000, 'what the merchant paid, not what the shelf asks');
   assert.equal(price.from, 'merchant');
@@ -233,7 +240,7 @@ test('a hand-linked product still outranks the type match', async () => {
   sellFilament(raw, { id: 'fil_pla_exact', type: 'PLA', priceIqd: 31000, netWeight: '1000' });
   raw.prepare(`UPDATE print_materials SET product_id = 'fil_pla_exact' WHERE id = 'pla'`).run();
 
-  const sources = await loadMaterialPrices(asD1(raw), null, ['pla']);
+  const sources = await pricesOf(raw, null, ['pla']);
   const price = resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources)!;
   assert.equal(price.iqdPerKg, 31000, 'the link is a decision, and a decision outranks a match');
   assert.equal(price.from, 'profile');

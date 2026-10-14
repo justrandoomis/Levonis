@@ -253,14 +253,19 @@ export function stubApp(
   db: unknown,
   user: StubUser | null,
   mount: Mount,
-  opts: { host?: string; env?: Record<string, unknown>; sessionAgeSeconds?: number; publishV2?: boolean } = {}
+  opts: { host?: string; env?: Record<string, unknown>; sessionAgeSeconds?: number; publishV2?: boolean | 'always' } = {}
 ) {
   const a = new Hono<AppContext>();
   // The clean start (A.12.1): seeded raw products are V2-published before a customer request
-  // (tests/fixtures/autoPublish.ts); `publishV2: false` keeps them as the cut-over left them.
+  // (tests/fixtures/autoPublish.ts); `publishV2: false` keeps them as the cut-over left them, and
+  // `'always'` publishes before an admin request too (a gift level or a pool names a sellable product).
   if (opts.publishV2 !== false) {
     a.use('*', async (c, next) => {
-      if (!c.req.path.startsWith('/api/admin')) await (await import('./autoPublish')).autoPublishV2(db);
+      // Only a customer request publishes by default: an /api/ path outside /api/admin (an admin or
+      // finance router a test mounts at a short prefix — '/p', '/f', '/i' — never needs a sellable
+      // product, and a fixture publish would approve the fixture rate under it).
+      const p = c.req.path;
+      if (opts.publishV2 === 'always' || (p.startsWith('/api/') && !p.startsWith('/api/admin'))) await (await import('./autoPublish')).autoPublishV2(db);
       await next();
     });
   }

@@ -1,0 +1,32 @@
+{
+  "step": "Pricing V2 clean start (DECISIONS row 222, spec addendum A.4.6): a product still in «يحتاج تسعيرًا» is neither listed, found nor searchable",
+  "vars": {
+    "hidden_slug": {
+      "optional": true,
+      "note": "workflow 7 reads one active ordinary product that is not V2-published (read-only) and passes --var hidden_slug=…; once every product is published there is none and these probes skip with a notice"
+    }
+  },
+  "probes": [
+    {
+      "path": "/api/products/{hidden_slug}",
+      "status": [
+        404
+      ]
+    },
+    {
+      "path": "/api/public/v1/products/{hidden_slug}",
+      "status": [
+        404
+      ]
+    },
+    {
+      "path": "/api/products?search={hidden_slug}",
+      "status": [
+        200
+      ],
+      "forbidValues": {
+        "slug": "{hidden_slug}"
+      }
+    }
+  ]
+}

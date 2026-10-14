@@ -57,6 +57,7 @@ import { miscRoutes } from '../worker/routes/misc';
 import { homeRoutes } from '../worker/routes/products';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import { ANONYMOUS_CACHE_CONTROL } from '../worker/lib/edgePolicy';
+import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 
 const BASE = '/api/admin/pricing';
 /** IQWealth's published parallel-market SELL — the provider's own public quote, not a Levonis figure. */
@@ -138,7 +139,7 @@ async function withZoneCache(run: (cache: Zone) => Promise<void>) {
 const settle = () => Promise.all(pending.splice(0));
 
 async function storedBody(cache: Zone, path: string): Promise<Record<string, any> | null> {
-  const entry = cache.store.get(`https://${APEX}${path}`);
+  const entry = cache.store.get(withCacheEpoch(`https://${APEX}${path}`));
   return entry ? ((await entry.clone().json()) as Record<string, any>) : null;
 }
 
@@ -271,7 +272,7 @@ test('purge seam: after the owner moves the adjustment, the refilled colo entry 
     cache.deleted.length = 0;
     await ownerSetsAdjustment(raw, PRIVATE_ADJUSTMENT_2);
     assert.equal(pairOf(raw, 'USD_IQD').market_adjustment_iqd, PRIVATE_ADJUSTMENT_2);
-    assert.ok(cache.deleted.includes(`https://${APEX}/api/settings/public`), `the act purged the apex entry (deleted: ${cache.deleted.join(', ') || 'none'})`);
+    assert.ok(cache.deleted.includes(withCacheEpoch(`https://${APEX}/api/settings/public`)), `the act purged the apex entry (deleted: ${cache.deleted.join(', ') || 'none'})`);
 
     // The next visitor refills the shared entry with the new figure.
     const after = await guestGet(raw, '/api/settings/public', '10.20.30.40');

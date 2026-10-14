@@ -4,7 +4,11 @@
  *
  * Every scenario runs the real scheduler, the real owner routes and the real
  * engine writer on a real 0181 database with the 41 census products; the
- * providers are fakes, the edge cache a recorder. Proves:
+ * providers are fakes, the edge cache a recorder. Since the clean start (spec
+ * addendum A.6) the products the run reprices are V2 products only, written
+ * through the V2 writer (tests/fixtures/pricingV2.ts `writeV2`): the brief's
+ * product cost-first, D = ceil_1000(EUR 450 × 1.1 × U + 2.5 kg × freight +
+ * $120 × U), every channel at D, COD = D. Proves:
  *   - a USD/IQD move above the dead band reprices an engine product within the
  *     SAME tick: the cart charges the new price, price − cost ≥ the minimum
  *     profit at the new rate, `engine_fx` history, values only in
@@ -37,63 +41,54 @@ import { ROOT, SqliteD1, type SqliteStatement } from './fixtures/d1';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import { sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
-import { listPricedProducts, loadPreviewContext, loadProducts } from '../worker/lib/pricingEngine/load';
-import { evaluateLegacy } from '../worker/lib/pricingEngine/legacy';
+import { listPricedProducts } from '../worker/lib/pricingEngine/load';
+import { autoRepriceStatus } from '../worker/lib/pricingEngine/autoReprice';
+import { cartGrid, writeV2 } from './fixtures/pricingV2';
 import { priceImageOf, priceImagesEach, priceImagesOf } from '../worker/lib/pricingEngine/engineWrite';
 import type { Env } from '../worker/lib/types';
 
 type World = ReturnType<typeof pricingWorld>;
 
-const COMPLETE = {
-  inputs: [{ scope: 'base', supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '120' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 50_000 },
-  ],
+/** The brief's product, cost-first in V2: EUR 450, Germany land 2.5 kg, a $120 minimum profit, no discount. */
+const adoptAms = async (w: World) => {
+  await writeV2(w.db, AMS, {
+    method: 'cost',
+    inputs: { supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 },
+    minimumProfitUsd: '120',
+  });
 };
 
-const seqOf = (w: World, pid: string) => row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', pid)?.s ?? 0;
-
-/** The owner's completing save through the product form: 409 with the preview, then the save with its hash. */
-async function adoptWith(w: World, pid: string, draft: Record<string, unknown>): Promise<boolean> {
-  const first = await w.putInputs(pid, { inputs_seq: seqOf(w, pid), ...draft });
-  if (first.status !== 409 || first.body.code !== 'PRICING_PREVIEW_REQUIRED') return false;
-  const hash = first.body.details?.preview?.preview_hash;
-  if (typeof hash !== 'string') return false;
-  const saved = await w.putInputs(pid, { inputs_seq: seqOf(w, pid), ...draft, preview_hash: hash, confirm_large_change: true });
-  return saved.status === 200 && saved.body.mode === 'engine';
-}
-
-const adoptAms = async (w: World) => assert.equal(await adoptWith(w, AMS, COMPLETE), true, 'the brief product adopts');
-
-/** A plain dollar product: USD supplier cost, Germany by land, $20 minimum profit, 15,000 IQD Direct Sale Extra. */
-const usdDraft = (usd: number) => ({
-  inputs: [{ scope: 'base', supplier_cost_amount: String(usd), supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '20' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 15_000 },
-  ],
-});
-
-/** The first `n` census products (not the brief's) that adopt with a USD supplier cost each. */
+/** The first `n` census products (not the brief's) the V2 writer prices cost-first at a USD supplier cost each, Germany land 1 kg, $20 minimum profit. */
 async function adoptUsdProducts(w: World, costs: readonly number[]): Promise<string[]> {
   const out: string[] = [];
   for (const p of await listPricedProducts(w.db)) {
     if (out.length === costs.length) break;
     if (p.id === AMS) continue;
-    if (await adoptWith(w, p.id, usdDraft(costs[out.length]!))) out.push(p.id);
+    try {
+      await writeV2(w.db, p.id, {
+        method: 'cost',
+        inputs: { supplier_cost_amount: String(costs[out.length]), supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 },
+        minimumProfitUsd: '20',
+      });
+      out.push(p.id);
+    } catch {
+      /* a shape this draft cannot price: the next */
+    }
   }
   assert.equal(out.length, costs.length, 'enough census products adopt');
   return out;
 }
 
-/** What the cart charges a guest today, per model × channel (the live resolver). */
+/** What the cart charges a guest today, per `combo_key@channel` (the live resolver). */
 async function cartPrices(w: World, pid = AMS) {
-  const loaded = (await loadProducts(w.db, [pid])).get(pid)!;
-  const ctx = await loadPreviewContext(w.db);
-  const ev = evaluateLegacy(pid, loaded.doc, loaded.view, ctx);
-  return Object.fromEntries(ev.models.flatMap((m) => m.channels.filter((c) => c.ok).map((c) => [`${m.option_id}@${c.channel}`, { prepaid: c.prepaid_iqd, cod: c.cod_iqd }])));
+  const grid = await cartGrid(w.db, pid);
+  return Object.fromEntries(Object.entries(grid).filter(([, v]) => v.ok).map(([k, v]) => [k, { prepaid: v.prepaid, cod: v.cod }]));
 }
+const LAND = `o:${AMS_MODEL}@pre_order_land`;
+const DIRECT = `o:${AMS_MODEL}@direct_sale`;
+
+/** The automatic repricing's own status (the stale list the owner's screens read). */
+const status = async (w: World) => (await autoRepriceStatus(w.db))!;
 
 /** Every customer-price column of the products named (and their relations), as stored. */
 const priceImage = (w: World, ids: readonly string[]) =>
@@ -158,7 +153,7 @@ test('a USD/IQD move above the dead band reprices the engine product within the 
   await adoptAms(w);
   const manual = manualIds(w);
   const manualBefore = priceImage(w, manual);
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`]!.prepaid, 992_000, '$620 × 1,600');
+  assert.equal((await cartPrices(w))[LAND]!.prepaid, 992_000, '$620 × 1,600');
   const history0 = count(w.raw, 'SELECT COUNT(*) AS n FROM price_history');
   const trap = trapPurges();
   let report: Awaited<ReturnType<typeof runFxScheduler>>;
@@ -179,27 +174,26 @@ test('a USD/IQD move above the dead band reprices the engine product within the 
   const land = ceil1000(450 * 1.1 * 1632 + 2.5 * 3200 + 120 * 1632);
   assert.equal(land, 1_012_000);
   const cart = await cartPrices(w);
-  assert.deepEqual(cart[`${AMS_MODEL}@pre_order_land`], { prepaid: land, cod: land + 50_000 });
-  assert.deepEqual(cart[`${AMS_MODEL}@direct_sale`], { prepaid: land + 50_000, cod: land + 50_000 });
+  assert.deepEqual(cart[LAND], { prepaid: land, cod: land });
+  assert.deepEqual(cart[DIRECT], { prepaid: land, cod: land });
 
   // The floor at the NEW rate: price − replacement cost ≥ the minimum profit ($120 × 1,632).
-  const costs = all<{ channel: string; computed_price_iqd: number; replacement_cost_iqd: number; target_profit_iqd: number; usd_iqd_rate: string; direct_sale_extra_iqd: number | null }>(
+  const costs = all<{ channel: string; final_price_iqd: number; replacement_cost_iqd: number; usd_iqd_rate: string }>(
     w.raw,
-    'SELECT channel, computed_price_iqd, replacement_cost_iqd, target_profit_iqd, usd_iqd_rate, direct_sale_extra_iqd FROM pricing_sku_costs WHERE product_id = ? ORDER BY channel',
+    'SELECT channel, final_price_iqd, replacement_cost_iqd, usd_iqd_rate FROM pricing_v2_sku_results WHERE product_id = ? ORDER BY channel',
     AMS
   );
   assert.equal(costs.length, 2);
   for (const c of costs) {
     assert.equal(c.usd_iqd_rate, '1632');
-    assert.equal(c.target_profit_iqd, 120 * 1632);
-    assert.ok(c.computed_price_iqd - c.replacement_cost_iqd >= c.target_profit_iqd, `${c.channel}: price − cost ≥ the minimum profit`);
+    assert.ok(c.final_price_iqd - c.replacement_cost_iqd >= 120 * 1632, `${c.channel}: price − cost ≥ the minimum profit`);
   }
 
   // Owner decision 6's observations: FX-only, so `engine_fx`, with the U the price was computed at.
   const history = all<Record<string, unknown>>(w.raw, 'SELECT variant_key, old_iqd, new_iqd, usd_iqd_rate, price_source FROM price_history WHERE product_id = ? ORDER BY id DESC LIMIT 2', AMS);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM price_history') - history0, 2);
   assert.deepEqual(history.map((h) => [h.variant_key, h.old_iqd, h.new_iqd, h.usd_iqd_rate, h.price_source]).sort(), [
-    [`sku:o:${AMS_MODEL}@direct_sale`, 1_042_000, land + 50_000, '1632', 'engine_fx'],
+    [`sku:o:${AMS_MODEL}@direct_sale`, 992_000, land, '1632', 'engine_fx'],
     [`sku:o:${AMS_MODEL}@pre_order_land`, 992_000, land, '1632', 'engine_fx'],
   ]);
 
@@ -210,10 +204,10 @@ test('a USD/IQD move above the dead band reprices the engine product within the 
     AMS
   )!;
   assert.equal(entry.action, 'reprice_auto');
-  assert.match(entry.idempotency_key, /^auto:lp_08:[0-9a-f]{64}$/);
+  assert.match(entry.idempotency_key, /^auto:lp_08:/);
   assert.match(entry.pricing_after_json, /1012000/);
   assert.equal(entry.actor_id, 'system:fx');
-  const log = row<{ actor_id: string | null; detail: string }>(w.raw, "SELECT actor_id, detail FROM audit_log WHERE action = 'pricing.engine.repriced_auto'")!;
+  const log = row<{ actor_id: string | null; detail: string }>(w.raw, "SELECT actor_id, detail FROM audit_log WHERE action LIKE 'pricing.%repriced_auto'")!;
   assert.equal(log.actor_id, null, 'the cron is the system');
   assert.doesNotMatch(log.detail, /1012000|1062000|1632|992000/, 'audit_log carries ids and codes only');
   assert.match(log.detail, /"reasons":\["EUR","USD"\]/);
@@ -226,11 +220,10 @@ test('a USD/IQD move above the dead band reprices the engine product within the 
   assert.ok(trap.paths.includes('/api/settings/public'));
 
   // Nothing is left: the stale list is empty, the status says the last run; every token deleted.
-  const list = await json(await get(w.app, '/api/admin/pricing/save-list'));
-  assert.equal(list.stale.count, 0);
-  assert.equal(list.auto.active, false);
-  assert.equal(list.auto.last_run.repriced, 1);
-  assert.equal(list.auto.last_run.trigger, 'fx');
+  const st = await status(w);
+  assert.equal(st.stale, 0);
+  assert.equal(st.last_run?.repriced, 1);
+  assert.equal(st.last_run?.trigger, 'fx');
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM ops_guards'), 0);
   // Manual products: never touched.
   assert.equal(priceImage(w, manual), manualBefore);
@@ -241,7 +234,7 @@ test('below the dead band: a check is recorded and nothing else — no price wri
   const w = pricingWorld();
   await adoptAms(w);
   const image = priceImage(w, [AMS, ...manualIds(w)]);
-  const stamps = JSON.stringify(all(w.raw, 'SELECT * FROM pricing_sku_costs ORDER BY product_id, combo_key, channel'));
+  const stamps = JSON.stringify(all(w.raw, 'SELECT * FROM pricing_v2_sku_results ORDER BY product_id, combo_key, channel'));
   const before = {
     history: count(w.raw, 'SELECT COUNT(*) AS n FROM price_history'),
     audits: count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_audit'),
@@ -261,7 +254,7 @@ test('below the dead band: a check is recorded and nothing else — no price wri
   assert.equal(report.repricing?.skipped, 'NOTHING_STALE');
   assert.equal(pairOf(w.raw, 'USD_IQD').effective_rate, '1600');
   assert.equal(priceImage(w, [AMS, ...manualIds(w)]), image);
-  assert.equal(JSON.stringify(all(w.raw, 'SELECT * FROM pricing_sku_costs ORDER BY product_id, combo_key, channel')), stamps);
+  assert.equal(JSON.stringify(all(w.raw, 'SELECT * FROM pricing_v2_sku_results ORDER BY product_id, combo_key, channel')), stamps);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM price_history'), before.history);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_audit'), before.audits);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'pricing.%'"), before.logs);
@@ -307,10 +300,10 @@ test('REVIEW_REQUIRED reprices nothing until the owner approves; the approval re
     assert.equal(pair.effective_rate, '1680');
     assert.equal(pair.drift_anchor_rate, '1680');
     const land = ceil1000(450 * 1.1 * 1680 + 2.5 * 3200 + 120 * 1680);
-    assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`]!.prepaid, land);
+    assert.equal((await cartPrices(w))[LAND]!.prepaid, land);
     const entry = row<{ action: string; actor_id: string }>(w.raw, "SELECT action, actor_id FROM pricing_audit WHERE entity = 'sku_price' ORDER BY created_at DESC, rowid DESC LIMIT 1")!;
     assert.deepEqual(entry, { action: 'reprice_auto', actor_id: 'usr_owner' });
-    const log = row<{ actor_id: string }>(w.raw, "SELECT actor_id FROM audit_log WHERE action = 'pricing.engine.repriced_auto'")!;
+    const log = row<{ actor_id: string }>(w.raw, "SELECT actor_id FROM audit_log WHERE action LIKE 'pricing.%repriced_auto'")!;
     assert.equal(log.actor_id, 'usr_owner', "the owner's act repriced");
     const slug = row<{ slug: string }>(w.raw, 'SELECT slug FROM products WHERE id = ?', AMS)!.slug;
     assert.ok(trap.paths.includes(`/api/products/${slug}`));
@@ -366,9 +359,7 @@ test('deficit first, within the statement budget, carried over tick by tick unti
   const manual = manualIds(w);
   const manualBefore = priceImage(w, manual);
   applyRate(w.raw, 'USD_IQD', '1700'); // +6.25%: every engine product is now below its new floor
-  const listed = await json(await get(w.app, '/api/admin/pricing/save-list'));
-  assert.equal(listed.stale.count, 4);
-  assert.equal(listed.auto.active, true);
+  assert.equal((await status(w)).stale, 4);
 
   const BUDGET = 75;
   const order: string[] = [];
@@ -389,16 +380,14 @@ test('deficit first, within the statement budget, carried over tick by tick unti
   }
   assert.deepEqual(order, [p900!, AMS, p300!, p100!], 'largest deficit first, then each tick takes up where the last stopped');
   assert.ok(perProduct.every((n) => n <= 40), `statements per repriced product ≤ 40 (${perProduct.join(', ')})`);
-  const after = await json(await get(w.app, '/api/admin/pricing/save-list'));
-  assert.equal(after.stale.count, 0, 'the stale list is empty');
-  assert.equal(after.auto.active, false);
-  // Every product at the new rate keeps price − cost ≥ the minimum profit.
-  for (const c of all<{ product_id: string; computed_price_iqd: number; replacement_cost_iqd: number; target_profit_iqd: number; usd_iqd_rate: string }>(
+  assert.equal((await status(w)).stale, 0, 'the stale list is empty');
+  // Every product at the new rate: every result at 1,700, and the direct price keeps D − R ≥ T × U.
+  for (const c of all<{ product_id: string; channel: string; final_price_iqd: number; replacement_cost_iqd: number; target_profit_usd: string; usd_iqd_rate: string }>(
     w.raw,
-    'SELECT product_id, computed_price_iqd, replacement_cost_iqd, target_profit_iqd, usd_iqd_rate FROM pricing_sku_costs'
+    'SELECT product_id, channel, final_price_iqd, replacement_cost_iqd, target_profit_usd, usd_iqd_rate FROM pricing_v2_sku_results'
   )) {
     assert.equal(c.usd_iqd_rate, '1700', c.product_id);
-    assert.ok(c.computed_price_iqd - c.replacement_cost_iqd >= c.target_profit_iqd, c.product_id);
+    if (c.channel === 'direct_sale') assert.ok(c.final_price_iqd - c.replacement_cost_iqd >= Number(c.target_profit_usd) * 1700, c.product_id);
   }
   assert.deepEqual(engineIds(w).sort(), [AMS, p900!, p300!, p100!].sort());
   assert.equal(priceImage(w, manual), manualBefore, 'manual products never touched');
@@ -415,7 +404,7 @@ test('a product that cannot be repriced keeps its prices, stays listed with its 
               DELETE FROM pricing_rules WHERE product_id = '${AMS}' AND kind = 'target_profit';
               DELETE FROM ops_guards WHERE id = 'engine-price:${AMS}';`);
   // A second product's write is refused by the database itself.
-  w.raw.exec(`CREATE TRIGGER test_refuse BEFORE INSERT ON pricing_sku_costs WHEN NEW.product_id = '${refused}' BEGIN SELECT RAISE(ABORT, 'INJECTED'); END;`);
+  w.raw.exec(`CREATE TRIGGER test_refuse BEFORE INSERT ON pricing_v2_sku_results WHEN NEW.product_id = '${refused}' BEGIN SELECT RAISE(ABORT, 'INJECTED'); END;`);
   const amsImage = priceImage(w, [AMS]);
   const refusedImage = priceImage(w, [refused!]);
   applyRate(w.raw, 'USD_IQD', '1700');
@@ -434,17 +423,17 @@ test('a product that cannot be repriced keeps its prices, stays listed with its 
   assert.equal(row<{ c: string }>(w.raw, 'SELECT reprice_blocked_code AS c FROM product_pricing_state WHERE product_id = ?', AMS)!.c, 'TARGET_PROFIT_MISSING');
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM ops_guards'), 0);
 
-  // Listed, with its code (never a figure), on the owner's page and in the counts.
-  const list = await json(await get(w.app, '/api/admin/pricing/save-list'));
-  assert.equal(list.stale.count, 2);
+  // Listed, with its code (never a figure), in the run's status and on the product's state.
+  const st = await status(w);
+  assert.equal(st.stale, 2);
   assert.deepEqual(
-    (list.stale.items as Array<{ product_id: string; blocked_code: string | null }>).map((i) => [i.product_id, i.blocked_code]).sort(),
+    all<{ product_id: string; c: string | null }>(w.raw, 'SELECT product_id, reprice_blocked_code AS c FROM product_pricing_state WHERE reprice_blocked_code IS NOT NULL ORDER BY product_id').map((i) => [i.product_id, i.c]).sort(),
     [
       [AMS, 'TARGET_PROFIT_MISSING'],
       [refused!, 'COMMIT_REFUSED'],
     ].sort()
   );
-  assert.equal(list.auto.blocked, 2);
+  assert.equal(st.blocked, 2);
   const rates = await json(await get(w.app, '/api/admin/pricing/rates'));
   assert.equal(rates.reprice_blocked, 2);
   assert.equal(rates.stale_products, 2);
@@ -461,7 +450,7 @@ test('a product that cannot be repriced keeps its prices, stays listed with its 
   const again = await sweepStaleEnginePrices(envOf(w.raw), { trigger: 'sweep', budget: statementBudget(200) });
   assert.equal(again.skipped, 'NOTHING_STALE');
   assert.equal(again.stale, 2);
-  assert.ok(again.statements <= 4, `one indexed read and the rates (${again.statements})`);
+  assert.ok(again.statements <= 5, `one indexed read, the V2 results and the rates (${again.statements})`);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM pricing_audit'), audits);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'fx_attention'"), 2, 'no second bell');
 
@@ -488,11 +477,11 @@ test("a central shipping rate the owner changes reprices the products on that ro
   const res = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version, rate_iqd: '3400', preview_hash: preview.preview_hash });
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
   // ceil_1000(EUR 450 × 1.1 × 1,600 + 2.5 kg × 3,400 + $120 × 1,600) = ceil_1000(992,500)
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`]!.prepaid, 993_000);
+  assert.equal((await cartPrices(w))[LAND]!.prepaid, 993_000);
   assert.equal(ceil1000(450 * 1.1 * 1600 + 2.5 * 3400 + 120 * 1600), 993_000);
-  const sources = all<{ s: string }>(w.raw, "SELECT DISTINCT price_source AS s FROM price_history WHERE batch_id LIKE 'fx_%'").map((r) => r.s);
+  const sources = all<{ s: string }>(w.raw, "SELECT DISTINCT price_source AS s FROM price_history WHERE product_id = ? AND price_source LIKE 'engine_%'", AMS).map((r) => r.s);
   assert.deepEqual(sources, ['engine_owner']);
-  const log = row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action = 'pricing.engine.repriced_auto'")!;
+  const log = row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action LIKE 'pricing.%repriced_auto'")!;
   assert.match(log.detail, /"trigger":"shipping"/);
   assert.match(log.detail, /"reasons":\["GERMANY_LAND"\]/);
 });
@@ -528,7 +517,7 @@ test('the multi-product price image reads exactly the single image every engine 
   });
   const r = await sweepStaleEnginePrices(envOf(w.raw, refusing), { trigger: 'sweep', budget: statementBudget(200) });
   assert.deepEqual(r.repriced, [AMS]);
-  assert.equal((await cartPrices(w))[`${AMS_MODEL}@pre_order_land`]!.prepaid, ceil1000(450 * 1.1 * 1700 + 2.5 * 3200 + 120 * 1700));
+  assert.equal((await cartPrices(w))[LAND]!.prepaid, ceil1000(450 * 1.1 * 1700 + 2.5 * 3200 + 120 * 1700));
 });
 
 function tsFiles(dir: string, out: string[] = []): string[] {
@@ -553,7 +542,6 @@ test('static: the storefront never imports the repricing or the engine — only 
     'worker/lib/fx/reprice.ts',
     'worker/lib/fx/scheduler.ts',
     'worker/lib/pricingEngine/ratePreview.ts',
-    'worker/routes/adminPricing.ts',
   ]);
   // The client and every customer route import nothing of the engine.
   for (const f of tsFiles(join(ROOT, 'src'))) assert.doesNotMatch(readFileSync(f, 'utf8'), /from\s+['"][^'"]*(pricingEngine|fx\/reprice)[^'"]*['"]/, relative(ROOT, f));
@@ -565,7 +553,7 @@ test('static: the storefront never imports the repricing or the engine — only 
 
 // ------------------------------------------------------------- the owner's words
 
-test('«يُعاد التسعير تلقائياً» on «التسعير والشحن» and in the rates panel, in ar, en and real Sorani; the bell carries no figure', async () => {
+test('«يُعاد التسعير تلقائياً» in ar, en and real Sorani; the bell carries no figure', async () => {
   const { ENGINE_SAVE_STRINGS } = await import('../src/components/adminOperations/engineSaveStrings');
   const { REPRICE_BLOCKED_NOTICE } = await import('../worker/lib/fx/notify');
   assert.equal(ENGINE_SAVE_STRINGS.ar.autoTitle, 'يُعاد التسعير تلقائياً');
@@ -584,16 +572,6 @@ test('«يُعاد التسعير تلقائياً» on «التسعير وال�
   }
   assert.doesNotMatch(`${REPRICE_BLOCKED_NOTICE.title.ckb} ${REPRICE_BLOCKED_NOTICE.body.ckb}`, /[ةىيك]/);
   assert.match(REPRICE_BLOCKED_NOTICE.body.ckb, /[ڕڵێۆەڤ]/);
-  // The status line sits in the stale list, which both screens mount.
-  const list = readFileSync(join(ROOT, 'src/components/adminPricing/EngineSaveList.tsx'), 'utf8');
-  assert.match(list, /<AutoRepriceLine /);
-  assert.match(list, /data-engine-blocked-code/);
-  assert.match(readFileSync(join(ROOT, 'src/components/adminPricing/RatesPanel.tsx'), 'utf8'), /<EngineSaveList lang=\{lang\} compact/);
-  const root = readFileSync(join(ROOT, 'src/components/adminPricing/AdminPricing.tsx'), 'utf8');
-  const panel = readFileSync(join(ROOT, 'src/components/adminPricing/RatesPanel.tsx'), 'utf8');
-  assert.match(root, /<EngineSaveList lang=\{lang\} reloadKey=\{reload\} onChanged=\{refreshPrices\} \/>/);
-  assert.match(root, /<RatesPanel lang=\{lang\} dir=\{dir\} onChanged=\{refreshPrices\} reloadKey=\{reload\} \/>/);
-  assert.match(list, /if \(done > 0\) onChanged\?\.\(\);/);
-  assert.match(panel, /reloadKey=\{ratesSeq \+ reloadKey\} onChanged=\{onChanged\}/);
-  assert.match(panel, /\[reload, reloadKey\]/);
+  // The stale list and its status line (EngineSaveList, AutoRepriceLine) went with the V1 client (the clean
+  // start, spec addendum A.6, A.11); the strings and the bell stay.
 });

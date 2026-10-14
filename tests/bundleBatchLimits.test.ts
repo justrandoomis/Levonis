@@ -17,7 +17,6 @@
  * still commits (so the limit is not theatre), and one line over it is refused
  * by name with nothing written (so the limit is real).
  */
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, stubApp, post, json, count, type StubUser } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
@@ -25,6 +24,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { MAX_PHYSICAL_LINES } from '../worker/lib/bundleComposition';
 import { addBundle, seedCatalogue, orderBody, type ComponentSpec } from './lib/bundles';
 import type { DatabaseSync } from 'node:sqlite';
+import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown) =>
@@ -50,7 +50,7 @@ function manyMembers(raw: DatabaseSync, n: number): ComponentSpec[] {
   return out;
 }
 
-test('a MAXIMAL legal order commits — the ceiling is not theatre', async () => {
+q7Test('a MAXIMAL legal order commits — the ceiling is not theatre', async () => {
   const raw = seedCatalogue();
   const components = manyMembers(raw, 24);
   addBundle(raw, {
@@ -74,7 +74,7 @@ test('a MAXIMAL legal order commits — the ceiling is not theatre', async () =>
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
 });
 
-test('one line over the ceiling is refused with COMPOSITION_TOO_LARGE, naming the limit, writing nothing', async () => {
+q7Test('one line over the ceiling is refused with COMPOSITION_TOO_LARGE, naming the limit, writing nothing', async () => {
   const raw = seedCatalogue();
   const components = manyMembers(raw, 26);
   addBundle(raw, {
@@ -94,7 +94,7 @@ test('one line over the ceiling is refused with COMPOSITION_TOO_LARGE, naming th
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0);
 });
 
-test('the ceiling is judged across the WHOLE order, not one line at a time', async () => {
+q7Test('the ceiling is judged across the WHOLE order, not one line at a time', async () => {
   const raw = seedCatalogue();
   const components = manyMembers(raw, 24);
   addBundle(raw, {
@@ -125,7 +125,7 @@ test('the ceiling is judged across the WHOLE order, not one line at a time', asy
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
 });
 
-test('a maximal TRACKED order stays inside D1’s bound-parameter budget', async () => {
+q7Test('a maximal TRACKED order stays inside D1’s bound-parameter budget', async () => {
   // Every member tracked, so `planInventory` really does bind one placeholder
   // per (move × target) in its pre-read and really does write two guarded
   // statements per target — the shape the parameter cap applies to.

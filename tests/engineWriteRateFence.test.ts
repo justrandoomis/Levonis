@@ -17,88 +17,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { row } from './fixtures/app';
 import { applyRate } from './fixtures/fx';
-import { pricingWorld, AMS, AMS_MODEL } from './fixtures/procurementPricing';
-import { loadPreviewContext, loadProducts } from '../worker/lib/pricingEngine/load';
+import { pricingWorld } from './fixtures/procurementPricing';
 import { loadPricingRates } from '../worker/lib/pricingEngine/rates';
-import { loadProductPricing } from '../worker/lib/pricingEngine/store';
-import { effectiveWrites, loadEngineReads, parseProductInputs, productEngineEvaluation } from '../worker/lib/pricingEngine/productInputs';
-import { engineWriteStatements, rateFenceBinds, RATES_FENCE_SQL } from '../worker/lib/pricingEngine/engineWrite';
-import { isFenceMiss } from '../worker/lib/fx/commit';
+import { rateFenceBinds, RATES_FENCE_SQL } from '../worker/lib/pricingEngine/engineWrite';
 
-const COMPLETE = {
-  inputs: [{ scope: 'base', supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '120' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 50_000 },
-  ],
-};
-
-type World = ReturnType<typeof pricingWorld>;
-
-async function adopt(w: World) {
-  const first = await w.putInputs(AMS, { inputs_seq: 0, ...COMPLETE });
-  assert.equal(first.status, 409, JSON.stringify(first.body));
-  const hash = first.body.details.preview.preview_hash as string;
-  const saved = await w.putInputs(AMS, { inputs_seq: 0, ...COMPLETE, preview_hash: hash, confirm_large_change: true });
-  assert.equal(saved.status, 200, JSON.stringify(saved.body));
-}
-
-const landPrice = (w: World) =>
-  row<{ regular_price_iqd: number }>(
-    w.raw,
-    `SELECT t.regular_price_iqd FROM product_option_transports t JOIN product_option_fulfillment f ON f.id = t.fulfillment_id
-      WHERE t.product_id = ? AND f.option_id = ? AND t.method = 'land'`,
-    AMS,
-    AMS_MODEL
-  )!.regular_price_iqd;
-
-/** The owner's next save (minimum profit $120 → $130), evaluated at `rates`, against the store as it is NOW. */
-async function nextSave(w: World, rates: NonNullable<Awaited<ReturnType<typeof loadPricingRates>>>) {
-  const loaded = (await loadProducts(w.db, [AMS])).get(AMS)!;
-  const [stored, ctx, reads] = await Promise.all([loadProductPricing(w.db, AMS), loadPreviewContext(w.db), loadEngineReads(w.db, AMS)]);
-  const draft = parseProductInputs({ inputs: [], rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '130' }] }, loaded, stored, { rates, now: new Date().toISOString() });
-  const writes = effectiveWrites(draft);
-  const ev = await productEngineEvaluation(loaded, stored, ctx, rates, draft, reads, { writes });
-  assert.equal(ev.kind, 'reprice');
-  assert.equal(ev.complete, true, ev.codes.join(','));
-  const statements = await engineWriteStatements(w.db, ev, writes.inputWrites, writes.ruleWrites, {
-    actor: 'usr_owner',
-    now: new Date().toISOString(),
-    source: 'product_form',
-    idempotencyKey: `price:${AMS}:${ev.hash}`,
-  });
-  return { ev, statements };
-}
-
-test('a rate committed after the evaluation read its rates refuses the price write; nothing is written; at the current rate it writes', async () => {
-  const w = pricingWorld();
-  await adopt(w);
-  assert.equal(landPrice(w), 992_000, 'adopted at $620 × 1,600');
-
-  // The race: the save read its rates at U = 1,600 …
-  const before = await loadPricingRates(w.db);
-  assert.equal(before!.usd_iqd, '1600');
-  // … then the USD/IQD rate moved (config_version moves with it) …
-  applyRate(w.raw, 'USD_IQD', '1700');
-  // … and the store (with the NEW config_version) is read after it.
-  const stale = await nextSave(w, before!);
-  assert.equal(stale.ev.rows.find((r) => r.channel === 'pre_order_land')!.new_iqd, 1_008_000, '$630 × 1,600: the superseded rate');
-  await assert.rejects(w.db.batch(stale.statements), (e) => isFenceMiss(e), 'the rate fence refuses the batch');
-  assert.equal(landPrice(w), 992_000, 'no price was written');
-  assert.equal(
-    row<{ amount_usd: string }>(w.raw, "SELECT amount_usd FROM pricing_rules WHERE product_id = ? AND kind = 'target_profit' AND scope = 'product'", AMS)!.amount_usd,
-    '120',
-    'nor the rule'
-  );
-
-  // The same save at the rates in force now writes the current price: (EUR 450 × 1.1 + 8,000 IQD ÷ 1,700 + $130) × 1,700.
-  const now = await loadPricingRates(w.db);
-  const fresh = await nextSave(w, now!);
-  await w.db.batch(fresh.statements);
-  assert.equal(landPrice(w), 1_071_000);
-  assert.equal(row<{ usd_iqd_rate: string }>(w.raw, "SELECT usd_iqd_rate FROM pricing_sku_costs WHERE product_id = ? AND channel = 'pre_order_land'", AMS)!.usd_iqd_rate, '1700');
-});
-
+// The V1 price write this file once raced (PUT …/inputs, the engine writer) is closed by the clean start
+// (DECISIONS row 222, addendum A.6); the rate fence the V2 writer reuses stays pinned as a pure SQL unit.
 test('the rate fence compares every central rate by value, a missing one included', async () => {
   const w = pricingWorld();
   const rates = (await loadPricingRates(w.db))!;

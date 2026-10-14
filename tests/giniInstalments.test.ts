@@ -47,6 +47,7 @@ import { SETTING_DEFAULTS, PUBLIC_SETTING_KEYS, getSetting } from '../worker/lib
 import { acceptedPolicies } from './lib/policies';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 const PRINTER_IQD = 899_000;
 const DELIVERY_IQD = 5_000;
@@ -102,6 +103,7 @@ function appAs(db: D1Database) {
     c.env = { DB: db } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.route('/api/orders', orderRoutes);
   a.route('/api/cart', cartRoutes);
   // The customer's own return request — mounted here because the refund it
@@ -131,6 +133,7 @@ function adminAppAs(db: D1Database) {
     c.env = { DB: db } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.use('/api/admin/*', requireMainHost);
   a.route('/api/admin', adminRoutes);
   a.route('/api/returns', returnRoutes);
@@ -719,6 +722,7 @@ test('the courier is asked for the delivery fee on a gini order — not 0, and n
       } as never;
       await next();
     });
+    admin.use('*', autoPublishFromEnv);
     admin.use('/api/admin/*', requireMainHost);
     admin.route('/api/admin', adminRoutes);
     admin.onError((err, c) => {

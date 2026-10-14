@@ -105,7 +105,6 @@ function createBody(id: string, key: string) {
     id,
     name_en: 'Media gate',
     name_ar: 'بوابة الصور',
-    price_iqd: 100_000,
     status: 'draft',
     relations: {
       inventory_mode: 'BASE',
@@ -124,7 +123,6 @@ function selectorBody(id: string, optionKey: string, colorKey: string) {
     id,
     name_en: 'Bound selector media',
     name_ar: 'صور مرتبطة',
-    price_iqd: 100_000,
     status: 'draft',
     relations: {
       inventory_mode: 'BASE',
@@ -536,7 +534,6 @@ test('products-v2 preserves omitted product dimensions and explicit null clears 
     id,
     name_en: 'Dimension preserve',
     name_ar: 'حفظ الأبعاد',
-    price_iqd: 100_000,
     status: 'draft',
   };
 

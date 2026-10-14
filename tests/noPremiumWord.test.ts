@@ -165,15 +165,14 @@ test('one name in three languages, the same on the contracts and on the owner sc
   assert.notEqual(NAME.ckb, NAME.ar);
 });
 
-test('the admin screens that set a product’s direct-sale fee call it by the same name — quick price, CSV import sheet', () => {
+test('the admin screen that sets a product’s direct-sale fee calls it by the same name — the CSV import sheet', () => {
   const NAME = { ar: 'زيادة البيع المباشر', en: 'Direct Sale Extra' } as const;
   // The import sheet's human label row (the parser reads the machine row, never this one).
   const shape = templateShape('printer', ['printers'], { includeCost: true });
   const at = shape.columns.indexOf('direct_surcharge_iqd');
   assert.ok(at >= 0, 'the import sheet has no direct_surcharge_iqd column');
   assert.equal(labelRow(shape)[at], NAME.ar);
-  // Quick price shows ar + en side by side. The product form no longer types the fee at all
-  // (Pricing V2-4, 2026-10-14: no dinar field in the form; DECISIONS row 222).
-  assert.match(readFileSync(join(ROOT, 'src/components/adminProducts/QuickPricePanel.tsx'), 'utf8'), new RegExp(`ar="${NAME.ar}" en="${NAME.en}"`));
+  // The product form no longer types the fee at all (Pricing V2-4, 2026-10-14: no dinar field in the
+  // form; DECISIONS row 222), and the quick price panel went with the old client (the clean start, A.6).
   assert.doesNotMatch(readFileSync(join(ROOT, 'src/components/adminProducts/form/OptionsSection.tsx'), 'utf8'), new RegExp(`ar="${NAME.ar}"`));
 });
