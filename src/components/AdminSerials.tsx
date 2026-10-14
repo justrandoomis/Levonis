@@ -1663,7 +1663,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     {(DECISION_OPTIONS[claimMove.to] ?? []).map((d) => (
                       <label
                         key={d}
-                        className={`lv-button ${moveDecision === d ? 'lv-button-primary' : 'lv-button-secondary'} cursor-pointer focus-within:ring-2 focus-within:ring-gold`}
+                        className={`lv-button ${moveDecision === d ? 'lv-button-primary' : 'lv-button-secondary'} cursor-pointer focus-within:ring-2 focus-within:ring-focus`}
                       >
                         <input
                           type="radio"
@@ -1881,7 +1881,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     ) : (
                       <div className="flex gap-2 pt-1">
                         <label
-                          className={`lv-button lv-button-secondary w-11 px-0 shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-gold ${claimBusy ? 'opacity-50 pointer-events-none' : ''}`}
+                          className={`lv-button lv-button-secondary w-11 px-0 shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-focus ${claimBusy ? 'opacity-50 pointer-events-none' : ''}`}
                           title={s.attachFile}
                         >
                           <Paperclip className="w-4 h-4" aria-hidden="true" />
