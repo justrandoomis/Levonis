@@ -493,7 +493,7 @@ export default function ReviewSheet({
                         data-star={n}
                         disabled={busy}
                         onClick={() => setStars(n)}
-                        className="w-11 h-11 inline-flex items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+                        className="w-11 h-11 inline-flex items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
                       >
                         <Star
                           className={`w-7 h-7 transition-colors ${n <= stars ? 'text-gold' : 'text-text-muted'}`}

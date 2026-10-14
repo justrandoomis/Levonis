@@ -289,13 +289,12 @@ function RequestList({ onOpen, canOffer = false, onClosed }: { onOpen: (r: Reque
           group="requests-scope"
           size="sm"
           className="mb-4"
-          label={loc('أي الطلبات', 'Which requests')}
+          label={loc('أي الطلبات', 'Which requests', 'کام داواکاری')}
           value={scope}
           onChange={(id) => setScope(id as 'mine' | 'all')}
           dataAttr="data-requests-scope"
           items={[
-            // OWNER: Sorani to be written by hand.
-            { id: 'mine', label: loc('مناسب لي', 'Fits my workshop') },
+            { id: 'mine', label: loc('مناسب لي', 'Fits my workshop', 'گونجاو بۆ وۆرکشۆپەکەم') },
             { id: 'all', label: loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان') },
           ]}
         />
@@ -394,7 +393,7 @@ function AllRequests({
   const search = (
     <form role="search" onSubmit={(e) => e.preventDefault()} className="relative">
       <label htmlFor="requests-search" className="sr-only">
-        {loc('ابحث في طلبات الطباعة', 'Search print requests')}
+        {loc('ابحث في طلبات الطباعة', 'Search print requests', 'لە داواکارییەکانی چاپ بگەڕێ')}
       </label>
       <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
       <input
@@ -406,14 +405,14 @@ function AllRequests({
         value={draft}
         maxLength={60}
         onChange={(e) => setDraft(e.target.value)}
-        placeholder={loc('ابحث في طلبات الطباعة', 'Search print requests')}
+        placeholder={loc('ابحث في طلبات الطباعة', 'Search print requests', 'لە داواکارییەکانی چاپ بگەڕێ')}
         data-requests-search
       />
       {draft && (
         <button
           type="button"
           onClick={() => setDraft('')}
-          aria-label={loc('مسح البحث', 'Clear search')}
+          aria-label={loc('مسح البحث', 'Clear search', 'گەڕان بسڕەوە')}
           className="absolute end-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <X className="h-4 w-4" aria-hidden="true" />
@@ -439,7 +438,7 @@ function AllRequests({
         <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
         <p className="text-text-secondary text-[13px]">
           {q ? (
-            <bdi>{loc(`لا نتائج لـ «${q}»`, `No results for “${q}”`)}</bdi>
+            <bdi>{loc(`لا نتائج لـ «${q}»`, `No results for “${q}”`, `هیچ ئەنجامێک نییە بۆ «${q}»`)}</bdi>
           ) : (
             loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')
           )}
@@ -494,11 +493,10 @@ function AllRequests({
           className="lv-button lv-button-secondary w-full"
         >
           {more
-            ? loc('جارٍ التحميل…', 'Loading…')
+            ? loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')
             : moreError
-              ? // OWNER: Sorani to be written by hand.
-                loc('تعذّر التحميل — حاول مجددًا', 'Could not load — try again')
-              : loc('المزيد', 'Load more')}
+              ? loc('تعذّر التحميل — حاول مجددًا', 'Could not load — try again', 'بار نەکرا — دووبارە هەوڵ بدەرەوە')
+              : loc('المزيد', 'Load more', 'زیاتر پیشان بدە')}
         </button>
       )}
     </div>
@@ -629,8 +627,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
               : s === 'cancelled'
                 ? loc('ملغي ومسترجع', 'Cancelled and refunded', 'هەڵوەشێنراوە')
                 : s === 'refunded'
-                  ? // OWNER: Sorani to be written by hand.
-                    loc('مسترجع بقرار Levonis', 'Refunded by Levonis')
+                  ? loc('مسترجع بقرار Levonis', 'Refunded by Levonis', 'بە بڕیاری Levonis پارەکە گەڕێنرایەوە')
                   : s;
 
   const disputeReady = description.trim().length >= 10;
@@ -668,7 +665,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
           {HELD_STATES.includes(o.state) && (
             <details className="mb-2 group" data-community-order-contact={o.id}>
               <summary className="min-h-[44px] flex items-center cursor-pointer text-[12.5px] font-semibold text-gold rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                {loc('التواصل مع التاجر', 'Contact the merchant')}
+                {loc('التواصل مع التاجر', 'Contact the merchant', 'پەیوەندی بە بازرگانەکەوە')}
               </summary>
               <OrderContactCard orderId={o.id} compact />
             </details>
@@ -731,8 +728,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         testId="confirm-receipt"
         title={loc('هل استلمت العمل فعلًا؟', 'Did you actually receive the work?', 'کارەکەت وەرگرت؟')}
         confirmLabel={loc('تأكيد الاستلام', 'Confirm receipt', 'پشتڕاستکردنەوەی وەرگرتن')}
-        // OWNER: Sorani to be written by hand.
-        busyLabel={loc('جارٍ التحويل…', 'Releasing…')}
+        busyLabel={loc('جارٍ التحويل…', 'Releasing…', 'پارەکە دەگوازرێتەوە…')}
         busy={busy}
         error={error}
         onConfirm={run}
@@ -757,10 +753,10 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         onConfirm={run}
         onClose={() => setAction(null)}
       >
-        {/* OWNER: Sorani to be written by hand. */}
         {loc(
           'يُلغى التنفيذ قبل أن يبدأ التاجر، ويعود المبلغ المحجوز إلى رصيدك.',
-          'The order is cancelled before the merchant starts, and the held money returns to your balance.'
+          'The order is cancelled before the merchant starts, and the held money returns to your balance.',
+          'داواکارییەکە پێش ئەوەی بازرگانەکە دەست پێ بکات هەڵدەوەشێتەوە، و بڕە پارە گیراوەکە دەگەڕێتەوە بۆ باڵانسەکەت.'
         )}
       </ConfirmSheet>
 
@@ -769,8 +765,7 @@ function MyCommunityOrders({ whileClosed = false }: { whileClosed?: boolean } = 
         testId="open-dispute"
         title={loc('فتح نزاع', 'Open a dispute', 'ناکۆکی تۆمار بکە')}
         confirmLabel={loc('فتح نزاع', 'Open a dispute', 'ناکۆکی تۆمار بکە')}
-        // OWNER: Sorani to be written by hand.
-        busyLabel={loc('جارٍ الإرسال…', 'Sending…')}
+        busyLabel={loc('جارٍ الإرسال…', 'Sending…', 'دەنێردرێت…')}
         busy={busy}
         error={error}
         confirmDisabled={!disputeReady}

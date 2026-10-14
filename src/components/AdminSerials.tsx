@@ -1133,7 +1133,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       type="button"
                       onClick={() => editWarranty(u)}
                       disabled={busyUnit === u.unit_id}
-                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                      className="inline-flex items-center gap-1 mt-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
                     >
                       <ShieldCheck className="w-3 h-3" aria-hidden="true" />{s.editWarranty}
                     </button>
@@ -1191,7 +1191,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       onClick={() => setHistoryOpen((h) => ({ ...h, [u.unit_id]: !h[u.unit_id] }))}
                       aria-expanded={!!historyOpen[u.unit_id]}
                       data-unit-history-toggle={u.unit_id}
-                      className="inline-flex items-center gap-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                      className="inline-flex items-center gap-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
                     >
                       <History className="w-3 h-3" aria-hidden="true" />
                       {historyOpen[u.unit_id] ? s.hideHistory : s.history}

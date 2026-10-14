@@ -2215,7 +2215,7 @@ export default function Checkout() {
                             rel="noopener noreferrer"
                             data-pickup-map
                             onClick={(e) => e.stopPropagation()}
-                            className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                            className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
                           >
                             <MapPin aria-hidden="true" className="w-3.5 h-3.5" />
                             {loc('عرض مكان المخزن على الخريطة', 'See the pickup location on the map', 'شوێنی وەرگرتن لەسەر نەخشە ببینە')}
@@ -3083,7 +3083,7 @@ export default function Checkout() {
                   aria-expanded={false}
                   aria-controls="checkout-promo-field"
                   data-checkout-promo-toggle
-                  className="inline-flex items-center gap-2 text-[13px] font-light text-text-muted hover:text-text-secondary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  className="inline-flex items-center gap-2 text-[13px] font-light text-text-muted hover:text-text-secondary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <Tag className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
                   {loc('استخدام كود خاص', 'Use a special code', 'بەکارهێنانی کۆدی تایبەت')}
@@ -3161,8 +3161,8 @@ export default function Checkout() {
                             customerQuote.mark();
                             setUseWalletBalance(!useWalletBalance);
                         }}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                            walletSwitchOn ? 'bg-white' : 'lv-well'
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
+                            walletSwitchOn ? 'bg-white border-transparent' : 'lv-well border-[var(--clay-field)]'
                         } ${walletSwitchLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${
@@ -3207,7 +3207,7 @@ export default function Checkout() {
                                         setUseWalletBalance(true);
                                         setPaymentMethod(partialWalletMethodId);
                                     }}
-                                    className="mt-2 inline-flex items-center rounded-md border border-red-400/40 px-2.5 py-1 font-medium text-red-300 hover:text-text-primary hover:border-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                                    className="mt-2 inline-flex items-center rounded-md border border-red-400/40 px-2.5 py-1 font-medium text-red-300 hover:text-text-primary hover:border-white/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                                 >
                                     {loc(
                                       `استخدم ${walletMoney(walletBalanceShown)} من الرصيد وادفع الباقي عند الاستلام`,

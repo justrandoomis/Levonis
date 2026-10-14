@@ -1195,35 +1195,41 @@ export default function Wallet() {
               size="sm"
               className={`grow min-w-0 sm:grow-0 ${TYPE_FILTER_BASIS[(lang as Lang) in TYPE_FILTER_BASIS ? (lang as Lang) : 'ar']}`}
             />
-            <div className="relative shrink-0">
-              <select
-                className="lv-input h-9 min-h-9 w-auto appearance-none rounded-full ps-2.5 pe-7 text-[12px] font-bold"
-                aria-label={s.statusAll}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+            {/* The status select and the search button WRAP TOGETHER. Apart,
+                the Sorani row (whose type labels need basis-56) fitted the
+                select and dropped the 36px search button onto a line of its
+                own at 360-390px. */}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <div className="relative shrink-0">
+                <select
+                  className="lv-input h-9 min-h-9 w-auto appearance-none rounded-full ps-2.5 pe-7 text-[12px] font-bold"
+                  aria-label={s.statusAll}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                >
+                  <option value="all">{s.statusAll}</option>
+                  <option value="pending">{s.statusPending}</option>
+                  <option value="approved">{s.statusApproved}</option>
+                  <option value="rejected">{s.statusRejected}</option>
+                </select>
+                <ChevronDown
+                  aria-hidden
+                  className="w-3.5 h-3.5 text-text-muted absolute end-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setSearchOpen((v) => !v)}
+                aria-label={s.searchPlaceholder}
+                aria-expanded={searchOpen || !!search}
+                aria-controls="wallet-search"
+                className={`sm:hidden h-9 w-9 shrink-0 rounded-full border border-border-subtle flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                  searchOpen || search ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
+                }`}
               >
-                <option value="all">{s.statusAll}</option>
-                <option value="pending">{s.statusPending}</option>
-                <option value="approved">{s.statusApproved}</option>
-                <option value="rejected">{s.statusRejected}</option>
-              </select>
-              <ChevronDown
-                aria-hidden
-                className="w-3.5 h-3.5 text-text-muted absolute end-2 top-1/2 -translate-y-1/2 pointer-events-none"
-              />
+                <Search className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setSearchOpen((v) => !v)}
-              aria-label={s.searchPlaceholder}
-              aria-expanded={searchOpen || !!search}
-              aria-controls="wallet-search"
-              className={`sm:hidden h-9 w-9 shrink-0 rounded-full border border-border-subtle flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                searchOpen || search ? 'bg-[var(--clay-well-bg)] shadow-press text-text-primary' : 'bg-surface-raised shadow-xs text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-            </button>
             <form
               id="wallet-search"
               role="search"

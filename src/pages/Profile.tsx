@@ -392,7 +392,7 @@ export default function Profile() {
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex min-w-0 items-center gap-0.5">
-                <h1 dir="auto" title={displayName} data-profile-username className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-start text-[17px] font-semibold leading-6 text-text-primary">{displayName}</h1>
+                <h1 dir="auto" title={displayName} data-profile-username className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-start text-[17px] font-semibold leading-7 text-text-primary">{displayName}</h1>
                 {isAuthenticated && (
                   <IconButton
                     onClick={() => setQrOpen(true)}
@@ -409,8 +409,11 @@ export default function Profile() {
                   </span>
                 ) : (
                   <>
+                    {/* The member pill is gold ink on the card with a gold
+                        hairline: a gold tint under 10px gold text measured
+                        4.24:1 in light, under the 4.5:1 small text needs. */}
                     {memTier !== 'free' ? (
-                      <button type="button" onClick={() => navigate('/subscription')} className="flex h-6 min-w-0 shrink-0 items-center gap-1 rounded-sm bg-gold/10 px-1.5 text-[10px] font-semibold text-gold hover:bg-gold/15 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                      <button type="button" onClick={() => navigate('/subscription')} className="flex h-6 min-w-0 shrink-0 items-center gap-1 rounded-sm border border-gold/40 px-1.5 text-[10px] font-semibold text-gold hover:bg-gold/10 active:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                         <span>{loc(`عضو ${tierLabel(memTier)}`, `${tierLabel(memTier)} Member`, `ئەندامی ${tierLabel(memTier)}`)}</span>
                         {memExpiry && (
                           <span className="hidden font-normal opacity-75 sm:inline">· {loc('حتى', 'until', 'تا')} {fmtDate(memExpiry)}</span>

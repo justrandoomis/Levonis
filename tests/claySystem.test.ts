@@ -273,7 +273,15 @@ test('the Tier-1 surfaces write their shadow into --tw-shadow, so a ring compose
   // Forced colours drop every box-shadow: the pressed selection gets an outline.
   assert.match(css, /@media \(forced-colors: active\) \{[^@]*\.lv-choice:is\(\[aria-pressed='true'\]/);
   // …and a focused CHOSEN option still shows the focus ring there: as specific as the selection, after it.
-  assert.match(css, /@media \(forced-colors: active\) \{[^@]*\.lv-choice:is\([^@]*:focus-visible,\s*\.lv-choice:focus-visible,\s*\[data-clay-dimple\]:focus-visible \{\s*outline: 2px solid CanvasText;/);
+  assert.match(css, /@media \(forced-colors: active\) \{[^@]*\.lv-choice:is\([^@]*:focus-visible,\s*\.lv-choice:focus-visible,\s*\.lv-choice:has\(input:focus-visible\),\s*\[data-clay-dimple\]:focus-visible \{\s*outline: 2px solid CanvasText;/);
+  // A <label class="lv-choice"> around a hidden radio is never focused itself (the radio is):
+  // its ring comes from :has(), or the checkout's address, delivery and payment cards show none.
+  assert.match(css, /\.lv-choice:focus-visible,\s*\.lv-choice:has\(input:focus-visible\) \{\s*outline: 2px solid var\(--color-focus\);/);
+  // The cart's two disclosure rows sit in clipping cards: a real button each, with an INSET ring.
+  const cart = read('src/pages/Cart.tsx');
+  assert.doesNotMatch(cart, /<div onClick=\{\(\) => setDealsExpanded/, 'the offers header is a clickable div again: the Tab key cannot reach it');
+  assert.match(cart, /onClick=\{\(\) => setDealsExpanded\(!dealsExpanded\)\}\s*aria-expanded=\{dealsExpanded\}[^>]*focus-visible:ring-inset focus-visible:ring-focus/);
+  assert.match(cart, /aria-controls="support-code-panel"[^>]*focus-visible:ring-inset focus-visible:ring-focus/);
 });
 
 // ---------------------------------------------------------------------- 4
@@ -343,6 +351,15 @@ test('the contrast of the final set (plan §3.9): 4.5:1 for text, 3:1 for bounda
 const sources: [string, string][] = (readdirSync(join(ROOT, 'src'), { recursive: true }) as string[])
   .filter((f) => /\.tsx?$/.test(f))
   .map((f) => [`src/${f.split('\\').join('/')}`, read(`src/${f}`)]);
+
+test('one focus ink: no focus ring is drawn in the raw gold (in dark it is not the focus colour)', () => {
+  // `--color-gold` and `--color-focus` are one value in light and two in dark (#BAA369 against
+  // #d2c392), so a `focus-visible:ring-gold` drew a second focus colour on every dark screen.
+  const offenders = sources
+    .filter(([, text]) => /\b(?:focus|focus-visible|focus-within|peer-focus-visible|group-focus-visible):ring-gold\b/.test(text))
+    .map(([file]) => file);
+  assert.deepEqual(offenders, [], `focus rings in the raw gold: ${offenders.join(', ')}`);
+});
 
 test('solid clay, not glass: no backdrop blur, no filter glow, no hand-written shadow colour or shadow token in a class', () => {
   assert.ok(sources.length > 500, 'the walk over src/ found too few sources to prove anything');

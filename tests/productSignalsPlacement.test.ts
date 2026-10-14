@@ -46,7 +46,11 @@ const signalsRow = (): string => {
 test('the signals row renders BELOW the store line and ABOVE the description', () => {
   const storeLine = product.indexOf('{s.officialStore} · Levonis');
   const title = product.indexOf('<h1 className=');
-  const row = product.indexOf('<div data-product-signals');
+  // The row is drawn by one helper (`signalsRow`) and PLACED twice: in the
+  // reading column on a phone, and under the buy column's identity lines from
+  // 1024px, where the reading column's h1 and store line are visually hidden.
+  // The order that carries the owner's complaint is the order of the PLACEMENTS.
+  const row = product.indexOf("{signalsRow('mt-3 lg:hidden')}");
   const conditionPanel = product.indexOf('<ConditionPanel condition={productCondition}');
   const description = product.indexOf('<Section title={s.description}');
 
@@ -61,6 +65,14 @@ test('the signals row renders BELOW the store line and ABOVE the description', (
   // condition CHIP in this row introduces that panel rather than echoing it.
   assert.ok(row < conditionPanel, 'the signals row comes BEFORE the condition panel');
   assert.ok(row < description, 'the signals row comes BEFORE «وصف المنتج»');
+
+  // From 1024px: directly under the buy column's own store line, above the price.
+  const identity = product.indexOf('data-product-buy-identity>');
+  const deskRow = product.indexOf("{signalsRow('mt-2')}", identity);
+  const price = product.indexOf('{priceBlock}', identity);
+  assert.ok(identity > 0 && deskRow > identity, 'the buy column draws the signals under its identity lines');
+  assert.ok(deskRow < price, 'and above the price');
+  assert.equal(product.split('<div data-product-signals').length - 1, 1, 'one row, drawn by one helper — not two copies to drift apart');
 });
 
 test('each chip is guarded, so nothing prints a zero it does not have', () => {

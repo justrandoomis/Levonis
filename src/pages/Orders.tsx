@@ -585,7 +585,7 @@ export default function Orders() {
               type="button"
               onClick={showAllDelivered}
               data-show-all-delivered
-              className="font-bold text-gold underline underline-offset-2 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+              className="font-bold text-gold underline underline-offset-2 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
             >
               {s.showAllDelivered}
             </button>

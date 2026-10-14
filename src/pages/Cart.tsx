@@ -1792,7 +1792,11 @@ export default function Cart() {
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 mt-auto">
+                  {/* On a phone the stepper row also takes the width under the
+                      picture (the text above is always taller than it), so a
+                      long «سڕینەوە» stays beside the stepper instead of
+                      dropping to a line of its own at 360-390px. */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-auto -ms-[calc(72px+0.375rem)] min-[390px]:-ms-[calc(80px+0.375rem)] sm:ms-0">
                     <div className="flex flex-wrap items-center gap-2">
                       {/* THE CAP IS THE SERVER'S, AND THE STEPPER DISABLES AT IT
                           (§10). A composition line's `stock` is NULL for ever by
@@ -1979,20 +1983,28 @@ export default function Cart() {
           })}
         </div>
 
-        {/* Deals Row */}
+        {/* Deals Row. The header is a real button: as a clickable <div> the
+            Tab key never reached it, so the points discount could not be
+            opened without a pointer. Its focus ring is INSET because the
+            card clips everything outside it (overflow-hidden). */}
         <div className="lv-surface mx-4 mt-3 flex flex-col overflow-hidden">
-          <div onClick={() => setDealsExpanded(!dealsExpanded)} className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-surface-selected transition-colors">
-            <div className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            type="button"
+            onClick={() => setDealsExpanded(!dealsExpanded)}
+            aria-expanded={dealsExpanded}
+            className="px-4 py-3 flex items-center justify-between text-start cursor-pointer hover:bg-surface-selected transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+          >
+            <span className="flex items-center gap-2">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
               <span className="text-text-primary text-[15px] font-bold">{loc('العروض والخصومات', 'Deals & Discounts', 'ئۆفەر و داشکاندن')}</span>
               {(usePoints && pointsDiscount > 0) && (
                 <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded">{loc('تم التطبيق', 'Applied', 'جێبەجێ کرا')}</span>
               )}
-            </div>
-            <ChevronRight className={`w-4 h-4 text-text-muted transition-transform ${dealsExpanded ? 'rotate-90' : ''}`} />
-          </div>
+            </span>
+            <ChevronRight aria-hidden="true" className={`w-4 h-4 text-text-muted transition-transform ${dealsExpanded ? 'rotate-90' : ''}`} />
+          </button>
 
           {dealsExpanded && (
             <div className="px-4 pb-4 pt-1 animate-in slide-in-from-top-2 fade-in duration-200">
@@ -2045,7 +2057,7 @@ export default function Cart() {
                   */}
                   <span
                     aria-hidden="true"
-                    className="relative shrink-0 w-[46px] h-[28px] rounded-full lv-well transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black"
+                    className="relative shrink-0 w-[46px] h-[28px] rounded-full lv-well transition-colors duration-200 peer-checked:bg-gold peer-checked:[&>span]:start-[21px] peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black"
                   >
                     <span className="absolute top-[3px] start-[3px] w-[22px] h-[22px] rounded-full bg-snow shadow-1 transition-[inset-inline-start] duration-200 ease-out" />
                   </span>
@@ -2070,7 +2082,7 @@ export default function Cart() {
             onClick={() => setSupportOpen((v) => !v)}
             aria-expanded={supportOpen}
             aria-controls="support-code-panel"
-            className="px-4 py-3 flex items-center justify-between text-start hover:bg-surface-selected transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            className="px-4 py-3 flex items-center justify-between text-start hover:bg-surface-selected transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
           >
             <div className="flex items-center gap-2 min-w-0">
               <HeartHandshake className="w-5 h-5 text-text-secondary shrink-0" aria-hidden="true" />
@@ -2109,7 +2121,7 @@ export default function Cart() {
                         type="button"
                         onClick={() => pickSupportRef(ref)}
                         disabled={!!err}
-                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-border-subtle bg-surface text-start text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg border border-border-subtle bg-surface text-start text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                       >
                         <span dir="ltr" className="font-mono text-[13px] truncate">@{info?.username || ref}</span>
                         <span className="text-[11px] text-text-muted truncate">
@@ -2389,6 +2401,7 @@ export default function Cart() {
       {!loading && items.length > 0 && (
         <div
           data-testid="cart-summary-bar"
+          data-bottom-bar
           className="fixed inset-x-3 bottom-[var(--nav-stack)] z-[130] rounded-xl border border-border-subtle bg-surface-raised/98 px-3 py-3 shadow-2xl sm:px-4 md:inset-x-0 md:mx-auto md:w-auto md:max-w-md"
         >
           {/* A FIXED ROW HEIGHT. The savings line used to mount and unmount as

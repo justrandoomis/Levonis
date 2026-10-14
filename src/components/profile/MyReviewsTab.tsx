@@ -126,7 +126,7 @@ export default function MyReviewsTab({ isAuthenticated }: { isAuthenticated: boo
         <button
           type="button"
           onClick={() => navigate('/auth?next=%2Fprofile')}
-          className="min-h-[44px] px-6 rounded-xl bg-olive text-gold-muted text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          className="min-h-[44px] px-6 rounded-xl bg-olive text-gold-muted text-[13px] font-bold hover:opacity-90 active:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           {s.signInCta}
         </button>

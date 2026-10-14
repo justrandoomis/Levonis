@@ -1090,29 +1090,28 @@ export default function Settings() {
                 theme it resolved to, so the row never hides what is on screen.
               */}
               <div className="px-4 py-3" data-settings-appearance>
-                {/* OWNER: Sorani to be written by hand (the four appearance strings below). */}
                 <p id="settings-appearance" className="font-bold text-[15px] mb-2 flex items-center gap-2">
                   <SunMoon aria-hidden="true" className="w-4 h-4 text-text-secondary" />
-                  {loc('المظهر', 'Appearance')}
+                  {loc('المظهر', 'Appearance', 'ڕووکار')}
                 </p>
                 <Segmented
                   group="appearance"
-                  label={loc('المظهر', 'Appearance')}
+                  label={loc('المظهر', 'Appearance', 'ڕووکار')}
                   value={themePref}
                   onChange={(id) => setThemePreference(id as ThemePreference)}
                   dataAttr="data-theme-choice"
                   items={[
-                    { id: 'light', label: loc('فاتح', 'Light'), icon: <Sun aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
-                    { id: 'dark', label: loc('داكن', 'Dark'), icon: <Moon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
-                    { id: 'system', label: loc('حسب الجهاز', 'Device'), icon: <SunMoon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
+                    { id: 'light', label: loc('فاتح', 'Light', 'ڕووناک'), icon: <Sun aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
+                    { id: 'dark', label: loc('داكن', 'Dark', 'تاریک'), icon: <Moon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
+                    { id: 'system', label: loc('حسب الجهاز', 'Device', 'بەپێی ئامێر'), icon: <SunMoon aria-hidden="true" className="hidden w-4 h-4 shrink-0 sm:block" /> },
                   ]}
                 />
                 <p className="mt-2 text-[12px] text-text-muted leading-relaxed">
                   {themePref === 'system'
                     ? theme === 'dark'
-                      ? loc('يتبع إعداد جهازك — داكن الآن.', 'Follows your device — dark right now.')
-                      : loc('يتبع إعداد جهازك — فاتح الآن.', 'Follows your device — light right now.')
-                    : loc('يُطبَّق على كل الصفحات ويُحفظ على هذا الجهاز.', 'Applies to every page and is kept on this device.')}
+                      ? loc('يتبع إعداد جهازك — داكن الآن.', 'Follows your device — dark right now.', 'ڕێکخستنی ئامێرەکەت پەیڕەو دەکات — ئێستا تاریکە.')
+                      : loc('يتبع إعداد جهازك — فاتح الآن.', 'Follows your device — light right now.', 'ڕێکخستنی ئامێرەکەت پەیڕەو دەکات — ئێستا ڕووناکە.')
+                    : loc('يُطبَّق على كل الصفحات ويُحفظ على هذا الجهاز.', 'Applies to every page and is kept on this device.', 'لەسەر هەموو پەڕەکان جێبەجێ دەکرێت و لەسەر ئەم ئامێرە پاشەکەوت دەکرێت.')}
                 </p>
               </div>
               {/*

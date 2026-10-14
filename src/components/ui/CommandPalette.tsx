@@ -222,7 +222,7 @@ export function CommandPalette({
           field line, and its focus is shown on the whole well: the caret alone
           is not a focus indicator. The halo with the line, as on every search
           field: on cream the line alone was too faint. */}
-      <div className="mx-2 mt-2 flex items-center gap-3 rounded-full lv-well border border-[var(--clay-field)] px-4 focus-within:ring-2 focus-within:ring-focus/20 focus-within:border-focus" data-command-field>
+      <div className="mx-2 mt-2 flex items-center gap-3 rounded-full lv-well border border-[var(--clay-field)] px-4 focus-within:ring-2 focus-within:ring-focus/40 focus-within:border-focus" data-command-field>
         <Search aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-text-muted" />
         <input
           ref={inputRef}

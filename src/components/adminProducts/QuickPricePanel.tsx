@@ -1433,7 +1433,7 @@ function CellEditor({
     <div className="min-w-0" data-qp-cell={key} data-qp-mode={mode} data-qp-dirty-cell={dirty ? '1' : '0'}>
       <div
         // A price cell is a well (clay): sunk behind the 3:1 field line.
-        className={`flex items-center h-8 rounded-[var(--ap-radius-md)] border lv-well transition-colors duration-150 focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20 ${
+        className={`flex items-center h-8 rounded-[var(--ap-radius-md)] border lv-well transition-colors duration-150 focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/40 ${
           bad
             ? 'border-[var(--ap-danger)]'
             : dirty

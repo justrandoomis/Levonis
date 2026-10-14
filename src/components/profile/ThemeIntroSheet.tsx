@@ -143,14 +143,13 @@ export default function ThemeIntroSheet() {
     setThemePreference(choice, origin);
   };
 
-  // OWNER: Sorani to be written by hand (every string in this sheet).
   const OPTIONS: Array<{ id: ThemePreference; label: string; hint: string }> = [
-    { id: 'light', label: loc('فاتح', 'Light'), hint: loc('عاجي دافئ', 'Warm ivory') },
-    { id: 'dark', label: loc('داكن', 'Dark'), hint: loc('أسود هادئ', 'Quiet black') },
+    { id: 'light', label: loc('فاتح', 'Light', 'ڕووناک'), hint: loc('عاجي دافئ', 'Warm ivory', 'عاجیی گەرم') },
+    { id: 'dark', label: loc('داكن', 'Dark', 'تاریک'), hint: loc('أسود هادئ', 'Quiet black', 'ڕەشی هێمن') },
     {
       id: 'system',
-      label: loc('حسب الجهاز', 'Device'),
-      hint: theme === 'dark' ? loc('داكن الآن', 'Dark right now') : loc('فاتح الآن', 'Light right now'),
+      label: loc('حسب الجهاز', 'Device', 'بەپێی ئامێر'),
+      hint: theme === 'dark' ? loc('داكن الآن', 'Dark right now', 'ئێستا تاریکە') : loc('فاتح الآن', 'Light right now', 'ئێستا ڕووناکە'),
     },
   ];
 
@@ -166,10 +165,10 @@ export default function ThemeIntroSheet() {
     >
       <div className="px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-5 sm:pb-6">
         <h2 id="theme-intro-title" className="text-center text-[19px] font-bold text-text-primary">
-          {loc('اختر المظهر', 'Choose your look')}
+          {loc('اختر المظهر', 'Choose your look', 'ڕووکارەکەت هەڵبژێرە')}
         </h2>
         <p className="mx-auto mt-1 max-w-[18rem] text-center text-[13px] leading-relaxed text-text-secondary">
-          {loc('فاتح أو داكن، أو دعه يتبع إعداد جهازك.', 'Light or dark — or let it follow your device.')}
+          {loc('فاتح أو داكن، أو دعه يتبع إعداد جهازك.', 'Light or dark — or let it follow your device.', 'ڕووناک یان تاریک، یان با ڕێکخستنی ئامێرەکەت پەیڕەو بکات.')}
         </p>
 
         <div role="group" aria-labelledby="theme-intro-title" className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-3">
@@ -205,7 +204,7 @@ export default function ThemeIntroSheet() {
         </div>
 
         <p id="theme-intro-note" className="mt-4 text-center text-[12px] leading-relaxed text-text-muted">
-          {loc('يمكنك تغييره لاحقًا من الإعدادات ← المظهر.', 'You can change it any time in Settings → Appearance.')}
+          {loc('يمكنك تغييره لاحقًا من الإعدادات ← المظهر.', 'You can change it any time in Settings → Appearance.', 'هەر کاتێک بتەوێت لە ڕێکخستنەکان ← ڕووکار دەتوانیت بیگۆڕیت.')}
         </p>
 
         <button
@@ -213,7 +212,7 @@ export default function ThemeIntroSheet() {
           onClick={close}
           className="lv-button lv-button-primary mt-4 min-h-12 w-full text-[15px]"
         >
-          {loc('تم', 'Done')}
+          {loc('تم', 'Done', 'تەواو')}
         </button>
       </div>
     </Sheet>

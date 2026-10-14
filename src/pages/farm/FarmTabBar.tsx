@@ -94,7 +94,7 @@ export default function FarmTabBar({
                 if (lock) onLocked?.(tab, lock);
                 else onChange(tab);
               }}
-              className={`relative flex-1 min-w-0 min-h-[52px] px-0.5 py-1 rounded-full flex flex-col items-center justify-center gap-0.5 press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70 ${
+              className={`relative flex-1 min-w-0 min-h-[52px] px-0.5 py-1 rounded-full flex flex-col items-center justify-center gap-0.5 press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/70 ${
                 lock ? 'text-zinc-600 cursor-help' : active ? 'text-gold' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >

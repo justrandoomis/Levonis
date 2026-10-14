@@ -296,7 +296,7 @@ export function ClaimThreadOverlay({
         <div className="flex items-center gap-2">
           <label
             htmlFor="warranty-thread-file"
-            className={`lv-button lv-button-secondary w-11 px-0 shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-gold ${
+            className={`lv-button lv-button-secondary w-11 px-0 shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-focus ${
               replyBusy ? 'opacity-50 pointer-events-none' : ''
             }`}
           >

@@ -455,7 +455,11 @@ html {
 
   /* Keyboard focus on a CHOSEN option: an outline, so it never competes with
      the press or the start bar (a ring utility would be one more shadow). */
-  .lv-choice:focus-visible {
+  /* A <label class="lv-choice"> around a visually hidden radio is never
+     focused itself: the radio is. Without :has() the checkout's address,
+     delivery and payment cards showed no ring at all under the Tab key. */
+  .lv-choice:focus-visible,
+  .lv-choice:has(input:focus-visible) {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
@@ -961,8 +965,22 @@ html {
      (or current tab) showed the 1px Highlight outline instead of its ring. */
   :focus-visible,
   .lv-choice:focus-visible,
+  .lv-choice:has(input:focus-visible),
   [data-clay-dimple]:focus-visible {
     outline: 2px solid CanvasText;
+  }
+  /* A button with no border of its own (ghost, the Quick Buy pair) was bare
+     text here; a switch's knob and its «on» fill are backgrounds, so it was
+     invisible. The system's own button line, knob ink and Highlight instead.
+     `!important` because the Quick Buy capsules set `border: 0` inline. */
+  .lv-button {
+    border: 1px solid ButtonText !important;
+  }
+  [role='switch'] span:not(:has(span)) {
+    background: ButtonText;
+  }
+  [role='switch'][aria-checked='true'] span:not(:has(span)) {
+    background: Highlight;
   }
 }
 
@@ -1137,6 +1155,15 @@ html:lang(ckb) .leading-tight {
   :root {
     --nav-stack: calc(max(68px, var(--lv-home-hit)) + max(1rem, env(safe-area-inset-bottom)) + 20px);
   }
+}
+/* KEYBOARD FOCUS IS NEVER PARKED UNDER THE BOTTOM CHROME. Tabbing scrolled a
+   card just into view — under the nav pills, or under the cart's summary bar
+   and the product's buy bar. The scroller stops that far above the edge. */
+#main-scroll-container {
+  scroll-padding-bottom: var(--nav-stack);
+}
+#main-scroll-container:has([data-bottom-bar]) {
+  scroll-padding-bottom: calc(var(--nav-stack) + 9rem);
 }
 /* A modal owns the interaction. Hiding the persistent nav while one is open
    avoids two competing bottom controls and is shared by every Overlay/Sheet. */

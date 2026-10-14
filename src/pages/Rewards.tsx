@@ -344,8 +344,10 @@ export default function Rewards() {
     </span>
   );
 
+  // ONE COLUMN AT EVERY WIDTH. Full-bleed at 1280 the balance sat on one edge
+  // and its coin on the other, 1,100px apart; the account pages read as a column.
   return (
-    <div data-testid="rewards-root" dir={dir} className="w-full min-h-screen font-sans flex flex-col text-text-primary pb-24 overflow-y-auto relative">
+    <div data-testid="rewards-root" dir={dir} className="w-full max-w-2xl mx-auto min-h-screen font-sans flex flex-col text-text-primary pb-24 overflow-y-auto relative">
       <div
         aria-hidden="true"
         className="absolute top-0 left-0 w-full h-96 opacity-[0.07] pointer-events-none"
@@ -419,8 +421,12 @@ export default function Rewards() {
             <div className="flex justify-between items-center mb-6 relative">
               <div className="pt-2">
                 <div className="text-[14px] text-gold mb-0.5 font-medium">{loc('رصيدي', 'My Balance', 'باڵانسەکەم')}</div>
+                {/* A page that could not load does not know the balance: a
+                    quiet dash, never a zero it was not told (the wallet's own
+                    rule). Muted and regular weight: at 56px a bold ink dash read as a
+                    redaction bar. */}
                 <div aria-live="polite" className="text-[56px] leading-[1.1] font-bold tracking-tight tabular-nums">
-                  {formatFigure(data?.point_balance ?? pointBalance ?? 0, lang)}
+                  {data ? formatFigure(data.point_balance, lang) : loadError && !pointBalance ? <span className="font-normal text-text-muted">—</span> : formatFigure(pointBalance ?? 0, lang)}
                 </div>
               </div>
               {/* THE COIN: one raised gold disc lit from above, the star in ink.
@@ -517,8 +523,8 @@ export default function Rewards() {
                           d.status === 'today'
                             ? 'w-[48px] pb-1.5 border border-gold rounded-md bg-surface-raised transform -translate-y-1 overflow-hidden animate-day-pop'
                             : d.status === 'checked'
-                              ? 'w-[42px] pt-1 pb-1.5 bg-surface-selected rounded-md'
-                              : 'w-[42px] pt-1 pb-1.5 lv-well rounded-md'
+                              ? 'w-10 pt-1 pb-1.5 bg-surface-selected rounded-md'
+                              : 'w-10 pt-1 pb-1.5 lv-well rounded-md'
                         }`}
                       >
                         {d.status === 'today' ? (
@@ -598,7 +604,7 @@ export default function Rewards() {
                 {!data && loadError && (
                   <EmptyState
                     compact
-                    title={loc('لا توجد طرق لكسب النقاط الآن', 'No ways to earn points right now', 'ئێستا هیچ ڕێگایەک بۆ کۆکردنەوەی خاڵ نییە')}
+                    title={loc('تعذّر تحميل المهام', "The missions couldn't be loaded", 'ئەرکەکان بار نەکران')}
                     action={
                       <button type="button" onClick={loadRewards} className="lv-button lv-button-secondary mt-1">
                         {loc('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}

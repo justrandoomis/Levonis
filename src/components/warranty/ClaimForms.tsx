@@ -267,7 +267,7 @@ export function DeviceClaimOverlay({
             <label
               htmlFor="warranty-claim-files"
               aria-describedby="warranty-claim-attachments-label warranty-claim-evidence-hint"
-              className={`lv-button lv-button-secondary cursor-pointer focus-within:ring-2 focus-within:ring-gold ${
+              className={`lv-button lv-button-secondary cursor-pointer focus-within:ring-2 focus-within:ring-focus ${
                 uploadBusy || attachments.length >= MAX_ATTACHMENTS ? 'opacity-60 pointer-events-none' : ''
               }`}
             >

@@ -65,7 +65,7 @@ const STRINGS = {
 } as const;
 
 const ROW =
-  'w-full flex items-center gap-3 min-h-[56px] px-4 py-2 text-start hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:opacity-60';
+  'w-full flex items-center gap-3 min-h-[56px] px-4 py-2 text-start hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:opacity-60';
 
 export default function SupportActions({
   order,

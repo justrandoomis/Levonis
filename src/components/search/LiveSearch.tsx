@@ -334,7 +334,7 @@ export default function LiveSearch({
   // into whatever it sits on, with the 3:1 field line, and focus keeps the
   // well (the line turns to the focus ink, plus the halo). Both tones are the
   // same well with the same halo: on cream the line alone was too faint a cue.
-  const fieldSkin = 'rounded-full lv-well border border-[var(--clay-field)] focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20';
+  const fieldSkin = 'rounded-full lv-well border border-[var(--clay-field)] focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/40';
 
   const announcement = !panelShown
     ? ''

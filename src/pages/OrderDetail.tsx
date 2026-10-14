@@ -712,7 +712,7 @@ export default function OrderDetail() {
                               {it.product_slug ? (
                                 <Link
                                   to={`/product/${encodeURIComponent(it.product_slug)}`}
-                                  className="text-text-primary text-[13.5px] font-bold line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                                  className="text-text-primary text-[13.5px] font-bold line-clamp-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
                                 >
                                   {it.name}
                                 </Link>

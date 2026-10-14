@@ -3524,7 +3524,7 @@ export default function Product() {
               </div>
               <Link
                 to="/policies/extended_warranty"
-                className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+                className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
                 data-warranty-policy-link
               >
                 <FileText aria-hidden="true" className="w-3.5 h-3.5" />
@@ -3559,7 +3559,7 @@ export default function Product() {
         <span className="tabular-nums">{s.inCart(inCartQty)}</span>
         <Link
           to="/cart"
-          className="shrink-0 font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded"
+          className="shrink-0 font-medium text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
         >
           {s.viewCart}
         </Link>
@@ -3737,6 +3737,97 @@ export default function Product() {
       </button>
     );
 
+  /*
+    THE THREE SIGNALS A SHOPPER WEIGHS BEFORE THE PRICE.
+
+    WHY HERE, DIRECTLY UNDER «المتجر الرسمي». The owner asked for
+    this row to sit below the store line and above «وصف المنتج»,
+    and reported it as never applied. It had in fact shipped — but
+    ABOVE the <h1>, so the first thing on the page was a row of
+    badges and the header looked untouched. A shopper reads WHAT
+    this is and WHO sells it first; the signals qualify that
+    answer, so they follow it.
+
+    It goes ABOVE the ConditionPanel, not below it, for two
+    reasons. The «مستعمل / مفتوح العلبة» chip in this row is the
+    one-word version of the panel's whole argument, so the chip
+    must introduce the panel rather than repeat it after the fact.
+    And the panel is a paragraph of prose: dropping a badge row
+    after it would restart the header halfway down the page.
+
+    Availability, score and how many have sold. Only the first
+    carries a semantic tint: it is the one that changes what
+    happens when you tap Buy, and tinting all three would make a
+    row of competing badges out of what should read as one quiet
+    line of facts (§7 — accent where it communicates importance).
+    The star keeps the gold because a rating without one is not a
+    rating; the sales chip is neutral.
+
+    Each chip renders only when it has something true to say — no
+    "0 reviews" and no "0+ sold". A new product shows one chip,
+    which is correct: nothing has happened to it yet.
+
+    FROM 1024px THE IDENTITY LINES ARE THE BUY COLUMN'S (see its top), so the
+    row is drawn there under them and hidden here: the owner's rule — below the
+    store line, above «وصف المنتج» — holds at every width, not only on a phone.
+  */
+  const signalsRow = (place: string) => (
+    <div data-product-signals className={`flex items-center gap-x-2 gap-y-1.5 flex-wrap ${place}`}>
+      <span className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold ${modeBadge.cls}`}>
+        {modeBadge.icon}
+        {modeBadge.label}
+      </span>
+
+      {rating && rating.count > 0 ? (
+        <span
+          data-product-rating
+          aria-label={s.ratingAria(rating.average.toFixed(1), rating.count)}
+          className="inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary"
+        >
+          <Star aria-hidden="true" className="w-3.5 h-3.5 text-gold" fill="currentColor" strokeWidth={0} />
+          {/* Tabular figures so a 4.0 and a 4.8 occupy the same
+              width and the row does not shift as products change. */}
+          <span className="font-bold tabular-nums" dir="ltr">{rating.average.toFixed(1)}</span>
+          <span className="text-text-muted tabular-nums">
+            ({rating.count.toLocaleString('en-US')} {s.reviewsCount(rating.count)})
+          </span>
+        </span>
+      ) : null}
+
+      {salesBadge !== null ? (
+        <span
+          data-product-sales={salesBadge}
+          aria-label={s.salesAria(salesBadge.toLocaleString('en-US'))}
+          className="inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary"
+        >
+          <TrendingUp aria-hidden="true" className="w-3.5 h-3.5 text-text-secondary" />
+          {/* `dir="ltr"` on the figure alone: «+200 مبيعات» has an
+              LTR number inside an RTL sentence, and without the
+              isolate the plus sign jumps to the wrong side of it. */}
+          <span className="font-bold tabular-nums" dir="ltr">+{salesBadge.toLocaleString('en-US')}</span>
+          <span className="text-text-muted">{s.salesSold}</span>
+        </span>
+      ) : null}
+
+      {/* A graded unit says so beside its availability, not only
+          in the panel below — the chip row is what a shopper reads
+          before scrolling, and "used" is not a footnote. */}
+      {productCondition ? (
+        <span
+          data-condition-chip={productCondition.kind}
+          className="inline-flex items-center gap-1.5 border border-info/30 bg-info/10 rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold text-info"
+        >
+          <PackageOpen aria-hidden="true" className="w-3.5 h-3.5" />
+          {conditionKindLabel(productCondition.kind, lang)}
+        </span>
+      ) : null}
+      {product.brand ? (
+        <span className="border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary">{product.brand}</span>
+      ) : null}
+      {stockNote ? <span className="text-text-secondary text-[12px] leading-normal">{stockNote}</span> : null}
+    </div>
+  );
+
   // ------------------------------------------------------------------ render
   return (
     <div ref={pageRef} className="w-full min-h-[100dvh] text-text-secondary font-sans" dir={dir}>
@@ -3836,7 +3927,9 @@ export default function Product() {
                       aria-label={s.imageOf.replace('{n}', String(i + 1)).replace('{total}', String(gallery.length))}
                       onClick={() => setGalleryIndex(i)}
                       className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border transition-colors ${
-                        i === galleryIndex ? 'border-white/30 bg-surface-selected' : 'border-border-subtle'
+                        // Forced colours repaint every border alike: the chosen
+                        // picture keeps a Highlight frame there.
+                        i === galleryIndex ? 'border-white/30 bg-surface-selected forced-colors:border-2 forced-colors:border-[Highlight]' : 'border-border-subtle'
                       }`}
                     >
                       <SafeImage
@@ -3886,90 +3979,7 @@ export default function Product() {
                 )}
               </p>
               </div>
-              {/*
-                THE THREE SIGNALS A SHOPPER WEIGHS BEFORE THE PRICE.
-
-                WHY HERE, DIRECTLY UNDER «المتجر الرسمي». The owner asked for
-                this row to sit below the store line and above «وصف المنتج»,
-                and reported it as never applied. It had in fact shipped — but
-                ABOVE the <h1>, so the first thing on the page was a row of
-                badges and the header looked untouched. A shopper reads WHAT
-                this is and WHO sells it first; the signals qualify that
-                answer, so they follow it.
-
-                It goes ABOVE the ConditionPanel, not below it, for two
-                reasons. The «مستعمل / مفتوح العلبة» chip in this row is the
-                one-word version of the panel's whole argument, so the chip
-                must introduce the panel rather than repeat it after the fact.
-                And the panel is a paragraph of prose: dropping a badge row
-                after it would restart the header halfway down the page.
-
-                Availability, score and how many have sold. Only the first
-                carries a semantic tint: it is the one that changes what
-                happens when you tap Buy, and tinting all three would make a
-                row of competing badges out of what should read as one quiet
-                line of facts (§7 — accent where it communicates importance).
-                The star keeps the gold because a rating without one is not a
-                rating; the sales chip is neutral.
-
-                Each chip renders only when it has something true to say — no
-                "0 reviews" and no "0+ sold". A new product shows one chip,
-                which is correct: nothing has happened to it yet.
-              */}
-              <div data-product-signals className="mt-3 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
-                <span className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold ${modeBadge.cls}`}>
-                  {modeBadge.icon}
-                  {modeBadge.label}
-                </span>
-
-                {rating && rating.count > 0 ? (
-                  <span
-                    data-product-rating
-                    aria-label={s.ratingAria(rating.average.toFixed(1), rating.count)}
-                    className="inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary"
-                  >
-                    <Star aria-hidden="true" className="w-3.5 h-3.5 text-gold" fill="currentColor" strokeWidth={0} />
-                    {/* Tabular figures so a 4.0 and a 4.8 occupy the same
-                        width and the row does not shift as products change. */}
-                    <span className="font-bold tabular-nums" dir="ltr">{rating.average.toFixed(1)}</span>
-                    <span className="text-text-muted tabular-nums">
-                      ({rating.count.toLocaleString('en-US')} {s.reviewsCount(rating.count)})
-                    </span>
-                  </span>
-                ) : null}
-
-                {salesBadge !== null ? (
-                  <span
-                    data-product-sales={salesBadge}
-                    aria-label={s.salesAria(salesBadge.toLocaleString('en-US'))}
-                    className="inline-flex items-center gap-1.5 border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary"
-                  >
-                    <TrendingUp aria-hidden="true" className="w-3.5 h-3.5 text-text-secondary" />
-                    {/* `dir="ltr"` on the figure alone: «+200 مبيعات» has an
-                        LTR number inside an RTL sentence, and without the
-                        isolate the plus sign jumps to the wrong side of it. */}
-                    <span className="font-bold tabular-nums" dir="ltr">+{salesBadge.toLocaleString('en-US')}</span>
-                    <span className="text-text-muted">{s.salesSold}</span>
-                  </span>
-                ) : null}
-
-                {/* A graded unit says so beside its availability, not only
-                    in the panel below — the chip row is what a shopper reads
-                    before scrolling, and "used" is not a footnote. */}
-                {productCondition ? (
-                  <span
-                    data-condition-chip={productCondition.kind}
-                    className="inline-flex items-center gap-1.5 border border-info/30 bg-info/10 rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold text-info"
-                  >
-                    <PackageOpen aria-hidden="true" className="w-3.5 h-3.5" />
-                    {conditionKindLabel(productCondition.kind, lang)}
-                  </span>
-                ) : null}
-                {product.brand ? (
-                  <span className="border border-border-subtle rounded-full px-2.5 py-1 text-[11px] leading-normal text-text-secondary">{product.brand}</span>
-                ) : null}
-                {stockNote ? <span className="text-text-secondary text-[12px] leading-normal">{stockNote}</span> : null}
-              </div>
+              {signalsRow('mt-3 lg:hidden')}
               {/* «يناسب» — the printers this part fits, each one tap away. */}
               <PrinterFitsLine printers={fitsPrinters} />
               {/* The frame the price below only makes sense inside: what this
@@ -4398,6 +4408,7 @@ export default function Product() {
                   </CommunityStoreLink>
                 ) : null}
               </p>
+              {signalsRow('mt-2')}
             </div>
             {priceBlock}
             {selectionBlocks}
@@ -4412,7 +4423,7 @@ export default function Product() {
       </div>
 
       {/* ------------------------------------------------ phone purchase bar */}
-      <div ref={buyBarRef} data-testid="product-buybar" className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
+      <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
         {/*
           THE CONFIRMATION LIVES WHERE THE TAP HAPPENED. On a phone the CTA is
           this fixed bar while the status panel is hundreds of pixels above the

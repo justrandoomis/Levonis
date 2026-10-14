@@ -100,7 +100,14 @@ test('the points page has one light and an honest error', () => {
   assert.doesNotMatch(page, /Paperclip/, 'the check-in card has its paperclip back');
   assert.match(page, /bg-gold-fill shadow-1 grid place-items-center text-onyx/, 'the coin is one raised gold disc');
   assert.match(page, /<div className="lv-surface-raised p-4">/, 'the check-in card is the one raised slab');
-  assert.match(page, /formatFigure\(data\?\.point_balance \?\? pointBalance \?\? 0, lang\)/, 'the balance uses the shared figure helper');
+  assert.match(
+    page,
+    /data \? formatFigure\(data\.point_balance, lang\) : loadError && !pointBalance \? <span className="font-normal text-text-muted">—<\/span> : formatFigure\(pointBalance \?\? 0, lang\)/,
+    'the balance uses the shared figure helper, and a page that could not load shows a dash, not a zero it was not told'
+  );
+  assert.doesNotMatch(page, /No ways to earn points right now/, 'a failed load is reported as «there are no missions»');
+  // From 1024px the page is one centred column, not a balance on one edge and its coin on the other.
+  assert.match(page, /data-testid="rewards-root" dir=\{dir\} className="w-full max-w-2xl mx-auto /);
   assert.doesNotMatch(page, /setLoadError\(err instanceof Error \? err\.message/, 'the load error prints the server’s raw sentence again');
   assert.match(page, /refusalText\(code, refusalLang\(lang\)\)/);
 });

@@ -168,7 +168,7 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
         {loadState === 'failed' && (
           <p className="text-red-400 text-[12px]">
             {s.loadError}{' '}
-            <button type="button" onClick={load} className="underline font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold rounded">
+            <button type="button" onClick={load} className="underline font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded">
               {s.retry}
             </button>
           </p>
