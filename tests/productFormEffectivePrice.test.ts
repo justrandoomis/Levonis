@@ -368,53 +368,6 @@ test('an adjustment ALONE survives the same round trip untouched', async () => {
 });
 
 
-// ============================================ the form is wired to the resolver
-//
-// There is no DOM in this suite, so the wiring is pinned the way
-// `tests/adminProductHydration.test.ts` pins it: by reading the component
-// source. These assertions are cheap and they catch the exact regression this
-// round fixed — a future edit that goes back to rendering the four
-// `*_price_iqd` scalars raw, or that reimplements the ladder locally.
-
-test('OptionsSection resolves through the shared helper and never re-implements the ladder', () => {
-  const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
-
-  assert.match(src, /rowCells\(prices as PriceFields, beneath\)/, 'the cells come from the shared resolver');
-  // The box holds what the tier is CHARGED, which is `cell.effective` plus the
-  // resolver's member fallback — see `chargedAt` and the test below it.
-  assert.match(src, /value=\{charged\}/, 'the box holds the RESOLVED number, not the stored scalar');
-  assert.match(src, /beneath=\{base\}/, 'an option is measured over the product base');
-  assert.match(src, /beneath=\{beneathColor\(c\)\}/, 'a colour is measured over its option');
-  assert.match(src, /rowLadder\(parent as PriceFields, base\)/, 'and it inherits the option UNCLAMPED');
-
-  // One typed number must write BOTH halves of the pair.
-  assert.match(
-    src,
-    /onChange\(\{ \[col\]: v, \[ADJUST_OF\[col\]\]: null \}/,
-    'a typed fixed price must clear the adjustment beside it'
-  );
-
-  // And the arithmetic must not be here. A local `+ adjust` in this file is the
-  // second implementation the shared helper exists to prevent.
-  assert.ok(
-    !/_adjust_iqd\s*[)\]]*\s*[+-]/.test(src),
-    'OptionsSection is doing price arithmetic of its own'
-  );
-});
-
-test('ProductForm feeds the section the LIVE base price, not the loaded one', () => {
-  const src = readFileSync(new URL('../src/components/adminProducts/ProductForm.tsx', import.meta.url), 'utf8');
-  assert.match(src, /regular: doc\.price_iqd/, 'the base comes from the editor document');
-  assert.match(src, /prime: doc\.prime_price_iqd/);
-  assert.match(src, /pro: doc\.pro_price_iqd/);
-  assert.match(src, /cost: doc\.product_cost_iqd/);
-  // `loadedBasePrice` is the PinnedPriceNotice's snapshot of what was saved. If
-  // the ladder were fed from it, raising the base in section 4 would leave every
-  // inheriting option showing yesterday's number until the page was reloaded.
-  assert.ok(!/regular: loadedBasePrice/.test(src), 'the ladder must follow the live edit');
-});
-
-
 // ==================== the exhaustive cross-check against the real resolver
 //
 // The four numbered tests above pin the owner's own product. This one asks the
@@ -512,15 +465,6 @@ test('the ladder keeps its null, so a bulk edit still cannot pin a price nobody 
   const cells = rowCells(A1_COMBO, { regular: 725_000, prime: null, pro: null, cost: null });
   assert.equal(cells.pro.effective, null);
   assert.equal(cells.pro.inherited, null);
-});
-
-test('the form renders the charged number, not the raw ladder value', () => {
-  const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
-  assert.match(src, /value=\{charged\}/, 'the box holds what the tier is charged');
-  assert.match(src, /charged: charges\[field\]\.charged/);
-  assert.match(src, /viaRegular: charges\[field\]\.viaRegular/);
-  assert.match(src, /rowCharges\(prices as PriceFields, beneath, level\)/, 'and it is told which rung this row is');
-  assert.match(src, /data-price-mode=\{viaRegular \? 'regular-fallback' : 'inherit'\}/, 'and says which it is');
 });
 
 // ============ THE ZERO THAT ISN'T A PRICE (adversarial review, finding 1)
@@ -636,30 +580,11 @@ test('a randomised sweep finds no shape where the editor and the till disagree',
 });
 
 // ============== the rest of the adversarial review's product-form findings
-
-test('every price input keeps its label — `Field` cannot wire a two-child cell', () => {
-  // `Field` clones its generated id onto its child only when that child is a
-  // SINGLE element (`React.isValidElement(children)`). The price cell has two
-  // — the input and the provenance line — so `children` is an array, no clone
-  // happens, and `<label htmlFor>` would point at nothing: three or four
-  // inputs per option value and per colour with no accessible name.
-  const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
-  assert.match(src, /const inputId = useId\(\);/, 'the cell mints its own id');
-  assert.match(src, /<Field ar=\{label_ar\} en=\{label_en\} tip=\{tip\} htmlFor=\{inputId\}>/, 'and tells the label');
-  assert.match(src, /<Money\s+id=\{inputId\}/, 'and the input answers to it');
-
-  const ui = readFileSync(new URL('../src/components/adminProducts/form/formUi.tsx', import.meta.url), 'utf8');
-  assert.match(ui, /React\.isValidElement\(children\) && !htmlFor/, 'the clone rule that makes this necessary');
-});
-
-test('a colour linked to several options says its price moves with them', () => {
-  const src = readFileSync(new URL('../src/components/adminProducts/form/OptionsSection.tsx', import.meta.url), 'utf8');
-  // It resolves under the FIRST linked option — a price really charged for a
-  // real combination — instead of the base, which is charged for none of them.
-  assert.match(src, /const parent = c\.option_value_ids\.map\(\(id\) => optionById\.get\(id\)\)\.find\(Boolean\);/);
-  assert.match(src, /data-color-price-spread/, 'and the range is disclosed');
-  assert.match(src, /spread=\{colorSpread\(c\)\}/);
-});
+//
+// Pricing V2-4 (2026-10-14, DECISIONS row 222, spec addendum A.12.2): the
+// product form no longer types a dinar price — the option and colour price
+// cells these source pins guarded are deleted, so the pins went with them.
+// The resolver tests above stay: the ladder still prices V1 rows elsewhere.
 
 test('the colour spread is the set of prices the colour really takes', () => {
   // base 725,000; option A adds nothing, option B adds 174,000; the colour

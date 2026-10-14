@@ -39,31 +39,23 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, FileUp } from 'lucide-react';
-import { api, ApiError, failureText, formatIqd } from '../../lib/api';
+import { api, ApiError, failureText } from '../../lib/api';
 import { refusalIssues } from './applyResult';
 import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
-import {
-  UsdPricingColourRow,
-  UsdPricingModelRow,
-  UsdPricingOptionsFooter,
-  UsdPricingSkuRow,
-  pricingSkuKey,
-  type FormColour,
-  type FormSku,
-  type PricingScope,
-  UsdPricingPreview,
-  UsdPricingProductPanel,
-  UsdPricingProvider,
-  UsdPricingSaveSheet,
-  useUsdPricingState,
-  type FormModel,
-  type UsdPricingFormContext,
-} from './form/UsdPricingSection';
-import { USD_PRICING_FORM_STRINGS, usdPricingFormStrings } from './form/usdPricingStrings';
+// «الأسعار» — Pricing V2 for every product (the clean start, DECISIONS row 222): sections ٣ and ٥ and
+// the one review sheet. No dinar price is typed anywhere in this form (spec §5, addendum A.6/A.7).
+import { useV2Pricing, V2PricingProvider } from './form/v2/useV2Pricing';
+import PricesSectionV2 from './form/v2/PricesSectionV2';
+import StatusChipV2 from './form/v2/StatusChipV2';
+import ReviewSheetV2 from './form/v2/ReviewSheetV2';
+import ModelPriceSelector from './form/v2/ModelPriceSelector';
+import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelector';
+import { comboKeyOf, iqdText, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
+import { v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
-import type { BrandV2, CatalogV2, ProductDimensionsV2 } from '../../lib/productTypes';
+import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
 import {
   blankDoc,
   defaultProductDeliveryOptions,
@@ -75,7 +67,6 @@ import {
   type ProductResponse,
   type SaveResponse,
 } from './types';
-import PinnedPriceNotice from './PinnedPriceNotice';
 import DeliveryAvailabilityNotice from './DeliveryAvailabilityNotice';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 // «تحديث البيانات» — the product data file, both ways (owner brief 2026-10-10):
@@ -86,20 +77,16 @@ import { DATA_FILE_STRINGS, pick as pickDataFileString } from './dataFileStrings
 import { COMPLETENESS_UI, CompletenessBanner, CompletenessProvider, MissingBlock, fill, tri, useProductCompleteness } from './completeness';
 // Types only — no runtime import, so the sheet stays in its own lazy chunk.
 import type { ReviewItem, TranslationOverrides } from './form/TranslationsSheet';
-import { repriceRow, pinnedRows, type RepriceMode } from '../../../worker/lib/pinnedPrices';
 import {
   Banner,
   Field,
   Grid,
-  MirrorNote,
   Money,
   Qty,
   SectionCard,
   Select,
   TextArea,
   TextInput,
-  TierPriceDisclosure,
-  type TierPriceMark,
   Toggle,
   btnGhost,
   btnPrimary,
@@ -132,9 +119,6 @@ import { ImagesSection } from './form/ImagesSection';
 import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 import { setLeaveGuard } from '../../lib/leaveGuard';
-
-/** The package measurements pricing reads (the box and the packed weight): their unsaved edits are guarded on leaving. */
-const PACKAGE_MEASURE_KEYS = ['package_weight_g', 'package_width_mm', 'package_depth_mm', 'package_height_mm'] as const;
 
 interface TemplateField {
   id: string;
@@ -193,7 +177,7 @@ export default function ProductForm({
   onListChanged: () => void;
 }) {
   const { dir, lang } = useLanguage();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   /**
    * PRO, PAUSED (0145): its price field and its discount rule are hidden
    * until the owner resumes it. PREMIUM has none at all any more — «حذف خيار
@@ -218,20 +202,16 @@ export default function ProductForm({
    * A new product has nothing stored to lose.
    */
   const [costLoaded, setCostLoaded] = useState(true);
-  // Owner decision 8: the engine prices this product — its price cells are read only (every admin).
-  const [engineManaged, setEngineManaged] = useState(false);
-  const [engineDirectOnly, setEngineDirectOnly] = useState(false);
-  const costShown = canSeeCost && costLoaded;
+  /**
+   * The id add-product's save persists (the server keeps a sent id): the V2
+   * preview prices the draft under it before the first save (spec §4.1, P13).
+   */
+  const [draftId] = useState(() => `prd_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`);
 
   const [doc, setDoc] = useState<EditorDoc>(() => blankDoc());
   const [rel, setRel] = useState<RelationsState>(() => emptyRelations());
   const [baseline, setBaseline] = useState('');
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState('');
-  // The base price this product had when the editor opened. A pinned-price
-  // warning is only honest against the value the owner started from, not
-  // against every keystroke.
-  const [loadedBasePrice, setLoadedBasePrice] = useState<number | null>(null);
-  const [pinnedDismissed, setPinnedDismissed] = useState(false);
   const columnRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(!!productId);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -367,48 +347,6 @@ export default function ProductForm({
     };
   }, []);
 
-  /**
-   * Move every row that carries its own price, in one pass over the two places
-   * a price can live: the relational option values / colours / variants the
-   * editor manages, and the JSON options and colours the document carries for
-   * products that never grew relational rows. Both are written by the same
-   * save, so the storefront and the cart cannot end up disagreeing.
-   *
-   * This edits the FORM, not the database. Nothing is committed until the
-   * owner saves, so the move is as reviewable and as undoable as any other
-   * edit they make on this screen.
-   */
-  const applyPinnedReprice = useCallback(
-    (mode: RepriceMode, from: number, to: number) => {
-      const move = <X extends { id: string; regular_price_iqd?: number | null; prime_price_iqd?: number | null; pro_price_iqd?: number | null }>(
-        x: X
-      ): X => {
-        const [pinned] = pinnedRows({ options: [x as never] });
-        if (!pinned) return x;
-        const next = repriceRow(pinned, mode, from, to);
-        return {
-          ...x,
-          regular_price_iqd: next.regular_price_iqd,
-          prime_price_iqd: next.prime_price_iqd,
-          pro_price_iqd: next.pro_price_iqd,
-        };
-      };
-      setRel((r) => ({
-        ...r,
-        groups: r.groups.map((g) => ({ ...g, values: g.values.map(move) })),
-        colors: r.colors.map(move),
-        variants: r.variants.map(move),
-      }));
-      setDoc((d) => ({
-        ...d,
-        options: Array.isArray(d.options) ? d.options.map((o) => move(o)) : d.options,
-        colors: Array.isArray(d.colors) ? d.colors.map((col) => move(col)) : d.colors,
-      }));
-      setPinnedDismissed(true);
-    },
-    []
-  );
-
   /** The product and its structure, read in parallel. Nothing on screen changes. */
   const readProduct = useCallback(async (id: string) => {
     const [p, r] = await Promise.all([
@@ -434,11 +372,7 @@ export default function ProductForm({
     setRel(rs);
     // Both answers, never the first one alone (see `relationsCarryCost`).
     setCostLoaded(carriesCost(p.product) && relationsCarryCost(r));
-    setEngineManaged(p.engine_managed === true);
-    setEngineDirectOnly(p.engine_direct_only === true);
     setLoadedUpdatedAt(p.product.updated_at ?? '');
-    setLoadedBasePrice(typeof d.price_iqd === 'number' ? d.price_iqd : null);
-    setPinnedDismissed(false);
     setBaseline(JSON.stringify({ d, rs }));
   }, []);
   const loadProduct = useCallback(async (id: string) => {
@@ -684,123 +618,69 @@ export default function ProductForm({
     [isPrinterCatalog, doc.warranty_plans, doc.serialized, doc.warranty_base_months]
   );
 
-  // ------------------------------------------------- «التسعير بالدولار والشحن»
-  // The owner's USD pricing lives in this form (sections ٣, ٥ and ٨) and saves
-  // through the pricing door with this form's own save. Its measure is the
-  // form's package measurement — the same state as «الأبعاد والوزن», never a
-  // second copy (form/UsdPricingSection.tsx). Inert for everyone but the owner.
-  const savedMeasures = useMemo(() => {
-    const options: Record<string, ProductDimensionsV2 | undefined> = {};
-    const colours: Record<string, ProductDimensionsV2 | undefined> = {};
-    const skus: Record<string, ProductDimensionsV2 | undefined> = {};
+  // -------------------------------------------------------------- «الأسعار» (Pricing V2)
+  // Every ordinary product is priced in sections ٣ and ٥ by the V2 writer (the clean start, DECISIONS
+  // row 222): the owner and the price editors type dollars (Q2), the owner alone the cost; the save
+  // sends structure and prices together (`pricing_v2`, one batch) and the review sheet shows only the
+  // prices that change. Every price shown is the server's answer (form/v2/useV2Pricing.ts).
+  const v2Lang = lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar';
+  const v2s = v2Strings(v2Lang);
+  /** The document and relations the save would post (the structure a preview prices). */
+  const structureOf = useCallback(() => {
+    const { options: _o, colors: _c, media: _m, ...docFields } = docRef.current as EditorDoc & Record<string, unknown>;
+    void _o; void _c; void _m;
+    return { doc: docFields as Record<string, unknown>, relations: relationsToWire(relRef.current) as unknown as Record<string, unknown> };
+  }, []);
+  /** The priced part of the structure: models, colours, links, «يُباع» and its routes, the variant rows. */
+  const structureKeyOf = (d: Pick<EditorDoc, 'sale_types'>, r: RelationsState) =>
+    JSON.stringify({
+      sale: d.sale_types,
+      groups: r.groups.map((g) => [g.id, g.values.map((v) => [v.id, v.active, v.fulfillments.map((f) => [f.fulfillment_type, f.enabled, f.transports.map((t) => [t.method, t.enabled])])])]),
+      colors: r.colors.map((c) => [c.id, c.active, c.option_value_ids]),
+      variants: r.variants.map((v) => [v.option_value_ids, v.color_id, v.active]),
+    });
+  const structureKey = structureKeyOf(doc, rel);
+  const savedStructureKey = useMemo(() => {
     try {
       const b = baseline ? (JSON.parse(baseline) as { d: EditorDoc; rs: RelationsState }) : null;
-      for (const g of b?.rs.groups ?? []) for (const v of g.values) options[v.id] = v.dimensions;
-      for (const c of b?.rs.colors ?? []) colours[c.id] = c.dimensions;
-      for (const v of b?.rs.variants ?? []) skus[pricingSkuKey(v.option_value_ids, v.color_id)] = v.dimensions;
-      return { base: b?.d.dimensions ?? null, options, colours, skus };
+      return b ? structureKeyOf(b.d, b.rs) : '';
     } catch {
-      return { base: null, options, colours, skus };
+      return '';
     }
   }, [baseline]);
-  const pricingModels = useMemo<FormModel[]>(
-    () =>
-      rel.groups.flatMap((g) =>
-        g.values
-          .filter((v) => v.active !== false)
-          .map((v) => ({
-            id: v.id,
-            name_en: v.name_en,
-            name_ar: v.name_ar,
-            name_ckb: v.name_ckb,
-            sells_direct: v.fulfillments.some((f) => f.fulfillment_type === 'direct_sale' && f.enabled),
-          }))
-      ),
-    [rel.groups]
-  );
-  const optionDimensions = useMemo(
-    () => Object.fromEntries(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v.dimensions] as const))),
-    [rel.groups]
-  );
-  // FX-7: each colour and each variant row prices at its own level too (empty = its model's).
-  const pricingColours = useMemo<FormColour[]>(
-    () => rel.colors.filter((c) => c.active !== false).map((c) => ({ id: c.id, name_en: c.name_en, name_ar: c.name_ar, name_ckb: c.name_ckb, option_ids: c.option_value_ids })),
-    [rel.colors]
-  );
-  const pricingSkus = useMemo<FormSku[]>(
-    () => rel.variants.map((v) => ({ combo_key: pricingSkuKey(v.option_value_ids, v.color_id), option_value_ids: v.option_value_ids, color_id: v.color_id })),
-    [rel.variants]
-  );
-  const colourDimensions = useMemo(() => Object.fromEntries(rel.colors.map((c) => [c.id, c.dimensions] as const)), [rel.colors]);
-  const skuDimensions = useMemo(() => Object.fromEntries(rel.variants.map((v) => [pricingSkuKey(v.option_value_ids, v.color_id), v.dimensions] as const)), [rel.variants]);
-  const setPricingMeasure = useCallback((scope: PricingScope, id: string, patch: Partial<ProductDimensionsV2>) => {
-    if (scope === 'base') {
-      setDoc((d) => ({ ...d, dimensions: { ...(d.dimensions ?? emptyDimensions()), ...patch } }));
-      return;
-    }
-    if (scope === 'color') {
-      setRel((r) => ({ ...r, colors: r.colors.map((c) => (c.id === id ? { ...c, dimensions: { ...(c.dimensions ?? emptyDimensions()), ...patch } } : c)) }));
-      return;
-    }
-    if (scope === 'sku') {
-      // Only a variant row the form already holds (its measure fields show only then).
-      setRel((r) => ({
-        ...r,
-        variants: r.variants.map((v) => (pricingSkuKey(v.option_value_ids, v.color_id) === id ? { ...v, dimensions: { ...(v.dimensions ?? emptyDimensions()), ...patch } } : v)),
-      }));
-      return;
-    }
-    setRel((r) => ({
-      ...r,
-      groups: r.groups.map((g) => ({
-        ...g,
-        values: g.values.map((v) => (v.id === id ? { ...v, dimensions: { ...(v.dimensions ?? emptyDimensions()), ...patch } } : v)),
-      })),
-    }));
-  }, []);
-  const pricingForm = useMemo<UsdPricingFormContext>(
-    () => ({
-      baseDimensions: doc.dimensions,
-      optionDimensions,
-      savedBaseDimensions: savedMeasures.base,
-      savedOptionDimensions: savedMeasures.options,
-      models: pricingModels,
-      productSellsDirect: doc.sale_types.includes('direct_sale' as SaleType),
-      colours: pricingColours,
-      skus: pricingSkus,
-      colourDimensions,
-      savedColourDimensions: savedMeasures.colours,
-      skuDimensions,
-      savedSkuDimensions: savedMeasures.skus,
-      setMeasure: setPricingMeasure,
-    }),
-    [doc.dimensions, optionDimensions, savedMeasures, pricingModels, doc.sale_types, pricingColours, pricingSkus, colourDimensions, skuDimensions, setPricingMeasure]
-  );
-  const pricing = useUsdPricingState({
-    productId: doc.id || null,
-    enabled: canSeeCost,
-    form: pricingForm,
-    // The engine wrote the prices: read the product again (its prices and the lock), keeping unsaved edits.
-    onPricesWritten: (id) => void reloadKeepingEdits(id),
+  const live = useMemo<Omit<V2LiveIds, 'skus'>>(() => {
+    const active = rel.groups.flatMap((g) => g.values.filter((v) => v.active !== false));
+    return {
+      options: new Set(active.map((v) => v.id)),
+      models: new Set((rel.groups[0]?.values ?? []).filter((v) => v.active !== false).map((v) => v.id)),
+      colours: new Set(rel.colors.filter((c) => c.active !== false).map((c) => c.id)),
+    };
+  }, [rel.groups, rel.colors]);
+  const v2 = useV2Pricing({
+    // Every product this form edits is priced by V2 (a bundle never opens here: its editor is the bundles panel).
+    enabled: true,
+    productId: productId || doc.id || null,
+    draftId,
+    ownerHint: canSeeCost,
+    structureOf,
+    structureKey,
+    structureDirty: baseline !== '' && structureKey !== savedStructureKey,
+    live,
+    packageDims: doc.dimensions ?? null,
   });
-  const us = usdPricingFormStrings(lang);
-  const usEn = USD_PRICING_FORM_STRINGS.en;
-  // THE OWNER'S PRICING NEVER LEAVES SILENTLY (owner report 2026-10-10): typed values that are not saved —
-  // or a held engine save waiting in its sheet — live only in this page, so leaving it asks first. So do
-  // the package measurements pricing reads (the box and weight), once edited and not saved with the
-  // product: «حفظ التسعير بالدولار» stores them for pricing only (verifier F4). Every way out asks — «رجوع»,
-  // the browser, and the dashboard's sidebar, drawer and menus (lib/leaveGuard.ts; verifier F3). The
-  // product's other unsaved edits are not guarded here (as before).
-  const pricingAtRisk = canSeeCost && (pricing.touched || (!!pricing.review && !pricing.review.stored));
-  const measuresUnsaved = useMemo(() => {
-    if (!canSeeCost || baseline === '') return false;
-    const same = (a: ProductDimensionsV2 | null | undefined, b: ProductDimensionsV2 | null | undefined) =>
-      PACKAGE_MEASURE_KEYS.every((k) => (a?.[k] ?? null) === (b?.[k] ?? null));
-    const differs = (now: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>, saved: Readonly<Record<string, ProductDimensionsV2 | null | undefined>>) =>
-      Object.entries(now).some(([id, d]) => !same(d, saved[id]));
-    return !same(doc.dimensions, savedMeasures.base) || differs(optionDimensions, savedMeasures.options) || differs(colourDimensions, savedMeasures.colours) || differs(skuDimensions, savedMeasures.skus);
-  }, [canSeeCost, baseline, doc.dimensions, savedMeasures, optionDimensions, colourDimensions, skuDimensions]);
-  const leaveWarning = pricingAtRisk ? us.leaveUnsaved : measuresUnsaved ? us.leaveMeasures : null;
+  const modelNames = useCallback(
+    (id: string) => {
+      for (const g of rel.groups) for (const v of g.values) if (v.id === id) return { ar: v.name_ar || v.name_en, en: v.name_en, ckb: v.name_ckb || v.name_en };
+      return null;
+    },
+    [rel.groups]
+  );
+  const firstModelId = rel.groups[0]?.values.find((v) => v.active !== false)?.id ?? null;
+  const lowest = v2.answer ? lowestPrice(v2.answer.table) : null;
+  // THE TYPED PRICES NEVER LEAVE SILENTLY (owner report 2026-10-10, row 214 F3): dollars typed and not
+  // saved — or a review sheet waiting — live only in this page, so leaving it asks first. Every way out
+  // asks — «رجوع», the browser, and the dashboard's sidebar, drawer and menus (lib/leaveGuard.ts).
+  const leaveWarning = v2.touched || !!v2.review ? v2s.leaveUnsaved : null;
   const leave = () => {
     if (leaveWarning && !window.confirm(leaveWarning)) return;
     onBack();
@@ -818,11 +698,11 @@ export default function ProductForm({
       release();
     };
   }, [leaveWarning]);
-  /** «اعرض»: the section the pricing outcome names, opened and scrolled to (٣ the product, ٥ its models). */
+  /** «اعرض»: the section a pricing refusal or a missing line names, opened and scrolled to (٣ the product, ٥ its models). */
   const showPricing = (n: 3 | 5) => {
     setOpen(n);
     requestAnimationFrame(() =>
-      document.querySelector(n === 3 ? '[data-form="usd-pricing"]' : '[data-form="usd-pricing-options"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      document.querySelector(n === 3 ? '[data-form="pricing-v2"]' : '[data-section="5"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
     );
   };
 
@@ -830,10 +710,6 @@ export default function ProductForm({
     () =>
       validateForm({
         name_en: doc.name_en,
-        price_iqd: doc.price_iqd,
-        prime_price_iqd: doc.prime_price_iqd,
-        pro_price_iqd: doc.pro_price_iqd,
-        product_cost_iqd: doc.product_cost_iqd,
         category_id: doc.category_id,
         sale_types: doc.sale_types as SaleType[],
         rel,
@@ -888,16 +764,22 @@ export default function ProductForm({
 
   // -------------------------------------------------------------- saving
 
-  const save = async (status: 'draft' | 'active', { overwrite = false }: { overwrite?: boolean } = {}) => {
+  /**
+   * ONE «نشر» (spec §5.6, docs/PRICING-V2.md §2.6): the document, the structure and — for every ordinary
+   * product — its `pricing_v2` block go in ONE request, which the server writes in ONE batch. When no
+   * price moves it saves with no sheet; when prices move the server answers 409 with its preview and
+   * the review sheet lists only the changed rows; its confirm resends with the preview's hash (and the
+   * 15% tick); a fresh sign-in is asked for a large change. Cancel keeps every typed value.
+   */
+  const save = async (
+    status: 'draft' | 'active',
+    { overwrite = false, confirm }: { overwrite?: boolean; confirm?: { hash: string; confirmLarge: boolean } } = {}
+  ) => {
     setShowErrors(true);
     setStaleSave(null);
     const next = { ...doc, status } as EditorDoc;
     const check = validateForm({
       name_en: next.name_en,
-      price_iqd: next.price_iqd,
-      prime_price_iqd: next.prime_price_iqd,
-      pro_price_iqd: next.pro_price_iqd,
-      product_cost_iqd: next.product_cost_iqd,
       category_id: next.category_id,
       sale_types: next.sale_types as SaleType[],
       rel,
@@ -913,8 +795,8 @@ export default function ProductForm({
     setSaving(true);
     setSaveErr(null);
     setSaveNote(null);
-    // The owner's USD pricing as typed now; it follows the product through the pricing door.
-    const pricingSnap = pricing.snapshot();
+    // The prices as typed now (and the review sheet's answer): they travel with the product.
+    const pricingBlock = v2.saveBlock(status, confirm);
     try {
       // The document WITHOUT its derived copies of the structure: `options`,
       // `colors` and `media` have no editor here, and the server rebuilds the
@@ -925,6 +807,8 @@ export default function ProductForm({
       void _o; void _c; void _m;
       const body: Record<string, unknown> = {
         ...docFields,
+        // Add-product: the id the V2 preview priced the draft under (the server keeps a sent id).
+        ...(next.id ? {} : { id: draftId }),
         relations: relationsToWire(rel),
         ...(Object.keys(overrides).length ? { translation_overrides: overrides } : {}),
         // Omitted deliberately when the admin has chosen to overwrite: the
@@ -934,16 +818,19 @@ export default function ProductForm({
         // Read without cost: the blanks this form holds are "not shown", and
         // the server keeps every stored cost (see `costLoaded`).
         ...(next.id && !costLoaded ? { cost_loaded: false } : {}),
+        ...(pricingBlock ? { pricing_v2: pricingBlock } : {}),
       };
       const res = await api.post<SaveResponse & {
         translation_review_needed?: string[];
         translation_review?: ReviewItem[];
         warnings?: string[];
+        already?: boolean;
+        pricing_v2?: { priced: boolean };
       }>(
         '/api/admin/products-v2',
         body
       );
-      const savedId = res.product?.id ?? next.id;
+      const savedId = res.product?.id ?? next.id ?? draftId;
       setReviewNeeded(res.translation_review_needed ?? []);
       setReviewDetail(res.translation_review ?? []);
       // What was just written is stored and `approved`; re-sending it on every
@@ -960,9 +847,11 @@ export default function ProductForm({
       const fresh = await api.get<RelationsResponse>(`/api/admin/products/${savedId}/relations`);
       const savedRel = relationsFromWire(fresh);
       setRel(savedRel);
-      if ((res.warnings?.length ?? 0) > 0) setSaveNote(res.warnings!.join(' · '));
+      const notes = [...(res.warnings ?? [])];
+      if (res.pricing_v2) notes.push(res.pricing_v2.priced ? v2s.savedPriced : v2s.savedDataOnly);
+      if (notes.length) setSaveNote(notes.join(' · '));
 
-      const freshDoc = res.product ? toEditorDoc(res.product) : next;
+      const freshDoc = res.product ? toEditorDoc(res.product) : { ...next, id: savedId };
       setDoc(freshDoc);
       // The echo and the structure read-back are two answers too.
       if (res.product) setCostLoaded(carriesCost(res.product) && relationsCarryCost(fresh));
@@ -973,16 +862,8 @@ export default function ProductForm({
       baselineGeneration.current += 1;
       setBaseline(JSON.stringify({ d: freshDoc, rs: savedRel }));
       setShowErrors(false);
-      // The pricing after the product (the models it names exist now); a refusal
-      // there keeps the typed values and never fails the product's own save.
-      if (pricingSnap && savedId) {
-        const priced = await pricing.saveAfterProduct(savedId, pricingSnap);
-        const warned = res.warnings?.length ? res.warnings.join(' · ') : '';
-        if (priced.message) setSaveNote([warned, priced.message].filter(Boolean).join(' · '));
-      } else if (canSeeCost && savedId) {
-        // No pricing typed: when this save completed the product (owner decision 8), the new prices are shown first.
-        await pricing.afterProductSaved(savedId);
-      }
+      // The prices are read again from the server and the draft starts over from them.
+      v2.afterSave();
       onListChanged();
       if (!productId && savedId) {
         // Reload so the new id is reflected everywhere (relations, preview).
@@ -1000,14 +881,52 @@ export default function ProductForm({
         setSaveErr(null);
         return;
       }
+      const text = contractRefusal(e, refusalLang(lang), failureText(e, 'فشل الحفظ / save failed'));
+      // THE ONE SHEET: prices move — the server's preview of exactly what this save writes.
+      const preview = e instanceof ApiError ? previewOf(e.details) : null;
+      if (
+        e instanceof ApiError &&
+        preview &&
+        (e.code === 'PRICING_PREVIEW_REQUIRED' || e.code === 'PRICING_PREVIEW_STALE' || e.code === 'PRICING_LARGE_CHANGE_CONFIRM')
+      ) {
+        v2.openReview(preview, status);
+        if (e.code === 'PRICING_PREVIEW_STALE' && confirm) v2.reviewError(text);
+        return;
+      }
+      if (e instanceof ApiError && e.code === 'REAUTH_REQUIRED' && v2.review) {
+        v2.reviewError(v2s.reauth, true);
+        return;
+      }
+      // A refusal that names its section opens it (٣ the prices, ٥ a model or a colour).
+      const section = e instanceof ApiError ? refusalSection(e.details) : null;
+      if (section) {
+        v2.closeReview();
+        showPricing(section);
+      }
       const lines = e instanceof ApiError ? refusalIssues((e.body ?? e.details ?? {}) as Parameters<typeof refusalIssues>[0]) : [];
       // A refusal of the programme contract (OWNER_ONLY: the product's serial
       // answer is the owner's) in the reader's language, Sorani included; any
       // other failure reads exactly as before.
-      const base = contractRefusal(e, refusalLang(lang), failureText(e, 'فشل الحفظ / save failed'));
-      setSaveErr(lines.length ? `${base}: ${lines.join(' · ')}` : base);
+      setSaveErr(lines.length ? `${text}: ${lines.join(' · ')}` : text);
+      if (v2.review) v2.reviewError(text);
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** The review sheet's confirm: the same save, with the preview's hash and the tick. */
+  const confirmReview = (confirmLarge: boolean) => {
+    const r = v2.review;
+    if (!r?.preview.review_hash) return;
+    void save(r.status, { confirm: { hash: r.preview.review_hash, confirmLarge } });
+  };
+  /** A large change needs a NEW sign-in: the session ends first; the way back is this product's form. */
+  const signInAgain = async () => {
+    const id = productId || doc.id;
+    try {
+      await logout?.();
+    } finally {
+      window.location.assign(`/auth?next=${encodeURIComponent(id ? `/admin?tab=products&edit=${encodeURIComponent(id)}` : '/admin?tab=products')}`);
     }
   };
 
@@ -1031,27 +950,6 @@ export default function ProductForm({
   }, [loading, loadErr]);
 
   // --------------------------------------------------------------- render
-
-  /**
-   * HOW MANY ROWS IGNORE THE BASE PRICE. `pinnedRows` is the same reader the
-   * price-change notice uses, so the count under the price field and the
-   * warning that appears when it moves can never disagree.
-   */
-  const pricedRowCount = useMemo(
-    () =>
-      pinnedRows({
-        options: [
-          ...rel.groups.flatMap((g) => g.values as unknown as Array<Record<string, unknown>>),
-          ...((doc.options ?? []) as unknown as Array<Record<string, unknown>>),
-        ],
-        colors: [
-          ...(rel.colors as unknown as Array<Record<string, unknown>>),
-          ...((doc.colors ?? []) as unknown as Array<Record<string, unknown>>),
-        ],
-        variants: rel.variants as unknown as Array<Record<string, unknown>>,
-      } as never).length,
-    [rel.groups, rel.colors, rel.variants, doc.options, doc.colors]
-  );
 
   /** One line per REASON rather than 66 keys — the counts an owner can act on. */
   const reviewSummary = useMemo(() => {
@@ -1109,8 +1007,8 @@ export default function ProductForm({
     // min-w-0 on the outer column is what keeps a long value from widening the
     // whole admin page, and there is no bottom padding: this screen owns its
     // own bottom edge (see the effect above and the save bar below).
-    // «التسعير بالدولار والشحن»: one state for its mount points (sections ٣, ٥ and ٨).
-    <UsdPricingProvider value={pricing}>
+    // «الأسعار» (Pricing V2): one state for its mount points (sections ٣, ٥ and ٨, and the review sheet).
+    <V2PricingProvider value={v2}>
     <CompletenessProvider items={missingItems} lang={lang} optionName={optionNameOf}>
     <div ref={columnRef} className="min-w-0 w-full max-w-[880px] mx-auto px-3">
       <div className="flex items-center gap-2 py-3 min-w-0">
@@ -1543,104 +1441,21 @@ export default function ProductForm({
         </Grid>
       </SectionCard>
 
-      {/* 3 ──────────────────────────────────────────── prices, memberships */}
+      {/* 3 ──────────────────────────────────────────── prices, memberships
+          «الأسعار» — Pricing V2 for every product (spec §5.3, addendum A.7): the method, the cost
+          (the owner's), the dollar price and the pre-order discount, the result, what is missing and
+          the final customer prices. No dinar price is typed here, and no old one is shown. */}
       <SectionCard
         n={3}
         missing={sectionMissing(3)}
         missingLabel={sectionMissingLabel(3)}
         ar={proPaused ? 'الأسعار' : 'الأسعار والعضويات'}
         en={proPaused ? 'Prices' : 'Prices & memberships'}
-        summary={summarize([
-          doc.price_iqd !== null ? formatIqd(doc.price_iqd) : 'بلا سعر',
-          !proPaused && doc.pro_price_iqd !== null ? `PRO ${formatIqd(doc.pro_price_iqd)}` : null,
-        ])}
-        error={showErrors && (!!errors.price_iqd || !!errors.prices)}
+        chip={<StatusChipV2 answer={v2.answer} owner={v2.owner} hidden={v2.hidden} />}
+        summary={summarize([lowest !== null ? v2s.from(iqdText(lowest)) : v2.hidden ? v2s.chipHidden : v2s.noPriceYet])}
+        error={showErrors && !!errors.prices}
         {...section(3)}
       >
-        {showErrors && errors.prices && <Banner kind="error">{errors.prices}</Banner>}
-        {/* «ناقص» (owner brief 2026-10-10): what has no single input here — the
-            USD pricing data of an engine product, the private data another admin
-            is told about without its name, and a cost no visible box carries. */}
-        <MissingBlock codes={costShown ? ['ENGINE_INPUTS', 'OWNER_DATA'] : ['ENGINE_INPUTS', 'OWNER_DATA', 'COST']} />
-        <Grid cols={3}>
-          {/* An engine-priced product's price is the engine's (the owner sees it
-              as «سعر المتجر الحالي», read only); every other product — and every
-              other admin — keeps the editable «السعر» exactly as before. */}
-          {(canSeeCost && pricing.engine) || engineManaged ? (
-            <Field ar={us.storePrice} en={lang === 'en' ? '' : usEn.storePrice} hint={us.storePriceEngine}>
-              <TextInput readOnly aria-readonly="true" data-form="store-price-engine" value={doc.price_iqd === null ? '—' : formatIqd(doc.price_iqd)} />
-            </Field>
-          ) : (
-          <Field
-            ar="السعر"
-            en="Price"
-            required
-            need="PRICE"
-            error={err('price_iqd')}
-            hint={canSeeCost && pricing.answer && doc.id ? us.storePriceManual : undefined}
-            tip="الخيار أو اللون الذي له سعر خاص يستبدل هذا السعر ولا يُضاف إليه. إن غيّرت هذا الرقم وكانت هناك أسعار خاصة، ستُسأل عمّا تفعل بها."
-          >
-            <Money
-              required
-              value={doc.price_iqd}
-              onChange={(v) => setDoc((d) => ({ ...d, price_iqd: v ?? 0 }))}
-            />
-            {pricedRowCount > 0 && (
-              <MirrorNote
-                kind="replaces"
-                where="٥ الخيارات والألوان"
-                detail={`${pricedRowCount} صفًّا له سعر خاص يتجاهل هذا الرقم`}
-              />
-            )}
-          </Field>
-          )}
-          {/*
-            THE SAME FOLD AS EVERY OPTION AND COLOUR ROW, so one control means
-            one thing everywhere in this form. The product row is the one rung
-            that carries NO adjustment column — `ProductDocV2` states
-            `prime_price_iqd` / `pro_price_iqd` and nothing else, while
-            `PriceFieldsV2` adds `*_adjust_iqd` only for options, colours and
-            variants — so `!== null` is the honest "is it typed" test HERE and
-            only here. It is still not truthiness: a typed 0 is a price, and 0
-            must open this panel exactly as 855,000 does.
-
-            Folding is safe at product level for the same reason it is safe on a
-            colour: a set price opens the panel by itself, so the
-            MembershipDiscountSection banner below — which tells the admin a
-            typed price «في الأعلى» is why their rule is not being read — can
-            never point at a box that is out of sight.
-          */}
-          {!proPaused && (
-            <TierPriceDisclosure
-              scope="product"
-              marks={
-                [doc.pro_price_iqd !== null ? { label: 'PRO', iqd: doc.pro_price_iqd } : null].filter(
-                  (m): m is TierPriceMark => m !== null
-                )
-              }
-            >
-              <Grid cols={3}>
-                <Field ar="سعر LEVO PRO" en="PRO" hint="فارغ = سياسة المتجر">
-                  <Money value={doc.pro_price_iqd} onChange={(v) => setDoc((d) => ({ ...d, pro_price_iqd: v }))} />
-                  <MirrorNote kind="replaces" where="خصم العضوية أسفل هذا القسم" detail="السعر المكتوب يفوز على أي قاعدة خصم" />
-                </Field>
-              </Grid>
-            </TierPriceDisclosure>
-          )}
-          {/* The owner's old dinar cost, shown as what it is now: the legacy cost
-              profit falls back to; the USD pricing below never reads it. */}
-          {costShown && (
-            <Field ar={us.legacyCost} en={lang === 'en' ? '' : usEn.legacyCost} tip={us.legacyCostTip} need="COST">
-              <Money value={doc.product_cost_iqd} onChange={(v) => setDoc((d) => ({ ...d, product_cost_iqd: v }))} />
-            </Field>
-          )}
-        </Grid>
-
-        {/* The real cost layers behind the stock, directly under the one field
-            that invites the reader to believe there is only one of them.
-            Renders nothing for a product with no batches, or for an assistant
-            admin whose payload carries no costs. */}
-        {canSeeCost && doc.id && <InventorySummary productId={doc.id} />}
         {/* The owner before the address is verified: no cost input, and the
             way to open it (DECISIONS row 185 amendment). */}
         {!canSeeCost && user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
@@ -1648,65 +1463,24 @@ export default function ProductForm({
             cost appears after the save (which keeps every stored cost). */}
         {canSeeCost && !costLoaded && <CostOpensAfterSave />}
 
-        {/* The owner's USD pricing and shipping for the product (supplier cost in
-            its currency, route, weight or volume, extras, minimum profit in USD,
-            Direct Sale Extra) and its 4-cell summary. Saved through the pricing
-            door, never with this form's document. */}
-        {canSeeCost && <UsdPricingProductPanel />}
+        <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} />
 
-        {/* Stored by the template as `original_price_iqd` (the struck-through
-            "was" price). No input here by design — but it is stored, it is
-            carried by every save, and it is shown so it is never mistaken for
-            a value the import lost. */}
-        {doc.original_price_iqd !== null && doc.original_price_iqd !== undefined && (
-          <p className="text-[11px] text-text-secondary mb-3" data-form="original-price-preserved">
-            السعر قبل التخفيض المحفوظ: {formatIqd(doc.original_price_iqd)} — يُعدَّل عبر القالب النصي.
-          </p>
-        )}
+        {/* The real cost layers behind the stock (the owner's batches): renders nothing
+            for a product with no batches, or for an admin whose payload carries no costs. */}
+        {canSeeCost && doc.id && <InventorySummary productId={doc.id} />}
 
-        {/* The answer to "I changed the price and the cart still charges the
-            old one". It appears the moment the base moves away from what this
-            product was opened with, and only while rows exist that would
-            ignore it. */}
-        {!pinnedDismissed && loadedBasePrice !== null && doc.price_iqd !== null && doc.price_iqd !== loadedBasePrice && (
-          <PinnedPriceNotice
-            from={loadedBasePrice}
-            to={doc.price_iqd}
-            lang={lang}
-            source={{
-              options: [
-                ...rel.groups.flatMap((g) => g.values as unknown as Array<Record<string, unknown>>),
-                ...((doc.options ?? []) as unknown as Array<Record<string, unknown>>),
-              ],
-              colors: [
-                ...(rel.colors as unknown as Array<Record<string, unknown>>),
-                ...((doc.colors ?? []) as unknown as Array<Record<string, unknown>>),
-              ],
-              variants: rel.variants as unknown as Array<Record<string, unknown>>,
-            }}
-            onApply={(mode) => applyPinnedReprice(mode, loadedBasePrice, doc.price_iqd as number)}
-            onDismiss={() => setPinnedDismissed(true)}
-          />
-        )}
-
-        {/* §18 — THE MEMBERSHIP DISCOUNT RULE FOR THIS ONE PRODUCT.
-            It belongs beside the typed member prices because the two answer the
-            same question and the typed one WINS: a `pro_price_iqd` entered
-            above is the owner's price for this exact product and beats any
-            rule (docs/MEMBERSHIP_BENEFITS.md §2). Reading them together is the
-            only way to see that, and the panel says so out loud.
-
-            It saves through the admin benefits door, NOT with this form: every
-            write to a benefit rule appends a version and an audit row in one
-            batch, and the product save has no business doing that. */}
+        {/* §18 — THE MEMBERSHIP DISCOUNT RULE FOR THIS ONE PRODUCT. A membership
+            benefit, not a typed price (typed member prices are retired with the old
+            dinar pricing, DECISIONS row 222): it saves through the admin benefits
+            door, NOT with this form — every write to a benefit rule appends a
+            version and an audit row in one batch. */}
         {!proPaused && (
           <MembershipDiscountSection
             // `doc.id`, not the `productId` prop: after the FIRST save the prop
             // is still null (the parent list has not re-mounted the editor) while
-            // the document already carries the id the server assigned — the same
-            // reason PricePreview reads it from the document below.
+            // the document already carries the id the server assigned.
             productId={doc.id || null}
-            typedMemberPrice={{ prime: doc.prime_price_iqd, pro: doc.pro_price_iqd }}
+            typedMemberPrice={{ prime: null, pro: null }}
           />
         )}
       </SectionCard>
@@ -1933,46 +1707,30 @@ export default function ProductForm({
         <OptionsSection
           rel={rel}
           setRel={setRel}
-          // LIVE, not the loaded document: an admin who raises the base price in
-          // price section must see every inheriting option's price move with it
-          // before they save, not after a reload.
-          base={{
-            regular: doc.price_iqd,
-            prime: doc.prime_price_iqd,
-            pro: doc.pro_price_iqd,
-            cost: doc.product_cost_iqd,
-          }}
           baseDimensions={doc.dimensions ?? emptyDimensions()}
-          canSeeCost={costShown}
           errors={showErrors ? errors : {}}
-          // Owner decision 8: an engine-priced product's price cells show the engine's price, read only.
-          // A stock purchase prices direct sale only (DI-2): the direct-sale cells stay the engine's,
-          // while model, colour and pre-order prices stay the owner's.
-          pricesLocked={(engineManaged || (canSeeCost && pricing.engine)) && !engineDirectOnly}
-          directPricesLocked={engineManaged || (canSeeCost && pricing.engine)}
-          // Each model's own USD pricing (empty = the product's), its computed
-          // customer price and its 4-cell summary, inside the model's card.
-          valueExtra={
-            canSeeCost
-              ? (v) => {
-                  const model = pricingModels.find((m) => m.id === v.id);
-                  return model ? <UsdPricingModelRow model={model} /> : null;
+          // «الخيارات والألوان» on Pricing V2 (spec §5.4): the only money on these cards is one dollar
+          // selector per model and per colour; the price beside it is the server's answer.
+          pricingV2={
+            v2.mode
+              ? {
+                  model: (v, isModel) => <ModelPriceSelector id={v.id} isModel={isModel} line={lineWithOption(v2.answer?.table ?? [], v.id)} />,
+                  colour: (c) => <ColourPriceSelector id={c.id} table={v2.answer?.table ?? []} />,
+                  combo: (combo) => {
+                    const key = comboKeyOf(combo.option_value_ids, combo.color_id);
+                    const line = skuLines(v2.answer?.table ?? []).find((l) => l.combo_key === key);
+                    const direct = line?.channels.direct_sale?.price_iqd ?? null;
+                    return direct !== null ? (
+                      <p className="mt-1 text-[11px] text-text-secondary" data-v2-combo={key}>
+                        {v2s.direct} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(direct)}</span>
+                      </p>
+                    ) : null;
+                  },
+                  colourBar: <ColourBulkBar colourIds={rel.colors.filter((c) => c.active !== false).map((c) => c.id)} />,
                 }
               : undefined
           }
-          // FX-7: each colour's own USD pricing (empty = its model's) and its computed
-          // customer price per model; each variant row's, inside the colour's card.
-          colorExtra={
-            canSeeCost
-              ? (c) => {
-                  const colour = pricingColours.find((x) => x.id === c.id);
-                  return colour ? <UsdPricingColourRow colour={colour} /> : null;
-                }
-              : undefined
-          }
-          comboExtra={canSeeCost ? (combo) => <UsdPricingSkuRow comboKey={pricingSkuKey(combo.option_value_ids, combo.color_id)} /> : undefined}
         />
-        {canSeeCost && <UsdPricingOptionsFooter />}
       </SectionCard>
 
       {/* 6 ───────────────────────────────────────────────────────── images */}
@@ -2188,25 +1946,23 @@ export default function ProductForm({
         n={8}
         ar="المعاينة والحفظ"
         en="Preview & save"
-        summary={dirty || (canSeeCost && pricing.touched) ? us.unsaved : us.savedShort}
+        summary={dirty || v2.touched ? v2s.unsaved : v2s.saved}
         {...section(8)}
       >
         <div className="space-y-2 text-[12px] text-text-secondary min-w-0">
           <Row k="الاسم" v={doc.name_en || '—'} />
           <Row k="القسم" v={catalogs.find((c) => c.id === doc.category_id)?.name_en ?? '—'} />
-          <Row k="السعر" v={doc.price_iqd === null ? '—' : formatIqd(doc.price_iqd)} />
-          {!proPaused && <Row k="PRO" v={doc.pro_price_iqd === null ? '—' : formatIqd(doc.pro_price_iqd)} />}
+          {/* «السعر» is the lowest final price of the table (the server's), never a typed field. */}
+          <Row k={v2s.price} v={lowest !== null ? v2s.from(iqdText(lowest)) : v2.hidden ? v2s.chipHidden : '—'} />
           <Row k="أنواع البيع" v={doc.sale_types.join(' + ')} />
           <Row k="مصدر المخزون" v={rel.inventory_mode} />
           <Row k="الخيارات / الألوان" v={`${valueCount} / ${rel.colors.length}`} />
           <Row k="الصور" v={String(rel.images.length)} />
         </div>
-        {/* Owner decision 8's six figures per model × channel, with the unsaved pricing. */}
-        {canSeeCost && <UsdPricingPreview />}
         {previewOpen && (
           <div className="lv-well mt-3 rounded-md p-3 min-w-0">
             <pre className="text-[11px] text-text-secondary overflow-x-auto" dir="ltr">
-              {JSON.stringify({ doc: { ...doc, spec_fields: doc.spec_fields }, relations: relationsToWire(rel) }, null, 2)}
+              {JSON.stringify(withoutLegacyMoney({ doc: { ...doc, spec_fields: doc.spec_fields }, relations: relationsToWire(rel), pricing_v2: v2.wire }), null, 2)}
             </pre>
           </div>
         )}
@@ -2222,9 +1978,10 @@ export default function ProductForm({
             server so the preview can never disagree with checkout. It reflects
             the last SAVED version, which the panel states when the form is
             dirty rather than showing a stale number as current. */}
-        {doc.id && (
+        {/* A product no customer sees yet has no checkout price to preview (the clean start). */}
+        {doc.id && !v2.hidden && (
           <div className="mt-3">
-            <PricePreview productId={doc.id} savedDoc={doc} rel={rel} dirty={dirty} savedRevision={baseline} />
+            <PricePreview productId={doc.id} savedDoc={doc} rel={rel} dirty={dirty || v2.touched} savedRevision={baseline} />
           </div>
         )}
       </SectionCard>
@@ -2256,37 +2013,18 @@ export default function ProductForm({
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 {saveErr}
               </span>
-            ) : canSeeCost && pricing.outcome && (pricing.outcome.kind === 'refused' || pricing.outcome.kind === 'invalid' || pricing.outcome.kind === 'partial') ? (
-              // EVERY PRICING OUTCOME IS SAID WHERE «نشر» IS PRESSED (owner report 2026-10-10: «محفوظ ✓» over a lost save).
-              <span className={`${pricing.outcome.kind === 'partial' ? 'text-amber-300' : 'text-red-400'} flex min-w-0 items-center gap-1`} title={pricing.outcome.text} data-pricing-status={pricing.outcome.kind}>
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                <span className="min-w-0 truncate">{pricing.outcome.text}</span>
-                <button type="button" className="underline ms-1 shrink-0" onClick={() => showPricing(pricing.outcome?.section ?? 3)}>
-                  {us.show}
-                </button>
+            ) : v2.review ? (
+              // The review sheet is open: nothing is saved until it is confirmed.
+              <span className="text-amber-300" data-pricing-status="review">
+                {v2s.chipReview(String((v2.review.preview.changes ?? []).length))}
               </span>
-            ) : canSeeCost && pricing.review ? (
-              <span className="text-amber-300" title={pricing.review.stored ? us.readyWaiting : us.heldNotSaved} data-pricing-status="review">
-                {pricing.review.stored ? us.readyWaiting : us.heldNotSaved}
-              </span>
-            ) : dirty ? (
-              <span className="text-amber-300">{us.unsaved}</span>
-            ) : canSeeCost && pricing.touched ? (
-              <span className="text-amber-300" title={us.pricingUnsaved} data-pricing-status="unsaved">
-                {us.pricingUnsaved}
-              </span>
-            ) : canSeeCost && pricing.outcome && (pricing.outcome.kind === 'ready' || pricing.outcome.kind === 'held') ? (
-              <span className="text-amber-300 flex min-w-0 items-center gap-1" title={pricing.outcome.text} data-pricing-status={pricing.outcome.kind}>
-                <span className="min-w-0 truncate">{pricing.outcome.text}</span>
-                {pricing.outcome.kind === 'ready' && (
-                  <button type="button" className="underline ms-1 shrink-0" onClick={pricing.openReview}>
-                    {us.reviewAndAdopt}
-                  </button>
-                )}
+            ) : dirty || v2.touched ? (
+              <span className="text-amber-300" data-pricing-status={v2.touched ? 'unsaved' : undefined}>
+                {v2s.unsaved}
               </span>
             ) : (
-              <span className="text-emerald-300 inline-flex items-center gap-1" data-pricing-status={canSeeCost && pricing.outcome?.kind === 'saved' ? 'saved' : undefined}>
-                <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? us.savedShort}
+              <span className="text-emerald-300 inline-flex items-center gap-1" data-pricing-status="saved">
+                <Check className="w-3.5 h-3.5 shrink-0" /> {fileUpdateNote ?? v2s.saved}
               </span>
             )}
           </span>
@@ -2324,8 +2062,20 @@ export default function ProductForm({
         </div>
       </div>
 
-      {/* The writer's preview sheet, at the form's ROOT: a held or ready save is seen whichever section is open. */}
-      {canSeeCost && <UsdPricingSaveSheet />}
+      {/* THE ONE REVIEW SHEET (spec §5.6), at the form's ROOT: seen whichever section is open. Its cancel
+          keeps every typed value; its confirm resends the same save with the preview's hash and tick. */}
+      {v2.review && (
+        <ReviewSheetV2
+          key={v2.review.preview.review_hash ?? 'review'}
+          preview={v2.review.preview}
+          busy={saving}
+          error={v2.review.error}
+          reauth={v2.review.reauth}
+          onConfirm={confirmReview}
+          onCancel={v2.closeReview}
+          onSignIn={() => void signInAgain()}
+        />
+      )}
 
       {sectionUpdateOpen && productId && (
         <React.Suspense fallback={null}>
@@ -2342,7 +2092,7 @@ export default function ProductForm({
       )}
     </div>
     </CompletenessProvider>
-    </UsdPricingProvider>
+    </V2PricingProvider>
   );
 }
 

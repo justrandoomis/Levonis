@@ -16,24 +16,30 @@
  *    bare text field.
  *
  * The link matrix keeps its wording («اربط اللون بخيارات محددة…») — the §12
- * evidence screenshots anchor on it. Cost is only rendered for a financial
- * admin — and the server refuses to write it either way (§11).
+ * evidence screenshots anchor on it.
+ *
+ * NO DINAR PRICE IS TYPED HERE ANY MORE (Pricing V2, the clean start: DECISIONS
+ * row 222, implementation spec §5.4, §5.5 and addendum A.6). The option and
+ * colour price / subscriber / cost cells, the direct cell's extra, the
+ * route's surcharge and the colour spread warning are gone:
+ * a model's and a colour's price is ONE selector in dollars, mounted by the
+ * form through `pricingV2` (form/v2/ModelPriceSelector, ColourPriceSelector),
+ * and the price shown beside it is the server's. The structure — models,
+ * colours, links, «يُباع» with its routes and lead times, stock — stays here
+ * for everyone. The stored price columns of each row travel back unchanged
+ * and unseen (the V2 writer owns the published prices).
  */
 
-import { MissingNote } from '../completeness';
-import React, { useId } from 'react';
+import React from 'react';
 import { Trash2, GripVertical } from 'lucide-react';
 import {
   Field,
   ImgSlot,
   Grid,
-  Money,
   Qty,
   Repeater,
   TextInput,
   Toggle,
-  TierPriceDisclosure,
-  type TierPriceMark,
   btnGhost,
   iconBtn,
   field as fieldCls,
@@ -49,68 +55,42 @@ import {
   inheritedDimensionsForSelection,
   type FormColor,
   type FormGroup,
-  type FormPrices,
   type FormFulfillment,
   type FormTransport,
   type FormVariant,
   type FormValue,
   type RelationsState,
 } from './model';
-// The SAME resolver the storefront and Quick Edit use — never a second copy of
-// the ladder. `Field` is already a form component here, so the pricing type
-// comes in as `GridField`.
-import {
-  rowCells,
-  rowLadder,
-  rowCharges,
-  COLUMN_OF,
-  type Cell,
-  type Field as GridField,
-} from '../../../../worker/lib/priceGrid';
-import { ADJUST_OF, type PriceFields } from '../../../../worker/lib/pricing';
 import { emptyDimensions, type ProductDimensionsV2 } from '../../../lib/productTypes';
 import { DimensionsSection } from './DimensionsSection';
-import { useProPaused } from '../../../lib/proPause';
+
+/**
+ * The dollar price selectors the form mounts in section ٥ (Pricing V2, spec
+ * §5.4): one per model card, one per colour card, the SKU result line in each
+ * exact-stock row, and the colours' bulk bar.
+ */
+export interface OptionsPricingV2 {
+  /** `isModel`: the value belongs to the model group (the first group) — a fixed price and a discount name a model only. */
+  model: (value: FormValue, isModel: boolean) => React.ReactNode;
+  colour: (color: FormColor) => React.ReactNode;
+  combo?: (combo: { option_value_ids: string[]; color_id: string | null }) => React.ReactNode;
+  colourBar?: React.ReactNode;
+}
 
 export function OptionsSection({
   rel,
   setRel,
-  base,
   baseDimensions,
-  canSeeCost,
   errors,
-  valueExtra,
-  colorExtra,
-  comboExtra,
-  pricesLocked = false,
-  directPricesLocked,
+  pricingV2,
 }: {
   rel: RelationsState;
   setRel: (fn: (r: RelationsState) => RelationsState) => void;
-  /** The product's own four prices — what an option inherits when it carries
-   *  none of its own. Without it every option row would read «inherit» with no
-   *  number beside it, which is the defect this section's price cells fix. */
-  base: Record<GridField, number | null>;
   /** Product measurements inherited by every selection rung. */
   baseDimensions: ProductDimensionsV2;
-  canSeeCost: boolean;
   errors: Record<string, string>;
-  /** Rendered at the end of each model's card (the owner's USD pricing of that model); absent for everyone else. */
-  valueExtra?: (value: FormValue) => React.ReactNode;
-  /** FX-7: rendered in each colour's card (the owner's USD pricing of that colour); absent for everyone else. */
-  colorExtra?: (color: FormColor) => React.ReactNode;
-  /** FX-7: rendered in each variant row of a colour's card (the owner's USD pricing of that SKU). */
-  comboExtra?: (combo: { option_value_ids: string[]; color_id: string | null }) => React.ReactNode;
-  /**
-   * The engine prices this product (owner decision 8): every price cell —
-   * each model's, each colour's, the direct-sale increase and the route
-   * increases — shows the price the engine wrote and cannot be typed into (the
-   * database refuses a changed price with ENGINE_MANAGED anyway). Cost, stock
-   * and everything else stay editable.
-   */
-  pricesLocked?: boolean;
-  /** The direct-sale cells alone (a product the engine prices for direct sale only); defaults to pricesLocked. */
-  directPricesLocked?: boolean;
+  /** The dollar price selectors (Pricing V2); absent, the section edits structure only. */
+  pricingV2?: OptionsPricingV2;
 }) {
   // Every mutation re-derives the inventory source, so the explainer strip,
   // the section summary and the saved wire all tell the same story.
@@ -345,45 +325,7 @@ export function OptionsSection({
       images: r.images.map((i) => (i.color_id === id ? { ...i, color_id: null } : i)),
     }));
 
-  /**
-   * WHAT A COLOUR INHERITS, AND WHEN THERE IS NO SINGLE ANSWER.
-   *
-   * The resolver's ladder is base → option → colour (pricing.ts `pick`), so a
-   * colour's own price is measured over the OPTION the customer picked — not
-   * over the base. A colour linked to exactly one option therefore resolves
-   * under that option.
-   *
-   * A colour linked to SEVERAL has no single price, and that is the honest
-   * answer rather than a defect to paper over: the same «+5,000» colour costs
-   * 730,000 under the base model and 904,000 under the Combo. Falling back to
-   * the base — which is what this did, matching `adminPriceGrid.ts` — showed a
-   * number the customer can never be charged. It now resolves under the FIRST
-   * linked option (a price that is really charged for a real combination) and
-   * the row SAYS the number moves with the option, naming the range.
-   */
   const optionById = new Map(rel.groups.flatMap((g) => g.values.map((v) => [v.id, v] as const)));
-
-  const beneathColor = (c: FormColor): Record<GridField, number | null> => {
-    const parent = c.option_value_ids.map((id) => optionById.get(id)).find(Boolean);
-    if (!parent) return base;
-    // `rowLadder`, not `rowCells`: the UNCLAMPED values, exactly as `buildGrid`
-    // carries them down. `clampMemberLadder` is the resolver's last word on the
-    // line the customer picked, not on what the next rung inherits.
-    return rowLadder(parent as PriceFields, base);
-  };
-
-  /** The distinct regular prices this colour takes across its linked options. */
-  const colorSpread = (c: FormColor): number[] => {
-    if (c.option_value_ids.length < 2) return [];
-    const seen = new Set<number>();
-    for (const id of c.option_value_ids) {
-      const parent = optionById.get(id);
-      if (!parent) continue;
-      const under = rowCharges(c as PriceFields, rowLadder(parent as PriceFields, base), 'color').regular.charged;
-      if (under !== null) seen.add(under);
-    }
-    return [...seen].sort((a, b) => a - b);
-  };
 
   const toggleLink = (colorId: string, valueId: string) =>
     setRelAuto((r) => {
@@ -487,7 +429,7 @@ export function OptionsSection({
         onAdd={addGroup}
         empty="لا توجد مجموعات. أضف مجموعة مثل «المقاس» أو «السعة»."
       >
-        {rel.groups.map((g) => (
+        {rel.groups.map((g, groupIndex) => (
           <div key={g.id} className="min-w-0 rounded-lg bg-surface-raised p-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <TextInput
@@ -543,15 +485,11 @@ export function OptionsSection({
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                  {(errors[`value:${v.id}`] || errors[`value_price:${v.id}`]) && (
-                    <p className="mt-1 text-[11px] text-danger">
-                      {errors[`value:${v.id}`] ?? errors[`value_price:${v.id}`]}
-                    </p>
-                  )}
+                  {errors[`value:${v.id}`] && <p className="mt-1 text-[11px] text-danger">{errors[`value:${v.id}`]}</p>}
+                  {/* The model's price — one dollar selector (Pricing V2, spec §5.4). */}
+                  {pricingV2?.model(v, groupIndex === 0)}
                   <FulfillmentEditor
                     value={v}
-                    locked={pricesLocked}
-                    directLocked={directPricesLocked ?? pricesLocked}
                     onChange={(fulfillments) => patchValue(g.id, v.id, { fulfillments })}
                     onValueChange={(patch) => patchValue(g.id, v.id, patch)}
                     error={errors[`value_availability:${v.id}`]}
@@ -594,19 +532,6 @@ export function OptionsSection({
                           )}
                         </>
                       )}
-                      <PriceCells
-                        prices={v}
-                        beneath={base}
-                        level="option"
-                        canSeeCost={canSeeCost}
-                        locked={pricesLocked}
-                        onChange={(patch) => patchValue(g.id, v.id, patch)}
-                      />
-                      {/* «ناقص» (owner brief 2026-10-10): this model reaches no cost —
-                          neither a dinar cost here nor a supplier cost in its USD pricing. */}
-                      <div className="col-span-full -mt-1">
-                        <MissingNote code="COST" optionId={v.id} withLabel />
-                      </div>
                       <Field ar="مفعّل" en="Active">
                         <Toggle
                           checked={v.active}
@@ -623,7 +548,6 @@ export function OptionsSection({
                     label={`أبعاد ${v.name_en || 'الخيار'} / Option dimensions`}
                     onChange={(dimensions) => patchValue(g.id, v.id, { dimensions })}
                   />
-                  {valueExtra?.(v)}
                 </div>
               ))}
               <button type="button" onClick={() => addValue(g.id)} className={`${btnGhost} h-8 px-2.5 text-[12px]`}>
@@ -654,6 +578,7 @@ export function OptionsSection({
           </button>
         </div>
       ) : null}
+      {pricingV2?.colourBar}
       <Repeater title="الألوان / Colours" addLabel="لون" onAdd={addColor} empty="لا توجد ألوان.">
         {rel.colors.map((c) => (
           <div key={c.id} className="min-w-0 rounded-lg bg-surface-raised p-2.5">
@@ -702,23 +627,14 @@ export function OptionsSection({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-            {(errors[`color:${c.id}`] || errors[`color_hex:${c.id}`] || errors[`color_price:${c.id}`]) && (
-              <p className="mt-1 text-[11px] text-danger">
-                {errors[`color:${c.id}`] ?? errors[`color_hex:${c.id}`] ?? errors[`color_price:${c.id}`]}
-              </p>
+            {(errors[`color:${c.id}`] || errors[`color_hex:${c.id}`]) && (
+              <p className="mt-1 text-[11px] text-danger">{errors[`color:${c.id}`] ?? errors[`color_hex:${c.id}`]}</p>
             )}
+            {/* The colour's price — «يتبع الموديل | ± $ فوق الموديل» (Pricing V2, decision C1). */}
+            {pricingV2?.colour(c)}
 
             <div className="mt-2">
               <Grid cols={3}>
-                <PriceCells
-                  prices={c}
-                  beneath={beneathColor(c)}
-                  level="color"
-                  canSeeCost={canSeeCost}
-                  locked={pricesLocked}
-                  onChange={(patch) => patchColor(c.id, patch)}
-                  spread={colorSpread(c)}
-                />
                 <Field ar="مفعّل" en="Active">
                   <Toggle
                     checked={c.active}
@@ -737,7 +653,6 @@ export function OptionsSection({
               label={`أبعاد ${c.name_en || 'اللون'} / Colour dimensions`}
               onChange={(dimensions) => patchColor(c.id, { dimensions })}
             />
-            {colorExtra?.(c)}
 
             {/* ----------------------------------------------- link matrix */}
             {rel.groups.some((g) => g.values.length > 0) && (
@@ -834,7 +749,7 @@ export function OptionsSection({
                             label={`أبعاد ${label || 'التركيبة'} / Variant dimensions`}
                             onChange={(dimensions) => patchCombination(combo, { dimensions })}
                           />
-                          {comboExtra?.(combo)}
+                          {pricingV2?.combo?.(combo)}
                         </div>
                       );
                     })}
@@ -877,296 +792,14 @@ function AutoStockNote({ rel }: { rel: RelationsState }) {
   );
 }
 
-/**
- * THE FOUR PRICES, SHOWING WHAT THIS ROW ACTUALLY CHARGES.
- *
- * WHY THIS IS NOT FOUR `Money` INPUTS ANY MORE. A price may be stored as a
- * FIXED number or as an ADJUSTMENT over the value beneath — the base+adjustment
- * shape `normalizeCheapestBase` deliberately writes so the product's own price
- * is the cheapest sellable one. In that shape `regular_price_iqd` is NULL and
- * `regular_adjust_iqd` holds the delta, so reading the four `*_price_iqd`
- * scalars raw showed «inherit» on a row the storefront was charging 899,000
- * for. The price was never missing; the form was reading the wrong half.
- *
- * The effective number now comes from `rowCells`, which is the SAME `priceMode`
- * / `step` / `memberAtRung` / `clampMemberLadder` chain the checkout resolver
- * and the Quick Edit grid use — not a second implementation that could drift.
- *
- * EDITING. What is shown is what is edited: typing a number pins it as a fixed
- * price for this row AND clears the adjustment beside it, so a fixed price and
- * an adjustment can never both be set (`pick` would silently ignore the
- * adjustment, and clearing the cell later would resurrect an ancient delta).
- * Clearing the input returns the row to inherit — both halves null.
- *
- * THE BOX ALWAYS HOLDS THE RESOLVED NUMBER, in every one of the three modes,
- * because "what will this row charge?" is the question the admin is asking and
- * an empty box was the whole defect. What distinguishes the modes is the line
- * BENEATH the box, which names the provenance of the number above it — and the
- * «يرث» button, which is how a pinned row goes back to following its parent
- * without the admin having to guess that blanking the field means that.
- */
-function PriceCell({
-  label_ar,
-  label_en,
-  tip,
-  cell,
-  charged,
-  viaRegular,
-  onCommit,
-  locked = false,
-}: {
-  label_ar: string;
-  label_en: string;
-  tip?: string;
-  /** The engine's price, read only (owner decision 8). */
-  locked?: boolean;
-  cell: Cell;
-  /** What this tier is ACTUALLY charged — `chargedAt`, which includes the
-   *  resolver's own fallback for a member tier that has no price anywhere. */
-  charged: number | null;
-  /** True when that number is the regular price standing in for a tier with
-   *  no price of its own. Shown, never implied. */
-  viaRegular: boolean;
-  onCommit: (v: number | null) => void;
-}) {
-  const fmt = (n: number | null) => (n === null ? '—' : new Intl.NumberFormat('en-US').format(n));
-  const landing = cell.inherited ?? (viaRegular ? charged : null);
-  /**
-   * WIRED BY HAND, because `Field` cannot do it here. `Field` clones its
-   * generated id onto its child only when that child is a SINGLE element
-   * (`React.isValidElement(children)`); this cell has two — the input and the
-   * provenance line — so `children` is an array, no clone happens, and the
-   * `<label htmlFor>` would point at an element that does not exist. That is
-   * three or four inputs per option value and per colour with no accessible
-   * name and a label that does not focus them.
-   */
-  const inputId = useId();
-  return (
-    <Field ar={label_ar} en={label_en} tip={tip} htmlFor={inputId}>
-      <Money
-        id={inputId}
-        value={charged}
-        onChange={onCommit}
-        disabled={locked}
-        placeholder={landing === null ? 'يرث / inherit' : `يرث ${fmt(landing)}`}
-      />
-      {locked && (
-        <p className="mt-1 text-[10px] text-info truncate" data-price-mode="engine">
-          سعر محرك التسعير · Engine price · نرخی بزوێنەری نرخدانان
-        </p>
-      )}
-      {/* THE PROVENANCE LINE. Never hidden, and never guessed: `cell.mode` is
-          `priceMode`'s answer for this exact row, so the sentence under the box
-          is the same fact the resolver acts on. */}
-      <div className="mt-1 flex items-center justify-between gap-2 min-w-0">
-        {cell.mode === 'adjust' && cell.adjust !== null ? (
-          <p className="text-[10px] text-warning truncate" data-price-mode="adjust">
-            {cell.adjust >= 0 ? '+' : '−'}
-            {fmt(Math.abs(cell.adjust))} فوق {fmt(cell.inherited)}
-          </p>
-        ) : cell.mode === 'fixed' ? (
-          <p className="text-[10px] text-text-secondary truncate" data-price-mode="fixed">
-            سعر ثابت لهذا الصف
-          </p>
-        ) : (
-          // Inherit, and the number in the box came from somewhere: say where,
-          // so an untouched cell showing 885,000 is not mistaken for a pinned
-          // one. A member cell inherits the value beneath PLUS this row's
-          // regular surcharge — which is why an option with no PRIME price of
-          // its own still shows a PRIME number, and why that number is right.
-          //
-          // `viaRegular` is the OTHER case, and it is the common one: the
-          // product states no PRIME/PRO price at all, so the resolver charges
-          // that member the regular price. The box shows what they pay and this
-          // line says why, because an unexplained equal number reads as a bug
-          // and an empty box reads as "free".
-          <p className="text-[10px] text-text-muted truncate" data-price-mode={viaRegular ? 'regular-fallback' : 'inherit'}>
-            {viaRegular
-              ? `بلا سعر لهذه الفئة — تُحاسب بسعر البيع ${fmt(charged)}`
-              : charged === null
-                ? 'لا سعر — يرث ولا شيء فوقه'
-                : `موروث: ${fmt(charged)}`}
-          </p>
-        )}
-        {/* Returning to inheritance is a BUTTON, not a blanked field. Blanking
-            works too (both halves go null), but an admin should not have to
-            discover that. */}
-        {cell.mode !== 'inherit' && !locked && (
-          <button
-            type="button"
-            onClick={() => onCommit(null)}
-            className="shrink-0 text-[10px] text-text-muted hover:text-text-primary underline underline-offset-2"
-            data-price-inherit
-            title="امسح سعر هذا الصف ليتبع ما فوقه"
-          >
-            يرث
-          </button>
-        )}
-      </div>
-    </Field>
-  );
-}
-
-/**
- * WHICH TIERS THIS ROW HAS ACTUALLY TYPED — the answer the folded line prints
- * and the reason the panel opens by itself.
- *
- * Two things here are deliberate and both were wrong in the obvious version:
- *
- *   THE GATE IS `cell.mode`, not the scalar. `priceMode` is the resolver's own
- *   three-way answer (fixed / adjust / inherit) and it is already what decides
- *   whether this cell shows its «يرث» button. A check on
- *   `prices.pro_price_iqd !== null` reads one half of a pair: a row whose PRO
- *   is stored as `pro_adjust_iqd` — the shape `normalizeCheapestBase` and
- *   Quick Edit write — would read as untyped, fold shut, and hide a live
- *   override on one of a hundred colours. Truthiness would be worse still,
- *   because a typed 0 IS a price here (a colour's PRIME of 0 is charged as 0).
- *
- *   THE NUMBER COMES FROM `charges`, BUT ONLY AFTER THAT GATE HAS PASSED —
- *   and the order is the whole point. `rowCharges` returns
- *   `charged: v ?? regular`, the regular price standing in for a tier that has
- *   none, so `charges.pro.charged` is non-null on essentially every row:
- *   gating on it would stamp «سعر خاص · PRO …» on all hundred colours and the
- *   plain invitation would never appear once. That is why the gate is the
- *   mode. But `cell.effective` is the wrong number to PRINT, because it is
- *   this row's stored value before the rung carry, and the carry is not
- *   cosmetic: `memberAtRung` drops a member price that lands at zero or below,
- *   so an OPTION with a PRIME of 0 is charged the regular price (see `level`
- *   above). Printing `effective` there put «· PRIME 0 د.ع» on the folded line
- *   while the till took 885,000 and the cell inside the panel said so in
- *   words — the one line that exists so a row cannot hide its override was
- *   contradicting the box beneath it and telling the owner a customer pays
- *   nothing. `viaRegular` is precisely "this row states a price and the
- *   resolver charges the regular one instead", so it becomes `null` and
- *   `tierPriceSummary` prints «(لا يُحتسب)»: the mark survives — the row is
- *   still flagged as having something typed, which is rule 1 — while the
- *   amount stops lying.
- */
-export function tierPriceMarks(
-  cells: ReturnType<typeof rowCells>,
-  charges: ReturnType<typeof rowCharges>,
-): TierPriceMark[] {
-  // PRO alone: PREMIUM carries no member price since 2026-09-27 (0145).
-  return ([['PRO', 'pro']] as const)
-    .filter(([, f]) => cells[f].mode !== 'inherit')
-    .map(([label, f]) => ({ label, iqd: charges[f].viaRegular ? null : charges[f].charged }));
-}
-
-function PriceCells({
-  prices,
-  beneath,
-  level,
-  spread,
-  canSeeCost,
-  onChange,
-  locked = false,
-}: {
-  prices: FormPrices;
-  /** What this row inherits: the product base for an option, the option's own
-   *  resolved prices for a colour that hangs under one. */
-  beneath: Record<GridField, number | null>;
-  /**
-   * WHICH RUNG THIS ROW IS. Not decoration: the resolver carries a member price
-   * through the colour rung even when no colour is picked, and that carry
-   * erases a value of zero or less. An option's PRIME of 0 is therefore charged
-   * as the regular price, while a COLOUR's PRIME of 0 is charged as 0 — the
-   * colour is the last rung and nothing carries it further.
-   */
-  level: 'option' | 'color';
-  /** Colours only: the distinct prices this row takes across the options it is
-   *  linked to. More than one means the number shown is one of several. */
-  spread?: number[];
-  canSeeCost: boolean;
-  onChange: (patch: Partial<FormPrices>) => void;
-  /** The engine prices this product: the price cells read only (never the cost). */
-  locked?: boolean;
-}) {
-  const cells = rowCells(prices as PriceFields, beneath);
-  // The MODE, the adjustment and the inherited value come from the cells; the
-  // NUMBER a customer is charged comes from `rowCharges`, which walks the same
-  // rungs the resolver walks and in the same order.
-  const charges = rowCharges(prices as PriceFields, beneath, level);
-  /** One typed number pins the pair: fixed set, adjustment cleared. */
-  const commit = (field: GridField) => (v: number | null) => {
-    const col = COLUMN_OF[field];
-    onChange({ [col]: v, [ADJUST_OF[col]]: null } as Partial<FormPrices>);
-  };
-  const cellProps = (field: GridField) => ({
-    cell: cells[field],
-    charged: charges[field].charged,
-    viaRegular: charges[field].viaRegular,
-    onCommit: commit(field),
-    // Cost is never the engine's to set: it stays editable.
-    locked: locked && field !== 'cost',
-  });
-  const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n);
-  const memberMarks = tierPriceMarks(cells, charges);
-  // PRO's cell is hidden while PRO is paused (src/lib/proPause.ts).
-  const proPaused = useProPaused();
-  return (
-    <>
-      {/*
-        A COLOUR LINKED TO SEVERAL OPTIONS HAS NO SINGLE PRICE. The same
-        «+5,000» costs 730,000 under the base model and 904,000 under the
-        Combo, because the resolver measures a colour over the OPTION the
-        customer picked. The cells below show it under the first linked option
-        — a price that is really charged for a real combination — and this says
-        the number moves, with the range, instead of letting one of several
-        read as the answer.
-      */}
-      {spread && spread.length > 1 && (
-        <p
-          className="col-span-full text-[10px] text-warning leading-snug -mb-1"
-          data-color-price-spread
-        >
-          هذا اللون مرتبط بعدة خيارات، وسعره يتغيّر معها: من {fmt(spread[0])} إلى {fmt(spread[spread.length - 1])}.
-          الأرقام أدناه محسوبة على أول خيار مرتبط.
-        </p>
-      )}
-      <PriceCell label_ar="السعر" label_en="Regular" {...cellProps('regular')} />
-      {/*
-        PRIME AND PRO FOLD; «السعر» AND «التكلفة» NEVER DO. The two member
-        boxes are the ones an option or a colour usually says nothing about,
-        and they are also the two that can quietly take this row out of the
-        product's membership discount — so they get the line that names them
-        when they are folded, and the panel that opens by itself when they are
-        set. The nested `Grid cols={3}` matches the parent's track count so the
-        two boxes stay under «السعر» instead of re-dividing the band into
-        halves.
-      */}
-      {!proPaused && (
-        <TierPriceDisclosure scope={level} marks={memberMarks}>
-          <Grid cols={3}>
-            <PriceCell label_ar="PRO" label_en="PRO" {...cellProps('pro')} />
-          </Grid>
-        </TierPriceDisclosure>
-      )}
-      {canSeeCost && (
-        <PriceCell
-          label_ar="التكلفة"
-          label_en="Cost"
-          tip="إداري فقط — لا تظهر للعميل ولا لمساعد الأدمن."
-          {...cellProps('cost')}
-        />
-      )}
-    </>
-  );
-}
-
 /** Independent order-type switches for one real model. */
 function FulfillmentEditor({
   value,
   onChange,
   onValueChange,
   error,
-  locked = false,
-  directLocked = locked,
 }: {
   value: FormValue;
-  /** The engine prices this product: the direct-sale and route increases are its own, read only. */
-  locked?: boolean;
-  /** The direct-sale increase alone (the engine prices direct sale only). */
-  directLocked?: boolean;
   onChange: (next: FormFulfillment[]) => void;
   onValueChange: (patch: Partial<FormValue>) => void;
   error?: string;
@@ -1209,20 +842,6 @@ function FulfillmentEditor({
             label="بيع مباشر"
             sub="Direct sale"
           />
-          {direct.enabled && (
-            <div className="mt-2">
-              <Field ar="زيادة البيع المباشر" en="Direct Sale Extra" hint="تخص هذا الخيار فقط وتُضاف إلى سعره الأساسي">
-                <Money
-                  value={direct.regular_adjust_iqd ?? null}
-                  disabled={directLocked}
-                  onChange={(regular_adjust_iqd) =>
-                    replaceCell({ ...direct, regular_price_iqd: null, regular_adjust_iqd })
-                  }
-                  placeholder={directLocked ? 'سعر محرك التسعير' : 'بلا زيادة'}
-                />
-              </Field>
-            </div>
-          )}
         </div>
 
         <div className={`rounded-lg border p-2.5 ${preorder.enabled ? 'border-info/30 bg-info/10' : 'border-border-subtle'}`}>
@@ -1245,17 +864,6 @@ function FulfillmentEditor({
                         label={meta.ar}
                         sub={meta.en}
                       />
-                      {current.enabled && (
-                        <div className="mt-1.5">
-                          <Money
-                            value={current.surcharge_iqd}
-                            disabled={locked}
-                            onChange={(surcharge_iqd) => replaceRoute({ ...current, surcharge_iqd })}
-                            placeholder="بلا زيادة"
-                          />
-                          <p className="mt-1 text-[10px] text-text-muted">زيادة هذا المسار فقط؛ لا يوجد مخزون للطلب المسبق.</p>
-                        </div>
-                      )}
                     </div>
                   );
                 })}

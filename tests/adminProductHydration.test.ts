@@ -797,12 +797,14 @@ test('ProductForm: loads through hydrateRelations, keeps a stored section/family
   // The stored specs render even when the section has no template.
   assert.match(src, /storedSpecCount > 0\s*\?\s*`\$\{storedSpecCount\} مواصفة محفوظة بلا قالب قسم`/);
   // One source on screen: the price preview lists what sections 5–6 show.
-  assert.match(src, /<PricePreview productId=\{doc\.id\} savedDoc=\{doc\} rel=\{rel\} dirty=\{dirty\} savedRevision=\{baseline\} \/>/);
+  // Pricing V2-4: an unsaved dollar edit in section ٣/٥ makes the preview wait for the save too.
+  assert.match(src, /<PricePreview productId=\{doc\.id\} savedDoc=\{doc\} rel=\{rel\} dirty=\{dirty \|\| v2\.touched\} savedRevision=\{baseline\} \/>/);
   assert.match(read('src/components/adminProducts/PricePreview.tsx'), /hasRelationStructure\(rel\)/);
   assert.match(read('src/components/adminProducts/PricePreview.tsx'), /\[productId, savedRevision, optionId, pickedKey, perGroup, colorId, transport, warrantyId, tier\]/, 'same selection is re-quoted after a saved price or relation changes');
-  // Stored placements and the struck-through price the form has no input for.
+  // Stored placements are shown. The struck-through dinar price is not (Pricing V2-4, 2026-10-14:
+  // the form never shows a legacy dinar price — DECISIONS row 222, spec addendum A.6).
   assert.match(src, /data-form="catalogs-preserved"/);
-  assert.match(src, /data-form="original-price-preserved"/);
+  assert.doesNotMatch(src, /data-form="original-price-preserved"/);
   // Alt text authored in Arabic / Kurdish is shown beside the English input.
   assert.match(read('src/components/adminProducts/form/ImagesSection.tsx'), /data-form="image-imported-alt"/);
 });

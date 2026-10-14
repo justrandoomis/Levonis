@@ -255,35 +255,32 @@ jobs:
           fail=0
 
           # P1. EVERY MARKER HERE IS A STRING LITERAL OR AN ATTRIBUTE VALUE,
-          # never an identifier: `rowCells` and friends are renamed by the
-          # minifier, so grepping for them would fail on a bundle that carries
-          # the fix perfectly. Verified against a local `npm run build` before
-          # this check was written.
+          # never an identifier: the minifier renames identifiers, so grepping
+          # for one would fail on a bundle that carries the fix perfectly.
+          # Verified against a local `npm run build` (scripts/check-live-markers.mjs).
           #
-          # The provenance line under each price cell exists only because the
-          # cell resolves through the shared ladder — it has nothing to print
-          # otherwise.
-          hit=$(grep -l 'data-price-mode' /tmp/mods/* 2>/dev/null | head -1 || true)
+          # Pricing V2-4 (2026-10-14, DECISIONS row 222): the dinar price cells
+          # whose provenance line, «يرث» control and member fallback this step
+          # used to find are deleted — the form types no dinar price. What ships
+          # instead is the one review sheet, the section status chip and the
+          # server's result line under each model's dollar selector.
+          hit=$(grep -l 'data-v2-review-confirm' /tmp/mods/* 2>/dev/null | head -1 || true)
           if [ -n "$hit" ]; then
-            echo "  ok   P1 the price provenance line ships — in $(basename "$hit")"
+            echo "  ok   P1 the one price review sheet ships — in $(basename "$hit")"
           else
-            echo "  FAIL P1 the provenance line is missing — the form would show «inherit» again"; fail=1
+            echo "  FAIL P1 the price review sheet is missing"; fail=1
           fi
-          # The «يرث» reset button: a cell can only offer to STOP overriding if
-          # it knows it is overriding, which is the resolved mode.
-          hit=$(grep -l 'data-price-inherit' /tmp/mods/* 2>/dev/null | head -1 || true)
+          hit=$(grep -l 'data-section-chip' /tmp/mods/* 2>/dev/null | head -1 || true)
           if [ -n "$hit" ]; then
-            echo "  ok   P1 the return-to-inherit control ships — in $(basename "$hit")"
+            echo "  ok   P1 the section status chip ships — in $(basename "$hit")"
           else
-            echo "  FAIL P1 the return-to-inherit control is missing"; fail=1
+            echo "  FAIL P1 the section status chip is missing"; fail=1
           fi
-          # And the member-fallback disclosure: a tier with no price of its own
-          # is charged the regular price, and the cell says so.
-          hit=$(grep -l 'regular-fallback' /tmp/mods/* 2>/dev/null | head -1 || true)
+          hit=$(grep -l 'data-v2-model-result' /tmp/mods/* 2>/dev/null | head -1 || true)
           if [ -n "$hit" ]; then
-            echo "  ok   P1 the PRIME/PRO fallback disclosure ships — in $(basename "$hit")"
+            echo "  ok   P1 the model price result line ships — in $(basename "$hit")"
           else
-            echo "  FAIL P1 the member-fallback disclosure is missing"; fail=1
+            echo "  FAIL P1 the model price result line is missing"; fail=1
           fi
 
           # P2 is server-side, so it is proved by the API rather than the

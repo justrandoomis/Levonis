@@ -9,8 +9,8 @@
  *   - the notices a preview raises (held rate, the 1,000 step, COD at the
  *     direct price, a fall above 30%, the route fee folded in, member prices);
  *   - the product form: a save the server holds (409 with the preview) opens
- *     the sheet and the confirm re-sends the same body with the preview's hash;
- *     a save that writes prices never rides on the live preview's hash;
+ *     the one V2 review sheet and the confirm re-sends the same save with the
+ *     preview's hash and the 15% tick (Pricing V2-4);
  *   - the purchase review: an apply that writes prices shows them with the
  *     15% tick, and a refused apply's fresh hash is taken only when it writes
  *     the prices already shown;
@@ -93,18 +93,21 @@ test('an apply writes prices only for a complete product that needs the write; a
   assert.equal(samePrices(null, adoption()), false, 'a price write the review did not show');
 });
 
-test('the product form: a held save opens the sheet; the confirm re-sends the body with the preview’s hash; the live preview never adopts', () => {
-  const section = src('src/components/adminProducts/form/UsdPricingSection.tsx');
-  assert.match(section, /REVIEW_CODES = new Set\(\['PRICING_PREVIEW_REQUIRED', 'PRICING_PREVIEW_STALE', 'PRICING_LARGE_CHANGE_CONFIRM'\]\)/);
-  assert.match(section, /preview\.wire === w && !preview\.answer\.adoption\?\.kind \? preview\.answer\.preview_hash : null/, 'a price write goes without the live hash');
-  assert.match(section, /\{ \.\.\.held\.body, preview_hash: held\.hash, \.\.\.\(confirmLarge \? \{ confirm_large_change: true \} : \{\}\) \}/);
-  assert.match(section, /e\.code === 'REAUTH_REQUIRED'\) \{\s*setReview\(\{ \.\.\.held, error: es\.reauth \}\)/);
-  assert.match(section, /r\.adoption\?\.kind && r\.adoption\.needs_write && r\.adoption\.complete && r\.preview_hash/, 'a product save that completed the product opens the sheet');
-  assert.match(section, /\/products\/\$\{encodeURIComponent\(productId\)\}\/manual`, \{ write_seq: stored\.write_seq \?\? 0 \}/);
+test('the product form (Pricing V2-4): a held save opens the ONE sheet; the confirm re-sends the same save with the preview’s hash and the tick', () => {
   const form = src('src/components/adminProducts/ProductForm.tsx');
-  assert.match(form, /\{canSeeCost && <UsdPricingSaveSheet \/>\}/);
-  assert.match(form, /await pricing\.afterProductSaved\(savedId\)/);
-  assert.match(form, /onPricesWritten: \(id\) => void reloadKeepingEdits\(id\)/);
+  // The three holds of the product save open the V2 review sheet with the server's preview.
+  assert.match(form, /e\.code === 'PRICING_PREVIEW_REQUIRED' \|\| e\.code === 'PRICING_PREVIEW_STALE' \|\| e\.code === 'PRICING_LARGE_CHANGE_CONFIRM'/);
+  assert.match(form, /v2\.openReview\(preview, status\)/);
+  // The confirm is the same save with the hash the sheet showed and the 15% tick.
+  assert.match(form, /void save\(r\.status, \{ confirm: \{ hash: r\.preview\.review_hash, confirmLarge \} \}\)/);
+  // A large change needs a fresh sign-in: the sheet says so and offers it.
+  assert.match(form, /e\.code === 'REAUTH_REQUIRED' && v2\.review\) \{\s*v2\.reviewError\(v2s\.reauth, true\)/);
+  assert.match(form, /<ReviewSheetV2/);
+  const hook = src('src/components/adminProducts/form/v2/useV2Pricing.ts');
+  assert.match(hook, /const hash = confirm\?\.hash \?\? shown\?\.review_hash \?\? null;/);
+  assert.match(hook, /if \(confirm\?\.confirmLarge\) block\.confirm_large_change = true;/);
+  // The V1 sheet and its section are gone with the old dinar fields.
+  assert.doesNotMatch(form, /UsdPricingSaveSheet|UsdPricingSection/);
 });
 
 test('the purchase review: the prices an apply writes, the 15% tick, and no unseen prices on a retry', () => {
