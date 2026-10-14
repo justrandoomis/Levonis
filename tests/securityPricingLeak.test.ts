@@ -33,8 +33,10 @@ const seed = () => {
   return raw;
 };
 // Pricing V2 (0189): the role matrix seeds its costly product's V2 stores with
-// V2_SENTINELS (seedV2Sentinels). No door serves them before V2-3b, whose owner
-// routes add the not-vacuous check for them (spec §8).
+// V2_SENTINELS (seedV2Sentinels). The product stays unmigrated here, so no door
+// serves them; the V2 routes' sweep over the same sentinels — with the product
+// made V2, and the owner's read proving it is not vacuous — is
+// tests/pricingV2Roles.test.ts (spec §8, V2-3b deviation 11).
 const SENTINELS = [...FX_SENTINELS, ...BATCH_SENTINELS, ...V2_SENTINELS];
 const extra = { decimals: SENTINELS, numbers: SENTINELS.map(Number) };
 

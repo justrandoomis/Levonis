@@ -402,6 +402,8 @@ export const purgeCatalogueAfterWrite: MiddlewareHandler<AppContext> = async (c,
   await next();
   if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') return;
   if (c.res.status >= 300) return;
+  // A V2 pricing preview (V2-3b) is a POST that writes nothing: nothing to purge.
+  if (/\/pricing\/preview$/.test(new URL(c.req.url).pathname)) return;
   const slug = c.get('catalogueSlug') ?? (await catalogueSlugFromPath(c));
   await afterCatalogueWrite(c, slug ? [slug] : []);
 };

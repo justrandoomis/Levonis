@@ -7,7 +7,9 @@
  * until it is listed here:
  *   - everyone who may see the product's prices (owner and price editors): the
  *     final IQD table, old → new, the 15% / 30% flags, whether a route is
- *     blocked, the grouped missing codes and field NAMES, the hash;
+ *     blocked, the grouped missing codes and field NAMES, the hash (`review_hash`,
+ *     C-14: never `preview_hash` / `change_pct`, the V1 and FX oracle keys of
+ *     FINANCIAL_FIELDS — the V2 change is `change_percent`);
  *   - the owner alone (`v2_*`, every key in FINANCIAL_FIELDS): the exact IQD,
  *     the USD ceiling, the floor and its flags, R, T, `below_cost`, U, the
  *     dollar points and discounts — never to a price editor, whose USD view
@@ -54,7 +56,7 @@ const changeOf = (r: V2Row) => ({
   channel: r.channel,
   old_iqd: r.old_iqd,
   new_iqd: r.new_iqd,
-  change_pct: r.change_pct,
+  change_percent: r.change_pct,
   large: r.large,
   drop_flag: r.drop_flag,
 });
@@ -73,7 +75,9 @@ export function v2EditorAnswer(ev: V2Evaluation) {
     large_change: ev.large_change,
     drop_flag: ev.drop_flag,
     needs_write: ev.needs_write,
-    preview_hash: ev.hash,
+    // C-14: versions and final prices only — never U, R or T. Not `preview_hash`: that key is the V1 and
+    // FX hashes', which bind private values (FINANCIAL_FIELDS); the apply body still sends it as `preview_hash`.
+    review_hash: ev.hash,
   };
 }
 

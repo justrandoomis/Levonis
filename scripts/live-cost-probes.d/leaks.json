@@ -1,5 +1,5 @@
 {
-  "step": "Leak audit 2026-10-10 (DECISIONS row 220) — a stranger reads final values only: no accessory buying price, no print margin or rate, no printer economics, no supplier picture link",
+  "step": "Leak audit 2026-10-10 (DECISIONS row 220) — a stranger reads final values only: no accessory buying price, no print margin or rate, no printer economics, no supplier picture link; Pricing V2 (spec §8): no V2 private key (v2_*, discount_usd, usd_ceil6, exact_iqd) and no V2 flag on a product page",
   "vars": {
     "slug": {
       "from": "/api/products?limit=1",
@@ -56,7 +56,8 @@
       ],
       "valuePatterns": {
         "source_url": "^$"
-      }
+      },
+      "forbidKeys": "^v2_|^v2$|discount_usd|deltas_usd|usd_ceil6|exact_iqd|^sku_strict$"
     },
     {
       "path": "/api/public/v1/products/{slug}",
@@ -65,7 +66,8 @@
       ],
       "valuePatterns": {
         "source_url": "^$"
-      }
+      },
+      "forbidKeys": "^v2_|^v2$|discount_usd|deltas_usd|usd_ceil6|exact_iqd|^sku_strict$"
     }
   ],
   "note": "Anonymous GETs only. `source_url` is held to the empty string wherever it appears: a picture's supplier link is the owner's (projectPublic blanks it; the public API v1 drops the key, and an absent key passes). The print-service rates and the accessory buying price left every public answer with DECISIONS row 220."

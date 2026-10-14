@@ -277,6 +277,14 @@ test('leaks.json: each probe flags the value the audit found leaking, and passes
   const leak = judge(page, 200, JSON.stringify({ product: { media: [{ key: 'k', source_url: SUPPLIER_LINK }] } })).join('\n');
   assert.match(leak, /source_url \(at product\.media\[0\]\.source_url\) does not match/);
   assert.doesNotMatch(leak, /supplier-secret/, 'a failure line never carries the value');
+  // Pricing V2 (spec §8): a V2 private key or flag on a product page is a leak; the final price is not.
+  for (const path of ['/api/products/{slug}', '/api/public/v1/products/{slug}']) {
+    const p = at(path);
+    for (const k of ['v2_points', 'discount_usd', 'usd_ceil6', 'exact_iqd', 'sku_strict', 'v2']) {
+      assert.match(judge(p, 200, JSON.stringify({ product: { [k]: '1' } })).join('\n'), new RegExp(`forbidden key ${k}`), `${path} ${k}`);
+    }
+    assert.deepEqual(judge(p, 200, JSON.stringify({ product: { price_iqd: 1_600_000, sku_prices: [{ combo_key: 'o:a', channel: 'direct_sale', regular_price_iqd: 1_600_000 }] } })), [], path);
+  }
 });
 
 test('leaks.json against the local Worker with every private print figure set and a supplier link on the probed product: every probe passes', async () => {

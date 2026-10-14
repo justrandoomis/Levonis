@@ -27,7 +27,7 @@ import { completenessInstalled } from './listing';
 export const AFTER_WRITE_MAX = 50;
 
 /** Path segments under /api/admin/products(-v2)/ that are not a product id. */
-const NOT_A_PRODUCT = new Set(['brands', 'catalogs', 'maintenance', 'recommended', 'consolidation', 'simulate', 'versions', 'completeness', 'printer-options', 'stats', 'save-bulk']);
+const NOT_A_PRODUCT = new Set(['brands', 'catalogs', 'maintenance', 'recommended', 'consolidation', 'simulate', 'versions', 'completeness', 'printer-options', 'stats', 'save-bulk', 'pricing']);
 
 /** Writes that store nothing (a preview, a what-if, a quote): nothing to re-evaluate. */
 const READ_ONLY_POST = /\/(?:preview|what-if|quote)$/;

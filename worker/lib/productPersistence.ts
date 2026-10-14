@@ -2427,6 +2427,15 @@ export interface ProductSavePlan {
   warnings: string[];
   money: boolean;
   actorId: string;
+  /**
+   * PRICING V2 (spec §4.1, V2-3b): the relational view this batch leaves
+   * behind — the planned rows and, when the save carries them, the planned
+   * order-type cells and routes under the very ids the batch writes — so the
+   * V2 writer can price the DRAFT before it is saved, and its price rows land
+   * on the rows this batch creates. Null when the save carries no relations
+   * (the stored view stands). Read-only: nothing here is written.
+   */
+  view?: ProductRelationsView | null;
 }
 
 /**
@@ -2676,11 +2685,13 @@ export async function planProductSave(
   const relationStatements: D1PreparedStatement[] = [];
   /** Filled by the relations planner; queued for R2 removal only after commit. */
   const detachedMedia: string[] = [];
+  let plannedSnap: RelationsSnapshot | null = null;
   if (intent.relations) {
     const snap =
       intent.mode === 'create'
         ? snapshotForCreate(doc!)
         : await loadRelationsSnapshot(db, productId, doc ? { ladder: ladderOf(doc), saleTypes: doc.sale_types } : {});
+    plannedSnap = snap;
     // Without cost write, a row created for a legacy document-only option or
     // colour takes the cost the stored document holds (S1 review L2).
     if (prev && !actor.money) snap.documentCosts = documentRowCosts(prev);
@@ -2865,6 +2876,7 @@ export async function planProductSave(
    */
   const cellStatements: D1PreparedStatement[] = [];
   let plannedCells: ProductSavePlan['cells'] = null;
+  let plannedCellIds: PlannedCellIds | null = null;
   if (relations?.requested) {
     const cells: unknown[] = [];
     for (const v of relations.requested.values) {
@@ -3021,11 +3033,28 @@ export async function planProductSave(
       // because nobody reads it row by row — and either one strands a live
       // pre-order whose release would then match no row at all.
       refuseStrandedCapacity(existing, parsed);
-      cellStatements.push(...fulfillmentStatements(db, productId, parsed, undefined, existing));
+      // Pricing V2 (V2-3b): the ids the replace gives NEW cells and routes are
+      // recorded, so the planned view (`plan.view`) names the rows this very
+      // batch writes and a V2 price row written after them lands on them.
+      const freshIds: string[] = [];
+      cellStatements.push(
+        ...fulfillmentStatements(
+          db,
+          productId,
+          parsed,
+          () => {
+            const id = newId('ofl');
+            freshIds.push(id);
+            return id;
+          },
+          existing
+        )
+      );
       // Carried to `verifyApplied`: the capacity is a NUMBER THIS SAVE WROTE,
       // and until now the read-back net compared every other written number
       // and not this one.
       plannedCells = { requested: parsed, held: existing };
+      plannedCellIds = plannedCellIdsOf(parsed, existing, freshIds);
     }
   }
 
@@ -3212,7 +3241,129 @@ export async function planProductSave(
     warnings,
     money: actor.money,
     actorId: actor.adminId,
+    view:
+      relations && plannedSnap
+        ? plannedSaveView(relations.requested, plannedSnap, productId, actor.money, plannedCells && plannedCellIds ? { cells: plannedCells.requested, ids: plannedCellIds } : null)
+        : null,
   };
+}
+
+/** The ids `fulfillmentStatements` gives each planned cell and route, in its own order (kept rows keep theirs). */
+interface PlannedCellIds {
+  cells: string[];
+  routes: string[][];
+}
+
+/**
+ * The ids of the planned cells and routes, replayed in the order
+ * `fulfillmentStatements` settles them: each cell's id (kept, else the next
+ * fresh one), then each of its routes'. `fresh` holds the ids it generated,
+ * in the order it asked for them.
+ */
+function plannedCellIdsOf(cells: readonly FulfillmentCell[], existing: ExistingCells, fresh: readonly string[]): PlannedCellIds {
+  let n = 0;
+  const next = () => fresh[n++] ?? newId('ofl');
+  const ids: PlannedCellIds = { cells: [], routes: [] };
+  for (const cell of cells) {
+    ids.cells.push(existing.cells.get(cellKey(cell.option_id, cell.fulfillment_type))?.id ?? next());
+    ids.routes.push(cell.transports.map((t) => existing.transports.get(transportKey(cell.option_id, cell.fulfillment_type, t.method))?.id ?? next()));
+  }
+  return ids;
+}
+
+/**
+ * PRICING V2 (V2-3b): the relational view the save leaves behind — the planned
+ * mirror (`plannedRelationsView`), its variants, and, when the payload states
+ * them, its order-type cells and routes under the ids the batch writes. A cell
+ * whose money the payload did not mention keeps the stored figures; a cost the
+ * actor may not write is the stored one. Read by the V2 writer only.
+ */
+function plannedSaveView(
+  req: RequestedRelations,
+  snap: RelationsSnapshot,
+  productId: string,
+  money: boolean,
+  cells: { cells: readonly FulfillmentCell[]; ids: PlannedCellIds } | null
+): ProductRelationsView {
+  const view = plannedRelationsView(req, snap, productId, money);
+  const storedVariant = new Map(snap.existingVariants.map((v) => [v.id, v] as const));
+  view.variants = req.variants.map((v) => ({
+    id: v.id,
+    product_id: productId,
+    combo_key: v.combo_key,
+    sku: v.sku,
+    active: v.active,
+    stock: v.stock,
+    reserved: storedVariant.get(v.id)?.reserved ?? 0,
+    low_stock_threshold: v.low_stock_threshold,
+    regular_price_iqd: v.prices.regular_price_iqd,
+    prime_price_iqd: v.prices.prime_price_iqd,
+    pro_price_iqd: v.prices.pro_price_iqd,
+    cost_iqd: money ? v.prices.cost_iqd : null,
+  }));
+  if (!cells) return view;
+  const storedCell = new Map(snap.existing.fulfillments.map((f) => [f.id, f] as const));
+  const storedRoute = new Map(snap.existing.transports.map((t) => [t.id, t] as const));
+  const fulfillments: ProductRelationsView['fulfillments'] = [];
+  const transports: ProductRelationsView['transports'] = [];
+  cells.cells.forEach((cell, i) => {
+    const id = cells.ids.cells[i]!;
+    const was = storedCell.get(id);
+    const priced = cell.priced !== false || !was;
+    fulfillments.push({
+      id,
+      product_id: productId,
+      option_id: cell.option_id,
+      fulfillment_type: cell.fulfillment_type,
+      enabled: cell.enabled ? 1 : 0,
+      regular_price_iqd: priced ? cell.regular_price_iqd : was.regular_price_iqd,
+      prime_price_iqd: priced ? cell.prime_price_iqd : was.prime_price_iqd,
+      pro_price_iqd: priced ? cell.pro_price_iqd : was.pro_price_iqd,
+      cost_iqd: priced ? cell.cost_iqd : was.cost_iqd,
+      regular_adjust_iqd: priced ? cell.regular_adjust_iqd : (was.regular_adjust_iqd ?? null),
+      prime_adjust_iqd: priced ? cell.prime_adjust_iqd : (was.prime_adjust_iqd ?? null),
+      pro_adjust_iqd: priced ? cell.pro_adjust_iqd : (was.pro_adjust_iqd ?? null),
+      cost_adjust_iqd: priced ? cell.cost_adjust_iqd : (was.cost_adjust_iqd ?? null),
+      lead_time_text: cell.lead_time_text,
+      lead_time_text_ar: cell.lead_time_text_ar ?? was?.lead_time_text_ar ?? '',
+      lead_time_text_ckb: cell.lead_time_text_ckb ?? was?.lead_time_text_ckb ?? '',
+      lead_time_min_days: cell.lead_time_min_days,
+      lead_time_max_days: cell.lead_time_max_days,
+      sort: cell.sort ?? 0,
+      capacity: cell.capacity ?? null,
+    });
+    cell.transports.forEach((t, k) => {
+      const routeId = cells.ids.routes[i]![k]!;
+      const prev = storedRoute.get(routeId);
+      const routePriced = t.priced !== false || !prev;
+      transports.push({
+        id: routeId,
+        product_id: productId,
+        fulfillment_id: id,
+        method: t.method,
+        enabled: t.enabled ? 1 : 0,
+        surcharge_iqd: routePriced ? t.surcharge_iqd : prev.surcharge_iqd,
+        regular_price_iqd: routePriced ? t.regular_price_iqd : prev.regular_price_iqd,
+        prime_price_iqd: routePriced ? t.prime_price_iqd : prev.prime_price_iqd,
+        pro_price_iqd: routePriced ? t.pro_price_iqd : prev.pro_price_iqd,
+        cost_iqd: routePriced ? t.cost_iqd : prev.cost_iqd,
+        regular_adjust_iqd: routePriced ? t.regular_adjust_iqd : (prev.regular_adjust_iqd ?? null),
+        prime_adjust_iqd: routePriced ? t.prime_adjust_iqd : (prev.prime_adjust_iqd ?? null),
+        pro_adjust_iqd: routePriced ? t.pro_adjust_iqd : (prev.pro_adjust_iqd ?? null),
+        cost_adjust_iqd: routePriced ? t.cost_adjust_iqd : (prev.cost_adjust_iqd ?? null),
+        lead_time_text: t.lead_time_text,
+        lead_time_text_ar: t.lead_time_text_ar ?? prev?.lead_time_text_ar ?? '',
+        lead_time_text_ckb: t.lead_time_text_ckb ?? prev?.lead_time_text_ckb ?? '',
+        lead_time_min_days: t.lead_time_min_days,
+        lead_time_max_days: t.lead_time_max_days,
+        sort: t.sort,
+        capacity: t.capacity,
+      } as ProductRelationsView['transports'][number]);
+    });
+  });
+  view.fulfillments = fulfillments;
+  view.transports = transports;
+  return view;
 }
 
 /**

@@ -46,6 +46,8 @@ import { discountStatements, discountWrites, pointStatements, pointWrites, V2_RE
 
 /** A product save with V2 prices (structure + prices in one batch): D1's per-invocation budget is the hard limit (risk R-4). */
 export const V2_SAVE_STATEMENT_CAP = 600;
+/** A prices-only V2 write (PUT …/pricing, the migration's per-product commit): the engine's own cap (spec §3.3). */
+export const V2_PRICING_STATEMENT_CAP = 200;
 
 const imageBinds = (pid: string) => [pid, pid, pid, pid, pid, pid];
 
@@ -65,6 +67,22 @@ export interface V2WriteOptions {
   updatedAt?: string | null;
   extraAudits?: D1PreparedStatement[];
   auditDetail?: Record<string, unknown>;
+  /**
+   * V2-3b: a product this very save creates (add-product, V2 from birth). Its
+   * structure statements (the `products` INSERT first) run BEFORE the batch
+   * head, because the state row and every V2 row name the product by foreign
+   * key; the price image and the stale-edit fences are skipped — nothing
+   * existed to read, and the INSERT's primary key is the race guard.
+   */
+  newProduct?: boolean;
+  /**
+   * V2-5 (spec §6.3): the migration's own statements — the legacy snapshot,
+   * the folded purchase overlay, the retired Direct Sale Extra rows — laid
+   * after the owner's data and before the price rows.
+   */
+  migration?: readonly D1PreparedStatement[];
+  /** V2-5: the write is the owner's migration commit (pricing_audit `migration`/`migrate_commit`, audit_log `pricing.v2.migrated`). */
+  migrationCommit?: boolean;
 }
 
 /** The private result row of one planned SKU × channel (each 0189 pair written whole). */
@@ -169,25 +187,29 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
       : []),
   ];
 
+  const fresh = o.newProduct === true;
   return [
+    // (A product this save creates: its row and relations first — everything below names it.)
+    ...(fresh ? (o.structure ?? []) : []),
     // 1-2. What was read, as read.
     ...batchHead(db, ev.stored, o.now),
     ...fence(db, 'EXISTS(SELECT 1 FROM pricing_engine_control WHERE id = 1 AND paused = 0)'),
-    ...fence(db, `(${PRICE_IMAGE_SQL}) = ?`, [...imageBinds(pid), ev.image]),
+    ...(fresh ? [] : fence(db, `(${PRICE_IMAGE_SQL}) = ?`, [...imageBinds(pid), ev.image])),
     ...fence(db, RATES_FENCE_SQL, rateFenceBinds(ev.rates)),
     ...fence(db, 'EXISTS(SELECT 1 FROM product_pricing_state WHERE product_id = ? AND pricing_method IS ?)', [pid, storedMethod]),
-    ...(o.updatedAt !== undefined ? fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [pid, o.updatedAt]) : []),
+    ...(!fresh && o.updatedAt !== undefined ? fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [pid, o.updatedAt]) : []),
     // 3. The tokens.
     db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`engine-price:${pid}`),
     ...(create || methodMoves ? [db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`pricing-mode:${pid}`)] : []),
     // 4. The product save's structure, unchanged.
-    ...(o.structure ?? []),
+    ...(fresh ? [] : (o.structure ?? [])),
     // 5. The owner's data.
     ...inputStatements(db, pid, ev.inputWrites, o.actor, o.now, { pack: true }),
     ...ruleStatements(db, pid, ev.ruleWrites, o.actor, o.now, { pack: true }),
     ...pointStatements(db, pid, points, o.actor, o.now),
     ...discountStatements(db, pid, discounts, o.actor, o.now),
     ...(overlay ? [directPurchaseStatement(db, ev.stored, overlay, o.actor, o.now)] : []),
+    ...(o.migration ?? []),
     // 6. The price rows.
     ...(writePrices ? priceRowStatements(db, pid, plan, o.now) : []),
     // 7. The history: the V2 price and the U it was computed at.
@@ -233,10 +255,10 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
     ...(o.extraAudits ?? []),
     pricingAuditStatement(db, {
       id: auditId,
-      entity: 'sku_price',
+      entity: o.migrationCommit ? 'migration' : 'sku_price',
       entity_key: pid,
       product_id: pid,
-      action: auto ? 'reprice_auto' : create ? 'engine_entry' : 'reprice_owner',
+      action: o.migrationCommit ? 'migrate_commit' : auto ? 'reprice_auto' : create ? 'engine_entry' : 'reprice_owner',
       before: ev.rows.map((r) => ({ combo_key: r.combo_key, channel: r.channel, price_iqd: r.old_iqd })),
       after: plan.prices.map((p) => ({ combo_key: p.combo_key, channel: p.channel, price_iqd: p.price.computed_price_iqd, usd_ceil6: p.price.v2.usd_ceil6, usd_iqd_rate: u })),
       summary: {
@@ -257,7 +279,7 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
       now: o.now,
     }),
     ...(
-      await auditStatements(db, auditActor, auto ? 'pricing.engine.repriced_auto' : create ? 'pricing.v2.created' : 'pricing.v2.repriced', pid, {
+      await auditStatements(db, auditActor, o.migrationCommit ? 'pricing.v2.migrated' : auto ? 'pricing.engine.repriced_auto' : create ? 'pricing.v2.created' : 'pricing.v2.repriced', pid, {
         product_id: pid,
         v2: true,
         rows_changed: history.length,
@@ -267,6 +289,95 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
       })
     ).statements,
     ...(create || methodMoves ? [db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`pricing-mode:${pid}`)] : []),
+    db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`engine-price:${pid}`),
+    ...batchTail(db, pid),
+  ];
+}
+
+/**
+ * V2-3b (spec §4.3 step 6): an INCOMPLETE V2 save stores its data and never a
+ * price. An existing V2 product keeps its sellable prices at the last good
+ * write (the strict rung refuses every SKU × channel left unpriced, C-13); a
+ * product this save creates is born V2 and stays hidden until it is priced
+ * (row 205). One batch: the head and its fences, the tokens, the structure
+ * (a new product's first), the owner's data, the method, the audit, the tail.
+ * No price row, no result, no `write_seq` move, no price history.
+ */
+export async function v2DataStatements(db: D1Database, ev: V2Evaluation, o: V2WriteOptions): Promise<D1PreparedStatement[]> {
+  if (o.auto) throw new Error('v2DataStatements: never an automatic write');
+  const pid = ev.product_id;
+  const storedMethod = ev.stored.state?.mode === 'engine' ? (ev.stored.state.pricing_method ?? null) : null;
+  const methodMoves = storedMethod !== ev.method;
+  const points = pointWrites(ev.v2?.points ?? [], ev.points);
+  const discounts = discountWrites(ev.v2?.discounts ?? [], ev.discounts);
+  const fresh = o.newProduct === true;
+  const overlay = ev.stored.direct_purchase?.direct_only ? { ...ev.stored.direct_purchase, direct_only: false, version: ev.stored.direct_purchase.version + 1 } : null;
+  const audits: PricingAuditRow[] = [
+    ...points.map((w) => ({
+      entity: 'input' as const,
+      entity_key: `v2point:${w.scope}:${w.scope_id}`,
+      product_id: pid,
+      action: (w.existing ? (w.next ? 'update' : 'delete') : 'create') as PricingAuditRow['action'],
+      before: w.existing ? { kind: w.existing.kind, amount_usd: w.existing.amount_usd } : null,
+      after: w.next ? { kind: w.next.kind, amount_usd: w.next.usd } : null,
+      actor: o.actor,
+      now: o.now,
+    })),
+    ...discounts.map((w) => ({
+      entity: 'rule' as const,
+      entity_key: `v2discount:${w.scope}:${w.scope_id}`,
+      product_id: pid,
+      action: 'rule_set' as const,
+      before: w.existing ? { amount_usd: w.existing.amount_usd } : null,
+      after: w.next ? { amount_usd: w.next.usd } : null,
+      actor: o.actor,
+      now: o.now,
+    })),
+    ...(methodMoves ? [{ entity: 'engine_mode' as const, entity_key: pid, product_id: pid, action: 'update' as const, before: { method: storedMethod }, after: { method: ev.method }, summary: { data_only: true }, actor: o.actor, now: o.now }] : []),
+  ];
+  return [
+    ...(fresh ? (o.structure ?? []) : []),
+    ...batchHead(db, ev.stored, o.now),
+    ...fence(db, 'EXISTS(SELECT 1 FROM product_pricing_state WHERE product_id = ? AND pricing_method IS ?)', [pid, storedMethod]),
+    ...(!fresh && o.updatedAt !== undefined ? fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [pid, o.updatedAt]) : []),
+    db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`engine-price:${pid}`),
+    ...(methodMoves ? [db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`pricing-mode:${pid}`)] : []),
+    ...(fresh ? [] : (o.structure ?? [])),
+    ...inputStatements(db, pid, ev.inputWrites, o.actor, o.now, { pack: true }),
+    ...ruleStatements(db, pid, ev.ruleWrites, o.actor, o.now, { pack: true }),
+    ...pointStatements(db, pid, points, o.actor, o.now),
+    ...discountStatements(db, pid, discounts, o.actor, o.now),
+    ...(overlay ? [directPurchaseStatement(db, ev.stored, overlay, o.actor, o.now)] : []),
+    ...(methodMoves
+      ? [
+          db
+            .prepare(
+              `UPDATE product_pricing_state
+                  SET mode = 'engine', pricing_method = ?, v2_since = COALESCE(v2_since, ?),
+                      opted_in_at = CASE WHEN mode = 'manual' THEN ? ELSE opted_in_at END,
+                      opted_in_by = CASE WHEN mode = 'manual' THEN ? ELSE opted_in_by END,
+                      updated_at = ?
+                WHERE product_id = ?`
+            )
+            .bind(ev.method, o.now, o.now, o.actor, o.now, pid),
+        ]
+      : []),
+    ...pricingAuditStatements(db, audits),
+    ...(o.extraAudits ?? []),
+    ...(
+      await auditStatements(db, o.auditActor === undefined ? o.actor : o.auditActor, 'pricing.v2.data_saved', pid, {
+        product_id: pid,
+        v2: true,
+        source: o.source,
+        complete: false,
+        points_changed: points.length,
+        discounts_changed: discounts.length,
+        inputs_changed: ev.inputWrites.length,
+        rules_changed: ev.ruleWrites.length,
+        ...(o.auditDetail ?? {}),
+      })
+    ).statements,
+    ...(methodMoves ? [db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`pricing-mode:${pid}`)] : []),
     db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`engine-price:${pid}`),
     ...batchTail(db, pid),
   ];

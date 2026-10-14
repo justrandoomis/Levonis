@@ -35,7 +35,9 @@
  */
 
 import { completenessAfterWrite } from '../lib/completenessHooks';
-import { engineDbRefusal } from '../lib/pricingDbRefusals';
+import { engineDbRefusal, engineDbRefusalCode } from '../lib/pricingDbRefusals';
+import { productEngineV2 } from '../lib/engineInstalled';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
@@ -1365,6 +1367,22 @@ function cellRefusal(relations: Record<string, unknown>, shape: ExistingShape | 
 /** Only deliberate user-facing refusals belong in a downloadable report.
  * Database and provider failures may carry SQL bindings, including the
  * stored cost carried through an assistant's otherwise safe import. */
+/**
+ * Pricing V2 (spec §3.5): a dollar-priced product's row refused by the price
+ * lock names the V2 section («هذا المنتج يُسعَّر بالدولار — عدّل من قسم
+ * الأسعار»), not the V1 ENGINE_MANAGED sentence. Its prices are edited in the
+ * product's own «الأسعار»; the file's price columns never reach them. Null for
+ * every other error (the report's sentence is `importFailureReason`'s).
+ */
+async function v2LockRefusal(db: D1Database, productId: string | null | undefined, error: unknown): Promise<HttpError | null> {
+  if (!productId || engineDbRefusalCode(error) !== 'ENGINE_MANAGED') return null;
+  try {
+    return (await productEngineV2(db, productId)) ? new HttpError(409, serverMessage('PRICING_V2_MANAGED'), 'PRICING_V2_MANAGED', { section: 3 }) : null;
+  } catch {
+    return null;
+  }
+}
+
 function importFailureReason(error: unknown): string {
   const pricing = engineDbRefusal(error);
   if (pricing) return pricing.message;
@@ -2106,7 +2124,8 @@ adminImportRoutes.post('/confirm', async (c) => {
           reason: '',
         });
         if (localized.review_needed.length) reviewNeeded.push(`${key}: ${localized.review_needed.join(', ')}`);
-      } catch (error) {
+      } catch (thrown) {
+        let error: unknown = thrown;
         // A transport can report an error after D1 committed. Never turn that
         // uncertain outcome into a false failure or repeat a CREATE: the
         // checkpoint shares the product transaction, so read it first.
@@ -2122,6 +2141,9 @@ adminImportRoutes.post('/confirm', async (c) => {
         ) {
           throw new ImportApplyLeaseLost();
         }
+        // Pricing V2 (spec §3.5): a dollar-priced product's locked row names the V2 section instead.
+        const v2Locked = await v2LockRefusal(c.env.DB, productId, error);
+        if (v2Locked) error = v2Locked;
 
         outcome = {
           key,
