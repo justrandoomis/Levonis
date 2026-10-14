@@ -26,7 +26,7 @@
  * admin projection carry no `sku_prices`, and get no level here — every caller
  * then answers exactly as before.
  */
-import { parseSkuComboKey, routeOfChannel, isSkuChannel, type PreorderRoute } from '@levonis/pricing/skuChannel';
+import { parseSkuComboKey, routeOfChannel, isSkuChannel, skuComboKey, type PreorderRoute } from '@levonis/pricing/skuChannel';
 import type { SkuPriceRow } from './pricing';
 import { optionValueIdsInRelationOrder } from './cartSelectionIdentity';
 
@@ -102,4 +102,30 @@ export function skuLevelResolveInput(s: SkuLevelSelection): {
     transportMethod: s.transport_method,
     ...(s.transport_method ? { fulfillmentType: 'pre_order' as const } : {}),
   };
+}
+
+/**
+ * PRICING V2 (spec §9, for V2-0's offers): a V2 SKU's direct price D and each
+ * route's price P, read from the SKU rows alone — public final prices, never a
+ * private figure — so an offer can set D and keep P = D − Δ by the same
+ * difference. Null when the document is not a V2 product's (not strict) or the
+ * selection has no V2 row.
+ */
+export function v2Offerable(
+  doc: { sku_prices?: readonly SkuPriceRow[] | null; sku_strict?: true },
+  selection: { optionValueIds: readonly string[]; colorId: string | null }
+): { direct_iqd: number | null; preorder: Partial<Record<PreorderRoute, number>> } | null {
+  if (doc.sku_strict !== true || !doc.sku_prices?.length) return null;
+  const key = skuComboKey({ option_value_ids: selection.optionValueIds, color_id: selection.colorId });
+  const rows = doc.sku_prices.filter((r) => r.v2 === true && r.combo_key === key);
+  if (!rows.length) return null;
+  const preorder: Partial<Record<PreorderRoute, number>> = {};
+  let direct: number | null = null;
+  for (const r of rows) {
+    if (!isSkuChannel(r.channel)) continue;
+    const route = routeOfChannel(r.channel);
+    if (route) preorder[route] = r.regular_price_iqd;
+    else direct = r.regular_price_iqd;
+  }
+  return { direct_iqd: direct, preorder };
 }

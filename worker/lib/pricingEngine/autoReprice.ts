@@ -63,6 +63,11 @@ import { engineDbRefusalCode } from '../pricingDbRefusals';
 import { isMissingTable } from '../fx/pairs';
 import { loadPreviewContext, loadProducts } from './load';
 import { loadProductsPricing, pricingAuditStatement } from './store';
+import { isMissingV2Schema } from '../productOverlay';
+import { loadV2Store, type StoredV2Result, type V2Store } from './v2/store';
+import { loadStoredV2Results, staleReasonsV2 } from './v2/stale';
+import { evaluateV2Write, storedDesired, type V2Evaluation } from './v2/evaluate';
+import { v2WriteStatements } from './v2/write';
 import { loadPricingRates, type PricingRates } from './rates';
 import {
   engineWriteStatements,
@@ -101,6 +106,8 @@ export const PRODUCT_CHUNK = 50;
 export const READS_PER_CHUNK = 10;
 /** Keep room for a normal writer batch instead of spending the tick on reads. */
 const MIN_WRITE_ROOM = 40;
+/** Pricing V2: `loadV2Store`'s one batch (the method, the points, the discounts, the results). */
+export const V2_STORE_READS = 4;
 const candidateReads = (n: number): number => 1 + 1 + READS_PER_CHUNK * Math.ceil(n / PRODUCT_CHUNK) + 5 + 1;
 /** The system actor of an automatic write the cron starts. */
 export const SYSTEM_ACTOR = 'system:fx';
@@ -115,18 +122,32 @@ export interface EngineStateRow {
   reprice_blocked_at: string | null;
   /** The newest change of any central rate (fx or shipping) — a blocked product is retried after it. */
   rates_at: string | null;
+  /** Pricing V2 (spec C-1): the product's method — set on a V2 product, null on V1 (and on a database without 0189). */
+  pricing_method?: 'cost' | 'usd' | null;
 }
 
-const ENGINE_STATES_SQL = `SELECT s.product_id, p.slug, s.inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at,
+const engineStatesSql = (v2: boolean) => `SELECT s.product_id, p.slug, s.inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at,${v2 ? ' s.pricing_method,' : ''}
        MAX(COALESCE((SELECT MAX(updated_at) FROM pricing_fx_rates), ''), COALESCE((SELECT MAX(updated_at) FROM pricing_shipping_rates), '')) AS rates_at
   FROM product_pricing_state s JOIN products p ON p.id = s.product_id
  WHERE s.mode = 'engine' AND COALESCE(p.composition, '') = ''
  ORDER BY s.product_id`;
 
-/** Every engine-priced product (one indexed read: idx_product_pricing_state_engine). Throws on a database without 0181. */
-export async function loadEngineStates(db: D1Database): Promise<EngineStateRow[]> {
-  const { results } = await db.prepare(ENGINE_STATES_SQL).all<EngineStateRow>();
-  return (results ?? []).map((r) => ({
+/**
+ * Every engine-priced product (one indexed read: idx_product_pricing_state_engine) — V2 products
+ * included: they are `mode = 'engine'` (spec C-1), so the automatic repricing selects them as it
+ * always has, and only the code after the selection branches on the method. On a database without
+ * 0189 the read is V1's (a second statement, reported through `spent`). Throws on a database without 0181.
+ */
+export async function loadEngineStates(db: D1Database, opts: { spent?: (n: number) => void } = {}): Promise<EngineStateRow[]> {
+  let rows: EngineStateRow[];
+  try {
+    rows = (await db.prepare(engineStatesSql(true)).all<EngineStateRow>()).results ?? [];
+  } catch (e) {
+    if (!isMissingV2Schema(e)) throw e;
+    opts.spent?.(1);
+    rows = (await db.prepare(engineStatesSql(false)).all<EngineStateRow>()).results ?? [];
+  }
+  return rows.map((r) => ({
     product_id: String(r.product_id),
     slug: String(r.slug ?? ''),
     inputs_seq: Number(r.inputs_seq ?? 0),
@@ -134,6 +155,7 @@ export async function loadEngineStates(db: D1Database): Promise<EngineStateRow[]
     reprice_blocked_code: r.reprice_blocked_code ?? null,
     reprice_blocked_at: r.reprice_blocked_at ?? null,
     rates_at: r.rates_at ? String(r.rates_at) : null,
+    pricing_method: r.pricing_method === 'cost' || r.pricing_method === 'usd' ? r.pricing_method : null,
   }));
 }
 
@@ -142,17 +164,38 @@ export interface StaleEngineProduct {
   /** What moved since the stored price: a supplier currency (USD / EUR / CNY) or a shipping profile. */
   reasons: string[];
   rows: StoredSkuCost[];
+  /** Pricing V2: the product's stored V2 results (a V2 product has no V1 rows). */
+  v2_rows?: StoredV2Result[];
 }
 
-/** The stale list: engine products whose stored figures were computed at a confirmed rate that has changed. */
-export function staleEngineProducts(states: readonly EngineStateRow[], costs: readonly StoredSkuCost[], rates: PricingRates): StaleEngineProduct[] {
+/** A V2 state (spec C-1): its stale list reads the V2 results. */
+export const isV2State = (s: Pick<EngineStateRow, 'pricing_method'>): boolean => !!s.pricing_method;
+
+/**
+ * The stale list: engine products whose stored figures were computed at a confirmed rate that has
+ * changed — V1's from `pricing_sku_costs` exactly as before, a V2 product's from its V2 results
+ * (`staleReasonsV2`: U for every one, the supplier currency and shipping only cost-first).
+ */
+export function staleEngineProducts(states: readonly EngineStateRow[], costs: readonly StoredSkuCost[], rates: PricingRates, v2Results: readonly StoredV2Result[] = []): StaleEngineProduct[] {
   const out: StaleEngineProduct[] = [];
   for (const state of states) {
+    if (isV2State(state)) {
+      const v2Rows = v2Results.filter((r) => r.product_id === state.product_id);
+      const reasons = staleReasonsV2(v2Rows, rates);
+      if (reasons.length) out.push({ state, reasons, rows: [], v2_rows: v2Rows });
+      continue;
+    }
     const rows = costs.filter((c) => c.product_id === state.product_id);
     const reasons = staleReasons(rows, rates);
     if (reasons.length) out.push({ state, reasons, rows });
   }
   return out;
+}
+
+/** The V2 results of the V2 states named, in one statement (none read when no state is V2). */
+export async function loadV2ResultsOf(db: D1Database, states: readonly EngineStateRow[]): Promise<StoredV2Result[]> {
+  const ids = states.filter(isV2State).map((s) => s.product_id);
+  return ids.length ? loadStoredV2Results(db, ids) : [];
 }
 
 /** A blocked product waits 24 hours, unless a central rate moved after it was blocked (or the owner saved it, which clears the code). */
@@ -184,6 +227,16 @@ export function blockCodeOf(codes: readonly string[]): string {
   const pick = codes.includes('RESOLVER_MISMATCH') ? 'RESOLVER_MISMATCH' : (codes.find((c) => c !== 'PRICE_INVALID') ?? codes[0] ?? 'REPRICE_BLOCKED');
   return /^[A-Z0-9_]{1,40}$/.test(pick) ? pick : 'REPRICE_BLOCKED';
 }
+
+/** V2: how far the new prices lie above today's, the worst SKU × channel (whole dinars). Ordering only. */
+export function deficitOfV2(ev: Pick<V2Evaluation, 'rows'>): number {
+  let worst = Number.NEGATIVE_INFINITY;
+  for (const r of ev.rows) if (r.new_iqd !== null) worst = Math.max(worst, r.new_iqd - (r.old_iqd ?? 0));
+  return Number.isFinite(worst) ? worst : 0;
+}
+
+/** V2: no customer-visible price moves (V2 carries no member price and no fee to fold in). */
+export const pricesUnchangedV2 = (ev: Pick<V2Evaluation, 'rows'>): boolean => ev.rows.every((r) => r.old_iqd === r.new_iqd);
 
 /** No customer-visible price moves: every channel's price, PRO and PRIME stay, and no route fee is folded in. */
 export function pricesUnchanged(ev: Pick<EngineEvaluation, 'rows'>): boolean {
@@ -253,18 +306,21 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     if (!budget.spend(1)) return finish('BUDGET');
     let states: EngineStateRow[];
     try {
-      states = await loadEngineStates(db);
+      states = await loadEngineStates(db, { spent: (n) => void budget.spend(n) });
     } catch (e) {
       if (isMissingTable(e)) return finish('NOT_INSTALLED');
       throw e;
     }
     if (!states.length) return finish('NOTHING_STALE');
-    if (!budget.spend(3)) return finish('BUDGET');
-    const [costs, rates] = await Promise.all([loadStoredSkuCosts(db, states.map((s) => s.product_id)), loadPricingRates(db)]);
+    // Pricing V2: the V2 states' stale list reads their V2 results (one statement more, only when there is one).
+    const hasV2 = states.some(isV2State);
+    if (!budget.spend(3 + (hasV2 ? 1 : 0))) return finish('BUDGET');
+    const [costs, rates] = await Promise.all([loadStoredSkuCosts(db, states.filter((s) => !isV2State(s)).map((s) => s.product_id)), loadPricingRates(db)]);
     if (!rates) return finish('NOT_INSTALLED');
+    const v2Results = hasV2 ? await loadV2ResultsOf(db, states) : [];
     // A derived rate out of step with its pairs prices nothing (every writer refuses FX_DERIVED_STALE).
     if (rates.derived_stale) return finish('DERIVED_STALE');
-    const stale = staleEngineProducts(states, costs, rates);
+    const stale = staleEngineProducts(states, costs, rates, v2Results);
     report.stale = stale.length;
     let due = stale.filter((p) => !blockedAndWaiting(p.state, now));
     if (!due.length) return finish('NOTHING_STALE');
@@ -304,7 +360,9 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     // 2. The candidates, in a constant number of reads: the control row, the price images FIRST (every
     //    write is fenced on them), then the documents, the stores and the guest pricing context.
     const ids = due.map((p) => p.state.product_id);
-    if (!budget.spend(candidateReads(ids.length))) return finish('BUDGET');
+    // Pricing V2: the due V2 products' stores (method, points, discounts, results) — one batch of four.
+    const v2Ids = due.filter((p) => isV2State(p.state)).map((p) => p.state.product_id);
+    if (!budget.spend(candidateReads(ids.length) + (v2Ids.length ? V2_STORE_READS : 0))) return finish('BUDGET');
     const control = await loadEngineControl(db);
     if (control.paused) return finish('PAUSED');
     let images: Map<string, string>;
@@ -317,9 +375,10 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
       images = await priceImagesEach(db, ids);
     }
     const [loaded, stores, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
+    const v2Stores: Map<string, V2Store | null> = v2Ids.length ? await loadV2Store(db, v2Ids) : new Map();
 
     // 3. The writer's own evaluation of each: plan, the exact resolver check, the six figures.
-    const ready: Array<{ p: StaleEngineProduct; ev: EngineEvaluation; deficit: number }> = [];
+    const ready: Array<{ p: StaleEngineProduct; ev: EngineEvaluation; deficit: number } | { p: StaleEngineProduct; v2: V2Evaluation; deficit: number }> = [];
     const failing: Array<{ p: StaleEngineProduct; code: string }> = [];
     for (const p of due) {
       const pid = p.state.product_id;
@@ -327,6 +386,30 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
       const stored = stores.get(pid);
       // Deleted, or taken back to manual since the first read: not ours to price.
       if (!product || !stored || stored.state?.mode !== 'engine') continue;
+      // Pricing V2 (spec §3.4): the V2 writer, at the stored method, points and discounts.
+      if (isV2State(p.state)) {
+        if (!stored.state.pricing_method) continue; // no longer V2 since the first read: not this branch's
+        const v2Store = v2Stores.get(pid) ?? null;
+        let v2: V2Evaluation;
+        try {
+          const desired = storedDesired(v2Store);
+          v2 = await evaluateV2Write({ loaded: product, stored, v2: v2Store, ctx, rates, control, method: stored.state.pricing_method, points: desired.points, discounts: desired.discounts, inputWrites: [], ruleWrites: [], image: images.get(pid) ?? '', auto: true });
+        } catch (e) {
+          if (product.view?.sku_prices_unread) {
+            console.error('auto reprice: SKU prices unreadable, retried next tick:', pid);
+            continue;
+          }
+          console.error('auto reprice: V2 evaluation failed:', pid, e instanceof Error ? e.name : 'unknown');
+          failing.push({ p, code: 'REPRICE_BLOCKED' });
+          continue;
+        }
+        if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write) {
+          failing.push({ p, code: blockCodeOf(v2.codes) });
+          continue;
+        }
+        ready.push({ p, v2, deficit: deficitOfV2(v2) });
+        continue;
+      }
       let ev: EngineEvaluation;
       try {
         ev = await evaluateEngineWrite({
@@ -406,17 +489,19 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
     // 5. Deficit first: one atomic, fenced, idempotent, audited batch per product, while the budget lasts.
     const slugs: string[] = [];
     for (let i = 0; i < ready.length; i++) {
-      const { p, ev } = ready[i]!;
+      const item = ready[i]!;
+      const p = item.p;
       const pid = p.state.product_id;
-      const unchanged = pricesUnchanged(ev);
-      const statements = await engineWriteStatements(db, ev, [], [], {
+      const unchanged = 'v2' in item ? pricesUnchangedV2(item.v2) : pricesUnchanged(item.ev);
+      const write = {
         actor,
         auditActor,
         now: nowIso,
         source: AUTO_REPRICE_SOURCE,
-        idempotencyKey: `auto:${pid}:${ev.hash}`,
+        idempotencyKey: `auto:${pid}:${'v2' in item ? item.v2.hash : item.ev.hash}`,
         auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: unchanged, trigger: opts.trigger, reasons: p.reasons },
-      });
+      };
+      const statements = 'v2' in item ? await v2WriteStatements(db, item.v2, write) : await engineWriteStatements(db, item.ev, [], [], write);
       if (statements.length > AUTO_REPRICE_STATEMENT_CAP) {
         await block(p, 'PRICING_SET_TOO_LARGE');
         continue;
@@ -536,14 +621,16 @@ export async function autoRepriceStatus(db: D1Database, rates?: PricingRates | n
     const states = await loadEngineStates(db);
     const [r, costs, control, last] = await Promise.all([
       rates === undefined ? loadPricingRates(db) : Promise.resolve(rates),
-      loadStoredSkuCosts(db, states.map((s) => s.product_id)),
+      loadStoredSkuCosts(db, states.filter((s) => !isV2State(s)).map((s) => s.product_id)),
       loadEngineControl(db),
       lastAutoRun(db),
     ]);
     if (!r) return null;
+    // Pricing V2: V2 products count here (spec §3.5): stale through their V2 results.
+    const v2Results = await loadV2ResultsOf(db, states);
     return {
       engine_products: states.length,
-      stale: staleEngineProducts(states, costs, r).length,
+      stale: staleEngineProducts(states, costs, r, v2Results).length,
       blocked: states.filter((s) => s.reprice_blocked_code !== null).length,
       paused: control.paused,
       derived_stale: r.derived_stale,

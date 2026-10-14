@@ -143,6 +143,7 @@ import {
   engineEvaluationDto,
   engineWriteStatements,
   evaluateEngineWrite,
+  isV2Product,
   loadEngineControl,
   loadStoredSkuCosts,
   priceImageOf,
@@ -186,6 +187,15 @@ async function loadOne(db: D1Database, id: string): Promise<LoadedProduct> {
     throw new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE');
   }
   return loaded;
+}
+
+/**
+ * PRICING V2 (spec §3.5): the V1 doors of a V2 product refuse with a code that
+ * names the form section where its prices live — the old panel hides itself on
+ * `v2: true`. Codes and the section only, never a value.
+ */
+function refuseV2Door(stored: Pick<ProductPricingData, 'state'>, code: 'PRICING_V2_MANAGED' | 'PRICING_V2_NO_MANUAL' | 'PRICING_V2_PURCHASE_LATER' = 'PRICING_V2_MANAGED'): void {
+  if (isV2Product(stored)) throw new HttpError(409, serverMessage(code), code, { section: 3, v2: true });
 }
 
 const pageOf = (raw: string | undefined): number => {
@@ -867,6 +877,8 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
   if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
   const loaded = await loadOne(db, c.req.param('id'));
   const pid = loaded.id;
+  // Pricing V2 (spec C-11): purchase → price is V2-6's; the receive itself is untouched (the lot is costed).
+  refuseV2Door(await loadProductPricing(db, pid), 'PRICING_V2_PURCHASE_LATER');
   if (typeof body.purchase_id !== 'string' || !/^[A-Za-z0-9_-]{8,60}$/.test(body.purchase_id)) throw inputInvalid('purchase_id');
   if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');
   if (body.use_purchase !== undefined && typeof body.use_purchase !== 'boolean') throw inputInvalid('use_purchase');
@@ -1032,6 +1044,7 @@ adminPricingRoutes.put('/products/:id/rules', async (c) => {
   const loaded = await loadOne(db, c.req.param('id'));
   const pid = loaded.id;
   const data = await loadProductPricing(db, pid);
+  refuseV2Door(data);
   if (body.inputs_seq !== undefined && body.inputs_seq !== null) {
     if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
     if (body.inputs_seq !== (data.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
@@ -1053,13 +1066,18 @@ async function productInputsContext(c: Context<AppContext>) {
 
 adminPricingRoutes.get('/products/:id/inputs', async (c) => {
   const { rates, loaded, stored, ctx, reads } = await productInputsContext(c);
-  return c.json(await productInputsAnswer(loaded, stored, ctx, rates, undefined, reads));
+  const answer = await productInputsAnswer(loaded, stored, ctx, rates, undefined, reads);
+  // Pricing V2 (spec §3.5): the old panel of a V2 product reads `v2: true` and hides itself; it
+  // carries no V1 hash, because every V1 write of a V2 product refuses.
+  if (isV2Product(stored)) return c.json({ ...answer, v2: true, preview_hash: null, conversion_hash: null });
+  return c.json(answer);
 });
 
 adminPricingRoutes.post('/products/:id/preview', async (c) => {
   const body = strictBody(await jsonObject(c), ['draft', 'adopt']);
   if (body.adopt !== undefined && typeof body.adopt !== 'boolean') throw inputInvalid('adopt');
   const { rates, loaded, stored, ctx, reads } = await productInputsContext(c);
+  refuseV2Door(stored);
   const draft = parseProductInputs(strictBody(body.draft ?? {}, ['inputs', 'rules']), loaded, stored, { rates, now: new Date().toISOString() });
   return c.json(await productInputsAnswer(loaded, stored, ctx, rates, draft, reads, { adopt: body.adopt === true }));
 });
@@ -1158,6 +1176,7 @@ adminPricingRoutes.put('/products/:id/inputs', async (c) => {
   // Storing data only and adopting the engine in the same request contradict each other.
   if (body.data_only === true && body.adopt === true) throw inputInvalid('data_only');
   const { db, rates, loaded, stored, ctx, reads } = await productInputsContext(c);
+  refuseV2Door(stored);
   if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
   const pid = loaded.id;
   if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
@@ -1372,6 +1391,11 @@ adminPricingRoutes.post('/products/save-bulk', async (c) => {
   for (const item of items) {
     try {
       const { ev } = await bulkEvaluation(db, item.product_id, rates, ctx);
+      // Pricing V2 (spec §3.5): a V2 product is never in V1's bulk save.
+      if (ev.codes.includes('PRICING_V2_MANAGED')) {
+        results.push({ product_id: item.product_id, status: 'refused', code: 'PRICING_V2_MANAGED' });
+        continue;
+      }
       if (!ev.kind || (!ev.needs_write && ev.complete)) {
         results.push({ product_id: item.product_id, status: 'unchanged' });
         continue;
@@ -1406,6 +1430,8 @@ adminPricingRoutes.post('/products/:id/manual', async (c) => {
   const loaded = await loadOne(db, c.req.param('id'));
   const pid = loaded.id;
   const stored = await loadProductPricing(db, pid);
+  // Pricing V2 (spec §3.5): a V2 product never returns to manual pricing here (rollback is V2-7's snapshot tool).
+  refuseV2Door(stored, 'PRICING_V2_NO_MANUAL');
   if (stored.state?.mode !== 'engine') throw new HttpError(409, serverMessage('PRICING_NOT_MANAGED'), 'PRICING_NOT_MANAGED');
   if (typeof body.write_seq !== 'number' || body.write_seq !== stored.state.write_seq) throw fxRefusal(409, 'PRICING_CHANGED');
   // FX-7 gaps: a failed read of the SKU prices is not "none": flipping to manual without deleting them
@@ -1456,6 +1482,7 @@ adminPricingRoutes.post('/products/:id/targets/adopt', async (c) => {
   const loaded = await loadOne(db, c.req.param('id'));
   const pid = loaded.id;
   if (typeof body.legacy_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.legacy_hash)) throw inputInvalid('legacy_hash');
+  refuseV2Door(await loadProductPricing(db, pid));
   const ctx = await loadPreviewContext(db);
   const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx).legacy;
   const hash = await legacyHashOf(legacy.rules);

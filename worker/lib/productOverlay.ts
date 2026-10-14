@@ -37,6 +37,7 @@ import type {
   SkuPriceRow,
 } from './pricing';
 import { parsePhysicalDimensions } from './physicalDimensions';
+import { PRODUCT_SKU_ROW_KEY, skuKeyOfStored } from '@levonis/pricing/skuChannel';
 import {
   liveValues,
   loadProductRelations,
@@ -161,6 +162,14 @@ export interface ProductRelationsView {
    * Absent on every successful read and on a database without 0183.
    */
   sku_prices_unread?: true;
+  /**
+   * Pricing V2 (spec C-1, C-13): the product's state is V2 (`mode = 'engine'`
+   * and a `pricing_method`), read in the same statement as its SKU rows. The
+   * customer's document is then strict: a selection × channel with no row is
+   * refused instead of priced from the ladder. Absent on every other product,
+   * on a database without 0189, and when the V2-aware read fell back to V1's.
+   */
+  sku_strict?: true;
 }
 
 export const EMPTY_RELATIONS: ProductRelationsView = {
@@ -222,6 +231,21 @@ interface SkuPriceDbRow extends SkuPriceRow {
   product_id: string;
 }
 
+/** A row as the read returns it: a V2 product's marker row has no key (spec C-13). */
+interface SkuPriceReadRow {
+  product_id: string;
+  combo_key: string | null;
+  channel: string | null;
+  regular_price_iqd: number | null;
+  v2?: number | null;
+}
+
+interface SkuRead {
+  rows: SkuPriceDbRow[];
+  /** The V2 products among those read (their customer document is strict). */
+  strict: Set<string>;
+}
+
 /**
  * THE SKU RUNG'S ROWS (0183, FX-7), read QUIETLY: a database without the table
  * answers 'absent' — the resolver then walks the ladder exactly as before — and
@@ -241,24 +265,60 @@ interface SkuPriceDbRow extends SkuPriceRow {
  * as it does for that older Worker — instead of overriding the manual prices
  * typed since, or the engine's newer figures, once this Worker is back.
  */
-async function skuPriceRows(run: () => Promise<{ results: SkuPriceDbRow[] }>): Promise<SkuPriceDbRow[] | 'absent' | 'failed'> {
-  try {
-    const rows = (await run()).results ?? [];
-    return rows
-      .map((r) => ({ product_id: String(r.product_id), combo_key: String(r.combo_key), channel: String(r.channel), regular_price_iqd: Number(r.regular_price_iqd) }))
-      .filter((r) => Number.isSafeInteger(r.regular_price_iqd) && r.regular_price_iqd > 0);
-  } catch (e) {
+async function skuPriceRows(
+  v2: () => Promise<{ results: SkuPriceReadRow[] }>,
+  v1: () => Promise<{ results: SkuPriceReadRow[] }>
+): Promise<SkuRead | 'absent' | 'failed'> {
+  const parse = (rows: readonly SkuPriceReadRow[]): SkuRead => {
+    const strict = new Set<string>();
+    const out: SkuPriceDbRow[] = [];
+    for (const r of rows) {
+      // Pricing V2: one marker row per V2 product (no key), read in the same statement as its rows.
+      if (r.combo_key === null || r.combo_key === undefined) {
+        strict.add(String(r.product_id));
+        continue;
+      }
+      const row: SkuPriceDbRow = {
+        product_id: String(r.product_id),
+        // The option-less product's stored key `o:*` is the canonical `''` everywhere else (spec C-3).
+        combo_key: skuKeyOfStored(String(r.combo_key)),
+        channel: String(r.channel),
+        regular_price_iqd: Number(r.regular_price_iqd),
+        ...(Number(r.v2) === 1 ? { v2: true as const } : {}),
+      };
+      if (Number.isSafeInteger(row.regular_price_iqd) && row.regular_price_iqd > 0) out.push(row);
+    }
+    return { rows: out, strict };
+  };
+  const fail = (e: unknown): 'absent' | 'failed' => {
     if (isMissingRelationTable(e)) return 'absent';
     console.error(`product relations unavailable (sku prices): ${e instanceof Error ? e.message : String(e)}`);
     return 'failed';
+  };
+  try {
+    return parse((await v2()).results ?? []);
+  } catch (e) {
+    // A database without 0189 (a deploy ahead of its migration): V1's read, where every V2 row is inert and
+    // the ladder answers with the highest price (0183's rollback rule) — never 'absent' for this error.
+    if (!isMissingV2Schema(e)) return fail(e);
+    try {
+      return parse((await v1()).results ?? []);
+    } catch (e1) {
+      return fail(e1);
+    }
   }
 }
 
-/** The view's two SKU fields from one read: the rows, null when absent or failed, and the failure flag. */
-function skuFields(read: SkuPriceDbRow[] | 'absent' | 'failed'): Pick<ProductRelationsView, 'sku_prices' | 'sku_prices_unread'> {
+/** The view's SKU fields from one read: the rows, null when absent or failed, the failure flag, and V2's strict flag. */
+function skuFields(read: SkuRead | SkuPriceDbRow[] | 'absent' | 'failed', productId?: string): Pick<ProductRelationsView, 'sku_prices' | 'sku_prices_unread' | 'sku_strict'> {
   if (read === 'failed') return { sku_prices: null, sku_prices_unread: true };
   if (read === 'absent') return { sku_prices: null };
-  return { sku_prices: read.map(({ combo_key, channel, regular_price_iqd }) => ({ combo_key, channel, regular_price_iqd })) };
+  const rows = Array.isArray(read) ? read : read.rows;
+  const strict = !Array.isArray(read) && productId !== undefined && read.strict.has(productId);
+  return {
+    sku_prices: rows.map(({ combo_key, channel, regular_price_iqd, v2 }) => ({ combo_key, channel, regular_price_iqd, ...(v2 ? { v2 } : {}) })),
+    ...(strict ? { sku_strict: true as const } : {}),
+  };
 }
 
 const SKU_PRICE_COLUMNS = 'product_id, combo_key, channel, regular_price_iqd';
@@ -268,6 +328,33 @@ const SKU_ROW_LIVE = `EXISTS (SELECT 1 FROM pricing_sku_costs c
    JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
   WHERE c.product_id = product_sku_prices.product_id AND c.combo_key = product_sku_prices.combo_key
     AND c.channel = product_sku_prices.channel AND c.computed_price_iqd = product_sku_prices.regular_price_iqd)`;
+
+/**
+ * PRICING V2 (spec §3.4): a SKU row of a V2 product counts while the V2
+ * writer's private result for that exact SKU × channel says the same price —
+ * its key canonical (`o:*` is the product itself, `''`). Written in the same
+ * batch as the row, every time; an older Worker that rewrote either leaves the
+ * row inert, exactly as SKU_ROW_LIVE does for V1.
+ */
+const SKU_ROW_LIVE_V2 = `EXISTS (SELECT 1 FROM pricing_v2_sku_results r
+   JOIN product_pricing_state s ON s.product_id = r.product_id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+  WHERE r.product_id = product_sku_prices.product_id
+    AND r.combo_key = CASE product_sku_prices.combo_key WHEN '${PRODUCT_SKU_ROW_KEY}' THEN '' ELSE product_sku_prices.combo_key END
+    AND r.channel = product_sku_prices.channel AND r.final_price_iqd = product_sku_prices.regular_price_iqd)`;
+
+/** The V2-aware read: the live rows (V1 or V2, each flagged) and one marker row per V2 product, in one statement. */
+const skuRowsV2Sql = (where: string) => `SELECT ${SKU_PRICE_COLUMNS}, (${SKU_ROW_LIVE_V2}) AS v2 FROM product_sku_prices WHERE ${where}
+  AND (${SKU_ROW_LIVE} OR ${SKU_ROW_LIVE_V2})
+UNION ALL
+SELECT product_id, NULL, NULL, NULL, 2 FROM product_pricing_state
+  WHERE ${where} AND mode = 'engine' AND pricing_method IS NOT NULL
+ORDER BY product_id, combo_key, channel`;
+
+/** A V2 table or column is not on this database (0189 not applied). */
+export function isMissingV2Schema(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /no such (table|column)/i.test(msg) && /pricing_v2_sku_results|pricing_method|pricing_price_points|pricing_preorder_discounts|v2_since/i.test(msg);
+}
 
 /** Loads everything relational for one product in four batched reads. */
 export async function loadRelationsView(
@@ -294,8 +381,9 @@ export async function loadRelationsView(
         .bind(productId)
         .all<ImageRow>()
     ),
-    skuPriceRows(() =>
-      db.prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id = ? AND ${SKU_ROW_LIVE} ORDER BY combo_key, channel`).bind(productId).all<SkuPriceDbRow>()
+    skuPriceRows(
+      () => db.prepare(skuRowsV2Sql('product_id = ?')).bind(productId, productId).all<SkuPriceReadRow>(),
+      () => db.prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id = ? AND ${SKU_ROW_LIVE} ORDER BY combo_key, channel`).bind(productId).all<SkuPriceReadRow>()
     ),
   ]);
   const activeImages = images.filter(isActiveProductImageRow);
@@ -315,7 +403,7 @@ export async function loadRelationsView(
     images: activeImages,
     fulfillments: rel.fulfillments,
     transports: rel.transports,
-    ...skuFields(skuPrices),
+    ...skuFields(skuPrices, productId),
   };
 }
 
@@ -378,11 +466,13 @@ export async function loadRelationsViews(
         .bind(JSON.stringify(ids))
         .all<OptionTransportRow>()
     ),
-    skuPriceRows(() =>
-      db
-        .prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id IN (SELECT value FROM json_each(?)) AND ${SKU_ROW_LIVE} ORDER BY product_id, combo_key, channel`)
-        .bind(JSON.stringify(ids))
-        .all<SkuPriceDbRow>()
+    skuPriceRows(
+      () => db.prepare(skuRowsV2Sql('product_id IN (SELECT value FROM json_each(?))')).bind(JSON.stringify(ids), JSON.stringify(ids)).all<SkuPriceReadRow>(),
+      () =>
+        db
+          .prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id IN (SELECT value FROM json_each(?)) AND ${SKU_ROW_LIVE} ORDER BY product_id, combo_key, channel`)
+          .bind(JSON.stringify(ids))
+          .all<SkuPriceReadRow>()
     ),
   ]);
 
@@ -403,7 +493,7 @@ export async function loadRelationsViews(
   const im = bucket(images);
   const fl = bucket(fulfillments);
   const ot = bucket(optionTransports);
-  const sp = Array.isArray(skuPrices) ? bucket(skuPrices) : null;
+  const sp = typeof skuPrices === 'object' ? bucket(skuPrices.rows) : null;
 
   for (const row of rows) {
     const gs = g.get(row.id) ?? [];
@@ -427,7 +517,10 @@ export async function loadRelationsViews(
       images: ims,
       fulfillments: fl.get(row.id) ?? [],
       transports: ot.get(row.id) ?? [],
-      ...skuFields(sp === null ? (skuPrices as 'absent' | 'failed') : (sp.get(row.id) ?? [])),
+      ...skuFields(
+        sp === null || typeof skuPrices !== 'object' ? (skuPrices as 'absent' | 'failed') : { rows: sp.get(row.id) ?? [], strict: skuPrices.strict },
+        row.id
+      ),
     });
   }
   return out;
@@ -483,7 +576,10 @@ export function applyRelations(
   view: ProductRelationsView,
   opts: OverlayOpts = {}
 ): ProductDoc {
-  if (!view.has_relations) return doc;
+  // Pricing V2 (spec C-3, C-13): an option-less V2 product prices through the rung (`o:*` → `''`) even
+  // with no relational row at all, and its customer document is strict. Every other product with no
+  // relational row falls through unchanged, exactly as before.
+  if (!view.has_relations) return opts.includeInactive !== true && view.sku_strict === true ? withSkuRung(doc, view, doc.options) : doc;
   const showAll = opts.includeInactive === true;
   const nameIn = (stored: string | null | undefined, english: string): string =>
     opts.authoredNames ? (typeof stored === 'string' ? stored : '') : authoredName(stored, english);
@@ -705,8 +801,20 @@ export function applyRelations(
   // 0183 (FX-7): the SKU rung rides on the customer's document only — the
   // admin projections (includeInactive) edit the ladder and never carry it —
   // and only when the product has rows, so every other document is unchanged.
-  const skuPrices = !showAll && view.sku_prices && view.sku_prices.length ? view.sku_prices : null;
-  return { ...doc, options, colors, media: canonicalProductMedia(mediaCandidates), ...(skuPrices ? { sku_prices: skuPrices } : {}) };
+  const next = { ...doc, options, colors, media: canonicalProductMedia(mediaCandidates) };
+  return showAll ? next : withSkuRung(next, view, options);
+}
+
+/**
+ * The SKU rung and V2's strict flag on a customer's document (see `applyRelations`).
+ * The product's own row (`''`, stored `o:*`) is dropped on a product that has an
+ * active option (risk R-13): a malformed one must never price a line whose model
+ * was not chosen. V1 never writes that key, so every V1 document is unchanged.
+ */
+function withSkuRung(doc: ProductDoc, view: ProductRelationsView, options: readonly OptionV2[]): ProductDoc {
+  const hasOption = options.some((o) => o.active !== false && !o.merged_into);
+  const rows = (view.sku_prices ?? []).filter((r) => r.combo_key !== '' || !hasOption);
+  return { ...doc, ...(rows.length ? { sku_prices: rows } : {}), ...(view.sku_strict === true ? { sku_strict: true as const } : {}) };
 }
 
 /** The snapshot the inventory engine needs, from an already-loaded view. */

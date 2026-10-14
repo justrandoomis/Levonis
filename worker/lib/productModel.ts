@@ -307,6 +307,12 @@ export interface ProductDoc {
    */
   sku_prices?: readonly SkuPriceRow[];
   /**
+   * Pricing V2 (spec C-13): set by the overlay on a CUSTOMER document of a V2
+   * product only — a selection × channel with no SKU row is refused rather
+   * than priced from the ladder. Never parsed, written or published.
+   */
+  sku_strict?: true;
+  /**
    * Per-product last-mile rules stored canonically at
    * `ops_policy.delivery_options`. null means a pre-feature product and keeps
    * the legacy global shipping tariff; an object is an explicit allow-list.

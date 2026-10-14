@@ -92,6 +92,13 @@ export interface PricingStateRow {
   write_seq: number;
   /** Set when the owner took the product back to manual pricing (a later save then adopts only when asked). */
   opted_out_at?: string | null;
+  /**
+   * Pricing V2 (0189, spec C-1): 'cost' «من التكلفة» or 'usd' «سعر بالدولار» on a V2 product; null (or
+   * absent, on a database without 0189) on every other. A V2 product is `mode = 'engine'` with a method.
+   */
+  pricing_method?: 'cost' | 'usd' | null;
+  /** The first V2 write (migration or create), or null. */
+  v2_since?: string | null;
 }
 
 /** Everything the engine stores about one product, read in one snapshot. */
@@ -103,7 +110,14 @@ export interface ProductPricingData {
   config_version: number;
   direct_purchase?: DirectPurchaseOverlay | null;
   direct_purchase_available?: boolean;
+  /** Pricing V2: the product's points, discounts and results (v2/store.ts `loadV2Store`); absent until loaded, null when 0189 is not installed. */
+  v2?: import('./v2/store').V2Store | null;
 }
+
+/** The state columns every reader selects; 0189 adds the method and its first V2 write. */
+const STATE_COLUMNS_V1 = 'product_id, mode, inputs_seq, write_seq, opted_out_at';
+const STATE_COLUMNS = `${STATE_COLUMNS_V1}, pricing_method, v2_since`;
+const isMissingStateColumn = (e: unknown): boolean => /no such column/i.test(e instanceof Error ? e.message : String(e)) && /pricing_method|v2_since/i.test(e instanceof Error ? e.message : String(e));
 
 /** One product's store, in one batch (one snapshot). */
 export async function loadProductPricing(db: D1Database, productId: string): Promise<ProductPricingData> {
@@ -114,14 +128,24 @@ export async function loadProductPricing(db: D1Database, productId: string): Pro
 export async function loadProductsPricing(db: D1Database, ids: readonly string[]): Promise<Map<string, ProductPricingData>> {
   const unique = [...new Set(ids)];
   const list = JSON.stringify(unique);
-  const [state, inputs, rules, control] = await db.batch([
-    db.prepare('SELECT product_id, mode, inputs_seq, write_seq, opted_out_at FROM product_pricing_state WHERE product_id IN (SELECT value FROM json_each(?))').bind(list),
-    db.prepare(`SELECT ${INPUT_COLUMNS.join(', ')} FROM pricing_inputs WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY product_id, scope, scope_id, origin`).bind(list),
-    db
-      .prepare(`SELECT ${RULE_COLUMNS.join(', ')} FROM pricing_rules WHERE product_id IS NULL OR product_id IN (SELECT value FROM json_each(?)) ORDER BY id`)
-      .bind(list),
-    db.prepare('SELECT config_version FROM pricing_engine_control WHERE id = 1'),
-  ]);
+  const read = (stateColumns: string) =>
+    db.batch([
+      db.prepare(`SELECT ${stateColumns} FROM product_pricing_state WHERE product_id IN (SELECT value FROM json_each(?))`).bind(list),
+      db.prepare(`SELECT ${INPUT_COLUMNS.join(', ')} FROM pricing_inputs WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY product_id, scope, scope_id, origin`).bind(list),
+      db
+        .prepare(`SELECT ${RULE_COLUMNS.join(', ')} FROM pricing_rules WHERE product_id IS NULL OR product_id IN (SELECT value FROM json_each(?)) ORDER BY id`)
+        .bind(list),
+      db.prepare('SELECT config_version FROM pricing_engine_control WHERE id = 1'),
+    ]);
+  let batch: D1Result[];
+  try {
+    batch = await read(STATE_COLUMNS);
+  } catch (e) {
+    // A database without 0189 (a deploy ahead of its migration): no product is V2, the state reads as before.
+    if (!isMissingStateColumn(e)) throw e;
+    batch = await read(STATE_COLUMNS_V1);
+  }
+  const [state, inputs, rules, control] = batch;
   const states = ((state as D1Result<PricingStateRow>).results ?? []) as PricingStateRow[];
   const inputRows = ((inputs as D1Result<StoredInputRow>).results ?? []) as StoredInputRow[];
   const ruleRows = ((rules as D1Result<StoredRuleRow>).results ?? []) as StoredRuleRow[];
@@ -476,7 +500,7 @@ export interface PricingAuditRow {
   /** Set when another row of the batch names this one (product_pricing_state.activation_audit_id). */
   id?: string;
   /** 'run': one automatic repricing run (FX-5), product_id null, counts only. */
-  entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode' | 'run';
+  entity: 'input' | 'rule' | 'product_write' | 'sku_price' | 'engine_mode' | 'run' | 'migration';
   entity_key: string;
   product_id: string | null;
   action:
@@ -489,7 +513,11 @@ export interface PricingAuditRow {
     | 'rule_convert'
     | 'engine_exit'
     | 'reprice_auto'
-    | 'run_finished';
+    | 'run_finished'
+    // Pricing V2 (spec §3.9, C-12): 0181's own vocabulary, never extended.
+    | 'create'
+    | 'delete'
+    | 'migrate_commit';
   before?: unknown;
   after?: unknown;
   summary?: Record<string, unknown>;

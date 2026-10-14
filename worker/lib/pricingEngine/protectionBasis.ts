@@ -27,6 +27,7 @@
 import { ceilProcurementExact, mulProcurementExact, procurementExact, quotientProcurementExact } from '@levonis/contracts/procurementCost';
 import { skuComboKey, skuPriceHistoryKey, type SkuChannel } from '@levonis/pricing/skuChannel';
 import { isMissingTable } from '../fx/pairs';
+import { isMissingV2Schema } from '../productOverlay';
 import { baseUsdOf } from './orderBasis';
 
 /** `price_protection` v5's effective date: orders created on or after it take the USD-base rule. */
@@ -101,39 +102,73 @@ export async function engineObservations(
   const keys = typeof combos === 'string' ? [skuComboKey({ option_value_ids: combos ? [combos] : [], color_id: null })] : [...new Set(combos)];
   if (!keys.length) return { history: [], today: null };
   try {
-    const [hist, today] = await db.batch([
-      db
-        .prepare(
-          `SELECT new_iqd, usd_iqd_rate, price_source FROM price_history
-            WHERE product_id = ? AND variant_key IN (SELECT value FROM json_each(?)) AND field = 'regular' AND new_iqd IS NOT NULL
-              AND changed_at >= ? AND changed_at <= ?`
-        )
-        .bind(productId, JSON.stringify(keys.map((k) => skuPriceHistoryKey(k, channel))), window.from, window.to),
-      db
-        .prepare(
-          `SELECT c.combo_key, c.computed_price_iqd, c.usd_iqd_rate FROM pricing_sku_costs c
-             JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
-            WHERE c.product_id = ? AND c.combo_key IN (SELECT value FROM json_each(?)) AND c.channel = ?`
-        )
-        .bind(productId, JSON.stringify(keys), channel),
-    ]);
-    const rows = ((hist as D1Result<{ new_iqd: number; usd_iqd_rate: string | null; price_source: string }>).results ?? []) as Array<{ new_iqd: number; usd_iqd_rate: string | null; price_source: string }>;
-    const todays = ((today as D1Result<{ combo_key: string; computed_price_iqd: number; usd_iqd_rate: string }>).results ?? []) as Array<{ combo_key: string; computed_price_iqd: number; usd_iqd_rate: string }>;
-    const t = keys.map((k) => todays.find((r) => r.combo_key === k)).find((r) => !!r) ?? null;
-    return {
-      history: rows
-        .filter((r) => Number.isSafeInteger(Number(r.new_iqd)) && Number(r.new_iqd) >= 0)
-        .map((r) => ({
-          price_iqd: Number(r.new_iqd),
-          usd_iqd_rate: r.usd_iqd_rate ?? null,
-          source: r.price_source === 'engine_owner' || r.price_source === 'engine_fx' ? r.price_source : 'manual',
-        })),
-      today: t ? { price_iqd: Number(t.computed_price_iqd), usd_iqd_rate: String(t.usd_iqd_rate) } : null,
-    };
+    return await observe(db, productId, keys, channel, window, true);
+  } catch (e) {
+    // A database without 0189: V1's read of today's price alone, exactly as before.
+    if (!isMissingV2Schema(e)) {
+      if (isMissingTable(e) || isMissingColumn(e)) return { history: [], today: null };
+      throw e;
+    }
+  }
+  try {
+    return await observe(db, productId, keys, channel, window, false);
   } catch (e) {
     if (isMissingTable(e) || isMissingColumn(e)) return { history: [], today: null };
     throw e;
   }
+}
+
+/**
+ * Today's engine price of the keys: V1's stored result, and — Pricing V2 (spec §3.4) — a V2 product's
+ * result (`final_price_iqd`, canonical key) in the same statement.
+ */
+function todayStatement(db: D1Database, productId: string, keys: readonly string[], channel: SkuChannel, v2: boolean): D1PreparedStatement {
+  const v1 = `SELECT c.combo_key, c.computed_price_iqd, c.usd_iqd_rate FROM pricing_sku_costs c
+             JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
+            WHERE c.product_id = ? AND c.combo_key IN (SELECT value FROM json_each(?)) AND c.channel = ?`;
+  if (!v2) return db.prepare(v1).bind(productId, JSON.stringify(keys), channel);
+  return db
+    .prepare(
+      `${v1}
+       UNION ALL
+       SELECT r.combo_key, r.final_price_iqd AS computed_price_iqd, r.usd_iqd_rate FROM pricing_v2_sku_results r
+         JOIN product_pricing_state s ON s.product_id = r.product_id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+        WHERE r.product_id = ? AND r.combo_key IN (SELECT value FROM json_each(?)) AND r.channel = ?`
+    )
+    .bind(productId, JSON.stringify(keys), channel, productId, JSON.stringify(keys), channel);
+}
+
+async function observe(
+  db: D1Database,
+  productId: string,
+  keys: readonly string[],
+  channel: SkuChannel,
+  window: { from: string; to: string },
+  v2: boolean
+): Promise<{ history: EngineObservation[]; today: EngineToday | null }> {
+  const [hist, today] = await db.batch([
+    db
+      .prepare(
+        `SELECT new_iqd, usd_iqd_rate, price_source FROM price_history
+          WHERE product_id = ? AND variant_key IN (SELECT value FROM json_each(?)) AND field = 'regular' AND new_iqd IS NOT NULL
+            AND changed_at >= ? AND changed_at <= ?`
+      )
+      .bind(productId, JSON.stringify(keys.map((k) => skuPriceHistoryKey(k, channel))), window.from, window.to),
+    todayStatement(db, productId, keys, channel, v2),
+  ]);
+  const rows = ((hist as D1Result<{ new_iqd: number; usd_iqd_rate: string | null; price_source: string }>).results ?? []) as Array<{ new_iqd: number; usd_iqd_rate: string | null; price_source: string }>;
+  const todays = ((today as D1Result<{ combo_key: string; computed_price_iqd: number; usd_iqd_rate: string }>).results ?? []) as Array<{ combo_key: string; computed_price_iqd: number; usd_iqd_rate: string }>;
+  const t = keys.map((k) => todays.find((r) => r.combo_key === k)).find((r) => !!r) ?? null;
+  return {
+    history: rows
+      .filter((r) => Number.isSafeInteger(Number(r.new_iqd)) && Number(r.new_iqd) >= 0)
+      .map((r) => ({
+        price_iqd: Number(r.new_iqd),
+        usd_iqd_rate: r.usd_iqd_rate ?? null,
+        source: r.price_source === 'engine_owner' || r.price_source === 'engine_fx' ? r.price_source : 'manual',
+      })),
+    today: t ? { price_iqd: Number(t.computed_price_iqd), usd_iqd_rate: String(t.usd_iqd_rate) } : null,
+  };
 }
 
 /** ρ = ceil(P × U0 ÷ U): an engine price restated at the purchase-time rate, rounded up to the dinar. */

@@ -1,0 +1,90 @@
+/**
+ * PRICING V2 — WHAT EACH ROLE MAY READ OF A V2 EVALUATION (spec §3.1 dto.ts,
+ * §4.4 role projection, C-7; V2-3b's routes answer through these).
+ *
+ * Built from EXPLICIT ALLOW-LISTS, field by field — never by deleting keys from
+ * a richer object, so a field added to the evaluation later reaches nobody
+ * until it is listed here:
+ *   - everyone who may see the product's prices (owner and price editors): the
+ *     final IQD table, old → new, the 15% / 30% flags, whether a route is
+ *     blocked, the grouped missing codes and field NAMES, the hash;
+ *   - the owner alone (`v2_*`, every key in FINANCIAL_FIELDS): the exact IQD,
+ *     the USD ceiling, the floor and its flags, R, T, `below_cost`, U, the
+ *     dollar points and discounts — never to a price editor, whose USD view
+ *     would reveal the private applied rate (row 220, C-7).
+ * Nothing here is computed: every figure is the evaluation's own.
+ */
+import type { V2Evaluation, V2Row } from './evaluate';
+
+/** One row of the table every price editor reads: final IQD only. */
+function publicRow(r: V2Row) {
+  return {
+    combo_key: r.combo_key,
+    option_value_ids: [...r.option_value_ids],
+    color_id: r.color_id,
+    names: { ar: r.name_ar, en: r.name_en, ckb: r.name_ckb },
+    channel: r.channel,
+    price_iqd: r.new_iqd,
+    old_iqd: r.old_iqd,
+    ...(r.blocked ? { blocked: true as const } : {}),
+  };
+}
+
+/** The owner's private figures of one row (every key `v2_*`, FINANCIAL_FIELDS). */
+function ownerExtras(r: V2Row) {
+  const o = r.owner;
+  return o
+    ? {
+        v2_exact_iqd: o.exact_iqd,
+        v2_usd_ceil6: o.usd_ceil6,
+        v2_delta_usd: o.deltas_usd,
+        v2_discount_usd: o.discount_usd,
+        v2_discount_scope: o.discount_from ? { scope: o.discount_from.scope, id: o.discount_from.scope_id } : null,
+        v2_floor: o.floor,
+        v2_replacement_iqd: o.replacement_cost_iqd,
+        v2_profit_usd: o.target_profit_usd,
+        v2_below_cost: o.below_cost,
+      }
+    : null;
+}
+
+const changeOf = (r: V2Row) => ({
+  combo_key: r.combo_key,
+  names: { ar: r.name_ar, en: r.name_en, ckb: r.name_ckb },
+  channel: r.channel,
+  old_iqd: r.old_iqd,
+  new_iqd: r.new_iqd,
+  change_pct: r.change_pct,
+  large: r.large,
+  drop_flag: r.drop_flag,
+});
+
+/** A price editor's (or any non-owner admin's) view of an evaluation: final dinars, codes and names only. */
+export function v2EditorAnswer(ev: V2Evaluation) {
+  return {
+    product_id: ev.product_id,
+    v2: true as const,
+    method: ev.method,
+    complete: ev.complete,
+    codes: [...ev.codes],
+    table: ev.rows.map(publicRow),
+    changes: ev.changes.map(changeOf),
+    missing: ev.missing.map((m) => ({ code: m.code, field: m.field, level: m.level, count: m.count, first_name: m.first_name })),
+    large_change: ev.large_change,
+    drop_flag: ev.drop_flag,
+    needs_write: ev.needs_write,
+    preview_hash: ev.hash,
+  };
+}
+
+/** The owner's view: the editor's, plus the private figures per row and the dollar set behind them. */
+export function v2OwnerAnswer(ev: V2Evaluation) {
+  const base = v2EditorAnswer(ev);
+  return {
+    ...base,
+    table: ev.rows.map((r) => ({ ...publicRow(r), owner: ownerExtras(r) })),
+    v2_points: ev.points.map((p) => ({ scope: p.scope, id: p.scope_id, kind: p.kind, usd: p.usd })),
+    v2_discounts: ev.discounts.map((d) => ({ scope: d.scope, id: d.scope_id, usd: d.usd })),
+    v2_rate: ev.rates?.usd_iqd ? { usd_iqd: ev.rates.usd_iqd, version: ev.rates.pair_versions.USD_IQD } : null,
+  };
+}

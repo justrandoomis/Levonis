@@ -25,6 +25,7 @@
 import { ceilToPlaces, procurementExact, procurementExactText, quotientProcurementExact } from '@levonis/contracts/procurementCost';
 import { channelOfRoute, skuComboKey, type PreorderRoute, type SkuChannel } from '@levonis/pricing/skuChannel';
 import { isMissingTable } from '../fx/pairs';
+import { isMissingV2Schema } from '../productOverlay';
 
 export interface LineForBasis {
   /** The caller's line id. */
@@ -65,26 +66,42 @@ export function baseUsdOf(priceIqd: number, usdIqd: string): string {
   return procurementExactText(ceilToPlaces(quotientProcurementExact(procurementExact(priceIqd), procurementExact(usdIqd)), 6));
 }
 
+const V1_BASIS_SQL = `SELECT c.product_id, c.combo_key, c.channel, c.computed_price_iqd, c.usd_iqd_rate
+           FROM pricing_sku_costs c
+           JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
+          WHERE c.product_id IN (SELECT value FROM json_each(?))`;
+
+/** Pricing V2: the V2 results of V2 products (canonical keys, '' = the product itself). */
+const V2_BASIS_SQL = `SELECT r.product_id, r.combo_key, r.channel, r.final_price_iqd AS computed_price_iqd, r.usd_iqd_rate
+           FROM pricing_v2_sku_results r
+           JOIN product_pricing_state s ON s.product_id = r.product_id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+          WHERE r.product_id IN (SELECT value FROM json_each(?))`;
+
 /** The engine snapshot of each line that was bought at an engine price (see the file header). */
 export async function engineBasisOf(db: D1Database, lines: readonly LineForBasis[]): Promise<Map<string, EngineLineBasis>> {
   const out = new Map<string, EngineLineBasis>();
   const wanted = lines.filter((l) => l.product_id && Number.isSafeInteger(l.regular_iqd) && l.regular_iqd > 0 && channelOfLine(l) !== null);
   if (!wanted.length) return out;
-  let rows: Array<{ product_id: string; combo_key: string; channel: string; computed_price_iqd: number; usd_iqd_rate: string }>;
+  type BasisRow = { product_id: string; combo_key: string; channel: string; computed_price_iqd: number; usd_iqd_rate: string };
+  let rows: BasisRow[];
+  const list = JSON.stringify([...new Set(wanted.map((l) => l.product_id))]);
   try {
-    const res = await db
-      .prepare(
-        `SELECT c.product_id, c.combo_key, c.channel, c.computed_price_iqd, c.usd_iqd_rate
-           FROM pricing_sku_costs c
-           JOIN product_pricing_state s ON s.product_id = c.product_id AND s.mode = 'engine'
-          WHERE c.product_id IN (SELECT value FROM json_each(?))`
-      )
-      .bind(JSON.stringify([...new Set(wanted.map((l) => l.product_id))]))
-      .all<{ product_id: string; combo_key: string; channel: string; computed_price_iqd: number; usd_iqd_rate: string }>();
+    // Pricing V2 (spec §3.6): a V2 line's engine price is its V2 result's final price, at the U it was
+    // computed at — the same §12 snapshot; base USD keeps today's definition (C-10).
+    const res = await db.prepare(`${V1_BASIS_SQL} UNION ALL ${V2_BASIS_SQL}`).bind(list, list).all<BasisRow>();
     rows = res.results ?? [];
   } catch (e) {
-    if (isMissingTable(e)) return out;
-    throw e;
+    // A database without 0189: V1's read alone, exactly as before (no product is V2 there).
+    if (!isMissingV2Schema(e)) {
+      if (isMissingTable(e)) return out;
+      throw e;
+    }
+    try {
+      rows = (await db.prepare(V1_BASIS_SQL).bind(list).all<BasisRow>()).results ?? [];
+    } catch (e1) {
+      if (isMissingTable(e1)) return out;
+      throw e1;
+    }
   }
   for (const l of wanted) {
     const channel = channelOfLine(l)!;

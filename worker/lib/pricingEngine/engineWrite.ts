@@ -48,7 +48,8 @@
 import { pruneDirectPurchase, directPurchaseStatement, directPurchaseStore, type DirectPurchaseOverlay } from './directPurchase';
 import { resolveSkuInputs, type ChannelPrice } from '@levonis/pricing/costToPrice';
 import { currentUsdCost } from '@levonis/pricing/fxChain';
-import { skuPriceHistoryKey, type SkuChannel } from '@levonis/pricing/skuChannel';
+import { LEGACY_TARGETS_ALGORITHM } from '@levonis/pricing/legacyTargets';
+import { skuPriceHistoryKey, storedSkuKey, type SkuChannel } from '@levonis/pricing/skuChannel';
 import { ceilToPlaces, compareProcurementExact, procurementExact, procurementExactText, quotientProcurementExact } from '@levonis/contracts/procurementCost';
 import type { PricingContext } from '../../routes/cart';
 import { newId, sha256Hex } from '../crypto';
@@ -77,7 +78,7 @@ import {
   type StoredInputRow,
   type StoredRuleRow,
 } from './store';
-import { planWrites, verifyPlan, type PricePlan, type Verification } from './writer';
+import { planWrites, verifyPlan, type PlanPriceCore, type PricePlan, type Verification } from './writer';
 
 // ------------------------------------------------------------ the price image
 
@@ -438,7 +439,48 @@ export function withRuleIds(writes: readonly RuleWrite[]): RuleWrite[] {
   return writes.map((w) => (w.existing || w.new_id ? w : { ...w, new_id: newId('prule') }));
 }
 
+/**
+ * An evaluation that refuses with one code and writes nothing (`kind` null,
+ * incomplete, no hash): every V1 door handed a V2 product answers with it
+ * (spec §3.4: PRICING_V2_MANAGED), so no V1 plan, verification or batch is
+ * ever built for a product the V2 writer owns.
+ */
+export function refusedEvaluation(a: Pick<EngineEvaluationInput, 'loaded' | 'stored' | 'rates' | 'image' | 'inputs'>, code: string): EngineEvaluation {
+  const plan: PricePlan = { ok: false, codes: [code], product: null, values: [], cells: [], routes: [], prices: [], per_sku: false, sku_table: false, had_skus: false, skus: [], colors: [], variants: [] };
+  return {
+    product_id: a.loaded.id,
+    mode: a.stored.state?.mode === 'engine' ? 'engine' : 'manual',
+    kind: null,
+    complete: false,
+    codes: [code],
+    rows: [],
+    large_change: false,
+    drop_flag: false,
+    legacy_step: false,
+    cod_priced_as_direct: false,
+    review_pending: false,
+    needs_write: false,
+    hash: null,
+    plan,
+    verification: { ok: false, mismatches: [], rows: [] },
+    conversions: [],
+    rules: [],
+    inputs: [...a.inputs],
+    direct_inputs: [],
+    models: [],
+    legacy: { models: [], units: [], per_sku: false, sku_overflow: false, legacy: { algorithm: LEGACY_TARGETS_ALGORITHM, product_id: a.loaded.id, models: [], rules: [] }, option_groups: 0, typed_member_prices: false, colour_pricing: false },
+    image: a.image,
+    rates: a.rates,
+    stored: a.stored,
+  };
+}
+
+/** Pricing V2 (spec C-1): `mode = 'engine'` with a method. Every V1 door refuses such a product. */
+export const isV2Product = (stored: Pick<ProductPricingData, 'state'>): boolean => stored.state?.mode === 'engine' && !!stored.state?.pricing_method;
+
 export async function evaluateEngineWrite(a: EngineEvaluationInput): Promise<EngineEvaluation> {
+  // Pricing V2 (spec §3.4): the V1 writer never prices a V2 product — every V1 door bounces with a code.
+  if (isV2Product(a.stored)) return refusedEvaluation(a, 'PRICING_V2_MANAGED');
   if (!a.channel && !a.allChannels && a.stored.direct_purchase?.direct_only) return evaluateEngineWrite({ ...a, channel: 'direct_sale' });
   // Per SKU or per model, and which SKU rows the write replaces, both read the rung: never on a failed read.
   refuseUnreadSkus(a.loaded);
@@ -728,8 +770,86 @@ const SKU_COST_COLUMNS = [
 
 const MEMBER_NULLS = 'prime_price_iqd = NULL, pro_price_iqd = NULL, regular_adjust_iqd = NULL, prime_adjust_iqd = NULL, pro_adjust_iqd = NULL';
 /** pricing_sku_costs rows per INSERT (each row is about a kilobyte of bound JSON). */
-const SKU_COST_CHUNK = 60;
+export const SKU_COST_CHUNK = 60;
 const priceFrom = (table: string) => `(SELECT json_extract(j.value, '$.p') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = ${table}.id)`;
+
+/**
+ * THE PRICE ROWS OF ONE PLAN (writer.ts), one statement per table, in the
+ * order every engine batch writes them (V1's `engineWriteStatements` and V2's
+ * `v2WriteStatements` alike; spec §3.3 step 6):
+ *   - `products`: the plan's price, member prices and the direct surcharge
+ *     NULL, the route list with every commission 0 (V2: each one explicit);
+ *   - option values, order-type cells and routes (`surcharge_iqd` 0, member
+ *     prices and adjustments NULL — which also clears a cell's Direct Sale Extra);
+ *   - V2: the route rows the owner accepted as blocked, switched off;
+ *   - colour prices cleared, variants mirroring their SKU's direct price;
+ *   - `product_sku_prices` replaced, each key in its stored form (`storedSkuKey`:
+ *     V2's option-less product is `o:*`, spec C-3; every V1 key is unchanged).
+ */
+export function priceRowStatements<C extends PlanPriceCore>(db: D1Database, pid: string, plan: PricePlan<C>, now: string): D1PreparedStatement[] {
+  const json = (list: ReadonlyArray<{ id: string; price: number }>) => JSON.stringify(list.map((x) => ({ id: x.id, p: x.price })));
+  const skuJson = JSON.stringify(plan.skus.map((k) => ({ k: storedSkuKey(k.combo_key), c: k.channel, p: k.price })));
+  const variantJson = JSON.stringify(plan.variants.map((v) => ({ id: v.id, p: v.price })));
+  return [
+    ...(plan.product
+      ? [
+          db
+            .prepare(
+              `UPDATE products SET price_iqd = ?, prime_price_iqd = NULL, pro_price_iqd = NULL, direct_surcharge_iqd = NULL,
+                      preorder_transports = COALESCE(?, preorder_transports), updated_at = ? WHERE id = ?`
+            )
+            .bind(plan.product.price_iqd, plan.product.preorder_transports, now, pid),
+        ]
+      : []),
+    ...(plan.direct_surcharge_iqd !== undefined
+      ? [db.prepare('UPDATE products SET direct_surcharge_iqd = ?, updated_at = ? WHERE id = ?').bind(plan.direct_surcharge_iqd, now, pid)] : []),
+    ...(plan.values.length
+      ? [db.prepare(`UPDATE product_option_values SET regular_price_iqd = ${priceFrom('product_option_values')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.values), pid, json(plan.values))]
+      : []),
+    ...(plan.cells.length
+      ? [db.prepare(`UPDATE product_option_fulfillment SET regular_price_iqd = ${priceFrom('product_option_fulfillment')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.cells), pid, json(plan.cells))]
+      : []),
+    ...(plan.routes.length
+      ? [db.prepare(`UPDATE product_option_transports SET regular_price_iqd = ${priceFrom('product_option_transports')}, surcharge_iqd = 0, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.routes), pid, json(plan.routes))]
+      : []),
+    ...(plan.disable_routes?.length
+      ? [db.prepare('UPDATE product_option_transports SET enabled = 0 WHERE product_id = ? AND id IN (SELECT value FROM json_each(?))').bind(pid, JSON.stringify(plan.disable_routes))]
+      : []),
+    // FX-7 (0183): a colour's own price is cleared — its SKUs carry theirs — and a variant mirrors its SKU's
+    // direct price; the SKU rows are replaced (none when the product is priced per model).
+    ...(plan.colors.length
+      ? [
+          db
+            .prepare(`UPDATE product_colors SET regular_price_iqd = NULL, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT value FROM json_each(?))`)
+            .bind(pid, JSON.stringify(plan.colors)),
+        ]
+      : []),
+    ...(plan.variants.length
+      ? [
+          db
+            .prepare(
+              `UPDATE product_variants SET regular_price_iqd = (SELECT json_extract(j.value, '$.p') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = product_variants.id),
+                      prime_price_iqd = NULL, pro_price_iqd = NULL
+                WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`
+            )
+            .bind(variantJson, pid, variantJson),
+        ]
+      : []),
+    ...(plan.sku_table && (plan.skus.length || plan.had_skus) ? [db.prepare(`DELETE FROM product_sku_prices WHERE product_id = ?${plan.channel ? ' AND channel = ?' : ''}`).bind(pid, ...(plan.channel ? [plan.channel] : []))] : []),
+    ...(plan.sku_table && plan.skus.length
+      ? [
+          db
+            .prepare(
+              `INSERT INTO product_sku_prices (product_id, combo_key, channel, regular_price_iqd, source, write_seq, updated_at)
+               SELECT ?, json_extract(value, '$.k'), json_extract(value, '$.c'), json_extract(value, '$.p'), 'ENGINE',
+                      COALESCE((SELECT write_seq FROM product_pricing_state WHERE product_id = ?), 0) + 1, ?
+                 FROM json_each(?)`
+            )
+            .bind(pid, pid, now, skuJson),
+        ]
+      : []),
+  ];
+}
 
 /**
  * FX-5: an AUTOMATIC repricing of an engine product after a confirmed rate
@@ -778,7 +898,6 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
   const auditId = newId('paud');
   const batchId = `${auto ? 'fx' : 'pe'}_${newId()}`;
   const plan = ev.plan;
-  const json = (list: ReadonlyArray<{ id: string; price: number }>) => JSON.stringify(list.map((x) => ({ id: x.id, p: x.price })));
   const today = (comboKey: string, channel: SkuChannel) => ev.rows.find((r) => r.combo_key === comboKey && r.channel === channel)?.old_iqd ?? null;
   const history = writePrices
     ? plan.prices
@@ -789,8 +908,6 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
   // The private figures in chunks, so one bound JSON never nears D1's value cap (a SKU grid of 240 × 4 rows).
   const costChunks: Array<typeof skuRows> = [];
   for (let i = 0; i < skuRows.length; i += SKU_COST_CHUNK) costChunks.push(skuRows.slice(i, i + SKU_COST_CHUNK));
-  const skuJson = JSON.stringify(plan.skus.map((k) => ({ k: k.combo_key, c: k.channel, p: k.price })));
-  const variantJson = JSON.stringify(plan.variants.map((v) => ({ id: v.id, p: v.price })));
   const auditActor = o.auditActor === undefined ? o.actor : o.auditActor;
   let revisedOverlay = pruneDirectPurchase(ev.stored, inputWrites, ruleWrites);
   if (!plan.channel && ev.stored.direct_purchase?.direct_only) revisedOverlay = { ...(revisedOverlay ?? ev.stored.direct_purchase), direct_only: false, version: (ev.stored.direct_purchase?.version ?? 0) + 1 };
@@ -826,60 +943,7 @@ export async function engineWriteStatements(db: D1Database, ev: EngineEvaluation
         .bind(c.amount_usd, c.legacy_amount_iqd, c.usd_iqd_rate, o.actor, o.now, c.rule.id, c.rule.version)
     ),
     // The price rows (writer.ts), one statement per table — none when an automatic repricing moves no customer price.
-    ...(writePrices && plan.product
-      ? [
-          db
-            .prepare(
-              `UPDATE products SET price_iqd = ?, prime_price_iqd = NULL, pro_price_iqd = NULL, direct_surcharge_iqd = NULL,
-                      preorder_transports = COALESCE(?, preorder_transports), updated_at = ? WHERE id = ?`
-            )
-            .bind(plan.product!.price_iqd, plan.product!.preorder_transports, o.now, pid),
-        ]
-      : []),
-    ...(writePrices && plan.direct_surcharge_iqd !== undefined
-      ? [db.prepare('UPDATE products SET direct_surcharge_iqd = ?, updated_at = ? WHERE id = ?').bind(plan.direct_surcharge_iqd, o.now, pid)] : []),
-    ...(writePrices && plan.values.length
-      ? [db.prepare(`UPDATE product_option_values SET regular_price_iqd = ${priceFrom('product_option_values')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.values), pid, json(plan.values))]
-      : []),
-    ...(writePrices && plan.cells.length
-      ? [db.prepare(`UPDATE product_option_fulfillment SET regular_price_iqd = ${priceFrom('product_option_fulfillment')}, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.cells), pid, json(plan.cells))]
-      : []),
-    ...(writePrices && plan.routes.length
-      ? [db.prepare(`UPDATE product_option_transports SET regular_price_iqd = ${priceFrom('product_option_transports')}, surcharge_iqd = 0, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`).bind(json(plan.routes), pid, json(plan.routes))]
-      : []),
-    // FX-7 (0183): a colour's own price is cleared — its SKUs carry theirs — and a variant mirrors its SKU's
-    // direct price; the SKU rows are replaced (none when the product is priced per model).
-    ...(writePrices && plan.colors.length
-      ? [
-          db
-            .prepare(`UPDATE product_colors SET regular_price_iqd = NULL, ${MEMBER_NULLS} WHERE product_id = ? AND id IN (SELECT value FROM json_each(?))`)
-            .bind(pid, JSON.stringify(plan.colors)),
-        ]
-      : []),
-    ...(writePrices && plan.variants.length
-      ? [
-          db
-            .prepare(
-              `UPDATE product_variants SET regular_price_iqd = (SELECT json_extract(j.value, '$.p') FROM json_each(?) j WHERE json_extract(j.value, '$.id') = product_variants.id),
-                      prime_price_iqd = NULL, pro_price_iqd = NULL
-                WHERE product_id = ? AND id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`
-            )
-            .bind(variantJson, pid, variantJson),
-        ]
-      : []),
-    ...(writePrices && plan.sku_table && (plan.skus.length || plan.had_skus) ? [db.prepare(`DELETE FROM product_sku_prices WHERE product_id = ?${plan.channel ? ' AND channel = ?' : ''}`).bind(pid, ...(plan.channel ? [plan.channel] : []))] : []),
-    ...(writePrices && plan.sku_table && plan.skus.length
-      ? [
-          db
-            .prepare(
-              `INSERT INTO product_sku_prices (product_id, combo_key, channel, regular_price_iqd, source, write_seq, updated_at)
-               SELECT ?, json_extract(value, '$.k'), json_extract(value, '$.c'), json_extract(value, '$.p'), 'ENGINE',
-                      COALESCE((SELECT write_seq FROM product_pricing_state WHERE product_id = ?), 0) + 1, ?
-                 FROM json_each(?)`
-            )
-            .bind(pid, pid, o.now, skuJson),
-        ]
-      : []),
+    ...(writePrices ? priceRowStatements(db, pid, plan, o.now) : []),
     // Owner decision 6's observations: the engine price and the U it was computed at
     // (`engine_fx` for an automatic repricing that only exchange rates moved).
     ...(history.length
