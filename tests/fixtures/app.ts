@@ -253,9 +253,17 @@ export function stubApp(
   db: unknown,
   user: StubUser | null,
   mount: Mount,
-  opts: { host?: string; env?: Record<string, unknown>; sessionAgeSeconds?: number } = {}
+  opts: { host?: string; env?: Record<string, unknown>; sessionAgeSeconds?: number; publishV2?: boolean } = {}
 ) {
   const a = new Hono<AppContext>();
+  // The clean start (A.12.1): seeded raw products are V2-published before a customer request
+  // (tests/fixtures/autoPublish.ts); `publishV2: false` keeps them as the cut-over left them.
+  if (opts.publishV2 !== false) {
+    a.use('*', async (c, next) => {
+      if (!c.req.path.startsWith('/api/admin')) await (await import('./autoPublish')).autoPublishV2(db);
+      await next();
+    });
+  }
   a.use('*', async (c, next) => {
     c.set('host', classifyHost(opts.host ?? APEX, APEX));
     // A signed-in stub is a FRESH sign-in unless the test says otherwise: an

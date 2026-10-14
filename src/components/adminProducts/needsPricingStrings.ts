@@ -50,7 +50,7 @@ export const NEEDS_PRICING = {
   composition: { ar: 'حزمة — بانتظار قرار التسعير', en: 'Bundle — awaiting a pricing decision', ckb: 'پاکێج — چاوەڕێی بڕیاری نرخدانانە' },
   page: { ar: 'صفحة', en: 'Page', ckb: 'پەڕە' },
   prev: { ar: 'السابق', en: 'Previous', ckb: 'پێشوو' },
-  next: { ar: 'التالي', en: 'Next', ckb: 'دواتر' },
+  next: { ar: 'التالي', en: 'Next', ckb: 'پەڕەی دواتر' },
   filters: {
     all: { ar: 'الكل', en: 'All', ckb: 'هەموو' },
     ready: { ar: 'جاهز للنشر', en: 'Ready to publish', ckb: 'ئامادەیە بۆ بڵاوکردنەوە' },
