@@ -39,7 +39,7 @@ import { applyReturnSerials, returnedUnits, serialAssignmentsInstalled } from '.
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, requireAdmin, badRequest, notFound, int, str, oneOf } from '../lib/http';
+import { requireAuth, requireAdmin, badRequest, conflict, notFound, int, str, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { emitFromRequest, eventsEnabled } from '../lib/eventBus';
@@ -59,6 +59,7 @@ import { resolveReturnedOriginIds, planUnsellableOriginReturn, type ReturnedOrig
 import { operationsInstalled, baghdadDay } from '../lib/operations';
 import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
 import { calculateGoods, spread, type GoodsLine } from '../lib/orderProfit';
+import { paidNetUnit } from '../lib/paidNet';
 import { validateInvestorReturnEvidence } from '../lib/investorFinance';
 import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
 import { mysteryRefusal } from '../lib/mystery/issues';
@@ -70,6 +71,11 @@ import { channelOfLine } from '../lib/pricingEngine/orderBasis';
 import { claimBasis, engineCombosOf, engineObservations, takesUsdBaseRule, usdIqdInForceAt } from '../lib/pricingEngine/protectionBasis';
 import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/conditionProjection';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { PRICE_PROTECTION_OWNER_LINE_IQD } from '../../packages/contracts/src/moneyAuthority';
+import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
+import { isOwner } from '../lib/adminScope';
+import { closedClaimSql } from '../lib/deviceOps';
+import { returnWinsStatements, tradedUnitsSql, tradeInInstalled, tradeInsOnLine } from '../lib/tradeIn';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -134,6 +140,57 @@ interface ReturnCaseRow extends Record<string, unknown> {
   admin_note: string;
   decided_by: string | null;
   decided_at: string | null;
+}
+
+/**
+ * ONE MONEY PROCESS PER UNIT (Services V2 plan §1.3) — what a return case
+ * touches. A case that names its device answers for that device; one that
+ * does not answers for every device of the line, and for a legacy claim
+ * filed on the line itself. Positional binds: `claimTargetBinds`.
+ */
+function claimTargetSql(byUnit: boolean): string {
+  return byUnit
+    ? 'wc.unit_id = ?'
+    : '(wc.unit_id IN (SELECT id FROM order_item_units WHERE order_item_id = ?) OR (wc.unit_id IS NULL AND wc.order_item_id = ?))';
+}
+function claimTargetBinds(kase: { unit_id?: string | null; order_item_id: string }): string[] {
+  return kase.unit_id ? [kase.unit_id] : [kase.order_item_id, kase.order_item_id];
+}
+
+/**
+ * An OPEN warranty claim on what a NEW return case covers: the device it
+ * names (`?1` = the unit id), or every device of its lines and a legacy claim
+ * filed on one of them (`?1` = the line ids, JSON). One predicate for the
+ * read, the in-batch fence and the honest refusal after an abort.
+ */
+function openClaimOnCaseSql(byUnit: boolean): string {
+  return byUnit
+    ? `EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.unit_id = ?1 AND NOT ${closedClaimSql('wc')})`
+    : `EXISTS (SELECT 1 FROM warranty_claims wc
+         WHERE (wc.unit_id IN (SELECT id FROM order_item_units WHERE order_item_id IN (SELECT value FROM json_each(?1)))
+                OR (wc.unit_id IS NULL AND wc.order_item_id IN (SELECT value FROM json_each(?1))))
+           AND NOT ${closedClaimSql('wc')})`;
+}
+
+/**
+ * Would refunding this case take back a device a trade-in holds? A case that
+ * names its device: is it in a traded slot. One that does not: do the traded
+ * slots, the units already refunded and this case add up to more than the
+ * line holds.
+ */
+async function refundTakesTradedUnit(db: D1Database, kase: Pick<ReturnCaseRow, 'id' | 'order_item_id' | 'unit_id' | 'qty'>): Promise<boolean> {
+  const tradeIns = await tradeInsOnLine(db, kase.order_item_id);
+  if (!tradeIns.length) return false;
+  if (kase.unit_id) return tradeIns.some((t) => t.unitIds.includes(kase.unit_id!));
+  const [line, refunded] = await Promise.all([
+    db.prepare('SELECT qty FROM order_items WHERE id = ?').bind(kase.order_item_id).first<{ qty: number }>(),
+    db
+      .prepare("SELECT COALESCE(SUM(qty), 0) AS n FROM return_cases WHERE order_item_id = ? AND id <> ? AND state = 'resolved' AND resolution = 'refund'")
+      .bind(kase.order_item_id, kase.id)
+      .first<{ n: number }>(),
+  ]);
+  const traded = tradeIns.reduce((n, t) => n + t.units, 0);
+  return traded + (Number(refunded?.n) || 0) + (Number(kase.qty) || 1) > (Number(line?.qty) || 1);
 }
 
 function casePublic(r: ReturnCaseRow, extra: Record<string, unknown> = {}) {
@@ -467,9 +524,41 @@ returnRoutes.post('/', async (c) => {
     throw badRequest('The requested quantity exceeds what remains returnable for this item', 'QTY_EXCEEDED');
   }
 
+  // ---- ONE MONEY PROCESS PER UNIT (Services V2 plan §1.3) -----------------
+  // A device on the repair desk is handled there — one door per defect: an
+  // open warranty request refuses a return of the same device (the team
+  // turns it into a return when that is the remedy).
+  // The device the case names, or every device of the lines it covers.
+  const claimScope = { unitId: unitId || null, lineIds: JSON.stringify(quotaTargets.map((t) => t.id)) };
+  const warrantyClaimOpen = () =>
+    conflict('This device has an open warranty request. Follow it from Warranty & maintenance; our team turns it into a return if needed.', 'WARRANTY_CLAIM_OPEN');
+  const claimOpenNow = await c.env.DB.prepare(`SELECT ${openClaimOnCaseSql(!!claimScope.unitId)} AS open`)
+    .bind(claimScope.unitId ?? claimScope.lineIds)
+    .first<{ open: number }>();
+  if (claimOpenNow?.open) throw warrantyClaimOpen();
+  // A trade-in of the same device: before its credit is spent, THE RETURN
+  // WINS and the trade-in is cancelled in the same batch as the case; once a
+  // live order holds the credit, or the exchange is complete, the return is
+  // refused here (support decides). Trade-ins never take a bundle line.
+  const tradeInCancels: Array<Awaited<ReturnType<typeof tradeInsOnLine>>[number]> = [];
+  if (!bundleChildren.length) {
+    const tradeIns = await tradeInsOnLine(c.env.DB, orderItemId);
+    const traded = tradeIns.reduce((n, t) => n + t.units, 0);
+    const affected = unitId
+      ? tradeIns.filter((t) => t.unitIds.includes(unitId))
+      : traded + (usedByItem.get(orderItemId) ?? 0) + qty > Number(item.item_qty)
+        ? tradeIns
+        : [];
+    if (affected.some((t) => t.committed)) {
+      throw conflict('This device is part of a trade-in whose credit is in use or which is complete, so it cannot be returned here. Contact support.', 'TRADE_IN_ACTIVE');
+    }
+    tradeInCancels.push(...affected);
+  }
+
   const nowIso = new Date(now).toISOString();
   const caseFor = (targetItemId: string, caseQty: number) => {
     const caseId = newId('ret');
+    const caseUnit = targetItemId === orderItemId ? unitId || null : null;
     return {
       id: caseId,
       statement: c.env.DB.prepare(
@@ -480,7 +569,7 @@ returnRoutes.post('/', async (c) => {
         caseId,
         item.order_id,
         targetItemId,
-        targetItemId === orderItemId ? unitId || null : null,
+        caseUnit,
         user.id,
         caseQty,
         reason,
@@ -502,7 +591,33 @@ returnRoutes.post('/', async (c) => {
     ? bundleChildren.map((k) => caseFor(k.id, childCaseQty(k)))
     : [caseFor(orderItemId, qty)];
   const id = cases[0].id;
-  await c.env.DB.batch(cases.map((k) => k.statement));
+  const cancels = (await Promise.all(tradeInCancels.map((t) => returnWinsStatements(c.env.DB, t.request, user.id, id, nowIso)))).flat();
+  /**
+   * ONE DOOR PER DEFECT, INSIDE THE BATCH (plan §1.3): the read above asked
+   * again after the case is written — a warranty request opened in between
+   * turns the first case's quantity negative, the table's CHECK (qty > 0)
+   * aborts the whole batch, and nothing is written; otherwise it touches no
+   * row. One statement whatever the bundle's size.
+   */
+  const claimFence = c.env.DB.prepare(
+    `UPDATE return_cases SET qty = -1 WHERE id = ?2 AND ${openClaimOnCaseSql(!!claimScope.unitId)}`
+  ).bind(claimScope.unitId ?? claimScope.lineIds, id);
+  try {
+    await c.env.DB.batch([...cases.map((k) => k.statement), claimFence, ...cancels]);
+  } catch (e) {
+    if (!/NOT NULL|constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    // Nothing was written. A warranty request opened on the device meanwhile:
+    // the repair desk has it. Otherwise a trade-in moved (its credit spent, or
+    // cancelled by its owner): try again.
+    const open = await c.env.DB.prepare(`SELECT ${openClaimOnCaseSql(!!claimScope.unitId)} AS open`)
+      .bind(claimScope.unitId ?? claimScope.lineIds)
+      .first<{ open: number }>();
+    if (open?.open) throw warrantyClaimOpen();
+    if (cancels.length) {
+      throw conflict('The trade-in on this device changed while the return was being opened. Refresh and try again.', 'TRADE_IN_STALE');
+    }
+    throw e;
+  }
 
   await audit(c.env.DB, user.id, 'return.request', id, { order_id: item.order_id, order_item_id: orderItemId, qty, reason });
   /**
@@ -630,6 +745,10 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   if ((to === 'rejected' || resolution === 'declined') && !reason) {
     throw badRequest('A reason is required when rejecting or declining a return');
   }
+  // A REFUND MOVES MONEY (owner decision 3, PP-B1): an assistant moves the
+  // case through collection and inspection, never to a refund. The amount is
+  // the server's own (what was paid), so a financial admin refunds it in full.
+  const refundGrant = to === 'resolved' && resolution === 'refund' ? assertMoneyAuthority(c, { act: 'return_refund' }) : null;
 
   const nowIso = new Date().toISOString();
   let returnedOrigins: ReturnedOriginSelection | undefined;
@@ -638,6 +757,16 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   if (to === 'resolved' && resolution === 'refund') {
     await validateInvestorReturnEvidence(c.env.DB, id);
     await refuseProtectedReturn(c.env.DB, kase.order_item_id);
+    // ONE MONEY PROCESS PER UNIT (plan §1.3): no refund for a device that is
+    // on the repair desk, or that a trade-in still holds (its credit spent or
+    // the exchange done) — the same questions the refund batch asks again.
+    if (await c.env.DB.prepare(`SELECT 1 FROM warranty_claims wc WHERE ${claimTargetSql(!!kase.unit_id)} AND NOT ${closedClaimSql('wc')} LIMIT 1`)
+      .bind(...claimTargetBinds(kase)).first()) {
+      throw badRequest('This device has an open warranty request. Close it before refunding the return.', 'WARRANTY_CLAIM_OPEN');
+    }
+    if (await refundTakesTradedUnit(c.env.DB, kase)) {
+      throw badRequest('This device is part of a trade-in whose credit is in use or which is complete, so it cannot be refunded.', 'TRADE_IN_ACTIVE');
+    }
     // 0178 §14: serials scanned at inspection (or explicit unit ids) must be
     // devices of THIS line and THIS buyer — refused before any money moves
     // (critique M6: the customer's own unit pick is never trusted alone).
@@ -761,9 +890,12 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
           OR (SELECT qty FROM (${priorSql}))<>?
           OR (SELECT amount FROM (${priorSql}))<>?
           OR ?>?
-          OR EXISTS(SELECT 1 FROM price_protection_claims ppc WHERE ppc.order_item_id=? AND ppc.state IN ('approved','credited'))`)
+          OR EXISTS(SELECT 1 FROM price_protection_claims ppc WHERE ppc.order_item_id=? AND ppc.state IN ('approved','credited'))
+          OR EXISTS(SELECT 1 FROM warranty_claims wc WHERE ${claimTargetSql(!!kase.unit_id)} AND NOT ${closedClaimSql('wc')})
+          OR ${tradedUnitsSql(await tradeInInstalled(c.env.DB))}+?>?`)
         .bind(newId('return_guard'), kase.order_id, item.id, kase.user_id, id, from,
-          item.id, id, prior.qty, item.id, id, prior.amount, prior.qty + kase.qty, itemQty, item.id);
+          item.id, id, prior.qty, item.id, id, prior.amount, prior.qty + kase.qty, itemQty, item.id,
+          ...claimTargetBinds(kase), item.id, prior.qty + kase.qty, itemQty);
 
       // WE MAY ONLY GIVE BACK MONEY WE ACTUALLY TOOK.
       //
@@ -919,6 +1051,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
 
   await audit(c.env.DB, admin.id, 'return.transition', id, {
     from, to, resolution, reason,
+    ...(refundGrant ? { authority: refundGrant.audit } : {}),
     refund: refundResult
       ? {
           amount_iqd: refundResult.amount_iqd,
@@ -1086,43 +1219,24 @@ async function refuseReturnedProtection(db: D1Database, itemId: string, opts: { 
   if (overlap) throw badRequest(serverMessage('PRICE_PROTECTION_RETURN_REVIEW'), 'PRICE_PROTECTION_RETURN_REVIEW');
 }
 
-/** Customer protection uses the same frozen coupon/points shipping-share
- * allocation as returns, plus the recorded membership and accepted price
- * adjustment. It excludes warranty/transport fees and never exceeds the
- * accepted invoice. Current membership rules and finance report overrides
- * are not customer payment facts and never enter this calculation. */
+/** WHAT WAS PAID FOR ONE UNIT — the shared paid-net rule (Services V2 plan
+ * §3.2, packages/pricing/src/paidNet.ts; worker/lib/paidNet.ts reads the
+ * facts): the unit merchandise without warranty or transport fees, less the
+ * frozen membership, the line's own discount and its share of the order
+ * coupon and points, plus the accepted price adjustment; never above what
+ * the order charged. A trade-in credit counts as paid (owner decision 5).
+ * Trade-in reads the very same figure. Current membership rules and finance
+ * report overrides are not customer payment facts and never enter it. */
 async function protectionPaidUnit(db: D1Database, orderId: string, itemId: string): Promise<{ unit: number; orderTotal: number }> {
-  const [order, result] = await Promise.all([
-    db.prepare('SELECT * FROM orders WHERE id=?').bind(orderId).first<Record<string, unknown>>(),
-    db.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY id').bind(orderId).all<GoodsLine>(),
-  ]);
-  const items = result.results ?? [], item = items.find(line => line.id === itemId);
-  if (!order || !item) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
-  const member = calculateGoods({ ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 },
-    items.map(line => ({ ...line, coupon_discount_iqd: 0 })), []);
-  const accepted = calculateGoods(order, items, []);
-  const coupon = safeParse<{ discount_iqd?: number } | null>(order.coupon_snapshot as string | null, null);
-  const discounts = (coupon ? Number(coupon.discount_iqd) || 0 : 0) + (Number(order.points_discount_iqd) || 0);
-  const invoiceBasis = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
-  const paid = accepted.lines.map(line => {
-    const qty = Math.max(1, Number(line.qty) || 1);
-    const allocation = line.component_alloc_iqd === null || line.component_alloc_iqd === undefined ? null : Number(line.component_alloc_iqd);
-    const merchandise = allocation ?? unitMerchandiseIqd({ qty, unit_price_iqd: Number(line.unit_price_iqd) || 0,
-      pricing_snapshot: line.pricing_snapshot as string | null, warranty_snapshot: line.warranty_snapshot as string | null,
-      transport_snapshot: line.transport_snapshot as string | null }) * qty;
-    const gross = allocation ?? (Number(line.unit_price_iqd) || 0) * qty;
-    const memberLine = member.lines.find(v => v.id === line.id);
-    if (!memberLine) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
-    const membership = Math.max(0, gross - memberLine.net_goods_iqd);
-    const discount = invoiceBasis > 0 ? Math.floor(discounts * gross / invoiceBasis) : 0;
-    return Math.max(0, merchandise - membership - discount + line.price_adjustment_iqd);
-  });
-  const total = paid.reduce((sum, value) => sum + value, 0);
-  const orderTotal = Math.max(0, Number(order.total_iqd) || 0);
-  const capped = total > orderTotal ? spread(orderTotal, paid) : paid;
-  const index = accepted.lines.findIndex(line => line.id === itemId);
-  if (index < 0) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
-  return { unit: Math.floor(capped[index] / Math.max(1, Number(item.qty) || 1)), orderTotal };
+  const paid = await paidNetUnit(db, orderId, itemId);
+  if (!paid) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
+  return paid;
+}
+
+/** Units of a line held by a trade-in (draft to complete): each slot counts once, whatever part was claimed. */
+async function tradedUnitsOnLine(db: D1Database, orderItemId: string): Promise<number> {
+  const row = await db.prepare(`SELECT ${tradedUnitsSql(await tradeInInstalled(db))} AS n`).bind(orderItemId).first<{ n: number }>();
+  return Number(row?.n) || 0;
 }
 
 /** Prior protection credits already granted for the same order item. */
@@ -1206,6 +1320,15 @@ priceProtectionRoutes.post('/claims', async (c) => {
     .bind(orderItemId)
     .first();
   if (pending) throw badRequest('A claim for this item is already awaiting review', 'CLAIM_PENDING');
+
+  // A UNIT HANDED IN FOR A TRADE-IN IS NOT PRICE-PROTECTED (PP-B8; plan §1.3).
+  // The trade-in valued it on what was paid; protecting it as well pays the
+  // same fall twice. Its claim rows exist from the draft until it is
+  // cancelled, so a live or completed trade-in takes its units out of the
+  // claim; a line all of whose units are traded in is refused.
+  const tradedUnits = await tradedUnitsOnLine(c.env.DB, orderItemId);
+  const coveredQty = Math.max(0, (Number(item.qty) || 1) - tradedUnits);
+  if (coveredQty <= 0) throw badRequest('This device is part of a trade-in, so price protection does not cover it.', 'TRADE_IN_UNIT');
 
   // The price CLASS the buyer actually had, from the checkout snapshot — a
   // regular buyer is never compared against a PRO-only price.
@@ -1355,7 +1478,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
     throw badRequest('No eligible price drop was found for this item within the window', 'NO_ELIGIBLE_DROP');
   }
 
-  const qty = Number(item.qty) || 1;
+  const qty = coveredQty;
   const eligibleTotal = perUnitDrop * qty;
   const prior = await priorCreditedIqd(c.env.DB, orderItemId);
   const computed = Math.max(0, eligibleTotal - prior);
@@ -1462,7 +1585,15 @@ priceProtectionRoutes.get('/admin/claims', requireAdmin, async (c) => {
  * (wtx_pp_<claimId>) and re-applies the cumulative cap at decision time so
  * concurrent claims can never overcompensate the same item.
  */
-priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) => {
+/**
+ * WHO DECIDES (owner decision 3, worker/lib/moneyAuthority.ts; PP-B1). An
+ * assistant decides nothing — approving credits a wallet and rejecting ends
+ * the customer's claim. A financial admin approves up to the owner line
+ * (`PRICE_PROTECTION_OWNER_LINE_IQD`, computed credit); above it, or when the
+ * approver wrote a price row of this product inside the claim's window (four
+ * eyes), the owner approves, with a reason.
+ */
+priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMoneyAuthority('price_protection_decide'), async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = await c.req.json().catch(() => ({}));
@@ -1493,6 +1624,11 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
 
   if (claim.state !== 'requested') throw badRequest('This claim was already decided');
   await refuseReturnedProtection(c.env.DB, claim.order_item_id, { openReturns: true });
+  // A unit that went into a trade-in since the claim was filed is no longer covered (PP-B8).
+  const lineQty = Number((await c.env.DB.prepare('SELECT qty FROM order_items WHERE id = ?').bind(claim.order_item_id).first<{ qty: number }>())?.qty) || 1;
+  const tradedUnits = await tradedUnitsOnLine(c.env.DB, claim.order_item_id);
+  const coveredQty = Math.min(Number(claim.qty) || 1, Math.max(0, lineQty - tradedUnits));
+  if (coveredQty <= 0) throw badRequest('This device is part of a trade-in, so price protection does not cover it.', 'TRADE_IN_UNIT');
   // Owner decision 6: v5 claims credit their eligible USD-base reduction.
   // Both this cumulative amount and the absence of a return are checked again
   // in the same transaction as the decision and actual wallet credit.
@@ -1500,7 +1636,7 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
   const actualDrop = Math.max(0, Math.min(claim.original_unit_iqd, paid.unit) - claim.observed_unit_iqd);
   const perUnit = Math.min(claim.eligible_unit_iqd ?? actualDrop, actualDrop);
   if (perUnit <= 0) throw badRequest('No eligible price drop remains against the amount paid for this item', 'NO_ELIGIBLE_DROP');
-  const eligibleTotal = Math.max(0, perUnit * claim.qty);
+  const eligibleTotal = Math.max(0, perUnit * coveredQty);
   const unresolvedPrior = await c.env.DB.prepare("SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>? LIMIT 1")
     .bind(claim.order_item_id, id).first();
   if (unresolvedPrior) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
@@ -1509,6 +1645,23 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
   if (credit <= 0) {
     throw badRequest('Earlier credits already cover the eligible difference — nothing left to credit', 'ALREADY_COMPENSATED');
   }
+  // Four eyes: a non-owner who wrote a price row of this product inside the
+  // claim's window does not approve the credit that row created.
+  const window = safeParse<{ window?: { from?: unknown; to?: unknown } }>(claim.policy_snapshot, {}).window;
+  const priceAuthor = !isOwner(c.env, admin) && typeof window?.from === 'string' && typeof window?.to === 'string'
+    ? !!(await c.env.DB.prepare(
+        `SELECT 1 FROM price_history WHERE changed_by = ?
+            AND product_id = (SELECT product_id FROM order_items WHERE id = ?)
+            AND changed_at >= ? AND changed_at <= ? LIMIT 1`
+      ).bind(admin.id, claim.order_item_id, window.from, window.to).first())
+    : false;
+  const grant = assertMoneyAuthority(c, {
+    act: 'price_protection_decide',
+    amountIqd: credit,
+    ceilingIqd: PRICE_PROTECTION_OWNER_LINE_IQD,
+    conflictOfInterest: priceAuthor,
+    reason,
+  });
   const order = await c.env.DB.prepare('SELECT exchange_rate FROM orders WHERE id = ?')
     .bind(claim.order_id).first<{ exchange_rate: number }>();
   const rate = Math.trunc(Number(order?.exchange_rate)) || 1400;
@@ -1528,9 +1681,11 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
         WHERE order_item_id=? AND state IN ('approved','credited') AND id<>?)<>?
       OR EXISTS(SELECT 1 FROM return_cases WHERE order_item_id=? AND ${RETURN_BLOCKS_PROTECTION_SQL})
       OR EXISTS(SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>?)
-      OR (SELECT total_iqd FROM orders WHERE id=?) IS NOT ?`)
+      OR (SELECT total_iqd FROM orders WHERE id=?) IS NOT ?
+      OR ${tradedUnitsSql(await tradeInInstalled(db))}<>?`)
     .bind(newId('pp_guard'), claim.user_id, claim.order_id, claim.order_item_id,
-      id, claim.order_item_id, id, prior, claim.order_item_id, claim.order_item_id, id, claim.order_id, paid.orderTotal);
+      id, claim.order_item_id, id, prior, claim.order_item_id, claim.order_item_id, id, claim.order_id, paid.orderTotal,
+      claim.order_item_id, tradedUnits);
   try {
     await db.batch([
       guard,
@@ -1560,7 +1715,7 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, async (c) =
     }, { aggregateId: claim.user_id, actorId: admin.id });
   }
 
-  await audit(c.env.DB, admin.id, 'price_protection.approve', id, { credited_iqd: credit, usd_cents: cents, reason });
+  await audit(c.env.DB, admin.id, 'price_protection.approve', id, { credited_iqd: credit, usd_cents: cents, reason, units: coveredQty, authority: grant.audit });
   const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();
   return c.json({
     success: true,

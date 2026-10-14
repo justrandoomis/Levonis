@@ -45,6 +45,11 @@ interface RulesResponse {
   rules: Record<TradeInFamily, Stored>;
   history: Record<TradeInFamily, Array<{ id: string; version: number; is_default: number; note: string; created_at: string; created_by_name: string | null }>>;
   financial_scope: boolean;
+  /**
+   * The verified main admin. The rules decide every estimate a financial admin
+   * may approve, so editing them is the owner's act alone (owner decision 3).
+   */
+  owner_scope?: boolean;
 }
 
 const clone = <X,>(x: X): X => JSON.parse(JSON.stringify(x)) as X;
@@ -229,12 +234,14 @@ export default function RulesEditor() {
                 <p dir="ltr" className="break-words">{errors.slice(0, 8).join(', ')}</p>
               </div>
             ) : null}
-            {!data.financial_scope ? (
-              <p className="text-[12px] text-[var(--ap-warning)]">{L('حفظ القواعد يحتاج صلاحية مالية.', 'Saving rules needs the financial scope.')}</p>
+            {data.owner_scope !== true ? (
+              <p className="text-[12px] text-[var(--ap-warning)]">
+                {loc('حفظ القواعد للأدمن الرئيسي فقط.', 'Only the main admin can save the rules.', 'تەنها بەڕێوەبەری سەرەکی دەتوانێت یاساکان پاشەکەوت بکات.')}
+              </p>
             ) : null}
             <input className={`${T.input} w-full`} placeholder={L('ملاحظة للنسخة (اختياري)', 'Version note (optional)')} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
             <div className="flex gap-2">
-              <button type="button" className={`${T.btnPrimary} flex-1`} disabled={!dirty || busy || !data.financial_scope || (check !== null && !check.ok)} onClick={save} data-save-rules>
+              <button type="button" className={`${T.btnPrimary} flex-1`} disabled={!dirty || busy || data.owner_scope !== true || (check !== null && !check.ok)} onClick={save} data-save-rules>
                 <Save className="w-4 h-4" aria-hidden />
                 {L('حفظ كنسخة جديدة', 'Save as a new version')}
               </button>

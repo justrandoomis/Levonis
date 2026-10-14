@@ -10,6 +10,11 @@
  * an assistant at the guard and lets a full admin through. Trade-in valuation
  * and rules are on the owner's review list (security spec §8): trade-in value
  * is what Levonis pays for a used device it may resell.
+ *
+ * Services V2, owner decision 3 (DECISIONS row 223, worker/lib/moneyAuthority.ts):
+ * the trade-in inspection and completion join the money routes, the valuation
+ * rules are the owner's alone, and a value above the server's estimate is the
+ * owner's too (judged in the handler, where the estimate is read).
  */
 import type { RouteClassFile } from './_types';
 import { adminWalletAdjustRoutes } from '../../worker/routes/adminWalletAdjust';
@@ -34,17 +39,19 @@ export default {
       prefix: '/api/admin/trade-in',
       name: 'adminTradeInRoutes',
       router: adminTradeInRoutes,
-      writes: 'a trade-in request’s inspection and status; its money is in the `money` routes',
+      writes: 'a trade-in request’s status (cancel); its inspection, valuation and completion are `money` routes',
       routes: {
         'GET /requests': 'op',
         'GET /requests/:id': 'op',
-        'POST /requests/:id/inspect': 'op',
+        // Owner decision 3 (G16): starting the inspection and completing move the device and the money it stands for.
+        'POST /requests/:id/inspect': 'money',
         'POST /requests/:id/approve': 'money',
         'POST /requests/:id/value': 'money',
-        'POST /requests/:id/complete': 'op',
+        'POST /requests/:id/complete': 'money',
         'POST /requests/:id/cancel': 'op',
         'GET /rules': 'op',
-        'PUT /rules/:family': 'money',
+        // The rules decide every estimate a financial admin may approve: the owner's alone (owner decision 3).
+        'PUT /rules/:family': 'owner',
         'POST /rules/:family/test': { cls: 'op', noBody: 'tries a valuation rule of one device family on a sample; needs a family the role fixture does not seed' },
       },
     },

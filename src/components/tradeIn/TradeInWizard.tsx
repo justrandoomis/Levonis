@@ -652,6 +652,11 @@ function DeviceStep({
       case 'TRADE_IN_LINKED_ELSEWHERE':
         // Owner decision 3: the buyer passed the device on — its holder releases it first.
         return loc('مربوط بحساب آخر — يُفكّ ربطه أولاً', 'Linked to another account — release it first', 'بە هەژمارێکی ترەوە بەستراوە — سەرەتا جیای بکەرەوە');
+      // One money process per device (Services V2): the repair desk, or a price-protection claim, goes first.
+      case 'TRADE_IN_SERVICE_OPEN':
+        return loc('عليه طلب ضمان أو صيانة مفتوح', 'Has an open warranty or repair request', 'داواکاریی گەرەنتی یان چاککردنەوەی کراوەی لەسەرە');
+      case 'TRADE_IN_PROTECTION_OPEN':
+        return loc('عليه مطالبة حماية سعر قيد المراجعة', 'Has a price-protection claim under review', 'داواکاریی پاراستنی نرخی لەسەرە کە لە پێداچوونەوەدایە');
       default:
         return loc('غير متاح للاستبدال', 'Not available', 'بۆ گۆڕینەوە بەردەست نییە');
     }

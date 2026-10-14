@@ -34,8 +34,8 @@ import type { AppContext } from '../lib/types';
 import { HttpError, badRequest, int, notFound, oneOf, requireAdmin, requireAuth, str, unavailable } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
-import { requireFinancialScope } from '../lib/walletAdjust';
-import { canMoveMoney } from '../lib/adminScope';
+import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
+import { canMoveMoney, isOwner, isUnverifiedOwner } from '../lib/adminScope';
 import { buildMediaKey, deleteMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
 import { rasterDimensions } from '../lib/imageMetadata';
@@ -413,36 +413,60 @@ adminTradeInRoutes.get('/requests', async (c) => {
   return c.json({ success: true, ...out, page, limit });
 });
 
+/** The verified owner: the one admin who may go above the estimate (decision 3) and edit the rules. */
+const ownerScope = (c: Context<AppContext>) => {
+  const user = c.get('user');
+  return isOwner(c.env, user) && !isUnverifiedOwner(c.env, user);
+};
+
 adminTradeInRoutes.get('/requests/:id', async (c) => {
   const req = await adminRequest(c);
   const view = await requestView(c.env, req, 'admin');
   const customer = await c.env.DB.prepare('SELECT id, name, email, phone_e164, username FROM users WHERE id = ?').bind(req.user_id).first();
-  return c.json({ success: true, request: view, customer, financial_scope: canMoveMoney(c.env, c.get('user')) });
+  return c.json({ success: true, request: view, customer, financial_scope: canMoveMoney(c.env, c.get('user')), owner_scope: ownerScope(c) });
 });
 
-adminTradeInRoutes.post('/requests/:id/inspect', async (c) => {
+/**
+ * WHO MAY DO WHAT HERE (owner decision 3, worker/lib/moneyAuthority.ts).
+ * An assistant reads the queue and nothing more: starting the inspection and
+ * completing the exchange move the device and the money it stands for (G16).
+ * A financial admin approves the estimate, proposes a value up to it, and
+ * completes; a value ABOVE the estimate the server computed is the owner's
+ * alone, with a private reason (`owner_reason`) recorded and flagged (M1).
+ */
+adminTradeInRoutes.post('/requests/:id/inspect', requireMoneyAuthority('trade_in_inspect'), async (c) => {
   const admin = c.get('user')!;
   const req = await run(async () => markInspected(c.env, await adminRequest(c), admin.id));
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
 });
 
-adminTradeInRoutes.post('/requests/:id/approve', requireFinancialScope, async (c) => {
+adminTradeInRoutes.post('/requests/:id/approve', requireMoneyAuthority('trade_in_approve'), async (c) => {
   const admin = c.get('user')!;
   await rateLimit(c, 'admin-trade-in', 120, 3600);
-  const req = await run(async () => approveEstimate(c.env, await adminRequest(c), admin.id));
+  const current = await adminRequest(c);
+  // The estimate IS the server's figure: approving it is within a financial admin's authority.
+  const grant = assertMoneyAuthority(c, { act: 'trade_in_approve', amountIqd: current.estimated_iqd, ceilingIqd: current.estimated_iqd });
+  const req = await run(async () => approveEstimate(c.env, current, admin.id, grant));
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
 });
 
-adminTradeInRoutes.post('/requests/:id/value', requireFinancialScope, async (c) => {
+adminTradeInRoutes.post('/requests/:id/value', requireMoneyAuthority('trade_in_value'), async (c) => {
   const admin = c.get('user')!;
   await rateLimit(c, 'admin-trade-in', 120, 3600);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const reason = str(body.reason, 'reason', { max: 500, required: false });
+  // The owner's reason for going above the estimate: the audit row and the
+  // reports read it, the customer never does (`reason` above is theirs).
+  const ownerReason = str(body.owner_reason, 'owner_reason', { max: 500, required: false });
   const raw = body.value_iqd;
   if (typeof raw !== 'number' || !Number.isSafeInteger(raw)) {
     throw badRequest('The value must be a whole number of dinars.', 'TRADE_IN_INVALID_VALUE');
   }
-  const req = await run(async () => changeValue(c.env, await adminRequest(c), admin.id, raw, reason));
+  const current = await adminRequest(c);
+  // M1: «value ≤ estimate unless owner». The ceiling is the estimate the
+  // server fixed at submit — never a figure the client sends.
+  const grant = assertMoneyAuthority(c, { act: 'trade_in_value', amountIqd: raw, ceilingIqd: current.estimated_iqd ?? 0, reason: ownerReason });
+  const req = await run(async () => changeValue(c.env, current, admin.id, raw, reason, grant));
   afterResponse(
     c,
     notifyCustomerOfValue(c.env, req).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${req.id}:` }))
@@ -450,7 +474,7 @@ adminTradeInRoutes.post('/requests/:id/value', requireFinancialScope, async (c) 
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
 });
 
-adminTradeInRoutes.post('/requests/:id/complete', async (c) => {
+adminTradeInRoutes.post('/requests/:id/complete', requireMoneyAuthority('trade_in_complete'), async (c) => {
   const admin = c.get('user')!;
   const req = await run(async () => completeRequest(c.env, await adminRequest(c), admin.id));
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
@@ -472,6 +496,8 @@ adminTradeInRoutes.get('/rules', async (c) => {
     rules: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, { ...publicRules(book[f]), id: book[f].id, note: book[f].note, created_at: book[f].created_at }])),
     history,
     financial_scope: canMoveMoney(c.env, c.get('user')),
+    // The valuation rules decide every estimate a financial admin may approve: the owner's alone (decision 3).
+    owner_scope: ownerScope(c),
   });
 });
 
@@ -481,7 +507,7 @@ function familyOf(c: Context<AppContext>): TradeInFamily {
   return f as TradeInFamily;
 }
 
-adminTradeInRoutes.put('/rules/:family', requireFinancialScope, async (c) => {
+adminTradeInRoutes.put('/rules/:family', requireMoneyAuthority('trade_in_rules'), async (c) => {
   const admin = c.get('user')!;
   await rateLimit(c, 'admin-trade-in-rules', 60, 3600);
   const family = familyOf(c);

@@ -1243,6 +1243,59 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The request changed while you were working on it. Refresh and try again.',
     ckb: 'داواکارییەکە لە کاتی کارکردنت لەسەری گۆڕا. پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   },
+  // ---- one money process per unit (Services V2 plan §1.3, row 223) --------
+  // A device on the repair bench, or a line whose price-protection claim is
+  // still being decided, is not valued for a trade-in until that is over.
+  TRADE_IN_SERVICE_OPEN: {
+    ar: 'على هذا الجهاز طلب ضمان أو صيانة مفتوح. يمكن استبداله بعد إغلاق ذلك الطلب.',
+    en: 'This device has an open warranty or repair request. It can be traded in once that request is closed.',
+    ckb: 'داواکارییەکی گەرەنتی یان چاککردنەوەی کراوە لەسەر ئەم ئامێرەیە. دوای داخستنی ئەو داواکارییە دەتوانرێت بگۆڕدرێتەوە.',
+  },
+  TRADE_IN_PROTECTION_OPEN: {
+    ar: 'على هذا المنتج مطالبة حماية سعر قيد المراجعة. يمكن استبداله بعد البت فيها.',
+    en: 'This item has a price-protection claim under review. It can be traded in once that claim is decided.',
+    ckb: 'داواکارییەکی پاراستنی نرخ لەسەر ئەم بەرهەمە لە ژێر پێداچوونەوەدایە. دوای بڕیاردان لەسەری دەتوانرێت بگۆڕدرێتەوە.',
+  },
+  // Owner decision 2: the credit is usable for a limited time.
+  TRADE_IN_CREDIT_EXPIRED: {
+    ar: 'انتهت صلاحية رصيد الاستبدال. تواصل معنا لمراجعة الطلب.',
+    en: 'The trade-in credit has expired. Contact us to review the request.',
+    ckb: 'ماوەی باڵانسی گۆڕینەوە بەسەرچووە. پەیوەندیمان پێوە بکە بۆ پێداچوونەوەی داواکارییەکە.',
+  },
+  // Price protection on a device handed in for a trade-in (PP-B8): it was valued on what was paid.
+  TRADE_IN_UNIT: {
+    ar: 'هذا الجهاز ضمن طلب استبدال، فلا تشمله حماية السعر.',
+    en: 'This device is part of a trade-in, so price protection does not cover it.',
+    ckb: 'ئەم ئامێرە بەشێکە لە داواکارییەکی گۆڕینەوە، بۆیە پاراستنی نرخ نایگرێتەوە.',
+  },
+  // A return of a device whose trade-in credit is already spent, or whose trade-in is complete.
+  TRADE_IN_ACTIVE: {
+    ar: 'هذا الجهاز ضمن استبدال استُخدم رصيده أو اكتمل، فلا يمكن إرجاعه من هنا. تواصل مع الدعم.',
+    en: 'This device is part of a trade-in whose credit is in use or which is complete, so it cannot be returned here. Contact support.',
+    ckb: 'ئەم ئامێرە بەشێکە لە گۆڕینەوەیەک کە باڵانسەکەی بەکارهاتووە یان تەواو بووە، بۆیە لێرەوە ناگەڕێندرێتەوە. پەیوەندی بە پشتگیرییەوە بکە.',
+  },
+  // One door per defect: an open return and an open warranty request do not run side by side.
+  RETURN_CASE_OPEN: {
+    ar: 'على هذا الجهاز طلب إرجاع مفتوح. تابعه من صفحة الطلب؛ يُعالَج العيب هناك.',
+    en: 'This device has an open return case. Follow it from the order page; the fault is handled there.',
+    ckb: 'داواکارییەکی گەڕاندنەوەی کراوە لەسەر ئەم ئامێرەیە. لە پەڕەی داواکارییەکەوە بەدوایدا بچۆ؛ کێشەکە لەوێ چارەسەر دەکرێت.',
+  },
+  WARRANTY_CLAIM_OPEN: {
+    ar: 'على هذا الجهاز طلب ضمان مفتوح. تابعه من «الضمان والصيانة»، وفريقنا يحوّله إلى إرجاع إن لزم.',
+    en: 'This device has an open warranty request. Follow it from «Warranty & maintenance»; our team turns it into a return if needed.',
+    ckb: 'داواکارییەکی گەرەنتیی کراوە لەسەر ئەم ئامێرەیە. لە «گەرەنتی و چاککردنەوە» بەدوایدا بچۆ؛ تیمەکەمان ئەگەر پێویست بوو دەیکاتە گەڕاندنەوە.',
+  },
+  // The warranty desk (G-3, G-4): a decision says what the stage says, and «replaced» needs the replacement.
+  CLAIM_DECISION_MISMATCH: {
+    ar: 'القرار لا يطابق المرحلة: «مقبول» يعني إصلاحاً أو استبدالاً، و«مرفوض» يعني رفضاً أو سوء استخدام.',
+    en: 'The decision does not match the stage: approved means repair or replace; rejected means reject or misuse.',
+    ckb: 'بڕیارەکە لەگەڵ قۆناغەکە ناگونجێت: «پەسەندکراو» واتە چاککردنەوە یان گۆڕین، و «ڕەتکراوە» واتە ڕەتکردنەوە یان خراپ بەکارهێنان.',
+  },
+  CLAIM_REPLACEMENT_REQUIRED: {
+    ar: 'سجّل الجهاز البديل أولاً من «استبدال الوحدة»، ثم اختر مرحلة «استُبدل».',
+    en: 'Record the replacement unit first (Replace unit), then set the stage to replaced.',
+    ckb: 'سەرەتا ئامێرە جێگرەوەکە لە «گۆڕینی یەکە» تۆمار بکە، پاشان قۆناغی «گۆڕدرا» هەڵبژێرە.',
+  },
   // ---- Community projects (worker/routes/communityPosts.ts) ----------------
   POST_MEDIA_NOT_OWNED: {
     ar: 'هذه الصورة ليست من صورك. ارفع الصورة من جهازك ثم أضفها.',

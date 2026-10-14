@@ -172,6 +172,10 @@ export interface RequestView {
   difference_iqd: number | null;
   excess_iqd: number | null;
   credit_order: { id: string; status: string; amount_iqd: number } | null;
+  /** The credit's last moment (owner decision 2); null once an order holds it, or for a credit with no end. Older servers omit it. */
+  credit_expires_at?: string | null;
+  /** The credit ended unused: «إتمام الدفع» is closed. */
+  credit_expired?: boolean;
   customer_note: string;
   cancel_reason: string;
   blockers: { inputs: Record<string, string[]>; photos: Record<string, string[]>; target: boolean } | null;

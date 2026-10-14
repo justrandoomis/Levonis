@@ -355,7 +355,11 @@ test('owner decision 1, review fixes: a revoked «الاستلام» is refused 
   // The camera sheet decodes by code through the shared table; «أجهزة الطلبات» and the order's warranty section too.
   assert.match(read('src/components/adminOrders/serials/serialsApi.ts'), /refusalText\(err\.code, l, /);
   const units = read('src/components/AdminSerials.tsx');
-  assert.equal((units.match(/apiRefusal\(e, refusalLang\(lang\), e\.message\)/g) ?? []).length, 2, 'the assign and the replace / reassign window');
+  assert.equal(
+    (units.match(/apiRefusal\(e, refusalLang\(lang\), e\.message\)/g) ?? []).length,
+    4,
+    'the assign, the replace / reassign window, the delivery correction and the claim stage move'
+  );
   assert.match(read('src/components/adminWarranty/WarrantySection.tsx'), /apiRefusal\(e, rl, e\.message\)/);
 });
 

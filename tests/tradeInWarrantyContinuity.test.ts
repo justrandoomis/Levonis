@@ -397,13 +397,14 @@ test('S9 recomputeUnitWindow keeps a carried START as well as its end; only the 
 
 // ============================================================ per-role authorization
 
-test('completion is `op` for every admin — owner, full, assistant, and a preparer whose «الاستلام» is off; customers, merchants and strangers get nothing', async () => {
+test('completion moves the device and the money it stands for (owner decision 3, G16): the owner and a full admin complete; an assistant or a preparer is refused; customers, merchants and strangers get nothing', async () => {
   const w = world();
   w.raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,admin_scope) VALUES ('prep','Prep','prep@x.co','h','admin','assistant'), ('m1','Shop','m1@x.co','h','merchant',NULL);
     INSERT INTO ops_permissions (user_id, capability, allowed) VALUES ('prep','receive',0);
   `);
   const admins = ['boss', 'adm', 'ast', 'prep'] as const;
+  const moneyScope = new Set<string>(['boss', 'adm']);
   let n = 0;
   for (const who of admins) {
     n++;
@@ -413,6 +414,12 @@ test('completion is `op` for every admin — owner, full, assistant, and a prepa
                 VALUES ('unit_r${n}','${o}','lr${n}','pA1','u1',1,'2026-09-01T00:00:00.000Z','2026-09-01T00:00:00.000Z','2027-09-01T00:00:00.000Z')`);
     const id = tradeIn(w, { user: 'u1', order: o, item: `lr${n}` });
     const res = await complete(w, who, id);
+    if (!moneyScope.has(who)) {
+      assert.equal(res.status, 403, `${who}: ${await res.clone().text()}`);
+      assert.equal((await json(res)).code, 'FINANCIAL_SCOPE_REQUIRED');
+      assert.equal(row(w.raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'awaiting_payment', `${who}: nothing moved`);
+      continue;
+    }
     assert.equal(res.status, 200, `${who}: ${await res.clone().text()}`);
     const audit = row<{ actor_id: string; target: string }>(w.raw, "SELECT actor_id, target FROM audit_log WHERE action = 'serial.traded_in' AND target = ?", `unit_r${n}`)!;
     assert.equal(audit.actor_id, who, 'a unit with no serial on file is recorded by its unit id');

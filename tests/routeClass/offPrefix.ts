@@ -189,11 +189,21 @@ export default {
         'POST /admin/orders/:orderId/units/backfill': 'op',
         'POST /admin/units/backfill-delivered': 'op',
         'POST /admin/units/:unitId/serial': 'op',
-        'PATCH /admin/units/:unitId/delivery': 'op',
-        'PATCH /admin/units/:unitId/warranty': 'op',
-        'POST /admin/units/:unitId/replace': 'op',
+        'PATCH /admin/units/:unitId/delivery': {
+          cls: 'op',
+          why: 'a correction that shortens or keeps the window is any admin’s; a LATER date is the owner’s, judged in the handler once the unit is read (owner decision 3, G-2)',
+        },
+        'PATCH /admin/units/:unitId/warranty': {
+          cls: 'op',
+          why: 'shortening keeps confirm_shorter; LENGTHENING is the owner’s, judged in the handler once the unit is read (owner decision 3, G-1)',
+        },
+        // A whole-unit replacement is the owner's act alone (owner decision 3, row 223).
+        'POST /admin/units/:unitId/replace': 'owner',
         'GET /admin/claims': 'op',
-        'PATCH /admin/claims/:id': 'op',
+        'PATCH /admin/claims/:id': {
+          cls: 'op',
+          why: 'receiving, diagnosing, repairing and closing are any admin’s; a DECISION (approved, rejected, replaced, or a changed decision) needs the financial scope, judged in the handler once the claim is read (owner decision 3)',
+        },
         'POST /admin/products/:id/ops-policy': 'op',
       },
     },
@@ -268,7 +278,10 @@ export default {
         'POST /': 'open',
         'GET /': 'open',
         'GET /admin/queue': 'op',
-        'POST /admin/:id/transition': 'op',
+        'POST /admin/:id/transition': {
+          cls: 'op',
+          why: 'collection and inspection moves are any admin’s; resolving with a REFUND needs the financial scope, judged in the handler (owner decision 3, PP-B1)',
+        },
         'GET /:id': 'open',
       },
     },
@@ -281,7 +294,9 @@ export default {
         'POST /claims': 'open',
         'GET /claims': 'open',
         'GET /admin/claims': 'op',
-        'POST /admin/claims/:id/decide': 'op',
+        // Approving credits a wallet; rejecting ends the claim (owner decision 3, PP-B1). Above the
+        // owner line, or for the author of the price that made the drop, the owner decides (handler).
+        'POST /admin/claims/:id/decide': 'money',
       },
     },
     {

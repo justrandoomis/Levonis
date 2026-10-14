@@ -382,8 +382,15 @@ test('a catastrophic catalogue drop cannot credit more than the component cost i
   assert.equal(claim.success, true, JSON.stringify(claim));
 
   const before = spendable(raw, 'buyer');
+  // A credit this size is above the 250,000 line a financial admin approves
+  // alone (owner decision 3, DECISIONS row 223): the main admin decides it,
+  // with a recorded reason. The cap below is what this test is about.
+  const mainAdmin: StubUser = { id: 'boss', role: 'admin', email: 'boss@x.co' };
   const approved = await json(
-    await post(appFor(db, admin), `/api/price-protection/admin/claims/${claim.claim.id}/decide`, { decision: 'approved' })
+    await post(appFor(db, mainAdmin), `/api/price-protection/admin/claims/${claim.claim.id}/decide`, {
+      decision: 'approved',
+      reason: 'catalogue error, verified',
+    })
   );
   assert.equal(approved.success, true, JSON.stringify(approved));
   const credited = spendable(raw, 'buyer') - before;

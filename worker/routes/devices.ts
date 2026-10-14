@@ -104,6 +104,7 @@ import {
   stageToLegacyStatus,
   CLAIM_STAGES,
   CLAIM_TRANSITIONS,
+  closedClaimSql,
   type ClaimStage,
   type UnitRow,
   type WarrantySnapshotLite,
@@ -114,6 +115,7 @@ import { formatAudit, ruleForUnit } from '../lib/serialRules';
 import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
 import { isOwner } from '../lib/adminScope';
+import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
 import { fence, requireSerialWrite } from '../lib/operations';
 import { custodyHistory, originStartFrom, tradedInSql, unitCoverage, unitIdentity, type CustodyStep } from '../lib/deviceCustody';
 import { isLostRace } from '../lib/gifts/fence';
@@ -168,7 +170,51 @@ export function receiptNoFrom(input: string): string | null {
 }
 
 /** A claim at one of these stages is closed and no longer binds the device to its holder. */
-export const CLOSED_CLAIM_SQL = `stage IN ('rejected','replaced','resolved') OR (stage IS NULL AND status IN ('rejected','approved'))`;
+export const CLOSED_CLAIM_SQL = closedClaimSql();
+
+/**
+ * An OPEN return case on a device (Services V2 plan §1.3: «one door per
+ * defect»), in SQL: a case on the unit itself, or a case that names no device
+ * on its line (it answers for every device of the line). `line` and `unit`
+ * are the parameter markers to compare with.
+ */
+function openReturnOnUnitSql(line: string, unit: string): string {
+  return `EXISTS (SELECT 1 FROM return_cases rc
+     WHERE rc.state NOT IN ('rejected','resolved')
+       AND (rc.unit_id = ${unit} OR (rc.unit_id IS NULL AND rc.order_item_id = ${line})))`;
+}
+const RETURN_CASE_OPEN = () =>
+  conflict(
+    'على هذا الجهاز طلب إرجاع مفتوح؛ يُعالَج العيب هناك. / This device has an open return case; the fault is handled there.',
+    'RETURN_CASE_OPEN'
+  );
+
+/**
+ * WHAT A CLAIM DECISION MAY SAY AT EACH STAGE (G-3): an accepted claim is
+ * repaired or replaced; a rejected one is rejected or misuse. A claim still
+ * being received or diagnosed carries no decision yet.
+ */
+const DECISIONS_AT: Record<ClaimStage, readonly string[]> = {
+  received: [],
+  diagnosing: [],
+  approved: ['repair', 'replace'],
+  repairing: ['repair', 'replace'],
+  replaced: ['replace'],
+  resolved: ['repair', 'replace'],
+  rejected: ['reject', 'misuse'],
+};
+/** The decision a stage implies when none is sent and the one on the row does not fit. */
+const DEFAULT_DECISION_AT: Partial<Record<ClaimStage, string>> = {
+  repairing: 'repair',
+  replaced: 'replace',
+  rejected: 'reject',
+};
+/**
+ * The stages that DECIDE a claim — whether the shop repairs or replaces at its
+ * own cost, or refuses. Owner decision 3: an assistant receives, diagnoses,
+ * replies and closes what was decided; the decision itself is a money act.
+ */
+const MONEY_STAGES: readonly ClaimStage[] = ['approved', 'rejected', 'replaced'];
 
 const UNIT_COLS = `id, order_id, order_item_id, product_id, owner_user_id, unit_index,
   delivered_at, warranty_base_months, warranty_ext_months, warranty_start_at, warranty_end_at,
@@ -933,9 +979,18 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     ? `wc_${(await sha256Hex(`${user.id}\n${idempotencyKey}`)).slice(0, 20)}`
     : newId('wc');
   const productName = String(unit.name_snapshot || unit.p_name_ar || unit.p_name || 'Device');
+  /**
+   * ONE DOOR PER DEFECT (Services V2 plan §1.3): a device with an OPEN return
+   * case is handled by that return — the same defect is never on the return
+   * desk and the repair desk at once. Asked INSIDE the insert (the return
+   * door asks the mirror question of an open claim), so a return opened
+   * between any read and this write still wins.
+   */
   const written = await c.env.DB.prepare(
     `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'received', 'submitted', ?) ON CONFLICT(id) DO NOTHING`
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9
+      WHERE NOT ${openReturnOnUnitSql('?3', '?6')}
+     ON CONFLICT(id) DO NOTHING`
   )
     .bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority)
     .run();
@@ -993,7 +1048,15 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
      * guard. A key reused across units is a caller bug, not a replay, so it
      * gets the collision refusal below rather than a mixed answer.
      */
-    if (!existing) throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
+    if (!existing) {
+      // Nothing was written and no claim of this caller's carries the id: the
+      // open-return fence above held, or the key collided.
+      const returnOpen = await c.env.DB.prepare(`SELECT ${openReturnOnUnitSql('?1', '?2')} AS open`)
+        .bind(unit.order_item_id, unit.id)
+        .first<{ open: number }>();
+      if (returnOpen?.open) throw RETURN_CASE_OPEN();
+      throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
+    }
     return c.json({
       success: true,
       id: existing.id,
@@ -1639,6 +1702,15 @@ deviceRoutes.patch('/admin/units/:unitId/delivery', async (c) => {
   // A unit that carries a warranty keeps its start and end (owner decision 3,
   // S9): only its own used-sale cover moves with the corrected date.
   const win = recomputeUnitWindow(unit, deliveredAt);
+  // A LATER DATE IS MORE WARRANTY (G-2). The window slides with the delivery
+  // date, so moving it later gives cover the shop sells — the owner's act
+  // alone (decision 3), recorded with the reason above. An earlier date (a
+  // correction that shortens) keeps today's door.
+  const laterDate = !!unit.delivered_at && Date.parse(deliveredAt) > Date.parse(unit.delivered_at);
+  const laterEnd = !!win.end_at && (!unit.warranty_end_at || Date.parse(win.end_at) > Date.parse(unit.warranty_end_at));
+  const authority = laterDate || laterEnd || (!unit.delivered_at && !!win.end_at)
+    ? assertMoneyAuthority(c, { act: 'warranty_delivery_later' })
+    : null;
   await c.env.DB.prepare(
     'UPDATE order_item_units SET delivered_at = ?, warranty_start_at = ?, warranty_end_at = ?, policy_version = COALESCE(?, policy_version) WHERE id = ?'
   )
@@ -1650,6 +1722,7 @@ deviceRoutes.patch('/admin/units/:unitId/delivery', async (c) => {
     new_delivered_at: deliveredAt,
     old_end_at: unit.warranty_end_at,
     new_end_at: win.end_at,
+    ...(authority ? { authority: authority.audit } : {}),
   });
   const cov = coverageState(deliveredAt, win.end_at);
   return c.json({ success: true, delivered_at: deliveredAt, warranty_end_at: win.end_at, state: cov.state });
@@ -1769,6 +1842,14 @@ deviceRoutes.patch('/admin/units/:unitId/warranty', async (c) => {
   const oldEndMs = unit.warranty_end_at ? Date.parse(unit.warranty_end_at) : NaN;
   const newEndMs = win.end_at ? Date.parse(win.end_at) : NaN;
   const shortens = Number.isFinite(oldEndMs) && Number.isFinite(newEndMs) && newEndMs < oldEndMs;
+  // LENGTHENING IS THE OWNER'S (G-1, decision 3). Extra months are a product
+  // the shop sells (7.5–10% of the printer, row 91) and they lift the
+  // trade-in bonus too: more months than the unit has, or a later end, is
+  // the owner's act alone. Shortening keeps `confirm_shorter` below.
+  const lengthens =
+    baseMonths + extMonths > (oldTotal ?? 0) ||
+    (Number.isFinite(newEndMs) && (!Number.isFinite(oldEndMs) || newEndMs > oldEndMs));
+  const authority = lengthens ? assertMoneyAuthority(c, { act: 'warranty_lengthen' }) : null;
   if (shortens && body.confirm_shorter !== true) {
     throw new HttpError(
       409,
@@ -1796,6 +1877,7 @@ deviceRoutes.patch('/admin/units/:unitId/warranty', async (c) => {
     new_total_months: baseMonths + extMonths,
     old_end_at: unit.warranty_end_at,
     new_end_at: win.end_at,
+    ...(authority ? { authority: authority.audit } : {}),
   });
 
   const cov = coverageState(unit.delivered_at, win.end_at);
@@ -1813,7 +1895,8 @@ deviceRoutes.patch('/admin/units/:unitId/warranty', async (c) => {
 
 // ------------------------------------------------------------- replacement
 
-deviceRoutes.post('/admin/units/:unitId/replace', async (c) => {
+/** A WHOLE-UNIT REPLACEMENT is the owner's act alone (owner decision 3, row 223): a new device for an old one. */
+deviceRoutes.post('/admin/units/:unitId/replace', requireMoneyAuthority('warranty_replace'), async (c) => {
   const admin = c.get('user')!;
   const unitId = c.req.param('unitId');
   const body = await c.req.json().catch(() => ({}));
@@ -2147,19 +2230,60 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
   if (decisionStages.includes(nextStage) && reason.length < 5) {
     throw badRequest('A reason (min 5 characters) is required for this decision');
   }
-  let decision: string | null = claim.decision ?? null;
+  const stored: string | null = claim.decision ?? null;
+  let sent: string | null = null;
   if (body.decision !== undefined && body.decision !== null && body.decision !== '') {
     const d = str(body.decision, 'decision', { max: 20 });
     if (!['repair', 'replace', 'reject', 'misuse'].includes(d)) {
       throw badRequest('decision must be one of: repair, replace, reject, misuse');
     }
-    decision = d;
+    sent = d;
+  }
+
+  /**
+   * DECIDING IS A MONEY ACT (owner decision 3, row 223). Accepting a claim
+   * commits the shop to a repair or a replacement at its own cost; rejecting
+   * it ends the customer's claim. An assistant receives, diagnoses, moves an
+   * accepted claim into repair and closes it; the decision is a financial
+   * admin's (403 FINANCIAL_SCOPE_REQUIRED, the same answer for every stage).
+   */
+  const decides = (MONEY_STAGES.includes(nextStage) && current !== nextStage) || (sent !== null && sent !== stored);
+  const authority = decides ? assertMoneyAuthority(c, { act: 'warranty_claim_decision' }) : null;
+
+  // G-3: THE DECISION SAYS WHAT THE STAGE SAYS. A decision sent with the move
+  // must fit the stage; the one on the row is kept only while it still fits
+  // (a claim reopened from «rejected» drops its «reject»), else the stage's
+  // own (repairing → repair, replaced → replace, rejected → reject).
+  const allowed = DECISIONS_AT[nextStage];
+  if (sent !== null && !allowed.includes(sent)) {
+    throw badRequest(
+      'The decision does not match the stage: approved means repair or replace; rejected means reject or misuse.',
+      'CLAIM_DECISION_MISMATCH'
+    );
+  }
+  const decision: string | null = sent ?? (stored && allowed.includes(stored) ? stored : (DEFAULT_DECISION_AT[nextStage] ?? null));
+
+  // G-4: «REPLACED» NEEDS THE REPLACEMENT. The customer is told the device was
+  // replaced, so the unit must carry the replacement the owner recorded
+  // (POST /admin/units/:unitId/replace) — asked here for the honest refusal,
+  // and again inside the update.
+  const toReplaced = nextStage === 'replaced' && current !== 'replaced';
+  if (toReplaced) {
+    const replaced = claim.unit_id
+      ? await c.env.DB.prepare('SELECT 1 AS x FROM order_item_units WHERE id = ? AND replaced_by_unit_id IS NOT NULL')
+          .bind(claim.unit_id)
+          .first<{ x: number }>()
+      : null;
+    if (!replaced) {
+      throw conflict('Record the replacement unit first (Replace unit), then set the stage to replaced.', 'CLAIM_REPLACEMENT_REQUIRED');
+    }
   }
 
   const res = await c.env.DB.prepare(
     `UPDATE warranty_claims
         SET stage = ?, status = ?, decision = ?, decision_reason = ?, assigned_staff = ?, admin_note = ?
-      WHERE id = ? AND COALESCE(stage, '') = COALESCE(?, '')`
+      WHERE id = ? AND COALESCE(stage, '') = COALESCE(?, '')
+        AND (? = 0 OR EXISTS (SELECT 1 FROM order_item_units u WHERE u.id = warranty_claims.unit_id AND u.replaced_by_unit_id IS NOT NULL))`
   )
     .bind(
       nextStage,
@@ -2169,7 +2293,8 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
       admin.id,
       reason || claim.admin_note || '',
       id,
-      claim.stage
+      claim.stage,
+      toReplaced ? 1 : 0
     )
     .run();
   if (res.meta.changes === 0) throw conflict('The claim changed while you were editing — reload and retry');
@@ -2181,6 +2306,7 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
     reason,
     user_id: claim.user_id,
     unit_id: claim.unit_id,
+    ...(authority ? { authority: authority.audit } : {}),
   });
   /**
    * THE CLAIMANT HEARS WHERE THEIR CLAIM NOW STANDS. A decision with its reason

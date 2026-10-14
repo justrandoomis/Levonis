@@ -23,11 +23,16 @@
  *                 the id exists).
  *
  *   THE BASE      «يتم الاعتماد على سعر الجهاز الذي اشتراه» — what the
- *                 customer actually paid for ONE unit of the line: the stored
- *                 unit price, less the extended-warranty fee folded into it
- *                 (the cover that is left is valued by its own factor, not
- *                 twice), less line-applied membership and coupon discounts
- *                 per unit. Never a catalogue price.
+ *                 customer actually paid for ONE unit of the line, by the
+ *                 one rule price protection reads too (Services V2 plan
+ *                 §3.2, packages/pricing/src/paidNet.ts): the merchandise
+ *                 without the extended-warranty fee (the cover that is left
+ *                 is valued by its own factor, not twice) or the transport
+ *                 fee, less the frozen membership, the line's own discount,
+ *                 and its share of the order's coupon and points; plus an
+ *                 accepted price adjustment; less every price-protection
+ *                 credit already paid on the line. A trade-in credit that
+ *                 bought the device counts as paid. Never a catalogue price.
  *
  *   THE AMS SPLIT «اذا كان … الـ AMS الذي أتى مع جهاز الكومبو … نتعامل مع سعر
  *                 ams فقط». A Combo is an OPTION of the printer ('a1-combo'
@@ -87,7 +92,9 @@ import { parseProductRow } from './productModel';
 import { resolveUnitPrice } from './pricing';
 import { applyRelations, capacityFrom, loadRelationsView, snapshotFrom } from './productOverlay';
 import { isPrinterProduct, printerProductIds } from './printerIdentity';
-import { parseOpsPolicy } from './deviceOps';
+import { closedClaimSql, parseOpsPolicy } from './deviceOps';
+import { loadOrdersPaidNet } from './paidNet';
+import type { MoneyGrant } from './moneyAuthority';
 import { addMonths } from './membershipOps';
 import { membershipDiscountAtLine } from './orderMembership';
 import { effectiveBaseMonths } from './warrantyPlans';
@@ -124,6 +131,7 @@ import {
   type TradeInStatus,
 } from '@levonis/pricing/tradeIn';
 import { DEFAULT_RULE_SETS } from '@levonis/pricing/tradeInDefaults';
+import { paidNetPerUnit } from '@levonis/pricing/paidNet';
 
 // ================================================================= errors
 
@@ -151,7 +159,10 @@ export type TradeInCode =
   | 'TRADE_IN_RULES_INVALID'
   | 'TRADE_IN_COUPON_MISMATCH'
   | 'TRADE_IN_LINKED_ELSEWHERE'
-  | 'TRADE_IN_STALE';
+  | 'TRADE_IN_STALE'
+  | 'TRADE_IN_SERVICE_OPEN'
+  | 'TRADE_IN_PROTECTION_OPEN'
+  | 'TRADE_IN_CREDIT_EXPIRED';
 
 export class TradeInError extends Error {
   constructor(
@@ -190,6 +201,9 @@ const MESSAGES: Record<TradeInCode, string> = {
   TRADE_IN_COUPON_MISMATCH: 'This trade-in credit applies only to its own new device, bought directly, by its owner.',
   TRADE_IN_STALE: 'The request changed while you were working on it. Refresh and try again.',
   TRADE_IN_LINKED_ELSEWHERE: 'This device is linked to another account. It must be released from that account before it can be traded in.',
+  TRADE_IN_SERVICE_OPEN: 'This device has an open warranty or repair request. It can be traded in once that request is closed.',
+  TRADE_IN_PROTECTION_OPEN: 'This item has a price-protection claim under review. It can be traded in once that claim is decided.',
+  TRADE_IN_CREDIT_EXPIRED: 'The trade-in credit has expired.',
 };
 
 const STATUS_OF: Partial<Record<TradeInCode, 400 | 409>> = {
@@ -489,7 +503,12 @@ const LINE_SQL = `SELECT oi.id AS item_id, oi.order_id, oi.product_id, oi.name_s
      AND oi.bundle_parent_item_id IS NULL
      AND NOT EXISTS (SELECT 1 FROM order_items k WHERE k.bundle_parent_item_id = oi.id)`;
 
-/** Paid for ONE unit, per the header's definition. */
+/**
+ * ONE unit of a line on its own — the shared paid-net rule with no
+ * order-level coupon, points or adjustment (those need the whole order:
+ * eligibility reads it through `loadOrdersPaidNet`). The line is floored once
+ * over its quantity, the same rounding price protection applies.
+ */
 export function paidPerUnit(line: Pick<LineRow, 'unit_price_iqd' | 'qty' | 'warranty_snapshot' | 'membership_discount_iqd' | 'coupon_discount_iqd'>
   & Partial<Pick<LineRow, 'product_id' | 'membership_rule_id' | 'benefit_snapshot'>>): number {
   const qty = Math.max(1, Number(line.qty) || 1);
@@ -497,8 +516,24 @@ export function paidPerUnit(line: Pick<LineRow, 'unit_price_iqd' | 'qty' | 'warr
   const w = safeParse<{ fee_iqd?: unknown } | null>(line.warranty_snapshot, null);
   const fee = typeof w?.fee_iqd === 'number' && Number.isFinite(w.fee_iqd) ? Math.max(0, Math.min(Math.trunc(w.fee_iqd), unit)) : 0;
   const membership = membershipDiscountAtLine({ benefit_snapshot: line.benefit_snapshot }, { ...line });
-  const discounts = Math.max(0, (membership || 0) + (Number(line.coupon_discount_iqd) || 0));
-  return Math.max(0, unit - fee - Math.floor(discounts / qty));
+  const gross = unit * qty;
+  return (
+    paidNetPerUnit(
+      { subtotal_iqd: gross, shipping_iqd: 0, total_iqd: gross, order_coupon_iqd: 0, points_iqd: 0 },
+      [
+        {
+          id: 'line',
+          qty,
+          gross_iqd: gross,
+          merchandise_iqd: (unit - fee) * qty,
+          membership_iqd: Math.max(0, membership || 0),
+          line_discount_iqd: Math.max(0, Number(line.coupon_discount_iqd) || 0),
+          price_adjustment_iqd: 0,
+        },
+      ],
+      'line'
+    ) ?? 0
+  );
 }
 
 /** Units per line shown for trade-in: a line of 30 printers is a reseller, not this screen. */
@@ -510,7 +545,8 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
   const idx = await catalogIndexFor(db);
   const itemIds = JSON.stringify(lines.map((l) => l.item_id));
   const productIds = JSON.stringify([...new Set(lines.map((l) => l.product_id))]);
-  const [units, receipts, claims, returns, values, rules, links] = await Promise.all([
+  const orderIds = [...new Set(lines.map((l) => l.order_id))];
+  const [units, receipts, claims, returns, values, rules, links, paidNet, protection, serviceClaims] = await Promise.all([
     db
       .prepare(
         `SELECT id, order_item_id, unit_index, delivered_at, warranty_end_at, warranty_base_months, replaced_by_unit_id
@@ -558,7 +594,35 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       )
       .bind(itemIds)
       .all<{ unit_id: string; user_id: string }>(),
+    // «ما دفعه فعلاً» — the whole order, by the shared rule (plan §3.2).
+    loadOrdersPaidNet(db, orderIds),
+    // Price protection on these lines: what was already credited (it comes
+    // off what was paid — no trade-in on the original price after a credit),
+    // and whether a claim is still being decided (no trade-in until it is).
+    db
+      .prepare(
+        `SELECT order_item_id,
+                COALESCE(SUM(CASE WHEN state IN ('approved','credited') THEN credited_iqd ELSE 0 END), 0) AS credited,
+                COALESCE(SUM(CASE WHEN state IN ('requested','approved') THEN 1 ELSE 0 END), 0) AS open
+           FROM price_protection_claims WHERE order_item_id IN (SELECT value FROM json_each(?1)) GROUP BY order_item_id`
+      )
+      .bind(itemIds)
+      .all<{ order_item_id: string; credited: number; open: number }>(),
+    // Devices on the repair desk: an OPEN warranty claim on a unit of these
+    // lines (or a legacy claim on the line itself). The trade-in waits for it.
+    db
+      .prepare(
+        `SELECT wc.unit_id, wc.order_item_id FROM warranty_claims wc
+          WHERE (wc.unit_id IN (SELECT id FROM order_item_units WHERE order_item_id IN (SELECT value FROM json_each(?1)))
+                 OR (wc.unit_id IS NULL AND wc.order_item_id IN (SELECT value FROM json_each(?1))))
+            AND NOT ${closedClaimSql('wc')}`
+      )
+      .bind(itemIds)
+      .all<{ unit_id: string | null; order_item_id: string | null }>(),
   ]);
+  const protectionOf = new Map((protection.results ?? []).map((r) => [r.order_item_id, r]));
+  const claimedUnits = new Set((serviceClaims.results ?? []).map((r) => r.unit_id).filter((x): x is string => !!x));
+  const claimedLines = new Set((serviceClaims.results ?? []).filter((r) => !r.unit_id && r.order_item_id).map((r) => String(r.order_item_id)));
   const holderOf = new Map((links.results ?? []).map((l) => [l.unit_id, l.user_id]));
   const unitById = new Map((units.results ?? []).map((u) => [u.id, u]));
   /** The slot's LIVE unit: its own, or the end of its warranty-replacement chain (deviceCustody `liveUnitOfSlot`). */
@@ -593,7 +657,16 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
     ]);
     const comboValue = productValues.find((v) => selected.has(v.id) && isComboValue(v)) ?? null;
     const isCombo = (family === 'fdm' || family === 'resin') && (comboValue !== null || COMBO_RE.test(`${line.option_snapshot} ${line.name_snapshot}`));
-    const paid = paidPerUnit(line);
+    const facts = paidNet.get(line.order_id);
+    const pp = protectionOf.get(line.item_id);
+    const credited = Math.max(0, Number(pp?.credited) || 0);
+    // What the unit cost, by the shared rule, less its share of every
+    // protection credit already paid on the line (rounded against the store).
+    const paid = Math.max(
+      0,
+      (facts ? paidNetPerUnit(facts.order, facts.lines, line.item_id) ?? 0 : 0) - Math.ceil(credited / Math.max(1, Number(line.qty) || 1))
+    );
+    const protectionOpen = (Number(pp?.open) || 0) > 0;
     const split = isCombo
       ? amsSplit({
           paidIqd: paid,
@@ -624,6 +697,13 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       // is released — the completion would otherwise take it from them.
       const live = liveOf(unit);
       const holder = live ? holderOf.get(live.id) ?? null : null;
+      // The slot's devices: its own unit and every warranty replacement after it.
+      const slotUnits: string[] = [];
+      for (let cur: typeof unit = unit, hop = 0; cur && hop <= MAX_REPLACEMENT_HOPS; hop++) {
+        slotUnits.push(cur.id);
+        cur = cur.replaced_by_unit_id ? (unitById.get(cur.replaced_by_unit_id) ?? null) : null;
+      }
+      const serviceOpen = claimedLines.has(line.item_id) || slotUnits.some((id) => claimedUnits.has(id));
       const linkedElsewhere = !!holder && holder !== userId;
       const unitClaims = (claims.results ?? []).filter((c) => c.order_item_id === line.item_id && c.unit_index === unitIndex);
       const claimedParts = new Set(unitClaims.map((c) => c.part));
@@ -650,6 +730,11 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
         else if (returnSet.has(line.item_id)) reason = 'TRADE_IN_RETURN_OPEN';
         else if (unknownSplit && scope !== 'whole') reason = 'TRADE_IN_SCOPE_UNAVAILABLE';
         else if (roles.some((r) => claimedParts.has(r))) reason = 'TRADE_IN_ALREADY_CLAIMED';
+        // One money process per unit (plan §1.3): a device on the repair desk
+        // (V4 / G-5) or a line whose price-protection claim is still being
+        // decided is not valued until that process is over.
+        else if (serviceOpen) reason = 'TRADE_IN_SERVICE_OPEN';
+        else if (protectionOpen) reason = 'TRADE_IN_PROTECTION_OPEN';
         // The AMS alone leaves the printer (and its link) where it is.
         else if (linkedElsewhere && scope !== 'ams_only') reason = 'TRADE_IN_LINKED_ELSEWHERE';
         else if (components.reduce((s, c) => s + c.base_iqd, 0) < rules[components[0].family].min_base_iqd) reason = 'TRADE_IN_BELOW_MINIMUM';
@@ -885,6 +970,89 @@ function fence(db: D1Database, id: string, token: string): D1PreparedStatement {
 
 const isAbort = (e: unknown) => /NOT NULL|constraint|UNIQUE/i.test(e instanceof Error ? e.message : String(e));
 
+/**
+ * ONE MONEY PROCESS PER UNIT (Services V2 plan §1.3), inside the batch.
+ *
+ * The eligibility read above refuses a unit with an open return, an open
+ * warranty claim or a price-protection claim being decided; this is the same
+ * question asked AGAIN in the write, so a claim opened between that read and
+ * this batch aborts it (status → NULL on the NOT NULL column) instead of
+ * landing a draft, an estimate or a credit on a device that is on the repair
+ * desk or whose price is being compensated. `?2` the line, `?3` the slot's
+ * unit ids (JSON).
+ */
+const RETURN_OPEN_SQL = `EXISTS (SELECT 1 FROM return_cases rc WHERE rc.order_item_id = ?2 AND rc.state <> 'rejected')`;
+const SERVICE_OPEN_SQL = `EXISTS (SELECT 1 FROM warranty_claims wc
+   WHERE (wc.unit_id IN (SELECT value FROM json_each(?3)) OR (wc.unit_id IS NULL AND wc.order_item_id = ?2))
+     AND NOT ${closedClaimSql('wc')})`;
+const PROTECTION_OPEN_SQL = `EXISTS (SELECT 1 FROM price_protection_claims pc WHERE pc.order_item_id = ?2 AND pc.state IN ('requested','approved'))`;
+
+interface Slot {
+  orderItemId: string;
+  unitIds: string[];
+}
+
+/** The devices of one slot: its own unit and every warranty replacement after it (the deviceCustody chain). */
+export async function slotOf(db: D1Database, orderItemId: string, unitIndex: number): Promise<Slot> {
+  const { results } = await db
+    .prepare('SELECT id, unit_index, replaced_by_unit_id FROM order_item_units WHERE order_item_id = ?')
+    .bind(orderItemId)
+    .all<{ id: string; unit_index: number; replaced_by_unit_id: string | null }>();
+  const byId = new Map((results ?? []).map((u) => [u.id, u]));
+  const unitIds: string[] = [];
+  let cur = (results ?? []).find((u) => Number(u.unit_index) === unitIndex) ?? null;
+  for (let hop = 0; cur && hop <= MAX_REPLACEMENT_HOPS; hop++) {
+    unitIds.push(cur.id);
+    cur = cur.replaced_by_unit_id ? (byId.get(cur.replaced_by_unit_id) ?? null) : null;
+  }
+  return { orderItemId, unitIds };
+}
+
+function serviceFence(db: D1Database, requestId: string, slot: Slot): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE trade_in_requests SET status = CASE WHEN ${RETURN_OPEN_SQL} OR ${SERVICE_OPEN_SQL} OR ${PROTECTION_OPEN_SQL} THEN NULL ELSE status END
+        WHERE id = ?1`
+    )
+    .bind(requestId, slot.orderItemId, JSON.stringify(slot.unitIds));
+}
+
+/** Which process holds the unit now, after a fenced batch aborted — the honest refusal, or null. */
+async function serviceBlocker(db: D1Database, slot: Slot): Promise<TradeInCode | null> {
+  const row = await db
+    .prepare(`SELECT ${RETURN_OPEN_SQL} AS ret, ${SERVICE_OPEN_SQL} AS svc, ${PROTECTION_OPEN_SQL} AS pp WHERE ?1 IS NULL OR ?1 IS NOT NULL`)
+    .bind(null, slot.orderItemId, JSON.stringify(slot.unitIds))
+    .first<{ ret: number; svc: number; pp: number }>();
+  if (row?.svc) return 'TRADE_IN_SERVICE_OPEN';
+  if (row?.pp) return 'TRADE_IN_PROTECTION_OPEN';
+  if (row?.ret) return 'TRADE_IN_RETURN_OPEN';
+  return null;
+}
+
+/** Owner decision 2: a trade-in credit is usable for seven days from the moment it is minted. */
+export const TRADE_IN_CREDIT_VALID_DAYS = 7;
+const DAY_MS = 86_400_000;
+
+/**
+ * WHEN A CREDIT ENDS (owner decision 2): its coupon's own end, plus the time
+ * an order that spent it and was then cancelled held it — a cancelled order
+ * costs the customer no time and buys them none either. Null: a credit minted
+ * before credits had an end keeps none.
+ */
+export function creditEndsAt(
+  endsAt: string | null | undefined,
+  held: { created_at: string; cancelled_at: string | null } | null | undefined,
+  nowMs: number
+): string | null {
+  if (!endsAt || !Number.isFinite(Date.parse(endsAt))) return null;
+  const from = held ? Date.parse(held.created_at) : NaN;
+  const to = held?.cancelled_at ? Date.parse(held.cancelled_at) : nowMs;
+  const lost = Number.isFinite(from) && Number.isFinite(to) ? Math.max(0, to - from) : 0;
+  return new Date(Date.parse(endsAt) + lost).toISOString();
+}
+
+const creditExpired = (endsAt: string | null, nowMs: number) => endsAt !== null && Date.parse(endsAt) < nowMs;
+
 /** Unfinished drafts one customer may hold at once. */
 export const MAX_OPEN_DRAFTS = 5;
 
@@ -956,10 +1124,12 @@ export async function createDraft(
     );
   });
   stmts.push(eventStatement(db, id, { id: userId, role: 'customer' }, 'create', null, 'draft', { scope: input.scope }, nowIso));
+  const slot = await slotOf(db, unit.order_item_id, unit.unit_index);
+  stmts.push(serviceFence(db, id, slot));
   try {
     await db.batch(stmts);
   } catch (e) {
-    if (isAbort(e)) throw refuse('TRADE_IN_ALREADY_CLAIMED');
+    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_ALREADY_CLAIMED');
     throw e;
   }
   return (await loadRequest(db, id))!;
@@ -1408,6 +1578,7 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
   const now = new Date().toISOString();
   const { estimate } = estimateFor({ ...req, target_price_iqd: priced.price_iqd }, comps, book, now);
   const token = randomToken(12);
+  const slot = await slotOf(db, req.order_item_id, req.unit_index);
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
@@ -1418,6 +1589,7 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
       )
       .bind(id, now, token, priced.price_iqd, JSON.stringify(priced.snapshot), estimate.total_iqd, JSON.stringify(estimate), JSON.stringify(estimate.rule_versions)),
     fence(db, id, token),
+    serviceFence(db, id, slot),
     ...estimate.components.map((c) =>
       db
         .prepare('UPDATE trade_in_components SET estimate_json = ?1, value_iqd = ?2 WHERE request_id = ?3 AND role = ?4')
@@ -1444,7 +1616,7 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
   try {
     await db.batch(stmts);
   } catch (e) {
-    if (isAbort(e)) throw refuse('TRADE_IN_STALE');
+    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
     throw e;
   }
   return (await loadRequest(db, id))!;
@@ -1463,7 +1635,7 @@ async function releaseStatements(db: D1Database, req: RequestRow): Promise<D1Pre
 export async function creditOrders(db: D1Database, requestId: string) {
   const { results } = await db
     .prepare(
-      `SELECT r.order_id, r.coupon_id, r.amount_iqd, o.status, o.created_at
+      `SELECT r.order_id, r.coupon_id, r.amount_iqd, o.status, o.created_at, o.cancelled_at
          FROM coupons c
          JOIN coupon_redemptions r ON r.coupon_id = c.id
          JOIN orders o ON o.id = r.order_id
@@ -1471,7 +1643,7 @@ export async function creditOrders(db: D1Database, requestId: string) {
         ORDER BY r.created_at DESC`
     )
     .bind(requestId)
-    .all<{ order_id: string; coupon_id: string; amount_iqd: number; status: string; created_at: string }>();
+    .all<{ order_id: string; coupon_id: string; amount_iqd: number; status: string; created_at: string; cancelled_at: string | null }>();
   return results ?? [];
 }
 
@@ -1526,6 +1698,121 @@ export async function cancelRequest(
   return (await loadRequest(db, req.id))!;
 }
 
+/** A trade-in holding units of one line, as the return door sees it (plan §1.3). */
+export interface LineTradeIn {
+  request: RequestRow;
+  /** The devices of every slot it claims (each unit and its warranty replacements). */
+  unitIds: string[];
+  /** Slots claimed on the line. */
+  units: number;
+  /** A live (not cancelled) order spent its credit, or it is complete: the device is no longer just the customer's. */
+  committed: boolean;
+}
+
+/**
+ * Whether this database carries the trade-in tables (0143). The return and
+ * price-protection doors ask about trade-ins on every money act, and code can
+ * run ahead of its migrations (a redeploy of an older database): without the
+ * tables there is no trade-in to fence against, and nothing must 500.
+ */
+export async function tradeInInstalled(db: D1Database): Promise<boolean> {
+  try {
+    await db.prepare('SELECT 1 FROM trade_in_claims LIMIT 0').all();
+    return true;
+  } catch (e) {
+    if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return false;
+    throw e;
+  }
+}
+
+/**
+ * The units of a line a trade-in holds (draft to complete), in SQL with ONE
+ * positional parameter (the line id): each slot counts once, whatever part
+ * was claimed. A database without the trade-in tables holds none.
+ */
+export const tradedUnitsSql = (installed: boolean) =>
+  installed
+    ? '(SELECT COUNT(DISTINCT unit_index) FROM trade_in_claims WHERE order_item_id = ?)'
+    : 'COALESCE((SELECT 0 WHERE ? IS NOT NULL), 0)';
+
+/** Every trade-in holding a unit of `orderItemId` (its claim rows exist only while it is live or complete). */
+export async function tradeInsOnLine(db: D1Database, orderItemId: string): Promise<LineTradeIn[]> {
+  if (!(await tradeInInstalled(db))) return [];
+  const { results } = await db
+    .prepare('SELECT DISTINCT request_id, unit_index FROM trade_in_claims WHERE order_item_id = ?')
+    .bind(orderItemId)
+    .all<{ request_id: string; unit_index: number }>();
+  const byRequest = new Map<string, number[]>();
+  for (const r of results ?? []) {
+    const list = byRequest.get(r.request_id) ?? [];
+    if (!list.includes(Number(r.unit_index))) list.push(Number(r.unit_index));
+    byRequest.set(r.request_id, list);
+  }
+  const out: LineTradeIn[] = [];
+  for (const [id, indexes] of byRequest) {
+    const request = await loadRequest(db, id);
+    if (!request) continue;
+    const live = (await creditOrders(db, id)).some((o) => o.status !== 'cancelled');
+    const unitIds = (await Promise.all(indexes.map((i) => slotOf(db, orderItemId, i)))).flatMap((s) => s.unitIds);
+    out.push({
+      request,
+      unitIds,
+      units: indexes.length,
+      committed: live || isTerminal(request.status) || !canTransition(request.status, 'cancelled'),
+    });
+  }
+  return out;
+}
+
+/**
+ * THE RETURN WINS (plan §1.3: «Trade-in submitted, before intake → Return ✓
+ * the return wins; the trade-in is cancelled»). The statements that cancel a
+ * trade-in, in the SAME batch as the return case the customer is opening:
+ * fenced on the status read, and on no live order holding its credit — a
+ * credit spent in the meantime aborts the whole batch (no case, no cancel).
+ * The credit coupon dies with the request (`releaseStatements`); the customer
+ * is told in their language.
+ */
+export async function returnWinsStatements(db: D1Database, req: RequestRow, actorUserId: string, returnCaseId: string, now: string): Promise<D1PreparedStatement[]> {
+  const token = randomToken(12);
+  return [
+    db
+      .prepare(
+        `UPDATE trade_in_requests
+            SET status = 'cancelled', cancelled_at = ?2, updated_at = ?2, cancel_reason = '', cancelled_by = ?3, decision_token = ?4
+          WHERE id = ?1 AND status = ?5`
+      )
+      .bind(req.id, now, actorUserId, token, req.status),
+    fence(db, req.id, token),
+    db
+      .prepare(
+        `UPDATE trade_in_requests SET status = CASE WHEN EXISTS (
+            SELECT 1 FROM coupons c JOIN coupon_redemptions r ON r.coupon_id = c.id JOIN orders o ON o.id = r.order_id
+             WHERE c.trade_in_id = ?1 AND o.status <> 'cancelled') THEN NULL ELSE status END
+          WHERE id = ?1`
+      )
+      .bind(req.id),
+    ...(await releaseStatements(db, req)),
+    eventStatement(db, req.id, { id: actorUserId, role: 'customer' }, 'cancel', req.status, 'cancelled', { reason: 'return_opened', return_case_id: returnCaseId }, now),
+    notifyStatement(db, {
+      userId: req.user_id,
+      kind: 'trade_in',
+      title_ar: 'أُلغي طلب الاستبدال',
+      title_en: 'Your trade-in request was cancelled',
+      body_ar: 'فتحت طلب إرجاع لهذا الجهاز، فأُلغي طلب استبداله.',
+      body_en: 'You opened a return for this device, so its trade-in request was cancelled.',
+      meta: {
+        title_ckb: 'داواکاریی گۆڕینەوەکەت هەڵوەشێندرایەوە',
+        body_ckb: 'داواکاریی گەڕاندنەوەت بۆ ئەم ئامێرە کردەوە، بۆیە داواکاریی گۆڕینەوەکەی هەڵوەشێندرایەوە.',
+      },
+      link: requestPath(req.id),
+      entity_type: 'trade_in',
+      entity_id: req.id,
+      eventKey: `trade_in:${req.id}:cancelled`,
+    }).stmt,
+  ];
+}
+
 export async function markInspected(env: Env, req: RequestRow, adminId: string): Promise<RequestRow> {
   const db = env.DB;
   if (req.status === 'under_review') return req;
@@ -1573,17 +1860,26 @@ function couponCode(): string {
  * only, not stackable. Its value is the credit — min(value, target price) —
  * so even a coupon that escaped the checkout's trade-in guard could not take
  * more than the device is worth.
+ *
+ * IT ENDS (owner decision 2, row 223): `ends_at` is seven days after it is
+ * minted (`TRADE_IN_CREDIT_VALID_DAYS`), and `validateCoupon` refuses it
+ * after that. A fixed dinar credit held for months ages with the device and
+ * the prices it was computed from. A re-minted credit keeps the original end
+ * plus the days the cancelled order held it (`checkoutCredit`).
  */
-function couponStatement(db: D1Database, req: RequestRow, credit: number, couponId: string, code: string, now: string): D1PreparedStatement {
+function couponStatement(db: D1Database, req: RequestRow, credit: number, couponId: string, code: string, now: string, endsAt: string | null): D1PreparedStatement {
   const optionIds = safeParse<string[]>(req.target_option_value_ids, []);
   return db
     .prepare(
       `INSERT INTO coupons (id, code, tier_required, kind, value, min_total_iqd, max_global, max_per_user, active, created_at,
-          assigned_user_id, scope, product_id, option_value_id, color_id, fulfillment_types, applies_to, cap_scope, max_quantity, stacks, trade_in_id)
-       VALUES (?1, ?2, NULL, 'fixed_iqd', ?3, 0, 1, 1, 1, ?4, ?5, 'product', ?6, ?7, ?8, '["direct_sale"]', 'merchandise', 'per_order', 1, 0, ?9)`
+          assigned_user_id, scope, product_id, option_value_id, color_id, fulfillment_types, applies_to, cap_scope, max_quantity, stacks, trade_in_id, ends_at)
+       VALUES (?1, ?2, NULL, 'fixed_iqd', ?3, 0, 1, 1, 1, ?4, ?5, 'product', ?6, ?7, ?8, '["direct_sale"]', 'merchandise', 'per_order', 1, 0, ?9, ?10)`
     )
-    .bind(couponId, code, credit, now, req.user_id, req.target_product_id, optionIds[0] ?? null, req.target_color_id, req.id);
+    .bind(couponId, code, credit, now, req.user_id, req.target_product_id, optionIds[0] ?? null, req.target_color_id, req.id, endsAt);
 }
+
+/** «2026-10-21» — the credit's last day, as the notification states it in every language. */
+const dayText = (iso: string) => iso.slice(0, 10);
 
 /**
  * FIX THE VALUE AND OPEN THE PAYMENT STAGE — the shared tail of «اعتماد
@@ -1595,7 +1891,13 @@ async function fixValue(
   env: Env,
   req: RequestRow,
   value: number,
-  step: { via: 'admin' | 'web' | 'telegram'; actor: { id: string; role: 'customer' | 'admin' }; passThrough: 'approved_as_estimated' | 'customer_accepted' }
+  step: {
+    via: 'admin' | 'web' | 'telegram';
+    actor: { id: string; role: 'customer' | 'admin' };
+    passThrough: 'approved_as_estimated' | 'customer_accepted';
+    /** The money authority the admin acted under (worker/lib/moneyAuthority.ts), for the audit row. */
+    grant?: MoneyGrant;
+  }
 ): Promise<RequestRow> {
   const db = env.DB;
   const priced = await priceTarget(env, req.user_id, {
@@ -1608,6 +1910,15 @@ async function fixValue(
   const token = randomToken(12);
   const couponId = s.credit_iqd > 0 ? newId('cpn') : null;
   const code = couponId ? couponCode() : null;
+  const endsAt = new Date(Date.parse(now) + TRADE_IN_CREDIT_VALID_DAYS * DAY_MS).toISOString();
+  const until = couponId
+    ? {
+        ar: ` الرصيد صالح حتى ${dayText(endsAt)}.`,
+        en: ` The credit is valid until ${dayText(endsAt)}.`,
+        ckb: ` باڵانسەکە تا ${dayText(endsAt)} بەردەوامە.`,
+      }
+    : { ar: '', en: '', ckb: '' };
+  const slot = await slotOf(db, req.order_item_id, req.unit_index);
   const from = req.status;
   const stmts: D1PreparedStatement[] = [
     db
@@ -1620,19 +1931,22 @@ async function fixValue(
       )
       .bind(req.id, s.trade_in_value_iqd, s.credit_iqd, s.difference_iqd, s.target_price_iqd, JSON.stringify(priced.snapshot), couponId, now, step.via, token, from, req.offer_no),
     fence(db, req.id, token),
+    // No credit for a device that went to the repair desk, whose price is
+    // being compensated, or that a return is bringing back (plan §1.3).
+    serviceFence(db, req.id, slot),
     eventStatement(db, req.id, step.actor, step.passThrough === 'approved_as_estimated' ? 'approve' : 'accept', from, step.passThrough, { value_iqd: value, via: step.via }, now),
     eventStatement(db, req.id, { id: null, role: 'system' }, 'awaiting_payment', step.passThrough, 'awaiting_payment', { ...s }, now),
-    ...(couponId && code ? [couponStatement(db, req, s.credit_iqd, couponId, code, now)] : []),
+    ...(couponId && code ? [couponStatement(db, req, s.credit_iqd, couponId, code, now, endsAt)] : []),
     notifyStatement(db, {
       userId: req.user_id,
       kind: 'trade_in',
       title_ar: 'ثُبّتت قيمة الاستبدال — أكمل الدفع',
       title_en: 'Your trade-in value is fixed — complete the payment',
-      body_ar: `قيمة جهازك ${iqdText(s.trade_in_value_iqd, 'ar')}. المطلوب للجهاز الجديد ${iqdText(s.difference_iqd, 'ar')} + التوصيل.`,
-      body_en: `Your device is worth ${iqdText(s.trade_in_value_iqd, 'en')}. You pay ${iqdText(s.difference_iqd, 'en')} for the new device, plus delivery.`,
+      body_ar: `قيمة جهازك ${iqdText(s.trade_in_value_iqd, 'ar')}. المطلوب للجهاز الجديد ${iqdText(s.difference_iqd, 'ar')} + التوصيل.${until.ar}`,
+      body_en: `Your device is worth ${iqdText(s.trade_in_value_iqd, 'en')}. You pay ${iqdText(s.difference_iqd, 'en')} for the new device, plus delivery.${until.en}`,
       meta: {
         title_ckb: 'بەهای گۆڕینەوە جێگیر کرا — پارەدان تەواو بکە',
-        body_ckb: `بەهای ئامێرەکەت ${iqdText(s.trade_in_value_iqd, 'ckb')}. بۆ ئامێرە نوێیەکە ${iqdText(s.difference_iqd, 'ckb')} دەدەیت، لەگەڵ کرێی گەیاندن.`,
+        body_ckb: `بەهای ئامێرەکەت ${iqdText(s.trade_in_value_iqd, 'ckb')}. بۆ ئامێرە نوێیەکە ${iqdText(s.difference_iqd, 'ckb')} دەدەیت، لەگەڵ کرێی گەیاندن.${until.ckb}`,
       },
       link: requestPath(req.id),
       entity_type: 'trade_in',
@@ -1641,7 +1955,7 @@ async function fixValue(
     }).stmt,
   ];
   if (step.actor.role === 'admin') {
-    stmts.push(...(await auditStatements(db, step.actor.id, 'trade_in.approve', req.id, { value_iqd: value, ...s })).statements);
+    stmts.push(...(await auditStatements(db, step.actor.id, 'trade_in.approve', req.id, { value_iqd: value, ...s, authority: step.grant?.audit ?? null })).statements);
   }
   try {
     await db.batch(stmts);
@@ -1649,17 +1963,17 @@ async function fixValue(
     if (isAbort(e)) {
       const now2 = await loadRequest(db, req.id);
       if (now2 && now2.offer_no !== req.offer_no) throw refuse('TRADE_IN_OFFER_STALE');
-      throw refuse('TRADE_IN_STALE');
+      throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
     }
     throw e;
   }
   return (await loadRequest(db, req.id))!;
 }
 
-export async function approveEstimate(env: Env, req: RequestRow, adminId: string): Promise<RequestRow> {
+export async function approveEstimate(env: Env, req: RequestRow, adminId: string, grant?: MoneyGrant): Promise<RequestRow> {
   if (!canTransition(req.status, 'approved_as_estimated')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   if (req.estimated_iqd === null) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
-  return fixValue(env, req, req.estimated_iqd, { via: 'admin', actor: { id: adminId, role: 'admin' }, passThrough: 'approved_as_estimated' });
+  return fixValue(env, req, req.estimated_iqd, { via: 'admin', actor: { id: adminId, role: 'admin' }, passThrough: 'approved_as_estimated', grant });
 }
 
 export const TRADE_IN_VALUE_MAX_IQD = 1_000_000_000;
@@ -1670,12 +1984,20 @@ export const TRADE_IN_VALUE_MAX_IQD = 1_000_000_000;
  * answers. The in-app row rides in the batch; email, WhatsApp and the
  * Telegram buttons follow (`notifyCustomerOfValue`).
  */
-export async function changeValue(env: Env, req: RequestRow, adminId: string, value: number, reason: string): Promise<RequestRow> {
+export async function changeValue(
+  env: Env,
+  req: RequestRow,
+  adminId: string,
+  value: number,
+  reason: string,
+  grant?: MoneyGrant
+): Promise<RequestRow> {
   const db = env.DB;
   if (!Number.isSafeInteger(value) || value < 0 || value > TRADE_IN_VALUE_MAX_IQD) throw refuse('TRADE_IN_INVALID_VALUE');
   if (!canTransition(req.status, 'value_changed')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   const now = new Date().toISOString();
   const token = randomToken(12);
+  const slot = await slotOf(db, req.order_item_id, req.unit_index);
   const offer = req.offer_no + 1;
   const est = req.estimated_iqd ?? 0;
   const target = req.target_price_iqd ?? 0;
@@ -1691,7 +2013,8 @@ export async function changeValue(env: Env, req: RequestRow, adminId: string, va
         )
         .bind(req.id, value, reason, offer, now, token, req.status, req.offer_no),
       fence(db, req.id, token),
-      eventStatement(db, req.id, { id: adminId, role: 'admin' }, 'change_value', req.status, 'value_changed', { value_iqd: value, estimated_iqd: est, reason, offer_no: offer }, now),
+      serviceFence(db, req.id, slot),
+      eventStatement(db, req.id, { id: adminId, role: 'admin' }, 'change_value', req.status, 'value_changed', { value_iqd: value, estimated_iqd: est, reason, offer_no: offer, above_estimate: grant?.above_ceiling === true }, now),
       notifyStatement(db, {
         userId: req.user_id,
         kind: 'trade_in',
@@ -1709,10 +2032,10 @@ export async function changeValue(env: Env, req: RequestRow, adminId: string, va
         },
         eventKey: `trade_in:${req.id}:offer:${offer}`,
       }).stmt,
-      ...(await auditStatements(db, adminId, 'trade_in.change_value', req.id, { value_iqd: value, estimated_iqd: est, reason, offer_no: offer })).statements,
+      ...(await auditStatements(db, adminId, 'trade_in.change_value', req.id, { value_iqd: value, estimated_iqd: est, reason, offer_no: offer, authority: grant?.audit ?? null })).statements,
     ]);
   } catch (e) {
-    if (isAbort(e)) throw refuse('TRADE_IN_STALE');
+    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
     throw e;
   }
   return (await loadRequest(db, req.id))!;
@@ -1787,14 +2110,22 @@ export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code:
   if (live) return { code: null, order_id: live.order_id };
   if (!req.credit_iqd || !req.coupon_id) return { code: null, order_id: null };
   const current = await db
-    .prepare('SELECT id, code, active FROM coupons WHERE id = ? AND trade_in_id = ?')
+    .prepare('SELECT id, code, active, ends_at FROM coupons WHERE id = ? AND trade_in_id = ?')
     .bind(req.coupon_id, req.id)
-    .first<{ id: string; code: string; active: number }>();
-  const used = orders.some((o) => o.coupon_id === req.coupon_id);
-  if (current && current.active === 1 && !used) return { code: current.code, order_id: null };
-  if (!used) throw refuse('TRADE_IN_COUPON_MISMATCH');
+    .first<{ id: string; code: string; active: number; ends_at: string | null }>();
+  const held = orders.find((o) => o.coupon_id === req.coupon_id) ?? null;
+  const nowMs = Date.now();
+  if (current && current.active === 1 && !held) {
+    if (creditExpired(creditEndsAt(current.ends_at, null, nowMs), nowMs)) throw refuse('TRADE_IN_CREDIT_EXPIRED');
+    return { code: current.code, order_id: null };
+  }
+  if (!held) throw refuse('TRADE_IN_COUPON_MISMATCH');
   // The order that spent the credit was cancelled: a fresh coupon, the old one
   // retired, both behind the fence on `coupon_id` still naming the old one.
+  // It keeps the old end plus the time that order held the credit
+  // (`creditEndsAt`); a credit minted before credits ended keeps no end.
+  const endsAt = creditEndsAt(current?.ends_at, held, nowMs);
+  if (creditExpired(endsAt, nowMs)) throw refuse('TRADE_IN_CREDIT_EXPIRED');
   const now = new Date().toISOString();
   const token = randomToken(12);
   const couponId = newId('cpn');
@@ -1806,7 +2137,7 @@ export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code:
         .bind(req.id, couponId, now, token, req.coupon_id),
       fence(db, req.id, token),
       db.prepare('UPDATE coupons SET active = 0 WHERE id = ?').bind(req.coupon_id),
-      couponStatement(db, req, req.credit_iqd, couponId, code, now),
+      couponStatement(db, req, req.credit_iqd, couponId, code, now, endsAt),
       eventStatement(db, req.id, { id: null, role: 'system' }, 'credit_reissued', 'awaiting_payment', 'awaiting_payment', { previous_coupon: req.coupon_id }, now),
     ]);
   } catch (e) {
@@ -2015,18 +2346,24 @@ function photoView(p: PhotoRow) {
 /** The request as its owner sees it; the admin view adds the customer and the audit detail. */
 export async function requestView(env: Env, req: RequestRow, audience: 'customer' | 'admin') {
   const db = env.DB;
-  const [comps, photos, events, book, orders] = await Promise.all([
+  const [comps, photos, events, book, orders, credit] = await Promise.all([
     loadComponents(db, req.id),
     loadPhotos(db, req.id),
     loadEvents(db, req.id),
     loadRuleBook(db),
     creditOrders(db, req.id),
+    req.coupon_id
+      ? db.prepare('SELECT ends_at FROM coupons WHERE id = ? AND trade_in_id = ?').bind(req.coupon_id, req.id).first<{ ends_at: string | null }>()
+      : Promise.resolve(null),
   ]);
   const now = new Date().toISOString();
   const live = estimateFor(req, comps, book, now);
   const stored = safeParse<Estimate | null>(req.estimate_json, null);
   const blockers = req.status === 'draft' ? submitBlockers(req, comps, photos, book) : null;
   const creditOrder = orders.find((o) => o.status !== 'cancelled') ?? null;
+  // The credit's last moment, as «إتمام الدفع» will judge it (`checkoutCredit`).
+  const creditEnd = credit ? creditEndsAt(credit.ends_at, orders.find((o) => o.coupon_id === req.coupon_id) ?? null, Date.parse(now)) : null;
+  const creditLapsed = !creditOrder && creditExpired(creditEnd, Date.parse(now));
   const offer =
     req.admin_value_iqd !== null
       ? {
@@ -2089,6 +2426,9 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
     difference_iqd: req.difference_iqd,
     excess_iqd: req.final_value_iqd !== null && req.credit_iqd !== null ? req.final_value_iqd - req.credit_iqd : null,
     credit_order: creditOrder ? { id: creditOrder.order_id, status: creditOrder.status, amount_iqd: creditOrder.amount_iqd } : null,
+    /** The credit's last moment (owner decision 2), or null for a credit minted before credits ended. */
+    credit_expires_at: creditOrder ? null : creditEnd,
+    credit_expired: creditLapsed,
     customer_note: req.customer_note,
     cancel_reason: req.cancel_reason,
     blockers,
@@ -2109,7 +2449,7 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       submit: req.status === 'draft' && !!blockers && !Object.keys(blockers.inputs).length && !Object.keys(blockers.photos).length && !blockers.target,
       cancel: !isTerminal(req.status) && !creditOrder,
       decide: req.status === 'value_changed',
-      pay: req.status === 'awaiting_payment' && !creditOrder && (req.credit_iqd ?? 0) > 0,
+      pay: req.status === 'awaiting_payment' && !creditOrder && (req.credit_iqd ?? 0) > 0 && !creditLapsed,
     },
     created_at: req.created_at,
     submitted_at: req.submitted_at,

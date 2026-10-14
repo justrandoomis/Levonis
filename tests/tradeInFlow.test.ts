@@ -415,8 +415,12 @@ async function submitted(raw: DatabaseSync, scope: 'whole' | 'printer_only' | 'a
 test('a changed value asks the customer; only the linked owner may press, a stale offer cannot be accepted', async () => {
   const raw = seed();
   const id = await submitted(raw);
-  // An assistant admin may inspect but not put a number on it.
-  assert.equal((await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/inspect`)).status, 200);
+  // An assistant admin neither inspects nor puts a number on it (owner decision 3, G16): starting the
+  // inspection moves the device and the money it stands for.
+  const noInspect = await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/inspect`);
+  assert.equal(noInspect.status, 403);
+  assert.equal((await json(noInspect)).code, 'FINANCIAL_SCOPE_REQUIRED');
+  assert.equal((await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/inspect`)).status, 200);
   const denied = await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 150_000 });
   assert.equal(denied.status, 403);
   assert.equal((await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/approve`)).status, 403);

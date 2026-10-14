@@ -9,12 +9,15 @@
  * line that makes it, the final value and the difference the customer pays.
  *
  * THE ACTIONS are the server's (worker/routes/tradeIn.ts) and nothing more:
- *   بدء الفحص         submitted → under_review (any admin)
+ *   بدء الفحص         submitted → under_review (financial scope)
  *   اعتماد التقدير    the estimate becomes the final value (financial scope)
  *   تغيير القيمة      a new value + optional reason; the customer is asked to
  *                    accept or decline in-app, by email/WhatsApp and with
- *                    Telegram buttons (financial scope)
+ *                    Telegram buttons (financial scope, up to the estimate;
+ *                    above it the main admin alone, with a private reason —
+ *                    owner decision 3, worker/lib/moneyAuthority.ts)
  *   إتمام الاستبدال   once the customer's order for the new device exists
+ *                    (financial scope)
  *   إلغاء             with a reason, while no live order carries the credit
  * A button the server would refuse is disabled here with the reason beside it;
  * the server still decides.
@@ -28,6 +31,7 @@ import * as T from '../adminProducts/theme';
 import '../adminProducts/theme.css';
 import { Modal } from '../adminProducts/ui';
 import { api, ApiError, failureText } from '../../lib/api';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, STATUS_LABELS, TRADE_IN_FAMILIES, checklistOf, tradeInSettlement, type TradeInFamily, type TradeInStatus } from '../../../packages/pricing/src/tradeIn';
 import type { AdminRequestView as RequestView } from '../tradeIn/model';
@@ -249,6 +253,8 @@ interface DetailResponse {
   request: RequestView;
   customer: { id: string; name: string; email: string; phone_e164: string | null; username: string | null } | null;
   financial_scope: boolean;
+  /** The verified main admin: may go above the estimate, with a reason. Older servers omit it. */
+  owner_scope?: boolean;
 }
 
 function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose: () => void; onChanged: () => void }) {
@@ -259,6 +265,7 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
   const [busy, setBusy] = useState('');
   const [value, setValue] = useState('');
   const [reason, setReason] = useState('');
+  const [ownerReason, setOwnerReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [mode, setMode] = useState<'' | 'value' | 'cancel'>('');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -284,7 +291,8 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
       onChanged();
     } catch (e) {
       const code = e instanceof ApiError ? e.code : '';
-      setError(`${failureText(e, 'Failed')}${code ? ` (${code})` : ''}`);
+      const text = e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : failureText(e, 'Failed');
+      setError(`${text}${code ? ` (${code})` : ''}`);
     } finally {
       setBusy('');
     }
@@ -293,11 +301,15 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
   const r = data?.request;
   const proposed = Number(value.replace(/[^0-9]/g, ''));
   const preview = useMemo(() => (r && value ? tradeInSettlement(r.target?.price_iqd ?? 0, proposed) : null), [r, value, proposed]);
+  // Owner decision 3 (M1): a value above the estimate the server fixed is the main admin's alone, with a reason.
+  const aboveEstimate = !!r && !!value && proposed > (r.estimated_iqd ?? 0);
+  const ownerScope = data?.owner_scope === true;
+  const canSend = !!value && (!aboveEstimate || (ownerScope && ownerReason.trim().length >= 5));
 
   const footer = r ? (
     <div className="flex flex-wrap items-center gap-2">
       {r.status === 'submitted' ? (
-        <button type="button" className={T.btnSecondary} disabled={!!busy} onClick={() => act('inspect', 'inspect')} data-act="inspect">
+        <button type="button" className={T.btnSecondary} disabled={!!busy || !data?.financial_scope} onClick={() => act('inspect', 'inspect')} data-act="inspect">
           <ClipboardCheck className="w-4 h-4" aria-hidden />
           {L('بدء الفحص', 'Start inspection')}
         </button>
@@ -315,7 +327,7 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
         </button>
       ) : null}
       {r.status === 'awaiting_payment' ? (
-        <button type="button" className={T.btnPrimary} disabled={!!busy || ((r.credit_iqd ?? 0) > 0 && !r.credit_order)} onClick={() => act('complete', 'complete')} data-act="complete">
+        <button type="button" className={T.btnPrimary} disabled={!!busy || !data?.financial_scope || ((r.credit_iqd ?? 0) > 0 && !r.credit_order)} onClick={() => act('complete', 'complete')} data-act="complete">
           <PackageCheck className="w-4 h-4" aria-hidden />
           {L('إتمام الاستبدال', 'Complete the trade-in')}
         </button>
@@ -337,7 +349,11 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
         <div className="space-y-4" data-admin-trade-in={r.id}>
           {!data?.financial_scope ? (
             <p className="text-[12.5px] rounded-[var(--ap-radius-md)] border border-[var(--ap-warning-border)] bg-[var(--ap-warning-bg)] text-[var(--ap-warning)] p-2.5">
-              {L('اعتماد القيمة أو تغييرها يحتاج صلاحية مالية.', 'Approving or changing a value needs the financial scope.')}
+              {loc(
+                'الفحص واعتماد القيمة وتغييرها وإتمام الاستبدال تحتاج صلاحية مالية.',
+                'Inspecting, approving or changing a value and completing the trade-in need the financial scope.',
+                'پشکنین و پەسەندکردن یان گۆڕینی بەها و تەواوکردنی گۆڕینەوە پێویستیان بە دەسەڵاتی دارایی هەیە.'
+              )}
             </p>
           ) : null}
           {mode === 'value' ? (
@@ -352,13 +368,41 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                   <input className={`${T.input} w-full`} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
                 </label>
               </div>
+              {aboveEstimate ? (
+                ownerScope ? (
+                  <label className="block" data-owner-reason>
+                    <span className={`block text-[12px] ${T.text3} mb-1`}>
+                      {loc(
+                        'أعلى من التقدير — سبب قرارك (خاص، يُسجَّل ويُعلَّم في التقارير، لا يراه الزبون)',
+                        'Above the estimate — your reason (private: recorded and flagged in reports, never shown to the customer)',
+                        'سەرووی خەمڵاندنەکە — هۆکاری بڕیارەکەت (تایبەتە: تۆمار دەکرێت و لە ڕاپۆرتەکاندا نیشانە دەکرێت، کڕیار نایبینێت)'
+                      )}
+                    </span>
+                    <input className={`${T.input} w-full`} maxLength={500} value={ownerReason} onChange={(e) => setOwnerReason(e.target.value)} />
+                  </label>
+                ) : (
+                  <p className="text-[12.5px] text-[var(--ap-warning)]" role="status" data-above-estimate>
+                    {loc(
+                      'القيمة أعلى من التقدير: يعتمدها الأدمن الرئيسي فقط. أرسل قيمة تساوي التقدير أو أقل.',
+                      'The value is above the estimate: only the main admin can set it. Send a value at or below the estimate.',
+                      'بەهاکە سەرووی خەمڵاندنەکەیە: تەنها بەڕێوەبەری سەرەکی دەتوانێت دایبنێت. بەهایەک بنێرە کە یەکسان یان کەمتر بێت لە خەمڵاندنەکە.'
+                    )}
+                  </p>
+                )
+              ) : null}
               {preview ? (
                 <p className={`text-[12.5px] ${T.text2}`}>
                   {L('الفرق الذي سيدفعه الزبون', 'The customer would pay')}: <strong className="text-[var(--ap-text-1)]">{iqd(preview.difference_iqd)}</strong>
                   {preview.excess_iqd > 0 ? ` · ${L('فائض غير محتسب', 'uncredited excess')} ${iqd(preview.excess_iqd)}` : ''}
                 </p>
               ) : null}
-              <button type="button" className={T.btnPrimary} disabled={!value || !!busy} onClick={() => act('value', 'value', { value_iqd: proposed, reason: reason.trim() })} data-send-value>
+              <button
+                type="button"
+                className={T.btnPrimary}
+                disabled={!canSend || !!busy}
+                onClick={() => act('value', 'value', { value_iqd: proposed, reason: reason.trim(), ...(aboveEstimate ? { owner_reason: ownerReason.trim() } : {}) })}
+                data-send-value
+              >
                 {L('أرسل للزبون للموافقة', 'Send to the customer')}
               </button>
             </div>

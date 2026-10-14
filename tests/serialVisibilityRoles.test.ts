@@ -312,23 +312,28 @@ test('decision 1 writes: adding, changing or removing a serial follows `receive`
   const prepAssign = await post(as('prep'), `/api/devices/admin/units/${open.id}/serial`, { serial: '03919D580607848' });
   assert.equal(prepAssign.status, 200, await prepAssign.clone().text());
 
-  // A warranty replacement that NAMES a new serial adds it (its asset row and
-  // an activated binding): that half follows `receive`. Support is refused it
-  // and nothing changes; the replacement itself, with no new serial, keeps the
-  // gate it always had; the preparer adds the serial through it.
+  // A whole-unit warranty replacement is the owner's act alone (owner decision
+  // 3, DECISIONS row 223: a new device for an old one). Support and the
+  // preparer are refused at the door — with or without a new serial, whatever
+  // their `receive` — and nothing changes; the owner replaces and adds the
+  // named serial (its asset row and an activated binding).
   const units = (w.raw.prepare("SELECT u.id FROM order_item_units u WHERE u.order_id = 'ORD-W' ORDER BY u.unit_index").all() as Array<{ id: string }>).map((u) => u.id);
   const fresh = '03919D580607851';
-  const supReplace = await post(as('sup'), `/api/devices/admin/units/${units[0]}/replace`, { new_serial: fresh, reason: 'dead on arrival' });
-  assert.equal(supReplace.status, 403, await supReplace.clone().text());
-  assert.equal((await json(supReplace)).code, 'SERIAL_WRITE_NOT_ALLOWED');
+  for (const [who, body] of [
+    ['sup', { new_serial: fresh, reason: 'dead on arrival' }],
+    ['sup', { reason: 'swapped at the counter' }],
+    ['prep', { new_serial: fresh, reason: 'dead on arrival' }],
+  ] as const) {
+    const refused = await post(as(who), `/api/devices/admin/units/${units[0]}/replace`, body);
+    assert.equal(refused.status, 403, await refused.clone().text());
+    assert.equal((await json(refused)).code, 'FINANCIAL_SCOPE_REQUIRED', who);
+  }
   assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM serial_inventory WHERE serial_norm = '${fresh}'`), 0, 'nothing was added');
   assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM device_serials WHERE serial_norm = '${fresh}'`), 0);
   assert.equal(row<{ r: string | null }>(w.raw, 'SELECT replaced_by_unit_id AS r FROM order_item_units WHERE id = ?', units[0])!.r, null, 'the unit was not replaced');
-  const supPlain = await post(as('sup'), `/api/devices/admin/units/${units[1]}/replace`, { reason: 'swapped at the counter' });
-  assert.equal(supPlain.status, 200, `a replacement with no new serial keeps its gate: ${await supPlain.clone().text()}`);
-  const prepReplace = await post(as('prep'), `/api/devices/admin/units/${units[0]}/replace`, { new_serial: fresh, reason: 'dead on arrival' });
-  assert.equal(prepReplace.status, 200, await prepReplace.clone().text());
-  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM device_serials WHERE serial_norm = '${fresh}'`), 1, 'the preparer added it');
+  const ownerReplace = await post(as('boss'), `/api/devices/admin/units/${units[0]}/replace`, { new_serial: fresh, reason: 'dead on arrival' });
+  assert.equal(ownerReplace.status, 200, await ownerReplace.clone().text());
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM device_serials WHERE serial_norm = '${fresh}'`), 1, 'the owner added it');
 
   // The owner, with `receive = 0` on their own row, is never locked out.
   order(w.raw, 'ORD-W2', [{ id: 'l2', product: 'pA1' }]);

@@ -176,14 +176,18 @@ test('M4 the replacement door: a serial promised to another order is not a spare
   await deliver(w, 'ORD-SOLD');
   const sold = unitOf(w, 'ORD-SOLD');
   await scan(w, 'adm', 'ORD-PREP', 'lp', 1, SN2);
-  // SN2 is reserved for ORD-PREP: never handed out as a replacement.
-  const promised = await post(w.as('adm'), `/api/devices/admin/units/${sold.id}/replace`, { reason: 'dead on arrival, swapped', new_serial: SN2 });
+  // A whole-unit replacement is the owner's act alone (owner decision 3, DECISIONS row 223): staff are refused at the door.
+  const staffTry = await post(w.as('adm'), `/api/devices/admin/units/${sold.id}/replace`, { reason: 'dead on arrival, swapped', new_serial: SN3 });
+  assert.equal(staffTry.status, 403, await staffTry.clone().text());
+  assert.equal((await json(staffTry)).code, 'OWNER_REQUIRED');
+  // SN2 is reserved for ORD-PREP: never handed out as a replacement, even by the owner (who is told which order).
+  const promised = await post(w.as('boss'), `/api/devices/admin/units/${sold.id}/replace`, { reason: 'dead on arrival, swapped', new_serial: SN2 });
   const pb = await json(promised);
   assert.equal(promised.status, 409, JSON.stringify(pb));
   assert.equal(pb.code, 'SERIAL_IN_USE');
-  assert.equal(pb.details?.order_id, undefined, 'and staff are not told which order');
+  assert.equal(pb.details?.order_id, 'ORD-PREP');
   // A spare from the shelf: the old binding ends 'replaced', the new device is bound to the new unit.
-  const ok = await post(w.as('adm'), `/api/devices/admin/units/${sold.id}/replace`, { reason: 'dead on arrival, swapped', new_serial: SN3 });
+  const ok = await post(w.as('boss'), `/api/devices/admin/units/${sold.id}/replace`, { reason: 'dead on arrival, swapped', new_serial: SN3 });
   const ob = await json(ok);
   assert.equal(ok.status, 200, JSON.stringify(ob));
   const oldBinding = row<R>(w.raw, "SELECT release_reason, unit_id FROM serial_assignments WHERE serial_norm = ? AND order_id = 'ORD-SOLD'", SN)!;

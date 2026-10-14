@@ -59,9 +59,12 @@ test('frozen unit membership changes only its own deduction; warranty, coupon an
   const line = { product_id: 'printer', membership_rule_id: 'rule', unit_price_iqd: 360000, qty: 2,
     warranty_snapshot: JSON.stringify({ fee_iqd: 15000 }), membership_discount_iqd: 80000, coupon_discount_iqd: 10001 };
   const snapshot = (applied_at: 'unit' | 'line') => JSON.stringify({ lines: [{ product_id: 'printer', rule_id: 'rule', applied_at }] });
-  assert.equal(paidPerUnit({ ...line, benefit_snapshot: snapshot('unit') }), 340000);
-  assert.equal(paidPerUnit({ ...line, unit_price_iqd: 400000, benefit_snapshot: snapshot('line') }), 340000);
-  assert.equal(paidPerUnit({ ...line, benefit_snapshot: null }), 300000);
+  // The shared paid-net rule (Services V2 plan §3.2, packages/pricing/src/paidNet.ts) floors the
+  // LINE once over its quantity, as price protection always did: the odd dinar of a 10,001 coupon
+  // split over two units stays on the store's side (680,000 − 10,001 → 339,999.5 → 339,999).
+  assert.equal(paidPerUnit({ ...line, benefit_snapshot: snapshot('unit') }), 339999);
+  assert.equal(paidPerUnit({ ...line, unit_price_iqd: 400000, benefit_snapshot: snapshot('line') }), 339999);
+  assert.equal(paidPerUnit({ ...line, benefit_snapshot: null }), 299999);
 });
 
 for (const cap of ['per_unit', 'per_order'] as const) {

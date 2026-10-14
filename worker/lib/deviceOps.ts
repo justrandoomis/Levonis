@@ -605,6 +605,22 @@ export const CLAIM_TRANSITIONS: Record<ClaimStage, ClaimStage[]> = {
   resolved: [],
 };
 
+/**
+ * A CLOSED claim, in SQL, on `alias` (or unqualified with ''). Closed claims
+ * no longer bind the device to its holder (worker/routes/devices.ts) and no
+ * longer hold a money process on the unit (Services V2 plan §1.3): a device
+ * with an OPEN claim is on the repair desk, and a trade-in waits for it.
+ *
+ * ALWAYS TRUE OR FALSE, NEVER NULL. A legacy row (stage NULL) still in
+ * review made `stage IN (…)` NULL, so `NOT closed` was NULL too and the open
+ * claim counted as neither open nor closed: a device at the repair desk read
+ * «no open claim». The COALESCEs keep the answer two-valued.
+ */
+export function closedClaimSql(alias = ''): string {
+  const a = alias ? `${alias}.` : '';
+  return `(COALESCE(${a}stage, '') IN ('rejected','replaced','resolved') OR (${a}stage IS NULL AND COALESCE(${a}status, '') IN ('rejected','approved')))`;
+}
+
 /** Effective stage for rows that predate the stage column. */
 export function effectiveClaimStage(stage: unknown, legacyStatus: unknown): ClaimStage {
   if (typeof stage === 'string' && (CLAIM_STAGES as readonly string[]).includes(stage)) return stage as ClaimStage;

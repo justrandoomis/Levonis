@@ -312,6 +312,10 @@ for (const role of NON_OWNER_ADMINS) {
 test('A — the cost-touching writes (return refund that restores the costly lot; claim approval) answer a non-owner admin without a cost', async () => {
   for (const role of ['full', 'legacy_null', 'grantee_off'] as const) {
     const raw = await world();
+    // One door per defect (Services V2 plan §1.3): no refund while the repair
+    // desk holds the same device. This case is about the refund's answer, so
+    // its world closes the warranty claim first.
+    raw.prepare("UPDATE warranty_claims SET stage='resolved' WHERE id=?").run(IDS.warrantyClaim);
     const remainingBefore = (raw.prepare("SELECT qty_remaining AS q FROM inventory_lots WHERE id='lot1'").get() as { q: number }).q;
     const ret = await send(raw, role, 'POST', `/api/returns/admin/${IDS.returnCase}/transition`, {
       to: 'resolved',

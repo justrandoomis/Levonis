@@ -745,7 +745,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       await api.patch(`/api/devices/admin/units/${device.unit_id}/delivery`, { delivered_at: ts.trim(), reason: reason.trim() });
       refreshCurrent();
     } catch (e) {
-      setUnitsError(e instanceof ApiError ? e.message : s.error);
+      // A later date is the owner's (OWNER_REQUIRED): the refusal reads in the admin's language.
+      setUnitsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
     } finally {
       setBusyUnit(null);
     }
@@ -831,7 +832,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       await api.patch(`/api/devices/admin/claims/${claim.id}`, { stage: next, reason: reason.trim() || undefined });
       await loadClaims(null);
     } catch (e) {
-      setClaimsError(e instanceof ApiError ? e.message : s.error);
+      // A decision needs the financial scope; «replaced» needs the replacement first — said in the admin's language.
+      setClaimsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
     } finally {
       setClaimBusy(false);
     }

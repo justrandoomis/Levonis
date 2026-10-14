@@ -263,7 +263,23 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
               <FactRow label={L('قيمة جهازك', 'Your device')} value={<Money iqd={req.final_value_iqd} />} />
               <FactRow label={L('سعر الجهاز الجديد', 'New device')} value={<Money iqd={target?.price_iqd ?? null} />} />
               <FactRow label={L('المطلوب دفعه', 'You pay')} value={<Money iqd={req.difference_iqd} />} strong />
+              {/* Owner decision 2: the credit is usable for a limited time. */}
+              {!req.credit_order && req.credit_expires_at ? (
+                <FactRow
+                  label={loc('الرصيد صالح حتى', 'Credit valid until', 'باڵانس بەردەوامە تا')}
+                  value={<span className="tabular-nums">{dateText(req.credit_expires_at, lang)}</span>}
+                />
+              ) : null}
             </dl>
+            {req.credit_expired && !req.credit_order ? (
+              <Note tone="amber" compact animate={false} className="mt-3" data-credit-expired>
+                {loc(
+                  'انتهت صلاحية رصيد الاستبدال. تواصل معنا لمراجعة الطلب.',
+                  'The trade-in credit has expired. Contact us to review the request.',
+                  'ماوەی باڵانسی گۆڕینەوە بەسەرچووە. پەیوەندیمان پێوە بکە بۆ پێداچوونەوەی داواکارییەکە.'
+                )}
+              </Note>
+            ) : null}
             {req.excess_iqd && req.excess_iqd > 0 ? (
               <Note tone="amber" compact animate={false} className="mt-3">
                 {L('يُحتسب من قيمة جهازك ما يغطي سعر الجهاز الجديد فقط.', 'Only the new device’s price is credited from your device’s value.')}
