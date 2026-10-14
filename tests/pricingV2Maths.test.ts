@@ -8,13 +8,17 @@
  * Proven here:
  *   1. every fixed cell of PRICING-V2.md §1.6 and of the decision examples (§8);
  *   2. a property over 4,000 SKUs against an independent BigInt oracle (anchor and
- *      discount precedence, the floor in both modes, blocked routes, the errors),
- *      plus P ≤ D, the step, D − R ≥ T, monotone discounts and colour differences;
- *   3. the reproduce rule over 10,000 prices and rates;
- *   4. off-step prices move up; the engine products' keep terms;
+ *      discount precedence, the floor — a floored route sells at D, owner answer Q1 —,
+ *      blocked routes, the errors, the price-first below-cost and below-minimum-profit
+ *      warnings, Q3), plus P ≤ D, the step, D − R ≥ T, monotone discounts and colour
+ *      differences;
+ *   3. the owner's answers of 2026-10-14 (DECISIONS row 222): Q1 a floored route sells at
+ *      the direct price (never at its cost), Q3 a typed price below cost + minimum profit
+ *      saves with the owner's warning, Q5 a negative model difference is lifted to the floor;
  *   5. no float ever enters;
- *   6. a pre-order-only SKU sells every route at D;
- * and the keep_usd proposal (spec §1.4 / §6.2) on fixed grids and a property.
+ *   6. a pre-order-only SKU sells every route at D.
+ * The reproduce helper (usdReproducing) lives with its only user, tests/fixtures/v2Publish.ts,
+ * and is proven by tests/v2Publish.test.ts: the clean start (Q6) retired the migration.
  *
  * Run: node --import tsx --test tests/pricingV2Maths.test.ts
  */
@@ -27,15 +31,13 @@ import {
   resolveDiscount,
   type V2Channel,
   type V2Discount,
-  type V2FloorMode,
   type V2Input,
   type V2Method,
   type V2PricePoint,
   type V2Result,
   type V2Sku,
 } from '../packages/pricing/src/priceV2';
-import { discountReproducing, engineKeepTerms, proposeKeepUsd, usdReproducing, type TodayGrid } from '../packages/pricing/src/priceV2Migration';
-import { priceSku, type CentralRates, type PricingInputRow, type SupplierCurrency } from '../packages/pricing/src/costToPrice';
+import type { CentralRates, PricingInputRow, SupplierCurrency } from '../packages/pricing/src/costToPrice';
 import type { RuleResolution } from '../packages/pricing/src/ruleResolution';
 import { composeIqdRates } from '../packages/pricing/src/fxChain';
 import {
@@ -201,7 +203,7 @@ test('B1 air example: R_air 1,265,000, P_air 1,425,000 (land and air alike), pro
   assert.equal(air.floor, 'none');
 });
 
-test('B1 floor: air freight above the discounted price → `direct` sells at D (discount withdrawn), `cost` lifts to ceil(R_air)', () => {
+test('B1 floor, owner answer Q1: air freight above the discounted price → the route sells at D (discount withdrawn), never lifted to its cost', () => {
   const skus = [workedSku('std', null, ['direct_sale', 'pre_order_land', 'pre_order_air'])];
   // 30,000/kg × 22 kg = 660,000 → R_air = 1,485,000: above P = 1,425,000, below D = 1,500,000.
   const direct = worked('1500', '1.08', { skus }, { CHINA_AIR: '30000' });
@@ -214,15 +216,13 @@ test('B1 floor: air freight above the discounted price → `direct` sells at D (
   assert.equal(ch(direct, STD, 'pre_order_land').price_iqd, 1_425_000, 'land keeps its discount');
   assert.equal(direct.ok, true);
 
-  const lifted = worked('1500', '1.08', { skus, floorMode: 'cost' }, { CHINA_AIR: '30000' });
-  const liftedAir = ch(lifted, STD, 'pre_order_air');
-  assert.equal(liftedAir.price_iqd, 1_485_000, 'ceil_1000(R_air)');
-  assert.equal(liftedAir.floor, 'lifted_to_cost');
-  assert.deepEqual(codes(lifted, STD, 'warning', 'pre_order_air'), ['V2_LIFTED_TO_COST']);
-  // An odd R lifts to the NEXT step, never below the cost.
-  const odd = worked('1500', '1.08', { skus, floorMode: 'cost' }, { CHINA_AIR: '29999.5' });
+  // Q1: the price is never the cost rounded up (that would publish the cost) — whatever R_air is.
+  const odd = worked('1500', '1.08', { skus }, { CHINA_AIR: '29999.5' });
   assert.equal(ch(odd, STD, 'pre_order_air').replacement?.replacement_exact, '1484989');
-  assert.equal(ch(odd, STD, 'pre_order_air').price_iqd, 1_485_000);
+  assert.equal(ch(odd, STD, 'pre_order_air').price_iqd, 1_500_000, 'D, not ceil_1000(R_air) = 1,485,000');
+  assert.equal(ch(odd, STD, 'pre_order_air').floor, 'discount_withdrawn');
+  // The retired `cost` floor mode is a programming error, never a price.
+  assert.throws(() => priceProductV2({ ...inputOfWorked(), floorMode: 'cost' } as V2Input), /PRICING_INVARIANT/);
 });
 
 test('B1 block: R_air above D blocks air only; land and direct stay priced', () => {
@@ -289,7 +289,7 @@ test('cost-first: D never below R_stock + T (C-9) — a low fixed price or a neg
   assert.equal(ch(above, STD, 'direct_sale').floor, 'none');
 });
 
-test('price-first never floors (C-6): below its known cost it only warns the owner', () => {
+test('price-first never floors (C-6, Q3): below its known cost, or below cost + minimum profit, it only warns the owner', () => {
   const r = worked('1500', '1.08', {
     method: 'usd',
     points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '700' }],
@@ -305,6 +305,49 @@ test('price-first never floors (C-6): below its known cost it only warns the own
   assert.equal(ch(r, STD, 'direct_sale').below_cost, false, '1,050,000 > R_stock 1,023,000');
   assert.deepEqual(codes(r, STD, 'warning', 'pre_order_air'), ['V2_BELOW_COST']);
   assert.equal(air.target_profit_usd, null);
+  // Q3: E_D 1,050,000 < R_stock 1,023,000 + T $318 × 1,500 = 1,500,000 → saved, priced, the owner warned.
+  assert.ok(codes(r, STD, 'warning').includes('V2_BELOW_MIN_PROFIT'));
+  for (const c of skuOf(r, STD).channels) assert.equal(c.below_min_profit, true, `${c.channel}: every channel shares D`);
+});
+
+test('Q3: a typed dollar price at or above cost + minimum profit raises nothing; without a complete cost or minimum profit nothing is said', () => {
+  const at = (usd: string, sku: V2Sku = workedSku('std', null)) =>
+    worked('1500', '1.08', { method: 'usd', points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd }], discounts: [], skus: [sku] });
+  // R_stock + T = 1,023,000 + 477,000 = 1,500,000 = $1,000 × 1,500.
+  const exact = at('1000');
+  assert.equal(ch(exact, STD, 'direct_sale').below_min_profit, false, 'E_D = R_stock + T is not below');
+  assert.ok(!codes(exact, STD, 'warning').includes('V2_BELOW_MIN_PROFIT'));
+  const cent = at('999.99');
+  assert.equal(ch(cent, STD, 'direct_sale').below_min_profit, true, 'one cent under');
+  assert.equal(ch(cent, STD, 'direct_sale').price_iqd, 1_500_000, 'the price is the typed dollars, never moved');
+  assert.equal(cent.ok, true);
+  // No minimum profit, or no cost: no warning (and never an error on a price-first product).
+  const noTarget = at('700', { ...workedSku('std', null), target: undefined });
+  assert.equal(noTarget.ok, true);
+  assert.equal(ch(noTarget, STD, 'direct_sale').below_min_profit, false);
+  const noCost = at('700', { ...workedSku('std', null), chain: undefined });
+  assert.equal(ch(noCost, STD, 'direct_sale').below_min_profit, false);
+  assert.equal(ch(noCost, STD, 'direct_sale').below_cost, false);
+  // A model or SKU fixed price is judged the same (the direct price, whatever its anchor).
+  const model = worked('1500', '1.08', {
+    method: 'usd',
+    points: [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '1200' }, { scope: 'option', scope_id: 'std', kind: 'fixed', usd: '800' }],
+    discounts: [],
+    skus: [workedSku('std', null)],
+  });
+  assert.equal(ch(model, STD, 'direct_sale').anchor, 'model_fixed');
+  assert.equal(ch(model, STD, 'direct_sale').below_min_profit, true);
+  // Cost-first never carries the price-first warnings.
+  const cost = worked('1500', '1.08', { skus: [workedSku('std', null)] });
+  for (const c of skuOf(cost, STD).channels) assert.deepEqual([c.below_cost, c.below_min_profit], [false, false]);
+});
+
+test('Q5: from cost, a negative model difference below R_stock + T is lifted to the floor with V2_DIRECT_MIN_PROFIT', () => {
+  const r = worked('1500', '1.08', { points: [{ scope: 'option', scope_id: 'std', kind: 'delta', usd: '-40' }], discounts: [], skus: [workedSku('std', null)] });
+  const d = ch(r, STD, 'direct_sale');
+  assert.equal(d.price_iqd, 1_500_000, 'R + T + (−$40 × 1,500) = 1,440,000 → lifted to 1,500,000');
+  assert.equal(d.floor, 'direct_min_profit');
+  assert.deepEqual(codes(r, STD, 'warning'), ['V2_DIRECT_MIN_PROFIT']);
 });
 
 /* ---------------------------------------------- refusals and codes -- */
@@ -529,7 +572,6 @@ const qCeilStep = (a: Q): number => {
 
 interface Gen {
   method: V2Method;
-  floorMode: V2FloorMode | undefined;
   U: string;
   E: string;
   C: string;
@@ -591,7 +633,6 @@ function generate(g: ReturnType<typeof lcg>): Gen {
   }
   return {
     method,
-    floorMode: pick([undefined, 'direct', 'cost'] as const),
     U: dec(1200, 2400, int(0, 4)),
     E: eFrac ? `1.${eFrac}` : '1',
     C: `0.1${String(int(1, 999999999)).padStart(9, '0')}`.replace(/0+$/, ''),
@@ -648,12 +689,11 @@ function inputOf(gen: Gen, over: Partial<V2Input> = {}): V2Input {
     points: gen.points,
     discounts: gen.discounts,
     skus,
-    ...(gen.floorMode ? { floorMode: gen.floorMode } : {}),
     ...over,
   };
 }
 
-type Expected = { price: number; floor: string; anchor: string; discount: string | null; below: boolean; direct: number } | { error: string };
+type Expected = { price: number; floor: string; anchor: string; discount: string | null; below: boolean; belowMin: boolean; direct: number } | { error: string };
 
 /** An independent oracle: the §1.3 algorithm on the generator's own fields, in plain BigInt pairs. */
 function oracle(gen: Gen, input: V2Input): Map<string, Map<SkuChannel, Expected>> {
@@ -713,6 +753,8 @@ function oracle(gen: Gen, input: V2Input): Map<string, Map<SkuChannel, Expected>
       continue;
     }
     const D = qCeilStep(eD);
+    // Q3: price-first, the direct price below R_stock + T (both known) — on every channel of the SKU.
+    const belowMin = gen.method === 'usd' && rStock !== null && typeof rStock !== 'string' && qCmp(eD, qAdd(rStock, T)) < 0;
     const sellsDirect = s.channels.includes('direct_sale');
     const won =
       (key ? gen.discounts.find((d) => d.scope === 'sku' && d.scope_id === key) : undefined) ??
@@ -724,7 +766,7 @@ function oracle(gen: Gen, input: V2Input): Map<string, Map<SkuChannel, Expected>
       const route = routeOfChannel(c);
       if (!route) {
         const below = gen.method === 'usd' && rStock !== null && typeof rStock !== 'string' && qCmp(eD, rStock) < 0;
-        rows.set(c, { price: D, floor: dFloor, anchor, discount: null, below, direct: D });
+        rows.set(c, { price: D, floor: dFloor, anchor, discount: null, below, belowMin, direct: D });
         continue;
       }
       const rR = gen.withChain ? R(s, ROUTE_PROFILE[route]) : null;
@@ -745,11 +787,11 @@ function oracle(gen: Gen, input: V2Input): Map<string, Map<SkuChannel, Expected>
           rows.set(c, { error: 'V2_ROUTE_BELOW_COST' });
           continue;
         }
-        if (qCmp(eP, r) < 0) [price, floor] = (gen.floorMode ?? 'direct') === 'direct' ? [D, 'discount_withdrawn'] : [qCeilStep(r), 'lifted_to_cost'];
+        if (qCmp(eP, r) < 0) [price, floor] = [D, 'discount_withdrawn']; // Q1: never lifted to the cost
       }
       const below = gen.method === 'usd' && rR !== null && typeof rR !== 'string' && qCmp(eP, rR) < 0;
       const discountText = sellsDirect && won ? won.usd : '0';
-      rows.set(c, { price, floor, anchor, discount: discountText, below, direct: D });
+      rows.set(c, { price, floor, anchor, discount: discountText, below, belowMin, direct: D });
     }
   }
   return out;
@@ -767,10 +809,10 @@ const qText = ([n, d]: Q): string => {
 };
 const usdText = (t: string) => qText(q(t));
 
-test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R ≥ T; the floor in both modes; monotone discounts; colour moves every model alike', () => {
+test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R ≥ T; a floored route sells at D (Q1); the Q3 warning; monotone discounts; colour moves every model alike', () => {
   const g = lcg(20261013n);
   let skuCount = 0;
-  const seen = { anchor: new Map<string, number>(), floor: new Map<string, number>(), error: new Map<string, number>(), below: 0, monotone: 0, colour: 0, products: 0 };
+  const seen = { anchor: new Map<string, number>(), floor: new Map<string, number>(), error: new Map<string, number>(), below: 0, belowMin: 0, monotone: 0, colour: 0, products: 0 };
   const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
   while (skuCount < 4000) {
     const gen = generate(g);
@@ -783,7 +825,7 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
       const exp = want.get(s.combo_key)!;
       for (const [channel, e] of exp) {
         const got = s.channels.find((c) => c.channel === channel);
-        const where = `product ${seen.products} ${s.combo_key} ${channel} (${gen.method}/${gen.floorMode ?? 'default'})`;
+        const where = `product ${seen.products} ${s.combo_key} ${channel} (${gen.method})`;
         if ('error' in e) {
           assert.equal(got, undefined, `${where}: priced, expected ${e.error}`);
           assert.ok(s.issues.some((i) => i.severity === 'error' && i.channel === channel && i.code === e.error), `${where}: ${e.error} not in ${JSON.stringify(s.issues)}`);
@@ -797,9 +839,11 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
         assert.equal(got.anchor, e.anchor, `${where}: anchor`);
         assert.equal(got.discount_usd, e.discount === null ? null : usdText(e.discount), `${where}: discount`);
         assert.equal(got.below_cost, e.below, `${where}: below_cost`);
+        assert.equal(got.below_min_profit, e.belowMin, `${where}: below_min_profit`);
         bump(seen.anchor, got.anchor);
         bump(seen.floor, got.floor);
         if (got.below_cost) seen.below++;
+        if (got.below_min_profit) seen.belowMin++;
 
         // The owner's rules, checked from the outside.
         assert.ok(got.price_iqd <= got.direct_iqd, `${where}: P ≤ D`);
@@ -813,13 +857,12 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
           if (rStock) assert.ok(qCmp(qSub(qi(got.direct_iqd), rStock), qMul(q(gen.T), q(gen.U))) >= 0, `${where}: D − R_stock ≥ T × U`);
           if (routeOfChannel(channel)) {
             const rR = q(got.replacement!.replacement_exact);
-            if ((gen.floorMode ?? 'direct') === 'cost') assert.ok(qCmp(qi(got.price_iqd), rR) >= 0, `${where}: P ≥ R_r`);
-            else {
-              const eP = qSub(q(got.direct_exact_iqd), qMul(q(got.discount_usd!), q(gen.U)));
-              assert.ok(got.price_iqd === qCeilStep(eP) || got.price_iqd === got.direct_iqd, `${where}: P ∈ {ceil(E_P), D}`);
-              assert.ok(qCmp(qi(got.price_iqd), rR) >= 0, `${where}: never below R_r`);
-            }
+            const eP = qSub(q(got.direct_exact_iqd), qMul(q(got.discount_usd!), q(gen.U)));
+            assert.ok(got.price_iqd === qCeilStep(eP) || got.price_iqd === got.direct_iqd, `${where}: P ∈ {ceil(E_P), D}`);
+            assert.ok(qCmp(qi(got.price_iqd), rR) >= 0, `${where}: never below R_r`);
+            assert.ok(got.floor !== 'discount_withdrawn' || got.price_iqd === got.direct_iqd, `${where}: a floored route sells at D (Q1)`);
           }
+          assert.equal(got.below_min_profit, false, `${where}: cost-first never carries the price-first warning`);
         } else {
           assert.equal(got.floor, 'none', 'price-first never floors');
           assert.equal(qCmp(qMul(q(got.usd_exact!), q(gen.U)), exact), 0, `${where}: exact = USD × U`);
@@ -865,93 +908,13 @@ test('property (4,000 SKUs): exactly the oracle; P ≤ D; on the step; D − R �
   }
   // Not vacuous: every branch was taken.
   for (const a of ['sku_fixed', 'model_fixed', 'product_fixed', 'cost']) assert.ok((seen.anchor.get(a) ?? 0) >= 20, `anchor ${a}: ${seen.anchor.get(a)}`);
-  for (const f of ['none', 'discount_withdrawn', 'lifted_to_cost', 'direct_min_profit']) assert.ok((seen.floor.get(f) ?? 0) >= 10, `floor ${f}: ${seen.floor.get(f)}`);
+  for (const f of ['none', 'discount_withdrawn', 'direct_min_profit']) assert.ok((seen.floor.get(f) ?? 0) >= 10, `floor ${f}: ${seen.floor.get(f)}`);
+  assert.ok(!seen.floor.has('lifted_to_cost'), 'Q1: no route is ever lifted to its cost');
   for (const e of ['V2_PRICE_MISSING', 'V2_DISCOUNT_TOO_LARGE', 'V2_ROUTE_BELOW_COST', 'CBM_MISSING']) assert.ok((seen.error.get(e) ?? 0) >= 3, `error ${e}: ${seen.error.get(e)}`);
   assert.ok(seen.below >= 10, `below_cost: ${seen.below}`);
+  assert.ok(seen.belowMin >= 10, `below_min_profit: ${seen.belowMin}`);
   assert.ok(seen.monotone >= 500, `monotone pairs: ${seen.monotone}`);
   assert.ok(seen.colour >= 200, `colour pairs: ${seen.colour}`);
-});
-
-/* ------------------------------------------ 3. the reproduce property -- */
-
-test('reproduce property (10,000 prices and rates): ceil(usdReproducing(I) × U) = ceil(I); a pre-order under D is reproduced by Δ; above D sells at D', () => {
-  const g = lcg(20261014n);
-  for (let i = 0; i < 10_000; i++) {
-    const U = `${g.int(1000, 99999)}.${String(g.int(0, 9999)).padStart(4, '0')}`;
-    const I = g.int(1, 1_000_000_000);
-    const usd = usdReproducing(I, U);
-    assert.match(usd, /^[0-9]+(\.[0-9]{1,2})?$/, 'cents');
-    assert.equal(qCeilStep(qMul(q(usd), q(U))), qCeilStep(qi(I)), `I ${I} U ${U} → ${usd}`);
-
-    const D_I = g.int(1000, 1_000_000_000);
-    const P_I = g.rnd() < 0.8 ? g.int(1, D_I) : g.int(D_I, D_I + 5_000_000);
-    const D = usdReproducing(D_I, U);
-    const delta = discountReproducing(D, P_I, U);
-    const P = qCeilStep(qMul(qSub(q(D), q(delta)), q(U)));
-    if (P_I <= D_I) assert.equal(P, qCeilStep(qi(P_I)), `D_I ${D_I} P_I ${P_I} U ${U}`);
-    else {
-      assert.equal(delta, '0');
-      assert.equal(P, qCeilStep(qi(D_I)));
-    }
-    assert.ok(qCmp(q(delta), qi(0)) >= 0);
-  }
-});
-
-test('off-step prices move UP: 1,004,500 → 1,005,000 (never 1,004,000); a step-exact price stays', () => {
-  for (const U of ['1500', '1530.25', '1600', '99999.9999', '1000']) {
-    assert.equal(qCeilStep(qMul(q(usdReproducing(1_004_500, U)), q(U))), 1_005_000, U);
-    assert.equal(qCeilStep(qMul(q(usdReproducing(1_000_500, U)), q(U))), 1_001_000, U);
-    assert.equal(qCeilStep(qMul(q(usdReproducing(1_000_000, U)), q(U))), 1_000_000, U);
-    assert.equal(qCeilStep(qMul(q(usdReproducing(1, U)), q(U))), 1000, U);
-  }
-  assert.equal(usdReproducing(1_500_000, '1500'), '1000');
-  assert.equal(usdReproducing(1_425_000, '1500'), '950');
-  assert.equal(discountReproducing('1000', 1_425_000, '1500'), '50');
-  assert.equal(discountReproducing('1000', 1_600_000, '1500'), '0', 'a pre-order above D sells at D');
-  assert.throws(() => usdReproducing(1000, '100000'), RangeError, 'a cent × U must stay below one step');
-  assert.throws(() => usdReproducing(0, '1500'), RangeError);
-});
-
-test('engine keep terms: T_new = T + ceil_cents(DSE ÷ U), Δ = the cents added; D is today’s or today’s + 1,000, the base route exactly today’s', () => {
-  assert.deepEqual(engineKeepTerms('120', 50000, '1600'), { t_new: '151.25', discount: '31.25' });
-  assert.deepEqual(engineKeepTerms('120.5', 0, '1600'), { t_new: '120.5', discount: '0' });
-  assert.deepEqual(engineKeepTerms('100', 2000, '1530'), { t_new: '101.31', discount: '1.31' }, '2,000 ÷ 1,530 = 1.3071… → 1.31');
-  assert.throws(() => engineKeepTerms('120.123', 1000, '1600'), RangeError);
-
-  // Against E1 itself: today's V1 prices (target T, extra DSE) and V2 cost-first with T_new and Δ.
-  const g = lcg(20261015n);
-  let differ = 0;
-  for (let i = 0; i < 600; i++) {
-    const U = g.dec(1200, 2400, g.int(0, 4));
-    const T = g.dec(1, 500, g.int(0, 2));
-    const dse = 1000 * g.int(0, 200);
-    const rates = chainRates(U, '1.08', '0.14', { GERMANY_LAND: g.dec(500, 30000, 2) });
-    const chain = { base: { override: { supplier_cost: g.dec(1, 3000, 2), supplier_currency: 'USD' as const, shipping_profile: 'GERMANY_LAND' as const, shipping_weight_g: g.int(100, 60000), additional_cost_iqd: g.int(0, 50000) } } };
-    const v1 = priceSku({
-      chain,
-      rates,
-      channels: ['direct_sale', 'pre_order_land'],
-      target: usdTarget(T),
-      extra: { status: 'active', kind: 'direct_sale_extra', amount_iqd: dse, rule: ref('rule_x'), tie: false, candidates: [ref('rule_x')] },
-    });
-    assert.equal(v1.ok, true);
-    const terms = engineKeepTerms(T, dse, U);
-    const v2 = priceProductV2({
-      method: 'cost',
-      rates,
-      points: [],
-      discounts: terms.discount === '0' ? [] : [{ scope: 'product', scope_id: '', usd: terms.discount }],
-      skus: [{ combo_key: '', model_id: null, option_value_ids: [], color_id: null, channels: ['direct_sale', 'pre_order_land'], chain, target: usdTarget(terms.t_new) }],
-    });
-    assert.equal(v2.ok, true, JSON.stringify(v2));
-    const d1 = v1.channels.find((c) => c.channel === 'direct_sale')!.computed_price_iqd;
-    const p1 = v1.channels.find((c) => c.channel === 'pre_order_land')!.computed_price_iqd;
-    const [d2, p2] = [v2.skus[0].channels[0].price_iqd, v2.skus[0].channels[1].price_iqd];
-    assert.ok(d2 === d1 || d2 === d1 + 1000, `D ${d1} → ${d2}`);
-    assert.equal(p2, p1, 'the base route keeps today’s pre-order price');
-    if (d2 !== d1) differ++;
-  }
-  assert.ok(differ > 0, 'the +1,000 case occurs (ROUNDING_STEP flag in V2-5)');
 });
 
 /* ------------------------------------------------------- 5. no float -- */
@@ -973,11 +936,6 @@ test('no float: a fractional JS number anywhere in the input is a RangeError, ne
     spoil(input);
     assert.throws(() => priceProductV2(input), RangeError, what);
   }
-  assert.throws(() => usdReproducing(1000.5, '1500'), RangeError);
-  assert.throws(() => usdReproducing(1000, 1500.5 as unknown as string), RangeError);
-  assert.throws(() => discountReproducing(999.5 as unknown as string, 1000, '1500'), RangeError);
-  assert.throws(() => engineKeepTerms('120', 0.5, '1600'), RangeError);
-  assert.throws(() => proposeKeepUsd([{ combo_key: '', model_id: null, color_id: null, channels: [{ channel: 'direct_sale', prepaid_iqd: 1000.5, cod_iqd: 1000 }] }], '1500'), RangeError);
 });
 
 function inputOfWorked(): V2Input {
@@ -997,161 +955,4 @@ test('programming errors throw: a combo key that is not its selection, a SKU lis
   assert.throws(() => priceProductV2({ ...base, skus: [{ ...base.skus[0], model_id: 'nope' }] }), /PRICING_INVARIANT/);
   const extra: RuleResolution = { status: 'active', kind: 'direct_sale_extra', amount_iqd: 0, rule: ref('x'), tie: false, candidates: [ref('x')] };
   assert.throws(() => priceProductV2({ ...base, skus: [{ ...base.skus[0], target: extra }] }), /PRICING_INVARIANT/);
-});
-
-/* ------------------------------------------------- keep_usd (§6.2) -- */
-
-const row = (combo_key: string, model_id: string | null, color_id: string | null, channels: Array<[SkuChannel, number, number?]>): TodayGrid[number] => ({
-  combo_key,
-  model_id,
-  color_id,
-  channels: channels.map(([channel, prepaid_iqd, cod_iqd]) => ({ channel, prepaid_iqd, cod_iqd: cod_iqd ?? prepaid_iqd })),
-});
-
-test('keep_usd: a grid V2 itself produced is reproduced exactly with the fewest rows; with no priced colour only FX_LINKED is flagged', () => {
-  // §1.6 at U 1,500 with COD = D (today's rule for a direct cell).
-  const grid: TodayGrid = [
-    row(STD, 'std', null, [['direct_sale', 1_500_000], ['pre_order_land', 1_425_000, 1_500_000]]),
-    row(COMBO, 'combo', null, [['direct_sale', 1_815_000], ['pre_order_land', 1_778_000, 1_815_000]]),
-    row(STD_RED, 'std', 'red', [['direct_sale', 1_503_000], ['pre_order_land', 1_428_000, 1_503_000]]),
-    row(COMBO_RED, 'combo', 'red', [['direct_sale', 1_818_000], ['pre_order_land', 1_781_000, 1_818_000]]),
-  ];
-  const p = proposeKeepUsd(grid, '1500');
-  assert.equal(p.result.ok, true, JSON.stringify(p.result));
-  assert.ok(p.rows.every((r) => !r.changed), 'every prepaid and COD figure reproduced');
-  // Red was priced (+3,000 on both models): reproduced as one $2 difference, and said so.
-  assert.deepEqual(p.flags, [{ code: 'LEGACY_COLOUR_PRICE', color_id: 'red', became: 'colour_delta' }, { code: 'FX_LINKED' }]);
-  assert.equal(p.unchanged, false, 'a flag other than FX_LINKED needs the owner');
-  assert.deepEqual(p.points, [
-    { scope: 'product', scope_id: '', kind: 'fixed', usd: '1000' },
-    { scope: 'option', scope_id: 'combo', kind: 'fixed', usd: '1210' },
-    { scope: 'color', scope_id: 'red', kind: 'delta', usd: '2' },
-  ]);
-  // Combo's kept price 1,778,000 is reproduced by the largest cents under it: 1,185.33, so Δ = 24.67.
-  assert.deepEqual(p.discounts, [
-    { scope: 'product', scope_id: '', usd: '50' },
-    { scope: 'option', scope_id: 'combo', usd: '24.67' },
-  ]);
-  assert.deepEqual(p.kept_routes, { [STD]: 'land', [COMBO]: 'land', [STD_RED]: 'land', [COMBO_RED]: 'land' });
-
-  // Without a priced colour (the census: 0 of 153), nothing but FX_LINKED: «unchanged».
-  const plain = proposeKeepUsd(grid.slice(0, 2), '1500');
-  assert.deepEqual(plain.flags, [{ code: 'FX_LINKED' }]);
-  assert.equal(plain.unchanged, true);
-  // An option-less product: one product price, one product discount.
-  const single = proposeKeepUsd([row('', null, null, [['direct_sale', 992_000], ['pre_order_sea', 900_000, 992_000]])], '1600');
-  assert.equal(single.unchanged, true, JSON.stringify(single));
-  assert.deepEqual(single.points, [{ scope: 'product', scope_id: '', kind: 'fixed', usd: '620' }]);
-  assert.deepEqual(single.discounts, [{ scope: 'product', scope_id: '', usd: '57.5' }]);
-});
-
-test('keep_usd flags: two routes that differ (AMS 2 Pro), a pre-order above direct, an off-step price, a colour priced on one model only, COD that now pays D', () => {
-  const grid: TodayGrid = [
-    // Two routes at different prices: the stock route (land) is kept, air moves to land's price.
-    row('o:pro', 'pro', null, [['direct_sale', 1_800_000], ['pre_order_land', 1_600_000], ['pre_order_air', 1_700_000]]),
-    // Pre-order dearer than direct: sells at D.
-    row('o:lite', 'lite', null, [['direct_sale', 900_000], ['pre_order_land', 950_000]]),
-    // Off-step direct price: moves UP to the next step.
-    row('o:max', 'max', null, [['direct_sale', 2_000_500], ['pre_order_land', 1_900_000]]),
-  ];
-  const p = proposeKeepUsd(grid, '1600', { keepRoute: () => 'land' });
-  assert.equal(p.result.ok, true, JSON.stringify(p.result));
-  const byCode = (code: string) => p.flags.filter((f) => f.code === code);
-  assert.deepEqual(byCode('ROUTES_NOT_REPRODUCIBLE'), [
-    { code: 'ROUTES_NOT_REPRODUCIBLE', model_id: 'pro', kept_route: 'land', moved: [{ combo_key: 'o:pro', route: 'air', old_iqd: 1_700_000, new_iqd: 1_600_000 }] },
-  ]);
-  assert.deepEqual(byCode('PREORDER_ABOVE_DIRECT'), [{ code: 'PREORDER_ABOVE_DIRECT', model_id: 'lite', combo_key: 'o:lite', route: 'land', old_iqd: 950_000, new_iqd: 900_000 }]);
-  assert.deepEqual(byCode('OFF_STEP_PRICE'), [{ code: 'OFF_STEP_PRICE', rows: [{ combo_key: 'o:max', channel: 'direct_sale', old_iqd: 2_000_500, new_iqd: 2_001_000 }] }]);
-  assert.equal(p.unchanged, false);
-  const at = (k: string, c: SkuChannel) => p.rows.find((r) => r.combo_key === k && r.channel === c)!;
-  assert.equal(at('o:pro', 'pre_order_land').new_iqd, 1_600_000);
-  assert.equal(at('o:pro', 'direct_sale').new_iqd, 1_800_000);
-  assert.equal(at('o:max', 'pre_order_land').new_iqd, 1_900_000);
-  // COD of a pre-order now pays D (the grid's COD equalled the route price).
-  const cod = byCode('COD_CHANGES')[0] as Extract<(typeof p.flags)[number], { code: 'COD_CHANGES' }>;
-  assert.ok(cod.rows.some((r) => r.combo_key === 'o:pro' && r.channel === 'pre_order_land' && r.old_cod_iqd === 1_600_000 && r.new_cod_iqd === 1_800_000));
-
-  // Keeping air instead (the owner's per-model switch): land moves.
-  const air = proposeKeepUsd(grid.slice(0, 1), '1600', { keepRoute: (m) => (m === 'pro' ? 'air' : null) });
-  assert.deepEqual(air.flags.find((f) => f.code === 'ROUTES_NOT_REPRODUCIBLE'), {
-    code: 'ROUTES_NOT_REPRODUCIBLE', model_id: 'pro', kept_route: 'air', moved: [{ combo_key: 'o:pro', route: 'land', old_iqd: 1_600_000, new_iqd: 1_700_000 }],
-  });
-
-  // A colour priced on one model only cannot be one difference: it becomes a SKU price.
-  const colour = proposeKeepUsd(
-    [
-      row('o:a', 'a', null, [['direct_sale', 30_000]]),
-      row('o:b', 'b', null, [['direct_sale', 24_000]]),
-      row('o:a|c:gold', 'a', 'gold', [['direct_sale', 33_000]]),
-      row('o:b|c:gold', 'b', 'gold', [['direct_sale', 24_000]]),
-    ],
-    '1500'
-  );
-  assert.equal(colour.result.ok, true, JSON.stringify(colour.result));
-  assert.deepEqual(colour.flags.filter((f) => f.code === 'LEGACY_COLOUR_PRICE'), [{ code: 'LEGACY_COLOUR_PRICE', color_id: 'gold', became: 'sku_fixed' }]);
-  assert.ok(colour.points.some((x) => x.scope === 'sku' && x.scope_id === 'o:a|c:gold'));
-  assert.ok(colour.rows.every((r) => !r.changed), 'every price reproduced');
-  // The same +3,000 on both models is one colour difference of $2 (C1).
-  const uniform = proposeKeepUsd(
-    [
-      row('o:a', 'a', null, [['direct_sale', 30_000]]),
-      row('o:b', 'b', null, [['direct_sale', 24_000]]),
-      row('o:a|c:gold', 'a', 'gold', [['direct_sale', 33_000]]),
-      row('o:b|c:gold', 'b', 'gold', [['direct_sale', 27_000]]),
-    ],
-    '1500'
-  );
-  assert.deepEqual(uniform.points.filter((x) => x.scope === 'color'), [{ scope: 'color', scope_id: 'gold', kind: 'delta', usd: '2' }]);
-  assert.deepEqual(uniform.flags.filter((f) => f.code === 'LEGACY_COLOUR_PRICE'), [{ code: 'LEGACY_COLOUR_PRICE', color_id: 'gold', became: 'colour_delta' }]);
-});
-
-test('keep_usd property: every direct and kept-route price is reproduced (to the step); every changed row carries a flag', () => {
-  const g = lcg(20261016n);
-  let changedRows = 0;
-  for (let n = 0; n < 400; n++) {
-    const U = g.dec(1200, 2400, g.int(0, 4));
-    const models = Array.from({ length: g.int(0, 3) }, (_, i) => `m${i}`);
-    const colours = Array.from({ length: g.int(0, 2) }, (_, i) => `c${i}`);
-    const colourAdd = Object.fromEntries(colours.map((c) => [c, g.rnd() < 0.5 ? 0 : 1000 * g.int(1, 20)]));
-    const grid: Array<TodayGrid[number]> = [];
-    for (const m of models.length ? models : [null]) {
-      const modelD = 1000 * g.int(20, 3000) + (g.rnd() < 0.1 ? g.int(1, 999) : 0);
-      for (const c of colours.length ? colours : [null]) {
-        const key = skuComboKey({ option_value_ids: m ? [m] : [], color_id: c });
-        const D = modelD + (c ? colourAdd[c] : 0) + (g.rnd() < 0.1 ? 1000 * g.int(1, 5) : 0);
-        const channels: Array<[SkuChannel, number, number?]> = [];
-        if (g.rnd() < 0.85) channels.push(['direct_sale', D]);
-        for (const route of ['pre_order_air', 'pre_order_sea', 'pre_order_land'] as const) {
-          if (g.rnd() < 0.4) channels.push([route, Math.max(1000, D - 1000 * g.int(-3, 60)), g.rnd() < 0.5 ? D : undefined]);
-        }
-        if (!channels.length) channels.push(['direct_sale', D]);
-        grid.push(row(key, m, c, channels));
-      }
-    }
-    const p = proposeKeepUsd(grid, U, { keepRoute: () => g.pick(['air', 'sea', 'land', null] as const) });
-    assert.equal(p.result.ok, true, JSON.stringify(p.result.issues));
-    const flagged = new Set<string>();
-    const above = new Set<string>();
-    for (const f of p.flags) {
-      if (f.code === 'ROUTES_NOT_REPRODUCIBLE') for (const m of f.moved) flagged.add(`${m.combo_key}@pre_order_${m.route}`);
-      if (f.code === 'PREORDER_ABOVE_DIRECT') {
-        flagged.add(`${f.combo_key}@pre_order_${f.route}`);
-        above.add(`${f.combo_key}@pre_order_${f.route}`);
-      }
-      if (f.code === 'OFF_STEP_PRICE' || f.code === 'COD_CHANGES') for (const r of f.rows) flagged.add(`${r.combo_key}@${r.channel}`);
-    }
-    for (const r of p.rows) {
-      const kept = p.kept_routes[r.combo_key];
-      const stepped = Math.ceil(r.old_prepaid_iqd / 1000) * 1000;
-      if (r.channel === 'direct_sale' || (kept && r.channel === `pre_order_${kept}` && !above.has(`${r.combo_key}@${r.channel}`)))
-        assert.equal(r.new_iqd, stepped, `${r.combo_key} ${r.channel}`);
-      if (r.changed) {
-        changedRows++;
-        assert.ok(flagged.has(`${r.combo_key}@${r.channel}`), `${r.combo_key} ${r.channel} changed without a flag: ${JSON.stringify(r)}`);
-      }
-      assert.ok(r.new_iqd! <= r.new_cod_iqd!, 'P ≤ D');
-    }
-    assert.equal(p.unchanged, p.rows.every((r) => !r.changed) && p.flags.length === 1);
-  }
-  assert.ok(changedRows > 100, `only ${changedRows} changed rows`);
 });

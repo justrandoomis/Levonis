@@ -191,7 +191,7 @@ export function seedV2Sentinels(raw: DatabaseSync, productId = 'p_a1', model = '
   raw
     .prepare(
       `INSERT INTO pricing_legacy_snapshots (id, product_id, reason, captured_at, usd_iqd_rate, fx_version, actor, payload_json, payload_sha256)
-       VALUES (?, ?, 'v2_migration', ?, '1562.5', 1, 'usr_owner', ?, ?)`
+       VALUES (?, ?, 'clean_start', ?, '1562.5', 1, 'usr_owner', ?, ?)`
     )
     .run(`v2snap_${productId}`, productId, at, V2_SENTINEL_SNAPSHOT_PAYLOAD, sha);
 }

@@ -140,6 +140,12 @@ const AREAS: Record<string, readonly string[]> = {
     'v2_replacement_iqd', 'v2_rate', 'v2_cost_inputs', 'v2_proposal', 'v2_legacy_snapshot', 'v2_legacy_payload',
     'v2_discount_scope',
   ],
+  // The clean start (DECISIONS row 222, spec addendum A.1 Q2/Q3, A.9, A.10; migration 0190): the
+  // below-minimum-profit warning, an order line's frozen estimate beyond `estimated_cost_iqd`, and a
+  // confirmed purchase's pending price review with its inputs.
+  CLEAN_START: [
+    'v2_below_min_profit', 'estimated_cost_usd', 'estimated_usd_iqd_rate', 'estimated_fx_version', 'purchase_review', 'v2_purchase_inputs',
+  ],
 };
 
 /**

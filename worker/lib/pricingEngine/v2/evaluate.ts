@@ -22,7 +22,7 @@
  * PRIVATE: the rows' owner figures (R, T, the exact IQD, the floor and its
  * flags, `below_cost`) are the owner's; `dto.ts` (V2-3b) projects per role.
  */
-import { priceProductV2, V2_DEFAULT_FLOOR_MODE, type V2Channel, type V2Discount, type V2FloorMode, type V2Method, type V2PricePoint, type V2Result, type V2Sku } from '@levonis/pricing/priceV2';
+import { priceProductV2, type V2Channel, type V2Discount, type V2Method, type V2PricePoint, type V2Result, type V2Sku } from '@levonis/pricing/priceV2';
 import { resolveRuleAt } from '@levonis/pricing/ruleResolution';
 import type { PricingIssue } from '@levonis/pricing/costToPrice';
 import type { SkuChannel } from '@levonis/pricing/skuChannel';
@@ -38,9 +38,6 @@ import { planWritesFromUnits, structuralChannel, verifyPlan, type BlockedChannel
 import { refuseUnreadSkus, skuTableOf, type EngineControl } from '../engineWrite';
 import { discountsOf, pointsOf, type StoredV2Result, type V2Store } from './store';
 import { staleReasonsV2 } from './stale';
-
-/** Spec C-5, owner question Q1: a route whose discounted price falls below its own cost sells at D. A code constant. */
-export const V2_FLOOR_MODE: V2FloorMode = V2_DEFAULT_FLOOR_MODE;
 
 /** One planned V2 price: the dinar figure every engine plan carries, and the V2 maths behind it. */
 export interface V2PlanPrice {
@@ -65,7 +62,6 @@ export interface V2EvaluationInput {
   inputWrites: readonly InputWrite[];
   ruleWrites: readonly RuleWrite[];
   image: string;
-  floorMode?: V2FloorMode;
   /** The owner's preview listed the blocked routes («متوقف: أقل من التكلفة»): they may be written as off. */
   acceptBlocked?: boolean;
   /** A digest of a draft's structure (V2-3b's product save); bound into the hash. */
@@ -109,6 +105,8 @@ export interface V2Row {
     replacement_cost_iqd: number | null;
     target_profit_usd: string | null;
     below_cost: boolean;
+    /** Q3: price-first, the direct price is below cost + minimum profit (owner-only). */
+    below_min_profit: boolean;
   } | null;
 }
 
@@ -220,7 +218,8 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
   // 2. The units: every sellable SKU (V2 is always per SKU), and its structural channels.
   const legacy = evaluateLegacy(pid, a.loaded.doc, a.loaded.view, a.ctx, { perSku: true });
   const units = legacy.units;
-  // 3. The SKUs of the V2 maths: their chain (cost inputs, optional price-first) and, cost-first, T.
+  // 3. The SKUs of the V2 maths: their chain (cost inputs, optional price-first) and T (required
+  //    cost-first; price-first only for the owner's below-minimum-profit warning, Q3).
   const skus: V2Sku[] = units.map((unit) => {
     const ids = unitOptionIds(unit);
     const colorId = unitColorId(unit);
@@ -232,14 +231,14 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
       color_id: colorId,
       channels: unit.channels.filter(structuralChannel).map((c) => c.channel),
       chain: chainOfUnit(inputs, { option_value_ids: ids, color_id: colorId, combo_key: combo || null }),
-      ...(a.method === 'cost' ? { target: resolveRuleAt(rules, 'target_profit', unitRuleTarget(pid, { option_value_ids: ids, color_id: colorId }), { usdIqdRate: u }) } : {}),
+      target: resolveRuleAt(rules, 'target_profit', unitRuleTarget(pid, { option_value_ids: ids, color_id: colorId }), { usdIqdRate: u }),
     };
   });
 
   // 4. The maths (exact; codes for what is missing, never a guess).
   let result: V2Result | null = null;
   if (rates && u && units.length) {
-    result = priceProductV2({ method: a.method, rates: rates.central, points: a.points, discounts: a.discounts, skus, floorMode: a.floorMode ?? V2_FLOOR_MODE });
+    result = priceProductV2({ method: a.method, rates: rates.central, points: a.points, discounts: a.discounts, skus });
   }
 
   // 5. The planned prices, and the blocked channels.
@@ -320,6 +319,7 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
               replacement_cost_iqd: c.replacement?.replacement_cost_iqd ?? null,
               target_profit_usd: c.target_profit_usd,
               below_cost: c.below_cost,
+              below_min_profit: c.below_min_profit,
             }
           : null,
       });

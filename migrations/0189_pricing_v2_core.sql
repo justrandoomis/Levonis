@@ -125,8 +125,10 @@ BEGIN UPDATE product_pricing_state SET inputs_seq = inputs_seq + 1 WHERE product
 --    0181 CHECKs cannot hold a price-first row (supplier, profile and rule are NOT NULL), a pre-order row
 --    whose Δ exceeds the rounding slack, or Δ at all. combo_key is canonical ('' = the product itself).
 --    The stored backstops: P ≤ D; direct_sale carries no Δ and sells at D; price-first never floors
---    (C-6); a cost-first row names its replacement cost and its minimum-profit rule. Exact figures are
---    decimal text, never a float. Guards follow 0183 (ENGINE_MANAGED, same tokens).
+--    (C-6); a cost-first row names its replacement cost and its minimum-profit rule. A floored route
+--    sells at D, never at its cost (owner answer Q1, DECISIONS row 222: no 'lifted_to_cost'); the
+--    price-first owner warnings below cost and below cost + minimum profit (Q3) are stored per row.
+--    Exact figures are decimal text, never a float. Guards follow 0183 (ENGINE_MANAGED, same tokens).
 CREATE TABLE IF NOT EXISTS pricing_v2_sku_results (
   product_id         TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   combo_key          TEXT NOT NULL CHECK (length(combo_key) <= 400 AND (combo_key = '' OR combo_key GLOB 'o:?*' OR combo_key GLOB 'c:?*')),
@@ -149,7 +151,9 @@ CREATE TABLE IF NOT EXISTS pricing_v2_sku_results (
                        AND CAST(discount_usd AS REAL) >= 0 AND CAST(discount_usd AS REAL) <= 100000)),
   discount_scope     TEXT CHECK (discount_scope IS NULL OR discount_scope IN ('product','option','color','sku')),
   discount_scope_id  TEXT CHECK (discount_scope_id IS NULL OR length(discount_scope_id) <= 400),
-  floor              TEXT NOT NULL DEFAULT 'none' CHECK (floor IN ('none','discount_withdrawn','lifted_to_cost','direct_min_profit')),
+  floor              TEXT NOT NULL DEFAULT 'none' CHECK (floor IN ('none','discount_withdrawn','direct_min_profit')),
+  below_cost         INTEGER NOT NULL DEFAULT 0 CHECK (below_cost IN (0,1)),
+  below_min_profit   INTEGER NOT NULL DEFAULT 0 CHECK (below_min_profit IN (0,1)),
   shipping_profile   TEXT CHECK (shipping_profile IS NULL OR shipping_profile IN ('GERMANY_LAND','CHINA_AIR','CHINA_SEA')),
   supplier_currency  TEXT CHECK (supplier_currency IS NULL OR supplier_currency IN ('USD','EUR','CNY')),
   fx_rate            TEXT CHECK (fx_rate IS NULL OR (fx_rate GLOB '[0-9]*' AND fx_rate NOT GLOB '*[^0-9.]*' AND fx_rate NOT GLOB '*.*.*'
@@ -180,6 +184,7 @@ CREATE TABLE IF NOT EXISTS pricing_v2_sku_results (
   CHECK ((channel = 'direct_sale') = (discount_usd IS NULL)),
   CHECK (channel <> 'direct_sale' OR final_price_iqd = direct_price_iqd),
   CHECK (method = 'cost' OR floor = 'none'),
+  CHECK (method = 'usd' OR (below_cost = 0 AND below_min_profit = 0)),
   CHECK (method = 'usd' OR (replacement_exact IS NOT NULL AND target_rule_id IS NOT NULL)),
   CHECK ((discount_scope IS NULL) = (discount_scope_id IS NULL)),
   CHECK ((replacement_exact IS NULL) = (replacement_cost_iqd IS NULL)),
@@ -204,23 +209,27 @@ WHEN EXISTS (SELECT 1 FROM products p WHERE p.id = OLD.product_id)
  AND NOT EXISTS (SELECT 1 FROM ops_guards g WHERE g.id IN ('engine-price:' || OLD.product_id, 'pricing-rates-apply'))
 BEGIN SELECT RAISE(ABORT, 'ENGINE_MANAGED'); END;
 
--- 5. The legacy snapshot taken at the owner's migration confirm (spec §3 step 1, §2.5): every legacy
---    money field of the product, read by explicit column lists, so V2-7's rollback tool can restore it.
---    APPEND-ONLY: never updated, never re-inserted under an id, never deleted while the product exists —
---    except by the permanent product deletion itself, which holds 'product-delete:<product_id>' inside
---    its own batch (worker/lib/productDeletion.ts). A cascade (the product row already gone) passes.
+-- 5. The invisible archive of every product's old dinar pricing (the clean start, owner answer Q6,
+--    DECISIONS row 222; spec addendum A.3): one row per product, written by migration 0190 at deploy
+--    (reason 'clean_start', payload_version 2: the raw columns captured by SQL, by explicit column
+--    lists). For audit only: never shown in any UI and never read for pricing. The rate is the applied
+--    USD/IQD at deploy, NULL when none was ever applied; SQL cannot hash, so payload_sha256 may be NULL
+--    (integrity is the triggers'). APPEND-ONLY: never updated, never re-inserted under an id, never
+--    deleted while the product exists — except by the permanent product deletion itself, which holds
+--    'product-delete:<product_id>' inside its own batch (worker/lib/productDeletion.ts). A cascade (the
+--    product row already gone) passes.
 CREATE TABLE IF NOT EXISTS pricing_legacy_snapshots (
   id              TEXT PRIMARY KEY,
   product_id      TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  reason          TEXT NOT NULL CHECK (reason IN ('v2_migration')),
+  reason          TEXT NOT NULL CHECK (reason IN ('clean_start')),
   captured_at     TEXT NOT NULL,
-  usd_iqd_rate    TEXT NOT NULL CHECK (usd_iqd_rate GLOB '[0-9]*' AND usd_iqd_rate NOT GLOB '*[^0-9.]*' AND usd_iqd_rate NOT GLOB '*.*.*'
-                    AND usd_iqd_rate NOT GLOB '*.' AND length(usd_iqd_rate) <= 32 AND CAST(usd_iqd_rate AS REAL) > 0),
-  fx_version      INTEGER NOT NULL CHECK (fx_version > 0),
+  usd_iqd_rate    TEXT CHECK (usd_iqd_rate IS NULL OR (usd_iqd_rate GLOB '[0-9]*' AND usd_iqd_rate NOT GLOB '*[^0-9.]*' AND usd_iqd_rate NOT GLOB '*.*.*'
+                    AND usd_iqd_rate NOT GLOB '*.' AND length(usd_iqd_rate) <= 32 AND CAST(usd_iqd_rate AS REAL) > 0)),
+  fx_version      INTEGER CHECK (fx_version IS NULL OR fx_version > 0),
   actor           TEXT NOT NULL,
-  payload_version INTEGER NOT NULL DEFAULT 1 CHECK (payload_version = 1),
+  payload_version INTEGER NOT NULL DEFAULT 1 CHECK (payload_version IN (1, 2)),
   payload_json    TEXT NOT NULL CHECK (json_valid(payload_json) AND length(payload_json) <= 1000000),
-  payload_sha256  TEXT NOT NULL CHECK (length(payload_sha256) = 64 AND payload_sha256 NOT GLOB '*[^0-9a-f]*')
+  payload_sha256  TEXT CHECK (payload_sha256 IS NULL OR (length(payload_sha256) = 64 AND payload_sha256 NOT GLOB '*[^0-9a-f]*'))
 );
 CREATE INDEX IF NOT EXISTS idx_pricing_legacy_snapshots_product ON pricing_legacy_snapshots(product_id, captured_at);
 CREATE TRIGGER IF NOT EXISTS pricing_legacy_snapshots_immutable BEFORE UPDATE ON pricing_legacy_snapshots

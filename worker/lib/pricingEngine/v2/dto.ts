@@ -11,7 +11,8 @@
  *     C-14: never `preview_hash` / `change_pct`, the V1 and FX oracle keys of
  *     FINANCIAL_FIELDS — the V2 change is `change_percent`);
  *   - the owner alone (`v2_*`, every key in FINANCIAL_FIELDS): the exact IQD,
- *     the USD ceiling, the floor and its flags, R, T, `below_cost`, U — never
+ *     the USD ceiling, the floor and its flags, R, T, `below_cost`,
+ *     `below_min_profit` (Q3), U — never
  *     to a price editor;
  *   - on a PRICE-FIRST product, the owner AND the price editors (the owner's
  *     answer Q2, DECISIONS row 222: «staff see and edit USD»; the owner
@@ -51,6 +52,7 @@ function ownerExtras(r: V2Row) {
         v2_replacement_iqd: o.replacement_cost_iqd,
         v2_profit_usd: o.target_profit_usd,
         v2_below_cost: o.below_cost,
+        v2_below_min_profit: o.below_min_profit,
       }
     : null;
 }

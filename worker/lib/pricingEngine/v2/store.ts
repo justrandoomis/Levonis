@@ -57,6 +57,9 @@ export interface StoredV2Result {
   discount_scope: V2Scope | null;
   discount_scope_id: string | null;
   floor: V2Floor;
+  /** Price-first owner warnings (0/1): below this channel's cost; the direct price below cost + minimum profit (Q3). */
+  below_cost: number;
+  below_min_profit: number;
   shipping_profile: string | null;
   supplier_currency: string | null;
   fx_rate: string | null;
@@ -80,7 +83,7 @@ export interface StoredV2Result {
 
 export const V2_RESULT_COLUMNS = [
   'product_id', 'combo_key', 'channel', 'method', 'anchor', 'final_price_iqd', 'exact_iqd', 'direct_price_iqd', 'direct_exact_iqd',
-  'usd_ceil6', 'deltas_usd', 'discount_usd', 'discount_scope', 'discount_scope_id', 'floor', 'shipping_profile', 'supplier_currency',
+  'usd_ceil6', 'deltas_usd', 'discount_usd', 'discount_scope', 'discount_scope_id', 'floor', 'below_cost', 'below_min_profit', 'shipping_profile', 'supplier_currency',
   'fx_rate', 'fx_version', 'cross_rate', 'cross_fx_version', 'shipping_rate', 'shipping_version', 'replacement_exact',
   'replacement_cost_iqd', 'target_profit_usd', 'target_rule_id', 'target_rule_version', 'usd_iqd_rate', 'usd_fx_version',
   'inputs_seq', 'config_version', 'write_seq', 'computed_at',
@@ -164,6 +167,8 @@ function resultOf(r: Record<string, unknown>): StoredV2Result {
     discount_scope: txt(r.discount_scope) as V2Scope | null,
     discount_scope_id: txt(r.discount_scope_id),
     floor: String(r.floor ?? 'none') as V2Floor,
+    below_cost: Number(r.below_cost ?? 0) === 1 ? 1 : 0,
+    below_min_profit: Number(r.below_min_profit ?? 0) === 1 ? 1 : 0,
     shipping_profile: txt(r.shipping_profile),
     supplier_currency: txt(r.supplier_currency),
     fx_rate: txt(r.fx_rate),

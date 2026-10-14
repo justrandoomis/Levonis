@@ -124,7 +124,7 @@ function result(over: Record<string, string | number | null> = {}): string {
 const SHA = 'a'.repeat(64);
 function snapshot(over: Record<string, string | number | null> = {}): string {
   return insertSql('pricing_legacy_snapshots', {
-    id: 'snap1', product_id: P, reason: 'v2_migration', captured_at: NOW, usd_iqd_rate: '1500', fx_version: 1,
+    id: 'snap1', product_id: P, reason: 'clean_start', captured_at: NOW, usd_iqd_rate: '1500', fx_version: 1,
     actor: 'usr_owner', payload_json: '{"product":{"price_iqd":1500000}}', payload_sha256: SHA, ...over,
   });
 }
@@ -277,6 +277,8 @@ test('V2 results: P ≤ D, direct sells at D with no Δ, price-first never floor
   run(db, priced(P, result({ combo_key: '', method: 'usd', anchor: 'product_fixed', replacement_exact: null, replacement_cost_iqd: null, target_rule_id: null, target_rule_version: null, target_profit_usd: null, shipping_profile: null, supplier_currency: null, fx_rate: null, fx_version: null, shipping_rate: null, shipping_version: null })));
   run(db, priced(P, result({ combo_key: `o:${P}_o1`, final_price_iqd: 1500000, exact_iqd: '1500000', floor: 'discount_withdrawn' })));
   run(db, priced(P, result({ combo_key: `o:${P}_o1|c:${P}_c0`, exact_iqd: '1424999.123456789', deltas_usd: '-35.44', discount_usd: '0', usd_ceil6: '949.999416' })));
+  // Q3 (DECISIONS row 222): a price-first row carries the owner's two warnings.
+  run(db, priced(P, result({ combo_key: `o:${P}_o0|c:${P}_c0`, method: 'usd', anchor: 'product_fixed', below_cost: 1, below_min_profit: 1 })));
 
   const bad: Array<[Record<string, string | number | null>, string]> = [
     [{ final_price_iqd: 1501000 }, 'P > D'],
@@ -284,7 +286,11 @@ test('V2 results: P ≤ D, direct sells at D with no Δ, price-first never floor
     [{ channel: 'direct_sale', discount_usd: null, discount_scope: null, discount_scope_id: null }, 'direct sale below D'],
     [{ discount_usd: null, discount_scope: null, discount_scope_id: null }, 'a pre-order row without its Δ'],
     [{ method: 'usd', floor: 'discount_withdrawn' }, 'a price-first row with a floor (C-6)'],
+    [{ floor: 'lifted_to_cost' }, 'a route lifted to its cost (owner answer Q1: never; the floor sells at D)'],
     [{ method: 'usd', floor: 'lifted_to_cost' }, 'a price-first row lifted to cost'],
+    [{ below_cost: 1 }, 'a cost-first row flagged below cost (Q3 flags are price-first only)'],
+    [{ below_min_profit: 1 }, 'a cost-first row flagged below minimum profit'],
+    [{ below_cost: 2 }, 'a below-cost flag that is not 0/1'],
     [{ replacement_exact: null, replacement_cost_iqd: null }, 'a cost-first row without its cost'],
     [{ target_rule_id: null, target_rule_version: null }, 'a cost-first row without its rule'],
     [{ final_price_iqd: 1425500 }, 'a price off the 1,000 step'],
@@ -346,11 +352,17 @@ test('the legacy snapshot is append-only: never edited, re-inserted or deleted w
     [{ payload_sha256: 'A'.repeat(64) }, 'an upper-case digest'],
     [{ payload_sha256: 'g'.repeat(64) }, 'a digest that is not hex'],
     [{ reason: 'other' }, 'an unknown reason'],
-    [{ payload_version: 2 }, 'an unknown payload version'],
+    [{ reason: 'v2_migration' }, 'the retired V2-5 reason (the clean start replaced the migration)'],
+    [{ payload_version: 3 }, 'an unknown payload version'],
     [{ usd_iqd_rate: '0' }, 'a zero rate'],
     [{ fx_version: 0 }, 'a rate version of 0'],
   ];
   bad.forEach(([over, why], i) => assert.throws(() => run(db, snapshot({ id: `snap_bad_${i}`, ...over })), CHECK, why));
+  // The clean start's archive (spec addendum A.3.1): payload v2 captured by SQL, no digest (SQL cannot
+  // hash), and no rate when no USD/IQD was ever applied.
+  run(db, snapshot({ id: 'snap_cs', payload_version: 2, payload_sha256: null, usd_iqd_rate: null, fx_version: null }));
+  assert.equal(count(db, "SELECT COUNT(*) AS n FROM pricing_legacy_snapshots WHERE id = 'snap_cs'"), 1);
+  run(db, tokenSql(`product-delete:${P}`, `DELETE FROM pricing_legacy_snapshots WHERE id = 'snap_cs'`));
 
   // Only the permanent deletion's own token releases it while the product exists.
   run(db, tokenSql(`product-delete:${P}`, `DELETE FROM pricing_legacy_snapshots WHERE id = 'snap1'`));

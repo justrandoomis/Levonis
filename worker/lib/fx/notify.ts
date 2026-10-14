@@ -14,6 +14,9 @@ import type { Env } from '../types';
 import { notify } from '../notifications';
 import type { FxAttention } from './decide';
 import type { FxPairId } from './pairs';
+import { verifiedOwnerId } from '../verifiedOwner';
+
+export { verifiedOwnerId };
 
 const PAIR_NAME: Readonly<Record<FxPairId, { ar: string; en: string; ckb: string }>> = {
   USD_IQD: { ar: 'الدولار ← الدينار', en: 'USD → IQD', ckb: 'دۆلار ← دینار' },
@@ -57,21 +60,6 @@ export function fxNoticeText(a: Pick<FxAttention, 'pair' | 'kind'>) {
     body_en: `${name.en}: ${body.en}`,
     body_ckb: `${name.ckb}: ${body.ckb}`,
   };
-}
-
-/** The verified owner's user id, or null (no owner address, or not verified yet). */
-export async function verifiedOwnerId(env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>): Promise<string | null> {
-  const owner = (env.INITIAL_ADMIN_EMAIL ?? '').trim().toLowerCase();
-  if (!owner) return null;
-  const row = await env.DB
-    .prepare(
-      `SELECT id FROM users
-        WHERE lower(trim(email)) = ? AND role = 'admin' AND trim(COALESCE(email_verified_at, '')) <> ''
-        ORDER BY id LIMIT 1`
-    )
-    .bind(owner)
-    .first<{ id: string }>();
-  return row?.id ?? null;
 }
 
 export async function notifyOwnerFx(env: Pick<Env, 'DB' | 'INITIAL_ADMIN_EMAIL'>, attentions: readonly FxAttention[]): Promise<void> {
