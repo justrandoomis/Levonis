@@ -73,6 +73,7 @@ import { BATCH_SENTINELS, FX_SENTINELS, seedBatchSentinels, seedFxSentinels } fr
 import { FINANCIAL_FIELDS } from '../worker/lib/adminScope';
 import { INLINE_RESOLVE_ID, MANIFEST_PATH, type ViteManifest } from '../worker/lib/socialPreview';
 import { SESSION_COOKIE_NAME } from '../worker/lib/session';
+import { fetchPublished } from './fixtures/autoPublish';
 
 // ---------------------------------------------------------------- the private figures this file adds
 
@@ -221,7 +222,7 @@ interface Doc {
 async function fetchDoc(e: ReturnType<typeof env>, host: string, path: string, token: string | null): Promise<Doc> {
   const headers: Record<string, string> = { Host: host, 'CF-Connecting-IP': '9.9.9.9', 'Accept-Language': 'ar' };
   if (token) headers.Cookie = `${SESSION_COOKIE_NAME}=${token}`;
-  const res = await worker.fetch(new Request(`https://${host}${path}`, { headers }), e as never, ctx);
+  const res = await fetchPublished(worker, new Request(`https://${host}${path}`, { headers }), e as never, ctx);
   const out: Record<string, string> = {};
   res.headers.forEach((v, k) => (out[k] = v));
   return { status: res.status, type: res.headers.get('content-type') ?? '', text: await res.text(), headers: out };

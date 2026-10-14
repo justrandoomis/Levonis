@@ -327,11 +327,14 @@ test('before 0149: the first screen and the explorer still answer, with the pict
   const first = await home.request('/api/home', { headers: IP }, undefined, ctx);
   assert.equal(first.status, 200, 'never a 500 on the first screen');
   const body = await json(first);
-  const sub = (body.categories as Array<{ id: string; children?: Array<Record<string, unknown>> }>)
-    .find((c) => c.id === 'cat_printers')!
-    .children!.find((c) => c.id === SUB)!;
-  assert.equal(sub.image_url, coverUrl, 'the cover that exists is still drawn');
-  assert.equal(sub.mobile_image_url, '', 'a column that does not exist yet holds nothing — which is what it will hold');
+  // The clean start (A.12.4 item 6): a database without 0189 lists no product, so the first screen offers
+  // no section with products in it — the pictures are read back from the admin list below instead.
+  assert.ok(Array.isArray(body.categories));
+  assert.equal(
+    (body.categories as Array<{ id: string }>).some((c) => c.id === 'cat_printers'),
+    false,
+    'nothing is listed before 0189'
+  );
 
   const tree = await get(catalog, '/api/catalog/tree');
   assert.equal(tree.status, 200);
@@ -339,7 +342,8 @@ test('before 0149: the first screen and the explorer still answer, with the pict
   const list = await json(await get(admin, '/api/admin/taxonomy/catalogs'));
   const mine = list.catalogs.find((c: { id: string }) => c.id === SUB);
   assert.equal(mine.picture_variants, false, 'the panel offers the large pictures only');
-  assert.equal(mine.mobile_image_url, '');
+  assert.equal(mine.image_url, coverUrl, 'the cover that exists is still stored and drawn');
+  assert.equal(mine.mobile_image_url, '', 'a column that does not exist yet holds nothing — which is what it will hold');
 });
 
 test('before 0149: a new slot refuses with SCHEMA_PENDING, before anything is written to R2', async () => {

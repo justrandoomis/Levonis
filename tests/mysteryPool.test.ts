@@ -37,6 +37,7 @@ import {
   type MysteryOffer,
 } from '../worker/lib/mysteryDraw';
 import { HttpError } from '../worker/lib/http';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 const OK_OFFER = { ok: true, reason: null, required_tiers: [] as never[], locked_preview: true };
 const WINDOW = { starts_at: null, ends_at: null, nowMs: Date.parse('2026-06-01T00:00:00Z') };
@@ -52,7 +53,7 @@ function seed(raw: DatabaseSync) {
       ('p_empty','empty','Empty Spool','فارغ',25000,'active',0,'BASE','[]','[]','direct_sale','["direct_sale"]','[]','[]'),
       ('p_draft','draft','Draft Spool','مسودة',25000,'draft',9,'BASE','[]','[]','direct_sale','["direct_sale"]','[]','[]'),
       ('p_untracked','untracked','Untracked Spool','بلا تتبع',25000,'active',NULL,'BASE','[]','[]','direct_sale','["direct_sale"]','[]','[]'),
-      ('p_pre','pre','Pre-order Spool','مسبق',25000,'active',NULL,'BASE','[]','[]','pre_order','["pre_order"]','["air"]','[]'),
+      ('p_pre','pre','Pre-order Spool','مسبق',25000,'active',NULL,'BASE','[]','[]','pre_order','["pre_order"]','[{"method":"air","active":true,"commission_iqd":0}]','[]'),
       ('p_named','named','Premium PLA Filament','فتيل',25000,'active',7,'BASE','[]','[]','direct_sale','["direct_sale"]','[]','[]'),
       ('p_colors','colors','Colour Spool','ألوان',25000,'active',NULL,'COLOR','[]','[]','direct_sale','["direct_sale"]','[]','[]'),
       ('p_bundle','bundlerow','A Bundle','حزمة',90000,'active',NULL,'BASE','[]','[]','bundle','["bundle"]','[]','[]');
@@ -129,6 +130,7 @@ const offerOf = (over: Partial<MysteryOffer> = {}): MysteryOffer => ({
 test('every unsellable entry is excluded, and the admin is told exactly why', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct');
   entry(raw, 'mpe_ok', id, 'p_red');
@@ -151,7 +153,9 @@ test('every unsellable entry is excluded, and the admin is told exactly why', as
   assert.equal(reasons.get('mpe_zero'), 'ZERO_WEIGHT');
   assert.equal(reasons.get('mpe_off'), 'ENTRY_INACTIVE');
   assert.equal(reasons.get('mpe_white'), 'SELECTION_INACTIVE', 'a deactivated colour is not sellable');
-  assert.equal(reasons.get('mpe_nested'), 'COMPOSITION_NESTED', 'never a bundle inside a mystery pool');
+  // Never a bundle inside a mystery pool. Until the owner answers Q7 (addendum A.14) a composition is not
+  // listed at all, so it is excluded one step earlier; once it is listed again the reason is COMPOSITION_NESTED.
+  assert.equal(reasons.get('mpe_nested'), 'PRODUCT_INACTIVE', 'never a bundle inside a mystery pool');
 
   assert.deepEqual(
     set.candidates.map((c) => c.entry_id).sort(),
@@ -169,6 +173,7 @@ test('every unsellable entry is excluded, and the admin is told exactly why', as
 test('the DRAW query never even sees the excluded rows the preview explains', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct');
   entry(raw, 'mpe_ok', id, 'p_red');
@@ -186,6 +191,7 @@ test('two entries naming ONE stock row are not two slots on the wheel', async ()
   // cannot forbid it — the ids differ — so the loader does, and says so.
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct');
   entry(raw, 'mpe_first', id, 'p_red');
@@ -199,6 +205,7 @@ test('min_available is a floor, not a suggestion', async () => {
   const raw = freshDb();
   seed(raw);
   raw.exec("UPDATE products SET stock = 2 WHERE id = 'p_red'");
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct', { min_available: 3 });
   entry(raw, 'mpe_ok', id, 'p_red');
@@ -213,6 +220,7 @@ test('min_available is a floor, not a suggestion', async () => {
 test('a catalog requirement is structural: a matching NAME is not membership', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct', { require_catalog_ids: ['cat_filament'] });
   entry(raw, 'mpe_named', id, 'p_named'); // "Premium PLA Filament", no membership
@@ -226,6 +234,7 @@ test('a catalog requirement is structural: a matching NAME is not membership', a
 test('a facet requirement is structural too', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct', { require_facet_ids: ['fct_pla'] });
   entry(raw, 'mpe_red', id, 'p_red');
@@ -248,6 +257,7 @@ test('the engine contains no product-name matching at all', () => {
 test('a pool whose every entry is unsellable is SOLD OUT, and refuses with 503', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct');
   entry(raw, 'mpe_empty', id, 'p_empty');
@@ -284,6 +294,7 @@ test('a pool whose every entry is unsellable is SOLD OUT, and refuses with 503',
 test('availability is floor(Σ eligible available / spool_qty), through the SAME function a bundle uses', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct');
   entry(raw, 'mpe_red', id, 'p_red'); // 10
@@ -304,6 +315,7 @@ test('availability is floor(Σ eligible available / spool_qty), through the SAME
 test('a direct purchase is never converted into a pre-order', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const direct = pool(raw, 'mpl_direct', 'direct');
   const pre = pool(raw, 'mpl_pre', 'preorder');
@@ -353,6 +365,7 @@ test('a mode that is disabled, or has no pool, refuses with MYSTERY_MODE_NOT_AVA
 test('a pre-order pool does not test stock, and a direct pool always does', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const pre = pool(raw, 'mpl_pre', 'preorder');
   entry(raw, 'mpe_pre', pre, 'p_pre'); // stock NULL, pre-order
@@ -385,6 +398,7 @@ test('a pre-order pool does not test stock, and a direct pool always does', asyn
 test('the family narrowing filters by a taxonomy id, and only that', async () => {
   const raw = freshDb();
   seed(raw);
+  await publishSeededV2(raw);
   const db = asD1(raw);
   const id = pool(raw, 'mpl_1', 'direct');
   entry(raw, 'mpe_red', id, 'p_red', { family: 'fct_pla' });

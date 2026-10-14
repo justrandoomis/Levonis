@@ -105,39 +105,27 @@ test('L3 — an assistant can neither set nor blank the cost through the legacy 
 
 // ---------------------------------------------------------------- L4
 
-test('L4 — a bulk preview below cost says nothing about the cost to an assistant', async () => {
+// The clean start (DECISIONS row 222, addendum A.6) closed the dinar price grid for every role: its bulk
+// preview and its ladder check are gone, so neither can compare a price with a hidden cost any more.
+test('L4/L9 — the price grid is closed for every role: one refusal by section, whatever the value, naming no cost', async () => {
   const raw = freshDb();
   seedCostlyProduct(raw);
-  const grid = (user: StubUser) => stubApp(asD1(raw), user, (a) => a.route('/api/admin/products', adminPriceGridRoutes));
-  const below = { op: 'set', fields: ['regular'], value: 100_000, scope: { levels: ['product'] } };
-
-  const owner = await json(await post(grid(OWNER), '/api/admin/products/p_a1/price-grid/bulk', below));
-  assert.ok((owner.preview.guards as unknown[]).length > 0, 'the owner is warned — otherwise this proves nothing');
-
-  for (const user of [ASSISTANT, FULL]) {
-    for (const value of [100_000, 700_000, 611_110, 611_112]) {
-      const res = await json(await post(grid(user), '/api/admin/products/p_a1/price-grid/bulk', { ...below, value }));
-      assert.equal(res.success, true, JSON.stringify(res));
-      assert.deepEqual(res.preview.guards, [], `no guard at ${value} for ${user.id}`);
-      assert.deepEqual(leaks(res), []);
+  const bodies = new Set<string>();
+  for (const user of [OWNER, FULL, ASSISTANT]) {
+    const grid = stubApp(asD1(raw), user, (a) => a.route('/api/admin/products', adminPriceGridRoutes));
+    for (const value of [100_000, 700_000, COST.product, COST.product + 1]) {
+      for (const apply of [false, true]) {
+        const res = await post(grid, '/api/admin/products/p_a1/price-grid/bulk', { op: 'set', fields: ['regular'], value, scope: { levels: ['product'] }, apply });
+        const body = await json(res);
+        assert.equal(res.status, 409, JSON.stringify(body));
+        assert.equal(body.code, 'PRICING_V2_MANAGED');
+        assert.equal(body.details?.section, 3);
+        assert.deepEqual(leaks(body), []);
+        bodies.add(JSON.stringify(body));
+      }
     }
   }
-
-  // And the apply does not ask an assistant to confirm a below-cost price.
-  const applied = await post(grid(ASSISTANT), '/api/admin/products/p_a1/price-grid/bulk', { ...below, apply: true });
-  assert.equal(applied.status, 200, JSON.stringify(await applied.clone().json()));
-});
-
-test('L4/L9 — the grid’s ladder check never compares a price with a cost the assistant cannot see', async () => {
-  const raw = freshDb();
-  seedCostlyProduct(raw);
-  const grid = stubApp(asD1(raw), ASSISTANT, (a) => a.route('/api/admin/products', adminPriceGridRoutes));
-  const res = await post(grid, '/api/admin/products/p_a1/price-grid/bulk', {
-    op: 'set', fields: ['regular'], value: COST.product, scope: { levels: ['product'] },
-  });
-  const body = await json(res);
-  assert.equal(body.success, true, JSON.stringify(body));
-  assert.deepEqual(body.errors, [], 'a price equal to the hidden cost is not refused — that refusal was the oracle');
+  assert.equal(bodies.size, 1, 'the same answer for every role and every value: no oracle on the hidden cost');
 });
 
 // ---------------------------------------------------------------- L5 / L7 / L8
@@ -257,7 +245,9 @@ test('the fixture seeds every cost level it claims to (or the leak checks above 
 
 // ---------------------------------------------------------------- L10
 
-test('L10 — a TXT file cannot write a model’s order-type cost for an assistant; a financial admin still can', async () => {
+// The clean start (DECISIONS row 222, addendum A.6): no file writes a legacy dinar cost any more — the planner pins
+// every legacy money cell for every writer, the owner's included (V2 costs are the owner's pricing inputs).
+test('L10 — a TXT file writes no model’s order-type cost, an assistant’s or the owner’s', async () => {
   const { templateRoutes } = await import('../worker/routes/template');
   const raw = freshDb();
   const OWNER: StubUser = { id: 'usr_owner', role: 'admin', email: 'boss@x.co', admin_scope: null };
@@ -300,23 +290,21 @@ ${cells(String(COST.cell), String(COST.cell))}`,
     'draft'
   );
   const id = String(created.product_id);
-  assert.deepEqual(cellCosts(id), [
-    { t: 'direct_sale', c: COST.cell, a: null },
-    { t: 'pre_order', c: COST.cell, a: null },
-  ], 'the owner wrote both cells’ cost — otherwise this proves nothing');
+  assert.deepEqual(
+    cellCosts(id).map((r) => r.c),
+    [null, null],
+    'the owner’s file wrote no legacy cell cost either: the planner pins them'
+  );
 
   const stampOf = () => String(row(raw, 'SELECT updated_at FROM products WHERE id = ?', id)!.updated_at);
   const update = (user: StubUser, direct: string, preorder: string) =>
     apply(user, `template_version=2\nproduct_id=${id}\nexpected_updated_at=${stampOf()}\n${cells(direct, preorder)}`, 'update');
 
   await update(ASSISTANT, '1', '+2');
-  assert.deepEqual(cellCosts(id), [
-    { t: 'direct_sale', c: COST.cell, a: null },
-    { t: 'pre_order', c: COST.cell, a: null },
-  ], 'the stored cell costs survive an assistant’s file');
+  assert.deepEqual(cellCosts(id).map((r) => r.c), [null, null], 'an assistant’s file writes none');
 
   await update(OWNER, '500000', '510000');
-  assert.deepEqual(cellCosts(id).map((r) => r.c), [500000, 510000], 'a financial admin’s file still writes them');
+  assert.deepEqual(cellCosts(id).map((r) => r.c), [null, null], 'nor does the owner’s');
 });
 
 // ------------------------------------------- S1: no equality oracle on a write

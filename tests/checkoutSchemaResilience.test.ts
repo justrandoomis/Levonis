@@ -33,6 +33,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 /** Columns `cart_items` grew after 0001, each in its own migration. Dropping
  *  one reproduces the window in which the Worker is deployed and its
@@ -88,6 +89,7 @@ function app(db: D1Database) {
     c.env = { DB: db } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.route('/api/orders', orderRoutes);
   a.route('/api/cart', cartRoutes);
   a.onError((err, c) => {

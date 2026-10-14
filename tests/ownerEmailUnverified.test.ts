@@ -153,8 +153,9 @@ async function assertOpen(a: ReturnType<typeof app>, cookie: string) {
   assert.equal(user.owner_email_unverified, false, 'and the prompt is gone');
   const summary = await call(a, cookie, 'GET', '/api/admin/finance-workspace/summary');
   assert.equal(summary.status, 200, summary.text.slice(0, 200));
-  const history = await call(a, cookie, 'GET', '/api/admin/products/p_a1/price-history');
-  assert.equal(history.status, 200);
+  // (The price history read is a closed V1 door since the clean start, spec addendum A.6: the profit preview stands for it.)
+  const preview = await call(a, cookie, 'GET', '/api/admin/inventory/incoming/inc1/profit-preview');
+  assert.equal(preview.status, 200, preview.text.slice(0, 200));
   const doc = await call(a, cookie, 'GET', '/api/admin/products-v2/p_a1');
   assert.notDeepEqual(leaks(doc.json), [], 'the owner now reads the seeded cost on the product document');
 }
@@ -488,7 +489,7 @@ test('a form read while unverified and saved after verifying keeps EVERY stored 
   assert.equal(((save.json.product as Record<string, unknown>) ?? {}).product_cost_iqd, COST.product);
 });
 
-test('a form that DID read the cost still clears it with an explicit blank — the flag is what tells the two apart', async () => {
+test('a form that DID read the cost cannot blank it any more — the clean start (spec addendum A.6) refuses a moved legacy cost by name', async () => {
   const raw = seededCopyUnverifiedOwner();
   raw.exec("UPDATE users SET email_verified_at = '2026-10-08T00:00:00.000Z' WHERE id = 'usr_owner'");
   const a = app(raw);
@@ -496,19 +497,17 @@ test('a form that DID read the cost still clears it with an explicit blank — t
   const { product, body } = await formBodyFor(a, cookie, raw);
   assert.equal(product.product_cost_iqd, COST.product, 'read with cost');
   const save = await call(a, cookie, 'POST', '/api/admin/products-v2', { ...body, product_cost_iqd: null });
-  assert.equal(save.status, 200, save.text.slice(0, 400));
-  assert.equal(productCosts(raw).product, null, 'the owner blanked it on purpose');
+  assert.equal(save.status, 409, save.text.slice(0, 400));
+  assert.equal(save.json.code, 'PRICING_V2_MANAGED');
+  assert.equal(productCosts(raw).product, COST.product, 'the stored cost stays');
 });
 
-test('the quick panel’s fulfilment save read without cost keeps the order-type and route costs (cost_loaded: false)', async () => {
+test('a fulfilment save read without cost — and carrying no money key, as every client since the clean start — keeps the order-type and route costs', async () => {
   const raw = seededCopyUnverifiedOwner();
   const a = app(raw);
   const cookie = await sessionFor(raw, 'usr_owner');
-  const grid = await call(a, cookie, 'GET', '/api/admin/products/p_a1/price-grid');
-  assert.equal(grid.status, 200, grid.text.slice(0, 300));
-  assert.equal(grid.json.can_view_cost, false, 'the panel read the product without cost');
   raw.exec("UPDATE users SET email_verified_at = '2026-10-08T00:00:00.000Z' WHERE id = 'usr_owner'");
-  // As the panel sends them: the cells it read, their stripped costs as explicit blanks.
+  // The cells it read: a capacity edit, no cost, adjustment or surcharge key at all.
   const fulfillments = [
     {
       option_id: 'v_a1',
@@ -516,9 +515,7 @@ test('the quick panel’s fulfilment save read without cost keeps the order-type
       enabled: true,
       sort: 0,
       capacity: 5,
-      cost_iqd: null,
-      cost_adjust_iqd: null,
-      transports: [{ method: 'air', enabled: true, sort: 0, surcharge_iqd: 25000, capacity: 3, cost_iqd: null, cost_adjust_iqd: null }],
+      transports: [{ method: 'air', enabled: true, sort: 0, capacity: 3 }],
     },
   ];
   const put = await call(a, cookie, 'PUT', '/api/admin/products/p_a1/fulfillment', { fulfillments, cost_loaded: false });

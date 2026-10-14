@@ -21,7 +21,6 @@
  *  - NO `cost_iqd`, anywhere, at any level. It is stripped before persistence
  *    because the order is served straight back to the buyer.
  */
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, stubApp, post, get, json, all, row, type StubUser } from './fixtures/app';
@@ -29,6 +28,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { createInvoiceForOrder } from '../worker/lib/invoices';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
+import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown) =>
@@ -70,7 +70,7 @@ async function buyOne(raw: DatabaseSync) {
   return { db, orderId: res.order.id as string, before: res.order };
 }
 
-test('case 7 — the order is unchanged after every component is repriced, renamed and deactivated', async () => {
+q7Test('case 7 — the order is unchanged after every component is repriced, renamed and deactivated', async () => {
   const raw = seedCatalogue();
   const { db, orderId, before } = await buyOne(raw);
   const beforeDetail = await json(await get(appFor(db), `/api/orders/${orderId}`));
@@ -91,7 +91,7 @@ test('case 7 — the order is unchanged after every component is repriced, renam
   assert.equal(before.items[0].unit_price_iqd, 400_000);
 });
 
-test('bundle cart, quote, order and invoice freeze the active relational primary, never stale or quarantined media', async () => {
+q7Test('bundle cart, quote, order and invoice freeze the active relational primary, never stale or quarantined media', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const image = '/files/products/prd_b1/gallery/primary.webp';
@@ -142,7 +142,7 @@ test('bundle cart, quote, order and invoice freeze the active relational primary
   assert.equal(wire.includes('bad.example'), false);
 });
 
-test('case 7 — the invoice is unchanged too, and lists the parts under the priced line', async () => {
+q7Test('case 7 — the invoice is unchanged too, and lists the parts under the priced line', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await buyOne(raw);
   const env = { DB: db } as unknown as Parameters<typeof createInvoiceForOrder>[0];
@@ -168,7 +168,7 @@ test('case 7 — the invoice is unchanged too, and lists the parts under the pri
   assert.deepEqual(again, snapshot);
 });
 
-test('the composition block answers what was bought, at what price, under which offer — and carries no cost', async () => {
+q7Test('the composition block answers what was bought, at what price, under which offer — and carries no cost', async () => {
   const raw = seedCatalogue();
   const { orderId } = await buyOne(raw);
   const rows = all<Record<string, unknown>>(raw, 'SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid', orderId);
@@ -222,7 +222,7 @@ test('the composition block answers what was bought, at what price, under which 
   }
 });
 
-test('the parent option_snapshot is DATA ONLY — no prose, no count, no English sentence', async () => {
+q7Test('the parent option_snapshot is DATA ONLY — no prose, no count, no English sentence', async () => {
   const raw = seedCatalogue();
   const { orderId } = await buyOne(raw);
   const parent = all<Record<string, unknown>>(
@@ -238,7 +238,7 @@ test('the parent option_snapshot is DATA ONLY — no prose, no count, no English
   assert.ok(!/\bincludes\b/i.test(snap));
 });
 
-test('a bundle line keeps its own transport snapshot and its components keep theirs', async () => {
+q7Test('a bundle line keeps its own transport snapshot and its components keep theirs', async () => {
   const raw = seedCatalogue();
   raw.exec(
     `INSERT INTO admin_settings (key, value) VALUES ('preorderTransportDefaults', '[{"method":"sea","commission_iqd":3000}]')`

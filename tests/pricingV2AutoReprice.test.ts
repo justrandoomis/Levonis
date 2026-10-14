@@ -6,7 +6,8 @@
  * V2 products are `mode = 'engine'`, so the run already selects them; only the
  * branch after the selection is new. Proves:
  *   - U moves past the dead band: every V2 product, both methods, reprices in
- *     the same run beside a V1 engine product — a price-first product follows
+ *     the same run (since the clean start, spec addendum A.6, only V2 products
+ *     are selected: a V1 product is hidden until published) — a price-first product follows
  *     U (its dollars re-read), deficit first, within the statement budget (a
  *     tight budget defers the rest, a later run finishes them);
  *   - EUR moves: only the cost-first EUR product moves;
@@ -38,13 +39,11 @@ import type { Env } from '../worker/lib/types';
 type World = ReturnType<typeof pricingWorld>;
 
 const AMS2 = legacyProductId('bambu-lab-ams-2-pro');
-const V1 = legacyProductId('bambu-lab-a1');
 const OL = 'p_v2_ol';
 const fixed = (usd: string) => ({ scope: 'product' as const, scope_id: '', kind: 'fixed' as const, usd });
 const off = (usd: string) => ({ scope: 'product' as const, scope_id: '', usd });
 const envOf = (raw: DatabaseSync): Env => ({ ...fxEnv(raw), STORE_ROOT_DOMAIN: 'levonis-iq.com' }) as Env;
 const ceil1000 = (n: number) => Math.ceil(n / 1000) * 1000;
-const seqOf = (w: World, pid: string) => row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', pid)?.s ?? 0;
 
 function trapPurges() {
   const g = globalThis as { caches?: unknown };
@@ -54,17 +53,10 @@ function trapPurges() {
   return { paths, restore: () => (before === undefined ? delete g.caches : (g.caches = before)) };
 }
 
-/** A world with three V2 products (price-first one model, price-first option-less, cost-first EUR with air + land) and one V1 engine product. */
+/** A world with three V2 products (price-first one model, price-first option-less, cost-first EUR with air + land). */
 async function world(): Promise<World> {
   const w = pricingWorld();
   seedOptionless(w.raw, OL, { routes: ['land'] });
-  const draft = {
-    inputs: [{ scope: 'base', supplier_cost_amount: '200', supplier_cost_currency: 'USD', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 1000 }],
-    rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '30' }, { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 15_000 }],
-  };
-  const first = await w.putInputs(V1, { inputs_seq: seqOf(w, V1), ...draft });
-  const saved = await w.putInputs(V1, { inputs_seq: seqOf(w, V1), ...draft, preview_hash: first.body.details.preview.preview_hash, confirm_large_change: true });
-  assert.equal(saved.status, 200, JSON.stringify(saved.body));
   await writeV2(w.db, AMS, { method: 'usd', points: [fixed('1000')], discounts: [off('50')] });
   await writeV2(w.db, OL, { method: 'usd', points: [fixed('500')], discounts: [off('25')] });
   await writeV2(w.db, AMS2, {
@@ -90,22 +82,22 @@ async function run(w: World, trigger: 'fx' | 'shipping' | 'sweep', limit = 600) 
 
 const slugOf = (w: World, pid: string) => row<{ s: string }>(w.raw, 'SELECT slug AS s FROM products WHERE id = ?', pid)!.s;
 
-test('U moves past the dead band: every V2 product (both methods) reprices beside V1, price-first follows U, deficit first, engine_fx, purged', async () => {
+test('U moves past the dead band: every V2 product (both methods) reprices, price-first follows U, deficit first, engine_fx, purged', async () => {
   const w = await world();
   const status0 = await autoRepriceStatus(w.db);
-  assert.equal(status0?.engine_products, 4);
+  assert.equal(status0?.engine_products, 3);
   assert.equal(status0?.stale, 0);
   const history0 = count(w.raw, 'SELECT COUNT(*) AS n FROM price_history');
 
   applyRate(w.raw, 'USD_IQD', '1632');
-  assert.equal((await autoRepriceStatus(w.db))?.stale, 4, 'the V2 products are stale through their results, V1 through its own');
+  assert.equal((await autoRepriceStatus(w.db))?.stale, 3, 'the V2 products are stale through their results');
   const { report, paths } = await run(w, 'fx');
   assert.equal(report.skipped, null);
-  assert.deepEqual([...report.repriced].sort(), [AMS, AMS2, OL, V1].sort());
-  assert.deepEqual([...report.changed].sort(), [AMS, AMS2, OL, V1].sort());
+  assert.deepEqual([...report.repriced].sort(), [AMS, AMS2, OL].sort());
+  assert.deepEqual([...report.changed].sort(), [AMS, AMS2, OL].sort());
   assert.deepEqual(report.blocked, []);
   // Deficit first among the V2 products: the largest increase first ($1,000 → +32,000; $950 cost-first; $500 → +16,000).
-  const v2Order = report.repriced.filter((id) => id !== V1);
+  const v2Order = report.repriced;
   assert.equal(v2Order.at(-1), OL, `the smallest increase last (${v2Order.join(', ')})`);
 
   // A price-first product follows U: its dollars re-read at 1,632.
@@ -127,22 +119,30 @@ test('U moves past the dead band: every V2 product (both methods) reprices besid
   assert.ok(v2Hist.every((h) => h.price_source === 'engine_fx' && h.usd_iqd_rate === '1632'));
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_audit WHERE entity = 'sku_price' AND action = 'reprice_auto' AND product_id IN (?, ?, ?)", AMS, OL, AMS2), 3);
   // The purge: exactly the moved products' pages.
-  for (const pid of [AMS, AMS2, OL, V1]) assert.ok(paths.includes(`/api/products/${slugOf(w, pid)}`), `${pid} purged`);
+  for (const pid of [AMS, AMS2, OL]) assert.ok(paths.includes(`/api/products/${slugOf(w, pid)}`), `${pid} purged`);
   // (Each page is purged on every host the shop answers on: the set of pages is what counts.)
   const productPages = [...new Set(paths.filter((p) => /^\/api\/products\/[^/]+$/.test(p)))];
-  assert.deepEqual(productPages.sort(), [AMS, AMS2, OL, V1].map((pid) => `/api/products/${slugOf(w, pid)}`).sort());
+  assert.deepEqual(productPages.sort(), [AMS, AMS2, OL].map((pid) => `/api/products/${slugOf(w, pid)}`).sort());
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM ops_guards'), 0);
   // Nothing is left: the next run finds nothing stale.
   assert.equal((await run(w, 'sweep')).report.skipped, 'NOTHING_STALE');
 });
 
 test('a tight budget defers in deficit order and a later run finishes; EUR moves only the cost-first EUR product', async () => {
-  const w = await world();
-  applyRate(w.raw, 'USD_IQD', '1632');
-  const tight = await run(w, 'sweep', 120);
+  // The tightest budget that still reprices one product and defers another (the three V2 products cost ~115
+  // statements in one run since the clean start dropped the V1 product): found, not guessed.
+  let w = await world();
+  let tight: Awaited<ReturnType<typeof run>> | null = null;
+  for (let limit = 110; limit >= 30 && !tight; limit -= 10) {
+    w = await world();
+    applyRate(w.raw, 'USD_IQD', '1632');
+    const r = await run(w, 'sweep', limit);
+    if (r.report.deferred.length > 0 && r.report.repriced.length > 0) tight = r;
+  }
+  assert.ok(tight, 'some budget defers a product while another is repriced');
   assert.ok(tight.report.deferred.length > 0, `some products wait for a later tick (used ${tight.used})`);
   const rest = await run(w, 'sweep');
-  assert.deepEqual([...tight.report.repriced, ...rest.report.repriced].sort(), [AMS, AMS2, OL, V1].sort());
+  assert.deepEqual([...tight.report.repriced, ...rest.report.repriced].sort(), [AMS, AMS2, OL].sort());
 
   // EUR/USD 1.1 → 1.12: only the cost-first product with a EUR supplier moves.
   const before = { ams: await cartGrid(w.db, AMS), ol: await cartGrid(w.db, OL) };
@@ -181,7 +181,7 @@ test('the owner’s rate-act preview lists the V2 products, and its hash moves w
   const move = { kind: 'fx' as const, act: 'manual' as const, pair: 'USD_IQD' as const, owner_version: 1, before: '1600', after: '1632', clears_pending: false };
   const p1 = await previewRateAct(w.db, move, (await loadPricingRates(w.db))!, 600);
   const ids = new Set(p1.preview.rows.map((r) => r.product_id));
-  for (const pid of [AMS, AMS2, OL, V1]) assert.ok(ids.has(pid), `${pid} is in the preview`);
+  for (const pid of [AMS, AMS2, OL]) assert.ok(ids.has(pid), `${pid} is in the preview`);
   const ams = p1.preview.rows.find((r) => r.product_id === AMS && r.channel === 'direct_sale')!;
   assert.deepEqual([ams.today_prepaid_iqd, ams.computed_price_iqd], [1_600_000, 1_632_000]);
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM ops_guards'), 0, 'a preview writes nothing');

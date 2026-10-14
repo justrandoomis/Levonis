@@ -46,6 +46,7 @@ import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { isRevealed, milestoneReached, reachedMilestones, stageForMilestone } from '../worker/lib/mysteryReveal';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { addMysteryOffer, forbiddenTokens, seedMysteryPool, COLOR_POOL_PRODUCT, POOL_PRODUCTS } from './lib/mysteryOffer';
+import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
@@ -126,7 +127,7 @@ test('revealed_at, once written, IS the truth — a backwards derivation cannot 
 
 // -------------------------------------------------------- the twenty surfaces
 
-test('case 15: no customer surface carries the pick, its prices or its images before the milestone', async () => {
+q7Test('case 15: no customer surface carries the pick, its prices or its images before the milestone', async () => {
   const { raw, db, orderId, drawn } = await buyMystery({ revealStage: 'delivered' });
   const app = appFor(db);
 
@@ -198,7 +199,7 @@ test('case 15: no customer surface carries the pick, its prices or its images be
   assertNoLeak('POST /api/returns', returned, raw, drawn);
 });
 
-test('case 15: the cart and the quote carry no components and no pick', async () => {
+q7Test('case 15: the cart and the quote carry no components and no pick', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
   addMysteryOffer(raw);
@@ -237,7 +238,7 @@ test('case 15: the cart and the quote carry no components and no pick', async ()
  * and 'delivered'. The pool therefore carries a COLOUR-TRACKED candidate, and
  * the catalogue is snapshotted a third time after the stage move.
  */
-test('case 15, surface 18: the public catalogue is byte-identical around the purchase AND the confirmation', async () => {
+q7Test('case 15, surface 18: the public catalogue is byte-identical around the purchase AND the confirmation', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw, 'mpl_test', { withColorCandidate: true });
   addMysteryOffer(raw);
@@ -402,7 +403,7 @@ test('case 15, surface 18: the checkout stock refusal names no count for a pool 
  * `size_class` leaked a partition of the candidate set, before the purchase
  * and after it. The pool below is deliberately heterogeneous.
  */
-test('case 15: the shipping quote and the frozen delivery snapshot name no size class from the pool', async () => {
+q7Test('case 15: the shipping quote and the frozen delivery snapshot name no size class from the pool', async () => {
   const raw = seedCatalogue();
   seedMysteryPool(raw);
   addMysteryOffer(raw, { revealStage: 'delivered' });
@@ -435,7 +436,7 @@ test('case 15: the shipping quote and the frozen delivery snapshot name no size 
 
 // ------------------------------------------------------------- the admin side
 
-test('case 15: admins see the pick THROUGHOUT, with the "not yet revealed" chip', async () => {
+q7Test('case 15: admins see the pick THROUGHOUT, with the "not yet revealed" chip', async () => {
   const { db, orderId, drawn } = await buyMystery({ revealStage: 'delivered' });
   const adminApp = appFor(db, boss);
   const payload = await json(await get(adminApp, `/api/admin/orders/${orderId}`));
@@ -456,7 +457,7 @@ test('case 15: admins see the pick THROUGHOUT, with the "not yet revealed" chip'
 
 // ------------------------------------------------------------ monotonicity
 
-test('reveal is monotone on the ORDER axis: forward reveals, backward does not un-reveal', async () => {
+q7Test('reveal is monotone on the ORDER axis: forward reveals, backward does not un-reveal', async () => {
   const { raw, db, orderId, drawn } = await buyMystery({ revealStage: 'confirmed' });
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
   const app = appFor(db);
@@ -486,7 +487,7 @@ test('reveal is monotone on the ORDER axis: forward reveals, backward does not u
   assert.equal(backLine.mystery.revealed, true, 'a backwards stage move un-revealed the pick');
 });
 
-test('reveal is monotone on the CONFIG axis: editing reveal_stage moves no existing order', async () => {
+q7Test('reveal is monotone on the CONFIG axis: editing reveal_stage moves no existing order', async () => {
   const { raw, db, orderId, drawn } = await buyMystery({ revealStage: 'delivered' });
   const app = appFor(db);
 
@@ -513,7 +514,7 @@ test('reveal is monotone on the CONFIG axis: editing reveal_stage moves no exist
 
 // ------------------------------------------------------------- the re-roll
 
-test('a revealed mystery order cannot be self-cancelled, and cancelling frees no redemption slot', async () => {
+q7Test('a revealed mystery order cannot be self-cancelled, and cancelling frees no redemption slot', async () => {
   const { raw, db, orderId } = await buyMystery({ revealStage: 'confirmed' });
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
   const app = appFor(db);
@@ -541,7 +542,7 @@ test('a revealed mystery order cannot be self-cancelled, and cancelling frees no
   );
 });
 
-test("the 'paid' milestone is crossed by the settlement, not by a stage", async () => {
+q7Test("the 'paid' milestone is crossed by the settlement, not by a stage", async () => {
   const { raw, db, orderId, drawn } = await buyMystery({ revealStage: 'paid' });
   const app = appFor(db);
   // A cash-on-delivery order is not paid at purchase, so nothing is revealed.

@@ -125,10 +125,12 @@ test('the owner, every route: no table but rate_limits changes after any call, a
     assert.ok(res.status < 500, `${c.method} ${c.path}: ${res.status} ${JSON.stringify(res.body).slice(0, 200)}`);
     assert.deepEqual(changedTables(before, snapshot(raw)), [], `${c.method} ${c.path} changed a table`);
   }
-  // The calls really ran: answers, refusals, a 404 and the bundle's 409 among them.
-  assert.ok(answered >= 41 + 4 + 30, `only ${answered} answered`);
+  // The calls really ran: the overview's pages answer; since the clean start (spec addendum A.6) every
+  // V1 product door — the product sheet and the what-if, for any id — is 409 PRICING_V2_MANAGED.
+  assert.ok(answered >= 6, `only ${answered} answered`);
   const codes = new Set(Object.values(statuses));
-  for (const s of [200, 400, 404, 409]) assert.ok(codes.has(s), `no ${s} among the answers`);
+  for (const s of [200, 409]) assert.ok(codes.has(s), `no ${s} among the answers`);
+  assert.deepEqual([...codes].sort(), [200, 409]);
   // The one write: the limiter's counter moved, once per request.
   assert.ok(rateLimitCount(raw) > limiterBefore, 'the rate limiter counted the requests');
 
@@ -136,7 +138,8 @@ test('the owner, every route: no table but rate_limits changes after any call, a
   assert.deepEqual(writes, [], 'a statement other than the rate limiter writes');
   const reads = d1.statements.filter((sql) => !RATE_LIMIT.test(sql));
   for (const sql of reads) assert.match(sql, /^\s*(SELECT|WITH)\b/i, sql.slice(0, 120));
-  assert.ok(reads.length > 100, `only ${reads.length} reads recorded — the recorder is not wired`);
+  // Since the clean start only the overview reads (every V1 door refuses before it reads): each answer read at least once.
+  assert.ok(reads.length >= answered, `only ${reads.length} reads recorded — the recorder is not wired`);
 });
 
 test('every other admin and every other caller: refused, and still nothing but the limiter writes', async () => {

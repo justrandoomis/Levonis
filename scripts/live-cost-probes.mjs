@@ -26,7 +26,17 @@
  *                       An absent key passes: a database without a rate.
  *                       The failure names the key and the type, never the value
  *   vars                `{name}` placeholders, filled from an earlier anonymous
- *                       GET (a live slug, so no probe names a product by hand)
+ *                       GET (a live slug, so no probe names a product by hand),
+ *                       or from the command line (`--var name=value`, which
+ *                       wins). `"optional": true` (the clean start, DECISIONS
+ *                       row 222): a probe whose optional var has no value is
+ *                       SKIPPED with a notice, neither run nor failed — an
+ *                       empty catalogue right after the cut-over is not a leak.
+ *                       `ran === 0` still fails the run.
+ *   forbidValues        {"key": "{var}"}: no occurrence of the key may carry
+ *                       the filled value (a hidden product's slug must not be
+ *                       in a search answer). The failure names the key and
+ *                       where, never the value
  *
  * WHAT IT NEVER DOES. No cookie, no token, no write, no method but GET, no
  * redirect followed (a redirect is reported as its own status). Nothing it
@@ -39,6 +49,7 @@
  *   node scripts/live-cost-probes.mjs                       (https://levonis-iq.com)
  *   node scripts/live-cost-probes.mjs --base https://…      (another origin)
  *   node scripts/live-cost-probes.mjs --dir path/to/probes  (another probe folder)
+ *   node scripts/live-cost-probes.mjs --var hidden_slug=x   (a var from the workflow)
  *
  * NO OWNER-ROW CHECK (DECISIONS row 185 amendment, 2026-10-08). The deploy no
  * longer reads the users table: an owner whose address is not verified yet is
@@ -85,11 +96,43 @@ export function fillPath(path, vars) {
   });
 }
 
+/** The `{name}` placeholders a probe needs (its path and its forbidValues). */
+export function probeVars(probe) {
+  const text = [probe.path, ...Object.values(probe.forbidValues ?? {})].join(' ');
+  return [...String(text).matchAll(/\{([a-z_][a-z0-9_]*)\}/gi)].map((m) => m[1]);
+}
+
+/**
+ * One probe against the resolved vars: `{ path }` to run, `{ skip }` when an
+ * OPTIONAL var it needs has no value (the clean start: no listed product yet),
+ * or `{ error }` when a required one is missing.
+ */
+export function planProbe(probe, vars, defs = {}) {
+  const missing = probeVars(probe).filter((name) => typeof vars[name] !== 'string' || vars[name] === '');
+  if (missing.length && missing.every((name) => defs[name]?.optional === true)) return { skip: `skipped (no listed product yet: {${missing.join('}, {')}} has no value)` };
+  try {
+    return { path: fillPath(probe.path, vars) };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+/** `--var name=value` (repeatable) → { name: value }. */
+export function cliVars(args) {
+  const out = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== '--var' || !args[i + 1]) continue;
+    const eq = args[i + 1].indexOf('=');
+    if (eq > 0) out[args[i + 1].slice(0, eq)] = args[i + 1].slice(eq + 1);
+  }
+  return out;
+}
+
 /**
  * The verdict for one probe over one answer: a list of failure lines, empty
  * when it passed. Pure, so a test can feed it fixed bodies.
  */
-export function judge(probe, status, text) {
+export function judge(probe, status, text, vars = {}) {
   const failures = [];
   const allowed = Array.isArray(probe.status) && probe.status.length ? probe.status : [200];
   if (!allowed.includes(status)) failures.push(`status ${status}, expected ${allowed.join(' or ')}`);
@@ -119,6 +162,13 @@ export function judge(probe, status, text) {
     }
     if (seen === 0) failures.push(`required key ${name} is absent`);
     else if (bad > 0) failures.push(`${bad} of ${seen} ${name} value(s) are not integers`);
+  }
+  for (const [name, template] of Object.entries(probe.forbidValues ?? {})) {
+    const value = String(template).replace(/\{([a-z_][a-z0-9_]*)\}/gi, (w, v) => String(vars[v] ?? ''));
+    if (!value) continue;
+    for (const { key, value: got, path } of walkKeys(body)) {
+      if (key === name && String(got) === value) failures.push(`forbidden value of key ${key} (at ${path})`);
+    }
   }
   for (const [name, pattern] of Object.entries(probe.valuePatterns ?? {})) {
     const re = new RegExp(pattern);
@@ -158,11 +208,15 @@ async function main() {
   const base = flag('--base', 'https://levonis-iq.com');
   const dir = resolve(flag('--dir', join(HERE, 'live-cost-probes.d')));
   const files = loadProbeFiles(dir);
+  const fromCli = cliVars(args);
   let failed = 0;
   let ran = 0;
+  let skipped = 0;
   for (const { file, spec } of files) {
-    const vars = {};
+    const vars = { ...fromCli };
     for (const [name, def] of Object.entries(spec.vars ?? {})) {
+      if (typeof vars[name] === 'string' && vars[name]) continue;
+      if (!def.from) continue;
       try {
         const r = await get(base, def.from);
         const v = pick(JSON.parse(r.text), def.pick);
@@ -173,14 +227,18 @@ async function main() {
       }
     }
     for (const probe of spec.probes ?? []) {
-      let path;
-      try {
-        path = fillPath(probe.path, vars);
-      } catch (err) {
-        failed++;
-        console.log(`::error::${file}: ${probe.path} — ${err.message}`);
+      const plan = planProbe(probe, vars, spec.vars ?? {});
+      if (plan.skip) {
+        skipped++;
+        console.log(`::notice::${file}: ${probe.path} — ${plan.skip}`);
         continue;
       }
+      if (plan.error) {
+        failed++;
+        console.log(`::error::${file}: ${probe.path} — ${plan.error}`);
+        continue;
+      }
+      const path = plan.path;
       ran++;
       let status = 0;
       let text = '';
@@ -191,7 +249,7 @@ async function main() {
         console.log(`::error::${file}: GET ${path} did not answer (${err?.name ?? 'error'})`);
         continue;
       }
-      const failures = judge(probe, status, text);
+      const failures = judge(probe, status, text, vars);
       if (failures.length) {
         failed++;
         for (const f of failures) console.log(`::error::${file}: GET ${path} — ${f}`);
@@ -200,7 +258,7 @@ async function main() {
       }
     }
   }
-  console.log(`${ran} probe(s) run, ${failed} failed`);
+  console.log(`${ran} probe(s) run, ${failed} failed${skipped ? `, ${skipped} skipped (no listed product yet)` : ''}`);
   if (ran === 0) {
     console.log('::error::no probe ran — an empty probe set proves nothing');
     process.exit(1);

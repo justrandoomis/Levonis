@@ -49,6 +49,7 @@ import { freshDb, asD1, count } from './fixtures/app';
 import { SqliteD1 } from './fixtures/d1';
 import { sweepStockAlerts } from '../worker/lib/stockAlerts';
 import type { Env } from '../worker/lib/types';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
 
@@ -154,6 +155,7 @@ test('a pass that loses the claim writes NO message — the second buzz never ha
   const raw = freshDb();
   seed(raw);
   alert(raw, 'a1', 'u1', { kind: 'option_value', optionValueId: 'v_big' });
+  await publishSeededV2(raw);
 
   const report = await sweepStockAlerts({ DB: stolenClaimDb(raw) } as unknown as Env, 60, 200);
 
@@ -170,6 +172,7 @@ test('and the pass that DOES own the arming still fires, exactly once', async ()
   seed(raw);
   alert(raw, 'a1', 'u1', { kind: 'option_value', optionValueId: 'v_big' });
 
+  await publishSeededV2(raw);
   const env = { DB: asD1(raw) } as unknown as Env;
   const first = await sweepStockAlerts(env, 60, 200);
   assert.equal(first.matched, 1, 'the edge was found');
@@ -198,6 +201,7 @@ test('a claim abandoned mid-flight is returned to armed, so the promise survives
     lastCheckedAt: minutesAgo(90),
   });
 
+  await publishSeededV2(raw);
   const env = { DB: asD1(raw) } as unknown as Env;
   await sweepStockAlerts(env, 60, 200);
 
@@ -234,6 +238,7 @@ test('a claim still inside its grace is left completely alone — writes nothing
     lastCheckedAt: claimedAt,
   });
 
+  await publishSeededV2(raw);
   await sweepStockAlerts({ DB: asD1(raw) } as unknown as Env, 60, 200);
 
   const row = stateOf(raw, 'a1');
@@ -261,6 +266,7 @@ test('a customer whose wishes straddle the page boundary is not told twice', asy
   alert(raw, 'b1', 'u2', { kind: 'product', optionValueId: '' });
   alert(raw, 'c1', 'u1', { kind: 'option_value', optionValueId: 'v_small' });
 
+  await publishSeededV2(raw);
   const env = { DB: asD1(raw) } as unknown as Env;
   const first = await sweepStockAlerts(env, 60, 3);
 
@@ -290,6 +296,7 @@ test('a page that is full but cuts nothing still fires — the check defers, it 
   alert(raw, 'a1', 'u1', { kind: 'option_value', optionValueId: 'v_big' });
   alert(raw, 'a2', 'u1', { kind: 'option_value', optionValueId: 'v_mid' });
 
+  await publishSeededV2(raw);
   const report = await sweepStockAlerts({ DB: asD1(raw) } as unknown as Env, 60, 2);
 
   assert.equal(report.matched, 2, 'both rows judged');
@@ -306,6 +313,7 @@ test('a budget too small for one group fires it anyway, rather than never', asyn
   alert(raw, 'a2', 'u1', { kind: 'option_value', optionValueId: 'v_mid' });
   alert(raw, 'a3', 'u1', { kind: 'option_value', optionValueId: 'v_small' });
 
+  await publishSeededV2(raw);
   await sweepStockAlerts({ DB: asD1(raw) } as unknown as Env, 60, 2);
 
   assert.equal(buzzes(raw, 'u1'), 1, 'the pass spoke rather than stalling');

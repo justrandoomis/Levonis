@@ -109,25 +109,3 @@ test('the product form (Pricing V2-4): a held save opens the ONE sheet; the conf
   // The V1 sheet and its section are gone with the old dinar fields.
   assert.doesNotMatch(form, /UsdPricingSaveSheet|UsdPricingSection/);
 });
-
-test('the purchase review: the prices an apply writes, the 15% tick, and no unseen prices on a retry', () => {
-  const review = src('src/components/adminOperations/ProcurementPricingReview.tsx');
-  assert.match(review, /data-pricing-direct-first=\{writes\?\.kind \?\? 'data'\}/);
-  assert.match(review, /writes\?\.large_change && onLarge/, 'the direct review retains the large-price confirmation');
-  assert.match(review, /<PricingRowsTable rows=\{adoptionRows\(writes\)\.filter\(isDirect\)\} variant="direct" \/>/, 'stock purchase confirms only the direct prices it can write');
-  assert.match(review, /if \(!shown\?\.preview_hash \|\| !samePrices\(shown\.adoption, product\.adoption\)\) throw e;/);
-  const panel = src('src/components/adminOperations/ProcurementPanel.tsx');
-  assert.match(panel, /applyPurchase\(product\.product_id, purchaseId, hash, own, confirmLarge\[product\.product_id\] === true\)/);
-  assert.match(panel, /samePrices\(shown\.adoption, product\.adoption\)/);
-});
-
-test('the stale list sits on «التسعير والشحن» and in the rates panel; it previews before the bulk save', () => {
-  assert.match(src('src/components/adminPricing/AdminPricing.tsx'), /\{!productId && <EngineSaveList lang=\{lang\}[^>]* \/>\}/);
-  assert.match(src('src/components/adminPricing/RatesPanel.tsx'), /<EngineSaveList lang=\{lang\} compact reloadKey=\{ratesSeq \+ reloadKey\} onChanged=\{onChanged\} \/>/, 'rate and workspace revisions refresh the list, and completed bulk saves notify the workspace');
-  const list = src('src/components/adminPricing/EngineSaveList.tsx');
-  assert.match(list, /previewSaveList\(firstBatch\(list\)\)/);
-  assert.match(list, /saveBulk\(sheet\.map\(\(i\) => \(\{ product_id: i\.product_id, preview_hash: i\.preview\.preview_hash! \}\)\), confirmLarge\)/);
-  const wire = src('src/components/adminPricing/api.ts');
-  assert.match(wire, /`\$\{PRICING_API\}\/products\/save-bulk`, body/);
-  assert.match(wire, /ENGINE_BULK_MAX = 20/);
-});

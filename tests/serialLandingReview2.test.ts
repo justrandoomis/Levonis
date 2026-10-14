@@ -46,6 +46,7 @@ import { COST_REFUSALS, serverMessage } from '../packages/contracts/src/costRefu
 import { seedCatalogue, addBundle, orderBody } from './lib/bundles';
 import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
+import { q7Test } from './fixtures/q7';
 
 type World = ReturnType<typeof world>;
 
@@ -139,9 +140,12 @@ test('F1: the printer flag is refused to a non-owner ONLY when it flips a produc
 
 // ================================================================ F2 / F4
 
-const HEAD = ['row_type', 'key', 'name', 'status', 'category', 'sub_category', 'price_iqd', 'serialized'];
+// The row's own written cell is its description: since the clean start (DECISIONS row 222) a sheet never writes a
+// dinar price (the planner pins it), so a price cell can no longer prove the row was written. The sheet still
+// carries the (required, pinned) price column.
+const HEAD = ['row_type', 'key', 'name', 'status', 'category', 'sub_category', 'price_iqd', 'description', 'serialized'];
 const sheet = (...rows: Array<Record<string, string>>) =>
-  toCsv([HEAD, ...rows.map((r) => HEAD.map((h) => ({ row_type: 'product', status: 'draft', price_iqd: '100000', ...r })[h] ?? ''))]);
+  toCsv([HEAD, ...rows.map((r) => HEAD.map((h) => ({ row_type: 'product', status: 'draft', price_iqd: '100000', description: 'n100000', ...r })[h] ?? ''))]);
 const importApp = (w: World, who: keyof typeof USERS): App => stubApp(w.db, USERS[who], (a) => a.route('/api/admin/import', adminImportRoutes));
 
 async function preview(app: App, csv: string) {
@@ -189,27 +193,27 @@ test('F2: a full admin\'s price-only row for a printer held by an EXTRA placemen
   const w = extraPlacementWorld();
   assert.equal(await effective(w, 'pA1'), true);
   const app = importApp(w, 'adm');
-  const pv = await preview(app, sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-dev', price_iqd: '910000' }));
+  const pv = await preview(app, sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-dev', description: 'n910000' }));
   assert.deepEqual(serialErrors(pv.rows[0]), [], JSON.stringify(pv.rows[0]));
   assert.equal(pv.rows[0].action, 'update', JSON.stringify(pv.rows[0]));
   const done = await confirm(app, pv.import_id);
   assert.equal(done.success, true, JSON.stringify(done));
   assert.equal(done.summary.updated, 1, JSON.stringify(done));
   assert.deepEqual(shelves(w, 'pA1'), ['ct_dev', 'ct_print'], 'the printer catalog survives the import');
-  assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pA1'")!.p, 910000);
+  assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pA1'")!.p, 'n910000');
   assert.equal(await effective(w, 'pA1'), true, 'still a printer, still needs a serial');
 });
 
 test('F2: the owner\'s confirm keeps the extra placement too, and a row that MOVES the product drops only its old section', async () => {
   const w = extraPlacementWorld();
   const owner = importApp(w, 'boss');
-  let pv = await preview(owner, sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-dev', price_iqd: '920000' }));
+  let pv = await preview(owner, sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-dev', description: 'n920000' }));
   let done = await confirm(owner, pv.import_id);
   assert.equal(done.success, true, JSON.stringify(done));
   assert.deepEqual(shelves(w, 'pA1'), ['ct_dev', 'ct_print']);
   // A full admin moves it to another section: the printer catalog stays, ct_dev goes.
   const adm = importApp(w, 'adm');
-  pv = await preview(adm, sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-acc', price_iqd: '920000' }));
+  pv = await preview(adm, sheet({ key: 'sp-a1', name: 'Bambu Lab A1 Combo', category: 'sp-acc', description: 'n920000' }));
   assert.deepEqual(serialErrors(pv.rows[0]), [], 'still a printer through its extra placement — nothing flips');
   done = await confirm(adm, pv.import_id);
   assert.equal(done.success, true, JSON.stringify(done));
@@ -224,7 +228,7 @@ test('F4: a full admin\'s confirm of an older preview does not undo the owner\'s
   assert.equal(await effective(w, 'pAMS'), false);
   const app = importApp(w, 'adm');
   // The serialized cell is EMPTY: keep what is stored.
-  const pv = await preview(app, sheet({ key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', serialized: '', price_iqd: '410000' }));
+  const pv = await preview(app, sheet({ key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', serialized: '', description: 'n410000' }));
   assert.equal(pv.rows[0].errors.length, 0, JSON.stringify(pv.rows[0]));
   // The owner now says this product needs a serial (and sets another key).
   const own = await post(w.as('boss'), '/api/devices/admin/products/pAMS/ops-policy', { serialized: true, warranty_base_months: 6 });
@@ -237,7 +241,7 @@ test('F4: a full admin\'s confirm of an older preview does not undo the owner\'s
   assert.equal(opsOf(w, 'pAMS').serialized, true, 'the owner\'s word survives');
   assert.equal(opsOf(w, 'pAMS').warranty_base_months, 6, 'and so does every key the sheet did not set');
   assert.equal(await effective(w, 'pAMS'), true);
-  assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pAMS'")!.p, 410000, 'the row\'s own cells are written');
+  assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pAMS'")!.p, 'n410000', 'the row\'s own cells are written');
 });
 
 test('F4: a row the LIVE row now refuses fails at confirm, alone — the other rows are written', async () => {
@@ -251,8 +255,8 @@ test('F4: a row the LIVE row now refuses fails at confirm, alone — the other r
   const pv = await preview(
     app,
     sheet(
-      { key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', serialized: 'yes', price_iqd: '420000' },
-      { key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil', price_iqd: '27000' }
+      { key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', serialized: 'yes', description: 'n420000' },
+      { key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil', description: 'n27000' }
     )
   );
   for (const r of pv.rows) assert.deepEqual(serialErrors(r), [], JSON.stringify(r));
@@ -267,8 +271,8 @@ test('F4: a row the LIVE row now refuses fails at confirm, alone — the other r
   assert.ok(/^سطر \d+: /.test(ams.reason), 'the same shape as a preview refusal');
   assert.equal(pla.action, 'updated', JSON.stringify(pla));
   assert.equal(opsOf(w, 'pAMS').serialized, false, 'the owner\'s word stands');
-  assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pAMS'")!.p, 399000, 'nothing of the refused row was written');
-  assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pPLA'")!.p, 27000);
+  assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pAMS'")!.p, '', 'nothing of the refused row was written');
+  assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pPLA'")!.p, 'n27000');
   // The owner's own confirm of the same kind of row is never refused.
   const owner = importApp(w, 'boss');
   const opv = await preview(owner, sheet({ key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', serialized: 'yes' }));
@@ -455,7 +459,7 @@ test('F7: the mystery-offer editor judges a non-owner\'s serial word too', async
   assert.equal(owner.status, 200, await owner.clone().text());
 });
 
-test('F7: a bundle PARENT never gets warranty units of its own — its components carry the devices', async () => {
+q7Test('F7: a bundle PARENT never gets warranty units of its own — its components carry the devices', async () => {
   const raw = seedCatalogue();
   raw.exec(`
     INSERT OR IGNORE INTO catalogs (id,slug,name_ar,name_en,is_printer_catalog) VALUES ('cat_pr','printers-test','طابعات','Printers',1);
@@ -665,7 +669,11 @@ test('R2: the owner\'s writes carry no fence — his placement lands whatever ch
     } as unknown as D1Database;
     return { seen, app: (who: keyof typeof USERS) => stubApp(db, USERS[who], mountSerialWorld) };
   };
-  const fenced = (seen: string[]) => seen.some((sql) => /INSERT INTO ops_guards/.test(sql));
+  // The serial fence only: since the clean start (DECISIONS row 222) every ordinary product save also carries
+  // the V2 writer's own guards — its engine-price token and its `pricing_method` / `updated_at` fences — which
+  // are pricing concurrency, not a serial judgement, and are prepared for the owner too.
+  const pricingGuard = (sql: string) => /^INSERT INTO ops_guards \(id, ok\) VALUES/.test(sql) || /product_pricing_state|updated_at IS \?/.test(sql);
+  const fenced = (seen: string[]) => seen.some((sql) => /INSERT INTO ops_guards/.test(sql) && !pricingGuard(sql));
   // Each one a real change that flips nothing, so a non-owner passes too.
   const writes = (app: App) => [
     () => post(app, '/api/admin/taxonomy/catalogs', { id: 'ct_new', name_en: 'New', is_printer_catalog: true }),
@@ -769,8 +777,8 @@ test('R3: a word the owner writes between the confirm\'s re-read and its write f
     const pv = await preview(
       importApp(w, 'adm'),
       sheet(
-        { key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', price_iqd: '410000' },
-        { key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil', price_iqd: '27000' }
+        { key: 'sp-ams-lite', name: 'Bambu Lab AMS Lite', category: 'sp-acc', sub_category: 'sp-ams', description: 'n410000' },
+        { key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil', description: 'n27000' }
       )
     );
     for (const r of pv.rows) assert.equal(r.errors.length, 0, JSON.stringify(r));
@@ -792,14 +800,14 @@ test('R3: a word the owner writes between the confirm\'s re-read and its write f
     assert.equal(pla.action, 'updated', JSON.stringify(pla));
     if (between === 'serialized') assert.equal(opsOf(w, 'pAMS').serialized, true, 'the owner\'s word stands');
     else assert.equal(opsOf(w, 'pAMS').warranty_base_months, 6, 'the owner\'s months stand');
-    assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pAMS'")!.p, 399000, 'nothing of that row was written');
-    assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pPLA'")!.p, 27000, 'the next row was');
+    assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pAMS'")!.p, '', 'nothing of that row was written');
+    assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pPLA'")!.p, 'n27000', 'the next row was');
   }
 });
 
 // ====================================================================== R4
 
-const NO_SECTION = ['row_type', 'key', 'name', 'status', 'price_iqd'];
+const NO_SECTION = ['row_type', 'key', 'name', 'status', 'price_iqd', 'description'];
 
 test('R4: a sheet whose section cells are absent or empty keeps the LIVE filing — a re-filing made after its preview survives the confirm', async () => {
   for (const cols of [NO_SECTION, HEAD] as const) {
@@ -808,7 +816,7 @@ test('R4: a sheet whose section cells are absent or empty keeps the LIVE filing 
       UPDATE catalogs SET template_family = 'devices' WHERE id IN ('ct_acc','ct_print');
       UPDATE products SET category_id = 'ct_acc', sub_category_id = 'ct_fil' WHERE id = 'pPLA';
     `);
-    const csv = toCsv([cols, cols.map((h) => ({ row_type: 'product', key: 'sp-pla', name: 'PLA spool', status: 'draft', price_iqd: '26000' } as Record<string, string>)[h] ?? '')]);
+    const csv = toCsv([cols, cols.map((h) => ({ row_type: 'product', key: 'sp-pla', name: 'PLA spool', status: 'draft', price_iqd: '26000', description: 'n26000' } as Record<string, string>)[h] ?? '')]);
     const app = importApp(w, 'adm');
     const pv = await preview(app, csv);
     assert.equal(pv.rows[0].errors.length, 0, JSON.stringify(pv.rows[0]));
@@ -820,11 +828,11 @@ test('R4: a sheet whose section cells are absent or empty keeps the LIVE filing 
     `);
     const done = await confirm(app, pv.import_id);
     assert.equal(done.summary.updated, 1, JSON.stringify(done));
-    const p = row<{ c: string; s: string; price: number }>(w.raw, "SELECT category_id AS c, sub_category_id AS s, price_iqd AS price FROM products WHERE id = 'pPLA'")!;
+    const p = row<{ c: string; s: string; price: string }>(w.raw, "SELECT category_id AS c, sub_category_id AS s, description AS price FROM products WHERE id = 'pPLA'")!;
     const label = cols === NO_SECTION ? 'absent' : 'empty';
     assert.equal(p.s, 'ct_ams', `${label}: the owner's re-filing is kept`);
     assert.equal(p.c, 'ct_acc');
-    assert.equal(p.price, 26000, `${label}: the row's own cells are written`);
+    assert.equal(p.price, 'n26000', `${label}: the row's own cells are written`);
     assert.ok(!shelves(w, 'pPLA').includes('ct_fil'), `${label}: the old shelf is not put back`);
     assert.ok(shelves(w, 'pPLA').includes('ct_ams'));
   }
@@ -836,7 +844,7 @@ test('R4: the serial re-check judges the live filing it keeps; a sheet that DOES
     UPDATE catalogs SET template_family = 'devices' WHERE id IN ('ct_acc','ct_print');
     UPDATE products SET category_id = 'ct_acc', sub_category_id = 'ct_fil' WHERE id = 'pPLA';
   `);
-  const csv = toCsv([NO_SECTION, ['product', 'sp-pla', 'PLA spool', 'draft', '26500']]);
+  const csv = toCsv([NO_SECTION, ['product', 'sp-pla', 'PLA spool', 'draft', '26500', 'n26500']]);
   const app = importApp(w, 'adm');
   const pv = await preview(app, csv);
   // The owner files the spool under the printers after the preview — it now needs a serial.
@@ -852,11 +860,11 @@ test('R4: the serial re-check judges the live filing it keeps; a sheet that DOES
   assert.equal(done.summary.updated, 1, JSON.stringify(done));
   assert.equal(row<{ c: string }>(w.raw, "SELECT category_id AS c FROM products WHERE id = 'pPLA'")!.c, 'ct_print');
   assert.equal(await effective(w, 'pPLA'), true);
-  assert.equal(row<{ p: number }>(w.raw, "SELECT price_iqd AS p FROM products WHERE id = 'pPLA'")!.p, 26500);
+  assert.equal(row<{ p: string }>(w.raw, "SELECT description AS p FROM products WHERE id = 'pPLA'")!.p, 'n26500');
 
   // A sheet that names the section: the sheet's pair is written, as in round 3.
   const owner = importApp(w, 'boss');
-  const named = await preview(owner, sheet({ key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil', price_iqd: '27000' }));
+  const named = await preview(owner, sheet({ key: 'sp-pla', name: 'PLA spool', category: 'sp-acc', sub_category: 'sp-fil', description: 'n27000' }));
   w.raw.exec(`UPDATE products SET sub_category_id = 'ct_ams' WHERE id = 'pPLA'`);
   assert.equal((await confirm(owner, named.import_id)).summary.updated, 1);
   const p = row<{ c: string; s: string }>(w.raw, "SELECT category_id AS c, sub_category_id AS s FROM products WHERE id = 'pPLA'")!;

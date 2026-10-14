@@ -31,6 +31,7 @@ import { classifyHost } from '../worker/lib/hosts';
 import { robotsAllows, robotsRoute, sitemapRoute } from '../worker/routes/seo';
 import { DECOY_WORKER_FIRST } from '../worker/lib/deception/decoys';
 import { injectSocialPreview } from '../worker/lib/socialPreview';
+import { autoPublishFromEnv, publishSeededV2 } from './fixtures/autoPublish';
 
 const ORIGIN = `https://${APEX}`;
 
@@ -41,6 +42,7 @@ function app(db: unknown, host: string) {
     c.env = { DB: db, APP_ORIGIN: ORIGIN, STORE_ROOT_DOMAIN: APEX } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.get('/robots.txt', robotsRoute);
   a.get('/sitemap.xml', sitemapRoute);
   return a;
@@ -51,7 +53,7 @@ const fetchText = async (a: ReturnType<typeof app>, path: string, host: string) 
   return { res, body: await res.text() };
 };
 
-function seedProducts(raw: ReturnType<typeof freshDb>) {
+async function seedProducts(raw: ReturnType<typeof freshDb>) {
   raw.exec(`
     INSERT INTO products (id,slug,name,description,price_iqd,status,updated_at)
       VALUES ('p1','bambu-a1','Bambu A1','',700000,'active','2026-09-01T10:00:00.000Z');
@@ -60,6 +62,10 @@ function seedProducts(raw: ReturnType<typeof freshDb>) {
     INSERT INTO products (id,slug,name,description,price_iqd,status,updated_at)
       VALUES ('p3','hidden','Hidden','',1000,'draft','2026-09-10T10:00:00.000Z');
   `);
+  // The clean start (A.12.1): a customer (and a crawler) sees only a V2-published product. Published
+  // here, then the rows keep the dates the tests read.
+  await publishSeededV2(raw);
+  raw.exec(`UPDATE products SET updated_at = CASE id WHEN 'p1' THEN '2026-09-01T10:00:00.000Z' ELSE '2026-09-10T10:00:00.000Z' END`);
 }
 
 // =========================================================================
@@ -124,7 +130,7 @@ test('a host that is not a storefront is not indexed at all', async () => {
 
 test('the sitemap lists the shop and its ACTIVE products, newest first', async () => {
   const raw = freshDb();
-  seedProducts(raw);
+  await seedProducts(raw);
   const a = app(asD1(raw), APEX);
   const { res, body } = await fetchText(a, '/sitemap.xml', APEX);
 
@@ -147,7 +153,7 @@ test('the sitemap lists the shop and its ACTIVE products, newest first', async (
  */
 test('a merchant subdomain names ITSELF, never the platform', async () => {
   const raw = freshDb();
-  seedProducts(raw);
+  await seedProducts(raw);
   const merchant = `ali3d.${APEX}`;
   const a = app(asD1(raw), merchant);
 
@@ -171,7 +177,7 @@ test('a merchant subdomain names ITSELF, never the platform', async () => {
  */
 test('a merchant advertises its OWN catalogue, not the platform\'s', async () => {
   const raw = freshDb();
-  seedProducts(raw);
+  await seedProducts(raw);
   const merchant = `ali3d.${APEX}`;
   const a = app(asD1(raw), merchant);
   const { body } = await fetchText(a, '/sitemap.xml', merchant);
@@ -288,7 +294,7 @@ test('a product with no description keeps the shop line rather than inventing on
  */
 test('a product document keeps a validator of its rewritten body and answers 304', async () => {
   const raw = freshDb();
-  seedProducts(raw);
+  await seedProducts(raw);
   const { default: worker } = await import('../worker/index');
   const shell = '<!doctype html><html><head><title>LEVONIS</title>\n<meta name="description" content="shop" />\n</head><body></body></html>';
   const env = {

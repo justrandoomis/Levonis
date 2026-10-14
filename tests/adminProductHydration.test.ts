@@ -816,7 +816,7 @@ test('ProductForm: ONE request saves the document and the structure, and what is
   // server plans both into a single db.batch; the old second request left a
   // bare product row behind whenever the relations were refused on a rule only
   // the server knows (docs/TXT_IMPORT_PARITY.md).
-  assert.match(save, /relations: relationsToWire\(rel\)/, 'the structure is part of the create/update request');
+  assert.match(save, /relations: withoutLegacyMoney\(relationsToWire\(rel\)\)/, 'the structure is part of the create/update request (the clean start A.6: without its dinar money)');
   assert.doesNotMatch(save, /api\.put<[^>]*>\(\s*`\/api\/admin\/products\/\$\{savedId\}\/relations`/, 'no second write');
   assert.doesNotMatch(save, /حُفظ المنتج، لكن تعذّر حفظ/, 'a half-saved product can no longer happen, so the note is gone');
   // The derived copies of the structure never travel with the document: the

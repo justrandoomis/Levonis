@@ -113,10 +113,11 @@ test('quick chips and sheet sections come from the live facets and offer only re
   const sections = sheetSections(type, facets, emptyListing());
   assert.deepEqual(sections, ['availability', 'price', 'brands', 'max_colors', 'build_volume', 'enclosed', 'skill_level']);
   assert.ok(!sections.includes('technology'), 'every printer is FDM: «التقنية» is not a choice');
-  // No offer is live and every printer has a lower PRO price (10 of 10): neither switch
+  // No offer is live, and since the clean start no printer carries a typed PRO price (the first V2
+  // price clears it; member prices come from the benefit rules, and the seed has none): neither switch
   // would change the list, so «العروض والعضوية» is not drawn.
   assert.equal(facets.offer, 0);
-  assert.equal(facets.member, 10);
+  assert.equal(facets.member, 0);
   assert.ok(!sections.includes('offers'));
 
   // A chip turned on is a chip the list honours, and it stays on the row to be turned off.

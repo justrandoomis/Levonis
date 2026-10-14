@@ -1,7 +1,9 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import type { AppContext } from '../lib/types';
 import { HttpError, requireAdmin } from '../lib/http';
+import { canViewCost } from '../lib/adminScope';
+import { costRefusal } from '../lib/costAccess';
 
 /**
  * QUICK EDIT — CLOSED BY THE CLEAN START (the owner's answer Q6, DECISIONS row
@@ -28,12 +30,22 @@ adminPriceGridRoutes.use('*', requireAdmin);
 const refuse = (section: 3 | 5) => () => {
   throw new HttpError(409, serverMessage('PRICING_V2_MANAGED'), 'PRICING_V2_MANAGED', { section, v2: true });
 };
+/**
+ * The owner-only (COST) doors keep their guard in front of the closed sign: every
+ * other admin hears the one COST_ACCESS_DENIED answer (or the owner's
+ * OWNER_EMAIL_UNVERIFIED way out) exactly as before the clean start.
+ */
+const refuseCost = (section: 3 | 5) => (c: Context<AppContext>) => {
+  const admin = c.get('user')!;
+  if (!canViewCost(c.env, admin)) throw costRefusal(c.env, admin);
+  return refuse(section)();
+};
 
 adminPriceGridRoutes.get('/:id/price-grid', refuse(3));
 adminPriceGridRoutes.patch('/:id/price-grid', refuse(3));
 adminPriceGridRoutes.patch('/:id/price-grid/traits', refuse(5));
 adminPriceGridRoutes.post('/:id/price-grid/bulk', refuse(3));
-adminPriceGridRoutes.post('/:id/price-grid/copy', refuse(3));
+adminPriceGridRoutes.post('/:id/price-grid/copy', refuseCost(3));
 adminPriceGridRoutes.post('/:id/price-grid/undo', refuse(3));
-adminPriceGridRoutes.get('/:id/price-history', refuse(3));
-adminPriceGridRoutes.post('/:id/price-grid/cost-change', refuse(3));
+adminPriceGridRoutes.get('/:id/price-history', refuseCost(3));
+adminPriceGridRoutes.post('/:id/price-grid/cost-change', refuseCost(3));

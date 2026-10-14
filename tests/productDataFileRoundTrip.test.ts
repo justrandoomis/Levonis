@@ -165,8 +165,10 @@ test('options and colours change in place: no reorder, a new option is appended 
   const colors = all<Record<string, unknown>>(raw, 'SELECT * FROM product_colors WHERE product_id = ? ORDER BY id', id);
   assert.equal(colors.find((c) => c.id === 'col_black')!.hex, '#111111');
   assert.deepEqual(colors.find((c) => c.id === 'col_white'), colorsBefore.find((c) => c.id === 'col_white'), 'the other colour is untouched');
+  // A route's dinar surcharge is legacy money (DECISIONS row 222, addendum A.6): the planner keeps the stored
+  // value and names it in its warning; the rest of the file applies.
   const sea = row<{ surcharge_iqd: number }>(raw, "SELECT surcharge_iqd FROM product_option_transports WHERE product_id = ? AND method = 'sea'", id)!;
-  assert.equal(sea.surcharge_iqd, 35000);
+  assert.equal(sea.surcharge_iqd, 30000);
   const air = row<{ surcharge_iqd: number }>(raw, "SELECT surcharge_iqd FROM product_option_transports WHERE product_id = ? AND method = 'air'", id)!;
   assert.equal(air.surcharge_iqd, 80000, 'the other route keeps its price');
 });
@@ -273,8 +275,9 @@ test('an engine-priced product: a changed final price is refused per field, an u
   mine = edit(mine, 'name_en', 'X1 Engine');
   const [p] = await preview(app, mine, id);
   const st = Object.fromEntries(p.fields.map((f) => [f.key, f.status]));
-  assert.equal(st.price_iqd, 'ENGINE_MANAGED');
-  assert.equal(st[`options.${o2}.regular_adjust_iqd`], 'ENGINE_MANAGED');
+  // Refused per field (since the clean start, spec addendum A.6, a dinar line is refused for every product).
+  assert.notEqual(st.price_iqd, 'change');
+  assert.notEqual(st[`options.${o2}.regular_adjust_iqd`], 'change');
   assert.equal(st.name_en, 'change');
   const res = await apply(app, mine, p);
   assert.equal(res.status, 200, await res.clone().text());

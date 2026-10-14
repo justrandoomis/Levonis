@@ -102,22 +102,22 @@ test('saving an order-type quota does not wipe the prices the panel never sent',
   }
 });
 
-test('a payload that DOES mention money is still taken at its word, nulls included', async () => {
+test('a payload that MOVES money is refused by name (the clean start, spec addendum A.6): nothing is written, not even the quantity', async () => {
   const raw = seed();
+  const before = { cell: cellRow(raw), route: routeRow(raw) };
   const body = panelBody(25, 8) as unknown as {
     fulfillments: Array<Record<string, unknown> & { transports: Array<Record<string, unknown>> }>;
   };
   body.fulfillments[0].regular_price_iqd = 600000;
   body.fulfillments[0].prime_price_iqd = null;
-  const res = await json(
-    await put(appFor(asD1(raw), owner), '/api/admin/products/p_a1/fulfillment', body)
-  );
-  assert.equal(res.success, true, JSON.stringify(res));
-
-  assert.equal(cellRow(raw).regular_price_iqd, 600000, 'a stated price is written');
-  assert.equal(cellRow(raw).prime_price_iqd, null, 'and a deliberately cleared one is cleared — that is how it is done');
-  // The ROUTE said nothing about money, so its prices stand.
-  assert.equal(routeRow(raw).regular_price_iqd, 620000);
+  const res = await put(appFor(asD1(raw), owner), '/api/admin/products/p_a1/fulfillment', body);
+  const answer = await json(res);
+  assert.equal(res.status, 409, JSON.stringify(answer));
+  assert.equal(answer.code, 'PRICING_V2_MANAGED');
+  assert.equal(answer.details.section, 5);
+  assert.match(String(answer.details.field), /regular_price_iqd|prime_price_iqd/);
+  assert.doesNotMatch(JSON.stringify(answer), /600000/, 'the refusal names the field, never the value');
+  assert.deepEqual({ cell: cellRow(raw), route: routeRow(raw) }, before, 'one batch or nothing');
 });
 
 test('an assistant admin cannot erase a cost it is not allowed to see', async () => {

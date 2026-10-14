@@ -31,6 +31,7 @@ import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { productRoutes } from '../worker/routes/products';
 import { toEditorDoc } from '../src/components/adminProducts/types';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -140,6 +141,8 @@ test('§4 — a step’s image, video and official link survive TXT → DB → A
 
   // 5. AND THE CUSTOMER SEES IT. The whole point of the guide.
   raw.prepare("UPDATE products SET status='active' WHERE id = ?").run(id);
+  // The clean start (A.4, A.6): a file sets no dinar price; the customer sees the product once it is V2-published.
+  await publishV2(raw, id, { usd: usdReproducing(725_000, FIXTURE_U) });
   const pub = await json(await get(app, '/api/products/a1-usage-media'));
   const shown = (pub.product.usage_guide.steps as Array<Record<string, unknown>>).find((s) => s.id === 'ustep_unbox')!;
   assert.deepEqual(shown.images, [STEP_IMAGE_A, STEP_IMAGE_B]);

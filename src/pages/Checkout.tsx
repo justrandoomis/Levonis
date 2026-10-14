@@ -678,7 +678,7 @@ export default function Checkout() {
   // is told rather than left to spot the total changing on its own.
   const [pricesMoved, setPricesMoved] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  /** The clean start (DECISIONS row 222): a line's product is not for sale now — the way out is the cart. */
+  /** The clean start (DECISIONS row 222): the product of a line is not for sale now — the way out is the cart. */
   const [unavailableInCart, setUnavailableInCart] = useState(false);
 
   const [selectedAddressId, setSelectedAddressId] = useState('');

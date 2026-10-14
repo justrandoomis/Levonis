@@ -32,6 +32,7 @@ import { parseCsv, toCsv } from '../worker/lib/importCsv';
 import { deleteProductPermanently } from '../worker/lib/productDeletion';
 import { maintenanceFor, planPrinterFits } from '../worker/lib/printerFits';
 import { matchPrinterRef } from '../worker/lib/templateRefs';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 import { flatFields, groupsForSection, productTypeForBranch, type SectionRef } from '../worker/lib/templateFamilies';
 import { activeFilterCount, listingParamPairs, parseListingParams } from '../packages/catalog/src/discovery';
 import { appliedChips, quickChips, sheetSections } from '../src/lib/catalog/listingModel';
@@ -128,6 +129,8 @@ async function seedParts(t: ReturnType<typeof setup>) {
   );
   assert.equal(ams.status, 200, JSON.stringify(ams.body));
   t.raw.exec("UPDATE products SET status = 'active' WHERE slug IN ('hardened-nozzle-04','textured-pei-plate','ams-lite-unit')");
+  // The clean start (A.6, A.12.1): a file sets no dinar price — each part is priced in dollars (15,000 at the fixture U).
+  for (const body of [nozzle.body, plate.body, ams.body]) await publishV2(t.raw, String(body.product_id), { usd: usdReproducing(15_000, FIXTURE_U) });
   return { nozzle: String(nozzle.body.product_id), plate: String(plate.body.product_id), ams: String(ams.body.product_id) };
 }
 
@@ -304,6 +307,8 @@ test('«تحديث البيانات» compares the printers with the section and
     [{ field: 'fits_printers', before: 'bambu-lab-a1-mini, bambu-lab-a1', after: 'bambu-lab-a1, bambu-lab-h2d-pro' }]
   );
   assert.ok((preview.ignored_keys as string[]).includes('price_iqd'));
+  // The clean start (A.6): a file never sets a dinar price — the part was born at 0 and is priced in dollars.
+  const priceBefore = row<{ price_iqd: number }>(t.raw, 'SELECT price_iqd FROM products WHERE id = ?', nozzle)!.price_iqd;
   const res = await post(t.admin, '/api/admin/template/apply', {
     text: edited,
     mode: 'update',
@@ -314,7 +319,7 @@ test('«تحديث البيانات» compares the printers with the section and
   });
   assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
   assert.deepEqual(linksOf(t.raw, nozzle), ['prd_a1', 'prd_h2d']);
-  assert.equal(row<{ price_iqd: number }>(t.raw, 'SELECT price_iqd FROM products WHERE id = ?', nozzle)!.price_iqd, 15000);
+  assert.equal(row<{ price_iqd: number }>(t.raw, 'SELECT price_iqd FROM products WHERE id = ?', nozzle)!.price_iqd, priceBefore, 'a specs-only file never moves the price');
 });
 
 test('the spreadsheet lane carries «يناسب الطابعات» too: preview names a stranger, confirm writes, export returns it', async () => {
@@ -492,10 +497,8 @@ test('ahead of 0148 every reader answers «none», and only a save that asks for
   seedPrinters(raw);
   const db = asD1(raw);
   const guest = stubApp(db, null, mountShop);
-  const a1 = await json(await get(guest, '/api/products/bambu-lab-a1'));
-  assert.equal(a1.success, true);
-  assert.equal(a1.maintenance_parts, null);
-  assert.deepEqual(a1.fits_printers, []);
+  // The clean start (A.12.4 item 6): a database without 0189 lists nothing — the product page is not found.
+  assert.equal((await get(guest, '/api/products/bambu-lab-a1')).status, 404);
   const listing = await json(await get(guest, '/api/products?fits=bambu-lab-a1'));
   assert.deepEqual(listing.products, []);
   const faceted = await json(await get(guest, '/api/products?facets=1'));

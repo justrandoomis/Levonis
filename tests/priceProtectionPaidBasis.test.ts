@@ -7,6 +7,8 @@ import { orderRoutes } from '../worker/routes/orders';
 import { adminOrderPriceRoutes, orderPriceRoutes } from '../worker/routes/orderPriceAdjust';
 import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
 import { seedCatalogue, orderBody } from './lib/bundles';
+import { publishSeededV2 } from './fixtures/autoPublish';
+import { repriceV2 } from './fixtures/v2Publish';
 
 async function checkout(member: 'none' | 'unit' | 'line' = 'none', discounts: { coupon?: number; points?: number } = {}) {
   const raw = seedCatalogue(), baseDb = asD1(raw);
@@ -30,6 +32,7 @@ async function checkout(member: 'none' | 'unit' | 'line' = 'none', discounts: { 
       VALUES ('refund-lot','p_pla','base','',6,6,10000,'received','2026-01-01T00:00:00Z');`);
   if (discounts.coupon) raw.prepare("INSERT INTO coupons(id,code,kind,value,min_total_iqd,active) VALUES ('integration-coupon','INTEGRATION','fixed_iqd',?,0,1)").run(discounts.coupon);
   if (discounts.points) raw.prepare("INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status) VALUES ('integration-points',?,'deposit','POINT',?,'approved')").run(buyer, discounts.points);
+  await publishSeededV2(raw); // the clean start (A.12.1): the serialising wrapper hides the raw rows from stubApp
   const customer = stubApp(db, { id: buyer, role: 'customer', email: memberOn ? 'r@x.co' : 's@x.co' }, a => {
     a.route('/api/cart', cartRoutes); a.route('/api/orders', orderRoutes);
     a.route('/api/orders', orderPriceRoutes); a.route('/api/price-protection', priceProtectionRoutes);
@@ -65,9 +68,10 @@ async function acceptCut(world: Awaited<ReturnType<typeof checkout>>, cut: numbe
 }
 
 
-function deliverAndLower(w: Awaited<ReturnType<typeof checkout>>, price: number) {
+/** Delivers the order, then the owner lowers the price — through the V2 writer (the engine locks refuse a raw UPDATE). */
+async function deliverAndLower(w: Awaited<ReturnType<typeof checkout>>, price: number) {
   w.raw.prepare("UPDATE orders SET status='delivered',stage='delivered',delivered_at=? WHERE id=?").run(new Date().toISOString(), w.id);
-  w.raw.prepare("UPDATE products SET price_iqd=? WHERE id='p_pla'").run(price);
+  await repriceV2(w.raw, 'p_pla', price);
   return w.raw.prepare('SELECT * FROM order_items WHERE order_id=?').get(w.id)!;
 }
 const claim = (w: Awaited<ReturnType<typeof checkout>>, itemId: unknown) => post(w.customer, '/api/price-protection/claims', { orderItemId: itemId });
@@ -75,7 +79,7 @@ const approve = (w: Awaited<ReturnType<typeof checkout>>, claimId: unknown) => p
 
 test('actual line-applied membership does not turn a higher price into a protected drop', async () => {
   const w = await checkout('line');
-  const item = deliverAndLower(w, 24000);
+  const item = await deliverAndLower(w, 24000);
   const res = await claim(w, item.id);
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'NO_ELIGIBLE_DROP');
@@ -84,23 +88,25 @@ test('actual line-applied membership does not turn a higher price into a protect
 
 test('a unit-applied member price is compared with today’s member price of the same class (PP-B4), never with the regular one', async () => {
   // Paid 22,500 as a PRO member (25,000 less the 10% unit rule). The regular price falls to
-  // 24,000, so the same class pays 21,600 today: the member is owed that 900 per unit — before
-  // Services V2 S-P0a the member was compared with the regular 24,000 and refused.
+  // 20,000, so the same class pays 18,000 today: the member is owed 4,500 per unit — before
+  // Services V2 S-P0a the member was compared with the regular 20,000 (2,500). Since the clean
+  // start every line is a V2 (engine) line, whose rule calls a drop below one 1,000 step
+  // FX_ONLY_DROP (protectionBasis.ts), so the fall is wide enough to be a price move.
   const w = await checkout('unit');
-  const item = deliverAndLower(w, 24000);
+  const item = await deliverAndLower(w, 20000);
   const res = await json(await claim(w, item.id));
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.original_unit_iqd, 22500);
-  assert.equal(res.claim.observed_unit_iqd, 21600);
-  assert.equal(res.claim.eligible_unit_iqd, 900);
+  assert.equal(res.claim.observed_unit_iqd, 18000);
+  assert.equal(res.claim.eligible_unit_iqd, 4500);
   const paid = await json(await approve(w, res.claim.id));
   assert.equal(paid.success, true, JSON.stringify(paid));
-  assert.equal(paid.credit.amount_iqd, 1800, '900 × the 2 units');
+  assert.equal(paid.credit.amount_iqd, 9000, '4,500 × the 2 units');
 });
 
 test('a real line-membership price drop records and pays only the difference from the frozen paid price', async () => {
   const w = await checkout('line');
-  const item = deliverAndLower(w, 20000);
+  const item = await deliverAndLower(w, 20000);
   // Today's rules must never re-decide the member saving frozen at checkout.
   w.raw.exec("UPDATE membership_benefit_rules SET percent=50 WHERE benefit_type='product_discount'");
   const res = await json(await claim(w, item.id));
@@ -115,11 +121,11 @@ test('a real line-membership price drop records and pays only the difference fro
 test('customer-accepted price cuts reach protection eligibility and a genuine remaining drop', async () => {
   const w = await checkout();
   await acceptCut(w, 10000);
-  const item = deliverAndLower(w, 22000);
+  const item = await deliverAndLower(w, 22000);
   const noDrop = await claim(w, item.id);
   assert.equal(noDrop.status, 400);
   assert.equal((await json(noDrop)).code, 'NO_ELIGIBLE_DROP');
-  w.raw.exec("UPDATE products SET price_iqd=15000 WHERE id='p_pla'");
+  await repriceV2(w.raw, 'p_pla', 15000);
   const res = await json(await claim(w, item.id));
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.original_unit_iqd, 20000);
@@ -130,7 +136,7 @@ test('customer-accepted price cuts reach protection eligibility and a genuine re
 for (const observed of [24000, 20000]) {
   test(`a legacy pending gross-membership claim at ${observed} is capped again before payment`, async () => {
     const w = await checkout('line');
-    const item = deliverAndLower(w, observed);
+    const item = await deliverAndLower(w, observed);
     w.raw.prepare(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
       VALUES('legacy','u_pro',?,?,25000,?,2,'requested')`).run(w.id, item.id, observed);
     const res = await approve(w, 'legacy');
@@ -148,7 +154,7 @@ for (const observed of [24000, 20000]) {
 
 test('prior paid protection remains immutable and consumes the corrected eligible difference', async () => {
   const w = await checkout('line');
-  const item = deliverAndLower(w, 20000);
+  const item = await deliverAndLower(w, 20000);
   w.raw.prepare(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state,credited_iqd)
     VALUES('prior','u_pro',?,?,25000,24000,2,'credited',2000)`).run(w.id, item.id);
   w.raw.prepare(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
@@ -163,7 +169,10 @@ test('prior paid protection remains immutable and consumes the corrected eligibl
 for (const discounts of [{ coupon: 10000 }, { points: 10000 }, { coupon: 5000, points: 5000 }]) {
   test(`protection uses the established frozen customer discount allocation for ${JSON.stringify(discounts)}`, async () => {
     const w = await checkout('none', discounts);
-    const item = deliverAndLower(w, 18000);
+    // Since the clean start every line is a V2 (engine) line, and its rule calls a drop below one 1,000 step
+    // FX_ONLY_DROP (protectionBasis.ts): the new price is low enough that the discounted paid price still
+    // drops by more than a step, so the allocation itself is what this test measures.
+    const item = await deliverAndLower(w, 15000);
     const order = w.raw.prepare('SELECT * FROM orders WHERE id=?').get(w.id)!;
     const coupon = Number(JSON.parse(String(order.coupon_snapshot ?? 'null'))?.discount_iqd ?? 0);
     // Services V2 S-P0a: the code's goods part is frozen on the line and comes
@@ -177,13 +186,13 @@ for (const discounts of [{ coupon: 10000 }, { points: 10000 }, { coupon: 5000, p
     assert.equal(res.success, true, JSON.stringify(res));
     assert.equal(res.claim.original_unit_iqd, Math.floor(paid / 2));
     const credited = await json(await approve(w, res.claim.id));
-    assert.equal(credited.credit.amount_iqd, Math.max(0, Math.floor(paid / 2) - 18000) * 2);
+    assert.equal(credited.credit.amount_iqd, Math.max(0, Math.floor(paid / 2) - 15000) * 2);
   });
 }
 
 test('a large frozen coupon cannot turn a low-paid invoice into an oversized protection payout', async () => {
   const w = await checkout('none', { coupon: 50000 });
-  const item = deliverAndLower(w, 10000);
+  const item = await deliverAndLower(w, 10000);
   const order = w.raw.prepare('SELECT * FROM orders WHERE id=?').get(w.id)!;
   assert.equal(order.total_iqd, 5000);
   const res = await claim(w, item.id);
@@ -198,7 +207,7 @@ test('a large frozen coupon cannot turn a low-paid invoice into an oversized pro
 
 test('a fully discounted invoice cannot generate a new wallet protection credit', async () => {
   const w = await checkout('none', { coupon: 55000 });
-  const item = deliverAndLower(w, 10000);
+  const item = await deliverAndLower(w, 10000);
   // The code takes the goods to 0; since S-P0a a goods code stops at the
   // goods, so only the delivery fee is charged.
   assert.equal(Number(item.coupon_discount_iqd), 50000);

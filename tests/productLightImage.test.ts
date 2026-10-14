@@ -33,6 +33,7 @@ import { loadLightProductImages } from '../worker/lib/productSelectionImage';
 import { parseImport, templateShape } from '../worker/lib/importCsv';
 import { productMainImage, themedImage } from '../src/lib/productImage';
 import { isStorableLightImage } from '../src/components/adminProducts/form/MainImagesPair';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 
@@ -98,6 +99,8 @@ test('0138 — the light main image travels TXT → D1 → admin form → save �
 
   // The storefront: the product page and the listing card both carry it.
   raw.prepare("UPDATE products SET status = 'active' WHERE id = ?").run(id);
+  // The clean start (A.4, A.6): a file sets no dinar price; the customer sees the product once it is V2-published.
+  await publishV2(raw, id, { usd: usdReproducing(100_000, FIXTURE_U) });
   const detail = await json(await get(app, '/api/products/a1-two-images'));
   const product = (detail.product ?? detail) as Record<string, unknown>;
   assert.equal(product.light_image, LIGHT_2, 'GET /api/products/:slug');

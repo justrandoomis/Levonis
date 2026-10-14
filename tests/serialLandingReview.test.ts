@@ -44,7 +44,7 @@ test('S1 #1: creating a product with a `serialized` that differs from its placem
     const w = world();
     // A printer switched off at birth.
     const printer = await post(w.as(who), '/api/admin/products-v2', {
-      name_en: 'New printer', name_ar: 'طابعة جديدة', price_iqd: 899000, status: 'draft',
+      name_en: 'New printer', name_ar: 'طابعة جديدة', status: 'draft',
       category_id: 'ct_print', catalog_ids: ['ct_print'], serialized: false,
     });
     assert.equal(printer.status, 403, `${who}: ${await printer.clone().text()}`);
@@ -52,19 +52,19 @@ test('S1 #1: creating a product with a `serialized` that differs from its placem
     // An AMS born in a 'required' section with serialization off.
     w.raw.exec(`UPDATE catalogs SET serial_policy = 'required' WHERE id = 'ct_ams'`);
     const ams = await post(w.as(who), '/api/admin/products-v2', {
-      name_en: 'AMS HT', name_ar: 'AMS HT', price_iqd: 300000, status: 'draft',
+      name_en: 'AMS HT', name_ar: 'AMS HT', status: 'draft',
       category_id: 'ct_acc', sub_category_id: 'ct_ams', catalog_ids: ['ct_ams'], serialized: false,
     });
     assert.equal(ams.status, 403, who);
     // …and by the other key the save reads (`ops_policy.serialized`).
     const viaOps = await post(w.as(who), '/api/admin/products-v2', {
-      name_en: 'AMS HT 2', name_ar: 'AMS HT 2', price_iqd: 300000, status: 'draft',
+      name_en: 'AMS HT 2', name_ar: 'AMS HT 2', status: 'draft',
       category_id: 'ct_acc', sub_category_id: 'ct_ams', catalog_ids: ['ct_ams'], ops_policy: { serialized: false },
     });
     assert.equal(viaOps.status, 403, `${who} via ops_policy`);
     // A filament switched on at birth.
     const fil = await post(w.as(who), '/api/admin/products-v2', {
-      name_en: 'PETG spool', name_ar: 'خيط PETG', price_iqd: 25000, status: 'draft',
+      name_en: 'PETG spool', name_ar: 'خيط PETG', status: 'draft',
       category_id: 'ct_acc', sub_category_id: 'ct_fil', catalog_ids: ['ct_fil'], serialized: true,
     });
     assert.equal(fil.status, 403, who);
@@ -73,12 +73,12 @@ test('S1 #1: creating a product with a `serialized` that differs from its placem
   // The answer the placement already gives passes, and the owner may say anything.
   const w = world();
   const same = await post(w.as('ast'), '/api/admin/products-v2', {
-    name_en: 'Plain printer', name_ar: 'طابعة', price_iqd: 899000, status: 'draft',
+    name_en: 'Plain printer', name_ar: 'طابعة', status: 'draft',
     category_id: 'ct_print', catalog_ids: ['ct_print'], serialized: true,
   });
   assert.equal(same.status, 200, await same.clone().text());
   const owner = await post(w.as('boss'), '/api/admin/products-v2', {
-    name_en: 'Owner printer', name_ar: 'طابعة المالك', price_iqd: 899000, status: 'draft',
+    name_en: 'Owner printer', name_ar: 'طابعة المالك', status: 'draft',
     category_id: 'ct_print', catalog_ids: ['ct_print'], serialized: false,
   });
   assert.equal(owner.status, 200, await owner.clone().text());

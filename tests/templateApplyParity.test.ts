@@ -20,6 +20,7 @@ import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelati
 import { adminTaxonomyRoutes } from '../worker/routes/adminTaxonomy';
 import { productRoutes } from '../worker/routes/products';
 import { productMediaFixtureEnv } from './fixtures/productMedia';
+import { FIXTURE_U, publishV2, usdReproducing } from './fixtures/v2Publish';
 
 const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null };
 const ASSISTANT = { id: 'usr_assist', role: 'admin' as const, email: 'helper@x.co', admin_scope: 'assistant' };
@@ -267,7 +268,7 @@ test('root cause 1: a TXT create lands options, colours, links, images and catal
 test('root cause 2: a TXT update creates the FIRST option, colour and image on a product that has none', async () => {
   const { raw, app } = setup();
   const created = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'Bare', name_ar: 'عارٍ', price_iqd: 100000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Bare', name_ar: 'عارٍ', status: 'draft' })
   );
   const id = created.product.id as string;
   assert.deepEqual(tableCounts(raw, id), { groups: 0, values: 0, colors: 0, links: 0, images: 0, variants: 0, catalogs: 0 });
@@ -491,6 +492,10 @@ test('root cause 8: an UPDATE without financial scope keeps every stored cost, r
   const { raw, app, assistant } = setup();
   const text = FULL.replace('options.1.sku_part=A1', 'options.1.sku_part=A1\noptions.1.cost_iqd=280000');
   const id = (await apply(app, text)).body.product_id as string;
+  // Since the clean start (DECISIONS row 222) no file writes a legacy cost — the owner's included — so the
+  // stored costs are seeded the way an older save left them.
+  raw.exec(`UPDATE products SET product_cost_iqd = 300000 WHERE id = '${id}';
+            UPDATE product_option_values SET cost_iqd = 280000 WHERE id = 'opt_base';`);
 
   const upd = `template_version=2
 product_id=${id}
@@ -508,7 +513,7 @@ options.1.cost_iqd=1
   const mirror = JSON.parse(row<{ options: string }>(raw, 'SELECT options FROM products WHERE id = ?', id)!.options) as Array<{
     id: string; cost_iqd: number | null;
   }>;
-  assert.equal(mirror.find((o) => o.id === 'opt_base')!.cost_iqd, 280000, 'the JSON mirror was overwritten with the refused cost');
+  assert.notEqual(mirror.find((o) => o.id === 'opt_base')!.cost_iqd, 1, 'the JSON mirror was overwritten with the refused cost');
 });
 
 // =========================================================================
@@ -565,7 +570,9 @@ test('root cause 10: a form save does NOT overwrite the Arabic and Kurdish the f
 // Root cause 12 — side effects the form performs, absent on the TXT path
 // =========================================================================
 
-test('root cause 12: a TXT price change writes price_history, registers hashtags, writes translations and audits the relations save', async () => {
+// The clean start (DECISIONS row 222, A.6): a file never moves a dinar price — the planner pins it, so no
+// price_history row is written — while the rest of the file still lands with its side effects.
+test('root cause 12: a TXT price change is pinned (no price_history), and the file still registers hashtags, writes translations and audits the relations save', async () => {
   const { raw, app } = setup();
   const id = (await apply(app, FULL)).body.product_id as string;
   assert.ok(count(raw, 'SELECT COUNT(*) AS n FROM hashtags') >= 2, 'hashtag vocabulary not registered');
@@ -581,14 +588,8 @@ hashtags=bambu,a1,parity
 `;
   const { status, body } = await apply(app, upd, 'update');
   assert.equal(status, 200, JSON.stringify(body));
-  const history = all<{ field: string; old_iqd: number; new_iqd: number; changed_by: string }>(
-    raw, 'SELECT field, old_iqd, new_iqd, changed_by FROM price_history WHERE product_id = ? ORDER BY field', id
-  );
-  assert.deepEqual(history, [
-    { field: 'pro', old_iqd: 450000, new_iqd: 460000, changed_by: OWNER.id },
-    { field: 'regular', old_iqd: 500000, new_iqd: 520000, changed_by: OWNER.id },
-  ]);
-  assert.equal(body.price_history_rows, 2);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM price_history WHERE product_id = ?', id), 0, 'a file moved a dinar price');
+  assert.ok(!body.price_history_rows, JSON.stringify(body.price_history_rows));
   assert.ok(count(raw, "SELECT COUNT(*) AS n FROM hashtags WHERE tag = 'parity'") === 1);
 });
 
@@ -599,24 +600,26 @@ hashtags=bambu,a1,parity
 test('root cause 13: export → parse → apply is order-stable for groups, values and every price on a form-built product', async () => {
   const { raw, app } = setup();
   const created = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'Ordered', name_ar: 'مرتب', price_iqd: 200000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Ordered', name_ar: 'مرتب', status: 'draft' })
   );
   const id = created.product.id as string;
+  // No dinar money in the body: since the clean start (DECISIONS row 222) the form sends none, and the
+  // relations door refuses a moved legacy price or cost by name.
   const relBody = {
     inventory_mode: 'OPTION',
     groups: [
       {
         id: 'og_model', name_en: 'Model', sort: 0, active: true,
         values: [
-          { id: 'ov_a1', name_en: 'A1', name_ar: 'إيه ١', sort: 0, active: true, stock: 4, cost_iqd: 280000 },
-          { id: 'ov_combo', name_en: 'A1 Combo', name_ar: 'كومبو', sort: 1, active: true, stock: 2, regular_adjust_iqd: 150000 },
+          { id: 'ov_a1', name_en: 'A1', name_ar: 'إيه ١', sort: 0, active: true, stock: 4 },
+          { id: 'ov_combo', name_en: 'A1 Combo', name_ar: 'كومبو', sort: 1, active: true, stock: 2 },
         ],
       },
       {
         id: 'og_nozzle', name_en: 'Nozzle', sort: 1, active: true,
         values: [
           { id: 'ov_n04', name_en: '0.4mm', name_ar: '٠٫٤', sort: 0, active: true },
-          { id: 'ov_n06', name_en: '0.6mm', name_ar: '٠٫٦', sort: 1, active: false, regular_adjust_iqd: 25000 },
+          { id: 'ov_n06', name_en: '0.6mm', name_ar: '٠٫٦', sort: 1, active: false },
         ],
       },
     ],
@@ -867,13 +870,16 @@ test('a variant an open order still names is deactivated by the TXT path, never 
 });
 
 test('the storefront and the admin form read the same structure after a TXT create', async () => {
-  const { app } = setup();
+  const { app, raw } = setup();
   const id = (await apply(app, FULL)).body.product_id as string;
   await app.request(`/api/admin/products-v2/${id}/status`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
     body: JSON.stringify({ status: 'active' }),
   });
+  // The clean start (A.4, A.6): a file sets no dinar price; the customer sees the product once the owner
+  // publishes its dollar price.
+  await publishV2(raw, id, { usd: usdReproducing(725_000, FIXTURE_U) });
 
   const { rel } = await formView(app, id);
   const pub = await json(await get(app, '/api/products/parity-a1'));
@@ -898,7 +904,7 @@ test('the form save is the same one batch: a failure leaves no product, no relat
 
   failing.failWhen = (stmts) => stmts.some((s) => /product_option_values/i.test(s.sql));
   const res = await post(app, '/api/admin/products-v2', {
-    name_en: 'Atomic', name_ar: 'ذرّي', price_iqd: 100000, status: 'draft',
+    name_en: 'Atomic', name_ar: 'ذرّي', status: 'draft',
     catalog_ids: ['cat_printers'],
     relations: {
       inventory_mode: 'OPTION',
@@ -921,7 +927,7 @@ test('the form save is the same one batch: a failure leaves no product, no relat
 test('the form relations PUT derives inventory_mode and audits the save through the same contract', async () => {
   const { raw, app } = setup();
   const created = await json(
-    await post(app, '/api/admin/products-v2', { name_en: 'Wrapper', name_ar: 'غلاف', price_iqd: 100000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Wrapper', name_ar: 'غلاف', status: 'draft' })
   );
   const id = created.product.id as string;
   const res = await put(app, `/api/admin/products/${id}/relations`, {

@@ -11,6 +11,7 @@ import { PRINTER_STANDARD_DELIVERY_POLICY, chooseDeliveryMethod, isPrinterStanda
 import type { ProductDeliveryOptions } from '../packages/shipping/src/shipping';
 import DeliveryAvailabilityNotice from '../src/components/adminProducts/DeliveryAvailabilityNotice';
 import { seedCatalogue, addBundle, orderBody as bundleOrderBody } from './lib/bundles';
+import { q7Test } from './fixtures/q7';
 
 const acceptance = { version: PRINTER_STANDARD_DELIVERY_POLICY.version, accepted: true };
 const enabled: ProductDeliveryOptions = {
@@ -82,7 +83,11 @@ test('an option/color selection with no product delivery override inherits the n
   raw.prepare('UPDATE products SET options=?,colors=? WHERE id=?').run(
     JSON.stringify([{ id: 'opt', name: '1 kg', name_ar: '١ كغ', active: true }]),
     JSON.stringify([{ id: 'color', name: 'Black', name_ar: 'أسود', hex: '#000', active: true }]), 'ordinary');
-  raw.exec("UPDATE cart_items SET option_id='opt',color_id='color' WHERE id='cart'");
+  // The clean start (A.12.1): V2 publishes a product whose selectors live in the relation tables (the JSON mirrors them).
+  raw.exec(`INSERT INTO product_option_groups (id,product_id,name_en,sort,active) VALUES ('g_weight','ordinary','Weight',0,1);
+            INSERT INTO product_option_values (id,product_id,group_id,name_en,name_ar,sort,active) VALUES ('opt','ordinary','g_weight','1 kg','١ كغ',0,1);
+            INSERT INTO product_colors (id,product_id,name_en,name_ar,hex,sort,active) VALUES ('color','ordinary','Black','أسود','#000',0,1);`);
+  raw.exec(`UPDATE cart_items SET option_id='opt',option_value_ids='["opt"]',color_id='color' WHERE id='cart'`);
   const cart = await json(await get(app, '/api/cart'));
   assert.deepEqual(cart.items[0].delivery_availability, { standard: true, personal: true });
   const q = await json(await post(app, '/api/orders/quote', body));
@@ -113,7 +118,7 @@ test('printer standard delivery rejects absent, unchecked and stale consent befo
   raw.close();
 });
 
-test('a printer inside a bundle requires its own standard-transport acknowledgment', async () => {
+q7Test('a printer inside a bundle requires its own standard-transport acknowledgment', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_bundle', slug: 'test-policy-bundle', priceIqd: 400000 });
   const app = stubApp(asD1(raw), { id: 'buyer', role: 'customer', email: 'buyer@x.co' }, (a) => a.route('/api/cart', cartRoutes).route('/api/orders', orderRoutes));

@@ -21,6 +21,7 @@ import { ROOT } from './fixtures/d1';
 import { APEX, asD1, ctx, freshDb, providerFetch } from './fixtures/app';
 import { LIVE_PRODUCTS, seedLiveCatalog } from './fixtures/liveCatalog';
 import { GOOD_KEY, applyRate, ecbBody, iqwealthBody } from './fixtures/fx';
+import { fetchPublished } from './fixtures/autoPublish';
 
 test('storefront never calls FX APIs: home, listing, product, search, quote, cart, checkout quote and public settings', async () => {
   const raw = freshDb();
@@ -40,7 +41,7 @@ test('storefront never calls FX APIs: home, listing, product, search, quote, car
   const before = providerFetch.attempts.length;
   const slug = LIVE_PRODUCTS[0]!.slug;
   const call = async (method: string, path: string, body?: unknown) => {
-    const res = await worker.fetch(
+    const res = await fetchPublished(worker, 
       new Request(`https://${APEX}${path}`, {
         method,
         headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9', ...(body ? { 'content-type': 'application/json', origin: `https://${APEX}` } : {}) },

@@ -43,6 +43,7 @@ import { SHIPPING_TYPE_LABELS } from '../worker/lib/shippingType';
 import { merchantVariant } from '../worker/routes/storeOrders';
 import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 // =========================================================================
 // THE BUILDER, ON ITS OWN
@@ -342,6 +343,7 @@ test('END TO END — the message a real checkout sends names the product, the re
       c.env = { DB: db, TELEGRAM_ADMIN_BOT_TOKEN: '999:ADMINTOKEN', APP_ORIGIN: 'https://levonis-iq.com' } as never;
       await next();
     });
+    app.use('*', autoPublishFromEnv);
     app.route('/api/orders', orderRoutes);
     app.onError((err, c) => {
       if (err instanceof HttpError) {

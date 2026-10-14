@@ -47,7 +47,7 @@ function setup(raw: DatabaseSync = freshDb()) {
     a.route('/i', adminInventoryRoutes);
     a.route('/s', adminStockOperationsRoutes);
     a.route('/api/admin/pricing', adminPricingRoutes);
-  });
+  }, { publishV2: false }); // no product is published here: a fixture publish would approve a rate before the purchase
   return { raw, app };
 }
 

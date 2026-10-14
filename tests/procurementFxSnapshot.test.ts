@@ -25,7 +25,7 @@ function setup(raw: DatabaseSync = freshDb()) {
     INSERT INTO inventory_suppliers(id,name) VALUES ('supplier','Supplier');
     INSERT INTO products(id,name,slug,sku,price_iqd,product_cost_iqd,stock,inventory_mode)
       VALUES ('part','Part','fx-snapshot-part','FXSNAP',20000,10000,0,'BASE');`);
-  const app = stubApp(asD1(raw), { id: 'admin', email: 'boss@x.co', role: 'admin' }, (a) => a.route('/p', adminProcurementRoutes));
+  const app = stubApp(asD1(raw), { id: 'admin', email: 'boss@x.co', role: 'admin' }, (a) => a.route('/p', adminProcurementRoutes), { publishV2: false }); // a fixture publish would approve a rate
   return { raw, app };
 }
 

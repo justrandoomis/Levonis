@@ -35,12 +35,14 @@ test('on a 0179 database a routed purchase with charges saves as today, and the 
   const id = await w.save(w.draft({ charges: CHARGES }));
   const rows = raw.prepare('SELECT title, amount_iqd FROM purchase_charges WHERE purchase_id = ? ORDER BY position').all(id) as Array<{ title: string; amount_iqd: number }>;
   assert.deepEqual(rows.map((r) => [r.title, r.amount_iqd]), [['شحن محلي', 32_000], ['تغليف', 8_000]]);
-  for (const r of [await w.preview({ draft: w.draft({ charges: CHARGES }) }), await w.preview({ purchase_id: id }), await w.getInputs(AMS)]) {
+  for (const r of [await w.preview({ draft: w.draft({ charges: CHARGES }) }), await w.preview({ purchase_id: id })]) {
     assert.equal(r.status, 503, JSON.stringify(r.body));
     assert.equal(r.body.code, 'PRICING_NOT_INSTALLED');
   }
-  const put = await w.putInputs(AMS, { inputs_seq: 0, rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '120' }] });
-  assert.equal(put.status, 503);
+  // The V1 product inputs door is closed on every database since the clean start (spec addendum A.6).
+  for (const r of [await w.getInputs(AMS), await w.putInputs(AMS, { inputs_seq: 0, rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '120' }] })]) {
+    assert.deepEqual([r.status, r.body.code], [409, 'PRICING_V2_MANAGED']);
+  }
   // The saved document reads back with no role (null), as an older row does.
   const doc = (await json(await get(w.app, `/api/admin/procurement/documents/${id}`))) as { charges: Array<{ pricing_role: unknown }> };
   assert.deepEqual(doc.charges.map((c) => c.pricing_role), [null, null]);

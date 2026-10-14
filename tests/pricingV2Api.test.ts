@@ -30,6 +30,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { docWithoutLegacyMoney } from '../src/components/adminProducts/form/v2/v2Model';
 import { asD1, count, dbThrough, failingD1, get, json, post, put, row, stubApp } from './fixtures/app';
 import { legacyProductId, seedLegacyCatalogue } from './fixtures/legacyCatalogue';
 import { pricingWorld, AMS, OWNER_USER } from './fixtures/procurementPricing';
@@ -88,6 +89,9 @@ function newProductBody(id: string, status: 'draft' | 'active' = 'active') {
   };
 }
 
+/** What the form's save sends: the document without its dinar keys (the clean start, A.6 — `docWithoutLegacyMoney`). */
+const saveDoc = (doc: Record<string, unknown>) => docWithoutLegacyMoney(doc);
+
 const NEW_PRICING = {
   method: 'usd',
   points: [point('100'), { scope: 'option', id: 'np_pro', kind: 'fixed', usd: '150' }, { scope: 'color', id: 'np_red', kind: 'delta', usd: '5' }],
@@ -115,14 +119,14 @@ test('add-product: the draft is priced before the first save, and the save write
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM products WHERE id = 'np'"), 0, 'a preview writes nothing');
 
   // The save without the hash: the sheet first (the V2 preview rides on the refusal).
-  const bare = await answer(await post(app, '/api/admin/products-v2', { ...structure.doc, relations: structure.relations, pricing_v2: { pricing: NEW_PRICING } }));
+  const bare = await answer(await post(app, '/api/admin/products-v2', { ...saveDoc(structure.doc), relations: structure.relations, pricing_v2: { pricing: NEW_PRICING } }));
   assert.equal(bare.status, 409, JSON.stringify(bare.body).slice(0, 300));
   assert.equal(bare.body.code, 'PRICING_PREVIEW_REQUIRED');
   assert.equal(bare.body.details.section, 3);
   assert.equal(bare.body.details.preview.review_hash, pre.body.review_hash, 'the refusal carries the same preview');
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM products WHERE id = 'np'"), 0);
 
-  const saved = await answer(await post(app, '/api/admin/products-v2', { ...structure.doc, relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: pre.body.review_hash } }));
+  const saved = await answer(await post(app, '/api/admin/products-v2', { ...saveDoc(structure.doc), relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: pre.body.review_hash } }));
   assert.equal(saved.status, 200, JSON.stringify(saved.body).slice(0, 500));
   assert.equal(saved.body.created, true);
   assert.deepEqual(saved.body.pricing_v2, { priced: true });
@@ -141,7 +145,7 @@ test('add-product: the draft is priced before the first save, and the save write
     assert.equal(grid[`${r.combo_key}@${r.channel}`]?.fee ?? 0, 0);
   }
   // The same save again (a retry after a timeout): the hash replays, nothing new is written.
-  const again = await answer(await post(app, '/api/admin/products-v2', { ...structure.doc, relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: pre.body.review_hash } }));
+  const again = await answer(await post(app, '/api/admin/products-v2', { ...saveDoc(structure.doc), relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: pre.body.review_hash } }));
   assert.equal(again.status, 200, JSON.stringify(again.body).slice(0, 300));
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_audit WHERE product_id = 'np' AND action = 'engine_entry'"), 1);
 });
@@ -408,7 +412,7 @@ test('a database before 0189 (deploy ahead): the V2 reads answer the needs-prici
     assert.equal(save.status, 503, `${through}: ${JSON.stringify(save.body).slice(0, 300)}`);
     assert.equal(save.body.code, 'PRICING_NOT_INSTALLED');
     const structure = newProductBody('np');
-    const born = await answer(await post(app, '/api/admin/products-v2', { ...structure.doc, relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: 'a'.repeat(64) } }));
+    const born = await answer(await post(app, '/api/admin/products-v2', { ...saveDoc(structure.doc), relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: 'a'.repeat(64) } }));
     assert.equal(born.status, 503, `${through}: ${JSON.stringify(born.body).slice(0, 300)}`);
     assert.equal(born.body.code, 'PRICING_NOT_INSTALLED');
     assert.equal(born.body.details.section, 3);

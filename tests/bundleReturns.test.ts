@@ -24,7 +24,6 @@
  * LEDGER onto the rows it came off, and price protection refusing the parent by
  * name while evaluating a component on its own frozen standalone value.
  */
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, stubApp, post, get, json, all, count, row, spendable, type StubUser } from './fixtures/app';
@@ -33,6 +32,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { returnRoutes, priceProtectionRoutes } from '../worker/routes/returns';
 import { deductOrderStock } from '../worker/lib/orderInventory';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
+import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const admin: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
@@ -80,7 +80,7 @@ async function deliveredBundle(raw: DatabaseSync, opts: { couponCode?: string; q
 
 // --------------------------------------------------------- the arithmetic
 
-test('case 12 — a whole-bundle return refunds the parent’s line total NET of coupon and points, never 0 and never the gross', async () => {
+q7Test('case 12 — a whole-bundle return refunds the parent’s line total NET of coupon and points, never 0 and never the gross', async () => {
   const raw = seedCatalogue();
   raw.exec(
     `INSERT INTO coupons (id,code,kind,value,min_total_iqd,active) VALUES ('cp1','SAVE10','percent',10,0,1)`
@@ -133,7 +133,7 @@ test('case 12 — a whole-bundle return refunds the parent’s line total NET of
   assert.ok(spendable(raw, 'buyer') > before);
 });
 
-test('case 12 — the points reversal uses the same basis, so a returned bundle reverses what it accrued', async () => {
+q7Test('case 12 — the points reversal uses the same basis, so a returned bundle reverses what it accrued', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -154,7 +154,7 @@ test('case 12 — the points reversal uses the same basis, so a returned bundle 
   assert.ok(reversedBasis > 0);
 });
 
-test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qty / order_items.qty', async () => {
+q7Test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qty / order_items.qty', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw, { qty: 2 });
   const rows = itemsOf(raw, orderId);
@@ -191,7 +191,7 @@ test('case 12 — a partial-qty return of a multi-qty bundle scales by kase.qty 
 
 // ------------------------------------------------------------ stock, case 12
 
-test('case 12 — the restore goes through the LEDGER onto the colour row, never products.stock', async () => {
+q7Test('case 12 — the restore goes through the LEDGER onto the colour row, never products.stock', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const before = row<{ stock: number }>(raw, "SELECT stock FROM product_colors WHERE id='pc_black'")!;
@@ -222,7 +222,7 @@ test('case 12 — the restore goes through the LEDGER onto the colour row, never
   );
 });
 
-test('cancellation releases every component in the same batch as the status flip', async () => {
+q7Test('cancellation releases every component in the same batch as the status flip', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -256,7 +256,7 @@ test('cancellation releases every component in the same batch as the status flip
 
 // ------------------------------------------------------------ the grouping
 
-test('a component case names the bundle it came from and its siblings', async () => {
+q7Test('a component case names the bundle it came from and its siblings', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -287,7 +287,7 @@ test('a component case names the bundle it came from and its siblings', async ()
  * round is a legitimately planned restore whose expected equals its actual —
  * so the bound has to be the quota itself.
  */
-test('a whole-bundle return consumes the quota: the same bundle cannot be returned twice', async () => {
+q7Test('a whole-bundle return consumes the quota: the same bundle cannot be returned twice', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -302,7 +302,7 @@ test('a whole-bundle return consumes the quota: the same bundle cannot be return
     'the refused round opened no case at all — the fan-out stays all-or-nothing');
 });
 
-test('a rejected case frees the quota again, and a two-qty bundle can be returned one at a time', async () => {
+q7Test('a rejected case frees the quota again, and a two-qty bundle can be returned one at a time', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw, { qty: 2 });
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -321,7 +321,7 @@ test('a rejected case frees the quota again, and a two-qty bundle can be returne
   assert.equal(again.success, true, JSON.stringify(again));
 });
 
-test('a price-protection claim on the bundle PARENT is refused by name, not with a misleading NO_ELIGIBLE_DROP', async () => {
+q7Test('a price-protection claim on the bundle PARENT is refused by name, not with a misleading NO_ELIGIBLE_DROP', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const parent = itemsOf(raw, orderId).find((r) => r.bundle_parent_item_id === null)!;
@@ -351,7 +351,7 @@ test('a price-protection claim on the bundle PARENT is refused by name, not with
  * the refund basis, so a refund and a price-protection credit cannot disagree
  * about what one component cost.
  */
-test('a component price-protection claim is anchored on the PAID share, and can never exceed it', async () => {
+q7Test('a component price-protection claim is anchored on the PAID share, and can never exceed it', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const printer = itemsOf(raw, orderId).find((r) => r.product_id === 'p_printer')!;
@@ -376,7 +376,7 @@ test('a component price-protection claim is anchored on the PAID share, and can 
   assert.equal(res.claim.observed_unit_iqd, 300_000);
 });
 
-test('a catastrophic catalogue drop cannot credit more than the component cost inside the bundle', async () => {
+q7Test('a catastrophic catalogue drop cannot credit more than the component cost inside the bundle', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await deliveredBundle(raw);
   const order = row<Record<string, unknown>>(raw, 'SELECT * FROM orders WHERE id = ?', orderId)!;

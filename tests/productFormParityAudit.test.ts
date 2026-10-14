@@ -33,6 +33,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { docWithoutLegacyMoney, withoutLegacyMoney } from '../src/components/adminProducts/form/v2/v2Model';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, post, get, json, row, type App } from './fixtures/app';
 import { templateRoutes } from '../worker/routes/template';
@@ -112,7 +113,8 @@ function savePayload(doc: Record<string, unknown>, rel: RelationsState, stamp: s
   void _o;
   void _c;
   void _m;
-  return { ...docFields, status: 'draft', relations: relationsToWire(rel), expected_updated_at: stamp };
+  // Exactly as ProductForm sends it since the clean start (spec addendum A.6): no dinar money key travels.
+  return { ...docWithoutLegacyMoney(docFields), status: 'draft', relations: withoutLegacyMoney(relationsToWire(rel)), expected_updated_at: stamp };
 }
 
 /** Exactly the two GETs the form issues, through exactly its two transforms. */
@@ -385,11 +387,9 @@ test('§5 AUDIT — the form state itself carries all fifteen, not just the expo
   // form save below must not regenerate over them.
   assert.equal(doc.how_to_use_ar, 'سوِّ المنصة، حمّل الفلامنت، اطبع.');
   assert.equal(doc.how_to_use_ckb, 'تەختەکە ڕێک بخە، فیلامێنت بار بکە، چاپ بکە.');
-  assert.equal(doc.price_iqd, 500_000);
-  assert.equal(doc.prime_price_iqd, 480_000);
-  assert.equal(doc.pro_price_iqd, 450_000);
-  assert.equal(doc.original_price_iqd, 650_000);
-  assert.equal(doc.direct_surcharge_iqd, 15_000);
+  // The clean start (spec addendum A.6): a file creates no dinar money — the planner pins every
+  // legacy money key of a new product (born at 0 / empty), and the V2 price is the form's section ٣.
+  for (const k of ['price_iqd', 'prime_price_iqd', 'pro_price_iqd', 'original_price_iqd', 'direct_surcharge_iqd'] as const) assert.ok(!doc[k], k);
   assert.equal(doc.template_family, 'devices');
   assert.deepEqual(doc.hashtags.slice().sort(), ['audit', 'bambu']);
   assert.equal(doc.stock, 9);
@@ -399,7 +399,7 @@ test('§5 AUDIT — the form state itself carries all fifteen, not just the expo
   const values = rel.groups.flatMap((g) => g.values);
   assert.equal(rel.groups.length, 2, 'Model and Nozzle');
   assert.equal(values.length, 4);
-  assert.equal(values.find((v) => v.id === 'opt_combo')?.regular_adjust_iqd, 150_000, 'the surcharge, as an adjustment');
+  assert.ok(!values.find((v) => v.id === 'opt_combo')?.regular_adjust_iqd, 'no surcharge is born from the file (pinned)');
   assert.equal(values.find((v) => v.id === 'opt_n06')?.active, false);
   assert.equal(rel.colors.length, 1);
   assert.deepEqual(rel.colors[0].option_value_ids, [], 'empty option_ids remains the canonical all-options shorthand');
@@ -428,7 +428,7 @@ test('§5 AUDIT — the form state itself carries all fifteen, not just the expo
   // payment options / preorder transports
   assert.deepEqual(doc.payment_options.slice().sort(), ['card', 'cod', 'wallet']);
   assert.equal(doc.preorder_transports.length, 2);
-  assert.equal(doc.preorder_transports.find((t) => t.method === 'air')?.commission_iqd, 25_000);
+  assert.ok(!doc.preorder_transports.find((t) => t.method === 'air')?.commission_iqd, 'no commission is born from the file (pinned)');
 });
 
 test('§5 AUDIT — a SECOND save is still a no-op, so nothing drifts one hop at a time', async () => {

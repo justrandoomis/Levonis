@@ -22,10 +22,15 @@ function world() {
       VALUES ('ap1','promem',1,'Omar','+9647709876543','Erbil, Ankawa 4','','approved');
     INSERT INTO memberships (id,user_id,plan_id,tier,state,duration_months,price_paid_iqd,starts_at,expires_at) VALUES
       ('m_pro','promem','pro_12mo','pro','active',12,499000,'2026-01-01T00:00:00.000Z','2099-01-01T00:00:00.000Z');
-    INSERT INTO products (id, slug, name, description, price_iqd, pro_price_iqd, status, category_id, sub_category_id, stock, display_order) VALUES
-      ('p_a', 'machine-a', 'Machine A', '', 100000, 70000, 'active', 'cat_printers', 'cat_printers_fdm', 1, 0),
-      ('p_b', 'machine-b', 'Machine B', '', 90000, 88000, 'active', 'cat_printers', 'cat_printers_fdm', 1, 1),
-      ('p_c', 'machine-c', 'Machine C', '', 95000, NULL, 'active', 'cat_printers', 'cat_printers_fdm', 1, 2);
+    INSERT INTO products (id, slug, name, description, price_iqd, status, category_id, sub_category_id, stock, display_order) VALUES
+      ('p_a', 'machine-a', 'Machine A', '', 100000, 'active', 'cat_printers', 'cat_printers_fdm', 1, 0),
+      ('p_b', 'machine-b', 'Machine B', '', 90000, 'active', 'cat_printers', 'cat_printers_fdm', 1, 1),
+      ('p_c', 'machine-c', 'Machine C', '', 95000, 'active', 'cat_printers', 'cat_printers_fdm', 1, 2);
+    -- The clean start (DECISIONS row 222): a member price is a benefit rule — the first V2 price clears a
+    -- typed PRO rung. The same two PRO prices, as product rules: A 100,000 − 30,000, B 90,000 − 2,000.
+    INSERT INTO membership_benefit_rules (id, tier, benefit_type, scope, product_id, discount_mode, percent, fixed_iqd, enabled, priority, label) VALUES
+      ('r_a', 'pro', 'product_discount', 'product', 'p_a', 'fixed', NULL, 30000, 1, 0, 'PRO A'),
+      ('r_b', 'pro', 'product_discount', 'product', 'p_b', 'fixed', NULL, 2000, 1, 0, 'PRO B');
   `);
   const db = asD1(raw);
   const guest = stubApp(db, null, (a) => a.route('/api/products', productRoutes));

@@ -68,8 +68,9 @@ test('every GET answers on 0178 exactly as on the migrated database, for the own
   const diffs: string[] = [];
   const reached = new Set<string>();
   for (const [name, user] of [['owner', OWNER], ['full', ROLES.full]] as const) {
-    const ahead = appFor(seedRoleMatrix(freshDb()), user);
-    const behind = appFor(seedRoleMatrix(dbThrough('0178')), user);
+    // Neither side publishes (the clean start): before 0189 nothing can be, so a product hidden on both is the equal answer.
+    const ahead = appFor(seedRoleMatrix(freshDb()), user, undefined, { publishV2: false });
+    const behind = appFor(seedRoleMatrix(dbThrough('0178')), user, undefined, { publishV2: false });
     for (const path of paths) diffs.push(...judge(name, path, '0178', await call(ahead, 'GET', path), await call(behind, 'GET', path), reached));
   }
   assert.deepEqual(diffs, [], 'FX-1 behaves differently on 0178 than designed');

@@ -37,6 +37,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { q7Test } from './fixtures/q7';
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -48,6 +49,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { isSchemaMissing, safeErrorCode } from '../worker/lib/membershipBenefits';
 import { serverCause } from '../src/components/ui/AsyncStates';
 import { ApiError } from '../src/lib/api';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 // ------------------------------------------------------------------ fixture
 
@@ -132,6 +134,7 @@ function appFor(db: D1Database, userId: string) {
     c.env = { DB: db } as never;
     await next();
   });
+  app.use('*', autoPublishFromEnv);
   app.route('/api/cart', cartRoutes);
   // The same two-branch shape as worker/index.ts: a refusal keeps its code, an
   // escaped throw becomes a coded 500 through `safeErrorCode`.
@@ -367,7 +370,7 @@ test('the ckb strings for the new states are the ARABIC text, awaiting the owner
 const NO_0060 = { tables: ['offer_windows', 'offer_limits', 'offer_redemptions'] };
 const NO_0061 = { tables: ['mystery_pool_entries', 'mystery_pools', 'mystery_offers'] };
 
-test('a cart holding a BUNDLE still loads when the offers table is not installed', async () => {
+q7Test('a cart holding a BUNDLE still loads when the offers table is not installed', async () => {
   const raw = seed();
   raw.exec(`
     INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,
@@ -435,6 +438,7 @@ test('the CHECKOUT survives the same states the cart now survives', async () => 
       c.env = { DB: new SqliteD1(raw) as unknown as D1Database } as never;
       await next();
     });
+    app.use('*', autoPublishFromEnv);
     app.route('/api/orders', orderRoutes);
     app.onError((err, c) => {
       if (err instanceof HttpError) return c.json({ success: false, error: err.message, code: err.code }, err.status as 400);

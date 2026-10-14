@@ -5,7 +5,7 @@ import { requireCapability } from '../lib/operations';
 import { preorderOriginsView, savePreorderOrigins } from '../lib/preorderOrigins';
 import { canWriteCost } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { linkPreorderBatch } from '../lib/pricingEngine/v2/linkBatch';
+import { linkPreorderBatch } from '../lib/preorderBatchLink';
 
 /** Supplier evidence stays on its own admin route, never a public order DTO. */
 export const adminPreorderOriginRoutes = new Hono<AppContext>();

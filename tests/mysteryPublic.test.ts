@@ -45,6 +45,7 @@ import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { baghdadDay } from '../worker/lib/baghdadTime';
 import { seedCatalogue, orderBody } from './lib/bundles';
 import { POOL_PRODUCTS } from './lib/mysteryOffer';
+import { q7Test } from './fixtures/q7';
 
 const boss: StubUser = { id: 'boss', role: 'admin', email: 'a@x.co' };
 /** `boss` is the OWNER here: cost and the profit report are the owner's alone (owner decision 2). */
@@ -154,7 +155,7 @@ async function composeOffer(db: unknown, over: Record<string, unknown> = {}) {
 //  C1 — PUBLIC, NOT MEMBERS-ONLY
 // ===========================================================================
 
-test('a signed-out visitor and a non-member both see the random filament, and the non-member buys it', async () => {
+q7Test('a signed-out visitor and a non-member both see the random filament, and the non-member buys it', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -198,7 +199,7 @@ test('a signed-out visitor and a non-member both see the random filament, and th
   );
 });
 
-test('a per-offer restriction the owner sets deliberately still refuses a non-member', async () => {
+q7Test('a per-offer restriction the owner sets deliberately still refuses a non-member', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -324,7 +325,7 @@ async function buyOneBox(raw: DatabaseSync, db: unknown, offerId: string) {
   return { orderId, allocations, spools, drawn: allocations.map((a) => String(a.product_id)) };
 }
 
-test('the draw records the cost of what it took off the shelf, on the spool row, at the instant of the draw', async () => {
+q7Test('the draw records the cost of what it took off the shelf, on the spool row, at the instant of the draw', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -377,7 +378,7 @@ test('the draw records the cost of what it took off the shelf, on the spool row,
   assert.deepEqual(after, before, 'a later supplier-price edit cannot rewrite a sale that already happened');
 });
 
-test('a pool nobody has priced is recorded as UNKNOWN, and never as free goods', async () => {
+q7Test('a pool nobody has priced is recorded as UNKNOWN, and never as free goods', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   // The owner never typed a cost for any of these filaments.
@@ -403,7 +404,7 @@ test('a pool nobody has priced is recorded as UNKNOWN, and never as free goods',
   assert.equal(totals.gross_margin_percent, null, 'no margin can be computed from goods nobody priced');
 });
 
-test('the cost of the drawn filament never reaches the customer, before the reveal or after it', async () => {
+q7Test('the cost of the drawn filament never reaches the customer, before the reveal or after it', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);
@@ -466,7 +467,7 @@ async function mysteryTotals(raw: DatabaseSync, db: unknown) {
   return r.totals as Record<string, number | null>;
 }
 
-test('the finance report stops treating mystery revenue as costless, and files the cost under the offer that earned it', async () => {
+q7Test('the finance report stops treating mystery revenue as costless, and files the cost under the offer that earned it', async () => {
   const raw = seedCatalogue();
   seedFilaments(raw);
   const db = asD1(raw);

@@ -685,10 +685,20 @@ export function writeRoutes(mounts: readonly MountSpec[] = BASE_MOUNTS) {
   return out;
 }
 
-export function appFor(raw: DatabaseSync, user: StubUser | null, mounts: readonly MountSpec[] = BASE_MOUNTS) {
-  return stubApp(asD1(raw), user, (a) => {
-    for (const [prefix, router] of mounts) a.route(prefix, router);
-  });
+/**
+ * `publishV2: false` keeps the seeded products as the clean start left them (hidden until a V2
+ * price is published): the deploy-ahead sweeps compare a migrated database with one before 0189,
+ * where nothing can be published, so neither side may publish.
+ */
+export function appFor(raw: DatabaseSync, user: StubUser | null, mounts: readonly MountSpec[] = BASE_MOUNTS, opts: { publishV2?: boolean } = {}) {
+  return stubApp(
+    asD1(raw),
+    user,
+    (a) => {
+      for (const [prefix, router] of mounts) a.route(prefix, router);
+    },
+    opts.publishV2 === false ? { publishV2: false } : {}
+  );
 }
 
 export type MatrixApp = ReturnType<typeof appFor>;

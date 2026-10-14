@@ -48,6 +48,7 @@ import { productGallerySizes } from '../packages/contracts/src/imageSizes';
 import { DOCUMENT_CACHE_CONTROL } from '../worker/lib/securityPolicy';
 import { ARABIC_FONT_PRELOAD as SCRIPT_FONT, earlyHintsLink as scriptEarlyHintsLink, entryStylesheets as scriptEntryStylesheets, withEarlyHints } from '../scripts/write-asset-headers.mjs';
 import { HOME_PATH, RESOLVE_PATH, bootRequests } from '../src/lib/bootFetch';
+import { fetchPublished } from './fixtures/autoPublish';
 
 // ---------------------------------------------------------------- fixtures
 
@@ -119,7 +120,7 @@ function realWorker(opts: { manifest?: unknown; setCookie?: boolean } = {}) {
     },
   };
   const call = (host: string, path: string, headers: Record<string, string> = {}) =>
-    worker.fetch(new Request(`https://${host}${path}`, { headers: { Host: host, 'CF-Connecting-IP': '9.9.9.9', ...headers } }), env as never, ctx);
+    fetchPublished(worker, new Request(`https://${host}${path}`, { headers: { Host: host, 'CF-Connecting-IP': '9.9.9.9', ...headers } }), env as never, ctx);
   return { call, assetCalls, raw };
 }
 

@@ -11,6 +11,10 @@
  * carries the stored document's cost by id into a row it CREATES (a stored
  * row keeps its own, as before), and into the mirror.
  *
+ * Since the clean start (spec addendum A.6, DECISIONS row 222) the editor sends
+ * no dinar money key at all, so EVERY form save is cost-blind; a payload that
+ * still moves a stored cost is 409 PRICING_V2_MANAGED.
+ *
  * Run: node --import tsx --test tests/costBlindLegacyRowCosts.test.ts
  */
 import { test } from 'node:test';
@@ -27,6 +31,7 @@ import { adminPriceGridRoutes } from '../worker/routes/adminPriceGrid';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import { hydrateRelations, relationsToWire } from '../src/components/adminProducts/form/model';
+import { docWithoutLegacyMoney, withoutLegacyMoney } from '../src/components/adminProducts/form/v2/v2Model';
 import { asD1, row } from './fixtures/app';
 import { seededCopy, seededCopyUnverifiedOwner } from './fixtures/roleMatrix';
 
@@ -112,7 +117,11 @@ function rowCosts(raw: DatabaseSync): { options: Costs; colors: Costs } {
   };
 }
 
-/** What the editor sends: the document fields and the hydrated structure (from the JSON, no rows yet). */
+/**
+ * What the editor sends: the document fields and the hydrated structure (from the JSON, no rows yet)
+ * — since the clean start (spec addendum A.6) without a dinar money key at any depth, so every save
+ * is cost-blind and the stored costs must survive it. `wired` is the old editor's body, money included.
+ */
 async function formBody(a: ReturnType<typeof app>, cookie: string) {
   const got = await call(a, cookie, 'GET', '/api/admin/products-v2/p_a1');
   assert.equal(got.status, 200, got.text.slice(0, 300));
@@ -123,7 +132,12 @@ async function formBody(a: ReturnType<typeof app>, cookie: string) {
   const { options: _o, colors: _c, media: _m, ...docFields } = doc;
   void _o; void _c; void _m;
   const relations = relationsToWire(hydrateRelations(rel.json as never, product as never)) as unknown as Record<string, unknown>;
-  return { product, rel: rel.json, body: { ...docFields, relations } as Record<string, unknown> };
+  return {
+    product,
+    rel: rel.json,
+    body: { ...docWithoutLegacyMoney(docFields), relations: withoutLegacyMoney(relations) } as Record<string, unknown>,
+    wired: { ...docFields, relations } as Record<string, unknown>,
+  };
 }
 
 const EXPECTED = {
@@ -181,7 +195,7 @@ test('nothing is invented: a NEW option in a cost-blind save has no cost; a rena
   const relations = body.relations as { groups: Array<{ values: Array<Record<string, unknown>> }> };
   const values = relations.groups[0]!.values;
   values[0]!.name_en = 'Large';
-  values.push({ ...values[1]!, id: 'jo_new', name_en: 'Medium', variant_key: 'medium', variant_label: 'Medium', cost_iqd: null, cost_adjust_iqd: null });
+  values.push({ ...values[1]!, id: 'jo_new', name_en: 'Medium', variant_key: 'medium', variant_label: 'Medium' });
   const save = await call(a, cookie, 'POST', '/api/admin/products-v2', body);
   assert.equal(save.status, 200, save.text.slice(0, 400));
   const rows = rowCosts(raw);
@@ -190,20 +204,19 @@ test('nothing is invented: a NEW option in a cost-blind save has no cost; a rena
   assert.deepEqual(jsonCosts(raw).options.jo_new, { cost_iqd: null, cost_adjust_iqd: null });
 });
 
-test('with cost write the payload is the answer: the verified owner\'s explicit blank clears a document-only cost', async () => {
+test('the clean start (spec addendum A.6): the verified owner\'s explicit blank on a document-only cost is refused by name, and the cost stays', async () => {
   const raw = seededCopy();
   legacy(raw);
   const a = app(raw);
   const cookie = await sessionFor(raw, 'usr_owner');
-  const { body, rel } = await formBody(a, cookie);
+  const { wired, rel } = await formBody(a, cookie);
   assert.equal(rel.can_view_cost, true, 'the verified owner\'s relations answer carries cost');
-  const relations = body.relations as { groups: Array<{ values: Array<Record<string, unknown>> }> };
+  const relations = wired.relations as { groups: Array<{ values: Array<Record<string, unknown>> }> };
   const jo2 = relations.groups[0]!.values.find((v) => v.id === 'jo2')!;
   assert.equal(jo2.cost_iqd, 498765, 'the owner was shown the document cost');
   jo2.cost_iqd = null;
-  const save = await call(a, cookie, 'POST', '/api/admin/products-v2', body);
-  assert.equal(save.status, 200, save.text.slice(0, 400));
-  assert.deepEqual(rowCosts(raw).options.jo2, { cost_iqd: null, cost_adjust_iqd: null });
-  assert.deepEqual(jsonCosts(raw).options.jo2, { cost_iqd: null, cost_adjust_iqd: null });
-  assert.deepEqual(rowCosts(raw).colors, EXPECTED.colors, 'what the owner left alone is written as shown');
+  const save = await call(a, cookie, 'POST', '/api/admin/products-v2', wired);
+  assert.equal(save.status, 409, save.text.slice(0, 400));
+  assert.equal(save.json.code, 'PRICING_V2_MANAGED');
+  assert.deepEqual(jsonCosts(raw), EXPECTED, 'nothing moved');
 });

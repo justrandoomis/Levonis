@@ -120,7 +120,7 @@ test('the owner sees the seeded costs where they live: the product, the lot, the
   const r = await sweep('owner');
   for (const path of [
     '/api/admin/products-v2/p_a1',
-    '/api/admin/products/p_a1/price-grid',
+    // The clean start (spec addendum A.6): the price grid is a closed V1 door (409 PRICING_V2_MANAGED).
     '/api/admin/inventory/overview',
     '/api/admin/inventory/incoming',
     '/api/admin/finance-workspace/orders/ord1',
@@ -178,13 +178,15 @@ test('the finance screens are the owner’s alone: full and legacy admins are re
   assert.ok(finance.filter((p) => owner.statuses[p] === 200).length > 15, 'the owner reaches them');
 });
 
-test('«التسعير والشحن» (pricing engine MVP P1): the owner reads cost there; every other admin is refused at its door with COST_ACCESS_DENIED; customers and guests never reach it', async () => {
+test('«التسعير والشحن» (pricing engine MVP P1): the owner reads the counts there, its V1 product door is closed; every other admin is refused at its door with COST_ACCESS_DENIED; customers and guests never reach it', async () => {
   const detail = '/api/admin/pricing/products/p_a1';
   const routes = ['/api/admin/pricing/overview', detail];
   assert.ok(routes.every((p) => PATHS.includes(p)), 'the sweep enumerates the pricing router');
   const owner = await sweep('owner');
-  for (const p of routes) assert.equal(owner.statuses[p], 200, `the owner reads ${p}`);
-  assert.ok(owner.costSeen.includes(detail), 'the owner sees the costly product’s landed cost there');
+  assert.equal(owner.statuses['/api/admin/pricing/overview'], 200, 'the owner reads the counts');
+  // The clean start (spec addendum A.6): the V1 product sheet is closed, to the owner too.
+  assert.deepEqual([owner.statuses[detail], owner.codes[detail]], [409, 'PRICING_V2_MANAGED']);
+  assert.equal(owner.costSeen.includes(detail), false);
   for (const role of ['assistant', 'full', 'legacy_null', 'grantee_off', 'support_assistant'] as const) {
     const r = await sweep(role);
     for (const p of routes) {

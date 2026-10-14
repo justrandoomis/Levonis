@@ -11,9 +11,12 @@ import { templateRoutes } from '../../worker/routes/template';
 
 export const OWNER = { id: 'usr_owner', role: 'admin' as const, email: 'boss@x.co', admin_scope: null as string | null };
 
+const rawOfApp = new WeakMap<object, DatabaseSync>();
+
 export function setup(user: { id: string; role: 'admin'; email: string; admin_scope: string | null } = OWNER, raw: DatabaseSync = freshDb()) {
   const db = asD1(raw);
   const app = stubApp(db, user, (a) => a.route('/api/admin/template', templateRoutes));
+  rawOfApp.set(app, raw);
   return { raw, db, app };
 }
 export type App = ReturnType<typeof setup>['app'];
@@ -138,7 +141,27 @@ export async function create(app: App, text = PRODUCT): Promise<string> {
   const res = await post(app, '/api/admin/template/apply', { text, mode: 'draft', confirm: true });
   const body = (await res.json()) as { product_id?: string };
   assert.equal(res.status, 200, JSON.stringify(body));
+  // The clean start (spec addendum A.6): the template pins legacy money, so a product is born without
+  // it. The default product is the cut-over's — its dinar money as an older release stored it.
+  const raw = rawOfApp.get(app);
+  if (text === PRODUCT && raw) seedProductMoney(raw, body.product_id!);
   return body.product_id!;
+}
+
+/** The PRODUCT file's dinar money, written as an older release stored it (a fixture write; the product is manual). */
+export function seedProductMoney(raw: DatabaseSync, productId: string): void {
+  raw.prepare('UPDATE products SET price_iqd = 1000000, original_price_iqd = 1200000, product_cost_iqd = 700000 WHERE id = ?').run(productId);
+  raw.prepare("UPDATE product_option_values SET cost_iqd = 650000 WHERE product_id = ? AND id = 'opt_std'").run(productId);
+  raw.prepare("UPDATE product_option_values SET regular_adjust_iqd = 150000 WHERE product_id = ? AND id = 'opt_combo'").run(productId);
+  raw.prepare("UPDATE product_option_values SET regular_adjust_iqd = 50000 WHERE product_id = ? AND id = 'opt_kit'").run(productId);
+  for (const [method, surcharge] of [['air', 80000], ['sea', 30000]] as const) {
+    raw
+      .prepare(
+        `UPDATE product_option_transports SET surcharge_iqd = ? WHERE product_id = ? AND method = ?
+           AND fulfillment_id IN (SELECT id FROM product_option_fulfillment WHERE option_id = 'opt_std' AND fulfillment_type = 'pre_order')`
+      )
+      .run(surcharge, productId, method);
+  }
 }
 
 export function addImages(raw: DatabaseSync, productId: string) {

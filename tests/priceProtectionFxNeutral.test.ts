@@ -3,10 +3,12 @@
  * DROP IS NEVER PROTECTED (ODP §5.1 items 9-10; USD design §6.6; policy
  * `price_protection` v5 §10.4, §11.8).
  *
- * Runs the real claim route over an engine-priced product (adopted and
- * repriced through the real writer) and an order line carrying 0181's
- * engine snapshot, and the pure rule beside it. Proves:
- *   - the owner's two examples: the base price falls 500 → 480 USD at 1,600 →
+ * Runs the real claim route over an engine-priced product (written and
+ * repriced through the real writer — since the clean start, spec addendum A.6,
+ * the V2 writer: cost-first, D = ceil_1000(EUR 450 × 1.1 × U + 8,000 + T × U),
+ * every channel at D) and an order line carrying 0181's engine snapshot, and
+ * the pure rule beside it. Proves:
+ *   - the owner's two examples: the base price falls 620 → 600 USD at 1,600 →
  *     32,000 IQD owed; the base price stays and only the rate moves → nothing
  *     (FX_ONLY_DROP, in ar / en / ckb for the customer);
  *   - a mixed move pays the USD part only, never more than the actual dinar
@@ -24,7 +26,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, json, post, row, stubApp } from './fixtures/app';
-import { applyRate } from './fixtures/fx';
+import { writeV2 } from './fixtures/pricingV2';
+import { repriceStaleEngineProducts } from '../worker/lib/pricingEngine/autoReprice';
+import { statementBudget } from '../worker/lib/fx/budget';
+import type { Env } from '../worker/lib/types';
+import { applyRate, fxEnv } from './fixtures/fx';
 import { pricingWorld, AMS, AMS_MODEL } from './fixtures/procurementPricing';
 import { priceProtectionRoutes } from '../worker/routes/returns';
 import { claimBasis, restate } from '../worker/lib/pricingEngine/protectionBasis';
@@ -32,32 +38,26 @@ import { baseUsdOf, engineBasisOf } from '../worker/lib/pricingEngine/orderBasis
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 import { price_protection } from '../worker/lib/policies/price_protection';
 
-const COMPLETE = {
-  inputs: [{ scope: 'base', supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 }],
-  rules: [
-    { kind: 'target_profit', scope: 'product', amount_usd: '120' },
-    { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 50_000 },
-  ],
-};
-
 type World = ReturnType<typeof pricingWorld>;
 
-async function save(w: World, draft: Record<string, unknown>) {
-  const seq = row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', AMS)?.s ?? 0;
-  const first = await w.putInputs(AMS, { inputs_seq: seq, ...draft });
-  assert.equal(first.status, 409, JSON.stringify(first.body));
-  const r = await w.putInputs(AMS, { inputs_seq: seq, ...draft, preview_hash: first.body.details.preview.preview_hash, confirm_large_change: true });
-  assert.equal(r.status, 200, JSON.stringify(r.body));
+/** The brief's product, cost-first in V2 at a minimum profit of $T (EUR 450, Germany land 2.5 kg, no discount). */
+async function save(w: World, minimumProfitUsd: string) {
+  await writeV2(w.db, AMS, {
+    method: 'cost',
+    inputs: { supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 },
+    minimumProfitUsd,
+  });
 }
 
+/** The automatic run after a confirmed rate moved (an FX-only reprice: `engine_fx`). */
 async function resaveAtRates(w: World) {
-  const pv = await json(await post(w.app, '/api/admin/pricing/save-list/preview', { product_ids: [AMS] }));
-  const res = await json(await post(w.app, '/api/admin/pricing/products/save-bulk', { items: [{ product_id: AMS, preview_hash: pv.items[0].preview.preview_hash }], confirm_large_change: true }));
-  assert.deepEqual(res.results, [{ product_id: AMS, status: 'saved' }]);
+  const report = await repriceStaleEngineProducts({ ...fxEnv(w.raw), STORE_ROOT_DOMAIN: 'levonis-iq.com' } as Env, { trigger: 'fx', budget: statementBudget(600) });
+  assert.deepEqual(report.repriced, [AMS]);
 }
 
+/** Today's direct-sale price of the model: its V2 result (what the cart charges). */
 const directPrice = (w: World) =>
-  row<{ p: number }>(w.raw, "SELECT regular_price_iqd AS p FROM product_option_fulfillment WHERE option_id = ? AND fulfillment_type = 'direct_sale'", AMS_MODEL)!.p;
+  row<{ p: number }>(w.raw, "SELECT final_price_iqd AS p FROM pricing_v2_sku_results WHERE product_id = ? AND combo_key = ? AND channel = 'direct_sale'", AMS, `o:${AMS_MODEL}`)!.p;
 
 /** A delivered order of one direct-sale unit bought at today's engine price, with checkout's own snapshot. */
 async function boughtNow(w: World, opts: { createdAt?: string; engine?: boolean } = {}) {
@@ -97,8 +97,8 @@ const claim = async (w: World, itemId: string) => {
 /** A world with the brief's product adopted by the engine at 1,600. */
 async function engineWorld() {
   const w = pricingWorld();
-  await save(w, COMPLETE);
-  assert.equal(directPrice(w), 1_042_000);
+  await save(w, '120');
+  assert.equal(directPrice(w), 992_000);
   return w;
 }
 
@@ -106,17 +106,17 @@ test('the owner’s example 1: the base price falls by $20 at 1,600 → 32,000 I
   const w = await engineWorld();
   const bought = await boughtNow(w);
   assert.equal(bought.basis.usd_iqd_at_purchase, '1600');
-  assert.equal(bought.basis.base_usd_at_purchase, baseUsdOf(1_042_000, '1600'));
-  await save(w, { inputs: [], rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] });
-  assert.equal(directPrice(w), 1_010_000);
+  assert.equal(bought.basis.base_usd_at_purchase, baseUsdOf(992_000, '1600'));
+  await save(w, '100');
+  assert.equal(directPrice(w), 960_000);
   const r = await claim(w, bought.itemId);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.claim.eligible_unit_iqd, 32_000);
   const stored = row<Record<string, unknown>>(w.raw, 'SELECT eligible_unit_iqd, basis, usd_iqd_at_purchase, original_unit_iqd, observed_unit_iqd, policy_snapshot FROM price_protection_claims')!;
   assert.equal(stored.basis, 'usd_base');
   assert.equal(stored.usd_iqd_at_purchase, '1600');
-  assert.equal(stored.original_unit_iqd, 1_042_000);
-  assert.equal(stored.observed_unit_iqd, 1_010_000);
+  assert.equal(stored.original_unit_iqd, 992_000);
+  assert.equal(stored.observed_unit_iqd, 960_000);
   // The customer's snapshot carries no USD figure and no rate.
   assert.doesNotMatch(String(stored.policy_snapshot), /usd|1600|base_usd/i);
 });
@@ -141,15 +141,15 @@ test('a mixed move pays the USD part only, never more than the actual dinar drop
   const w = await engineWorld();
   const bought = await boughtNow(w);
   applyRate(w.raw, 'USD_IQD', '1500');
-  await save(w, { inputs: [], rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] });
+  await save(w, '100');
   const now = directPrice(w);
-  // EUR 450 × 1.1 × 1,500 + 8,000 + $100 × 1,500 = 900,500 → 901,000; + 50,000 extra.
-  assert.equal(now, 951_000);
+  // EUR 450 × 1.1 × 1,500 + 8,000 + $100 × 1,500 = 900,500 → 901,000.
+  assert.equal(now, 901_000);
   const r = await claim(w, bought.itemId);
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  const covered = 1_042_000 - restate(951_000, '1500', '1600');
+  const covered = 992_000 - restate(901_000, '1500', '1600');
   assert.equal(r.body.claim.eligible_unit_iqd, covered);
-  assert.ok(covered < 1_042_000 - 951_000, 'the rest came from the exchange rate');
+  assert.ok(covered < 992_000 - 901_000, 'the rest came from the exchange rate');
 
   // Approval credits what is covered (the wallet stays the order's wallet rate, decision 9).
   w.raw.exec(`INSERT OR IGNORE INTO users (id,name,email,password_hash,role) VALUES ('boss','Admin','a@x.co','h','admin')`);

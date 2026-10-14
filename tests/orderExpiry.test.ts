@@ -28,6 +28,7 @@ import { sweepExpiredOrders } from '../worker/lib/orderExpirySweep';
 import { resolveOrderExpiry, DEFAULT_ORDER_EXPIRY, MIN_TTL_MINUTES } from '../worker/lib/orderExpiry';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { addBundle, seedCatalogue, orderBody } from './lib/bundles';
+import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown) =>
@@ -95,7 +96,7 @@ async function prepaidOrder(raw: DatabaseSync, at = LONG_AGO) {
 
 // ------------------------------------------------------------ it is OFF
 
-test('the shipped default expires nothing at all', async () => {
+q7Test('the shipped default expires nothing at all', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
 
@@ -104,7 +105,7 @@ test('the shipped default expires nothing at all', async () => {
   assert.equal(orderOf(raw, orderId).status, 'pending', 'nothing happens until an owner turns it on');
 });
 
-test('enabled with ttl 0 is still off — "enabled" alone is not a policy', async () => {
+q7Test('enabled with ttl 0 is still off — "enabled" alone is not a policy', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   const report = await sweepExpiredOrders(envOf(db), { enabled: true, ttl_minutes: 0, batch_limit: 100 }, NOW);
@@ -114,7 +115,7 @@ test('enabled with ttl 0 is still off — "enabled" alone is not a policy', asyn
 
 // ------------------------------------------------------- it does its job
 
-test('an abandoned COD order is cancelled and every component goes back on the shelf', async () => {
+q7Test('an abandoned COD order is cancelled and every component goes back on the shelf', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   assert.equal(reserved(raw, 'p_pla'), 2, 'the checkout is holding both spools');
@@ -137,7 +138,7 @@ test('an abandoned COD order is cancelled and every component goes back on the s
   );
 });
 
-test('an order still inside its TTL is left alone', async () => {
+q7Test('an order still inside its TTL is left alone', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw, '2026-03-01T11:30:00.000Z'); // 30 min < 60
   const report = await sweepExpiredOrders(envOf(db), ON, NOW);
@@ -145,7 +146,7 @@ test('an order still inside its TTL is left alone', async () => {
   assert.equal(orderOf(raw, orderId).status, 'pending');
 });
 
-test('running the sweep twice changes nothing the second time', async () => {
+q7Test('running the sweep twice changes nothing the second time', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   const first = await sweepExpiredOrders(envOf(db), ON, NOW);
@@ -160,7 +161,7 @@ test('running the sweep twice changes nothing the second time', async () => {
 
 // ------------------------------------------- it never takes a real order
 
-test('a WALLET-PREPAID pending order is never expired — pending does not mean unpaid', async () => {
+q7Test('a WALLET-PREPAID pending order is never expired — pending does not mean unpaid', async () => {
   const raw = seedCatalogue();
   const { db, raw: r, orderId } = await prepaidOrder(raw);
   const paid = row<{ wallet_applied_iqd: number }>(r, 'SELECT wallet_applied_iqd FROM orders WHERE id = ?', orderId)!;
@@ -171,7 +172,7 @@ test('a WALLET-PREPAID pending order is never expired — pending does not mean 
   assert.equal(orderOf(r, orderId).status, 'pending');
 });
 
-test('a CONFIRMED order is never expired, even after an admin walks it back to pending', async () => {
+q7Test('a CONFIRMED order is never expired, even after an admin walks it back to pending', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];
@@ -186,7 +187,7 @@ test('a CONFIRMED order is never expired, even after an admin walks it back to p
   assert.equal(orderOf(raw, orderId).status, 'pending', 'a confirmed order is never lost to the clock');
 });
 
-test('an order with a COLLECTED settlement is never expired', async () => {
+q7Test('an order with a COLLECTED settlement is never expired', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   raw
@@ -201,7 +202,7 @@ test('an order with a COLLECTED settlement is never expired', async () => {
   assert.equal(orderOf(raw, orderId).status, 'pending');
 });
 
-test('an order a human has already moved is never expired', async () => {
+q7Test('an order a human has already moved is never expired', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   raw
@@ -215,7 +216,7 @@ test('an order a human has already moved is never expired', async () => {
   assert.equal(report.scanned, 0, 'somebody is working on this order');
 });
 
-test('a merchant store order is never expired by the platform sweep', async () => {
+q7Test('a merchant store order is never expired by the platform sweep', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   raw.prepare("UPDATE orders SET origin = 'store_product', seller_type = 'merchant' WHERE id = ?").run(orderId);
@@ -224,7 +225,7 @@ test('a merchant store order is never expired by the platform sweep', async () =
   assert.equal(report.scanned, 0, 'a merchant order is not this job to cancel');
 });
 
-test('a re-opened order restarts its clock instead of being swept again every 15 minutes', async () => {
+q7Test('a re-opened order restarts its clock instead of being swept again every 15 minutes', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   await sweepExpiredOrders(envOf(db), ON, NOW);
@@ -293,7 +294,7 @@ test('batch_limit bounds one run, and the rest wait for the next', async () => {
  * The flip is fenced on the status it read as well now, so the losing mover
  * reports RACED and writes nothing.
  */
-test('a stage move that lost the race to a cancellation writes nothing', async () => {
+q7Test('a stage move that lost the race to a cancellation writes nothing', async () => {
   const raw = seedCatalogue();
   await abandonedOrder(raw);
   const { failing, db } = failingD1(raw);
@@ -322,7 +323,7 @@ test('a stage move that lost the race to a cancellation writes nothing', async (
   );
 });
 
-test('but a DELIBERATE re-open from cancelled still works, and reclaims the slot', async () => {
+q7Test('but a DELIBERATE re-open from cancelled still works, and reclaims the slot', async () => {
   const raw = seedCatalogue();
   const { db, orderId } = await abandonedOrder(raw);
   const env = { DB: db } as unknown as Parameters<typeof moveOrderStage>[0];

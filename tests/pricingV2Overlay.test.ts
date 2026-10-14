@@ -34,6 +34,7 @@ import { parseProductRow, projectPublic } from '../worker/lib/productModel';
 import { loadProducts } from '../worker/lib/pricingEngine/load';
 import { v2EditorAnswer, v2OwnerAnswer } from '../worker/lib/pricingEngine/v2/dto';
 import { v2Offerable } from '../worker/lib/skuLevels';
+import { stageV1Engine } from './fixtures/v1Engine';
 
 type World = ReturnType<typeof pricingWorld>;
 
@@ -42,20 +43,16 @@ const C = (k: number) => `${PID}_c${k}`;
 const OL = 'p_v2_ol';
 const fixed = (usd: string) => ({ scope: 'product' as const, scope_id: '', kind: 'fixed' as const, usd });
 const off = (usd: string) => ({ scope: 'product' as const, scope_id: '', usd });
-const seqOf = (w: World, pid: string) => row<{ s: number }>(w.raw, 'SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?', pid)?.s ?? 0;
 
-/** A V1 product priced per SKU (a colour holds its own supplier cost), through the owner's own V1 door. */
+/** A V1 product priced per SKU (a colour holds its own supplier cost), as the cut-over found it (tests/fixtures/v1Engine.ts). */
 async function v1PerSku(w: World) {
-  const draft = {
+  await stageV1Engine(w.db, PID, {
     inputs: [
       { scope: 'base', supplier_cost_amount: '10', supplier_cost_currency: 'USD', shipping_profile: 'CHINA_SEA', manual_cbm: '0.005' },
       { scope: 'color', scope_id: C(0), supplier_cost_amount: '12', supplier_cost_currency: 'USD' },
     ],
     rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '3' }, { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 2000 }],
-  };
-  const first = await w.putInputs(PID, { inputs_seq: seqOf(w, PID), ...draft });
-  const saved = await w.putInputs(PID, { inputs_seq: seqOf(w, PID), ...draft, preview_hash: first.body.details.preview.preview_hash, confirm_large_change: true });
-  assert.equal(saved.status, 200, JSON.stringify(saved.body).slice(0, 400));
+  });
 }
 
 const viewsOf = async (w: World, ids: string[]) => loadRelationsViews(w.db, all<{ id: string; inventory_mode: string }>(w.raw, `SELECT id, inventory_mode FROM products WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids));

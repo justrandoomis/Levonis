@@ -45,6 +45,7 @@ import { adminRoutes } from '../worker/routes/admin';
 import { ANONYMOUS_CACHE_CONTROL, pathsChangedBySetting } from '../worker/lib/edgePolicy';
 import { CACHE_ALLOWLIST, canCache, canStore } from '../services/gateway/src/cache';
 import { matchRoute } from '../services/gateway/src/routes';
+import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 
 const WWW = `www.${APEX}`;
 
@@ -152,7 +153,7 @@ async function guestGet(raw: DatabaseSync, host: string, path: string, ip = '9.9
 
 /** The body the colo cache holds for `https://<host><path>`, or null. */
 async function storedBody(cache: ReturnType<typeof zoneCache>, host: string, path: string): Promise<Record<string, any> | null> {
-  const entry = cache.store.get(`https://${host}${path}`);
+  const entry = cache.store.get(withCacheEpoch(`https://${host}${path}`));
   return entry ? ((await entry.clone().json()) as Record<string, any>) : null;
 }
 
@@ -205,13 +206,13 @@ test('after the owner withdraws the print rates, no cached copy on any host or p
     ] as const) {
       const r = await guestGet(raw, host, path);
       assert.equal(r.status, 200, `${host}${path}: ${r.text.slice(0, 300)}`);
-      assert.ok(cache.store.has(`https://${host}${path}`), `${host}${path} was not stored`);
+      assert.ok(cache.store.has(withCacheEpoch(`https://${host}${path}`)), `${host}${path} was not stored`);
     }
 
     // The owner withdraws the rates on the apex. The seam purges ONLY these paths, ONLY on the apex.
     await ownerSets(raw, WITHDRAWN);
     assert.deepEqual(pathsChangedBySetting('printServicePricing'), ['/api/settings/public']);
-    assert.equal(cache.store.has(`https://${APEX}/api/settings/public`), false, 'precondition: the apex settings entry was purged');
+    assert.equal(cache.store.has(withCacheEpoch(`https://${APEX}/api/settings/public`)), false, 'precondition: the apex settings entry was purged');
 
     // A fresh build no longer carries the rates — so whatever still does is a cached copy.
     const fresh = await guestGet(raw, APEX, '/api/settings/public');

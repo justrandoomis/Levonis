@@ -42,6 +42,7 @@ import { assertHoldStateStatement, releaseHoldStatement } from '../walletOps';
 import { auditStatements } from '../audit';
 import { changedExactlyOne } from '../gifts/fence';
 import { placeOrder, type QuickBuyOrderHooks } from '../../routes/orders';
+import { isV2Published } from '../listing';
 import {
   parseJson,
   QUICK_BUY_FINALIZE_MAX_ATTEMPTS,
@@ -96,7 +97,12 @@ async function runOrderDoor(
   user: SessionUser,
   body: Record<string, unknown>,
   hooks: QuickBuyOrderHooks
-): Promise<{ ok: true } | { ok: false; code: string; message: string; status: number }> {
+): Promise<{ ok: true } | { ok: false; code: string; message: string; status: number; productIds?: string[] }> {
+  /** The products a PRODUCT_CURRENTLY_UNAVAILABLE refusal names (ids only, never a price). */
+  const idsOf = (details: unknown): string[] | undefined => {
+    const ids = (details as { product_ids?: unknown } | null | undefined)?.product_ids;
+    return Array.isArray(ids) ? ids.map(String) : undefined;
+  };
   try {
     let res: Response;
     if (runner.c) {
@@ -111,16 +117,16 @@ async function runOrderDoor(
       });
       app.onError((err, c) =>
         err instanceof HttpError
-          ? c.json({ success: false, error: err.message, code: err.code ?? 'ERROR' }, err.status as 400)
+          ? c.json({ success: false, error: err.message, code: err.code ?? 'ERROR', ...(err.details ? { details: err.details } : {}) }, err.status as 400)
           : c.json({ success: false, error: err instanceof Error ? err.message : String(err), code: 'ERROR' }, 500)
       );
       res = await app.request('https://quick-buy.internal/', { method: 'POST' }, env, runner.ctx);
     }
-    const json = (await res.json()) as { success?: boolean; code?: string; error?: string };
+    const json = (await res.json()) as { success?: boolean; code?: string; error?: string; details?: unknown };
     if (res.ok && json.success) return { ok: true };
-    return { ok: false, code: json.code ?? 'ERROR', message: json.error ?? '', status: res.status };
+    return { ok: false, code: json.code ?? 'ERROR', message: json.error ?? '', status: res.status, productIds: idsOf(json.details) };
   } catch (e) {
-    if (e instanceof HttpError) return { ok: false, code: e.code ?? 'ERROR', message: e.message, status: e.status };
+    if (e instanceof HttpError) return { ok: false, code: e.code ?? 'ERROR', message: e.message, status: e.status, productIds: idsOf(e.details) };
     return { ok: false, code: 'ERROR', message: e instanceof Error ? e.message : String(e), status: 500 };
   }
 }
@@ -419,10 +425,15 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
   }
   const code = result.ok ? 'QUICK_BUY_NOT_SUBMITTED' : result.code;
   // `session` was read AFTER the claim, so its count already includes this attempt.
-  // The clean start (DECISIONS row 222, spec addendum A.5): a product that is not for sale now (hidden,
-  // or not yet priced in dollars) will not be bought at the price this session held — give up at once,
-  // releasing the hold and the reservation, instead of retrying a refusal that cannot change by itself.
-  const terminal = session.finalize_attempts >= QUICK_BUY_FINALIZE_MAX_ATTEMPTS || code === 'PRODUCT_CURRENTLY_UNAVAILABLE';
+  // The clean start (DECISIONS row 222, spec addendum A.5): a product that has no V2 price yet will not be
+  // bought at the price this session held — give up at once, releasing the hold and the reservation, instead
+  // of retrying a refusal that cannot change by itself. A product that is merely withdrawn or held (it has
+  // its V2 price) keeps DECISIONS row 188's retries: the owner may put it back.
+  const unpriced =
+    !result.ok && code === 'PRODUCT_CURRENTLY_UNAVAILABLE'
+      ? (await Promise.all((result.productIds ?? []).map((id) => isV2Published(db, id)))).some((published) => !published)
+      : false;
+  const terminal = session.finalize_attempts >= QUICK_BUY_FINALIZE_MAX_ATTEMPTS || unpriced;
   // The lease is kept through a give-up, so no other finaliser starts an order
   // attempt while the release is being written. Otherwise it is shortened to
   // the retry spacing, by the database's clock: the next attempt comes about a

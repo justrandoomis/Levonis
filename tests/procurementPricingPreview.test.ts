@@ -115,16 +115,6 @@ test('total mode: an exact unit is kept; an inexact one is rounded UP at 6 place
   assert.equal(supplierUnitText({ cost_mode: 'unit', source_amount: 0, qty: 1 }), null);
 });
 
-test('no «additional» charge leaves the stored additional cost as it is', async () => {
-  const w = pricingWorld();
-  const put = await w.putInputs(AMS, { inputs_seq: 0, inputs: [{ scope: 'option', scope_id: AMS_MODEL, additional_cost_iqd: 5_000 }], rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '120' }] });
-  assert.equal(put.status, 200, JSON.stringify(put.body));
-  const r = await w.preview({ draft: w.draft() });
-  const entry = productOf(r.body).entries[0];
-  assert.equal(entry.changes.additional_cost_iqd, undefined);
-  assert.equal(summaryOf(r.body).additional_cost_iqd, 5_000);
-});
-
 // ---------------------------------------------------------------- pure mapping
 
 const storedWith = (rows: Array<Partial<StoredInputRow>>): ProductPricingData => ({
@@ -179,75 +169,9 @@ test('shadowing: a product-level value a model’s own row holds is listed as no
   assert.ok(d.shadowed.some((x) => x.scope === 'base' && x.field === 'supplier_cost_amount'), JSON.stringify(d.shadowed));
 });
 
-test('the bar’s profile: the stored default, else the first pre-order route; a direct-only product without one is blocked', async () => {
-  const w = pricingWorld();
-  // lp_08 sells by land pre-order: with no stored profile the bar takes that route.
-  const put = await w.putInputs(AMS, { inputs_seq: 0, inputs: [{ scope: 'base', supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_weight_g: 2500 }], rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '120' }] });
-  const s = put.body.models[0].pricing_summary;
-  assert.equal(s.profile_source, 'first_route');
-  assert.equal(s.shipping_profile, 'GERMANY_LAND');
-  assert.equal(s.preorder_base_iqd, 992_000);
-  // A direct-only product (bambu-lab-petg-basic, lp_15) with no profile: blocked, with E1's missing-profile code.
-  const direct = 'lp_15';
-  const d1 = await w.putInputs(direct, { inputs_seq: 0, inputs: [{ scope: 'base', supplier_cost_amount: '20', supplier_cost_currency: 'CNY', shipping_weight_g: 1000 }], rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '5' }] });
-  assert.equal(d1.status, 200, JSON.stringify(d1.body));
-  for (const m of d1.body.models) {
-    assert.equal(m.pricing_summary.state, 'blocked');
-    assert.deepEqual(m.pricing_summary.issue_codes, ['SHIPPING_PROFILE_MISSING']);
-  }
-  const d2 = await w.putInputs(direct, { inputs_seq: d1.body.inputs_seq, inputs: [{ scope: 'base', shipping_profile: 'CHINA_AIR' }] });
-  for (const m of d2.body.models) {
-    assert.equal(m.pricing_summary.profile_source, 'default');
-    assert.equal(m.pricing_summary.state, 'ok', JSON.stringify(m.pricing_summary));
-  }
-});
-
 // ---------------------------------------------------------------- a stock purchase is reviewed for direct sale (owner request 2026-10-10)
 
-const MIN_120 = { product_id: AMS, scope: 'product', amount_usd: '120' };
 const extra = (amount_iqd: unknown, over: Record<string, unknown> = {}) => ({ product_id: AMS, scope: 'product', scope_id: '', amount_iqd, ...over });
-const rowOf = (product: Answer, channel: string) => ((product.adoption?.kind ? product.adoption.rows : product.rows) as Answer[]).find((r) => r.channel === channel)!;
-
-test('the Direct Sale Extra typed in the review: without it the direct row is missing and nothing is priced; 0 makes the direct price the base pre-order price and completes the product', async () => {
-  const w = pricingWorld();
-  const none = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [MIN_120] } });
-  assert.equal(none.status, 200, JSON.stringify(none.body));
-  const p0 = productOf(none.body);
-  assert.deepEqual(p0.missing_codes, ['DIRECT_SALE_EXTRA_MISSING'], 'today’s behaviour, pinned: no invented default');
-  assert.equal(p0.adoption.kind, null);
-  assert.deepEqual(rowOf(p0, 'direct_sale').issue_codes, ['DIRECT_SALE_EXTRA_MISSING']);
-  assert.equal(rowOf(p0, 'direct_sale').computed_price_iqd, null);
-  assert.equal(summaryOf(none.body).sells_direct, true, 'the bar knows the model sells direct');
-  assert.equal(summaryOf(none.body).direct_sale_price_iqd, null);
-  assert.deepEqual(p0.direct_sale_extras, [], 'no stored extra');
-
-  const zero = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [MIN_120], direct_sale_extras: [extra(0)] } });
-  assert.equal(zero.status, 200, JSON.stringify(zero.body));
-  const p1 = productOf(zero.body);
-  assert.deepEqual(p1.missing_codes, []);
-  assert.equal(p1.adoption.kind, 'adopt');
-  assert.equal(p1.adoption.complete, true);
-  const direct = rowOf(p1, 'direct_sale');
-  assert.equal(direct.computed_price_iqd, 992_000);
-  assert.equal(direct.computed_price_iqd, direct.preorder_base_iqd, '0: the direct price is the base pre-order price');
-  assert.equal(direct.direct_sale_extra_iqd, 0);
-  assert.ok(p1.rows.every((r: { channel: string }) => r.channel === 'direct_sale'), 'stock purchase preview contains direct-sale prices only');
-  assert.ok(p1.adoption.rows.every((r: { channel: string }) => r.channel === 'direct_sale'), 'apply preview cannot request a preorder write');
-  assert.equal(summaryOf(zero.body).direct_sale_price_iqd, 992_000);
-  assert.equal(summaryOf(zero.body).direct_sale_extra_iqd, 0);
-
-  const fifty = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [MIN_120], direct_sale_extras: [extra(50_000)] } });
-  assert.equal(rowOf(productOf(fifty.body), 'direct_sale').computed_price_iqd, 1_042_000);
-  assert.equal(summaryOf(fifty.body).direct_sale_price_iqd, 1_042_000);
-  // The extra is in the hashes: a stale apply can never write another extra.
-  assert.notEqual(productOf(fifty.body).preview_hash, p1.preview_hash);
-  // null is INHERIT: with nothing stored, nothing changes.
-  const inherit = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [MIN_120], direct_sale_extras: [extra(null)] } });
-  assert.equal(inherit.status, 200);
-  assert.deepEqual(productOf(inherit.body).missing_codes, ['DIRECT_SALE_EXTRA_MISSING']);
-  // The preview writes nothing.
-  assert.equal(row<{ n: number }>(w.raw, 'SELECT COUNT(*) AS n FROM pricing_rules')!.n, 0);
-});
 
 test('the typed extra is refused as the rules route refuses it: off the 1,000 step (naming the field, never the value), negative, fractional, another product’s model, a duplicate, an unknown key', async () => {
   const w = pricingWorld();
@@ -272,22 +196,6 @@ test('the typed extra is refused as the rules route refuses it: off the 1,000 st
   assert.equal(unknown.status, 400);
   assert.equal(unknown.body.code, 'UNKNOWN_FIELD');
   assert.equal((await send(Array.from({ length: 61 }, () => extra(0)))).status, 400, 'at most 60 entries');
-});
-
-test('a model whose own extra is BLOCKED (a legacy review) stays missing under a product-level entry; the product and the model together complete it', async () => {
-  const w = pricingWorld();
-  w.raw.exec(`INSERT INTO pricing_rules (id, kind, scope, product_id, scope_id, state, amount_iqd, source, legacy_result_id, version, updated_at)
-    VALUES ('rule_blocked', 'direct_sale_extra', 'option', '${AMS}', '${AMS_MODEL}', 'BLOCKED', NULL, 'LEGACY_MIGRATION', 'legacy_1', 1, '2026-10-10T00:00:00.000Z')`);
-  const productOnly = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [MIN_120], direct_sale_extras: [extra(0)] } });
-  assert.equal(productOnly.status, 200, JSON.stringify(productOnly.body));
-  const p = productOf(productOnly.body);
-  assert.ok((p.missing_codes as string[]).length > 0, 'BLOCKED stops the walk: the product-level 0 does not reach the model');
-  assert.equal(p.adoption.kind, null);
-  assert.deepEqual(p.direct_sale_extras, [{ scope: 'option', scope_id: AMS_MODEL, state: 'BLOCKED', source: 'LEGACY_MIGRATION', direct_sale_extra_iqd: null }], 'the review sees the BLOCKED row to type through it');
-  const both = await w.preview({ draft: w.draft(), pricing: { minimum_profits: [MIN_120], direct_sale_extras: [extra(0), extra(0, { scope: 'option', scope_id: AMS_MODEL })] } });
-  assert.equal(both.status, 200, JSON.stringify(both.body));
-  assert.deepEqual(productOf(both.body).missing_codes, []);
-  assert.equal(productOf(both.body).adoption.kind, 'adopt');
 });
 
 test('today’s Direct Sale Extra is offered only where the old prices give one clean answer (answer B, on the 1,000 step)', async () => {

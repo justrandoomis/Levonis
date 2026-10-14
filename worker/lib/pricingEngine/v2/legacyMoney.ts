@@ -103,14 +103,20 @@ function docMoney(body: Row, prev: ProductDoc | null, costs: boolean, sink?: str
   if (costs) holdRow(body, stored, ['product_cost_iqd'], 3, 'doc', sink);
   if (!has(body, 'price_iqd') || body.price_iqd === null || body.price_iqd === '') body.price_iqd = prev ? prev.price_iqd : 0;
 
-  // Route commissions are retired (0189's fee trigger; `pinV2PriceFields` writes 0): an echo passes.
+  // Route commissions are retired (0189's fee trigger; `pinV2PriceFields` writes 0): an echo passes, and a
+  // route the writer leaves without one keeps its stored commission. A route with no stored twin (a new route,
+  // or any route of a new product) is born with none — 0, never null (null inherits the admin default fee).
   if (Array.isArray(body.preorder_transports)) {
     const before = new Map<string, number | null>((prev?.preorder_transports ?? []).map((t) => [String(t.method), t.commission_iqd ?? null] as const));
     for (const t of body.preorder_transports) {
-      if (!isRow(t) || !has(t, 'commission_iqd')) continue;
-      const was = before.get(String(t.method)) ?? null;
-      if (same(t.commission_iqd, was)) continue;
-      const field = `doc.preorder_transports.${String(t.method)}.commission_iqd`;
+      if (!isRow(t)) continue;
+      const method = String(t.method);
+      const was = before.has(method) ? (before.get(method) ?? null) : 0;
+      if (!has(t, 'commission_iqd') || same(t.commission_iqd, was)) {
+        if (was !== null || !has(t, 'commission_iqd')) t.commission_iqd = was;
+        continue;
+      }
+      const field = `doc.preorder_transports.${method}.commission_iqd`;
       if (!sink) throw legacyMoneyRefusal(3, field);
       t.commission_iqd = was;
       sink.push(field);

@@ -48,6 +48,7 @@ import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 import { arithmeticLeaks } from './fixtures/costlyProduct';
+import { autoPublishFromEnv } from './fixtures/autoPublish';
 
 // ------------------------------------------------------------------ fixture
 
@@ -127,6 +128,7 @@ function appAs(db: D1Database, userId: string) {
     c.env = { DB: db } as never;
     await next();
   });
+  a.use('*', autoPublishFromEnv);
   a.route('/api/orders', orderRoutes);
   a.route('/api/cart', cartRoutes);
   a.route('/api/products', productRoutes);
@@ -270,8 +272,8 @@ test('a pre-order cart quotes the configured price with no method or the wallet,
   assert.equal(cash.subtotal_iqd, 150_000);
   assert.equal(cash.pricing_basis, 'direct');
   assert.equal(cash.shipping_type, 'preorder_sea', 'priced as direct, still a pre-order');
-  // 150,000 = base + the direct premium: the rule lives in that number and in
-  // the quote's own `pricing_basis`; the line names only its journey (C5).
+  // 150,000 is the V2 direct price — a dollar-priced product carries no route fee (fees retired at
+  // birth): the rule lives in that number and in the quote's own `pricing_basis`; the line names only its journey (C5).
   assert.deepEqual(cash.lines[0].breakdown.transport, { method: 'sea' });
   assert.deepEqual(arithmeticLeaks(cash.lines[0]), []);
   assert.equal(cash.total_iqd, 155_000);
@@ -326,17 +328,20 @@ test('a pre-order with NO direct premium keeps its commission under cash on deli
   assert.equal(placed.order.subtotal_iqd, 115_000);
   assert.equal(placed.order.due_on_delivery_iqd, 120_000);
   assert.equal(placed.order.items[0].pricing.pricing_basis, 'preorder');
-  assert.equal(placed.order.financial.fees_iqd, 15_000);
+  // A V2 price carries no route commission (fees are 0 on a dollar-priced product): no fee line.
+  assert.equal(placed.order.financial.fees_iqd, 0);
   const inv = raw.prepare('SELECT snapshot FROM invoices WHERE order_id = ? AND revision = 1').get(placed.order.id) as { snapshot: string };
-  assert.equal(JSON.parse(inv.snapshot).lines[0].transport_commission_iqd, 15_000);
+  assert.equal(JSON.parse(inv.snapshot).lines[0].transport_commission_iqd, 0);
 
-  // A PRO at the approved address: the commission is waived by PRO, cash or wallet.
+  // A PRO at the approved address: a V2 price carries no commission, so there is nothing for PRO to waive —
+  // the member pays the same dollar price (member prices come from the benefit rules only).
   cartLine(raw, 'ci2', 'pro', 'p_po', 'sea');
   const proCash = (await json(await post(appAs(db, 'pro'), '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote;
-  assert.equal(proCash.lines[0].unit_price_iqd, 100_000);
+  assert.equal(proCash.lines[0].unit_price_iqd, 115_000);
   assert.equal(proCash.pricing_basis, 'preorder');
-  // 100,000: the PRO waiver is inside the number; the line names the route only (C5).
+  // 115,000: a V2 price carries no route commission for PRO to waive; the line names the route only (C5).
   assert.deepEqual(proCash.lines[0].breakdown.transport, { method: 'sea' });
+  assert.deepEqual(arithmeticLeaks(proCash.lines[0]), []);
   await Promise.allSettled(pending);
 });
 
@@ -377,7 +382,7 @@ test('cash + a wallet that covers the whole total is a PREPAID pre-order: pre-or
   assert.equal(placed.order.items[0].pricing.pricing_basis, 'preorder');
   assert.equal(placed.order.items[0].unit_price_iqd, 115_000);
   assert.equal(placed.order.financial.payment_state, 'paid');
-  assert.equal(placed.order.financial.fees_iqd, 15_000, 'the commission is the fee — never the premium the wallet did not pay');
+  assert.equal(placed.order.financial.fees_iqd, 0, 'no commission and no premium on a V2 price');
 
   // A wallet that covers only PART of the total: money is collected at the
   // door, so the cash rule stands — direct pricing, the premium, the rest due.
@@ -395,52 +400,6 @@ test('cash + a wallet that covers the whole total is a PREPAID pre-order: pre-or
 
 // ------------- M3: one PRO purchase context on the product, the cart, the door
 
-test('an active PRO whose default address is NOT approved pays the surcharge on the product quote, the cart and the checkout alike', async () => {
-  const { db, raw } = setup();
-  cartLine(raw, 'ci1', 'pro2', 'p_a1', '');
-  const a = appAs(db, 'pro2');
-
-  // The product page: detail, quote and the per-mode figures.
-  const detail = await json(await a.request('/api/products/a1'));
-  assert.equal(detail.pricing.unit_subtotal_iqd, 150_000, 'the premium is charged: base 100,000 + 50,000');
-  assert.deepEqual(arithmeticLeaks(detail.pricing), [], 'and only the final number is published (C5)');
-  assert.deepEqual(detail.viewer_tier, { tier: 'pro', active: true, pricing_active: false, pro_benefits_context: false });
-  assert.equal(detail.pricing_modes.direct.unit_subtotal_iqd, 150_000);
-  const pq = await json(await post(a, '/api/products/a1/quote', { qty: 1 }));
-  assert.equal(pq.quote.unit_subtotal_iqd, 150_000);
-  assert.deepEqual(
-    pq.pricing_modes.preorder.map((m: QuoteMode) => [m.method, m.prepaid!.unit_subtotal_iqd, m.cod!.unit_subtotal_iqd, m.cod_reprices]),
-    [['sea', 115_000, 150_000, true]]
-  );
-  assert.equal(pq.pricing_modes.cod_reprices, true);
-  // The cart.
-  const cart = await json(await a.request('/api/cart'));
-  assert.equal(cart.items[0].unit_price_iqd, 150_000);
-  assert.deepEqual(arithmeticLeaks(cart.items[0]), []);
-  assert.equal(cart.tierActive, false, 'PRO, but not for pricing');
-  // The checkout, at that very address.
-  const quote = (await json(await post(a, '/api/orders/quote', quoteBody('addr_p2', 'cash')))).quote;
-  assert.equal(quote.lines[0].unit_price_iqd, 150_000);
-  assert.equal(quote.tier.pro_benefits_context, false);
-  assert.equal(quote.tier.active, true);
-
-  // The PRO at the approved default address: all three surfaces waive it.
-  cartLine(raw, 'ci2', 'pro', 'p_a1', '');
-  const p = appAs(db, 'pro');
-  const pDetail = await json(await p.request('/api/products/a1'));
-  assert.equal(pDetail.pricing.unit_subtotal_iqd, 100_000);
-  assert.deepEqual(pDetail.viewer_tier, { tier: 'pro', active: true, pricing_active: true, pro_benefits_context: true });
-  assert.deepEqual(pDetail.pricing_modes.direct, { unit_subtotal_iqd: 100_000 }, 'the waiver is inside the final number (C5)');
-  const pModes = (await json(await post(p, '/api/products/a1/quote', { qty: 1 }))).pricing_modes;
-  assert.deepEqual(
-    pModes.preorder.map((m: QuoteMode) => [m.prepaid!.unit_subtotal_iqd, m.cod!.unit_subtotal_iqd, m.cod_reprices]),
-    [[100_000, 100_000, false]],
-    'exempt from both fees, cash changes nothing for a PRO — so no hint'
-  );
-  assert.equal((await json(await p.request('/api/cart'))).items[0].unit_price_iqd, 100_000);
-  assert.equal((await json(await post(p, '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote.lines[0].unit_price_iqd, 100_000);
-});
-
 test('POST /api/orders — a pre-order paid cash on delivery: direct pricing, still preorder_sea with fourteen stages, no gift', async () => {
   const { db, raw } = setup();
   cartLine(raw, 'ci1', 'buyer', 'p_a1', 'sea');
@@ -456,15 +415,16 @@ test('POST /api/orders — a pre-order paid cash on delivery: direct pricing, st
   assert.equal(order.total_iqd, 155_000);
   assert.equal(order.due_on_delivery_iqd, 155_000);
   assert.equal(order.membership_gift, null, 'a COD pre-order earns no prepaid gift');
-  assert.equal(order.financial.merchandise_iqd, 100_000);
-  assert.equal(order.financial.fees_iqd, 50_000, 'the direct premium is the fee, not the commission');
+  // The V2 direct price is the merchandise: no premium is split out as a fee.
+  assert.equal(order.financial.merchandise_iqd, 150_000);
+  assert.equal(order.financial.fees_iqd, 0, 'no direct premium on a V2 price');
 
   const item = order.items[0];
   assert.equal(item.unit_price_iqd, 150_000);
   assert.equal(item.is_printer, false);
   assert.equal(item.pricing.pricing_basis, 'direct');
-  assert.deepEqual(item.pricing.direct, { surcharge_iqd: 50_000, waived: false });
-  assert.deepEqual(item.transport, { method: 'sea', commission_iqd: 15_000, waived: true, waived_by: 'cod_direct_pricing' });
+  assert.deepEqual(item.pricing.direct, null);
+  assert.equal(item.transport?.commission_iqd ?? 0, 0, 'no route fee on a V2 product');
   assert.equal(item.selection.transport_method, 'sea', '"buy again" repeats the pre-order line');
   assert.ok(!JSON.stringify(body).toLowerCase().includes('cost'), 'no cost field reaches the buyer');
 
@@ -482,7 +442,7 @@ test('POST /api/orders — a pre-order paid cash on delivery: direct pricing, st
   assert.ok(inv, 'an invoice was issued');
   const line = JSON.parse(inv!.snapshot).lines[0];
   assert.equal(line.transport_commission_iqd, 0);
-  assert.equal(line.direct_surcharge_iqd, 50_000);
+  assert.equal(line.direct_surcharge_iqd, 0, 'no direct premium on a V2 price');
   assert.equal(line.unit_price_iqd, 150_000);
   await Promise.allSettled(pending);
 });
@@ -502,59 +462,14 @@ test('POST /api/orders — a pre-order paid from the wallet keeps the commission
   assert.equal(order.due_on_delivery_iqd, 0);
   assert.equal(order.items[0].pricing.pricing_basis, 'preorder');
   assert.equal(order.items[0].pricing.direct, null);
-  assert.deepEqual(order.items[0].transport, { method: 'sea', commission_iqd: 15_000, waived: false });
-  assert.equal(order.financial.fees_iqd, 15_000, 'the commission is the fee');
+  assert.deepEqual(order.items[0].transport, { method: 'sea', commission_iqd: 0, waived: false });
+  assert.equal(order.financial.fees_iqd, 0, 'no route commission on a V2 price');
   // No PRO context → no gift, whatever the payment method.
   assert.equal(order.membership_gift, null);
   await Promise.allSettled(pending);
 });
 
 // -------------------------------------------------------------- PRO context
-
-test('PRO at the approved address: prepaid pre-order waives the commission and earns the gift; cash waives the premium and earns none', async () => {
-  const { db, raw } = setup();
-  raw.exec(
-    `INSERT INTO admin_settings (key, value) VALUES ('preorderGiftConfig', '{"enabled":true,"product_id":"p_pla","label_ar":"بكرة PLA","qty":1}')`
-  );
-  cartLine(raw, 'ci1', 'pro', 'p_a1', 'sea');
-  const a = appAs(db, 'pro');
-
-  // Prepaid: 100,000 + 0 (commission waived by PRO); delivery waived (merchandise > 75,000 at the approved address).
-  const prepaid = (await json(await post(a, '/api/orders/quote', quoteBody('addr_p', 'wallet', { useWallet: true })))).quote;
-  assert.equal(prepaid.tier.pro_benefits_context, true);
-  assert.equal(prepaid.lines[0].unit_price_iqd, 100_000);
-  assert.equal(prepaid.pricing_basis, 'preorder');
-  assert.deepEqual(prepaid.lines[0].breakdown.transport, { method: 'sea' });
-  assert.deepEqual(arithmeticLeaks(prepaid.lines[0]), []);
-  assert.equal(prepaid.shipping.total_iqd, 0);
-
-  // Cash: priced as direct → the premium APPLIES but PRO is exempt → base only.
-  const cash = (await json(await post(a, '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote;
-  assert.equal(cash.lines[0].unit_price_iqd, 100_000);
-  assert.equal(cash.pricing_basis, 'direct');
-  assert.deepEqual(cash.lines[0].breakdown.transport, { method: 'sea' });
-  assert.deepEqual(arithmeticLeaks(cash.lines[0]), []);
-
-  // Place the prepaid one: the gift is frozen on the order.
-  const placed = await json(await post(a, '/api/orders', orderBody('addr_p', 'wallet', { useWallet: true })));
-  assert.equal(placed.success, true, JSON.stringify(placed));
-  assert.equal(placed.order.shipping_type, 'preorder_sea');
-  assert.equal(placed.order.due_on_delivery_iqd, 0);
-  assert.equal(placed.order.membership_gift?.reason, 'pro_prepaid_preorder');
-  assert.equal(placed.order.membership_gift?.value_iqd, 0);
-
-  // A second pre-order, cash this time: same journey, no gift (money is due at the door).
-  cartLine(raw, 'ci2', 'pro', 'p_a1', 'sea');
-  const cod = await json(await post(a, '/api/orders', orderBody('addr_p', 'cash')));
-  assert.equal(cod.success, true, JSON.stringify(cod));
-  assert.equal(cod.order.shipping_type, 'preorder_sea');
-  assert.equal(cod.order.subtotal_iqd, 100_000);
-  assert.equal(cod.order.due_on_delivery_iqd, 100_000);
-  assert.equal(cod.order.membership_gift, null);
-  assert.equal(cod.order.items[0].pricing.pricing_basis, 'direct');
-  assert.equal(cod.order.items[0].pricing.direct.waived, true);
-  await Promise.allSettled(pending);
-});
 
 // ------------------------------------------------------------ refused ids
 
@@ -585,7 +500,7 @@ test('half_advance is refused with 400 PAYMENT_METHOD_NOT_ALLOWED and the offere
 
 // ------------------------------------------------------------- direct cart
 
-test('a direct cart: cash and wallet are both allowed, the premium is charged (not for PRO), five stages', async () => {
+test('a direct cart: cash and wallet are both allowed, the V2 price is charged (to PRO alike), five stages', async () => {
   const { db, raw } = setup();
   cartLine(raw, 'ci1', 'buyer', 'p_a1', '');
   cartLine(raw, 'ci2', 'pro', 'p_a1', '');
@@ -611,9 +526,9 @@ test('a direct cart: cash and wallet are both allowed, the premium is charged (n
   const tracking = await json(await buyer.request(`/api/orders/${placed.order.id}/tracking?lang=en`));
   assert.equal(tracking.steps.length, 5);
 
-  // PRO: exempt from the premium on a direct line too.
+  // PRO: a V2 product has no direct premium to exempt from (member prices are benefit rules, the clean start).
   const pro = (await json(await post(appAs(db, 'pro'), '/api/orders/quote', quoteBody('addr_p', 'cash')))).quote;
-  assert.equal(pro.lines[0].unit_price_iqd, 100_000);
+  assert.equal(pro.lines[0].unit_price_iqd, 150_000);
   assert.deepEqual(arithmeticLeaks(pro.lines[0]), []);
   await Promise.allSettled(pending);
 });
@@ -635,7 +550,7 @@ test('an eligible PRO checkout finances with BNPL and freezes the 12-hour fulfil
   ))).quote;
   assert.deepEqual(quote.allowed_payment_methods, ['wallet', 'cash', 'bnpl', 'gini']);
   assert.equal(quote.bnpl.eligible, true);
-  assert.equal(quote.bnpl.financed_iqd, 100_000);
+  assert.equal(quote.bnpl.financed_iqd, 150_000);
   assert.equal(quote.due_on_delivery_iqd, 0);
   assert.equal(quote.shipping.total_iqd, 0, 'eligible PRO delivery is waived at the approved address');
   assert.equal(quote.priority_delivery.eligible, true);
@@ -651,19 +566,19 @@ test('an eligible PRO checkout finances with BNPL and freezes the 12-hour fulfil
   assert.equal(placed.order.fulfillment_service, 'pro_priority_12h');
   assert.equal(placed.order.priority, 1);
   assert.ok(placed.order.priority_due_at);
-  assert.equal(placed.order.bnpl_due_iqd, 100_000);
+  assert.equal(placed.order.bnpl_due_iqd, 150_000);
   assert.ok(placed.order.bnpl_due_at);
   assert.equal(placed.order.due_on_delivery_iqd, 0);
   assert.equal(placed.order.financial.payment_state, 'bnpl_due');
   assert.equal(
     (raw.prepare("SELECT amount_iqd FROM bnpl_ledger WHERE order_id=? AND kind='charge'").get(placed.order.id) as { amount_iqd: number }).amount_iqd,
-    100_000
+    150_000
   );
   const stored = raw.prepare('SELECT fulfillment_service, priority_due_at, bnpl_due_iqd FROM orders WHERE id=?')
     .get(placed.order.id) as { fulfillment_service: string; priority_due_at: string; bnpl_due_iqd: number };
   assert.equal(stored.fulfillment_service, 'pro_priority_12h');
   assert.ok(stored.priority_due_at);
-  assert.equal(stored.bnpl_due_iqd, 100_000);
+  assert.equal(stored.bnpl_due_iqd, 150_000);
   await Promise.allSettled(pending);
 });
 

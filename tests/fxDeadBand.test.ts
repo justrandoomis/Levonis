@@ -25,6 +25,7 @@ import { adminPricingRoutes } from '../worker/routes/adminPricing';
 import { runFxScheduler } from '../worker/lib/fx/scheduler';
 import { FX_STRINGS } from '../src/components/adminPricing/fxStrings';
 import { settingsDiffLine } from '../src/components/adminPricing/FxHistorySheet';
+import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 
 const BASE = '/api/admin/pricing';
 const H = 3_600_000;
@@ -108,7 +109,7 @@ test('the edge of the band: exactly 0.5% is a move (APPLIED); 0.4999% is UNCHANG
     assert.equal(report.checked[0]!.result, expected, String(sell));
     assert.equal(pairOf(raw, 'USD_IQD').effective_rate, expected === 'APPLIED' ? String(sell) : '2000');
     // The spy is not vacuous: a real move purges the public settings' cached copies.
-    assert.equal(spy.deleted.some((u) => u.endsWith('/api/settings/public')), expected === 'APPLIED', `${sell}: purge`);
+    assert.equal(spy.deleted.some((u) => u.endsWith(withCacheEpoch('/api/settings/public'))), expected === 'APPLIED', `${sell}: purge`);
   }
 });
 

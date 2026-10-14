@@ -35,7 +35,6 @@
  *    `UNIQUE (subject_type, subject_id, order_id)` and abort a cart that could
  *    never succeed, with a message the catch block does not map.
  */
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, failingD1, stubApp, post, json, all, count, row, spendable, type StubUser } from './fixtures/app';
@@ -43,6 +42,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { orderRoutes } from '../worker/routes/orders';
 import { eligibleMerchandiseIqd } from '../worker/lib/pointsOps';
 import { addBundle, seedCatalogue, orderBody, DEFAULT_COMPONENTS, PAST } from './lib/bundles';
+import { q7Test } from './fixtures/q7';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown, user: StubUser = buyer) =>
@@ -64,7 +64,7 @@ async function addBundleToCart(db: unknown, body: Record<string, unknown>, user:
 
 // ------------------------------------------------------ the money invariants
 
-test('the parent carries the money, the components carry zero, and every sum ties out', async () => {
+q7Test('the parent carries the money, the components carry zero, and every sum ties out', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -107,7 +107,7 @@ test('the parent carries the money, the components carry zero, and every sum tie
   );
 });
 
-test('points accrue on the parent only, and on the number ACTUALLY charged — in a derived price mode too', async () => {
+q7Test('points accrue on the parent only, and on the number ACTUALLY charged — in a derived price mode too', async () => {
   for (const mode of ['fixed', 'derived'] as const) {
     const raw = seedCatalogue();
     addBundle(raw, {
@@ -156,7 +156,7 @@ test('points accrue on the parent only, and on the number ACTUALLY charged — i
   }
 });
 
-test('case 6 — a body carrying prices, savings and a tier changes nothing about what is stored', async () => {
+q7Test('case 6 — a body carrying prices, savings and a tier changes nothing about what is stored', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   const db = asD1(raw);
@@ -187,7 +187,7 @@ test('case 6 — a body carrying prices, savings and a tier changes nothing abou
 
 // ------------------------------------------------------ availability, case 1
 
-test('case 1 at the door — the scarcest component decides: qty 3 is sold, qty 4 is refused', async () => {
+q7Test('case 1 at the door — the scarcest component decides: qty 3 is sold, qty 4 is refused', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', config: { max_qty_per_order: 9 } });
   const db = asD1(raw);
@@ -209,7 +209,7 @@ test('case 1 at the door — the scarcest component decides: qty 3 is sold, qty 
   });
 });
 
-test('case 1 aggregated — a bundle and a bare product of the same row are summed, and refused at PLAN time', async () => {
+q7Test('case 1 aggregated — a bundle and a bare product of the same row are summed, and refused at PLAN time', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -230,7 +230,7 @@ test('case 1 aggregated — a bundle and a bare product of the same row are summ
 
 // ------------------------------------------------------- atomicity, case 2
 
-test('case 2 — a component taken between the plan and the commit rolls the WHOLE order back', async () => {
+q7Test('case 2 — a component taken between the plan and the commit rolls the WHOLE order back', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const { failing, db } = failingD1(raw);
@@ -259,7 +259,7 @@ test('case 2 — a component taken between the plan and the commit rolls the WHO
   assert.deepEqual(row(raw, 'SELECT stock_reserved FROM products WHERE id = ?', 'p_printer'), { stock_reserved: 0 });
 });
 
-test('every component reserves in the order’s own batch, and the fence counts them', async () => {
+q7Test('every component reserves in the order’s own batch, and the fence counts them', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -295,7 +295,7 @@ test('every component reserves in the order’s own batch, and the fence counts 
 
 // ------------------------------------------------------ idempotency, case 17
 
-test('case 17 — a double tap, a retry and a replay all produce exactly one order and one set of ledger rows', async () => {
+q7Test('case 17 — a double tap, a retry and a replay all produce exactly one order and one set of ledger rows', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', limits: { max_per_user: 5 } });
   const db = asD1(raw);
@@ -319,7 +319,7 @@ test('case 17 — a double tap, a retry and a replay all produce exactly one ord
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM order_items'), 4);
 });
 
-test('two lines of ONE bundle write exactly one offer_redemptions row with the summed quantity', async () => {
+q7Test('two lines of ONE bundle write exactly one offer_redemptions row with the summed quantity', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -338,7 +338,7 @@ test('two lines of ONE bundle write exactly one offer_redemptions row with the s
   assert.equal(Number(redemptions[0].qty), 3, 'the quantity is summed across both lines');
 });
 
-test('the per-user limit is the database’s decision, and its refusal is mapped', async () => {
+q7Test('the per-user limit is the database’s decision, and its refusal is mapped', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', limits: { max_per_user: 1 } });
   const db = asD1(raw);
@@ -353,7 +353,7 @@ test('the per-user limit is the database’s decision, and its refusal is mapped
 
 // -------------------------------------------------------- the quote, case 20
 
-test('case 20 — a four-component bundle is ONE quote line with its parts nested, and the printer note still fires', async () => {
+q7Test('case 20 — a four-component bundle is ONE quote line with its parts nested, and the printer note still fires', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -381,7 +381,7 @@ test('case 20 — a four-component bundle is ONE quote line with its parts neste
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_ledger'), 0);
 });
 
-test('the customer’s order payload shows ONE item with its parts nested underneath', async () => {
+q7Test('the customer’s order payload shows ONE item with its parts nested underneath', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter' });
   const db = asD1(raw);
@@ -415,7 +415,7 @@ const MUTATIONS: Array<{ name: string; sql: string; code: string }> = [
 ];
 
 for (const m of MUTATIONS) {
-  test(`case 11 — ${m.name} AFTER the cart row is written ⇒ refused at the door, writing nothing`, async () => {
+  q7Test(`case 11 — ${m.name} AFTER the cart row is written ⇒ refused at the door, writing nothing`, async () => {
     const raw = seedCatalogue();
     addBundle(raw, { id: 'prd_b1', slug: 'starter', window: { active: 1 } });
     const db = asD1(raw);
@@ -430,7 +430,7 @@ for (const m of MUTATIONS) {
   });
 }
 
-test('case 11 — a chosen colour deactivated after the cart row is written is refused by name', async () => {
+q7Test('case 11 — a chosen colour deactivated after the cart row is written is refused by name', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -446,7 +446,7 @@ test('case 11 — a chosen colour deactivated after the cart row is written is r
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM orders'), 0);
 });
 
-test('case 11 — an opted-in optional component that cannot be satisfied is REFUSED by name, never dropped', async () => {
+q7Test('case 11 — an opted-in optional component that cannot be satisfied is REFUSED by name, never dropped', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -468,7 +468,7 @@ test('case 11 — an opted-in optional component that cannot be satisfied is REF
 
 // ------------------------------------------------------- case 4, pre-order
 
-test('case 4 — a pre-order bundle sells with no physical stock, on the 14-stage path, and reserves nothing', async () => {
+q7Test('case 4 — a pre-order bundle sells with no physical stock, on the 14-stage path, and reserves nothing', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_pre',
@@ -511,7 +511,7 @@ test('case 4 — a pre-order bundle sells with no physical stock, on the 14-stag
 
 // ------------------------------------------------------------ case 8, money
 
-test('case 8 — a coupon applies once, to merchandise that already contains the bundle price', async () => {
+q7Test('case 8 — a coupon applies once, to merchandise that already contains the bundle price', async () => {
   const raw = seedCatalogue();
   addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
   raw.exec(
@@ -533,7 +533,7 @@ test('case 8 — a coupon applies once, to merchandise that already contains the
   );
 });
 
-test('case 8 — a derived price that falls below its floor stops the sale rather than selling at nothing', async () => {
+q7Test('case 8 — a derived price that falls below its floor stops the sale rather than selling at nothing', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -549,7 +549,7 @@ test('case 8 — a derived price that falls below its floor stops the sale rathe
 
 // ------------------------------------------------------------ case 9, tiers
 
-test('case 9 — a PLUS member is charged the offer’s PLUS rung, and the ladder never inverts', async () => {
+q7Test('case 9 — a PLUS member is charged the offer’s PLUS rung, and the ladder never inverts', async () => {
   const raw = seedCatalogue();
   addBundle(raw, {
     id: 'prd_b1',
@@ -578,7 +578,7 @@ test('case 9 — a PLUS member is charged the offer’s PLUS rung, and the ladde
   assert.equal(snapshot.applied_tier, 'regular', 'the shared ResolvedPrice tier union is not widened');
 });
 
-test('a printer bought INSIDE a bundle still gets its device unit and its warranty clock', async () => {
+q7Test('a printer bought INSIDE a bundle still gets its device unit and its warranty clock', async () => {
   // The proof of §6.2's claim that device units, warranty coverage, return
   // cases and price-protection claims all key on `order_items.id` — and that
   // the COMPONENT row is the one naming the real product, so none of them
@@ -605,7 +605,7 @@ test('a printer bought INSIDE a bundle still gets its device unit and its warran
   assert.equal(String(unit.product_id), 'p_printer');
 });
 
-test('case 4 — a pre-order bundle paid CASH ON DELIVERY is priced by the direct-sale rules, and the quote says so', async () => {
+q7Test('case 4 — a pre-order bundle paid CASH ON DELIVERY is priced by the direct-sale rules, and the quote says so', async () => {
   // The owner's rule: «إذا اختار الزبون الدفع عند الاستلام فيجب أن يتبع السعر
   // نفس قواعد البيع المباشر». For a bundle the money that changes is its
   // COMPONENTS' transport commissions — they ride on the parent (§2.2) — so a

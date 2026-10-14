@@ -21,6 +21,7 @@ import { loadRelationsView, snapshotFrom } from '../worker/lib/productOverlay';
 import { resolveForOrderType } from '../worker/lib/inventory';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
+import { withoutLegacyMoney } from '../src/components/adminProducts/form/v2/v2Model';
 import {
   combinationKey,
   directStockCombinations,
@@ -198,10 +199,10 @@ test('the form save of a linked + global colour product is accepted by the plann
     a.route('/api/admin/products', adminProductRelationsRoutes);
   });
   const made = (await (
-    await post(app, '/api/admin/products-v2', { name_en: 'Mixed', name_ar: 'مختلط', price_iqd: 100000, status: 'draft' })
+    await post(app, '/api/admin/products-v2', { name_en: 'Mixed', name_ar: 'مختلط', status: 'draft' }) // the clean start: born without a dinar price
   ).json()) as { product: { id: string } };
   const id = made.product.id;
-  const wire = relationsToWire(mixedForm());
+  const wire = withoutLegacyMoney(relationsToWire(mixedForm())) as ReturnType<typeof relationsToWire>; // the editor sends no dinar money (A.6)
   assert.equal(wire.inventory_mode, 'VARIANT_COMBINATION');
   const res = await app.request(`/api/admin/products/${id}/relations`, {
     method: 'PUT',

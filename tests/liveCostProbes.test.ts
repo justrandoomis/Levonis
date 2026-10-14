@@ -25,7 +25,8 @@ import { FX_DISPLAY_RATE, FX_SENTINELS, seedFxSentinels } from './fixtures/fxSen
 import worker from '../worker/index';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
-const { fillPath, judge, loadProbeFiles, pick, walkKeys } = probesScript;
+import { fetchPublished } from './fixtures/autoPublish';
+const { cliVars, fillPath, judge, loadProbeFiles, pick, planProbe, walkKeys } = probesScript;
 
 interface Probe {
   path: string;
@@ -34,8 +35,12 @@ interface Probe {
   forbidPattern?: string;
   requireIntegerKeys?: string[];
   valuePatterns?: Record<string, string>;
+  forbidValues?: Record<string, string>;
 }
-const files = loadProbeFiles(join(ROOT, 'scripts/live-cost-probes.d')) as Array<{ file: string; spec: { probes: Probe[]; vars?: Record<string, { from: string; pick: string }> } }>;
+const files = loadProbeFiles(join(ROOT, 'scripts/live-cost-probes.d')) as Array<{
+  file: string;
+  spec: { probes: Probe[]; vars?: Record<string, { from?: string; pick?: string; optional?: boolean }> };
+}>;
 const s1 = files.find((f) => f.file === 's1.json')!;
 const probe = (path: string) => s1.spec.probes.find((p) => p.path === path);
 
@@ -133,14 +138,20 @@ async function probeLocally(proResumed: boolean) {
   raw.exec('PRAGMA foreign_keys = OFF;');
   seedCostlyProduct(raw);
   seedLiveCatalog(raw);
-  if (proResumed) raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
+  if (proResumed) {
+    raw.exec(`UPDATE admin_settings SET value = '{"paused":false,"since":null}' WHERE key = 'proPause'`);
+    // Since the clean start a member price is a benefit rule, never a typed rung (DECISIONS row 222): one
+    // catalogue-wide PRO rule, so the resumed pages carry its id.
+    raw.exec(`INSERT INTO membership_benefit_rules (id, tier, benefit_type, scope, product_id, discount_mode, percent, fixed_iqd, enabled, priority, label)
+      VALUES ('mbr_rule_pro_probe', 'pro', 'product_discount', 'global', NULL, 'percent', 5, NULL, 1, 0, 'PRO probe')`);
+  }
   const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
   const get = async (path: string) => {
-    const res = await worker.fetch(new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    const res = await fetchPublished(worker, new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
     return { status: res.status, text: await res.text() };
   };
   const vars: Record<string, string> = {};
-  for (const [name, def] of Object.entries(s1.spec.vars ?? {})) vars[name] = pick(JSON.parse((await get(def.from)).text), def.pick);
+  for (const [name, def] of Object.entries(s1.spec.vars ?? {})) vars[name] = pick(JSON.parse((await get(def.from!)).text), def.pick!);
   const failures: string[] = [];
   for (const p of s1.spec.probes) {
     const path = fillPath(p.path, vars);
@@ -181,7 +192,7 @@ test('pricing.json (MVP P1): the owner’s pricing workspace refuses a stranger 
   seedCostlyProduct(raw);
   const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
   for (const p of pricing!.spec.probes) {
-    const res = await worker.fetch(new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    const res = await fetchPublished(worker, new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
     assert.deepEqual(judge(p, res.status, await res.text()), [], p.path);
   }
 });
@@ -226,7 +237,9 @@ test('fx.json (FX-1): the public settings and the home carry only the effective 
     if (withRate) seedFxSentinels(raw);
     const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
     for (const p of fx!.spec.probes) {
-      const res = await worker.fetch(new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+      // Without a rate nothing is published (a fixture publish would approve its own rate): no product shows.
+      const request = new Request(`https://${APEX}${p.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } });
+      const res = withRate ? await fetchPublished(worker, request, env as never, ctx) : await worker.fetch(request, env as never, ctx);
       const text = await res.text();
       assert.deepEqual(judge(p, res.status, text), [], `${p.path} (${withRate ? 'a rate' : 'no rate'})`);
       if (p.path === '/api/settings/public' || p.path === '/api/home') {
@@ -302,11 +315,11 @@ test('leaks.json against the local Worker with every private print figure set an
   `);
   const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
   const get = async (path: string) => {
-    const res = await worker.fetch(new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    const res = await fetchPublished(worker, new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
     return { status: res.status, text: await res.text() };
   };
   const vars: Record<string, string> = {};
-  for (const [name, def] of Object.entries(leaksFile.spec.vars ?? {})) vars[name] = pick(JSON.parse((await get(def.from)).text), def.pick);
+  for (const [name, def] of Object.entries(leaksFile.spec.vars ?? {})) vars[name] = pick(JSON.parse((await get(def.from!)).text), def.pick!);
   assert.ok(vars.slug, 'the probed slug resolves');
   // A picture fetched by URL from a supplier, on the very product the probes read.
   const key = `products/x/gallery/${'d4'.repeat(32)}.webp`;
@@ -353,5 +366,75 @@ test('workflow 7: an empty INITIAL_ADMIN_EMAIL is still refused, no step reads t
   const verify = yml.indexOf('- name: Verify the live site, read-only');
   const probes = yml.indexOf('- name: Cost-privacy probes, read-only');
   assert.ok(verify > 0 && probes > verify, 'the probes run after the live verification');
-  assert.match(yml.slice(probes, probes + 300), /run: node scripts\/live-cost-probes\.mjs --base https:\/\/levonis-iq\.com/);
+  assert.match(yml.slice(probes, probes + 600), /node scripts\/live-cost-probes\.mjs --base https:\/\/levonis-iq\.com/);
+});
+
+// ------------------------------------------------------------- the clean start (DECISIONS row 222, addendum A.4.6)
+
+test('optional vars: a probe whose optional var has no value is SKIPPED, a required one still refuses; --var fills a var; forbidValues names the key, never the value', () => {
+  const page = { path: '/api/products/{slug}', status: [200] };
+  assert.deepEqual(Object.keys(planProbe(page, {}, { slug: { optional: true } })), ['skip']);
+  assert.match(planProbe(page, {}, { slug: { optional: true } }).skip, /no listed product yet/);
+  assert.match(planProbe(page, {}, { slug: { from: '/api/products?limit=1' } }).error, /has no value/);
+  assert.deepEqual(planProbe(page, { slug: 'a1' }, { slug: { optional: true } }), { path: '/api/products/a1' });
+  assert.deepEqual(cliVars(['--base', 'https://x', '--var', 'hidden_slug=bambu-a1', '--var', 'broken']), { hidden_slug: 'bambu-a1' });
+  const search: Probe = { path: '/api/products?search={hidden_slug}', status: [200], forbidValues: { slug: '{hidden_slug}' } };
+  assert.deepEqual(judge(search, 200, JSON.stringify({ products: [{ slug: 'other' }] }), { hidden_slug: 'secret-slug' }), []);
+  const hit = judge(search, 200, JSON.stringify({ products: [{ slug: 'secret-slug' }] }), { hidden_slug: 'secret-slug' }).join('\n');
+  assert.match(hit, /forbidden value of key slug \(at products\[0\]\.slug\)/);
+  assert.doesNotMatch(hit, /secret-slug/, 'a failure line never carries the value');
+  // The runner wires it: the CLI vars, the skip and the summary.
+  const src = sourceOf('scripts/live-cost-probes.mjs');
+  assert.match(src, /const plan = planProbe\(probe, vars, spec\.vars \?\? \{\}\);/);
+  assert.match(src, /::notice::/);
+  assert.match(src, /if \(ran === 0\)/, 'an empty probe set still fails the run');
+});
+
+test('the clean start: s1.json and leaks.json read their slug as OPTIONAL, and cleanstart.json probes the hidden product workflow 7 passes in', () => {
+  for (const name of ['s1.json', 'leaks.json']) {
+    const f = files.find((x) => x.file === name)!;
+    assert.equal(f.spec.vars?.slug?.optional, true, `${name}: an empty catalogue right after the cut-over is not a leak`);
+    // Probes with no var always run, so the file never proves nothing.
+    assert.ok(f.spec.probes.some((p) => !/\{/.test(p.path)), `${name}: some probes need no listed product`);
+  }
+  const clean = files.find((x) => x.file === 'cleanstart.json');
+  assert.ok(clean, 'scripts/live-cost-probes.d/cleanstart.json exists');
+  assert.equal(clean!.spec.vars?.hidden_slug?.optional, true);
+  assert.equal(clean!.spec.vars?.hidden_slug?.from, undefined, 'the slug comes from the workflow (--var), never from a public read');
+  const byPath = new Map(clean!.spec.probes.map((p) => [p.path, p]));
+  assert.deepEqual(byPath.get('/api/products/{hidden_slug}')?.status, [404]);
+  assert.deepEqual(byPath.get('/api/public/v1/products/{hidden_slug}')?.status, [404]);
+  assert.deepEqual(byPath.get('/api/products?search={hidden_slug}')?.forbidValues, { slug: '{hidden_slug}' });
+  // Workflow 7 reads one hidden product, read-only, after the migrations, and hands it to the runner.
+  const wf = sourceOf('.github/workflows/deploy-staging-code.yml');
+  assert.match(wf, /> \/tmp\/hidden_slug\.json/);
+  assert.match(wf, /pv2\.mode = 'engine' AND pv2\.pricing_method IS NOT NULL AND EXISTS \(SELECT 1 FROM pricing_v2_sku_results/);
+  assert.match(wf, /--var "hidden_slug=\$hidden"/);
+  assert.ok(wf.indexOf('/tmp/hidden_slug.json') < wf.indexOf('Deploy, carrying every existing var forward'), 'read after the migrations, before the deploy');
+});
+
+test('cleanstart.json against the local Worker: a product still waiting for its V2 price is neither shown, found nor searched', async () => {
+  const raw = freshDb();
+  raw.exec('PRAGMA foreign_keys = OFF;');
+  seedLiveCatalog(raw);
+  const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
+  // No publish: every seeded product is as the cut-over left it.
+  const hidden = LIVE_PRODUCTS[0]!.slug;
+  const clean = files.find((x) => x.file === 'cleanstart.json')!;
+  const failures: string[] = [];
+  for (const p of clean.spec.probes) {
+    const plan = planProbe(p, { hidden_slug: hidden }, clean.spec.vars ?? {});
+    assert.ok(plan.path, p.path);
+    const res = await worker.fetch(new Request(`https://${APEX}${plan.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    failures.push(...(judge(p, res.status, await res.text(), { hidden_slug: hidden }) as string[]).map((f) => `${plan.path}: ${f}`));
+  }
+  assert.deepEqual(failures, []);
+  // And with an empty catalogue every slug probe of s1.json skips — none fails.
+  const vars: Record<string, string> = {};
+  const listed = JSON.parse(await (await worker.fetch(new Request(`https://${APEX}/api/products?limit=1`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx)).text());
+  assert.equal(pick(listed, 'products.0.slug'), undefined, 'nothing is listed before the first V2 price');
+  for (const p of s1.spec.probes) {
+    const plan = planProbe(p, vars, s1.spec.vars ?? {});
+    assert.ok(!plan.error, `${p.path}: ${plan.error}`);
+  }
 });
