@@ -108,7 +108,7 @@ import {
   preorderPricingFor,
   PAYMENT_METHOD_NOT_ALLOWED,
 } from '../lib/paymentPolicy';
-import type { PreorderPricing } from '../lib/pricing';
+import { SKU_STRICT_ERROR, type PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor, type MaintenanceTarget } from '../lib/printerFits';
@@ -2665,6 +2665,8 @@ export async function computeCheckout(
       if (offerPriceRefusal(resolved.errors)) {
         throw badRequest(`"${displayName}" is not available right now`, 'OFFER_INACTIVE');
       }
+      // Pricing V2 strict (spec C-13): a SKU × channel not priced yet is not for sale.
+      if (resolved.errors.includes(SKU_STRICT_ERROR)) throw badRequest(`"${displayName}" is not available right now`, SKU_STRICT_ERROR);
       if (resolved.errors.length > 0) {
         throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
       }

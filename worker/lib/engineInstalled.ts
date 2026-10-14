@@ -150,9 +150,32 @@ export async function productEngineManaged(db: D1Database, productId: string): P
  * product form, the relations and fulfilment saves, the TXT and CSV imports —
  * where an unchanged price still saves.
  */
-export async function refuseEngineManaged(db: D1Database, productId: string): Promise<void> {
+export async function refuseEngineManaged(db: D1Database, productId: string, section: 3 | 5 = 3): Promise<void> {
+  // Pricing V2 (spec §3.4, §3.5): a V2 product's prices are edited in the form's section ٣ (or ٥) only.
+  if (await productEngineV2(db, productId)) throw v2Managed(section);
   if (await productEngineManaged(db, productId) && !(await productEngineDirectOnly(db, productId)))
     throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
+}
+
+/** 409 PRICING_V2_MANAGED, naming the form section (spec §3.10: every refusal carries `details.section`, never a value). */
+export const v2Managed = (section: 3 | 5 = 3): HttpError =>
+  new HttpError(409, serverMessage('PRICING_V2_MANAGED'), 'PRICING_V2_MANAGED', { section, v2: true });
+
+/**
+ * Is this product priced by the V2 writer? (spec C-1: `mode = 'engine'` with a
+ * `pricing_method`.) A database without 0189 has no V2 product: false. Not a
+ * cost — every admin may know it.
+ */
+export async function productEngineV2(db: D1Database, productId: string): Promise<boolean> {
+  try {
+    const row = await db
+      .prepare("SELECT 1 AS x FROM product_pricing_state WHERE product_id = ? AND mode = 'engine' AND pricing_method IS NOT NULL")
+      .bind(productId)
+      .first<{ x: number }>();
+    return !!row;
+  } catch {
+    return false;
+  }
 }
 
 /**

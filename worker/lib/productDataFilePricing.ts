@@ -37,7 +37,7 @@ import {
   productEngineEvaluation,
   type ProductInputsDraft,
 } from './pricingEngine/productInputs';
-import { engineEvaluationDto, type EngineEvaluation } from './pricingEngine/engineWrite';
+import { engineEvaluationDto, isV2Product, type EngineEvaluation } from './pricingEngine/engineWrite';
 import { inputInvalid } from './pricingEngine/whatIf';
 import type { PricingContext } from '../routes/cart';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
@@ -211,6 +211,11 @@ export async function judgePricing(
 ): Promise<PricingJudgement> {
   const out: PricingJudgement = { refusals: new Map(), accepted: [], draft: null, writes: null, ev: null, kind: 'none', hash: null, large_change: false, adoption: null, rates: null, ctx: null };
   if (!changes.length) return out;
+  // Pricing V2 (spec §3.5): a V2 product's prices live in the form's section ٣; the TXT V2 block is V2-7's.
+  if (isV2Product(live.stored)) {
+    for (const n of changes) out.refusals.set(n.nkey, { status: 'INVALID_VALUE', message: serverMessage('PRICING_V2_MANAGED') });
+    return out;
+  }
   const rates = await loadPricingRates(db);
   out.rates = rates;
   if (!rates) {

@@ -457,7 +457,24 @@ export interface PricingProduct {
    * `SkuPriceRow`.
    */
   sku_prices?: readonly SkuPriceRow[];
+  /**
+   * PRICING V2 (spec C-13): the product is priced per SKU by the V2 writer,
+   * which writes a row for every sellable SKU × channel. A selection × channel
+   * with no row is then refused (`SKU_STRICT_ERROR`) instead of falling back to
+   * the ladder: a model or route added before it could be priced must never
+   * sell at the product's base price. Set by the relational overlay on the
+   * customer's document only; never published (`projectPublic` lists fields).
+   */
+  sku_strict?: true;
 }
+
+/**
+ * The resolver's refusal of a V2 selection × channel the writer has not priced
+ * (spec C-13). An existing customer code, so the cart, the checkout and the
+ * client already speak it («هذا الاختيار لم يعد معروضًا للبيع»); the spec's
+ * PRICE_NOT_READY is a dropped code (tests/programmeRefusals.test.ts).
+ */
+export const SKU_STRICT_ERROR = 'VARIANT_UNAVAILABLE';
 
 /**
  * The chosen warranty plan, resolved for THIS line and frozen verbatim into
@@ -851,13 +868,29 @@ export interface SkuPriceRow {
   combo_key: string;
   channel: string;
   regular_price_iqd: number;
+  /**
+   * PRICING V2: the row is the V2 writer's (its private result still says this
+   * price). Only the COD arm reads it — a V2 SKU sold direct pays its direct
+   * row under cash on delivery even with no direct cell. V1 rows never carry it.
+   */
+  v2?: true;
+}
+
+/**
+ * The SKU rung's price of one combination on one channel, or null. The key
+ * `''` (the product itself) is a row only on a V2 option-less product: the
+ * overlay maps its stored key `o:*` to `''` (spec C-3) and drops it on a
+ * product that has options (risk R-13); V1 never writes it.
+ */
+function skuRowOf(rows: readonly SkuPriceRow[] | null | undefined, comboKey: string, channel: string | null): SkuPriceRow | null {
+  if (!rows || !rows.length || !channel) return null;
+  const row = rows.find((r) => r.combo_key === comboKey && r.channel === channel);
+  const p = row?.regular_price_iqd;
+  return row && typeof p === 'number' && Number.isSafeInteger(p) && p > 0 ? row : null;
 }
 
 function skuRegularOf(rows: readonly SkuPriceRow[] | null | undefined, comboKey: string, channel: string | null): number | null {
-  if (!rows || !rows.length || !channel || !comboKey) return null;
-  const row = rows.find((r) => r.combo_key === comboKey && r.channel === channel);
-  const p = row?.regular_price_iqd;
-  return typeof p === 'number' && Number.isSafeInteger(p) && p > 0 ? p : null;
+  return skuRowOf(rows, comboKey, channel)?.regular_price_iqd ?? null;
 }
 
 const SKU_ROUTES: ReadonlySet<string> = new Set(['air', 'sea', 'land']);
@@ -991,12 +1024,24 @@ export function resolveUnitPrice(input: {
    * is never cheaper than the wallet.
    */
   const directCell = findFulfillment(option, 'direct_sale');
+  // THE SKU RUNG'S KEY (see `SkuPriceRow`): the line's whole selection and colour.
+  const skuOptionIds = input.optionValueIds && input.optionValueIds.length ? input.optionValueIds : option ? [option.id] : [];
+  const skuKey = skuComboKey({ option_value_ids: skuOptionIds, color_id: color?.id ?? null });
+  /**
+   * PRICING V2 (spec §3.4, §7 default 2): a V2 SKU that sells direct has a
+   * `direct_sale` row of its own, so its pre-order paid at the door pays D even
+   * where no direct cell exists (an option-less or colour-only product). Only a
+   * row the V2 writer still says (`v2`) moves the ladder; V1 rows never do.
+   */
+  const directSku =
+    preorderPricing === 'cod' && lineType === 'pre_order' ? skuRowOf(product.sku_prices, skuKey, 'direct_sale') : null;
+  const v2DirectSku = directSku?.v2 === true ? directSku : null;
   const codPricesAsDirect =
     preorderPricing === 'cod' &&
     lineType === 'pre_order' &&
-    (hasDirectPremium || (directCell !== null && directCell.enabled !== false));
+    (hasDirectPremium || (directCell !== null && directCell.enabled !== false) || v2DirectSku !== null);
   const pricingType: 'direct_sale' | 'pre_order' =
-    codPricesAsDirect && directCell !== null && directCell.enabled !== false ? 'direct_sale' : lineType;
+    codPricesAsDirect && ((directCell !== null && directCell.enabled !== false) || v2DirectSku !== null) ? 'direct_sale' : lineType;
 
   // The VALIDITY checks below read `lineType` — what the customer ordered —
   // while the money reads `pricingType`. Conflating them is what made a COD
@@ -1060,8 +1105,7 @@ export function resolveUnitPrice(input: {
   // THE SKU RUNG (see `SkuPriceRow`): after the colour, only when a row exists.
   const skuChannel =
     pricingType === 'direct_sale' ? 'direct_sale' : SKU_ROUTES.has(method) ? `pre_order_${method}` : null;
-  const skuOptionIds = input.optionValueIds && input.optionValueIds.length ? input.optionValueIds : option ? [option.id] : [];
-  const skuRegular = skuRegularOf(product.sku_prices, skuComboKey({ option_value_ids: skuOptionIds, color_id: color?.id ?? null }), skuChannel);
+  const skuRegular = skuRegularOf(product.sku_prices, skuKey, skuChannel);
   let regular = ladder;
   let proExplicit = proLadder;
   let primeExplicit = primeLadder;
@@ -1331,6 +1375,11 @@ export function resolveUnitPrice(input: {
       };
     }
   }
+
+  // PRICING V2, strict (spec C-13): every sellable V2 SKU × channel has a row; none = not priced yet, so
+  // the line is refused rather than priced from the ladder. A line that names no route yet
+  // (TRANSPORT_REQUIRED: not a channel at all) is left to that refusal, exactly as on every other product.
+  if (product.sku_strict === true && skuRegular === null && skuChannel !== null && !errors.includes('TRANSPORT_REQUIRED')) errors.push(SKU_STRICT_ERROR);
 
   const commissionEffective = transport && !transport.waived ? transport.commission_iqd : 0;
   const warrantyFee = warranty ? warranty.fee_iqd : 0;

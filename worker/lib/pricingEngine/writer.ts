@@ -43,7 +43,7 @@
  *
  * Pure: no I/O. The batch is built by engineWrite.ts.
  */
-import { resolveUnitPrice } from '../pricing';
+import { resolveUnitPrice, SKU_STRICT_ERROR } from '../pricing';
 import type { ChannelPrice } from '@levonis/pricing/costToPrice';
 import { PREORDER_ROUTES, routeOfChannel, type SkuChannel } from '@levonis/pricing/skuChannel';
 import { applyRelations, type ProductRelationsView } from '../productOverlay';
@@ -53,20 +53,32 @@ import { modelsOf, observeModel, unitColorId, unitComboKey, unitOptionIds, type 
 import type { LoadedProduct } from './load';
 import type { PricedModel } from './procurementPreview';
 
+/** What every planned price carries, whichever engine computed it (V1's `ChannelPrice`, V2's own record). */
+export interface PlanPriceCore {
+  computed_price_iqd: number;
+}
+
 /** One engine price of one model (or, priced per SKU, one SKU) × channel, as written. */
-export interface PlannedPrice {
+export interface PlannedPrice<C extends PlanPriceCore = ChannelPrice> {
   /** The model (the option value the cart prices a line from); '' = the product itself. */
   option_id: string;
   /** The unit's key: the model's own, or the exact SKU's (FX-7). */
   combo_key: string;
   channel: SkuChannel;
-  price: ChannelPrice;
+  price: C;
   /** FX-7: the unit's whole selection (the model first) and its colour. */
   option_value_ids: string[];
   color_id: string | null;
 }
 
-export interface PricePlan {
+/** Pricing V2 (spec §3.3 step 6): a SKU × channel the V2 maths blocked (its route's cost is above D). */
+export interface BlockedChannel {
+  option_id: string;
+  combo_key: string;
+  channel: SkuChannel;
+}
+
+export interface PricePlan<C extends PlanPriceCore = ChannelPrice> {
   channel?: 'direct_sale';
   direct_surcharge_iqd?: number;
   ok: boolean;
@@ -76,7 +88,7 @@ export interface PricePlan {
   values: Array<{ id: string; price: number }>;
   cells: Array<{ id: string; price: number }>;
   routes: Array<{ id: string; price: number }>;
-  prices: PlannedPrice[];
+  prices: PlannedPrice<C>[];
   /** FX-7: the product is priced per SKU — its prices are the rows of `skus`. */
   per_sku: boolean;
   /** FX-7: the database has the SKU rung (0183): the product's SKU rows are replaced by `skus` (none when priced per model). */
@@ -88,12 +100,29 @@ export interface PricePlan {
   colors: string[];
   /** FX-7: variant rows' regular price — the SKU's direct price (else its highest), or null to clear a stray one. */
   variants: Array<{ id: string; price: number | null }>;
+  /**
+   * PRICING V2 (spec §3.4): the plan is V2's — every SKU is a unit (the
+   * product itself included, written under `o:*`), every route carries an
+   * explicit 0 commission, and the after-document is strict.
+   */
+  v2?: true;
+  /** V2: the SKU × channels left unsold because their route costs more than D (spec §3.3 step 6). */
+  blocked?: BlockedChannel[];
+  /** V2: route rows switched off because every SKU of their model is blocked on them (the owner's preview listed it). */
+  disable_routes?: string[];
 }
 
 /** What the plan may write beyond the per-model fields (FX-7): is the SKU rung (0183) on this database. */
 export interface PlanOptions {
   channel?: 'direct_sale';
   skuTable?: boolean;
+  /**
+   * PRICING V2 (spec §3.4): plan V2's prices. `blocked` are the SKU × channels
+   * the V2 maths blocked; they are written only when `acceptBlocked` (the
+   * owner's preview listed them as «متوقف: أقل من التكلفة»), else the plan is
+   * refused with V2_ROUTE_BELOW_COST.
+   */
+  v2?: { blocked: readonly BlockedChannel[]; acceptBlocked: boolean };
 }
 
 const present = (v: unknown) => v !== null && v !== undefined;
@@ -134,9 +163,9 @@ export function shapeProblems(loaded: LoadedProduct, legacy: LegacyEvaluation, o
   return [...out].sort();
 }
 
-/** The engine's prices of every model (or SKU) × channel sold today → the row writes (see the file header). */
+/** The engine's prices of every model (or SKU) × channel sold today → the row writes (see the file header). V1's adapter. */
 export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, models: readonly PricedModel[], opts: PlanOptions = {}): PricePlan {
-  const codes = new Set(shapeProblems(loaded, legacy, opts));
+  const codes = new Set<string>();
   const prices: PlannedPrice[] = [];
   for (const m of models) {
     const sold = m.channels.filter((c) => c.ok).map((c) => c.channel);
@@ -154,18 +183,40 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
       prices.push({ option_id: m.option_id, combo_key: m.combo_key, channel, price, option_value_ids: [...m.option_value_ids], color_id: m.color_id });
     }
   }
+  return planWritesFromUnits(loaded, legacy, prices, { ...opts, v2: undefined }, codes);
+}
+
+/**
+ * The planned prices of every unit × channel → the row writes (see the file
+ * header). V1 reaches it through `planWrites` exactly as before; V2 (spec
+ * §3.4, `opts.v2`) hands it its own per-SKU prices. `codes` are the caller's
+ * own reasons the prices are not writable.
+ */
+export function planWritesFromUnits<C extends PlanPriceCore>(
+  loaded: LoadedProduct,
+  legacy: LegacyEvaluation,
+  prices: PlannedPrice<C>[],
+  opts: PlanOptions = {},
+  callerCodes: Iterable<string> = []
+): PricePlan<C> {
+  const codes = new Set(shapeProblems(loaded, legacy, opts));
+  for (const c of callerCodes) codes.add(c);
+  const v2 = opts.v2 ?? null;
+  // A V2 route the maths blocked is written only when the owner's preview listed it (spec §3.3 step 6).
+  if (v2 && v2.blocked.length && !v2.acceptBlocked) codes.add('V2_ROUTE_BELOW_COST');
   if (!prices.length) codes.add('PRICE_INVALID');
-  const perSku = legacy.per_sku;
+  // V2 always prices per SKU (spec §3.2 step 2): `legacy` was built per SKU.
+  const perSku = legacy.per_sku || !!v2;
   const skuTable = opts.skuTable === true;
   const hadSkus = skuTable && (loaded.view?.sku_prices?.length ?? 0) > 0;
-  const empty: PricePlan = { ok: false, codes: [...codes].sort(), product: null, values: [], cells: [], routes: [], prices, per_sku: perSku, sku_table: skuTable, had_skus: hadSkus, skus: [], colors: [], variants: [] };
+  const empty: PricePlan<C> = { ok: false, codes: [...codes].sort(), product: null, values: [], cells: [], routes: [], prices, per_sku: perSku, sku_table: skuTable, had_skus: hadSkus, skus: [], colors: [], variants: [], ...(v2 ? { v2: true as const, blocked: [...v2.blocked], disable_routes: [] } : {}) };
   if (codes.size) return empty;
 
   const view = loaded.view;
   const values: PricePlan['values'] = [];
   const cells: PricePlan['cells'] = [];
   const routes: PricePlan['routes'] = [];
-  const byModel = new Map<string, PlannedPrice[]>();
+  const byModel = new Map<string, PlannedPrice<C>[]>();
   for (const p of prices) byModel.set(p.option_id, [...(byModel.get(p.option_id) ?? []), p]);
   for (const [optionId, list] of byModel) {
     if (!optionId) continue;
@@ -196,11 +247,25 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
   const hasModels = loaded.doc.options.some((o) => o.active !== false && !o.merged_into);
   const basePrice = perSku && !hasModels ? Math.max(...all) : Math.min(...all);
 
+  // V2 (spec C-13): a model sold today that the V2 maths could not price on any channel holds the
+  // product's highest price, so an older Worker (which ignores the strict flag) never sells it lower.
+  let disableRoutes: string[] = [];
+  let disableMethods = new Set<string>();
+  if (v2) {
+    const top = Math.max(...all);
+    for (const unit of legacy.units) {
+      if (!unit.option_id || byModel.has(unit.option_id) || values.some((v) => v.id === unit.option_id)) continue;
+      if (unit.channels.length) values.push({ id: unit.option_id, price: top });
+    }
+    ({ routes: disableRoutes, methods: disableMethods } = blockedRoutes(loaded, legacy, v2.blocked));
+  }
+
   // FX-7: the SKU rows, the colours' cleared prices and the variants' mirror (with the SKU rung only).
-  // The product itself (key '') is never a SKU row — the table refuses the key, and the ladder's own
-  // product price already is that unit's price (verifyPlan reads it back either way). FX-7 gaps.
+  // V1: the product itself (key '') is never a SKU row — the ladder's own product price already is that
+  // unit's price (verifyPlan reads it back either way). FX-7 gaps. V2 writes it under `o:*` (spec C-3):
+  // its routes sell below D, which no product-level field can say.
   const skus: PricePlan['skus'] =
-    perSku && skuTable ? prices.filter((p) => p.combo_key !== '').map((p) => ({ combo_key: p.combo_key, channel: p.channel, price: p.price.computed_price_iqd })) : [];
+    perSku && skuTable ? prices.filter((p) => !!v2 || p.combo_key !== '').map((p) => ({ combo_key: p.combo_key, channel: p.channel, price: p.price.computed_price_iqd })) : [];
   const colors = skuTable ? (view?.colors ?? []).filter(colourStatesPrice).map((c) => c.id) : [];
   const variants: PricePlan['variants'] = [];
   if (skuTable) {
@@ -211,13 +276,13 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
       if (price !== null ? v.regular_price_iqd !== price || present(v.prime_price_iqd) || present(v.pro_price_iqd) : variantStatesPrice(v)) variants.push({ id: v.id, price });
     }
   }
-  const plan: PricePlan = {
+  const plan: PricePlan<C> = {
     ok: true,
     codes: [],
-    product: { price_iqd: basePrice, preorder_transports: zeroCommissions(loaded.row.preorder_transports) },
+    product: { price_iqd: basePrice, preorder_transports: v2 ? v2Transports(loaded.row.preorder_transports, disableMethods) : zeroCommissions(loaded.row.preorder_transports) },
     values,
     cells,
-    routes,
+    routes: v2 ? routes.filter((r) => !disableRoutes.includes(r.id)) : routes,
     prices,
     per_sku: perSku,
     sku_table: skuTable,
@@ -225,6 +290,7 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
     skus,
     colors,
     variants,
+    ...(v2 ? { v2: true as const, blocked: [...v2.blocked], disable_routes: disableRoutes } : {}),
   };
   if (opts.channel === 'direct_sale') {
     plan.channel = 'direct_sale';
@@ -251,6 +317,58 @@ export function planWrites(loaded: LoadedProduct, legacy: LegacyEvaluation, mode
   return plan;
 }
 
+/**
+ * V2 (spec §3.3 step 6): which route rows to switch off — a model's enabled
+ * route on which EVERY one of its SKUs is blocked — and, for a product with no
+ * model, which of its own routes. A route blocked for some SKUs only stays on:
+ * those SKUs have no row and the strict resolver refuses them (C-13).
+ */
+function blockedRoutes(loaded: LoadedProduct, legacy: LegacyEvaluation, blocked: readonly BlockedChannel[]): { routes: string[]; methods: Set<string> } {
+  const routes: string[] = [];
+  const methods = new Set<string>();
+  if (!blocked.length) return { routes, methods };
+  const view = loaded.view;
+  for (const channel of new Set(blocked.map((b) => b.channel))) {
+    const route = routeOfChannel(channel);
+    if (!route) continue;
+    for (const optionId of new Set(legacy.units.map((u) => u.option_id))) {
+      const units = legacy.units.filter((u) => u.option_id === optionId && u.channels.some((c) => c.channel === channel));
+      if (!units.length || !units.every((u) => blocked.some((b) => b.combo_key === unitComboKey(u) && b.channel === channel))) continue;
+      if (!optionId) {
+        methods.add(route);
+        continue;
+      }
+      const preCell = (view?.fulfillments ?? []).find((f) => f.option_id === optionId && f.fulfillment_type === 'pre_order' && truthy(f.enabled));
+      const row = preCell ? (view?.transports ?? []).find((t) => t.fulfillment_id === preCell.id && t.method === route && truthy(t.enabled)) : null;
+      if (row) routes.push(row.id);
+    }
+  }
+  return { routes, methods };
+}
+
+/**
+ * V2's product route list (spec §3.3 step 6, §2.6): every listed route with an
+ * explicit `commission_iqd` of 0 — a route without one would fall back to the
+ * admin default (0189's fee trigger counts it as non-zero) — and a route every
+ * SKU of the product is blocked on switched off. Null when it is not a JSON list.
+ */
+function v2Transports(raw: unknown, disable: ReadonlySet<string>): string | null {
+  if (typeof raw !== 'string' || raw === '') return null;
+  try {
+    const list = JSON.parse(raw) as unknown;
+    if (!Array.isArray(list)) return null;
+    const next = list.map((t) => {
+      if (!t || typeof t !== 'object' || Array.isArray(t)) return t;
+      const r = t as Record<string, unknown>;
+      return { ...r, commission_iqd: 0, ...(typeof r.method === 'string' && disable.has(r.method) ? { active: false } : {}) };
+    });
+    const out = JSON.stringify(next);
+    return out === JSON.stringify(list) ? raw : out;
+  } catch {
+    return null;
+  }
+}
+
 /** The product's route list with every commission at 0 (other keys kept); null when it is not a JSON list. */
 function zeroCommissions(raw: unknown): string | null {
   if (typeof raw !== 'string' || raw === '') return null;
@@ -273,7 +391,7 @@ const MEMBER_CLEARED = {
 };
 
 /** The product's row and relations as they would be after the plan (an in-memory copy). */
-export function documentAfter(loaded: LoadedProduct, plan: PricePlan) {
+export function documentAfter<C extends PlanPriceCore>(loaded: LoadedProduct, plan: PricePlan<C>) {
   const row: Record<string, unknown> = { ...loaded.row };
   if (plan.direct_surcharge_iqd !== undefined) row.direct_surcharge_iqd = plan.direct_surcharge_iqd;
   if (plan.product) {
@@ -296,6 +414,8 @@ export function documentAfter(loaded: LoadedProduct, plan: PricePlan) {
           return w ? { ...f, ...MEMBER_CLEARED, regular_price_iqd: w.price } : f;
         }),
         transports: loaded.view.transports.map((t) => {
+          // V2: a route every SKU of its model is blocked on is switched off (spec §3.3 step 6).
+          if (plan.disable_routes?.includes(t.id)) return { ...t, enabled: 0 };
           const w = at(plan.routes, t);
           return w ? { ...t, ...MEMBER_CLEARED, regular_price_iqd: w.price, surcharge_iqd: 0 } : t;
         }),
@@ -305,7 +425,14 @@ export function documentAfter(loaded: LoadedProduct, plan: PricePlan) {
           const w = plan.variants.find((x) => x.id === v.id);
           return w ? { ...v, regular_price_iqd: w.price, prime_price_iqd: null, pro_price_iqd: null } : v;
         }),
-        sku_prices: plan.sku_table ? [...(plan.channel ? (loaded.view.sku_prices ?? []).filter((k) => k.channel !== plan.channel) : []), ...plan.skus.map((k) => ({ combo_key: k.combo_key, channel: k.channel, regular_price_iqd: k.price }))] : loaded.view.sku_prices,
+        sku_prices: plan.sku_table
+          ? [
+              ...(plan.channel ? (loaded.view.sku_prices ?? []).filter((k) => k.channel !== plan.channel) : []),
+              // V2 (spec §3.4): its rows carry the flag the COD arm reads, and the document is strict.
+              ...plan.skus.map((k) => ({ combo_key: k.combo_key, channel: k.channel, regular_price_iqd: k.price, ...(plan.v2 ? { v2: true as const } : {}) })),
+            ]
+          : loaded.view.sku_prices,
+        ...(plan.v2 ? { sku_strict: true as const } : {}),
       }
     : undefined;
   const parsed = parseProductRow(row);
@@ -313,8 +440,8 @@ export function documentAfter(loaded: LoadedProduct, plan: PricePlan) {
   return { row, view, doc };
 }
 
-/** The same document as an older Worker reads it — without the SKU rung (FX-7 rollback check). */
-const withoutSkuRung = (doc: ReturnType<typeof parseProductRow>) => ({ ...doc, sku_prices: undefined });
+/** The same document as an older Worker reads it — without the SKU rung, and without V2's strict flag (FX-7 rollback check). */
+const withoutSkuRung = (doc: ReturnType<typeof parseProductRow>) => ({ ...doc, sku_prices: undefined, sku_strict: undefined });
 
 /** The selection a unit's cart line carries (a SKU's), or none (a model). */
 const selectionOf = (unit: ModelToday): SkuSelectionOf | undefined =>
@@ -372,13 +499,21 @@ export interface Verification {
  * direct (the resolver's COD rule, USD design §2.3) and the channel's own price
  * otherwise, and the same set of channels must stay on sale.
  */
-export function verifyPlan(loaded: LoadedProduct, legacy: LegacyEvaluation, plan: PricePlan, ctx: PricingContext): Verification {
+/**
+ * A V2 unit's structurally sellable channel (spec §3.2 step 2): priced today, or refused only because
+ * its price is not there yet — a draft's 0, or V2's strict rung on a SKU × channel not priced yet.
+ */
+export const structuralChannel = (c: { ok: boolean; errors: readonly string[] }): boolean =>
+  c.ok || (c.errors.length > 0 && c.errors.every((e) => e === 'REGULAR_PRICE_INVALID' || e === SKU_STRICT_ERROR));
+
+export function verifyPlan<C extends PlanPriceCore>(loaded: LoadedProduct, legacy: LegacyEvaluation, plan: PricePlan<C>, ctx: PricingContext): Verification {
   if (!plan.ok) return { ok: false, mismatches: ['plan'], rows: [] };
   const after = documentAfter(loaded, plan);
   const { models } = modelsOf(after.doc, after.view);
   const older = plan.per_sku && !plan.channel ? withoutSkuRung(after.doc) : null;
   const mismatches: string[] = [];
   const rows: VerifiedRow[] = [];
+  const v2 = plan.v2 === true;
   for (const before of legacy.units) {
     const combo = unitComboKey(before);
     const label = plan.per_sku ? combo : before.option_id;
@@ -389,13 +524,18 @@ export function verifyPlan(loaded: LoadedProduct, legacy: LegacyEvaluation, plan
     }
     const sku = selectionOf(before);
     const observed = observeModel(after.doc, option, ctx, sku);
-    const soldBefore = before.channels.filter((c) => c.ok).map((c) => c.channel).sort();
+    // V2: every structurally sellable channel stays on sale except the ones the owner accepted as blocked.
+    const soldBefore = (v2
+      ? before.channels.filter((c) => structuralChannel(c) && !(plan.blocked ?? []).some((b) => b.combo_key === combo && b.channel === c.channel))
+      : before.channels.filter((c) => c.ok)
+    ).map((c) => c.channel).sort();
     const soldAfter = observed.channels.filter((c) => c.ok).map((c) => c.channel).sort();
     if (soldBefore.join(',') !== soldAfter.join(',')) mismatches.push(`${label}:channels`);
     const priceOf = (ch: SkuChannel) => plan.prices.find((p) => p.combo_key === combo && p.channel === ch)?.price.computed_price_iqd ?? null;
     const direct = priceOf('direct_sale');
-    // The resolver's COD rule (pricing.ts): a pre-order paid at the door is priced from an ENABLED direct cell.
-    const directCell = (option?.fulfillments ?? []).some((f) => f.fulfillment_type === 'direct_sale' && f.enabled !== false);
+    // The resolver's COD rule (pricing.ts): a pre-order paid at the door is priced from an ENABLED direct cell
+    // — and, V2 (spec §3.4), from the SKU's own direct row wherever the SKU sells direct.
+    const directCell = (option?.fulfillments ?? []).some((f) => f.fulfillment_type === 'direct_sale' && f.enabled !== false) || (v2 && direct !== null);
     // FX-7: the same unit as an older Worker reads it (no SKU rung) — never below the engine's price.
     const old = older ? observeModel(older, option, ctx, sku) : null;
     for (const c of observed.channels.filter((x) => x.ok)) {
@@ -418,6 +558,9 @@ export function verifyPlan(loaded: LoadedProduct, legacy: LegacyEvaluation, plan
       const codExpected = c.route !== null && directCell ? direct : engine;
       if (codExpected === null || c.cod_iqd !== codExpected) mismatches.push(`${key}:cod`);
       if (engine < 1000) mismatches.push(`${key}:floor`);
+      // V2 (spec §3.8): no fee on any channel, and a pre-order never above its SKU's direct price.
+      if (v2 && (c.fee_iqd ?? 0) !== 0) mismatches.push(`${key}:fee`);
+      if (v2 && direct !== null && engine > direct) mismatches.push(`${key}:above_direct`);
       if (old) {
         const o = old.channels.find((x) => x.channel === c.channel);
         if (!o || !o.ok || (o.prepaid_iqd ?? 0) < engine || (codExpected !== null && (o.cod_iqd ?? 0) < codExpected)) mismatches.push(`${key}:rollback`);

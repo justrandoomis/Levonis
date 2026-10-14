@@ -90,6 +90,11 @@ const INPUT_BLOCK_CODES: ReadonlySet<string> = new Set([
   'TARGET_PROFIT_BLOCKED',
   'DIRECT_SALE_EXTRA_MISSING',
   'DIRECT_SALE_EXTRA_BLOCKED',
+  // Pricing V2 (spec §1.1): the product's own dollar prices and discounts.
+  'V2_PRICE_MISSING',
+  'V2_DISCOUNT_TOO_LARGE',
+  'V2_SCOPE_INVALID',
+  'V2_POINT_CONFLICT',
 ]);
 
 // ------------------------------------------------------------------ facts
@@ -208,6 +213,13 @@ export interface EvaluationInput {
   category_ok: boolean;
   /** The engine's last blocked-repricing code ('' = none). */
   blocked: string;
+  /**
+   * Pricing V2 (spec §3.4, C-1): the method of a V2 product («من التكلفة» 'cost', «سعر بالدولار» 'usd'),
+   * null on every other. A price-first product needs no cost to be sold (PRICING-V2 A1: «ولا يوقف منتجًا
+   * ينقصه بيانات») — its cost serves profit reports only (C-6) — so COST and the minimum profit are not
+   * asked of it; a cost-first one is asked exactly what an engine product is.
+   */
+  method?: 'cost' | 'usd' | null;
 }
 
 const positive = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v > 0;
@@ -249,9 +261,10 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
 
   if (!String(doc.name_ar ?? '').trim()) add('NAME_AR');
   if (e.mode !== 'engine' && !positive(doc.price_iqd)) add('PRICE');
+  const priceFirst = e.mode === 'engine' && e.method === 'usd';
 
-  // COST ★: every model reaches one.
-  for (const m of models) {
+  // COST ★: every model reaches one (Pricing V2: not asked of a price-first product).
+  for (const m of priceFirst ? [] : models) {
     const modelId = m?.id ?? '';
     const legacy = legacyCostOf(doc, m);
     if (legacy !== null && legacy > 0) continue;
@@ -266,7 +279,7 @@ export function evaluateCompleteness(e: EvaluationInput): CompletenessItem[] {
   // ENGINE_INPUTS ★: an engine product's own pricing data (never the rates).
   if (e.mode === 'engine') {
     if (e.blocked && INPUT_BLOCK_CODES.has(e.blocked)) add('ENGINE_INPUTS');
-    for (const m of models) {
+    for (const m of priceFirst ? [] : models) {
       const modelId = m?.id ?? '';
       if (targetActive(e.rules, e.id, modelId ? [modelId] : [], null)) continue;
       if (directForModel(modelId) && targetActive(e.direct!.rules, e.id, modelId ? [modelId] : [], null)) continue;
@@ -421,6 +434,7 @@ export async function recomputeCompleteness(
       ...(p?.direct_purchase ? { direct: directPurchaseStore(p) } : {}),
       category_ok: Number(f.cat_ok) === 1,
       blocked: String(f.blocked ?? ''),
+      method: f.mode === 'engine' ? (p?.state?.pricing_method ?? null) : null,
     });
     const key = await factsKeyOf(f, globalSig);
     const complete = items.length === 0;
@@ -661,5 +675,6 @@ export async function evaluateDraft(
     direct,
     category_ok: !!category,
     blocked: '',
+    method: d.mode === 'engine' && pricing?.state?.mode === 'engine' ? (pricing.state.pricing_method ?? null) : null,
   });
 }

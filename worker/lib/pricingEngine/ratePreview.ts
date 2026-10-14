@@ -49,15 +49,23 @@ import { canonical } from './procurementPreview';
 import {
   blockCodeOf,
   deficitOf,
+  deficitOfV2,
+  isV2State,
   loadEngineStates,
+  loadV2ResultsOf,
   pricesUnchanged,
+  pricesUnchangedV2,
   priceSourceOf,
   staleEngineProducts,
   AUTO_REPRICE_SOURCE,
   PRODUCT_CHUNK,
   READS_PER_CHUNK,
+  V2_STORE_READS,
   type EngineStateRow,
 } from './autoReprice';
+import { loadV2Store, type V2Store } from './v2/store';
+import { evaluateV2Write, storedDesired, type V2Evaluation } from './v2/evaluate';
+import { v2WriteStatements } from './v2/write';
 import { engineWriteStatements, evaluateEngineWrite, loadEngineControl, loadStoredSkuCosts, priceImagesOf, type EngineEvaluation } from './engineWrite';
 
 /** What an owner act moves. */
@@ -202,32 +210,91 @@ const names = (doc: { name_ar?: unknown; name_en?: unknown; name_ckb?: unknown }
 export async function previewRateAct(db: D1Database, move: RateMove, rates: PricingRates, budgetLeft: number): Promise<RatePreviewResult> {
   const after = ratesAfter(rates, move);
   let states: EngineStateRow[];
+  let fallbackReads = 0;
   try {
-    states = await loadEngineStates(db);
+    states = await loadEngineStates(db, { spent: (n) => (fallbackReads += n) });
   } catch (e) {
     if (isMissingTable(e)) states = [];
     else throw e;
   }
-  let statements = 1;
-  const costs = states.length ? await loadStoredSkuCosts(db, states.map((s) => s.product_id)) : [];
-  if (states.length) statements += 1;
-  const stale = staleEngineProducts(states, costs, after);
+  let statements = 1 + fallbackReads;
+  const v1States = states.filter((s) => !isV2State(s));
+  const costs = v1States.length ? await loadStoredSkuCosts(db, v1States.map((s) => s.product_id)) : [];
+  if (v1States.length) statements += 1;
+  // Pricing V2 (spec §3.4, R-9): V2 products are in the preview too — the only place the owner sees what a
+  // rate move does to price-first products, which never moved with the rate before.
+  const v2Results = await loadV2ResultsOf(db, states);
+  if (states.some(isV2State)) statements += 1;
+  const stale = staleEngineProducts(states, costs, after, v2Results);
   const ids = stale.map((p) => p.state.product_id);
   const rows: RatePreviewRow[] = [];
   const blocked: RatePreviewBlocked[] = [];
   const evaluated: Array<{ pid: string; hash: string | null; code: string | null }> = [];
-  const ready: Array<{ ev: EngineEvaluation; deficit: number; cost: number }> = [];
+  const ready: Array<{ ev: { product_id: string; rows: Array<{ old_iqd: number | null; new_iqd: number | null }> }; deficit: number; cost: number }> = [];
   if (ids.length) {
     const control = await loadEngineControl(db);
     const images = await priceImagesOf(db, ids);
     const [loaded, stores, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
     statements += 1 + 1 + READS_PER_CHUNK * Math.ceil(ids.length / PRODUCT_CHUNK) + 5 + 1;
+    const v2Ids = stale.filter((p) => isV2State(p.state)).map((p) => p.state.product_id);
+    const v2Stores = v2Ids.length ? await loadV2Store(db, v2Ids) : new Map<string, V2Store | null>();
+    if (v2Ids.length) statements += V2_STORE_READS;
     for (const p of stale) {
       const pid = p.state.product_id;
       const product = loaded.get(pid);
       const stored = stores.get(pid);
       if (!product || !stored || stored.state?.mode !== 'engine') continue;
       const productNames = names(product.doc);
+      if (isV2State(p.state)) {
+        if (!stored.state.pricing_method) continue;
+        const v2Store = v2Stores.get(pid) ?? null;
+        let v2: V2Evaluation;
+        try {
+          const desired = storedDesired(v2Store);
+          v2 = await evaluateV2Write({ loaded: product, stored, v2: v2Store, ctx, rates: after, control, method: stored.state.pricing_method, points: desired.points, discounts: desired.discounts, inputWrites: [], ruleWrites: [], image: images.get(pid) ?? '', auto: true });
+        } catch {
+          blocked.push({ product_id: pid, ...productNames, code: 'REPRICE_BLOCKED' });
+          evaluated.push({ pid, hash: null, code: 'REPRICE_BLOCKED' });
+          continue;
+        }
+        if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write) {
+          const code = blockCodeOf(v2.codes);
+          blocked.push({ product_id: pid, ...productNames, code });
+          evaluated.push({ pid, hash: null, code });
+          continue;
+        }
+        evaluated.push({ pid, hash: v2.hash, code: null });
+        const batch = await v2WriteStatements(db, v2, {
+          actor: 'preview',
+          now: new Date(0).toISOString(),
+          source: AUTO_REPRICE_SOURCE,
+          idempotencyKey: `preview:${pid}`,
+          auto: { priceSource: priceSourceOf(p.reasons), pricesUnchanged: pricesUnchangedV2(v2), trigger: 'owner_rate', reasons: p.reasons },
+        });
+        ready.push({ ev: { product_id: pid, rows: v2.rows }, deficit: deficitOfV2(v2), cost: batch.length });
+        for (const r of v2.rows) {
+          if (r.new_iqd === null) continue;
+          rows.push({
+            product_id: pid,
+            ...productNames,
+            option_id: r.option_id,
+            combo_key: r.combo_key,
+            model_ar: r.name_ar,
+            model_en: r.name_en,
+            model_ckb: r.name_ckb,
+            channel: r.channel,
+            today_prepaid_iqd: r.old_iqd,
+            computed_price_iqd: r.new_iqd,
+            change_iqd: r.change_iqd,
+            change_pct: r.change_pct,
+            // V2: the new price − today's (the run's own ordering, deficitOfV2).
+            deficit_iqd: r.new_iqd - (r.old_iqd ?? 0),
+            large: r.large,
+            drop_flag: r.drop_flag,
+          });
+        }
+        continue;
+      }
       let ev: EngineEvaluation;
       try {
         ev = await evaluateEngineWrite({

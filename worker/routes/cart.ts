@@ -66,6 +66,7 @@ export function refuseIncompleteSelection(availability: SaleAvailability, label?
 }
 import {
   resolveUnitPrice,
+  SKU_STRICT_ERROR,
   proPolicyFrom,
   type PreorderPricing,
   type ProPricingPolicy,
@@ -2096,6 +2097,8 @@ cartRoutes.post('/items', async (c) => {
   if (resolved.errors.length === 1 && resolved.errors[0] === 'TRANSPORT_REQUIRED') {
     throw badRequest('Choose a shipping method for this pre-order', 'TRANSPORT_REQUIRED');
   }
+  // Pricing V2 strict (spec C-13): a SKU × channel not priced yet is not for sale — the page speaks this code.
+  if (resolved.errors.includes(SKU_STRICT_ERROR)) throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }
@@ -2560,6 +2563,7 @@ cartRoutes.patch('/items/:id', async (c) => {
   if (offerPriceRefusal(resolved.errors)) {
     throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
   }
+  if (resolved.errors.includes(SKU_STRICT_ERROR)) throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');
   }

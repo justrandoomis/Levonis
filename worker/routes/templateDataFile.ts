@@ -48,7 +48,7 @@ import { auditStatements } from '../lib/audit';
 import { fence, isFenceMiss } from '../lib/operations';
 import { afterCatalogueWrite } from '../lib/edgePolicy';
 import { requireFreshSession } from '../lib/costAccess';
-import { productEngineManaged } from '../lib/engineInstalled';
+import { productEngineManaged, productEngineV2, v2Managed } from '../lib/engineInstalled';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { dataFileMessage, type DataFileRefusalCode } from '../../packages/contracts/src/dataFileRefusals';
@@ -1097,7 +1097,11 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
         throw new HttpError(409, dataFileMessage('DATA_FILE_CHANGED'), 'DATA_FILE_CHANGED');
       }
       if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return c.json({ success: true, already: true, product_id: productId });
-      if (/ENGINE_MANAGED/.test(msg)) throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
+      if (/ENGINE_MANAGED/.test(msg)) {
+        // Pricing V2 (spec §3.5): a V2 product's prices and structure are saved through its section ٣ / ٥.
+        if (await productEngineV2(db, productId)) throw v2Managed(3);
+        throw new HttpError(409, serverMessage('ENGINE_MANAGED'), 'ENGINE_MANAGED');
+      }
       if (msg.includes('UNIQUE') && msg.includes('products.sku')) throw new HttpError(400, 'sku: already used by another product / رمز المنتج مستخدم في منتج آخر', 'SKU_TAKEN');
       const refusal = engineDbRefusal(e);
       if (refusal) throw refusal;

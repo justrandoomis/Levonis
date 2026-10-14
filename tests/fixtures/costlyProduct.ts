@@ -74,6 +74,14 @@ const snakeOf = (k: string) => k.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}
 const PRICE_CHAIN_KEYS: ReadonlySet<string> = new Set(['failure_reserve_iqd', 'markup_percent', 'break_even_iqd']);
 
 /**
+ * Pricing V2 (spec §8): the column names of the V2 writer's private results
+ * (`pricing_v2_sku_results`), so a raw result row reaching any channel is
+ * caught by name as well as by sentinel. `floor` is left out on purpose: an
+ * address carries a floor too.
+ */
+const V2_RESULT_KEYS: ReadonlySet<string> = new Set(['discount_usd', 'deltas_usd', 'usd_ceil6', 'exact_iqd', 'direct_exact_iqd']);
+
+/**
  * Text keys that carry PRIVATE IDENTITY rather than a figure: a picture's
  * `source_url` is the supplier listing the owner fetched it from (the public
  * API v1 drops it; DECISIONS row 220). Flagged when non-empty inside a media
@@ -122,6 +130,8 @@ export function leaks(value: unknown, extra: LeakExtra = {}): string[] {
           out.push(`${path}.${k} ∈ FINANCIAL_FIELDS = ${JSON.stringify(x)?.slice(0, 60)}`);
         } else if (PRICE_CHAIN_KEYS.has(k) && x !== null && x !== undefined) {
           out.push(`${path}.${k} = ${JSON.stringify(x)?.slice(0, 60)} (a step of the price)`);
+        } else if (V2_RESULT_KEYS.has(k) && x !== null && x !== undefined) {
+          out.push(`${path}.${k} = ${JSON.stringify(x)?.slice(0, 60)} (a V2 private result)`);
         } else if (
           PRIVATE_MEDIA_TEXT_KEYS.has(k) &&
           typeof x === 'string' &&
