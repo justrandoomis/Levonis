@@ -29,10 +29,24 @@
  *                       GET (a live slug, so no probe names a product by hand),
  *                       or from the command line (`--var name=value`, which
  *                       wins). `"optional": true` (the clean start, DECISIONS
- *                       row 222): a probe whose optional var has no value is
- *                       SKIPPED with a notice, neither run nor failed — an
- *                       empty catalogue right after the cut-over is not a leak.
+ *                       row 222): a probe whose optional var is legitimately
+ *                       empty is SKIPPED with a notice, neither run nor failed —
+ *                       an empty catalogue right after the cut-over is not a
+ *                       leak. A var read by GET is empty only when that GET
+ *                       answered 200 with JSON whose picked list is there and
+ *                       empty (`products: []`); any other answer (no answer, a
+ *                       status that is not 200, a body that is not JSON) is a
+ *                       FAILED read, and it fails the run: a broken listing
+ *                       must never pass as an empty one. A var with no `from`
+ *                       (the workflow's `--var`) is empty when not given.
  *                       `ran === 0` still fails the run.
+ *   requireWhenVar      "name" of an optional var: `requireIntegerKeys` holds
+ *                       only while that var has a value. When it is legitimately
+ *                       empty (nothing listed yet), the keys may be absent, but
+ *                       wherever they appear they are still integers, and
+ *                       forbidKeys / forbidPattern stay in force
+ *   integerKeys         like requireIntegerKeys, without the presence rule:
+ *                       every occurrence is an integer, an absent key passes
  *   forbidValues        {"key": "{var}"}: no occurrence of the key may carry
  *                       the filled value (a hidden product's slug must not be
  *                       in a search answer). The failure names the key and
@@ -103,18 +117,70 @@ export function probeVars(probe) {
 }
 
 /**
- * One probe against the resolved vars: `{ path }` to run, `{ skip }` when an
- * OPTIONAL var it needs has no value (the clean start: no listed product yet),
- * or `{ error }` when a required one is missing.
+ * One var's GET answer → `{ value }`, `{ empty: true }` when the answer is a
+ * 200 with JSON whose picked list is there and empty (`products.0.slug` over
+ * `{"products": []}`: nothing is listed yet, the clean start), or `{ error }`
+ * for anything else — a status that is not 200, a body that is not JSON, no
+ * list at all, or a first item without the key. Only `empty` lets an optional
+ * var's probes skip; an error is a failed read (it never names a value).
  */
-export function planProbe(probe, vars, defs = {}) {
-  const missing = probeVars(probe).filter((name) => typeof vars[name] !== 'string' || vars[name] === '');
-  if (missing.length && missing.every((name) => defs[name]?.optional === true)) return { skip: `skipped (no listed product yet: {${missing.join('}, {')}} has no value)` };
+export function readVar(def, status, text) {
+  if (status !== 200) return { error: `status ${status}, expected 200` };
+  let body;
   try {
-    return { path: fillPath(probe.path, vars) };
+    body = JSON.parse(text);
+  } catch {
+    return { error: 'the answer is not JSON' };
+  }
+  const v = pick(body, def.pick);
+  if (typeof v === 'string' && v) return { value: v };
+  const parts = String(def.pick).split('.');
+  const at = parts.findIndex((part) => /^\d+$/.test(part));
+  if (at >= 0) {
+    const list = at === 0 ? body : pick(body, parts.slice(0, at).join('.'));
+    if (Array.isArray(list) && list.length === 0) return { empty: true };
+  }
+  return { error: `the answer has no ${def.pick}` };
+}
+
+/**
+ * A var is legitimately empty when it has no value, it is optional, and
+ * either nothing reads it (a workflow `--var` not given) or its GET proved
+ * there is nothing to list (`empty` holds its name, see `readVar`).
+ */
+function isEmptyVar(name, vars, defs, empty) {
+  if (typeof vars[name] === 'string' && vars[name] !== '') return false;
+  const def = defs[name];
+  return def?.optional === true && (!def.from || empty.has(name));
+}
+
+/**
+ * One probe against the resolved vars: `{ path }` to run, `{ skip }` when an
+ * OPTIONAL var it needs is legitimately empty (the clean start: no listed
+ * product yet), or `{ error }` when a var is missing otherwise (a required
+ * one, or an optional one whose read failed). A probe whose `requireWhenVar`
+ * is legitimately empty runs as `{ path, probe, notice }`: `probe` is the one
+ * to judge, its required integer keys allowed to be absent.
+ */
+export function planProbe(probe, vars, defs = {}, empty = new Set()) {
+  const missing = probeVars(probe).filter((name) => typeof vars[name] !== 'string' || vars[name] === '');
+  if (missing.length && missing.every((name) => isEmptyVar(name, vars, defs, empty))) return { skip: `skipped (no listed product yet: {${missing.join('}, {')}} has no value)` };
+  let path;
+  try {
+    path = fillPath(probe.path, vars);
   } catch (err) {
     return { error: err.message };
   }
+  const when = probe.requireWhenVar;
+  if (when && (probe.requireIntegerKeys ?? []).length && isEmptyVar(when, vars, defs, empty)) {
+    const { requireIntegerKeys, ...rest } = probe;
+    return {
+      path,
+      probe: { ...rest, integerKeys: [...(probe.integerKeys ?? []), ...requireIntegerKeys] },
+      notice: `nothing listed yet ({${when}} is empty): ${requireIntegerKeys.join(', ')} may be absent, and wherever present must be integers`,
+    };
+  }
+  return { path };
 }
 
 /** `--var name=value` (repeatable) → { name: value }. */
@@ -152,7 +218,7 @@ export function judge(probe, status, text, vars = {}) {
   if (probe.forbidPattern && new RegExp(probe.forbidPattern, 'i').test(text ?? '')) {
     failures.push(`the body matches the forbidden pattern /${probe.forbidPattern}/i`);
   }
-  for (const name of probe.requireIntegerKeys ?? []) {
+  const integers = (name, required) => {
     let seen = 0;
     let bad = 0;
     for (const { key, value } of walkKeys(body)) {
@@ -160,9 +226,11 @@ export function judge(probe, status, text, vars = {}) {
       seen++;
       if (!Number.isSafeInteger(value)) bad++;
     }
-    if (seen === 0) failures.push(`required key ${name} is absent`);
+    if (seen === 0 && required) failures.push(`required key ${name} is absent`);
     else if (bad > 0) failures.push(`${bad} of ${seen} ${name} value(s) are not integers`);
-  }
+  };
+  for (const name of probe.requireIntegerKeys ?? []) integers(name, true);
+  for (const name of probe.integerKeys ?? []) integers(name, false);
   for (const [name, template] of Object.entries(probe.forbidValues ?? {})) {
     const value = String(template).replace(/\{([a-z_][a-z0-9_]*)\}/gi, (w, v) => String(vars[v] ?? ''));
     if (!value) continue;
@@ -199,6 +267,76 @@ async function get(base, path) {
   return { status: res.status, text: await res.text() };
 }
 
+/**
+ * The whole run over the probe files, with `get(path)` → `{ status, text }`
+ * (workflow 7 passes a live GET; the tests pass the local Worker). Returns
+ * the counts; every line goes to `log`. Exported so a test runs exactly
+ * what workflow 7 runs.
+ */
+export async function runProbes(files, get, fromCli = {}, log = console.log) {
+  let failed = 0;
+  let ran = 0;
+  let skipped = 0;
+  for (const { file, spec } of files) {
+    const vars = { ...fromCli };
+    const empty = new Set();
+    for (const [name, def] of Object.entries(spec.vars ?? {})) {
+      if (typeof vars[name] === 'string' && vars[name]) continue;
+      if (!def.from) continue;
+      let read;
+      try {
+        const r = await get(def.from);
+        read = readVar(def, r.status, r.text);
+      } catch (err) {
+        read = { error: `no answer (${err?.name ?? 'error'})` };
+      }
+      if (read.value) {
+        vars[name] = read.value;
+      } else if (read.empty) {
+        empty.add(name);
+        log(`::notice::${file}: ${def.from} lists nothing yet, {${name}} is empty`);
+      } else {
+        // Not an empty catalogue: a broken listing must never pass as one.
+        failed++;
+        log(`::error::${file}: {${name}} could not be read from ${def.from} (${read.error})`);
+      }
+    }
+    for (const probe of spec.probes ?? []) {
+      const plan = planProbe(probe, vars, spec.vars ?? {}, empty);
+      if (plan.skip) {
+        skipped++;
+        log(`::notice::${file}: ${probe.path} — ${plan.skip}`);
+        continue;
+      }
+      if (plan.error) {
+        failed++;
+        log(`::error::${file}: ${probe.path} — ${plan.error}`);
+        continue;
+      }
+      if (plan.notice) log(`::notice::${file}: ${probe.path} — ${plan.notice}`);
+      const path = plan.path;
+      ran++;
+      let status = 0;
+      let text = '';
+      try {
+        ({ status, text } = await get(path));
+      } catch (err) {
+        failed++;
+        log(`::error::${file}: GET ${path} did not answer (${err?.name ?? 'error'})`);
+        continue;
+      }
+      const failures = judge(plan.probe ?? probe, status, text, vars);
+      if (failures.length) {
+        failed++;
+        for (const f of failures) log(`::error::${file}: GET ${path} — ${f}`);
+      } else {
+        log(`ok  GET ${path} -> ${status}`);
+      }
+    }
+  }
+  return { ran, failed, skipped };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const flag = (name, fallback) => {
@@ -207,57 +345,7 @@ async function main() {
   };
   const base = flag('--base', 'https://levonis-iq.com');
   const dir = resolve(flag('--dir', join(HERE, 'live-cost-probes.d')));
-  const files = loadProbeFiles(dir);
-  const fromCli = cliVars(args);
-  let failed = 0;
-  let ran = 0;
-  let skipped = 0;
-  for (const { file, spec } of files) {
-    const vars = { ...fromCli };
-    for (const [name, def] of Object.entries(spec.vars ?? {})) {
-      if (typeof vars[name] === 'string' && vars[name]) continue;
-      if (!def.from) continue;
-      try {
-        const r = await get(base, def.from);
-        const v = pick(JSON.parse(r.text), def.pick);
-        if (typeof v === 'string' && v) vars[name] = v;
-        else console.log(`::warning::${file}: {${name}} could not be read from ${def.from} (status ${r.status})`);
-      } catch (err) {
-        console.log(`::warning::${file}: {${name}} could not be read from ${def.from} (${err?.name ?? 'error'})`);
-      }
-    }
-    for (const probe of spec.probes ?? []) {
-      const plan = planProbe(probe, vars, spec.vars ?? {});
-      if (plan.skip) {
-        skipped++;
-        console.log(`::notice::${file}: ${probe.path} — ${plan.skip}`);
-        continue;
-      }
-      if (plan.error) {
-        failed++;
-        console.log(`::error::${file}: ${probe.path} — ${plan.error}`);
-        continue;
-      }
-      const path = plan.path;
-      ran++;
-      let status = 0;
-      let text = '';
-      try {
-        ({ status, text } = await get(base, path));
-      } catch (err) {
-        failed++;
-        console.log(`::error::${file}: GET ${path} did not answer (${err?.name ?? 'error'})`);
-        continue;
-      }
-      const failures = judge(probe, status, text, vars);
-      if (failures.length) {
-        failed++;
-        for (const f of failures) console.log(`::error::${file}: GET ${path} — ${f}`);
-      } else {
-        console.log(`ok  GET ${path} -> ${status}`);
-      }
-    }
-  }
+  const { ran, failed, skipped } = await runProbes(loadProbeFiles(dir), (path) => get(base, path), cliVars(args));
   console.log(`${ran} probe(s) run, ${failed} failed${skipped ? `, ${skipped} skipped (no listed product yet)` : ''}`);
   if (ran === 0) {
     console.log('::error::no probe ran — an empty probe set proves nothing');

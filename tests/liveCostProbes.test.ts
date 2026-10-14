@@ -26,7 +26,7 @@ import worker from '../worker/index';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
 import { fetchPublished } from './fixtures/autoPublish';
-const { cliVars, fillPath, judge, loadProbeFiles, pick, planProbe, walkKeys } = probesScript;
+const { cliVars, fillPath, judge, loadProbeFiles, pick, planProbe, readVar, runProbes, walkKeys } = probesScript;
 
 interface Probe {
   path: string;
@@ -34,6 +34,8 @@ interface Probe {
   forbidKeys?: string;
   forbidPattern?: string;
   requireIntegerKeys?: string[];
+  requireWhenVar?: string;
+  integerKeys?: string[];
   valuePatterns?: Record<string, string>;
   forbidValues?: Record<string, string>;
 }
@@ -83,6 +85,12 @@ test('every probe file has the shape the script reads, and every regex compiles'
       assert.ok(Array.isArray(p.status) && p.status.every((s) => Number.isInteger(s)), `${file}: ${p.path} status`);
       if (p.forbidKeys) assert.doesNotThrow(() => new RegExp(p.forbidKeys!, 'i'));
       if (p.forbidPattern) assert.doesNotThrow(() => new RegExp(p.forbidPattern!, 'i'));
+      if (p.requireWhenVar !== undefined) {
+        // It relaxes a presence rule, so it must name a var this file reads by GET and may find empty.
+        const def = spec.vars?.[p.requireWhenVar];
+        assert.ok(def?.optional === true && typeof def.from === 'string' && typeof def.pick === 'string', `${file}: ${p.path} requireWhenVar names an optional var read by GET`);
+        assert.ok((p.requireIntegerKeys ?? []).length > 0, `${file}: ${p.path} requireWhenVar without requireIntegerKeys`);
+      }
     }
   }
 });
@@ -94,6 +102,7 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
   const products = probe('/api/products?limit=3')!;
   assert.deepEqual(products.status, [200]);
   assert.deepEqual(products.requireIntegerKeys, ['price_iqd']);
+  assert.equal(products.requireWhenVar, 'slug', 'the listing needs its prices only while something is listed (the clean start)');
   const keys = new RegExp(products.forbidKeys!, 'i');
   // Critique A9: the narrow regex missed these.
   for (const k of ['cost_iqd', 'supplier_cost', 'replacement_cost_iqd', 'target_profit_iqd', 'margin_iqd', 'premium_rule_id', 'extra_rule_id', 'extra_rule_version', 'fx_rate', 'exchange_rate_used', 'shipping_rate', 'shipping_weight_g', 'shipping_cbm', 'rate_iqd', 'manual_cbm', 'effective_cbm', 'pricing_weight_g', 'pricing_revision', 'pricing_mode']) {
@@ -385,9 +394,82 @@ test('optional vars: a probe whose optional var has no value is SKIPPED, a requi
   assert.doesNotMatch(hit, /secret-slug/, 'a failure line never carries the value');
   // The runner wires it: the CLI vars, the skip and the summary.
   const src = sourceOf('scripts/live-cost-probes.mjs');
-  assert.match(src, /const plan = planProbe\(probe, vars, spec\.vars \?\? \{\}\);/);
+  assert.match(src, /const plan = planProbe\(probe, vars, spec\.vars \?\? \{\}, empty\);/);
+  assert.match(src, /judge\(plan\.probe \?\? probe, status, text, vars\)/, 'a relaxed listing probe is judged as planned');
+  assert.match(src, /await runProbes\(loadProbeFiles\(dir\), \(path\) => get\(base, path\), cliVars\(args\)\)/, 'main runs the exported runner the tests run');
   assert.match(src, /::notice::/);
   assert.match(src, /if \(ran === 0\)/, 'an empty probe set still fails the run');
+});
+
+test('readVar: only a 200 JSON answer whose picked list is there and empty is an empty catalogue; no answer, another status, a body that is not JSON or no list at all is a failed read', () => {
+  const def = { from: '/api/products?limit=1', pick: 'products.0.slug', optional: true };
+  assert.deepEqual(readVar(def, 200, JSON.stringify({ success: true, products: [{ slug: 'a1' }] })), { value: 'a1' });
+  assert.deepEqual(readVar(def, 200, JSON.stringify({ success: true, products: [] })), { empty: true });
+  assert.match(readVar(def, 503, JSON.stringify({ success: true, products: [] })).error, /status 503/, 'a 503 with an empty list is still a failed read');
+  assert.match(readVar(def, 200, '<html>error</html>').error, /not JSON/);
+  assert.match(readVar(def, 200, JSON.stringify({ success: false, error: 'SERVICE_SETUP' })).error, /has no products\.0\.slug/, 'no list at all is not an empty one');
+  assert.match(readVar(def, 200, JSON.stringify({ products: [{ name: 'A1' }] })).error, /has no products\.0\.slug/, 'a listed product without a slug is not an empty catalogue');
+  assert.match(readVar(def, 200, JSON.stringify({ products: {} })).error, /has no/);
+  assert.match(readVar(def, 200, JSON.stringify({ products: [{ slug: 7 }] })).error, /has no products\.0\.slug/, 'a slug that is not text is not a slug');
+});
+
+test('planProbe + judge: requireWhenVar lets the listing\'s prices be absent ONLY while its var is proven empty; integers and forbidden keys still hold; a failed read relaxes nothing', () => {
+  const defs = { slug: { from: '/api/products?limit=1', pick: 'products.0.slug', optional: true } };
+  const listing: Probe = { path: '/api/products?limit=3', status: [200], forbidKeys: 'cost|fx', forbidPattern: 'MANUAL_OVERRIDE', requireIntegerKeys: ['price_iqd'], requireWhenVar: 'slug' };
+  const page: Probe = { path: '/api/products/{slug}', status: [200], requireIntegerKeys: ['price_iqd'] };
+  const empty = new Set(['slug']);
+  // Proven empty: the slug probe skips; the listing runs relaxed.
+  assert.deepEqual(Object.keys(planProbe(page, {}, defs, empty)), ['skip']);
+  const relaxed = planProbe(listing, {}, defs, empty);
+  assert.equal(relaxed.path, '/api/products?limit=3');
+  assert.match(relaxed.notice, /nothing listed yet/);
+  assert.deepEqual(relaxed.probe.requireIntegerKeys, undefined);
+  assert.deepEqual(relaxed.probe.integerKeys, ['price_iqd']);
+  assert.deepEqual(judge(relaxed.probe, 200, JSON.stringify({ success: true, products: [] })), [], 'an empty list answered 200 is not a leak');
+  assert.match(judge(listing, 200, JSON.stringify({ success: true, products: [] })).join('\n'), /required key price_iqd is absent/, 'the unrelaxed probe is what failed the cut-over');
+  assert.match(judge(relaxed.probe, 200, JSON.stringify({ products: [{ price_iqd: '1' }] })).join('\n'), /not integers/, 'a price that does appear is still an integer');
+  assert.match(judge(relaxed.probe, 200, JSON.stringify({ products: [], cost_iqd: 1 })).join('\n'), /forbidden key cost_iqd/, 'the forbidden keys still hold');
+  assert.match(judge(relaxed.probe, 200, '{"products":[],"n":"MANUAL_OVERRIDE"}').join('\n'), /forbidden pattern/);
+  assert.match(judge(relaxed.probe, 500, JSON.stringify({ products: [] })).join('\n'), /status 500/);
+  // A listed slug: the presence rule is back.
+  assert.deepEqual(planProbe(listing, { slug: 'a1' }, defs, new Set()), { path: '/api/products?limit=3' });
+  // A FAILED read (the var has no value but was not proven empty): nothing is relaxed, the slug probes refuse.
+  assert.deepEqual(planProbe(listing, {}, defs, new Set()), { path: '/api/products?limit=3' });
+  assert.match(planProbe(page, {}, defs, new Set()).error, /has no value/, 'a failed read is not an empty catalogue');
+  // A workflow var with no `from`, not given: still a legitimate skip (the clean start's hidden slug).
+  assert.deepEqual(Object.keys(planProbe({ path: '/api/products/{hidden_slug}', status: [404] }, {}, { hidden_slug: { optional: true } })), ['skip']);
+});
+
+/** A fake site for runProbes: answers by path, `throw` for a path that does not answer. */
+function fakeSite(answers: Record<string, { status: number; body: unknown } | 'throw'>) {
+  return async (path: string) => {
+    const a = answers[path];
+    if (a === 'throw') throw Object.assign(new Error('timeout'), { name: 'TimeoutError' });
+    if (!a) return { status: 401, text: '{"success":false}' };
+    return { status: a.status, text: typeof a.body === 'string' ? a.body : JSON.stringify(a.body) };
+  };
+}
+
+test('runProbes: the cut-over run — nothing listed yet — is green with the slug probes skipped; a listing that cannot be read fails the run, never passes as empty', async () => {
+  const lines: string[] = [];
+  const log = (l: string) => lines.push(l);
+  const emptyList = { status: 200, body: { success: true, products: [] } };
+  const site = (listing: { status: number; body: unknown } | 'throw') => fakeSite({ '/api/products?limit=1': listing, '/api/products?limit=3': emptyList, '/api/home': { status: 200, body: { success: true, sections: [] } } });
+  const s1Only = [s1];
+  // The clean start: an empty catalogue answered 200.
+  const green = await runProbes(s1Only, site(emptyList), {}, log);
+  assert.equal(green.failed, 0, lines.filter((l) => l.startsWith('::error::')).join('\n'));
+  assert.ok(green.ran > 0 && green.skipped === 2, `ran ${green.ran}, skipped ${green.skipped}`);
+  assert.ok(lines.some((l) => /::notice::s1\.json: \/api\/products\?limit=3 — nothing listed yet/.test(l)), 'the relaxation is said out loud');
+  // Every way the read can fail is a failure, and the slug probes do not silently skip.
+  for (const [why, listing] of [['no answer', 'throw'], ['a 503', { status: 503, body: { success: true, products: [] } }], ['not JSON', { status: 200, body: '<html>' }], ['no list', { status: 200, body: { success: false } }]] as const) {
+    lines.length = 0;
+    const red = await runProbes(s1Only, site(listing), {}, log);
+    assert.ok(red.failed > 0, `${why}: the run must fail`);
+    assert.ok(lines.some((l) => /^::error::s1\.json: \{slug\} could not be read from \/api\/products\?limit=1/.test(l)), `${why}: the read failure is an error`);
+    assert.equal(red.skipped, 0, `${why}: no slug probe skips on a failed read`);
+    assert.ok(lines.some((l) => /^::error::s1\.json: \/api\/products\/\{slug\} — variable \{slug\} has no value/.test(l)), `${why}: the product page probe refuses`);
+  }
 });
 
 test('the clean start: s1.json and leaks.json read their slug as OPTIONAL, and cleanstart.json probes the hidden product workflow 7 passes in', () => {
@@ -410,7 +492,17 @@ test('the clean start: s1.json and leaks.json read their slug as OPTIONAL, and c
   assert.match(wf, /> \/tmp\/hidden_slug\.json/);
   assert.match(wf, /pv2\.mode = 'engine' AND pv2\.pricing_method IS NOT NULL AND EXISTS \(SELECT 1 FROM pricing_v2_sku_results/);
   assert.match(wf, /--var "hidden_slug=\$hidden"/);
-  assert.ok(wf.indexOf('/tmp/hidden_slug.json') < wf.indexOf('Deploy, carrying every existing var forward'), 'read after the migrations, before the deploy');
+  // Read AFTER the deploy and right before the probes: a product the owner publishes while the deploy
+  // runs (the new Worker accepts V2 publishes the moment it lands) must not turn a good deploy red.
+  const readAt = wf.indexOf('- name: Read one product still waiting for its V2 price (read-only)');
+  const deployAt = wf.indexOf('- name: Deploy, carrying every existing var forward');
+  const verifyAt = wf.indexOf('- name: Verify the live site, read-only');
+  const probesAt = wf.indexOf('- name: Cost-privacy probes, read-only');
+  assert.ok(readAt > 0 && deployAt > 0 && verifyAt > 0 && probesAt > 0, 'the four steps are found');
+  assert.ok(wf.indexOf('> /tmp/hidden_slug.json') > deployAt, 'the hidden product is read after the deploy');
+  assert.ok(readAt > verifyAt && readAt < probesAt, 'after the live verification, before the probes');
+  assert.equal((wf.slice(readAt, probesAt).match(/^\s*- name: /gm) ?? []).length, 1, 'no step between the read and the probes');
+  assert.doesNotMatch(wf.slice(readAt, probesAt), /--yes|--file|INSERT|UPDATE|DELETE/i, 'the read writes nothing');
 });
 
 test('cleanstart.json against the local Worker: a product still waiting for its V2 price is neither shown, found nor searched', async () => {
@@ -429,12 +521,26 @@ test('cleanstart.json against the local Worker: a product still waiting for its 
     failures.push(...(judge(p, res.status, await res.text(), { hidden_slug: hidden }) as string[]).map((f) => `${plan.path}: ${f}`));
   }
   assert.deepEqual(failures, []);
-  // And with an empty catalogue every slug probe of s1.json skips — none fails.
-  const vars: Record<string, string> = {};
-  const listed = JSON.parse(await (await worker.fetch(new Request(`https://${APEX}/api/products?limit=1`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx)).text());
-  assert.equal(pick(listed, 'products.0.slug'), undefined, 'nothing is listed before the first V2 price');
-  for (const p of s1.spec.probes) {
-    const plan = planProbe(p, vars, s1.spec.vars ?? {});
-    assert.ok(!plan.error, `${p.path}: ${plan.error}`);
-  }
+  // And the whole run workflow 7 makes on the cut-over deploy — every probe file, through the same runner,
+  // against this unpublished Worker — is green: the slug probes skip, the listing runs without requiring a
+  // price nothing lists yet, and every other probe passes.
+  const localGet = async (path: string) => {
+    const res = await worker.fetch(new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
+    return { status: res.status, text: await res.text() };
+  };
+  const listed = await localGet('/api/products?limit=1');
+  assert.equal(pick(JSON.parse(listed.text), 'products.0.slug'), undefined, 'nothing is listed before the first V2 price');
+  assert.deepEqual(readVar(s1.spec.vars!.slug, listed.status, listed.text), { empty: true }, 'an empty catalogue, not a failed read');
+  const listing = await localGet('/api/products?limit=3');
+  assert.match(judge(probe('/api/products?limit=3')!, listing.status, listing.text).join('\n'), /required key price_iqd is absent/, 'not vacuous: without requireWhenVar this probe fails the cut-over deploy');
+  const lines: string[] = [];
+  const run = await runProbes(files, localGet, { hidden_slug: hidden }, (l: string) => lines.push(l));
+  assert.deepEqual(lines.filter((l) => l.startsWith('::error::')), []);
+  assert.equal(run.failed, 0);
+  assert.ok(run.ran > 0, 'some probes ran');
+  assert.ok(lines.some((l) => /::notice::s1\.json: \/api\/products\?limit=3 — nothing listed yet/.test(l)), 'the listing ran relaxed');
+  assert.ok(lines.some((l) => /^ok {2}GET \/api\/products\?limit=3 -> 200$/.test(l)), 'and passed');
+  assert.ok(lines.some((l) => /^ok {2}GET \/api\/products\/[^ ]+ -> 404$/.test(l)), 'the hidden product was probed');
+  const slugProbes = files.flatMap((f) => f.spec.probes.filter((p) => /\{slug\}/.test(p.path))).length;
+  assert.equal(run.skipped, slugProbes, 'every {slug} probe skipped, nothing else');
 });

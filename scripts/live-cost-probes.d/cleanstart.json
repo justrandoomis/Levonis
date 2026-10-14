@@ -3,7 +3,7 @@
   "vars": {
     "hidden_slug": {
       "optional": true,
-      "note": "workflow 7 reads one active ordinary product that is not V2-published (read-only) and passes --var hidden_slug=…; once every product is published there is none and these probes skip with a notice"
+      "note": "workflow 7 reads one active ordinary product that is not V2-published (read-only), after the deploy and right before the probes (a product published while the deploy ran is not mistaken for a leak), and passes --var hidden_slug=…; once every product is published there is none and these probes skip with a notice"
     }
   },
   "probes": [
