@@ -37,8 +37,9 @@ export default {
         // rules (tests/userPatchPolicy.test.ts, tests/adminPromotionDefault.test.ts).
         'PATCH /users/:id': { cls: 'op', path: '/api/admin/users/u1', body: { membership_tier: 'plus' } },
         'GET /products': 'op',
-        // The legacy save binds the cost only for the owner (leak L3).
-        'POST /products': { cls: 'op', body: { id: 'p_a1', name: 'Bambu Lab A1', slug: 'a1', price_iqd: 910000 } },
+        // The legacy save bound dinar prices straight into the row; the Pricing V2 clean start (DECISIONS
+        // row 222) closed it for every request (409 PRICING_V2_MANAGED, worker/routes/admin.ts).
+        'POST /products': { cls: 'op', noBody: 'closed by the Pricing V2 clean start: every request answers 409 PRICING_V2_MANAGED before anything is read, so no body is valid' },
         'DELETE /products/:id': { cls: 'op', noBody: 'removes a product row (refused while history holds it); answers ids only' },
         'GET /wallet-requests': 'op',
         // The deposit desk is an assistant duty (tests/communityMoneyScope.test.ts «desk»).

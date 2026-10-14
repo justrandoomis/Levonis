@@ -22,7 +22,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ppWorld, type PpWorld } from './sv2_price-protection_fixture';
+import { PRE_V5, ppWorld, type PpWorld } from './sv2_price-protection_fixture';
 import { get, json, post, stubApp } from './fixtures/app';
 import { priceProtectionRoutes } from '../worker/routes/returns';
 import { PRICE_PROTECTION_NOTICES, PRICE_PROTECTION_REASONS, PRICE_PROTECTION_REASON_CODES } from '../packages/contracts/src/priceProtection';
@@ -68,16 +68,19 @@ test('PP-B2 a model that inherits the base price IS compared with the base price
 test('PP-B2 the model’s own dip, raised back inside the window, still counts — and the base rows never do', async () => {
   const w = ppWorld();
   printer(w);
-  const { itemId } = w.deliveredLine({ productId: 'pm', unit: 350_000, optionId: 'pm_combo' });
-  w.priceRow('pm', 'option:pm_combo', 350_000, 320_000, ago(40_000));
-  w.priceRow('pm', 'option:pm_combo', 320_000, 350_000, ago(30_000));
+  // Since the clean start (DECISIONS row 222) the Combo's own price is its V2 model price: the V2 writer
+  // alone moves it and records each move in the Combo's own `sku:` history — no base row is its price.
+  await w.publish('pm');
+  const { itemId } = w.deliveredLine({ productId: 'pm', unit: 350_000, optionId: 'pm_combo', createdAt: PRE_V5 });
+  await w.priceV2('pm', { product: 200_000, models: { pm_combo: 320_000 } });
+  await w.priceV2('pm', { product: 200_000, models: { pm_combo: 350_000 } });
   w.priceRow('pm', '', 200_000, 150_000, ago(20_000));
   const c = await w.claim(itemId);
   assert.equal(c.status, 200, JSON.stringify(c.body));
   assert.equal(c.body.claim.observed_unit_iqd, 320_000, 'the Combo’s own 320,000, never the base’s 150,000');
   const snap = JSON.parse(String((w.raw.prepare('SELECT policy_snapshot p FROM price_protection_claims').get() as { p: string }).p));
-  assert.deepEqual(snap.history_keys, ['option:pm_combo']);
-  assert.equal(snap.today_rung, 'option');
+  assert.deepEqual(snap.history_keys, [], 'no hand-written row is a V2 model’s price');
+  assert.equal(snap.today_rung, 'sku');
 });
 
 test('PP-B2 a line whose model changed rung since checkout reads only today’s price, never the raw rows', async () => {
@@ -108,18 +111,19 @@ function twoChannels(w: PpWorld) {
 test('PP-B3 a pre-order paid cash on delivery is compared with the direct schedule it was charged', async () => {
   const w = ppWorld();
   twoChannels(w);
+  // The clean start (DECISIONS row 222): published in V2 — direct 950,000, the air pre-order 900,000 under it.
+  await w.publish('pf');
   const { itemId } = w.deliveredLine({
-    productId: 'pf', unit: 950_000, optionId: 'pf_a',
+    productId: 'pf', unit: 950_000, optionId: 'pf_a', createdAt: PRE_V5,
     pricing: { pricing_basis: 'direct', fulfillment: { type: 'pre_order' } },
     transport: { method: 'air', commission_iqd: 0, waived: true, waived_by: 'cod_direct_pricing' },
   });
   // Only the pre-order price falls: the cash-on-delivery buyer paid the direct price, which did not.
-  w.raw.exec(`UPDATE product_option_fulfillment SET regular_price_iqd = 870000 WHERE id = 'pf_a_p';
-              UPDATE product_option_transports SET regular_price_iqd = 870000 WHERE id = 'pf_a_p_air';`);
+  await w.priceV2('pf', { product: 950_000, preorder: 870_000 });
   const none = await w.claim(itemId);
   assert.equal(none.body.code, 'NO_ELIGIBLE_DROP', JSON.stringify(none.body));
   // The direct price falls: that is this buyer's drop.
-  w.raw.exec(`UPDATE product_option_fulfillment SET regular_price_iqd = 920000 WHERE id = 'pf_a_d'`);
+  await w.priceV2('pf', { product: 920_000, preorder: 870_000 });
   const c = await w.claim(itemId);
   assert.equal(c.status, 200, JSON.stringify(c.body));
   assert.equal(c.body.claim.observed_unit_iqd, 920_000);
@@ -129,11 +133,14 @@ test('PP-B3 a pre-order channel closed today is never compared with the direct p
   const w = ppWorld();
   twoChannels(w);
   const { itemId } = w.deliveredLine({
-    productId: 'pf', unit: 900_000, optionId: 'pf_a',
+    productId: 'pf', unit: 900_000, optionId: 'pf_a', createdAt: PRE_V5,
     pricing: { pricing_basis: 'preorder' }, transport: { method: 'air', commission_iqd: 0 },
   });
+  // Today the model is no longer sold by pre-order and its direct price is lower — the product as the
+  // clean start publishes it in V2 (DECISIONS row 222): the pre-order channel has no V2 result.
   w.raw.exec(`UPDATE product_option_fulfillment SET enabled = 0 WHERE id = 'pf_a_p';
               UPDATE product_option_fulfillment SET regular_price_iqd = 850000 WHERE id = 'pf_a_d';`);
+  await w.publish('pf');
   const c = await w.claim(itemId);
   assert.equal(c.status, 400, `the pre-order buyer was paid at the direct price: ${JSON.stringify(c.body)}`);
   assert.equal(c.body.code, 'NO_ELIGIBLE_DROP', 'a closed channel has no price today — not a support case');
@@ -141,26 +148,27 @@ test('PP-B3 a pre-order channel closed today is never compared with the direct p
 
 // ------------------------------------------------------------------ PP-B4
 
-test('PP-B4 a PRIME buyer of a model is compared with that model’s own PRIME price; a regular buyer of it only with the regular one', async () => {
+test('PP-B4 a member buyer of a model is compared with that model’s own member price; a regular buyer of it only with the regular one', async () => {
   const w = ppWorld();
   printer(w);
-  w.raw.exec(`UPDATE product_option_values SET prime_price_iqd = 330000 WHERE id = 'pm_combo'`);
-  const prime = w.deliveredLine({ productId: 'pm', unit: 330_000, optionId: 'pm_combo', pricing: { applied_tier: 'prime', applied_iqd: 330_000, regular_iqd: 350_000 } });
-  const regular = w.deliveredLine({ productId: 'pm', unit: 350_000, optionId: 'pm_combo' });
-  // The Combo's PRIME price dips to 310,000 and comes back; its regular price never moves.
-  w.priceRow('pm', 'option:pm_combo', 330_000, 310_000, ago(40_000), 'prime');
-  w.priceRow('pm', 'option:pm_combo', 310_000, 330_000, ago(30_000), 'prime');
-  const p = await w.claim(prime.itemId);
+  // Since the clean start (DECISIONS row 222) a member price is a membership rule over the model's V2
+  // price, never a typed rung — and only PRO carries a discount rule (PREMIUM/PRIME: free delivery only).
+  await w.publish('pm');
+  const member = w.deliveredLine({ productId: 'pm', unit: 330_000, optionId: 'pm_combo', createdAt: PRE_V5, pricing: { applied_tier: 'pro', applied_iqd: 330_000, regular_iqd: 350_000 } });
+  const regular = w.deliveredLine({ productId: 'pm', unit: 350_000, optionId: 'pm_combo', createdAt: PRE_V5 });
+  // Today a 10% PRO rule prices the Combo's PRO buyers at 315,000; its regular price never moves.
+  await w.memberRule('pro', 'pm', 10);
+  const p = await w.claim(member.itemId);
   assert.equal(p.status, 200, JSON.stringify(p.body));
-  assert.equal(p.body.claim.observed_unit_iqd, 310_000);
+  assert.equal(p.body.claim.observed_unit_iqd, 315_000);
   const r = await w.claim(regular.itemId);
-  assert.equal(r.body.code, 'NO_ELIGIBLE_DROP', 'a PRIME price is never a regular buyer’s drop');
-  // Today the Combo's PRIME price falls for good: the PRIME buyer is compared with it.
-  w.raw.exec(`UPDATE product_option_values SET prime_price_iqd = 300000 WHERE id = 'pm_combo'`);
+  assert.equal(r.body.code, 'NO_ELIGIBLE_DROP', 'a member price is never a regular buyer’s drop');
+  // The model's own price falls for good: the PRO buyer is compared with that model's PRO price.
   await w.decide(w.owner, p.body.claim.id);
-  const again = await w.claim(prime.itemId);
+  await w.priceV2('pm', { product: 200_000, models: { pm_combo: 330_000 } });
+  const again = await w.claim(member.itemId);
   assert.equal(again.status, 200, JSON.stringify(again.body));
-  assert.equal(again.body.claim.observed_unit_iqd, 300_000);
+  assert.equal(again.body.claim.observed_unit_iqd, 297_000, '330,000 less the 10% PRO rule');
 });
 
 // ------------------------------------------------------------------ PP-B6 / PP-B7
@@ -263,7 +271,10 @@ test('the sheet: the price rows of the window (never a cost row), which ones thi
   assert.equal(sheet.success, true, JSON.stringify(sheet));
   assert.deepEqual(
     sheet.evidence.map((e: { key: string; field: string; new_iqd: number; counted: boolean; by_owner: boolean }) => [e.key, e.field, e.new_iqd, e.counted, e.by_owner]),
-    [['', 'regular', 45_000, true, true], ['option:elsewhere', 'regular', 10_000, false, true]]
+    // Since the clean start (DECISIONS row 222) the product sells at its V2 price: the row the V2 writer
+    // recorded when it published it (`sku:`, the line's own SKU × channel) is the one compared; the
+    // hand-written base row is shown but is no longer the line's price.
+    [['', 'regular', 45_000, false, true], ['option:elsewhere', 'regular', 10_000, false, true], ['sku:@direct_sale', 'regular', 40_000, true, true]]
   );
   assert.doesNotMatch(JSON.stringify(sheet), /cost|profit|usd|rate/i, 'no cost, profit or rate on the staff sheet');
   assert.deepEqual(sheet.now, { paid_unit_iqd: 50_000, per_unit_iqd: 10_000, units: 1, prior_credited_iqd: 0, credit_iqd: 10_000 });

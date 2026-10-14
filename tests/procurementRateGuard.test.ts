@@ -234,7 +234,8 @@ test('F17: the owner finance screens give every loc() its own Sorani — never t
     // The panel's funding step (step 0) and product step (step 1).
     'src/components/adminOperations/PurchaseFundingFields.tsx',
     'src/components/adminOperations/StockSelection.tsx',
-    'src/components/adminOperations/SelectionPriceUpdate.tsx',
+    // SelectionPriceUpdate (a dinar store-price door) was deleted by the Pricing V2 clean start (DECISIONS
+    // row 222); its successor, the product's purchase review, is pinned below.
     'src/components/financePeople/LegacyInvestmentHistory.tsx',
   ]) {
     const calls = locCalls(path);
@@ -251,4 +252,13 @@ test('F17: the owner finance screens give every loc() its own Sorani — never t
   // «إضافة مخزون موجود», the finding's example, reads in Sorani.
   assert.match(src('src/components/adminOperations/ProcurementPanel.tsx'), /loc\('إضافة مخزون موجود', 'Add stock on hand', 'زیادکردنی کۆگای ئامادە'\)/);
   assert.match(src('src/components/adminOperations/ProcurementPanel.tsx'), /loc\(p\.name_ar, p\.name_en, p\.name_ckb\)/);
+  // The purchase review (Pricing V2 D1) that replaced SelectionPriceUpdate: every entry of its string
+  // table carries its own Sorani.
+  const review = src('src/components/adminProducts/form/v2/PurchaseReviewCard.tsx');
+  const entries = [...review.matchAll(/\{ ar: '([^']*)', en: '[^']*', ckb: '([^']*)' \}/g)];
+  assert.ok(entries.length >= 9, 'the purchase review string table');
+  for (const [, ar, ckb] of entries) {
+    assert.notEqual(ckb, ar, `PurchaseReviewCard: the Sorani slot carries the Arabic (${ar})`);
+    assert.doesNotMatch(ckb!, /[ةىيك]/, `PurchaseReviewCard: an Arabic-only letter in the Sorani (${ckb})`);
+  }
 });

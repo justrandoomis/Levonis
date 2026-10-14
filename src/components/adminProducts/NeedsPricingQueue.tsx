@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, ImageOff, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api';
+import VariantImg from '../ui/VariantImg';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
 import { NEEDS_PRICING as S, tri, type QueueLang } from './needsPricingStrings';
@@ -217,7 +218,7 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
               <li key={p.id} data-queue-product={p.id} className={`${T.surface} flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center`}>
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)]">
-                    {p.image ? <img src={p.image} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <ImageOff className={`h-5 w-5 ${T.text3}`} aria-hidden />}
+                    {p.image ? <VariantImg sizes="48px" src={p.image} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <ImageOff className={`h-5 w-5 ${T.text3}`} aria-hidden />}
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">

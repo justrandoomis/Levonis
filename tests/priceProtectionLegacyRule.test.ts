@@ -24,6 +24,14 @@
  * When FX-4 adds the dollar rule for engine-priced products, every case here
  * is a MANUALLY priced product and must stay green unchanged.
  *
+ * Since Pricing V2's clean start (DECISIONS row 222) no product sells at a
+ * hand-typed dinar price: the product is V2-published, its prices move only
+ * through the V2 writer (the engine locks refuse an UPDATE), the writer's own
+ * `sku:` rows are its price record, and a member price is a PRO membership
+ * rule, never a typed rung. The orders here predate policy v5 (2026-10-09),
+ * so version 4's dinar rule is still the one that decides them — every
+ * article below is pinned on those terms.
+ *
  * Run: node --import tsx --test tests/priceProtectionLegacyRule.test.ts
  */
 import { test } from 'node:test';
@@ -31,12 +39,16 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, json, post, row, type StubUser } from './fixtures/app';
 import { priceProtectionRoutes } from '../worker/routes/returns';
+import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
+import { publishV2, repriceV2 } from './fixtures/v2Publish';
 
 const RATE = 1400;
 const HOUR = 3_600_000;
 const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
 /** Delivered a day ago: inside the seven-day window. */
 const DELIVERED_AT = iso(24 * HOUR);
+/** Ordered before `price_protection` v5 (2026-10-09): version 4's dinar rule decides the claim. */
+const ORDERED_AT = '2026-10-08T09:00:00.000Z';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const proBuyer: StubUser = { id: 'pro_b', role: 'customer', email: 'r@x.co' };
@@ -65,7 +77,7 @@ interface Line {
  * delivered order per buyer holding the given lines, each with the checkout
  * snapshot of the price class it was bought at.
  */
-function world(lines: { buyer?: Line[]; pro_b?: Line[] }): DatabaseSync {
+async function world(lines: { buyer?: Line[]; pro_b?: Line[] }, o: { proPercent?: number } = {}): Promise<DatabaseSync> {
   const raw = freshDb();
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role) VALUES
@@ -81,10 +93,10 @@ function world(lines: { buyer?: Line[]; pro_b?: Line[] }): DatabaseSync {
     raw
       .prepare(
         `INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
-                             subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at)
-         VALUES (?,?,'delivered','{}','standard','{}','cash',?,0,?,?,0,?)`
+                             subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at,created_at)
+         VALUES (?,?,'delivered','{}','standard','{}','cash',?,0,?,?,0,?,?)`
       )
-      .run(orderId, user, total, RATE, total, DELIVERED_AT);
+      .run(orderId, user, total, RATE, total, DELIVERED_AT, ORDERED_AT);
     for (const l of items) {
       const qty = l.qty ?? 1;
       raw
@@ -101,15 +113,30 @@ function world(lines: { buyer?: Line[]; pro_b?: Line[] }): DatabaseSync {
         );
     }
   }
+  // The clean start: p1 sells at its V2 price (100,000, published through the real writer), and its PRO
+  // price is a PRO membership rule over it (10% → 90,000, the seeded PRO price).
+  await publishV2(raw, 'p1');
+  await proRule(raw, o.proPercent ?? 10);
   return raw;
 }
 
+/** The PRO membership rule on p1 (a member price since the clean start). */
+async function proRule(raw: DatabaseSync, percent: number) {
+  const app = stubApp(asD1(raw), admin, (a) => a.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes));
+  const res = await post(app, '/api/admin/membership-benefits', { tier: 'pro', benefit_type: 'product_discount', scope: 'product', product_id: 'p1', discount_mode: 'percent', percent });
+  assert.equal(res.status, 200, await res.clone().text());
+}
+
+/**
+ * A row of p1's price record, as the V2 writer records one (`sku:` — the product's one SKU, direct sale),
+ * dated in the past; a `pro` row is a member price no V2 writer records — the claim never reads one.
+ */
 const history = (raw: DatabaseSync, field: 'regular' | 'pro', newIqd: number, msAgo: number) =>
   raw
-    .prepare("INSERT INTO price_history (product_id,variant_key,field,old_iqd,new_iqd,changed_by,changed_at) VALUES ('p1','',?,NULL,?,'boss',?)")
+    .prepare("INSERT INTO price_history (product_id,variant_key,field,old_iqd,new_iqd,changed_by,changed_at,price_source) VALUES ('p1','sku:@direct_sale',?,NULL,?,'boss',?,'engine_owner')")
     .run(field, newIqd, iso(msAgo));
-const setPrice = (raw: DatabaseSync, regular: number, pro: number | null = 90_000) =>
-  raw.prepare("UPDATE products SET price_iqd = ?, pro_price_iqd = ? WHERE id = 'p1'").run(regular, pro);
+/** A price move: through the V2 writer, never an UPDATE (the engine locks refuse it since the clean start). */
+const setPrice = (raw: DatabaseSync, regular: number) => repriceV2(raw, 'p1', regular);
 /**
  * The claim's comparison snapshot is staff material (PP-B7): the customer's
  * answer no longer carries it, so these pins read the stored row.
@@ -118,13 +145,13 @@ const snapshot = (raw: DatabaseSync, c: Record<string, unknown>) =>
   JSON.parse(String(row<{ p: string }>(raw, 'SELECT policy_snapshot AS p FROM price_protection_claims WHERE id = ?', c.id)!.p)) as Record<string, unknown>;
 
 test('10.4 — a drop: the paid unit price against today’s price, times the quantity, in dinars', async () => {
-  const raw = world({ buyer: [{ id: 'oi_1', product: 'p1', qty: 2, paid: 100_000 }] });
+  const raw = await world({ buyer: [{ id: 'oi_1', product: 'p1', qty: 2, paid: 100_000 }] });
 
   // No fall, no claim.
   const none = await claim(raw, buyer, 'oi_1');
   assert.equal(none.code, 'NO_ELIGIBLE_DROP', JSON.stringify(none));
 
-  setPrice(raw, 92_000);
+  await setPrice(raw, 92_000);
   const res = await claim(raw, buyer, 'oi_1');
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.original_unit_iqd, 100_000);
@@ -141,7 +168,7 @@ test('10.4 — a drop: the paid unit price against today’s price, times the qu
 });
 
 test('10.6 — a fall raised back within the window still counts; one before delivery, or on the PRO price, does not', async () => {
-  const raw = world({ buyer: [{ id: 'oi_1', product: 'p1', paid: 100_000 }] });
+  const raw = await world({ buyer: [{ id: 'oi_1', product: 'p1', paid: 100_000 }] });
   // Today's price is back at 100,000, but it was 85,000 twelve hours ago.
   history(raw, 'regular', 85_000, 12 * HOUR);
   // Neither of these can lower a regular buyer's comparison:
@@ -150,19 +177,22 @@ test('10.6 — a fall raised back within the window still counts; one before del
   const res = await claim(raw, buyer, 'oi_1');
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.observed_unit_iqd, 85_000);
-  assert.equal(snapshot(raw, res.claim).history_min_iqd, 85_000);
+  // The 85,000 is the V2 writer's own row of the product's SKU (observed above); no hand-written row
+  // is a V2 product's price, so the manual minimum is empty.
+  assert.equal(snapshot(raw, res.claim).history_min_iqd, null);
   assert.equal(snapshot(raw, res.claim).current_applied_iqd, 100_000);
   assert.equal(snapshot(raw, res.claim).computed_eligible_iqd, 15_000);
 });
 
 test('10.5 — a regular buyer is never compared with a PRO price; a PRO buyer is compared with the PRO price or the regular one', async () => {
-  const raw = world({
-    buyer: [{ id: 'oi_r', product: 'p1', paid: 100_000 }],
-    pro_b: [{ id: 'oi_p', product: 'p1', paid: 90_000, tier: 'pro' }],
-  });
-
-  // Only the PRO price fell: the regular buyer has nothing to claim.
-  setPrice(raw, 100_000, 80_000);
+  // Only the PRO price fell (the PRO rule is now 20%: 80,000): the regular buyer has nothing to claim.
+  const raw = await world(
+    {
+      buyer: [{ id: 'oi_r', product: 'p1', paid: 100_000 }],
+      pro_b: [{ id: 'oi_p', product: 'p1', paid: 90_000, tier: 'pro' }],
+    },
+    { proPercent: 20 }
+  );
   const regular = await claim(raw, buyer, 'oi_r');
   assert.equal(regular.code, 'NO_ELIGIBLE_DROP', JSON.stringify(regular));
 
@@ -174,7 +204,7 @@ test('10.5 — a regular buyer is never compared with a PRO price; a PRO buyer i
   assert.equal(pro.claim.observed_unit_iqd, 80_000);
 
   // …and, for a PRO buyer, a regular price recorded lower in the window counts too.
-  const raw2 = world({ pro_b: [{ id: 'oi_p', product: 'p1', paid: 90_000, tier: 'pro' }] });
+  const raw2 = await world({ pro_b: [{ id: 'oi_p', product: 'p1', paid: 90_000, tier: 'pro' }] });
   history(raw2, 'regular', 75_000, 6 * HOUR);
   const pro2 = await claim(raw2, proBuyer, 'oi_p');
   assert.equal(pro2.success, true, JSON.stringify(pro2));
@@ -182,7 +212,7 @@ test('10.5 — a regular buyer is never compared with a PRO price; a PRO buyer i
 });
 
 test('bundles — the parent is refused by name; a part is measured from its paid share, never its catalogue value', async () => {
-  const raw = world({
+  const raw = await world({
     buyer: [
       { id: 'oi_parent', product: 'p_bundle', paid: 180_000, optionId: 'bx_starter' },
       { id: 'oi_part', product: 'p1', paid: 0, parent: 'oi_parent', componentValue: 100_000, componentAlloc: 80_000 },
@@ -192,11 +222,11 @@ test('bundles — the parent is refused by name; a part is measured from its pai
   assert.equal(parent.code, 'COMPOSITION_NOT_ELIGIBLE', JSON.stringify(parent));
 
   // 90,000 is below the catalogue value but above the 80,000 actually paid.
-  setPrice(raw, 90_000);
+  await setPrice(raw, 90_000);
   const above = await claim(raw, buyer, 'oi_part');
   assert.equal(above.code, 'NO_ELIGIBLE_DROP', JSON.stringify(above));
 
-  setPrice(raw, 70_000);
+  await setPrice(raw, 70_000);
   const res = await claim(raw, buyer, 'oi_part');
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.original_unit_iqd, 80_000, 'the paid share');
@@ -205,9 +235,9 @@ test('bundles — the parent is refused by name; a part is measured from its pai
 });
 
 test('10.8 and 10.9 — one open claim at a time, and earlier credits are deducted up to the whole difference', async () => {
-  const raw = world({ buyer: [{ id: 'oi_1', product: 'p1', paid: 100_000 }] });
+  const raw = await world({ buyer: [{ id: 'oi_1', product: 'p1', paid: 100_000 }] });
 
-  setPrice(raw, 90_000);
+  await setPrice(raw, 90_000);
   const first = await claim(raw, buyer, 'oi_1');
   assert.equal(first.success, true, JSON.stringify(first));
   const pending = await claim(raw, buyer, 'oi_1');
@@ -217,7 +247,7 @@ test('10.8 and 10.9 — one open claim at a time, and earlier credits are deduct
   assert.equal(approved.claim.credited_iqd, 10_000);
 
   // A further fall: only the part not already paid out.
-  setPrice(raw, 85_000);
+  await setPrice(raw, 85_000);
   const second = await claim(raw, buyer, 'oi_1');
   assert.equal(second.success, true, JSON.stringify(second));
   assert.equal(snapshot(raw, second.claim).eligible_total_iqd, 15_000);

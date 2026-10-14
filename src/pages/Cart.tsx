@@ -1500,7 +1500,7 @@ export default function Cart() {
             {unavailableLines.map((line) => (
               <div key={line.cart_item_id} className="flex min-w-0 items-center gap-3" data-cart-unavailable-line={line.cart_item_id}>
                 {line.image ? (
-                  <img src={line.image} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-lg object-cover opacity-60" />
+                  <VariantImg sizes="56px" src={line.image} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover opacity-60" />
                 ) : (
                   <div className="h-14 w-14 shrink-0 rounded-lg bg-surface-raised" aria-hidden="true" />
                 )}

@@ -127,10 +127,14 @@ test('the legacy admin route refuses every structural save before any write', ()
   assert.match(handler, /LEGACY_PRODUCT_STRUCTURE_UNSUPPORTED/);
   assert.match(handler, /products-v2/, 'the refusal must name the route that writes both');
 
-  // The check comes BEFORE the write, which is the only place it means anything.
+  // The check comes BEFORE any write, which is the only place it means anything. Since the Pricing V2
+  // clean start (DECISIONS row 222) the handler writes nothing at all: after this guard it refuses every
+  // request (409 PRICING_V2_MANAGED — its dinar price door is closed).
+  const own = handler.slice(0, handler.indexOf('adminRoutes.', 1));
+  assert.doesNotMatch(own, /INSERT INTO products|UPDATE products/, 'the legacy save writes no product row');
   assert.ok(
-    handler.indexOf('LEGACY_PRODUCT_STRUCTURE_UNSUPPORTED') < handler.indexOf('INSERT INTO products'),
-    'the guard must precede the upsert'
+    own.indexOf('LEGACY_PRODUCT_STRUCTURE_UNSUPPORTED') < own.indexOf("'PRICING_V2_MANAGED'"),
+    'the structural guard answers first, then the closed door'
   );
 });
 

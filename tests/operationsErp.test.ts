@@ -23,6 +23,7 @@ import { planLotRestore } from '../worker/lib/inventoryLots';
 import { parsePurchaseCsv } from '../worker/lib/purchaseCsv';
 import { getOrderProfitBase } from '../worker/lib/orderProfit';
 import type { Env } from '../worker/lib/types';
+import { repriceV2 } from './fixtures/v2Publish';
 
 const ADMIN = { id: 'admin', email: 'boss@x.co', role: 'admin' as const };
 function setup() {
@@ -152,7 +153,10 @@ test('CSV parses quoted commas and refuses unknown or ambiguous selections befor
 test('purchase selection fills latest cost and resolved selling price, and refuses foreign child ids', async () => {
   const { raw, db, app } = setup();
   assert.equal((await productSelections(db, 'printer'))[0].purchase_unit_iqd, 10000);
-  raw.exec("UPDATE products SET direct_surcharge_iqd=2000 WHERE id='printer'");
+  // Since the Pricing V2 clean start (DECISIONS row 222) the selling reference is the store's V2 direct
+  // price: none («يحتاج تسعيرًا») until the product is priced, and no typed Direct Sale Extra adds to it.
+  assert.equal((await productSelections(db, 'printer'))[0].selling_price_iqd, null);
+  await repriceV2(raw, 'printer', 52_000);
   assert.equal((await productSelections(db, 'printer'))[0].selling_price_iqd, 52000);
   const invalid = await post(
     app,

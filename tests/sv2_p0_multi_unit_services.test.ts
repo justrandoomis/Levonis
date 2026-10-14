@@ -21,7 +21,8 @@ import { json, post, get, row, send, ctx, stubApp } from './fixtures/app';
 import { LimitD1 } from './fixtures/d1Limits';
 import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { deviceRoutes } from '../worker/routes/devices';
-import { ppWorld } from './sv2_price-protection_fixture';
+import { PRE_V5, ppWorld } from './sv2_price-protection_fixture';
+import { repriceV2 } from './fixtures/v2Publish';
 import { CUSTOMER, STAFF, adminApp, customerApp, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 import { REQUIRED_PHOTOS, blankInputs } from '../packages/pricing/src/tradeIn';
 
@@ -75,8 +76,10 @@ test('F7: the protection credited for unit 2 alone comes off unit 2’s trade-in
   // Unit 1 goes into a trade-in (its base frozen at what was paid).
   const t1 = await submitted(raw);
   assert.equal(row<{ base_iqd: number }>(raw, "SELECT base_iqd FROM trade_in_components WHERE request_id = ? AND role = 'device'", t1)!.base_iqd, paid);
-  // The A1 drops 50,000; the claim covers the one unit not in a trade-in.
-  raw.exec(`UPDATE products SET price_iqd = 800000 WHERE id = 'p_a1'; UPDATE product_option_values SET regular_price_iqd = 800000 WHERE id = 'v_a1';`);
+  // The A1 drops 50,000 — through the V2 writer (the clean start, DECISIONS row 222: the trade-in's
+  // customer request already published it, and the engine locks refuse an UPDATE); the claim covers
+  // the one unit not in a trade-in.
+  await repriceV2(raw, 'p_a1', 800_000);
   const pp = (who: typeof CUSTOMER) => stubApp(dbOf(raw), who, (a) => a.route('/api/price-protection', priceProtectionRoutes));
   const filed = await json(await post(pp(CUSTOMER), '/api/price-protection/claims', { orderItemId: 'oi_a1' }));
   assert.equal(filed.success, true, JSON.stringify(filed));
@@ -121,19 +124,24 @@ test('F8: a direct line is compared on its own channel — a removed direct cell
       VALUES ('pf_a_d', 'pf', 'pf_a', 'direct_sale', 1, 950000), ('pf_a_p', 'pf', 'pf_a', 'pre_order', 1, 900000);
     INSERT INTO product_option_transports (id, product_id, fulfillment_id, method, enabled, surcharge_iqd, regular_price_iqd)
       VALUES ('pf_a_p_air', 'pf', 'pf_a_p', 'air', 1, 0, 900000);`);
+  // The clean start (DECISIONS row 222): published in V2 — direct 950,000, the air pre-order 900,000.
+  await w.publish('pf');
   const direct = { pricing_basis: 'direct', fulfillment: { type: 'direct_sale' }, price_source: 'fulfillment' };
-  const { itemId } = w.deliveredLine({ productId: 'pf', unit: 950_000, optionId: 'pf_a', pricing: direct });
+  const { itemId } = w.deliveredLine({ productId: 'pf', unit: 950_000, optionId: 'pf_a', pricing: direct, createdAt: PRE_V5 });
   assert.equal((await w.claim(itemId)).body.code, 'NO_ELIGIBLE_DROP');
-  // The shop removes the direct cell (pre-order only now). No price fell on the direct channel.
-  w.raw.exec(`DELETE FROM product_option_fulfillment WHERE id = 'pf_a_d'; UPDATE products SET sale_types = '["pre_order"]' WHERE id = 'pf'`);
+  // The shop removes the direct cell (pre-order only now) and re-prices: the V2 writer prices no direct
+  // channel any more. No price fell on the direct channel.
+  w.structure('pf', `DELETE FROM product_option_fulfillment WHERE id = 'pf_a_d'; UPDATE products SET sale_types = '["pre_order"]' WHERE id = 'pf'`);
+  await w.priceV2('pf', { product: 900_000 });
   const closed = await w.claim(itemId);
   assert.equal(closed.status, 400, JSON.stringify(closed.body));
   assert.equal(closed.body.code, 'NO_ELIGIBLE_DROP');
-  // A real drop on the direct channel is still paid (a second direct line, its cell lowered).
-  w.raw.exec(`INSERT INTO product_option_fulfillment (id, product_id, option_id, fulfillment_type, enabled, regular_price_iqd)
-                VALUES ('pf_a_d2', 'pf', 'pf_a', 'direct_sale', 1, 920000);
-              UPDATE products SET sale_types = '["direct_sale","pre_order"]' WHERE id = 'pf'`);
-  const second = w.deliveredLine({ productId: 'pf', unit: 950_000, optionId: 'pf_a', pricing: direct });
+  // A real drop on the direct channel is still paid (a second direct line, the direct channel back at 920,000).
+  w.structure('pf', `INSERT INTO product_option_fulfillment (id, product_id, option_id, fulfillment_type, enabled, regular_price_iqd)
+                       VALUES ('pf_a_d2', 'pf', 'pf_a', 'direct_sale', 1, 920000);
+                     UPDATE products SET sale_types = '["direct_sale","pre_order"]' WHERE id = 'pf'`);
+  await w.priceV2('pf', { product: 920_000, preorder: 900_000 });
+  const second = w.deliveredLine({ productId: 'pf', unit: 950_000, optionId: 'pf_a', pricing: direct, createdAt: PRE_V5 });
   const paid = await w.claim(second.itemId);
   assert.equal(paid.status, 200, JSON.stringify(paid.body));
   assert.equal(paid.body.claim.observed_unit_iqd, 920_000);

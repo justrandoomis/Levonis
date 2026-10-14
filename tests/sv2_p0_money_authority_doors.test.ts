@@ -22,7 +22,7 @@ import { giftRoutes } from '../worker/routes/gifts';
 import { reviewRoutes } from '../worker/routes/reviews';
 import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
-import { ppWorld } from './sv2_price-protection_fixture';
+import { ppWorld, PRE_V5 } from './sv2_price-protection_fixture';
 import { legacyBox } from './fixtures/giftWorld';
 import { adminApp, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 
@@ -175,7 +175,10 @@ test('F6: the author of a PRO rule that makes the drop does not approve the clai
     a.route('/api/price-protection', priceProtectionRoutes);
     a.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
   });
-  const { itemId } = w.deliveredLine({ productId: 'p', unit: 1_000_000, pricing: { applied_tier: 'pro', applied_iqd: 1_000_000, regular_iqd: 1_000_000 } });
+  // The order predates policy v5: since the clean start (DECISIONS row 222) every product a customer can
+  // buy is V2- (engine-) priced, and a v5 order's claim compares the base price in USD (owner decision
+  // 6), which a member rule never moves — under 10.4's dinar rule the PRO rule's drop is the claim.
+  const { itemId } = w.deliveredLine({ productId: 'p', unit: 1_000_000, createdAt: PRE_V5, pricing: { applied_tier: 'pro', applied_iqd: 1_000_000, regular_iqd: 1_000_000 } });
   const rule = await post(as('fin'), '/api/admin/membership-benefits', { tier: 'pro', benefit_type: 'product_discount', scope: 'product', product_id: 'p', discount_mode: 'percent', percent: 20 });
   assert.equal(rule.status, 200, await rule.clone().text());
   const filed = await w.claim(itemId);

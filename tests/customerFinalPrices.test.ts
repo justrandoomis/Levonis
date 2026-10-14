@@ -12,11 +12,14 @@
  *       `price_source`, `member_rule`, fee by name or raw ladder — except the
  *       three facts a customer screen still renders (DEFERRED to V2-7).
  *
- * The C2/C5 fixture is the payment suite's: one product sold both ways (base
- * 100,000; sea commission 15,000; direct premium 50,000), here with a live
- * offer of 10,000 off for everyone. The C3 fixture is the engine's census
- * product `bambu-lab-pla-matte-1kg` (2 models × 25 colours), saved through the
- * owner's real pricing door with one colour costing more.
+ * The C2/C5 fixture is the payment suite's: one product sold both ways (seeded
+ * base 100,000; sea commission 15,000; direct premium 50,000), V2-published at
+ * the prices that seed reproduces (direct 150,000, sea 115,000, no fee on top —
+ * the clean start, DECISIONS row 222), here with a live offer of 10,000 off for
+ * everyone. The C3 fixture is the engine's census
+ * product `bambu-lab-pla-matte-1kg` (2 models × 25 colours), priced through the
+ * real V2 writer with one colour dearer (since the clean start every product a
+ * customer sees is V2-published; the seeded fixture is published the same way).
  *
  * Run: node --import tsx --test tests/customerFinalPrices.test.ts
  */
@@ -38,16 +41,18 @@ import { acceptedPolicies } from './lib/policies';
 import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { arithmeticLeaks } from './fixtures/costlyProduct';
 import { pricingWorld } from './fixtures/procurementPricing';
+import { writeV2 } from './fixtures/pricingV2';
 import { legacyProductId } from './fixtures/legacyCatalogue';
 import { loadPreviewContext, loadProducts } from '../worker/lib/pricingEngine/load';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 // ------------------------------------------------------------------ fixture
 
 const SEA = JSON.stringify([{ method: 'sea', commission_iqd: 15_000, active: true }]);
 const OFF = 10_000;
 
-function setup(offer: { required_tiers?: string[]; discount_iqd?: number } | null = {}) {
+async function setup(offer: { required_tiers?: string[]; discount_iqd?: number } | null = {}) {
   resetPolicyCorpusMemo();
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
@@ -70,6 +75,10 @@ function setup(offer: { required_tiers?: string[]; discount_iqd?: number } | nul
        VALUES ('p_a1','a1','Bambu A1','بامبو A1',100000,'active',10,'[]','[]','direct_sale','["direct_sale","pre_order"]',?,50000,'[]')`
     )
     .run(SEA);
+  // The clean start (DECISIONS row 222, addendum A.12.1): a seeded product is hidden until its first
+  // complete V2 write — published here through the real writer, reproducing its seeded prices (route
+  // fees retired at birth, so the sea route's 115,000 and the direct 150,000 are the V2 prices themselves).
+  await publishSeededV2(raw);
   if (offer) {
     raw
       .prepare(
@@ -155,7 +164,8 @@ const modesOf = (m: J) => ({
   routes: (m.preorder as Mode[]).map((r) => [r.method, r.prepaid?.unit_subtotal_iqd ?? null, r.cod?.unit_subtotal_iqd ?? null]),
 });
 
-// With the offer: goods 90,000; direct = 90,000 + 50,000 premium; sea prepaid = 90,000 + 15,000; sea cash = priced as direct.
+// With the offer, on the V2 prices the seeded ladder reproduces (direct 150,000, sea 115,000 — no fee on top
+// since the clean start): direct 140,000; sea prepaid 105,000; sea cash = priced as direct.
 const DIRECT = 100_000 - OFF + 50_000;
 const SEA_PREPAID = 100_000 - OFF + 15_000;
 const SEA_COD = DIRECT;
@@ -163,14 +173,14 @@ const SEA_COD = DIRECT;
 // ------------------------------------------------------------------- C2
 
 test('C2: a live offer prices the opening price, the quote, the pills and the public API purchase block exactly as the cart and the checkout charge it', async () => {
-  const { db, raw } = setup();
+  const { db, raw } = await setup();
   const buyer = appAs(db, 'buyer');
 
   // The product page, as it opens: its seeded quote and its pills.
   const detail = await json(await buyer.request('/api/products/a1'));
   assert.equal(detail.product.offer.price_source, 'offer', 'the window is live for this viewer');
   assert.equal(detail.pricing.unit_subtotal_iqd, DIRECT, 'the opening price carries the offer the cart will charge');
-  assert.equal(detail.pricing.regular_iqd, 100_000 - OFF);
+  assert.equal(detail.pricing.regular_iqd, DIRECT, 'a V2 item price is its direct price — no premium on top');
   assert.equal(detail.price_levels.base.unit_subtotal_iqd, DIRECT, 'the level grid and the opening price agree');
   assert.deepEqual(modesOf(detail.pricing_modes), { direct: DIRECT, routes: [['sea', SEA_PREPAID, SEA_COD]] });
 
@@ -204,7 +214,7 @@ test('C2: a live offer prices the opening price, the quote, the pills and the pu
 });
 
 test('C2: the gate gates the quote too — a members-only window is not priced for a viewer the door would refuse, so the quote equals the cart', async () => {
-  const { db, raw } = setup({ required_tiers: ['pro'] });
+  const { db, raw } = await setup({ required_tiers: ['pro'] });
   const buyer = appAs(db, 'buyer');
   const quote = await json(await post(buyer, '/api/products/a1/quote', { qty: 1, fulfillmentType: 'direct_sale' }));
   assert.equal(quote.quote.unit_subtotal_iqd, 150_000, 'the ladder price: this viewer may not take the window');
@@ -214,7 +224,7 @@ test('C2: the gate gates the quote too — a members-only window is not priced f
 });
 
 test('C2: with no window the figures are the ladder ones, unchanged (no price moves)', async () => {
-  const { db } = setup(null);
+  const { db } = await setup(null);
   const buyer = appAs(db, 'buyer');
   const quote = await json(await post(buyer, '/api/products/a1/quote', { qty: 1, fulfillmentType: 'direct_sale' }));
   assert.equal(quote.quote.unit_subtotal_iqd, 150_000);
@@ -226,7 +236,7 @@ test('C2: a window priced below its floor reaches the customer as the cart\'s ow
   // (DERIVED_PRICE_BELOW_FLOOR + OFFER_INACTIVE). The page prints every code
   // its opening price and its quote carry, so only the one the door refuses
   // with — and the page has a sentence for — may reach it.
-  const { db } = setup({ discount_iqd: 150_000 });
+  const { db } = await setup({ discount_iqd: 150_000 });
   const buyer = appAs(db, 'buyer');
   const detail = await json(await buyer.request('/api/products/a1'));
   assert.deepEqual(detail.pricing.errors, ['OFFER_INACTIVE'], 'the opening price');
@@ -248,11 +258,14 @@ test('C2: a window priced below its floor reaches the customer as the cart\'s ow
 });
 
 test('C2: the public API says which figure the cart charges — `price` is the item price, `purchase` the price of each way to buy', async () => {
-  const { db } = setup();
-  // The fixture is the case the wording must survive: item 90,000, cart 140,000 direct / 105,000 by sea.
+  const { db } = await setup();
+  // The fixture is the case the wording must survive: item 140,000 (a V2 item price is its direct price),
+  // cart 140,000 direct / 105,000 by sea — the item price is not what every way to buy charges.
   const api = await publicProduct(db, 'a1');
-  assert.equal(api.price.amount, 100_000 - OFF);
+  assert.equal(api.price.amount, DIRECT);
   assert.equal(api.purchase.direct_sale, DIRECT);
+  assert.equal(api.purchase.pre_order[0].prepaid, SEA_PREPAID);
+  assert.notEqual(api.purchase.pre_order[0].prepaid, api.price.amount);
   const env = { DB: db, STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
   const res = await worker.fetch(
     new Request(`https://${APEX}/api/public/v1/context`, { headers: { Host: APEX, 'CF-Connecting-IP': '9.9.9.9' } }),
@@ -271,7 +284,7 @@ test('C2: the public API says which figure the cart charges — `price` is the i
 // ------------------------------------------------------------------- C5
 
 test('C5: the page, the quote, the cart, the checkout and the order carry final numbers only; the three rendered facts are kept for V2-7', async () => {
-  const { db, raw } = setup();
+  const { db, raw } = await setup();
   cartLine(raw, 'ci_s', 'sea', 'sea');
   const seaApp = appAs(db, 'sea');
   const guest = appAs(db, null);
@@ -307,11 +320,13 @@ test('C5: the page, the quote, the cart, the checkout and the order carry final 
   // The DEFERRED facts, still served because OrderDetail and PaymentBreakdown render them (V2-7).
   const line = placed.order.items[0];
   assert.equal(line.pricing.pricing_basis, 'direct', '«سُعِّر كبيع مباشر (الدفع عند الاستلام)»');
-  assert.deepEqual(line.pricing.direct, { surcharge_iqd: 50_000, waived: false }, 'PaymentBreakdown names the fee');
-  assert.deepEqual(line.transport, { method: 'sea', commission_iqd: 15_000, waived: true, waived_by: 'cod_direct_pricing' });
+  // Since the clean start a dollar-priced product carries no direct premium and no route commission
+  // (fees retired at birth): the deferred facts still reach OrderDetail, naming no fee.
+  assert.equal(line.pricing.direct, null, 'no direct premium to name on a V2 price');
+  assert.deepEqual(line.transport, { method: 'sea', commission_iqd: 0, waived: true, waived_by: 'cod_direct_pricing' });
   // …and the final figures a customer reads.
   assert.equal(line.pricing.unit_subtotal_iqd, SEA_COD);
-  assert.equal(line.pricing.regular_iqd, 100_000 - OFF);
+  assert.equal(line.pricing.regular_iqd, DIRECT, 'a V2 item price is its direct price — no premium on top');
   assert.equal('offer' in line.pricing, false, 'the offer arithmetic stays on the stored row');
 
   // The product JSON: the routes by name, no premium, no ladder on any level.
@@ -331,22 +346,15 @@ const C = (k: number) => `${PID}_c${k}`;
 
 test('C3: the public API prices each option and each colour of a per-SKU product «from» its lowest SKU, with a `from` flag (row 202)', async () => {
   const w = pricingWorld();
-  // The owner's real save: base $10 by sea, $3 minimum profit, 2,000 IQD direct-sale extra, colour 0 at $12.
-  const draft = {
-    inputs: [
-      { scope: 'base', supplier_cost_amount: '10', supplier_cost_currency: 'USD', shipping_profile: 'CHINA_SEA', manual_cbm: '0.005' },
-      { scope: 'color', scope_id: C(0), supplier_cost_amount: '12', supplier_cost_currency: 'USD' },
+  // The clean start (DECISIONS row 222, addendum A.6): the V1 door this used to save through is closed — the
+  // owner prices in dollars through the V2 writer. Product $10, colour 0 at +$2: every SKU of colour 0 is dearer.
+  await writeV2(w.db, PID, {
+    method: 'usd',
+    points: [
+      { scope: 'product', scope_id: '', kind: 'fixed', usd: '10' },
+      { scope: 'color', scope_id: C(0), kind: 'delta', usd: '2' },
     ],
-    rules: [
-      { kind: 'target_profit', scope: 'product', amount_usd: '3' },
-      { kind: 'direct_sale_extra', scope: 'product', amount_iqd: 2000 },
-    ],
-  };
-  const seqOf = () => (w.raw.prepare('SELECT inputs_seq AS s FROM product_pricing_state WHERE product_id = ?').get(PID) as { s: number } | undefined)?.s ?? 0;
-  const first = await w.putInputs(PID, { inputs_seq: seqOf(), ...draft });
-  assert.equal(first.status, 409, JSON.stringify(first.body).slice(0, 300));
-  const saved = await w.putInputs(PID, { inputs_seq: seqOf(), ...draft, preview_hash: first.body.details.preview.preview_hash, confirm_large_change: true });
-  assert.equal(saved.status, 200, JSON.stringify(saved.body).slice(0, 300));
+  });
 
   // What the cart charges a guest for a direct line of each SKU.
   const loaded = (await loadProducts(w.db, [PID])).get(PID)!;

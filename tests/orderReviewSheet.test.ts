@@ -30,6 +30,7 @@ import type { AppContext } from '../worker/lib/types';
 import { HttpError } from '../worker/lib/http';
 import { STATIC_SECURITY_HEADERS } from '../worker/lib/securityPolicy';
 import { reviewRoutes } from '../worker/routes/reviews';
+import { publishSeededV2 } from './fixtures/autoPublish';
 
 interface Line {
   order_item_id: string;
@@ -272,6 +273,9 @@ test('review text is bounded on the way in and comes back out as data, never mar
   const ok = await postReview(db, buyer, { productId: 'p1', orderId: 'ORD-D', stars: 5, body: `${injection} ${text(30)}` });
   assert.equal(ok.status, 200);
 
+  // The public reviews belong to a listed product: since the Pricing V2 clean start (DECISIONS row 222)
+  // a seeded product is listed once its first V2 price is published (addendum A.12.1).
+  await publishSeededV2(raw);
   const res = await appAs(db, buyer).request('/api/reviews/product/p1');
   assert.equal(res.status, 200);
   const rawBody = await res.text();

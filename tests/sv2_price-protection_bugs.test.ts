@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ppWorld } from './sv2_price-protection_fixture';
+import { PRE_V5, ppWorld } from './sv2_price-protection_fixture';
 
 /** A plain product, one price, no options. */
 function plain(w: ReturnType<typeof ppWorld>, id = 'p', price = 40_000) {
@@ -85,16 +85,19 @@ test('PP-B3 a pre-order line is compared with today’s PRE-ORDER price, not the
 });
 
 // ---------------------------------------------------------------- PP-B4
-test('PP-B4 a PRIME buyer is compared with today’s PRIME price (policy 10.4: “a buyer of the same price class”)', async () => {
+test('PP-B4 a member buyer is compared with today’s member price (policy 10.4: “a buyer of the same price class”)', async () => {
   const w = ppWorld();
-  w.raw.exec(`INSERT INTO products (id, slug, name, status, price_iqd, prime_price_iqd, stock) VALUES ('pp', 'pp', 'Printer', 'active', 100000, 90000, 5)`);
-  const { itemId } = w.deliveredLine({ productId: 'pp', unit: 90_000, pricing: { applied_tier: 'prime', applied_iqd: 90_000, regular_iqd: 100_000 } });
-  // Both prices fall 5%: regular 95,000, PRIME 85,500.
-  w.raw.exec(`UPDATE products SET price_iqd = 95000, prime_price_iqd = 85500 WHERE id = 'pp'`);
-  w.priceRow('pp', '', 100_000, 95_000);
-  w.priceRow('pp', '', 90_000, 85_500, undefined, 'prime');
+  // Since the clean start (DECISIONS row 222) a member price is a membership rule over the V2 price,
+  // never a typed rung, and only PRO carries a discount rule (PREMIUM/PRIME: free delivery only); the
+  // order predates v5, so 10.4's class comparison decides it.
+  w.raw.exec(`INSERT INTO products (id, slug, name, status, price_iqd, stock) VALUES ('pp', 'pp', 'Printer', 'active', 100000, 5)`);
+  await w.publish('pp');
+  await w.memberRule('pro', 'pp', 10);
+  const { itemId } = w.deliveredLine({ productId: 'pp', unit: 90_000, createdAt: PRE_V5, pricing: { applied_tier: 'pro', applied_iqd: 90_000, regular_iqd: 100_000 } });
+  // The price falls 5%: regular 95,000, PRO 85,500.
+  await w.reprice('pp', 95_000);
   const c = await w.claim(itemId);
-  assert.equal(c.status, 200, `the PRIME buyer is compared with the regular price and refused: ${c.body.code}`);
+  assert.equal(c.status, 200, `the member is compared with the regular price and refused: ${c.body.code}`);
   assert.equal(c.body.claim.observed_unit_iqd, 85_500);
 });
 

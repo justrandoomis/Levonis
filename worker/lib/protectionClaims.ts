@@ -27,7 +27,7 @@
  * and never the staff's comparison inputs (PP-B7). The decision is told to the
  * customer in the same batch as the decision itself (PP-B6).
  */
-import type { Tier } from '../../packages/pricing/src/pricing';
+import { SKU_STRICT_ERROR, type Tier } from '../../packages/pricing/src/pricing';
 import { notifyStatement } from './notifications';
 import { safeParse } from './types';
 import {
@@ -96,12 +96,18 @@ export function lineChannelOf(
   return { fulfillmentType: direct ? 'direct_sale' : null, transportMethod: null, preorderPricing: 'prepaid' };
 }
 
-/** The resolver's answers that mean «this channel is not sold today», not «this variant is gone». */
+/**
+ * The resolver's answers that mean «this channel is not sold today», not «this variant is gone».
+ * Since Pricing V2's clean start (DECISIONS row 222) every product a customer can buy is priced per
+ * SKU × channel by the V2 writer, and the strict resolver (spec C-13) answers SKU_STRICT_ERROR for a
+ * SKU × channel the writer did not price — the same «not sold on this channel today» (PP-B3).
+ */
 export const CHANNEL_CLOSED_ERRORS: ReadonlySet<string> = new Set([
   'FULFILLMENT_NOT_OFFERED',
   'FULFILLMENT_DISABLED',
   'TRANSPORT_DISABLED',
   'TRANSPORT_NOT_OFFERED',
+  SKU_STRICT_ERROR,
 ]);
 
 const SOURCES = new Set(['base', 'option', 'fulfillment', 'transport', 'color', 'sku']);

@@ -23,6 +23,7 @@ import { validateCoupon } from '../worker/lib/membershipOps';
 import { TRADE_IN_CREDIT_VALID_DAYS } from '../worker/lib/tradeIn';
 import { OWNER, STAFF, adminApp, approvedAndOrdered, customerApp, daysAgo, restoreFetch, seed, submitted, CUSTOMER } from './sv2_tradein_fixture';
 import { ppWorld } from './sv2_price-protection_fixture';
+import { repriceV2 } from './fixtures/v2Publish';
 import type { Env } from '../worker/lib/types';
 
 test.after(restoreFetch);
@@ -180,7 +181,8 @@ test('X4/X5 a device whose price-protection claim or warranty case is open is no
   // A live trade-in: the device is not price-protected (PP-B8, through the real doors).
   const b = world({ deliveredDaysAgo: 2 });
   await submitted(b.raw);
-  b.raw.exec(`UPDATE products SET price_iqd = 800000 WHERE id = 'p_a1'; UPDATE product_option_values SET regular_price_iqd = 800000 WHERE id = 'v_a1';`);
+  // The price falls through the V2 writer (the clean start, DECISIONS row 222: the engine locks refuse an UPDATE).
+  await repriceV2(b.raw, 'p_a1', 800_000);
   assert.deepEqual(await code(await post(b.as(CUSTOMER), '/api/price-protection/claims', { orderItemId: 'oi_a1' })), [400, 'TRADE_IN_UNIT']);
 
   // A warranty case opened between the submit and the approval: no credit is minted.
