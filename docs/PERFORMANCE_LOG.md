@@ -1985,3 +1985,39 @@ The census gained four documented refinements, each pinned by a test that also p
 still counts: a field or fill named in a comment is not code; a skeleton bar is not a button; an arrow function
 inside a tag does not end it; a house well (`lv-input`, the kit's `ap-field` recipes `T.input`/`T.select`/
 `T.selectSm`, `lv-well`, `fw-input`/`fw-select`, the /auth wells) is styled.
+
+## 2026-10-14 — clay polish QA: the screenshot pass after batches 1–3 and one batch of fixes (DECISIONS row 232)
+
+One bounded QA pass over `feat/clay-polish` after the three polish batches: every customer screen re-shot in
+Arabic and Sorani, light and dark, at 390 and 1280 (208 shots), the populated screens (48) and the staff screens
+(62), compared with the critique's "before" shots; then the plan's §8 passes that had never run — a keyboard Tab
+pass on home, product, cart and checkout (28 stops per theme, judged by the visible difference between focused
+and blurred), reduced-motion and forced-colours emulation on home, product and checkout, and a contrast / clipped
+text / overflow probe on 17 screens in ar and ckb at 390 and ckb at 360. No regression was found: no sideways
+scroll, no clipped Sorani label, no focus stop without an indicator or under the bottom chrome, nothing moving
+under reduced motion, 0 contrast misses across the 62 staff shots. Fixed in one batch: the interrupted earlier
+QA run's edits (kept after review — `:has()` focus on hidden-radio choice cards, the cart's offers header as a
+real button, `scroll-padding-bottom` under the bottom chrome, forced-colours button lines and switch knobs,
+stronger search halos, the product signals row in the buy column, the points page's unknown balance, Sorani for
+the appearance controls and the community requests board), plus this pass's own findings: 21 gold focus rings
+now use the focus ink, `/points` is one centred column from 1024 px, the Sorani wallet toolbar wraps the status
+select and the search button together, the member pill passes 4.5:1, and the chosen gallery picture keeps a
+Highlight frame in forced colours. Measured locally against the batch-3 build with the same toolchain.
+
+### Bytes (gzip −9, node zlib level 9 — the gate's method; `vite build` + `write-asset-headers`, tests/bundleBudget.test.ts green)
+
+| | before (batch 3, built locally) | after | gate |
+|---|---|---|---|
+| `index-*.css` | 42,433 B | 42,572 B (+139 B) | — |
+| CSS, public files (8) | 54,961 B | **55,100 B (+139 B)**; local headroom 6,340 B | 60 KB = 61,440 B, **not raised** |
+| CSS, private operations (3) | 7,107 B | 7,107 B (unchanged); headroom 573 B | 7.5 KB = 7,680 B, **not raised** |
+| entry chunk | 65,340 B | 65,341 B (+1 B) | 72 KB |
+| initial payload (4 files) | 184,773 B | 184,774 B (+1 B) | 200 KB |
+| merchant workspace shell closure | 32,710 B | 32,713 B (no shell source changed; import-hash noise); headroom 55 B | 32 KB = 32,768 B, **not raised** |
+
+Where the bytes went: added — `.lv-choice:has(input:focus-visible)` in the focus rule and in forced colours, the
+forced-colours `.lv-button` line and switch knob/fill rules, `scroll-padding-bottom` on the main scroller (and its
+`:has([data-bottom-bar])` variant), the `ring-focus/40` halos, `focus-visible:ring-inset`, `max-w-2xl`,
+`border-gold/40`, and the forced-colours Highlight frame on the chosen gallery picture. Removed — the
+`focus-visible:ring-gold`, `focus-within:ring-gold`, `peer-focus-visible:ring-gold` and `ring-gold/70` focus
+utilities (their `ring-focus` twins were already in the sheet, or are now) and `hover:bg-gold/15`.
