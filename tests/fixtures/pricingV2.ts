@@ -17,6 +17,13 @@ import { loadV2Store } from '../../worker/lib/pricingEngine/v2/store';
 import { evaluateV2Write, type V2Evaluation } from '../../worker/lib/pricingEngine/v2/evaluate';
 import { v2WriteStatements } from '../../worker/lib/pricingEngine/v2/write';
 import { evaluateLegacy } from '../../worker/lib/pricingEngine/legacy';
+import { asD1, stubApp, type StubUser } from './app';
+import { OWNER_USER } from './procurementPricing';
+import { noStoreUnlessSet } from '../../worker/lib/edgePolicy';
+import { adminProductsRoutes } from '../../worker/routes/adminProducts';
+import { adminProductRelationsRoutes } from '../../worker/routes/adminProductRelations';
+import { adminPricingRoutes } from '../../worker/routes/adminPricing';
+import { cartRoutes } from '../../worker/routes/cart';
 
 const sql = (v: unknown): string => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 
@@ -108,4 +115,24 @@ export async function cartGrid(db: D1Database, pid: string): Promise<Record<stri
   const out: Record<string, { prepaid: number | null; cod: number | null; fee: number | null; ok: boolean; errors: string[] }> = {};
   for (const u of ev.units) for (const c of u.channels) out[`${u.combo_key ?? u.option_id}@${c.channel}`] = { prepaid: c.prepaid_iqd, cod: c.cod_iqd, fee: c.fee_iqd, ok: c.ok, errors: c.errors };
   return out;
+}
+
+/**
+ * V2-3b: the product routers on a pricing world's database — the product save
+ * and its V2 pricing routes, the relations, the pricing door and the cart —
+ * as `user` (default: the owner), with a sign-in `sessionAgeSeconds` old.
+ */
+export function v2App(raw: DatabaseSync, user: StubUser | null = OWNER_USER, sessionAgeSeconds?: number) {
+  return stubApp(
+    asD1(raw),
+    user,
+    (a) => {
+      a.use('/api/admin/*', noStoreUnlessSet);
+      a.route('/api/admin/products-v2', adminProductsRoutes);
+      a.route('/api/admin/products', adminProductRelationsRoutes);
+      a.route('/api/admin/pricing', adminPricingRoutes);
+      a.route('/api/cart', cartRoutes);
+    },
+    sessionAgeSeconds === undefined ? {} : { sessionAgeSeconds }
+  );
 }

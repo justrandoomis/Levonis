@@ -66,6 +66,24 @@ export default {
         'PUT /:id/catalogs': { cls: 'op', body: { catalog_ids: [] } },
         // The admin price preview: the owner's carries cost_iqd, everyone else's does not.
         'POST /:id/quote': { cls: 'op', body: { tier: 'pro' } },
+        // Pricing V2-3b (spec §4.1, C-7): price editors reach these, so they are `op`; every dollar,
+        // rate and cost field is enforced per field (403 COST_ACCESS_DENIED with the field names) and
+        // every answer is an allow-list (v2/dto.ts) — the owner's carries `v2_*`, nobody else's does
+        // (tests/pricingV2Roles.test.ts sweeps them over V2_SENTINELS).
+        'GET /:id/pricing': 'op',
+        'POST /pricing/preview': {
+          cls: 'op',
+          body: {
+            product_id: null,
+            structure: { doc: { id: 'prd_v2_route_class', name_en: 'Draft', name_ar: 'مسودة', price_iqd: 0, status: 'draft' }, relations: null },
+            pricing: { method: 'usd', points: [{ scope: 'product', id: '', kind: 'fixed', usd: '100' }] },
+          },
+          why: 'add-product’s V2 preview: prices the draft in memory and writes nothing (a non-owner sending dollars is refused by field)',
+        },
+        'PUT /:id/pricing': {
+          cls: 'op',
+          noBody: 'refused before the body is read for the seeded product: it is not V2 yet (409 PRICING_V2_NOT_MIGRATED)',
+        },
       },
     },
     {

@@ -318,6 +318,24 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
     assert.deepEqual(engine, [...helpers].sort(), f);
   }
+  // Pricing V2-3b (spec §3.5, §4.1): the owner's product save writes a V2 product's structure and
+  // prices in ONE batch through the V2 writer, and its V2 pricing routes (GET/preview/PUT under
+  // /api/admin/products-v2) are the V2 API itself — an admin router behind the admin door, never a
+  // customer path. It imports the V2 modules (and the engine's 400 builder) only, pinned here.
+  const V2_PRODUCT_SAVE: Readonly<Record<string, readonly string[]>> = {
+    'worker/routes/adminProducts.ts': [
+      '../lib/pricingEngine/v2/api',
+      '../lib/pricingEngine/v2/draft',
+      '../lib/pricingEngine/v2/productSave',
+      '../lib/pricingEngine/v2/write',
+      '../lib/pricingEngine/whatIf',
+    ],
+  };
+  for (const [f, modules] of Object.entries(V2_PRODUCT_SAVE)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...modules].sort(), f);
+  }
   for (const helper of ['worker/lib/pricingEngine/orderBasis.ts', 'worker/lib/pricingEngine/protectionBasis.ts']) {
     const src = files.find((x) => x.f === helper)!.src;
     assert.doesNotMatch(src, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview)['"]/, helper);
@@ -341,5 +359,8 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     assert.deepEqual(engine, [...helpers].sort(), f);
   }
   assert.doesNotMatch(files.find((x) => x.f === 'worker/lib/pricingEngine/procurementRate.ts')!.src, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview)['"]/);
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in PURCHASE_RATE) && !OWNER_TOOLS.includes(f)), []);
+  for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
+    assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
+  }
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in PURCHASE_RATE) && !OWNER_TOOLS.includes(f)), []);
 });

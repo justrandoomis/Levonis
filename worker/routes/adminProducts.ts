@@ -53,7 +53,31 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { productEngineDirectOnly, productEngineManaged, refuseEngineManaged } from '../lib/engineInstalled';
+import { pricingV2Installed, productEngineDirectOnly, productEngineManaged, productEngineV2, refuseEngineManaged } from '../lib/engineInstalled';
+import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { engineDbRefusal } from '../lib/pricingDbRefusals';
+import { limitRoute } from '../lib/ratelimit';
+import { SESSION_CACHE_CONTROL } from '../lib/edgePolicy';
+import { jsonObject } from '../lib/http';
+import { pinV2PriceFields, previewDraft } from '../lib/pricingEngine/v2/draft';
+import { planV2ProductSave, type V2SaveOutcome } from '../lib/pricingEngine/v2/productSave';
+import {
+  desiredFor,
+  evaluateDesired,
+  gateV2,
+  loadV2Read,
+  notMigratedAnswer,
+  parseV2Wire,
+  storedMethodOf,
+  v2Answer,
+  v2BatchOutcome,
+  v2Body,
+  v2PriceKey,
+  v2ViewerOf,
+  type V2Read,
+} from '../lib/pricingEngine/v2/api';
+import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
+import { inputInvalid } from '../lib/pricingEngine/whatIf';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
 import {
   catalogEditRefusal,
@@ -1235,6 +1259,124 @@ adminProductsRoutes.get('/printer-options', async (c) => {
   return c.json({ success: true, printers: await printerOptions(c.env.DB) });
 });
 
+// ---------------------------------------------------------------- Pricing V2-3b
+//
+// The V2 state of a product, its draft-capable preview and its prices-only
+// apply (implementation spec §4; worker/lib/pricingEngine/v2/api.ts). On the
+// products router because price editors reach them (C-7); the owner-only
+// fields are enforced per field and every answer is built from an allow-list
+// (v2/dto.ts). Private and never stored. A preview writes nothing.
+
+const COMPOSITION_REFUSAL = () => new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE', { section: 3 });
+
+/** The stored product as V2 reads it; 404 for an unknown id, 409 for a bundle (never V2-priced). */
+async function v2ReadOf(c: Context<AppContext>, id: string): Promise<V2Read> {
+  const read = await loadV2Read(c.env.DB, id);
+  if (!read) throw notFound('Product not found');
+  if ((read.loaded.doc.composition ?? '') !== '') throw COMPOSITION_REFUSAL();
+  return read;
+}
+
+/** The product's V2 answer as stored, for this caller (the store laid over nothing: the same set a preview with no field prices). */
+async function v2StoredAnswer(c: Context<AppContext>, id: string) {
+  const read = await v2ReadOf(c, id);
+  const viewer = v2ViewerOf(c.env, c.get('user'));
+  if (!storedMethodOf(read)) return notMigratedAnswer(read, viewer);
+  const stored = desiredFor(read, { sent: [] }, { viewer: 'owner', env: c.env, user: c.get('user'), now: new Date().toISOString() });
+  return v2Answer({ viewer, read, ev: await evaluateDesired(read, stored) });
+}
+
+adminProductsRoutes.get('/:id/pricing', limitRoute('pricing-read', 1200), async (c) => {
+  c.header('Cache-Control', SESSION_CACHE_CONTROL);
+  return c.json({ success: true, ...(await v2StoredAnswer(c, c.req.param('id'))) });
+});
+
+adminProductsRoutes.post('/pricing/preview', limitRoute('pricing-read', 1200), async (c) => {
+  c.header('Cache-Control', SESSION_CACHE_CONTROL);
+  const body = v2Body(await jsonObject(c), ['product_id', 'seq', 'structure', 'pricing']);
+  const wire = parseV2Wire(body.pricing);
+  const viewer = v2ViewerOf(c.env, c.get('user'));
+  const db = c.env.DB;
+  let read: V2Read;
+  let draft = false;
+  if (body.product_id === null || body.product_id === undefined) {
+    // Add-product: the draft's structure is priced before the first save (its ids are the save's).
+    if (body.structure === undefined || body.structure === null) throw inputInvalid('structure');
+    const loaded = await previewDraft(c, body.structure, null);
+    read = (await loadV2Read(db, loaded.id, loaded))!;
+    draft = true;
+  } else {
+    if (typeof body.product_id !== 'string' || !body.product_id) throw inputInvalid('product_id');
+    const stored = await v2ReadOf(c, body.product_id);
+    if (!storedMethodOf(stored)) throw new HttpError(409, serverMessage('PRICING_V2_NOT_MIGRATED'), 'PRICING_V2_NOT_MIGRATED', { section: 3 });
+    if (body.structure === undefined || body.structure === null) read = stored;
+    else {
+      const loaded = await previewDraft(c, body.structure, { row: stored.loaded.row, loaded: stored.loaded });
+      read = (await loadV2Read(db, loaded.id, loaded))!;
+    }
+  }
+  const desired = desiredFor(read, wire, { viewer, env: c.env, user: c.get('user'), now: new Date().toISOString() });
+  const ev = await evaluateDesired(read, desired);
+  return c.json({ success: true, ...v2Answer({ viewer, read, ev, draft }) });
+});
+
+adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async (c) => {
+  c.header('Cache-Control', SESSION_CACHE_CONTROL);
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  // Refused before the body is read: an unmigrated product has no V2 prices to apply.
+  const read = await v2ReadOf(c, id);
+  const method = storedMethodOf(read);
+  if (!method) throw new HttpError(409, serverMessage('PRICING_V2_NOT_MIGRATED'), 'PRICING_V2_NOT_MIGRATED', { section: 3 });
+  const body = v2Body(await jsonObject(c), ['seq', 'pricing', 'preview_hash', 'confirm_large_change']);
+  if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
+  const seq = v2Body(body.seq, ['inputs_seq', 'write_seq']);
+  const whole = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
+  if (!whole(seq.inputs_seq) || !whole(seq.write_seq)) throw inputInvalid('seq');
+  const wire = parseV2Wire(body.pricing);
+  const viewer = v2ViewerOf(c.env, c.get('user'));
+  const user = c.get('user')!;
+  const now = new Date().toISOString();
+  // §4.3 step 1 before step 2: a replay of a saved preview answers as the first save did.
+  const pid = read.loaded.id;
+  if ((seq.inputs_seq !== (read.stored.state?.inputs_seq ?? 0) || seq.write_seq !== (read.stored.state?.write_seq ?? 0))) {
+    if (typeof body.preview_hash === 'string' && (await db.prepare('SELECT 1 AS hit FROM pricing_audit WHERE idempotency_key = ?').bind(v2PriceKey(pid, body.preview_hash)).first())) {
+      return c.json({ success: true, already: true, ...(await v2StoredAnswer(c, pid)) });
+    }
+    throw new HttpError(409, serverMessage('PRICING_CHANGED'), 'PRICING_CHANGED', { section: 3 });
+  }
+  const desired = desiredFor(read, wire, { viewer, env: c.env, user, now });
+  const ev = await evaluateDesired(read, desired);
+  const verdict = await gateV2({
+    c,
+    ev,
+    hash: body.preview_hash,
+    confirm: body.confirm_large_change,
+    priceChange: true,
+    publishing: false,
+    prices_only: true,
+    preview: async () => v2Answer({ viewer, read, ev }),
+  });
+  if (verdict === 'already') return c.json({ success: true, already: true, ...(await v2StoredAnswer(c, pid)) });
+  if (verdict === 'noop') return c.json({ success: true, unchanged: true, ...v2Answer({ viewer, read, ev }) });
+  const opts = { actor: user.id, now, source: 'product_pricing', idempotencyKey: v2PriceKey(pid, ev.hash ?? newId()) };
+  const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : await v2WriteStatements(db, ev, opts);
+  if (statements.length > V2_PRICING_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE', { section: 3 });
+  try {
+    await db.batch(statements);
+  } catch (e) {
+    const outcome = v2BatchOutcome(e);
+    if (outcome === 'already') return c.json({ success: true, already: true, ...(await v2StoredAnswer(c, pid)) });
+    if (outcome) throw outcome;
+    const refusal = engineDbRefusal(e);
+    if (refusal) throw refusal;
+    throw e;
+  }
+  const slug = typeof read.loaded.row.slug === 'string' ? read.loaded.row.slug : null;
+  if (slug) c.set('catalogueSlug', slug);
+  return c.json({ success: true, already: false, saved: verdict === 'data' ? 'data' : 'prices', ...(await v2StoredAnswer(c, pid)) });
+});
+
 adminProductsRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
   // THE PRODUCT AS IT ACTUALLY IS: the relational overlay, inactive rows
@@ -1514,6 +1656,23 @@ adminProductsRoutes.post('/', async (c) => {
       ? (body.relations as Record<string, unknown>)
       : null;
 
+  // PRICING V2-3b (spec §3.5, §4.1): a V2 product's save — or a product created with a `pricing_v2`
+  // block (V2 from birth) — writes its structure INSIDE the V2 writer's batch, with its prices. The
+  // price fields of the document are not the client's: the stored ladder stays until the V2 writer
+  // replaces it in the same batch, and no route carries a commission. An unmigrated product never
+  // becomes V2 here: that is the owner's migration (V2-5).
+  const v2Block = body.pricing_v2;
+  const v2Stored = prev ? await productEngineV2(c.env.DB, prev.id) : false;
+  if (prev && !v2Stored && v2Block !== undefined && v2Block !== null) {
+    throw new HttpError(409, serverMessage('PRICING_V2_NOT_MIGRATED'), 'PRICING_V2_NOT_MIGRATED', { section: 3 });
+  }
+  const v2Save = v2Stored || (!prev && v2Block !== undefined && v2Block !== null);
+  // A database before 0189 (a deploy ahead of its migration) has nowhere to put a V2 product's prices.
+  if (v2Save && !v2Stored && !(await pricingV2Installed(c.env.DB))) {
+    throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED', { section: 3 });
+  }
+  if (v2Save) pinV2PriceFields(doc, prev);
+
   const saveIntent: ProductWriteIntent = {
     mode: prev ? 'update' : 'create',
     doc,
@@ -1529,6 +1688,8 @@ adminProductsRoutes.post('/', async (c) => {
       : undefined,
     actor: { adminId: admin.id, money: writesCost },
     translations: localized.fields,
+    // V2 writes its own SKU-level price history (the V2 batch); the document's ladder is pinned.
+    ...(v2Save ? { priceHistory: false } : {}),
   };
 
   // The media verifier protects every accepted object in D1. Reject the
@@ -1588,6 +1749,23 @@ adminProductsRoutes.post('/', async (c) => {
   }
 
   if (answerGuard) plan.statements = answerGuard.around(plan.statements);
+  // PRICING V2-3b: the V2 gates, then one batch — the planner's statements inside the V2 writer's.
+  let v2Outcome: V2SaveOutcome | null = null;
+  if (v2Save) {
+    v2Outcome = await planV2ProductSave(c, {
+      plan,
+      prev,
+      updatedAt: existingRow?.updated_at === undefined || existingRow?.updated_at === null ? null : String(existingRow.updated_at),
+      block: v2Block,
+      status: doc.status,
+    });
+    if (v2Outcome.kind === 'already') {
+      const current = await reloadForVerification(c.env.DB, doc.id);
+      c.set('catalogueSlug', doc.slug);
+      return c.json({ success: true, already: true, created: false, product: current ? projectForAdmin(c.env, admin, current.document) : null });
+    }
+    plan.statements = v2Outcome.statements;
+  }
   try {
     await saveProductAtomic(c.env.DB, plan, [
       {
@@ -1603,6 +1781,16 @@ adminProductsRoutes.post('/', async (c) => {
     ]);
   } catch (e) {
     if (answerGuard && isLostRace(e)) throw serialRefuse(409, 'SERIAL_FILING_CHANGED');
+    if (v2Outcome) {
+      const outcome = v2BatchOutcome(e);
+      if (outcome === 'already') {
+        const current = await reloadForVerification(c.env.DB, doc.id);
+        return c.json({ success: true, already: true, created: false, product: current ? projectForAdmin(c.env, admin, current.document) : null });
+      }
+      if (outcome) throw outcome;
+      const refusal = engineDbRefusal(e);
+      if (refusal) throw refusal;
+    }
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('UNIQUE') && msg.includes('slug')) throw badRequest('slug: already used by another product', 'SLUG_TAKEN');
     // The race backstop for the named SKU check in `planProductSave` — the
@@ -1653,6 +1841,8 @@ adminProductsRoutes.post('/', async (c) => {
     translation_review: localized.review_details,
     ...(priceHistoryWarning ? { price_history_warning: priceHistoryWarning } : {}),
     ...(translationWarning ? { translation_warning: translationWarning } : {}),
+    // V2-3b: whether this save wrote prices (`priced`) or stored its data only (incomplete).
+    ...(v2Outcome && 'priced' in v2Outcome ? { pricing_v2: { priced: v2Outcome.priced } } : {}),
   });
 });
 
