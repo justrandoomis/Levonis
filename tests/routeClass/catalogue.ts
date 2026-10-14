@@ -108,13 +108,15 @@ export default {
       routes: {
         'GET /': 'op',
         'GET /versions': 'op',
-        'POST /': 'op',
-        'PUT /:id': 'op',
-        'DELETE /:id': 'op',
+        // A member price rule is a price members pay (and price protection pays
+        // against): a financial admin's write, never an assistant's (decision 3).
+        'POST /': 'money',
+        'PUT /:id': 'money',
+        'DELETE /:id': 'money',
         'GET /recommended': 'op',
-        'POST /recommended': 'op',
+        'POST /recommended': 'money',
         'GET /consolidation': 'op',
-        'POST /consolidation': 'op',
+        'POST /consolidation': 'money',
         'POST /simulate': 'op',
       },
     },

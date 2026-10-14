@@ -771,7 +771,10 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   // A REFUND MOVES MONEY (owner decision 3, PP-B1): an assistant moves the
   // case through collection and inspection, never to a refund. The amount is
   // the server's own (what was paid), so a financial admin refunds it in full.
-  const refundGrant = to === 'resolved' && resolution === 'refund' ? assertMoneyAuthority(c, { act: 'return_refund' }) : null;
+  // Never the approver's own refund (a conflict of interest: the owner, with a reason).
+  const refundGrant = to === 'resolved' && resolution === 'refund'
+    ? assertMoneyAuthority(c, { act: 'return_refund', beneficiaryUserId: kase.user_id, reason })
+    : null;
 
   const nowIso = new Date().toISOString();
   let returnedOrigins: ReturnedOriginSelection | undefined;
@@ -1693,16 +1696,77 @@ function claimWindow(claim: Pick<ClaimRow, 'policy_snapshot'>): { from: string; 
   return typeof w?.from === 'string' && typeof w?.to === 'string' ? { from: w.from, to: w.to } : null;
 }
 
-/** Four eyes: a non-owner who wrote a price row of this product inside the claim's window. */
+/**
+ * A MEMBER PRICE RULE THAT COULD PRICE THIS PRODUCT, as a version row's
+ * before or after image (`membership_benefit_versions`, every writer: the
+ * rules editor, a product save, an import). A product rule counts for its own
+ * product only; a section or global rule counts for every product (it may
+ * cover this one). A row that is not a rule object counts too — unread is
+ * never «unrelated». `img` the JSON column, `?P` the product id marker.
+ */
+const ruleImageTouches = (img: string, product: string) =>
+  `(${img} IS NOT NULL AND NOT (json_valid(${img}) AND json_type(${img}) = 'object'
+      AND (json_extract(${img}, '$.benefit_type') <> 'product_discount'
+           OR (json_extract(${img}, '$.scope') = 'product' AND json_extract(${img}, '$.product_id') IS NOT ${product}))))`;
+
+/**
+ * THE PRICES OUTSIDE `price_history` THAT A CLAIM COMPARES (PP-B4): a PRO or
+ * PREMIUM buyer is compared with today's member price, made by the member
+ * price rules and the PRO pricing policy. Their changes inside the claim's
+ * window, newest first: who wrote each, and what kind. The four-eyes test and
+ * the evidence sheet read the same rows. Times are compared as instants and
+ * answered as ISO (the version table stores «YYYY-MM-DD HH:MM:SS»).
+ */
+async function memberPriceWrites(
+  db: D1Database,
+  claim: Pick<ClaimRow, 'order_item_id' | 'policy_snapshot'>,
+  authorId: string | null
+): Promise<Array<{ at: string; kind: 'member_rule' | 'pro_policy'; author_id: string | null; author: string | null; author_email: string | null }>> {
+  const window = claimWindow(claim);
+  if (!window) return [];
+  // A regular buyer is compared with the regular price only: member prices are
+  // not this claim's evidence. A claim that does not say its class may be a
+  // member's, so it counts.
+  if (safeParse<{ buyer_class?: unknown }>(claim.policy_snapshot, {}).buyer_class === 'regular') return [];
+  const product = await db.prepare('SELECT product_id FROM order_items WHERE id = ?').bind(claim.order_item_id).first<{ product_id: string }>();
+  if (!product) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT at, kind, author_id, u.name AS author, u.email AS author_email FROM (
+          SELECT strftime('%Y-%m-%dT%H:%M:%fZ', v.created_at) AS at, 'member_rule' AS kind, v.actor_user_id AS author_id FROM membership_benefit_versions v
+           WHERE julianday(v.created_at) BETWEEN julianday(?1) AND julianday(?2)
+             AND (?3 IS NULL OR v.actor_user_id = ?3)
+             AND (${ruleImageTouches('v.before_json', '?4')} OR ${ruleImageTouches('v.after_json', '?4')})
+          UNION ALL
+          SELECT strftime('%Y-%m-%dT%H:%M:%fZ', a.created_at), 'pro_policy', a.actor_id FROM audit_log a
+           WHERE a.action = 'settings.update' AND a.target = 'proPricingPolicy'
+             AND julianday(a.created_at) BETWEEN julianday(?1) AND julianday(?2)
+             AND (?3 IS NULL OR a.actor_id = ?3)
+        ) w LEFT JOIN users u ON u.id = w.author_id
+        ORDER BY julianday(at) DESC LIMIT 50`
+    )
+    .bind(window.from, window.to, authorId, product.product_id)
+    .all<{ at: string; kind: 'member_rule' | 'pro_policy'; author_id: string | null; author: string | null; author_email: string | null }>();
+  return results ?? [];
+}
+
+/**
+ * Four eyes: a non-owner who wrote a price of this product inside the claim's
+ * window — a price row, a member price rule that could price it, or the PRO
+ * pricing policy (review F6: a PRO buyer is compared with the member price
+ * those make, and they leave no `price_history` row).
+ */
 async function approverWrotePrice(c: Context<AppContext>, claim: ClaimRow): Promise<boolean> {
   const admin = c.get('user')!;
   const window = claimWindow(claim);
   if (isOwner(c.env, admin) || !window) return false;
-  return !!(await c.env.DB.prepare(
+  const priceRow = await c.env.DB.prepare(
     `SELECT 1 FROM price_history WHERE changed_by = ?
         AND product_id = (SELECT product_id FROM order_items WHERE id = ?)
         AND changed_at >= ? AND changed_at <= ? LIMIT 1`
-  ).bind(admin.id, claim.order_item_id, window.from, window.to).first());
+  ).bind(admin.id, claim.order_item_id, window.from, window.to).first();
+  if (priceRow) return true;
+  return (await memberPriceWrites(c.env.DB, claim, admin.id)).length > 0;
 }
 
 const EVIDENCE_FIELDS = ['regular', 'prime', 'pro'] as const;
@@ -1773,6 +1837,14 @@ priceProtectionRoutes.get('/admin/claims/:id', requireAdmin, async (c) => {
   }
   const priceAuthor = figures ? await approverWrotePrice(c, claim) : false;
   const aboveLine = !!figures && figures.credit > PRICE_PROTECTION_OWNER_LINE_IQD;
+  // The approver's own claim (review F5): the owner decides it.
+  const beneficiary = claim.user_id === admin.id;
+  const ruleChanges = (await memberPriceWrites(db, claim, null)).map((w) => ({
+    at: w.at,
+    kind: w.kind,
+    author: w.author ?? null,
+    by_owner: isOwner(c.env, { email: String(w.author_email ?? '') }),
+  }));
   return c.json({
     success: true,
     claim: claimForStaff(claim),
@@ -1780,6 +1852,9 @@ priceProtectionRoutes.get('/admin/claims/:id', requireAdmin, async (c) => {
     order: order ?? null,
     customer: customer ? { id: customer.id, name: customer.name, email: customer.email, phone: customer.phone_e164 ?? null } : null,
     evidence,
+    // Member price rules and the PRO pricing policy changed inside the window
+    // (who, when, which kind) — the member prices this claim may compare.
+    rule_changes: ruleChanges,
     now: figures
       ? { paid_unit_iqd: figures.paid.unit, per_unit_iqd: figures.perUnit, units: figures.coveredQty, prior_credited_iqd: figures.prior, credit_iqd: figures.credit }
       : null,
@@ -1788,8 +1863,8 @@ priceProtectionRoutes.get('/admin/claims/:id', requireAdmin, async (c) => {
     approval: {
       financial_scope: financial,
       owner_scope: owner,
-      needs_owner: aboveLine || priceAuthor,
-      why: aboveLine ? 'above_line' : priceAuthor ? 'price_author' : null,
+      needs_owner: aboveLine || priceAuthor || beneficiary,
+      why: beneficiary ? 'beneficiary' : aboveLine ? 'above_line' : priceAuthor ? 'price_author' : null,
     },
     reasons: PRICE_PROTECTION_REASON_CODES,
   });
@@ -1873,6 +1948,7 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
     amountIqd: credit,
     ceilingIqd: PRICE_PROTECTION_OWNER_LINE_IQD,
     conflictOfInterest: await approverWrotePrice(c, claim),
+    beneficiaryUserId: claim.user_id,
     reason,
   });
   const order = await c.env.DB.prepare('SELECT exchange_rate FROM orders WHERE id = ?')

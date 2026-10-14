@@ -38,6 +38,10 @@ const ACTS: MoneyAct[] = [
   'warranty_delivery_later',
   'warranty_replace',
   'warranty_claim_decision',
+  'coupon_issue',
+  'gift_grant',
+  'review_reward',
+  'member_price_rules',
 ];
 
 function refusal(fn: () => unknown): { status: number; code: string | undefined; message: string } {
@@ -107,11 +111,35 @@ test('the owner goes above a ceiling only with a recorded reason; owner-only act
     ceiling_iqd: 520_000,
     above_ceiling: true,
     conflict_of_interest: false,
+    self_beneficiary: false,
     owner_reason: 'حالة ممتازة مع الملحقات',
   });
   for (const act of OWNER_ONLY_ACTS) assert.equal(moneyAuthority(env, OWNER as never, { act }).tier, 'owner', act);
   // Within the ceiling the owner needs no reason either.
   assert.equal(moneyAuthority(env, OWNER as never, { act: 'trade_in_value', amountIqd: 100, ceilingIqd: 520_000 }).above_ceiling, false);
+});
+
+test('an approver who is the account the money goes to has a conflict: the owner decides, with a reason (review F5)', () => {
+  for (const act of ['price_protection_decide', 'trade_in_approve', 'return_refund', 'gift_grant', 'review_reward'] as const) {
+    const self = refusal(() => moneyAuthority(env, FULL as never, { act, amountIqd: 1_000, ceilingIqd: PRICE_PROTECTION_OWNER_LINE_IQD, beneficiaryUserId: 'staff' }));
+    assert.deepEqual([self.status, self.code], [403, 'OWNER_REQUIRED'], act);
+    // Someone else's money: as before.
+    assert.equal(moneyAuthority(env, FULL as never, { act, amountIqd: 1_000, ceilingIqd: PRICE_PROTECTION_OWNER_LINE_IQD, beneficiaryUserId: 'cust' }).tier, 'financial', act);
+  }
+  assert.equal(refusal(() => moneyAuthority(env, OWNER as never, { act: 'return_refund', beneficiaryUserId: 'boss' })).code, 'OWNER_REASON_REQUIRED');
+  const owner = moneyAuthority(env, OWNER as never, { act: 'return_refund', beneficiaryUserId: 'boss', reason: 'my own test order' });
+  assert.deepEqual([owner.audit.self_beneficiary, owner.audit.conflict_of_interest], [true, true]);
+  // No beneficiary named, or an empty one: no conflict.
+  assert.equal(moneyAuthority(env, FULL as never, { act: 'gift_grant', beneficiaryUserId: '' }).audit.self_beneficiary, false);
+});
+
+test('a public promo code is the owner’s alone (decision 3); gifts, rewards and member rules are a financial admin’s', () => {
+  assert.ok(OWNER_ONLY_ACTS.has('coupon_issue'));
+  assert.equal(refusal(() => moneyAuthority(env, FULL as never, { act: 'coupon_issue' })).code, 'OWNER_REQUIRED');
+  for (const act of ['gift_grant', 'review_reward', 'member_price_rules'] as const) {
+    assert.ok(!OWNER_ONLY_ACTS.has(act), act);
+    assert.equal(moneyAuthority(env, FULL as never, { act }).tier, 'financial', act);
+  }
 });
 
 test('the owner’s address on an unverified row is not yet the owner', () => {

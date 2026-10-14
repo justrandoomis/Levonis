@@ -223,7 +223,9 @@ export default {
         'GET /media/*': 'open',
         'GET /admin/queue': 'op',
         'POST /admin/:id/moderate': 'op',
-        'POST /admin/:id/reward': 'op',
+        // Declining or asking for changes is any admin's; APPROVING pays and is
+        // judged in the handler once the action is read (moneyAuthority review_reward).
+        'POST /admin/:id/reward': { cls: 'op', why: 'approve is a money act judged in the handler (review_reward); reject and request_changes stay with every admin' },
       },
     },
     {
@@ -255,17 +257,19 @@ export default {
         'GET /admin/levels': 'op',
         'PUT /admin/levels/:n': 'op',
         'GET /admin/products/:id/options': 'op',
-        'POST /admin/levels/:n/items': 'op',
-        'PUT /admin/items/:id': 'op',
+        // What a level holds is what every level gift may become (decision 3).
+        'POST /admin/levels/:n/items': 'money',
+        'PUT /admin/items/:id': 'money',
         'DELETE /admin/items/:id': 'op',
         'GET /admin/users': 'op',
         'GET /admin/grants': 'op',
         'GET /admin/grants/:id': 'op',
         'GET /admin/grants/:id/audit': 'op',
-        'POST /admin/grants': 'op',
-        'PATCH /admin/grants/:id': 'op',
+        'POST /admin/grants': 'money',
+        // The note is any admin's; changing WHY a gift was given is judged in the handler (gift_grant).
+        'PATCH /admin/grants/:id': { cls: 'op', why: 'a reason change is a money act judged in the handler (gift_grant); the internal note stays with every admin' },
         'POST /admin/grants/:id/cancel': 'op',
-        'POST /admin/grants/:id/convert': 'op',
+        'POST /admin/grants/:id/convert': 'money',
         'POST /admin/grants/:id/fulfill': 'op',
       },
     },

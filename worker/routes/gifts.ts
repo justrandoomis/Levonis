@@ -32,6 +32,7 @@ import {
   str,
 } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
+import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
 import { auditStatements } from '../lib/audit';
 import { newId } from '../lib/crypto';
 import { notifyStatement } from '../lib/notifications';
@@ -357,8 +358,15 @@ async function duplicateItem(db: D1Database, level: number, input: ItemInput, ex
   return !!hit;
 }
 
-/** «إضافة منتج إلى المستوى» — a real store product, fully pinned (D3). */
-giftRoutes.post('/admin/levels/:n/items', async (c) => {
+/**
+ * «إضافة منتج إلى المستوى» — a real store product, fully pinned (D3).
+ *
+ * WHAT A LEVEL HOLDS IS WHAT EVERY LEVEL GIFT MAY BECOME (owner decision 3):
+ * a customer holding a level gift chooses among its items, so adding or
+ * changing one gives value to every such holder. A financial admin's act; an
+ * assistant reads the levels only.
+ */
+giftRoutes.post('/admin/levels/:n/items', requireMoneyAuthority('gift_grant'), async (c) => {
   const admin = c.get('user')!;
   const n = levelParam(c);
   const input = parseItemInput(await jsonObject(c));
@@ -408,7 +416,7 @@ async function productItemRow(db: D1Database, id: string): Promise<Record<string
 }
 
 /** Edit a level item. Gifts that already chose it keep their own frozen selection. */
-giftRoutes.put('/admin/items/:id', async (c) => {
+giftRoutes.put('/admin/items/:id', requireMoneyAuthority('gift_grant'), async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id') ?? '';
   const row = await productItemRow(c.env.DB, id);
@@ -516,11 +524,14 @@ function grantReason(v: unknown): GrantReason {
  * the grant to why; the note is internal and NEVER reaches the customer.
  * `idempotencyKey` makes a retried press the same grant.
  */
-giftRoutes.post('/admin/grants', async (c) => {
+giftRoutes.post('/admin/grants', requireMoneyAuthority('gift_grant'), async (c) => {
   await rateLimit(c, 'gift_admin_grant', 60, 300);
   const admin = c.get('user')!;
   const body = await jsonObject(c);
   const userId = str(body.userId, 'userId', { min: 1, max: 80 });
+  // A GIFT GIVES VALUE AWAY (owner decision 3): a financial admin grants it,
+  // never to their own account (the owner does that, with a reason).
+  const authority = assertMoneyAuthority(c, { act: 'gift_grant', beneficiaryUserId: userId, reason: str(body.ownerReason, 'ownerReason', { max: 500, required: false }) });
   const mode = body.mode === 'product' ? 'product' : body.mode === 'level' ? 'level' : null;
   if (!mode) throw badRequest('mode must be level or product', 'GIFT_MODE_INVALID');
   const level = int(body.level, 'level', { min: 1, max: 5 });
@@ -584,6 +595,7 @@ giftRoutes.post('/admin/grants', async (c) => {
     requestId: idempotencyKey,
     requestHash: hash,
     now,
+    auditExtra: { authority: authority.audit },
   });
   try {
     await c.env.DB.batch(plan.statements);
@@ -617,6 +629,12 @@ giftRoutes.patch('/admin/grants/:id', async (c) => {
   if (body.reason !== undefined) {
     if (legacy) throw conflict('A legacy gift keeps its legacy reason.', 'GIFT_STATE');
     reason = grantReason(body.reason);
+  }
+  // WHY a gift was given is part of the grant (the books report promotions by
+  // reason): a financial admin's to change, like the grant itself. The
+  // internal note stays with every admin.
+  if (reason !== text(g.reason)) {
+    assertMoneyAuthority(c, { act: 'gift_grant', beneficiaryUserId: text(g.user_id), reason: str(body.ownerReason, 'ownerReason', { max: 500, required: false }) });
   }
   if (note === text(g.admin_note) && reason === text(g.reason)) {
     return c.json({ success: true, grant: await loadAdminGift(c.env.DB, id), unchanged: true });
@@ -697,11 +715,13 @@ giftRoutes.post('/admin/grants/:id/cancel', async (c) => {
  * LEVEL grant of its own level: the customer chooses one of the level's real
  * products and orders it through the cart.
  */
-giftRoutes.post('/admin/grants/:id/convert', async (c) => {
+giftRoutes.post('/admin/grants/:id/convert', requireMoneyAuthority('gift_grant'), async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id') ?? '';
   const body = await jsonObject(c);
   const g = await adminRow(c.env.DB, id);
+  // Choosing the level a legacy box becomes is a grant (owner decision 3).
+  const authority = assertMoneyAuthority(c, { act: 'gift_grant', beneficiaryUserId: text(g.user_id), reason: str(body.ownerReason, 'ownerReason', { max: 500, required: false }) });
   if (text(g.grant_mode || 'legacy') !== 'legacy' || g.state !== 'available') {
     throw conflict('Only a legacy gift that was never redeemed can be converted.', 'GIFT_NOT_CONVERTIBLE');
   }
@@ -717,6 +737,7 @@ giftRoutes.post('/admin/grants/:id/convert', async (c) => {
     from: 'legacy:available',
     to: 'level:granted',
     reward_id: g.reward_id ?? null,
+    authority: authority.audit,
   });
   const words = { ar: `المستوى ${level}`, en: `level ${level}`, ckb: `ئاستی ${level}` };
   try {

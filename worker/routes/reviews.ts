@@ -18,6 +18,7 @@ import {
 } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
+import { assertMoneyAuthority } from '../lib/moneyAuthority';
 import { audit, auditStatements } from '../lib/audit';
 import { notifyGiftGranted, planGrant } from '../lib/gifts/grant';
 import { changedExactlyOne, isLostRace, loadLevels } from '../lib/gifts/model';
@@ -1258,6 +1259,12 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
   if (row.state === 'approved') {
     throw conflict('This reward was already approved — granted rewards are preserved, not re-decided');
   }
+  // APPROVING PAYS (owner decision 3): a gift level or points. A financial
+  // admin decides it, never for their own review (the owner does, with a
+  // reason). Declining and asking for changes move nothing: any admin may.
+  const authority = action === 'approve'
+    ? assertMoneyAuthority(c, { act: 'review_reward', beneficiaryUserId: String(row.user_id), reason: str(body.ownerReason, 'ownerReason', { max: 500, required: false }) })
+    : null;
   const now = new Date().toISOString();
 
   if (action !== 'approve') {
@@ -1332,6 +1339,7 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
       quality_score: score,
       reason,
       entitlement_id: plan.id,
+      authority: authority?.audit ?? null,
     });
     try {
       await c.env.DB.batch([
@@ -1388,6 +1396,6 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
     console.error('review points award failed', e instanceof Error ? e.message : e);
     throw badRequest('Approval failed. Please try again.');
   }
-  await audit(c.env.DB, admin.id, 'review.reward', id, { action: 'approve', kind: 'points', points, reason });
+  await audit(c.env.DB, admin.id, 'review.reward', id, { action: 'approve', kind: 'points', points, reason, authority: authority?.audit ?? null });
   return c.json({ success: true, review_id: id, reward_state: 'approved', points_awarded: points });
 });

@@ -438,19 +438,36 @@ adminTradeInRoutes.get('/requests/:id', async (c) => {
  * A financial admin approves the estimate, proposes a value up to it, and
  * completes; a value ABOVE the estimate the server computed is the owner's
  * alone, with a private reason (`owner_reason`) recorded and flagged (M1).
+ * None of these acts is the customer's own: an admin who is the trade-in's
+ * customer — who answered its condition questions — leaves them to the owner
+ * (a conflict of interest, decided with a reason).
  */
 adminTradeInRoutes.post('/requests/:id/inspect', requireMoneyAuthority('trade_in_inspect'), async (c) => {
   const admin = c.get('user')!;
-  const req = await run(async () => markInspected(c.env, await adminRequest(c), admin.id));
+  const current = await adminRequest(c);
+  assertMoneyAuthority(c, { act: 'trade_in_inspect', beneficiaryUserId: current.user_id, reason: await ownerReasonOf(c) });
+  const req = await run(async () => markInspected(c.env, current, admin.id));
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
 });
+
+/** The owner's private reason, when the body carries one (`owner_reason`); empty otherwise. */
+async function ownerReasonOf(c: Context<AppContext>): Promise<string> {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  return str(body.owner_reason, 'owner_reason', { max: 500, required: false });
+}
 
 adminTradeInRoutes.post('/requests/:id/approve', requireMoneyAuthority('trade_in_approve'), async (c) => {
   const admin = c.get('user')!;
   await rateLimit(c, 'admin-trade-in', 120, 3600);
   const current = await adminRequest(c);
   // The estimate IS the server's figure: approving it is within a financial admin's authority.
-  const grant = assertMoneyAuthority(c, { act: 'trade_in_approve', amountIqd: current.estimated_iqd, ceilingIqd: current.estimated_iqd });
+  const grant = assertMoneyAuthority(c, {
+    act: 'trade_in_approve',
+    amountIqd: current.estimated_iqd,
+    ceilingIqd: current.estimated_iqd,
+    beneficiaryUserId: current.user_id,
+    reason: await ownerReasonOf(c),
+  });
   const req = await run(async () => approveEstimate(c.env, current, admin.id, grant));
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
 });
@@ -470,7 +487,7 @@ adminTradeInRoutes.post('/requests/:id/value', requireMoneyAuthority('trade_in_v
   const current = await adminRequest(c);
   // M1: «value ≤ estimate unless owner». The ceiling is the estimate the
   // server fixed at submit — never a figure the client sends.
-  const grant = assertMoneyAuthority(c, { act: 'trade_in_value', amountIqd: raw, ceilingIqd: current.estimated_iqd ?? 0, reason: ownerReason });
+  const grant = assertMoneyAuthority(c, { act: 'trade_in_value', amountIqd: raw, ceilingIqd: current.estimated_iqd ?? 0, beneficiaryUserId: current.user_id, reason: ownerReason });
   const req = await run(async () => changeValue(c.env, current, admin.id, raw, reason, grant));
   afterResponse(
     c,
@@ -481,7 +498,9 @@ adminTradeInRoutes.post('/requests/:id/value', requireMoneyAuthority('trade_in_v
 
 adminTradeInRoutes.post('/requests/:id/complete', requireMoneyAuthority('trade_in_complete'), async (c) => {
   const admin = c.get('user')!;
-  const req = await run(async () => completeRequest(c.env, await adminRequest(c), admin.id));
+  const current = await adminRequest(c);
+  assertMoneyAuthority(c, { act: 'trade_in_complete', beneficiaryUserId: current.user_id, reason: await ownerReasonOf(c) });
+  const req = await run(async () => completeRequest(c.env, current, admin.id));
   return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
 });
 

@@ -2286,7 +2286,12 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
    * admin's (403 FINANCIAL_SCOPE_REQUIRED, the same answer for every stage).
    */
   const decides = (MONEY_STAGES.includes(nextStage) && current !== nextStage) || (sent !== null && sent !== stored);
-  const authority = decides ? assertMoneyAuthority(c, { act: 'warranty_claim_decision' }) : null;
+  // Accepting commits the shop's money to the claimant: an admin who IS the
+  // claimant leaves that to the owner (a conflict, with a reason).
+  const accepts = nextStage === 'approved' || nextStage === 'replaced' || sent === 'repair' || sent === 'replace';
+  const authority = decides
+    ? assertMoneyAuthority(c, { act: 'warranty_claim_decision', beneficiaryUserId: accepts ? claim.user_id : null, reason })
+    : null;
 
   // G-3: THE DECISION SAYS WHAT THE STAGE SAYS. A decision sent with the move
   // must fit the stage; the one on the row is kept only while it still fits

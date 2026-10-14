@@ -71,15 +71,24 @@ interface EvidenceRow {
   counted: boolean;
 }
 
+/** A member price rule or the PRO pricing policy changed inside the claim's window (review F6). */
+interface RuleChangeRow {
+  at: string;
+  kind: 'member_rule' | 'pro_policy';
+  author: string | null;
+  by_owner: boolean;
+}
+
 interface DetailResponse {
   claim: ClaimView;
   item: { name: string; variant: string; qty: number } | null;
   order: { id: string; status: string; created_at: string; delivered_at: string | null } | null;
   customer: { name: string; email: string; phone: string | null } | null;
   evidence: EvidenceRow[];
+  rule_changes?: RuleChangeRow[];
   now: { paid_unit_iqd: number; per_unit_iqd: number; units: number; prior_credited_iqd: number; credit_iqd: number } | null;
   blocked: string | null;
-  approval: { financial_scope: boolean; owner_scope: boolean; needs_owner: boolean; why: 'above_line' | 'price_author' | null };
+  approval: { financial_scope: boolean; owner_scope: boolean; needs_owner: boolean; why: 'above_line' | 'price_author' | 'beneficiary' | null };
 }
 
 const FILTERS: Array<ClaimState | ''> = ['requested', 'credited', 'rejected', ''];
@@ -391,11 +400,17 @@ function Detail({ id, onClose, onChanged }: { id: string; onClose: () => void; o
               </label>
             ) : (
               <p className="text-[12.5px] text-[var(--ap-warning)]" role="status" data-needs-owner>
-                {approval?.why === 'price_author'
+                {approval?.why === 'beneficiary'
                   ? loc(
-                      'كتبتَ سعراً لهذا المنتج خلال مدة المطالبة: يعتمدها الأدمن الرئيسي فقط.',
-                      'You wrote a price of this product within the claim’s period: only the main admin can approve it.',
-                      'تۆ لە ماوەی داواکارییەکەدا نرخێکت بۆ ئەم بەرهەمە نووسیوە: تەنها بەڕێوەبەری سەرەکی دەتوانێت پەسەندی بکات.'
+                      'هذه مطالبة حسابك أنت: يعتمدها الأدمن الرئيسي فقط.',
+                      'This is your own account’s claim: only the main admin can approve it.',
+                      'ئەمە داواکاریی هەژماری خۆتە: تەنها بەڕێوەبەری سەرەکی دەتوانێت پەسەندی بکات.'
+                    )
+                  : approval?.why === 'price_author'
+                  ? loc(
+                      'كتبتَ سعراً لهذا المنتج (أو قاعدة سعر للأعضاء) خلال مدة المطالبة: يعتمدها الأدمن الرئيسي فقط.',
+                      'You wrote a price of this product (or a member price rule) within the claim’s period: only the main admin can approve it.',
+                      'تۆ لە ماوەی داواکارییەکەدا نرخێکت بۆ ئەم بەرهەمە (یان ڕێسایەکی نرخی ئەندامان) نووسیوە: تەنها بەڕێوەبەری سەرەکی دەتوانێت پەسەندی بکات.'
                     )
                   : loc(
                       'المبلغ فوق حد الموافقة المالية: يعتمده الأدمن الرئيسي فقط بسبب مكتوب.',
@@ -499,6 +514,30 @@ function Detail({ id, onClose, onChanged }: { id: string; onClose: () => void; o
                   </div>
                 )}
               </section>
+
+              {data.rule_changes && data.rule_changes.length > 0 ? (
+                <section className={`${T.surface} p-4`} data-rule-changes>
+                  <h3 className="text-[14px] font-bold mb-2">
+                    {loc('تغييرات أسعار الأعضاء خلال المدة', 'Member price changes in the period', 'گۆڕانکارییەکانی نرخی ئەندامان لە ماوەکەدا')}
+                  </h3>
+                  <ul className="space-y-1.5 text-[12.5px]">
+                    {data.rule_changes.map((r, i) => (
+                      <li key={i} className="flex flex-wrap gap-x-2" data-rule-change={r.kind}>
+                        <span className="whitespace-nowrap">{day(r.at, lang, true)}</span>
+                        <span>
+                          {r.kind === 'pro_policy'
+                            ? loc('سياسة تسعير PRO', 'PRO pricing policy', 'سیاسەتی نرخدانانی PRO')
+                            : loc('قاعدة سعر للأعضاء', 'Member price rule', 'ڕێسای نرخی ئەندامان')}
+                        </span>
+                        <span className={T.text3}>
+                          {r.author ?? '—'}
+                          {r.by_owner ? ` (${loc('المالك', 'Owner', 'خاوەن')})` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
             </div>
 
             <aside className="space-y-4">

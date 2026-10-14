@@ -64,8 +64,9 @@ export default {
         'PATCH /orders/:id/stage': 'op',
         'PATCH /orders/:id': 'op',
         'GET /coupons': 'op',
-        'POST /coupons': { cls: 'op', noBody: 'promo codes (a discount rule); no cost column is read' },
-        'PATCH /coupons/:id': { cls: 'op', noBody: 'promo codes (a discount rule); no cost column is read' },
+        // A public promo code pays whoever holds it: the owner's alone (owner decision 3, row 223).
+        'POST /coupons': { cls: 'owner', why: 'issuing a public promo code (moneyAuthority coupon_issue)' },
+        'PATCH /coupons/:id': { cls: 'owner', why: 'editing a public promo code (moneyAuthority coupon_issue)' },
         'DELETE /coupons/:id': { cls: 'op', noBody: 'promo codes (a discount rule); no cost column is read' },
         'GET /settings': 'op',
         'GET /site-media': 'op',

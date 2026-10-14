@@ -24,11 +24,18 @@
  *                                           returned in `audit` for the row
  *
  * OWNER-ONLY ACTS ignore amounts: lengthening a warranty, moving a delivery
- * date later, replacing a whole unit, editing the trade-in valuation rules.
+ * date later, replacing a whole unit, editing the trade-in valuation rules,
+ * issuing or editing a public promo code (decision 3: «الأكواد العامة»).
  *
- * A CONFLICT OF INTEREST (the approver wrote the price row that made a
- * price-protection drop: plan §3.5 «four eyes») is treated as above the
- * ceiling: the owner, with a reason.
+ * The other doors that give value away ask here too, with no ceiling of
+ * their own: a gift grant (and a legacy gift's conversion), a review reward,
+ * the member price rules. An assistant is refused at each.
+ *
+ * A CONFLICT OF INTEREST is treated as above the ceiling: the owner, with a
+ * reason. Two kinds: the approver wrote the price (a price row, a member
+ * price rule or the PRO pricing policy) that made a price-protection drop
+ * (plan §3.5 «four eyes»), and the approver IS the account the money goes to
+ * (`beneficiaryUserId` — their own claim, trade-in, refund, gift or reward).
  *
  * The answers carry no amount and no ceiling (`moneyAuthorityMessage`): the
  * same sentence whatever was asked. The amounts go to the audit row only.
@@ -51,7 +58,11 @@ export type MoneyAct =
   | 'warranty_lengthen'
   | 'warranty_delivery_later'
   | 'warranty_replace'
-  | 'warranty_claim_decision';
+  | 'warranty_claim_decision'
+  | 'coupon_issue'
+  | 'gift_grant'
+  | 'review_reward'
+  | 'member_price_rules';
 
 /** The acts only the owner performs, whatever the amount (decision 3). */
 export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
@@ -59,6 +70,8 @@ export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
   'warranty_lengthen',
   'warranty_delivery_later',
   'warranty_replace',
+  // A public promo code (the coupon editor makes no other kind): decision 3.
+  'coupon_issue',
 ]);
 
 /** The shortest reason the owner may record for going above a ceiling. */
@@ -76,6 +89,12 @@ export interface MoneyAsk {
   ceilingIqd?: number | null;
   /** The approver has a stake in the figure (four eyes): the owner decides. */
   conflictOfInterest?: boolean;
+  /**
+   * The account this act pays or gives to, when it is one person's (the
+   * customer of a claim, a trade-in, a refund, a gift, a reward). The
+   * approver being that account is a conflict of interest.
+   */
+  beneficiaryUserId?: string | null;
   /** The owner's reason, required above a ceiling or on a conflict. */
   reason?: string | null;
 }
@@ -91,9 +110,14 @@ export interface MoneyGrant {
     ceiling_iqd: number | null;
     above_ceiling: boolean;
     conflict_of_interest: boolean;
+    /** The approver is the account the money goes to. */
+    self_beneficiary: boolean;
     owner_reason?: string;
   };
 }
+
+/** Who asks: the session's user (its id names a self-dealing approver). */
+export type MoneySubject = CostSubject & { id?: string | null };
 
 function refusal(status: 400 | 403, code: MoneyAuthorityCode): HttpError {
   return new HttpError(status, moneyAuthorityMessage(code), code);
@@ -106,12 +130,13 @@ const whole = (v: unknown): number | null => (typeof v === 'number' && Number.is
  * OWNER_REQUIRED, 403 OWNER_EMAIL_UNVERIFIED, 400 OWNER_REASON_REQUIRED) or
  * returns the grant with what the audit row should carry.
  */
-export function moneyAuthority(env: Env, user: CostSubject | null | undefined, ask: MoneyAsk): MoneyGrant {
+export function moneyAuthority(env: Env, user: MoneySubject | null | undefined, ask: MoneyAsk): MoneyGrant {
   if (!user || user.role !== 'admin' || !canMoveMoney(env, user)) throw refusal(403, 'FINANCIAL_SCOPE_REQUIRED');
   const owner = isOwner(env, user);
   const amount = whole(ask.amountIqd);
   const ceiling = whole(ask.ceilingIqd);
-  const conflict = ask.conflictOfInterest === true;
+  const selfBeneficiary = typeof ask.beneficiaryUserId === 'string' && ask.beneficiaryUserId !== '' && ask.beneficiaryUserId === user.id;
+  const conflict = ask.conflictOfInterest === true || selfBeneficiary;
   const ownerOnly = OWNER_ONLY_ACTS.has(ask.act);
   const above = ceiling !== null && (amount === null || amount > ceiling);
   const needsOwner = ownerOnly || above || conflict;
@@ -133,6 +158,7 @@ export function moneyAuthority(env: Env, user: CostSubject | null | undefined, a
       ceiling_iqd: ceiling,
       above_ceiling: above,
       conflict_of_interest: conflict,
+      self_beneficiary: selfBeneficiary,
       ...(above || conflict ? { owner_reason: reason } : {}),
     },
   };

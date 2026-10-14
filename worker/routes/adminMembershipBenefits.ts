@@ -25,6 +25,7 @@ import {
 import type { TierStatus } from '../lib/entitlements';
 import { auditStatements } from '../lib/audit';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
+import { requireMoneyAuthority } from '../lib/moneyAuthority';
 import { selectRule, type BenefitRule, type DeliveryMethodId } from '@levonis/pricing/membershipBenefits';
 
 /**
@@ -257,7 +258,16 @@ adminMembershipBenefitRoutes.get('/versions', async (c) => {
   return c.json({ success: true, versions: results ?? [] });
 });
 
-adminMembershipBenefitRoutes.post('/', async (c) => {
+/**
+ * A MEMBER PRICE RULE IS A PRICE (owner decision 3): it lowers what PRO and
+ * PREMIUM members pay, and price protection pays members the difference. An
+ * assistant reads the rules and simulates them; writing one — create, edit,
+ * delete, the recommended starting set, a consolidation — is a financial
+ * admin's (403 FINANCIAL_SCOPE_REQUIRED otherwise). Every write leaves a
+ * `membership_benefit_versions` row naming its author, which the
+ * price-protection four-eyes test reads.
+ */
+adminMembershipBenefitRoutes.post('/', requireMoneyAuthority('member_price_rules'), async (c) => {
   const user = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const rule = ruleFromBody(body, newId('mbr'));
@@ -265,7 +275,7 @@ adminMembershipBenefitRoutes.post('/', async (c) => {
   return c.json({ success: true, rule, version_id: versionId });
 });
 
-adminMembershipBenefitRoutes.put('/:id', async (c) => {
+adminMembershipBenefitRoutes.put('/:id', requireMoneyAuthority('member_price_rules'), async (c) => {
   const user = c.get('user')!;
   const id = c.req.param('id');
   const existing = await c.env.DB.prepare('SELECT id FROM membership_benefit_rules WHERE id = ?').bind(id).first();
@@ -276,7 +286,7 @@ adminMembershipBenefitRoutes.put('/:id', async (c) => {
   return c.json({ success: true, rule, version_id: versionId });
 });
 
-adminMembershipBenefitRoutes.delete('/:id', async (c) => {
+adminMembershipBenefitRoutes.delete('/:id', requireMoneyAuthority('member_price_rules'), async (c) => {
   const user = c.get('user')!;
   const id = c.req.param('id');
   const existing = await c.env.DB.prepare('SELECT id FROM membership_benefit_rules WHERE id = ?').bind(id).first();
@@ -437,7 +447,7 @@ adminMembershipBenefitRoutes.get('/recommended', async (c) => {
  * the dialog listed them. A key the plan no longer offers (a rule was added
  * for that section in the meantime) is skipped, never overwritten.
  */
-adminMembershipBenefitRoutes.post('/recommended', async (c) => {
+adminMembershipBenefitRoutes.post('/recommended', requireMoneyAuthority('member_price_rules'), async (c) => {
   const user = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   if (!Array.isArray(body.keys) || body.keys.length === 0) {
@@ -669,7 +679,7 @@ adminMembershipBenefitRoutes.get('/consolidation', async (c) => {
  * the request — a second admin converting the same group, an edit landing
  * between the plan and the batch — because the batch itself is fenced.
  */
-adminMembershipBenefitRoutes.post('/consolidation', async (c) => {
+adminMembershipBenefitRoutes.post('/consolidation', requireMoneyAuthority('member_price_rules'), async (c) => {
   const user = c.get('user')!;
   const db = c.env.DB;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;

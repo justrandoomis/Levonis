@@ -20,6 +20,7 @@ import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
 import { moneyAuthorityMessage } from '../../packages/contracts/src/moneyAuthority';
+import { requireMoneyAuthority } from '../lib/moneyAuthority';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
@@ -3875,7 +3876,13 @@ function couponFieldsFrom(body: Record<string, unknown>) {
   };
 }
 
-adminRoutes.post('/coupons', async (c) => {
+/**
+ * A PROMO CODE IS A PUBLIC CODE: anyone holding it is paid by it. Issuing or
+ * editing one is the owner's alone (owner decision 3, row 223: «الأكواد
+ * العامة»); an assistant and a financial admin are refused at the door.
+ * Retiring a code (DELETE below) gives nothing away and stays with every admin.
+ */
+adminRoutes.post('/coupons', requireMoneyAuthority('coupon_issue'), async (c) => {
   const adminUser = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
   // Stored uppercased, as the column has always assumed, and with spaces
@@ -3914,7 +3921,7 @@ function refuseTradeInCoupon(row: { trade_in_id?: string | null } | null): void 
   if (row?.trade_in_id) throw new HttpError(409, moneyAuthorityMessage('TRADE_IN_COUPON_MANAGED'), 'TRADE_IN_COUPON_MANAGED');
 }
 
-adminRoutes.patch('/coupons/:id', async (c) => {
+adminRoutes.patch('/coupons/:id', requireMoneyAuthority('coupon_issue'), async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));

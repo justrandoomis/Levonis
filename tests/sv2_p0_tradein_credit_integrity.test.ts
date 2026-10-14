@@ -142,8 +142,9 @@ test('F3: the coupon editor neither rewrites nor retires a trade-in credit — f
       kind: 'fixed_iqd', value: 1_500_000, max_per_user: 1, max_global: 1, ends_at: new Date(Date.now() + 365 * 86_400_000).toISOString(),
     });
     const pb = await json(patched);
-    assert.equal(patched.status, 409, `${who.id}: ${JSON.stringify(pb)}`);
-    assert.equal(pb.code, 'TRADE_IN_COUPON_MANAGED');
+    // Editing any promo code is the owner's (decision 3); the owner is refused for a trade-in credit.
+    const expected = who === OWNER ? [409, 'TRADE_IN_COUPON_MANAGED'] : [403, who === ASSISTANT ? 'FINANCIAL_SCOPE_REQUIRED' : 'OWNER_REQUIRED'];
+    assert.deepEqual([patched.status, pb.code], expected, `${who.id}: ${JSON.stringify(pb)}`);
     const retired = await send(app, 'DELETE', `/api/admin/coupons/${t.coupon}`);
     assert.equal(retired.status, 409, who.id);
     assert.equal((await json(retired)).code, 'TRADE_IN_COUPON_MANAGED');
