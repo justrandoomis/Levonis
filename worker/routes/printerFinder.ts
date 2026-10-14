@@ -24,6 +24,7 @@
  * 60 s (the key is the URL, so it only helps repeat answers — which a shared
  * results link is).
  */
+import { withCacheEpoch } from '../lib/publicApi/cache';
 import { listing } from '../lib/listing';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -179,7 +180,8 @@ printerFinderRoutes.get('/', async (c) => {
   // Keyed by the CANONICAL answers, not the raw URL: junk parameters and key
   // order must not mint new cache entries, and two equal answer sets share one.
   const canonical = new URL(c.req.url);
-  const key = new Request(`${canonical.origin}${canonical.pathname}?${encodePairs(finderParamPairs(answers))}`, { method: 'GET' });
+  // The clean start (A.4): the catalogue epoch, so no answer cached before it is ever served.
+  const key = new Request(withCacheEpoch(`${canonical.origin}${canonical.pathname}?${encodePairs(finderParamPairs(answers))}`), { method: 'GET' });
   if (cache) {
     const hit = await cache.match(key).catch(() => undefined);
     // With this route's own lifetime, not the zone's four-hour Browser Cache

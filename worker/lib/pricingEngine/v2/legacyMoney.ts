@@ -117,24 +117,27 @@ function docMoney(body: Row, prev: ProductDoc | null, costs: boolean, sink?: str
     }
   }
 
-  // The document's own JSON selectors (a client that sends `options` / `colors` in the document).
+  // The document's own JSON selectors (`options` / `colors`): a derived mirror of the relational rows
+  // (the planner rebuilds it from them), so a figure there is never refused — it is put back to the
+  // stored mirror (a V2 product's mirror can lag its SKU rows; an echo of either must save).
   for (const list of ['options', 'colors'] as const) {
     const rows = body[list];
     if (!Array.isArray(rows)) continue;
     const storedRows = new Map(((prev?.[list] ?? []) as unknown as Row[]).map((r) => [String(r.id), r] as const));
+    const kept: string[] = [];
     for (const r of rows) {
       if (!isRow(r)) continue;
       const twin = storedRows.get(String(r.id)) ?? null;
       const at = `doc.${list}.${String(r.id)}`;
       // The pre-0018 shape names the regular price `price_iqd`.
       if (has(r, 'price_iqd') && !same(r.price_iqd, twin?.regular_price_iqd ?? null)) {
-        if (!sink) throw legacyMoneyRefusal(5, `${at}.price_iqd`);
         delete r.price_iqd;
-        sink.push(`${at}.price_iqd`);
+        kept.push(`${at}.price_iqd`);
       }
-      holdRow(r, twin, [...LEGACY_ROW_PRICE_KEYS, 'compare_at_iqd'], 5, at, sink);
-      if (costs) holdRow(r, twin, LEGACY_ROW_COST_KEYS, 5, at, sink);
+      holdRow(r, twin, [...LEGACY_ROW_PRICE_KEYS, 'compare_at_iqd'], 5, at, kept);
+      if (costs) holdRow(r, twin, LEGACY_ROW_COST_KEYS, 5, at, kept);
     }
+    if (sink) sink.push(...kept);
   }
 }
 
