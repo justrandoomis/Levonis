@@ -326,6 +326,8 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     'worker/routes/adminProducts.ts': [
       '../lib/pricingEngine/v2/api',
       '../lib/pricingEngine/v2/draft',
+      // The clean start (spec addendum A.7): a product's first V2 write retires its old rows in the same batch.
+      '../lib/pricingEngine/v2/firstWrite',
       '../lib/pricingEngine/v2/productSave',
       '../lib/pricingEngine/v2/write',
       '../lib/pricingEngine/whatIf',

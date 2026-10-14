@@ -11,9 +11,14 @@
  *     C-14: never `preview_hash` / `change_pct`, the V1 and FX oracle keys of
  *     FINANCIAL_FIELDS — the V2 change is `change_percent`);
  *   - the owner alone (`v2_*`, every key in FINANCIAL_FIELDS): the exact IQD,
- *     the USD ceiling, the floor and its flags, R, T, `below_cost`, U, the
- *     dollar points and discounts — never to a price editor, whose USD view
- *     would reveal the private applied rate (row 220, C-7).
+ *     the USD ceiling, the floor and its flags, R, T, `below_cost`, U — never
+ *     to a price editor;
+ *   - on a PRICE-FIRST product, the owner AND the price editors (the owner's
+ *     answer Q2, DECISIONS row 222: «staff see and edit USD»; the owner
+ *     accepted that staff may work out U, risk R-2): the dollar points and
+ *     discounts they edit and each channel's exact dollars, under keys
+ *     outside FINANCIAL_FIELDS (`editor_usd`, `editor_usd_price`, added by
+ *     api.ts `v2Answer`). Never on a cost-first product, where D = R + T.
  * Nothing here is computed: every figure is the evaluation's own.
  */
 import type { V2Evaluation, V2Row } from './evaluate';

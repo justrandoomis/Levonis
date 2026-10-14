@@ -142,6 +142,15 @@ export const V2_SENTINELS = [
   '654321', // a legacy cost inside the migration snapshot's payload
 ] as const;
 
+/**
+ * The owner's answer Q2 (DECISIONS row 222, spec addendum A.12.3) splits them:
+ * the DOLLAR PRICE figures a price editor may read and write on a PRICE-FIRST
+ * V2 product's pricing answer (and nowhere else) …
+ */
+export const V2_PRICE_SENTINELS = ['987.65', '-43.21', '43.21', '7.77', '1234.56', '61.73', '13.79'] as const;
+/** … and the cost-derived figures nobody but the owner ever reads, anywhere. */
+export const V2_COST_SENTINELS = ['1543210.987654', '987.654321', '765432', '313.13', '654321'] as const;
+
 /** The legacy snapshot's payload (its SHA-256 is stored beside it, as V2-5 will). */
 export const V2_SENTINEL_SNAPSHOT_PAYLOAD = JSON.stringify({ product: { price_iqd: 900000, product_cost_iqd: 654321 } });
 

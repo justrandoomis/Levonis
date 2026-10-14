@@ -164,23 +164,6 @@ export default {
           cls: 'cost_write',
           why: '«رجوع إلى التسعير اليدوي»: the product leaves the engine (fenced on write_seq); every price stays as written',
         },
-        // Pricing V2-5 (spec §6.1): «نقل الأسعار إلى الدولار» — the owner's alone. The list, the proposals and
-        // the preview price in memory and write nothing; each commit is one atomic batch per product.
-        'GET /v2/migration': { cls: 'cost_read', why: 'every unmigrated product with its default proposal: changed rows, flags, unchanged, hash' },
-        'GET /v2/migration/:id': { cls: 'cost_read', why: 'one product’s three proposals, old → new per SKU × channel, prepaid and cash on delivery' },
-        'POST /v2/migration/:id/preview': {
-          cls: 'cost_read',
-          body: { option: 'keep_usd' },
-          why: 'a proposal with the owner’s choices (option, kept route per model) and its hash: writes nothing; POST only for its body',
-        },
-        'POST /v2/migration/:id/commit': {
-          cls: 'cost_write',
-          why: 'one product moved to dollar pricing in one batch: the legacy snapshot, the V2 rows, the SKU prices, the method, the audit (fresh sign-in)',
-        },
-        'POST /v2/migration/commit-unchanged': {
-          cls: 'cost_write',
-          why: '«اعتمد كل المنتجات التي لا يتغيّر سعرها»: up to 20 zero-diff products, each its own batch (fresh sign-in)',
-        },
       },
     },
   ],

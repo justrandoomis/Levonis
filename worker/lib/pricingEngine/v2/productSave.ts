@@ -2,8 +2,10 @@
  * PRICING V2-3b — THE PRODUCT SAVE WITH ITS PRICES, ONE BATCH (spec §3.3 step
  * 4, §3.5 last row, §4.1, §4.3; docs/PRICING-V2.md §2.6 «نشر»).
  *
- * `POST /api/admin/products-v2` on a V2 product — or creating a product with a
- * `pricing_v2` block (V2 from birth) — prices the document the save would
+ * `POST /api/admin/products-v2` on a V2 product — or any ordinary product's
+ * save with a `pricing_v2` block: a product created V2 from birth, or an
+ * existing product's first V2 write (the clean start, addendum A.7) — prices
+ * the document the save would
  * leave (`draftLoadedOf` over the very plan the save writes) and lays the
  * planner's statements INSIDE the V2 writer's batch, after its fences and
  * under its token: the 0181/0188 value-compared locks pass, so adding a model
@@ -30,7 +32,8 @@ import type { ProductSavePlan } from '../../productPersistence';
 import { strictBody } from '../../fx/ownerActs';
 import { inputInvalid } from '../whatIf';
 import { loadProducts } from '../load';
-import { desiredFor, evaluateDesired, gateV2, loadV2Read, parseV2Wire, v2Answer, v2PriceKey, v2ViewerOf } from './api';
+import { desiredFor, evaluateDesired, gateV2, loadV2Read, parseV2Wire, storedMethodOf, v2Answer, v2PriceKey, v2ViewerOf } from './api';
+import { firstWriteStatements } from './firstWrite';
 import { draftLoadedOf } from './draft';
 import { V2_SAVE_STATEMENT_CAP, v2DataStatements, v2WriteStatements } from './write';
 
@@ -65,13 +68,17 @@ export async function planV2ProductSave(c: Context<AppContext>, s: V2SaveInput):
   const now = new Date().toISOString();
   const desired = desiredFor(read, wire, { viewer, env: c.env, user, now });
   const ev = await evaluateDesired(read, desired);
+  // Publishing = the product becomes visible to customers: a draft made active, or — the clean start
+  // (addendum A.4/A.7) — an active product that has never had a complete V2 write (it is hidden until
+  // it has one). Either needs a complete price.
+  const published = !!storedMethodOf(read) && (read.v2?.results.length ?? 0) > 0;
   const verdict = await gateV2({
     c,
     ev,
     hash: block.preview_hash,
     confirm: block.confirm_large_change,
     priceChange: ev.changes.length > 0 || wire.sent.length > 0,
-    publishing: s.status === 'active' && (!s.prev || s.prev.status !== 'active'),
+    publishing: s.status === 'active' && (!s.prev || s.prev.status !== 'active' || !published),
     preview: async () => v2Answer({ viewer, read, ev, draft: !s.prev }),
   });
   if (verdict === 'already') return { kind: 'already' };
@@ -84,6 +91,8 @@ export async function planV2ProductSave(c: Context<AppContext>, s: V2SaveInput):
     updatedAt: s.prev ? s.updatedAt : undefined,
     newProduct: !s.prev,
     auditDetail: { structure_statements: s.plan.statements.length },
+    // The clean start: an existing product's first complete V2 write retires its Direct Sale Extra and overlay.
+    ...(s.prev && ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored) } : {}),
   };
   const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : await v2WriteStatements(db, ev, opts);
   if (statements.length > V2_SAVE_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE', { section: 5 });

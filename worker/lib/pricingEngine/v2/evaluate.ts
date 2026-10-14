@@ -92,6 +92,12 @@ export interface V2Row {
   large: boolean;
   drop_flag: boolean;
   blocked: boolean;
+  /**
+   * Price-first only: this channel's exact dollars (D_usd ± differences − Δ),
+   * every term a figure the price editor typed (owner answer Q2) — never a
+   * cost. Null from cost, and on a channel not priced.
+   */
+  usd_exact: string | null;
   owner: {
     anchor: V2Channel['anchor'];
     floor: V2Channel['floor'];
@@ -279,7 +285,9 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
     const sku = skus[n]!;
     for (const channel of sku.channels) {
       const today = unit.channels.find((c) => c.channel === channel) ?? null;
-      const oldIqd = today?.ok ? today.prepaid_iqd : null;
+      // The clean start (DECISIONS row 222, addendum A.7): a product's FIRST V2 write starts from nothing.
+      // An old dinar price is never shown beside it, never moves a 15% / 30% gate and never seeds a row.
+      const oldIqd = kind === 'v2_create' ? null : today?.ok ? today.prepaid_iqd : null;
       const p = prices.find((x) => x.combo_key === sku.combo_key && x.channel === channel) ?? null;
       const newIqd = p ? p.price.computed_price_iqd : null;
       const c = p?.price.v2 ?? null;
@@ -299,6 +307,7 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
         large: large(oldIqd, newIqd),
         drop_flag: drop(oldIqd, newIqd),
         blocked: blocked.some((b) => b.combo_key === sku.combo_key && b.channel === channel),
+        usd_exact: a.method === 'usd' ? (c?.usd_exact ?? null) : null,
         owner: c
           ? {
               anchor: c.anchor,
