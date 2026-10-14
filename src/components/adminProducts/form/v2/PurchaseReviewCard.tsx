@@ -12,6 +12,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, formatIqd } from '../../../../lib/api';
 import { useLanguage } from '../../../../LanguageContext';
 import { Button } from '../../../ui/Button';
+import { channelName, useV2Lang } from './v2Ui';
+import type { V2Channel } from './v2Model';
 
 interface ReviewInput {
   scope: string;
@@ -56,6 +58,7 @@ const T = {
 
 export default function PurchaseReviewCard({ productId, onApplied }: { productId: string; onApplied: () => void }) {
   const { lang } = useLanguage();
+  const v2Lang = useV2Lang();
   const t = (k: keyof typeof T) => (lang === 'en' ? T[k].en : lang === 'ckb' ? T[k].ckb : T[k].ar);
   const nameOf = (n: Change['names']) => (lang === 'en' ? n.en : lang === 'ckb' ? n.ckb || n.ar : n.ar) || n.en;
   const [review, setReview] = useState<Review | null>(null);
@@ -109,7 +112,7 @@ export default function PurchaseReviewCard({ productId, onApplied }: { productId
               {preview.changes.map((c) => (
                 <li key={`${c.combo_key}|${c.channel}`} className="flex min-w-0 flex-wrap items-center gap-x-2">
                   <span className="min-w-0 truncate" dir="auto">{nameOf(c.names)}</span>
-                  <span className="text-text-muted">{c.channel}</span>
+                  <span className="text-text-muted">{channelName(c.channel as V2Channel, v2Lang)}</span>
                   <span dir="ltr">
                     {c.old_iqd === null ? '—' : formatIqd(c.old_iqd)} → {c.new_iqd === null ? '—' : formatIqd(c.new_iqd)}
                   </span>
@@ -119,7 +122,7 @@ export default function PurchaseReviewCard({ productId, onApplied }: { productId
           )}
           {preview.large_change || preview.drop_flag ? (
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={tick} onChange={(e) => setTick(e.target.checked)} />
+              <input type="checkbox" checked={tick} onChange={(e) => setTick(e.target.checked)} data-v2-purchase-review-large />
               {t('large')}
             </label>
           ) : null}
@@ -132,6 +135,7 @@ export default function PurchaseReviewCard({ productId, onApplied }: { productId
             size="sm"
             variant="primary"
             disabled={busy}
+            data-v2-purchase-review-action="preview"
             onClick={() =>
               run(async () => {
                 const r = await api.post<{ preview: Preview }>(`${base}/${encodeURIComponent(review.id)}/preview`, {});
@@ -146,6 +150,7 @@ export default function PurchaseReviewCard({ productId, onApplied }: { productId
             size="sm"
             variant="primary"
             disabled={busy || ((preview.large_change || preview.drop_flag) && !tick)}
+            data-v2-purchase-review-action="apply"
             onClick={() =>
               run(async () => {
                 await api.post(`${base}/${encodeURIComponent(review.id)}/apply`, { preview_hash: preview.review_hash, ...(tick ? { confirm_large_change: true } : {}) });
@@ -163,6 +168,7 @@ export default function PurchaseReviewCard({ productId, onApplied }: { productId
           size="sm"
           variant="secondary"
           disabled={busy}
+          data-v2-purchase-review-action="dismiss"
           onClick={() =>
             run(async () => {
               await api.post(`${base}/${encodeURIComponent(review.id)}/dismiss`, {});

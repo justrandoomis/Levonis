@@ -66,7 +66,7 @@ import { sellableSkus } from '../legacy';
 import { evaluateV2Write, type V2Evaluation } from './evaluate';
 import { discountsOf, loadV2Store, pointsOf, type V2Store } from './store';
 import { v2EditorAnswer, v2OwnerAnswer } from './dto';
-import { firstWriteInputs, withFirstWriteInputs } from './firstWrite';
+import { firstWriteInputs, pendingReviewOf, reviewFoldInputs, withFirstWriteInputs, type FirstWriteReview } from './firstWrite';
 
 /* ------------------------------------------------------------------ who -- */
 
@@ -94,6 +94,8 @@ export interface V2Read {
   rates: PricingRates | null;
   control: EngineControl;
   image: string;
+  /** A product with no method yet: its newest pending purchase review (D1), folded into the owner's prefill. */
+  review?: FirstWriteReview | null;
 }
 
 /**
@@ -108,7 +110,9 @@ export async function loadV2Read(db: D1Database, productId: string, draft?: Load
   const ctx = await loadPreviewContext(db);
   const rates = await loadPricingRates(db);
   const image = await priceImageOf(db, productId);
-  return { loaded, stored: stored.get(productId)!, v2: v2.get(productId) ?? null, ctx, rates, control, image };
+  const own = stored.get(productId)!;
+  const review = storedMethodOf({ stored: own }) ? null : await pendingReviewOf(db, productId);
+  return { loaded, stored: own, v2: v2.get(productId) ?? null, ctx, rates, control, image, review };
 }
 
 /** The engine control's defaults (0181's seeded row), for a database without it. */
@@ -306,7 +310,11 @@ export function desiredFor(read: V2Read, wire: V2Wire, o: DesiredOptions): V2Des
   const live = (r: { scope: V2Scope; scope_id: string }) => r.scope === 'product' || ids[r.scope].has(r.scope_id);
   const storedPoints = stored ? pointsOf(read.v2?.points ?? []).filter(live) : [];
   const storedDiscounts = stored ? discountsOf(read.v2?.discounts ?? []).filter(live) : [];
-  const fold = stored ? [] : firstWriteInputs(read.stored);
+  // D1 (addendum A.10): the owner's prefill also carries a pending purchase review's cost inputs (newer than
+  // the overlay, so laid over it); an editor's never does (an editor neither reads nor writes a cost).
+  const fold = stored
+    ? []
+    : withFirstWriteInputs(firstWriteInputs(read.stored), o.viewer === 'owner' ? reviewFoldInputs(read.stored, read.review, (scope, id) => ids[scope].has(id)) : []);
   if (o.viewer === 'editor') {
     // Owner answer Q2: an editor prices in dollars — the points and the discounts — and never touches
     // the method or a cost field (refused by NAME, decided from the request alone). A product with no
@@ -488,6 +496,8 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
       minimum_profit: ev.stored.rules
         .filter((r) => r.product_id === ev.product_id && r.kind === 'target_profit')
         .map((r) => ({ scope: r.scope, scope_id: r.scope_id, state: r.state, amount_usd: r.amount_usd ?? null })),
+      // D1: a needs-pricing product's prefill carries this pending purchase review (its first write applies it).
+      ...(!storedMethod && read.review ? { purchase_review_id: read.review.id } : {}),
     };
   }
   return answer;

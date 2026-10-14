@@ -19,6 +19,11 @@
  *     history and audit with idempotency `v2purchase:<review>:<hash>`, and
  *     marks the review `applied`.
  *   - DISMISS «أبقِ التكلفة الحالية»: the review becomes `dismissed`, audited.
+ *   - A product still in «يحتاج تسعيرًا» (no method): these doors answer
+ *     PRICING_V2_NEEDS_PRICING; the review is folded into the OWNER's prefill
+ *     instead (v2/firstWrite.ts `reviewFoldInputs`) and the owner's first
+ *     complete write marks it applied in its own batch. An editor's first
+ *     write leaves it pending for the owner.
  *
  * Owner-only end to end: the review's figures are cost (FINANCIAL_FIELDS
  * `purchase_review`, `v2_purchase_inputs`); everyone else gets the cost
@@ -34,6 +39,8 @@ import { auditStatements } from '../../audit';
 import { cleanStartInstalled } from '../../engineInstalled';
 import { deriveProductEntries, purchaseIneligibility, type PurchaseForPricing } from '../fromPurchase';
 import { loadPricingRates } from '../rates';
+import { loadProducts } from '../load';
+import { purchaseSkuLevels } from '../procurementPreview';
 import { loadProductsPricing, ownerRow, type InputWrite } from '../store';
 import { inputInvalid } from '../whatIf';
 import { desiredFor, evaluateDesired, gateV2, loadV2Read, storedMethodOf, v2Answer, v2BatchOutcome, v2ViewerOf } from './api';
@@ -74,6 +81,7 @@ export async function purchaseReviewStatements(db: D1Database, purchase: Purchas
   const pids = ids.filter((id) => ordinary.has(id));
   if (!pids.length) return [];
   const stored = await loadProductsPricing(db, pids);
+  const loaded = await loadProducts(db, pids);
   const rates = await loadPricingRates(db);
   const out: D1PreparedStatement[] = [];
   for (const pid of pids) {
@@ -81,7 +89,17 @@ export async function purchaseReviewStatements(db: D1Database, purchase: Purchas
     if (!data) continue;
     const lines = purchase.lines.filter((l) => l.product_id === pid);
     if (purchaseIneligibility({ status: purchase.status, cost_state: purchase.cost_state, lines })) continue;
-    const derived = deriveProductEntries(purchase, pid, data, { optIn: new Set(), prefer: false, usePurchase: true, rates });
+    // Every line in a supplier currency counts (the procurement screen's per-line tick went with its
+    // price step): the review IS the owner's decision, and nothing moves before it. A colour or a
+    // variant line feeds its own level (FX-7), as the procurement preview reads it.
+    const product = loaded.get(pid);
+    const derived = deriveProductEntries(purchase, pid, data, {
+      optIn: new Set(lines.map((l) => l.key)),
+      prefer: false,
+      usePurchase: true,
+      rates,
+      levels: product ? purchaseSkuLevels(product) : undefined,
+    });
     const inputs: ReviewInput[] = derived.entries
       .filter((e) => Object.keys(e.write.set).length > 0)
       .map((e) => ({ scope: e.write.scope, scope_id: e.write.scope_id, set: e.write.set, source_ref: e.write.source_ref }));

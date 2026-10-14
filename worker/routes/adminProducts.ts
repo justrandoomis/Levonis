@@ -87,7 +87,7 @@ import {
   uninstalledAnswer,
   type V2Read,
 } from '../lib/pricingEngine/v2/api';
-import { firstWriteStatements } from '../lib/pricingEngine/v2/firstWrite';
+import { firstWriteStatements, foldedReviewOf } from '../lib/pricingEngine/v2/firstWrite';
 import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2StructureStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
 import { needsPricingAnswer, QUEUE_FILTERS, type QueueFilter } from '../lib/pricingEngine/v2/queue';
 import { applyPurchaseReview, dismissPurchaseReview, loadPurchaseReview, previewPurchaseReview, reviewView } from '../lib/pricingEngine/v2/purchaseReview';
@@ -1449,7 +1449,7 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
     source: 'product_pricing',
     idempotencyKey: v2PriceKey(pid, ev.hash ?? newId()),
     // The clean start: a product's first complete V2 write retires its Direct Sale Extra and purchase overlay.
-    ...(ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored) } : {}),
+    ...(ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored, foldedReviewOf(read, viewer, user.id, now)) } : {}),
     ...(bell.length ? { extraAudits: bell } : {}),
   };
   const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : await v2WriteStatements(db, ev, opts);
