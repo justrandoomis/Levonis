@@ -194,10 +194,11 @@ function seed(): DatabaseSync {
   item('i11', 'o8', 'p_filament', 2, 0, 0, 3_000, 'snapshot', { parent: 'i9', alloc: 50_000 });
 
   // O9 — MAY, and it exists for ONE assertion: an order carrying a coupon at
-  // BOTH levels. Nothing in the codebase writes `order_items.coupon_discount_iqd`
-  // today (migration 0077 added the column; checkout's INSERT does not name
-  // it), so this row is synthetic on purpose — it pins down what the report
-  // does the day a writer lands.
+  // BOTH levels. Since Services V2 S-P0a the checkout writes the goods part of
+  // a coupon onto `order_items.coupon_discount_iqd` and keeps the whole figure
+  // in the order's snapshot; this row is that shape (20,000 on the order, of
+  // which 8,000 sits on the line), and pins that only the residual is
+  // subtracted at the order level.
   order('o9', 'delivered', '2026-05-05T10:00:00.000Z', 100_000, 0, 0, 0, { coupon: 20_000 });
   item('i12', 'o9', 'p_filament', 1, 100_000, 100_000, 30_000, 'snapshot', { coupon: 8_000 });
 
@@ -451,22 +452,21 @@ test('a bundle books its money on the parent and its cost on the components, onc
   assert.equal(gross, 74_000);
 });
 
-test('a coupon is subtracted where it is frozen — and today that is the order', async () => {
+test('a coupon is subtracted once: on the line where it is frozen, and only the residual at the order', async () => {
   const raw = seed();
   const a = appFor(raw, OWNER);
   const r = await json(await get(a, '/api/admin/finance/report/summary?from=2026-05-01&to=2026-05-31&granularity=range'));
 
-  // CHARACTERIZATION, NOT A BLESSING. O9 carries a coupon at BOTH levels, which
-  // no real order can today: checkout never writes
-  // `order_items.coupon_discount_iqd`, so the per-line subtraction below is
-  // always 0 and the order-level figure is the whole truth. The day a writer
-  // for 0077's column lands, THIS TEST FAILS — and that is the point, because
-  // at that moment `ORDERS_BY_DAY_SQL` must start reporting the RESIDUAL
-  // instead, or the same coupon is taken off twice.
+  // O9 carries 20,000 of coupon, 8,000 of it frozen on its one line. Line
+  // revenue subtracts the 8,000; the order level subtracts only the 12,000
+  // that belongs to no line (Services V2, correction 2). Subtracting the
+  // whole 20,000 again would take the line's 8,000 off twice.
   assert.equal(r.totals.revenue_iqd, 92_000); // 100,000 − 8,000 frozen on the line
-  assert.equal(r.totals.coupon_discount_iqd, 20_000); // the order-level figure
+  assert.equal(r.totals.coupon_discount_iqd, 12_000); // 20,000 − 8,000: the residual
   assert.equal(r.totals.gross_profit_iqd, 62_000); // 92,000 − 30,000
-  assert.equal(r.totals.net_profit_iqd, 42_000); // 62,000 − 20,000
+  assert.equal(r.totals.net_profit_iqd, 50_000); // 62,000 − 12,000
+  // Every dinar of the coupon is subtracted exactly once.
+  assert.equal(100_000 - r.totals.revenue_iqd + r.totals.coupon_discount_iqd, 20_000);
 });
 
 test('a day report puts the midnight order on the first of March, and the days sum exactly', async () => {

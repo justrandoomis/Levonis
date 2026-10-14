@@ -149,16 +149,21 @@ test('prior paid protection remains immutable and consumes the corrected eligibl
 for (const discounts of [{ coupon: 10000 }, { points: 10000 }, { coupon: 5000, points: 5000 }]) {
   test(`protection uses the established frozen customer discount allocation for ${JSON.stringify(discounts)}`, async () => {
     const w = await checkout('none', discounts);
-    const item = deliverAndLower(w, 20000);
+    const item = deliverAndLower(w, 18000);
     const order = w.raw.prepare('SELECT * FROM orders WHERE id=?').get(w.id)!;
-    const coupon = JSON.parse(String(order.coupon_snapshot ?? 'null'))?.discount_iqd ?? 0;
-    const discount = Number(coupon) + Number(order.points_discount_iqd);
-    const paid = 50000 - Math.floor(discount * 50000 / (Number(order.subtotal_iqd) + Number(order.shipping_iqd)));
+    const coupon = Number(JSON.parse(String(order.coupon_snapshot ?? 'null'))?.discount_iqd ?? 0);
+    // Services V2 S-P0a: the code's goods part is frozen on the line and comes
+    // off it in full; only the residual (none here) and the points are shared
+    // by gross over subtotal + delivery.
+    const lineCoupon = Number(item.coupon_discount_iqd);
+    assert.equal(lineCoupon, coupon, 'the whole code sits on the one line it discounted');
+    const shared = coupon - lineCoupon + Number(order.points_discount_iqd);
+    const paid = 50000 - lineCoupon - Math.floor(shared * 50000 / (Number(order.subtotal_iqd) + Number(order.shipping_iqd)));
     const res = await json(await claim(w, item.id));
     assert.equal(res.success, true, JSON.stringify(res));
     assert.equal(res.claim.original_unit_iqd, Math.floor(paid / 2));
     const credited = await json(await approve(w, res.claim.id));
-    assert.equal(credited.credit.amount_iqd, Math.max(0, Math.floor(paid / 2) - 20000) * 2);
+    assert.equal(credited.credit.amount_iqd, Math.max(0, Math.floor(paid / 2) - 18000) * 2);
   });
 }
 
@@ -180,7 +185,11 @@ test('a large frozen coupon cannot turn a low-paid invoice into an oversized pro
 test('a fully discounted invoice cannot generate a new wallet protection credit', async () => {
   const w = await checkout('none', { coupon: 55000 });
   const item = deliverAndLower(w, 10000);
-  assert.equal(w.raw.prepare('SELECT total_iqd FROM orders WHERE id=?').get(w.id)!.total_iqd, 0);
+  // The code takes the goods to 0; since S-P0a a goods code stops at the
+  // goods, so only the delivery fee is charged.
+  assert.equal(Number(item.coupon_discount_iqd), 50000);
+  const order = w.raw.prepare('SELECT total_iqd, shipping_iqd FROM orders WHERE id=?').get(w.id)!;
+  assert.equal(order.total_iqd, order.shipping_iqd);
   const res = await claim(w, item.id);
   assert.equal(res.status, 400);
   assert.equal((await json(res)).code, 'NO_ELIGIBLE_DROP');

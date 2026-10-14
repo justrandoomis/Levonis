@@ -5,9 +5,11 @@
  *
  * Two amounts the workspace never subtracted from an order's revenue:
  *   F4  the ORDER-LEVEL coupon — the part of the coupon recorded on the order
- *       that no order line carries (`order_items.coupon_discount_iqd` has no
- *       writer yet, so today it is the whole coupon; a line share, once one
- *       exists, is already inside `calculateGoods` and is not counted twice);
+ *       that no order line carries. Since Services V2 S-P0a checkout writes a
+ *       code's goods part onto `order_items.coupon_discount_iqd`, which is
+ *       already inside `calculateGoods` and is not counted twice; what is left
+ *       here is a delivery discount, a trade-in credit, or the whole coupon of
+ *       an order written before the cut-over;
  *   F5  price-protection credits paid back to the customer on a line
  *       (`price_protection_claims`, state 'credited').
  *

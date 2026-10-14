@@ -132,17 +132,16 @@
  *     splitting it across lines would need a division whose rounded parts
  *     would not re-add to the order's own column. It is subtracted in NET
  *     profit (§5), never inside gross.
- *   THE ORDER-LEVEL COUPON — `coupon_snapshot.discount_iqd`, falling back to
- *     `orders.coupon_discount_iqd` for a merchant-store order, which is the
- *     only writer of that column. Migration 0077 added
- *     `order_items.coupon_discount_iqd` precisely so a coupon COULD be
- *     attributed to the line it hit, and NOTHING IN THE CODEBASE WRITES IT
- *     YET — checkout's `INSERT INTO order_items` does not name the column. So
- *     the two can never double-count today, and the order-level figure is the
- *     whole truth. The day a writer lands, the per-line subtraction above
- *     starts carrying part of it and THIS expression must become the residual;
- *     `tests/financeReport.test.ts` seeds an order with both set and asserts
- *     which one wins, so the change cannot go unnoticed.
+ *   THE ORDER-LEVEL COUPON'S RESIDUAL — `coupon_snapshot.discount_iqd`
+ *     (falling back to `orders.coupon_discount_iqd` for a merchant-store order,
+ *     the only writer of that column) LESS every line's
+ *     `order_items.coupon_discount_iqd`. Since Services V2 S-P0a the checkout
+ *     writes the goods part of a coupon onto the lines it hit (0077's column),
+ *     and line revenue above already subtracts it; only what belongs to no
+ *     line — a delivery discount, a trade-in credit, an older order's whole
+ *     coupon — is subtracted here, so the same coupon is never taken off
+ *     twice. `tests/financeReport.test.ts` seeds an order with both set and
+ *     pins the residual.
  *   `shipping_iqd` and `cod_tax_iqd` — money collected for delivery and for the
  *     courier's cash-handling fee. The matching outgoings are OPERATING
  *     EXPENSES the owner enters in the panel, so both sides meet in NET profit,
@@ -1347,6 +1346,16 @@ const REFUND_AGGREGATES = `
                   ELSE COALESCE(${REFUND_COGS}, 0) END) AS fifo_cogs_iqd`;
 
 /**
+ * THE ORDER-LEVEL COUPON, LESS WHAT ITS LINES ALREADY CARRY (Services V2,
+ * correction 2). Checkout freezes the goods part of a coupon on
+ * `order_items.coupon_discount_iqd`, which line revenue subtracts; this is the
+ * rest — a delivery discount, a trade-in credit, or the whole coupon of an
+ * order written before the lines carried it. Never negative.
+ */
+const ORDER_COUPON_RESIDUAL_IQD = `MAX(0, COALESCE(json_extract(o.coupon_snapshot, '$.discount_iqd'), o.coupon_discount_iqd, 0)
+                - COALESCE((SELECT SUM(ci.coupon_discount_iqd) FROM order_items ci WHERE ci.order_id = o.id), 0))`;
+
+/**
  * Order-level collections, on the SAME recognition rule as the lines so the
  * two can be added without asking a second question. Binds: startIso, endIso.
  */
@@ -1356,7 +1365,7 @@ export const ORDERS_BY_DAY_SQL = `
          SUM(COALESCE(o.shipping_iqd, 0)) AS shipping_iqd,
          SUM(COALESCE(o.cod_tax_iqd, 0)) AS cod_tax_iqd,
          SUM(COALESCE(o.points_discount_iqd, 0)) AS points_iqd,
-         SUM(COALESCE(json_extract(o.coupon_snapshot, '$.discount_iqd'), o.coupon_discount_iqd, 0)) AS coupon_iqd
+         SUM(${ORDER_COUPON_RESIDUAL_IQD}) AS coupon_iqd
     FROM orders o
    WHERE ${DELIVERED_WHERE}
    GROUP BY day`;
@@ -1377,7 +1386,7 @@ export const ordersByDaySql = (schema: SchemaFacts): string => !schema.hasPriceA
          SUM(MAX(0,COALESCE(o.shipping_iqd,0)-o.excess_cut)) AS shipping_iqd,
          SUM(MAX(0,COALESCE(o.cod_tax_iqd,0)-MAX(0,o.excess_cut-COALESCE(o.shipping_iqd,0)))) AS cod_tax_iqd,
          SUM(COALESCE(o.points_discount_iqd,0)) AS points_iqd,
-         SUM(COALESCE(json_extract(o.coupon_snapshot,'$.discount_iqd'),o.coupon_discount_iqd,0)) AS coupon_iqd
+         SUM(${ORDER_COUPON_RESIDUAL_IQD}) AS coupon_iqd
     FROM ap_order_cuts o GROUP BY day`;
 
 /**

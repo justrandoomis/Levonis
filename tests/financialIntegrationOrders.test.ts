@@ -153,22 +153,27 @@ test('actual unit-discount checkout finance counts the member saving once', asyn
   assert.equal(goods!.lines[0].net_goods_iqd, 45000, 'unit discount is already inside immutable line_total_iqd');
 });
 
-test('refund keeps the frozen coupon and points shipping-share policy beside line membership and accepted cut', async () => {
+test('refund takes the coupon off its own line and keeps the points shipping-share policy beside line membership and accepted cut', async () => {
   const world = await checkout('line', { coupon: 1000, points: 500 });
   await acceptCut(world, 10000);
   const order = world.raw.prepare('SELECT * FROM orders WHERE id=?').get(world.id)!;
+  const item = world.raw.prepare('SELECT * FROM order_items WHERE order_id=?').get(world.id)!;
   const coupon = JSON.parse(String(order.coupon_snapshot)).discount_iqd;
   assert.equal(coupon, 1000);
+  // Services V2 S-P0a: the code's goods part is frozen on the line it named
+  // and comes off that line in full; the points keep their shipping share.
+  assert.equal(Number(item.coupon_discount_iqd), 1000);
   assert.ok(Number(order.points_discount_iqd) > 0, 'checkout actually admits the point spend');
-  const originalDiscounts = Number(coupon) + Number(order.points_discount_iqd);
-  const expected = 50000 - Math.floor(originalDiscounts * 50000 / (Number(order.subtotal_iqd) + Number(order.shipping_iqd))) - 5000 - 10000;
+  const pointsShare = Math.floor(Number(order.points_discount_iqd) * 50000 / (Number(order.subtotal_iqd) + Number(order.shipping_iqd)));
+  const expected = 50000 - 1000 - pointsShare - 5000 - 10000;
   assert.equal(await refundGoods(world), expected);
 });
 
 test('splitting two returned units cannot refund more than returning the whole frozen line', async () => {
   const world = await checkout('none', { coupon: 2 });
-  const order = world.raw.prepare('SELECT * FROM orders WHERE id=?').get(world.id)!;
-  const wholeRefund = 50000 - Math.floor(2 * 50000 / (Number(order.subtotal_iqd) + Number(order.shipping_iqd)));
+  const item = world.raw.prepare('SELECT * FROM order_items WHERE order_id=?').get(world.id)!;
+  assert.equal(Number(item.coupon_discount_iqd), 2, 'the 2-dinar code sits on the line it discounted');
+  const wholeRefund = 50000 - 2;
   const first = await refundGoods(world, 1);
   const second = await refundGoods(world, 1);
   assert.equal(first + second, wholeRefund, 'the final returned unit receives the exact remainder, never an extra dinar');
@@ -184,7 +189,8 @@ test('concurrent partial refunds serialize the exact remainder and the loser can
   assert.equal(world.raw.prepare('SELECT state FROM return_cases WHERE id=?').get(failed)!.state, 'inspected');
   const retry = await resolve(failed);
   assert.equal(retry.status, 200, JSON.stringify(await json(retry)));
-  assert.equal(world.raw.prepare("SELECT SUM(amount_iqd) n FROM wallet_transactions WHERE id LIKE 'wtx_ret_%'").get()!.n, 49999);
+  // The whole line, less the 2-dinar code frozen on it.
+  assert.equal(world.raw.prepare("SELECT SUM(amount_iqd) n FROM wallet_transactions WHERE id LIKE 'wtx_ret_%'").get()!.n, 49998);
   const replay = await resolve(failed);
   assert.equal(replay.status, 400);
   assert.equal(world.raw.prepare("SELECT COUNT(*) n FROM wallet_transactions WHERE id LIKE 'wtx_ret_%'").get()!.n, 2);

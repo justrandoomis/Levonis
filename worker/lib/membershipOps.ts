@@ -18,6 +18,8 @@ import { audit } from './audit';
 import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
 import { levonisCollectibleSql } from './gini';
 import { isSchemaMissing } from './membershipBenefits';
+import { allocateCoupon, type CouponAllocation, type CouponContext, type CouponLine, type CouponRule } from '@levonis/pricing/coupons';
+import { couponNamesDelivery, couponRuleOf, wholeOrderTarget } from './couponLines';
 
 /**
  * Calendar-month addition with month-end clamping: the day-of-month is
@@ -280,7 +282,40 @@ export interface CouponCheck {
   reason?: string;
   coupon_id?: string;
   code?: string;
+  /** What the code takes off: goods and delivery together. */
   discount_iqd?: number;
+  /**
+   * Which lines it took the goods part from, and how much the delivery part is
+   * (an ordinary coupon). Frozen on the order by the checkout.
+   */
+  allocation?: CouponAllocation;
+  /** The coupon's targeting, for a caller that re-prices the delivery part. */
+  rule?: CouponRule;
+  /**
+   * A TRADE-IN CREDIT (0143) — payment in kind, not a promotion (owner
+   * decision 5). It is never allocated to lines; the checkout caps it at one
+   * unit of the target line (`tradeInCouponCap`).
+   */
+  payment_in_kind?: boolean;
+  /**
+   * The code's minimum spend and tier, for the cart's message — ONLY when the
+   * code is live and this customer may see it. An unknown code, someone
+   * else's personal code and an inactive code all answer without them, so the
+   * answer never tells a prober which codes exist (offers B4).
+   */
+  min_total_iqd?: number;
+  tier_required?: string | null;
+}
+
+/** The lines a coupon is allocated against, and the order facts it may filter on. */
+export interface CouponTarget {
+  lines: readonly CouponLine[];
+  ctx: CouponContext;
+  /**
+   * The delivery fee is not known yet (the cart, before an address): a code
+   * that names the delivery and matches a line is valid, worth 0 here.
+   */
+  deliveryPending?: boolean;
 }
 
 interface CouponRow {
@@ -296,14 +331,31 @@ interface CouponRow {
   max_per_user: number;
   active: number;
   assigned_user_id: string | null;
+  /** 0143 — set on a trade-in credit only; absent before that migration. */
+  trade_in_id?: string | null;
+  [column: string]: unknown;
 }
 
 /**
- * Validates a coupon for a user + order total. Does NOT redeem — the
- * checkout batch inserts the coupon_redemptions row (UNIQUE order_id makes
- * redemption idempotent) after this returns ok.
+ * Validates a coupon for a user + order total, and works out what it takes.
+ * Does NOT redeem — the checkout batch inserts the coupon_redemptions row
+ * (UNIQUE order_id makes redemption idempotent; the limit trigger decides)
+ * after this returns ok.
+ *
+ * `totalIqd` is the basis the code's minimum spend is tested against. The
+ * AMOUNT comes from the resolver over `target`'s lines (offers B2/B3): a
+ * scoped code discounts only the lines it names, a percentage is taken off the
+ * goods and never off a fee or the delivery, and a delivery code reduces the
+ * delivery only. Without a target the whole total stands in as one unscoped
+ * goods line (`wholeOrderTarget`).
  */
-export async function validateCoupon(env: Env, userId: string, code: string, totalIqd: number): Promise<CouponCheck> {
+export async function validateCoupon(
+  env: Env,
+  userId: string,
+  code: string,
+  totalIqd: number,
+  target?: CouponTarget
+): Promise<CouponCheck> {
   const normalized = code.trim().toUpperCase();
   if (!normalized) return { ok: false, reason: 'CODE_REQUIRED' };
   if (!Number.isInteger(totalIqd) || totalIqd < 0) return { ok: false, reason: 'INVALID_TOTAL' };
@@ -315,15 +367,19 @@ export async function validateCoupon(env: Env, userId: string, code: string, tot
   // A PERSONAL COUPON IS SOMEONE ELSE'S CODE TO EVERYONE ELSE. 0077 added
   // `assigned_user_id` ("one named customer") and nothing redeemed against it;
   // the first coupons to set it are the trade-in credits (0143), each worth a
-  // used printer. Answered exactly as an unknown code, so a prober learns
-  // nothing about whose it is.
+  // used printer. Answered exactly as an unknown code — no minimum, no tier —
+  // so a prober learns nothing about whose it is, or that it exists.
   if (coupon.assigned_user_id && coupon.assigned_user_id !== userId) return { ok: false, reason: 'CODE_NOT_FOUND' };
   if (!coupon.active) return { ok: false, reason: 'INACTIVE' };
 
+  // From here on the code is live and this customer's to see.
+  const facts = { min_total_iqd: Number(coupon.min_total_iqd) || 0, tier_required: coupon.tier_required ?? null };
+  const refuse = (reason: string): CouponCheck => ({ ok: false, reason, ...facts });
+
   const nowMs = Date.now();
-  if (coupon.starts_at && nowMs < Date.parse(coupon.starts_at)) return { ok: false, reason: 'NOT_STARTED' };
-  if (coupon.ends_at && nowMs > Date.parse(coupon.ends_at)) return { ok: false, reason: 'EXPIRED' };
-  if (totalIqd < coupon.min_total_iqd) return { ok: false, reason: 'MIN_TOTAL_NOT_MET' };
+  if (coupon.starts_at && nowMs < Date.parse(coupon.starts_at)) return refuse('NOT_STARTED');
+  if (coupon.ends_at && nowMs > Date.parse(coupon.ends_at)) return refuse('EXPIRED');
+  if (totalIqd < coupon.min_total_iqd) return refuse('MIN_TOTAL_NOT_MET');
 
   if (coupon.tier_required) {
     // Server-side tier check — never a client-supplied flag.
@@ -343,26 +399,40 @@ export async function validateCoupon(env: Env, userId: string, code: string, tot
       benefits.exclusiveCoupons(status) &&
       (coupon.tier_required === 'plus' || coupon.tier_required === 'prime' || coupon.tier_required === 'pro') &&
       tierInherits(status.tier, coupon.tier_required);
-    if (!tierOk) return { ok: false, reason: 'TIER_REQUIRED' };
+    if (!tierOk) return refuse('TIER_REQUIRED');
   }
 
+  // ADVICE ONLY, AND COUNTED THE WAY THE TRIGGER COUNTS (offers B7): a
+  // released redemption gave its use back, so only `active` rows are spent.
+  // The decision is `trg_coupon_redemption_limits`, inside the order's batch.
   if (coupon.max_global !== null) {
-    const g = await env.DB.prepare('SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ?')
+    const g = await env.DB.prepare("SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ? AND state = 'active'")
       .bind(coupon.id)
       .first<{ n: number }>();
-    if ((g?.n ?? 0) >= coupon.max_global) return { ok: false, reason: 'GLOBAL_LIMIT_REACHED' };
+    if ((g?.n ?? 0) >= coupon.max_global) return refuse('GLOBAL_LIMIT_REACHED');
   }
-  const u = await env.DB.prepare('SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ? AND user_id = ?')
+  const u = await env.DB.prepare("SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ? AND user_id = ? AND state = 'active'")
     .bind(coupon.id, userId)
     .first<{ n: number }>();
-  if ((u?.n ?? 0) >= coupon.max_per_user) return { ok: false, reason: 'PER_USER_LIMIT_REACHED' };
+  if ((u?.n ?? 0) >= coupon.max_per_user) return refuse('PER_USER_LIMIT_REACHED');
 
-  let discount =
-    coupon.kind === 'fixed_iqd' ? coupon.value : Math.floor((totalIqd * coupon.value) / 100);
-  discount = Math.min(discount, totalIqd); // a coupon never pushes the total below zero
-  if (discount <= 0) return { ok: false, reason: 'NO_DISCOUNT' };
+  if (coupon.trade_in_id) {
+    // Payment in kind: the stated credit, never more than the basis. The
+    // checkout caps it at one unit of the target line.
+    let credit = coupon.kind === 'fixed_iqd' ? coupon.value : Math.floor((totalIqd * coupon.value) / 100);
+    credit = Math.min(credit, totalIqd);
+    if (credit <= 0) return refuse('NO_DISCOUNT');
+    return { ok: true, coupon_id: coupon.id, code: coupon.code, discount_iqd: credit, payment_in_kind: true, ...facts };
+  }
 
-  return { ok: true, coupon_id: coupon.id, code: coupon.code, discount_iqd: discount };
+  const rule = couponRuleOf(coupon);
+  const on: CouponTarget = target ?? wholeOrderTarget(totalIqd);
+  const allocation = allocateCoupon(rule, on.lines, on.ctx);
+  if (allocation.total_iqd <= 0) {
+    const waitsForDelivery = !!on.deliveryPending && couponNamesDelivery(rule) && allocation.matched_line_ids.length > 0;
+    if (!waitsForDelivery) return refuse('NO_DISCOUNT');
+  }
+  return { ok: true, coupon_id: coupon.id, code: coupon.code, discount_iqd: allocation.total_iqd, allocation, rule, ...facts };
 }
 
 /**

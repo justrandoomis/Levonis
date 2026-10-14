@@ -419,10 +419,9 @@ test('confirmation is blocked until the receipt is scanned, and only for a gini 
  * `giniSplit(2_000, 5_000)` is asserted as a unit above, but a unit test of a
  * pure function cannot prove that the ROUTE ever hands it a payable smaller
  * than its own delivery fee — and a clamp nothing reaches is a clamp nobody
- * can trust. So this drives the whole checkout there: a coupon validated
- * against merchandise PLUS the delivery it is being spent on, which is what
- * lets `couponDiscount` exceed the goods and leave a payable of 2,000 against
- * a 5,000 fee.
+ * can trust. So this drives the whole checkout there: a coupon that reduces
+ * the goods and then the delivery, which is what lets `couponDiscount` exceed
+ * the goods and leave a payable of 2,000 against a 5,000 fee.
  *
  * `payable - shipping` is −3,000 there. The three things that must hold
  * instead — neither half negative, the door never above the payable, and the
@@ -431,9 +430,11 @@ test('confirmation is blocked until the receipt is scanned, and only for a gini 
  */
 test('a coupon spent past the merchandise drives the payable under the delivery fee — the split still sums to it', async () => {
   const { raw, db } = setup();
-  // 25,000 of goods, a 5,000 delivery, and 28,000 of coupon: the fee is inside
-  // the basis the coupon is measured against, so it can eat into it.
-  raw.exec("INSERT INTO coupons (id,code,kind,value,min_total_iqd,max_per_user,active) VALUES ('cp_big','GINIBIG','fixed_iqd',28000,0,5,1)");
+  // 25,000 of goods, a 5,000 delivery, and 28,000 of coupon written to reduce
+  // the goods AND the delivery (0077 `applies_to='both'`): the goods take
+  // 25,000 and the delivery the remaining 3,000. (Since Services V2 S-P0a a
+  // goods-only code stops at the goods and never reaches the fee.)
+  raw.exec("INSERT INTO coupons (id,code,kind,value,min_total_iqd,max_per_user,active,applies_to) VALUES ('cp_big','GINIBIG','fixed_iqd',28000,0,5,1,'both')");
   // Points funded and asked for in the same breath — both discount levers
   // pulled at once is the shape the report described.
   raw.exec("INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status) VALUES ('pts_b','buyer','deposit','POINT',20000,'approved')");

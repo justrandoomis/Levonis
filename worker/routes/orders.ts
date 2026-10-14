@@ -171,6 +171,8 @@ import {
 } from '../lib/bnpl';
 import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/priorityDelivery';
 import { validateCoupon } from '../lib/membershipOps';
+import { allocateCoupon, type CouponContext, type CouponRule } from '@levonis/pricing/coupons';
+import { couponDeliveryMethod, couponLinesOf, couponNamesDelivery, productCouponFactsFromRows, transportOf } from '../lib/couponLines';
 import { TradeInError, tradeInCouponCap } from '../lib/tradeIn';
 import {
   getAvailableBalances,
@@ -1988,6 +1990,12 @@ export interface CheckoutComputation {
   couponId: string | null;
   couponDiscount: number;
   couponSnapshot: string | null;
+  /**
+   * What the coupon took off each order item (offers B2), keyed by item id —
+   * written to `order_items.coupon_discount_iqd`. Sums to the goods part of
+   * `couponDiscount`; empty for a trade-in credit, which is payment in kind.
+   */
+  couponLineDiscounts: Map<string, number>;
   pointsBalance: number;
   pointsDiscount: number;
   /** Eligible official-store merchandise AFTER coupon — the redemption cap. */
@@ -2231,6 +2239,8 @@ export async function computeCheckout(
   // the order. It decides which payment methods may be offered, and how a
   // pre-order line is priced once the method is known.
   const shippingType: ShippingType = cartShippingType(rows) ?? 'direct';
+  // The brand and sections a coupon's scope may name, from the same product rows.
+  const couponProductFacts = productCouponFactsFromRows(rows);
   // BNPL is added to the offered ids only after the server resolves an active
   // PRO membership, account approval, KYC, approved address and available
   // credit. A client-supplied `bnpl` id cannot put itself on this list.
@@ -3298,20 +3308,66 @@ export async function computeCheckout(
     // the FINAL quote then applies the configured threshold basis.
     let shipping = isPickup ? emptyQuote : runQuote(memberMerchandise);
 
-    // Coupon — validated against the honest payable total (subtotal + the
-    // delivery actually charged); applied FIRST: coupon, then points, then wallet.
+    // Coupon — its MINIMUM is tested against the honest payable total
+    // (subtotal + the delivery actually charged); its AMOUNT comes from the
+    // coupon resolver over the priced lines (offers B2/B3): a scoped code
+    // discounts only the lines it names, a percentage is taken off the goods
+    // and never off a fee or the delivery, a delivery code reduces only the
+    // delivery. Applied FIRST: coupon, then points, then wallet.
     let couponDiscount = 0;
+    /** The part of it that came off the goods (Σ of the per-line figures, or a trade-in credit). */
+    let couponMerchandise = 0;
+    /** The part that came off the delivery fee — settled on the FINAL quote below. */
+    let couponDelivery = 0;
+    /** Per order item: what the code took off that line, frozen on `order_items.coupon_discount_iqd`. */
+    let couponLineDiscounts = new Map<string, number>();
+    let couponRule: CouponRule | null = null;
     let couponId: string | null = null;
+    let couponCode: string | null = null;
     let couponSnapshot: string | null = null;
+    const couponLines = couponLinesOf(
+      p.lines.map((l) => {
+        const member = benefitByLine.get(l.id);
+        const offer = safeParse<{ offer?: unknown } | null>(l.pricing_snapshot, null)?.offer;
+        return {
+          id: l.id,
+          product_id: l.product_id,
+          option_value_ids: l.option_value_ids,
+          color_id: l.color_id,
+          qty: l.qty,
+          applied_iqd: l.applied_iqd,
+          transport_method: transportOf(l.transport_snapshot),
+          is_parent: parentLineIds.has(l.id),
+          is_component: !!l.bundle_parent_item_id,
+          is_gift: !!l.gift,
+          member_line_discount_iqd: member && member.applied_at === 'line' ? member.total_iqd : 0,
+          already_discounted:
+            !!offer ||
+            (!!l.benefit && l.applied_iqd < l.benefit.regular_unit_iqd) ||
+            (member?.total_iqd ?? 0) > 0 ||
+            (parentLineIds.has(l.id) && Number(l.composition_saving_percent ?? 0) > 0),
+        };
+      }),
+      couponProductFacts,
+      benefitAncestry,
+      shippingType === 'direct' ? 'direct_sale' : 'pre_order'
+    );
+    const couponCtx = (deliveryIqd: number): CouponContext => ({
+      delivery_method: couponDeliveryMethod(delivery.id),
+      delivery_iqd: isPickup ? 0 : deliveryIqd,
+    });
     if (input.couponCode) {
       const couponBasis = Math.max(0, subtotal - lineDiscount) + shipping.total_iqd;
-      const check = await validateCoupon(c.env, user.id, input.couponCode, couponBasis);
+      const check = await validateCoupon(c.env, user.id, input.couponCode, couponBasis, {
+        lines: couponLines,
+        ctx: couponCtx(shipping.total_iqd),
+      });
       if (!check.ok || !check.coupon_id) {
         const reason = check.reason ?? 'COUPON_INVALID';
         throw badRequest(`Coupon could not be applied (${reason})`, reason);
       }
       couponId = check.coupon_id;
-      couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), couponBasis));
+      couponCode = check.code ?? input.couponCode.toUpperCase();
       // ---- TRADE-IN CREDIT (0143) — the only trade-in code in this function.
       // A trade-in credit is a personal coupon bound to one request. The guard
       // refuses it unless this customer's cart holds the target line bought
@@ -3321,13 +3377,21 @@ export async function computeCheckout(
         if (e instanceof TradeInError) throw badRequest(e.message, e.code);
         throw e;
       });
-      if (tradeInCap !== null) couponDiscount = Math.min(couponDiscount, tradeInCap);
       // ---- end TRADE-IN CREDIT
-      couponSnapshot = JSON.stringify({
-        coupon_id: check.coupon_id,
-        code: check.code ?? input.couponCode.toUpperCase(),
-        discount_iqd: couponDiscount,
-      });
+      if (check.payment_in_kind || !check.allocation || !check.rule) {
+        // PAYMENT IN KIND (owner decision 5): the credit is one order-level
+        // amount, never spread onto lines as if it were a promotion.
+        couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), couponBasis));
+        if (tradeInCap !== null) couponDiscount = Math.min(couponDiscount, tradeInCap);
+        couponMerchandise = Math.min(couponDiscount, memberMerchandise);
+        couponDelivery = 0;
+      } else {
+        couponRule = check.rule;
+        couponMerchandise = check.allocation.merchandise_iqd;
+        couponDelivery = check.allocation.delivery_iqd;
+        couponLineDiscounts = new Map(check.allocation.lines.map((l) => [l.line_id, l.amount_iqd]));
+        couponDiscount = couponMerchandise + couponDelivery;
+      }
     }
 
     // §4.4 redemption: "use my points" applies ALL available points, capped at
@@ -3341,7 +3405,7 @@ export async function computeCheckout(
     // tested against merchandise after coupons AND points (product-form §5).
     // There is no circularity: neither the coupon cap nor the points cap depends
     // on the delivery fee.
-    const eligibleMerchandise = Math.max(0, memberMerchandise - Math.min(couponDiscount, memberMerchandise));
+    const eligibleMerchandise = Math.max(0, memberMerchandise - Math.min(couponMerchandise, memberMerchandise));
     let pointsDiscount = 0;
     if (input.usePoints && available.points_available > 0) {
       pointsDiscount = capRedeemablePoints(available.points_available, eligibleMerchandise);
@@ -3370,12 +3434,40 @@ export async function computeCheckout(
       }
     }
 
+    // THE DELIVERY PART, ON THE FEE ACTUALLY CHARGED. The goods part does not
+    // depend on the delivery, but the fee can change between the first quote
+    // and this one (a threshold the coupon itself moved), so a code that names
+    // the delivery is re-applied to the final fee — never more than it. One
+    // that has nothing left to take (delivery came out free) is refused and its
+    // use is not spent (plan §1.1 ⑫).
+    if (couponRule && couponNamesDelivery(couponRule)) {
+      couponDelivery = allocateCoupon(couponRule, couponLines, couponCtx(shipping.total_iqd)).delivery_iqd;
+      couponDiscount = couponMerchandise + couponDelivery;
+      if (couponDiscount <= 0) throw badRequest('Coupon could not be applied (NO_DISCOUNT)', 'NO_DISCOUNT');
+    }
+    if (couponId) {
+      couponSnapshot = JSON.stringify(
+        couponRule
+          ? {
+              coupon_id: couponId,
+              code: couponCode,
+              discount_iqd: couponDiscount,
+              // The split, frozen: Σ order_items.coupon_discount_iqd is the
+              // goods part, and the delivery part belongs to no line.
+              merchandise_iqd: couponMerchandise,
+              delivery_iqd: couponDelivery,
+            }
+          : { coupon_id: couponId, code: couponCode, discount_iqd: couponDiscount }
+      );
+    }
+
     const beforeDiscounts = Math.max(0, subtotal - lineDiscount + shipping.total_iqd - couponDiscount);
     const afterPoints = beforeDiscounts - pointsDiscount;
 
     // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one
-    // floor at the end).
-    const netEligible = netEligibleIqd(memberMerchandise, couponDiscount, pointsDiscount);
+    // floor at the end). Only the coupon's GOODS part comes off it: delivery
+    // never earned points, so a delivery discount takes none away.
+    const netEligible = netEligibleIqd(memberMerchandise, couponMerchandise, pointsDiscount);
     const pointsEarnPending = pointsForEligibleIqd(netEligible, pointsRule.iqd_per_point);
 
     // Advance-payment requirements are paid from the wallet: "pay in advance"
@@ -3635,7 +3727,7 @@ export async function computeCheckout(
      * delivery was waived is asked for nothing at the door.
      */
     const { paidIqd: giniPaidIqd, deliveryDueIqd: giniDeliveryDueIqd } = isGiniOrder
-      ? giniSplit(payableBeforeCodTax, shipping.total_iqd)
+      ? giniSplit(payableBeforeCodTax, Math.max(0, shipping.total_iqd - couponDelivery))
       : { paidIqd: 0, deliveryDueIqd: 0 };
 
     /**
@@ -3704,6 +3796,7 @@ export async function computeCheckout(
       couponId,
       couponDiscount,
       couponSnapshot,
+      couponLineDiscounts,
       pointsDiscount,
       eligibleMerchandise,
       netEligible,
@@ -3845,6 +3938,7 @@ export async function computeCheckout(
     couponId: settled.couponId,
     couponDiscount: settled.couponDiscount,
     couponSnapshot: settled.couponSnapshot,
+    couponLineDiscounts: settled.couponLineDiscounts,
     pointsBalance: available.points_available,
     pointsDiscount: settled.pointsDiscount,
     eligibleMerchandise: settled.eligibleMerchandise,
@@ -4743,6 +4837,10 @@ export async function placeOrder(
         // §19 — WHAT THE MEMBERSHIP TOOK OFF THIS LINE, and under which rule.
         membership_discount_iqd: comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
         membership_rule_id: comp.benefits.byLine.get(it.id)?.rule_id ?? null,
+        // WHAT THE COUPON TOOK OFF THIS LINE (0077's column, first written here).
+        // Every reader subtracts it once and takes only the RESIDUAL of the
+        // order-level coupon (Services V2 plan, correction 2).
+        coupon_discount_iqd: comp.couponLineDiscounts.get(it.id) ?? 0,
       // The two 0175 columns, on a gift line only — and the six 0181 columns on an
       // engine-priced line only; every other line's INSERT is the statement it always was.
       }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq } : basis ? { ...basis } : undefined)

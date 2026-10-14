@@ -111,11 +111,17 @@ test('case 12 — a whole-bundle return refunds the parent’s line total NET of
     refunded += Number(resolved.refund.amount_iqd);
   }
 
-  const coupon = JSON.parse(String(order.coupon_snapshot)) as { discount_iqd: number };
-  const discounts = coupon.discount_iqd + Number(order.points_discount_iqd);
+  // Since Services V2 S-P0a the code's goods part is frozen on the PARENT line
+  // it named (`coupon_discount_iqd`) and comes off it in full; only the
+  // order-level residual and the points are shared by gross over the base.
+  const coupon = JSON.parse(String(order.coupon_snapshot)) as { discount_iqd: number; delivery_iqd?: number };
+  const lineCoupon = Number(parent.coupon_discount_iqd);
+  assert.ok(lineCoupon > 0, 'the 10% code is frozen on the bundle line it discounted');
+  const residual = Math.max(0, coupon.discount_iqd - (coupon.delivery_iqd ?? 0) - rows.reduce((s, r) => s + Number(r.coupon_discount_iqd), 0));
+  const discounts = residual + Number(order.points_discount_iqd);
   const base = Number(order.subtotal_iqd) + Number(order.shipping_iqd);
   const gross = Number(parent.line_total_iqd);
-  const exactNet = gross - Math.floor((discounts * gross) / base);
+  const exactNet = gross - lineCoupon - Math.floor((discounts * gross) / base);
 
   assert.ok(refunded > 0, 'pricing a component case off unit_price_iqd would refund exactly 0');
   assert.ok(refunded < gross, 'refunding the allocation raw would over-refund by the discount share');

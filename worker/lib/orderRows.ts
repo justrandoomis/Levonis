@@ -135,6 +135,8 @@ export interface OrderItemRow {
    *  the row itself. */
   membership_discount_iqd: number;
   membership_rule_id: string | null;
+  /** What the order's coupon took off this line (0077). 0 when it took nothing. */
+  coupon_discount_iqd?: number;
   /**
    * THE COST OF GOODS SOLD, AS IT WAS AT THIS INSTANT (migration 0095), taken
    * from the same resolver output that priced the line — never re-read. A line
@@ -156,10 +158,10 @@ export function orderItemInsertStatement(db: D1Database, orderId: string, it: Or
            option_id, option_value_ids, color_id, shipping_method_id, qty, unit_price_iqd, line_total_iqd,
            pricing_snapshot, warranty_snapshot, transport_snapshot,
            bundle_parent_item_id, bundle_component_id, component_value_iqd, component_alloc_iqd,
-           membership_discount_iqd, membership_rule_id, cost_iqd, cost_basis,
+           membership_discount_iqd, membership_rule_id, coupon_discount_iqd, cost_iqd, cost_basis,
            net_weight_g, width_mm, depth_mm, height_mm,
            package_weight_g, package_width_mm, package_depth_mm, package_height_mm${x.names})
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                  ?, ?, ?, ?, ?, ?, ?, ?${x.marks})`
   ).bind(
     it.id, orderId, it.product_id,
@@ -170,6 +172,7 @@ export function orderItemInsertStatement(db: D1Database, orderId: string, it: Or
     it.bundle_parent_item_id ?? null, it.bundle_component_id ?? null,
     it.component_value_iqd ?? null, it.component_alloc_iqd ?? null,
     it.membership_discount_iqd, it.membership_rule_id,
+    Math.max(0, Math.trunc(Number(it.coupon_discount_iqd) || 0)),
     it.cost_iqd ?? null,
     it.cost_basis ?? COST_BASIS.unrecorded,
     it.physical_dimensions.net_weight_g,

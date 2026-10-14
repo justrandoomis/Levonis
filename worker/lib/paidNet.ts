@@ -11,7 +11,8 @@
  *                component: its stored allocation)
  *   membership   the frozen line membership, as the finance report reads it
  *                (`calculateGoods` with the coupon and points left out)
- *   own discount `order_items.coupon_discount_iqd`
+ *   own discount `order_items.coupon_discount_iqd` (written by checkout since
+ *                S-P0a: the goods part of a coupon, on the lines it named)
  *   order shares the coupon residual and the points, by gross over
  *                subtotal + delivery
  *   adjustment   the accepted price adjustment's share (`calculateGoods`)
@@ -34,12 +35,19 @@ export interface OrderPaidNet {
   lines: PaidNetLineFacts[];
 }
 
-/** The order-level coupon checkout froze: its id and the dinars it took. */
-export function orderCoupon(order: Row): { couponId: string | null; discountIqd: number } {
-  const snap = safeParse<{ coupon_id?: unknown; discount_iqd?: unknown } | null>(order.coupon_snapshot as string | null, null);
+/**
+ * The order-level coupon checkout froze: its id, the dinars it took, and the
+ * part of them that came off the DELIVERY fee (a delivery code, frozen in the
+ * snapshot since Services V2 S-P0a; 0 on an older order). The delivery part is
+ * no unit's price, so it is never shared onto a line.
+ */
+export function orderCoupon(order: Row): { couponId: string | null; discountIqd: number; deliveryIqd: number } {
+  const snap = safeParse<{ coupon_id?: unknown; discount_iqd?: unknown; delivery_iqd?: unknown } | null>(order.coupon_snapshot as string | null, null);
+  const discountIqd = snap ? Math.max(0, Math.trunc(Number(snap.discount_iqd) || 0)) : 0;
   return {
     couponId: snap && typeof snap.coupon_id === 'string' && snap.coupon_id ? snap.coupon_id : null,
-    discountIqd: snap ? Math.max(0, Math.trunc(Number(snap.discount_iqd) || 0)) : 0,
+    discountIqd,
+    deliveryIqd: snap ? Math.min(discountIqd, Math.max(0, Math.trunc(Number(snap.delivery_iqd) || 0))) : 0,
   };
 }
 
@@ -49,11 +57,12 @@ export function orderCoupon(order: Row): { couponId: string | null; discountIqd:
  * for a human review rather than guessing).
  */
 export function paidNetFacts(order: Row, items: GoodsLine[], tradeInCredit: boolean): OrderPaidNet | null {
-  const member = calculateGoods(
-    { ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 },
-    items.map((line) => ({ ...line, coupon_discount_iqd: 0 })),
-    []
-  );
+  const goodsOnly = { ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 };
+  const member = calculateGoods(goodsOnly, items.map((line) => ({ ...line, coupon_discount_iqd: 0 })), []);
+  // The same with each line's own coupon discount: a bundle parent's is spread
+  // over its components exactly as its membership is, so a component carries
+  // its share of the code that named its bundle.
+  const discounted = calculateGoods(goodsOnly, items, []);
   const accepted = calculateGoods(order, items, []);
   const lines: PaidNetLineFacts[] = [];
   for (const line of accepted.lines) {
@@ -70,14 +79,15 @@ export function paidNetFacts(order: Row, items: GoodsLine[], tradeInCredit: bool
       }) * qty;
     const gross = allocation ?? (Number(line.unit_price_iqd) || 0) * qty;
     const memberLine = member.lines.find((v) => v.id === line.id);
-    if (!memberLine) return null;
+    const discountedLine = discounted.lines.find((v) => v.id === line.id);
+    if (!memberLine || !discountedLine) return null;
     lines.push({
       id: String(line.id),
       qty,
       gross_iqd: gross,
       merchandise_iqd: merchandise,
       membership_iqd: Math.max(0, gross - memberLine.net_goods_iqd),
-      line_discount_iqd: Math.max(0, Math.trunc(Number(line.coupon_discount_iqd) || 0)),
+      line_discount_iqd: Math.max(0, memberLine.net_goods_iqd - discountedLine.net_goods_iqd),
       price_adjustment_iqd: Math.trunc(Number(line.price_adjustment_iqd) || 0),
     });
   }
@@ -87,7 +97,9 @@ export function paidNetFacts(order: Row, items: GoodsLine[], tradeInCredit: bool
       subtotal_iqd: Math.max(0, Math.trunc(Number(order.subtotal_iqd) || 0)),
       shipping_iqd: Math.max(0, Math.trunc(Number(order.shipping_iqd) || 0)),
       total_iqd: Math.max(0, Math.trunc(Number(order.total_iqd) || 0)),
-      order_coupon_iqd: tradeInCredit ? 0 : coupon.discountIqd,
+      // The goods part only: the lines' own discounts come off it as the
+      // residual inside paidNetLines; a delivery part is no unit's price.
+      order_coupon_iqd: tradeInCredit ? 0 : coupon.discountIqd - coupon.deliveryIqd,
       points_iqd: Math.max(0, Math.trunc(Number(order.points_discount_iqd) || 0)),
       paid_in_kind_iqd: tradeInCredit ? coupon.discountIqd : 0,
     },

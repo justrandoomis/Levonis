@@ -831,24 +831,40 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const caseGross = storedAlloc !== null
         ? Math.floor(storedAlloc * kase.qty / itemQty)
         : (Number(item.unit_price_iqd) || 0) * kase.qty;
-      const coupon = safeParse<{ discount_iqd?: number } | null>(order.coupon_snapshot as string | null, null);
-      const discounts = (coupon ? Number(coupon.discount_iqd) || 0 : 0) + (Number(order.points_discount_iqd) || 0);
+      // WHAT WAS PAID FOR THE LINE (offers B6, Services V2 correction 2): the
+      // coupon's goods part is frozen on the lines it named
+      // (`order_items.coupon_discount_iqd`) and comes off THAT line only; the
+      // order-level split carries just the residual — an older order's whole
+      // coupon, a trade-in credit — and never a delivery discount, which is
+      // no line's price. A line discount is therefore never refunded as if
+      // it had not been given, and never subtracted twice.
+      const coupon = safeParse<{ discount_iqd?: number; delivery_iqd?: number } | null>(order.coupon_snapshot as string | null, null);
+      const couponTotal = coupon ? Math.max(0, Math.trunc(Number(coupon.discount_iqd) || 0)) : 0;
+      const couponDelivery = coupon ? Math.min(couponTotal, Math.max(0, Math.trunc(Number(coupon.delivery_iqd) || 0))) : 0;
+      const lineCoupons = orderItems.reduce((sum, line) => sum + Math.max(0, Math.trunc(Number(line.coupon_discount_iqd) || 0)), 0);
+      const couponResidual = Math.max(0, couponTotal - couponDelivery - lineCoupons);
+      const discounts = couponResidual + (Number(order.points_discount_iqd) || 0);
       const base = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
       // Unit-level savings are already inside the frozen price. The shared
       // goods calculation subtracts only line-level membership savings and
       // distributes a parent's savings over bundle components. Report-only
       // finance adjustments never enter these immutable invoice rows.
-      const membershipBasis = calculateGoods({ ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 },
-        orderItems.map((line) => ({ ...line, coupon_discount_iqd: 0 })), []);
+      const goodsOnly = { ...order, points_discount_iqd: 0, price_adjustment_iqd: 0 };
+      const membershipBasis = calculateGoods(goodsOnly, orderItems.map((line) => ({ ...line, coupon_discount_iqd: 0 })), []);
+      // The same, with each line's own coupon discount taken off it (a
+      // bundle parent's spread over its components, like its membership).
+      const lineCouponBasis = calculateGoods(goodsOnly, orderItems, []);
       const acceptedBasis = calculateGoods(order, orderItems, []);
-      // Preserve the established coupon/points split including its shipping
-      // share, then apply the missing membership/accepted-price adjustments.
+      // Preserve the established residual/points split including its shipping
+      // share, then apply the membership, line-coupon and accepted-price adjustments.
       const fullRefunds = acceptedBasis.lines.map((line) => {
         const gross = Number(line.component_alloc_iqd ?? (Number(line.unit_price_iqd) || 0) * line.qty);
         const memberNet = membershipBasis.lines.find((v) => v.id === line.id)?.net_goods_iqd ?? gross;
         const memberReduction = Math.max(0, gross - memberNet);
+        const couponNet = lineCouponBasis.lines.find((v) => v.id === line.id)?.net_goods_iqd ?? memberNet;
+        const lineCouponReduction = Math.max(0, memberNet - couponNet);
         const discount = base > 0 ? Math.floor((discounts * gross) / base) : 0;
-        return Math.max(0, gross - discount - memberReduction + line.price_adjustment_iqd);
+        return Math.max(0, gross - discount - memberReduction - lineCouponReduction + line.price_adjustment_iqd);
       });
       // A final-price cut can exhaust the goods and then reduce delivery.
       // The old discount split must not resurrect goods that were fully cut,

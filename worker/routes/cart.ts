@@ -46,6 +46,7 @@ import {
 import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
+import { couponLinesOf, productCouponFacts } from '../lib/couponLines';
 import { rateLimit } from '../lib/ratelimit';
 import { lineOrderType, saleAvailability, unusableOrderType } from './products';
 import type { SaleAvailability } from './products';
@@ -1100,23 +1101,57 @@ cartRoutes.post('/coupon-check', async (c) => {
 
   const { items } = await loadCart(c);
   if (items.length === 0) throw badRequest('Your cart is empty', 'CART_EMPTY');
-  const merchandise = items.reduce(
-    (sum, it) => sum + Number((it as { unit_price_iqd?: number }).unit_price_iqd ?? 0) * Number((it as { qty?: number }).qty ?? 0),
-    0
-  );
+  type CartItemView = {
+    id?: unknown; kind?: unknown; productId?: unknown; qty?: unknown; unit_price_iqd?: unknown;
+    option_value_ids?: unknown; color_id?: unknown; transport_method?: unknown;
+    breakdown?: { applied_iqd?: unknown } | null;
+  };
+  const views = items as unknown as CartItemView[];
+  const merchandise = views.reduce((sum, it) => sum + Number(it.unit_price_iqd ?? 0) * Number(it.qty ?? 0), 0);
 
-  const check = await validateCoupon(c.env, user.id, code, merchandise);
+  // The same resolver the checkout runs, over the cart's own lines: what a
+  // scoped code names, on the goods alone. The delivery is not chosen yet, so
+  // a delivery code is valid here and worth what the checkout says.
+  const [facts, ancestry] = await Promise.all([
+    productCouponFacts(c.env.DB, views.map((it) => String(it.productId ?? ''))),
+    catalogAncestry(c.env.DB),
+  ]);
+  const preorder = views.some((it) => typeof it.transport_method === 'string' && it.transport_method !== '');
+  const lines = couponLinesOf(
+    views.map((it) => ({
+      id: String(it.id ?? ''),
+      product_id: String(it.productId ?? ''),
+      option_value_ids: Array.isArray(it.option_value_ids) ? it.option_value_ids.map(String) : [],
+      color_id: String(it.color_id ?? ''),
+      qty: Number(it.qty) || 0,
+      applied_iqd: Number(it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0,
+      transport_method: String(it.transport_method ?? ''),
+      is_parent: it.kind === 'bundle' || it.kind === 'mystery',
+      is_component: false,
+      is_gift: it.kind === 'gift',
+      member_line_discount_iqd: 0,
+      already_discounted: false,
+    })),
+    facts,
+    ancestry,
+    preorder ? 'pre_order' : 'direct_sale'
+  );
+  const check = await validateCoupon(c.env, user.id, code, merchandise, {
+    lines,
+    ctx: { delivery_method: null, delivery_iqd: 0 },
+    deliveryPending: true,
+  });
   if (!check.ok) {
-    const row = await c.env.DB
-      .prepare('SELECT min_total_iqd, tier_required FROM coupons WHERE code = ? AND active = 1')
-      .bind(code.trim().toUpperCase())
-      .first<{ min_total_iqd: number; tier_required: string | null }>();
+    // ONE ANSWER FOR EVERY CODE THIS CUSTOMER CANNOT SEE (offers B4): the
+    // minimum and the tier come from `validateCoupon` itself, and only for a
+    // live code that is theirs to use — never from a second look-up that
+    // would tell a stranger's personal code apart from one that does not exist.
     return c.json({
       success: true,
       valid: false,
       reason: check.reason ?? 'COUPON_INVALID',
-      min_total_iqd: row ? row.min_total_iqd : null,
-      tier_required: row ? row.tier_required : null,
+      min_total_iqd: check.min_total_iqd ?? null,
+      tier_required: check.tier_required ?? null,
       cart_total_iqd: merchandise,
     });
   }
@@ -1124,9 +1159,10 @@ cartRoutes.post('/coupon-check', async (c) => {
     success: true,
     valid: true,
     code: check.code,
-    // An ESTIMATE against merchandise only, and named for what it is. The
-    // checkout quote is the authority and will differ once delivery counts.
-    estimated_discount_iqd: check.discount_iqd,
+    // An ESTIMATE on the goods only, and named for what it is. The checkout
+    // quote is the authority and adds any delivery part. A delivery code has
+    // no goods part, so it carries no figure here rather than a misleading 0.
+    ...(check.discount_iqd ? { estimated_discount_iqd: check.discount_iqd } : {}),
     cart_total_iqd: merchandise,
   });
 });
