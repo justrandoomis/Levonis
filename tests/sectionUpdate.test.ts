@@ -179,10 +179,12 @@ test('the comparison names every changed field of the section — and what the f
   const id = await create(app);
   // The owner edits the FULL export: a spec, a content block — and the price.
   const full = await (await get(app, `/api/admin/template/export/${id}`)).text();
-  const edited = full
+  // A product still «يحتاج تسعيرًا» exports no old dinar price (review 2026-10-14): the price line is typed by hand.
+  assert.doesNotMatch(full, /^price_iqd=/m);
+  const edited = `${full
     .replace('spec.print_speed=300', 'spec.print_speed=600')
     .replace('content_blocks.1.body_ar=نص تعريفي', 'content_blocks.1.body_ar=نص جديد')
-    .replace(/price_iqd=25000/, 'price_iqd=19000');
+    .trimEnd()}\nprice_iqd=19000\n`;
   const p = await preview(app, id, edited);
   assert.equal(p.success, true);
   assert.deepEqual(p.errors, []);

@@ -75,7 +75,7 @@
  *                 notification. Two admins, or an admin and a Telegram press,
  *                 cannot both win.
  */
-import { needsPricingIds } from './pricingEngine/v2/legacyMoney';
+import { needsPricingIds } from './needsPricing';
 import { listing } from './listing';
 import type { Env } from './types';
 import { safeParse } from './types';

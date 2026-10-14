@@ -78,14 +78,16 @@ async function checkout(member: 'none' | 'unit' | 'line' = 'none', discounts: { 
   if (discounts.coupon) raw.prepare("INSERT INTO coupons(id,code,kind,value,min_total_iqd,active) VALUES ('integration-coupon','INTEGRATION','fixed_iqd',?,0,1)").run(discounts.coupon);
   if (discounts.points) raw.prepare("INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status) VALUES ('integration-points',?,'deposit','POINT',?,'approved')").run(buyer, discounts.points);
   await publishSeededV2(raw); // the clean start (A.12.1): the serialising wrapper hides the raw rows from stubApp
+  // Published once above: no per-request auto-publish, whose reads would serialise two "simultaneous" calls
+  // and so hide the race the refund fence is tested against.
   const customer = stubApp(db, { id: buyer, role: 'customer', email: memberOn ? 'r@x.co' : 's@x.co' }, a => {
     a.route('/api/cart', cartRoutes); a.route('/api/orders', orderRoutes);
     a.route('/api/orders', orderPriceRoutes); a.route('/api/returns', returnRoutes);
-  });
+  }, { publishV2: false });
   const admin = stubApp(db, { id: 'boss', role: 'admin', email: 'boss@x.co' }, a => {
     a.route('/api/admin/orders', adminOrderPriceRoutes); a.route('/api/returns', returnRoutes);
     a.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
-  });
+  }, { publishV2: false });
   if (memberOn) {
     const rule = await json(await post(admin, '/api/admin/membership-benefits', {
       tier: 'pro', benefit_type: 'product_discount', scope: 'global', discount_mode: 'percent',
