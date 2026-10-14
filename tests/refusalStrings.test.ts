@@ -120,6 +120,9 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/routes/cart.ts',
     'worker/routes/orders.ts',
     'worker/routes/returns.ts',
+    // Who may move money in the services (owner decision 3, row 223): every
+    // service money door answers through this one rule.
+    'worker/lib/moneyAuthority.ts',
     // The address book refuses on the money path too: a parcel with an
     // undialable number or no governorate is a delivery that fails.
     'worker/routes/addresses.ts',
