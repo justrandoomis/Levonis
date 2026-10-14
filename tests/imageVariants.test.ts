@@ -81,12 +81,12 @@ test('only a still picture, read from the key, can be cut; GIF and video cannot'
   for (const key of ['merchants/u1/public/clip.mp4', 'products/banner.gif', 'products/p1/a.svg', 'products/p1/noext']) assert.equal(variantSourceMime(key), null, key);
 });
 
-test('the format follows Accept, and the quality is fixed: AVIF 75, WebP 75 (was 85), JPEG 85, PNG lossless', () => {
+test('the format follows Accept, and the quality is fixed: AVIF 60 (was 75), WebP 75 (was 85), JPEG 85, PNG lossless', () => {
   assert.equal(negotiateVariantFormat('image/avif,image/webp,image/apng,*/*;q=0.8', 'image/webp'), 'image/avif');
   assert.equal(negotiateVariantFormat('image/webp,*/*', 'image/jpeg'), 'image/webp');
   assert.equal(negotiateVariantFormat('*/*', 'image/png'), 'image/png', 'a PNG keeps its transparency');
   assert.equal(negotiateVariantFormat(undefined, 'image/jpeg'), 'image/jpeg');
-  assert.deepEqual(VARIANT_QUALITY, { 'image/avif': 75, 'image/webp': 75, 'image/jpeg': 85, 'image/png': undefined });
+  assert.deepEqual(VARIANT_QUALITY, { 'image/avif': 60, 'image/webp': 75, 'image/jpeg': 85, 'image/png': undefined });
 });
 
 test('the srcset builder: public /files/ stills only, trimmed at the original, capped per place', () => {
@@ -194,7 +194,7 @@ test('first request: cut once at that width, answered, and stored put-if-absent 
   assert.equal(res.headers.get('etag'), `"${etagOf(bucket, KEY)}-w640-avif"`, 'the same ETag shape the route has always sent');
   assert.equal(res.headers.get('X-Content-Type-Options'), 'nosniff');
   assert.equal(res.headers.get('Content-Security-Policy'), "default-src 'none'; sandbox");
-  assert.deepEqual(images!.calls.map(({ width, fit, format, quality }) => ({ width, fit, format, quality })), [{ width: 640, fit: 'scale-down', format: 'image/avif', quality: 75 }]);
+  assert.deepEqual(images!.calls.map(({ width, fit, format, quality }) => ({ width, fit, format, quality })), [{ width: 640, fit: 'scale-down', format: 'image/avif', quality: 60 }]);
 
   const vkey = variantObjectKey(KEY, 640, 'avif');
   assert.equal(vkey, `variants/v1/${KEY}/w640.avif`);
@@ -202,7 +202,7 @@ test('first request: cut once at that width, answered, and stored put-if-absent 
   assert.ok(put, 'the copy was stored');
   assert.deepEqual(put.onlyIf, { etagDoesNotMatch: '*' }, 'two first requests cannot overwrite each other');
   assert.deepEqual(Object.keys(put.custom!).sort(), ['fmt', 'height', 'q', 'src', 'src_etag', 'ver', 'w', 'width']);
-  assert.deepEqual(put.custom, { src: KEY, src_etag: etagOf(bucket, KEY), w: '640', width: '640', height: '640', fmt: 'avif', q: '75', ver: '1' });
+  assert.deepEqual(put.custom, { src: KEY, src_etag: etagOf(bucket, KEY), w: '640', width: '640', height: '640', fmt: 'avif', q: '60', ver: '1' });
   assert.equal(put.cacheControl, 'public, max-age=31536000, immutable');
 });
 
@@ -251,7 +251,7 @@ test('other query parameters fork neither the cache key nor the stored copy, and
   await fetchIt(`/files/${KEY}?w=640&q=100&x=1`, AVIF);
   await fetchIt(`/files/${KEY}?x=2&w=640`, AVIF);
   assert.equal(images!.calls.length, 1);
-  assert.equal(images!.calls[0].quality, 75);
+  assert.equal(images!.calls[0].quality, 60);
   assert.deepEqual(bucket.keys('variants/'), [`variants/v1/${KEY}/w640.avif`]);
   const key = imageVariantCacheKey(new Request(`https://levonis-iq.com/files/${KEY}?q=100&w=640`), KEY, 640, 'image/webp');
   assert.equal(key.url, `https://levonis-iq.com/files/${KEY}?w=640&f=webp&v=1`);
@@ -402,4 +402,61 @@ test('the plain request is untouched by the copy store: same headers, no binding
   assert.equal(images!.calls.length, 0);
   assert.ok(!bucket.ops.some((op) => op.includes('variants/')));
   assert.deepEqual(dimsOf(avifBytes(2, 3)), { format: 'image/avif', width: 2, height: 3 }, 'the AVIF builder reads back');
+});
+
+// ------------------------------------------------- the release that starts the store
+
+test('right after the release: a data centre still holding the copy cut BEFORE the store (no `v`) answers from it at once and keeps a new copy after the response', async () => {
+  const cache = new MemCache();
+  const { bucket, images, fetchIt } = setup({ cache });
+  // What an earlier deploy left in this data centre's edge: `?w=640&f=avif`, no `v`, immutable.
+  const legacyKey = imageVariantCacheKey(new Request(`http://localhost/files/${KEY}?w=640`), KEY, 640, 'image/avif', true);
+  assert.equal(new URL(legacyKey.url).searchParams.get('v'), null);
+  const old = avifBytes(640, 640);
+  await cache.put(legacyKey, new Response(old as unknown as BodyInit, {
+    headers: { 'Content-Type': 'image/avif', etag: `"${etagOf(bucket, KEY)}-w640-avif"`, 'Cache-Control': 'public, max-age=31536000, immutable' },
+  }));
+
+  const first = await fetchIt(`/files/${KEY}?w=640`, AVIF);
+  assert.equal(first.status, 200);
+  assert.equal(first.headers.get('X-Variant-Source'), 'legacy');
+  assert.equal(first.headers.get('Cache-Control'), 'public, max-age=3600', 'short-lived in the browser: the kept copy replaces it');
+  assert.deepEqual(new Uint8Array(await first.arrayBuffer()), old);
+  // After the response: cut once, kept in R2 and under the current edge key.
+  assert.equal(images!.calls.length, 1);
+  assert.ok(bucket.objects.has(`variants/v1/${KEY}/w640.avif`));
+  const current = imageVariantCacheKey(new Request(`http://localhost/files/${KEY}?w=640`), KEY, 640, 'image/avif');
+  assert.ok(await cache.match(current), 'the new copy is at the edge');
+
+  const second = await fetchIt(`/files/${KEY}?w=640`, AVIF);
+  assert.equal(second.headers.get('X-Variant-Source'), 'edge');
+  assert.equal(second.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+  assert.equal(images!.calls.length, 1, 'not cut again');
+
+  // A 304 from the old entry costs no bytes either.
+  const fresh = new MemCache();
+  const again = setup({ cache: fresh });
+  const etag = `"${etagOf(again.bucket, KEY)}-w320-avif"`;
+  await fresh.put(imageVariantCacheKey(new Request(`http://localhost/files/${KEY}?w=320`), KEY, 320, 'image/avif', true), new Response(avifBytes(320, 320) as unknown as BodyInit, { headers: { 'Content-Type': 'image/avif', etag } }));
+  const notModified = await again.fetchIt(`/files/${KEY}?w=320`, { ...AVIF, 'If-None-Match': etag });
+  assert.equal(notModified.status, 304);
+});
+
+test('a key rewritten in place never answers from an entry of before the store — it may be of an older picture', async () => {
+  const cache = new MemCache();
+  const { bucket, images, fetchIt } = setup({ cache });
+  const LOGO = 'UiUx/Logo/Logo.webp';
+  bucket.seed(LOGO, webpBytes(1000, 400), { contentType: 'image/webp' });
+  await cache.put(imageVariantCacheKey(new Request(`http://localhost/files/${LOGO}?w=320`), LOGO, 320, 'image/avif', true), new Response(avifBytes(320, 999) as unknown as BodyInit, { headers: { 'Content-Type': 'image/avif' } }));
+  const res = await fetchIt(`/files/${LOGO}?w=320`, AVIF);
+  assert.equal(res.headers.get('X-Variant-Source'), 'render');
+  assert.deepEqual(dimsOf(new Uint8Array(await res.arrayBuffer())), { format: 'image/avif', width: 320, height: 128 });
+  assert.equal(images!.calls.length, 1);
+});
+
+test('the edge keys a delete names are the keys the route writes', () => {
+  const req = new Request(`https://levonis-iq.com/files/${KEY}?w=800&q=9`);
+  assert.equal(imageVariantCacheKey(req, KEY, 800, 'image/avif').url, `https://levonis-iq.com/files/${KEY}?w=800&f=avif&v=1`);
+  assert.equal(imageVariantCacheKey(req, KEY, 800, 'image/avif', true).url, `https://levonis-iq.com/files/${KEY}?w=800&f=avif`);
+  assert.equal(imageVariantCacheKey(new Request('https://levonis-iq.com/files/link-cards/c1.webp?w=320'), 'link-cards/c1.webp', 320, 'image/webp').url, 'https://levonis-iq.com/files/link-cards/c1.webp?w=320&f=webp&v=1&__edge=2');
 });

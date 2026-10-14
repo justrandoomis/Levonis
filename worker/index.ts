@@ -1256,9 +1256,9 @@ export default {
     });
     ctx.waitUntil(uploads);
     // The small copies of every public picture already in R2 (owner
-    // 2026-10-13, worker/lib/imageVariants.ts): a bounded step — 24 cuts, 150
-    // R2 operations, 20 s — that lists R2 itself and runs NO D1 statement, so
-    // it takes nothing from the shared budget above. Never throws.
+    // 2026-10-13, worker/lib/imageVariants.ts): a bounded step — 72 cuts,
+    // 400 R2 operations, 45 s — that lists R2 itself and runs NO D1 statement,
+    // so it takes nothing from the shared budget above. Never throws.
     ctx.waitUntil(
       sweepImageVariants(env).catch((error) => {
         console.error('scheduled image copy sweep rejected:', error instanceof Error ? error.name : 'unknown');

@@ -71,3 +71,55 @@ export function avifDimensions(bytes: Uint8Array): RasterDimensions | null {
   return best;
 }
 
+
+const u32le = (b: Uint8Array, i: number) => (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0;
+const fourcc = (b: Uint8Array, i: number) => String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+
+/**
+ * A PUBLIC WEBP SAYS NOTHING ABOUT WHERE IT WAS TAKEN.
+ *
+ * A WebP that arrives as WebP is stored byte for byte (the converter never
+ * sees it), and an extended WebP (`VP8X`) may carry an `EXIF` chunk — a
+ * phone's GPS position, its make and serial, the time — and an `XMP ` chunk.
+ * Served at `/files/<key>` (and by `?w=` whenever it falls back to the
+ * original) to anyone, that is a customer's home address on a public post.
+ *
+ * This returns the same picture without those two chunks — the RIFF size and
+ * the VP8X flags (EXIF 0x08, XMP 0x04) corrected — and every other chunk
+ * untouched, in order: the bitstream, alpha, the colour profile, animation.
+ * Anything that is not a well-formed extended WebP (a simple `VP8 `/`VP8L`
+ * file cannot carry either chunk) comes back as it was. Pure; no binding.
+ */
+export function stripWebpMetadata(bytes: Uint8Array): Uint8Array {
+  if (bytes.byteLength < 30 || fourcc(bytes, 0) !== 'RIFF' || fourcc(bytes, 8) !== 'WEBP' || fourcc(bytes, 12) !== 'VP8X') return bytes;
+  const end = Math.min(bytes.byteLength, 8 + u32le(bytes, 4));
+  const keep: Array<[number, number]> = [];
+  let dropped = false;
+  for (let at = 12; at < end; ) {
+    if (at + 8 > end) return bytes;
+    const size = u32le(bytes, at + 4);
+    const next = at + 8 + size + (size & 1);
+    if (next > end + (size & 1)) return bytes;
+    const tag = fourcc(bytes, at);
+    if (tag === 'EXIF' || tag === 'XMP ') dropped = true;
+    else keep.push([at, Math.min(next, end)]);
+    at = next;
+  }
+  if (!dropped) return bytes;
+  const length = keep.reduce((sum, [a, b]) => sum + (b - a), 12);
+  const out = new Uint8Array(length);
+  out.set(bytes.subarray(0, 12));
+  let w = 12;
+  for (const [a, b] of keep) {
+    out.set(bytes.subarray(a, b), w);
+    w += b - a;
+  }
+  const riff = length - 8;
+  out[4] = riff & 255;
+  out[5] = (riff >>> 8) & 255;
+  out[6] = (riff >>> 16) & 255;
+  out[7] = (riff >>> 24) & 255;
+  // The VP8X flags byte (first byte of its payload): clear EXIF and XMP.
+  out[20] &= ~(0x08 | 0x04);
+  return out;
+}

@@ -688,10 +688,25 @@ export async function deleteMediaObjectIfCreated(
  *
  * `brands/` and `services/` are here for the same reason: fixed names an admin
  * curates, not per-upload keys.
+ *
+ * `link-cards/` is the one key the SERVER rewrites in place: a link card is
+ * read again after a day and keeps its row id, and its re-hosted Open Graph
+ * picture is written over `link-cards/<card id>.webp` (worker/lib/linkCards.ts).
+ * Until it was listed here the old picture stayed `immutable` in browsers and
+ * at the edge, and its small copy (`?w=`) stayed in R2 for good and was served
+ * from every data centre after the linked page had changed or removed it.
  */
 export function isRewritableMediaKey(key: string): boolean {
-  return /^ui(?:ux)?\//i.test(key) || key.startsWith('brands/') || key.startsWith('services/');
+  return /^ui(?:ux)?\//i.test(key) || key.startsWith('brands/') || key.startsWith('services/') || key.startsWith('link-cards/');
 }
+
+/**
+ * The edge-cache generation of a rewritable key (worker/routes/uploads.ts
+ * `edgeCacheKey` explains it). Here, beside the rule it belongs to, so a
+ * delete (worker/lib/productDeletion.ts `invalidateMediaCache`) can name the
+ * same entries the route writes.
+ */
+export const REWRITABLE_EDGE_GENERATION = '2';
 
 export const IMMUTABLE_PUBLIC_CACHE = 'public, max-age=31536000, immutable';
 export const REVALIDATED_PUBLIC_CACHE = 'public, max-age=300, must-revalidate';

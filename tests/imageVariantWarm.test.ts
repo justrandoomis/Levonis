@@ -75,7 +75,7 @@ test('a product picture: its AVIF copies up to its own width, after the answer, 
   assert.match(key, /^products\/catalog\/gallery\/[a-f0-9]+\.webp$/);
   assert.deepEqual(avifRungs(w.pub, key), rungsFor(1254));
   assert.ok(w.pub.objects.has(`variants/v1/${key}/done`), 'the sweep will skip it');
-  assert.ok(w.images.calls.every((c) => c.format === 'image/avif' && c.quality === 75 && c.fit === 'scale-down'));
+  assert.ok(w.images.calls.every((c) => c.format === 'image/avif' && c.quality === 60 && c.fit === 'scale-down'));
   assert.equal(w.pub.objects.get(`variants/v1/${key}/w1280.avif`)!.custom!.width, '1254', 'never enlarged');
 });
 
@@ -130,4 +130,38 @@ test('warmImageVariants is total: no binding, a non-public key or a missing orig
   assert.equal((await warmImageVariants(withImages, { key: 'receipts/u1/evidence/a.webp' })).skipped, 'not_public_still');
   assert.equal((await warmImageVariants(withImages, { key: 'products/a.gif' })).skipped, 'not_public_still');
   assert.equal((await warmImageVariants(withImages, { key: 'products/missing.webp' })).skipped, 'missing');
+});
+
+test('the warm-up holds ONE copy of the original for every width, and stops at its first failed cut', async () => {
+  // A 17 MB legacy JPEG cut at eight widths held the original once more per
+  // width (`new Blob([bytes])` each time) and peaked at +180 MB — over the
+  // isolate's 128 MB. Count the Blobs made while warming one picture.
+  const pub = new R2Double();
+  const images = imagesDouble();
+  const key = 'products/catalog/gallery/big.webp';
+  const bytes = webpBytes(1600, 1600, { pad: 2000 });
+  pub.seed(key, bytes);
+  const RealBlob = globalThis.Blob;
+  let made = 0;
+  (globalThis as { Blob: typeof Blob }).Blob = class extends RealBlob {
+    constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+      super(parts, options);
+      if (parts?.some((p) => (p as ArrayBufferView).byteLength === bytes.byteLength)) made += 1;
+    }
+  };
+  try {
+    const report = await warmImageVariants({ R2_PUBLIC: pub, BUCKET: pub, IMAGES: images.binding } as never, { key, bytes, width: 1600, etag: 'e1' });
+    assert.equal(report.made, rungsFor(1600).length);
+  } finally {
+    (globalThis as { Blob: typeof Blob }).Blob = RealBlob;
+  }
+  assert.equal(made, 1, 'one Blob of the original, read afresh for each width');
+
+  const failing = imagesDouble('throw9422');
+  const pub2 = new R2Double();
+  pub2.seed(key, bytes);
+  const report = await warmImageVariants({ R2_PUBLIC: pub2, BUCKET: pub2, IMAGES: failing.binding } as never, { key, bytes, width: 1600, etag: 'e1' });
+  assert.equal(report.failed, 1);
+  assert.equal(failing.calls.length, 1, 'one failed cut, not one per width');
+  assert.equal(pub2.objects.has(`variants/v1/${key}/done`), false);
 });

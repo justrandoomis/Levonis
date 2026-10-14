@@ -6,9 +6,11 @@
  *
  * What these pin: it lists R2 itself — both buckets, every public prefix, the
  * legacy keys and the owner's hand uploads — and skips private keys, non-still
- * pictures and the copy store; a tick's budget (24 cuts, 150 operations, the
- * wall clock); the cursor kept in R2 and resumed; the `done` marker; the pause
- * after five failed cuts in a row; the next pass seven days later; the old
+ * pictures and the copy store; a tick's budget (72 cuts, three at a time, 400
+ * operations, the wall clock); the cursor kept in R2 and resumed; the `done`
+ * marker and the original's ETag it records; the pause after five pictures in
+ * a row that failed because the binding did (a probe tells it from a picture
+ * the binding cannot read, which is marked instead); the next pass seven days later; the old
  * store version deleted; ZERO D1 statements; and the quarter-hour branch
  * handing it to `waitUntil` with its own `.catch`.
  *
@@ -89,9 +91,9 @@ test('one pass: both buckets, every public prefix, only public still pictures, a
   assert.ok(state.pass_done);
 });
 
-test('a tick is bounded — 24 cuts by default — and the next tick resumes from the kept cursor until the pass is done', async () => {
+test('a tick is bounded — 72 cuts by default — and the next tick resumes from the kept cursor until the pass is done', async () => {
   const w = world();
-  for (let i = 0; i < 10; i++) w.pub.seed(`products/catalog/gallery/p${i}.webp`, webpBytes(1254, 1254));
+  for (let i = 0; i < 12; i++) w.pub.seed(`products/catalog/gallery/p${i}.webp`, webpBytes(1254, 1254));
   const first = await sweepImageVariants(w.env, { now: w.now, limits: { pageSize: 3 } });
   assert.equal(first.transforms, SWEEP_LIMITS.transforms);
   assert.ok(first.operations <= SWEEP_LIMITS.operations);
@@ -105,9 +107,9 @@ test('a tick is bounded — 24 cuts by default — and the next tick resumes fro
     ticks += 1;
   }
   assert.equal(report.pass_done, true);
-  for (let i = 0; i < 10; i++) assert.equal(avif(w.pub, `products/catalog/gallery/p${i}.webp`), 7, `p${i}`);
-  assert.equal(w.images.calls.length, 70, 'each copy cut exactly once across the ticks');
-  assert.ok(ticks <= 4, `ten 1254 px photos take ${ticks} ticks`);
+  for (let i = 0; i < 12; i++) assert.equal(avif(w.pub, `products/catalog/gallery/p${i}.webp`), 7, `p${i}`);
+  assert.equal(w.images.calls.length, 84, 'each copy cut exactly once across the ticks');
+  assert.ok(ticks <= 3, `twelve 1254 px photos take ${ticks} ticks`);
 });
 
 test('the operation budget and the wall clock end a tick, never mid-write', async () => {
@@ -137,7 +139,7 @@ test('a picture already marked is skipped for a listing; copies made lazily are 
   assert.deepEqual(w.images.calls.map((c) => c.width).sort((a, b) => a! - b!), [160, 320, 480, 800, 1080, 1280], 'the lazy 640 copy is kept, the rest cut');
 });
 
-test('five failed cuts in a row pause the sweep for six hours; nothing breaks meanwhile', async () => {
+test('five pictures in a row failing BECAUSE OF THE BINDING pause the sweep for six hours; nothing breaks meanwhile', async () => {
   const images = imagesDouble('throw9422');
   const w = world({ images });
   for (let i = 0; i < 8; i++) w.pub.seed(`products/catalog/gallery/f${i}.webp`, webpBytes(1254, 1254));
@@ -152,8 +154,8 @@ test('five failed cuts in a row pause the sweep for six hours; nothing breaks me
   const paused = await sweepImageVariants(w.env, { now: w.now });
   assert.equal(paused.paused, true);
   assert.deepEqual(w.pub.ops, [`get ${VARIANT_SWEEP_STATE_KEY}`]);
-  // The failed pictures are marked partial: retried in the next pass, not before.
-  assert.equal(w.pub.objects.get('variants/v1/products/catalog/gallery/f0.webp/done')!.custom!.partial, '1');
+  // The binding's failure is not the pictures': none is marked, so each is cut once it works again.
+  assert.equal(w.pub.objects.has('variants/v1/products/catalog/gallery/f0.webp/done'), false);
   // Six hours later the binding works again and the sweep carries on.
   images.state.mode = 'ok';
   w.advance(SWEEP_LIMITS.pauseMs);
@@ -206,4 +208,56 @@ test('the quarter-hour tick hands the sweep to waitUntil with its own .catch, be
   assert.doesNotMatch(otherCrons, /sweepImageVariants/, 'not on the minute or the FX cron');
   const crons = readFileSync(join(ROOT, 'worker/lib/cronSchedules.ts'), 'utf8');
   assert.doesNotMatch(crons, /image/i, 'no cron string of its own');
+});
+
+test('a picture rewritten in place is cut again: the marker and every copy record the ETag of the bytes they came from', async () => {
+  const w = world();
+  const key = 'link-cards/lnk_1.webp';
+  w.pub.seed(key, webpBytes(1200, 630), { cacheControl: 'public, max-age=31536000, immutable' });
+  const first = await sweepImageVariants(w.env, { now: w.now, limits: { transforms: 100, operations: 500 } });
+  assert.equal(first.pass_done, true);
+  const firstEtag = w.pub.objects.get(key)!.etag;
+  assert.equal(w.pub.objects.get(`variants/v1/${key}/done`)!.custom!.src_etag, firstEtag);
+  assert.equal(w.pub.objects.get(`variants/v1/${key}/w640.avif`)!.custom!.height, '336');
+  // The card's refresh writes a square picture over the same key.
+  w.pub.seed(key, webpBytes(800, 800), { cacheControl: 'public, max-age=31536000, immutable' });
+  const newEtag = w.pub.objects.get(key)!.etag;
+  w.advance(SWEEP_LIMITS.passGapMs + 60_000);
+  const again = await sweepImageVariants(w.env, { now: w.now, limits: { transforms: 100, operations: 500 } });
+  assert.equal(again.pass_done, true);
+  assert.equal(w.pub.objects.get(`variants/v1/${key}/done`)!.custom!.src_etag, newEtag);
+  const copy = w.pub.objects.get(`variants/v1/${key}/w640.avif`)!;
+  assert.equal(copy.custom!.src_etag, newEtag, 'replaced, not kept');
+  assert.equal(copy.custom!.height, '640');
+  assert.equal(copy.cacheControl, 'public, max-age=300, must-revalidate', 'a link card revalidates like the brand folder');
+});
+
+test('a picture the binding cannot read is marked once and never pauses the sweep; one cut, one probe', async () => {
+  const images = imagesDouble();
+  const w = world({ images });
+  const bad = webpBytes(1254, 1254);
+  w.pub.seed('users/eve/posts/bad.webp', bad);
+  w.pub.seed('users/zed/posts/good.webp', webpBytes(640, 480));
+  // The binding refuses that one picture's bytes and nothing else.
+  const real = images.binding.input.bind(images.binding);
+  (images.binding as { input: unknown }).input = (stream: ReadableStream<Uint8Array>) => {
+    const handle = {
+      t: null as unknown,
+      transform(t: unknown) { handle.t = t; return handle; },
+      async output(o: { format: string; quality?: number }) {
+        const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+        if (bytes.byteLength === bad.byteLength && bytes.every((b, i) => b === bad[i])) throw Object.assign(new Error('9412: bad input'), { code: 9412 });
+        const inner = real(new Blob([bytes as unknown as BlobPart]).stream());
+        return (handle.t ? inner.transform(handle.t as never) : inner).output(o as never);
+      },
+    };
+    return handle;
+  };
+  const report = await sweepImageVariants(w.env, { now: w.now });
+  assert.equal(report.paused, false);
+  assert.equal(report.failures, 0, 'not the binding\'s failure');
+  assert.equal(report.unreadable, 1);
+  assert.equal(report.transforms, 2 + rungsFor(640).length, 'one cut and one probe for the bad picture');
+  assert.equal(w.pub.objects.get('variants/v1/users/eve/posts/bad.webp/done')!.custom!.skip, 'unreadable');
+  assert.equal(avif(w.pub, 'users/zed/posts/good.webp'), rungsFor(640).length);
 });

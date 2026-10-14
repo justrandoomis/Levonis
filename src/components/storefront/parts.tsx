@@ -5,7 +5,7 @@
  * runtime (runtime.tsx).
  */
 import { productName } from '../../lib/productText';
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type SyntheticEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Loader2, Play, ShoppingBag } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
@@ -127,6 +127,23 @@ export function Column({ children, className = '' }: { children: ReactNode; clas
 export function storeImgProps(src: string | null | undefined, sizes: string): { src: string | undefined; srcSet: string | undefined; sizes: string | undefined } {
   const srcSet = src ? variantSrcSet(src) : undefined;
   return { src: src || undefined, srcSet, sizes: srcSet && sizes };
+}
+
+/**
+ * CROPPED TO FILL, A WIDE PICTURE IS DRAWN WIDER THAN ITS BOX: `object-cover`
+ * scales it to the box's height, so a 2.4:1 photograph in a square tile is
+ * drawn 2.4 × as wide as the `sizes` that names the tile, and its copy is
+ * stretched (the verification of DECISIONS row 226: 0.5–0.7 image pixels per
+ * screen pixel). A merchant's block pictures carry no dimensions, so once a
+ * copy has loaded its own shape says it: when it is drawn wider than the box,
+ * `sizes` becomes the drawn width and the browser fetches the copy that
+ * covers it. A picture no wider than its box is left alone.
+ */
+export function coverFit(e: SyntheticEvent<HTMLImageElement>): void {
+  const img = e.currentTarget;
+  const drawn = Math.ceil((img.clientHeight * img.naturalWidth) / img.naturalHeight);
+  // Set once: the bigger copy's own load finds the same width and changes nothing.
+  if (drawn > img.clientWidth * 1.05 && img.sizes !== `${drawn}px`) img.sizes = `${drawn}px`;
 }
 
 /** A store tile: 2 or 3 across on a phone and up to 5 across on a wide theme (theme.ts gridClasses). */

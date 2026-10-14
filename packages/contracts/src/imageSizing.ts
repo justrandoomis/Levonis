@@ -99,6 +99,12 @@ export function variantSrcSet(src: string, options: VariantSrcSetOptions = {}): 
  * `storeImagePreload`). Here rather than with the other presets
  * (packages/contracts/src/imageSizes.ts) because a store visit already holds
  * this module and must not download the other one for two strings.
+ *
+ * The hero is cropped to fill its box, and on a phone that box is far less
+ * wide than a cover photograph (390 × 240 for the cover hero, 1.6:1): a
+ * 2.4:1 cover is drawn at 1.5 × the screen's width, so a phone asks for that
+ * (the verification of DECISIONS row 226 measured 0.74 image pixels per
+ * screen pixel at `100vw`).
  */
-export const STORE_HERO_SIZES = '100vw';
+export const STORE_HERO_SIZES = '(max-width: 639px) 150vw, 100vw';
 export const STORE_GALLERY_SIZES = '(min-width: 672px) 672px, 100vw';

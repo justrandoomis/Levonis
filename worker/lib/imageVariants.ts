@@ -165,17 +165,38 @@ function sourceDimensions(bytes: Uint8Array, mime: string): RasterDimensions | n
 }
 
 /** The width of an original: from its header, else from the binding's decoder (free), else null. */
-async function sourceWidthOf(env: VariantEnv, bytes: Uint8Array, mime: string): Promise<number | null> {
-  const header = sourceDimensions(bytes, mime);
+async function sourceWidthOf(env: VariantEnv, head: Uint8Array, mime: string, whole: Blob): Promise<number | null> {
+  const header = sourceDimensions(head, mime);
   if (header) return header.width;
   const images = env.IMAGES as (ImagesBinding & { info?: ImagesBinding['info'] }) | undefined;
   if (!images || typeof images.info !== 'function') return null;
   try {
-    const info = await images.info(new Blob([bytes]).stream());
+    const info = await images.info(whole.stream());
     return 'width' in info && info.width > 0 ? info.width : null;
   } catch {
     return null;
   }
+}
+
+/** Enough of an original's first bytes for its header (a JPEG's frame follows up to 64 KB of EXIF). */
+const HEAD_BYTES = 256 * 1024;
+
+/**
+ * IS THE BINDING WORKING, OR WAS IT THIS PICTURE?
+ *
+ * A failed cut is either the binding's (the Images allowance spent — 9422 —
+ * or an outage), which every later cut will hit too, or the picture's: a
+ * WebP whose header is fine and whose payload is not, which any signed-in
+ * customer can post. Counting both alike let ten such posts pause the whole
+ * backfill for twelve hours, and retry them every pass. So after a failure
+ * one tiny known-good picture is cut: if that works, the failure was the
+ * picture's alone.
+ */
+const PROBE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAA1BMVEXIeCjqlaEmAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQY02NgGAXIAAABEAAB7JfjegAAAABJRU5ErkJggg==';
+async function bindingWorks(env: VariantEnv): Promise<boolean> {
+  const probe = Uint8Array.from(atob(PROBE_PNG), (ch) => ch.charCodeAt(0));
+  const out = await renderImageVariant(env, probe, { width: IMAGE_VARIANT_WIDTHS[0], format: 'image/avif', sourceWidth: 16 });
+  return out.ok;
 }
 
 async function putDoneMarker(bucket: R2Bucket, key: string, version: number, meta: Record<string, string> = {}): Promise<void> {
@@ -237,28 +258,34 @@ export async function warmImageVariants(env: VariantEnv, input: VariantWarmInput
       await putDoneMarker(home, input.key, VARIANT_STORE_VERSION, { skip: 'animated' });
       return { ...report, skipped: 'animated' };
     }
-    const width = Number(input.width) > 0 ? Number(input.width) : await sourceWidthOf(env, bytes, mime);
+    // ONE Blob for every width (renderImageVariant reads it afresh each time).
+    const source = new Blob([bytes]);
+    const width = Number(input.width) > 0 ? Number(input.width) : await sourceWidthOf(env, bytes.subarray(0, HEAD_BYTES), mime, source);
     const rungs = rungsFor(width);
     if (!rungs.length) return { ...report, skipped: 'unknown_width' };
     // A minted key is immutable; a fixed name in the brand folder follows its own object.
     const policy = publicMediaCacheControl(input.key, cacheControl ?? 'immutable');
-    const source = bytes;
     const queue = [...rungs];
-    const worker = async () => {
-      while (queue.length) {
+    const worker = async (most = Infinity) => {
+      for (let n = 0; n < most && queue.length; n++) {
         const rung = queue.shift()!;
         const out = await renderImageVariant(env, source, { width: rung, format: 'image/avif', sourceWidth: width });
         if (!out.ok) {
           report.failed += 1;
           console.warn('image_variant_warm_failed', JSON.stringify({ reason: out.reason, w: rung }));
-          continue;
+          // One failure ends the warm-up: a picture the binding cannot read fails
+          // at every width, and the sweep or the first visitor will try again.
+          queue.length = 0;
+          return;
         }
         await storeVariant(env, { key: input.key, width: rung, format: 'image/avif', out, sourceEtag: etag, cacheControl: policy });
         report.made += 1;
       }
     };
+    // The first width alone, so a picture the binding cannot read costs one cut.
+    await worker(1);
     await Promise.all([worker(), worker()]);
-    if (report.failed === 0) await putDoneMarker(home, input.key, VARIANT_STORE_VERSION);
+    if (report.failed === 0) await putDoneMarker(home, input.key, VARIANT_STORE_VERSION, { src_etag: etag });
     return report;
   } catch (error) {
     console.warn('image_variant_warm_failed', JSON.stringify({ reason: error instanceof Error ? error.name : 'unknown' }));
@@ -302,17 +329,23 @@ export const SWEEP_PREFIXES = [
 ] as const;
 
 /**
- * ONE TICK'S BUDGET. 24 transforms × 96 ticks a day is ~2,300 copies a day; the
- * live shop's ~300 public originals × ~6 rungs (~1,800 copies, once) are done
- * within a day — inside the Images Free plan's 5,000 a month even if that is
- * the plan the account is on. Five failed cuts in a row (9422: over the
- * monthly allowance) pause the sweep for six hours; nothing breaks meanwhile,
- * because the site serves the original whenever a copy cannot be had.
+ * ONE TICK'S BUDGET. 72 cuts, three at a time, in at most 45 s: the live
+ * shop's ~300 public originals × ~6 rungs (~1,800 copies, once) are done in
+ * about six hours after a release instead of a day — the resize runs in the
+ * Images service, not in this isolate, so a cut costs the Worker a few
+ * milliseconds of CPU, and a quarter-hour cron may run far longer than 45 s.
+ * The one-time backfill stays inside the Images Free plan's 5,000 a month
+ * even if that is the plan the account is on. Five cuts in a row that fail
+ * BECAUSE OF THE BINDING (the probe below fails too — 9422, an outage) pause
+ * the sweep for six hours; a picture the binding cannot read is marked and
+ * skipped instead. Nothing breaks meanwhile: the site serves the original
+ * whenever a copy cannot be had.
  */
 export const SWEEP_LIMITS = {
-  transforms: 24,
-  operations: 150,
-  wallMs: 20_000,
+  transforms: 72,
+  concurrency: 3,
+  operations: 400,
+  wallMs: 45_000,
   failureStreak: 5,
   pauseMs: 6 * 60 * 60 * 1000,
   passGapMs: 7 * 24 * 60 * 60 * 1000,
@@ -330,17 +363,21 @@ export interface SweepState {
   pass_started: string | null;
   pass_done: string | null;
   paused_until: string | null;
-  /** Consecutive failed cuts. */
+  /** Consecutive pictures whose cut failed because the binding did. */
   failures: number;
 }
 
 export interface SweepReport {
   skipped: string | null;
+  /** Cuts asked of the binding, the health probe included. */
   transforms: number;
   operations: number;
   stored: number;
   completed: number;
+  /** Cuts that failed because the binding did (each picture counted once). */
   failures: number;
+  /** Pictures the binding works for and cannot read: marked and skipped. */
+  unreadable: number;
   paused: boolean;
   pass_done: boolean;
   removed_old: number;
@@ -367,10 +404,12 @@ async function readSweepState(bucket: R2Bucket): Promise<SweepState> {
  *
  * One bounded step per quarter-hour tick, resuming from the cursor kept in
  * `variants/_state/sweep-v1.json`. For each original: one listing of its copy
- * prefix (a `done` marker means skip), one GET, its width from its header,
- * then the missing AVIF rungs, then the marker. When a pass ends the next
- * starts seven days later, and costs one listing and a marker check per
- * picture; copies of an older `VARIANT_STORE_VERSION` are deleted then.
+ * prefix (a `done` marker of the same bytes means skip — the marker and every
+ * copy record the original's ETag, so a picture rewritten in place is cut
+ * again), one GET, its width from its header, then the missing AVIF rungs,
+ * three at a time, then the marker. When a pass ends the next starts seven
+ * days later, and costs one listing and a marker check per picture; copies of
+ * an older `VARIANT_STORE_VERSION` are deleted then.
  *
  * NO D1. Not one statement — the tick's shared D1 budget is not touched
  * (tests/imageVariantSweep.test.ts counts them). Never throws.
@@ -384,7 +423,7 @@ export async function sweepImageVariants(
   const version = options.version ?? VARIANT_STORE_VERSION;
   const started = now();
   const report: SweepReport = {
-    skipped: null, transforms: 0, operations: 0, stored: 0, completed: 0, failures: 0, paused: false, pass_done: false, removed_old: 0,
+    skipped: null, transforms: 0, operations: 0, stored: 0, completed: 0, failures: 0, unreadable: 0, paused: false, pass_done: false, removed_old: 0,
   };
   try {
     if (!env.IMAGES) return { ...report, skipped: 'unavailable' };
@@ -409,7 +448,6 @@ export async function sweepImageVariants(
     }
     state.paused_until = null;
     state.pass_started ??= new Date(started).toISOString();
-    const passStarted = Date.parse(state.pass_started);
 
     outer: while (opsLeft() > 1 && timeLeft()) {
       const bucket = sources[state.bucket];
@@ -448,56 +486,105 @@ export async function sweepImageVariants(
         const listing = await home.list({ prefix: variantPrefix(key, version), include: ['customMetadata'] });
         op();
         const existing = new Map(listing.objects.map((o) => [o.key, o] as const));
+        // The original's ETag, from the listing (free). A copy or a marker of
+        // OTHER bytes — a link card's refreshed picture, a fixed name the owner
+        // replaced — is stale and cut again; one of these bytes is kept.
+        const listedEtag = bareEtag(object.etag ?? object.httpEtag);
+        const ofTheseBytes = (o: R2Object | undefined): boolean => !!o && (!listedEtag || !o.customMetadata?.src_etag || o.customMetadata.src_etag === listedEtag);
         const done = existing.get(variantDoneKey(key, version));
-        if (done && (done.customMetadata?.partial !== '1' || done.uploaded.getTime() >= passStarted)) continue;
+        // The legacy bucket's copy of a key is never the one rewritten in place
+        // (new writes go to the dedicated bucket, which is listed first and is
+        // what the route serves): a marked key there is done whatever its ETag.
+        if (done && (bucket !== sources[0] || ofTheseBytes(done))) continue;
 
         const original = await bucket.get(key);
         op();
         if (!original) continue;
-        const bytes = new Uint8Array(await original.arrayBuffer());
-        if (isAnimatedWebp(bytes)) {
-          await putDoneMarker(home, key, version, { skip: 'animated' });
+        // ONE copy of the original in memory, as a Blob every cut reads afresh,
+        // and only its first bytes as an array (the header, the animation flag).
+        const blob = typeof (original as Partial<R2ObjectBody>).blob === 'function' ? await original.blob() : new Blob([await original.arrayBuffer()]);
+        const head = new Uint8Array(await blob.slice(0, HEAD_BYTES).arrayBuffer());
+        const etag = bareEtag(original.httpEtag);
+        if (isAnimatedWebp(head)) {
+          await putDoneMarker(home, key, version, { skip: 'animated', src_etag: etag });
           op();
           report.completed += 1;
           continue;
         }
-        const width = await sourceWidthOf(env, bytes, mime);
+        const width = await sourceWidthOf(env, head, mime, blob);
         if (!width) {
-          await putDoneMarker(home, key, version, { skip: 'unreadable' });
+          await putDoneMarker(home, key, version, { skip: 'unreadable', src_etag: etag });
           op();
           continue;
         }
-        const etag = bareEtag(original.httpEtag);
         const policy = publicMediaCacheControl(key, original.httpMetadata?.cacheControl ?? null);
-        let failed = false;
-        for (const rung of rungsFor(width)) {
-          if (existing.has(variantObjectKey(key, rung, 'avif', version))) continue;
-          // Out of budget mid-picture: the copies made so far stay; the next tick re-lists and finishes it.
-          if (report.transforms >= limits.transforms || opsLeft() < 2 || !timeLeft()) break outer;
-          report.transforms += 1;
-          const out = await renderImageVariant(env, bytes, { width: rung, format: 'image/avif', sourceWidth: width });
-          if (!out.ok) {
-            failed = true;
-            report.failures += 1;
-            state.failures += 1;
-            console.warn('image_variant_sweep_failed', JSON.stringify({ reason: out.reason, w: rung }));
-            break;
+        const queue = rungsFor(width).filter((rung) => !ofTheseBytes(existing.get(variantObjectKey(key, rung, 'avif', version))));
+        let verdict: Promise<boolean> | null = null;
+        let pictureFailed = false;
+        let bindingFailed = false;
+        let outOfBudget = false;
+        let inFlight = 0;
+        const cut = async (most = Infinity) => {
+          for (let n = 0; n < most && queue.length && !pictureFailed && !bindingFailed; n++) {
+            // Out of budget mid-picture: the copies made so far stay; the next tick re-lists and finishes it.
+            // Each cut in flight will spend an operation on its copy, and the picture one on its marker.
+            if (report.transforms >= limits.transforms || opsLeft() - inFlight < 3 || !timeLeft()) {
+              outOfBudget = true;
+              return;
+            }
+            const rung = queue.shift()!;
+            report.transforms += 1;
+            inFlight += 1;
+            try {
+              const out = await renderImageVariant(env, blob, { width: rung, format: 'image/avif', sourceWidth: width });
+              if (!out.ok) {
+                console.warn('image_variant_sweep_failed', JSON.stringify({ reason: out.reason, w: rung }));
+                // Asked once per picture, however many cuts were in flight.
+                if (!verdict) {
+                  report.transforms += 1;
+                  verdict = bindingWorks(env);
+                }
+                if (await verdict) pictureFailed = true;
+                else bindingFailed = true;
+                return;
+              }
+              await storeVariant(env, { key, width: rung, format: 'image/avif', out, sourceEtag: etag, cacheControl: policy, version, replace: true });
+              op();
+              report.stored += 1;
+            } finally {
+              inFlight -= 1;
+            }
           }
-          state.failures = 0;
-          await storeVariant(env, { key, width: rung, format: 'image/avif', out, sourceEtag: etag, cacheControl: policy, version, replace: true });
+        };
+        // The first width alone: a picture the binding cannot read costs one cut, not one per worker.
+        await cut(1);
+        await Promise.all(Array.from({ length: Math.max(1, limits.concurrency) }, () => cut()));
+        if (bindingFailed) {
+          // Not the picture's fault: no marker, so it is tried again once the binding works.
+          report.failures += 1;
+          state.failures += 1;
+          if (state.failures >= limits.failureStreak) {
+            state.failures = 0;
+            state.paused_until = new Date(now() + limits.pauseMs).toISOString();
+            report.paused = true;
+            break outer;
+          }
+          continue;
+        }
+        state.failures = 0;
+        if (pictureFailed) {
+          // The binding works and cannot read THIS picture: skipped for good, until
+          // its bytes change (a new ETag) or the store version does. Its copies
+          // are still tried when a visitor asks, and the original served if not.
+          report.unreadable += 1;
+          await putDoneMarker(home, key, version, { skip: 'unreadable', src_etag: etag });
           op();
-          report.stored += 1;
+          continue;
         }
-        // A failed picture is marked `partial`: skipped for the rest of this pass, tried again in the next.
-        await putDoneMarker(home, key, version, failed ? { partial: '1' } : {});
+        if (outOfBudget) break outer;
+        await putDoneMarker(home, key, version, { src_etag: etag });
         op();
-        if (!failed) report.completed += 1;
-        if (state.failures >= limits.failureStreak) {
-          state.failures = 0;
-          state.paused_until = new Date(now() + limits.pauseMs).toISOString();
-          report.paused = true;
-          break outer;
-        }
+        report.completed += 1;
       }
       if (page.truncated && page.cursor) state.cursor = page.cursor;
       else {

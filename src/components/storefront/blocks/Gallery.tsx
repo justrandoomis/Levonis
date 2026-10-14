@@ -1,6 +1,6 @@
 /** GALLERY — the merchant's own pictures, a grid or a shelf, each with an optional caption. */
 import { mediaSrc } from '../../../../packages/storeLayout/src/refs';
-import { BlockHeading, Column, storeImgProps, useText } from '../parts';
+import { BlockHeading, Column, coverFit, storeImgProps, useText } from '../parts';
 import type { BlockProps } from '../types';
 
 export default function GalleryBlock({ block }: BlockProps<'gallery'>) {
@@ -12,7 +12,7 @@ export default function GalleryBlock({ block }: BlockProps<'gallery'>) {
   const tiles = images.map((it, i) => (
     <figure key={i} className="min-w-0">
       <div className="sf-media sf-well sf-r-sm overflow-hidden">
-        <img {...storeImgProps(it.src, '(min-width: 768px) 280px, 50vw')} alt={it.caption} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+        <img {...storeImgProps(it.src, '(min-width: 768px) 280px, 50vw')} onLoad={coverFit} alt={it.caption} className="w-full h-full object-cover" loading="lazy" decoding="async" />
       </div>
       {it.caption && (
         <figcaption className="text-zinc-400 text-[11.5px] mt-1.5 line-clamp-2" dir="auto">

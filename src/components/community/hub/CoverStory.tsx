@@ -10,6 +10,7 @@
  */
 import { Link } from 'react-router-dom';
 import SafeImage from '../../ui/SafeImage';
+import { coverStorySizes, mediaAspect } from '../../../../packages/contracts/src/imageSizes';
 import type { PostCard } from '../projects/api';
 import type { CommunityWork } from './api';
 import { HubLink } from './parts';
@@ -48,7 +49,7 @@ export default function CoverStory({ cover }: { cover: Cover }) {
     return (
       <HubLink href={w.store.url} data-community-cover="work" className={FRAME}>
         <div className="absolute inset-0">
-          <SafeImage sizes="(min-width: 1024px) 720px, 100vw" src={w.imageUrl} alt={w.title} aspect="auto" eager className="h-full w-full" bgClassName="bg-surface-selected" imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />
+          <SafeImage sizes={coverStorySizes(null)} src={w.imageUrl} alt={w.title} aspect="auto" eager className="h-full w-full" bgClassName="bg-surface-selected" imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />
         </div>
         <div aria-hidden="true" className="lv-bleed-scrim-deep pointer-events-none absolute inset-0" />
         <Caption kicker={s.coverKicker} title={w.title} by={w.store.name} />
@@ -62,7 +63,7 @@ export default function CoverStory({ cover }: { cover: Cover }) {
     <Link to={p.url} data-community-cover="post" data-project-card={p.id} className={FRAME}>
       {/* The photograph in its own absolute box: SafeImage's wrapper is `relative`, so it cannot be the one taken out of flow. */}
       <div className="absolute inset-0">
-        <SafeImage sizes="(min-width: 1024px) 720px, 100vw" src={p.cover?.url ?? null} alt={p.title} aspect="auto" eager className="h-full w-full" bgClassName="bg-surface-selected" imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />
+        <SafeImage sizes={coverStorySizes(mediaAspect(p.cover))} src={p.cover?.url ?? null} alt={p.title} aspect="auto" eager className="h-full w-full" bgClassName="bg-surface-selected" imgClassName="transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none" />
       </div>
       <div aria-hidden="true" className="lv-bleed-scrim-deep pointer-events-none absolute inset-0" />
       <Caption kicker={s.coverKicker} title={p.title} by={facts.join(' · ')} />

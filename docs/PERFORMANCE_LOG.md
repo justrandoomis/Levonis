@@ -1760,59 +1760,110 @@ Layout and rules of the stored copies: `docs/MEDIA_STORAGE.md` «Small copies �
 
 | Encoding at the same widths | Bytes | vs live | Mean SSIM |
 |---|--:|--:|--:|
-| live `IMAGES` AVIF q75 (today, kept) | 656,545 | 1.00 | 0.9777 |
+| live `IMAGES` AVIF q75 (before) | 656,545 | 1.00 | 0.9777 |
 | sharp WebP q75 | 579,248 | 0.88 | 0.9775 |
 | sharp WebP q80 | 695,916 | 1.06 | 0.9819 |
 | sharp AVIF q50 / q55 / q60 | 378,453 / 437,854 / 522,294 | 0.58 / 0.67 / 0.80 | 0.9755 / 0.9787 / 0.9826 |
 
 The binding's WebP is ≈ 1.14× sharp's at the same quality, so its WebP q75 and AVIF q75
-cost the same bytes at today's grade: AVIF q75 stays, WebP drops from q85 to q75 (≈ −30 %
-for browsers without AVIF). A lower AVIF setting needs billed live transforms to judge —
-not done here.
+cost the same bytes: WebP drops from q85 to q75 (≈ −30 % for browsers without AVIF).
 
-### Image bytes per page — local lab, before (`f7f44ca2`) and after, same server
+**AVIF is q60** (the verification of row 226 found the product grid's bytes unchanged at q75).
+The calibration (34 live copies, `verify-perf/calibration.json`): the binding's AVIF q75 bytes
+equal libaom's (sharp) at q68. Assuming the same offset, q60 ≈ sharp q53. On the 7 grid
+photographs at the drawn size: sharp q53 is −41 % of the bytes at the 640 rung with SSIM
+0.978 against 0.984 at q68; desktop 320 rung −38 %, SSIM 0.975 against 0.982. The offset is
+measured at one point only — the first live check after release compares a kept `?w=640`
+copy's bytes with today's (expected ≈ −40 %).
 
-Method: both local builds served by one lab server (`scratchpad/images-perf/scripts/server-build.mjs`):
-the build's own `index.html` (no Worker preload injection, so both builds equally), API answers
-from fixtures of live public GETs, `/files/<key>` the live stored original, and every `?w=W`
-copy cut by the same stand-in encoder (sharp, width `min(W, original)`, WebP q75 — the live
-binding's AVIF q75 is ≈ 1.13× these bytes, the same for both columns). Playwright Chromium,
-phone 390×844 at DPR 3, desktop 1280×800 at DPR 1, page loaded then scrolled to the end;
-bytes are every distinct `/files/` response.
+### Image bytes per page — calibrated local lab, before (`f7f44ca2`) and after
 
-| Page | Phone before | Phone after | Desktop before | Desktop after | What moved |
-|---|--:|--:|--:|--:|---|
-| `/` | 162,112 B | **140,084 B** (−14 %) | 218,182 B | **184,140 B** (−16 %) | desktop promo photos 1080 → 800; on the phone a tile reuses the hero's copy already in cache |
-| `/products` | 189,098 | 189,098 | 72,216 | 72,216 | already right-sized |
-| `/product/esun-pla-plus` | 49,280 | 49,280 | 19,372 | 19,372 | the original is small: the srcset now stops at its own width (480) instead of asking for a "1080" that is the same file |
-| `/product/bambu-lab-round-magnet` | 83,068 | 83,068 | 73,654 | **51,548** (−30 %) | `productGallerySizes(aspect)`: the 558 px photo takes 800, not 1080 |
-| `/categories` | 524,150 | **160,770** (−69 %) | 524,150 | **116,516** (−78 %) | `CropPhoto` originals → 800 (phone) / 640 (desktop) |
-| `/categories/printing-materials` | 342,932 | **123,318** (−64 %) | 321,470 | **65,660** (−80 %) | same |
-| **All six** | **1,350,640** | **745,618 (−45 %)** | **1,229,044** | **509,452 (−59 %)** | |
+Method (the verification lab, `scratchpad/images-perf/verify-perf/` + `fix2/`): each build
+served by its own `wrangler dev --local` with the real `/files` route, local R2 holding the 23
+live originals and the local `IMAGES` binding; `/api/*` from fixtures of live public GETs. A
+local proxy re-encodes every `?w=` copy's body with sharp AVIF at the calibrated quality —
+q68 for the base (= the live binding's q75 bytes) and q53 for the after build (q60) — so the
+bytes are live-equivalent. Playwright Chromium, phone 390×844 at DPR 3, desktop 1280×800 at
+DPR 1, page loaded then scrolled to the end; both builds fetched the same number of pictures
+on every page.
+
+| Page | Phone before | Phone after | Desktop before | Desktop after |
+|---|--:|--:|--:|--:|
+| `/` | 162,711 | 92,267 (−43 %) | 264,263 | 125,383 (−53 %) |
+| `/products` (grid) | 218,359 | **86,469 (−60 %)** | 81,533 | 50,810 (−38 %) |
+| `/product/esun-pla-plus` | 56,195 | 37,142 (−34 %) | 22,335 | 15,661 (−30 %) |
+| `/product/bambu-lab-round-magnet` | 96,711 | 57,022 (−41 %) | 86,237 | 35,555 (−59 %) |
+| `/categories` | 524,150 | 108,465 (−79 %) | 524,150 | 76,731 (−85 %) |
+| `/categories/printing-materials` | 347,833 | 76,020 (−78 %) | 323,947 | 53,352 (−84 %) |
+| **All six** | **1,405,959** | **457,385 (−67 %)** | **1,302,465** | **357,492 (−73 %)** |
+
+What moved: on the phone grid the 174 px card at DPR 3 takes the 480 copy (`(min-resolution:
+2.5dppx)` clause, 0.92 image px per screen px) instead of 640; every AVIF copy is q60; the
+category banners take 800 / 640 copies instead of the 1254² originals; the magnet's 558 px
+desktop photo takes 800, not 1080. Sensitivity to the q60 calibration (`fix2/sens.json`, the
+same copies re-encoded): the sizing alone, every copy at the old quality (sharp q68), is
+788,709 B phone (−44 %) / 614,263 B desktop (−53 %); if the binding's q60 behaves like sharp
+q58 rather than q53, 551,488 (−61 %) / 431,355 (−67 %), and the phone grid −53 % instead of −60 %.
+
+The first report of row 226 said −45 % / −59 %: that was a WebP q75 stand-in (≈ 0.89× the
+live AVIF) and, for the home page on the phone, a different cache-reuse timing; it does not
+reproduce and is replaced by the table above.
 
 Not in the table: the store pages and `/community` (closed live), and the ~140 other sites
 (cart, account, chat cards, compare, community feed, back office) that downloaded originals
 and now take thumbnail rungs — a 512 px avatar drawn at 32 px becomes a 160 px copy.
 
-### Latency (what the change removes; to be confirmed live)
+### Latency
+
+LCP, Slow 4G (150 ms, 1.6 Mbit/s) + CPU ×4, warm caches, median of 3, builds alternated, the
+same calibrated lab (`fix2/lcp.json`, `fix2/lcp-sum.json`; load average 3.6–6.9 during the
+run, so differences under ≈ 300 ms are noise):
+
+| Page | Phone before → after | Desktop before → after |
+|---|--:|--:|
+| `/` | 3,972 → 3,448 ms | 2,264 → 2,232 ms |
+| `/products` | 3,984 → 3,488 ms | 3,572 → 3,404 ms |
+| `/product/esun-pla-plus` | 3,876 → 3,844 ms | 3,956 → 3,872 ms |
+| `/product/bambu-lab-round-magnet` | 4,360 → 3,996 ms | 4,264 → 3,912 ms |
+| `/categories` | **5,060 → 3,584 ms** | **5,080 → 3,464 ms** |
+| `/categories/printing-materials` | 4,548 → 4,132 ms | **5,220 → 3,952 ms** |
 
 Every copy cut once is kept in R2 and read from there by every data centre afterwards
 (`X-Variant-Source: r2`), at about the original's first-byte time instead of a fresh resize
-(0.85–2.34 s). The AVIF rungs of a new upload are cut in `waitUntil` at upload; pictures
-already stored are cut by the quarter-hour sweep (≤ 24 transforms a tick, ≈ 1,800 once,
-inside a day). Only a WebP copy nobody asked for before pays one resize, once in its life.
-Live checks after deploy: `?w=640` twice from two data centres (`render` once, then `r2`/`edge`),
+(0.85–2.34 s live). Right after the release, a data centre that still holds a copy cut before
+it (edge key without `v`) answers from it at once (`legacy`, one hour in the browser) and the
+kept copy is cut after the response; the AVIF rungs of a new upload are cut at upload; pictures
+already stored are cut by the quarter-hour sweep (72 cuts a tick, three at a time — the ≈ 1,800
+copies of the live shop in about six hours). Live checks after deploy: `?w=640` twice from two
+data centres (`render` or `legacy` once, then `r2`/`edge`), its bytes against today's copy,
 `GET /files/variants/v1/…` → 404, `/categories` HTML with `?w=800` in the `CropPhoto` srcset,
 and `image_variant_failed` / sweep pauses in the Workers logs.
+
+### Verification round (2026-10-14) — what was found and what changed
+
+| Finding | Change |
+|---|---|
+| The grid's bytes did not move (0 %) | AVIF q60; the phone grid at DPR ≥ 2.5 takes the 480 copy |
+| Reported −45 % / −59 % did not reproduce | the calibrated table above |
+| First views slow right after deploy (new edge key, empty R2, 24 cuts a tick) | the old edge copy answers while the kept copy is cut; sweep 72 cuts a tick |
+| Each width held the original again (17 MB JPEG: +180 MB) | one Blob read afresh for every width |
+| Cropped-to-fill pictures stretched (community covers, store gallery and hero, store product photo, admin form on a phone) | `coverSizes` with the picture's aspect, `coverFit` after load where none is known, hero `150vw` on a phone, admin sizes per real column |
+| A refreshed link card's copy stayed old, from R2, for good | `link-cards/` is rewritten in place: copies checked against the original's ETag, 5-minute revalidation, the sweep re-cuts on a new ETag |
+| Ten bad customer posts paused the sweep 12 h | a probe tells the binding's failure from the picture's; a bad picture is marked once and skipped |
+| A deleted picture's copies stayed in that data centre's edge | `invalidateMediaCache` drops every copy's entry |
+| A public WebP kept its GPS EXIF | `stripWebpMetadata` at every door that keeps a public WebP as it came |
+| WebP q85 → q75 for browsers without AVIF | kept (the same grade as the AVIF most visitors get) |
+| CLS 0.004 on a category page (the sort button) | not from this change: the base shows the same shift |
+| `source_url` in live `/api/products/<slug>` | already removed in the base (`projectPublic`, row 220); goes live with this push |
 
 ### Bytes of code (gzip −9, the gate's method; `vite build`, tests/bundleBudget.test.ts green, no budget raised)
 
 | | before (`f7f44ca2`, built locally) | after | gate |
 |---|--:|--:|--:|
-| entry chunk | 65,425 B | 65,904 B (+479 B: the one width list and the srcset builder) | 72 KB |
-| initial payload | 184,858 B | 185,337 B | 200 KB |
-| storefront app payload | 238,931 B | 239,436 B; headroom 180 B | 234 KB = 239,616 B, **not raised** |
+| entry chunk | 65,425 B | 65,926 B (+501 B: the one width list, the srcset builder, the store hero's phone `sizes`) | 72 KB |
+| initial payload | 184,858 B | 185,359 B | 200 KB |
+| storefront app payload | 238,931 B | 239,553 B (`coverFit` in the store's parts); headroom 63 B | 234 KB = 239,616 B, **not raised** |
 | merchant workspace shell closure | 32,751 B | 32,751 B (the shell's logo keeps its plain `<img>`) | 32 KB = 32,768 B, **not raised** |
 | CSS (11 files) | 62,708 B | 62,708 B | — |
 
-The storefront's last 180 bytes are now spoken for: the next storefront change needs funding first.
+The storefront has 63 bytes left: the next storefront change needs bytes freed first.

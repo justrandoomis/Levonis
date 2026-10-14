@@ -88,12 +88,24 @@ export default function ProductCard({
         widthClass={`${widthClass ?? (width === 'rail' ? 'w-[148px] shrink-0' : 'w-full')}${className ? ` ${className}` : ''}`}
         compareToggle={compareToggle}
         eager={eager}
-        imageSizes={imageSizes ?? (width === 'rail' ? '148px' : '(min-width: 1280px) calc((100vw - 72px) / 5), (min-width: 1024px) calc((100vw - 68px) / 4), (min-width: 640px) calc((100vw - 56px) / 3), calc((100vw - 42px) / 2)')}
+        imageSizes={imageSizes ?? (width === 'rail' ? '148px' : GRID_CARD_SIZES)}
       />
     );
   }
   return <RegularCard p={p} widthClass={widthClass ?? 'w-[160px]'} />;
 }
+
+/**
+ * A GRID CARD'S PHOTOGRAPH: 5 / 4 / 3 across, two across a phone. On a phone
+ * of DPR 2.5 or more the slot is declared at 1 / 2.2 instead of 1 / 2 of the
+ * row, so the 174 px card of a 390 px DPR-3 phone takes the 480 copy (0.92
+ * image pixels per screen pixel at 460 ppi, which no eye resolves) instead of
+ * the 640 one — about a third of the grid's bytes (verification of DECISIONS
+ * row 226: the grid's bytes had not moved). A 2.625 phone gets the same copy
+ * at 0.99.
+ */
+const GRID_CARD_SIZES =
+  '(min-width: 1280px) calc((100vw - 72px) / 5), (min-width: 1024px) calc((100vw - 68px) / 4), (min-width: 640px) calc((100vw - 56px) / 3), (min-resolution: 2.5dppx) calc((100vw - 42px) / 2.2), calc((100vw - 42px) / 2)';
 
 function CompactCard({
   p,

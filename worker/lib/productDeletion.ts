@@ -1,6 +1,7 @@
 import { isSafeMediaKey } from './mediaStorage';
-import { deleteMediaObject, isAnonymousPublicMediaKey } from './mediaStorage';
-import { deleteVariantsIn } from './variantKeys';
+import { deleteMediaObject, isAnonymousPublicMediaKey, isRewritableMediaKey, REWRITABLE_EDGE_GENERATION } from './mediaStorage';
+import { deleteVariantsIn, variantEdgeUrl } from './variantKeys';
+import { IMAGE_VARIANT_WIDTHS } from '../../packages/contracts/src/imageSizing';
 import { membershipDiscountAtLineSql, UNLINKED_MEMBERSHIP_PRODUCTS } from './orderMembership';
 import { DELETED_PRODUCT_FINANCE_SCOPE_ACTION } from './financeDeletedProductScope';
 
@@ -1297,8 +1298,8 @@ export async function pendingMediaCleanup(
  * `/files/*` participates in `caches.default` with a one-year `immutable`
  * lifetime, which is honest for a key that never changes its bytes — but a
  * DELETED key must stop being served, and an immutable entry would outlive the
- * object by up to a year. Each removed key's URL is dropped from the colo cache
- * that this request landed in.
+ * object by up to a year. Each removed key's URL — and the entries of its
+ * small copies — is dropped from the colo cache that this request landed in.
  *
  * SCOPE, STATED PLAINLY: `caches.default.delete` is per-colo. It clears the
  * cache of the datacentre serving the admin's own request, not every edge
@@ -1312,16 +1313,45 @@ export async function invalidateMediaCache(origin: string, keys: string[]): Prom
   const cache = typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default ?? null : null;
   if (!cache) return [];
   const invalidated: string[] = [];
+  const base = origin.replace(/\/+$/, '');
   for (const key of keys) {
-    const url = `${origin.replace(/\/+$/, '')}/files/${key}`;
-    try {
-      if (await cache.delete(url)) invalidated.push(url);
-    } catch {
-      // A cache that refuses a delete is not a reason to fail a delete that
-      // has already committed.
-    }
+    const generation = isRewritableMediaKey(key) ? REWRITABLE_EDGE_GENERATION : null;
+    const plain = `${base}/files/${key}`;
+    const urls = [plain, ...(generation ? [`${plain}?__edge=${generation}`] : []), ...variantEdgeUrls(base, key, generation)];
+    const outcomes = await Promise.all(
+      urls.map((url) =>
+        cache.delete(url).then(
+          (gone) => (gone ? url : null),
+          // A cache that refuses a delete is not a reason to fail a delete that
+          // has already committed.
+          () => null
+        )
+      )
+    );
+    for (const url of outcomes) if (url) invalidated.push(url);
   }
   return invalidated;
+}
+
+/**
+ * AND ITS SMALL COPIES. `/files/<key>?w=` answers are edge entries of their own
+ * (worker/routes/uploads.ts `imageVariantCacheKey`) — one per width and format,
+ * under the current key and the older one without `v` — and each would keep
+ * answering for a year in this data centre after the picture was deleted.
+ * Only a public still picture has copies.
+ */
+function variantEdgeUrls(origin: string, key: string, generation: string | null): string[] {
+  const ext = /\.(webp|jpe?g|png)$/i.exec(key)?.[1]?.toLowerCase();
+  if (!ext || !isAnonymousPublicMediaKey(key)) return [];
+  const formats = ['avif', 'webp', ...(ext === 'png' ? ['png'] : ext === 'webp' ? [] : ['jpeg'])];
+  const urls: string[] = [];
+  for (const width of IMAGE_VARIANT_WIDTHS) {
+    for (const format of formats) {
+      urls.push(variantEdgeUrl(origin, key, width, format, { generation }));
+      urls.push(variantEdgeUrl(origin, key, width, format, { generation, legacy: true }));
+    }
+  }
+  return urls;
 }
 
 // ---------------------------------------------------------------------------

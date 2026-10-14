@@ -14,14 +14,14 @@ import {
   type ImageVariantWidth,
 } from '../lib/imageConvert';
 import { bareEtag, readStoredVariant, scheduleVariantWarm, storeVariant, variantEtag } from '../lib/imageVariants';
-import { VARIANT_STORE_VERSION, isVariantStoreKey } from '../lib/variantKeys';
+import { isVariantStoreKey, variantEdgeUrl } from '../lib/variantKeys';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, badRequest, forbidden, notFound, oneOf, unavailable } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { recordStaffChatFileRead } from './chats';
-import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
+import { rasterDimensions, stripWebpMetadata, validRasterDimensions } from '../lib/imageMetadata';
 import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
 import { getSetting, type UploadLimits } from '../lib/settings';
 import {
@@ -40,6 +40,7 @@ import {
   isSafeMediaKey,
   publicMediaCacheControl,
   putMediaObject,
+  REWRITABLE_EDGE_GENERATION,
   type MediaDomain,
   type MediaVisibility,
 } from '../lib/mediaStorage';
@@ -581,6 +582,10 @@ uploadRoutes.post('/', async (c) => {
   // this route was changed to stop telling.
   const key = buildMediaKey({ ...target, kind: target.keyKind, extension: storedExt, objectId: newId() });
   const cacheControl = target.visibility === 'public' ? 'public, max-age=31536000, immutable' : 'private, max-age=300';
+  // A WebP that arrived as WebP is stored as it came — without its EXIF and
+  // XMP chunks when anyone may read it: a phone's GPS position on a public
+  // post is the customer's address (worker/lib/imageMetadata.ts).
+  if (target.visibility === 'public' && storedMime === 'image/webp') buf = stripWebpMetadata(buf);
 
   // The per-purpose quota (§9.4 `uploadQuotas`: a maker's posts may hold 2 GiB
   // of live files), counted on the bytes that will actually be stored.
@@ -668,7 +673,8 @@ export function parseByteRange(header: string, size: number): { offset: number; 
  * entries written from now on. `caches.default.delete` reaches one colo.
  *
  * So a rewritable key (`isRewritableMediaKey`: the brand folder, brands,
- * services) is cached under a key carrying `REWRITABLE_EDGE_GENERATION`.
+ * services, link cards) is cached under a key carrying `REWRITABLE_EDGE_GENERATION`
+ * (worker/lib/mediaStorage.ts).
  * Every entry written under the plain URL — at every colo, by any past
  * deploy — is simply never asked for again and ages out. Bump the
  * generation if a rewritable policy ever has to be abandoned the same way.
@@ -678,7 +684,7 @@ export function parseByteRange(header: string, size: number): { offset: number; 
  * The request's headers are carried over, so conditional requests behave as
  * before; only the URL the cache files it under changes.
  */
-export const REWRITABLE_EDGE_GENERATION = '2';
+export { REWRITABLE_EDGE_GENERATION };
 export function edgeCacheKey(request: Request, key: string): Request {
   if (!isRewritableMediaKey(key)) return request;
   const url = new URL(request.url);
@@ -772,13 +778,12 @@ export function answerRangeFromFull(full: Response, rangeHeader: string, ifRange
  * mint cache entries with it. Rewritable keys carry the generation as the
  * original does.
  */
-export function imageVariantCacheKey(request: Request, key: string, width: ImageVariantWidth, format: ImageVariantFormat): Request {
-  const url = new URL(request.url);
-  url.search = '';
-  url.searchParams.set('w', String(width));
-  url.searchParams.set('f', format.slice('image/'.length));
-  url.searchParams.set('v', String(VARIANT_STORE_VERSION));
-  return edgeCacheKey(new Request(url.toString(), { method: 'GET' }), key);
+export function imageVariantCacheKey(request: Request, key: string, width: ImageVariantWidth, format: ImageVariantFormat, legacy = false): Request {
+  const url = variantEdgeUrl(new URL(request.url).origin, key, width, format.slice('image/'.length), {
+    legacy,
+    generation: isRewritableMediaKey(key) ? REWRITABLE_EDGE_GENERATION : null,
+  });
+  return new Request(url, { method: 'GET' });
 }
 
 /**
@@ -885,6 +890,46 @@ async function peekStream(stream: ReadableStream<Uint8Array>, n: number): Promis
   return { head, stream: replay };
 }
 
+/** How long a browser keeps a copy answered from the edge entry of before copies were kept. */
+const LEGACY_COPY_CACHE = 'public, max-age=3600';
+
+/**
+ * AFTER THE RESPONSE: cut one copy from the stored original and keep it — in
+ * R2 (put-if-absent) and in this data centre's edge under the current key.
+ * Nothing is kept when the picture is animated, too large for the binding or
+ * defeats it; the next request simply tries again.
+ */
+async function cutAndKeepCopy(
+  c: Context<AppContext>,
+  key: string,
+  cache: Cache,
+  cacheKey: Request,
+  width: ImageVariantWidth,
+  format: ImageVariantFormat
+): Promise<void> {
+  const obj = await getMediaObject(c.env, 'public', key);
+  if (!obj) return;
+  if (obj.size > IMAGES_MAX_INPUT_BYTES) {
+    await obj.body.cancel().catch(() => undefined);
+    return;
+  }
+  // One copy of the original in memory, as the Blob the binding reads.
+  const blob = typeof (obj as Partial<R2ObjectBody>).blob === 'function' ? await obj.blob() : new Blob([await obj.arrayBuffer()]);
+  if (isAnimatedWebp(new Uint8Array(await blob.slice(0, 32).arrayBuffer()))) return;
+  const sourceEtag = bareEtag(obj.httpEtag);
+  if (!sourceEtag) return;
+  const policy = publicMediaCacheControl(key, obj.httpMetadata?.cacheControl);
+  const out = await renderImageVariant(c.env, blob, { width, format });
+  if (!out.ok) {
+    console.warn('image_variant_failed', JSON.stringify({ reason: out.reason, w: width, fmt: format.slice('image/'.length) }));
+    return;
+  }
+  await storeVariant(c.env, { key, width, format, out, sourceEtag, cacheControl: policy });
+  const headers = variantHeaders(format, variantEtag(sourceEtag, width, format), policy);
+  headers.set('Content-Length', String(out.bytes.byteLength));
+  await cache.put(cacheKey, new Response(out.bytes, { headers }));
+}
+
 /**
  * `GET /files/<key>?w=<width>` — ONE SIZED COPY OF A PUBLIC PICTURE
  * (the widths: packages/contracts/src/imageSizing.ts; the copies:
@@ -896,9 +941,13 @@ async function peekStream(stream: ReadableStream<Uint8Array>, n: number): Promis
  *   1. this data centre's edge cache;                     X-Variant-Source: edge
  *   2. the copy stored in R2 — made once, by an earlier request, the upload's
  *      warm-up or the quarter-hour sweep — one R2 GET, then the edge;
- *      a fixed name in the brand folder is HEADed first, and a copy of a
- *      picture the owner has since replaced is never served;  X-Variant-Source: r2
- *   3. cut now from the original by the `IMAGES` binding, answered, and
+ *      a key rewritten in place (the brand folder, a link card) is HEADed
+ *      first, and a copy of a picture since replaced is never served;
+ *                                                         X-Variant-Source: r2
+ *   3. while the store fills after the release that started it, the copy
+ *      this data centre cut before (edge key without `v`), answered at once
+ *      and replaced by a kept copy cut after the response;  X-Variant-Source: legacy
+ *   4. cut now from the original by the `IMAGES` binding, answered, and
  *      stored in R2 and the edge after the response.     X-Variant-Source: render
  *
  * A 304 is decided from the ETag before any pixel is touched. NOTHING HERE
@@ -947,7 +996,7 @@ async function serveImageVariant(
     let usable = sourceEtag !== '';
     let policy = publicMediaCacheControl(key);
     if (isRewritableMediaKey(key)) {
-      // A fixed name the owner replaces by hand: the copy must be of the bytes there NOW.
+      // A key rewritten in place (the owner's fixed names, a refreshed link card): the copy must be of the bytes there NOW.
       const head = await headMediaObject(c.env, 'public', key);
       if (!head) {
         void stored.body.cancel().catch(() => undefined);
@@ -972,7 +1021,42 @@ async function serveImageVariant(
     void stored.body.cancel().catch(() => undefined);
   }
 
-  // 3. Cut it now.
+  // 3. Not in the store yet. Right after the release that started keeping
+  //    copies, the store is empty while this data centre may still hold the
+  //    copy the route cut BEFORE (its edge entry has no `v`): that answers
+  //    now, at edge speed, and the copy is cut and kept after the response —
+  //    instead of every first visitor waiting 1–2 s for a resize. Short-lived
+  //    in the browser, so the kept copy replaces it within the hour. Never for
+  //    a key rewritten in place, whose old entry may be of an old picture.
+  if (cache && !stale && !isRewritableMediaKey(key)) {
+    const legacy = await cache.match(imageVariantCacheKey(c.req.raw, key, width, format, true));
+    if (legacy && legacy.status === 200 && legacy.body) {
+      let later = false;
+      try {
+        c.executionCtx.waitUntil(
+          cutAndKeepCopy(c, key, cache, cacheKey, width, format).catch((error) => {
+            console.warn('image_variant_store_failed', error instanceof Error ? error.name : 'unknown');
+          })
+        );
+        later = true;
+      } catch {
+        // No execution context: cut it now, below.
+      }
+      if (later) {
+        const headers = new Headers(legacy.headers);
+        headers.set('Cache-Control', LEGACY_COPY_CACHE);
+        if (ifNoneMatch && ifNoneMatch === headers.get('etag')) {
+          void legacy.body.cancel().catch(() => undefined);
+          return new Response(null, { status: 304, headers });
+        }
+        headers.set('X-Variant-Source', 'legacy');
+        return new Response(legacy.body, { status: 200, headers });
+      }
+      void legacy.body.cancel().catch(() => undefined);
+    }
+  }
+
+  // 4. Cut it now.
   const original = await loadPublicOriginal(c, key, cache);
   if (!original) throw notFound();
   // Without the binding there is no variant to cut: the original IS the answer.
@@ -1269,7 +1353,8 @@ fileRoutes.get('/*', async (c) => {
      * Media keys outside the brand folder are content-addressed or carry a
      * per-upload token, so a URL's bytes never change. The brand folder is
      * different: its purpose is fixed names (`UiUx/Logo/Logo.webp`) the owner
-     * replaces in place so every existing reference keeps working.
+     * replaces in place so every existing reference keeps working — and so is
+     * a link card's picture, which its daily refresh writes over the same key.
      *
      * `immutable` does not merely cache: it tells the browser and the edge not
      * to ASK again. So a replaced logo stayed replaced-in-R2 and old-on-screen.

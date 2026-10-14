@@ -38,6 +38,32 @@ export function variantDoneKey(key: string, version: number = VARIANT_STORE_VERS
   return `${variantPrefix(key, version)}done`;
 }
 
+/** The formats a copy can be answered in, as the edge-cache key spells them (`f=`). */
+export const VARIANT_EDGE_FORMATS = ['avif', 'webp', 'jpeg', 'png'] as const;
+
+/**
+ * THE URL THE EDGE CACHE FILES ONE COPY UNDER (worker/routes/uploads.ts
+ * `imageVariantCacheKey` builds its key with this): `/files/<key>?w=&f=&v=`,
+ * plus `__edge=<generation>` for a key rewritten in place. `legacy` is the
+ * shape the route used before copies were kept in R2 — no `v` — which the
+ * data centres still hold for a year: the route answers from it while the
+ * new copy is being made, and a delete drops it too.
+ */
+export function variantEdgeUrl(
+  origin: string,
+  key: string,
+  width: number,
+  format: string,
+  options: { legacy?: boolean; generation?: string | null } = {}
+): string {
+  const url = new URL(`${origin.replace(/\/+$/, '')}/files/${key}`);
+  url.searchParams.set('w', String(width));
+  url.searchParams.set('f', format);
+  if (!options.legacy) url.searchParams.set('v', String(VARIANT_STORE_VERSION));
+  if (options.generation) url.searchParams.set('__edge', options.generation);
+  return url.toString();
+}
+
 /**
  * Delete every stored copy of `key` — every store version up to the current
  * one — from `bucket`. Returns how many objects went. A bucket double without

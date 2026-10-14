@@ -37,7 +37,7 @@
 
 import type { Env } from './types';
 import { GuardedFetchError, readResponseBytes } from './fetchGuard';
-import { avifDimensions, rasterDimensions, validRasterDimensions, type RasterDimensions } from './imageMetadata';
+import { avifDimensions, rasterDimensions, stripWebpMetadata, validRasterDimensions, type RasterDimensions } from './imageMetadata';
 import { IMAGE_VARIANT_WIDTHS, type ImageVariantWidth } from '../../packages/contracts/src/imageSizing';
 
 /** What the Images binding will accept in one call. */
@@ -377,12 +377,13 @@ export async function productImageToWebp(
           return { ok: false, reason: 'failed', detail: 'The WebP could not be decoded or has unsupported dimensions' };
         }
         box = isAnimatedWebp(bytes) ? null : storedCapBox(dimensions.width, dimensions.height);
-        // At or under the limit the WebP is kept byte for byte, as it always
-        // was — the product key is the digest of these exact bytes.
+        // At or under the limit the WebP is kept as it came — the product key
+        // is the digest of the stored bytes — less any EXIF/XMP chunk: every
+        // picture through here is public (a product, a link card).
         if (box === null) {
           return {
             ok: true,
-            bytes,
+            bytes: stripWebpMetadata(bytes),
             mime: 'image/webp',
             width: dimensions.width,
             height: dimensions.height,
@@ -444,8 +445,9 @@ export type CapOutcome = { bytes: Uint8Array; width: number; height: number; res
  * THE STORED-PICTURE LIMIT FOR THE DOORS THAT ACCEPT WEBP ONLY — a brand mark
  * or service icon (`POST /api/admin/site-media/:slot`) and a section picture
  * (`POST /api/admin/taxonomy/catalogs/:id/<slot>`). They store the owner's
- * WebP byte for byte, which stays true at or under the limit; above it the
- * picture is re-encoded at the converter's quality, scaled into the limit.
+ * WebP as it came (less any EXIF/XMP chunk — the picture is public), which
+ * stays true at or under the limit; above it the picture is re-encoded at the
+ * converter's quality, scaled into the limit.
  *
  * It never fails an upload that works today: without the binding, for an
  * animated WebP, or when the binding cannot do it, the bytes are kept as
@@ -453,7 +455,8 @@ export type CapOutcome = { bytes: Uint8Array; width: number; height: number; res
  */
 export async function capStoredWebp(env: Pick<Env, 'IMAGES'>, bytes: Uint8Array): Promise<CapOutcome> {
   const source = rasterDimensions(bytes, 'image/webp');
-  const unchanged: CapOutcome = { bytes, width: source?.width ?? 0, height: source?.height ?? 0, resized: false };
+  // Kept as it arrived means without EXIF/XMP: these pictures are public.
+  const unchanged: CapOutcome = { bytes: stripWebpMetadata(bytes), width: source?.width ?? 0, height: source?.height ?? 0, resized: false };
   if (!source || !validRasterDimensions(source) || isAnimatedWebp(bytes)) return unchanged;
   const box = storedCapBox(source.width, source.height);
   const images = env.IMAGES;
@@ -569,14 +572,24 @@ export function variantExtension(format: ImageVariantFormat): 'avif' | 'webp' | 
  * QUALITY PER OUTPUT FORMAT — FIXED, never a request parameter.
  *
  * Measured (docs/PERFORMANCE_LOG.md «Images R2»: luma SSIM against a lanczos3
- * resize of the stored original, 24 live copies): the binding's AVIF at 75 is
- * today's grade (SSIM 0.9777), and WebP at 75 reaches the same grade (0.9775)
- * — the 85 it used to share with the converter cost about 30 % more bytes for
- * nothing a visitor could see. A JPEG copy (a browser that takes neither)
- * keeps 85; a PNG keeps its lossless encoding.
+ * resize of the stored original, 24 live copies): the binding's AVIF at 75
+ * (SSIM 0.9777) cost what libaom's AVIF costs at 68 — its encoder is the
+ * faster, less efficient kind — and WebP at 75 reaches the same grade (0.9775)
+ * as the 85 it used to share with the converter, for about 30 % fewer bytes.
+ *
+ * AVIF IS 60 (owner 2026-10-13, «ضغطها بتكون بحجم صغير»; the verification of
+ * row 226 found the product grid's bytes unchanged at 75). On the 7 grid
+ * photographs the lab's calibrated stand-in (the binding's 75 ≈ libaom 68)
+ * puts 60 at about −40 % of the bytes, with SSIM at the drawn size 0.978
+ * against 0.984. The binding's scale was calibrated at one point only, so
+ * the live check after release (docs/PERFORMANCE_LOG.md) compares a kept
+ * 640 copy's bytes with today's. A quality change is a new
+ * `VARIANT_STORE_VERSION` (worker/lib/variantKeys.ts) once copies are live.
+ * A JPEG copy (a browser that takes neither) keeps 85; a PNG keeps its
+ * lossless encoding.
  */
 export const VARIANT_QUALITY: Record<ImageVariantFormat, number | undefined> = {
-  'image/avif': 75,
+  'image/avif': 60,
   'image/webp': 75,
   'image/jpeg': WEBP_QUALITY,
   'image/png': undefined,
@@ -617,18 +630,22 @@ export function verifyVariantBytes(bytes: Uint8Array, format: ImageVariantFormat
  */
 export async function renderImageVariant(
   env: Pick<Env, 'IMAGES'>,
-  source: ReadableStream<Uint8Array> | Uint8Array,
+  source: ReadableStream<Uint8Array> | Uint8Array | Blob,
   variant: { width: ImageVariantWidth; format: ImageVariantFormat; sourceWidth?: number | null }
 ): Promise<VariantOutcome> {
   const images = env.IMAGES;
   if (!images) {
     // Nobody is listening; let the source go rather than leak a stream.
-    if (!(source instanceof Uint8Array)) await source.cancel().catch(() => undefined);
+    if (source instanceof ReadableStream) await source.cancel().catch(() => undefined);
     return { ok: false, reason: 'unavailable' };
   }
   try {
     const quality = VARIANT_QUALITY[variant.format];
-    const input = source instanceof Uint8Array ? new Blob([source]).stream() : source;
+    // A Blob is read afresh for each copy without another copy of its bytes:
+    // the warm-up and the sweep cut up to eight widths from ONE Blob, where
+    // `new Blob([bytes])` per width held the original once more each time
+    // (a 17 MB legacy JPEG peaked at +180 MB, over the isolate's 128 MB).
+    const input = source instanceof Blob ? source.stream() : source instanceof Uint8Array ? new Blob([source]).stream() : source;
     const result = await images
       .input(input)
       .transform({ width: variant.width, fit: 'scale-down' })

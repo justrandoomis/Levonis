@@ -13,13 +13,14 @@
  * The main picture and the thumbs download the server's small copies (owner
  * 2026-10-13); the main one with `STORE_GALLERY_SIZES`, the same pair the
  * document preloads for a store product page (worker/lib/socialPreview.ts
- * `storeImagePreload`).
+ * `storeImagePreload`) — and, when it turns out wider than its frame (it is
+ * cropped to fill), the larger copy its drawn width needs (`coverFit`).
  */
 import { useEffect, useState } from 'react';
 import { Play, ShoppingBag } from 'lucide-react';
 import { STORE_GALLERY_SIZES } from '../../../packages/contracts/src/imageSizing';
 // The store pages' one picture helper (copies + sizes), already in their closure.
-import { storeImgProps } from '../storefront/parts';
+import { coverFit, storeImgProps } from '../storefront/parts';
 
 export interface GalleryItem {
   kind: 'image' | 'video';
@@ -67,7 +68,7 @@ export function ProductGallery({
             className="w-full h-full object-contain bg-black"
           />
         ) : (
-          <img {...storeImgProps(current.url, STORE_GALLERY_SIZES)} alt={current.alt || productName} className="w-full h-full object-cover" />
+          <img {...storeImgProps(current.url, STORE_GALLERY_SIZES)} onLoad={coverFit} alt={current.alt || productName} className="w-full h-full object-cover" />
         )}
       </div>
       {items.length > 1 && (

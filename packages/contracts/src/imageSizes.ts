@@ -31,10 +31,10 @@ export const IMAGE_SIZES = {
   avatarLarge: '112px',
   /** A store's logo. */
   logo72: '72px',
-  /** A product card in a grid (phone 164 of 390 CSS px). */
-  card: '(min-width: 1280px) 230px, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, 45vw',
-  /** A feed or project cover. */
-  feedCover: '(min-width: 1024px) 600px, 100vw',
+  /** A product card in a grid (phone 164 of 390 CSS px; at DPR 2.5+ the 480 copy, as home/ProductCard.tsx's grid). */
+  card: '(min-width: 1280px) 230px, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, (min-resolution: 2.5dppx) 41vw, 45vw',
+  /** The feed column's card: the phone's full width, 672 px on a desktop. Its cover is cropped to fill it — see `feedCoverSizes`. */
+  feedCover: '(min-width: 1024px) 672px, (min-width: 640px) calc(100vw - 32px), 100vw',
   /** A category banner's photograph (`CropPhoto`): phone 192–222, desktop 449–495 CSS px. */
   cropBanner: '(min-width: 1024px) 500px, (min-width: 640px) 40vw, 230px',
   /** Full-bleed. */
@@ -81,6 +81,62 @@ export function productGallerySizes(aspect?: number | null): string {
   // The phone frame is min(78vw, 340px) tall.
   parts.push(`min(calc(100vw - 58px), ${n2((340 - GALLERY_INSET) * r)}px, calc(${n2(78 * r)}vw - ${n2(GALLERY_INSET * r)}px))`);
   return parts.join(', ');
+}
+
+/** One box a picture is cropped to fill, at one breakpoint: its CSS width and its width / height. */
+export interface CoverBox {
+  media?: string;
+  width: string;
+  aspect: number;
+}
+
+/**
+ * A PICTURE CROPPED TO FILL ITS BOX IS DRAWN WIDER THAN THE BOX when it is
+ * wider than the box: `object-cover` scales it to the box's HEIGHT, so a 16:9
+ * photograph in a 4:3 card is drawn at 1.33 × the card's width, and a 2.4:1
+ * one in a square tile at 2.4 ×. A `sizes` that names the box asks for a copy
+ * that is then stretched — the verification of DECISIONS row 226 measured
+ * 0.53–0.71 image pixels per screen pixel on such covers. This is the box's
+ * `sizes` times that factor, per breakpoint (never below the box, at most 4 ×).
+ * `imageAspect` comes from the media row; without one, `unknownAspect` (16:9,
+ * the commonest wide photograph) is assumed.
+ */
+export function coverSizes(boxes: readonly CoverBox[], imageAspect?: number | null, unknownAspect = 16 / 9): string {
+  const a = Number(imageAspect) > 0 ? Number(imageAspect) : unknownAspect;
+  return boxes
+    .map((box) => {
+      const f = Math.min(4, Math.max(1, a / box.aspect));
+      const m = /^(\d+(?:\.\d+)?)(px|vw)$/.exec(box.width);
+      const width = f === 1 ? box.width : m ? `${n2(Number(m[1]) * f)}${m[2]}` : `calc(${box.width} * ${n2(f)})`;
+      return box.media ? `${box.media} ${width}` : width;
+    })
+    .join(', ');
+}
+
+/** A feed card's cover (community/feed/PostCard.tsx): 4:3, or 4:5 for a portrait picture, cropped to fill the feed column. */
+export function feedCoverSizes(cover: { width?: number | null; height?: number | null } | null | undefined): string {
+  const aspect = mediaAspect(cover);
+  const box = aspect !== null && aspect < 1 ? 0.8 : 4 / 3;
+  return coverSizes(
+    [
+      { media: '(min-width: 1024px)', width: '672px', aspect: box },
+      { media: '(min-width: 640px)', width: 'calc(100vw - 32px)', aspect: box },
+      { width: '100vw', aspect: box },
+    ],
+    aspect
+  );
+}
+
+/** The community hub's cover story (community/hub/CoverStory.tsx): 16:9 across a phone, 12:5 in the 1120 px column on a desktop. */
+export function coverStorySizes(aspect: number | null): string {
+  return coverSizes(
+    [
+      { media: '(min-width: 1024px)', width: 'min(1120px, calc(100vw - 32px))', aspect: 12 / 5 },
+      { width: '100vw', aspect: 16 / 9 },
+    ],
+    aspect,
+    1
+  );
 }
 
 /** width / height of a media row, or null when either is unknown. */
