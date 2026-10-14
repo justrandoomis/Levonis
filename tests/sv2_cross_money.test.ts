@@ -266,23 +266,25 @@ test('the trade-in credit lasts seven days; an expired one closes «إتمام �
   assert.deepEqual([check.ok, check.reason], [false, 'EXPIRED']);
 });
 
-test('a cancelled order re-issues the credit with the time that order held it — never a fresh week', async () => {
+test('a cancelled order gives the same credit back with the time that order held it — never a fresh week, never a second coupon', async () => {
   const w = world();
   const id = await submitted(w.raw);
   const { orderId } = await approvedAndOrdered(w.raw, id);
-  const old = row<{ id: string; ends_at: string }>(w.raw, 'SELECT id, ends_at FROM coupons WHERE trade_in_id = ? AND active = 1', id)!;
-  // The order held the credit for one day and was cancelled; the credit's own end has since passed.
-  const created = new Date(Date.now() - 3 * DAY).toISOString();
-  const cancelled = new Date(Date.now() - 2 * DAY).toISOString();
+  const old = row<{ id: string; code: string }>(w.raw, 'SELECT id, code FROM coupons WHERE trade_in_id = ? AND active = 1', id)!;
+  // The order has held the credit for one day; the credit's own end has since passed.
   const ownEnd = new Date(Date.now() - 60 * 60_000).toISOString();
-  w.raw.prepare("UPDATE orders SET status = 'cancelled', created_at = ? WHERE id = ?").run(created, orderId);
-  // 0081's trigger stamps the moment of cancelling; the scenario moves it back a day.
-  w.raw.prepare('UPDATE orders SET cancelled_at = ? WHERE id = ?').run(cancelled, orderId);
+  w.raw.prepare('UPDATE orders SET created_at = ? WHERE id = ?').run(new Date(Date.now() - DAY).toISOString(), orderId);
   w.raw.prepare('UPDATE coupons SET ends_at = ? WHERE id = ?').run(ownEnd, old.id);
+  // Cancelled now (0191's trigger: the use comes back, the end moves by the day the order held it).
+  w.raw.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(orderId);
+  const after = row<{ id: string; code: string; ends_at: string; active: number }>(w.raw, 'SELECT id, code, ends_at, active FROM coupons WHERE trade_in_id = ?', id)!;
+  assert.deepEqual([after.id, after.code, after.active], [old.id, old.code, 1], 'the same coupon, the same code');
+  assert.ok(Math.abs(Date.parse(after.ends_at) - (Date.parse(ownEnd) + DAY)) < 60_000, after.ends_at);
+  assert.equal(row<{ state: string }>(w.raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', orderId)!.state, 'released');
   const again = await post(customerApp(w.raw), `/api/trade-in/requests/${id}/checkout`);
   assert.equal(again.status, 200, await again.clone().text());
-  const fresh = row<{ ends_at: string }>(w.raw, 'SELECT ends_at FROM coupons WHERE trade_in_id = ? AND active = 1', id)!;
-  assert.equal(Date.parse(fresh.ends_at), Date.parse(ownEnd) + DAY);
+  assert.equal((await json(again)).coupon_code, old.code);
+  assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ?', id), 1);
 });
 
 // ===================================================================== G-3 / G-4

@@ -78,9 +78,11 @@ test('one definition of «open»: the TypeScript and the SQL agree on every stag
     const stages: Array<string | null> = [...CLAIM_STAGES, null, 'unknown_stage'];
     const statuses = ['submitted', 'in_review', 'approved', 'rejected'];
     let n = 0;
+    // unit_id NULL: since 0191 one device holds one open case (W-3), and this
+    // matrix is about the definition, not the device.
     const insert = raw.prepare(
       `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status)
-       VALUES (?, 'buyer', 'oi1', 'Bambu A1', 'matrix row', 'u1', ?, ?)`
+       VALUES (?, 'buyer', 'oi1', 'Bambu A1', 'matrix row', NULL, ?, ?)`
     );
     for (const stage of stages) for (const status of statuses) insert.run(`wc_m${n++}`, stage, status);
     const rows = all<{ id: string; stage: string | null; status: string; eff: string; open: number }>(
@@ -100,6 +102,14 @@ test('one definition of «open»: the TypeScript and the SQL agree on every stag
     assert.equal(claimIsOpen(null, 'in_review'), true);
     assert.equal(claimIsOpen('replaced', 'approved'), false);
     assert.equal(claimIsOpen('repairing', 'approved'), true);
+    // The database's own «one open case per device» (0191, W-3) spells «open»
+    // with this very text — for the new row, the old row and every other claim
+    // on the unit. Whitespace aside, a change here that is not made there fails.
+    const flat = (sql: string) => sql.replace(/\s+/g, ' ').trim();
+    const migration = flat(read('migrations/0191_services_integrity.sql'));
+    for (const alias of ['NEW', 'OLD', 'wc']) {
+      assert.ok(migration.includes(flat(closedClaimSql(alias))), `0191 spells «closed» for ${alias} as closedClaimSql('${alias}')`);
+    }
   } finally {
     raw.close();
   }

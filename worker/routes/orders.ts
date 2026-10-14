@@ -5298,6 +5298,15 @@ export async function placeOrder(
     if (msg.includes('COUPON_GLOBAL_LIMIT')) {
       throw badRequest('Coupon could not be applied (GLOBAL_LIMIT_REACHED)', 'GLOBAL_LIMIT_REACHED');
     }
+    // 0191: the limit trigger also refuses a coupon switched off after the
+    // checkout read it, and (0077) a personal coupon that is not this buyer's.
+    // The same uniform answers a fresh checkout gives (offers B4), never a 500.
+    if (msg.includes('COUPON_INACTIVE')) {
+      throw badRequest('Coupon could not be applied (INACTIVE)', 'INACTIVE');
+    }
+    if (msg.includes('COUPON_NOT_YOURS')) {
+      throw badRequest('Coupon could not be applied (CODE_NOT_FOUND)', 'CODE_NOT_FOUND');
+    }
     // The offer limits of §1.8. The read-time count is advice; this trigger is
     // the decision, and its ABORT rolls the whole checkout back — the same
     // two-layer contract the coupon limits above already follow.

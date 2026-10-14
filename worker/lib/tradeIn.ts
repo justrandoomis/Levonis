@@ -1067,6 +1067,10 @@ const DAY_MS = 86_400_000;
  * an order that spent it and was then cancelled held it — a cancelled order
  * costs the customer no time and buys them none either. Null: a credit minted
  * before credits had an end keeps none.
+ *
+ * Since migration 0191 the cancel itself moves the coupon's `ends_at` by that
+ * time (`trg_orders_coupon_released`), so `held` is only ever an order
+ * cancelled before 0191 whose use is still spent (row 237).
  */
 export function creditEndsAt(
   endsAt: string | null | undefined,
@@ -1724,11 +1728,15 @@ async function releaseStatements(db: D1Database, req: RequestRow): Promise<D1Pre
   return out;
 }
 
-/** The order that redeemed this request's credit, newest first — cancelled ones included. */
+/**
+ * The order that redeemed this request's credit, newest first — cancelled ones included.
+ * `redemption_state` is the use itself: 'released' once a cancel gave it back
+ * (migration 0191's trigger), still 'active' for an order cancelled before that.
+ */
 export async function creditOrders(db: D1Database, requestId: string) {
   const { results } = await db
     .prepare(
-      `SELECT r.order_id, r.coupon_id, r.amount_iqd, o.status, o.created_at, o.cancelled_at
+      `SELECT r.order_id, r.coupon_id, r.amount_iqd, r.state AS redemption_state, o.status, o.created_at, o.cancelled_at
          FROM coupons c
          JOIN coupon_redemptions r ON r.coupon_id = c.id
          JOIN orders o ON o.id = r.order_id
@@ -1736,7 +1744,15 @@ export async function creditOrders(db: D1Database, requestId: string) {
         ORDER BY r.created_at DESC`
     )
     .bind(requestId)
-    .all<{ order_id: string; coupon_id: string; amount_iqd: number; status: string; created_at: string; cancelled_at: string | null }>();
+    .all<{
+      order_id: string;
+      coupon_id: string;
+      amount_iqd: number;
+      redemption_state: string;
+      status: string;
+      created_at: string;
+      cancelled_at: string | null;
+    }>();
   return results ?? [];
 }
 
@@ -2040,8 +2056,13 @@ function couponCode(): string {
  * IT ENDS (owner decision 2, row 223): `ends_at` is seven days after it is
  * minted (`TRADE_IN_CREDIT_VALID_DAYS`), and `validateCoupon` refuses it
  * after that. A fixed dinar credit held for months ages with the device and
- * the prices it was computed from. A re-minted credit keeps the original end
- * plus the days the cancelled order held it (`checkoutCredit`).
+ * the prices it was computed from.
+ *
+ * IT IS THE REQUEST'S ONE COUPON, FOR LIFE (row 237, migration 0191's
+ * `trg_trade_in_one_credit`): it is minted once, in `fixValue`. When an order
+ * that spent it is cancelled the same coupon comes back with the same code,
+ * and its end moves by exactly the time that order held it (the cancel
+ * trigger, or `checkoutCredit` for an order cancelled before 0191).
  */
 function couponStatement(db: D1Database, req: RequestRow, credit: number, couponId: string, code: string, now: string, endsAt: string | null): D1PreparedStatement {
   const optionIds = safeParse<string[]>(req.target_option_value_ids, []);
@@ -2274,9 +2295,18 @@ export async function decideValue(
 }
 
 /**
- * «إتمام الدفع» — the coupon the checkout will redeem. Mints a replacement when
- * the order that used the previous one was cancelled; refuses when a live
- * order already carries the credit (the customer is sent to that order).
+ * «إتمام الدفع» — the coupon the checkout will redeem: the credit's ONE coupon
+ * (row 237). Refuses when a live order already carries the credit (the
+ * customer is sent to that order). Never mints: a cancelled order gives the
+ * same coupon back, and its end moves by the time that order held it.
+ *
+ * A cancel since migration 0191 already released the use and moved the end
+ * (`trg_orders_coupon_released`), so this only answers the code. An order
+ * cancelled BEFORE 0191 (or on a database without that trigger) still holds
+ * its use: this releases it here, once — every write is conditional on the
+ * use still being 'active' and the order still being cancelled, so two
+ * presses at the same moment release once and extend once (the end is
+ * assigned, never added to).
  */
 export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code: string | null; order_id: string | null }> {
   const db = env.DB;
@@ -2289,38 +2319,38 @@ export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code:
     .prepare('SELECT id, code, active, ends_at FROM coupons WHERE id = ? AND trade_in_id = ?')
     .bind(req.coupon_id, req.id)
     .first<{ id: string; code: string; active: number; ends_at: string | null }>();
-  const held = orders.find((o) => o.coupon_id === req.coupon_id) ?? null;
+  if (!current || current.active !== 1) throw refuse('TRADE_IN_COUPON_MISMATCH');
+  // A cancelled order that still holds the use: cancelled before 0191.
+  const held = orders.find((o) => o.coupon_id === current.id && o.status === 'cancelled' && o.redemption_state === 'active') ?? null;
   const nowMs = Date.now();
-  if (current && current.active === 1 && !held) {
-    if (creditExpired(creditEndsAt(current.ends_at, null, nowMs), nowMs)) throw refuse('TRADE_IN_CREDIT_EXPIRED');
-    return { code: current.code, order_id: null };
-  }
-  if (!held) throw refuse('TRADE_IN_COUPON_MISMATCH');
-  // The order that spent the credit was cancelled: a fresh coupon, the old one
-  // retired, both behind the fence on `coupon_id` still naming the old one.
-  // It keeps the old end plus the time that order held the credit
-  // (`creditEndsAt`); a credit minted before credits ended keeps no end.
-  const endsAt = creditEndsAt(current?.ends_at, held, nowMs);
+  const endsAt = creditEndsAt(current.ends_at, held, nowMs);
   if (creditExpired(endsAt, nowMs)) throw refuse('TRADE_IN_CREDIT_EXPIRED');
-  const now = new Date().toISOString();
-  const token = randomToken(12);
-  const couponId = newId('cpn');
-  const code = couponCode();
-  try {
+  if (held) {
+    const now = new Date(nowMs).toISOString();
+    // ?1 coupon, ?2 the cancelled order — the use is still spent and the order still cancelled.
+    const stillHeld = `EXISTS (SELECT 1 FROM coupon_redemptions r JOIN orders o ON o.id = r.order_id
+                                WHERE r.order_id = ?2 AND r.coupon_id = ?1 AND r.state = 'active' AND o.status = 'cancelled')`;
     await db.batch([
+      db.prepare(`UPDATE coupons SET ends_at = ?3 WHERE id = ?1 AND ?3 IS NOT NULL AND ${stillHeld}`).bind(current.id, held.order_id, endsAt),
       db
-        .prepare(`UPDATE trade_in_requests SET coupon_id = ?2, updated_at = ?3, decision_token = ?4 WHERE id = ?1 AND status = 'awaiting_payment' AND coupon_id = ?5`)
-        .bind(req.id, couponId, now, token, req.coupon_id),
-      fence(db, req.id, token),
-      db.prepare('UPDATE coupons SET active = 0 WHERE id = ?').bind(req.coupon_id),
-      couponStatement(db, req, req.credit_iqd, couponId, code, now, endsAt),
-      eventStatement(db, req.id, { id: null, role: 'system' }, 'credit_reissued', 'awaiting_payment', 'awaiting_payment', { previous_coupon: req.coupon_id }, now),
+        .prepare(
+          `INSERT INTO trade_in_events (id, request_id, actor_id, actor_role, action, from_status, to_status, detail_json, created_at)
+           SELECT ?3, ?4, NULL, 'system', 'credit_restored', 'awaiting_payment', 'awaiting_payment', ?5, ?6 WHERE ${stillHeld}`
+        )
+        .bind(
+          current.id,
+          held.order_id,
+          newId('tie'),
+          req.id,
+          JSON.stringify({ order_id: held.order_id, coupon_id: current.id, ends_at: endsAt, via: 'checkout' }),
+          now
+        ),
+      db
+        .prepare(`UPDATE coupon_redemptions SET state = 'released', released_at = ?3 WHERE order_id = ?2 AND coupon_id = ?1 AND state = 'active' AND ${stillHeld}`)
+        .bind(current.id, held.order_id, now),
     ]);
-  } catch (e) {
-    if (isAbort(e)) throw refuse('TRADE_IN_STALE');
-    throw e;
   }
-  return { code, order_id: null };
+  return { code: current.code, order_id: null };
 }
 
 interface CustodyPlan {
@@ -2541,8 +2571,11 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
   const stored = safeParse<Estimate | null>(req.estimate_json, null);
   const blockers = req.status === 'draft' ? submitBlockers(req, comps, photos, book) : null;
   const creditOrder = orders.find((o) => o.status !== 'cancelled') ?? null;
-  // The credit's last moment, as «إتمام الدفع» will judge it (`checkoutCredit`).
-  const creditEnd = credit ? creditEndsAt(credit.ends_at, orders.find((o) => o.coupon_id === req.coupon_id) ?? null, Date.parse(now)) : null;
+  // The credit's last moment, as «إتمام الدفع» will judge it (`checkoutCredit`). A released
+  // order's time is already in `ends_at`; only a cancellation from before 0191, whose use is
+  // still spent, is added on read.
+  const legacyHeld = orders.find((o) => o.coupon_id === req.coupon_id && o.status === 'cancelled' && o.redemption_state === 'active') ?? null;
+  const creditEnd = credit ? creditEndsAt(credit.ends_at, legacyHeld, Date.parse(now)) : null;
   const creditLapsed = !creditOrder && creditExpired(creditEnd, Date.parse(now));
   const offer =
     req.admin_value_iqd !== null

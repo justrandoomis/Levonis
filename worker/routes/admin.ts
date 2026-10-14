@@ -2564,6 +2564,21 @@ function giftReopenRefusal(): HttpError {
   );
 }
 
+/**
+ * 409 for every admin door that would re-open a cancelled order whose coupon
+ * use came back at the cancellation (0191, trg_coupon_redemption_reclaim) and
+ * has since been spent again or switched off — re-opening would hand the order
+ * a discount whose use belongs to another order. The order stays cancelled.
+ */
+const ORDER_REOPEN_COUPON_SPENT_RE = /COUPON_(PER_USER_LIMIT|GLOBAL_LIMIT|INACTIVE)/;
+function couponSpentReopenRefusal(): HttpError {
+  return new HttpError(
+    409,
+    'لا يمكن إعادة فتح هذا الطلب: الكود أو رصيد الاستبدال الذي استخدمه عاد لصاحبه عند الإلغاء ثم استُخدم مرة أخرى أو أُوقف. أنشئ طلباً جديداً. / This order cannot be re-opened: the code or trade-in credit it used came back when it was cancelled and has since been used again or switched off. Create a new order.',
+    'ORDER_REOPEN_COUPON_SPENT'
+  );
+}
+
 /** 409 for every admin door that would move a price-held order (0140). */
 function priceHeldRefusal(orderId: string): HttpError {
   return new HttpError(409, PRICE_APPROVAL_PENDING_MESSAGE, 'PRICE_APPROVAL_PENDING', { order_id: orderId });
@@ -3403,6 +3418,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
     if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
     if (res.reason === 'GIFT_ORDER_REOPEN_REFUSED') throw giftReopenRefusal();
+    if (res.reason === 'ORDER_REOPEN_COUPON_SPENT') throw couponSpentReopenRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // The re-claim trigger refused (§17 decision 4). The transition itself is
@@ -3576,6 +3592,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
         );
       }
       if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) throw giftReopenRefusal();
+      if (ORDER_REOPEN_COUPON_SPENT_RE.test(msg)) throw couponSpentReopenRefusal();
       throw e;
     }
   } else if (serialGate.statements.length) {
@@ -3742,12 +3759,14 @@ adminRoutes.patch('/orders/:id', async (c) => {
  *
  * Redemptions are counted, not stored twice: the count comes from the
  * coupon_redemptions rows the checkout writes, so a coupon's usage can never
- * disagree with the orders that used it.
+ * disagree with the orders that used it. Only LIVE uses count (row 237): a use
+ * a cancelled order gave back ('released') is the same use the limits no
+ * longer count, so «الاستخدام» agrees with what the next buyer is told.
  */
 adminRoutes.get('/coupons', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT c.*,
-            (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id) AS redeemed
+            (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id AND r.state = 'active') AS redeemed
        FROM coupons c ORDER BY c.created_at DESC LIMIT 200`
   ).all<Record<string, unknown>>();
   return c.json({ success: true, coupons: results ?? [] });

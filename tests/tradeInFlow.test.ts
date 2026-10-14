@@ -562,13 +562,16 @@ test('the accepted value is credited ONCE, on the target line only, for its owne
   // It cannot be cancelled from under a live order.
   assert.equal((await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/cancel`, { reason: 'test cancel' }))).code, 'TRADE_IN_ORDER_ACTIVE');
 
-  // The order is cancelled: the credit is re-issued, never lost, never doubled.
+  // The order is cancelled: the SAME credit comes back (row 237) — never lost,
+  // never doubled, never a second coupon. The cancel itself released the use.
   raw.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(orderId);
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', orderId)!.state, 'released');
   const re = await json(await post(a, `/api/trade-in/requests/${id}/checkout`));
-  assert.notEqual(re.coupon_code, code);
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ? AND active = 1', id), 1);
+  assert.equal(re.coupon_code, code, 'the same code comes back');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ?', id), 1, 'one coupon for life');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM trade_in_events WHERE request_id = ? AND action = 'credit_restored'", id), 1);
   const old = await post(a, '/api/orders/quote', await checkoutBody({ couponCode: code }));
-  assert.equal(old.status, 400, 'the spent code stays spent');
+  assert.equal(old.status, 200, 'the released code quotes again');
 
   // Completing needs a live order carrying the credit.
   assert.equal((await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/complete`))).code, 'TRADE_IN_NO_ORDER');

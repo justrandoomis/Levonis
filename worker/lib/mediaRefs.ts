@@ -785,6 +785,12 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'order_items.estimated_cost_usd': 'a USD amount, decimal text; no media',
   'order_items.estimated_usd_iqd_rate': 'an exchange rate, decimal text; no media',
   'order_item_inventory_allocations.link_kind': 'a link word (fifo / preorder_batch); no media',
+  // 0191 — Services S-P1 (DECISIONS row 237): the warranty cover a claim was filed under. «cover» here is
+  // warranty coverage, not a cover picture. Words, a timestamp and a policy key.
+  'warranty_claims.filed_cover_state': 'a coverage state word at filing (active / expired / needs_config / not_delivered / closed); no media',
+  'warranty_claims.filed_cover_via': 'a cover word (original / used_sale); no media',
+  'warranty_claims.filed_cover_end_at': 'a timestamp: the end of the cover at filing; no media',
+  'warranty_claims.filed_policy_version': "a policy key@version ('warranty@4'); no media",
   // 0182 — FX plan §4.3: a batch's purchase snapshot. Enum words, a timestamp and a currency code.
   'inventory_lots.snapshot_source': "where a batch's snapshot came from (purchase / legacy_incoming / adjustment); no media",
   'inventory_lots.fx_snapshot_at': 'a timestamp: when the purchase captured the central rates the batch carries; no media',

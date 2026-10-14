@@ -113,7 +113,16 @@ export interface MoveResult {
   /** Honest partial outcomes — the move happened, something beside it did not. */
   notes: string[];
   /** Why a move was refused, when moved === false. */
-  reason?: 'ILLEGAL_MOVE' | 'RACED' | 'NOT_FOUND' | 'OFFER_LIMIT_REACHED' | 'PRICE_APPROVAL_PENDING' | 'REFUNDED_ORDER' | 'GIFT_ORDER_REOPEN_REFUSED' | 'SERIALS_REQUIRED';
+  reason?:
+    | 'ILLEGAL_MOVE'
+    | 'RACED'
+    | 'NOT_FOUND'
+    | 'OFFER_LIMIT_REACHED'
+    | 'PRICE_APPROVAL_PENDING'
+    | 'REFUNDED_ORDER'
+    | 'GIFT_ORDER_REOPEN_REFUSED'
+    | 'SERIALS_REQUIRED'
+    | 'ORDER_REOPEN_COUPON_SPENT';
 }
 
 export interface MoveOptions {
@@ -482,6 +491,15 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'GIFT_ORDER_REOPEN_REFUSED',
+      };
+    }
+    // The coupon use this order gave back at its cancellation was spent again,
+    // or the coupon was switched off (0191, trg_coupon_redemption_reclaim): the
+    // order stays cancelled rather than hold a discount whose use is gone.
+    if (reopening && /COUPON_(PER_USER_LIMIT|GLOBAL_LIMIT|INACTIVE)/.test(msg)) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_REOPEN_COUPON_SPENT',
       };
     }
     throw e;

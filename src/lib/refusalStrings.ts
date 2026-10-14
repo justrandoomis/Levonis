@@ -1330,6 +1330,13 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The decision does not match the stage: approved means repair or replace; rejected means reject or misuse.',
     ckb: 'بڕیارەکە لەگەڵ قۆناغەکە ناگونجێت: «پەسەندکراو» واتە چاککردنەوە یان گۆڕین، و «ڕەتکراوە» واتە ڕەتکردنەوە یان خراپ بەکارهێنان.',
   },
+  // B1 (row 237): the desk re-opens a cancelled order whose coupon use came back at the
+  // cancellation and was then spent again or switched off. The order stays cancelled.
+  ORDER_REOPEN_COUPON_SPENT: {
+    ar: 'لا يمكن إعادة فتح هذا الطلب: الكود أو رصيد الاستبدال الذي استخدمه عاد لصاحبه عند الإلغاء ثم استُخدم مرة أخرى أو أُوقف. أنشئ طلباً جديداً.',
+    en: 'This order cannot be re-opened: the code or trade-in credit it used came back when it was cancelled and has since been used again or switched off. Create a new order.',
+    ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: ئەو کۆد یان باڵانسی گۆڕینەوەیەی بەکاری هێنابوو لە کاتی هەڵوەشاندنەوەدا گەڕایەوە و دواتر دووبارە بەکارهات یان ناچالاک کرا. داواکارییەکی نوێ دروست بکە.',
+  },
   // W-4: a rejected, replaced or resolved claim takes no more messages (the desk can reopen a rejected one).
   CLAIM_CLOSED: {
     ar: 'هذه المطالبة مغلقة ولا تُضاف إليها رسائل. إن عادت المشكلة فافتح مطالبة جديدة من بطاقة الجهاز.',

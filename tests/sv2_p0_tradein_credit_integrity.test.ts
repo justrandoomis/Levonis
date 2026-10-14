@@ -21,6 +21,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { json, post, send, row, count, stubApp, pending, type StubUser } from './fixtures/app';
 import { LimitD1 } from './fixtures/d1Limits';
+import { RaceD1, redeems } from './fixtures/raceD1';
 import { orderRoutes } from '../worker/routes/orders';
 import { returnRoutes } from '../worker/routes/returns';
 import { tradeInRoutes } from '../worker/routes/tradeIn';
@@ -29,22 +30,6 @@ import { OWNER, STAFF, CUSTOMER, adminApp, customerApp, checkoutBody, restoreFet
 
 test.after(restoreFetch);
 
-/** A D1 whose next batch matching `when` first lets another request finish. */
-class RaceD1 extends LimitD1 {
-  hook: (() => Promise<void>) | null = null;
-  when: (sqls: string[]) => boolean = () => false;
-  override async batch(statements: never[]) {
-    const sqls = statements.map((s) => String((s as unknown as { sql?: string }).sql ?? ''));
-    if (this.hook && this.when(sqls)) {
-      const h = this.hook;
-      this.hook = null;
-      await h();
-    }
-    return super.batch(statements);
-  }
-}
-
-const redeems = (sqls: string[]) => sqls.some((s) => s.includes('INSERT INTO coupon_redemptions'));
 const cancels = (sqls: string[]) => sqls.some((s) => /SET status = 'cancelled'/.test(s));
 
 /** An approved trade-in with its credit code in hand and the P1S in the cart. */

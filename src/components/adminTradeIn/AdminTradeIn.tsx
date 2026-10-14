@@ -70,6 +70,7 @@ const ACTIONS: Record<string, [string, string]> = {
   reject: ['رفض الزبون', 'Customer declined'],
   awaiting_payment: ['بانتظار الدفع', 'Awaiting payment'],
   credit_reissued: ['إعادة إصدار الرصيد', 'Credit re-issued'],
+  credit_restored: ['عاد الرصيد بعد إلغاء الطلب', 'Credit back (order cancelled)'],
   complete: ['اكتمل', 'Completed'],
   cancel: ['أُلغي', 'Cancelled'],
 };

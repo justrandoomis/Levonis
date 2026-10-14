@@ -43,6 +43,7 @@ const EVENT_LABELS: Record<string, [string, string, string]> = {
   reject: ['رفضت القيمة', 'You declined the value', 'بەهاکەت ڕەت کردەوە'],
   awaiting_payment: ['ثُبّتت القيمة — بانتظار الدفع', 'Value fixed — awaiting payment', 'بەهاکە جێگیر کرا — چاوەڕێی پارەدانە'],
   credit_reissued: ['أُعيد إصدار رصيد الاستبدال', 'Trade-in credit re-issued', 'باڵانسی گۆڕینەوە دووبارە دەرکرایەوە'],
+  credit_restored: ['عاد رصيد الاستبدال بعد إلغاء الطلب', 'Your trade-in credit is back after the order was cancelled', 'باڵانسی گۆڕینەوە دوای هەڵوەشاندنەوەی داواکارییەکە گەڕایەوە'],
   complete: ['اكتمل الاستبدال', 'Trade-in completed', 'گۆڕینەوەکە تەواو بوو'],
   cancel: ['أُلغي الطلب', 'Request cancelled', 'داواکارییەکە هەڵوەشێنرایەوە'],
 };

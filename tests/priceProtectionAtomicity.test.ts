@@ -21,9 +21,16 @@ function world() {
     tail = next.catch(() => undefined);
     return next;
   } } as unknown as D1Database;
-  const claim = (id = 'pp', drop = 10000, item = 'item') => raw.prepare(`INSERT INTO price_protection_claims
-    (id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
-    VALUES(?,'buyer','ord',?,50000,?,1,'requested')`).run(id, item, 50000 - drop);
+  // A requested claim, written the way a database older than 0191 can hold it:
+  // a duplicate «requested» claim on one line exists only in data older than
+  // 0191's ppc_one_open (G3), which refuses a second requested INSERT — so the
+  // row goes in as 'rejected' and is moved to 'requested' (no trigger stops an UPDATE).
+  const claim = (id = 'pp', drop = 10000, item = 'item') => {
+    raw.prepare(`INSERT INTO price_protection_claims
+      (id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
+      VALUES(?,'buyer','ord',?,50000,?,1,'rejected')`).run(id, item, 50000 - drop);
+    raw.prepare("UPDATE price_protection_claims SET state = 'requested' WHERE id = ?").run(id);
+  };
   const returnCase = (id = 'ret', item = 'item') => raw.prepare(`INSERT INTO return_cases
     (id,order_id,order_item_id,user_id,qty,reason,state,within_window)
     VALUES(?,'ord',?,'buyer',1,'defective','inspected',1)`).run(id, item);
