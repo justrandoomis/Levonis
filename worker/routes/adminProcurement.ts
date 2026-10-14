@@ -285,9 +285,26 @@ adminProcurementRoutes.get('/documents', async (c) => {
   const purchases = (results ?? []).map(({ attachment_url, ...p }) => ({ ...p, invoice_attachment_url: attachment_url ?? '' }));
   return c.json({ success: true, purchases, offset, total:count?.n??0 });
 });
+/**
+ * D1 (the clean start, addendum A.10): which products of a purchase have a
+ * price review from its confirm, and its state — product ids and states only,
+ * never a figure (the review's cost stays behind the owner's review routes).
+ * A database before 0190 has none.
+ */
+async function priceReviewsOf(db: D1Database, purchaseId: string): Promise<Array<{ product_id: string; state: string }>> {
+  try {
+    return (
+      (await db.prepare('SELECT product_id, state FROM pricing_v2_purchase_reviews WHERE purchase_id = ? ORDER BY created_at, id').bind(purchaseId).all<{ product_id: string; state: string }>()).results ?? []
+    );
+  } catch (e) {
+    if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return [];
+    throw e;
+  }
+}
 adminProcurementRoutes.get('/documents/:id', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'purchase');
-  return c.json({ success: true, ...documentWire(await document(c.env.DB, c.req.param('id'))) });
+  const doc = documentWire(await document(c.env.DB, c.req.param('id')));
+  return c.json({ success: true, ...doc, price_reviews: await priceReviewsOf(c.env.DB, doc.purchase.id) });
 });
 
 /**

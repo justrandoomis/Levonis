@@ -188,6 +188,8 @@ export interface V2Answer {
   v2_cost_inputs?: {
     inputs: V2CostInputRow[];
     minimum_profit: Array<{ scope: string; scope_id: string | null; state: string | null; amount_usd: string | null }>;
+    /** D1: a needs-pricing product's prefill carries this pending purchase review; its first complete write applies it. */
+    purchase_review_id?: string;
   };
 }
 

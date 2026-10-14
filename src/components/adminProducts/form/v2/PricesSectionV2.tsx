@@ -88,7 +88,13 @@ export default function PricesSectionV2({
           </a>
         </p>
       ) : null}
-      {v2.owner && productId && v2.mode === 'stored' ? <PurchaseReviewCard productId={productId} onApplied={v2.reload} /> : null}
+      {/* D1: a priced product reviews a purchase here; a needs-pricing product's first publish applies it (its prefill). */}
+      {v2.owner && productId && v2.mode === 'stored' && !v2.needsMethod ? <PurchaseReviewCard productId={productId} onApplied={v2.reload} /> : null}
+      {v2.owner && v2.needsMethod && a?.v2_cost_inputs?.purchase_review_id ? (
+        <p className="lv-alert lv-alert-info mb-3 px-3 py-2 text-[12px] leading-snug text-text-primary" data-v2-purchase-prefill>
+          {s.purchasePrefill}
+        </p>
+      ) : null}
       {codes.includes('FX_RATE_MISSING') ? <p className="lv-alert lv-alert-warning mb-3 px-3 py-2 text-[12px] text-text-primary">{s.rateMissing}</p> : null}
       {codes.includes('PRICING_NOT_INSTALLED') ? <p className="lv-alert lv-alert-warning mb-3 px-3 py-2 text-[12px] text-text-primary">{s.notInstalled}</p> : null}
 

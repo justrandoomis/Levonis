@@ -136,6 +136,7 @@ export interface V2Strings {
   chipHiddenReady: string;
   hiddenNote: string;
   hiddenNoteReady: string;
+  purchasePrefill: string;
   belowMinProfit: string;
   rateMissing: string;
   notInstalled: string;
@@ -269,6 +270,7 @@ const AR: V2Strings = {
   chipHiddenReady: 'مخفي: جاهز للنشر',
   hiddenNote: 'هذا المنتج مخفي عن الزبائن حتى يكتمل تسعيره بالدولار ويُنشر.',
   hiddenNoteReady: 'الأسعار مكتملة. اضغط «نشر» لمراجعتها وإظهار المنتج للزبائن.',
+  purchasePrefill: 'تكلفة آخر شراء مؤكد مُدرجة في التكلفة أدناه. راجع الأسعار الناتجة؛ تُعتمد التكلفة مع أول نشر.',
   belowMinProfit: 'سعر البيع المباشر أقل من التكلفة + الحد الأدنى للربح',
   rateMissing: 'لا يوجد سعر صرف دولار معتمد بعد — لا تُحسب الأسعار حتى يعتمده المالك.',
   notInstalled: 'التسعير بالدولار غير مفعّل على هذه النسخة من قاعدة البيانات بعد.',
@@ -402,6 +404,7 @@ const EN: V2Strings = {
   chipHiddenReady: 'Hidden: ready to publish',
   hiddenNote: 'This product is hidden from customers until its dollar pricing is complete and published.',
   hiddenNoteReady: 'The prices are complete. Press "Publish" to review them and show the product to customers.',
+  purchasePrefill: 'The cost of the latest confirmed purchase is filled in below. Review the resulting prices; the cost is applied with the first publish.',
   belowMinProfit: 'The direct price is below cost plus the minimum profit',
   rateMissing: 'No approved dollar rate yet — prices are not computed until the owner approves one.',
   notInstalled: 'Dollar pricing is not enabled on this database version yet.',
@@ -535,6 +538,7 @@ const CKB: V2Strings = {
   chipHiddenReady: 'شاراوەیە: ئامادەیە بۆ بڵاوکردنەوە',
   hiddenNote: 'ئەم بەرهەمە لە کڕیاران شاراوەیە تا نرخدانانی بە دۆلار تەواو دەبێت و بڵاو دەکرێتەوە.',
   hiddenNoteReady: 'نرخەکان تەواون. «بڵاوکردنەوە» دابگرە بۆ پێداچوونەوە و پیشاندانی بەرهەمەکە بە کڕیاران.',
+  purchasePrefill: 'تێچووی دوایین کڕینی پشتڕاستکراو لە خوارەوە پڕکراوەتەوە. نرخە دەرچووەکان ببینە؛ تێچووەکە لەگەڵ یەکەم بڵاوکردنەوە پەسەند دەکرێت.',
   belowMinProfit: 'نرخی فرۆشتنی ڕاستەوخۆ لە تێچوو + کەمترین قازانج کەمترە',
   rateMissing: 'هێشتا نرخی ئاڵوگۆڕی دۆلاری پەسەندکراو نییە — نرخەکان ناژمێردرێن تا خاوەن پەسەندی دەکات.',
   notInstalled: 'نرخدانان بە دۆلار هێشتا لەسەر ئەم وەشانەی بنکەدراوە چالاک نەکراوە.',

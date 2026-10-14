@@ -96,6 +96,8 @@ type Detail = {
     invoice_difference_iqd: number | null;
   };
   payments: Array<{ id: string; amount_iqd: number; payment_day: string; reference: string }>;
+  /** D1 (addendum A.10): the products whose new cost from this purchase waits for the owner's price review. */
+  price_reviews?: Array<{ product_id: string; state: string }>;
 };
 type Header = {
   supplier_id: string;
@@ -162,9 +164,6 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [optIn, setOptIn] = useState<string[]>([]),
     [usePurchase, setUsePurchase] = useState<Record<string, boolean>>({}),
     [preferValues, setPreferValues] = useState<Record<string, boolean>>({}),
-    // Owner decision 8: the owner's tick per product whose new prices move more than 15%.
-    [, setConfirmLarge] = useState<Record<string, boolean>>({}),
-    [, setApplyFailures] = useState<Array<{ product_id: string; label: string; message: string; purchase_id: string }>>([]),
     [savedPricing, setSavedPricing] = useState<PricingPreview | null>(null);
   const [investmentFor, setInvestmentFor] = useState('');
   const [config, setConfig] = useState<{ suppliers: Named[]; locations: Named[]; investors: PurchaseInvestor[]; cost_profiles: CostProfile[] }>({
@@ -283,10 +282,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setOptIn([]);
     setUsePurchase({});
     setPreferValues({});
-    setConfirmLarge({});
     setPricing(null);
     setPricingError('');
-    setApplyFailures([]);
     setEditing(true);
   };
   // The request body of a save — and of the pricing preview, which reads it with
@@ -673,6 +670,23 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               {loc('إغلاق', 'Close')}
             </button>
           </div>
+          {(() => {
+            // D1: a confirmed purchase writes no price; each product's new cost waits for the owner's review there.
+            const pending = [...new Set((selected.price_reviews ?? []).filter((r) => r.state === 'pending').map((r) => r.product_id))];
+            return pending.length ? (
+              <div className="lv-alert lv-alert-info mb-3 px-3 py-2 text-sm text-text-primary" data-purchase-price-reviews>
+                <strong>{loc('تكلفة هذا الشراء بانتظار مراجعتك', 'This purchase’s cost awaits your review', 'تێچووی ئەم کڕینە چاوەڕێی پێداچوونەوەتە')}</strong>
+                <p className="mt-1">{loc('لا يتغير أي سعر قبل أن تراجعه. افتح المنتج وراجع السعر الجديد، ثم اعتمده أو أبقِ التكلفة الحالية.', 'No price changes until you review it. Open the product and review the new price, then apply it or keep the current cost.', 'هیچ نرخێک ناگۆڕێت تا پێیدا نەچیتەوە. بەرهەمەکە بکەرەوە و نرخە نوێیەکە ببینە، پاشان پەسەندی بکە یان تێچووی ئێستا بهێڵەرەوە.')}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {pending.map((pid) => (
+                    <a key={pid} className={T.btnGhost} href={`/admin?tab=products&edit=${encodeURIComponent(pid)}`} data-purchase-review-open={pid}>
+                      {loc('راجع السعر', 'Review the price', 'نرخەکە ببینە')}: {selected.lines.find((l) => l.product_id === pid)?.label ?? pid}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
           {selected.lines.some((line) => line.unit_origins?.some((unit) => unit.serial_norm)) && <p className={`mb-3 text-sm ${T.text3}`}>{loc('الأرقام التسلسلية مثبتة لهذه القطع؛ لا يمكن إعادة تحرير الكميات والتكاليف. يمكنك تعديل اسم الشراء وطلب المورد والتتبع.', 'These units have fixed serials, so quantities and costs cannot be rewritten. The purchase name, supplier order and tracking remain editable.', 'ئەم پارچانە ژمارەی جێگیریان هەیە؛ بڕ و تێچوو ناگۆڕدرێن. ناوی کڕین، داواکاری دابینکەر و شوێنکەوتن هێشتا دەگۆڕدرێن.')}</p>}
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
             <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received')}: {l.qty_ordered} / {l.qty_received}</small></div></div>

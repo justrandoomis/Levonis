@@ -33,7 +33,7 @@ import { strictBody } from '../../fx/ownerActs';
 import { inputInvalid } from '../whatIf';
 import { loadProducts } from '../load';
 import { desiredFor, evaluateDesired, gateV2, loadV2Read, parseV2Wire, storedMethodOf, v2Answer, v2PriceKey, v2ViewerOf } from './api';
-import { firstWriteStatements } from './firstWrite';
+import { firstWriteStatements, foldedReviewOf } from './firstWrite';
 import { belowMinProfitBell, productNameOf } from './bell';
 import { draftLoadedOf } from './draft';
 import { V2_SAVE_STATEMENT_CAP, v2DataStatements, v2WriteStatements } from './write';
@@ -93,7 +93,7 @@ export async function planV2ProductSave(c: Context<AppContext>, s: V2SaveInput):
     newProduct: !s.prev,
     auditDetail: { structure_statements: s.plan.statements.length },
     // The clean start: an existing product's first complete V2 write retires its Direct Sale Extra and overlay.
-    ...(s.prev && ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored) } : {}),
+    ...(s.prev && ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored, foldedReviewOf(read, viewer, user.id, now)) } : {}),
     // Q3 (DECISIONS row 222): a price editor's publish below cost + minimum profit rings the owner in the same batch.
     ...(verdict === 'data' ? {} : { extraAudits: await belowMinProfitBell(c.env, ev, viewer, productNameOf(read.loaded.row)) }),
   };
