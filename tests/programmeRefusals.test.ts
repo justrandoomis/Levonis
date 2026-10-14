@@ -170,15 +170,15 @@ const REQUIRED: Record<string, readonly string[]> = {
     'PRICING_V2_OWNER_ONLY',
     'PRICING_V2_FEES_RETIRED',
     'PRICING_V2_NO_MANUAL',
-    'PRICING_V2_PURCHASE_LATER',
     'PRICING_V2_DISCOUNT_TOO_LARGE',
     'PRICING_V2_PRICE_MISSING',
     'PRICING_V2_SCOPE_INVALID',
-    'PRICING_V2_NOT_MIGRATED',
-    'PRICING_V2_MIGRATION_STALE',
     'OPTION_ID_RESERVED',
     'PRICING_SNAPSHOT_IMMUTABLE',
   ],
+  // The clean start (DECISIONS row 222, spec addendum A.13): a product not yet V2-published, and
+  // migration 0190's database refusal of a purchase price review decided twice.
+  'Pricing V2 clean start, addendum A.13 (0190)': ['PRICING_V2_NEEDS_PRICING', 'PRICING_REVIEW_DECIDED'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */
@@ -198,6 +198,11 @@ const DROPPED = [
   'PRICING_OPERATION_REUSED',
   'PRICING_COMPOSITION_NOT_SUPPORTED',
   'PRICING_HIDE_NOT_ACCEPTED',
+  // Retired by the clean start (DECISIONS row 222, addendum A.13): no product is "migrated" any more
+  // (every product is priced afresh), and a confirmed purchase becomes a price review (D1).
+  'PRICING_V2_NOT_MIGRATED',
+  'PRICING_V2_MIGRATION_STALE',
+  'PRICING_V2_PURCHASE_LATER',
 ];
 
 /** Letters Sorani has and Arabic does not — a Sorani sentence carries at least one. */

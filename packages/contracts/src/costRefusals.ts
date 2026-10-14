@@ -713,11 +713,6 @@ export const COST_REFUSALS = {
     en: 'A dollar-priced product cannot return to manual pricing',
     ckb: 'بەرهەمی نرخدراو بە دۆلار ناگەڕێتەوە بۆ نرخدانانی دەستی',
   },
-  PRICING_V2_PURCHASE_LATER: {
-    ar: 'سُجّلت الدفعة؛ حدّث تكلفة المنتج من قسم الأسعار',
-    en: "Stock recorded; update the product's cost in the Prices section",
-    ckb: 'وەجبەکە تۆمارکرا؛ تێچووی بەرهەمەکە لە بەشی نرخەکانەوە نوێ بکەرەوە',
-  },
   PRICING_V2_DISCOUNT_TOO_LARGE: {
     ar: 'خصم الطلب المسبق أكبر من سعر البيع المباشر',
     en: 'The pre-order discount is larger than the direct-sale price',
@@ -733,15 +728,12 @@ export const COST_REFUSALS = {
     en: 'This exception does not belong to this product',
     ckb: 'ئەم حاڵەتە تایبەتە هی ئەم بەرهەمە نییە',
   },
-  PRICING_V2_NOT_MIGRATED: {
-    ar: 'هذا المنتج لم يُنقل بعد إلى التسعير بالدولار',
-    en: 'This product has not been moved to dollar pricing yet',
-    ckb: 'ئەم بەرهەمە هێشتا نەگوازراوەتەوە بۆ نرخدانان بە دۆلار',
-  },
-  PRICING_V2_MIGRATION_STALE: {
-    ar: 'تغيّرت أسعار هذا المنتج منذ المعاينة؛ راجعها مرة أخرى',
-    en: 'This product changed since the preview; review it again',
-    ckb: 'ئەم بەرهەمە لە دوای پێشبینینەوە گۆڕاوە؛ دووبارە پێیدا بچۆرەوە',
+  // The clean start (DECISIONS row 222, spec addendum A.13): a product with no complete V2 price yet —
+  // hidden from every customer until it is priced in section ٣ and published.
+  PRICING_V2_NEEDS_PRICING: {
+    ar: 'هذا المنتج يحتاج تسعيرًا جديدًا بالدولار — أكمل قسم الأسعار',
+    en: 'This product needs new dollar pricing — complete the Prices section',
+    ckb: 'ئەم بەرهەمە پێویستی بە نرخدانانی نوێ بە دۆلار هەیە — بەشی نرخەکان تەواو بکە',
   },
   // Migration 0189's reserved option id: '*' is the option-less product's
   // stored SKU key ('o:*'), so no option value may take it.
@@ -756,6 +748,12 @@ export const COST_REFUSALS = {
     ar: 'الأسعار القديمة المحفوظة عند النقل إلى الدولار ثابتة ولا تتغير.',
     en: 'The old prices saved at the move to dollar pricing are fixed and never change.',
     ckb: 'ئەو نرخە کۆنانەی لە کاتی گواستنەوە بۆ دۆلار پاشەکەوت کران جێگیرن و هەرگیز ناگۆڕێن.',
+  },
+  // Migration 0190 (the clean start, D1): a confirmed purchase's price review is decided once.
+  PRICING_REVIEW_DECIDED: {
+    ar: 'تمت مراجعة هذه التكلفة من قبل',
+    en: 'This cost was already reviewed',
+    ckb: 'ئەم تێچووە پێشتر پێداچوونەوەی بۆ کراوە',
   },
 } as const satisfies Record<string, CostRefusal>;
 

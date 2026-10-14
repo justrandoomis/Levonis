@@ -93,6 +93,31 @@ export async function pricingV2Installed(db: D1Database): Promise<boolean> {
 }
 
 /**
+ * The clean start (0190, DECISIONS row 222): the purchase price reviews (D1),
+ * the order lines' frozen cost estimate and the allocations' link kind (V2-6).
+ * One statement names them all; a database without 0190 answers "no" and the
+ * writes that need them refuse with PRICING_NOT_INSTALLED (the listing
+ * predicate and the needs-pricing queue need only 0189). Remembered only when
+ * present.
+ */
+export async function cleanStartInstalled(db: D1Database): Promise<boolean> {
+  if (remembered(db, 'clean_start')) return true;
+  try {
+    await db
+      .prepare(
+        `SELECT (SELECT 1 FROM pricing_v2_purchase_reviews LIMIT 1) AS r,
+                (SELECT estimated_cost_iqd FROM order_items LIMIT 1) AS e,
+                (SELECT link_kind FROM order_item_inventory_allocations LIMIT 1) AS l`
+      )
+      .first<{ r: number | null }>();
+    remember(db, 'clean_start');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The columns the engine migrations add to live tables, the only ones this
  * helper answers for: 0181's, plus 0189's method and first-V2-write stamp on
  * `product_pricing_state`.
