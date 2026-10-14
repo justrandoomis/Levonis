@@ -9,6 +9,7 @@ import { api } from '../lib/api';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
+import { IconButton } from '../components/ui/Button';
 
 /**
  * THE POINTS & MISSIONS PAGE.
@@ -351,13 +352,13 @@ export default function Rewards() {
 
       {/* Header */}
       <div className="flex items-center px-4 py-4 sticky top-0 z-10 relative">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
-          className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
-        >
-          <ChevronLeft aria-hidden="true" className="w-6 h-6 text-gold rtl:rotate-180" strokeWidth={2.5} />
-        </button>
+        <span className="-ms-2">
+          <IconButton
+            onClick={() => navigate(-1)}
+            label={loc('رجوع', 'Back', 'گەڕانەوە')}
+            icon={<ChevronLeft aria-hidden="true" className="w-6 h-6 text-gold rtl:rotate-180" strokeWidth={2.5} />}
+          />
+        </span>
         <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions', 'خاڵ و ئەرکەکان')}</h1>
         {/* Registers this page's own character anchor, so the shell stops
             reserving a separate landing strip above this header. */}
