@@ -194,7 +194,7 @@ async function loadOne(db: D1Database, id: string): Promise<LoadedProduct> {
  * names the form section where its prices live — the old panel hides itself on
  * `v2: true`. Codes and the section only, never a value.
  */
-function refuseV2Door(stored: Pick<ProductPricingData, 'state'>, code: 'PRICING_V2_MANAGED' | 'PRICING_V2_NO_MANUAL' | 'PRICING_V2_PURCHASE_LATER' = 'PRICING_V2_MANAGED'): void {
+function refuseV2Door(stored: Pick<ProductPricingData, 'state'>, code: 'PRICING_V2_MANAGED' | 'PRICING_V2_NO_MANUAL' = 'PRICING_V2_MANAGED'): void {
   if (isV2Product(stored)) throw new HttpError(409, serverMessage(code), code, { section: 3, v2: true });
 }
 
@@ -878,7 +878,7 @@ adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
   const loaded = await loadOne(db, c.req.param('id'));
   const pid = loaded.id;
   // Pricing V2 (spec C-11): purchase → price is V2-6's; the receive itself is untouched (the lot is costed).
-  refuseV2Door(await loadProductPricing(db, pid), 'PRICING_V2_PURCHASE_LATER');
+  refuseV2Door(await loadProductPricing(db, pid), 'PRICING_V2_MANAGED');
   if (typeof body.purchase_id !== 'string' || !/^[A-Za-z0-9_-]{8,60}$/.test(body.purchase_id)) throw inputInvalid('purchase_id');
   if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');
   if (body.use_purchase !== undefined && typeof body.use_purchase !== 'boolean') throw inputInvalid('use_purchase');

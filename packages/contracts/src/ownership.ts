@@ -90,6 +90,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // the owner's migration confirm. Catalogue owns them for the reason
     // above: the writer is the act of pricing a catalogue product.
     'pricing_price_points', 'pricing_preorder_discounts', 'pricing_v2_sku_results', 'pricing_legacy_snapshots',
+    // 0190 (the clean start, DECISIONS row 222; D1): a confirmed stock purchase's pending price review —
+    // the cost inputs it would make current, until the owner applies or dismisses it.
+    'pricing_v2_purchase_reviews',
     // 0184 (owner brief 2026-10-10) — each catalogue product's verdict against
     // the one central list of required fields, and the owner's «hide
     // incomplete» hold. Derived from the product row and its pricing data, and

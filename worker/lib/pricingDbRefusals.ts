@@ -32,6 +32,8 @@ export const ENGINE_DB_REFUSALS = [
   'PRICING_V2_FEES_RETIRED',
   'OPTION_ID_RESERVED',
   'PRICING_SNAPSHOT_IMMUTABLE',
+  // Migration 0190 (the clean start, D1): a purchase price review already applied or dismissed.
+  'PRICING_REVIEW_DECIDED',
 ] as const satisfies readonly CostRefusalCode[];
 
 export type EngineDbRefusalCode = (typeof ENGINE_DB_REFUSALS)[number];

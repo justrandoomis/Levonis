@@ -770,6 +770,21 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'pricing_legacy_snapshots.actor': 'a user id; no media',
   'pricing_legacy_snapshots.payload_json': "the product's legacy money fields (IQD amounts, flags, ids) by explicit column lists, never an image column; no media",
   'pricing_legacy_snapshots.payload_sha256': 'a SHA-256 hex digest of the payload; no media',
+  // 0190 — the clean start (DECISIONS row 222): a confirmed purchase's pending price review (D1), an order
+  // line's frozen cost estimate and the allocation's link kind (V2-6). Ids, words, timestamps, decimals.
+  'pricing_v2_purchase_reviews.id': 'a review id; no media',
+  'pricing_v2_purchase_reviews.product_id': 'a product id; no media',
+  'pricing_v2_purchase_reviews.purchase_id': 'a stock purchase id; no media',
+  'pricing_v2_purchase_reviews.inputs_json': "the purchase's cost inputs for the product (amounts, currencies, measures, scopes), never an image column; no media",
+  'pricing_v2_purchase_reviews.state': 'a review state word (pending / applied / dismissed / superseded); no media',
+  'pricing_v2_purchase_reviews.created_at': 'a timestamp; no media',
+  'pricing_v2_purchase_reviews.created_by': 'a user id; no media',
+  'pricing_v2_purchase_reviews.decided_at': 'a timestamp; no media',
+  'pricing_v2_purchase_reviews.decided_by': 'a user id; no media',
+  'pricing_v2_purchase_reviews.audit_id': 'a pricing audit id; no media',
+  'order_items.estimated_cost_usd': 'a USD amount, decimal text; no media',
+  'order_items.estimated_usd_iqd_rate': 'an exchange rate, decimal text; no media',
+  'order_item_inventory_allocations.link_kind': 'a link word (fifo / preorder_batch); no media',
   // 0182 — FX plan §4.3: a batch's purchase snapshot. Enum words, a timestamp and a currency code.
   'inventory_lots.snapshot_source': "where a batch's snapshot came from (purchase / legacy_incoming / adjustment); no media",
   'inventory_lots.fx_snapshot_at': 'a timestamp: when the purchase captured the central rates the batch carries; no media',

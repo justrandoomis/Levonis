@@ -170,6 +170,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   { table: 'pricing_preorder_discounts', by: { column: 'product_id' } },
   { table: 'pricing_v2_sku_results', by: { column: 'product_id' } },
   { table: 'pricing_legacy_snapshots', by: { column: 'product_id' } },
+  // 0190 (the clean start, D1): a confirmed purchase's pending price review — the product's own private
+  // pricing, worthless without it (the FK cascades too; listed so the registry stays the whole truth).
+  // A decided review is immutable to UPDATE only; a DELETE passes.
+  { table: 'pricing_v2_purchase_reviews', by: { column: 'product_id' } },
   // 0184: the product's verdict against the required-field list and its
   // «hide incomplete» hold — derived from the product alone, codes only,
   // worthless without it (the FK cascades too; listed so the registry stays
@@ -894,6 +898,7 @@ export async function blockingReferences(db: DeletionDb, productId: string): Pro
 const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set([
   'product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_direct_purchase',
   'pricing_price_points', 'pricing_preorder_discounts', 'pricing_v2_sku_results', 'pricing_legacy_snapshots',
+  'pricing_v2_purchase_reviews',
 ]);
 
 /**

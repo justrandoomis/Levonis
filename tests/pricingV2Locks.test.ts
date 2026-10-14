@@ -7,7 +7,7 @@
  *   - every V1 pricing door answers PRICING_V2_MANAGED with its section
  *     (inputs, preview, rules, targets adopt, the price grid's and the
  *     selection price's guard), the exit to manual PRICING_V2_NO_MANUAL, the
- *     purchase apply PRICING_V2_PURCHASE_LATER — and V1's own evaluation
+ *     purchase apply PRICING_V2_MANAGED (D1: the purchase becomes a price review) — and V1's own evaluation
  *     refuses to plan it, so V1's bulk save reports it refused;
  *   - a structure edit (a new model with a direct cell) through the V2 save
  *     commits structure, prices and results in ONE batch — and the very same
@@ -55,7 +55,7 @@ test('every V1 door of a V2 product refuses with its code and section; V1 never 
     ['PUT rules', () => put(w.app, `/api/admin/pricing/products/${AMS}/rules`, { rules: [] }), 'PRICING_V2_MANAGED'],
     ['POST targets/adopt', () => post(w.app, `/api/admin/pricing/products/${AMS}/targets/adopt`, { legacy_hash: 'a'.repeat(64) }), 'PRICING_V2_MANAGED'],
     ['POST manual', () => post(w.app, `/api/admin/pricing/products/${AMS}/manual`, { write_seq: seq.w }), 'PRICING_V2_NO_MANUAL'],
-    ['POST apply-purchase', () => post(w.app, `/api/admin/pricing/products/${AMS}/apply-purchase`, { purchase_id: 'pur_12345678', preview_hash: 'b'.repeat(64) }), 'PRICING_V2_PURCHASE_LATER'],
+    ['POST apply-purchase', () => post(w.app, `/api/admin/pricing/products/${AMS}/apply-purchase`, { purchase_id: 'pur_12345678', preview_hash: 'b'.repeat(64) }), 'PRICING_V2_MANAGED'],
   ];
   // One request at a time (the test binding runs one transaction at a time).
   for (const [name, send, code] of doors) {
