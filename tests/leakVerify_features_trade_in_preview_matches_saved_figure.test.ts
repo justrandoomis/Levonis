@@ -12,13 +12,20 @@
  * The figures must agree, nothing may be stored by a preview, and a customer
  * answer that the save would refuse must be refused the same way.
  *
+ * Since Services V2 (trade-in G11) the preview is COUNTED and a draft's own
+ * view carries no figure for its customer — saving answers and reading the
+ * draft back would be an uncounted door to the same figure. So "the figure
+ * the request then carries" is read where it still lives: the desk's view of
+ * the saved draft (GET /api/admin/trade-in/requests/:id), which is the figure
+ * the submit fixes.
+ *
  * LOCAL ONLY: in-memory SQLite, the real trade-in routes, a stub session.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb, stubApp, post, json, send, type StubUser } from './fixtures/app';
-import { tradeInRoutes } from '../worker/routes/tradeIn';
+import { asD1, freshDb, stubApp, post, get, json, send, OWNER, type StubUser } from './fixtures/app';
+import { tradeInRoutes, adminTradeInRoutes } from '../worker/routes/tradeIn';
 import { blankInputs } from '../packages/pricing/src/tradeIn';
 
 const CUSTOMER: StubUser = { id: 'cust', role: 'customer', email: 'sara@x.co' };
@@ -28,7 +35,8 @@ function seed(): DatabaseSync {
   const raw = freshDb();
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,email_verified_at,locale) VALUES
-      ('cust','سارة','sara@x.co','h','customer','2026-01-01T00:00:00.000Z','ar');
+      ('cust','سارة','sara@x.co','h','customer','2026-01-01T00:00:00.000Z','ar'),
+      ('${OWNER.id}','owner','${OWNER.email}','h','admin','2026-01-01T00:00:00.000Z','ar');
     INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,images,category_id,sub_category_id) VALUES
       ('p_a1','a1','Bambu Lab A1','بامبو A1',850000,'active',10,'[]','[]','direct_sale','["direct_sale"]','[]','cat_printers','cat_printers_fdm'),
       ('p_p1s','p1s','Bambu Lab P1S','بامبو P1S',1500000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','cat_printers','cat_printers_fdm'),
@@ -49,13 +57,27 @@ function seed(): DatabaseSync {
   return raw;
 }
 const appOf = (raw: DatabaseSync) => stubApp(asD1(raw), CUSTOMER, (a) => a.route('/api/trade-in', tradeInRoutes));
+const deskOf = (raw: DatabaseSync) => stubApp(asD1(raw), OWNER, (a) => a.route('/api/admin/trade-in', adminTradeInRoutes));
 
 type Est = { total_iqd: number; components: Array<{ role: string; value_iqd: number }>; settlement: { difference_iqd?: number } | null };
+type DeskEst = { total_iqd: number; components: Array<{ role: string; valuation: { value_iqd: number } }>; settlement: { difference_iqd?: number } | null };
+
+/** The saved draft's figure, as the desk reads it (and the submit will fix it). */
+async function carried(raw: DatabaseSync, id: string): Promise<Est> {
+  const res = await get(deskOf(raw), `/api/admin/trade-in/requests/${id}`);
+  assert.equal(res.status, 200, await res.clone().text());
+  const e = (await json(res)).request.estimate as DeskEst;
+  assert.ok(e, 'the desk reads the saved draft\'s figure');
+  return { total_iqd: e.total_iqd, components: e.components.map((c) => ({ role: c.role, value_iqd: c.valuation.value_iqd })), settlement: e.settlement };
+}
 
 async function open(raw: DatabaseSync, order_item_id: string, scope: string) {
   const body = await json(await post(appOf(raw), '/api/trade-in/requests', { order_item_id, unit_index: 1, scope }));
   assert.ok(body.request?.id, JSON.stringify(body));
-  return body.request as { id: string; components: Array<{ role: string; family: 'fdm' | 'ams' | 'resin' }>; estimate: Est };
+  // The customer's own draft carries no figure (trade-in G11): the preview door is the only one.
+  assert.equal(body.request.estimate, null, JSON.stringify(body.request.estimate));
+  assert.equal(body.request.estimated_iqd, null);
+  return body.request as { id: string; components: Array<{ role: string; family: 'fdm' | 'ams' | 'resin' }> };
 }
 
 function answersFor(req: Awaited<ReturnType<typeof open>>, over: Record<string, Record<string, unknown>>) {
@@ -80,12 +102,14 @@ for (const [label, item, scope, over] of [
     const live = (await json(preview)).estimate as Est;
     assert.deepEqual(raw.prepare('SELECT inputs_json FROM trade_in_components WHERE request_id = ? ORDER BY role').all(req.id), before, 'a preview stores nothing');
 
+    const blank = (await json(await post(a, `/api/trade-in/requests/${req.id}/preview`, {}))).estimate as Est;
     const saved = (await json(await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { components }))).request;
-    assert.ok(saved?.estimate, JSON.stringify(saved));
-    assert.deepEqual(parts(live), parts(saved.estimate as Est), 'each part: the wizard\'s live value = the saved value');
-    assert.equal(live.total_iqd, (saved.estimate as Est).total_iqd, 'the total: live = saved');
+    assert.equal(saved.estimate, null, 'saving answers does not hand the customer a figure');
+    const desk = await carried(raw, req.id);
+    assert.deepEqual(parts(live), parts(desk), 'each part: the wizard\'s live value = the saved value');
+    assert.equal(live.total_iqd, desk.total_iqd, 'the total: live = saved');
     assert.ok(live.total_iqd > 0, 'a real figure');
-    assert.notEqual(live.total_iqd, req.estimate.total_iqd, 'the answers moved the figure (the door read them)');
+    assert.notEqual(live.total_iqd, blank.total_iqd, 'the answers moved the figure (the door read them)');
   });
 }
 
@@ -101,9 +125,10 @@ test('preview = save with the target the wizard quoted: the settlement agrees, a
   assert.equal(raw.prepare('SELECT target_product_id t FROM trade_in_requests WHERE id = ?').get(req.id)!.t, null, 'a preview chooses no target');
 
   await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { components });
-  const saved = (await json(await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { target }))).request;
-  assert.deepEqual(live.settlement, saved.estimate.settlement, 'the settlement the wizard showed = the one saved');
-  assert.equal(live.total_iqd, saved.estimate.total_iqd);
+  await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { target });
+  const saved = await carried(raw, req.id);
+  assert.deepEqual(live.settlement, saved.settlement, 'the settlement the wizard showed = the one saved');
+  assert.equal(live.total_iqd, saved.total_iqd);
 });
 
 test('an answer the save refuses, the preview refuses the same way (the wizard shows no invented figure)', async () => {

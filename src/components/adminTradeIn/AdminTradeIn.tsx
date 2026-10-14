@@ -168,7 +168,7 @@ function Requests({ lang }: { lang: string }) {
     return () => window.clearTimeout(id);
   }, [load, q]);
 
-  const label = (s: TradeInStatus | '') => (s ? loc(STATUS_LABELS[s].ar, STATUS_LABELS[s].en) : L('الكل', 'All'));
+  const label = (s: TradeInStatus | '') => (s ? loc(STATUS_LABELS[s].ar, STATUS_LABELS[s].en, STATUS_LABELS[s].ckb) : L('الكل', 'All'));
 
   return (
     <div className="space-y-3">
@@ -194,7 +194,7 @@ function Requests({ lang }: { lang: string }) {
           <option value="">{L('كل الأنواع', 'All families')}</option>
           {TRADE_IN_FAMILIES.map((f) => (
             <option key={f} value={f}>
-              {loc(FAMILY_LABELS[f].ar, FAMILY_LABELS[f].en)}
+              {loc(FAMILY_LABELS[f].ar, FAMILY_LABELS[f].en, FAMILY_LABELS[f].ckb)}
             </option>
           ))}
         </select>
@@ -222,7 +222,7 @@ function Requests({ lang }: { lang: string }) {
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13.5px] font-semibold truncate">{r.name}</span>
                     <span className={`block text-[12px] ${T.text3} truncate`}>
-                      {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en)} · {r.scope === 'ams_only' ? 'AMS' : r.scope === 'printer_only' ? L('الطابعة فقط', 'Printer only') : L('كامل', 'Whole')} → {r.target_name || '—'}
+                      {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en, FAMILY_LABELS[r.family].ckb)} · {r.scope === 'ams_only' ? 'AMS' : r.scope === 'printer_only' ? L('الطابعة فقط', 'Printer only') : L('كامل', 'Whole')} → {r.target_name || '—'}
                     </span>
                     <span className={`block text-[11.5px] ${T.text3} truncate`}>
                       {r.customer_name ?? '—'} · <span dir="ltr">{r.customer_phone ?? ''}</span> · <span dir="ltr">{r.order_id}</span>
@@ -430,11 +430,11 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                   <div className="min-w-0">
                     <p className="text-[15px] font-bold">{r.source.name}</p>
                     <p className={`text-[12.5px] ${T.text3}`}>
-                      {r.source.variant} · {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en)} ·{' '}
+                      {r.source.variant} · {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en, FAMILY_LABELS[r.family].ckb)} ·{' '}
                       {r.scope === 'ams_only' ? L('AMS فقط', 'AMS only') : r.scope === 'printer_only' ? L('الطابعة فقط', 'Printer only') : L('الجهاز كاملاً', 'Whole device')}
                     </p>
                   </div>
-                  <span className={`ms-auto ${T.badgeBase} ${statusTone(r.status)}`}>{loc(r.status_label.ar, r.status_label.en)}</span>
+                  <span className={`ms-auto ${T.badgeBase} ${statusTone(r.status)}`}>{loc(r.status_label.ar, r.status_label.en, r.status_label.ckb)}</span>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 text-[13px] sm:grid-cols-3">
                   <Fact k={L('الطلب الأصلي', 'Original order')} v={<a className="underline decoration-dotted" href={`/admin?tab=orders&order=${encodeURIComponent(r.order_id)}`} dir="ltr">{r.order_id} <ExternalLink className="inline w-3 h-3" aria-hidden /></a>} />
@@ -509,9 +509,9 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                         {c.photos.map((p) => {
                           const a = [...REQUIRED_PHOTOS[c.family], OPTIONAL_PHOTO].find((x) => x.id === p.angle);
                           return (
-                            <button key={p.id} type="button" onClick={() => setPhoto(p.url)} className="relative aspect-square rounded-[var(--ap-radius-sm)] overflow-hidden bg-[var(--ap-surface-3)]" title={a ? loc(a.label_ar, a.label_en) : p.angle}>
-                              <img src={p.url} alt={a ? loc(a.label_ar, a.label_en) : p.angle} className="w-full h-full object-cover" loading="lazy" />
-                              <span className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] px-1 truncate">{a ? loc(a.label_ar, a.label_en) : p.angle}</span>
+                            <button key={p.id} type="button" onClick={() => setPhoto(p.url)} className="relative aspect-square rounded-[var(--ap-radius-sm)] overflow-hidden bg-[var(--ap-surface-3)]" title={a ? loc(a.label_ar, a.label_en, a.label_ckb) : p.angle}>
+                              <img src={p.url} alt={a ? loc(a.label_ar, a.label_en, a.label_ckb) : p.angle} className="w-full h-full object-cover" loading="lazy" />
+                              <span className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] px-1 truncate">{a ? loc(a.label_ar, a.label_en, a.label_ckb) : p.angle}</span>
                             </button>
                           );
                         })}
@@ -534,6 +534,14 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                 <h3 className="text-[14px] font-bold mb-2">{L('القيمة والفرق', 'Value & difference')}</h3>
                 <dl className="space-y-1.5 text-[13px]">
                   <Fact k={L('القيمة التقديرية', 'Estimated value')} v={iqd(r.estimated_iqd)} row />
+                  {/* Trade-in G11: each figure the customer asked for is counted; a long run of them is a probe. */}
+                  {typeof r.previews === 'number' ? (
+                    <Fact
+                      k={loc('تقديرات طلبها الزبون', 'Estimates the customer asked for', 'ئەو خەمڵاندنانەی کڕیار داوای کردوون')}
+                      v={<span className="tabular-nums" data-trade-in-previews>{r.previews}</span>}
+                      row
+                    />
+                  ) : null}
                   <Fact k={L('القيمة المقترحة من الإدارة', 'Admin value')} v={r.offer ? `${iqd(r.offer.value_iqd)} (#${r.offer.offer_no})` : '—'} row />
                   <Fact k={L('قيمة الاستبدال النهائية', 'Final value')} v={iqd(r.final_value_iqd)} row />
                   <Fact k={L('الجهاز الجديد', 'New device')} v={r.target ? `${loc(r.target.name_ar, r.target.name)}` : '—'} row />

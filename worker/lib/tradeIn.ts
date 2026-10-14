@@ -108,6 +108,7 @@ import {
   TRADE_IN_FAMILIES,
   blankInputs,
   canTransition,
+  checklistLabelCkb,
   checklistOf,
   daysBetween,
   isTerminal,
@@ -162,11 +163,12 @@ export type TradeInCode =
   | 'TRADE_IN_STALE'
   | 'TRADE_IN_SERVICE_OPEN'
   | 'TRADE_IN_PROTECTION_OPEN'
-  | 'TRADE_IN_CREDIT_EXPIRED';
+  | 'TRADE_IN_CREDIT_EXPIRED'
+  | 'TRADE_IN_PREVIEW_LIMIT';
 
 export class TradeInError extends Error {
   constructor(
-    public readonly status: 400 | 404 | 409,
+    public readonly status: 400 | 404 | 409 | 429,
     public readonly code: TradeInCode | 'NOT_FOUND',
     message: string,
     public readonly details?: Record<string, unknown>
@@ -204,15 +206,17 @@ const MESSAGES: Record<TradeInCode, string> = {
   TRADE_IN_SERVICE_OPEN: 'This device has an open warranty or repair request. It can be traded in once that request is closed.',
   TRADE_IN_PROTECTION_OPEN: 'This item has a price-protection claim under review. It can be traded in once that claim is decided.',
   TRADE_IN_CREDIT_EXPIRED: 'The trade-in credit has expired.',
+  TRADE_IN_PREVIEW_LIMIT: 'You have reached the number of estimates allowed. Send the request as it is, or try again tomorrow.',
 };
 
-const STATUS_OF: Partial<Record<TradeInCode, 400 | 409>> = {
+const STATUS_OF: Partial<Record<TradeInCode, 400 | 409 | 429>> = {
   TRADE_IN_INPUTS_INVALID: 400,
   TRADE_IN_PHOTO_ANGLE: 400,
   TRADE_IN_INVALID_VALUE: 400,
   TRADE_IN_RULES_INVALID: 400,
   TRADE_IN_TARGET_REQUIRED: 400,
   TRADE_IN_COUPON_MISMATCH: 400,
+  TRADE_IN_PREVIEW_LIMIT: 429,
 };
 
 export const refuse = (code: TradeInCode, details?: Record<string, unknown>) =>
@@ -931,8 +935,13 @@ export async function loadPhotos(db: D1Database, requestId: string): Promise<Pho
 }
 
 async function loadEvents(db: D1Database, requestId: string) {
+  // A counted estimate (`previewDraft`) is a log line, not a step of the
+  // request: the timeline never draws it, and `previewCount` counts it.
   const { results } = await db
-    .prepare('SELECT id, actor_role, action, from_status, to_status, detail_json, created_at FROM trade_in_events WHERE request_id = ? ORDER BY created_at, rowid LIMIT 100')
+    .prepare(
+      `SELECT id, actor_role, action, from_status, to_status, detail_json, created_at FROM trade_in_events
+        WHERE request_id = ? AND action <> 'preview' ORDER BY created_at, rowid LIMIT 100`
+    )
     .bind(requestId)
     .all<{ id: string; actor_role: string; action: string; from_status: string | null; to_status: string | null; detail_json: string; created_at: string }>();
   return (results ?? []).map((e) => ({ ...e, detail: safeParse<Record<string, unknown>>(e.detail_json, {}), detail_json: undefined }));
@@ -1151,10 +1160,11 @@ export interface PricedTarget {
     slug: string;
     name: string;
     name_ar: string;
+    name_ckb?: string;
     image: string;
     family: TradeInFamily;
-    options: Array<{ id: string; label_ar: string; label_en: string }>;
-    color: { id: string; label_ar: string; label_en: string; hex: string } | null;
+    options: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }>;
+    color: { id: string; label_ar: string; label_en: string; label_ckb?: string; hex: string } | null;
   };
 }
 
@@ -1252,13 +1262,17 @@ export async function priceTarget(env: Env, userId: string, sel: TargetSelection
       slug: doc.slug,
       name: doc.name_en || doc.name_ar,
       name_ar: doc.name_ar || doc.name_en,
+      // The catalogue's own Sorani where the owner wrote it (DECISIONS row 183); the screen reads the name otherwise.
+      ...(doc.name_ckb ? { name_ckb: doc.name_ckb } : {}),
       image: coverOf(doc),
       family,
       options: optionValueIds.map((id) => {
         const o = doc.options.find((x) => x.id === id);
-        return { id, label_ar: o?.name_ar || o?.name_en || id, label_en: o?.name_en || o?.name_ar || id };
+        return { id, label_ar: o?.name_ar || o?.name_en || id, label_en: o?.name_en || o?.name_ar || id, ...(o?.name_ckb ? { label_ckb: o.name_ckb } : {}) };
       }),
-      color: color ? { id: color.id, label_ar: color.name_ar || color.name_en, label_en: color.name_en || color.name_ar, hex: color.hex } : null,
+      color: color
+        ? { id: color.id, label_ar: color.name_ar || color.name_en, label_en: color.name_en || color.name_ar, ...(color.name_ckb ? { label_ckb: color.name_ckb } : {}), hex: color.hex }
+        : null,
     },
   };
 }
@@ -1290,15 +1304,15 @@ export async function listTargets(env: Env) {
       .all<{ id: string; product_id: string; name_en: string; sort: number }>(),
     db
       .prepare(
-        `SELECT id, product_id, group_id, name_en, name_ar, sort FROM product_option_values
+        `SELECT id, product_id, group_id, name_en, name_ar, name_ckb, sort FROM product_option_values
           WHERE product_id IN (SELECT value FROM json_each(?1)) AND active = 1 AND merged_into IS NULL ORDER BY sort`
       )
       .bind(ids)
-      .all<{ id: string; product_id: string; group_id: string; name_en: string; name_ar: string | null; sort: number }>(),
+      .all<{ id: string; product_id: string; group_id: string; name_en: string; name_ar: string | null; name_ckb: string | null; sort: number }>(),
     db
-      .prepare('SELECT id, product_id, name_en, name_ar, hex, sort FROM product_colors WHERE product_id IN (SELECT value FROM json_each(?1)) AND active = 1 ORDER BY sort')
+      .prepare('SELECT id, product_id, name_en, name_ar, name_ckb, hex, sort FROM product_colors WHERE product_id IN (SELECT value FROM json_each(?1)) AND active = 1 ORDER BY sort')
       .bind(ids)
-      .all<{ id: string; product_id: string; name_en: string; name_ar: string | null; hex: string; sort: number }>(),
+      .all<{ id: string; product_id: string; name_en: string; name_ar: string | null; name_ckb: string | null; hex: string; sort: number }>(),
   ]);
   return picked.map(({ row, family }) => {
     const doc = parseProductRow(row);
@@ -1309,6 +1323,7 @@ export async function listTargets(env: Env) {
       slug: doc.slug,
       name: doc.name_en || doc.name_ar,
       name_ar: doc.name_ar || doc.name_en,
+      ...(doc.name_ckb ? { name_ckb: doc.name_ckb } : {}),
       image: coverOf(doc),
       family,
       from_price_iqd: doc.price_iqd,
@@ -1317,11 +1332,11 @@ export async function listTargets(env: Env) {
         name: grp.name_en,
         values: (values.results ?? [])
           .filter((v) => v.group_id === grp.id)
-          .map((v) => ({ id: v.id, label_ar: v.name_ar || v.name_en, label_en: v.name_en })),
+          .map((v) => ({ id: v.id, label_ar: v.name_ar || v.name_en, label_en: v.name_en, ...(v.name_ckb ? { label_ckb: v.name_ckb } : {}) })),
       })),
       colors: (colors.results ?? [])
         .filter((c) => c.product_id === pid)
-        .map((c) => ({ id: c.id, label_ar: c.name_ar || c.name_en, label_en: c.name_en, hex: c.hex })),
+        .map((c) => ({ id: c.id, label_ar: c.name_ar || c.name_en, label_en: c.name_en, ...(c.name_ckb ? { label_ckb: c.name_ckb } : {}), hex: c.hex })),
     };
   });
 }
@@ -1400,13 +1415,18 @@ export interface TradeInQuestions {
   version: number;
   /** The factors the owner turned on: which questions the wizard shows. */
   asked: FactorId[];
-  faults: Array<{ id: string; label_ar: string; label_en: string }>;
-  replaced_parts: Array<{ id: string; label_ar: string; label_en: string }>;
+  faults: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }>;
+  replaced_parts: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }>;
 }
 
 export function publicQuestions(r: TradeInRuleSet): TradeInQuestions {
+  // The Sorani of an item that still reads as seeded (DECISIONS row 183); an
+  // item the owner wrote carries the owner's two languages.
   const choices = (factor: 'faults' | 'replaced_parts') =>
-    checklistOf(r, factor).map(({ id, label_ar, label_en }) => ({ id, label_ar, label_en }));
+    checklistOf(r, factor).map(({ id, label_ar, label_en }) => {
+      const label_ckb = checklistLabelCkb(label_ar);
+      return label_ckb ? { id, label_ar, label_en, label_ckb } : { id, label_ar, label_en };
+    });
   return {
     family: r.family,
     version: r.version,
@@ -1438,19 +1458,48 @@ export function publicEstimate(e: Estimate): PublicEstimate {
 }
 
 /**
- * THE WIZARD'S LIVE FIGURE, PRICED HERE. The wizard used to run the engine on
- * the phone over the rules it was sent; now it posts the answers so far (and
- * the product it is looking at) and reads the final figures back. Nothing is
- * stored: the answers are validated exactly as `saveDraft` validates them, the
- * target is re-priced for this customer by the server, never taken from the
- * client.
+ * HOW MANY FIGURES ONE CUSTOMER MAY ASK FOR (Services V2, trade-in G11).
+ *
+ * An estimate is a function of the answers, so a door that answers any set of
+ * answers on demand recovers the owner's valuation rules one toggled answer at
+ * a time (DECISIONS row 220). The door stays — a customer deserves to see the
+ * figure before sending — but each answer is COUNTED, on the request and on
+ * the account: 20 for one request, 60 across the account in any 24 hours.
+ * A draft's own view carries no figure (`requestView`), so this is the only
+ * door to a draft's estimate, and the limit cannot be stepped around by
+ * saving answers and reading the draft back. The submitted request keeps the
+ * estimate fixed at submit, as before.
+ */
+export const TRADE_IN_PREVIEW_PER_REQUEST = 20;
+export const TRADE_IN_PREVIEW_PER_DAY = 60;
+const PREVIEW_DAY_MS = 24 * 3600 * 1000;
+
+/** Counted estimates on one request (the log lines `previewDraft` writes). */
+export async function previewCount(db: D1Database, requestId: string): Promise<number> {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM trade_in_events WHERE request_id = ? AND action = 'preview'`)
+    .bind(requestId)
+    .first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * THE WIZARD'S FIGURE, PRICED HERE AND COUNTED. The wizard posts the answers
+ * so far (and the product it is looking at) when the customer asks for the
+ * figure, and reads the final figures back. The answers are validated exactly
+ * as `saveDraft` validates them, the target is re-priced for this customer by
+ * the server, never taken from the client — and nothing about the request
+ * changes. What is written is one log line (`action = 'preview'`, with the
+ * total it answered, for the staff's eyes): the slot is taken by a single
+ * conditional INSERT, so two presses at once cannot both slip under the
+ * limit, and a refusal answers no figure at all.
  */
 export async function previewDraft(
   env: Env,
   userId: string,
   id: string,
   body: { components?: unknown; target?: unknown }
-): Promise<PublicEstimate> {
+): Promise<{ estimate: PublicEstimate; previews_left: number }> {
   const db = env.DB;
   const req = await ownRequest(db, userId, id);
   if (req.status !== 'draft') throw refuse('TRADE_IN_NOT_EDITABLE');
@@ -1473,7 +1522,31 @@ export async function previewDraft(
     if (!sel) throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'selection' });
     targetPrice = (await priceTarget(env, userId, sel)).price_iqd;
   }
-  return publicEstimate(estimateFor({ ...req, target_price_iqd: targetPrice }, answered, book, new Date().toISOString()).estimate);
+  const now = new Date();
+  const estimate = publicEstimate(estimateFor({ ...req, target_price_iqd: targetPrice }, answered, book, now.toISOString()).estimate);
+
+  const since = new Date(now.getTime() - PREVIEW_DAY_MS).toISOString();
+  const taken = await db
+    .prepare(
+      `INSERT INTO trade_in_events (id, request_id, actor_id, actor_role, action, from_status, to_status, detail_json, created_at)
+       SELECT ?1, ?2, ?3, 'customer', 'preview', NULL, NULL, ?4, ?5
+        WHERE EXISTS (SELECT 1 FROM trade_in_requests WHERE id = ?2 AND user_id = ?3 AND status = 'draft')
+          AND (SELECT COUNT(*) FROM trade_in_events WHERE request_id = ?2 AND action = 'preview') < ?6
+          AND (SELECT COUNT(*) FROM trade_in_events
+                WHERE request_id IN (SELECT id FROM trade_in_requests WHERE user_id = ?3)
+                  AND action = 'preview' AND created_at > ?7) < ?8`
+    )
+    .bind(newId('tie'), id, userId, JSON.stringify({ total_iqd: estimate.total_iqd }), now.toISOString(), TRADE_IN_PREVIEW_PER_REQUEST, since, TRADE_IN_PREVIEW_PER_DAY)
+    .run();
+  const used = await previewCount(db, id);
+  if (!taken.meta?.changes) {
+    // Which limit — so the screen can say «send it» or «tomorrow». The
+    // request's own state is re-read too: a draft sent a moment ago is not a limit.
+    const fresh = await ownRequest(db, userId, id);
+    if (fresh.status !== 'draft') throw refuse('TRADE_IN_NOT_EDITABLE');
+    throw refuse('TRADE_IN_PREVIEW_LIMIT', { scope: used >= TRADE_IN_PREVIEW_PER_REQUEST ? 'request' : 'day' });
+  }
+  return { estimate, previews_left: Math.max(0, TRADE_IN_PREVIEW_PER_REQUEST - used) };
 }
 
 // ================================================================= customer edits
@@ -2346,7 +2419,10 @@ function photoView(p: PhotoRow) {
 /** The request as its owner sees it; the admin view adds the customer and the audit detail. */
 export async function requestView(env: Env, req: RequestRow, audience: 'customer' | 'admin') {
   const db = env.DB;
-  const [comps, photos, events, book, orders, credit] = await Promise.all([
+  // The counted estimates: the admin reads how many a request used (a probe
+  // shows as a long run of them); a customer's draft says how many are left.
+  const countsPreviews = audience === 'admin' || req.status === 'draft';
+  const [comps, photos, events, book, orders, credit, previews] = await Promise.all([
     loadComponents(db, req.id),
     loadPhotos(db, req.id),
     loadEvents(db, req.id),
@@ -2355,6 +2431,7 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
     req.coupon_id
       ? db.prepare('SELECT ends_at FROM coupons WHERE id = ? AND trade_in_id = ?').bind(req.coupon_id, req.id).first<{ ends_at: string | null }>()
       : Promise.resolve(null),
+    countsPreviews ? previewCount(db, req.id) : Promise.resolve(0),
   ]);
   const now = new Date().toISOString();
   const live = estimateFor(req, comps, book, now);
@@ -2416,10 +2493,23 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       photos: photos.filter((p) => p.component_role === c.role).map(photoView),
     })),
     // The figure fixed at submit — what the admin reviews. While a draft, the
-    // live figure from the current answers (the same engine the page runs).
-    // A request never submitted stores no estimate (`{}`): the customer reads none.
-    estimate: ((e) => (audience === 'admin' || !e ? e : Array.isArray(e.components) ? publicEstimate(e) : null))(req.status === 'draft' ? live.estimate : stored),
-    estimated_iqd: req.status === 'draft' ? live.estimate.total_iqd : req.estimated_iqd,
+    // admin reads the live figure from the saved answers; the CUSTOMER reads
+    // none: a draft's figure is the counted preview's alone (`previewDraft`,
+    // trade-in G11), or saving an answer and reading the draft back would be
+    // an uncounted door to the same figure. A request never submitted stores
+    // no estimate (`{}`): the customer reads none.
+    estimate:
+      req.status === 'draft'
+        ? audience === 'admin'
+          ? live.estimate
+          : null
+        : ((e) => (audience === 'admin' || !e ? e : Array.isArray(e.components) ? publicEstimate(e) : null))(stored),
+    estimated_iqd: req.status === 'draft' ? (audience === 'admin' ? live.estimate.total_iqd : null) : req.estimated_iqd,
+    ...(audience === 'admin'
+      ? { previews }
+      : req.status === 'draft'
+        ? { previews_left: Math.max(0, TRADE_IN_PREVIEW_PER_REQUEST - previews) }
+        : {}),
     offer,
     final_value_iqd: req.final_value_iqd,
     credit_iqd: req.credit_iqd,
@@ -2465,7 +2555,7 @@ function pickPublicDetail(d: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-/** The rule set as the wizard needs it for its live preview — every number is already public by design («شفاف»). */
+/** The rule set as the admin desk reads it (`requestView(…, 'admin')`, the rules editor) — the owner's rules, never sent to a customer (DECISIONS row 220). */
 export function publicRules(r: StoredRuleSet): TradeInRuleSet {
   return {
     family: r.family,

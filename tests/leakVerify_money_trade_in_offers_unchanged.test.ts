@@ -8,6 +8,10 @@
  * produced by this file on the base worktree). The seed is the one of
  * tests/leakVerify_features_trade_in_preview_matches_saved_figure.test.ts.
  *
+ * Since Services V2 (trade-in G11) a draft's own view carries no figure for
+ * its customer; the saved answers are priced by the counted preview door (an
+ * empty body prices what was saved), which is what the customer reads.
+ *
  * LOCAL ONLY: in-memory SQLite, the real trade-in routes, a stub session.
  */
 import { test } from 'node:test';
@@ -72,9 +76,10 @@ async function fingerprint() {
     const components = Object.fromEntries(
       req.components.map((c) => [c.role, { ...blankInputs(c.family), ...((over as Record<string, Record<string, unknown>>)[c.role] ?? {}) }])
     );
-    let saved = (await json(await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { components }))).request;
-    if (target) saved = (await json(await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { target }))).request;
-    out[label] = { estimate: figures(saved.estimate as Est), estimated_iqd: saved.estimated_iqd };
+    await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { components });
+    if (target) await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { target });
+    const saved = (await json(await post(a, `/api/trade-in/requests/${req.id}/preview`, {}))).estimate as Est;
+    out[label] = { estimate: figures(saved), estimated_iqd: saved.total_iqd };
     raw.close();
   }
   return out;

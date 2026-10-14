@@ -1295,6 +1295,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The trade-in credit has expired. Contact us to review the request.',
     ckb: 'ماوەی باڵانسی گۆڕینەوە بەسەرچووە. پەیوەندیمان پێوە بکە بۆ پێداچوونەوەی داواکارییەکە.',
   },
+  // Trade-in G11: a draft's figure is counted — 20 a request, 60 an account a day.
+  TRADE_IN_PREVIEW_LIMIT: {
+    ar: 'بلغت عدد التقديرات المسموح به. أرسل الطلب كما هو ونحسب تقديره عند الإرسال، أو حاول غداً.',
+    en: 'You have reached the number of estimates allowed. Send the request as it is and we will work out its estimate when you send it, or try again tomorrow.',
+    ckb: 'گەیشتیتە ئەو ژمارە خەمڵاندنەی ڕێگەپێدراوە. داواکارییەکە وەک خۆی بنێرە و لە کاتی ناردندا خەمڵاندنەکەی دەکەین، یان سبەی هەوڵ بدەرەوە.',
+  },
   // Price protection on a device handed in for a trade-in (PP-B8): it was valued on what was paid.
   TRADE_IN_UNIT: {
     ar: 'هذا الجهاز ضمن طلب استبدال، فلا تشمله حماية السعر.',

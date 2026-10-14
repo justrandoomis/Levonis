@@ -7,10 +7,10 @@
  *   Stepper      whole numbers only (hours, repairs), with − / + at 44px and a
  *                field for typing a large figure off the printer's screen.
  *   Checklist    faults and replaced parts as toggle chips (aria-pressed).
- *   Breakdown    the valuation's lines, top to bottom, adding up — «شفاف».
+ *   Breakdown    one part's estimated value — the figure alone, never the
+ *                lines that price it (DECISIONS row 220).
  *
- * OWNER: Sorani to be written by hand (every loc() in this file without a
- * third argument).
+ * Every string is in Arabic, English and Sorani (DECISIONS row 183).
  */
 import React from 'react';
 import { Minus, Plus, Check } from 'lucide-react';
@@ -83,11 +83,11 @@ export function ScalePicker({
         })}
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-text-muted">
-        <span>{loc('سيئة', 'Poor')}</span>
+        <span>{loc('سيئة', 'Poor', 'خراپ')}</span>
         <span className="text-[12.5px] text-text-primary font-semibold text-center px-2" aria-live="polite">
           {descriptions[value - 1]}
         </span>
-        <span>{loc('كالجديد', 'Like new')}</span>
+        <span>{loc('كالجديد', 'Like new', 'وەک نوێ')}</span>
       </div>
     </fieldset>
   );
@@ -122,7 +122,7 @@ export function Stepper({
         {label}
       </label>
       <div className="flex items-center gap-2">
-        <button type="button" className={btn} onClick={() => set(value - step)} disabled={value <= 0} aria-label={loc('إنقاص', 'Decrease')}>
+        <button type="button" className={btn} onClick={() => set(value - step)} disabled={value <= 0} aria-label={loc('إنقاص', 'Decrease', 'کەمکردنەوە')}>
           <Minus className="w-4 h-4" aria-hidden />
         </button>
         <div className="relative flex-1 min-w-0">
@@ -140,7 +140,7 @@ export function Stepper({
           />
           {unit ? <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-[12px] text-text-muted">{unit}</span> : null}
         </div>
-        <button type="button" className={btn} onClick={() => set(value + step)} disabled={value >= max} aria-label={loc('زيادة', 'Increase')}>
+        <button type="button" className={btn} onClick={() => set(value + step)} disabled={value >= max} aria-label={loc('زيادة', 'Increase', 'زیادکردن')}>
           <Plus className="w-4 h-4" aria-hidden />
         </button>
       </div>
@@ -284,9 +284,9 @@ export function SettlementRows({ s }: { s: TradeInSettlement }) {
   const { loc } = useLanguage();
   return (
     <dl data-settlement>
-      <FactRow label={loc('سعر الجهاز الجديد (بيع مباشر)', 'New device (direct sale)')} value={<Money iqd={s.target_price_iqd} />} />
-      <FactRow label={loc('قيمة جهازك', 'Your device')} value={<Money iqd={-s.credit_iqd} signed />} />
-      <FactRow label={loc('المطلوب دفعه', 'You pay')} value={<Money iqd={s.difference_iqd} />} strong />
+      <FactRow label={loc('سعر الجهاز الجديد (بيع مباشر)', 'New device (direct sale)', 'نرخی ئامێرە نوێیەکە (فرۆشتنی ڕاستەوخۆ)')} value={<Money iqd={s.target_price_iqd} />} />
+      <FactRow label={loc('قيمة جهازك', 'Your device', 'بەهای ئامێرەکەت')} value={<Money iqd={-s.credit_iqd} signed />} />
+      <FactRow label={loc('المطلوب دفعه', 'You pay', 'ئەوەی دەیدەیت')} value={<Money iqd={s.difference_iqd} />} strong />
     </dl>
   );
 }

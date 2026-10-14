@@ -10,7 +10,7 @@
  *   POST   /requests                          open a draft on one unit (claims its parts)
  *   GET    /requests/:id                      the request, its timeline and what the wizard asks (never the rules)
  *   PATCH  /requests/:id                      save answers / target / note (draft only)
- *   POST   /requests/:id/preview              the live figure for unsaved answers (draft only, nothing stored)
+ *   POST   /requests/:id/preview              the figure for unsaved answers (draft only, counted: 20 a request, 60 a day)
  *   POST   /requests/:id/photos               one photograph (multipart: file, component, angle)
  *   DELETE /requests/:id/photos/:pid          remove one (draft only)
  *   POST   /requests/:id/submit               send for review — the server enforces answers, photos, target
@@ -205,12 +205,17 @@ tradeInRoutes.patch('/requests/:id', async (c) => {
   return c.json({ success: true, request: await requestView(c.env, req, 'customer') });
 });
 
-/** The live figure for the answers so far — priced here, nothing stored (see `previewDraft`). */
+/**
+ * The figure for the answers so far — priced here and counted (see
+ * `previewDraft`): 20 per request and 60 per account a day, enforced in the
+ * database; the hourly bucket below only stops a burst before it costs a read.
+ */
 tradeInRoutes.post('/requests/:id/preview', async (c) => {
   const user = c.get('user')!;
-  await rateLimit(c, 'trade_in_preview', 600, 3600);
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  return c.json({ success: true, estimate: await run(() => previewDraft(c.env, user.id, requestIdOf(c), body)) });
+  await rateLimit(c, 'trade_in_preview', 60, 3600);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+  const answer = await run(() => previewDraft(c.env, user.id, requestIdOf(c), body));
+  return c.json({ success: true, estimate: answer.estimate, previews_left: answer.previews_left });
 });
 
 /**

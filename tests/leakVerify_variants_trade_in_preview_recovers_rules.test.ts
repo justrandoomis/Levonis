@@ -7,6 +7,10 @@
  * POST /api/trade-in/requests/:id/preview answers the FINAL figure for the
  * answers so far (`publicEstimate`: value per part, total, settlement — no
  * line, floor or cap), rate-limited to 600 calls an hour per customer.
+ * (Services V2, trade-in G11: the door is now COUNTED — 20 figures a request,
+ * 60 an account a day — and a draft's own view carries no figure. Two figures
+ * still give one factor, so the recovery is slower, not closed: this stays
+ * the owner's ruling, below.)
  *
  * The figure is the additive model of packages/pricing/src/tradeIn.ts (public
  * code): value = base + Σ trunc(base × effect × weight / 10⁸), rounded down to

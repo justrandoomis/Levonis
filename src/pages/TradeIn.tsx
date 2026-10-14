@@ -25,7 +25,9 @@
  *
  *   THE SERVER DECIDES EVERY FIGURE. The price paid, the dates, the warranty
  *   left, the new device's direct-sale price and the estimate all come from
- *   the Worker; the live preview runs the same engine over the same rules.
+ *   the Worker, which keeps its valuation rules to itself: the customer is
+ *   promised a clear offer before sending, never «published rules» (Services
+ *   V2, trade-in G22), and each figure a draft asks for is counted (G11).
  *
  *   SIGNING IN IS ASKED FOR AT THE DOOR OF THE FORM, NOT OF THE PAGE. How a
  *   trade-in works is what someone came to read, so it is visible to everyone;
@@ -35,8 +37,7 @@
  * links), `?item=<order item>&unit=<n>` starts the wizard on that device (the
  * order page's «استبدل هذا الجهاز»), `?new=1` starts it on the device list.
  *
- * OWNER: Sorani to be written by hand (every loc() in this file without a
- * third argument).
+ * Every string is in Arabic, English and Sorani (DECISIONS row 183).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -70,7 +71,7 @@ function modeFromParams(p: URLSearchParams): Mode {
 
 export default function TradeIn() {
   const { loc, lang, dir } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
   const navigate = useNavigate();
@@ -98,7 +99,7 @@ export default function TradeIn() {
       const d = await api.get<{ requests: RequestSummary[] }>('/api/trade-in/requests');
       setMine(d.requests);
     } catch (e) {
-      setMineError(failureText(e, loc('تعذّر تحميل طلباتك.', 'Could not load your requests.')));
+      setMineError(failureText(e, loc('تعذّر تحميل طلباتك.', 'Could not load your requests.', 'داواکارییەکانت بار نەکران.')));
     }
   }, [loc]);
 
@@ -131,9 +132,9 @@ export default function TradeIn() {
   return (
     <div className="w-full min-h-screen text-text-secondary font-sans pb-28" data-trade-in-page>
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
-        <IconButton variant="secondary" onClick={goBack} label={L('رجوع', 'Back')} icon={<Back aria-hidden="true" className="w-5 h-5" />} />
+        <IconButton variant="secondary" onClick={goBack} label={L('رجوع', 'Back', 'گەڕانەوە')} icon={<Back aria-hidden="true" className="w-5 h-5" />} />
         <h1 className="text-text-primary font-bold text-lg leading-6 flex-1 min-w-0 truncate">
-          {mode.kind === 'request' ? L('طلب الاستبدال', 'Trade-in request') : L('استبدل جهازك بجديد', 'Trade in your device')}
+          {mode.kind === 'request' ? L('طلب الاستبدال', 'Trade-in request', 'داواکاریی گۆڕینەوە') : L('استبدل جهازك بجديد', 'Trade in your device', 'ئامێرەکەت بە نوێ بگۆڕەوە')}
         </h1>
       </header>
 
@@ -155,19 +156,20 @@ export default function TradeIn() {
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-full lv-well text-gold">
                 <Repeat className="w-5 h-5" aria-hidden />
               </span>
-              <h2 className="text-text-primary text-[22px] font-black leading-8 mt-3">{L('جهازك من LEVONIS يصبح رصيداً لجهاز جديد', 'Your LEVONIS device becomes credit for a new one')}</h2>
+              <h2 className="text-text-primary text-[22px] font-black leading-8 mt-3">{L('جهازك من LEVONIS يصبح رصيداً لجهاز جديد', 'Your LEVONIS device becomes credit for a new one', 'ئامێرەکەت لە LEVONIS دەبێتە باڵانس بۆ ئامێرێکی نوێ')}</h2>
               <p className="text-[13.5px] leading-6 text-text-secondary mt-1">
                 {L(
                   'للطابعات (FDM و Resin) وأجهزة الليزر وأنظمة الكومبو ووحدات AMS المشتراة من LEVONIS فقط. لا نقبل أجهزة من خارج المتجر.',
-                  'For printers (FDM and Resin), lasers, Combo systems and AMS units bought from LEVONIS only. We do not accept devices bought elsewhere.'
+                  'For printers (FDM and Resin), lasers, Combo systems and AMS units bought from LEVONIS only. We do not accept devices bought elsewhere.',
+                  'تەنها بۆ چاپکەرەکان (FDM و Resin)، ئامێرەکانی لەیزەر، سیستەمەکانی Combo و یەکەکانی AMS کە لە LEVONIS کڕدراون. ئامێری کڕدراو لە دەرەوەی فرۆشگا وەرناگرین.'
                 )}
               </p>
               <ol className="mt-4 space-y-3">
                 {[
-                  { icon: PackageSearch, t: L('اختر الجهاز من طلباتك السابقة', 'Pick the device from your past orders'), d: L('نملأ السعر والتاريخ والضمان تلقائياً.', 'We fill in the price, dates and warranty.') },
-                  { icon: Camera, t: L('صف حالته وصوّره', 'Describe and photograph it'), d: L('كل جزء بمفرده — الطابعة والـ AMS.', 'Each part on its own — the printer and the AMS.') },
-                  { icon: ClipboardCheck, t: L('اختر الجهاز الجديد وشاهد التقدير', 'Choose the new device and see the estimate'), d: L('بقواعد تقييم معلنة وشفافة.', 'With published, transparent rules.') },
-                  { icon: ShieldCheck, t: L('نفحصه ونثبّت القيمة، وتدفع الفرق', 'We inspect, fix the value, you pay the difference'), d: L('إن تغيّرت القيمة نطلب موافقتك أولاً.', 'If the value changes, we ask you first.') },
+                  { icon: PackageSearch, t: L('اختر الجهاز من طلباتك السابقة', 'Pick the device from your past orders', 'ئامێرەکە لە داواکارییەکانی پێشووت هەڵبژێرە'), d: L('نملأ السعر والتاريخ والضمان تلقائياً.', 'We fill in the price, dates and warranty.', 'نرخ و بەروار و گەرەنتی خۆکارانە پڕ دەکەینەوە.') },
+                  { icon: Camera, t: L('صف حالته وصوّره', 'Describe and photograph it', 'دۆخەکەی باس بکە و وێنەی بگرە'), d: L('كل جزء بمفرده — الطابعة والـ AMS.', 'Each part on its own — the printer and the AMS.', 'هەر بەشێک بە جیا — چاپکەر و AMS.') },
+                  { icon: ClipboardCheck, t: L('اختر الجهاز الجديد وشاهد التقدير', 'Choose the new device and see the estimate', 'ئامێرە نوێیەکە هەڵبژێرە و خەمڵاندنەکە ببینە'), d: L('بعرض واضح قبل الإرسال.', 'With a clear offer before you send.', 'بە پێشنیارێکی ڕوون پێش ناردن.') },
+                  { icon: ShieldCheck, t: L('نفحصه ونثبّت القيمة، وتدفع الفرق', 'We inspect, fix the value, you pay the difference', 'دەیپشکنین و بەهاکە جێگیر دەکەین، و تۆ جیاوازییەکە دەدەیت'), d: L('إن تغيّرت القيمة نطلب موافقتك أولاً.', 'If the value changes, we ask you first.', 'ئەگەر بەهاکە گۆڕا، سەرەتا ڕەزامەندیت وەردەگرین.') },
                 ].map((s, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <span className="h-9 w-9 shrink-0 rounded-sm lv-well text-text-primary flex items-center justify-center">
@@ -181,20 +183,20 @@ export default function TradeIn() {
                 ))}
               </ol>
               <Button variant="primary" block className="mt-5" onClick={start} data-trade-in-start>
-                {isAuthenticated ? L('ابدأ الاستبدال', 'Start a trade-in') : L('سجّل الدخول للبدء', 'Sign in to start')}
+                {isAuthenticated ? L('ابدأ الاستبدال', 'Start a trade-in', 'گۆڕینەوە دەست پێبکە') : L('سجّل الدخول للبدء', 'Sign in to start', 'بۆ دەستپێکردن بچۆ ژوورەوە')}
               </Button>
             </section>
 
             {isAuthenticated ? (
               <section aria-labelledby="ti-mine">
                 <h2 id="ti-mine" className="text-text-primary text-[17px] font-bold mb-2">
-                  {L('طلباتي للاستبدال', 'My trade-ins')}
+                  {L('طلباتي للاستبدال', 'My trade-ins', 'داواکارییەکانی گۆڕینەوەم')}
                 </h2>
                 {mineError ? (
                   <div className="rounded-2xl border border-border-subtle p-4">
                     <p className="text-[13px] text-rose-300">{mineError}</p>
                     <Button variant="secondary" className="mt-2" onClick={loadMine}>
-                      {L('إعادة المحاولة', 'Try again')}
+                      {L('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}
                     </Button>
                   </div>
                 ) : mine === null ? (
@@ -203,7 +205,7 @@ export default function TradeIn() {
                   </div>
                 ) : mine.length === 0 ? (
                   <p className="text-[13px] text-text-muted rounded-2xl border border-dashed border-border-subtle p-4">
-                    {L('لا توجد طلبات استبدال بعد.', 'No trade-in requests yet.')}
+                    {L('لا توجد طلبات استبدال بعد.', 'No trade-in requests yet.', 'هێشتا هیچ داواکارییەکی گۆڕینەوە نییە.')}
                   </p>
                 ) : (
                   <ul className="lv-surface overflow-hidden divide-y divide-border-subtle">
@@ -222,7 +224,7 @@ export default function TradeIn() {
                             <span className="min-w-0 flex-1">
                               <span className="block text-text-primary text-[14px] font-bold leading-5 truncate">{r.name}</span>
                               <span className={`block text-[12px] font-semibold ${waiting ? 'text-gold' : 'text-text-muted'}`}>
-                                {loc(r.status_label.ar, r.status_label.en)}
+                                {loc(r.status_label.ar, r.status_label.en, r.status_label.ckb)}
                               </span>
                               <span className="block text-[11.5px] text-text-muted">{dateText(r.created_at, lang)}</span>
                             </span>
@@ -244,7 +246,8 @@ export default function TradeIn() {
             <Note tone="zinc" compact animate={false}>
               {L(
                 'قيمة الاستبدال رصيد يُخصم من سعر الجهاز الجديد عند الطلب، وليست مبلغاً نقدياً. إذا زادت قيمة جهازك عن سعر الجهاز الجديد يُحتسب منها سعر الجهاز الجديد فقط.',
-                'The trade-in value is credit taken off the new device’s price at checkout, not cash. If your device is worth more than the new one, only the new device’s price is credited.'
+                'The trade-in value is credit taken off the new device’s price at checkout, not cash. If your device is worth more than the new one, only the new device’s price is credited.',
+                'بەهای گۆڕینەوە باڵانسێکە لە کاتی داواکردندا لە نرخی ئامێرە نوێیەکە کەم دەکرێتەوە، نەک پارەی نەقد. ئەگەر بەهای ئامێرەکەت لە نرخی ئامێرە نوێیەکە زیاتر بێت، تەنها نرخی ئامێرە نوێیەکەی لێ حیساب دەکرێت.'
               )}
             </Note>
           </div>

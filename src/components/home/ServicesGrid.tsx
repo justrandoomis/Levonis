@@ -123,17 +123,15 @@ export default function ServicesGrid() {
   const studio = (
     <a href={STUDIO_URL} target="_blank" rel="noopener noreferrer" data-service="studio" className={TILE}>
       <Layers aria-hidden="true" strokeWidth={1.5} className={ICON} />
-      {/* OWNER: Sorani to be written by hand. */}
-      <span className={TITLE}>{loc('استوديو ليفو', 'LEVO Studio')}</span>
+      <span className={TITLE}>{loc('استوديو ليفو', 'LEVO Studio', 'ستۆدیۆی LEVO')}</span>
     </a>
   );
 
   return (
     <section data-home-section="services" aria-labelledby="home-services-title">
       {/* No «عرض جميع الخدمات»: the shop has no services index page, and a
-          link has to go somewhere real. Every service is already on the grid.
-          OWNER: Sorani to be written by hand (the title). */}
-      <SectionHead id="home-services-title" title={loc('خدمات ومزايا إضافية', 'More services & benefits')} />
+          link has to go somewhere real. Every service is already on the grid. */}
+      <SectionHead id="home-services-title" title={loc('خدمات ومزايا إضافية', 'More services & benefits', 'خزمەتگوزاری و سوودی زیاتر')} />
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-6 lg:gap-3">
         {inApp.map((s) => (
           <React.Fragment key={s.id}>

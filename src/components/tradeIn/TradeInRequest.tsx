@@ -14,8 +14,7 @@
  *                    cart, the credit code into the ordinary checkout, and the
  *                    checkout decides what the credit is worth on that cart.
  *
- * OWNER: Sorani to be written by hand (every loc() in this file without a
- * third argument).
+ * Every string is in Arabic, English and Sorani (DECISIONS row 183).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -31,26 +30,26 @@ import Note from '../ui/Note';
 import SafeImage from '../ui/SafeImage';
 import Spinner from '../ui/Spinner';
 import { FAMILY_LABELS, REQUIRED_PHOTOS, OPTIONAL_PHOTO } from '../../../packages/pricing/src/tradeIn';
-import { type RequestView, dateText } from './model';
+import { type RequestView, dateText, partLabel } from './model';
 import { Breakdown, Card, FactRow, SectionTitle, SettlementRows } from './controls';
 
-const EVENT_LABELS: Record<string, [string, string]> = {
-  create: ['بدأت الطلب', 'You started the request'],
-  submit: ['أُرسل للمراجعة', 'Sent for review'],
-  inspect: ['بدأ الفحص', 'Inspection started'],
-  approve: ['اعتُمد التقدير', 'Estimate approved'],
-  change_value: ['قيمة جديدة من الفريق', 'A new value from the team'],
-  accept: ['وافقت على القيمة', 'You accepted the value'],
-  reject: ['رفضت القيمة', 'You declined the value'],
-  awaiting_payment: ['ثُبّتت القيمة — بانتظار الدفع', 'Value fixed — awaiting payment'],
-  credit_reissued: ['أُعيد إصدار رصيد الاستبدال', 'Trade-in credit re-issued'],
-  complete: ['اكتمل الاستبدال', 'Trade-in completed'],
-  cancel: ['أُلغي الطلب', 'Request cancelled'],
+const EVENT_LABELS: Record<string, [string, string, string]> = {
+  create: ['بدأت الطلب', 'You started the request', 'داواکارییەکەت دەست پێکرد'],
+  submit: ['أُرسل للمراجعة', 'Sent for review', 'بۆ پێداچوونەوە نێردرا'],
+  inspect: ['بدأ الفحص', 'Inspection started', 'پشکنین دەستی پێکرد'],
+  approve: ['اعتُمد التقدير', 'Estimate approved', 'خەمڵاندنەکە پەسەند کرا'],
+  change_value: ['قيمة جديدة من الفريق', 'A new value from the team', 'بەهایەکی نوێ لە تیمەکەوە'],
+  accept: ['وافقت على القيمة', 'You accepted the value', 'بەهاکەت قبووڵ کرد'],
+  reject: ['رفضت القيمة', 'You declined the value', 'بەهاکەت ڕەت کردەوە'],
+  awaiting_payment: ['ثُبّتت القيمة — بانتظار الدفع', 'Value fixed — awaiting payment', 'بەهاکە جێگیر کرا — چاوەڕێی پارەدانە'],
+  credit_reissued: ['أُعيد إصدار رصيد الاستبدال', 'Trade-in credit re-issued', 'باڵانسی گۆڕینەوە دووبارە دەرکرایەوە'],
+  complete: ['اكتمل الاستبدال', 'Trade-in completed', 'گۆڕینەوەکە تەواو بوو'],
+  cancel: ['أُلغي الطلب', 'Request cancelled', 'داواکارییەکە هەڵوەشێنرایەوە'],
 };
 
 export default function TradeInRequest({ id, onResume, onBack }: { id: string; onResume: (r: RequestView) => void; onBack: () => void }) {
   const { loc, lang } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   const navigate = useNavigate();
   const [req, setReq] = useState<RequestView | null>(null);
   const [error, setError] = useState('');
@@ -60,7 +59,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const errText = useCallback(
-    (e: unknown) => apiRefusal(e, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar') || failureText(e, loc('حدث خطأ. حاول مرة أخرى.', 'Something went wrong. Try again.')),
+    (e: unknown) => apiRefusal(e, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar') || failureText(e, loc('حدث خطأ. حاول مرة أخرى.', 'Something went wrong. Try again.', 'هەڵەیەک ڕوویدا. دووبارە هەوڵ بدەرەوە.')),
     [lang, loc]
   );
 
@@ -153,8 +152,8 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
       <Card>
         <p className="text-[13px] text-rose-300">{error}</p>
         <div className="flex gap-2 mt-3">
-          <Button variant="secondary" onClick={load}>{L('إعادة المحاولة', 'Try again')}</Button>
-          <Button variant="ghost" onClick={onBack}>{L('طلباتي للاستبدال', 'My trade-ins')}</Button>
+          <Button variant="secondary" onClick={load}>{L('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}</Button>
+          <Button variant="ghost" onClick={onBack}>{L('طلباتي للاستبدال', 'My trade-ins', 'داواکارییەکانی گۆڕینەوەم')}</Button>
         </div>
       </Card>
     );
@@ -183,16 +182,16 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
         <Card>
           <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-bold ${tone}`} data-status-chip>
             {req.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden /> : req.status === 'cancelled' || req.status === 'customer_rejected' ? <XCircle className="w-3.5 h-3.5" aria-hidden /> : <Clock className="w-3.5 h-3.5" aria-hidden />}
-            {loc(req.status_label.ar, req.status_label.en)}
+            {loc(req.status_label.ar, req.status_label.en, req.status_label.ckb)}
           </span>
           <div className="flex items-center gap-3 mt-3">
             <SafeImage sizes="56px" src={req.source.image} alt="" aspect="square" className="w-14 h-14 rounded-md shrink-0" bgClassName="bg-surface-raised" />
             <div className="min-w-0 flex-1">
               <p className="text-text-primary font-bold text-[15px] leading-6 line-clamp-2">{req.source.name}</p>
               <p className="text-[12px] text-text-muted">
-                {req.scope === 'ams_only' ? L('AMS فقط', 'AMS only') : req.scope === 'printer_only' ? L('الطابعة فقط', 'Printer only') : L('الجهاز كاملاً', 'Whole device')}
+                {req.scope === 'ams_only' ? L('AMS فقط', 'AMS only', 'تەنها AMS') : req.scope === 'printer_only' ? L('الطابعة فقط', 'Printer only', 'تەنها چاپکەر') : L('الجهاز كاملاً', 'Whole device', 'ئامێرەکە بە تەواوی')}
                 {' · '}
-                {loc(FAMILY_LABELS[req.family].ar, FAMILY_LABELS[req.family].en)}
+                {loc(FAMILY_LABELS[req.family].ar, FAMILY_LABELS[req.family].en, FAMILY_LABELS[req.family].ckb)}
               </p>
             </div>
           </div>
@@ -200,8 +199,8 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle text-[13px] text-text-secondary">
               <Repeat className="w-4 h-4 text-gold shrink-0" aria-hidden />
               <span className="min-w-0 truncate">
-                {L('إلى', 'For')} <strong className="text-text-primary">{loc(target.name_ar, target.name)}</strong>
-                {target.options?.length ? <span className="text-text-muted"> · {target.options.map((o) => (loc(o.label_ar, o.label_en))).join(' · ')}</span> : null}
+                {L('إلى', 'For', 'بۆ')} <strong className="text-text-primary">{loc(target.name_ar, target.name, target.name_ckb || target.name)}</strong>
+                {target.options?.length ? <span className="text-text-muted"> · {target.options.map((o) => (loc(o.label_ar, o.label_en, o.label_ckb || o.label_en))).join(' · ')}</span> : null}
               </span>
             </div>
           ) : null}
@@ -209,9 +208,9 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
 
         {req.status === 'draft' ? (
           <Card>
-            <SectionTitle title={L('الطلب لم يُرسل بعد', 'Not sent yet')} hint={L('أكمل الخطوات ثم أرسله للمراجعة.', 'Finish the steps, then send it for review.')} />
+            <SectionTitle title={L('الطلب لم يُرسل بعد', 'Not sent yet', 'داواکارییەکە هێشتا نەنێردراوە')} hint={L('أكمل الخطوات ثم أرسله للمراجعة.', 'Finish the steps, then send it for review.', 'هەنگاوەکان تەواو بکە، پاشان بۆ پێداچوونەوەی بنێرە.')} />
             <Button variant="primary" block onClick={() => onResume(req)} data-resume>
-              {L('أكمل الطلب', 'Continue the request')}
+              {L('أكمل الطلب', 'Continue the request', 'داواکارییەکە تەواو بکە')}
             </Button>
           </Card>
         ) : null}
@@ -219,18 +218,18 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
         {req.status === 'value_changed' && req.offer ? (
           <Card className="border-amber-900/60" data-decision>
             <SectionTitle
-              title={L('قيمة جديدة لجهازك', 'A new value for your device')}
-              hint={L('فحص فريق LEVONIS جهازك وحدّد قيمة مختلفة عن التقدير الأولي. اقبلها لنكمل، أو ارفضها ويُغلق الطلب.', 'The LEVONIS team inspected your device and set a value different from the estimate. Accept to continue, or decline to close the request.')}
+              title={L('قيمة جديدة لجهازك', 'A new value for your device', 'بەهایەکی نوێ بۆ ئامێرەکەت')}
+              hint={L('فحص فريق LEVONIS جهازك وحدّد قيمة مختلفة عن التقدير الأولي. اقبلها لنكمل، أو ارفضها ويُغلق الطلب.', 'The LEVONIS team inspected your device and set a value different from the estimate. Accept to continue, or decline to close the request.', 'تیمی LEVONIS ئامێرەکەتی پشکنی و بەهایەکی جیاواز لە خەمڵاندنی سەرەتایی دیاری کرد. قبووڵی بکە بۆ ئەوەی بەردەوام بین، یان ڕەتی بکەرەوە و داواکارییەکە دادەخرێت.')}
             />
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-[12px] text-text-muted">{L('التقدير الأولي', 'Estimate')}</p>
+                <p className="text-[12px] text-text-muted">{L('التقدير الأولي', 'Estimate', 'خەمڵاندنی سەرەتایی')}</p>
                 <p className="text-[15px] text-text-muted line-through">
                   <Money iqd={req.estimated_iqd} />
                 </p>
               </div>
               <div className="text-end">
-                <p className="text-[12px] text-text-secondary">{L('القيمة الجديدة', 'New value')}</p>
+                <p className="text-[12px] text-text-secondary">{L('القيمة الجديدة', 'New value', 'بەها نوێیەکە')}</p>
                 <p className="text-[26px] font-black text-text-primary leading-8">
                   <Money iqd={req.offer.value_iqd} />
                 </p>
@@ -238,7 +237,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             </div>
             {req.offer.reason ? (
               <p className="mt-3 text-[13px] leading-6 text-text-secondary lv-well rounded-md p-3">
-                <span className="text-text-muted">{L('السبب: ', 'Reason: ')}</span>
+                <span className="text-text-muted">{L('السبب: ', 'Reason: ', 'هۆکار: ')}</span>
                 {req.offer.reason}
               </p>
             ) : null}
@@ -247,10 +246,10 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
               <Button variant="secondary" onClick={() => setConfirm('reject')} data-reject>
-                {L('أرفض', 'Decline')}
+                {L('أرفض', 'Decline', 'ڕەتی دەکەمەوە')}
               </Button>
               <Button variant="accent" onClick={() => decide('accept')} data-accept>
-                {L('أوافق على القيمة', 'Accept the value')}
+                {L('أوافق على القيمة', 'Accept the value', 'بەهاکە قبووڵ دەکەم')}
               </Button>
             </div>
           </Card>
@@ -258,11 +257,11 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
 
         {req.status === 'awaiting_payment' ? (
           <Card className="border-emerald-900/60" data-payment>
-            <SectionTitle title={L('ثُبّتت قيمة الاستبدال', 'Your trade-in value is fixed')} hint={L('ادفع الفرق عند طلب الجهاز الجديد، والتوصيل كأي طلب.', 'Pay the difference when you order the new device; delivery as on any order.')} />
+            <SectionTitle title={L('ثُبّتت قيمة الاستبدال', 'Your trade-in value is fixed', 'بەهای گۆڕینەوەکەت جێگیر کرا')} hint={L('ادفع الفرق عند طلب الجهاز الجديد، والتوصيل كأي طلب.', 'Pay the difference when you order the new device; delivery as on any order.', 'کاتێک ئامێرە نوێیەکە داوا دەکەیت جیاوازییەکە بدە؛ گەیاندنیش وەک هەر داواکارییەکە.')} />
             <dl>
-              <FactRow label={L('قيمة جهازك', 'Your device')} value={<Money iqd={req.final_value_iqd} />} />
-              <FactRow label={L('سعر الجهاز الجديد', 'New device')} value={<Money iqd={target?.price_iqd ?? null} />} />
-              <FactRow label={L('المطلوب دفعه', 'You pay')} value={<Money iqd={req.difference_iqd} />} strong />
+              <FactRow label={L('قيمة جهازك', 'Your device', 'بەهای ئامێرەکەت')} value={<Money iqd={req.final_value_iqd} />} />
+              <FactRow label={L('سعر الجهاز الجديد', 'New device', 'نرخی ئامێرە نوێیەکە')} value={<Money iqd={target?.price_iqd ?? null} />} />
+              <FactRow label={L('المطلوب دفعه', 'You pay', 'ئەوەی دەیدەیت')} value={<Money iqd={req.difference_iqd} />} strong />
               {/* Owner decision 2: the credit is usable for a limited time. */}
               {!req.credit_order && req.credit_expires_at ? (
                 <FactRow
@@ -282,24 +281,24 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             ) : null}
             {req.excess_iqd && req.excess_iqd > 0 ? (
               <Note tone="amber" compact animate={false} className="mt-3">
-                {L('يُحتسب من قيمة جهازك ما يغطي سعر الجهاز الجديد فقط.', 'Only the new device’s price is credited from your device’s value.')}
+                {L('يُحتسب من قيمة جهازك ما يغطي سعر الجهاز الجديد فقط.', 'Only the new device’s price is credited from your device’s value.', 'لە بەهای ئامێرەکەت تەنها ئەوەندەی نرخی ئامێرە نوێیەکە دەگرێتەوە حیساب دەکرێت.')}
               </Note>
             ) : null}
             {req.credit_order ? (
               <Link to={`/orders/${encodeURIComponent(req.credit_order.id)}`} className="mt-4 flex items-center justify-between gap-2 min-h-[44px] rounded-md border border-border-subtle px-3 text-[13px] text-text-primary hover:bg-surface-raised">
-                <span>{L('طلب الشراء', 'Your order')} <span dir="ltr" className="font-mono">{req.credit_order.id}</span></span>
+                <span>{L('طلب الشراء', 'Your order', 'داواکاریی کڕینەکەت')} <span dir="ltr" className="font-mono">{req.credit_order.id}</span></span>
                 <CreditCard className="w-4 h-4 text-gold" aria-hidden />
               </Link>
             ) : (
               <Button variant="accent" block className="mt-4" onClick={() => pay(false)} disabled={!req.can.pay} data-pay>
-                {L('إتمام الدفع', 'Complete the payment')}
+                {L('إتمام الدفع', 'Complete the payment', 'تەواوکردنی پارەدان')}
               </Button>
             )}
             {cartConflict ? (
               <Note tone="amber" animate={false} className="mt-3">
-                <p>{L('في سلتك منتجات بنوع شحن آخر أو من متجر آخر، والجهاز الجديد بيع مباشر من LEVONIS.', 'Your cart holds items shipped another way or from another store; the new device is a direct LEVONIS sale.')}</p>
+                <p>{L('في سلتك منتجات بنوع شحن آخر أو من متجر آخر، والجهاز الجديد بيع مباشر من LEVONIS.', 'Your cart holds items shipped another way or from another store; the new device is a direct LEVONIS sale.', 'سەبەتەکەت بەرهەمی تێدایە بە جۆرێکی تری ناردن یان لە فرۆشگایەکی ترەوە، و ئامێرە نوێیەکە فرۆشتنی ڕاستەوخۆی LEVONIS ـە.')}</p>
                 <Button variant="secondary" size="sm" className="mt-2" onClick={() => pay(true)}>
-                  {L('أفرغ السلة وتابع', 'Empty the cart and continue')}
+                  {L('أفرغ السلة وتابع', 'Empty the cart and continue', 'سەبەتەکە بەتاڵ بکە و بەردەوام بە')}
                 </Button>
               </Note>
             ) : null}
@@ -308,12 +307,12 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
 
         {req.status === 'completed' ? (
           <Note tone="gold" animate={false} icon={<CheckCircle2 className="w-4 h-4" />}>
-            {L('اكتمل الاستبدال. شكراً لثقتك بـ LEVONIS.', 'The trade-in is complete. Thank you for trusting LEVONIS.')}
+            {L('اكتمل الاستبدال. شكراً لثقتك بـ LEVONIS.', 'The trade-in is complete. Thank you for trusting LEVONIS.', 'گۆڕینەوەکە تەواو بوو. سوپاس بۆ متمانەت بە LEVONIS.')}
           </Note>
         ) : null}
         {req.status === 'cancelled' && req.cancel_reason ? (
           <Note tone="zinc" animate={false}>
-            {L('سبب الإلغاء: ', 'Cancelled: ')}
+            {L('سبب الإلغاء: ', 'Cancelled: ', 'هۆکاری هەڵوەشاندنەوە: ')}
             {req.cancel_reason}
           </Note>
         ) : null}
@@ -328,7 +327,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
           <Card>
             <button type="button" className="w-full flex items-center justify-between gap-2 min-h-[44px]" aria-expanded={showBreakdown} onClick={() => setShowBreakdown((v) => !v)}>
               <span className="text-start">
-                <span className="block text-[12px] text-text-muted">{L('التقدير الأولي', 'Preliminary estimate')}</span>
+                <span className="block text-[12px] text-text-muted">{L('التقدير الأولي', 'Preliminary estimate', 'خەمڵاندنی سەرەتایی')}</span>
                 <span className="block text-[18px] font-black text-text-primary">
                   <Money iqd={req.estimated_iqd} />
                 </span>
@@ -338,7 +337,7 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
             {showBreakdown ? (
               <div className="mt-2 space-y-4">
                 {req.estimate.components.map((c) => (
-                  <Breakdown key={c.role} valuation={c} title={loc(c.label_ar, c.label_en)} />
+                  <Breakdown key={c.role} valuation={c} title={partLabel(c, loc)} />
                 ))}
               </div>
             ) : null}
@@ -347,16 +346,16 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
 
         {req.components.some((c) => c.photos.length > 0) ? (
           <Card>
-            <SectionTitle title={L('صورك', 'Your photos')} />
+            <SectionTitle title={L('صورك', 'Your photos', 'وێنەکانت')} />
             {req.components.map((c) => (
               <div key={c.role} className="mb-3 last:mb-0">
-                {req.components.length > 1 ? <p className="text-[12px] text-text-muted mb-1.5">{c.role === 'ams' ? 'AMS' : L('الطابعة', 'Printer')}</p> : null}
+                {req.components.length > 1 ? <p className="text-[12px] text-text-muted mb-1.5">{c.role === 'ams' ? 'AMS' : L('الطابعة', 'Printer', 'چاپکەر')}</p> : null}
                 <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
                   {c.photos.map((p) => {
                     const a = [...REQUIRED_PHOTOS[c.family], OPTIONAL_PHOTO].find((x) => x.id === p.angle);
                     return (
-                      <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="relative block aspect-square rounded-lg overflow-hidden bg-surface-raised" title={a ? (loc(a.label_ar, a.label_en)) : p.angle}>
-                        <img src={p.url} alt={a ? (loc(a.label_ar, a.label_en)) : ''} className="w-full h-full object-cover" loading="lazy" />
+                      <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="relative block aspect-square rounded-lg overflow-hidden bg-surface-raised" title={a ? (loc(a.label_ar, a.label_en, a.label_ckb)) : p.angle}>
+                        <img src={p.url} alt={a ? (loc(a.label_ar, a.label_en, a.label_ckb)) : ''} className="w-full h-full object-cover" loading="lazy" />
                       </a>
                     );
                   })}
@@ -369,15 +368,15 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
 
       <aside className="space-y-4">
         <Card>
-          <SectionTitle title={L('مراحل الطلب', 'Timeline')} />
+          <SectionTitle title={L('مراحل الطلب', 'Timeline', 'قۆناغەکانی داواکاری')} />
           <ol className="relative ms-2 border-s border-border-subtle">
             {req.events.map((e, i) => {
-              const label = EVENT_LABELS[e.action] ?? [e.action, e.action];
+              const label = EVENT_LABELS[e.action] ?? [e.action, e.action, e.action];
               const v = typeof e.detail.value_iqd === 'number' ? (e.detail.value_iqd as number) : null;
               return (
                 <li key={`${e.action}-${i}`} className="ms-4 pb-4 last:pb-0">
                   <span className={`absolute -start-[5px] mt-1.5 h-2.5 w-2.5 rounded-full ${i === req.events.length - 1 ? 'bg-gold' : 'bg-border-subtle'}`} aria-hidden />
-                  <p className="text-[13px] font-semibold text-text-primary">{loc(label[0], label[1])}</p>
+                  <p className="text-[13px] font-semibold text-text-primary">{loc(label[0], label[1], label[2])}</p>
                   <p className="text-[11.5px] text-text-muted tabular-nums">
                     {dateText(e.created_at, lang)}
                     {v !== null ? (
@@ -395,16 +394,16 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
         </Card>
         {req.can.cancel && req.status !== 'value_changed' ? (
           <Button variant="ghost" block onClick={() => setConfirm('cancel')} data-cancel>
-            {L('إلغاء الطلب', 'Cancel the request')}
+            {L('إلغاء الطلب', 'Cancel the request', 'هەڵوەشاندنەوەی داواکاری')}
           </Button>
         ) : null}
       </aside>
 
       <ConfirmDialog
         open={confirm === 'reject'}
-        title={L('رفض القيمة الجديدة؟', 'Decline the new value?')}
-        consequence={L('يُغلق طلب الاستبدال ويعود جهازك متاحاً لطلب جديد.', 'The trade-in request closes and your device is free for a new one.')}
-        confirmLabel={L('أرفض', 'Decline')}
+        title={L('رفض القيمة الجديدة؟', 'Decline the new value?', 'بەها نوێیەکە ڕەت دەکەیتەوە؟')}
+        consequence={L('يُغلق طلب الاستبدال ويعود جهازك متاحاً لطلب جديد.', 'The trade-in request closes and your device is free for a new one.', 'داواکاریی گۆڕینەوەکە دادەخرێت و ئامێرەکەت بۆ داواکارییەکی نوێ ئامادە دەبێتەوە.')}
+        confirmLabel={L('أرفض', 'Decline', 'ڕەتی دەکەمەوە')}
         destructive
         onConfirm={() => decide('reject')}
         onCancel={() => setConfirm(null)}
@@ -412,9 +411,9 @@ export default function TradeInRequest({ id, onResume, onBack }: { id: string; o
       />
       <ConfirmDialog
         open={confirm === 'cancel'}
-        title={L('إلغاء طلب الاستبدال؟', 'Cancel this trade-in?')}
-        consequence={L('لن نراجع هذا الطلب، ويعود جهازك متاحاً لطلب جديد.', 'We will not review this request, and your device is free for a new one.')}
-        confirmLabel={L('إلغاء الطلب', 'Cancel the request')}
+        title={L('إلغاء طلب الاستبدال؟', 'Cancel this trade-in?', 'ئەم گۆڕینەوەیە هەڵدەوەشێنیتەوە؟')}
+        consequence={L('لن نراجع هذا الطلب، ويعود جهازك متاحاً لطلب جديد.', 'We will not review this request, and your device is free for a new one.', 'پێداچوونەوە بەم داواکارییەدا ناکەین، و ئامێرەکەت بۆ داواکارییەکی نوێ ئامادە دەبێتەوە.')}
+        confirmLabel={L('إلغاء الطلب', 'Cancel the request', 'هەڵوەشاندنەوەی داواکاری')}
         destructive
         onConfirm={cancel}
         onCancel={() => setConfirm(null)}

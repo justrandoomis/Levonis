@@ -30,10 +30,11 @@ import Spinner from '../components/ui/Spinner';
  *    multiplier — rather than from the wallet's free-text notes dated by a UTC
  *    clock that disagrees with the day the award belongs to.
  *
- * Arabic is the source language and every string is written ar-first. Sorani
- * (ckb) is deliberately NOT passed to `loc`: the third argument is omitted, so
- * `loc` falls back to the Arabic — the shop owner writes the Kurdish by hand,
- * and no machine invents it here.
+ * Arabic is the source language and every string is written ar-first, then
+ * English, then Sorani (ckb). The Sorani is written, never the Arabic copied
+ * into its slot (DECISIONS row 183, which replaced the old «the owner writes
+ * the Kurdish by hand» rule this header used to state); a native speaker's
+ * review is welcome.
  */
 
 interface MissionView {
@@ -114,7 +115,7 @@ export default function Rewards() {
   const navigate = useNavigate();
   const { pointBalance, refreshWallet } = useWallet();
   const { isAuthenticated, isLoaded: authLoaded } = useAuth();
-  const { loc, dir } = useLanguage();
+  const { loc, lang, dir } = useLanguage();
   const { signIn } = useSignInPrompt();
 
   const [data, setData] = useState<RewardsData | null>(null);
@@ -135,7 +136,7 @@ export default function Rewards() {
       setData(res);
       setLoadError('');
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : loc('تعذّر تحميل صفحة النقاط', 'Failed to load rewards'));
+      setLoadError(err instanceof Error ? err.message : loc('تعذّر تحميل صفحة النقاط', 'Failed to load rewards', 'پەڕەی خاڵەکان بار نەکرا'));
     }
   }, [loc]);
 
@@ -162,14 +163,14 @@ export default function Rewards() {
   const say = (tone: 'good' | 'bad', text: string) => setNotice({ tone, text });
 
   const awardMessage = (r: AwardReply, what: string) => {
-    const gain = `+${r.points} ${loc('نقطة', 'pts')}`;
+    const gain = `+${r.points} ${loc('نقطة', 'pts', 'خاڵ')}`;
     return r.multiplier_x100 > 100
       ? `${what} · ${gain} (${r.base_points} × ${(r.multiplier_x100 / 100).toString()})`
       : `${what} · ${gain}`;
   };
 
   const failureText = (err: unknown) =>
-    err instanceof Error && err.message ? err.message : loc('تعذّر إتمام العملية', 'That did not go through');
+    err instanceof Error && err.message ? err.message : loc('تعذّر إتمام العملية', 'That did not go through', 'کردارەکە تەواو نەبوو');
 
   const handleCheckIn = async () => {
     if (!data || data.checked_in_today || isCheckingIn) return;
@@ -177,7 +178,7 @@ export default function Rewards() {
     setNotice(null);
     try {
       const res = await api.post<AwardReply>('/api/rewards/checkin');
-      say('good', awardMessage(res, loc(`تسجيل اليوم ${res.day ?? ''}`, `Day ${res.day ?? ''} check-in`)));
+      say('good', awardMessage(res, loc(`تسجيل اليوم ${res.day ?? ''}`, `Day ${res.day ?? ''} check-in`, `ئامادەبوونی ڕۆژی ${res.day ?? ''}`)));
       await Promise.all([loadRewards(), refreshWallet()]);
     } catch (err) {
       say('bad', failureText(err));
@@ -193,12 +194,12 @@ export default function Rewards() {
     setNotice(null);
     try {
       if (!('Notification' in window)) {
-        say('bad', loc('هذا المتصفح لا يدعم الإشعارات.', 'This browser does not support notifications.'));
+        say('bad', loc('هذا المتصفح لا يدعم الإشعارات.', 'This browser does not support notifications.', 'ئەم وێبگەڕە پشتگیریی ئاگادارکردنەوە ناکات.'));
         return;
       }
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        say('bad', loc('يجب السماح بالإشعارات للحصول على هذه المكافأة.', 'Allow notifications to earn this reward.'));
+        say('bad', loc('يجب السماح بالإشعارات للحصول على هذه المكافأة.', 'Allow notifications to earn this reward.', 'بۆ وەرگرتنی ئەم خەڵاتە دەبێت ڕێگە بە ئاگادارکردنەوەکان بدەیت.'));
         return;
       }
       const res = await api.post<AwardReply>('/api/rewards/push');
@@ -220,7 +221,7 @@ export default function Rewards() {
         Two arguments, so Sorani reads the Arabic by the documented fallback
         (LanguageContext) exactly as it did before. No Kurdish is invented.
       */
-      say('good', awardMessage(res, loc('تم منح إذن الإشعارات في هذا المتصفح', 'Notification permission granted in this browser')));
+      say('good', awardMessage(res, loc('تم منح إذن الإشعارات في هذا المتصفح', 'Notification permission granted in this browser', 'ڕێگەپێدانی ئاگادارکردنەوە لەم وێبگەڕەدا درا')));
       await Promise.all([loadRewards(), refreshWallet()]);
     } catch (err) {
       say('bad', failureText(err));
@@ -238,7 +239,7 @@ export default function Rewards() {
   const handleVideoMission = async () => {
     if (loadingMission || !data || data.missions.video.claimed) return;
     if (!data.missions.video.available || !data.missions.video.videoUrl) {
-      say('bad', loc('لا يوجد إعلان متاح اليوم.', 'No ad is available today.'));
+      say('bad', loc('لا يوجد إعلان متاح اليوم.', 'No ad is available today.', 'ئەمڕۆ هیچ ڕیکلامێک بەردەست نییە.'));
       return;
     }
     setLoadingMission('video');
@@ -260,7 +261,7 @@ export default function Rewards() {
     setLoadingMission('video_claim');
     try {
       const res = await api.post<AwardReply>('/api/rewards/video');
-      say('good', awardMessage(res, loc('شاهدت الإعلان', 'Ad watched')));
+      say('good', awardMessage(res, loc('شاهدت الإعلان', 'Ad watched', 'ڕیکلامەکەت بینی')));
       setShowVideoModal(false);
       await Promise.all([loadRewards(), refreshWallet()]);
     } catch (err) {
@@ -284,7 +285,8 @@ export default function Rewards() {
         'good',
         loc(
           `بدأت المهمة — تصفّح المنتجات ${mins} دقائق. الوقت يُحسب على خادم المتجر ويتوقف عند الخمول.`,
-          `Mission started — browse for ${mins} minutes. The time is counted by the store's server and pauses when you are idle.`
+          `Mission started — browse for ${mins} minutes. The time is counted by the store's server and pauses when you are idle.`,
+          `ئەرکەکە دەستی پێکرد — ${mins} خولەک بەرهەمەکان بگەڕێ. کاتەکە لەسەر ڕاژەکاری فرۆشگا دەژمێردرێت و کاتێک بێکار بیت دەوەستێت.`
         )
       );
       navigate('/');
@@ -301,10 +303,10 @@ export default function Rewards() {
   const allDailyDone = !!missions && missions.push.claimed && missions.video.claimed && missions.browse.claimed;
 
   const missionLabel: Record<string, string> = {
-    checkin: loc('تسجيل الدخول اليومي', 'Daily check-in'),
-    push: loc('تفعيل الإشعارات', 'Notifications enabled'),
-    video: loc('مشاهدة إعلان', 'Watched an ad'),
-    browse: loc('تصفّح المنتجات', 'Browsed products'),
+    checkin: loc('تسجيل الدخول اليومي', 'Daily check-in', 'ئامادەبوونی ڕۆژانە'),
+    push: loc('تفعيل الإشعارات', 'Notifications enabled', 'چالاککردنی ئاگادارکردنەوەکان'),
+    video: loc('مشاهدة إعلان', 'Watched an ad', 'بینینی ڕیکلام'),
+    browse: loc('تصفّح المنتجات', 'Browsed products', 'گەڕان بە بەرهەمەکاندا'),
   };
 
   /**
@@ -320,7 +322,7 @@ export default function Rewards() {
     const d = new Date(h.awarded_at);
     return Number.isNaN(d.getTime())
       ? ''
-      : d.toLocaleDateString(loc('ar-IQ', 'en-GB'), { year: 'numeric', month: 'short', day: 'numeric' });
+      : d.toLocaleDateString(lang === 'en' ? 'en-GB' : lang === 'ckb' ? ['ckb-IQ', 'ar-IQ'] : 'ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   /** Says plainly that the store cannot verify a task, instead of implying it can. */
@@ -330,7 +332,7 @@ export default function Rewards() {
       className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300/90 bg-amber-400/10 rounded-full px-2 py-0.5"
     >
       <ShieldAlert aria-hidden="true" className="w-3 h-3" />
-      {loc('غير مُتحقَّق منه', 'Not verifiable')}
+      {loc('غير مُتحقَّق منه', 'Not verifiable', 'پشتڕاست نەکراوەتەوە')}
     </span>
   );
 
@@ -351,12 +353,12 @@ export default function Rewards() {
       <div className="flex items-center px-4 py-4 sticky top-0 z-10 relative">
         <button
           onClick={() => navigate(-1)}
-          aria-label={loc('رجوع', 'Back')}
+          aria-label={loc('رجوع', 'Back', 'گەڕانەوە')}
           className="w-11 h-11 -ms-2 flex items-center justify-center rounded-full hover:bg-white/[0.06] active:bg-[var(--clay-well-bg)] active:shadow-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors"
         >
           <ChevronLeft aria-hidden="true" className="w-6 h-6 text-gold rtl:rotate-180" strokeWidth={2.5} />
         </button>
-        <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions')}</h1>
+        <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions', 'خاڵ و ئەرکەکان')}</h1>
         {/* Registers this page's own character anchor, so the shell stops
             reserving a separate landing strip above this header. */}
         <MotionCharacterHome kind="top-header" compact />
@@ -375,10 +377,10 @@ export default function Rewards() {
           <div className="text-center py-20">
             <Star aria-hidden="true" className="w-10 h-10 mx-auto mb-3 text-gold/70" />
             <p className="text-text-secondary font-medium mb-4">
-              {loc('سجّل الدخول لجمع النقاط ومتابعتها', 'Sign in to earn and track your points')}
+              {loc('سجّل الدخول لجمع النقاط ومتابعتها', 'Sign in to earn and track your points', 'بچۆ ژوورەوە بۆ کۆکردنەوە و بەدواداچوونی خاڵەکانت')}
             </p>
             <button onClick={signIn} className="lv-button lv-button-primary px-6">
-              {loc('تسجيل الدخول', 'Sign in')}
+              {loc('تسجيل الدخول', 'Sign in', 'چوونە ژوورەوە')}
             </button>
           </div>
         ) : (
@@ -403,7 +405,7 @@ export default function Rewards() {
             {/* Balance */}
             <div className="flex justify-between items-center mb-6 relative">
               <div className="pt-2">
-                <div className="text-[14px] text-gold mb-0.5 font-medium">{loc('رصيدي', 'My Balance')}</div>
+                <div className="text-[14px] text-gold mb-0.5 font-medium">{loc('رصيدي', 'My Balance', 'باڵانسەکەم')}</div>
                 <div aria-live="polite" className="text-[56px] leading-[1.1] font-black tracking-tight tabular-nums">
                   {(data?.point_balance ?? pointBalance).toLocaleString()}
                 </div>
@@ -441,30 +443,34 @@ export default function Rewards() {
                     {boosted
                       ? loc(
                           `اشتراكك يمنحك ${multiplier.label.replace('x', '')}× من النقاط`,
-                          `Your subscription earns you ${multiplier.label.replace('x', '')}× points`
+                          `Your subscription earns you ${multiplier.label.replace('x', '')}× points`,
+                          `بەشداریکردنەکەت ${multiplier.label.replace('x', '')}× خاڵت پێدەدات`
                         )
-                      : loc('نقاطك بالمعدّل الأساسي (1×)', 'You earn at the standard rate (1×)')}
+                      : loc('نقاطك بالمعدّل الأساسي (1×)', 'You earn at the standard rate (1×)', 'خاڵەکانت بە ڕێژەی بنەڕەتین (1×)')}
                   </h3>
                 </div>
                 <p className="text-text-secondary text-[12px] leading-relaxed">
                   {boosted
                     ? loc(
                         'يُطبَّق على تسجيل الدخول اليومي والمهام والشراء والتقييمات. المُضاعِف يُثبَّت لحظة منح النقاط، فانتهاء الاشتراك لاحقًا لا يغيّر ما رَبِحته.',
-                        'Applied to daily check-in, missions, purchases and reviews. The multiplier is frozen at the moment each award is made, so a subscription that later ends never changes what you already earned.'
+                        'Applied to daily check-in, missions, purchases and reviews. The multiplier is frozen at the moment each award is made, so a subscription that later ends never changes what you already earned.',
+                        'لەسەر ئامادەبوونی ڕۆژانە، ئەرکەکان، کڕین و هەڵسەنگاندنەکان جێبەجێ دەکرێت. چەندجارەکەرەکە لە ساتی پێدانی خاڵەکاندا جێگیر دەکرێت، بۆیە کۆتاییهاتنی بەشداریکردن دواتر ئەوەی بردووتەوە ناگۆڕێت.'
                       )
                     : data?.earning
                       ? loc(
                           `نقطة واحدة عن كل ${data.earning.iqd_per_point.toLocaleString('en-US')} د.ع من مشترياتك، وتسجيل الدخول اليومي يبدأ بنقطة ويزيد نقطة كل يوم متتالٍ حتى ${data.earning.checkin_top_rung} نقاط.`,
-                          `One point for every ${data.earning.iqd_per_point.toLocaleString('en-US')} IQD you spend, and the daily check-in starts at one point and climbs by one each consecutive day, up to ${data.earning.checkin_top_rung}.`
+                          `One point for every ${data.earning.iqd_per_point.toLocaleString('en-US')} IQD you spend, and the daily check-in starts at one point and climbs by one each consecutive day, up to ${data.earning.checkin_top_rung}.`,
+                          `بۆ هەر ${data.earning.iqd_per_point.toLocaleString('en-US')} د.ع لە کڕینەکانت یەک خاڵ، و ئامادەبوونی ڕۆژانە بە یەک خاڵ دەست پێدەکات و هەر ڕۆژێکی یەک لە دوای یەک یەک خاڵ زیاد دەبێت تا ${data.earning.checkin_top_rung} خاڵ.`
                         )
                       : loc(
                           'يُطبَّق على تسجيل الدخول اليومي والمهام والشراء والتقييمات.',
-                          'Applies to daily check-in, missions, purchases and reviews.'
+                          'Applies to daily check-in, missions, purchases and reviews.',
+                          'لەسەر ئامادەبوونی ڕۆژانە، ئەرکەکان، کڕین و هەڵسەنگاندنەکان جێبەجێ دەکرێت.'
                         )}
                 </p>
                 {boosted && multiplier.expires_at && (
                   <p className="text-text-muted text-[11px] mt-2">
-                    {loc('ينتهي في', 'Ends')} {new Date(multiplier.expires_at).toLocaleDateString()}
+                    {loc('ينتهي في', 'Ends', 'کۆتایی دێت لە')} {new Date(multiplier.expires_at).toLocaleDateString()}
                   </p>
                 )}
               </div>
@@ -487,13 +493,15 @@ export default function Rewards() {
                   <h2 className="text-[16px] font-bold mb-1">
                     {loc(
                       `سجّلت دخولك ${data?.streak ?? 0} ${(data?.streak ?? 0) === 1 ? 'يومًا' : 'أيام'} متتالية`,
-                      `You've checked in for ${data?.streak ?? 0} day${(data?.streak ?? 0) === 1 ? '' : 's'}`
+                      `You've checked in for ${data?.streak ?? 0} day${(data?.streak ?? 0) === 1 ? '' : 's'}`,
+                      `${data?.streak ?? 0} ڕۆژی یەک لە دوای یەک ئامادە بوویت`
                     )}
                   </h2>
                   <p className="text-[11px] text-text-secondary mb-4">
                     {loc(
                       'اليوم يُحدَّد بتوقيت بغداد على خادم المتجر — لا بتوقيت جهازك.',
-                      "The day is the store server's Baghdad date — not your device's."
+                      "The day is the store server's Baghdad date — not your device's.",
+                      'ڕۆژەکە بە کاتی بەغدا لەسەر ڕاژەکاری فرۆشگا دیاری دەکرێت — نەک بە کاتی ئامێرەکەت.'
                     )}
                   </p>
 
@@ -511,7 +519,7 @@ export default function Rewards() {
                       >
                         {d.status === 'today' ? (
                           <div className="w-full bg-gold text-accent-contrast text-[9px] font-bold text-center py-1 mb-1.5 tracking-wide">
-                            {loc('اليوم', 'Today')}
+                            {loc('اليوم', 'Today', 'ئەمڕۆ')}
                           </div>
                         ) : (
                           <span
@@ -519,7 +527,7 @@ export default function Rewards() {
                               d.status === 'checked' ? 'text-gold' : 'text-text-secondary'
                             }`}
                           >
-                            {loc(`يوم ${d.day}`, `Day ${d.day}`)}
+                            {loc(`يوم ${d.day}`, `Day ${d.day}`, `ڕۆژی ${d.day}`)}
                           </span>
                         )}
 
@@ -562,9 +570,9 @@ export default function Rewards() {
                     {isCheckingIn ? (
                       <Spinner size="sm" delayMs={0} decorative />
                     ) : data?.checked_in_today ? (
-                      loc('تم التسجيل اليوم', 'Checked in')
+                      loc('تم التسجيل اليوم', 'Checked in', 'ئەمڕۆ ئامادە بوویت')
                     ) : (
-                      loc(`سجّل الدخول (+${data?.checkin.points ?? 0})`, `Check in (+${data?.checkin.points ?? 0})`)
+                      loc(`سجّل الدخول (+${data?.checkin.points ?? 0})`, `Check in (+${data?.checkin.points ?? 0})`, `ئامادەبوون تۆمار بکە (+${data?.checkin.points ?? 0})`)
                     )}
                   </button>
                 </div>
@@ -573,7 +581,7 @@ export default function Rewards() {
 
             {/* Missions */}
             <div className="mt-8 mb-8">
-              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points')}</h2>
+              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points', 'خاڵ کۆبکەرەوە')}</h2>
               <div className="space-y-3 px-1">
                 {!data && !loadError && (
                   <div className="flex justify-center py-6">
@@ -582,7 +590,7 @@ export default function Rewards() {
                 )}
                 {allDailyDone && (
                   <div className="text-text-secondary text-center py-4 text-sm">
-                    {loc('أنهيت كل مهام اليوم.', "You're all caught up for today!")}
+                    {loc('أنهيت كل مهام اليوم.', "You're all caught up for today!", 'هەموو ئەرکەکانی ئەمڕۆت تەواو کرد.')}
                   </div>
                 )}
 
@@ -603,11 +611,11 @@ export default function Rewards() {
                       </div>
                       <div>
                         <h4 className="text-text-primary font-bold text-[14px] flex items-center gap-2 flex-wrap">
-                          {loc('فعّل الإشعارات', 'Enable Notifications')}
+                          {loc('فعّل الإشعارات', 'Enable Notifications', 'ئاگادارکردنەوەکان چالاک بکە')}
                           {missions.push.verification === 'client_asserted' && <UnverifiedTag proof={missions.push.proof} />}
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
-                          {loc('مرة واحدة لكل حساب', 'Once per account')}
+                          {loc('مرة واحدة لكل حساب', 'Once per account', 'یەک جار بۆ هەر هەژمارێک')}
                         </span>
                       </div>
                     </div>
@@ -642,16 +650,17 @@ export default function Rewards() {
                       </div>
                       <div>
                         <h4 className="text-text-primary font-bold text-[14px] flex items-center gap-2 flex-wrap">
-                          {loc('شاهد إعلانًا', 'Watch Ad')}
+                          {loc('شاهد إعلانًا', 'Watch Ad', 'ڕیکلامێک ببینە')}
                           <UnverifiedTag proof={missions.video.proof} />
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
                           {missions.video.available
                             ? loc(
                                 `${missions.video.required_seconds} ثانية على الأقل — يحسبها الخادم`,
-                                `${missions.video.required_seconds}s minimum, timed by the server`
+                                `${missions.video.required_seconds}s minimum, timed by the server`,
+                                `لانیکەم ${missions.video.required_seconds} چرکە — ڕاژەکار دەیژمێرێت`
                               )
-                            : loc('لا يوجد إعلان اليوم', 'No ad today')}
+                            : loc('لا يوجد إعلان اليوم', 'No ad today', 'ئەمڕۆ ڕیکلام نییە')}
                         </span>
                       </div>
                     </div>
@@ -683,13 +692,14 @@ export default function Rewards() {
                       </div>
                       <div>
                         <h4 className="text-text-primary font-bold text-[14px] flex items-center gap-2 flex-wrap">
-                          {loc('تصفّح المنتجات', 'Browse Products')}
+                          {loc('تصفّح المنتجات', 'Browse Products', 'بەرهەمەکان بگەڕێ')}
                           <UnverifiedTag proof={missions.browse.proof} />
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
                           {loc(
                             `${Math.round(missions.browse.required_seconds / 60)} دقائق`,
-                            `${Math.round(missions.browse.required_seconds / 60)} mins`
+                            `${Math.round(missions.browse.required_seconds / 60)} mins`,
+                            `${Math.round(missions.browse.required_seconds / 60)} خولەک`
                           )}
                           {missions.browse.progress_seconds > 0 &&
                             ` • ${missions.browse.progress_seconds}/${missions.browse.required_seconds}s`}
@@ -717,10 +727,10 @@ export default function Rewards() {
               the screen instead of only in the database.
             */}
             <div className="mt-8 mb-8">
-              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('سجلّ النقاط', 'Points History')}</h2>
+              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('سجلّ النقاط', 'Points History', 'مێژووی خاڵەکان')}</h2>
               <div className="px-1">
                 {data && data.history.length === 0 && (
-                  <div className="text-text-secondary text-center py-4 text-sm">{loc('لا يوجد نشاط بعد', 'No recent activity')}</div>
+                  <div className="text-text-secondary text-center py-4 text-sm">{loc('لا يوجد نشاط بعد', 'No recent activity', 'هێشتا هیچ چالاکییەک نییە')}</div>
                 )}
                 {data && data.history.length > 0 && (
                 <div className="lv-surface overflow-hidden divide-y divide-border-subtle">
@@ -740,7 +750,7 @@ export default function Rewards() {
                         <h4 className="text-text-primary font-bold text-[14px]">
                           {/* A ledger movement has no mission; it carries its own wording. */}
                           {missionLabel[h.mission] ?? (h.note || h.mission)}
-                          {h.streak_day ? ` · ${loc(`يوم ${h.streak_day}`, `day ${h.streak_day}`)}` : ''}
+                          {h.streak_day ? ` · ${loc(`يوم ${h.streak_day}`, `day ${h.streak_day}`, `ڕۆژی ${h.streak_day}`)}` : ''}
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
                           {/* THE INSTANT, NOT THE PERIOD. `day` is the mission's
@@ -756,7 +766,7 @@ export default function Rewards() {
                       </div>
                     </div>
                     <div className={`font-bold text-[16px] shrink-0 ${spend ? 'text-rose-300' : 'text-gold'}`}>
-                      {spend ? '−' : '+'}{h.points} {loc('نقطة', 'pts')}
+                      {spend ? '−' : '+'}{h.points} {loc('نقطة', 'pts', 'خاڵ')}
                     </div>
                   </div>
                   );
@@ -788,10 +798,10 @@ export default function Rewards() {
       >
         <div className="p-6 flex flex-col items-center">
           <h3 id="rewards-video-title" className="text-text-primary font-bold text-lg mb-2">
-            {loc('شاهد الإعلان لتربح النقاط', 'Watch the ad to earn')}
+            {loc('شاهد الإعلان لتربح النقاط', 'Watch the ad to earn', 'ڕیکلامەکە ببینە بۆ بردنەوەی خاڵ')}
           </h3>
           <p className="text-text-secondary text-sm text-center mb-6">
-            {loc('شاهد الإعلان كاملًا للحصول على نقاطك.', 'Please watch the entire video to receive your points.')}
+            {loc('شاهد الإعلان كاملًا للحصول على نقاطك.', 'Please watch the entire video to receive your points.', 'ڕیکلامەکە بە تەواوی ببینە بۆ وەرگرتنی خاڵەکانت.')}
           </p>
 
           <div className="w-full aspect-video bg-charcoal rounded-lg mb-6 relative overflow-hidden flex items-center justify-center border border-border-subtle">
@@ -812,21 +822,21 @@ export default function Rewards() {
               disabled={loadingMission === 'video_claim'}
             >
               {loadingMission === 'video_claim'
-                ? loc('جارٍ المطالبة…', 'Claiming...')
-                : loc(`احصل على ${data?.missions.video.points} نقطة`, `Claim ${data?.missions.video.points} pts`)}
+                ? loc('جارٍ المطالبة…', 'Claiming...', 'وەرگرتن…')
+                : loc(`احصل على ${data?.missions.video.points} نقطة`, `Claim ${data?.missions.video.points} pts`, `${data?.missions.video.points} خاڵ وەربگرە`)}
             </button>
           ) : (
             <div className="w-full flex items-center justify-between gap-3">
               <span className="text-gold font-bold text-sm">
                 {adWait > 0
-                  ? loc(`متبقٍ ${adWait} ثانية`, `${adWait}s remaining`)
-                  : loc('الإعلان قيد التشغيل…', 'Video is playing...')}
+                  ? loc(`متبقٍ ${adWait} ثانية`, `${adWait}s remaining`, `${adWait} چرکە ماوە`)
+                  : loc('الإعلان قيد التشغيل…', 'Video is playing...', 'ڕیکلامەکە پەخش دەکرێت…')}
               </span>
               <button
                 className="lv-button lv-button-ghost"
                 onClick={() => setShowVideoModal(false)}
               >
-                {loc('إغلاق', 'Close')}
+                {loc('إغلاق', 'Close', 'داخستن')}
               </button>
             </div>
           )}

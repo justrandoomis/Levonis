@@ -112,8 +112,9 @@ export interface TradeInQuestions {
   version: number;
   /** The factors the owner turned on: which questions to show. */
   asked: string[];
-  faults: Array<{ id: string; label_ar: string; label_en: string }>;
-  replaced_parts: Array<{ id: string; label_ar: string; label_en: string }>;
+  /** `label_ckb` while the item reads as the seed wrote it (worker `publicQuestions`). */
+  faults: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }>;
+  replaced_parts: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }>;
 }
 
 export interface TargetView {
@@ -121,10 +122,12 @@ export interface TargetView {
   slug: string;
   name: string;
   name_ar: string;
+  /** The catalogue's Sorani name where the owner wrote one. */
+  name_ckb?: string;
   image: string;
   family: TradeInFamily;
-  options: Array<{ id: string; label_ar: string; label_en: string }>;
-  color: { id: string; label_ar: string; label_en: string; hex: string } | null;
+  options: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }>;
+  color: { id: string; label_ar: string; label_en: string; label_ckb?: string; hex: string } | null;
   option_value_ids: string[];
   color_id: string | null;
   price_iqd: number | null;
@@ -142,7 +145,7 @@ export interface TradeInEvent {
 export interface RequestView {
   id: string;
   status: TradeInStatus;
-  status_label: { ar: string; en: string };
+  status_label: { ar: string; en: string; ckb?: string };
   scope: TradeInScope;
   family: TradeInFamily;
   is_combo: boolean;
@@ -179,6 +182,12 @@ export interface RequestView {
   customer_note: string;
   cancel_reason: string;
   blockers: { inputs: Record<string, string[]>; photos: Record<string, string[]>; target: boolean } | null;
+  /**
+   * A draft's figures left to ask for (trade-in G11: 20 a request, 60 a day).
+   * A draft's own view carries no estimate: the figure is the counted
+   * preview's (POST /requests/:id/preview). Older servers omit it.
+   */
+  previews_left?: number;
   events: TradeInEvent[];
   questions: Partial<Record<TradeInFamily, TradeInQuestions>>;
   can: { edit: boolean; submit: boolean; cancel: boolean; decide: boolean; pay: boolean };
@@ -191,6 +200,8 @@ export interface RequestView {
 
 /** The same request as an admin reads it: the rules that price it and the per-factor breakdown. */
 export interface AdminRequestView extends Omit<RequestView, 'components' | 'estimate' | 'questions'> {
+  /** How many counted estimates the customer asked for on this request. */
+  previews?: number;
   components: AdminComponentView[];
   estimate: AdminEstimateView | null;
   rules: Partial<Record<TradeInFamily, TradeInRuleSet>>;
@@ -199,7 +210,7 @@ export interface AdminRequestView extends Omit<RequestView, 'components' | 'esti
 export interface RequestSummary {
   id: string;
   status: TradeInStatus;
-  status_label: { ar: string; en: string };
+  status_label: { ar: string; en: string; ckb?: string };
   scope: TradeInScope;
   family: TradeInFamily;
   name: string;
@@ -220,11 +231,12 @@ export interface TargetOption {
   slug: string;
   name: string;
   name_ar: string;
+  name_ckb?: string;
   image: string;
   family: TradeInFamily;
   from_price_iqd: number;
-  groups: Array<{ id: string; name: string; values: Array<{ id: string; label_ar: string; label_en: string }> }>;
-  colors: Array<{ id: string; label_ar: string; label_en: string; hex: string }>;
+  groups: Array<{ id: string; name: string; values: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }> }>;
+  colors: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string; hex: string }>;
 }
 
 /** The facts a component's valuation stands on, from the request's frozen source. */
@@ -249,17 +261,33 @@ export function liveFromEstimate(e: EstimateView | null | undefined): LiveEstima
 }
 
 /** «14 شهر و 3 أيام» — a duration the customer can picture. */
-export function durationText(days: number, loc: (ar: string, en: string) => string): string {
+export function durationText(days: number, loc: (ar: string, en: string, ckb: string) => string): string {
   const months = Math.floor(days / 30);
   const rest = days - months * 30;
-  if (months === 0) return loc(`${rest} يوم`, `${rest} day${rest === 1 ? '' : 's'}`);
-  if (rest === 0) return loc(`${months} شهر`, `${months} month${months === 1 ? '' : 's'}`);
-  return loc(`${months} شهر و ${rest} يوم`, `${months} mo ${rest} d`);
+  if (months === 0) return loc(`${rest} يوم`, `${rest} day${rest === 1 ? '' : 's'}`, `${rest} ڕۆژ`);
+  if (rest === 0) return loc(`${months} شهر`, `${months} month${months === 1 ? '' : 's'}`, `${months} مانگ`);
+  return loc(`${months} شهر و ${rest} يوم`, `${months} mo ${rest} d`, `${months} مانگ و ${rest} ڕۆژ`);
 }
 
 export function dateText(iso: string | null | undefined, lang: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return '—';
-  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-IQ-u-nu-latn', { year: 'numeric', month: 'short', day: 'numeric' });
+  // Sorani first where the browser has it, the Arabic calendar names where it does not.
+  const locales = lang === 'en' ? 'en-GB' : lang === 'ckb' ? ['ckb-IQ-u-nu-latn', 'ar-IQ-u-nu-latn'] : 'ar-IQ-u-nu-latn';
+  return d.toLocaleDateString(locales, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
+ * A part's name in the reader's language. The Worker stores a part's label in
+ * Arabic and English (the device's own name, or «the AMS that came with» it);
+ * the Sorani is built here from the same name, never copied from the Arabic.
+ */
+export function partLabel(
+  c: { role: ComponentRole; label_ar: string; label_en: string },
+  loc: (ar: string, en: string, ckb: string) => string
+): string {
+  if (c.role !== 'ams') return loc(c.label_ar, c.label_en, c.label_en);
+  const device = c.label_en.replace(/^AMS included with\s+/, '');
+  return loc(c.label_ar, c.label_en, `ئەو AMS ـەی لەگەڵ ${device} هاتووە`);
 }

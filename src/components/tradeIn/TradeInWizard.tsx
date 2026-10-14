@@ -12,20 +12,20 @@
  *   4 الحالة      the condition of EACH part on its own (printer, then AMS).
  *   5 الصور       the required angles for each part's family, with progress.
  *   6 الجهاز الجديد the new device and model, priced by the server.
- *   7 التقدير     the preliminary estimate, line by line, and the difference —
- *                 «تقدير أولي — القيمة النهائية بعد الفحص» — then send.
+ *   7 التقدير     the preliminary estimate, each part's value and the
+ *                 difference — «تقدير أولي — القيمة النهائية بعد الفحص» — then send.
  *
- * WHAT THE SCREEN NEVER DOES: invent a figure. The live estimate is the
- * shared engine (packages/pricing/src/tradeIn.ts) over the rule set the server
- * sent; the target price comes from the server; the estimate on the last step
- * is the server's own, computed from the answers it saved. A draft is created
- * on the server the moment a device and a scope are chosen, which is also the
+ * WHAT THE SCREEN NEVER DOES: invent a figure. Every figure is the Worker's:
+ * the target price, and the estimate, which the screen ASKS for (the last
+ * step once, «حدّث التقدير» after an edit) and never streams on every tap —
+ * each answer is counted, 20 a request and 60 a day (Services V2, trade-in
+ * G11), and the valuation rules never reach the phone. A draft is created on
+ * the server the moment a device and a scope are chosen, which is also the
  * moment that part is claimed — so two tabs cannot trade it twice.
  *
- * OWNER: Sorani to be written by hand (every loc() in this file without a
- * third argument).
+ * Every string is in Arabic, English and Sorani (DECISIONS row 183).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Camera, CheckCircle2, Circle, ImagePlus, Loader2, Package, Trash2, AlertTriangle, ShieldCheck, Receipt } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, failureText } from '../../lib/api';
@@ -61,10 +61,14 @@ import {
   dateText,
   durationText,
   liveFromEstimate,
+  partLabel,
 } from './model';
 import { Breakdown, Card, Checklist, ChoicePills, FactRow, ScalePicker, SectionTitle, SettlementRows, Stepper, TextArea } from './controls';
 
 type Step = 'device' | 'summary' | 'scope' | 'condition' | 'photos' | 'target' | 'review';
+
+/** The figures one request may ask for (worker/lib/tradeIn.ts TRADE_IN_PREVIEW_PER_REQUEST). */
+const PREVIEWS_PER_REQUEST = 20;
 
 interface Props {
   /** `order_item_id:unit_index` from «استبدل هذا الجهاز» on an order page. */
@@ -80,7 +84,7 @@ function useErr() {
   return useCallback(
     (e: unknown, fallback?: string) =>
       apiRefusal(e, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar') ||
-      failureText(e, fallback ?? loc('تعذّر الحفظ. حاول مرة أخرى.', 'Could not save. Try again.')),
+      failureText(e, fallback ?? loc('تعذّر الحفظ. حاول مرة أخرى.', 'Could not save. Try again.', 'پاشەکەوت نەکرا. دووبارە هەوڵ بدەرەوە.')),
     [lang, loc]
   );
 }
@@ -117,7 +121,7 @@ function uploadPhoto(reqId: string, role: ComponentRole, angle: string, file: Fi
 export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }: Props) {
   const { loc, lang, dir } = useLanguage();
   const errText = useErr();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   const Next = dir === 'rtl' ? ArrowLeft : ArrowRight;
 
@@ -154,7 +158,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         }
       }
     } catch (e) {
-      setLoadError(errText(e, loc('تعذّر تحميل طلباتك السابقة.', 'Could not load your past orders.')));
+      setLoadError(errText(e, loc('تعذّر تحميل طلباتك السابقة.', 'Could not load your past orders.', 'داواکارییەکانی پێشووت بار نەکران.')));
     }
   }, [initialUnitKey, errText, loc]);
 
@@ -177,29 +181,63 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
   }, [unit, resume]);
   const index = steps.indexOf(step);
 
-  // THE LIVE FIGURE, PRICED BY THE WORKER (DECISIONS row 220): the answers so
-  // far (and the product being looked at) go to the preview door, which
-  // answers the final figures only — the valuation rules never reach the
-  // phone. Until the first answer the request's own estimate stands.
-  const [live, setLive] = useState<LiveEstimate | null>(null);
-  useEffect(() => {
-    if (!req || req.status !== 'draft') {
-      setLive(liveFromEstimate(req?.estimate));
-      return;
+  // THE FIGURE, PRICED BY THE WORKER AND COUNTED (DECISIONS row 220; trade-in
+  // G11). The answers so far (and the product being looked at) go to the
+  // preview door, which answers the final figures only — the valuation rules
+  // never reach the phone. The figure is ASKED FOR, never streamed on every
+  // tap: the last step asks once when it opens on answers it has no figure
+  // for, and «حدّث التقدير» asks again after an edit. Each answer is one of
+  // the request's 20 (and the account's 60 a day), and a draft's own view
+  // carries no figure, so this is the only door to it.
+  const target = useMemo(
+    () => (quote ? { product_id: quote.product_id, option_value_ids: quote.option_value_ids, color_id: quote.color_id } : null),
+    [quote]
+  );
+  const answerKey = useMemo(() => JSON.stringify({ inputs, target }), [inputs, target]);
+  const [live, setLive] = useState<{ key: string; figure: LiveEstimate } | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const [previewsLeft, setPreviewsLeft] = useState<number | null>(resume?.previews_left ?? null);
+  const figure = live?.figure ?? null;
+  const fresh = live !== null && live.key === answerKey;
+  const askFigure = useCallback(async () => {
+    if (!req || req.status !== 'draft') return;
+    setPreviewBusy(true);
+    setPreviewError('');
+    try {
+      const d = await api.post<{ estimate: EstimateView; previews_left?: number }>(`/api/trade-in/requests/${req.id}/preview`, {
+        components: inputs,
+        ...(target ? { target } : {}),
+      });
+      const f = liveFromEstimate(d.estimate);
+      setLive(f ? { key: answerKey, figure: f } : null);
+      if (typeof d.previews_left === 'number') setPreviewsLeft(d.previews_left);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'TRADE_IN_PREVIEW_LIMIT') setPreviewsLeft(0);
+      setPreviewError(errText(e));
+    } finally {
+      setPreviewBusy(false);
     }
-    let alive = true;
-    const target = quote ? { product_id: quote.product_id, option_value_ids: quote.option_value_ids, color_id: quote.color_id } : undefined;
-    const timer = setTimeout(() => {
-      api
-        .post<{ estimate: EstimateView }>(`/api/trade-in/requests/${req.id}/preview`, { components: inputs, ...(target ? { target } : {}) })
-        .then((d) => alive && setLive(liveFromEstimate(d.estimate)))
-        .catch(() => alive && setLive(null));
-    }, 300);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [req, inputs, quote]);
+  }, [req, inputs, target, answerKey, errText]);
+  // The last step asks once for the answers it opens on — never twice for the same answers.
+  const askedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (step !== 'review' || fresh || previewsLeft === 0 || askedFor.current === answerKey) return;
+    askedFor.current = answerKey;
+    void askFigure();
+  }, [step, fresh, previewsLeft, answerKey, askFigure]);
+  const canAsk = !!req && req.status === 'draft' && !fresh && !previewBusy && previewsLeft !== 0;
+  const askButton = (block = false) => (
+    <Button variant="secondary" size="sm" block={block} onClick={() => void askFigure()} disabled={!canAsk} loading={previewBusy} data-trade-in-ask>
+      {figure ? L('حدّث التقدير', 'Update the estimate', 'خەمڵاندنەکە نوێ بکەرەوە') : L('اعرض التقدير', 'Show the estimate', 'خەمڵاندنەکە پیشان بدە')}
+    </Button>
+  );
+  const leftText =
+    previewsLeft === null
+      ? ''
+      : previewsLeft === 0
+        ? L('لا تقديرات متبقية لهذا الطلب', 'No estimates left for this request', 'هیچ خەمڵاندنێک بۆ ئەم داواکارییە نەماوە')
+        : L(`تبقّى ${previewsLeft} من ${PREVIEWS_PER_REQUEST} تقديراً لهذا الطلب`, `${previewsLeft} of ${PREVIEWS_PER_REQUEST} estimates left for this request`, `${previewsLeft} لە ${PREVIEWS_PER_REQUEST} خەمڵاندن بۆ ئەم داواکارییە ماوە`);
 
   // ---------------------------------------------------------- transitions
   const go = (s: Step) => {
@@ -232,6 +270,8 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
       });
       setReq(data.request);
       setInputs(inputsOf(data.request));
+      setPreviewsLeft(data.request.previews_left ?? null);
+      setLive(null);
       setRole(data.request.components[0]?.role ?? 'device');
       go('condition');
     } catch (e) {
@@ -282,7 +322,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
       await api.post(`/api/trade-in/requests/${req.id}/submit`);
       onDone(req.id);
     } catch (e) {
-      setError(errText(e, loc('تعذّر الإرسال. حاول مرة أخرى.', 'Could not send. Try again.')));
+      setError(errText(e, loc('تعذّر الإرسال. حاول مرة أخرى.', 'Could not send. Try again.', 'نەنێردرا. دووبارە هەوڵ بدەرەوە.')));
     } finally {
       setBusy(false);
     }
@@ -330,7 +370,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
           cur ? { ...cur, components: cur.components.map((c) => (c.role === r ? { ...c, photos: [...c.photos, photo] } : c)) } : cur
         );
       } catch (e) {
-        setError(errText(e, loc('تعذّر رفع الصورة.', 'Could not upload the photo.')));
+        setError(errText(e, loc('تعذّر رفع الصورة.', 'Could not upload the photo.', 'وێنەکە بار نەکرا.')));
       } finally {
         setUploads((u) => {
           const next = { ...u };
@@ -355,13 +395,13 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
 
   // ---------------------------------------------------------- render
   const titles: Record<Step, string> = {
-    device: L('اختر الجهاز', 'Choose the device'),
-    summary: L('تفاصيل الجهاز', 'Device details'),
-    scope: L('ماذا تريد أن تستبدل؟', 'What are you trading in?'),
-    condition: L('حالة الجهاز', 'Condition'),
-    photos: L('صور الجهاز', 'Photos'),
-    target: L('الجهاز الجديد', 'Your new device'),
-    review: L('التقدير الأولي', 'Preliminary estimate'),
+    device: L('اختر الجهاز', 'Choose the device', 'ئامێرەکە هەڵبژێرە'),
+    summary: L('تفاصيل الجهاز', 'Device details', 'وردەکارییەکانی ئامێر'),
+    scope: L('ماذا تريد أن تستبدل؟', 'What are you trading in?', 'چی دەگۆڕیتەوە؟'),
+    condition: L('حالة الجهاز', 'Condition', 'دۆخی ئامێر'),
+    photos: L('صور الجهاز', 'Photos', 'وێنەکانی ئامێر'),
+    target: L('الجهاز الجديد', 'Your new device', 'ئامێرە نوێیەکەت'),
+    review: L('التقدير الأولي', 'Preliminary estimate', 'خەمڵاندنی سەرەتایی'),
   };
 
   const source = req?.source ?? (unit ? { ...unit, order_id: unit.order_id } : null);
@@ -416,7 +456,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
             ))}
           </div>
           <p className="mt-2 text-[12px] text-text-muted tabular-nums">
-            {loc(`الخطوة ${index + 1} من ${steps.length}`, `Step ${index + 1} of ${steps.length}`)}
+            {loc(`الخطوة ${index + 1} من ${steps.length}`, `Step ${index + 1} of ${steps.length}`, `هەنگاوی ${index + 1} لە ${steps.length}`)}
           </p>
           <h2 className="text-text-primary text-[22px] font-black leading-8 mt-0.5">{titles[step]}</h2>
         </div>
@@ -435,17 +475,17 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
               <div className="min-w-0">
                 <p className="text-text-primary font-bold text-[15px] leading-6 line-clamp-2">{source.name}</p>
                 {source.variant ? <p className="text-[12.5px] text-text-muted">{source.variant}</p> : null}
-                {unit ? <p className="text-[12px] text-gold mt-0.5">{loc(FAMILY_LABELS[unit.family].ar, FAMILY_LABELS[unit.family].en)}</p> : null}
+                {unit ? <p className="text-[12px] text-gold mt-0.5">{loc(FAMILY_LABELS[unit.family].ar, FAMILY_LABELS[unit.family].en, FAMILY_LABELS[unit.family].ckb)}</p> : null}
               </div>
             </div>
             <dl>
-              <FactRow label={L('رقم الطلب', 'Order')} value={<span dir="ltr" className="font-mono text-[12.5px]">{source.order_id}</span>} />
-              <FactRow label={L('تاريخ الاستلام', 'Received')} value={dateText(source.delivered_at, lang)} />
-              <FactRow label={L('السعر المدفوع', 'Price paid')} value={<Money iqd={source.paid_iqd ?? 0} />} />
-              <FactRow label={L('نهاية الضمان', 'Warranty ends')} value={source.warranty_end_at ? dateText(source.warranty_end_at, lang) : L('غير محدد', 'Not set')} />
-              <FactRow label={L('مدة الاستخدام', 'In use for')} value={durationText(facts.usage_days ?? 0, L)} />
+              <FactRow label={L('رقم الطلب', 'Order', 'ژمارەی داواکاری')} value={<span dir="ltr" className="font-mono text-[12.5px]">{source.order_id}</span>} />
+              <FactRow label={L('تاريخ الاستلام', 'Received', 'بەرواری وەرگرتن')} value={dateText(source.delivered_at, lang)} />
+              <FactRow label={L('السعر المدفوع', 'Price paid', 'نرخی دراو')} value={<Money iqd={source.paid_iqd ?? 0} />} />
+              <FactRow label={L('نهاية الضمان', 'Warranty ends', 'کۆتایی گەرەنتی')} value={source.warranty_end_at ? dateText(source.warranty_end_at, lang) : L('غير محدد', 'Not set', 'دیاری نەکراوە')} />
+              <FactRow label={L('مدة الاستخدام', 'In use for', 'ماوەی بەکارهێنان')} value={durationText(facts.usage_days ?? 0, L)} />
               <FactRow
-                label={L('المتبقي من الضمان', 'Warranty left')}
+                label={L('المتبقي من الضمان', 'Warranty left', 'گەرەنتیی ماوە')}
                 value={(() => {
                   // Owner decision 3: calendar months and days from the device's own
                   // end date — «11 شهرًا», not a rounded-up 12 (display only).
@@ -458,7 +498,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
               />
             </dl>
             <p className="mt-3 text-[12px] leading-5 text-text-muted">
-              {L('هذه البيانات من طلبك في LEVONIS ولا تحتاج إدخالها.', 'These come from your LEVONIS order — nothing to type.')}
+              {L('هذه البيانات من طلبك في LEVONIS ولا تحتاج إدخالها.', 'These come from your LEVONIS order — nothing to type.', 'ئەم زانیارییانە لە داواکارییەکەت لە LEVONIS وەرگیراون — پێویست ناکات هیچ بنووسیت.')}
             </p>
           </Card>
         )}
@@ -482,7 +522,7 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         {step === 'review' && req && (
           <div className="space-y-4" data-trade-in-review>
             <Note tone="gold" animate={false} icon={<AlertTriangle className="w-4 h-4" />}>
-              <p className="font-bold text-text-primary">{L('تقدير أولي — القيمة النهائية بعد الفحص', 'Preliminary estimate — the final value follows the inspection')}</p>
+              <p className="font-bold text-text-primary">{L('تقدير أولي — القيمة النهائية بعد الفحص', 'Preliminary estimate — the final value follows the inspection', 'خەمڵاندنی سەرەتایی — بەهای کۆتایی دوای پشکنین دیاری دەکرێت')}</p>
               <p className="text-text-secondary text-[12.5px] mt-0.5">
                 {loc(
                   'تحسب LEVONIS هذا الرقم من إجاباتك. بعد الإرسال يفحص فريق LEVONIS الجهاز، وإن تغيّرت القيمة نرسلها لك لتقبلها أو ترفضها.',
@@ -491,30 +531,68 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
                 )}
               </p>
             </Note>
-            {req.estimate?.components.map((c) => (
-              <Card key={c.role}>
-                <Breakdown valuation={c} title={loc(c.label_ar, c.label_en)} />
-              </Card>
-            ))}
-            {req.estimate?.settlement ? (
-              <Card>
-                <SectionTitle title={L('الفرق المطلوب', 'What you pay')} hint={L('التوصيل يُحسب عند الدفع كأي طلب.', 'Delivery is added at checkout, like any order.')} />
-                <SettlementRows s={req.estimate.settlement} />
-                {req.estimate.settlement.excess_iqd > 0 ? (
-                  <Note tone="amber" compact animate={false} className="mt-3">
-                    {loc(
-                      `قيمة جهازك أعلى من سعر الجهاز الجديد. يُحتسب منها ما يغطي الجهاز الجديد فقط، ولا يُصرف الفرق (${(req.estimate.settlement.excess_iqd).toLocaleString('en-US')} د.ع) نقداً أو في المحفظة. يمكنك اختيار جهاز أغلى.`,
-                      `Your device is worth more than the new one. Only the new device's price is credited; the rest (${req.estimate.settlement.excess_iqd.toLocaleString('en-US')} IQD) is not paid out in cash or to the wallet. You can choose a dearer device.`
-                    )}
-                  </Note>
+            {fresh && figure ? (
+              <>
+                {figure.parts.map((p) => {
+                  const c = req.components.find((x) => x.role === p.role);
+                  return (
+                    <Card key={p.role}>
+                      <Breakdown valuation={p} title={c ? partLabel(c, L) : undefined} />
+                    </Card>
+                  );
+                })}
+                {figure.settlement ? (
+                  <Card>
+                    <SectionTitle title={L('الفرق المطلوب', 'What you pay', 'جیاوازیی داواکراو')} hint={L('التوصيل يُحسب عند الدفع كأي طلب.', 'Delivery is added at checkout, like any order.', 'گەیاندن لە کاتی پارەداندا زیاد دەکرێت، وەک هەر داواکارییەک.')} />
+                    <SettlementRows s={figure.settlement} />
+                    {figure.settlement.excess_iqd > 0 ? (
+                      <Note tone="amber" compact animate={false} className="mt-3">
+                        {loc(
+                          `قيمة جهازك أعلى من سعر الجهاز الجديد. يُحتسب منها ما يغطي الجهاز الجديد فقط، ولا يُصرف الفرق (${figure.settlement.excess_iqd.toLocaleString('en-US')} د.ع) نقداً أو في المحفظة. يمكنك اختيار جهاز أغلى.`,
+                          `Your device is worth more than the new one. Only the new device's price is credited; the rest (${figure.settlement.excess_iqd.toLocaleString('en-US')} IQD) is not paid out in cash or to the wallet. You can choose a dearer device.`,
+                          `بەهای ئامێرەکەت لە نرخی ئامێرە نوێیەکە زیاترە. تەنها ئەوەندەی نرخی ئامێرە نوێیەکە دەگرێتەوە حیساب دەکرێت، و جیاوازییەکە (${figure.settlement.excess_iqd.toLocaleString('en-US')} د.ع) بە نەقد یان بۆ جزدان نادرێت. دەتوانیت ئامێرێکی گرانتر هەڵبژێریت.`
+                        )}
+                      </Note>
+                    ) : null}
+                  </Card>
                 ) : null}
+              </>
+            ) : (
+              <Card data-trade-in-no-figure>
+                {previewBusy ? (
+                  <div className="flex justify-center py-4">
+                    <Spinner />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[13px] leading-6 text-text-secondary">
+                      {previewError ||
+                        L('لم نحسب التقدير لإجاباتك الحالية بعد.', 'The estimate for your current answers is not worked out yet.', 'هێشتا خەمڵاندن بۆ وەڵامە ئێستاکانت نەکراوە.')}
+                    </p>
+                    <p className="text-[12.5px] leading-5 text-text-muted mt-1">
+                      {L(
+                        'يمكنك إرسال الطلب كما هو، ونحسب تقديره عند الإرسال ونعرضه في صفحة الطلب.',
+                        'You can send the request as it is: we work out its estimate when you send it and show it on the request page.',
+                        'دەتوانیت داواکارییەکە وەک خۆی بنێریت؛ لە کاتی ناردندا خەمڵاندنەکەی دەکەین و لە پەڕەی داواکارییەکەدا پیشانی دەدەین.'
+                      )}
+                    </p>
+                    {previewsLeft !== 0 ? <div className="mt-3">{askButton()}</div> : null}
+                  </>
+                )}
               </Card>
-            ) : null}
+            )}
             <Card>
-              <TextArea label={L('ملاحظات للفريق (اختياري)', 'A note for the team (optional)')} value={note} onChange={setNote} name="note" />
+              <TextArea label={L('ملاحظات للفريق (اختياري)', 'A note for the team (optional)', 'تێبینی بۆ تیمەکە (ئارەزوومەندانە)')} value={note} onChange={setNote} name="note" />
             </Card>
+            {leftText ? <p className="text-[11.5px] leading-5 text-text-muted tabular-nums lg:hidden">{leftText}</p> : null}
           </div>
         )}
+
+        {previewError && step !== 'review' ? (
+          <p className="text-[12.5px] text-amber-300 leading-5 lg:hidden" data-trade-in-preview-error>
+            {previewError}
+          </p>
+        ) : null}
 
         {error ? (
           <p role="alert" className="text-[13px] text-rose-300 leading-5" data-trade-in-error>
@@ -525,15 +603,21 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
         {/* THE ACTION BAR — sticky on the phone, above the tab bar. */}
         <div className="sticky bottom-[calc(var(--nav-stack,0px)+8px)] z-20 lg:static">
           <div className="flex items-center gap-2 rounded-2xl border border-border-subtle bg-surface-raised p-2 shadow-dock lg:shadow-none lg:bg-transparent lg:border-0 lg:p-0">
-            <Button variant="secondary" onClick={onPrev} icon={<Back className="w-4 h-4" aria-hidden />} aria-label={L('رجوع', 'Back')}>
-              <span className="hidden sm:inline">{L('رجوع', 'Back')}</span>
+            <Button variant="secondary" onClick={onPrev} icon={<Back className="w-4 h-4" aria-hidden />} aria-label={L('رجوع', 'Back', 'گەڕانەوە')}>
+              <span className="hidden sm:inline">{L('رجوع', 'Back', 'گەڕانەوە')}</span>
             </Button>
-            {live && step !== 'device' && step !== 'summary' && step !== 'scope' ? (
+            {req && step !== 'device' && step !== 'summary' && step !== 'scope' ? (
               <div className="flex-1 min-w-0 px-1 lg:hidden" aria-live="polite">
-                <p className="text-[11px] text-text-muted leading-4">{L('تقدير أولي', 'Estimate')}</p>
-                <p className="text-[15px] font-black text-text-primary leading-5">
-                  <Money iqd={live.total} />
-                </p>
+                {fresh && figure ? (
+                  <>
+                    <p className="text-[11px] text-text-muted leading-4">{L('تقدير أولي', 'Estimate', 'خەمڵاندنی سەرەتایی')}</p>
+                    <p className="text-[15px] font-black text-text-primary leading-5">
+                      <Money iqd={figure.total} />
+                    </p>
+                  </>
+                ) : step !== 'review' && canAsk ? (
+                  askButton()
+                ) : null}
               </div>
             ) : (
               <div className="flex-1" />
@@ -546,31 +630,42 @@ export default function TradeInWizard({ initialUnitKey, resume, onDone, onExit }
               iconEnd={step === 'review' ? undefined : <Next className="w-4 h-4" aria-hidden />}
               data-trade-in-next
             >
-              {step === 'review' ? L('أرسل للمراجعة', 'Send for review') : L('التالي', 'Continue')}
+              {step === 'review' ? L('أرسل للمراجعة', 'Send for review', 'بۆ پێداچوونەوە بینێرە') : L('التالي', 'Continue', 'دواتر')}
             </Button>
           </div>
         </div>
       </div>
 
       {/* THE ESTIMATE PANEL — beside the form on a wide screen. */}
-      <aside className="hidden lg:block sticky top-20 space-y-3" aria-label={L('التقدير الأولي', 'Preliminary estimate')}>
-        <Card>
-          <p className="text-[12px] text-text-muted">{L('تقدير أولي', 'Preliminary estimate')}</p>
-          <p className="text-[28px] font-black text-text-primary leading-9 mt-0.5">{live ? <Money iqd={live.total} /> : '—'}</p>
-          <p className="text-[12px] text-text-muted mt-1">{L('القيمة النهائية بعد الفحص', 'Final value after inspection')}</p>
-          {live?.settlement ? (
+      <aside className="hidden lg:block sticky top-20 space-y-3" aria-label={L('التقدير الأولي', 'Preliminary estimate', 'خەمڵاندنی سەرەتایی')}>
+        <Card data-trade-in-figure>
+          <p className="text-[12px] text-text-muted">{L('تقدير أولي', 'Preliminary estimate', 'خەمڵاندنی سەرەتایی')}</p>
+          <p className={`text-[28px] font-black leading-9 mt-0.5 ${fresh ? 'text-text-primary' : 'text-text-muted'}`}>{figure ? <Money iqd={figure.total} /> : '—'}</p>
+          <p className="text-[12px] text-text-muted mt-1">
+            {figure && !fresh
+              ? L('قبل تعديلاتك الأخيرة — حدّثه لترى الرقم الجديد.', 'Before your latest changes — update it to see the new figure.', 'پێش دوایین گۆڕانکارییەکانت — نوێی بکەرەوە بۆ بینینی ژمارە نوێیەکە.')
+              : L('القيمة النهائية بعد الفحص', 'Final value after inspection', 'بەهای کۆتایی دوای پشکنین')}
+          </p>
+          {fresh && figure?.settlement ? (
             <div className="mt-3 pt-3 border-t border-border-subtle">
-              <SettlementRows s={live.settlement} />
+              <SettlementRows s={figure.settlement} />
+            </div>
+          ) : null}
+          {req && req.status === 'draft' && step !== 'device' && step !== 'summary' && step !== 'scope' ? (
+            <div className="mt-3 pt-3 border-t border-border-subtle space-y-2">
+              {!fresh ? askButton(true) : null}
+              {previewError && step !== 'review' ? <p className="text-[12px] leading-5 text-amber-300">{previewError}</p> : null}
+              {leftText ? <p className="text-[11.5px] leading-5 text-text-muted tabular-nums">{leftText}</p> : null}
             </div>
           ) : null}
         </Card>
-        {live && live.parts.length > 0 && (step === 'condition' || step === 'photos' || step === 'target') ? (
+        {fresh && figure && figure.parts.length > 0 && (step === 'condition' || step === 'photos' || step === 'target') ? (
           <Card>
-            {live.parts.map((p) => {
+            {figure.parts.map((p) => {
               const c = req?.components.find((x) => x.role === p.role);
               return (
                 <div key={p.role} className="mb-3 last:mb-0">
-                  <Breakdown valuation={p} title={c ? (loc(c.label_ar, c.label_en)) : undefined} />
+                  <Breakdown valuation={p} title={c ? partLabel(c, L) : undefined} />
                 </div>
               );
             })}
@@ -603,13 +698,13 @@ function DeviceStep({
   onSelect: (u: EligibleUnit) => void;
 }) {
   const { loc, lang } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   if (loadError) {
     return (
       <Card>
         <p className="text-[13px] text-rose-300">{loadError}</p>
         <Button variant="secondary" className="mt-3" onClick={onRetry}>
-          {L('إعادة المحاولة', 'Try again')}
+          {L('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}
         </Button>
       </Card>
     );
@@ -625,11 +720,12 @@ function DeviceStep({
     return (
       <Card data-trade-in-empty>
         <Package className="w-6 h-6 text-text-muted" aria-hidden />
-        <p className="text-text-primary font-bold mt-2">{L('لا توجد أجهزة مؤهلة في طلباتك', 'No eligible devices in your orders')}</p>
+        <p className="text-text-primary font-bold mt-2">{L('لا توجد أجهزة مؤهلة في طلباتك', 'No eligible devices in your orders', 'هیچ ئامێرێکی شیاو لە داواکارییەکانتدا نییە')}</p>
         <p className="text-[13px] leading-6 text-text-secondary mt-1">
           {L(
             'الاستبدال مخصص للطابعات وأجهزة الليزر وملحقات AMS المشتراة من LEVONIS وبعد استلامها. لا نقبل أجهزة من خارج المتجر.',
-            'Trade-in is for printers, lasers and AMS units bought from LEVONIS, once delivered. We do not accept devices bought elsewhere.'
+            'Trade-in is for printers, lasers and AMS units bought from LEVONIS, once delivered. We do not accept devices bought elsewhere.',
+            'گۆڕینەوە بۆ ئەو چاپکەر و ئامێری لەیزەر و یەکە AMS ـانەیە کە لە LEVONIS کڕدراون و گەیەندراون. ئامێری کڕدراو لە دەرەوەی فرۆشگا وەرناگرین.'
           )}
         </p>
       </Card>
@@ -662,8 +758,8 @@ function DeviceStep({
     }
   };
   return (
-    <div className="space-y-2" role="radiogroup" aria-label={L('طلباتك السابقة', 'Your past orders')}>
-      <p className="text-[12.5px] text-text-muted">{L('من طلباتك السابقة في LEVONIS فقط', 'Only from your past LEVONIS orders')}</p>
+    <div className="space-y-2" role="radiogroup" aria-label={L('طلباتك السابقة', 'Your past orders', 'داواکارییەکانی پێشووت')}>
+      <p className="text-[12.5px] text-text-muted">{L('من طلباتك السابقة في LEVONIS فقط', 'Only from your past LEVONIS orders', 'تەنها لە داواکارییەکانی پێشووت لە LEVONIS')}</p>
       {units.map((u) => {
         const on = selected?.key === u.key;
         return (
@@ -681,7 +777,7 @@ function DeviceStep({
             <span className="min-w-0 flex-1">
               <span className="block text-text-primary text-[14px] font-bold leading-5 line-clamp-2">{u.name}</span>
               <span className="block text-[12px] text-text-muted truncate">
-                {[u.variant, loc(FAMILY_LABELS[u.family].ar, FAMILY_LABELS[u.family].en)].filter(Boolean).join(' · ')}
+                {[u.variant, loc(FAMILY_LABELS[u.family].ar, FAMILY_LABELS[u.family].en, FAMILY_LABELS[u.family].ckb)].filter(Boolean).join(' · ')}
               </span>
               <span className="block text-[11.5px] text-text-muted tabular-nums">
                 {u.order_id} · {dateText(u.delivered_at, lang)}
@@ -700,17 +796,17 @@ function DeviceStep({
 
 function ScopeStep({ unit, scope, onScope }: { unit: EligibleUnit; scope: TradeInScope; onScope: (s: TradeInScope) => void }) {
   const { loc } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   const label: Record<TradeInScope, { title: string; hint: string }> = {
-    whole: { title: L('الجهاز كاملاً', 'The whole device'), hint: L('الطابعة مع وحدة AMS — يُقيَّم كل جزء على حدة.', 'The printer with its AMS — each part assessed on its own.') },
-    printer_only: { title: L('الطابعة فقط', 'The printer only'), hint: L('تحتفظ بوحدة AMS.', 'You keep the AMS.') },
-    ams_only: { title: L('AMS فقط', 'The AMS only'), hint: L('تحتفظ بالطابعة، ونقيّم وحدة AMS بسعرها ضمن الكومبو.', 'You keep the printer; the AMS is valued at its share of the Combo.') },
+    whole: { title: L('الجهاز كاملاً', 'The whole device', 'ئامێرەکە بە تەواوی'), hint: L('الطابعة مع وحدة AMS — يُقيَّم كل جزء على حدة.', 'The printer with its AMS — each part assessed on its own.', 'چاپکەرەکە لەگەڵ یەکەی AMS — هەر بەشێک بە جیا هەڵدەسەنگێندرێت.') },
+    printer_only: { title: L('الطابعة فقط', 'The printer only', 'تەنها چاپکەرەکە'), hint: L('تحتفظ بوحدة AMS.', 'You keep the AMS.', 'یەکەی AMS لای خۆت دەمێنێتەوە.') },
+    ams_only: { title: L('AMS فقط', 'The AMS only', 'تەنها AMS'), hint: L('تحتفظ بالطابعة، ونقيّم وحدة AMS بسعرها ضمن الكومبو.', 'You keep the printer; the AMS is valued at its share of the Combo.', 'چاپکەرەکە لای خۆت دەمێنێتەوە، و یەکەی AMS بە بەشەکەی لە نرخی Combo هەڵدەسەنگێنین.') },
   };
   return (
-    <div className="space-y-2" role="radiogroup" aria-label={L('ماذا تريد أن تستبدل؟', 'What are you trading in?')}>
+    <div className="space-y-2" role="radiogroup" aria-label={L('ماذا تريد أن تستبدل؟', 'What are you trading in?', 'چی دەگۆڕیتەوە؟')}>
       {unit.ams_split.method === 'none' ? (
         <Note tone="amber" compact animate={false}>
-          {L('لم نتمكن من تحديد سعر AMS ضمن هذا الكومبو، لذا يُستبدل الجهاز كاملاً فقط.', 'We could not price the AMS inside this Combo, so only the whole device can be traded.')}
+          {L('لم نتمكن من تحديد سعر AMS ضمن هذا الكومبو، لذا يُستبدل الجهاز كاملاً فقط.', 'We could not price the AMS inside this Combo, so only the whole device can be traded.', 'نەمانتوانی نرخی AMS لەناو ئەم Combo ـیەدا دیاری بکەین، بۆیە تەنها ئامێرەکە بە تەواوی دەگۆڕدرێتەوە.')}
         </Note>
       ) : null}
       {unit.scopes.map((s) => {
@@ -736,48 +832,49 @@ function ScopeStep({ unit, scope, onScope }: { unit: EligibleUnit; scope: TradeI
               ) : null}
             </span>
             <span className="block text-[12.5px] leading-5 text-text-muted mt-1">{label[s.scope].hint}</span>
-            {!s.available ? <span className="block text-[12px] text-amber-300 mt-1">{L('غير متاح لهذا الجهاز', 'Not available for this device')}</span> : null}
+            {!s.available ? <span className="block text-[12px] text-amber-300 mt-1">{L('غير متاح لهذا الجهاز', 'Not available for this device', 'بۆ ئەم ئامێرە بەردەست نییە')}</span> : null}
           </button>
         );
       })}
       <p className="text-[12px] leading-5 text-text-muted pt-1">
         {L(
           'سعر AMS يُحسب من فرق سعر خيار الكومبو عن الخيار العادي، كنسبة مما دفعته فعلاً.',
-          'The AMS price is the gap between the Combo option and the plain one, as a share of what you actually paid.'
+          'The AMS price is the gap between the Combo option and the plain one, as a share of what you actually paid.',
+          'نرخی AMS لە جیاوازیی نێوان نرخی هەڵبژاردەی Combo و هەڵبژاردە ئاساییەکە دەردەهێنرێت، وەک ڕێژەیەک لەوەی بە ڕاستی داوتە.'
         )}
       </p>
     </div>
   );
 }
 
-const SCALES = (L: (ar: string, en: string) => string) => ({
+const SCALES = (L: (ar: string, en: string, ckb: string) => string) => ({
   cleanliness: [
-    L('متسخ جداً، بقايا واضحة', 'Very dirty, visible residue'),
-    L('متسخ', 'Dirty'),
-    L('مقبول', 'Acceptable'),
-    L('نظيف', 'Clean'),
-    L('نظيف كالجديد', 'Clean as new'),
+    L('متسخ جداً، بقايا واضحة', 'Very dirty, visible residue', 'زۆر پیس، پاشماوەی دیار'),
+    L('متسخ', 'Dirty', 'پیس'),
+    L('مقبول', 'Acceptable', 'گونجاو'),
+    L('نظيف', 'Clean', 'پاک'),
+    L('نظيف كالجديد', 'Clean as new', 'وەک نوێ پاک'),
   ] as [string, string, string, string, string],
   exterior: [
-    L('كسور أو تشققات', 'Cracks or breaks'),
-    L('تلف واضح', 'Visible damage'),
-    L('آثار استخدام عادية', 'Normal signs of use'),
-    L('جيدة جداً', 'Very good'),
-    L('كالجديد', 'Like new'),
+    L('كسور أو تشققات', 'Cracks or breaks', 'شکان یان درز'),
+    L('تلف واضح', 'Visible damage', 'زیانی دیار'),
+    L('آثار استخدام عادية', 'Normal signs of use', 'شوێنەواری ئاسایی بەکارهێنان'),
+    L('جيدة جداً', 'Very good', 'زۆر باش'),
+    L('كالجديد', 'Like new', 'وەک نوێ'),
   ] as [string, string, string, string, string],
   scratches: [
-    L('خدوش عميقة وكثيرة', 'Many deep scratches'),
-    L('خدوش واضحة', 'Visible scratches'),
-    L('خدوش خفيفة', 'Light scratches'),
-    L('بالكاد تُرى', 'Barely visible'),
-    L('بلا خدوش', 'No scratches'),
+    L('خدوش عميقة وكثيرة', 'Many deep scratches', 'ڕووشانی قووڵ و زۆر'),
+    L('خدوش واضحة', 'Visible scratches', 'ڕووشانی دیار'),
+    L('خدوش خفيفة', 'Light scratches', 'ڕووشانی سووک'),
+    L('بالكاد تُرى', 'Barely visible', 'بە زەحمەت دەبینرێن'),
+    L('بلا خدوش', 'No scratches', 'بێ ڕووشان'),
   ] as [string, string, string, string, string],
   accessory_condition: [
-    L('تالفة', 'Damaged'),
-    L('مستهلكة', 'Worn'),
-    L('مقبولة', 'Acceptable'),
-    L('جيدة', 'Good'),
-    L('كالجديدة', 'Like new'),
+    L('تالفة', 'Damaged', 'تێکچوو'),
+    L('مستهلكة', 'Worn', 'سواو'),
+    L('مقبولة', 'Acceptable', 'گونجاو'),
+    L('جيدة', 'Good', 'باش'),
+    L('كالجديدة', 'Like new', 'وەک نوێ'),
   ] as [string, string, string, string, string],
 });
 
@@ -785,7 +882,7 @@ function RoleTabs({ req, role, onRole }: { req: RequestView; role: ComponentRole
   const { loc } = useLanguage();
   if (req.components.length < 2) return null;
   return (
-    <div role="tablist" aria-label={loc('أجزاء الجهاز', 'Parts')} className="grid grid-cols-2 gap-1 rounded-lg lv-well p-1 border border-border-subtle">
+    <div role="tablist" aria-label={loc('أجزاء الجهاز', 'Parts', 'بەشەکانی ئامێر')} className="grid grid-cols-2 gap-1 rounded-lg lv-well p-1 border border-border-subtle">
       {req.components.map((c) => (
         <button
           key={c.role}
@@ -797,7 +894,7 @@ function RoleTabs({ req, role, onRole }: { req: RequestView; role: ComponentRole
             c.role === role ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
           }`}
         >
-          {c.role === 'ams' ? 'AMS' : loc('الطابعة', 'Printer')}
+          {c.role === 'ams' ? 'AMS' : loc('الطابعة', 'Printer', 'چاپکەر')}
         </button>
       ))}
     </div>
@@ -818,7 +915,7 @@ function ConditionStep({
   setInputs: React.Dispatch<React.SetStateAction<Partial<Record<ComponentRole, ComponentInputs>>>>;
 }) {
   const { loc } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   const comp = req.components.find((c) => c.role === role) ?? req.components[0];
   const questions = comp ? req.questions[comp.family] : undefined;
   const value = comp ? inputs[comp.role] : undefined;
@@ -827,67 +924,67 @@ function ConditionStep({
   const toggle = (key: 'faults' | 'replaced_parts', id: string) =>
     set({ [key]: value[key].includes(id) ? value[key].filter((x) => x !== id) : [...value[key], id] } as Partial<ComponentInputs>);
   const scales = SCALES(L);
-  const faults = questions.faults.map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en) }));
-  const parts = questions.replaced_parts.map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en) }));
+  const faults = questions.faults.map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en, i.label_ckb) }));
+  const parts = questions.replaced_parts.map((i) => ({ id: i.id, label: loc(i.label_ar, i.label_en, i.label_ckb) }));
   const enabled = (id: string) => questions.asked.includes(id);
   return (
     <div className="space-y-4" data-condition={comp.role}>
       <RoleTabs req={req} role={comp.role} onRole={onRole} />
       <p className="text-[12.5px] text-text-muted">
-        {loc(comp.label_ar, comp.label_en)} · {loc(FAMILY_LABELS[comp.family].ar, FAMILY_LABELS[comp.family].en)}
+        {partLabel(comp, loc)} · {loc(FAMILY_LABELS[comp.family].ar, FAMILY_LABELS[comp.family].en, FAMILY_LABELS[comp.family].ckb)}
       </p>
       {familyCountsHours(comp.family) && value.hours !== null ? (
         <Card>
           <Stepper
             name="hours"
-            label={L('ساعات التشغيل الفعلية', 'Actual operating hours')}
+            label={L('ساعات التشغيل الفعلية', 'Actual operating hours', 'کاتژمێرە ڕاستەقینەکانی کارکردن')}
             value={value.hours}
             onChange={(v) => set({ hours: v })}
             step={10}
             max={MAX_HOURS}
-            unit={L('ساعة', 'h')}
-            hint={L('تجدها غالباً في إعدادات الشاشة أو التطبيق («وقت الطباعة»).', 'Usually in the screen settings or the app ("print time").')}
+            unit={L('ساعة', 'h', 'کاتژمێر')}
+            hint={L('تجدها غالباً في إعدادات الشاشة أو التطبيق («وقت الطباعة»).', 'Usually in the screen settings or the app ("print time").', 'زۆرجار لە ڕێکخستنەکانی شاشە یان ئەپەکەدا دەیدۆزیتەوە («کاتی چاپ»).')}
           />
         </Card>
       ) : null}
       <Card className="space-y-5">
-        <ScalePicker name="cleanliness" label={L('حالة النظافة', 'Cleanliness')} value={value.cleanliness} onChange={(v) => set({ cleanliness: v })} descriptions={scales.cleanliness} />
-        <ScalePicker name="exterior" label={L('الحالة الخارجية', 'Exterior')} value={value.exterior} onChange={(v) => set({ exterior: v })} descriptions={scales.exterior} />
-        <ScalePicker name="scratches" label={L('الخدوش', 'Scratches')} value={value.scratches} onChange={(v) => set({ scratches: v })} descriptions={scales.scratches} />
+        <ScalePicker name="cleanliness" label={L('حالة النظافة', 'Cleanliness', 'پاکوخاوێنی')} value={value.cleanliness} onChange={(v) => set({ cleanliness: v })} descriptions={scales.cleanliness} />
+        <ScalePicker name="exterior" label={L('الحالة الخارجية', 'Exterior', 'دۆخی دەرەوە')} value={value.exterior} onChange={(v) => set({ exterior: v })} descriptions={scales.exterior} />
+        <ScalePicker name="scratches" label={L('الخدوش', 'Scratches', 'ڕووشانەکان')} value={value.scratches} onChange={(v) => set({ scratches: v })} descriptions={scales.scratches} />
       </Card>
       {faults.length > 0 ? (
         <Card className="space-y-3">
-          <Checklist name="faults" label={L('المشاكل أو الأعطال', 'Problems or faults')} items={faults} selected={value.faults} onToggle={(id) => toggle('faults', id)} emptyLabel={L('لا توجد مشاكل', 'No problems')} />
-          <TextArea name="fault_notes" label={L('صف المشكلة (اختياري)', 'Describe the problem (optional)')} value={value.fault_notes} onChange={(v) => set({ fault_notes: v })} />
+          <Checklist name="faults" label={L('المشاكل أو الأعطال', 'Problems or faults', 'کێشە یان تێکچوونەکان')} items={faults} selected={value.faults} onToggle={(id) => toggle('faults', id)} emptyLabel={L('لا توجد مشاكل', 'No problems', 'هیچ کێشەیەک نییە')} />
+          <TextArea name="fault_notes" label={L('صف المشكلة (اختياري)', 'Describe the problem (optional)', 'کێشەکە باس بکە (ئارەزوومەندانە)')} value={value.fault_notes} onChange={(v) => set({ fault_notes: v })} />
         </Card>
       ) : null}
       <Card className="space-y-4">
-        <Stepper name="repairs" label={L('عدد الإصلاحات السابقة', 'Previous repairs')} value={value.repairs_count} onChange={(v) => set({ repairs_count: v })} max={20} />
+        <Stepper name="repairs" label={L('عدد الإصلاحات السابقة', 'Previous repairs', 'ژمارەی چاککردنەوەکانی پێشوو')} value={value.repairs_count} onChange={(v) => set({ repairs_count: v })} max={20} />
         {parts.length > 0 && enabled('replaced_parts') ? (
-          <Checklist name="parts" label={L('القطع المستبدلة', 'Replaced parts')} items={parts} selected={value.replaced_parts} onToggle={(id) => toggle('replaced_parts', id)} emptyLabel={L('لا شيء', 'None')} />
+          <Checklist name="parts" label={L('القطع المستبدلة', 'Replaced parts', 'پارچە گۆڕدراوەکان')} items={parts} selected={value.replaced_parts} onToggle={(id) => toggle('replaced_parts', id)} emptyLabel={L('لا شيء', 'None', 'هیچ')} />
         ) : null}
-        <TextArea name="repair_notes" label={L('تفاصيل الإصلاحات (اختياري)', 'Repair details (optional)')} value={value.repair_notes} onChange={(v) => set({ repair_notes: v })} />
+        <TextArea name="repair_notes" label={L('تفاصيل الإصلاحات (اختياري)', 'Repair details (optional)', 'وردەکاریی چاککردنەوەکان (ئارەزوومەندانە)')} value={value.repair_notes} onChange={(v) => set({ repair_notes: v })} />
       </Card>
       <Card className="space-y-5">
         {enabled('accessory_condition') ? (
-          <ScalePicker name="accessory_condition" label={L('حالة الملحقات المرفقة', 'Included accessories')} value={value.accessory_condition} onChange={(v) => set({ accessory_condition: v })} descriptions={scales.accessory_condition} />
+          <ScalePicker name="accessory_condition" label={L('حالة الملحقات المرفقة', 'Included accessories', 'دۆخی پاشکۆ هاوپێچەکان')} value={value.accessory_condition} onChange={(v) => set({ accessory_condition: v })} descriptions={scales.accessory_condition} />
         ) : null}
         <ChoicePills
           name="original_accessories"
-          label={L('الملحقات الأصلية والعلبة', 'Original accessories & box')}
+          label={L('الملحقات الأصلية والعلبة', 'Original accessories & box', 'پاشکۆ ڕەسەنەکان و قوتووەکە')}
           value={value.original_accessories}
           onChange={(v) => set({ original_accessories: v })}
           options={[
-            { id: 'all', label: L('كاملة', 'All') },
-            { id: 'partial', label: L('بعضها', 'Some') },
-            { id: 'none', label: L('لا شيء', 'None') },
+            { id: 'all', label: L('كاملة', 'All', 'هەموویان') },
+            { id: 'partial', label: L('بعضها', 'Some', 'هەندێکیان') },
+            { id: 'none', label: L('لا شيء', 'None', 'هیچ') },
           ]}
         />
-        <TextArea name="notes" label={L('ملاحظات إضافية (اختياري)', 'Anything else (optional)')} value={value.notes} onChange={(v) => set({ notes: v })} />
+        <TextArea name="notes" label={L('ملاحظات إضافية (اختياري)', 'Anything else (optional)', 'تێبینیی زیاتر (ئارەزوومەندانە)')} value={value.notes} onChange={(v) => set({ notes: v })} />
       </Card>
       {req.components.length > 1 && comp.role === req.components[0].role ? (
         <button type="button" onClick={() => onRole(req.components[1].role)} className="w-full min-h-[44px] rounded-2xl border border-dashed border-border-subtle text-[13px] font-bold text-text-secondary hover:text-text-primary">
-          {L('التالي: حالة AMS', 'Next: the AMS condition')}
+          {L('التالي: حالة AMS', 'Next: the AMS condition', 'دواتر: دۆخی AMS')}
         </button>
       ) : null}
     </div>
@@ -910,7 +1007,7 @@ function PhotoStep({
   onRemove: (p: PhotoView) => void;
 }) {
   const { loc } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   const comp = req.components.find((c) => c.role === role) ?? req.components[0];
   if (!comp) return null;
   const angles = [...REQUIRED_PHOTOS[comp.family], OPTIONAL_PHOTO];
@@ -919,7 +1016,7 @@ function PhotoStep({
     <div className="space-y-3" data-photos={comp.role}>
       <RoleTabs req={req} role={comp.role} onRole={onRole} />
       <div className="flex items-center justify-between">
-        <p className="text-[13px] text-text-secondary">{L('صور إلزامية من عدة زوايا', 'Required photos from several angles')}</p>
+        <p className="text-[13px] text-text-secondary">{L('صور إلزامية من عدة زوايا', 'Required photos from several angles', 'وێنەی پێویست لە چەند گۆشەیەکەوە')}</p>
         <p className="text-[13px] font-bold text-text-primary tabular-nums">
           {done}/{REQUIRED_PHOTOS[comp.family].length}
         </p>
@@ -938,10 +1035,10 @@ function PhotoStep({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-text-primary text-[14px] font-bold leading-5">
-                    {loc(a.label_ar, a.label_en)}
-                    {required ? <span className="text-rose-300 ms-1" aria-label={L('مطلوبة', 'required')}>*</span> : null}
+                    {loc(a.label_ar, a.label_en, a.label_ckb)}
+                    {required ? <span className="text-rose-300 ms-1" aria-label={L('مطلوبة', 'required', 'پێویستە')}>*</span> : null}
                   </p>
-                  <p className="text-[12px] leading-5 text-text-muted">{loc(a.hint_ar, a.hint_en)}</p>
+                  <p className="text-[12px] leading-5 text-text-muted">{loc(a.hint_ar, a.hint_en, a.hint_ckb)}</p>
                   {mine.length > 0 || busy.length > 0 ? (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {mine.map((p) => (
@@ -950,7 +1047,7 @@ function PhotoStep({
                           <button
                             type="button"
                             onClick={() => onRemove(p)}
-                            aria-label={L('حذف الصورة', 'Remove photo')}
+                            aria-label={L('حذف الصورة', 'Remove photo', 'سڕینەوەی وێنە')}
                             className="absolute top-0.5 end-0.5 h-7 w-7 rounded-full bg-onyx/80 text-snow flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                           >
                             <Trash2 className="w-3.5 h-3.5" aria-hidden />
@@ -968,7 +1065,7 @@ function PhotoStep({
                 </div>
                 <label className="lv-button lv-button-secondary lv-button-sm shrink-0 cursor-pointer focus-within:ring-2 focus-within:ring-focus">
                   <ImagePlus className="w-4 h-4" aria-hidden />
-                  <span>{ok ? L('إضافة', 'Add') : L('تصوير', 'Photo')}</span>
+                  <span>{ok ? L('إضافة', 'Add', 'زیادکردن') : L('تصوير', 'Photo', 'وێنەگرتن')}</span>
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -987,7 +1084,7 @@ function PhotoStep({
       </ul>
       <p className="text-[12px] leading-5 text-text-muted flex items-start gap-1.5">
         <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden />
-        {L('الصور خاصة: تراها أنت وفريق الفحص في LEVONIS فقط.', 'Photos are private: only you and the LEVONIS inspection team can see them.')}
+        {L('الصور خاصة: تراها أنت وفريق الفحص في LEVONIS فقط.', 'Photos are private: only you and the LEVONIS inspection team can see them.', 'وێنەکان تایبەتن: تەنها تۆ و تیمی پشکنینی LEVONIS دەیانبینن.')}
       </p>
     </div>
   );
@@ -1009,7 +1106,7 @@ function TargetStep({
   current: TargetView | null;
 }) {
   const { loc } = useLanguage();
-  const L = (ar: string, en: string) => loc(ar, en);
+  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
   if (!targets) {
     return (
       <div className="flex justify-center py-10">
@@ -1026,7 +1123,7 @@ function TargetStep({
     <div className="space-y-3" data-targets>
       {current && !picked ? (
         <Note tone="zinc" compact animate={false}>
-          {L('اخترت سابقاً:', 'You chose:')} <strong className="text-text-primary">{loc(current.name_ar, current.name)}</strong>
+          {L('اخترت سابقاً:', 'You chose:', 'پێشتر هەڵتبژاردووە:')} <strong className="text-text-primary">{loc(current.name_ar, current.name, current.name_ckb || current.name)}</strong>
         </Note>
       ) : null}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1049,8 +1146,8 @@ function TargetStep({
               className="lv-choice text-start rounded-lg p-2.5"
             >
               <SafeImage sizes="(min-width: 640px) 160px, 45vw" src={t.image} alt="" aspect="square" className="w-full rounded-sm" bgClassName="bg-surface" />
-              <span className="block mt-2 text-text-primary text-[13px] font-bold leading-5 line-clamp-2">{loc(t.name_ar, t.name)}</span>
-              <span className="block text-[11.5px] text-text-muted">{loc(FAMILY_LABELS[t.family].ar, FAMILY_LABELS[t.family].en)}</span>
+              <span className="block mt-2 text-text-primary text-[13px] font-bold leading-5 line-clamp-2">{loc(t.name_ar, t.name, t.name_ckb || t.name)}</span>
+              <span className="block text-[11.5px] text-text-muted">{loc(FAMILY_LABELS[t.family].ar, FAMILY_LABELS[t.family].en, FAMILY_LABELS[t.family].ckb)}</span>
             </button>
           );
         })}
@@ -1059,7 +1156,7 @@ function TargetStep({
         <Card className="space-y-4">
           {chosen.groups.filter((g) => g.values.length > 1).map((g) => (
             <fieldset key={g.id}>
-              <legend className="text-[13.5px] font-semibold text-text-primary mb-2">{g.name || L('الموديل', 'Model')}</legend>
+              <legend className="text-[13.5px] font-semibold text-text-primary mb-2">{g.name || L('الموديل', 'Model', 'مۆدێل')}</legend>
               <div className="flex flex-wrap gap-2">
                 {g.values.map((v) => (
                   <button
@@ -1069,7 +1166,7 @@ function TargetStep({
                     className={chip(picked?.values[g.id] === v.id)}
                     onClick={() => picked && onPick({ ...picked, values: { ...picked.values, [g.id]: v.id } })}
                   >
-                    {loc(v.label_ar, v.label_en)}
+                    {loc(v.label_ar, v.label_en, v.label_ckb || v.label_en)}
                   </button>
                 ))}
               </div>
@@ -1077,28 +1174,28 @@ function TargetStep({
           ))}
           {chosen.colors.length > 1 ? (
             <fieldset>
-              <legend className="text-[13.5px] font-semibold text-text-primary mb-2">{L('اللون', 'Colour')}</legend>
+              <legend className="text-[13.5px] font-semibold text-text-primary mb-2">{L('اللون', 'Colour', 'ڕەنگ')}</legend>
               <div className="flex flex-wrap gap-2">
                 {chosen.colors.map((c) => (
                   <button key={c.id} type="button" aria-pressed={picked?.color_id === c.id} className={chip(picked?.color_id === c.id)} onClick={() => picked && onPick({ ...picked, color_id: c.id })}>
                     <span className="inline-block w-3 h-3 rounded-full border border-border-subtle me-1.5 align-middle" style={{ background: c.hex }} aria-hidden />
-                    {loc(c.label_ar, c.label_en)}
+                    {loc(c.label_ar, c.label_en, c.label_ckb || c.label_en)}
                   </button>
                 ))}
               </div>
             </fieldset>
           ) : null}
           <div className="flex items-center justify-between gap-3 pt-1" aria-live="polite">
-            <span className="text-[13px] text-text-secondary">{L('سعر البيع المباشر', 'Direct-sale price')}</span>
+            <span className="text-[13px] text-text-secondary">{L('سعر البيع المباشر', 'Direct-sale price', 'نرخی فرۆشتنی ڕاستەوخۆ')}</span>
             <span className="text-[17px] font-black text-text-primary">
-              {busy ? <Spinner size="sm" /> : quote && quote.product_id === chosen.product_id ? <Money iqd={quote.price_iqd} /> : L('اختر الخيارات', 'Choose the options')}
+              {busy ? <Spinner size="sm" /> : quote && quote.product_id === chosen.product_id ? <Money iqd={quote.price_iqd} /> : L('اختر الخيارات', 'Choose the options', 'هەڵبژاردەکان دیاری بکە')}
             </span>
           </div>
         </Card>
       ) : null}
       <p className="text-[12px] leading-5 text-text-muted flex items-center gap-1.5">
         <Receipt className="w-3.5 h-3.5" aria-hidden />
-        {L('السعر من الخادم، بسعر البيع المباشر بعد العمولة، ويُعاد التحقق منه عند الاعتماد.', 'The price comes from the server — the direct-sale price after commission — and is checked again when the value is fixed.')}
+        {L('السعر من الخادم، بسعر البيع المباشر بعد العمولة، ويُعاد التحقق منه عند الاعتماد.', 'The price comes from the server — the direct-sale price after commission — and is checked again when the value is fixed.', 'نرخەکە لە ڕاژەکارەوە دێت — نرخی فرۆشتنی ڕاستەوخۆ — و کاتێک بەهاکە جێگیر دەکرێت دووبارە پشکنینی بۆ دەکرێتەوە.')}
       </p>
     </div>
   );

@@ -166,7 +166,7 @@ export default function RulesEditor() {
       <div className="flex flex-wrap items-center gap-2">
         {TRADE_IN_FAMILIES.map((f) => (
           <button key={f} type="button" aria-pressed={family === f} className={T.chip} onClick={() => setFamily(f)} data-family={f}>
-            {loc(FAMILY_LABELS[f].ar, FAMILY_LABELS[f].en)}
+            {loc(FAMILY_LABELS[f].ar, FAMILY_LABELS[f].en, FAMILY_LABELS[f].ckb)}
           </button>
         ))}
       </div>
@@ -175,7 +175,7 @@ export default function RulesEditor() {
         <div className="flex flex-wrap items-center gap-2 justify-between">
           <div>
             <h2 className="text-[16px] font-bold">
-              {loc(FAMILY_LABELS[family].ar, FAMILY_LABELS[family].en)} · v{current.version}
+              {loc(FAMILY_LABELS[family].ar, FAMILY_LABELS[family].en, FAMILY_LABELS[family].ckb)} · v{current.version}
             </h2>
             <p className={`text-[12.5px] ${T.text3}`}>{L('كل حفظ يُنشئ نسخة جديدة؛ الطلبات القديمة تحتفظ بنسختها.', 'Every save creates a new version; older requests keep theirs.')}</p>
           </div>
@@ -214,7 +214,7 @@ export default function RulesEditor() {
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={f.enabled} onChange={(e) => setFactor(id, { enabled: e.target.checked })} className="h-4 w-4 accent-[var(--ap-accent)]" />
-                    <span className="text-[14px] font-semibold">{loc(FACTOR_LABELS[id].ar, FACTOR_LABELS[id].en)}</span>
+                    <span className="text-[14px] font-semibold">{loc(FACTOR_LABELS[id].ar, FACTOR_LABELS[id].en, FACTOR_LABELS[id].ckb)}</span>
                   </label>
                   <div className="ms-auto w-36">
                     <Pct label={L('نسبة التأثير', 'Impact weight')} bp={f.weight_bp} onChange={(v) => setFactor(id, { weight_bp: v })} invalid={bad(`${id}.weight_bp`)} />

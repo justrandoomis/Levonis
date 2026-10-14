@@ -232,16 +232,21 @@ test('the customer’s own draft carries only the final estimate — no rules, n
   const created = await post(app, '/api/trade-in/requests', { order_item_id: 'oi_a1', unit_index: 1, scope: 'whole' });
   assert.equal(created.status, 201, await created.clone().text());
   const draft = (await json(created)).request;
+  // Since Services V2 (trade-in G11) a draft's own view carries no figure: the
+  // counted preview door is the only one, and it answers the final figure.
+  assert.equal(draft.estimated_iqd, null, 'the draft view carries no figure');
+  const previewed = await json(await post(app, `/api/trade-in/requests/${draft.id}/preview`, {}));
   // The path really priced with the owner's rules: the A1's market override is in force.
-  assert.ok(typeof draft.estimated_iqd === 'number' && draft.estimated_iqd > 0, 'the final estimate is there (allowed)');
+  assert.ok(typeof previewed.estimate?.total_iqd === 'number' && previewed.estimate.total_iqd > 0, 'the final estimate is there (allowed)');
   const view = await json(await get(app, `/api/trade-in/requests/${draft.id}`));
   const found = [
     ...calculationLeaks(draft).map((l) => `POST /api/trade-in/requests ${l}`),
+    ...calculationLeaks(previewed).map((l) => `POST /api/trade-in/requests/:id/preview ${l}`),
     ...calculationLeaks(view).map((l) => `GET /api/trade-in/requests/:id ${l}`),
   ];
 
   // What the wizard paints from that answer (src/components/tradeIn/controls.tsx Breakdown).
-  const comp = (view.request?.estimate?.components ?? [])[0];
+  const comp = (previewed.estimate?.components ?? [])[0];
   if (comp?.valuation) {
     const html = renderToStaticMarkup(
       createElement(LanguageProvider, {

@@ -38,8 +38,9 @@
  *   clamped         = clamp(raw, base × floor_bp, base × cap_bp)
  *   value           = clamped rounded DOWN to `rounding_iqd` (1,000 by default)
  *
- * ADDITIVE, NOT MULTIPLICATIVE, on purpose. «شفاف» means a customer can read
- * the breakdown top to bottom and the lines add up to the answer. A product of
+ * ADDITIVE, NOT MULTIPLICATIVE, on purpose. «شفاف» means the desk can read
+ * the breakdown top to bottom and the lines add up to the answer (the customer
+ * reads the final figure alone — DECISIONS row 220, trade-in G22). A product of
  * thirteen percentages does not decompose into lines anyone can check; a sum
  * does. The clamp and the rounding are printed as their own lines for the same
  * reason — the breakdown always sums EXACTLY to the value.
@@ -65,12 +66,19 @@ export type TradeInFamily = (typeof TRADE_IN_FAMILIES)[number];
 export const isTradeInFamily = (v: unknown): v is TradeInFamily =>
   typeof v === 'string' && (TRADE_IN_FAMILIES as readonly string[]).includes(v);
 
-export const FAMILY_LABELS: Record<TradeInFamily, { ar: string; en: string }> = {
-  fdm: { ar: 'طابعة FDM (فلمنت)', en: 'FDM printer (filament)' },
-  resin: { ar: 'طابعة Resin', en: 'Resin printer' },
-  laser: { ar: 'جهاز ليزر', en: 'Laser machine' },
-  ams: { ar: 'AMS / نظام تعدد الألوان', en: 'AMS / multi-material unit' },
-  accessory: { ar: 'ملحق', en: 'Accessory' },
+/** A label in the three languages every screen speaks (DECISIONS row 183: the Sorani is written, never the Arabic copied). */
+export type Trilingual = {
+  ar: string;
+  en: string;
+  ckb: string;
+};
+
+export const FAMILY_LABELS: Record<TradeInFamily, Trilingual> = {
+  fdm: { ar: 'طابعة FDM (فلمنت)', en: 'FDM printer (filament)', ckb: 'چاپکەری FDM (فیلامێنت)' },
+  resin: { ar: 'طابعة Resin', en: 'Resin printer', ckb: 'چاپکەری Resin' },
+  laser: { ar: 'جهاز ليزر', en: 'Laser machine', ckb: 'ئامێری لەیزەر' },
+  ams: { ar: 'AMS / نظام تعدد الألوان', en: 'AMS / multi-material unit', ckb: 'AMS / سیستەمی چەند ڕەنگ' },
+  accessory: { ar: 'ملحق', en: 'Accessory', ckb: 'پاشکۆ' },
 };
 
 /**
@@ -119,21 +127,90 @@ export const FACTOR_IDS = [
 ] as const;
 export type FactorId = (typeof FACTOR_IDS)[number];
 
+/**
+ * THE SORANI OF THE SEEDED CHECKLIST ITEMS (faults and replaced parts),
+ * keyed by the Arabic the seed wrote. The items themselves live in the
+ * owner's rule sets (data, editable), which carry Arabic and English only;
+ * the Worker adds this Sorani to the questions it sends while an item still
+ * reads as seeded (`checklistLabelCkb`). An item the owner renamed or added
+ * has no Sorani here and is shown as the owner wrote it.
+ */
+const CHECKLIST_LABELS_CKB: Readonly<Record<string, string>> = {
+  'اللوحة الأم': 'بۆردی سەرەکی',
+  'الشاشة': 'شاشە',
+  'مروحة': 'پانکە',
+  'مزود الطاقة': 'دابینکەری کارەبا',
+  'انسداد النوزل': 'گیرانی نۆزڵ',
+  'تقطيع أو انزلاق في الإكسترودر': 'پچڕان یان خلیسکانی ئێکسترودەر',
+  'مشكلة في معايرة السطح': 'کێشە لە ڕێکخستنی ڕووی چاپ',
+  'خطأ في التسخين': 'هەڵەی گەرمکردنەوە',
+  'صوت غير طبيعي في المحركات': 'دەنگی نائاسایی لە بزوێنەرەکان',
+  'تآكل الأحزمة': 'سووانی قایشەکان',
+  'عطل الكاميرا أو الليدار': 'تێکچوونی کامێرا یان لایدار',
+  'عطل الشاشة أو اللمس': 'تێکچوونی شاشە یان دەستلێدان',
+  'مشكلة في الاتصال (واي فاي)': 'کێشەی پەیوەندی (وای فای)',
+  'مروحة عالية الصوت أو معطلة': 'پانکەی دەنگبەرز یان تێکچوو',
+  'عطل حساس الفلمنت': 'تێکچوونی هەستەوەری فیلامێنت',
+  'عطل في اللوحة الأم': 'تێکچوونی بۆردی سەرەکی',
+  'رأس الطباعة (Hotend)': 'سەری چاپ (Hotend)',
+  'النوزل': 'نۆزڵ',
+  'سطح الطباعة': 'ڕووی چاپ',
+  'الأحزمة': 'قایشەکان',
+  'الإكسترودر': 'ئێکسترودەر',
+  'تلف شاشة LCD': 'تێکچوونی شاشەی LCD',
+  'فيلم FEP مستهلك': 'فیلمی FEP سواوە',
+  'تسريب في الحوض': 'دزەکردن لە حەوزەکەوە',
+  'ضعف ضوء UV': 'لاوازیی ڕووناکیی UV',
+  'اهتزاز أو خلل في محور Z': 'لەرزین یان کێشە لە تەوەری Z',
+  'ضعف الالتصاق بالمنصة': 'لاوازیی لکان بە سەکۆکەوە',
+  'عطل شاشة اللمس': 'تێکچوونی شاشەی دەستلێدان',
+  'تسرب ريزن داخل الجهاز': 'ڕژانی ڕێزن بۆ ناو ئامێرەکە',
+  'شاشة LCD': 'شاشەی LCD',
+  'فيلم FEP': 'فیلمی FEP',
+  'الحوض': 'حەوز',
+  'منصة الطباعة': 'سەکۆی چاپ',
+  'وحدة UV': 'یەکەی UV',
+  'اتساخ أو خدش العدسة': 'پیسبوون یان ڕووشانی هاوێنە',
+  'ضعف قوة الليزر': 'لاوازیی هێزی لەیزەر',
+  'عطل نفخ الهواء': 'تێکچوونی فووکردنی هەوا',
+  'خطأ في العودة للصفر': 'هەڵە لە گەڕانەوە بۆ خاڵی سفر',
+  'عطل الكاميرا': 'تێکچوونی کامێرا',
+  'عطل حساس الأمان': 'تێکچوونی هەستەوەری سەلامەتی',
+  'العدسة': 'هاوێنە',
+  'وحدة الليزر': 'یەکەی لەیزەر',
+  'أخطاء في سحب الفلمنت': 'هەڵە لە ڕاکێشانی فیلامێنت',
+  'عطل قارئ RFID': 'تێکچوونی خوێنەرەوەی RFID',
+  'مشكلة في الـ Buffer': 'کێشە لە Buffer',
+  'عطل حساس الرطوبة': 'تێکچوونی هەستەوەری شێ',
+  'مشكلة في القاطع': 'کێشە لە بڕەرەکە',
+  'أنابيب PTFE مستهلكة': 'بۆرییە PTFE ـیەکان سواون',
+  'وحدة السحب (Feeder)': 'یەکەی ڕاکێشان (Feeder)',
+  'أنابيب PTFE': 'بۆرییەکانی PTFE',
+  'لا يعمل': 'کار ناکات',
+  'يعمل جزئياً': 'تەنها بەشێکی کار دەکات',
+  'قطع ناقصة': 'پارچەی کەمە',
+};
+
+/** The Sorani of a checklist item that still reads as seeded, else undefined. */
+export function checklistLabelCkb(labelAr: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(CHECKLIST_LABELS_CKB, labelAr) ? CHECKLIST_LABELS_CKB[labelAr] : undefined;
+}
+
 /** The owner's own words for each factor, in the order the breakdown prints. */
-export const FACTOR_LABELS: Record<FactorId, { ar: string; en: string }> = {
-  usage_age: { ar: 'مدة الاستخدام', en: 'Time in use' },
-  warranty_remaining: { ar: 'المتبقي من الضمان', en: 'Warranty remaining' },
-  operating_hours: { ar: 'ساعات التشغيل', en: 'Operating hours' },
-  cleanliness: { ar: 'حالة النظافة', en: 'Cleanliness' },
-  exterior: { ar: 'الحالة الخارجية', en: 'Exterior condition' },
-  scratches: { ar: 'الخدوش', en: 'Scratches' },
-  faults: { ar: 'المشاكل والأعطال', en: 'Problems & faults' },
-  repairs: { ar: 'الإصلاحات السابقة', en: 'Previous repairs' },
-  replaced_parts: { ar: 'القطع المستبدلة', en: 'Replaced parts' },
-  accessory_condition: { ar: 'حالة الملحقات المرفقة', en: 'Included accessories' },
-  original_accessories: { ar: 'توفر الملحقات الأصلية', en: 'Original accessories present' },
-  market: { ar: 'حالة السوق وقيمة إعادة البيع', en: 'Market & resale value' },
-  product_type: { ar: 'نوع الجهاز', en: 'Device type' },
+export const FACTOR_LABELS: Record<FactorId, Trilingual> = {
+  usage_age: { ar: 'مدة الاستخدام', en: 'Time in use', ckb: 'ماوەی بەکارهێنان' },
+  warranty_remaining: { ar: 'المتبقي من الضمان', en: 'Warranty remaining', ckb: 'گەرەنتیی ماوە' },
+  operating_hours: { ar: 'ساعات التشغيل', en: 'Operating hours', ckb: 'کاتژمێرەکانی کارکردن' },
+  cleanliness: { ar: 'حالة النظافة', en: 'Cleanliness', ckb: 'پاکوخاوێنی' },
+  exterior: { ar: 'الحالة الخارجية', en: 'Exterior condition', ckb: 'دۆخی دەرەوە' },
+  scratches: { ar: 'الخدوش', en: 'Scratches', ckb: 'ڕووشانەکان' },
+  faults: { ar: 'المشاكل والأعطال', en: 'Problems & faults', ckb: 'کێشە و تێکچوونەکان' },
+  repairs: { ar: 'الإصلاحات السابقة', en: 'Previous repairs', ckb: 'چاککردنەوەکانی پێشوو' },
+  replaced_parts: { ar: 'القطع المستبدلة', en: 'Replaced parts', ckb: 'پارچە گۆڕدراوەکان' },
+  accessory_condition: { ar: 'حالة الملحقات المرفقة', en: 'Included accessories', ckb: 'دۆخی پاشکۆ هاوپێچەکان' },
+  original_accessories: { ar: 'توفر الملحقات الأصلية', en: 'Original accessories present', ckb: 'بوونی پاشکۆ ڕەسەنەکان' },
+  market: { ar: 'حالة السوق وقيمة إعادة البيع', en: 'Market & resale value', ckb: 'دۆخی بازاڕ و بەهای دووبارە فرۆشتنەوە' },
+  product_type: { ar: 'نوع الجهاز', en: 'Device type', ckb: 'جۆری ئامێر' },
 };
 
 /** Limits every stored rule is validated against (bp = basis points). */
@@ -491,24 +568,37 @@ export interface PhotoAngle {
   id: string;
   label_ar: string;
   label_en: string;
+  label_ckb: string;
   /** What to frame, one sentence. */
   hint_ar: string;
   hint_en: string;
+  hint_ckb: string;
 }
 
-const A = (id: string, label_ar: string, label_en: string, hint_ar: string, hint_en: string): PhotoAngle => ({
+/** An angle: its id, then [ar, en, ckb] for the label and [ar, en, ckb] for the hint. */
+const A = (id: string, label: [string, string, string], hint: [string, string, string]): PhotoAngle => ({
   id,
-  label_ar,
-  label_en,
-  hint_ar,
-  hint_en,
+  label_ar: label[0],
+  label_en: label[1],
+  label_ckb: label[2],
+  hint_ar: hint[0],
+  hint_en: hint[1],
+  hint_ckb: hint[2],
 });
 
-const FRONT = A('front', 'الأمام', 'Front', 'الجهاز كاملاً من الأمام، والإضاءة جيدة.', 'The whole machine from the front, in good light.');
-const BACK = A('back', 'الخلف', 'Back', 'الجهة الخلفية مع المنافذ والكابلات.', 'The back, with the ports and cables.');
-const LEFT = A('left', 'الجانب الأيسر', 'Left side', 'الجانب الأيسر كاملاً.', 'The whole left side.');
-const RIGHT = A('right', 'الجانب الأيمن', 'Right side', 'الجانب الأيمن كاملاً.', 'The whole right side.');
-const SERIAL = A('serial', 'ملصق الرقم التسلسلي', 'Serial label', 'الملصق الذي يحمل الرقم التسلسلي، مقروءاً.', 'The label with the serial number, readable.');
+const FRONT = A(
+  'front',
+  ['الأمام', 'Front', 'پێشەوە'],
+  ['الجهاز كاملاً من الأمام، والإضاءة جيدة.', 'The whole machine from the front, in good light.', 'ئامێرەکە بە تەواوی لە پێشەوە، لە ڕووناکییەکی باشدا.']
+);
+const BACK = A('back', ['الخلف', 'Back', 'دواوە'], ['الجهة الخلفية مع المنافذ والكابلات.', 'The back, with the ports and cables.', 'لای دواوە لەگەڵ دەرچە و کێبڵەکان.']);
+const LEFT = A('left', ['الجانب الأيسر', 'Left side', 'لای چەپ'], ['الجانب الأيسر كاملاً.', 'The whole left side.', 'لای چەپ بە تەواوی.']);
+const RIGHT = A('right', ['الجانب الأيمن', 'Right side', 'لای ڕاست'], ['الجانب الأيمن كاملاً.', 'The whole right side.', 'لای ڕاست بە تەواوی.']);
+const SERIAL = A(
+  'serial',
+  ['ملصق الرقم التسلسلي', 'Serial label', 'لەیبڵی ژمارەی زنجیرەیی'],
+  ['الملصق الذي يحمل الرقم التسلسلي، مقروءاً.', 'The label with the serial number, readable.', 'ئەو لەیبڵەی ژمارەی زنجیرەیی لەسەرە، بە شێوەیەک بخوێندرێتەوە.']
+);
 
 /**
  * «صور إلزامية من عدة زوايا، مع صور خاصة للأجزاء المهمة حسب نوع الجهاز».
@@ -524,9 +614,17 @@ export const REQUIRED_PHOTOS: Record<TradeInFamily, PhotoAngle[]> = {
     BACK,
     LEFT,
     RIGHT,
-    A('build_plate', 'سطح الطباعة', 'Build plate', 'سطح الطباعة بعد رفعه أو من الأعلى، ليظهر أي خدش أو تلف.', 'The build plate, lifted or from above, so any wear shows.'),
-    A('hotend', 'رأس الطباعة / النوزل', 'Hotend / nozzle', 'رأس الطباعة والنوزل عن قرب.', 'The hotend and nozzle, close up.'),
-    A('screen_hours', 'الشاشة وساعات التشغيل', 'Screen with hours', 'الشاشة مشغّلة وتظهر ساعات التشغيل إن أمكن.', 'The screen switched on, showing the hour counter if it has one.'),
+    A(
+      'build_plate',
+      ['سطح الطباعة', 'Build plate', 'ڕووی چاپ'],
+      ['سطح الطباعة بعد رفعه أو من الأعلى، ليظهر أي خدش أو تلف.', 'The build plate, lifted or from above, so any wear shows.', 'ڕووی چاپ دوای هەڵگرتنی یان لە سەرەوە، بۆ ئەوەی هەر ڕووشان یان زیانێک دەربکەوێت.']
+    ),
+    A('hotend', ['رأس الطباعة / النوزل', 'Hotend / nozzle', 'سەری چاپ / نۆزڵ'], ['رأس الطباعة والنوزل عن قرب.', 'The hotend and nozzle, close up.', 'سەری چاپ و نۆزڵەکە لە نزیکەوە.']),
+    A(
+      'screen_hours',
+      ['الشاشة وساعات التشغيل', 'Screen with hours', 'شاشە و کاتژمێرەکانی کارکردن'],
+      ['الشاشة مشغّلة وتظهر ساعات التشغيل إن أمكن.', 'The screen switched on, showing the hour counter if it has one.', 'شاشەکە هەڵکراو بێت و ئەگەر هەبێت کاتژمێرەکانی کارکردن پیشان بدات.']
+    ),
     SERIAL,
   ],
   resin: [
@@ -534,39 +632,37 @@ export const REQUIRED_PHOTOS: Record<TradeInFamily, PhotoAngle[]> = {
     BACK,
     LEFT,
     RIGHT,
-    A('vat', 'حوض الريزن والفيلم', 'Resin vat & film', 'الحوض فارغاً ونظيفاً، وفيلم FEP واضح.', 'The vat empty and clean, with the FEP film visible.'),
-    A('lcd_screen', 'شاشة LCD', 'LCD screen', 'شاشة التعريض بعد رفع الحوض.', 'The exposure screen with the vat removed.'),
-    A('build_plate', 'منصة الطباعة', 'Build platform', 'منصة الطباعة من الأسفل.', 'The build platform from below.'),
+    A('vat', ['حوض الريزن والفيلم', 'Resin vat & film', 'حەوزی ڕێزن و فیلمەکە'], ['الحوض فارغاً ونظيفاً، وفيلم FEP واضح.', 'The vat empty and clean, with the FEP film visible.', 'حەوزەکە بەتاڵ و پاک، و فیلمی FEP بە ڕوونی دیار بێت.']),
+    A('lcd_screen', ['شاشة LCD', 'LCD screen', 'شاشەی LCD'], ['شاشة التعريض بعد رفع الحوض.', 'The exposure screen with the vat removed.', 'شاشەی تیشکدان دوای لابردنی حەوزەکە.']),
+    A('build_plate', ['منصة الطباعة', 'Build platform', 'سەکۆی چاپ'], ['منصة الطباعة من الأسفل.', 'The build platform from below.', 'سەکۆی چاپ لە خوارەوە.']),
     SERIAL,
   ],
   laser: [
     FRONT,
-    A('top', 'من الأعلى', 'From above', 'الجهاز من الأعلى ومنطقة العمل.', 'The machine from above, with the work area.'),
-    A('lens', 'العدسة', 'Lens', 'العدسة عن قرب، ليظهر أي اتساخ أو خدش.', 'The lens close up, so any dirt or scratch shows.'),
-    A('laser_module', 'وحدة الليزر', 'Laser module', 'وحدة/رأس الليزر كاملة.', 'The whole laser module/head.'),
-    A('work_area', 'سطح العمل', 'Work bed', 'سطح العمل أو الشبكة.', 'The work bed or honeycomb.'),
+    A('top', ['من الأعلى', 'From above', 'لە سەرەوە'], ['الجهاز من الأعلى ومنطقة العمل.', 'The machine from above, with the work area.', 'ئامێرەکە لە سەرەوە، لەگەڵ ناوچەی کارکردن.']),
+    A('lens', ['العدسة', 'Lens', 'هاوێنە'], ['العدسة عن قرب، ليظهر أي اتساخ أو خدش.', 'The lens close up, so any dirt or scratch shows.', 'هاوێنەکە لە نزیکەوە، بۆ ئەوەی هەر پیسی یان ڕووشانێک دەربکەوێت.']),
+    A('laser_module', ['وحدة الليزر', 'Laser module', 'یەکەی لەیزەر'], ['وحدة/رأس الليزر كاملة.', 'The whole laser module/head.', 'یەکە/سەری لەیزەر بە تەواوی.']),
+    A('work_area', ['سطح العمل', 'Work bed', 'ڕووی کار'], ['سطح العمل أو الشبكة.', 'The work bed or honeycomb.', 'ڕووی کار یان تۆڕەکە.']),
     SERIAL,
   ],
   ams: [
-    A('front', 'الأمام', 'Front', 'الوحدة كاملة من الأمام والغطاء مغلق.', 'The whole unit from the front, lid closed.'),
-    A('interior', 'الداخل', 'Interior', 'الغطاء مفتوح وتظهر الفتحات الأربع.', 'Lid open, with every slot visible.'),
-    A('back', 'الخلف والوصلات', 'Back & connectors', 'الخلف مع الأنابيب والوصلات.', 'The back, with its tubes and connectors.'),
+    A('front', ['الأمام', 'Front', 'پێشەوە'], ['الوحدة كاملة من الأمام والغطاء مغلق.', 'The whole unit from the front, lid closed.', 'یەکەکە بە تەواوی لە پێشەوە، سەرپۆشەکەی داخراو.']),
+    A('interior', ['الداخل', 'Interior', 'ناوەوە'], ['الغطاء مفتوح وتظهر الفتحات الأربع.', 'Lid open, with every slot visible.', 'سەرپۆشەکە کراوە و هەموو خانەکان دیار بن.']),
+    A('back', ['الخلف والوصلات', 'Back & connectors', 'دواوە و گەیەنەرەکان'], ['الخلف مع الأنابيب والوصلات.', 'The back, with its tubes and connectors.', 'دواوە لەگەڵ بۆری و گەیەنەرەکانی.']),
     SERIAL,
   ],
   accessory: [
     FRONT,
     BACK,
-    A('detail', 'تفاصيل الحالة', 'Condition detail', 'أي جزء يظهر حالته الحقيقية عن قرب.', 'Any part that shows its real condition, close up.'),
+    A('detail', ['تفاصيل الحالة', 'Condition detail', 'وردەکاریی دۆخ'], ['أي جزء يظهر حالته الحقيقية عن قرب.', 'Any part that shows its real condition, close up.', 'هەر بەشێک کە دۆخی ڕاستەقینەی لە نزیکەوە پیشان بدات.']),
   ],
 };
 
 /** Close-ups of damage are welcome and never required. */
 export const OPTIONAL_PHOTO: PhotoAngle = A(
   'damage',
-  'صور الأضرار (اختياري)',
-  'Damage close-ups (optional)',
-  'أي خدش أو كسر أو عطل ظاهر.',
-  'Any visible scratch, crack or fault.'
+  ['صور الأضرار (اختياري)', 'Damage close-ups (optional)', 'وێنەی زیانەکان (ئارەزوومەندانە)'],
+  ['أي خدش أو كسر أو عطل ظاهر.', 'Any visible scratch, crack or fault.', 'هەر ڕووشان، شکان یان تێکچوونێکی دیار.']
 );
 
 export const MAX_PHOTOS_PER_ANGLE = 3;
@@ -651,17 +747,17 @@ export const CLAIMING_STATUSES: readonly TradeInStatus[] = TRADE_IN_STATUSES.fil
   (s) => s !== 'customer_rejected' && s !== 'cancelled'
 );
 
-export const STATUS_LABELS: Record<TradeInStatus, { ar: string; en: string }> = {
-  draft: { ar: 'قيد التحضير', en: 'Draft' },
-  submitted: { ar: 'أُرسل للمراجعة', en: 'Submitted' },
-  under_review: { ar: 'قيد الفحص', en: 'Under inspection' },
-  approved_as_estimated: { ar: 'اعتُمد التقدير', en: 'Estimate approved' },
-  value_changed: { ar: 'قيمة جديدة بانتظار موافقتك', en: 'New value — your decision' },
-  customer_accepted: { ar: 'وافقت على القيمة', en: 'You accepted' },
-  customer_rejected: { ar: 'رفضت القيمة', en: 'You declined' },
-  awaiting_payment: { ar: 'بانتظار السداد', en: 'Awaiting payment' },
-  completed: { ar: 'اكتمل الاستبدال', en: 'Completed' },
-  cancelled: { ar: 'ملغى', en: 'Cancelled' },
+export const STATUS_LABELS: Record<TradeInStatus, Trilingual> = {
+  draft: { ar: 'قيد التحضير', en: 'Draft', ckb: 'لە ئامادەکردندایە' },
+  submitted: { ar: 'أُرسل للمراجعة', en: 'Submitted', ckb: 'بۆ پێداچوونەوە نێردرا' },
+  under_review: { ar: 'قيد الفحص', en: 'Under inspection', ckb: 'لە پشکنیندایە' },
+  approved_as_estimated: { ar: 'اعتُمد التقدير', en: 'Estimate approved', ckb: 'خەمڵاندنەکە پەسەند کرا' },
+  value_changed: { ar: 'قيمة جديدة بانتظار موافقتك', en: 'New value — your decision', ckb: 'بەهایەکی نوێ — چاوەڕێی بڕیاری تۆیە' },
+  customer_accepted: { ar: 'وافقت على القيمة', en: 'You accepted', ckb: 'بەهاکەت قبووڵ کرد' },
+  customer_rejected: { ar: 'رفضت القيمة', en: 'You declined', ckb: 'بەهاکەت ڕەت کردەوە' },
+  awaiting_payment: { ar: 'بانتظار السداد', en: 'Awaiting payment', ckb: 'چاوەڕێی پارەدانە' },
+  completed: { ar: 'اكتمل الاستبدال', en: 'Completed', ckb: 'گۆڕینەوەکە تەواو بوو' },
+  cancelled: { ar: 'ملغى', en: 'Cancelled', ckb: 'هەڵوەشێنرایەوە' },
 };
 
 // ============================================================ validation
