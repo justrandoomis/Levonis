@@ -4,6 +4,38 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
+## Releases of 2026-10-14 (all live, workflow 7 green, 22/22 live cost probes)
+
+- `059ea69d` — **Release A**: Pricing V2-0 (offer in quote/pills/public API, «from» prices,
+  final numbers only in customer JSON — DECISIONS 225; purchase rate from the approved central
+  rate with a 6% guard and Sorani finance screens — 224), the image pipeline (right-sized R2
+  copies + srcset everywhere, ~67% fewer image bytes on phones — 226), Sorani checkout, stock
+  counts, dates. Two test fixes: the store preload regex accepts imageSrcSet; the leak scanner
+  treats 64-hex audit digests as random ids.
+- `90fe7979` — **Services S-P0a/S-P0b** (DECISIONS 227/228): one money-authority rule (assistant
+  never moves money; financial admin up to the server's figure / 250,000; owner above with a
+  recorded reason; no self-approval), one `paidNetPerUnit`, mutual fences (return / warranty /
+  trade-in / protection on one unit), coupon line allocation with every reader cut over, price
+  protection rung/channel/PRIME fixes + review queue, warranty desk sheets, trade-in credit
+  integrity (7-day credit, approved figure only), public promo codes owner-only, Sorani.
+- `a7895150` — **Clay polish** (DECISIONS 229–232): dark depth and the light wash, one focus ink,
+  clay phone cart, calm order cards, real not-found page, honest points page, Sorani profile,
+  admin/merchant/auth leftovers; clay ratchet lowered to 0/10/29/0/19/5.
+
+Owner decisions recorded: rows 221 (Pricing V2 A1/B1/C1/D1), 222 (clean start: every product
+hidden at the deploy of Pricing V2 until its new pricing is published; staff see USD; route
+below cost sells at direct), 223 (Services V2 decisions 1–8; perks per printer, admin-set amount).
+
+In flight: **Pricing V2 clean start** on `feat/pricing-v2-core` (worktree
+`/home/user/levonis-v2core`, migrations 0189/0190; workflow `wf_6dfb26c6-4a5`): reviews → fix →
+side-branch CI `ci/pricing-v2` → land. Its deploy hides every store product until priced.
+Next: Services S-P1 … S-P10 (plan in the session scratchpad `services-v2/plan.md`).
+
+Working method (owner asked why work took days, 2026-10-14): local test/check runs on the
+4-CPU container took 60–90 min and dominated; agents now run only the tests near their change
+and the full 964-file verification runs on GitHub's 16 runners (side branch `ci/*` or workflow 7).
+Exploit-describing tests never go to a public side branch before their fix deploys.
+
 ## Release of 2026-10-13 — review fixes, sixteen CI shards, the cost-leak audit
 
 `ae3d8b2e` on the default branch carries, in order:
