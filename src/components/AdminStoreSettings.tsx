@@ -420,6 +420,15 @@ export default function AdminStoreSettings() {
               <input
                 className="lv-input"
                 type="text"
+                dir="rtl"
+                lang="ckb"
+                value={row.value.titleCkb || ''}
+                onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleCkb: e.target.value } } : r)); setDeliveryState('idle'); }}
+                placeholder="Title (Ckb)"
+              />
+              <input
+                className="lv-input"
+                type="text"
                 value={row.value.descAr}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descAr: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Desc (Ar)"
@@ -430,6 +439,15 @@ export default function AdminStoreSettings() {
                 value={row.value.descEn}
                 onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descEn: e.target.value } } : r)); setDeliveryState('idle'); }}
                 placeholder="Desc (En)"
+              />
+              <input
+                className="lv-input"
+                type="text"
+                dir="rtl"
+                lang="ckb"
+                value={row.value.descCkb || ''}
+                onChange={e => { setDeliveryRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descCkb: e.target.value } } : r)); setDeliveryState('idle'); }}
+                placeholder="Desc (Ckb)"
               />
               <select
                 className="lv-input"
@@ -513,6 +531,15 @@ export default function AdminStoreSettings() {
                 onChange={e => { setPaymentRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleEn: e.target.value } } : r)); setPaymentState('idle'); }}
                 placeholder="Title (En)"
               />
+              <input
+                className="lv-input"
+                type="text"
+                dir="rtl"
+                lang="ckb"
+                value={row.value.titleCkb || ''}
+                onChange={e => { setPaymentRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleCkb: e.target.value } } : r)); setPaymentState('idle'); }}
+                placeholder="Title (Ckb)"
+              />
               <div className="flex gap-2">
                 <input
                   className="lv-input flex-1"
@@ -574,9 +601,27 @@ export default function AdminStoreSettings() {
               <input
                 className="lv-input"
                 type="text"
+                dir="rtl"
+                lang="ckb"
+                value={row.value.titleCkb || ''}
+                onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, titleCkb: e.target.value } } : r)); setShippingState('idle'); }}
+                placeholder="Title (Ckb)"
+              />
+              <input
+                className="lv-input"
+                type="text"
                 value={row.value.descAr}
                 onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descAr: e.target.value } } : r)); setShippingState('idle'); }}
                 placeholder="Desc (Ar)"
+              />
+              <input
+                className="lv-input"
+                type="text"
+                dir="rtl"
+                lang="ckb"
+                value={row.value.descCkb || ''}
+                onChange={e => { setShippingRows(rows => rows.map(r => r.key === row.key ? { ...r, value: { ...r.value, descCkb: e.target.value } } : r)); setShippingState('idle'); }}
+                placeholder="Desc (Ckb)"
               />
               <div className="flex gap-2">
                 <input

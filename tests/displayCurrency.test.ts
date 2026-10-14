@@ -334,11 +334,12 @@ test('every customer-facing price goes through the hook, not formatIqd', () => {
       const code = read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
       const calls = code.match(/\bformatIqd\(/g) ?? [];
       if (rel === RATE_SENTENCE) {
-        // Exactly the four: two constants, twice (Arabic and English).
-        assert.equal(calls.length, 4, `${rel}: the rate-sentence allowance is for those two rates only`);
+        // Exactly the six: two constants, three times (Arabic, English and
+        // Sorani — DECISIONS row 183: the Sorani sentence quotes the same rate).
+        assert.equal(calls.length, 6, `${rel}: the rate-sentence allowance is for those two rates only`);
         assert.equal(
           (code.match(/formatIqd\(codTax(PerBlock|Block)Iqd\)/g) ?? []).length,
-          4,
+          6,
           `${rel}: the rate sentence must quote the ADMIN's configured rate, not the packaged constant`
         );
         continue;

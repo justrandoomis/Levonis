@@ -10,6 +10,7 @@ import { mascot } from '../lib/mascot';
 import { api, ApiError, CartItem } from '../lib/api';
 import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
+import { methodDesc, methodTitle } from '../lib/methodText';
 import { standardDeliveryFeeIqd } from '../../packages/shipping/src/shipping';
 import { asLang, monthsLabel } from '../components/orders/format';
 import Note from '../components/ui/Note';
@@ -1166,10 +1167,11 @@ export default function Cart() {
   const total = merchandise + shipping - pointsDiscount;
 
   /** A delivery method in the store's OWN configured words (a setting, never a
-   *  label typed here); `dir` picks the script, as the shipping sheet does. */
+   *  label typed here), in the reader's language — Sorani included, which a
+   *  `dir` test handed the Arabic (src/lib/methodText.ts). */
   const deliveryMethodName = (id: DeliveryMethodId) => {
     const configured = checkoutDeliveryMethods.find((m) => m.id === id);
-    return configured ? (dir === 'rtl' ? configured.titleAr : configured.titleEn) : id;
+    return configured ? methodTitle(configured, lang) : id;
   };
 
   /**
@@ -2739,10 +2741,10 @@ export default function Cart() {
               {(shippingView.shipping_methods ?? []).map((sm) => {
                 const globalMethod = cartShippingMethods.find((m) => m.id === sm.id);
                 const title = globalMethod
-                  ? (dir === 'rtl' ? globalMethod.titleAr : globalMethod.titleEn)
+                  ? methodTitle(globalMethod, lang)
                   : sm.method || sm.id;
                 const desc = globalMethod
-                  ? (dir === 'rtl' ? globalMethod.descAr : globalMethod.descEn)
+                  ? methodDesc(globalMethod, lang)
                   : sm.delivery_time || '';
                 const active = shippingView.shipping_method_id === sm.id;
                 return (

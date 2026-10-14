@@ -1520,8 +1520,13 @@ export interface DeliveryMethod {
   id: string;
   titleAr: string;
   titleEn: string;
+  /** Sorani, when the owner wrote one or the row still carries the shipped
+   *  Arabic (worker/lib/settings.ts `withShippedSorani`). Read through
+   *  `methodText`, which falls back to the Arabic. */
+  titleCkb?: string;
   descAr: string;
   descEn: string;
+  descCkb?: string;
   price_iqd: number;
   icon: string;
   /**
@@ -1545,8 +1550,8 @@ export interface DeliveryMethod {
    */
   map_url?: string;
 }
-export interface CheckoutPaymentMethod { id: string; titleAr: string; titleEn: string; icon: string }
-export interface CartShippingMethod { id: string; titleAr: string; titleEn: string; descAr: string; descEn: string }
+export interface CheckoutPaymentMethod { id: string; titleAr: string; titleEn: string; titleCkb?: string; icon: string }
+export interface CartShippingMethod { id: string; titleAr: string; titleEn: string; titleCkb?: string; descAr: string; descEn: string; descCkb?: string }
 export interface ManualPaymentMethod { id: string; name: string; details: string }
 /** A withdrawal payout channel (worker/lib/settings.ts `PayoutMethod`). */
 export interface PayoutMethod { id: string; name: string; requires_account: boolean }

@@ -66,10 +66,10 @@ test('the money column runs: goods → arrival → notes → settlement', () => 
   // The whole owner instruction, as one ordered list. Each marker is the
   // thing itself, not a comment about it, so moving a block moves the proof.
   inOrder(CHECKOUT, [
-    ['المجموع الفرعي', "loc('المجموع الفرعي', 'Subtotal')"],
+    ['المجموع الفرعي', "loc('المجموع الفرعي', 'Subtotal', 'کۆی لاوەکی')"],
     ['خصم العضوية', 'data-checkout-member-discount'],
-    ['خصم الكود', "loc('خصم الكود', 'Promo discount')"],
-    ['خصم النقاط', "loc('خصم النقاط', 'Points Discount')"],
+    ['خصم الكود', "loc('خصم الكود', 'Promo discount', 'داشکاندنی کۆد')"],
+    ['خصم النقاط', "loc('خصم النقاط', 'Points Discount', 'داشکاندنی خاڵ')"],
     ['تكلفة التوصيل إلى البيت', 'testId="delivery"'],
     ['ضريبة شركة التوصيل', 'testId="cod-tax"'],
     ['إعفاء العضوية', 'data-checkout-cod-tax-exemption'],
@@ -114,7 +114,7 @@ test('every control sits BELOW every note, so the price is read before it is pai
 
 test('the delivery row says «تكلفة التوصيل إلى البيت», and the word «الشحن» is gone from it', () => {
   assert.ok(
-    CHECKOUT.includes("loc('تكلفة التوصيل إلى البيت', 'Home delivery cost')"),
+    CHECKOUT.includes("loc('تكلفة التوصيل إلى البيت', 'Home delivery cost', 'تێچووی گەیاندن بۆ ماڵ')"),
     'the delivery label must name what it is: the cost of getting the order to the house'
   );
   assert.ok(
@@ -212,7 +212,7 @@ test('the cash-on-delivery commission is shown but never summed', () => {
 
 test('the promo code is a quiet line that expands, and opens itself when a code is live', () => {
   assert.ok(
-    CHECKOUT.includes("loc('استخدام كود خاص', 'Use a special code')"),
+    CHECKOUT.includes("loc('استخدام كود خاص', 'Use a special code', 'بەکارهێنانی کۆدی تایبەت')"),
     'the owner asked for «سطر ناعم استخدام كود خاص»'
   );
   assert.ok(
@@ -249,7 +249,7 @@ test('no money label in the column decides its LANGUAGE from the text DIRECTION'
   // missing translations. `loc(ar, en)` renders exactly the same thing and
   // leaves the empty Kurdish slot in plain sight.
   const column = CHECKOUT.slice(
-    at(CHECKOUT, "loc('المجموع الفرعي', 'Subtotal')"),
+    at(CHECKOUT, "loc('المجموع الفرعي', 'Subtotal', 'کۆی لاوەکی')"),
     at(CHECKOUT, 'data-testid="checkout-order-total"')
   );
   //

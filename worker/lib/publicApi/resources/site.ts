@@ -98,12 +98,12 @@ async function site(req: PublicRequest) {
       delivery_methods: delivery
         .filter((m) => m && typeof m === 'object')
         .map((m) => ({
-          title: localized(m.titleAr, m.titleEn, ''),
-          description: localized(m.descAr, m.descEn, ''),
+          title: localized(m.titleAr, m.titleEn, m.titleCkb ?? ''),
+          description: localized(m.descAr, m.descEn, m.descCkb ?? ''),
           price: int(m.price_iqd),
           home_delivery: deliversToHome({ id: String(m.id ?? ''), home_delivery: typeof m.home_delivery === 'boolean' ? m.home_delivery : undefined }),
         })),
-      payment_methods: payment.filter((m) => m && typeof m === 'object').map((m) => ({ title: localized(m.titleAr, m.titleEn, '') })),
+      payment_methods: payment.filter((m) => m && typeof m === 'object').map((m) => ({ title: localized(m.titleAr, m.titleEn, m.titleCkb ?? '') })),
       community_open: gate ? communityMayEnter(gate, null) : false,
       api: { context_url: urls.api('/context'), openapi_url: urls.api('/openapi.json') },
     },

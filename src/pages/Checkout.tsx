@@ -14,6 +14,7 @@ import {
 import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCentsToIqd, formatIqd } from '../lib/api';
+import { methodDesc, methodTitle } from '../lib/methodText';
 import type { DeliveryDayOption } from '../lib/api';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 /**
@@ -536,18 +537,19 @@ const DEFAULT_OFFERED_PAYMENT_IDS = ['wallet', 'cash'];
  * that sentence cannot carry — WHICH of the two ran out — because "sold out"
  * and "this month's pre-order quota is full" have different answers.
  *
- * `loc` is the app's translator and falls back to Arabic for Kurdish: the
- * Sorani here is the owner's to write by hand and is deliberately not invented.
+ * `loc` is the app's translator. Both sentences carry their own Sorani
+ * (DECISIONS row 183: a Sorani slot never carries the Arabic).
  */
 function counterNamed(code: string): string {
   if (code === 'PREORDER_CAPACITY_EXHAUSTED') {
     return loc(
       'العدّاد: حصة الطلب المسبق لهذا الاختيار — وليس مخزون البيع المباشر.',
-      'The counter: this selection’s pre-order quota — not direct-sale stock.'
+      'The counter: this selection’s pre-order quota — not direct-sale stock.',
+      'ژمێرەر: بەشی پێش-داواکاریی ئەم هەڵبژاردنە — نەک کۆگای فرۆشتنی ڕاستەوخۆ.'
     );
   }
   if (code === 'OUT_OF_STOCK' || code === 'QTY_UNAVAILABLE') {
-    return loc('العدّاد: مخزون البيع المباشر لهذا الاختيار.', 'The counter: direct-sale stock for this selection.');
+    return loc('العدّاد: مخزون البيع المباشر لهذا الاختيار.', 'The counter: direct-sale stock for this selection.', 'ژمێرەر: کۆگای فرۆشتنی ڕاستەوخۆی ئەم هەڵبژاردنە.');
   }
   return '';
 }
@@ -1445,7 +1447,7 @@ export default function Checkout() {
      */
     if (isGiniMethod && !giniOrderNoValid) return S.giniOrderNoBlock;
     if (shippingNeedsConfig) return S.needsConfig;
-    if (printerStandardRequired && !printerStandardAccepted) return loc('اقرأ تحذير التوصيل العادي للطابعات ووافق عليه لإتمام الطلب.', 'Read and acknowledge the printer standard-delivery warning to place your order.');
+    if (printerStandardRequired && !printerStandardAccepted) return loc('اقرأ تحذير التوصيل العادي للطابعات ووافق عليه لإتمام الطلب.', 'Read and acknowledge the printer standard-delivery warning to place your order.', 'ئاگادارکردنەوەی گەیاندنی ئاسایی بۆ پرینتەر بخوێنەوە و ڕەزامەندی لەسەر بدە بۆ تەواوکردنی داواکاری.');
     if (!consentSatisfied) return S.policyRequired;
     /**
      * The full-advance method with a short balance is not the printer-advance
@@ -1454,10 +1456,10 @@ export default function Checkout() {
      * partial path: cash on delivery with the wallet switch on.
      */
     if (!isBalanceSufficient && isPrepaidMethod && filteredPaymentMethods.some((m) => m.id === 'cash')) {
-      // OWNER: Sorani to be written by hand.
       return loc(
         'رصيدك لا يغطي كامل المبلغ — اختر الدفع عند الاستلام مع «استخدام رصيد المحفظة» ليُخصم رصيدك ويُدفع الباقي عند الاستلام.',
-        'Your balance does not cover the full amount — choose cash on delivery with «Use wallet balance» to deduct your balance and pay the rest on delivery.'
+        'Your balance does not cover the full amount — choose cash on delivery with «Use wallet balance» to deduct your balance and pay the rest on delivery.',
+        'باڵانسەکەت هەموو بڕەکە ناگرێتەوە — پارەدان لە کاتی گەیاندن هەڵبژێرە لەگەڵ «بەکارهێنانی باڵانسی جزدان» بۆ ئەوەی باڵانسەکەت ببڕدرێت و ئەوەی دەمێنێتەوە لە کاتی وەرگرتن بدرێت.'
       );
     }
     if (!isBalanceSufficient) return S.blockAdvance;
@@ -1541,14 +1543,14 @@ export default function Checkout() {
    */
   const walletSwitchOn = isWalletActive && !isGiniMethod;
   const walletSwitchLocked = isGiniMethod || isAdvanceRequired || walletBalanceShown === 0;
-  // OWNER: Sorani to be written by hand.
   const walletLockReason: string | null = isGiniMethod
     ? loc(
         'لا يُستخدم رصيد المحفظة مع جني: قيمة المنتج تُموَّل داخل تطبيق جني، ويُدفع رسم التوصيل فقط عند الاستلام.',
-        'Your wallet balance cannot be used with Gini: the purchase is financed inside the Gini app, and only the delivery fee is paid on delivery.'
+        'Your wallet balance cannot be used with Gini: the purchase is financed inside the Gini app, and only the delivery fee is paid on delivery.',
+        'باڵانسی جزدان لەگەڵ جینی بەکارناهێنرێت: نرخی بەرهەمەکە لە ناو ئەپی جینی دابین دەکرێت، و تەنها کرێی گەیاندن لە کاتی وەرگرتن دەدرێت.'
       )
     : !isAdvanceRequired && walletBalanceShown === 0
-      ? loc('لا يوجد رصيد في محفظتك لاستخدامه.', 'Your wallet has no balance to use.')
+      ? loc('لا يوجد رصيد في محفظتك لاستخدامه.', 'Your wallet has no balance to use.', 'هیچ باڵانسێک لە جزدانەکەتدا نییە بۆ بەکارهێنان.')
       : null;
   /** Where «use part of the balance, pay the rest at the door» sends a
    *  customer whose balance is short of the full-advance method: cash, when
@@ -1845,7 +1847,7 @@ export default function Checkout() {
             animate={{ opacity: 1, y: 0 }}
             transition={m.spring('ui')}
           >
-            {dir === 'rtl' ? 'تم استلام طلبك بنجاح' : 'Order Successfully Placed'}
+            {loc('تم استلام طلبك بنجاح', 'Order Successfully Placed', 'داواکارییەکەت بە سەرکەوتوویی وەرگیرا')}
           </motion.h2>
 
           <motion.p
@@ -1854,9 +1856,11 @@ export default function Checkout() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.06 }}
           >
-            {dir === 'rtl'
-              ? 'شكراً لك. سنقوم بمعالجة طلبك وإعلامك بآخر التحديثات قريباً.'
-              : 'Thank you. We will process your order and notify you with updates soon.'}
+            {loc(
+              'شكراً لك. سنقوم بمعالجة طلبك وإعلامك بآخر التحديثات قريباً.',
+              'Thank you. We will process your order and notify you with updates soon.',
+              'سوپاس. داواکارییەکەت ئامادە دەکەین و بەم زووانە لە نوێترین هەواڵەکانی ئاگادارت دەکەینەوە.'
+            )}
           </motion.p>
 
           <motion.div
@@ -1865,7 +1869,7 @@ export default function Checkout() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...m.spring('ui'), delay: m.reduced ? 0 : 0.12 }}
           >
-            <div className="text-xs text-text-muted mb-1 font-light">{dir === 'rtl' ? 'رقم الطلب' : 'Order Number'}</div>
+            <div className="text-xs text-text-muted mb-1 font-light">{loc('رقم الطلب', 'Order Number', 'ژمارەی داواکاری')}</div>
             <div className="text-lg font-mono tracking-widest text-text-primary">{placedOrder.id}</div>
             {placedInvoiceNo && (
               <div className="mt-4 pt-4 border-t border-border-subtle">
@@ -1924,13 +1928,13 @@ export default function Checkout() {
               onClick={() => navigate('/orders')}
               className="lv-button lv-button-secondary px-8"
             >
-              {dir === 'rtl' ? 'طلباتي' : 'My Orders'}
+              {loc('طلباتي', 'My Orders', 'داواکارییەکانم')}
             </button>
             <button
               onClick={() => navigate('/')}
               className="lv-button lv-button-primary px-8"
             >
-              {dir === 'rtl' ? 'العودة للرئيسية' : 'Back to Home'}
+              {loc('العودة للرئيسية', 'Back to Home', 'گەڕانەوە بۆ سەرەکی')}
             </button>
           </motion.div>
 
@@ -1982,20 +1986,22 @@ export default function Checkout() {
           <ShoppingCart className="w-7 h-7 text-text-muted" strokeWidth={1.5} />
         </div>
         <h2 className="text-xl font-normal mb-2 tracking-tight">
-          {dir === 'rtl' ? 'لا توجد منتجات لإتمام الطلب' : 'Nothing to check out'}
+          {loc('لا توجد منتجات لإتمام الطلب', 'Nothing to check out', 'هیچ بەرهەمێک نییە بۆ تەواوکردنی داواکاری')}
         </h2>
         <p className="text-text-muted max-w-sm mx-auto mb-8 text-sm font-light">
           {loadError
             ? loadError
-            : dir === 'rtl'
-              ? 'اختر المنتجات من سلتك أولاً ثم عد لإتمام الطلب.'
-              : 'Select items in your cart first, then come back to check out.'}
+            : loc(
+                'اختر المنتجات من سلتك أولاً ثم عد لإتمام الطلب.',
+                'Select items in your cart first, then come back to check out.',
+                'سەرەتا بەرهەمەکان لە سەبەتەکەت هەڵبژێرە، پاشان بگەڕێوە بۆ تەواوکردنی داواکاری.'
+              )}
         </p>
         <button
           onClick={() => navigate('/cart')}
           className="lv-button lv-button-primary px-8"
         >
-          {dir === 'rtl' ? 'العودة إلى السلة' : 'Back to Cart'}
+          {loc('العودة إلى السلة', 'Back to Cart', 'گەڕانەوە بۆ سەبەتە')}
         </button>
       </div>
     );
@@ -2009,7 +2015,7 @@ export default function Checkout() {
         <header className="lv-character-header sticky top-0 z-20 flex items-center justify-between border-b border-border-subtle bg-canvas px-4 py-3 sm:px-6 lg:px-12 lg:py-6">
           <button
             onClick={handleBack}
-            className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="lv-button lv-button-secondary size-11 shrink-0 px-0"
           >
             {dir === 'rtl' ? <ArrowRight className="w-5 h-5 text-text-primary" strokeWidth={1.5} /> : <ArrowLeft className="w-5 h-5 text-text-primary" strokeWidth={1.5} />}
           </button>
@@ -2017,7 +2023,7 @@ export default function Checkout() {
           <div className="flex items-center gap-2 text-text-secondary px-2 py-2">
             <Lock className="w-4 h-4" strokeWidth={1.5} />
             <span className="text-xs font-semibold tracking-widest uppercase">
-              {dir === 'rtl' ? 'دفع آمن' : 'Secure Checkout'}
+              {loc('دفع آمن', 'Secure Checkout', 'پارەدانی پارێزراو')}
             </span>
           </div>
         </header>
@@ -2026,10 +2032,10 @@ export default function Checkout() {
 
           <div>
             <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight mb-2">
-              {dir === 'rtl' ? 'إتمام الطلب' : 'Checkout'}
+              {loc('إتمام الطلب', 'Checkout', 'تەواوکردنی داواکاری')}
             </h1>
             <p className="text-sm text-text-muted font-light">
-              {dir === 'rtl' ? 'يرجى مراجعة وتأكيد تفاصيل طلبك أدناه.' : 'Please review and confirm your order details below.'}
+              {loc('يرجى مراجعة وتأكيد تفاصيل طلبك أدناه.', 'Please review and confirm your order details below.', 'تکایە وردەکارییەکانی داواکارییەکەت لە خوارەوە پێداچوونەوە بۆ بکە و پشتڕاستی بکەرەوە.')}
             </p>
           </div>
 
@@ -2037,7 +2043,7 @@ export default function Checkout() {
           <section>
             <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">1</span>
-              {dir === 'rtl' ? 'عنوان التوصيل' : 'Shipping Address'}
+              {loc('عنوان التوصيل', 'Shipping Address', 'ناونیشانی گەیاندن')}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {addresses.map(addr => (
@@ -2094,7 +2100,7 @@ export default function Checkout() {
             {addresses.length === 0 && (
               <p className="text-xs text-amber-400/80 mt-3 font-light flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-                {dir === 'rtl' ? 'أضف عنوان توصيل لإتمام الطلب.' : 'Add a delivery address to place your order.'}
+                {loc('أضف عنوان توصيل لإتمام الطلب.', 'Add a delivery address to place your order.', 'ناونیشانێکی گەیاندن زیاد بکە بۆ تەواوکردنی داواکاری.')}
               </p>
             )}
           </section>
@@ -2103,7 +2109,7 @@ export default function Checkout() {
           <section>
             <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">2</span>
-              {dir === 'rtl' ? 'طريقة الشحن' : 'Delivery Method'}
+              {loc('طريقة الشحن', 'Delivery Method', 'شێوازی گەیاندن')}
             </h2>
             {/* A PRO member quoted outside their PRO context is charged the
                 ordinary price and delivery — say why, where they choose. */}
@@ -2112,7 +2118,7 @@ export default function Checkout() {
             ) : null}
             {containsPrinter && availableDeliveryMethods.some((method) => method.id === 'personal') && !quotedDeliveryFees?.some((fee) => fee.id === 'personal' && !fee.available) && (
               <p className="mb-3 text-sm text-text-secondary" data-printer-delivery-default>
-                {loc('نختار التوصيل الشخصي افتراضيًا لطلبات الطابعات عندما يكون متاحًا. يمكنك اختيار التوصيل العادي أدناه بعد قراءة تحذير النقل.', 'Personal delivery is the initial choice for printer orders when available. You can choose standard delivery below after reading the transport warning.')}
+                {loc('نختار التوصيل الشخصي افتراضيًا لطلبات الطابعات عندما يكون متاحًا. يمكنك اختيار التوصيل العادي أدناه بعد قراءة تحذير النقل.', 'Personal delivery is the initial choice for printer orders when available. You can choose standard delivery below after reading the transport warning.', 'بۆ داواکارییەکانی پرینتەر، کاتێک بەردەست بێت گەیاندنی کەسی سەرەتا هەڵدەبژێرین. دوای خوێندنەوەی ئاگادارکردنەوەی گواستنەوە دەتوانیت گەیاندنی ئاسایی لە خوارەوە هەڵبژێریت.')}
               </p>
             )}
             <div className="grid grid-cols-1 gap-3">
@@ -2161,9 +2167,9 @@ export default function Checkout() {
                       </div>
                       <div className="min-w-0">
                         <h3 className={`font-normal text-base ${selected ? 'text-text-primary' : 'text-text-secondary'}`}>
-                          {dir === 'rtl' ? method.titleAr : method.titleEn}
+                          {methodTitle(method, lang)}
                         </h3>
-                        <p className="text-xs text-text-muted mt-0.5 font-light">{dir === 'rtl' ? method.descAr : method.descEn}</p>
+                        <p className="text-xs text-text-muted mt-0.5 font-light">{methodDesc(method, lang)}</p>
                         {/*
                           «بدل عرض كلمة محسوب حسب القطع بالكمية اجعل هناك
                            ملاحظة يظهر فيها عرض مكان المخزن على الخريطة».
@@ -2209,7 +2215,7 @@ export default function Checkout() {
                               : memberWaiver
                               ? loc('ميزة توصيل الأعضاء مطبّقة', 'Member delivery benefit applied', 'سوودی گەیاندنی ئەندام جێبەجێ کرا')
                               : method.id === 'standard'
-                                ? loc('رسم واحد للشحنة كاملة', 'One fee for the whole consignment')
+                                ? loc('رسم واحد للشحنة كاملة', 'One fee for the whole consignment', 'یەک کرێ بۆ هەموو بارەکە')
                                 : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
                           </p>
                         ) : null}
@@ -2226,7 +2232,7 @@ export default function Checkout() {
                     >
                       {unavailable
                         ? serverFee?.reason === 'needs_configuration'
-                          ? loc('غير مهيأ', 'Not configured') : loc('غير متاح', 'Unavailable', 'بەردەست نییە')
+                          ? loc('غير مهيأ', 'Not configured', 'ڕێکنەخراوە') : loc('غير متاح', 'Unavailable', 'بەردەست نییە')
                         : displayedPrice === null
                           ? '—'
                           : displayedPrice === 0
@@ -2245,7 +2251,7 @@ export default function Checkout() {
                     <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-6">
                       <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-amber-400" checked={printerStandardAccepted}
                         onChange={(event) => setPrinterStandardAcceptedContext(event.target.checked ? printerAcceptanceContext : null)} />
-                      <span>{loc('قرأت تحذير النقل وأوافق على اختيار التوصيل العادي لهذا الطلب.', 'I have read the transport warning and agree to standard delivery for this order.')}</span>
+                      <span>{loc('قرأت تحذير النقل وأوافق على اختيار التوصيل العادي لهذا الطلب.', 'I have read the transport warning and agree to standard delivery for this order.', 'ئاگادارکردنەوەی گواستنەوەم خوێندەوە و ڕازیم بە گەیاندنی ئاسایی بۆ ئەم داواکارییە.')}</span>
                     </label>
                   </div>
                 )}
@@ -2288,7 +2294,7 @@ export default function Checkout() {
           <section>
             <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-xs font-medium">3</span>
-              {dir === 'rtl' ? 'طريقة الدفع' : 'Payment Method'}
+              {loc('طريقة الدفع', 'Payment Method', 'شێوازی پارەدان')}
             </h2>
             <div className="grid grid-cols-1 gap-3">
               {filteredPaymentMethods.map(method => (
@@ -2316,7 +2322,7 @@ export default function Checkout() {
                     </div>
                     <div className="min-w-0">
                       <h3 className={`font-normal text-base ${paymentMethod === method.id ? 'text-text-primary' : 'text-text-secondary'}`}>
-                          {dir === 'rtl' ? method.titleAr : method.titleEn}
+                          {methodTitle(method, lang)}
                       </h3>
                       {S.paymentHint[method.id] && (
                         <p className="text-xs text-text-muted mt-0.5 font-light">{S.paymentHint[method.id]}</p>
@@ -2443,7 +2449,7 @@ export default function Checkout() {
 
           <h2 className="text-xl font-normal text-text-primary flex items-center gap-3 mb-6">
             <Receipt className="w-5 h-5 text-text-secondary" strokeWidth={1.5} />
-            {dir === 'rtl' ? 'ملخص الطلب' : 'Order Summary'}
+            {loc('ملخص الطلب', 'Order Summary', 'پوختەی داواکاری')}
           </h2>
 
           {/* Natural height now — the column above owns the scrolling. A nested
@@ -2552,7 +2558,7 @@ export default function Checkout() {
             */}
 
             <div className="flex justify-between items-center text-text-secondary">
-              <span className="font-light">{loc('المجموع الفرعي', 'Subtotal')}</span>
+              <span className="font-light">{loc('المجموع الفرعي', 'Subtotal', 'کۆی لاوەکی')}</span>
               <span className="text-text-primary font-normal tabular-nums">{money(total)}</span>
             </div>
 
@@ -2596,7 +2602,8 @@ export default function Checkout() {
                     {memberOrderDiscount > 0 && memberUnitDiscount > 0
                       ? loc(
                           `وفّرت ${money(memberSavingTotal)} بعضوية ${memberLabel} — منها ${money(memberUnitDiscount)} مطبّقة في أسعار المنتجات أعلاه`,
-                          `Saved ${money(memberSavingTotal)} with your ${memberLabel} membership — ${money(memberUnitDiscount)} of it is already in the prices above`
+                          `Saved ${money(memberSavingTotal)} with your ${memberLabel} membership — ${money(memberUnitDiscount)} of it is already in the prices above`,
+                          `پاشەکەوتت کرد ${money(memberSavingTotal)} — ئەندامێتی ${memberLabel}؛ ${money(memberUnitDiscount)} لەوە پێشتر لە نرخی بەرهەمەکانی سەرەوەدا جێبەجێ کراوە`
                         )
                       : loc(
                           `وفّرت ${money(memberSavingTotal)} بعضوية ${memberLabel}`,
@@ -2611,7 +2618,7 @@ export default function Checkout() {
             {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
               <div className="flex justify-between items-center text-emerald-400">
                 <span className="font-light">
-                  {loc('خصم الكود', 'Promo discount')}{' '}
+                  {loc('خصم الكود', 'Promo discount', 'داشکاندنی کۆد')}{' '}
                   <span dir="ltr" className="text-text-muted text-xs">{quote.coupon.code}</span>
                 </span>
                 <span className="font-normal">-{money(Number(quote.coupon.discount_iqd))}</span>
@@ -2620,7 +2627,7 @@ export default function Checkout() {
 
             {pointsDiscount > 0 && (
               <div className="flex justify-between items-center text-gold/90">
-                <span className="font-light">{loc('خصم النقاط', 'Points Discount')}</span>
+                <span className="font-light">{loc('خصم النقاط', 'Points Discount', 'داشکاندنی خاڵ')}</span>
                 <span className="font-normal tabular-nums">-{money(pointsDiscount)}</span>
               </div>
             )}
@@ -2656,8 +2663,8 @@ export default function Checkout() {
             */}
             <SummaryInfo
               testId="delivery"
-              label={loc('تكلفة التوصيل إلى البيت', 'Home delivery cost')}
-              question={loc('كيف حُسبت تكلفة التوصيل؟', 'How is the delivery cost calculated?')}
+              label={loc('تكلفة التوصيل إلى البيت', 'Home delivery cost', 'تێچووی گەیاندن بۆ ماڵ')}
+              question={loc('كيف حُسبت تكلفة التوصيل؟', 'How is the delivery cost calculated?', 'تێچووی گەیاندن چۆن هەژمار کرا؟')}
               value={
                 quoteLoading ? (
                   <span className="text-text-muted font-light text-xs">{S.quoteLoading}</span>
@@ -2705,7 +2712,8 @@ export default function Checkout() {
                           )
                         : loc(
                             `عضوية ${memberLabel} غطّت ${money(memberShipping.subsidy_iqd)} من أجرة التوصيل البالغة ${money(memberShipping.fee_before_benefit_iqd)}، وتدفع ${money(memberShipping.fee_paid_iqd)}`,
-                            `Your ${memberLabel} membership covered ${money(memberShipping.subsidy_iqd)} of the ${money(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${money(memberShipping.fee_paid_iqd)}`
+                            `Your ${memberLabel} membership covered ${money(memberShipping.subsidy_iqd)} of the ${money(memberShipping.fee_before_benefit_iqd)} delivery fee — you pay ${money(memberShipping.fee_paid_iqd)}`,
+                            `ئەندامێتی ${memberLabel} ${money(memberShipping.subsidy_iqd)}ی لە کرێی گەیاندنی ${money(memberShipping.fee_before_benefit_iqd)} گرتەوە — تۆ ${money(memberShipping.fee_paid_iqd)} دەدەیت`
                           )}
                     </p>
                   ) : null}
@@ -2721,27 +2729,28 @@ export default function Checkout() {
             >
               <p>{loc(
                 'التوصيل يُحسب حسب كل منتج وعدد قطعه، لا مبلغاً واحداً للطلب — لذلك يتغيّر المبلغ كلما تغيّرت السلة.',
-                'Delivery is charged per product and per number of pieces, not as one flat fee for the order — so it moves whenever the cart does.'
+                'Delivery is charged per product and per number of pieces, not as one flat fee for the order — so it moves whenever the cart does.',
+                'گەیاندن بەپێی هەر بەرهەمێک و ژمارەی پارچەکانی هەژمار دەکرێت، نەک یەک بڕ بۆ هەموو داواکارییەکە — بۆیە هەر کاتێک سەبەتەکە بگۆڕێت بڕەکەش دەگۆڕێت.'
               )}</p>
 
               {quote && quote.shipping.components.length > 0 && (
                 <div className="space-y-1.5 border-t border-white/5 pt-2">
                   {quote.shipping.components.map((component, index) => {
-                    const names: Record<string, [string, string]> = {
-                      ordinary: ['توصيل الطلب', 'Order delivery'],
-                      protected: ['حماية وتغليف', 'Protected handling'],
-                      printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery'],
-                      printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery'],
-                      carton: ['كرتونة كمية إضافية', 'Extra quantity carton'],
-                      product: ['توصيل حسب المنتج', 'Product delivery'],
+                    const names: Record<string, [string, string, string]> = {
+                      ordinary: ['توصيل الطلب', 'Order delivery', 'گەیاندنی داواکاری'],
+                      protected: ['حماية وتغليف', 'Protected handling', 'پاراستن و پاکەتکردن'],
+                      printer_small: ['توصيل طابعة صغيرة', 'Small printer delivery', 'گەیاندنی پرینتەری بچووک'],
+                      printer_large: ['توصيل طابعة كبيرة', 'Large printer delivery', 'گەیاندنی پرینتەری گەورە'],
+                      carton: ['كرتونة كمية إضافية', 'Extra quantity carton', 'کارتۆنی بڕی زیادە'],
+                      product: ['توصيل حسب المنتج', 'Product delivery', 'گەیاندن بەپێی بەرهەم'],
                     };
                     const name = component.product_name
-                      ? [component.product_name, component.product_name]
-                      : names[component.kind] ?? [component.kind, component.kind];
+                      ? [component.product_name, component.product_name, component.product_name]
+                      : names[component.kind] ?? [component.kind, component.kind, component.kind];
                     return (
                       <div key={`${component.kind}:${index}`} className="flex items-center justify-between gap-3">
                         <span className="text-text-muted">
-                          {loc(name[0], name[1])}
+                          {loc(name[0], name[1], name[2])}
                           {component.units > 1 ? ` × ${component.units}` : ''}
                         </span>
                         <span className={`tabular-nums ${component.waived ? 'text-emerald-400' : 'text-text-secondary'}`}>
@@ -2768,7 +2777,7 @@ export default function Checkout() {
                 the customer never sees a switch that cannot be honoured. */}
             {quote?.protected_delivery?.available && (
               <label
-                className="flex items-start gap-3 rounded-lg bg-white/[0.03] border border-white/5 p-3 cursor-pointer"
+                className="flex items-start gap-3 rounded-lg bg-surface-raised p-3 cursor-pointer"
                 data-checkout="protected-delivery"
               >
                 <input
@@ -2817,12 +2826,13 @@ export default function Checkout() {
               <SummaryInfo
                 testId="cod-tax"
                 label={S.codTax}
-                question={loc('لماذا توجد ضريبة على التوصيل؟', 'Why is there a delivery tax?')}
+                question={loc('لماذا توجد ضريبة على التوصيل؟', 'Why is there a delivery tax?', 'بۆچی باج لەسەر گەیاندن هەیە؟')}
                 value={<span className="text-text-primary font-normal tabular-nums">{money(codTaxRowIqd)}</span>}
               >
                 <p>{loc(
                   'شركة التوصيل تأخذ ضريبة على الطلبات ذات المبلغ العالي المدفوع عند الاستلام — وهي ليست من المتجر.',
-                  'The delivery company charges a tax on high amounts collected at the door — it is not the store’s.'
+                  'The delivery company charges a tax on high amounts collected at the door — it is not the store’s.',
+                  'کۆمپانیای گەیاندن باج لەسەر ئەو داواکارییانە وەردەگرێت کە بڕێکی زۆریان لە کاتی وەرگرتن دەدرێت — ئەم باجە هی فرۆشگاکە نییە.'
                 )}</p>
                 {/* The two numbers come from the policy module the server
                     charges by, never from a sentence typed here: if the rate
@@ -2838,11 +2848,13 @@ export default function Checkout() {
                      charges. Converting a definition would make the explanation
                      depend on a rate the shop can change tomorrow. */
                   `وقدرها ${formatIqd(codTaxPerBlockIqd)} عن كل ${formatIqd(codTaxBlockIqd)} من المبلغ المدفوع عند الاستلام.`,
-                  `It is ${formatIqd(codTaxPerBlockIqd)} for every ${formatIqd(codTaxBlockIqd)} collected at the door.`
+                  `It is ${formatIqd(codTaxPerBlockIqd)} for every ${formatIqd(codTaxBlockIqd)} collected at the door.`,
+                  `بۆ هەر ${formatIqd(codTaxBlockIqd)} کە لە کاتی وەرگرتن دەدرێت، ${formatIqd(codTaxPerBlockIqd)} وەردەگیرێت.`
                 )}</p>
                 <p>{loc(
                   'اختيار الدفع من المحفظة أو الدفع المسبق يُلغيها بالكامل.',
-                  'Paying from your wallet or in advance removes it entirely.'
+                  'Paying from your wallet or in advance removes it entirely.',
+                  'هەڵبژاردنی پارەدان لە جزدان یان پارەدانی پێشوەخت ئەم باجە بە تەواوی لادەبات.'
                 )}</p>
               </SummaryInfo>
             )}
@@ -2851,12 +2863,12 @@ export default function Checkout() {
               <div>
                 <div className="flex justify-between items-center text-gold/90" data-checkout-cod-tax-exemption>
                   <span className="font-light">
-                    {loc(`إعفاء عضوية ${memberLabel}`, `${memberLabel} membership exemption`)}
+                    {loc(`إعفاء عضوية ${memberLabel}`, `${memberLabel} membership exemption`, `بەخشینی ئەندامێتی ${memberLabel}`)}
                   </span>
                   <span className="font-normal tabular-nums">-{money(codTaxExemption)}</span>
                 </div>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-gold/90" data-checkout-member-cod>
-                  {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax')}
+                  {loc('تم إعفاؤك من ضريبة الدفع عند الاستلام', 'You are exempt from the cash-on-delivery tax', 'لە باجی پارەدان لە کاتی گەیاندن بەخشرایت')}
                 </p>
               </div>
             )}
@@ -2880,8 +2892,8 @@ export default function Checkout() {
               <SummaryInfo
                 testId="cod-commission"
                 tone="quiet"
-                label={loc('عمولة الدفع عند الاستلام', 'Cash-on-delivery commission')}
-                question={loc('ما هي عمولة الدفع عند الاستلام؟', 'What is the cash-on-delivery commission?')}
+                label={loc('عمولة الدفع عند الاستلام', 'Cash-on-delivery commission', 'کۆمیسیۆنی پارەدان لە کاتی گەیاندن')}
+                question={loc('ما هي عمولة الدفع عند الاستلام؟', 'What is the cash-on-delivery commission?', 'کۆمیسیۆنی پارەدان لە کاتی گەیاندن چییە؟')}
                 value={
                   <span className="tabular-nums" data-checkout-cod-commission>
                     +{money(codSurchargeIqd)}
@@ -2890,15 +2902,18 @@ export default function Checkout() {
               >
                 <p>{loc(
                   'الطلب المسبق المدفوع عند الاستلام يُسعَّر كبيع مباشر، والفرق هو هذه العمولة.',
-                  'A pre-order paid at the door is priced as a direct sale — this commission is the difference.'
+                  'A pre-order paid at the door is priced as a direct sale — this commission is the difference.',
+                  'پێش-داواکارییەک کە لە کاتی گەیاندن پارەی دەدرێت وەک فرۆشتنی ڕاستەوخۆ نرخ دەکرێت، و جیاوازییەکە ئەم کۆمیسیۆنەیە.'
                 )}</p>
                 <p>{loc(
                   'المبلغ محسوب أصلاً داخل أسعار المنتجات في المجموع الفرعي أعلاه، فهو معروض للتوضيح فقط ولا يُضاف مرة ثانية.',
-                  'It is already inside the product prices in the subtotal above — shown here for clarity, never added twice.'
+                  'It is already inside the product prices in the subtotal above — shown here for clarity, never added twice.',
+                  'ئەم بڕە پێشتر لە ناو نرخی بەرهەمەکانی کۆی لاوەکیی سەرەوەدایە — تەنها بۆ ڕوونکردنەوە پیشان دەدرێت و دووجار زیاد ناکرێت.'
                 )}</p>
                 <p>{loc(
                   'الدفع من المحفظة أو الدفع المسبق يُعيد سعر الطلب المسبق ويُلغي هذه العمولة.',
-                  'Paying from your wallet or in advance restores the pre-order price and removes it.'
+                  'Paying from your wallet or in advance restores the pre-order price and removes it.',
+                  'پارەدان لە جزدان یان پارەدانی پێشوەخت نرخی پێش-داواکاری دەگەڕێنێتەوە و ئەم کۆمیسیۆنە لادەبات.'
                 )}</p>
               </SummaryInfo>
             )}
@@ -3051,7 +3066,7 @@ export default function Checkout() {
                   className="inline-flex items-center gap-2 text-[13px] font-light text-text-muted hover:text-text-secondary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                 >
                   <Tag className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
-                  {loc('استخدام كود خاص', 'Use a special code')}
+                  {loc('استخدام كود خاص', 'Use a special code', 'بەکارهێنانی کۆدی تایبەت')}
                 </button>
               )}
             </div>

@@ -19,8 +19,16 @@ export interface DeliveryMethod {
   id: string;
   titleAr: string;
   titleEn: string;
+  /**
+   * SORANI, OPTIONAL. A row stored before the field existed has none, and the
+   * checkout then reads the Arabic — never a guess at the owner's own wording.
+   * `withShippedSorani` (below) fills it at read time only for a row that
+   * still carries the SHIPPED Arabic, word for word (DECISIONS row 183).
+   */
+  titleCkb?: string;
   descAr: string;
   descEn: string;
+  descCkb?: string;
   price_iqd: number;
   icon: string;
   /**
@@ -67,6 +75,8 @@ export interface CheckoutPaymentMethod {
   id: string;
   titleAr: string;
   titleEn: string;
+  /** Sorani, optional — see `DeliveryMethod.titleCkb`. */
+  titleCkb?: string;
   icon: string;
 }
 /**
@@ -120,8 +130,11 @@ export interface CartShippingMethod {
   id: string;
   titleAr: string;
   titleEn: string;
+  /** Sorani, optional — see `DeliveryMethod.titleCkb`. */
+  titleCkb?: string;
   descAr: string;
   descEn: string;
+  descCkb?: string;
 }
 export interface ManualPaymentMethod {
   id: string;
@@ -262,21 +275,21 @@ export const SETTING_DEFAULTS = {
   // `paymentMethods`. Seeded with the four channels the owner named.
   payoutMethods: DEFAULT_PAYOUT_METHODS as PayoutMethod[],
   checkoutDeliveryMethods: [
-    { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', descAr: '2-3 أيام عمل', descEn: '2-3 business days', price_iqd: 5000, icon: 'Truck', home_delivery: true },
-    { id: 'personal', titleAr: 'توصيل شخصي', titleEn: 'Personal Delivery', descAr: 'نفس اليوم', descEn: 'Same day delivery', price_iqd: 10000, icon: 'User', home_delivery: true },
-    { id: 'pickup', titleAr: 'استلام من المخزن', titleEn: 'Store Pickup', descAr: 'جاهز خلال ساعتين', descEn: 'Ready in 2 hours', price_iqd: 0, icon: 'Store', home_delivery: false },
+    { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', titleCkb: 'گەیاندنی ئاسایی', descAr: '2-3 أيام عمل', descEn: '2-3 business days', descCkb: '2-3 ڕۆژی کار', price_iqd: 5000, icon: 'Truck', home_delivery: true },
+    { id: 'personal', titleAr: 'توصيل شخصي', titleEn: 'Personal Delivery', titleCkb: 'گەیاندنی کەسی', descAr: 'نفس اليوم', descEn: 'Same day delivery', descCkb: 'هەمان ڕۆژ', price_iqd: 10000, icon: 'User', home_delivery: true },
+    { id: 'pickup', titleAr: 'استلام من المخزن', titleEn: 'Store Pickup', titleCkb: 'وەرگرتن لە کۆگا', descAr: 'جاهز خلال ساعتين', descEn: 'Ready in 2 hours', descCkb: 'لە ماوەی دوو کاتژمێردا ئامادەیە', price_iqd: 0, icon: 'Store', home_delivery: false },
   ] as DeliveryMethod[],
   checkoutPaymentMethods: [
-    { id: 'wallet', titleAr: 'محفظة ليفو', titleEn: 'Levo Wallet', icon: 'Wallet' },
-    { id: 'cash', titleAr: 'الدفع عند الاستلام', titleEn: 'Cash on Delivery', icon: 'Banknote' },
-    { id: 'bnpl', titleAr: 'اشترِ الآن وادفع لاحقًا', titleEn: 'Buy Now, Pay Later', icon: 'CalendarClock' },
+    { id: 'wallet', titleAr: 'محفظة ليفو', titleEn: 'Levo Wallet', titleCkb: 'جزدانی Levo', icon: 'Wallet' },
+    { id: 'cash', titleAr: 'الدفع عند الاستلام', titleEn: 'Cash on Delivery', titleCkb: 'پارەدان لە کاتی گەیاندن', icon: 'Banknote' },
+    { id: 'bnpl', titleAr: 'اشترِ الآن وادفع لاحقًا', titleEn: 'Buy Now, Pay Later', titleCkb: 'ئێستا بکڕە و دواتر بدە', icon: 'CalendarClock' },
     // «خيار ناعم وبسيط ليس ضخما» — it sits under cash on delivery, and it is
     // a row here for one reason only: checkout intersects this setting with
     // the server's allowed list, so an id missing from it is invisible with no
     // error at all. `normalizedSetting` rescues it on a configured shop.
-    { id: 'gini', titleAr: 'أقساط عبر تطبيق جني', titleEn: 'Instalments via Gini', icon: 'Landmark' },
-    { id: 'full_advance', titleAr: 'الدفع مقدما بالكامل', titleEn: 'Full Payment in Advance', icon: 'CreditCard' },
-    { id: 'half_advance', titleAr: 'دفع نصف المبلغ مقدما', titleEn: '50% Payment in Advance', icon: 'CreditCard' },
+    { id: 'gini', titleAr: 'أقساط عبر تطبيق جني', titleEn: 'Instalments via Gini', titleCkb: 'قیست لە ڕێگەی ئەپی جینی', icon: 'Landmark' },
+    { id: 'full_advance', titleAr: 'الدفع مقدما بالكامل', titleEn: 'Full Payment in Advance', titleCkb: 'پارەدانی تەواو بە پێشوەخت', icon: 'CreditCard' },
+    { id: 'half_advance', titleAr: 'دفع نصف المبلغ مقدما', titleEn: '50% Payment in Advance', titleCkb: 'پارەدانی نیوەی بڕەکە بە پێشوەخت', icon: 'CreditCard' },
   ] as CheckoutPaymentMethod[],
   // PRO-only financing. Access also requires an individually approved account,
   // verified identity and the approved default address; no fee is invented.
@@ -374,10 +387,10 @@ export const SETTING_DEFAULTS = {
    */
   catalogHideIncomplete: { enabled: false, since: null, by: null } as CatalogHideIncomplete,
   cartShippingMethods: [
-    { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days' },
-    { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days' },
-    { id: 'preorder_sea', titleAr: 'طلب مسبق (شحن بحري)', titleEn: 'Pre-order (Sea Freight)', descAr: 'يصل خلال 30-45 يوم عمل', descEn: 'Arrives in 30-45 business days' },
-    { id: 'preorder_land', titleAr: 'طلب مسبق (شحن بري)', titleEn: 'Pre-order (Land Freight)', descAr: 'يصل خلال 20-30 يوم عمل', descEn: 'Arrives in 20-30 business days' },
+    { id: 'direct', titleAr: 'شحن مباشر', titleEn: 'Direct Shipping', titleCkb: 'گەیاندنی ڕاستەوخۆ', descAr: 'يصل خلال 3-5 أيام عمل', descEn: 'Arrives in 3-5 business days', descCkb: 'لە ماوەی 3-5 ڕۆژی کاردا دەگات' },
+    { id: 'preorder_air', titleAr: 'طلب مسبق (شحن جوي)', titleEn: 'Pre-order (Air Freight)', titleCkb: 'پێش-داواکاری (گواستنەوەی ئاسمانی)', descAr: 'يصل خلال 10-14 يوم عمل', descEn: 'Arrives in 10-14 business days', descCkb: 'لە ماوەی 10-14 ڕۆژی کاردا دەگات' },
+    { id: 'preorder_sea', titleAr: 'طلب مسبق (شحن بحري)', titleEn: 'Pre-order (Sea Freight)', titleCkb: 'پێش-داواکاری (گواستنەوەی دەریایی)', descAr: 'يصل خلال 30-45 يوم عمل', descEn: 'Arrives in 30-45 business days', descCkb: 'لە ماوەی 30-45 ڕۆژی کاردا دەگات' },
+    { id: 'preorder_land', titleAr: 'طلب مسبق (شحن بري)', titleEn: 'Pre-order (Land Freight)', titleCkb: 'پێش-داواکاری (گواستنەوەی وشکانی)', descAr: 'يصل خلال 20-30 يوم عمل', descEn: 'Arrives in 20-30 business days', descCkb: 'لە ماوەی 20-30 ڕۆژی کاردا دەگات' },
   ] as CartShippingMethod[],
   homeSections: [] as Array<{ id: string; titleEn: string; titleAr: string; isVisible: boolean }>,
   homeBanners: {} as Record<string, Array<{ id: string; image: string; link: string }>>,
@@ -807,6 +820,38 @@ export function normalizeSerialPrepGate(value: unknown): SerialPrepGate {
   return { enabled: o.enabled === true, since };
 }
 
+/**
+ * THE SHIPPED SORANI FOR A ROW THAT STILL SAYS WHAT WE SHIPPED (DECISIONS row 183).
+ *
+ * The three method lists are admin-editable WHOLE ARRAYS, so a shop that saved
+ * them before `titleCkb`/`descCkb` existed has rows with no Sorani at all — and
+ * a Sorani reader saw «توصيل عادي», «محفظة ليفو» at the checkout. The default's
+ * Sorani is lent to a stored row only when that row's Arabic is still the
+ * default's Arabic, word for word: an owner who renamed «توصيل عادي» wrote
+ * something this file has never seen, and translating the OLD name over their
+ * new one would be a lie. Such a row keeps no Sorani until the owner writes one
+ * in the admin's Sorani field, and the checkout reads its Arabic meanwhile.
+ *
+ * Read time only. A Sorani the owner wrote is never replaced, and nothing is
+ * written back; the admin form shows the lent text, so saving it keeps it.
+ */
+function withShippedSorani(value: unknown, defaults: ReadonlyArray<Record<string, unknown>>): unknown {
+  if (!Array.isArray(value)) return value;
+  const byId = new Map(defaults.map((d) => [d.id, d]));
+  const same = (a: unknown, b: unknown) => typeof a === 'string' && typeof b === 'string' && a.trim() === b.trim();
+  const blank = (v: unknown) => typeof v !== 'string' || v.trim() === '';
+  return value.map((row) => {
+    if (typeof row !== 'object' || row === null || Array.isArray(row)) return row;
+    const r = row as Record<string, unknown>;
+    const d = byId.get(r.id);
+    if (!d) return row;
+    let out = r;
+    if (blank(r.titleCkb) && typeof d.titleCkb === 'string' && same(r.titleAr, d.titleAr)) out = { ...out, titleCkb: d.titleCkb };
+    if (blank(r.descCkb) && typeof d.descCkb === 'string' && same(r.descAr, d.descAr)) out = { ...out, descCkb: d.descCkb };
+    return out;
+  });
+}
+
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
   if (key === 'serialPrepGate') {
     return normalizeSerialPrepGate(value) as (typeof SETTING_DEFAULTS)[K];
@@ -836,7 +881,13 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
     const hasId = (id: string) =>
       configured.some((m) => typeof m === 'object' && m !== null && (m as { id?: unknown }).id === id);
     const missing = SETTING_DEFAULTS.checkoutPaymentMethods.filter((m) => m.id === 'bnpl' || m.id === 'gini').filter((m) => !hasId(m.id));
-    return (missing.length === 0 ? configured : [...configured, ...missing]) as (typeof SETTING_DEFAULTS)[K];
+    return withShippedSorani(
+      missing.length === 0 ? configured : [...configured, ...missing],
+      SETTING_DEFAULTS.checkoutPaymentMethods as unknown as Record<string, unknown>[]
+    ) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'checkoutDeliveryMethods' || key === 'cartShippingMethods') {
+    return withShippedSorani(value, SETTING_DEFAULTS[key] as unknown as Record<string, unknown>[]) as (typeof SETTING_DEFAULTS)[K];
   }
   // Merged over the defaults like `bnplPolicy` below, but through the policy
   // module's own resolver rather than a bare spread: a stored `max_days` of 0
