@@ -65,7 +65,7 @@ export default function ColourPriceSelector({ id, table }: { id: string; table: 
         {c.price === 'delta' ? (
           <span className="flex items-center gap-2">
             <Chip tone="info" data="exception">{s.exception}</Chip>
-            <button type="button" className="text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => set({ ...FOLLOW_COLOUR })} data-v2-inherit={id}>
+            <button type="button" className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => set({ ...FOLLOW_COLOUR })} data-v2-inherit={id}>
               {s.backToInherited}
             </button>
           </span>
@@ -97,7 +97,7 @@ export function ColourBulkBar({ colourIds }: { colourIds: readonly string[] }) {
         {anyOwn ? (
           <button
             type="button"
-            className="text-[11px] font-bold underline underline-offset-2 text-text-secondary"
+            className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary"
             onClick={() => {
               v2.setDraft((x) => ({ ...x, colours: Object.fromEntries(colourIds.map((id) => [id, { ...FOLLOW_COLOUR }])) }));
               v2.clearColours();

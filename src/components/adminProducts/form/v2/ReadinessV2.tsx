@@ -19,14 +19,16 @@ export const sectionOfMissing = (m: Pick<V2Missing, 'level'>): 3 | 5 => (m.level
 export default function ReadinessV2({ missing, onJump }: { missing: readonly V2Missing[]; onJump: (section: 3 | 5) => void }) {
   const lang = useV2Lang();
   const s = useV2Strings();
-  if (!missing.length) return null;
+  // A consequence is never a separate gap beside its cause («السعر المحسوب غير صالح» only says a price is missing).
+  const shown = missing.filter((m) => !(m.code === 'PRICE_INVALID' && missing.length > 1));
+  if (!shown.length) return null;
   const level = (m: V2Missing) =>
     m.level === 'model' ? s.levelModel : m.level === 'colour' ? s.levelColour : m.level === 'sku' ? s.levelSku : m.level === 'product' ? s.levelProduct : null;
   return (
     <div className="lv-alert lv-alert-warning min-w-0 px-3 py-2 mb-3" data-v2-readiness>
       <p className="mb-1 text-[12px] font-bold text-text-primary">{s.readinessTitle}</p>
       <ul className="grid gap-1">
-        {missing.map((m, i) => {
+        {shown.map((m, i) => {
           const where = level(m);
           const first = m.level && m.level !== 'product' ? nameIn(m.first_name, lang) : '';
           return (
@@ -36,7 +38,7 @@ export default function ReadinessV2({ missing, onJump }: { missing: readonly V2M
                 {where ? <span className="text-text-muted"> ({where}{first ? ` · ${first}` : ''})</span> : null}
                 {m.count > 1 ? <span className="text-text-muted"> · {s.missingCount(String(m.count))}</span> : null}
               </span>
-              <button type="button" className="shrink-0 text-[11px] font-bold underline underline-offset-2 text-text-primary" onClick={() => onJump(sectionOfMissing(m))} data-v2-jump={sectionOfMissing(m)}>
+              <button type="button" className="inline-flex min-h-11 shrink-0 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-primary" onClick={() => onJump(sectionOfMissing(m))} data-v2-jump={sectionOfMissing(m)}>
                 {s.show}
               </button>
             </li>

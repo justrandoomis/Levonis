@@ -137,6 +137,7 @@ export function inventoryStrings(loc: (ar: string, en: string, ckb?: string) => 
       empty: loc('لا توجد مشتريات مسجّلة.', 'No purchases recorded.', 'هیچ کڕینێک تۆمار نەکراوە.'),
       profitPreview: loc('الربح المتوقع', 'Expected profit', 'قازانجی چاوەڕوانکراو'),
       sellingPrice: loc('سعر البيع الحالي', 'Current selling price', 'نرخی فرۆشتنی ئێستا'),
+      needsPricing: loc('يحتاج تسعيرًا', 'Needs pricing', 'پێویستی بە نرخدانانە'),
       perUnitProfit: loc('ربح الوحدة', 'Profit per unit', 'قازانجی یەکە'),
       margin: loc('هامش الربح', 'Margin', 'ڕێژەی قازانج'),
       wholeBatch: loc('ربح الدفعة كاملة', 'Profit on the whole batch', 'قازانجی هەموو کۆگاکە'),

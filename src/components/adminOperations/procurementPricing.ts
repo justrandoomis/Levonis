@@ -246,9 +246,6 @@ export const extraOnStep = (typed: string): boolean => {
 
 export const pricingBody = (c: PricingChoices) => ({
   minimum_profits: c.minimums.map((m) => ({ product_id: m.product_id, scope: m.scope, scope_id: m.scope === 'product' ? '' : m.scope_id, amount_usd: m.amount_usd.trim() === '' ? null : m.amount_usd.trim() })),
-  ...(c.extras?.length
-    ? { direct_sale_extras: c.extras.map((x) => ({ product_id: x.product_id, scope: x.scope, scope_id: x.scope === 'product' ? '' : x.scope_id, amount_iqd: extraAmount(x.amount_iqd) })) }
-    : {}),
   manual_line_opt_in: c.optIn,
   use_purchase: c.usePurchase,
   prefer_purchase_values: c.prefer,
@@ -277,9 +274,6 @@ export function applyPurchase(productId: string, purchaseId: string, previewHash
     prefer_purchase_values: choices.prefer[productId] === true,
     manual_line_opt_in: choices.optIn.filter((k) => k.startsWith(`${productId}:`)),
     minimum_profits: body.minimum_profits.filter((m) => m.product_id === productId).map(({ scope, scope_id, amount_usd }) => ({ scope, scope_id, amount_usd })),
-    ...(body.direct_sale_extras?.some((x) => x.product_id === productId)
-      ? { direct_sale_extras: body.direct_sale_extras.filter((x) => x.product_id === productId).map(({ scope, scope_id, amount_iqd }) => ({ scope, scope_id, amount_iqd })) }
-      : {}),
   });
 }
 

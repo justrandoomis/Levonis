@@ -1,4 +1,5 @@
-import { holdLegacyCellMoney, holdLegacyRelationMoney } from '../lib/pricingEngine/v2/legacyMoney';
+import { holdLegacyCellMoney, holdLegacyRelationMoney, nullLegacyPricesDeep } from '../lib/pricingEngine/v2/legacyMoney';
+import { productV2Flag } from '../lib/engineInstalled';
 import { Hono } from 'hono';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import type { AppContext } from '../lib/types';
@@ -222,6 +223,8 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
   // say which. The form treats its costs as loaded only when BOTH say so —
   // otherwise its blank row costs would be saved as NULL.
   const financial = canViewCost(c.env, c.get('user'));
+  // The clean start: a product still «يحتاج تسعيرًا» answers its rows' old dinar prices EMPTY (archive only).
+  const legacy = (await productV2Flag(c.env.DB, productId)).needs_pricing ? nullLegacyPricesDeep : <T,>(v: T): T => v;
   return c.json(
     projectForAdmin(c.env, c.get('user'), {
       success: true,
@@ -234,17 +237,19 @@ adminProductRelationsRoutes.get('/:id/relations', async (c) => {
         low_stock_threshold: product.low_stock_threshold,
       },
       groups: rel.groups,
-      values: rel.values,
-      colors: rel.colors,
+      values: legacy(rel.values),
+      colors: legacy(rel.colors),
       links: rel.links,
       // The full editor now owns the model's order types too. Returning them
       // here keeps the first paint and the eventual whole-product save on one
       // canonical snapshot instead of loading the removed duplicate panel.
-      fulfillments: rel.fulfillments.map((f) => ({
-        ...f,
-        transports: transportsByFulfillment.get(f.id) ?? [],
-      })),
-      variants: variants.results,
+      fulfillments: legacy(
+        rel.fulfillments.map((f) => ({
+          ...f,
+          transports: transportsByFulfillment.get(f.id) ?? [],
+        }))
+      ),
+      variants: legacy(variants.results),
       images: activeImages,
       quarantined_images: quarantinedImages,
       facet_ids: facets.results.map((f) => f.facet_id),
@@ -514,7 +519,10 @@ adminProductRelationsRoutes.get('/:id/fulfillment', async (c) => {
         active: v.active,
         stock: v.stock,
       })),
-      fulfillments: rel.fulfillments.map((f) => ({ ...f, transports: byFulfillment.get(f.id) ?? [] })),
+      // The clean start: a product still «يحتاج تسعيرًا» answers its old dinar prices EMPTY (archive only).
+      fulfillments: ((await productV2Flag(c.env.DB, productId)).needs_pricing ? nullLegacyPricesDeep : <T,>(v: T): T => v)(
+        rel.fulfillments.map((f) => ({ ...f, transports: byFulfillment.get(f.id) ?? [] }))
+      ),
     })
   );
 });

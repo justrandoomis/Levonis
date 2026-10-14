@@ -13,6 +13,7 @@
  * editor never sees a cost code's name (`dto` projection in the route).
  */
 import type { Context } from 'hono';
+import { loadAuthoritativeProductImages } from '../../productSelectionImage';
 import type { AppContext } from '../../types';
 import { loadPreviewContext, loadProducts } from '../load';
 import { loadPricingRates } from '../rates';
@@ -218,7 +219,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       ev = await evaluateDesired(read, desiredFor(read, owner && !stored ? { method, sent: ['method'] } : { sent: [] }, o));
     } catch {
       // A product the engine cannot read yet (a malformed legacy row) is still listed, with nothing to say but its name.
-      rows.push({ id: cand.id, slug: cand.slug, names, image: read.image, status: cand.status, composition: '', state: stored ? 'saved' : 'needs_pricing', method: stored, default_method: method, can_finish: owner || method === 'usd', sellable_skus: 0, channels: [], missing: [], link });
+      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: '', state: stored ? 'saved' : 'needs_pricing', method: stored, default_method: method, can_finish: owner || method === 'usd', sellable_skus: 0, channels: [], missing: [], link });
       continue;
     }
     const answer = v2EditorAnswer(ev);
@@ -233,7 +234,9 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       id: cand.id,
       slug: cand.slug,
       names,
-      image: read.image,
+      // The picture is read for the page shown (below). NEVER `read.image`: that is the engine's price image —
+      // a fingerprint of every old dinar price of the product — not a picture (review 2026-10-14).
+      image: '',
       status: cand.status,
       composition: '',
       state,
@@ -283,12 +286,16 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
   const listed = rows.filter(pick);
   const pages = Math.max(1, Math.ceil(listed.length / QUEUE_PAGE_SIZE));
   const page = Math.min(Math.max(1, q.page), pages);
+  const shown = listed.slice((page - 1) * QUEUE_PAGE_SIZE, page * QUEUE_PAGE_SIZE);
+  // The product's real picture, from the one authority the products list reads (product_images).
+  const pictures = await loadAuthoritativeProductImages(db, shown.map((r) => r.id));
+  for (const r of shown) r.image = pictures.get(r.id) ?? '';
   return {
     success: true,
     rate_ready: !!rates?.usd_iqd,
     filter,
     counts,
-    products: listed.slice((page - 1) * QUEUE_PAGE_SIZE, page * QUEUE_PAGE_SIZE),
+    products: shown,
     page,
     pages,
     truncated,

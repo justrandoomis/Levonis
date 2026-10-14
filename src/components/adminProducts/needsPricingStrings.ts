@@ -70,3 +70,29 @@ export function hiddenBanner(n: number, lang: QueueLang): string {
 }
 
 export const tri = (t: Tri, lang: QueueLang): string => (lang === 'en' ? t.en : lang === 'ckb' ? t.ckb : t.ar);
+
+/**
+ * The «منتجات نشطة» tile's line (C5, review 2026-10-14): an active product still «يحتاج تسعيرًا» is hidden
+ * from every customer, so the tile says how many of its products customers cannot see yet.
+ */
+export function activeTileSub(totals: { active_needs_pricing?: number | null }, pct: number, lang: QueueLang): string {
+  const n = totals.active_needs_pricing ?? 0;
+  if (n > 0) {
+    if (lang === 'en') return `${pct}% of all · ${n} hidden until priced`;
+    if (lang === 'ckb') return `${pct}% · ${n} شاراوەیە تا نرخی بۆ دادەنرێت`;
+    return `${pct}% من الإجمالي · ${n} مخفي حتى يُسعَّر`;
+  }
+  if (lang === 'en') return `${pct}% of all products`;
+  if (lang === 'ckb') return `${pct}%`;
+  return `${pct}% من إجمالي المنتجات`;
+}
+
+/**
+ * The completeness card's note (C5): its own «مخفي الآن» count is the «ناقص» list's; the products still
+ * «يحتاج تسعيرًا» are a separate list, hidden whatever the switch says.
+ */
+export function separateListNote(n: number, lang: QueueLang): string {
+  if (lang === 'en') return `This count is the incomplete list only. ${n} more products are hidden until their pricing is published («Needs pricing»).`;
+  if (lang === 'ckb') return `ئەم ژمارەیە تەنها لیستی ناتەواوەکانە. ${n} بەرهەمی تر شاراوەن تا نرخدانانیان بڵاو دەکرێتەوە («پێویستی بە نرخدانانە»).`;
+  return `هذا العدد لقائمة «ناقص» وحدها. ${n} منتجًا آخر مخفي حتى يُنشر تسعيره («يحتاج تسعيرًا»).`;
+}

@@ -187,6 +187,10 @@ function productGate(p: GiftProductContext): Failure | null {
   if (!p.row) return fail('GIFT_PRODUCT_NOT_FOUND', ['PRODUCT_NOT_FOUND']);
   if (text(p.row.composition) !== '') return fail('GIFT_COMPOSITION_UNSUPPORTED', [text(p.row.composition).toUpperCase()]);
   if (text(p.row.status) !== 'active') return fail('GIFT_PRODUCT_INACTIVE', ['PRODUCT_INACTIVE']);
+  // The clean start (DECISIONS row 222): a product no customer sees (still «يحتاج تسعيرًا», or hidden as
+  // incomplete) is never a NEW gift — not granted, not a level item, not offered as a choice — until it is
+  // listed again. A gift already granted keeps its frozen line (the cart and the checkout never ask this).
+  if (p.listed === false) return fail('GIFT_PRODUCT_INACTIVE', ['PRODUCT_NOT_LISTED']);
   return null;
 }
 

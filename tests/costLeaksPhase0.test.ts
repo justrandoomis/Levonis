@@ -81,26 +81,22 @@ test('L2 — the legacy product list strips every rung’s cost for an assistant
   assert.equal((asOwner.products as Array<Record<string, unknown>>)[0]!.product_cost_iqd, COST.product);
 });
 
-test('L3 — an assistant can neither set nor blank the cost through the legacy save', async () => {
+test('L3 — the legacy save is closed for every role (the clean start): no cost, no price, no answer that carries either', async () => {
   const raw = freshDb();
   seedCostlyProduct(raw);
-  const app = legacyApp(raw, ASSISTANT);
   const base = { id: 'p_a1', name: 'Bambu Lab A1', slug: 'a1', price_iqd: 910000 };
-
-  const set = await post(app, '/api/admin/products', { ...base, product_cost_iqd: 1 });
-  assert.equal(set.status, 200, JSON.stringify(await set.clone().json()));
-  assert.deepEqual(leaks(await json(set)), [], 'and the answer carries no cost either');
+  const priceBefore = row(raw, 'SELECT price_iqd AS p FROM products WHERE id = ?', 'p_a1')!.p;
+  for (const who of [ASSISTANT, FULL, OWNER]) {
+    for (const body of [{ ...base, product_cost_iqd: 1 }, base]) {
+      const res = await post(legacyApp(raw, who), '/api/admin/products', body);
+      const out = await json(res);
+      assert.equal(res.status, 409, JSON.stringify(out));
+      assert.equal(out.code, 'PRICING_V2_MANAGED');
+      assert.deepEqual(leaks(out), [], 'the refusal carries no cost');
+    }
+  }
   assert.equal(row(raw, 'SELECT product_cost_iqd AS c FROM products WHERE id = ?', 'p_a1')!.c, COST.product);
-
-  await post(app, '/api/admin/products', base); // the validator used to emit null for an absent cost
-  assert.equal(row(raw, 'SELECT product_cost_iqd AS c FROM products WHERE id = ?', 'p_a1')!.c, COST.product);
-  assert.equal(row(raw, 'SELECT price_iqd AS p FROM products WHERE id = ?', 'p_a1')!.p, 910000, 'the price did save');
-
-  // A full admin cannot either (decision 2); the owner still can.
-  await post(legacyApp(raw, FULL), '/api/admin/products', { ...base, product_cost_iqd: 1 });
-  assert.equal(row(raw, 'SELECT product_cost_iqd AS c FROM products WHERE id = ?', 'p_a1')!.c, COST.product);
-  await post(legacyApp(raw, OWNER), '/api/admin/products', { ...base, product_cost_iqd: 500000 });
-  assert.equal(row(raw, 'SELECT product_cost_iqd AS c FROM products WHERE id = ?', 'p_a1')!.c, 500000);
+  assert.equal(row(raw, 'SELECT price_iqd AS p FROM products WHERE id = ?', 'p_a1')!.p, priceBefore, 'no dinar price is written');
 });
 
 // ---------------------------------------------------------------- L4

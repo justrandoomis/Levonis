@@ -38,6 +38,82 @@ export const LEGACY_ROW_PRICE_KEYS = ['regular_price_iqd', 'prime_price_iqd', 'p
 /** A selector row's cost fields (owner). */
 export const LEGACY_ROW_COST_KEYS = ['cost_iqd', 'cost_adjust_iqd'] as const;
 
+/**
+ * THE OLD DINAR PRICES ARE NEVER READ BACK BY ANY SCREEN OR FILE (DECISIONS row 222; review 2026-10-14). A
+ * product still «يحتاج تسعيرًا» keeps its legacy price, price adjustment, surcharge and route commission cells
+ * only as an archive: the admin reads of the product, its relations and its order types, and the TXT, CSV and
+ * data-file exports, answer them EMPTY (null) — the keys stay, so every reader and every file keeps its shape,
+ * and a key the form or a file does not send keeps the stored value on save. A V2-published product's cells
+ * are the V2 writer's and are read as they are. The owner-only cost cells are not prices: they stay behind the
+ * cost gate (projectForAdmin, `includeCost`).
+ */
+export const LEGACY_PRICE_KEY = /(^|_)(price_iqd|surcharge_iqd|commission_iqd)$|^(regular|prime|pro)_adjust_iqd$|^membership_prices$/;
+
+/** Every legacy price number (or numeric text) answered null, at every depth; objects and lists are walked, never blanked. */
+export function nullLegacyPricesDeep<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => nullLegacyPricesDeep(v)) as T;
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Row).map(([k, v]) => [k, LEGACY_PRICE_KEY.test(k) && (typeof v === 'number' || typeof v === 'string') ? null : nullLegacyPricesDeep(v)])
+  ) as T;
+}
+
+/** A flat file key (`options.1.direct.price_iqd`) names a legacy price when its last segment does. */
+export const isLegacyPriceFileKey = (key: string): boolean => LEGACY_PRICE_KEY.test(key.slice(key.lastIndexOf('.') + 1));
+
+/**
+ * A TXT export without its legacy price lines (`key=value`): an omitted key keeps the stored value on re-apply.
+ * A heredoc (`key=<<<TOKEN` … `TOKEN`) is text, kept whole — a description that says «price_iqd=99» is not a key.
+ */
+export function withoutLegacyPriceLines(text: string): string {
+  const out: string[] = [];
+  let heredoc: string | null = null;
+  for (const line of text.split('\n')) {
+    if (heredoc !== null) {
+      out.push(line);
+      if (line.trim() === heredoc) heredoc = null;
+      continue;
+    }
+    const trimmed = line.trim();
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0 || trimmed.startsWith('#')) {
+      out.push(line);
+      continue;
+    }
+    const value = trimmed.slice(eq + 1).trim();
+    if (value.startsWith('<<<')) {
+      heredoc = value.slice(3).trim() || 'END';
+      out.push(line);
+      continue;
+    }
+    if (!isLegacyPriceFileKey(trimmed.slice(0, eq).trim())) out.push(line);
+  }
+  return out.join('\n');
+}
+
+/**
+ * The products of `ids` that are NOT V2-published (no method, or no complete V2 write): their legacy money is an
+ * archive and leaves no export. Every id before 0189 (nothing is published there).
+ */
+export async function needsPricingIds(db: D1Database, ids: readonly string[]): Promise<Set<string>> {
+  const all = new Set(ids.filter(Boolean));
+  if (!all.size) return all;
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT s.product_id AS id FROM product_pricing_state s
+          WHERE s.product_id IN (SELECT value FROM json_each(?)) AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+            AND EXISTS (SELECT 1 FROM pricing_v2_sku_results r WHERE r.product_id = s.product_id)`
+      )
+      .bind(JSON.stringify([...all]))
+      .all<{ id: string }>();
+    for (const r of results ?? []) all.delete(String(r.id));
+  } catch {
+    // A database before 0189: nothing is published, every product needs pricing.
+  }
+  return all;
+}
+
 const has = (o: Row, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 const isRow = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
 

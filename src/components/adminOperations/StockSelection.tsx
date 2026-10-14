@@ -78,7 +78,8 @@ export default function StockSelection({
       {value && (
         <p className={`text-xs ${T.text3}`}>
           {loc('المتاح', 'Available')}: {value.stock === null ? '∞' : value.stock - value.reserved} ·{' '}
-          {loc('سعر البيع المرجعي', 'Selling reference')}: {money(value.selling_price_iqd)}
+          {loc('سعر البيع المرجعي', 'Selling reference', 'نرخی فرۆشتنی سەرچاوە')}:{' '}
+          {value.selling_price_iqd === null ? loc('يحتاج تسعيرًا', 'Needs pricing', 'پێویستی بە نرخدانانە') : money(value.selling_price_iqd)}
           {showPurchaseReference && value.purchase_unit_iqd !== undefined && (
             <>
               {' '}

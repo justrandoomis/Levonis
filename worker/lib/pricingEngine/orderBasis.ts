@@ -61,6 +61,17 @@ export function channelOfLine(line: Pick<LineForBasis, 'pricing_basis' | 'route'
   return line.route && ROUTES.includes(line.route) ? channelOfRoute(line.route as PreorderRoute) : null;
 }
 
+/**
+ * The channel whose replacement cost a line's frozen ESTIMATE reads: the route the item actually travels
+ * when it has one — a pre-order paid cash on delivery is PRICED from the direct ladder (`channelOfLine`
+ * says `direct_sale`) but still ships by its route, and its cost is that route's R, never R_stock — else
+ * the direct channel (review 2026-10-14).
+ */
+export function estimateChannelOfLine(line: Pick<LineForBasis, 'pricing_basis' | 'route'>): SkuChannel | null {
+  if (line.route && ROUTES.includes(line.route)) return channelOfRoute(line.route as PreorderRoute);
+  return line.pricing_basis === 'direct' ? 'direct_sale' : null;
+}
+
 /** Base USD = price ÷ U, rounded up at 6 places (decimal text). */
 export function baseUsdOf(priceIqd: number, usdIqd: string): string {
   return procurementExactText(ceilToPlaces(quotientProcurementExact(procurementExact(priceIqd), procurementExact(usdIqd)), 6));
@@ -154,7 +165,7 @@ const V2_ESTIMATE_SQL = `SELECT r.product_id, r.combo_key, r.channel, r.replacem
 export async function v2EstimateOf(db: D1Database, lines: readonly Omit<LineForBasis, 'regular_iqd'>[], cleanStart: boolean): Promise<Map<string, V2LineEstimate>> {
   const out = new Map<string, V2LineEstimate>();
   if (!cleanStart) return out;
-  const wanted = lines.filter((l) => l.product_id && channelOfLine(l) !== null);
+  const wanted = lines.filter((l) => l.product_id && estimateChannelOfLine(l) !== null);
   if (!wanted.length) return out;
   type Row = { product_id: string; combo_key: string; channel: string; replacement_cost_iqd: number; replacement_exact: string; usd_iqd_rate: string; usd_fx_version: number };
   let rows: Row[];
@@ -165,7 +176,7 @@ export async function v2EstimateOf(db: D1Database, lines: readonly Omit<LineForB
     throw e;
   }
   for (const l of wanted) {
-    const channel = channelOfLine(l)!;
+    const channel = estimateChannelOfLine(l)!;
     const ids = l.option_value_ids && l.option_value_ids.length ? l.option_value_ids : l.option_id ? [l.option_id] : [];
     const candidates = [...new Set([skuComboKey({ option_value_ids: ids, color_id: l.color_id || null }), skuComboKey({ option_value_ids: l.option_id ? [l.option_id] : [], color_id: null })])];
     const r = candidates.map((combo) => rows.find((x) => x.product_id === l.product_id && x.combo_key === combo && x.channel === channel)).find((x) => !!x);

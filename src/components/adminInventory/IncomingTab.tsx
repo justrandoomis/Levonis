@@ -281,7 +281,7 @@ function PurchaseDialog({ s, onClose, onDone }: { s: InvStrings; onClose: () => 
           // prices are entered explicitly or loaded by the procurement profile.
           setUnit(null);
         }} />
-        {selection && <p className={`text-[12px] ${T.text2}`}>{s.incoming.sellingPrice}: {money(selection.selling_price_iqd)}</p>}
+        {selection && <p className={`text-[12px] ${T.text2}`}>{s.incoming.sellingPrice}: {selection.selling_price_iqd === null ? s.incoming.needsPricing : money(selection.selling_price_iqd)}</p>}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <IqdField label={s.incoming.qty} value={qty} onChange={setQty} required />

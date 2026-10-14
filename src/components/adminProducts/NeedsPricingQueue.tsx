@@ -16,6 +16,8 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
 import { NEEDS_PRICING as S, tri, type QueueLang } from './needsPricingStrings';
+import { missingLabel } from './form/v2/StatusChipV2';
+import { v2Strings } from './form/v2/v2Strings';
 
 type Filter = 'all' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review';
 type State = 'needs_pricing' | 'saved' | 'ready' | 'composition_pending' | 'published';
@@ -76,15 +78,26 @@ const COUNT_OF: Record<Filter, string> = {
 
 const nameIn = (n: Names, lang: QueueLang) => (lang === 'en' ? n.en || n.ar : lang === 'ckb' ? n.ckb || n.ar || n.en : n.ar || n.en) || '—';
 
-/** «ناقص: تكلفة المورد (المنتج)» — the grouped line, names only. */
-function missingLine(m: Missing[], lang: QueueLang): string {
-  if (!m.length) return '';
-  const parts = m.slice(0, 3).map((x) => {
-    const label = x.code === 'OWNER_DATA' ? tri(S.ownerData, lang) : x.field ? `${x.code} · ${x.field}` : x.code;
-    const where = x.first_name ? ` (${nameIn(x.first_name, lang)})` : '';
-    return `${label}${where}${x.count > 1 ? ` ×${x.count}` : ''}`;
+/** Is any of the three name slots filled (a product without options sends an empty first name)? */
+const hasName = (n: Names | null): n is Names => !!n && !!(n.ar || n.en || n.ckb);
+
+/**
+ * «ناقص: تكلفة المورد (موديل · قياسي) ×6» — the grouped line, in the reader's language: the field's own
+ * label (`missingLabel`, the readiness list's words, never a raw code), the level word and the first SKU's
+ * name when it has one, a separator of the language, and no consequence code beside its cause.
+ */
+export function missingLine(m: readonly Missing[], lang: QueueLang): string {
+  const shown = m.filter((x) => !(x.code === 'PRICE_INVALID' && m.length > 1));
+  if (!shown.length) return '';
+  const s = v2Strings(lang);
+  const levelWord = (l: string | null) =>
+    l === 'model' ? s.levelModel : l === 'colour' ? s.levelColour : l === 'sku' ? s.levelSku : l === 'product' ? s.levelProduct : '';
+  const parts = shown.slice(0, 3).map((x) => {
+    const label = x.code === 'OWNER_DATA' ? tri(S.ownerData, lang) : missingLabel(x, lang);
+    const where = [levelWord(x.level), x.level && x.level !== 'product' && hasName(x.first_name) ? nameIn(x.first_name, lang) : ''].filter(Boolean).join(' · ');
+    return `${label}${where ? ` (${where})` : ''}${x.count > 1 ? ` ×${x.count}` : ''}`;
   });
-  return `${tri(S.missingPrefix, lang)}: ${parts.join('، ')}${m.length > 3 ? ` +${m.length - 3}` : ''}`;
+  return `${tri(S.missingPrefix, lang)}: ${parts.join(lang === 'en' ? ', ' : '، ')}${shown.length > 3 ? ` +${shown.length - 3}` : ''}`;
 }
 
 function StateChip({ p, lang }: { p: QueueProduct; lang: QueueLang }) {
@@ -166,7 +179,7 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
           <button
             key={f}
             type="button"
-            className={T.chip}
+            className={`${T.chip} min-h-11`}
             aria-pressed={filter === f}
             data-queue-filter={f}
             onClick={() => {

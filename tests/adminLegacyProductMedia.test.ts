@@ -113,14 +113,17 @@ test('legacy scalar update preserves pre-relational media mirrors', async () => 
     name: 'After',
     price_iqd: 125_000,
   });
-  assert.equal(response.status, 200, JSON.stringify(await json(response)));
+  // The clean start (DECISIONS row 222): the legacy scalar save wrote a dinar price, so it is closed.
+  const refused = await json(response);
+  assert.equal(response.status, 409, JSON.stringify(refused));
+  assert.equal(refused.code, 'PRICING_V2_MANAGED');
 
   const stored = raw.prepare(
     `SELECT name, price_iqd, images, options, colors, description_images, how_to_use, specifications, stores
        FROM products WHERE id = 'legacy_scalar'`
   ).get() as Record<string, unknown>;
-  assert.equal(stored.name, 'After');
-  assert.equal(stored.price_iqd, 125_000);
+  assert.equal(stored.name, 'Before', 'nothing was written');
+  assert.equal(stored.price_iqd, 100_000);
   assert.equal(stored.images, JSON.stringify(['/files/products/legacy/scalar.webp']));
   assert.equal(stored.options, JSON.stringify([{ id: 'old-option', image: '/files/products/legacy/option.webp' }]));
   assert.equal(stored.colors, JSON.stringify([{ id: 'old-color', image: '/files/products/legacy/color.webp' }]));
@@ -188,15 +191,15 @@ test('legacy admin product reads overlay authoritative relations and never reviv
   assert.equal(JSON.stringify(body).includes(staleMirrorOnly), false);
   assert.equal(JSON.stringify(body).includes('bad.example'), false);
 
-  // The adjacent scalar POST returns the same legacy wire shape and must not
-  // re-expose the mirror it deliberately preserves in storage.
+  // The adjacent scalar POST is closed since the clean start (it wrote a dinar price): its refusal
+  // carries no product, so it re-exposes no mirror either.
   const saved = await post(app, '/api/admin/products', {
     ...base(canonicalId),
     name: 'Canonical after scalar save',
   });
   const savedBody = await json(saved);
-  assert.equal(saved.status, 200, JSON.stringify(savedBody));
-  assert.deepEqual(savedBody.product.images, [primary, secondary]);
+  assert.equal(saved.status, 409, JSON.stringify(savedBody));
+  assert.equal(savedBody.code, 'PRICING_V2_MANAGED');
   assert.equal(JSON.stringify(savedBody).includes(staleCanonical), false);
 });
 

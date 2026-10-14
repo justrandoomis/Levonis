@@ -110,8 +110,8 @@ export default function ReviewSheetV2({
         )}
         {large ? (
           <div className="lv-alert lv-alert-warning grid gap-1 px-3 py-2.5">
-            <label className="flex items-center gap-2 text-[13px] text-text-primary">
-              <input type="checkbox" className="h-4 w-4" checked={ticked} disabled={busy} onChange={(e) => setTicked(e.target.checked)} data-v2-review-large />
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[13px] text-text-primary">
+              <input type="checkbox" className="h-5 w-5 shrink-0" checked={ticked} disabled={busy} onChange={(e) => setTicked(e.target.checked)} data-v2-review-large />
               {s.largeTick}
             </label>
             <span className="text-[12px] text-text-secondary">{s.largeNote}</span>

@@ -12,7 +12,7 @@
  * The dinars beside a field are the server's answer for the product's first
  * SKU; nothing is multiplied here.
  */
-import { iqdText, nameIn, signedUsd, type PriceDraft, type V2Names } from './v2Model';
+import { inheritPlaceholder, iqdText, nameIn, signedUsd, type PriceDraft, type V2Names } from './v2Model';
 import { useV2Lang, useV2Strings, UsdInput, V2Field } from './v2Ui';
 
 export default function ProfitDiscountCard({
@@ -23,6 +23,7 @@ export default function ProfitDiscountCard({
   preorder,
   modelNames,
   onJump,
+  inheritedMinProfit = null,
 }: {
   draft: PriceDraft;
   setDraft: (fn: (d: PriceDraft) => PriceDraft) => void;
@@ -33,6 +34,8 @@ export default function ProfitDiscountCard({
   preorder: number | null;
   modelNames: (id: string) => V2Names | null;
   onJump: (section: 3 | 5) => void;
+  /** The owner's answer: what the minimum profit inherits when the field is empty (§2.1 rule 2). */
+  inheritedMinProfit?: { amount_usd: string | null; amount_iqd: number | null } | null;
 }) {
   const s = useV2Strings();
   const lang = useV2Lang();
@@ -49,7 +52,7 @@ export default function ProfitDiscountCard({
         ) : owner ? (
           <V2Field label={s.minProfit}>
             {(id) => (
-              <UsdInput id={id} value={draft.min_profit_usd} placeholder={s.inherit} onChange={(min_profit_usd) => setDraft((d) => ({ ...d, min_profit_usd }))} data="min-profit" />
+              <UsdInput id={id} value={draft.min_profit_usd} placeholder={inheritPlaceholder(s.inherit, inheritedMinProfit)} onChange={(min_profit_usd) => setDraft((d) => ({ ...d, min_profit_usd }))} data="min-profit" />
             )}
           </V2Field>
         ) : null}
@@ -64,7 +67,7 @@ export default function ProfitDiscountCard({
                 {nameIn(modelNames(id), lang) || id} {m.discount_usd ? signedUsd(`-${m.discount_usd}`) : '—'}
               </span>
             ))}
-            <button type="button" className="font-bold underline underline-offset-2 text-text-primary" onClick={() => onJump(5)} data-v2-jump={5}>
+            <button type="button" className="inline-flex min-h-11 items-center px-1 font-bold underline underline-offset-2 text-text-primary" onClick={() => onJump(5)} data-v2-jump={5}>
               {s.show} ↘
             </button>
           </p>

@@ -43,6 +43,7 @@ import { auditStatements } from '../audit';
 import { changedExactlyOne } from '../gifts/fence';
 import { placeOrder, type QuickBuyOrderHooks } from '../../routes/orders';
 import { isV2Published } from '../listing';
+import { cleanStartAt } from '../offers';
 import {
   parseJson,
   QUICK_BUY_FINALIZE_MAX_ATTEMPTS,
@@ -201,6 +202,14 @@ export async function releaseSession(
   }
 }
 
+/** Was this session quoted before the clean start's instant (`admin_settings.pricingV2CleanStart.at`)? */
+export function quotedBeforeCleanStart(createdAt: string | null | undefined, cleanStart: string | null): boolean {
+  if (!cleanStart || !createdAt) return false;
+  const at = Date.parse(cleanStart);
+  const created = Date.parse(createdAt);
+  return Number.isFinite(at) && Number.isFinite(created) && created < at;
+}
+
 /** The code a stored `finalize_error` («CODE: message») starts with. */
 const codeOf = (finalizeError: string | null) => (finalizeError ?? '').split(':')[0].trim() || 'QUICK_BUY_NOT_SUBMITTED';
 
@@ -287,6 +296,12 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
     await releaseSession(db, session, items, { state: 'cancelled', reason: 'empty', actorId: session.user_id, fromStates: ['open'] });
     return { status: 'cancelled' };
   }
+
+  // The clean start (DECISIONS row 222; review 2026-10-14): a session opened before dollar pricing began
+  // holds quotes of the OLD dinar prices, and `unitCeilings` would cap a new V2 price at one of them. Its
+  // quote is not the price any more: given up at once (everything released, the customer told), never
+  // charged at an old number.
+  if (quotedBeforeCleanStart(session.created_at, await cleanStartAt(db))) return settleGiveUp(db, session, 'PRICE_CHANGED');
 
   const releaseMoves = items
     .filter((it) => it.reserved_qty > 0)

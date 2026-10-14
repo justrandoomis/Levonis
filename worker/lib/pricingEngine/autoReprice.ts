@@ -117,6 +117,8 @@ export interface EngineStateRow {
   product_id: string;
   slug: string;
   inputs_seq: number;
+  /** The inputs sequence the last complete write priced (null before any): another value is an unreviewed data save. */
+  priced_inputs_seq?: number | null;
   write_seq: number;
   reprice_blocked_code: string | null;
   reprice_blocked_at: string | null;
@@ -129,7 +131,7 @@ export interface EngineStateRow {
 // The clean start (DECISIONS row 222, spec addendum A.6): only V2 products are repriced. A V1 engine
 // product is hidden until it is priced in dollars, and repricing it would write `price_history` rows that
 // price protection reads as engine observations — an old dinar price published by the back door.
-const engineStatesSql = () => `SELECT s.product_id, p.slug, s.inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at, s.pricing_method,
+const engineStatesSql = () => `SELECT s.product_id, p.slug, s.inputs_seq, s.priced_inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at, s.pricing_method,
        MAX(COALESCE((SELECT MAX(updated_at) FROM pricing_fx_rates), ''), COALESCE((SELECT MAX(updated_at) FROM pricing_shipping_rates), '')) AS rates_at
   FROM product_pricing_state s JOIN products p ON p.id = s.product_id
  WHERE s.mode = 'engine' AND s.pricing_method IS NOT NULL AND COALESCE(p.composition, '') = ''
@@ -154,6 +156,7 @@ export async function loadEngineStates(db: D1Database, opts: { spent?: (n: numbe
     product_id: String(r.product_id),
     slug: String(r.slug ?? ''),
     inputs_seq: Number(r.inputs_seq ?? 0),
+    priced_inputs_seq: r.priced_inputs_seq === null || r.priced_inputs_seq === undefined ? null : Number(r.priced_inputs_seq),
     write_seq: Number(r.write_seq ?? 0),
     reprice_blocked_code: r.reprice_blocked_code ?? null,
     reprice_blocked_at: r.reprice_blocked_at ?? null,
@@ -229,6 +232,25 @@ export function deficitOf(ev: Pick<EngineEvaluation, 'rows'>): number {
 export function blockCodeOf(codes: readonly string[]): string {
   const pick = codes.includes('RESOLVER_MISMATCH') ? 'RESOLVER_MISMATCH' : (codes.find((c) => c !== 'PRICE_INVALID') ?? codes[0] ?? 'REPRICE_BLOCKED');
   return /^[A-Z0-9_]{1,40}$/.test(pick) ? pick : 'REPRICE_BLOCKED';
+}
+
+/**
+ * V2: why an automatic repricing must not publish this evaluation, or null.
+ *   - PRICING_V2_UNREVIEWED: the product's inputs (points, discounts, cost inputs, minimum profit) moved since
+ *     its last complete, reviewed write — a data-only save that skipped the preview hash, the 15% tick and the
+ *     fresh sign-in. Publishing it here would be that review's bypass; the owner opens the product instead.
+ *   - PRICING_V2_LARGE_CHANGE: a change above 15% (or a drop above 30%) nobody previewed. An owner rate or
+ *     shipping act carries the owner's own preview and tick of these flags (adminPricing.ts), so only the
+ *     unattended triggers (the FX fetch, the sweep) hold it.
+ */
+export function v2AutoHoldCode(
+  state: Pick<EngineStateRow, 'inputs_seq' | 'priced_inputs_seq'>,
+  ev: Pick<V2Evaluation, 'large_change' | 'drop_flag'>,
+  trigger: AutoRepriceTrigger
+): string | null {
+  if ((state.priced_inputs_seq ?? null) !== state.inputs_seq) return 'PRICING_V2_UNREVIEWED';
+  if ((ev.large_change || ev.drop_flag) && (trigger === 'fx' || trigger === 'sweep')) return 'PRICING_V2_LARGE_CHANGE';
+  return null;
 }
 
 /** V2: how far the new prices lie above today's, the worst SKU × channel (whole dinars). Ordering only. */
@@ -408,6 +430,11 @@ export async function repriceStaleEngineProducts(env: Env, opts: AutoRepriceOpti
         }
         if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write) {
           failing.push({ p, code: blockCodeOf(v2.codes) });
+          continue;
+        }
+        const hold = v2AutoHoldCode(p.state, v2, opts.trigger);
+        if (hold) {
+          failing.push({ p, code: hold });
           continue;
         }
         ready.push({ p, v2, deficit: deficitOfV2(v2) });

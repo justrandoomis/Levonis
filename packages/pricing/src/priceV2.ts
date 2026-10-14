@@ -598,18 +598,22 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     const rR = own.cost;
     if (method === 'cost') {
       const rExact = rR!.exact;
-      if (cmp(rExact, procurementExact(D)) > 0) {
+      // Q1 (DECISIONS row 222): a route never sells AT its own replacement cost — not even the cost rounded up
+      // to the step, which would publish it. The cost on the step is the line: the route is blocked when even
+      // the direct price does not clear it, and its discount is withdrawn when the discounted price does not.
+      const rStep = ceilStep(rExact, step);
+      if (rStep >= D) {
         fail(channel, [{ code: 'V2_ROUTE_BELOW_COST', profile: ROUTE_PROFILE[route] }]);
         continue;
       }
-      if (cmp(eP, rExact) < 0) {
+      if (price <= rStep) {
         // Q1: the direct price, no discount on this route — never lifted to the cost.
         price = D;
         exact = eD;
         floor = 'discount_withdrawn';
         warn({ code: 'V2_DISCOUNT_WITHDRAWN', profile: ROUTE_PROFILE[route] }, channel);
       }
-      invariant(cmp(procurementExact(price), rExact) >= 0, 'a cost-first route is never below its own cost');
+      invariant(price > rStep && cmp(procurementExact(price), rExact) > 0, 'a cost-first route always sells above its own cost');
     }
     const below = method === 'usd' && rR !== null && cmp(eP, rR.exact) < 0;
     if (below) warn({ code: 'V2_BELOW_COST', profile: ROUTE_PROFILE[route] }, channel);

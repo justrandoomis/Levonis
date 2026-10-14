@@ -220,9 +220,11 @@ test('every shape made V2 is charged exactly its V2 prices: prepaid, COD = D, fe
   assert.equal(v1Doc.sku_strict, undefined, 'a V1 document is never strict');
 });
 
-test('a cost-first route whose cost is above the discounted price sells at D; one above D is blocked unless the owner accepted it', async () => {
+test('a cost-first route whose cost is at or above the discounted price sells at D; one at or above D is blocked unless the owner accepted it', async () => {
   const w = pricingWorld();
-  // $120 off: E_P = 800,000 = R_land (kept); R_air 842,000 > 800,000 → the air route sells at D (C-5 `direct`).
+  // $120 off: E_P = 800,000 = R_land — a price AT the route's own cost would publish it (Q1, review
+  // 2026-10-14): the discount is withdrawn there too and the land route sells at D, like the air route
+  // (R_air 842,000 > 800,000; C-5 `direct`). Every route sells strictly above its replacement cost.
   const ev = await writeV2(w.db, AMS2, {
     method: 'cost',
     inputs: { supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 },
@@ -230,7 +232,12 @@ test('a cost-first route whose cost is above the discounted price sells at D; on
     discounts: [off('120')],
   });
   const at = (ch: string) => ev.plan.prices.find((p) => p.channel === ch)!;
-  assert.equal(at('pre_order_land').price.computed_price_iqd, 800_000);
+  assert.equal(at('pre_order_land').price.computed_price_iqd, 992_000);
+  assert.equal(at('pre_order_land').price.v2.floor, 'discount_withdrawn');
+  for (const p of ev.plan.prices) {
+    const r = p.price.v2.replacement?.replacement_cost_iqd ?? null;
+    if (r !== null && p.channel !== 'direct_sale') assert.ok(p.price.computed_price_iqd > r, `${p.channel} sells above its own cost`);
+  }
   assert.equal(at('pre_order_air').price.computed_price_iqd, 992_000);
   assert.equal(at('pre_order_air').price.v2.floor, 'discount_withdrawn');
   assert.equal(row<{ f: string }>(w.raw, "SELECT floor AS f FROM pricing_v2_sku_results WHERE product_id = ? AND channel = 'pre_order_air'", AMS2)!.f, 'discount_withdrawn');
@@ -249,7 +256,7 @@ test('a cost-first route whose cost is above the discounted price sells at D; on
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM pricing_v2_sku_results WHERE product_id = ? AND channel = 'pre_order_air'", AMS2), 0);
   const grid = await cartGrid(w.db, AMS2);
   assert.equal(grid[`o:${legacyOptionId('bambu-lab-ams-2-pro', 0)}@pre_order_air`], undefined, 'the blocked route is not offered');
-  assert.equal(grid[`o:${legacyOptionId('bambu-lab-ams-2-pro', 0)}@pre_order_land`]!.prepaid, 800_000);
+  assert.equal(grid[`o:${legacyOptionId('bambu-lab-ams-2-pro', 0)}@pre_order_land`]!.prepaid, 992_000, 'land sells at D: its discount would have sold it at its own cost');
 });
 
 test('strict mode: a model added to a V2 product before it is priced is refused, at the resolver and at the cart door', async () => {

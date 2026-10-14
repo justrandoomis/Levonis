@@ -65,6 +65,20 @@ export interface V2Strings {
   chipRate: Fill;
   rateHistory: string;
   publish: string;
+  /** The form's «مسودة» button (C13: the buttons speak the reader's language). */
+  draft: string;
+  /** The form header's status chip (C5): a product customers see, and one they do not. */
+  statusPublished: string;
+  statusHidden: string;
+  /** The weight unit beside a number, in the reader's language. */
+  kgUnit: string;
+  /** «المنتج: $40.00» — the inherited value shown as a placeholder or hint. */
+  inheritedProduct: Fill;
+  /** «الموديل: $40.00». */
+  inheritedModel: Fill;
+  /** The two separate resets of a model (its price, its discount exception). */
+  resetPrice: string;
+  resetDiscount: string;
   reviewTitle: string;
   reviewIntro: string;
   confirm: string;
@@ -199,6 +213,14 @@ const AR: V2Strings = {
   chipRate: (r) => `1 USD = ${r} د.ع (معتمد)`,
   rateHistory: 'السجل',
   publish: 'نشر',
+  draft: 'مسودة',
+  statusPublished: 'منشور',
+  statusHidden: 'مخفي',
+  kgUnit: 'كغ',
+  inheritedProduct: (v) => `المنتج: ${v}`,
+  inheritedModel: (v) => `الموديل: ${v}`,
+  resetPrice: 'السعر: رجوع للموروث',
+  resetDiscount: 'الخصم: رجوع للموروث',
   reviewTitle: 'راجع الأسعار التي ستتغيّر',
   reviewIntro: 'هذه الأسعار فقط تتغيّر بهذا الحفظ. لا يُحفظ شيء قبل اعتمادك.',
   confirm: 'اعتمد ونشر',
@@ -333,6 +355,14 @@ const EN: V2Strings = {
   chipRate: (r) => `1 USD = ${r} IQD (approved)`,
   rateHistory: 'History',
   publish: 'Publish',
+  draft: 'Draft',
+  statusPublished: 'Published',
+  statusHidden: 'Hidden',
+  kgUnit: 'kg',
+  inheritedProduct: (v) => `Product: ${v}`,
+  inheritedModel: (v) => `Model: ${v}`,
+  resetPrice: 'Price: back to inherited',
+  resetDiscount: 'Discount: back to inherited',
   reviewTitle: 'Review the prices that will change',
   reviewIntro: 'Only these prices change with this save. Nothing is saved before you confirm.',
   confirm: 'Confirm and publish',
@@ -467,6 +497,14 @@ const CKB: V2Strings = {
   chipRate: (r) => `1 USD = ${r} دینار (پەسەندکراو)`,
   rateHistory: 'تۆمار',
   publish: 'بڵاوکردنەوە',
+  draft: 'ڕەشنووس',
+  statusPublished: 'بڵاوکراوەتەوە',
+  statusHidden: 'شاراوە',
+  kgUnit: 'کگ',
+  inheritedProduct: (v) => `بەرهەم: ${v}`,
+  inheritedModel: (v) => `مۆدێل: ${v}`,
+  resetPrice: 'نرخ: گەڕانەوە بۆ نرخی بنەڕەت',
+  resetDiscount: 'داشکاندن: گەڕانەوە بۆ نرخی بنەڕەت',
   reviewTitle: 'ئەو نرخانە ببینە کە دەگۆڕێن',
   reviewIntro: 'تەنها ئەم نرخانە بەم پاشەکەوتکردنە دەگۆڕێن. پێش پەسەندکردنت هیچ پاشەکەوت ناکرێت.',
   confirm: 'پەسەندکردن و بڵاوکردنەوە',
@@ -558,4 +596,14 @@ export const V2_STRINGS: Readonly<Record<'ar' | 'en' | 'ckb', V2Strings>> = { ar
 /** The strings of the reader's language (Arabic for anything unknown). */
 export function v2Strings(lang: Language | string): V2Strings {
   return lang === 'en' ? EN : lang === 'ckb' ? CKB : AR;
+}
+
+/**
+ * The form header's status chip (C5): an active product still «يحتاج تسعيرًا» (or a new one, before its first
+ * V2 write) is hidden from customers, so the header never says «منشور» beside section ٣'s «مخفي».
+ */
+export function headerStatusText(status: string, needsPricing: boolean, s: Pick<V2Strings, 'statusPublished' | 'statusHidden' | 'draft' | 'chipHidden'>): string {
+  if (status === 'draft') return s.draft;
+  if (status === 'active') return needsPricing ? s.chipHidden : s.statusPublished;
+  return s.statusHidden;
 }

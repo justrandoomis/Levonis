@@ -12,6 +12,15 @@
  * both stay visible («تقديري مقابل فعلي»). Unlinking is the existing release
  * path.
  *
+ * THE LOT MUST BE THE LINE'S OWN STOCK ROW (review 2026-10-14): the line's
+ * selection (model, colour, variant) resolves to one shelf rung exactly as a
+ * direct sale of it would, and only a lot of that rung (`scope`/`scope_id`)
+ * may be linked — never another model's or colour's lot of the same product.
+ * The receive that created the lot raised that rung's sellable counter, so
+ * the link lowers it again in the same batch (an `adjust_out` ledger row,
+ * guarded by what is free): the units promised to this pre-order customer
+ * are never sold again as direct stock.
+ *
  * Owner-only (cost write). Replay-safe: the idempotency key
  * `preorder_link:<item>:<lot>:<operation>` answers `already`. A database
  * before 0190 has no `link_kind`: 503 PRICING_NOT_INSTALLED.
@@ -21,6 +30,10 @@ import { serverMessage } from '@levonis/contracts/costRefusals';
 import { auditStatements } from './audit';
 import { fence, isFenceMiss } from './operations';
 import { cleanStartInstalled } from './engineInstalled';
+import { planInventory, resolveStock, type StockTarget } from './inventory';
+import { hasLots } from './inventoryLots';
+import { loadRelationsViews, snapshotFrom } from './productOverlay';
+import { safeParse } from './types';
 
 /** The stages from which the pre-order's units are in the Levo warehouse. */
 export const LINKABLE_STAGES: readonly string[] = ['at_levo_warehouse', 'local_delivery_prep', 'shipped', 'out_for_delivery', 'delivered'];
@@ -57,9 +70,9 @@ export async function linkPreorderBatch(
   const order = await db.prepare('SELECT id, shipping_type, status, stage FROM orders WHERE id = ?').bind(input.orderId).first<{ id: string; shipping_type: string; status: string; stage: string }>();
   if (!order) throw notFound('Order not found');
   const item = await db
-    .prepare('SELECT id, order_id, product_id, qty FROM order_items WHERE id = ? AND order_id = ?')
+    .prepare('SELECT id, order_id, product_id, qty, option_value_ids, color_id FROM order_items WHERE id = ? AND order_id = ?')
     .bind(input.itemId, input.orderId)
-    .first<{ id: string; order_id: string; product_id: string | null; qty: number }>();
+    .first<{ id: string; order_id: string; product_id: string | null; qty: number; option_value_ids: string | null; color_id: string | null }>();
   if (!item || !item.product_id) throw notFound('Order item not found');
 
   // Replay: every key of this operation already written — the same answer, nothing moves.
@@ -96,12 +109,19 @@ export async function linkPreorderBatch(
   ).results ?? [];
   const byId = new Map(lots.map((l) => [l.id, l] as const));
 
+  // The line's own shelf rung: its selection resolved as a direct sale of it would be.
+  const target = await shelfTargetOf(db, item.product_id, item.option_value_ids, item.color_id);
+
   const statements: D1PreparedStatement[] = [];
   const linked: Array<{ lot_id: string; qty: number }> = [];
   for (const lotId of lotIds) {
     if (need <= 0) break;
     const lot = byId.get(lotId);
     if (!lot || lot.product_id !== item.product_id) throw badRequest(`lot_ids: ${lotId} is not a received lot of this product`, 'PREORDER_LINK_LOT');
+    // Another model's or colour's lot of the same product is not this line's batch.
+    if (!target || lot.scope !== target.scope || String(lot.scope_id ?? '') !== target.scope_id) {
+      throw badRequest(`lot_ids: ${lotId} is not a lot of this line's model and colour`, 'PREORDER_LINK_LOT');
+    }
     const take = Math.min(need, Number(lot.qty_remaining));
     if (take <= 0) continue;
     need -= take;
@@ -123,6 +143,23 @@ export async function linkPreorderBatch(
   }
   if (!linked.length) throw conflict('لا توجد قطع متبقية في هذه الدفعات / these lots hold no remaining units', 'PREORDER_LINK_EMPTY');
 
+  // The received units leave the sellable counter the receive raised (one guarded `adjust_out` row): what is
+  // promised to this pre-order customer is never sold again as direct stock. An untracked rung has no counter.
+  const total = linked.reduce((n, l) => n + l.qty, 0);
+  if (target && target.stock !== null) {
+    const plan = await planInventory(db, [{ product_id: item.product_id, qty: total, targets: [target], line_id: item.id }], {
+      kind: 'adjust_out',
+      operationId: `preorder_link_${op}`,
+      orderId: order.id,
+      actorUserId: input.actor,
+      reason: 'preorder_batch_link',
+    });
+    if (plan.rejected.length) {
+      throw conflict('هذه القطع محجوزة لطلبات أخرى / these units are already held by other orders', 'PREORDER_LINK_STOCK_HELD');
+    }
+    statements.push(...plan.statements);
+  }
+
   // Names and quantities only: a lot cost is never written to the audit log.
   const audit = await auditStatements(db, input.actor, 'order.preorder_batch_link', item.id, { order_id: order.id, order_item_id: item.id, lots: linked, operation_id: op });
   try {
@@ -133,4 +170,27 @@ export async function linkPreorderBatch(
     throw e;
   }
   return { already: false, linked };
+}
+
+/**
+ * The shelf rung (base, model, colour or variant) a direct sale of this selection draws from — the rung the
+ * receive of its batch raised. Null when the selection resolves to none (not modelled, incomplete).
+ */
+async function shelfTargetOf(db: D1Database, productId: string, optionValueIdsJson: string | null, colorId: string | null): Promise<StockTarget | null> {
+  const product = await db
+    .prepare('SELECT id, inventory_mode, stock, stock_reserved, low_stock_threshold FROM products WHERE id = ?')
+    .bind(productId)
+    .first<{ id: string; inventory_mode: string | null; stock: number | null; stock_reserved: number | null; low_stock_threshold: number | null }>();
+  if (!product) return null;
+  const view = (await loadRelationsViews(db, [{ id: product.id, inventory_mode: product.inventory_mode }])).get(product.id);
+  if (!view) return null;
+  const ids = safeParse<unknown[]>(optionValueIdsJson ?? '[]', []).filter((x): x is string => typeof x === 'string' && x !== '');
+  const res = resolveStock(snapshotFrom(view, { stock: product.stock, reserved: Number(product.stock_reserved ?? 0), low_stock_threshold: product.low_stock_threshold }), {
+    option_value_ids: ids,
+    color_id: colorId || null,
+  });
+  if (res.error) return null;
+  // Untracked: the product's own rung, with no counter to move.
+  if (!res.tracked || !res.targets.length) return { scope: 'base', scope_id: '', stock: null, reserved: 0, low_stock_threshold: null, label: '' };
+  return res.targets.find((t) => hasLots(t.scope)) ?? null;
 }

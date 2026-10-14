@@ -114,3 +114,35 @@ test('the link is refused before the batch arrives, and to everyone but the owne
   assert.equal((await json(denied)).code, 'COST_ACCESS_DENIED');
   assert.equal(one<{ q: number }>(raw, 'SELECT qty_remaining AS q FROM inventory_lots WHERE id = ?', 'lot1').q, 5);
 });
+
+test('«اربط بالدفعة الواصلة» takes only the line\'s own model/colour lot, and the linked units leave the sellable stock (review 2026-10-14)', async () => {
+  const raw = freshDb();
+  raw.exec(`INSERT INTO users (id, name, email, password_hash, role) VALUES ('u1', 'Buyer', 'b@x.co', 'h', 'customer'), ('${OWNER.id}', 'Owner', 'boss@x.co', 'h', 'admin');
+            INSERT INTO products (id, slug, name, price_iqd, status, selling_type, sale_types, inventory_mode) VALUES ('p1', 'p1', 'P', 20000, 'active', 'pre_order', '["direct_sale","pre_order"]', 'COLOR');
+            INSERT INTO product_colors (id, product_id, name_en, hex, sort, active, stock) VALUES ('c_black', 'p1', 'Black', '#000000', 0, 1, 5), ('c_white', 'p1', 'White', '#ffffff', 1, 1, 4);
+            INSERT INTO orders (id,user_id,status,stage,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_type)
+              VALUES ('o1','u1','processing','at_levo_warehouse','{}','standard','{}','cash',40000,0,1500,40000,0,'preorder_air');
+            INSERT INTO order_items (id,order_id,product_id,name_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis,estimated_cost_iqd,color_id)
+              VALUES ('l1','o1','p1','P','',2,20000,40000,NULL,'unpriced',4101,'c_black');
+            INSERT INTO inventory_lots (id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at)
+              VALUES ('lot_white','p1','color','c_white',4,4,9900,9900,0,0,39600,'received','2026-10-14T09:00:00Z'),
+                     ('lot_black','p1','color','c_black',5,5,4500,4500,0,0,22500,'received','2026-10-14T09:00:00Z');`);
+  const owner = stubApp(asD1(raw), OWNER, (a) => a.route('/api/admin/orders', adminPreorderOriginRoutes), { publishV2: false });
+  // The white lot is not this black line's batch: refused, nothing moves.
+  const wrong = await post(owner, '/api/admin/orders/o1/items/l1/link-batch', { lot_ids: ['lot_white'], operation_id: 'op_link_white01' });
+  assert.equal(wrong.status, 400);
+  assert.equal((await json(wrong)).code, 'PREORDER_LINK_LOT');
+  assert.equal(one<{ q: number }>(raw, 'SELECT qty_remaining AS q FROM inventory_lots WHERE id = ?', 'lot_white').q, 4);
+  // The black lot: linked, and the two units leave black's sellable counter with a ledger row, in the same batch.
+  const ok = await json(await post(owner, '/api/admin/orders/o1/items/l1/link-batch', { lot_ids: ['lot_black'], operation_id: 'op_link_black01' }));
+  assert.equal(ok.success, true, JSON.stringify(ok));
+  assert.equal(one<{ q: number }>(raw, 'SELECT qty_remaining AS q FROM inventory_lots WHERE id = ?', 'lot_black').q, 3);
+  assert.equal(one<{ s: number }>(raw, "SELECT stock AS s FROM product_colors WHERE id = 'c_black'").s, 3, 'the promised units are no longer sellable as direct stock');
+  assert.equal(one<{ s: number }>(raw, "SELECT stock AS s FROM product_colors WHERE id = 'c_white'").s, 4);
+  const ledger = one<{ kind: string; qty: number; scope: string; scope_id: string }>(raw, "SELECT kind, qty, scope, scope_id FROM inventory_ledger WHERE order_id = 'o1'");
+  assert.deepEqual({ ...ledger }, { kind: 'adjust_out', qty: 2, scope: 'color', scope_id: 'c_black' });
+  // A replay moves neither the lot nor the counter.
+  const again = await json(await post(owner, '/api/admin/orders/o1/items/l1/link-batch', { lot_ids: ['lot_black'], operation_id: 'op_link_black01' }));
+  assert.equal(again.already, true);
+  assert.equal(one<{ s: number }>(raw, "SELECT stock AS s FROM product_colors WHERE id = 'c_black'").s, 3);
+});

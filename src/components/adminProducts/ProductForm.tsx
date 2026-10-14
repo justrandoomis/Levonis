@@ -53,7 +53,7 @@ import ReviewSheetV2 from './form/v2/ReviewSheetV2';
 import ModelPriceSelector from './form/v2/ModelPriceSelector';
 import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelector';
 import { comboKeyOf, docWithoutLegacyMoney, iqdText, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
-import { v2Strings } from './form/v2/v2Strings';
+import { headerStatusText, v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
 import {
@@ -1020,16 +1020,19 @@ export default function ProductForm({
           {productId ? 'تعديل منتج' : 'منتج جديد'}
           <span className="text-[11px] font-medium text-text-muted ms-2">{doc.name_en || '—'}</span>
         </h2>
+        {/* The clean start: an active product still «يحتاج تسعيرًا» is hidden from customers — the header
+            says so in the warning tone, never «منشور» beside section ٣'s «مخفي». */}
         <span
+          data-form="status-chip"
           className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-md ${
-            doc.status === 'active'
+            doc.status === 'active' && !v2.hidden
               ? 'lv-chip [--chip:var(--color-success)]'
               : doc.status === 'draft'
                 ? 'bg-surface-selected text-text-secondary'
                 : 'lv-chip [--chip:var(--color-warning)]'
           }`}
         >
-          {doc.status === 'active' ? 'منشور' : doc.status === 'draft' ? 'مسودة' : 'مخفي'}
+          {headerStatusText(doc.status, v2.hidden, v2s)}
         </span>
       </div>
 
@@ -1453,7 +1456,8 @@ export default function ProductForm({
         ar={proPaused ? 'الأسعار' : 'الأسعار والعضويات'}
         en={proPaused ? 'Prices' : 'Prices & memberships'}
         chip={<StatusChipV2 answer={v2.answer} owner={v2.owner} hidden={v2.hidden} />}
-        summary={summarize([lowest !== null ? v2s.from(iqdText(lowest)) : v2.hidden ? v2s.chipHidden : v2s.noPriceYet])}
+        // The chip already says «مخفي: يحتاج تسعيرًا»: the summary never repeats it.
+        summary={summarize([lowest !== null ? v2s.from(iqdText(lowest)) : v2.hidden ? null : v2s.noPriceYet])}
         error={showErrors && !!errors.prices}
         {...section(3)}
       >
@@ -1648,7 +1652,8 @@ export default function ProductForm({
           plans={doc.warranty_plans}
           serialized={doc.serialized ?? null}
           baseMonths={doc.warranty_base_months ?? null}
-          priceIqd={doc.price_iqd}
+          // The example is the V2 direct price (the lowest sold), never an old dinar price of the document.
+          priceIqd={v2.answer && !v2.answer.needs_pricing ? lowestPrice((v2.answer.table ?? []).filter((r) => r.channel === 'direct_sale')) : null}
           errors={showErrors ? errors : {}}
           onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
           onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
@@ -2049,7 +2054,7 @@ export default function ProductForm({
             disabled={saving}
             onClick={() => void save('draft')}
           >
-            مسودة
+            {v2s.draft}
           </button>
           <button
             type="button"
@@ -2058,7 +2063,7 @@ export default function ProductForm({
             disabled={saving}
             onClick={() => void save('active')}
           >
-            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} نشر
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {v2s.publish}
           </button>
         </div>
       </div>

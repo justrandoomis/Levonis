@@ -355,10 +355,16 @@ test('TEST A: a TXT create fills EVERY section the file wrote, read back through
   assert.deepEqual(doc.hashtags, ['bambu', 'parity']);
   assert.deepEqual(doc.payment_options, ['cod', 'card', 'wallet']);
   assert.deepEqual([...doc.sale_types].sort(), ['direct_sale', 'pre_order'], 'selling_type=mixed must reach the form as both sale types');
-  // Fees are legacy money too (addendum A.6): a new product is born with none — the routes stay, at commission 0.
+  // Fees are legacy money too (addendum A.6): a new product is born with none — the routes stay, stored at
+  // commission 0; the form reads a product still «يحتاج تسعيرًا» with every legacy price EMPTY (review 2026-10-14).
   assert.equal(doc.direct_surcharge_iqd, null);
   assert.deepEqual(
     doc.preorder_transports.filter((t) => t.active).map((t) => [t.method, t.commission_iqd]),
+    [['air', null], ['sea', null]]
+  );
+  const storedRoutes = JSON.parse(String((raw.prepare('SELECT preorder_transports AS t FROM products WHERE id = ?').get(id) as { t: string }).t)) as Wire[];
+  assert.deepEqual(
+    storedRoutes.filter((t) => t.active).map((t) => [t.method, t.commission_iqd]),
     [['air', 0], ['sea', 0]]
   );
   assert.deepEqual(doc.spec_fields, { technology: 'FDM', model: 'A1', build_volume: '256 x 256 x 256' });
@@ -573,8 +579,9 @@ test('TEST C: create from TXT → export → parse → apply as update loses and
   const byMethod = (o: Wire) => new Map((o.preorder_transports as Wire[]).map((t) => [t.method as string, t]));
   const [was, now] = [byMethod(before.wireDoc), byMethod(after.wireDoc)];
   for (const [method, t] of was) assert.deepEqual(now.get(method), t, `transport "${method}" changed on the round trip`);
+  // (Read back EMPTY: the product still «يحتاج تسعيرًا» — its stored 0 is an archive, review 2026-10-14.)
   for (const [method, t] of now) {
-    if (!was.has(method)) assert.deepEqual(t, { method, commission_iqd: 0, active: false });
+    if (!was.has(method)) assert.deepEqual(t, { method, commission_iqd: null, active: false });
   }
 
   // A second round trip is a FIXED POINT: identical text in, identical

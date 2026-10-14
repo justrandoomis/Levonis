@@ -2,7 +2,6 @@ import type { ProcurementSelectionDefault } from '../../packages/contracts/src/p
 import { productImageFromRelations } from './productSelectionImage';
 import type { ImageRow,VariantRow } from './productOverlay';
 import { badRequest, notFound } from './http';
-import { derivedRung, type PriceFields } from './pricing';
 import { counterTarget } from './inventoryReceiving';
 import { comboKey, type StockScope } from './inventory';
 import { validateSelection, type OptionGroupRow, type OptionValueRow, type ColorRow, type ColorLinkRow } from './productRelations';
@@ -16,7 +15,11 @@ export type Selection = {
   sku: string;
   stock: number | null;
   reserved: number;
-  selling_price_iqd: number;
+  /**
+   * The store's reference price of this stock row: the lowest V2 direct price its SKUs sell at, null while the
+   * product needs pricing (the clean start: never the legacy ladder, never a Direct Sale Extra).
+   */
+  selling_price_iqd: number | null;
   unit_cost_iqd: number | null;
   purchase_unit_iqd: number | null;
   cost_source: string;
@@ -175,13 +178,12 @@ export async function productSelections(db: D1Database, productId: string): Prom
   const images=(await db.prepare('SELECT * FROM product_images WHERE product_id=? ORDER BY sort_order,id').bind(productId).all<ImageRow>()).results??[];
   const defaults = (await db.prepare(`SELECT d.*,p.currency FROM procurement_selection_cost_defaults d JOIN procurement_cost_profiles p ON p.id=d.profile_id WHERE d.product_id=?`)
     .bind(productId).all<ProcurementSelectionDefault & { scope: string; scope_id: string }>()).results ?? [];
+  const v2Direct = await v2DirectPrices(db, productId);
   const out: Selection[] = [];
   for (const cell of cells) {
-    let regular = Number(p.price_iqd),
-      cost = p.product_cost_iqd as number | null;
+    let cost = p.product_cost_iqd as number | null;
     const apply = (r: Cell | undefined) => {
       if (!r) return;
-      regular = derivedRung(r as unknown as PriceFields, { regular, prime: null, pro: null }).regular;
       cost = selectionCostRung(cost, r);
     };
     let option: Cell | undefined, color: Cell | undefined;
@@ -198,8 +200,8 @@ export async function productSelections(db: D1Database, productId: string): Prom
       apply(cell);
       if (scope === 'option') apply(fulfillments.find((f) => f.option_id === cell.id));
     }
-    regular += Number(p.direct_surcharge_iqd ?? 0);
     const scopeId = scope === 'base' ? '' : cell.id;
+    const regular = referencePriceOf(v2Direct, scope, scopeId, String(cell.combo_key ?? ''));
     const last = latest.find((l) => l.scope === scope && l.scope_id === scopeId);
     const weight = Number(
       cell.package_weight_g ?? cell.net_weight_g ?? p.package_weight_g ?? p.net_weight_g ?? 0,
@@ -249,6 +251,45 @@ export async function productSelections(db: D1Database, productId: string): Prom
   }
   return out;
 }
+/**
+ * The V2 direct prices of a V2-PUBLISHED product, by SKU combo key (empty for any other product, and on a
+ * database before 0189): the only store price a stock or procurement screen may show (the clean start).
+ */
+async function v2DirectPrices(db: D1Database, productId: string): Promise<Map<string, number>> {
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT r.combo_key, r.final_price_iqd FROM pricing_v2_sku_results r
+           JOIN product_pricing_state s ON s.product_id = r.product_id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+          WHERE r.product_id = ? AND r.channel = 'direct_sale'`
+      )
+      .bind(productId)
+      .all<{ combo_key: string | null; final_price_iqd: number }>();
+    return new Map((results ?? []).map((r) => [String(r.combo_key ?? ''), Number(r.final_price_iqd)]));
+  } catch {
+    return new Map();
+  }
+}
+
+/** The lowest V2 direct price among the SKUs a stock row holds (its model, colour or exact variant), or null. */
+export function referencePriceOf(prices: ReadonlyMap<string, number>, scope: StockScope, scopeId: string, variantCombo: string): number | null {
+  const parts = (k: string) => new Set(k.split('|').filter(Boolean));
+  const want = (k: string): boolean => {
+    if (scope === 'base') return true;
+    if (scope === 'option') return parts(k).has(`o:${scopeId}`);
+    if (scope === 'color') return parts(k).has(`c:${scopeId}`);
+    if (scope === 'variant') {
+      const a = parts(k);
+      const b = parts(variantCombo);
+      return a.size === b.size && [...a].every((x) => b.has(x));
+    }
+    return false;
+  };
+  let low: number | null = null;
+  for (const [k, v] of prices) if (Number.isSafeInteger(v) && want(k) && (low === null || v < low)) low = v;
+  return low;
+}
+
 export async function requireSelection(db: D1Database, productId: string, scope: string, scopeId: string) {
   const selection = (await productSelections(db, productId)).find(
     (s) => s.scope === scope && s.scope_id === (scope === 'base' ? '' : scopeId),

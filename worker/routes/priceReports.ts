@@ -53,6 +53,7 @@
  * the shop's IP.
  */
 
+import { pricingV2Installed } from '../lib/engineInstalled';
 import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -319,6 +320,13 @@ adminPriceReportRoutes.get('/', async (c) => {
     binds.push(productId);
   }
   const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  // «السعر الآن» is the lowest price the product's V2 results sell at — NULL while it needs pricing (the
+  // clean start: its stored ladder is an archive, never shown); NULL on a database before 0189.
+  const priceNowSql = (await pricingV2Installed(c.env.DB))
+    ? `(SELECT MIN(fr.final_price_iqd) FROM pricing_v2_sku_results fr
+          JOIN product_pricing_state fs ON fs.product_id = fr.product_id AND fs.mode = 'engine' AND fs.pricing_method IS NOT NULL
+         WHERE fr.product_id = r.product_id)`
+    : 'NULL';
 
   /**
    * LEFT JOINs, not JOINs. Both foreign keys cascade, so a missing product or
@@ -331,7 +339,7 @@ adminPriceReportRoutes.get('/', async (c) => {
     `SELECT r.id, r.product_id, r.price_iqd, r.our_price_iqd, r.seller_name, r.url, r.note,
             r.state, r.admin_note, r.reviewed_by, r.reviewed_at, r.created_at,
             p.name AS product_name, p.name_ar AS product_name_ar, p.slug AS product_slug,
-            p.price_iqd AS product_price_now,
+            ${priceNowSql} AS product_price_now,
             r.user_id AS reporter_id, u.name AS reporter_name, u.username AS reporter_username
        FROM price_reports r
        LEFT JOIN products p ON p.id = r.product_id

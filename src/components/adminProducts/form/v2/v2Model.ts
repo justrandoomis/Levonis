@@ -188,6 +188,8 @@ export interface V2Answer {
   v2_cost_inputs?: {
     inputs: V2CostInputRow[];
     minimum_profit: Array<{ scope: string; scope_id: string | null; state: string | null; amount_usd: string | null }>;
+    /** §2.1 rule 2: what the product's minimum profit inherits (a category or the store-wide rule), or null. */
+    inherited_minimum_profit?: { amount_usd: string | null; amount_iqd: number | null } | null;
     /** D1: a needs-pricing product's prefill carries this pending purchase review; its first complete write applies it. */
     purchase_review_id?: string;
   };
@@ -270,10 +272,12 @@ export interface ModelDraft {
   usd: string;
   discount: 'follow' | 'exception';
   discount_usd: string;
-  /** «تكلفة مختلفة»: the model's own supplier price, its currency and its weight. */
+  /** «تكلفة مختلفة»: the model's own supplier price, its currency, its weight and its box (§1.4: weight OR box). */
   supplier_amount: string;
   supplier_currency: SupplierCurrency | '';
   weight_g: number | null;
+  /** L × W × H in mm — one unit (a model shipped by sea is priced per CBM). */
+  box: [number, number, number] | null;
 }
 export interface ColourDraft {
   price: 'follow' | 'delta';
@@ -304,7 +308,7 @@ export interface PriceDraft {
 }
 
 export const EMPTY_COST: CostDraft = { supplier_amount: '', supplier_currency: '', route: '', weight_g: null, box: null, extras_iqd: null };
-export const FOLLOW_MODEL: ModelDraft = { price: 'follow', usd: '', discount: 'follow', discount_usd: '', supplier_amount: '', supplier_currency: '', weight_g: null };
+export const FOLLOW_MODEL: ModelDraft = { price: 'follow', usd: '', discount: 'follow', discount_usd: '', supplier_amount: '', supplier_currency: '', weight_g: null, box: null };
 export const FOLLOW_COLOUR: ColourDraft = { price: 'follow', usd: '' };
 export const NO_SKU: SkuDraft = { fixed_usd: '', discount_usd: '' };
 
@@ -326,12 +330,13 @@ export function draftOf(answer: V2Answer | null, fallbackMethod: V2Method = 'cos
   const model = (id: string) => (models[id] ??= { ...FOLLOW_MODEL });
   for (const r of inputs) {
     if (r.scope !== 'option' || !r.scope_id) continue;
-    if (r.supplier_cost_amount === null && r.shipping_weight_g === null) continue;
+    if (r.supplier_cost_amount === null && r.shipping_weight_g === null && boxOf(r) === null) continue;
     Object.assign(model(r.scope_id), {
       price: 'own_cost',
       supplier_amount: r.supplier_cost_amount ?? '',
       supplier_currency: r.supplier_cost_currency ?? '',
       weight_g: r.shipping_weight_g,
+      box: boxOf(r),
     });
   }
   for (const p of points) if (p.scope === 'option') Object.assign(model(p.id), { price: p.kind, usd: p.usd });
@@ -477,8 +482,15 @@ export function cleanUsdAmount(text: string): string | null {
 
 const modelCostFields = (m: ModelDraft | undefined): Partial<WireInput> =>
   m && m.price === 'own_cost'
-    ? { supplier_cost_amount: cleanUsdAmount(m.supplier_amount), supplier_cost_currency: m.supplier_currency || null, shipping_weight_g: m.weight_g }
-    : { supplier_cost_amount: null, shipping_weight_g: null };
+    ? {
+        supplier_cost_amount: cleanUsdAmount(m.supplier_amount),
+        supplier_cost_currency: m.supplier_currency || null,
+        shipping_weight_g: m.weight_g,
+        shipping_length_mm: m.box?.[0] ?? null,
+        shipping_width_mm: m.box?.[1] ?? null,
+        shipping_height_mm: m.box?.[2] ?? null,
+      }
+    : { supplier_cost_amount: null, shipping_weight_g: null, shipping_length_mm: null, shipping_width_mm: null, shipping_height_mm: null };
 
 /**
  * The request block: what differs from the stored draft (`base`), the stored
@@ -692,6 +704,23 @@ export const nameIn = (n: V2Names | null | undefined, lang: V2Lang): string => (
 export const iqdText = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : new Intl.NumberFormat('en-US').format(n));
 
 /** A dollar figure as the server stated it, at most 2 decimals shown («$1,000.00»). Display only. */
+/**
+ * §2.1 rule 2: the discount an SKU inherits when its own field is empty — its model's exception when the model
+ * has one, else the product's. The SKU field shows it («الموديل: $25.00» / «المنتج: $40.00»).
+ */
+export function inheritedSkuDiscount(draft: Pick<PriceDraft, 'discount_usd' | 'models'>, modelId: string | null): { from: 'model' | 'product'; usd: string } {
+  const m = modelId ? draft.models[modelId] : undefined;
+  if (m?.discount === 'exception' && m.discount_usd) return { from: 'model', usd: m.discount_usd };
+  return { from: 'product', usd: draft.discount_usd || '0' };
+}
+
+/** The owner's minimum-profit placeholder: «يرث ($40.00)» when something above decides, «يرث» alone otherwise. */
+export function inheritPlaceholder(inherit: string, inherited: { amount_usd: string | null; amount_iqd: number | null } | null | undefined): string {
+  if (inherited?.amount_usd) return `${inherit} (${usdText(inherited.amount_usd)})`;
+  if (inherited && inherited.amount_iqd !== null) return `${inherit} (${iqdText(inherited.amount_iqd)})`;
+  return inherit;
+}
+
 export function usdText(text: string | null | undefined): string {
   if (text === null || text === undefined || text === '') return '—';
   const n = Number(text);

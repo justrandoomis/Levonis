@@ -36,6 +36,7 @@ import {
 import MerchantCartView from '../components/merchant/MerchantCartView';
 import { isPaidTier, tierLabel } from '../components/subscription/tierMeta';
 import { useMoney } from '../CurrencyContext';
+import { cartEmptyText } from '../lib/cartEmptyText';
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -1530,7 +1531,10 @@ export default function Cart() {
         ) : items.length === 0 ? (
           <div className="lv-surface mx-4 mt-6 flex flex-col items-center gap-4 py-14 text-center text-text-muted">
             <ShoppingCart className="w-10 h-10 text-text-muted" />
-            <p>{loc('سلتك فارغة', 'Your cart is empty.', 'سەبەتەکەت بەتاڵە.')}</p>
+            {/* C7: unavailable lines above — never «سلتك فارغة» under them. */}
+            <p data-cart-empty={unavailableLines.length > 0 ? 'unavailable' : 'empty'}>
+              {(({ ar, en, ckb }) => loc(ar, en, ckb))(cartEmptyText(unavailableLines.length))}
+            </p>
             <button
               type="button"
               onClick={() => navigate('/products')}

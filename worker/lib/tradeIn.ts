@@ -70,6 +70,7 @@
  *                 notification. Two admins, or an admin and a Telegram press,
  *                 cannot both win.
  */
+import { needsPricingIds } from './pricingEngine/v2/legacyMoney';
 import { listing } from './listing';
 import type { Env } from './types';
 import { safeParse } from './types';
@@ -582,6 +583,10 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
     valuesByProduct.set(v.product_id, list);
   }
 
+  // The clean start (DECISIONS row 222; review 2026-10-14): a product still «يحتاج تسعيرًا» keeps its old dinar
+  // model prices only as an archive — the Combo/AMS split never reads them; such a Combo is valued by the
+  // reference method. A V2-published product's model cells are the V2 writer's and are read as before.
+  const unpriced = await needsPricingIds(db, [...new Set(lines.map((l) => l.product_id))]);
   const out: EligibleUnit[] = [];
   for (const line of lines) {
     const family = familyOfProduct(line, idx);
@@ -597,7 +602,7 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
     const split = isCombo
       ? amsSplit({
           paidIqd: paid,
-          combo: comboValue,
+          combo: unpriced.has(line.product_id) ? null : comboValue,
           siblings: productValues,
           productPriceIqd: Number(line.price_iqd) || 0,
           referenceIqd: rules.ams.ams_reference_iqd,

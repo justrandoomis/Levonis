@@ -1,3 +1,4 @@
+import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import type { AppContext, Env } from '../lib/types';
@@ -834,10 +835,12 @@ reviewRoutes.get('/order/:orderId', requireAuth, async (c) => {
  */
 reviewRoutes.get('/product/:idOrSlug', async (c) => {
   const idOrSlug = c.req.param('idOrSlug') ?? '';
-  const product = await c.env.DB.prepare('SELECT id FROM products WHERE id = ? OR slug = ?')
+  const product = await c.env.DB.prepare('SELECT id, status FROM products WHERE id = ? OR slug = ?')
     .bind(idOrSlug, idOrSlug)
-    .first<{ id: string }>();
-  if (!product) throw notFound('Product not found');
+    .first<{ id: string; status: string }>();
+  // A product customers cannot see (the clean start: still «يحتاج تسعيرًا») answers like one that does not exist.
+  const L = product ? await listing(c.env.DB) : null;
+  if (!product || !L!.isListedRow(product, await L!.unlistedIds([product.id]))) throw notFound('Product not found');
   const page = Math.max(1, Math.min(1000, parseInt(c.req.query('page') || '1', 10) || 1));
   const offset = (page - 1) * PAGE_SIZE;
 

@@ -39,18 +39,19 @@ const BRIEF: PricingSummary = {
   store_price_iqd: 900_000,
 };
 
-test('the brief’s example: $500.00 / +$120.00 / $620.00 / 992,000 د.ع, in that order, each figure an LTR island', () => {
+test('the card (the clean start): cost $500.00 / +$120.00 / the store’s V2 price 900,000 د.ع, in that order, each figure an LTR island', () => {
   const html = render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'AMS HT' }));
-  const order = ['$500.00', '+$120.00', '$620.00', '992,000 د.ع'].map((f) => html.indexOf(f));
+  const order = ['$500.00', '+$120.00', '900,000 د.ع'].map((f) => html.indexOf(f));
   assert.ok(order.every((i) => i > 0), html);
-  assert.deepEqual([...order].sort((a, b) => a - b), order, 'the four cells in the brief’s order');
-  assert.equal((html.match(/<bdi dir="ltr"/g) ?? []).length, 4, 'every figure is an LTR island');
-  assert.match(html, /grid-cols-2[^"]*sm:grid-cols-4|sm:grid-cols-4[^"]*grid-cols-2/, 'one row of four on a wide screen, two by two on a phone');
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'the three cells in order');
+  assert.equal((html.match(/<bdi dir="ltr"/g) ?? []).length, 3, 'every figure is an LTR island');
+  assert.match(html, /grid-cols-2[^"]*sm:grid-cols-3|sm:grid-cols-3[^"]*grid-cols-2/, 'one row on a wide screen, two by two on a phone');
   const s = PROCUREMENT_PRICING_STRINGS.ar;
-  for (const label of [s.cellCost, s.cellProfit, s.cellFinalUsd, s.cellSuggested]) assert.ok(html.includes(label), label);
+  for (const label of [s.cellCost, s.cellProfit, s.cellCustomer, s.reviewInPrices]) assert.ok(html.includes(label), label);
   assert.ok(html.includes(s.barAria('AMS HT')));
   assert.ok(html.includes('aria-live="polite"'));
-  assert.ok(html.includes(s.storePrice('900,000 د.ع')), 'a manual product shows today’s store price beside the suggestion');
+  // No price of the old engine (review 2026-10-14): no computed $620 final price, no 992,000 pre-order base.
+  assert.ok(!html.includes('$620.00') && !html.includes('992,000'), 'no V1 price on the card');
   assert.match(html, /aria-expanded="false"/, '«تفاصيل» starts closed');
 });
 
@@ -80,39 +81,14 @@ test('the bar, the card and the product form import no pricing or FX maths; they
   }
 });
 
-// ---------------------------------------------------------------- the procurement card leads with the direct price (owner request 2026-10-10)
+// ---------------------------------------------------------------- the clean start: no Direct Sale Extra, no old engine price (review 2026-10-14)
 
-const DIRECT: PricingSummary = { ...BRIEF, sells_direct: true, direct_sale_extra_iqd: 0, direct_sale_price_iqd: 992_000 };
-
-test('the card, a model that sells direct and is priced: cell 4 is the direct sale price, the caption names its two parts', () => {
+test('a product still «يحتاج تسعيرًا»: cell 4 says so; no Direct Sale Extra caption, whatever the (old) summary carries', () => {
   const s = PROCUREMENT_PRICING_STRINGS.ar;
-  const manual = render(createElement(PricingSummaryBar, { summary: { ...DIRECT, direct_sale_extra_iqd: 50_000, direct_sale_price_iqd: 1_042_000 }, label: 'A1', directFirst: true }));
-  assert.ok(manual.includes(s.cellDirectSuggested), 'a manual product: «سعر البيع المباشر المقترح»');
-  assert.ok(!manual.includes(s.cellSuggested));
-  assert.match(manual, /<output aria-live="polite"><bdi dir="ltr"[^>]*>1,042,000 د.ع<\/bdi><\/output>/);
-  assert.ok(manual.includes(s.directCaption('992,000 د.ع', '50,000 د.ع')));
-  assert.ok(!manual.includes(s.directSale('1,042,000 د.ع')), 'the old caption is replaced, not repeated');
-  assert.ok(manual.includes('$500.00') && manual.includes('+$120.00') && manual.includes('$620.00'), 'cells 1-3 (USD) unchanged; the extra stays in dinars');
-  assert.equal((manual.match(/<bdi dir="ltr"/g) ?? []).length, 4);
-  const engine = render(createElement(PricingSummaryBar, { summary: { ...DIRECT, engine_priced: true }, label: 'A1', directFirst: true }));
-  assert.ok(engine.includes(s.cellDirectCustomer), 'an engine product: «سعر البيع المباشر للزبون»');
-  assert.ok(engine.includes(s.directCaption('992,000 د.ع', '0 د.ع')));
-});
-
-test('the card, a model that sells direct but has no Direct Sale Extra: the base pre-order price under its own name, and where to complete it', () => {
-  const s = PROCUREMENT_PRICING_STRINGS.ar;
-  const html = render(createElement(PricingSummaryBar, { summary: { ...DIRECT, direct_sale_extra_iqd: null, direct_sale_price_iqd: null }, label: 'A1', directFirst: true }));
-  assert.ok(html.includes(s.cellPreorderBase));
-  assert.match(html, /<output aria-live="polite"><bdi dir="ltr"[^>]*>992,000 د.ع<\/bdi><\/output>/);
-  assert.ok(html.includes(s.extraInReview));
-});
-
-test('a pre-order-only model on the card, and every screen without the prop (the product form), read exactly as before', () => {
-  const before = render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'AMS HT' }));
-  assert.equal(render(createElement(PricingSummaryBar, { summary: { ...BRIEF, sells_direct: false }, label: 'AMS HT', directFirst: true })), before);
-  assert.equal(render(createElement(PricingSummaryBar, { summary: BRIEF, label: 'AMS HT', directFirst: true })), before, 'an older server without sells_direct');
-  const formDirect = render(createElement(PricingSummaryBar, { summary: DIRECT, label: 'AMS HT' }));
-  assert.ok(formDirect.includes(PROCUREMENT_PRICING_STRINGS.ar.cellSuggested), 'the product form keeps «السعر المقترح للزبون»');
-  assert.ok(formDirect.includes(PROCUREMENT_PRICING_STRINGS.ar.directSale('992,000 د.ع')));
-  assert.ok(!formDirect.includes(PROCUREMENT_PRICING_STRINGS.ar.cellDirectSuggested));
+  for (const lang of ['ar', 'en', 'ckb'] as const) assert.ok(PROCUREMENT_PRICING_STRINGS[lang].needsPricing && PROCUREMENT_PRICING_STRINGS[lang].reviewInPrices, lang);
+  assert.notEqual(PROCUREMENT_PRICING_STRINGS.ckb.needsPricing, PROCUREMENT_PRICING_STRINGS.ar.needsPricing, 'ckb never copies the Arabic');
+  const html = render(createElement(PricingSummaryBar, { summary: { ...BRIEF, store_price_iqd: null, sells_direct: true, direct_sale_extra_iqd: 50_000, direct_sale_price_iqd: 1_042_000 }, label: 'A1', directFirst: true }));
+  assert.match(html, new RegExp(`<output aria-live="polite"><bdi dir="ltr"[^>]*>${s.needsPricing}</bdi></output>`));
+  assert.ok(!html.includes('1,042,000') && !html.includes('50,000'), 'no Direct Sale Extra, no direct price of the old engine');
+  assert.ok(!html.includes(s.extraInReview));
 });

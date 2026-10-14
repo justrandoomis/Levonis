@@ -69,7 +69,7 @@ import { limitRoute } from '../lib/ratelimit';
 import { SESSION_CACHE_CONTROL } from '../lib/edgePolicy';
 import { jsonObject } from '../lib/http';
 import { pinV2PriceFields, previewDraft } from '../lib/pricingEngine/v2/draft';
-import { holdLegacyDocMoney, holdLegacyRelationMoney } from '../lib/pricingEngine/v2/legacyMoney';
+import { holdLegacyDocMoney, holdLegacyRelationMoney, nullLegacyPricesDeep } from '../lib/pricingEngine/v2/legacyMoney';
 import { planV2ProductSave, type V2SaveOutcome } from '../lib/pricingEngine/v2/productSave';
 import {
   desiredFor,
@@ -727,14 +727,6 @@ adminProductsRoutes.get('/', async (c) => {
   else if (q.stock === 'low')
     clauses.push(`(${hasDirectSql} AND ${displayStockSql} IS NOT NULL AND ${displayStockSql} - ${displayReservedSql} > 0 AND ${displayStockSql} - ${displayReservedSql} <= 5)`);
   else if (q.stock === 'preorder') clauses.push(`(NOT ${hasDirectSql})`);
-  if (q.price_min !== undefined) {
-    clauses.push('price_iqd >= ?');
-    params.push(int(q.price_min, 'price_min', { min: 0, max: 1_000_000_000 }));
-  }
-  if (q.price_max !== undefined) {
-    clauses.push('price_iqd <= ?');
-    params.push(int(q.price_max, 'price_max', { min: 0, max: 1_000_000_000 }));
-  }
   if (q.days !== undefined) {
     clauses.push('created_at >= ?');
     params.push(new Date(Date.now() - int(q.days, 'days', { min: 1, max: 3650 }) * 86_400_000).toISOString());
@@ -747,6 +739,20 @@ adminProductsRoutes.get('/', async (c) => {
          AND EXISTS (SELECT 1 FROM pricing_v2_sku_results vr WHERE vr.product_id = products.id))`
     : '0';
   if (q.needs_pricing === '1') clauses.push(`NOT ${v2PublishedSql}`);
+  // The price band and the price sorts read the V2 from-price (the lowest final price its V2 results sell at),
+  // NULL while the product needs pricing — never the legacy `price_iqd` of a hidden product, which a narrowing
+  // band would otherwise disclose to any admin (review 2026-10-14).
+  const v2FromSql = v2Cols
+    ? `(CASE WHEN ${v2PublishedSql} THEN (SELECT MIN(fr.final_price_iqd) FROM pricing_v2_sku_results fr WHERE fr.product_id = products.id) END)`
+    : 'NULL';
+  if (q.price_min !== undefined) {
+    clauses.push(`${v2FromSql} >= ?`);
+    params.push(int(q.price_min, 'price_min', { min: 0, max: 1_000_000_000 }));
+  }
+  if (q.price_max !== undefined) {
+    clauses.push(`${v2FromSql} <= ?`);
+    params.push(int(q.price_max, 'price_max', { min: 0, max: 1_000_000_000 }));
+  }
   // «ناقص» (owner brief 2026-10-10, migration 0184): the products the central
   // required-field list finds incomplete. Without 0184 there is nothing to
   // filter by and the column reads null.
@@ -766,8 +772,9 @@ adminProductsRoutes.get('/', async (c) => {
     updated: 'updated_at DESC',
     newest: 'created_at DESC',
     oldest: 'created_at ASC',
-    price_asc: 'price_iqd ASC, updated_at DESC',
-    price_desc: 'price_iqd DESC, updated_at DESC',
+    // Needs-pricing rows (no from-price) last, whichever way (A.5).
+    price_asc: `${v2FromSql} IS NULL, ${v2FromSql} ASC, updated_at DESC`,
+    price_desc: `${v2FromSql} IS NULL, ${v2FromSql} DESC, updated_at DESC`,
     sales: 'sold DESC, updated_at DESC',
     stock: `${displayStockSql} IS NULL, ${displayStockSql} - ${displayReservedSql} ASC, updated_at DESC`,
   };
@@ -784,7 +791,7 @@ adminProductsRoutes.get('/', async (c) => {
               low_stock_threshold, is_featured, brand_id, created_at, updated_at, doc_version,
               composition,
               ${v2PublishedSql} AS v2_published,
-              ${v2Cols ? '(SELECT MIN(fr.final_price_iqd) FROM pricing_v2_sku_results fr WHERE fr.product_id = products.id)' : 'NULL'} AS v2_from_iqd,
+              ${v2FromSql} AS v2_from_iqd,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
                         WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold${completenessCols}
@@ -984,6 +991,20 @@ adminProductsRoutes.get('/stats', async (c) => {
         )
         .first<{ incomplete: number; held: number }>()
     : null;
+  // The clean start (C5, review 2026-10-14): an ACTIVE product still «يحتاج تسعيرًا» is hidden from every
+  // customer — the Active tile says how many of its products customers cannot see yet (a count, never a figure).
+  const activeNeedsPricing = (await pricingV2Installed(db))
+    ? await db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM products p
+            WHERE p.status = 'active'
+              AND NOT EXISTS (SELECT 1 FROM product_pricing_state vs WHERE vs.product_id = p.id AND vs.mode = 'engine' AND vs.pricing_method IS NOT NULL
+                                AND EXISTS (SELECT 1 FROM pricing_v2_sku_results vr WHERE vr.product_id = p.id))`
+        )
+        .first<{ n: number }>()
+        .then((r) => Number(r?.n ?? 0))
+        .catch(() => null)
+    : null;
   // Revenue is a MONEY figure, not a cost (owner decision 2 keeps it with
   // full-scope admins).
   const financial = canMoveMoney(c.env, c.get('user'));
@@ -998,6 +1019,7 @@ adminProductsRoutes.get('/stats', async (c) => {
       featured: totals?.featured ?? 0,
       incomplete: completenessTotals ? Number(completenessTotals.incomplete ?? 0) : null,
       held: completenessTotals ? Number(completenessTotals.held ?? 0) : null,
+      active_needs_pricing: activeNeedsPricing,
     },
     weekly: weeks,
     sales_30d: {
@@ -1359,12 +1381,13 @@ async function v2ReadOf(c: Context<AppContext>, id: string): Promise<V2Read> {
 async function v2StoredAnswer(c: Context<AppContext>, id: string) {
   const read = await v2ReadOf(c, id);
   const viewer = v2ViewerOf(c.env, c.get('user'));
-  const o = { viewer: 'owner' as const, env: c.env, user: c.get('user'), now: new Date().toISOString() };
+  // The reader's own desired set: an editor's evaluation folds no purchase review and its hash binds no cost (C-14).
+  const o = { viewer, env: c.env, user: c.get('user'), now: new Date().toISOString() };
   const method = storedMethodOf(read);
   if (method) return v2Answer({ viewer, read, ev: await evaluateDesired(read, desiredFor(read, { sent: [] }, o)) });
   // A database before 0189 (a deploy ahead of its migration) prices nothing: the flag alone.
   if (!(await pricingV2Installed(c.env.DB))) return uninstalledAnswer(read, viewer);
-  const defaultMethod = await defaultMethodOf(read, viewer, { ...o, viewer });
+  const defaultMethod = await defaultMethodOf(read, viewer, o);
   const ev = await evaluateDesired(read, desiredFor(read, { method: defaultMethod, sent: ['method'] }, o));
   return v2Answer({ viewer, read, ev, defaultMethod });
 }
@@ -1483,11 +1506,13 @@ adminProductsRoutes.get('/:id', async (c) => {
   // product with no stock and then be refused by `planProductSave` on save.
   // The 409 names the panel that owns it instead.
   if (stored.row.composition !== '') throw compositionConflict(id, stored.row.slug);
+  const pricingV2 = await productV2Flag(c.env.DB, id);
   return c.json({
     success: true,
     // §11: an assistant admin gets the same document with every financial
     // field removed on the SERVER — reading the raw response reveals nothing.
-    product: projectForAdmin(c.env, c.get('user'), stored.document),
+    // The clean start: a product still «يحتاج تسعيرًا» answers its old dinar prices EMPTY (archive only).
+    product: projectForAdmin(c.env, c.get('user'), pricingV2.needs_pricing ? nullLegacyPricesDeep(stored.document) : stored.document),
     // Owner decision 8: the engine prices this product — its price cells are read only in the form
     // (a flag, not a cost: every admin may know it, and the old price writers refuse).
     engine_managed: await productEngineManaged(c.env.DB, id),
@@ -1495,7 +1520,7 @@ adminProductsRoutes.get('/:id', async (c) => {
     engine_direct_only: await productEngineDirectOnly(c.env.DB, id),
     // Pricing V2 (spec §5.1 as amended by addendum A.7): a flag, never a figure — every admin may know it.
     // `needs_pricing`: not V2-published (no method, or no complete V2 write yet), so no customer sees it.
-    pricing_v2: await productV2Flag(c.env.DB, id),
+    pricing_v2: pricingV2,
   });
 });
 
@@ -1893,7 +1918,8 @@ adminProductsRoutes.post('/', async (c) => {
           name_en: doc.name_en,
           slug: doc.slug,
           status: doc.status,
-          price_iqd: doc.price_iqd,
+          // No price in the audit detail: a product still «يحتاج تسعيرًا» carries only its old dinar price here
+          // (review 2026-10-14); a V2 price is recorded by the pricing audit, never in audit_log.
           content_rev: doc.content_rev,
         },
       },

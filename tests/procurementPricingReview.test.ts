@@ -165,12 +165,11 @@ test('the client helpers: typed extras by product, the request body, and the sam
   assert.equal(extraOnStep('0'), true);
   assert.equal(extraOnStep('1500'), false);
   assert.equal(extraOnStep('2000000000'), false);
-  // The body carries the extras only when typed: an older server, which refuses an unknown key, sees today's body.
+  // The clean start (DECISIONS row 222; review 2026-10-14): the body never carries a Direct Sale Extra — the
+  // server refuses one by name (PRICING_V2_FEES_RETIRED).
   const base = { minimums: [], optIn: [], usePurchase: {}, prefer: {} };
   assert.equal('direct_sale_extras' in pricingBody(base), false);
-  assert.deepEqual(pricingBody({ ...base, extras: [{ product_id: 'p_a1', scope: 'product', scope_id: 'ignored', amount_iqd: '٥٠٬٠٠٠' }] }).direct_sale_extras, [
-    { product_id: 'p_a1', scope: 'product', scope_id: '', amount_iqd: 50_000 },
-  ]);
+  assert.equal('direct_sale_extras' in pricingBody({ ...base, extras: [{ product_id: 'p_a1', scope: 'product', scope_id: 'ignored', amount_iqd: '٥٠٬٠٠٠' }] }), false);
   // A typed extra is something to apply, even when the purchase feeds nothing.
   const quiet: PricingProduct = { ...A1, entries: [] };
   assert.equal(hasSomethingToApply(quiet, base), false);

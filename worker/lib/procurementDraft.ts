@@ -99,10 +99,9 @@ export async function parseProcurementDraft(db: D1Database, b: Record<string, un
       weight,
       volume,
       invoiceQty: whole(r.invoiced_qty ?? qty, 'كمية الفاتورة', 0, 100000),
-      selling:
-        r.selling_price_iqd === null
-          ? null
-          : whole(r.selling_price_iqd ?? sel.selling_price_iqd, 'سعر البيع'),
+      // The reference store price is never filled from the selection on the server's side: a client that omits
+      // it stores null (the clean start — a product still «يحتاج تسعيرًا» has no store price to record).
+      selling: r.selling_price_iqd === null || r.selling_price_iqd === undefined ? null : whole(r.selling_price_iqd, 'سعر البيع'),
       charges: autoShipping,
       autoShipping,
       key: procurementSelectionKey(sel),

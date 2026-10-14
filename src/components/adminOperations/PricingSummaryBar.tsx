@@ -60,16 +60,19 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
       )
     : [];
   const shown = (v: string) => (busy ? '…' : v);
-  // Direct first: the model sells direct; `priced` when the engine gave its direct cell a price.
-  const direct = directFirst && summary?.sells_direct === true;
-  const priced = direct && ok && summary!.direct_sale_price_iqd != null;
-  const cell4Label = !direct ? (engine ? s.cellCustomer : s.cellSuggested) : priced || !ok ? (engine ? s.cellDirectCustomer : s.cellDirectSuggested) : s.cellPreorderBase;
-  const cell4Value = !ok ? '—' : priced ? money(summary!.direct_sale_price_iqd) : money(summary!.preorder_base_iqd);
+  // The clean start (DECISIONS row 222): cell 4 is the store's current V2 price, or «يحتاج تسعيرًا» — never a
+  // price of the old engine (no pre-order base, no Direct Sale Extra). A purchase's price change is reviewed in
+  // section ٣ «الأسعار» of the product.
+  void directFirst;
+  void engine;
+  const storePrice = summary?.store_price_iqd ?? null;
+  const cell4Label = s.cellCustomer;
+  const cell4Value = !summary ? '—' : storePrice === null ? s.needsPricing : money(storePrice);
 
   return (
     <section aria-label={s.barAria(label)} aria-busy={busy || undefined} className="mt-3 border-t border-[var(--ap-border)] pt-3" data-pricing-summary>
       {readOnlyLabel && <p className="mb-1.5 text-[12px] font-semibold text-[var(--ap-text-3)]">{s.current}</p>}
-      <dl className="grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-2 tabular-nums sm:grid-cols-3">
         <div className={CELL}>
           <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellCost}</dt>
           <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]"><Fig>{shown(ok ? usd(summary!.current_total_cost_cents) : '—')}</Fig></dd>
@@ -77,10 +80,6 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
         <div className={CELL}>
           <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellProfit}</dt>
           <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]"><Fig>{shown(profit)}</Fig></dd>
-        </div>
-        <div className={CELL}>
-          <dt className="text-[12px] text-[var(--ap-text-3)]">{s.cellFinalUsd}</dt>
-          <dd className="text-[15px] font-semibold text-[var(--ap-text-1)]"><Fig>{shown(ok ? usd(summary!.final_price_cents) : '—')}</Fig></dd>
         </div>
         <div className="rounded-[var(--ap-radius-md)] bg-[var(--ap-accent-soft)] px-3 py-2 text-[var(--ap-accent-text)]">
           <dt className="text-[12px]">{cell4Label}</dt>
@@ -94,14 +93,7 @@ export default function PricingSummaryBar({ summary, label, busy = false, notIns
       {ok && (
         <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[var(--ap-text-3)]">
           <span>{s.basedOn(profileName(summary!.shipping_profile, lang))}</span>
-          {priced ? (
-            <span data-direct-caption>{s.directCaption(money(summary!.preorder_base_iqd), money(summary!.direct_sale_extra_iqd))}</span>
-          ) : direct ? (
-            summary!.direct_sale_extra_iqd == null && <span>{s.extraInReview}</span>
-          ) : (
-            summary!.direct_sale_price_iqd != null && <span>{s.directSale(money(summary!.direct_sale_price_iqd))}</span>
-          )}
-          {!engine && summary!.store_price_iqd != null && <span>{s.storePrice(money(summary!.store_price_iqd))}</span>}
+          <span>{s.reviewInPrices}</span>
         </p>
       )}
       {summary && (
@@ -164,9 +156,7 @@ function PricingDetails({ summary: d, level }: { summary: PricingSummary; level:
         {d.minimum_target_profit_usd == null && d.target_profit_iqd != null && <span className="block">{s.migratedDinars}</span>}
       </span>,
     ],
-    [s.row11, <Fig key="11">{usd(d.final_price_cents)}</Fig>],
     [s.row12, <Fig key="12">{d.usd_iqd_rate ?? dash}</Fig>],
-    [s.row13, <Fig key="13">{d.preorder_base_iqd == null ? dash : money(d.preorder_base_iqd)}</Fig>],
   ];
   return (
     <>

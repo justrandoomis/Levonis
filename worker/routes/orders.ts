@@ -48,6 +48,8 @@ import {
   giftEntitlementIdOf,
   giftPricingBlock,
   giftTransportSnapshot,
+  giftUnitValueOf,
+  unpricedGiftResolved,
   giftVerdictRefusal,
   verifyGiftCartLines,
   type GiftPricingBlock,
@@ -2568,10 +2570,16 @@ export async function computeCheckout(
           }
           throw badRequest(`"${displayName}" is out of stock`, 'OUT_OF_STOCK', details);
         }
-        const block = giftPricingBlock(verdict, facts.resolved.regular_iqd, sel.qty);
+        // The clean start (DECISIONS row 222): a gift on a product still «يحتاج تسعيرًا» (no V2 document) keeps
+        // no figure of the old ladder — its value is the one frozen at the grant, its cost unknown (`unpriced`,
+        // no estimate: the product has no V2 result). A V2 product's gift is valued at its V2 regular price.
+        const v2Gift = facts.doc.sku_strict === true;
+        const giftUnit = giftUnitValueOf(v2Gift, facts.resolved.regular_iqd, verdict.frozenValueIqd, sel.qty);
+        const giftResolved = v2Gift ? facts.zeroed : unpricedGiftResolved(facts.zeroed, giftUnit);
+        const block = giftPricingBlock(verdict, giftUnit, sel.qty);
         // The cost leaves the customer's snapshot and lands on the row (0095):
         // a gift is a promotional cost, recorded like every other sale.
-        const { cost_iqd: giftCost, ...giftSnapshot } = facts.zeroed;
+        const { cost_iqd: giftCost, ...giftSnapshot } = giftResolved;
         const giftLineCost = costSnapshot(giftCost);
         lines.push({
           cart_item_id: String(row.cart_item_id),
@@ -2596,10 +2604,10 @@ export async function computeCheckout(
           tracked: stockRes.tracked,
           pricing_snapshot: JSON.stringify({ ...giftSnapshot, gift: block }),
           warranty_snapshot: null,
-          transport_snapshot: giftTransportSnapshot(facts.zeroed),
-          breakdown: publicBreakdown(facts.zeroed),
+          transport_snapshot: giftTransportSnapshot(giftResolved),
+          breakdown: publicBreakdown(giftResolved),
           is_printer: isPrinter,
-          pricing_basis: facts.zeroed.pricing_basis,
+          pricing_basis: giftResolved.pricing_basis,
           cost_iqd: giftLineCost.cost_iqd,
           cost_basis: giftLineCost.cost_basis,
           physical_dimensions: resolveSelectionPhysicalDimensions(facts.doc, view ?? EMPTY_RELATIONS, {

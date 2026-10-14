@@ -41,6 +41,10 @@ export interface ProcurementPricingStrings {
   cellProfit: string;
   cellFinalUsd: string;
   cellCustomer: string;
+  /** The clean start: the product has no V2 price yet. */
+  needsPricing: string;
+  /** Where a purchase's price change is decided. */
+  reviewInPrices: string;
   cellSuggested: string;
   basedOn: Fill;
   directSale: Fill;
@@ -152,6 +156,8 @@ const ar: ProcurementPricingStrings = {
   cellProfit: 'الحد الأدنى للربح',
   cellFinalUsd: 'السعر النهائي بالدولار',
   cellCustomer: 'السعر النهائي للزبون',
+  needsPricing: 'يحتاج تسعيرًا',
+  reviewInPrices: 'يُراجَع تغيير السعر في قسم «الأسعار» للمنتج',
   cellSuggested: 'السعر المقترح للزبون',
   basedOn: (profile) => `على أساس ${profile}`,
   directSale: (direct) => `البيع المباشر: ${direct}`,
@@ -257,6 +263,8 @@ const en: ProcurementPricingStrings = {
   cellProfit: 'Minimum profit',
   cellFinalUsd: 'Final price (USD)',
   cellCustomer: 'Final customer price',
+  needsPricing: 'Needs pricing',
+  reviewInPrices: 'The price change is reviewed in the product\'s Prices section',
   cellSuggested: 'Suggested customer price',
   basedOn: (profile) => `Based on ${profile}`,
   directSale: (direct) => `Direct sale: ${direct}`,
@@ -362,6 +370,8 @@ const ckb: ProcurementPricingStrings = {
   cellProfit: 'کەمترین قازانجی مەبەست',
   cellFinalUsd: 'نرخی کۆتایی بە دۆلار',
   cellCustomer: 'نرخی کۆتایی بۆ کڕیار',
+  needsPricing: 'پێویستی بە نرخدانانە',
+  reviewInPrices: 'گۆڕینی نرخەکە لە بەشی «نرخەکان»ی بەرهەمەکەدا پێیدا دەچنەوە',
   cellSuggested: 'نرخی پێشنیارکراو بۆ کڕیار',
   basedOn: (profile) => `لەسەر بنەمای ${profile}`,
   directSale: (direct) => `فرۆشتنی ڕاستەوخۆ: ${direct}`,

@@ -125,9 +125,9 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
   SHIPPING_PROFILE_MISSING: {
     severity: 'error',
     label: {
-      ar: 'طريقة الشحن الافتراضية غير محددة',
-      en: 'Default shipping profile is not chosen',
-      ckb: 'ڕێگای بنەڕەتیی ناردن هەڵنەبژێردراوە',
+      ar: 'مسار شحن المخزون غير محدد',
+      en: 'Stock shipping route is not chosen',
+      ckb: 'ڕێڕەوی ناردنی کۆگا هەڵنەبژێردراوە',
     },
   },
   WEIGHT_MISSING: {

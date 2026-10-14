@@ -27,6 +27,7 @@
  * Everything sits inside Levo Community's maintenance wall (communityGate),
  * exactly like the feeds beside it.
  */
+import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from '../lib/types';
@@ -118,13 +119,14 @@ export function postCard(p: Record<string, unknown>, root: string | null) {
       : null,
     printer: {
       name: String(p.printer_name ?? '') || String(p.printer_product_name ?? ''),
-      product: p.printer_product_id && p.printer_slug
+      // A catalogue link only to a product customers can see (the clean start: an unpriced product is hidden).
+      product: p.printer_product_id && p.printer_slug && p.printer_status === 'active'
         ? { id: String(p.printer_product_id), slug: String(p.printer_slug), name: String(p.printer_product_name ?? ''), name_ar: String(p.printer_product_name_ar ?? ''), url: `/product/${encodeURIComponent(String(p.printer_slug))}` }
         : null,
     },
     material: {
       name: String(p.material ?? '') || String(p.mat_name ?? ''),
-      product: p.material_product_id && p.mat_slug
+      product: p.material_product_id && p.mat_slug && p.mat_status === 'active'
         ? { id: String(p.material_product_id), slug: String(p.mat_slug), name: String(p.mat_name ?? ''), name_ar: String(p.mat_name_ar ?? ''), url: `/product/${encodeURIComponent(String(p.mat_slug))}` }
         : null,
     },
@@ -153,8 +155,8 @@ export const POST_COLUMNS = `p.*,
        s.slug AS s_slug, s.name AS s_name, s.logo_key AS s_logo, s.status AS s_status,
        cp.slug AS pr_slug, cp.name AS pr_name, cp.name_ar AS pr_name_ar, cp.price_iqd AS pr_price,
        cp.lifecycle AS pr_lifecycle, cp.status AS pr_status,
-       pp.slug AS printer_slug, pp.name AS printer_product_name, pp.name_ar AS printer_product_name_ar,
-       mp.slug AS mat_slug, mp.name AS mat_name, mp.name_ar AS mat_name_ar,
+       pp.slug AS printer_slug, pp.name AS printer_product_name, pp.name_ar AS printer_product_name_ar, pp.status AS printer_status,
+       mp.slug AS mat_slug, mp.name AS mat_name, mp.name_ar AS mat_name_ar, mp.status AS mat_status,
        (SELECT m.media_key FROM community_post_media m WHERE m.post_id = p.id ORDER BY m.sort_order, m.id LIMIT 1) AS cover_key,
        (SELECT m.kind FROM community_post_media m WHERE m.post_id = p.id ORDER BY m.sort_order, m.id LIMIT 1) AS cover_kind,
        (SELECT m.width FROM community_post_media m WHERE m.post_id = p.id ORDER BY m.sort_order, m.id LIMIT 1) AS cover_w,
@@ -218,8 +220,25 @@ export async function viewerFlagsFor(db: D1Database, viewerId: string | null, po
 
 type Card = ReturnType<typeof postCard>;
 export async function withViewerFlags<T extends Card>(db: D1Database, viewerId: string | null, cards: T[]): Promise<Array<T & { viewer: PostViewerFlags }>> {
-  const flags = await viewerFlagsFor(db, viewerId, cards.map((c) => c.id));
-  return cards.map((c) => ({ ...c, viewer: flags.get(c.id) ?? { liked: false, saved: false } }));
+  const [flags, listed] = await Promise.all([viewerFlagsFor(db, viewerId, cards.map((c) => c.id)), withListedEmbeds(db, cards)]);
+  return listed.map((c) => ({ ...c, viewer: flags.get(c.id) ?? { liked: false, saved: false } }));
+}
+
+/**
+ * THE CATALOGUE LINKS OF A POST ARE TO LISTED PRODUCTS ONLY (the clean start, DECISIONS row 222; review
+ * 2026-10-14): a printer or material product still «يحتاج تسعيرًا» (or held as incomplete) is hidden from every
+ * customer surface, so a card keeps the author's words and drops the link. One listing probe per list.
+ */
+export async function withListedEmbeds<T extends Card>(db: D1Database, cards: T[]): Promise<T[]> {
+  const ids = [...new Set(cards.flatMap((c) => [c.printer.product?.id, c.material.product?.id]).filter((x): x is string => !!x))];
+  if (!ids.length) return cards;
+  const unlisted = await (await listing(db)).unlistedIds(ids);
+  if (!unlisted.size) return cards;
+  return cards.map((c) => ({
+    ...c,
+    printer: c.printer.product && unlisted.has(c.printer.product.id) ? { ...c.printer, product: null } : c.printer,
+    material: c.material.product && unlisted.has(c.material.product.id) ? { ...c.material, product: null } : c.material,
+  }));
 }
 
 /** Pages by (published_at, id): `<published_at>|<id>`. */
@@ -436,10 +455,11 @@ communityPostRoutes.get('/posts/:id', async (c) => {
       : Promise.resolve(null),
   ]);
   const marks = flags.get(id) ?? { liked: false, saved: false };
+  const [card] = await withListedEmbeds(c.env.DB, [postCard(p, root)]);
   return c.json({
     success: true,
     post: {
-      ...postCard(p, root),
+      ...card!,
       body: String(p.body ?? ''),
       media: mine || viewer?.role === 'admin' ? media : media.map(({ key: _key, ...m }) => m),
       /** The attachments (§9.4): names, sizes, kinds — the keys to the author alone (D11). */
@@ -636,14 +656,16 @@ async function checkLinks(env: Env, userId: string, input: Partial<PostInput>, c
     const p = await env.DB.prepare('SELECT store_id, audience_user_id FROM community_products WHERE id = ?').bind(input.product_id).first<{ store_id: string | null; audience_user_id: string | null }>();
     if (!p || !storeId || p.store_id !== storeId || p.audience_user_id) throw badRequest('That product is not one of your store\'s', 'POST_LINK_NOT_OWNED');
   }
-  if (input.printer_product_id) {
-    const row = await env.DB.prepare('SELECT 1 AS x FROM products WHERE id = ?').bind(input.printer_product_id).first();
-    if (!row) throw badRequest('That printer is not in the catalogue', 'POST_LINK_NOT_FOUND');
-  }
-  if (input.material_product_id) {
-    const row = await env.DB.prepare('SELECT 1 AS x FROM products WHERE id = ?').bind(input.material_product_id).first();
-    if (!row) throw badRequest('That material is not in the catalogue', 'POST_LINK_NOT_FOUND');
-  }
+  // Only a product customers can see may be linked (the clean start: one still «يحتاج تسعيرًا» is hidden) —
+  // answered exactly like one that does not exist.
+  const linkable = async (productId: string): Promise<boolean> => {
+    const row = await env.DB.prepare('SELECT id, status FROM products WHERE id = ?').bind(productId).first<{ id: string; status: string }>();
+    if (!row) return false;
+    const L = await listing(env.DB);
+    return L.isListedRow(row, await L.unlistedIds([productId]));
+  };
+  if (input.printer_product_id && !(await linkable(input.printer_product_id))) throw badRequest('That printer is not in the catalogue', 'POST_LINK_NOT_FOUND');
+  if (input.material_product_id && !(await linkable(input.material_product_id))) throw badRequest('That material is not in the catalogue', 'POST_LINK_NOT_FOUND');
   /**
    * A REQUEST OR A CUSTOM ORDER: the author was a party — the customer, or the
    * workshop that made it (through its store's merchant). The customer's own

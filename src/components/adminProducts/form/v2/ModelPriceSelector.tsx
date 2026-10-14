@@ -16,8 +16,44 @@
 import { Select, TextInput } from '../formUi';
 import { FOLLOW_MODEL, SUPPLIER_CURRENCIES, firstPreorder, iqdText, signedUsd, usdText, type ModelDraft, type ModelPriceMode, type SkuLine, type SupplierCurrency } from './v2Model';
 import { useV2 } from './useV2Pricing';
-import { UnitInput } from './CostCard';
+import { boxOf, UnitInput } from './CostCard';
+import { useEffect, useState } from 'react';
 import { channelName, Chip, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
+
+/** A reset is a real button (44px), not a text link. */
+const RESET = 'inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary';
+
+/** The model's price back to «يتبع المنتج» — its discount exception untouched. */
+export const followPrice = (): Partial<ModelDraft> => ({ price: 'follow', usd: '', supplier_amount: '', supplier_currency: '', weight_g: null, box: null });
+/** The model's discount back to the product's — its price untouched. */
+export const followDiscount = (): Partial<ModelDraft> => ({ discount: 'follow', discount_usd: '' });
+
+/**
+ * A model's box as TYPED: a partly typed box stays on screen; the draft carries it only once all three axes are
+ * set (the box is one unit), so no keystroke starts from an empty box.
+ */
+function ModelBoxInputs({ fid, model, stored, onBox }: { fid: string; model: string; stored: [number, number, number] | null; onBox: (box: [number, number, number] | null) => void }) {
+  const s = useV2Strings();
+  const [axes, setAxes] = useState<Array<number | null>>(() => [...(stored ?? [null, null, null])]);
+  const key = stored ? stored.join(',') : '';
+  useEffect(() => {
+    if (stored) setAxes([...stored]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  const setAxis = (i: 0 | 1 | 2, v: number | null) => {
+    const next = [...axes];
+    next[i] = v;
+    setAxes(next);
+    onBox(boxOf(next));
+  };
+  return (
+    <div className="grid min-w-0 gap-1.5 [grid-template-columns:repeat(3,minmax(0,1fr))]" dir="ltr">
+      <UnitInput id={fid} stored={axes[0] ?? null} factor={10} decimals={1} onChange={(v) => setAxis(0, v)} label={s.boxLength} data={`model-box-l:${model}`} />
+      <UnitInput id={`${fid}-w`} stored={axes[1] ?? null} factor={10} decimals={1} onChange={(v) => setAxis(1, v)} label={s.boxWidth} data={`model-box-w:${model}`} />
+      <UnitInput id={`${fid}-h`} stored={axes[2] ?? null} factor={10} decimals={1} onChange={(v) => setAxis(2, v)} label={s.boxHeight} data={`model-box-h:${model}`} />
+    </div>
+  );
+}
 
 export default function ModelPriceSelector({ id, isModel, line }: { id: string; isModel: boolean; line: SkuLine | null }) {
   const v2 = useV2();
@@ -34,7 +70,7 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
       {pre ? (
         <>
           {' · '}
-          {s.preorderVia(channelName(pre.channel, lang))} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(pre.price_iqd)}</span>
+          {channelName(pre.channel, lang)} <span dir="ltr" className="font-bold tabular-nums text-text-primary">{iqdText(pre.price_iqd)}</span>
         </>
       ) : null}
     </p>
@@ -57,6 +93,7 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
     ...(isModel ? [{ value: 'fixed' as const, label: s.fixedPrice }] : []),
   ];
   const price = modes.some((x) => x.value === m.price) ? m.price : 'follow';
+
   const productDiscount = d.discount_usd ? usdText(d.discount_usd) : s.discountNone;
   return (
     <div className="mt-2 border-t border-border-subtle pt-2 min-w-0 grid gap-2" data-v2-model={id}>
@@ -100,6 +137,10 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
           <V2Field label={s.weightKg}>
             {(fid) => <UnitInput id={fid} stored={m.weight_g} factor={1000} decimals={3} onChange={(weight_g) => set({ weight_g })} data={`model-weight:${id}`} />}
           </V2Field>
+          {/* §1.4: weight OR box — a model shipped by sea is priced per CBM. */}
+          <div className="[grid-column:1/-1]">
+            <V2Field label={s.boxCm}>{(fid) => <ModelBoxInputs fid={fid} model={id} stored={m.box} onBox={(box) => set({ box })} />}</V2Field>
+          </div>
         </div>
       ) : null}
       {isModel ? (
@@ -113,8 +154,9 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
             )}
           </V2Field>
           {m.discount === 'exception' ? (
-            <V2Field label={s.discount}>
-              {(fid) => <UsdInput id={fid} value={m.discount_usd} placeholder="0" onChange={(discount_usd) => set({ discount_usd })} data={`model-discount-usd:${id}`} />}
+            // §2.1 rule 2: the inherited value stays visible beside the exception («المنتج: $40.00»).
+            <V2Field label={s.discount} hint={s.inheritedProduct(productDiscount)}>
+              {(fid) => <UsdInput id={fid} value={m.discount_usd} placeholder={d.discount_usd ? d.discount_usd : '0'} onChange={(discount_usd) => set({ discount_usd })} data={`model-discount-usd:${id}`} />}
             </V2Field>
           ) : null}
         </div>
@@ -122,14 +164,22 @@ export default function ModelPriceSelector({ id, isModel, line }: { id: string; 
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         {result}
         {price !== 'follow' || m.discount === 'exception' ? (
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-2">
             <Chip tone="info" data="exception">
               {s.exception}
               {price === 'delta' && m.usd ? ` ${signedUsd(m.usd)}` : ''}
             </Chip>
-            <button type="button" className="text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => set({ ...FOLLOW_MODEL })} data-v2-inherit={id}>
-              {s.backToInherited}
-            </button>
+            {/* One reset per selector: the price and the discount exception are two decisions. */}
+            {price !== 'follow' ? (
+              <button type="button" className={RESET} onClick={() => set(followPrice())} data-v2-inherit={id} data-v2-inherit-price={id}>
+                {s.resetPrice}
+              </button>
+            ) : null}
+            {m.discount === 'exception' ? (
+              <button type="button" className={RESET} onClick={() => set(followDiscount())} data-v2-inherit-discount={id}>
+                {s.resetDiscount}
+              </button>
+            ) : null}
           </span>
         ) : null}
       </div>

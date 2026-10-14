@@ -57,6 +57,7 @@ import {
   pricesUnchangedV2,
   priceSourceOf,
   staleEngineProducts,
+  v2AutoHoldCode,
   AUTO_REPRICE_SOURCE,
   PRODUCT_CHUNK,
   READS_PER_CHUNK,
@@ -257,8 +258,10 @@ export async function previewRateAct(db: D1Database, move: RateMove, rates: Pric
           evaluated.push({ pid, hash: null, code: 'REPRICE_BLOCKED' });
           continue;
         }
-        if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write) {
-          const code = blockCodeOf(v2.codes);
+        // The run the act starts holds what it would hold (an owner act: the unreviewed data save only).
+        const hold = v2.kind === 'v2_reprice' && v2.complete && v2.hash && v2.needs_write ? v2AutoHoldCode(p.state, v2, 'owner_rate') : null;
+        if (v2.kind !== 'v2_reprice' || !v2.complete || !v2.hash || !v2.needs_write || hold) {
+          const code = hold ?? blockCodeOf(v2.codes);
           blocked.push({ product_id: pid, ...productNames, code });
           evaluated.push({ pid, hash: null, code });
           continue;

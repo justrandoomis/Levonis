@@ -83,7 +83,7 @@ export default function PricesSectionV2({
       {v2.owner && a?.v2_rate ? (
         <p className="mb-2 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-text-secondary" data-v2-rate>
           <span dir="ltr">{s.chipRate(new Intl.NumberFormat('en-US', { maximumFractionDigits: 4 }).format(Number(a.v2_rate.usd_iqd)))}</span>
-          <a href="/admin?tab=pricing" className="font-bold underline underline-offset-2 text-text-primary">
+          <a href="/admin?tab=pricing" className="inline-flex min-h-11 items-center px-1 font-bold underline underline-offset-2 text-text-primary">
             {s.rateHistory}
           </a>
         </p>
@@ -109,13 +109,13 @@ export default function PricesSectionV2({
       {v2.money && d ? (
         priceFirst ? (
           <div className="mb-3 grid min-w-0 gap-3">
-            <ProfitDiscountCard draft={d} setDraft={v2.setDraft} owner={v2.owner} direct={lead?.channels.direct_sale?.price_iqd ?? null} preorder={pre?.price_iqd ?? null} modelNames={modelNames} onJump={onJump} />
+            <ProfitDiscountCard draft={d} setDraft={v2.setDraft} owner={v2.owner} direct={lead?.channels.direct_sale?.price_iqd ?? null} preorder={pre?.price_iqd ?? null} modelNames={modelNames} onJump={onJump} inheritedMinProfit={a?.v2_cost_inputs?.inherited_minimum_profit ?? null} />
             {v2.owner ? <CostCard cost={d.cost} onChange={setCost} optional fromPackage={fromPackage} /> : null}
           </div>
         ) : (
           <div className="mb-3 grid min-w-0 gap-3 [grid-template-columns:minmax(0,1fr)] lg:[grid-template-columns:repeat(2,minmax(0,1fr))]">
             {v2.owner ? <CostCard cost={d.cost} onChange={setCost} optional={false} fromPackage={fromPackage} /> : null}
-            <ProfitDiscountCard draft={d} setDraft={v2.setDraft} owner={v2.owner} direct={lead?.channels.direct_sale?.price_iqd ?? null} preorder={pre?.price_iqd ?? null} modelNames={modelNames} onJump={onJump} />
+            <ProfitDiscountCard draft={d} setDraft={v2.setDraft} owner={v2.owner} direct={lead?.channels.direct_sale?.price_iqd ?? null} preorder={pre?.price_iqd ?? null} modelNames={modelNames} onJump={onJump} inheritedMinProfit={a?.v2_cost_inputs?.inherited_minimum_profit ?? null} />
           </div>
         )
       ) : null}

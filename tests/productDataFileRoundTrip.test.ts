@@ -35,6 +35,15 @@ const snapshot = (raw: DatabaseSync, productId: string) => ({
   membership: all(raw, "SELECT * FROM membership_benefit_rules WHERE product_id = ? ORDER BY id", productId),
 });
 
+/**
+ * A price line written by hand: the file of a product still «يحتاج تسعيرًا» carries no old dinar price
+ * (review 2026-10-14) — an admin who types one anyway is judged exactly as before.
+ */
+function typeLine(text: string, id: string, key: string, value: string): string {
+  assert.doesNotMatch(text, new RegExp(`^${key.replace(/[.[\]]/g, '\\$&')}=`, 'm'), `the file carries no ${key}`);
+  return text.replace(`=== end ${id} ===`, `${key}=${value}\n=== end ${id} ===`);
+}
+
 /** Every column of `products` but the ones a save always moves. */
 const stripClock = (rows: Array<Record<string, unknown>>) =>
   rows.map((r) => {
@@ -134,7 +143,7 @@ test('options and colours change in place: no reorder, a new option is appended 
   const c1 = colorIndex('col_black');
   let edited = edit(text, `options.${o2}.name_en`, 'Combo Plus');
   edited = edit(edited, `colors.${c1}.hex`, '#111111');
-  edited = edit(edited, `options.${o1}.preorder.transports.2.surcharge_iqd`, '35000');
+  edited = typeLine(edited, id, `options.${o1}.preorder.transports.2.surcharge_iqd`, '35000');
   // A new model, written by hand at the end of the block (no id: the server gives it one).
   edited = edited.replace(
     `=== end ${id} ===`,
@@ -238,7 +247,7 @@ test('invalid values are refused per field; the valid ones still apply; a file o
   const id = await create(app);
   const text = await download(app, id);
   const c1 = /^colors\.(\d+)\.id=col_black$/m.exec(text)![1];
-  let mine = edit(text, 'price_iqd', 'abc');
+  let mine = typeLine(text, id, 'price_iqd', 'abc');
   mine = edit(mine, `colors.${c1}.hex`, 'not-a-colour');
   mine = edit(mine, 'display_order', '7');
   mine = mine.replace(`=== end ${id} ===`, `no_such_field=1\n=== end ${id} ===`);
@@ -252,7 +261,7 @@ test('invalid values are refused per field; the valid ones still apply; a file o
   assert.equal(row<{ display_order: number; price_iqd: number }>(raw, 'SELECT display_order, price_iqd FROM products WHERE id = ?', id)!.price_iqd, 1_000_000);
 
   const before = all(raw, 'SELECT * FROM products WHERE id = ?', id);
-  const onlyBad = edit(await download(app, id), 'price_iqd', '-5');
+  const onlyBad = typeLine(await download(app, id), id, 'price_iqd', '-5');
   const [q] = await preview(app, onlyBad, id);
   assert.equal(q.token, null);
   assert.deepEqual(q.fields.map((f) => f.status), ['INVALID_VALUE']);
@@ -270,8 +279,8 @@ test('an engine-priced product: a changed final price is refused per field, an u
     INSERT INTO product_pricing_state (product_id, mode, updated_at) VALUES ('${id}', 'engine', '2026-10-10T00:00:00.000Z');
     DELETE FROM ops_guards WHERE id = 'pricing-mode:${id}';`);
   const o2 = /^options\.(\d+)\.id=opt_combo$/m.exec(text)![1];
-  let mine = edit(text, 'price_iqd', '1100000');
-  mine = edit(mine, `options.${o2}.regular_adjust_iqd`, '170000');
+  let mine = typeLine(text, id, 'price_iqd', '1100000');
+  mine = typeLine(mine, id, `options.${o2}.regular_adjust_iqd`, '170000');
   mine = edit(mine, 'name_en', 'X1 Engine');
   const [p] = await preview(app, mine, id);
   const st = Object.fromEntries(p.fields.map((f) => [f.key, f.status]));

@@ -33,6 +33,7 @@
  * timed-out response, the same file twice in one ZIP) resolves to ONE write.
  */
 
+import { needsPricingIds, withoutLegacyPriceLines } from '../lib/pricingEngine/v2/legacyMoney';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { fetchPageImages, pickPageImage, type PageImages } from '../lib/productPageImages';
 import { Hono, type Context } from 'hono';
@@ -2201,18 +2202,19 @@ templateRoutes.get('/export/:productId', async (c) => {
   // rule exports EMPTY keys, so editing and re-applying this very file changes
   // nothing about it; only typing values or `__NULL__` does.
   const benefits = membershipLines(await loadMembershipRules(c.env.DB, doc.id)).join('\n');
-  return attachment(
-    `${exportProduct(doc, {
-      ...opts,
-      variants: templateVariantsFromView(loaded.view),
-      // Symmetric with the parser: the file says which level counts the stock.
-      inventoryMode: loaded.view.inventory_mode,
-      // §11, the same gate the CSV export has always applied: an assistant
-      // admin downloads the product without its cost, not the whole cost sheet.
-      includeCost: canViewCost(c.env, c.get('user')!),
-    })}\n${benefits}\n`,
-    `levonis-product-${doc.id}.txt`
-  );
+  // The clean start: a product still «يحتاج تسعيرًا» exports no old dinar price line (the archive is never a
+  // file); an omitted key keeps the stored value when the file is applied back.
+  const unpriced = (await needsPricingIds(c.env.DB, [doc.id])).has(doc.id);
+  const text = exportProduct(doc, {
+    ...opts,
+    variants: templateVariantsFromView(loaded.view),
+    // Symmetric with the parser: the file says which level counts the stock.
+    inventoryMode: loaded.view.inventory_mode,
+    // §11, the same gate the CSV export has always applied: an assistant
+    // admin downloads the product without its cost, not the whole cost sheet.
+    includeCost: canViewCost(c.env, c.get('user')!),
+  });
+  return attachment(`${unpriced ? withoutLegacyPriceLines(text) : text}\n${benefits}\n`, `levonis-product-${doc.id}.txt`);
 });
 
 /**

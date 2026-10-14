@@ -688,32 +688,21 @@ test('a printer stored before the rules (ops_policy "{}") still promises AND rec
 
 // ------------------------------------------- the legacy admin route (M2)
 
-test('the legacy POST /api/admin/products runs the printer guard: a filament with a plan is refused, a printer with +12 saves, a 6-month plan is refused', async () => {
+test('the legacy POST /api/admin/products is closed (the clean start): no plan, no price is written through it; customers never reach it', async () => {
   const { db, raw } = setup();
   const admin = appAs(db, 'adm', 'admin');
   const before = (raw.prepare("SELECT warranty_plans FROM products WHERE id = 'p_pla'").get() as { warranty_plans: string }).warranty_plans;
-
-  const fil = await post(admin, '/api/admin/products', { id: 'p_pla', slug: 'pla-basic', name: 'PLA Basic', price_iqd: 25_000, warranty_plans: [EXT12] });
-  assert.equal(fil.status, 400);
-  assert.equal((await json(fil)).code, WARRANTY_NOT_PRINTER);
+  for (const body of [
+    { id: 'p_pla', slug: 'pla-basic', name: 'PLA Basic', price_iqd: 25_000, warranty_plans: [EXT12] },
+    { slug: 'new-thing', name: 'New Thing', price_iqd: 10_000, warranty_plans: [EXT12] },
+    { id: 'p_x1', slug: 'x1-printer', name: 'Printer X1', price_iqd: 899_000, warranty_plans: [EXT12] },
+  ]) {
+    const res = await post(admin, '/api/admin/products', body);
+    assert.equal(res.status, 409);
+    assert.equal((await json(res)).code, 'PRICING_V2_MANAGED');
+  }
   assert.equal((raw.prepare("SELECT warranty_plans FROM products WHERE id = 'p_pla'").get() as { warranty_plans: string }).warranty_plans, before, 'nothing was written');
-
-  // A brand-new product is filed under no printer catalog yet: refused too.
-  const fresh = await post(admin, '/api/admin/products', { slug: 'new-thing', name: 'New Thing', price_iqd: 10_000, warranty_plans: [EXT12] });
-  assert.equal(fresh.status, 400);
-  assert.equal((await json(fresh)).code, WARRANTY_NOT_PRINTER);
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM products WHERE slug = 'new-thing'").get()!.n, 0);
-
-  const odd = await post(admin, '/api/admin/products', { id: 'p_x1', slug: 'x1-printer', name: 'Printer X1', price_iqd: 899_000, warranty_plans: [plan({ duration_months: 6 })] });
-  assert.equal(odd.status, 400);
-  assert.equal((await json(odd)).code, WARRANTY_PLAN_INVALID);
-
-  const ok = await post(admin, '/api/admin/products', { id: 'p_x1', slug: 'x1-printer', name: 'Printer X1', price_iqd: 899_000, warranty_plans: [EXT12] });
-  assert.equal(ok.status, 200, JSON.stringify(await ok.clone().json()));
-  const stored = JSON.parse((raw.prepare("SELECT warranty_plans FROM products WHERE id = 'p_x1'").get() as { warranty_plans: string }).warranty_plans);
-  assert.deepEqual(stored.map((w: { id: string }) => w.id), ['wp_ext12']);
-  // …and a printer save WITHOUT plans is simply fine.
-  assert.equal((await post(admin, '/api/admin/products', { id: 'p_x1', slug: 'x1-printer', name: 'Printer X1', price_iqd: 899_000 })).status, 200);
   // A customer cannot reach the route at all.
   assert.equal((await post(appAs(db, 'buyer'), '/api/admin/products', { id: 'p_x1', name: 'X', price_iqd: 1 })).status, 403);
 });

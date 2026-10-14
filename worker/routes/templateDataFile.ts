@@ -38,6 +38,7 @@
  * compared with the stored value, so the answer is the same for a right guess
  * and a wrong one.
  */
+import { isLegacyPriceFileKey, needsPricingIds } from '../lib/pricingEngine/v2/legacyMoney';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, HttpError, notFound, str } from '../lib/http';
@@ -847,13 +848,16 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
     await rateLimit(c, 'tpl_data_export', 240, 3600);
     const viewer = viewerOf(c);
     const blocks: string[] = [];
+    // The clean start: a product still «يحتاج تسعيرًا» exports no old dinar price line (the archive is never a
+    // file); an omitted line changes nothing when the file comes back.
+    const unpriced = await needsPricingIds(c.env.DB, ids);
     for (const id of ids) {
       const state = await liveState(c.env.DB, deps, id, viewer);
       if (typeof state === 'string') {
         if (ids.length === 1) throw state === 'missing' ? notFound('Product not found') : fileError(400, 'DATA_FILE_COMPOSITION');
         continue;
       }
-      blocks.push(await renderLive(state, viewer));
+      blocks.push(await renderLive(unpriced.has(id) ? { ...state, entries: state.entries.filter((e) => !isLegacyPriceFileKey(e.key)) } : state, viewer));
     }
     const text = renderDataFile(blocks, viewer.view ? 'owner' : 'staff', new Date().toISOString());
     const name = ids.length === 1 ? `levonis-product-data-${ids[0]}` : `levonis-products-data-${ids.length}`;

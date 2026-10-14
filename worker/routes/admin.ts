@@ -1,5 +1,4 @@
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
-import { afterProductsChanged } from '../lib/completenessHooks';
 import { announceStoreOrder } from '../lib/chatCards';
 import { Hono } from 'hono';
 import { asDocument } from '../lib/securityPolicy';
@@ -14,11 +13,12 @@ import { closeDepositNotification, enqueueUserDepositStatusNotification } from '
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAdmin, badRequest, notFound, conflict, str, int, oneOf, jsonArray, email, HttpError } from '../lib/http';
+import { requireAdmin, badRequest, notFound, conflict, str, int, oneOf, email, HttpError } from '../lib/http';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { newId, sha256Hex } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
-import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
+import { canMoveMoney, canViewCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
@@ -61,7 +61,6 @@ import { bnplOutstanding } from '../lib/bnpl';
 import { productDocumentPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
 import { applyRelations, loadRelationsViews, type ProductRelationsView } from '../lib/productOverlay';
-import { applyPrinterWarrantyRules } from '../lib/warrantyPlans';
 import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { baghdadDay, isDay } from '../lib/baghdadTime';
 import { dayLabel } from '../lib/deliveryDay';
@@ -80,7 +79,6 @@ import {
   stagesFor,
   type OrderStage,
 } from '../lib/orderStages';
-import { safeLink } from '../lib/homeContent';
 import {
   GINI_RECEIPT_REQUIRED,
   GINI_RECEIPT_REQUIRED_MESSAGE,
@@ -1036,8 +1034,6 @@ adminRoutes.patch('/users/:id', limitRoute('admin-user-patch', 60), async (c) =>
 
 // ---------------------------------------------------------------- products
 
-const SELLING_TYPES = ['direct_sale', 'pre_order', 'bundle'] as const;
-const PRODUCT_STATUS = ['draft', 'active', 'hidden'] as const;
 const LEGACY_ADMIN_PRODUCT_BATCH = 80;
 
 /**
@@ -1104,49 +1100,6 @@ const LEGACY_PRODUCT_STRUCTURE_FIELDS = [
   'stores',
 ] as const;
 
-function validateProductBody(body: Record<string, unknown>) {
-  const name = str(body.name, 'name', { min: 1, max: 200 });
-  const slugRaw = str(body.slug, 'slug', { max: 200, required: false });
-  const slug = (slugRaw || name).toLowerCase().replace(/[^a-z0-9؀-ۿ]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
-  if (!slug) throw badRequest('slug could not be derived — give the product a latin name or explicit slug');
-  const priceFields = (v: unknown, nameOf: string) =>
-    v === undefined || v === null || v === '' ? null : int(v, nameOf, { min: 0, max: 2_000_000_000 });
-  return {
-    name,
-    slug,
-    status: body.status === undefined ? 'active' : oneOf(body.status, 'status', PRODUCT_STATUS),
-    name_ar: str(body.name_ar, 'name_ar', { max: 200, required: false }),
-    name_ku: str(body.name_ku, 'name_ku', { max: 200, required: false }),
-    description: str(body.description, 'description', { max: 20_000, required: false }),
-    description_ar: str(body.description_ar, 'description_ar', { max: 20_000, required: false }),
-    description_ku: str(body.description_ku, 'description_ku', { max: 20_000, required: false }),
-    selling_type: body.selling_type === undefined ? 'direct_sale' : oneOf(body.selling_type, 'selling_type', SELLING_TYPES),
-    shipping_methods: jsonArray(body.shipping_methods, 'shipping_methods', 20),
-    price_iqd: int(body.price_iqd, 'price_iqd', { min: 0, max: 2_000_000_000 }),
-    original_price_iqd: priceFields(body.original_price_iqd, 'original_price_iqd'),
-    product_cost_iqd: priceFields(body.product_cost_iqd, 'product_cost_iqd'),
-    membership_prices: JSON.stringify(
-      typeof body.membership_prices === 'object' && body.membership_prices !== null ? body.membership_prices : {}
-    ),
-    payment_options: jsonArray(body.payment_options, 'payment_options', 20),
-    // «رابط المنتج في تطبيق جني». Through `safeLink` here as well as in
-    // productModel: this legacy route binds `Object.keys(p)` straight into the
-    // statement, so nothing else stands between an admin's paste and a column
-    // that ends up in an href on a public page.
-    gini_url: safeLink(body.gini_url),
-    subcategory_id: str(body.subcategory_id, 'subcategory_id', { max: 60, required: false }),
-    categories: str(body.categories, 'categories', { max: 500, required: false }),
-    display_order: int(body.display_order, 'display_order', { min: -100_000, max: 100_000, def: 0 }),
-    is_featured: body.is_featured ? 1 : 0,
-    brand: str(body.brand, 'brand', { max: 100, required: false }),
-    labels: jsonArray(body.labels, 'labels', 30),
-    hashtags: jsonArray(body.hashtags, 'hashtags', 30),
-    algorithm_tags: jsonArray(body.algorithm_tags, 'algorithm_tags', 30),
-    features: jsonArray(body.features, 'features', 50),
-    warranty_plans: jsonArray(body.warranty_plans, 'warranty_plans', 10),
-    stock: body.stock === undefined || body.stock === null || body.stock === '' ? null : int(body.stock, 'stock', { min: 0, max: 1_000_000 }),
-  };
-}
 
 adminRoutes.get('/products', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM products ORDER BY created_at DESC').all<Record<string, unknown>>();
@@ -1157,7 +1110,6 @@ adminRoutes.get('/products', async (c) => {
 });
 
 adminRoutes.post('/products', async (c) => {
-  const adminUser = c.get('user')!;
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
   const structuralFields = LEGACY_PRODUCT_STRUCTURE_FIELDS.filter((field) => body[field] !== undefined);
@@ -1170,53 +1122,11 @@ adminRoutes.post('/products', async (c) => {
     );
   }
 
-  // validateProductBody intentionally has no structural fields. A scalar-only
-  // UPDATE therefore retains every stored mirror exactly as it is.
-  const validated = validateProductBody(body);
-  // The validator always emits `product_cost_iqd` (null when absent) and the
-  // UPSERT binds every key it emits — so an assistant admin could set the
-  // cost, or blank it by leaving it out. Without financial scope the key is
-  // not bound at all: an UPDATE keeps the stored cost, an INSERT leaves it
-  // unset for the owner to fill (cost WRITE, owner decision 2).
-  const financial = canWriteCost(c.env, adminUser);
-  const { product_cost_iqd: sentCost, ...scalar } = validated;
-  void sentCost;
-  const p: Omit<typeof validated, 'product_cost_iqd'> = financial ? validated : scalar;
-  const id = typeof body.id === 'string' && body.id ? str(body.id, 'id', { max: 60 }) : newId('prd');
-
-  // EXTENDED WARRANTY IS FOR PRINTERS (owner mandate) — on THIS legacy route
-  // too, with the same guard and the same 400 codes as adminProducts.ts
-  // (WARRANTY_NOT_PRINTER / WARRANTY_PLAN_INVALID). Printer-ness is the
-  // stored catalog placement (this route names no catalogs), so a product
-  // that is not filed under a printer catalog cannot be given plans here,
-  // and a printer's plans must be the +12 / +24 extensions. The document is
-  // built over the stored row so the stored ops_policy (serialized, base)
-  // is what the rules judge.
-  const stored = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  await applyPrinterWarrantyRules(
-    c.env.DB,
-    parseProductRow({ ...(stored ?? {}), ...p, id, slug: p.slug }),
-    undefined
-  );
-
-  const cols = Object.keys(p);
-  const sql = `INSERT INTO products (id, ${cols.join(', ')})
-               VALUES (?, ${cols.map(() => '?').join(', ')})
-               ON CONFLICT(id) DO UPDATE SET ${cols.map((k) => `${k} = excluded.${k}`).join(', ')},
-                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
-  try {
-    await c.env.DB.prepare(sql).bind(id, ...Object.values(p)).run();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('UNIQUE') && msg.includes('slug')) throw badRequest('A product with this slug already exists');
-    throw e;
-  }
-  await audit(c.env.DB, adminUser.id, 'product.save', id, { name: p.name, price_iqd: p.price_iqd, status: p.status });
-  const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  await afterCatalogueWrite(c, [String(row?.slug ?? p.slug ?? '')]); // the guests' listing, home and this product page (P2 review)
-  await afterProductsChanged(c, [id]); // the required-field verdict (owner brief 2026-10-10)
-  const [product] = await legacyAdminProductProjection(c.env.DB, [row!]);
-  return c.json({ success: true, product: projectForAdmin(c.env, adminUser, product) });
+  // THE CLEAN START (DECISIONS row 222; review 2026-10-14): this legacy writer binds `price_iqd`,
+  // `original_price_iqd` and `membership_prices` straight into the row — an old dinar price door that no lock
+  // covers. Every platform product is priced in dollars (section ٣ «الأسعار», /api/admin/products-v2): the door
+  // is closed for every request, before anything is read or written. The answer names the section, never a value.
+  throw new HttpError(409, serverMessage('PRICING_V2_MANAGED'), 'PRICING_V2_MANAGED', { section: 3, v2: true, route: '/api/admin/products-v2' });
 });
 
 adminRoutes.delete('/products/:id', async (c) => {
