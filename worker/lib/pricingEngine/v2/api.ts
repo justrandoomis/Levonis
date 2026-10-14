@@ -9,19 +9,23 @@
  *   - PUT  /api/admin/products-v2/:id/pricing      prices-only apply
  *   - POST /api/admin/products-v2 with `pricing_v2` structure + prices, one batch
  *
- * ROLES (§4.4, C-7), enforced per FIELD from the request alone:
+ * ROLES (§4.4 as amended by the owner's answer Q2, DECISIONS row 222 —
+ * spec addendum A.1), enforced per FIELD from the request alone:
  *   - the OWNER (the verified owner: cost read and write) edits the method, the
  *     dollar price points, the pre-order discounts and the cost inputs and
  *     minimum profit, and reads every private figure (`v2_*`);
  *   - a PRICE EDITOR (every other admin — whoever may edit products today) on
- *     a price-first product edits IQD INTENTS only: final dinar prices the
- *     server stores as dollars with the reproduce helpers at today's U, so the
- *     typed dinars ARE the published dinars and no dollar figure, rate, cost
- *     or floor ever reaches them; on a cost-first product they read the final
- *     prices and may change structure only (the save reprices from cost);
- *   - a dollar or cost field from an editor is refused with 403
- *     COST_ACCESS_DENIED naming the FIELDS (never a value); intents on a
- *     cost-first product are 403 PRICING_V2_OWNER_ONLY {section: 3}.
+ *     a price-first («سعر بالدولار») product reads and writes the same DOLLAR
+ *     price points and discounts the owner does (`V2_STAFF_SEES_USD`), under
+ *     keys outside FINANCIAL_FIELDS (`editor_usd`); never the method, a cost
+ *     input, the minimum profit or anything derived from cost. On a
+ *     cost-first product they read the final dinars and may change structure
+ *     only (the save reprices from cost): a price write there is 403
+ *     PRICING_V2_OWNER_ONLY {section: 3}. A product with no method yet (the
+ *     clean start's «يحتاج تسعيرًا») is priced by an editor as price-first;
+ *   - a cost field (or the method) from an editor is refused with 403
+ *     COST_ACCESS_DENIED naming the FIELDS (never a value); `intents` (the
+ *     superseded dinar intents) is 400 PRICING_INPUT_INVALID for everyone.
  *
  * THE GATES (§4.3), in order: a replayed hash answers `already`; the sequence
  * the client read must still be the stored one (PRICING_CHANGED); a price
@@ -37,14 +41,13 @@
  * are the owner's; nothing here logs a value.
  */
 import type { Context } from 'hono';
-import { addProcurementExact, mulProcurementExact, procurementExact, procurementExactText, type ProcurementExact } from '@levonis/contracts/procurementCost';
+import { procurementExactText, type ProcurementExact } from '@levonis/contracts/procurementCost';
 import { serverMessage } from '@levonis/contracts/costRefusals';
-import { ceilStep } from '@levonis/pricing/costToPrice';
-import { parseV2Usd, V2_MAX_USD, V2_SCOPES, type V2Discount, type V2Method, type V2PricePoint, type V2Scope } from '@levonis/pricing/priceV2';
-import { discountReproducing, usdReproducing } from '@levonis/pricing/priceV2Migration';
+import { parseV2Usd, V2_SCOPES, type V2Discount, type V2Method, type V2PricePoint, type V2Scope } from '@levonis/pricing/priceV2';
 import type { AppContext, Env } from '../../types';
 import { HttpError } from '../../http';
 import { canViewCost, canWriteCost, costRefusal, type CostSubject } from '../../costAccess';
+import { V2_STAFF_SEES_USD } from '../../adminScope';
 import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../../session';
 import { sha256Hex } from '../../crypto';
 import { strictBody } from '../../fx/ownerActs';
@@ -63,6 +66,7 @@ import { sellableSkus } from '../legacy';
 import { evaluateV2Write, type V2Evaluation } from './evaluate';
 import { discountsOf, loadV2Store, pointsOf, type V2Store } from './store';
 import { v2EditorAnswer, v2OwnerAnswer } from './dto';
+import { firstWriteInputs, withFirstWriteInputs } from './firstWrite';
 
 /* ------------------------------------------------------------------ who -- */
 
@@ -149,21 +153,12 @@ export const storedMethodOf = (read: Pick<V2Read, 'stored'>): V2Method | null =>
 
 /* ------------------------------------------------------------- the wire -- */
 
-/** A price editor's final dinar prices (price-first products only, C-7). */
-export interface V2Intents {
-  direct_iqd?: number;
-  preorder_iqd?: number | null;
-  models?: Array<{ id: string; mode: 'follow' | 'fixed' | 'delta'; iqd?: number; preorder_iqd?: number | null }>;
-  colours?: Array<{ id: string; mode: 'follow' | 'delta'; iqd?: number }>;
-}
-
 /** The request's pricing block (§4.2 `V2DraftWire`), its shape checked; ids and values are checked against the product later. */
 export interface V2Wire {
   method?: V2Method;
   points?: V2PricePoint[];
   discounts?: V2Discount[];
   cost?: { inputs?: unknown; minimum_profit?: unknown };
-  intents?: V2Intents;
   /** Which keys the request carried (names only — what a non-owner is refused for). */
   sent: string[];
 }
@@ -225,56 +220,13 @@ function parseDiscounts(raw: unknown): V2Discount[] {
   });
 }
 
-const wholeIqd = (v: unknown, field: string, { min = 1, signed = false }: { min?: number; signed?: boolean } = {}): number => {
-  if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw inputInvalid(field);
-  if (signed ? v === 0 || Math.abs(v) > 100_000_000_000 : v < min || v > 100_000_000_000) throw inputInvalid(field);
-  return v;
-};
-
-function parseIntents(raw: unknown): V2Intents {
-  const r = strictBody(raw, ['direct_iqd', 'preorder_iqd', 'models', 'colours']);
-  const out: V2Intents = {};
-  if (r.direct_iqd !== undefined) out.direct_iqd = wholeIqd(r.direct_iqd, 'intents.direct_iqd');
-  if (r.preorder_iqd !== undefined) out.preorder_iqd = r.preorder_iqd === null ? null : wholeIqd(r.preorder_iqd, 'intents.preorder_iqd');
-  if (r.models !== undefined) {
-    if (!Array.isArray(r.models) || r.models.length > MAX_ROWS) throw inputInvalid('intents.models');
-    const seen = new Set<string>();
-    out.models = r.models.map((entry, i) => {
-      const m = strictBody(entry, ['id', 'mode', 'iqd', 'preorder_iqd']);
-      const field = `intents.models[${i}]`;
-      if (typeof m.id !== 'string' || !m.id || seen.has(m.id)) throw inputInvalid(`${field}.id`);
-      seen.add(m.id);
-      if (m.mode !== 'follow' && m.mode !== 'fixed' && m.mode !== 'delta') throw inputInvalid(`${field}.mode`);
-      const model: NonNullable<V2Intents['models']>[number] = { id: m.id, mode: m.mode };
-      if (m.mode === 'fixed') model.iqd = wholeIqd(m.iqd, `${field}.iqd`);
-      else if (m.mode === 'delta') model.iqd = wholeIqd(m.iqd, `${field}.iqd`, { signed: true });
-      else if (m.iqd !== undefined && m.iqd !== null) throw inputInvalid(`${field}.iqd`);
-      if (m.preorder_iqd !== undefined) model.preorder_iqd = m.preorder_iqd === null ? null : wholeIqd(m.preorder_iqd, `${field}.preorder_iqd`);
-      return model;
-    });
-  }
-  if (r.colours !== undefined) {
-    if (!Array.isArray(r.colours) || r.colours.length > MAX_ROWS) throw inputInvalid('intents.colours');
-    const seen = new Set<string>();
-    out.colours = r.colours.map((entry, i) => {
-      const c = strictBody(entry, ['id', 'mode', 'iqd']);
-      const field = `intents.colours[${i}]`;
-      if (typeof c.id !== 'string' || !c.id || seen.has(c.id)) throw inputInvalid(`${field}.id`);
-      seen.add(c.id);
-      if (c.mode !== 'follow' && c.mode !== 'delta') throw inputInvalid(`${field}.mode`);
-      if (c.mode === 'delta') return { id: c.id, mode: 'delta' as const, iqd: wholeIqd(c.iqd, `${field}.iqd`, { signed: true }) };
-      if (c.iqd !== undefined && c.iqd !== null) throw inputInvalid(`${field}.iqd`);
-      return { id: c.id, mode: 'follow' as const };
-    });
-  }
-  return out;
-}
-
 /** Parse the pricing block's SHAPE (absent block = nothing sent). Values are judged per role in `desiredFor`. */
 export function parseV2Wire(raw: unknown): V2Wire {
   if (raw === undefined || raw === null) return { sent: [] };
   if (!isRecord(raw)) throw inputInvalid('pricing');
-  const r = strictBody(raw, ['method', 'points', 'discounts', 'cost', 'intents']);
+  // The dinar intents of the first V2-3b draft are gone (owner answer Q2): everyone sends dollars.
+  if ('intents' in raw) throw inputInvalid('intents');
+  const r = strictBody(raw, ['method', 'points', 'discounts', 'cost']);
   const sent = Object.keys(r).filter((k) => r[k] !== undefined);
   const out: V2Wire = { sent };
   if (r.method !== undefined) {
@@ -288,7 +240,6 @@ export function parseV2Wire(raw: unknown): V2Wire {
     out.cost = { inputs: cost.inputs, minimum_profit: cost.minimum_profit };
     sent.splice(sent.indexOf('cost'), 1, ...(['inputs', 'minimum_profit'] as const).filter((k) => cost[k] !== undefined).map((k) => `cost.${k}`));
   }
-  if (r.intents !== undefined) out.intents = parseIntents(r.intents);
   return out;
 }
 
@@ -320,124 +271,6 @@ function checkScopes(rows: ReadonlyArray<{ scope: V2Scope; scope_id: string }>, 
   }
 }
 
-const exactUsd = (text: string): ProcurementExact => parseV2Usd(text, { signed: true, zero: true })!;
-const iqdAt = (usd: ProcurementExact, u: string): number => ceilStep(mulProcurementExact(usd, procurementExact(u)));
-const minus = (a: ProcurementExact, b: ProcurementExact): ProcurementExact => addProcurementExact(a, { num: -b.num, den: b.den });
-
-/** A signed dollar difference the 0189 CHECK can hold (|x| ≤ 100,000, never 0), or null for «none». */
-function deltaText(d: ProcurementExact, field: string): string | null {
-  if (d.num === 0n) return null;
-  const magnitude = d.num < 0n ? { num: -d.num, den: d.den } : d;
-  if (magnitude.num > BigInt(V2_MAX_USD) * magnitude.den) throw inputInvalid(field);
-  return usdText(d);
-}
-
-const reproducing = (iqd: number, u: string, field: string): string => {
-  const usd = usdReproducing(iqd, u);
-  const exact = procurementExact(usd);
-  if (exact.num <= 0n || exact.num > BigInt(V2_MAX_USD) * exact.den) throw inputInvalid(field);
-  return usd;
-};
-
-/**
- * C-7: a price editor's dinar intents laid over the stored dollar set. The
- * product's price, a model's own price or difference, a colour's difference
- * and the pre-order prices (the product's discount, a model's exception) are
- * stored in dollars with the reproduce helpers at today's U — so the dinars
- * typed are the dinars published. SKU-level points and discounts (set by the
- * owner or the migration) are never touched by an intent.
- */
-function applyIntents(points: V2PricePoint[], discounts: V2Discount[], intents: V2Intents, u: string, ids: ReturnType<typeof scopeIdsOf>): { points: V2PricePoint[]; discounts: V2Discount[] } {
-  const key = (scope: V2Scope, id: string): string => `${scope}\u0000${id}`;
-  const P = new Map<string, V2PricePoint>(points.map((p) => [key(p.scope, p.scope_id), p]));
-  const D = new Map<string, V2Discount>(discounts.map((d) => [key(d.scope, d.scope_id), d]));
-  if (intents.direct_iqd !== undefined) P.set(key('product', ''), { scope: 'product', scope_id: '', kind: 'fixed', usd: reproducing(intents.direct_iqd, u, 'intents.direct_iqd') });
-  const productPoint = P.get(key('product', ''));
-  const productUsd = productPoint ? exactUsd(productPoint.usd) : null;
-  const needProduct = (field: string): ProcurementExact => {
-    if (!productUsd) throw refusal(409, 'PRICING_V2_PRICE_MISSING', { field });
-    return productUsd;
-  };
-  const discountAt = (directUsd: ProcurementExact, preorderIqd: number): string => discountReproducing(usdText(directUsd), preorderIqd, u);
-  if (intents.preorder_iqd !== undefined) {
-    if (intents.preorder_iqd === null) D.delete(key('product', ''));
-    else {
-      const delta = discountAt(needProduct('intents.preorder_iqd'), intents.preorder_iqd);
-      if (procurementExact(delta).num === 0n) D.delete(key('product', ''));
-      else D.set(key('product', ''), { scope: 'product', scope_id: '', usd: delta });
-    }
-  }
-  for (const [i, m] of (intents.models ?? []).entries()) {
-    const field = `intents.models[${i}]`;
-    if (!ids.option.has(m.id)) throw refusal(400, 'PRICING_V2_SCOPE_INVALID', { section: 5, scope: 'option', id: m.id });
-    const k = key('option', m.id);
-    if (m.mode === 'follow') P.delete(k);
-    else if (m.mode === 'fixed') P.set(k, { scope: 'option', scope_id: m.id, kind: 'fixed', usd: reproducing(m.iqd!, u, `${field}.iqd`) });
-    else {
-      const base = needProduct(`${field}.iqd`);
-      const target = iqdAt(base, u) + m.iqd!;
-      if (target < 1) throw inputInvalid(`${field}.iqd`);
-      const d = deltaText(minus(procurementExact(usdReproducing(target, u)), base), `${field}.iqd`);
-      if (d === null) P.delete(k);
-      else P.set(k, { scope: 'option', scope_id: m.id, kind: 'delta', usd: d });
-    }
-    if (m.preorder_iqd !== undefined) {
-      const dk = key('option', m.id);
-      if (m.preorder_iqd === null) D.delete(dk);
-      else {
-        const own = P.get(k);
-        const direct = own?.kind === 'fixed' ? exactUsd(own.usd) : own ? addProcurementExact(needProduct(`${field}.preorder_iqd`), exactUsd(own.usd)) : needProduct(`${field}.preorder_iqd`);
-        D.set(dk, { scope: 'option', scope_id: m.id, usd: discountAt(direct, m.preorder_iqd) });
-      }
-    }
-  }
-  for (const [i, c] of (intents.colours ?? []).entries()) {
-    const field = `intents.colours[${i}]`;
-    if (!ids.color.has(c.id)) throw refusal(400, 'PRICING_V2_SCOPE_INVALID', { section: 5, scope: 'color', id: c.id });
-    const k = key('color', c.id);
-    if (c.mode === 'follow') {
-      P.delete(k);
-      continue;
-    }
-    const base = needProduct(`${field}.iqd`);
-    const target = iqdAt(base, u) + c.iqd!;
-    if (target < 1) throw inputInvalid(`${field}.iqd`);
-    const d = deltaText(minus(procurementExact(usdReproducing(target, u)), base), `${field}.iqd`);
-    if (d === null) P.delete(k);
-    else P.set(k, { scope: 'color', scope_id: c.id, kind: 'delta', usd: d });
-  }
-  return { points: [...P.values()], discounts: [...D.values()] };
-}
-
-/** The current intents of a price-first product, in dinars — the final prices themselves (C-7: never a dollar). */
-export function intentsOf(points: readonly V2PricePoint[], discounts: readonly V2Discount[], u: string | null): V2Intents | null {
-  if (!u) return null;
-  const product = points.find((p) => p.scope === 'product' && p.kind === 'fixed');
-  const productUsd = product ? exactUsd(product.usd) : null;
-  const productIqd = productUsd ? iqdAt(productUsd, u) : null;
-  const preorderOf = (direct: ProcurementExact, d: V2Discount | undefined) => (d ? iqdAt(minus(direct, exactUsd(d.usd)), u) : null);
-  const out: V2Intents = {};
-  if (productUsd && productIqd !== null) {
-    out.direct_iqd = productIqd;
-    out.preorder_iqd = preorderOf(productUsd, discounts.find((d) => d.scope === 'product'));
-  }
-  const models = new Set([...points.filter((p) => p.scope === 'option').map((p) => p.scope_id), ...discounts.filter((d) => d.scope === 'option').map((d) => d.scope_id)]);
-  out.models = [...models].sort().map((id) => {
-    const p = points.find((x) => x.scope === 'option' && x.scope_id === id);
-    const d = discounts.find((x) => x.scope === 'option' && x.scope_id === id);
-    const direct = p?.kind === 'fixed' ? exactUsd(p.usd) : p && productUsd ? addProcurementExact(productUsd, exactUsd(p.usd)) : productUsd;
-    const entry: NonNullable<V2Intents['models']>[number] = { id, mode: p ? p.kind : 'follow' };
-    if (p?.kind === 'fixed') entry.iqd = iqdAt(exactUsd(p.usd), u);
-    else if (p && productIqd !== null && direct) entry.iqd = iqdAt(direct, u) - productIqd;
-    if (d && direct) entry.preorder_iqd = preorderOf(direct, d);
-    return entry;
-  });
-  out.colours = points
-    .filter((p) => p.scope === 'color')
-    .map((p) => ({ id: p.scope_id, mode: 'delta' as const, ...(productUsd && productIqd !== null ? { iqd: iqdAt(addProcurementExact(productUsd, exactUsd(p.usd)), u) - productIqd } : {}) }));
-  return out;
-}
-
 /** `cost.minimum_profit`: a dollar text (the product's), null (inherit), or rule rows — the minimum profit only (C-4). */
 function minimumProfitRules(raw: unknown): unknown[] {
   if (raw === null || typeof raw === 'string') return [{ kind: 'target_profit', scope: 'product', amount_usd: raw }];
@@ -460,27 +293,37 @@ export interface DesiredOptions {
 /**
  * The desired V2 set for one evaluation: the store with the request laid over
  * it, per role (see the file header). Refusals name fields, never values.
+ *
+ * A product with NO method yet (the clean start's «يحتاج تسعيرًا», addendum
+ * A.7) has never had a V2 write: nothing stored seeds its dollar set, its
+ * desired set is exactly what the request sends, and its 0186 purchase
+ * overlay is folded into its ordinary cost inputs (`firstWriteInputs`).
  */
 export function desiredFor(read: V2Read, wire: V2Wire, o: DesiredOptions): V2Desired {
   const stored = storedMethodOf(read);
   const ids = scopeIdsOf(read.loaded);
   // A stored row whose model, colour or SKU the (draft) product no longer has is dropped with it.
   const live = (r: { scope: V2Scope; scope_id: string }) => r.scope === 'product' || ids[r.scope].has(r.scope_id);
-  const storedPoints = pointsOf(read.v2?.points ?? []).filter(live);
-  const storedDiscounts = discountsOf(read.v2?.discounts ?? []).filter(live);
+  const storedPoints = stored ? pointsOf(read.v2?.points ?? []).filter(live) : [];
+  const storedDiscounts = stored ? discountsOf(read.v2?.discounts ?? []).filter(live) : [];
+  const fold = stored ? [] : firstWriteInputs(read.stored);
   if (o.viewer === 'editor') {
-    // Every dollar, rate and cost field is the owner's: refused by NAME, decided from the request alone.
+    // Owner answer Q2: an editor prices in dollars — the points and the discounts — and never touches
+    // the method or a cost field (refused by NAME, decided from the request alone). A product with no
+    // method yet is priced by an editor as price-first.
     const method = stored ?? 'usd';
-    const fields = wire.sent.filter((k) => k !== 'intents' && !(k === 'method' && wire.method === method));
+    const dollars = (k: string) => V2_STAFF_SEES_USD && (k === 'points' || k === 'discounts');
+    const fields = wire.sent.filter((k) => !dollars(k) && !(k === 'method' && wire.method === method));
     if (fields.length) throw costRefusal(o.env, o.user, { fields });
-    if (!wire.intents) return { method, points: storedPoints, discounts: storedDiscounts, inputWrites: [], ruleWrites: [] };
-    if (method === 'cost') throw refusal(403, 'PRICING_V2_OWNER_ONLY');
-    const u = read.rates?.usd_iqd ?? null;
-    if (!u) throw refusal(409, 'PRICING_FX_RATE_MISSING');
-    const next = applyIntents(storedPoints, storedDiscounts, wire.intents, u, ids);
-    return { method, points: next.points, discounts: next.discounts, inputWrites: [], ruleWrites: [] };
+    const money = wire.points !== undefined || wire.discounts !== undefined;
+    // From cost, D is derived from R + T: a difference or a discount moved by an editor would be a cost oracle.
+    if (money && method === 'cost') throw refusal(403, 'PRICING_V2_OWNER_ONLY');
+    const points = wire.points ?? storedPoints;
+    const discounts = wire.discounts ?? storedDiscounts;
+    if (wire.points) checkScopes(points, ids);
+    if (wire.discounts) checkScopes(discounts, ids);
+    return { method, points, discounts, inputWrites: fold, ruleWrites: [] };
   }
-  if (wire.intents) throw inputInvalid('intents');
   const method = wire.method ?? stored;
   if (!method) throw inputInvalid('method');
   const points = wire.points ?? storedPoints;
@@ -497,7 +340,18 @@ export function desiredFor(read: V2Read, wire: V2Wire, o: DesiredOptions): V2Des
     ({ inputWrites, ruleWrites } = effectiveWrites({ inputs: draft.inputs, rules: ruleDraft, iqd: draft.iqd }));
     ruleWrites = withRuleIds(ruleWrites);
   }
-  return { method, points, discounts, inputWrites, ruleWrites };
+  return { method, points, discounts, inputWrites: withFirstWriteInputs(fold, inputWrites), ruleWrites };
+}
+
+/**
+ * The method a product with none yet is shown in (addendum A.7): from cost
+ * when the owner's stored inputs price every sellable SKU from cost, else the
+ * dollar price; an editor always the dollar price (Q2, Q9).
+ */
+export async function defaultMethodOf(read: V2Read, viewer: V2Viewer, o: DesiredOptions): Promise<V2Method> {
+  if (viewer !== 'owner') return 'usd';
+  const fromCost = await evaluateDesired(read, desiredFor(read, { method: 'cost', sent: ['method'] }, o));
+  return fromCost.complete ? 'cost' : 'usd';
 }
 
 /* ------------------------------------------------------------- evaluate -- */
@@ -574,34 +428,58 @@ export interface AnswerInput {
   ev: V2Evaluation;
   /** The product does not exist yet (add-product). */
   draft?: boolean;
+  /** A product with no method yet: the method it is shown in (`defaultMethodOf`). */
+  defaultMethod?: V2Method;
 }
 
 /**
  * The §4.2 answer, projected per role from EXPLICIT allow-lists (dto.ts): the
  * owner reads every private figure (`v2_*`); a price editor reads final dinars,
- * codes and names — plus, on a price-first product, its intents in dinars.
+ * codes and names — plus, on a price-first product, the dollar set it may edit
+ * (`editor_usd`, owner answer Q2; the owner's answer carries the same block,
+ * so the form has one path).
+ *
+ * `needs_pricing` (the clean start, addendum A.4/A.7): the product is not
+ * V2-published — no method, or a method and no complete write yet — so no
+ * customer sees it.
  */
 export function v2Answer(i: AnswerInput): Record<string, unknown> {
   const { ev, read, viewer } = i;
   const method = ev.method;
   const priceFirst = method === 'usd';
+  const storedMethod = storedMethodOf(read);
+  const dollars = viewer === 'owner' || V2_STAFF_SEES_USD;
   const base = viewer === 'owner' ? v2OwnerAnswer(ev) : v2EditorAnswer(ev);
   const table = (base.table as Array<Record<string, unknown>>).map((row, n) => {
     const r = ev.rows[n]!;
     const from = viewer === 'owner' || priceFirst ? discountFromOf(ev, r) : undefined;
-    return { ...row, source: sourceOf(ev, r), ...(from ? { discount_from: from } : {}) };
+    return {
+      ...row,
+      source: sourceOf(ev, r),
+      ...(from ? { discount_from: from } : {}),
+      ...(priceFirst && dollars && r.usd_exact !== null ? { editor_usd_price: r.usd_exact } : {}),
+    };
   });
+  const published = !!storedMethod && (read.v2?.results.length ?? 0) > 0;
   const answer: Record<string, unknown> = {
     ...base,
     product_id: i.draft ? null : ev.product_id,
-    v2: true,
+    v2: !!storedMethod || i.draft === true,
+    needs_pricing: !published,
     method,
+    ...(storedMethod || i.draft ? {} : { default_method: i.defaultMethod ?? method }),
     seq: { inputs_seq: read.stored.state?.inputs_seq ?? 0, write_seq: read.stored.state?.write_seq ?? 0 },
     status: statusOf(ev, read.rates),
-    can_edit: { money: viewer === 'owner' || priceFirst, cost: viewer === 'owner', structure: true },
+    can_edit: { money: viewer === 'owner' || (priceFirst && dollars), cost: viewer === 'owner', method: viewer === 'owner', structure: true },
     table,
     publishable: ev.complete,
   };
+  if (priceFirst && dollars) {
+    answer.editor_usd = {
+      points: ev.points.map((p) => ({ scope: p.scope, id: p.scope_id, kind: p.kind, usd: p.usd })),
+      discounts: ev.discounts.map((d) => ({ scope: d.scope, id: d.scope_id, usd: d.usd })),
+    };
+  }
   if (viewer === 'owner') {
     answer.v2_cost_inputs = {
       inputs: ev.inputs
@@ -611,24 +489,27 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
         .filter((r) => r.product_id === ev.product_id && r.kind === 'target_profit')
         .map((r) => ({ scope: r.scope, scope_id: r.scope_id, state: r.state, amount_usd: r.amount_usd ?? null })),
     };
-  } else if (priceFirst) {
-    answer.intents = intentsOf(ev.points, ev.discounts, read.rates?.usd_iqd ?? null);
   }
   return answer;
 }
 
-/** The answer for a product that is not V2 yet (unmigrated): a flag, never a figure. */
-export function notMigratedAnswer(read: V2Read, viewer: V2Viewer): Record<string, unknown> {
+/**
+ * A database before 0189 (a deploy ahead of its migration): nothing can be
+ * priced in V2 there, so the answer is the flag alone — never a figure.
+ */
+export function uninstalledAnswer(read: V2Read, viewer: V2Viewer): Record<string, unknown> {
   return {
     product_id: read.loaded.id,
     v2: false,
-    not_migrated: true,
-    method: null,
+    needs_pricing: true,
+    method: 'usd',
+    default_method: 'usd',
     seq: { inputs_seq: read.stored.state?.inputs_seq ?? 0, write_seq: read.stored.state?.write_seq ?? 0 },
-    status: { kind: 'current' },
-    can_edit: { money: false, cost: viewer === 'owner', structure: true },
+    status: { kind: 'missing', first: null },
+    can_edit: { money: false, cost: viewer === 'owner', method: false, structure: true },
+    codes: ['PRICING_NOT_INSTALLED'],
     table: [],
-    missing: [],
+    missing: [{ code: 'PRICING_NOT_INSTALLED', field: null, level: null, count: 0, first_name: null }],
     publishable: false,
   };
 }

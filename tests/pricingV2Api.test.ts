@@ -20,8 +20,11 @@
  *   - publishing an incomplete product is PRICING_V2_PRICE_MISSING; a draft
  *     saves its data, born V2 and unsellable;
  *   - every refusal names its section;
- *   - on a database before 0189 (a deploy ahead of it) the V2 reads answer as
- *     for an unmigrated product and every V2 write is PRICING_NOT_INSTALLED.
+ *   - a needs-pricing product (the clean start: no method) answers its prefill
+ *     with no old price beside it; its first write needs the sheet, publishes
+ *     and retires its Direct Sale Extra; without a block it saves as today;
+ *   - on a database before 0189 (a deploy ahead of it) the V2 reads answer the
+ *     needs-pricing flag alone and every V2 write is PRICING_NOT_INSTALLED.
  *
  * Run: REQUIRE_DIST=1 node --import tsx --test tests/pricingV2Api.test.ts
  */
@@ -300,28 +303,72 @@ test('a new model and a route switched on, on a V2 product: structure and prices
   assert.equal((await cartGrid(w.db, AMS))[`o:${NEW}@direct_sale`]!.prepaid, 1_600_000);
 });
 
-test('an unmigrated product: the V2 doors refuse with PRICING_V2_NOT_MIGRATED and the section; the old save is untouched', async () => {
+test('a needs-pricing product (the clean start, no method): its prefill, never an old price; its first write publishes and retires the old rows', async () => {
   const w = pricingWorld();
   const app = v2App(w.raw);
+  // The product read carries the flag (never a figure).
+  const flag0 = (await json(await get(app, `/api/admin/products-v2/${AMS}`))).pricing_v2;
+  assert.deepEqual(flag0, { v2: false, method: null, needs_pricing: true });
   const read = await answer(await get(app, `/api/admin/products-v2/${AMS}/pricing`));
-  assert.equal(read.status, 200);
-  assert.deepEqual([read.body.v2, read.body.not_migrated, read.body.table], [false, true, []]);
-  const doors = [
-    await answer(await post(app, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing: {} })),
-    await answer(await put(app, `/api/admin/products-v2/${AMS}/pricing`, { seq: { inputs_seq: 0, write_seq: 0 }, pricing: {} })),
-  ];
-  for (const r of doors) {
-    assert.equal(r.status, 409);
-    assert.equal(r.body.code, 'PRICING_V2_NOT_MIGRATED');
-    assert.equal(r.body.details.section, 3);
-  }
+  assert.equal(read.status, 200, JSON.stringify(read.body).slice(0, 300));
+  assert.deepEqual([read.body.v2, read.body.needs_pricing, read.body.not_migrated], [false, true, undefined]);
+  assert.ok(read.body.default_method === 'cost' || read.body.default_method === 'usd');
+  assert.equal(read.body.method, read.body.default_method, 'shown in the method it starts from');
+  assert.ok(read.body.table.length > 0, 'the table the prefill would publish');
+  assert.ok(read.body.table.every((r: { old_iqd: unknown }) => r.old_iqd === null), 'no old dinar price beside a first V2 price');
+  // A product with no method yet: the request names it (an owner's preview without one is refused by field).
+  const noMethod = await answer(await post(app, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing: {} }));
+  assert.equal(noMethod.status, 400);
+  assert.equal(noMethod.body.details.field, 'method');
+  const pricing = { method: 'usd', points: [point('1000')], discounts: [{ scope: 'product', id: '', usd: '50' }] };
+  const pre = await answer(await post(app, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing }));
+  assert.equal(pre.status, 200, JSON.stringify(pre.body).slice(0, 300));
+  assert.equal(pre.body.publishable, true);
+  assert.ok(pre.body.changes.length > 0 && pre.body.changes.every((ch: { old_iqd: unknown; large: boolean }) => ch.old_iqd === null && !ch.large), 'every row is new: no 15% gate against an old price');
+  assert.deepEqual(pre.body.editor_usd.points, [point('1000')], 'the owner reads the same dollar block every price editor does');
+  // The old purchase overlay and Direct Sale Extra rows of the product, seeded to prove the first write retires them.
+  w.raw.exec(`INSERT INTO pricing_rules (id, kind, scope, scope_id, product_id, state, amount_iqd, source, version, updated_at)
+              VALUES ('rule_dse_ams', 'direct_sale_extra', 'product', '', '${AMS}', 'ACTIVE', 5000, 'OWNER', 1, '2026-10-01T00:00:00.000Z')`);
   const doc = (await json(await get(app, `/api/admin/products-v2/${AMS}`))).product;
-  const migrate = await answer(await post(app, '/api/admin/products-v2', { ...doc, pricing_v2: { pricing: { method: 'usd', points: [point('1000')] } } }));
-  assert.equal(migrate.status, 409);
-  assert.equal(migrate.body.code, 'PRICING_V2_NOT_MIGRATED');
+  // Without the preview's hash the first write shows the sheet (409 with the preview), never a silent price.
+  const bare = await answer(await post(app, '/api/admin/products-v2', { ...doc, pricing_v2: { pricing } }));
+  assert.equal(bare.status, 409, JSON.stringify(bare.body).slice(0, 300));
+  assert.equal(bare.body.code, 'PRICING_PREVIEW_REQUIRED');
+  assert.equal(bare.body.details.section, 3);
+  const pre2 = await answer(await post(app, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing }));
+  const first = await answer(await post(app, '/api/admin/products-v2', { ...doc, pricing_v2: { pricing, preview_hash: pre2.body.review_hash } }));
+  assert.equal(first.status, 200, JSON.stringify(first.body).slice(0, 500));
+  assert.equal(first.body.pricing_v2.priced, true);
+  assert.equal(row<{ m: string | null }>(w.raw, 'SELECT pricing_method AS m FROM product_pricing_state WHERE product_id = ?', AMS)?.m, 'usd');
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM pricing_rules WHERE product_id = '${AMS}' AND kind = 'direct_sale_extra'`), 0, 'the Direct Sale Extra is retired with the first write');
+  assert.ok(count(w.raw, `SELECT COUNT(*) AS n FROM pricing_v2_sku_results WHERE product_id = '${AMS}'`) > 0);
+  const grid = await cartGrid(w.db, AMS);
+  assert.equal(grid[`o:${MODEL}@direct_sale`]!.prepaid, 1_600_000);
+  assert.deepEqual((await json(await get(app, `/api/admin/products-v2/${AMS}`))).pricing_v2, { v2: true, method: 'usd', needs_pricing: false });
+  const after = await answer(await get(app, `/api/admin/products-v2/${AMS}/pricing`));
+  assert.deepEqual([after.body.v2, after.body.needs_pricing, after.body.default_method], [true, false, undefined]);
+});
+
+test('a needs-pricing product saved without a pricing block keeps today’s save; a draft first write stores its data and stays unpublished', async () => {
+  const w = pricingWorld();
+  const app = v2App(w.raw);
+  const doc = (await json(await get(app, `/api/admin/products-v2/${AMS}`))).product;
   const plain = await answer(await post(app, '/api/admin/products-v2', doc));
-  assert.equal(plain.status, 200, 'an unmigrated product saves exactly as today');
+  assert.equal(plain.status, 200, 'a save with no pricing block is the save of today');
   assert.equal(row<{ m: string | null }>(w.raw, 'SELECT pricing_method AS m FROM product_pricing_state WHERE product_id = ?', AMS)?.m ?? null, null);
+  // Incomplete (no dollar price yet) and kept a draft: the data is saved, nothing is priced, nothing is published.
+  const doc2 = (await json(await get(app, `/api/admin/products-v2/${AMS}`))).product;
+  const data = await answer(await post(app, '/api/admin/products-v2', { ...doc2, status: 'draft', pricing_v2: { pricing: { method: 'usd' } } }));
+  assert.equal(data.status, 200, JSON.stringify(data.body).slice(0, 300));
+  assert.equal(data.body.pricing_v2.priced, false);
+  assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM pricing_v2_sku_results WHERE product_id = '${AMS}'`), 0);
+  assert.deepEqual((await json(await get(app, `/api/admin/products-v2/${AMS}`))).pricing_v2, { v2: true, method: 'usd', needs_pricing: true });
+  // Publishing it incomplete: PRICING_V2_PRICE_MISSING, naming section 3.
+  const doc3 = (await json(await get(app, `/api/admin/products-v2/${AMS}`))).product;
+  const publish = await answer(await post(app, '/api/admin/products-v2', { ...doc3, status: 'active', pricing_v2: { pricing: {} } }));
+  assert.equal(publish.status, 409, JSON.stringify(publish.body).slice(0, 300));
+  assert.equal(publish.body.code, 'PRICING_V2_PRICE_MISSING');
+  assert.equal(publish.body.details.section, 3);
   void asD1;
 });
 
@@ -341,7 +388,7 @@ test('every refusal names its section; a scope that is not the product\'s names 
   assert.equal(fee.body.details.section, 3);
 });
 
-test('a database before 0189 (deploy ahead): the V2 reads answer as for an unmigrated product; every V2 write is PRICING_NOT_INSTALLED and writes nothing', async () => {
+test('a database before 0189 (deploy ahead): the V2 reads answer the needs-pricing flag alone; every V2 write is PRICING_NOT_INSTALLED and writes nothing', async () => {
   for (const through of ['0176', '0188']) {
     const raw = dbThrough(through);
     raw.exec(OWNER_ROW_SQL);
@@ -350,17 +397,16 @@ test('a database before 0189 (deploy ahead): the V2 reads answer as for an unmig
     const pid = legacyProductId('bambu-lab-a1');
     const read = await answer(await get(app, `/api/admin/products-v2/${pid}/pricing`));
     assert.equal(read.status, 200, `${through}: ${JSON.stringify(read.body).slice(0, 300)}`);
-    assert.equal(read.body.not_migrated, true);
-    const list = await answer(await get(app, '/api/admin/pricing/v2/migration'));
-    assert.equal(list.status, 200, `${through}: ${JSON.stringify(list.body).slice(0, 300)}`);
-    assert.ok(list.body.items.length > 0 && list.body.items.every((i: { available: boolean }) => !i.available), `${through}: no rates, nothing to commit`);
-    assert.equal((await answer(await get(app, `/api/admin/pricing/v2/migration/${pid}`))).status, 200);
-    const commit = await answer(await post(app, `/api/admin/pricing/v2/migration/${pid}/commit`, { option: 'keep_usd', preview_hash: 'a'.repeat(64) }));
-    assert.equal(commit.status, 503, `${through}: ${JSON.stringify(commit.body).slice(0, 300)}`);
-    assert.equal(commit.body.code, 'PRICING_NOT_INSTALLED');
-    assert.equal(commit.body.details.section, 3);
-    const bulk = await answer(await post(app, '/api/admin/pricing/v2/migration/commit-unchanged', { items: [{ product_id: pid, preview_hash: 'a'.repeat(64) }] }));
-    assert.equal(bulk.body.code, 'PRICING_NOT_INSTALLED');
+    assert.deepEqual([read.body.needs_pricing, read.body.publishable, read.body.table], [true, false, []]);
+    // A product's first V2 write needs 0189: refused before anything is read or written.
+    const first = await answer(await put(app, `/api/admin/products-v2/${pid}/pricing`, { seq: { inputs_seq: 0, write_seq: 0 }, pricing: { method: 'usd', points: [point('1000')] } }));
+    assert.equal(first.status, 503, `${through}: ${JSON.stringify(first.body).slice(0, 300)}`);
+    assert.equal(first.body.code, 'PRICING_NOT_INSTALLED');
+    assert.equal(first.body.details.section, 3);
+    const doc = (await json(await get(app, `/api/admin/products-v2/${pid}`))).product;
+    const save = await answer(await post(app, '/api/admin/products-v2', { ...doc, pricing_v2: { pricing: { method: 'usd', points: [point('1000')] } } }));
+    assert.equal(save.status, 503, `${through}: ${JSON.stringify(save.body).slice(0, 300)}`);
+    assert.equal(save.body.code, 'PRICING_NOT_INSTALLED');
     const structure = newProductBody('np');
     const born = await answer(await post(app, '/api/admin/products-v2', { ...structure.doc, relations: structure.relations, pricing_v2: { pricing: NEW_PRICING, preview_hash: 'a'.repeat(64) } }));
     assert.equal(born.status, 503, `${through}: ${JSON.stringify(born.body).slice(0, 300)}`);

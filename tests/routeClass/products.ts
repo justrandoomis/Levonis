@@ -82,7 +82,7 @@ export default {
         },
         'PUT /:id/pricing': {
           cls: 'op',
-          noBody: 'refused before the body is read for the seeded product: it is not V2 yet (409 PRICING_V2_NOT_MIGRATED)',
+          noBody: 'a prices-only apply: without its body it is refused (400) and writes nothing; the seeded product needs pricing (its first V2 write comes through here or the save)',
         },
       },
     },

@@ -103,11 +103,6 @@ function calls(ids: readonly string[]): Array<{ method: 'GET' | 'POST'; path: st
   out.push({ method: 'POST', path: '/api/admin/pricing/products/lp_04/what-if', body: { supplier_cost: '640', currency: 'EUR', option_id: 'lp_04_o1' } });
   out.push({ method: 'POST', path: '/api/admin/pricing/products/zz-no-such-id/what-if', body: { supplier_cost: '10', currency: 'EUR' } });
   out.push({ method: 'POST', path: '/api/admin/pricing/products/bdl_1/what-if', body: { supplier_cost: '10', currency: 'EUR' } });
-  // Pricing V2-5 (spec §6.1): «نقل الأسعار إلى الدولار» — the list, the proposals and the preview write nothing.
-  for (const filter of ['all', 'unchanged', 'flagged']) out.push({ method: 'GET', path: `/api/admin/pricing/v2/migration?filter=${filter}` });
-  for (const id of [ids[0]!, ids[6]!, ids[33]!, 'p_a1', 'bdl_1', 'zz-no-such-id']) out.push({ method: 'GET', path: `/api/admin/pricing/v2/migration/${id}` });
-  for (const option of ['keep_usd', 'keep_cost', 'from_cost', 'nope'])
-    out.push({ method: 'POST', path: `/api/admin/pricing/v2/migration/${ids[6]!}/preview`, body: { option } });
   return out;
 }
 

@@ -7,7 +7,7 @@
  *      config_version as read, the owner-input token, the state row when absent;
  *   2. fences: the control row not paused, the PRICE IMAGE equal to the one the
  *      preview hashed, the central rates by VALUE (`RATES_FENCE_SQL`), the
- *      state's method as read (NULL on a create or a migration) and — the
+ *      state's method as read (NULL on a product's first V2 write) and — the
  *      product-save variant — `products.updated_at` (the stale-edit check);
  *   3. tokens: `engine-price:<id>`, and `pricing-mode:<id>` on the first V2
  *      write or a method change (0189's method triggers, 0181's mode trigger);
@@ -46,7 +46,7 @@ import { discountStatements, discountWrites, pointStatements, pointWrites, V2_RE
 
 /** A product save with V2 prices (structure + prices in one batch): D1's per-invocation budget is the hard limit (risk R-4). */
 export const V2_SAVE_STATEMENT_CAP = 600;
-/** A prices-only V2 write (PUT …/pricing, the migration's per-product commit): the engine's own cap (spec §3.3). */
+/** A prices-only V2 write (PUT …/pricing): the engine's own cap (spec §3.3). */
 export const V2_PRICING_STATEMENT_CAP = 200;
 
 const imageBinds = (pid: string) => [pid, pid, pid, pid, pid, pid];
@@ -56,7 +56,7 @@ export interface V2WriteOptions {
   /** The audit_log actor when it differs from `actor` (null: the system, for the cron). */
   auditActor?: string | null;
   now: string;
-  /** product_form | migration | fx_auto | … — the audit's source. */
+  /** product_form | product_pricing | fx_auto | … — the audit's source. */
   source: string;
   idempotencyKey: string;
   /** FX-5: an automatic repricing (labels only; never drafts, never a create). */
@@ -76,13 +76,12 @@ export interface V2WriteOptions {
    */
   newProduct?: boolean;
   /**
-   * V2-5 (spec §6.3): the migration's own statements — the legacy snapshot,
-   * the folded purchase overlay, the retired Direct Sale Extra rows — laid
-   * after the owner's data and before the price rows.
+   * The clean start (spec addendum A.7): a product's FIRST complete V2 write
+   * retires its Direct Sale Extra rules and its purchase overlay
+   * (`firstWriteStatements`), laid after the owner's data and before the price
+   * rows.
    */
-  migration?: readonly D1PreparedStatement[];
-  /** V2-5: the write is the owner's migration commit (pricing_audit `migration`/`migrate_commit`, audit_log `pricing.v2.migrated`). */
-  migrationCommit?: boolean;
+  firstWrite?: readonly D1PreparedStatement[];
 }
 
 /** The private result row of one planned SKU × channel (each 0189 pair written whole). */
@@ -209,7 +208,7 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
     ...pointStatements(db, pid, points, o.actor, o.now),
     ...discountStatements(db, pid, discounts, o.actor, o.now),
     ...(overlay ? [directPurchaseStatement(db, ev.stored, overlay, o.actor, o.now)] : []),
-    ...(o.migration ?? []),
+    ...(o.firstWrite ?? []),
     // 6. The price rows.
     ...(writePrices ? priceRowStatements(db, pid, plan, o.now) : []),
     // 7. The history: the V2 price and the U it was computed at.
@@ -255,10 +254,10 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
     ...(o.extraAudits ?? []),
     pricingAuditStatement(db, {
       id: auditId,
-      entity: o.migrationCommit ? 'migration' : 'sku_price',
+      entity: 'sku_price',
       entity_key: pid,
       product_id: pid,
-      action: o.migrationCommit ? 'migrate_commit' : auto ? 'reprice_auto' : create ? 'engine_entry' : 'reprice_owner',
+      action: auto ? 'reprice_auto' : create ? 'engine_entry' : 'reprice_owner',
       before: ev.rows.map((r) => ({ combo_key: r.combo_key, channel: r.channel, price_iqd: r.old_iqd })),
       after: plan.prices.map((p) => ({ combo_key: p.combo_key, channel: p.channel, price_iqd: p.price.computed_price_iqd, usd_ceil6: p.price.v2.usd_ceil6, usd_iqd_rate: u })),
       summary: {
@@ -279,7 +278,7 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
       now: o.now,
     }),
     ...(
-      await auditStatements(db, auditActor, o.migrationCommit ? 'pricing.v2.migrated' : auto ? 'pricing.engine.repriced_auto' : create ? 'pricing.v2.created' : 'pricing.v2.repriced', pid, {
+      await auditStatements(db, auditActor, auto ? 'pricing.engine.repriced_auto' : create ? 'pricing.v2.created' : 'pricing.v2.repriced', pid, {
         product_id: pid,
         v2: true,
         rows_changed: history.length,

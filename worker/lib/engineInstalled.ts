@@ -179,6 +179,30 @@ export async function productEngineV2(db: D1Database, productId: string): Promis
 }
 
 /**
+ * The product form's pricing flag (spec §5.1 as amended by addendum A.7): is
+ * the product V2 (a method), which method, and does it still NEED PRICING —
+ * no complete V2 write yet, so no customer sees it (the clean start's
+ * predicate, A.4). A flag, never a figure: every admin may know it. A
+ * database without 0189 has no V2 product: every product needs pricing.
+ */
+export async function productV2Flag(db: D1Database, productId: string): Promise<{ v2: boolean; method: 'cost' | 'usd' | null; needs_pricing: boolean }> {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT s.pricing_method AS method,
+                EXISTS (SELECT 1 FROM pricing_v2_sku_results r WHERE r.product_id = s.product_id) AS priced
+           FROM product_pricing_state s WHERE s.product_id = ? AND s.mode = 'engine' AND s.pricing_method IS NOT NULL`
+      )
+      .bind(productId)
+      .first<{ method: string; priced: number }>();
+    const method = row?.method === 'cost' || row?.method === 'usd' ? row.method : null;
+    return { v2: method !== null, method, needs_pricing: !(method !== null && Number(row?.priced) === 1) };
+  } catch {
+    return { v2: false, method: null, needs_pricing: true };
+  }
+}
+
+/**
  * Does the engine price this product's DIRECT SALE only? A stock purchase
  * applied to a manual product adopts it that way (pricing_direct_purchase
  * .direct_only); its model, colour, route and pre-order prices stay the

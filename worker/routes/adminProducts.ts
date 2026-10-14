@@ -53,7 +53,7 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { pricingV2Installed, productEngineDirectOnly, productEngineManaged, productEngineV2, refuseEngineManaged } from '../lib/engineInstalled';
+import { pricingV2Installed, productEngineDirectOnly, productEngineManaged, productEngineV2, productV2Flag, refuseEngineManaged } from '../lib/engineInstalled';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { limitRoute } from '../lib/ratelimit';
@@ -65,8 +65,8 @@ import {
   desiredFor,
   evaluateDesired,
   gateV2,
+  defaultMethodOf,
   loadV2Read,
-  notMigratedAnswer,
   parseV2Wire,
   storedMethodOf,
   v2Answer,
@@ -74,8 +74,10 @@ import {
   v2Body,
   v2PriceKey,
   v2ViewerOf,
+  uninstalledAnswer,
   type V2Read,
 } from '../lib/pricingEngine/v2/api';
+import { firstWriteStatements } from '../lib/pricingEngine/v2/firstWrite';
 import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
 import { inputInvalid } from '../lib/pricingEngine/whatIf';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
@@ -1277,13 +1279,24 @@ async function v2ReadOf(c: Context<AppContext>, id: string): Promise<V2Read> {
   return read;
 }
 
-/** The product's V2 answer as stored, for this caller (the store laid over nothing: the same set a preview with no field prices). */
+/**
+ * The product's V2 answer as stored, for this caller (the store laid over
+ * nothing: the same set a preview with no field prices). A product with no
+ * method yet — every product of the clean start (DECISIONS row 222, addendum
+ * A.7) — answers its PREFILL in the method it is shown in: its stored cost
+ * inputs, minimum profit and folded purchase overlay; never an old dinar price.
+ */
 async function v2StoredAnswer(c: Context<AppContext>, id: string) {
   const read = await v2ReadOf(c, id);
   const viewer = v2ViewerOf(c.env, c.get('user'));
-  if (!storedMethodOf(read)) return notMigratedAnswer(read, viewer);
-  const stored = desiredFor(read, { sent: [] }, { viewer: 'owner', env: c.env, user: c.get('user'), now: new Date().toISOString() });
-  return v2Answer({ viewer, read, ev: await evaluateDesired(read, stored) });
+  const o = { viewer: 'owner' as const, env: c.env, user: c.get('user'), now: new Date().toISOString() };
+  const method = storedMethodOf(read);
+  if (method) return v2Answer({ viewer, read, ev: await evaluateDesired(read, desiredFor(read, { sent: [] }, o)) });
+  // A database before 0189 (a deploy ahead of its migration) prices nothing: the flag alone.
+  if (!(await pricingV2Installed(c.env.DB))) return uninstalledAnswer(read, viewer);
+  const defaultMethod = await defaultMethodOf(read, viewer, { ...o, viewer });
+  const ev = await evaluateDesired(read, desiredFor(read, { method: defaultMethod, sent: ['method'] }, o));
+  return v2Answer({ viewer, read, ev, defaultMethod });
 }
 
 adminProductsRoutes.get('/:id/pricing', limitRoute('pricing-read', 1200), async (c) => {
@@ -1308,7 +1321,6 @@ adminProductsRoutes.post('/pricing/preview', limitRoute('pricing-read', 1200), a
   } else {
     if (typeof body.product_id !== 'string' || !body.product_id) throw inputInvalid('product_id');
     const stored = await v2ReadOf(c, body.product_id);
-    if (!storedMethodOf(stored)) throw new HttpError(409, serverMessage('PRICING_V2_NOT_MIGRATED'), 'PRICING_V2_NOT_MIGRATED', { section: 3 });
     if (body.structure === undefined || body.structure === null) read = stored;
     else {
       const loaded = await previewDraft(c, body.structure, { row: stored.loaded.row, loaded: stored.loaded });
@@ -1324,10 +1336,10 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   c.header('Cache-Control', SESSION_CACHE_CONTROL);
   const db = c.env.DB;
   const id = c.req.param('id');
-  // Refused before the body is read: an unmigrated product has no V2 prices to apply.
   const read = await v2ReadOf(c, id);
   const method = storedMethodOf(read);
-  if (!method) throw new HttpError(409, serverMessage('PRICING_V2_NOT_MIGRATED'), 'PRICING_V2_NOT_MIGRATED', { section: 3 });
+  // A product's FIRST V2 write needs 0189's tables (a deploy ahead of its migration writes nothing).
+  if (!method && !(await pricingV2Installed(db))) throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED', { section: 3 });
   const body = v2Body(await jsonObject(c), ['seq', 'pricing', 'preview_hash', 'confirm_large_change']);
   if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
   const seq = v2Body(body.seq, ['inputs_seq', 'write_seq']);
@@ -1359,7 +1371,14 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   });
   if (verdict === 'already') return c.json({ success: true, already: true, ...(await v2StoredAnswer(c, pid)) });
   if (verdict === 'noop') return c.json({ success: true, unchanged: true, ...v2Answer({ viewer, read, ev }) });
-  const opts = { actor: user.id, now, source: 'product_pricing', idempotencyKey: v2PriceKey(pid, ev.hash ?? newId()) };
+  const opts = {
+    actor: user.id,
+    now,
+    source: 'product_pricing',
+    idempotencyKey: v2PriceKey(pid, ev.hash ?? newId()),
+    // The clean start: a product's first complete V2 write retires its Direct Sale Extra and purchase overlay.
+    ...(ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored) } : {}),
+  };
   const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : await v2WriteStatements(db, ev, opts);
   if (statements.length > V2_PRICING_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE', { section: 3 });
   try {
@@ -1401,6 +1420,9 @@ adminProductsRoutes.get('/:id', async (c) => {
     engine_managed: await productEngineManaged(c.env.DB, id),
     // DI-2: the engine prices direct sale only; model, colour and pre-order prices stay editable.
     engine_direct_only: await productEngineDirectOnly(c.env.DB, id),
+    // Pricing V2 (spec §5.1 as amended by addendum A.7): a flag, never a figure — every admin may know it.
+    // `needs_pricing`: not V2-published (no method, or no complete V2 write yet), so no customer sees it.
+    pricing_v2: await productV2Flag(c.env.DB, id),
   });
 });
 
@@ -1656,17 +1678,18 @@ adminProductsRoutes.post('/', async (c) => {
       ? (body.relations as Record<string, unknown>)
       : null;
 
-  // PRICING V2-3b (spec §3.5, §4.1): a V2 product's save — or a product created with a `pricing_v2`
-  // block (V2 from birth) — writes its structure INSIDE the V2 writer's batch, with its prices. The
+  // PRICING V2-3b (spec §3.5, §4.1): a V2 product's save — or a save with a `pricing_v2` block: a
+  // product created V2 from birth, or an existing product's FIRST V2 write (the clean start, DECISIONS
+  // row 222, addendum A.7) — writes its structure INSIDE the V2 writer's batch, with its prices. The
   // price fields of the document are not the client's: the stored ladder stays until the V2 writer
-  // replaces it in the same batch, and no route carries a commission. An unmigrated product never
-  // becomes V2 here: that is the owner's migration (V2-5).
+  // replaces it in the same batch, and no route carries a commission. A bundle is never V2-priced (Q7).
   const v2Block = body.pricing_v2;
-  const v2Stored = prev ? await productEngineV2(c.env.DB, prev.id) : false;
-  if (prev && !v2Stored && v2Block !== undefined && v2Block !== null) {
-    throw new HttpError(409, serverMessage('PRICING_V2_NOT_MIGRATED'), 'PRICING_V2_NOT_MIGRATED', { section: 3 });
+  const v2Sent = v2Block !== undefined && v2Block !== null;
+  if (v2Sent && (doc.composition ?? '') !== '') {
+    throw new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE', { section: 3 });
   }
-  const v2Save = v2Stored || (!prev && v2Block !== undefined && v2Block !== null);
+  const v2Stored = prev ? await productEngineV2(c.env.DB, prev.id) : false;
+  const v2Save = v2Stored || v2Sent;
   // A database before 0189 (a deploy ahead of its migration) has nowhere to put a V2 product's prices.
   if (v2Save && !v2Stored && !(await pricingV2Installed(c.env.DB))) {
     throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED', { section: 3 });

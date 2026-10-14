@@ -91,15 +91,16 @@ export type PrivateGrant = (typeof PRIVATE_GRANTS)[number];
 export const PRIVATE_DELEGATION_ENABLED = false;
 
 /**
- * Pricing V2, owner question Q2 (implementation spec C-7, §4.4): a price
- * editor who sees a dollar price next to its published dinar price can work
- * out the private applied rate (DECISIONS row 220). Until the owner answers,
- * price editors edit FINAL DINARS only (v2/api.ts intents) and no dollar
- * figure reaches them. Turning this on is an owner-approved change to the
- * editor projection (v2/api.ts `v2Answer`, `desiredFor`); tests/pricingV2Roles
- * pins it.
+ * Pricing V2, owner question Q2 — ANSWERED (DECISIONS row 222, implementation
+ * spec addendum A.1): «staff who may edit product prices see and edit USD».
+ * On a price-first («سعر بالدولار») product a price editor reads and writes
+ * the dollar price, the model and colour differences and the pre-order
+ * discounts (v2/api.ts `desiredFor`, `v2Answer` `editor_usd` — keys outside
+ * FINANCIAL_FIELDS). Cost, freight, extras, the minimum profit, R, T, the
+ * profit, the applied rate and everything derived from cost stay the owner's
+ * (`v2_*`, FINANCIAL_FIELDS). tests/pricingV2Roles pins it.
  */
-export const V2_STAFF_SEES_USD = false;
+export const V2_STAFF_SEES_USD = true;
 
 /** Tests pass `{ delegation: true }` to prove the grant path; production never does. */
 export interface CostAccessOpts {
