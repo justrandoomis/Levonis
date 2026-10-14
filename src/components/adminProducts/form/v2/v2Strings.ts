@@ -500,7 +500,7 @@ const CKB: V2Strings = {
   draft: 'ڕەشنووس',
   statusPublished: 'بڵاوکراوەتەوە',
   statusHidden: 'شاراوە',
-  kgUnit: 'کگ',
+  kgUnit: 'کیلۆ',
   inheritedProduct: (v) => `بەرهەم: ${v}`,
   inheritedModel: (v) => `مۆدێل: ${v}`,
   resetPrice: 'نرخ: گەڕانەوە بۆ نرخی بنەڕەت',

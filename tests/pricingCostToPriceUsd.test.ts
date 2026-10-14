@@ -330,11 +330,37 @@ test('the storefront never recomputes: only the owner pricing router, the engine
       '../lib/pricingEngine/v2/draft',
       // The clean start (spec addendum A.7): a product's first V2 write retires its old rows in the same batch.
       '../lib/pricingEngine/v2/firstWrite',
+      // The clean start's legacy money door (A.6): it holds, pins or empties old dinar fields — computes no price.
+      '../lib/pricingEngine/v2/legacyMoney',
       '../lib/pricingEngine/v2/productSave',
+      // D1 (A.10): the owner's purchase review of a product's cost, applied through the V2 writer.
+      '../lib/pricingEngine/v2/purchaseReview',
+      // The «يحتاج تسعيرًا» queue (A.8): an admin read of what is missing, never a figure.
+      '../lib/pricingEngine/v2/queue',
       '../lib/pricingEngine/v2/write',
       '../lib/pricingEngine/whatIf',
     ],
   };
+  // The clean start's ADMIN doors (spec addendum A.6, A.10; review 2026-10-14): the structure saves, the
+  // TXT/CSV exports and the procurement panel hold, pin or empty the old dinar fields through the legacy
+  // money door, and the procurement panel reads the purchase reviews — admin routers and the save planner,
+  // never a customer path, and none of those modules computes a price.
+  const CLEAN_START_DOORS: Readonly<Record<string, readonly string[]>> = {
+    'worker/lib/productPersistence.ts': ['./pricingEngine/v2/legacyMoney'],
+    'worker/routes/adminImport.ts': ['../lib/pricingEngine/v2/legacyMoney'],
+    'worker/routes/adminProductRelations.ts': ['../lib/pricingEngine/v2/legacyMoney'],
+    'worker/routes/template.ts': ['../lib/pricingEngine/v2/legacyMoney'],
+    'worker/routes/adminProcurement.ts': ['../lib/pricingEngine/purchaseRead', '../lib/pricingEngine/v2/purchaseReview'],
+  };
+  for (const [f, modules] of Object.entries(CLEAN_START_DOORS)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...modules].sort(), f);
+  }
+  const legacyDoor = files.find((x) => x.f === 'worker/lib/pricingEngine/v2/legacyMoney.ts')!.src;
+  assert.doesNotMatch(legacyDoor, /from\s+['"][^'"]*(?:\/costToPrice|\/fxChain|\/ruleResolution|\/engineWrite|\/writer|\/procurementPreview|\/priceV2)['"]/, 'the legacy money door computes no price');
+  // The trade-in (a customer path) asks only which products still need pricing — a module outside the engine.
+  assert.doesNotMatch(files.find((x) => x.f === 'worker/lib/tradeIn.ts')!.src, /pricingEngine/);
   for (const [f, modules] of Object.entries(V2_PRODUCT_SAVE)) {
     const src = files.find((x) => x.f === f)!.src;
     const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
@@ -356,5 +382,5 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !OWNER_TOOLS.includes(f)), []);
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !OWNER_TOOLS.includes(f)), []);
 });

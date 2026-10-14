@@ -91,28 +91,8 @@ export function withoutLegacyPriceLines(text: string): string {
   return out.join('\n');
 }
 
-/**
- * The products of `ids` that are NOT V2-published (no method, or no complete V2 write): their legacy money is an
- * archive and leaves no export. Every id before 0189 (nothing is published there).
- */
-export async function needsPricingIds(db: D1Database, ids: readonly string[]): Promise<Set<string>> {
-  const all = new Set(ids.filter(Boolean));
-  if (!all.size) return all;
-  try {
-    const { results } = await db
-      .prepare(
-        `SELECT s.product_id AS id FROM product_pricing_state s
-          WHERE s.product_id IN (SELECT value FROM json_each(?)) AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
-            AND EXISTS (SELECT 1 FROM pricing_v2_sku_results r WHERE r.product_id = s.product_id)`
-      )
-      .bind(JSON.stringify([...all]))
-      .all<{ id: string }>();
-    for (const r of results ?? []) all.delete(String(r.id));
-  } catch {
-    // A database before 0189: nothing is published, every product needs pricing.
-  }
-  return all;
-}
+/** The products still «يحتاج تسعيرًا» (no complete V2 write) — a read that computes no price; see `../../needsPricing`. */
+export { needsPricingIds } from '../../needsPricing';
 
 const has = (o: Row, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 const isRow = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -139,7 +119,11 @@ export const legacyMoneyRefusal = (section: Section, field: string): HttpError =
  */
 function holdRow(row: Row, stored: Row | null, keys: readonly string[], section: Section, where: string, sink?: string[]): void {
   for (const k of keys) {
-    if (!has(row, k)) {
+    // A null PRICE is "not carried": the admin reads answer a product still «يحتاج تسعيرًا» with every legacy
+    // price EMPTY (`nullLegacyPricesDeep`), so an older client echoing what it loaded sends null — it keeps
+    // the stored archive, as an absent key does. A cost is never answered empty that way (the cost gate
+    // decides who reads it), so a null cost against a stored one is still a change and refused.
+    if (!has(row, k) || (row[k] === null && LEGACY_PRICE_KEY.test(k))) {
       if (stored && has(stored, k)) row[k] = stored[k] ?? null;
       continue;
     }
@@ -188,7 +172,8 @@ function docMoney(body: Row, prev: ProductDoc | null, costs: boolean, sink?: str
       if (!isRow(t)) continue;
       const method = String(t.method);
       const was = before.has(method) ? (before.get(method) ?? null) : 0;
-      if (!has(t, 'commission_iqd') || same(t.commission_iqd, was)) {
+      // A null is "not carried" (the reads answer an unpriced product's commissions EMPTY): the stored one stays.
+      if (!has(t, 'commission_iqd') || t.commission_iqd === null || same(t.commission_iqd, was)) {
         if (was !== null || !has(t, 'commission_iqd')) t.commission_iqd = was;
         continue;
       }
@@ -212,7 +197,7 @@ function docMoney(body: Row, prev: ProductDoc | null, costs: boolean, sink?: str
       const twin = storedRows.get(String(r.id)) ?? null;
       const at = `doc.${list}.${String(r.id)}`;
       // The pre-0018 shape names the regular price `price_iqd`.
-      if (has(r, 'price_iqd') && !same(r.price_iqd, twin?.regular_price_iqd ?? null)) {
+      if (has(r, 'price_iqd') && r.price_iqd !== null && !same(r.price_iqd, twin?.regular_price_iqd ?? null)) {
         delete r.price_iqd;
         kept.push(`${at}.price_iqd`);
       }

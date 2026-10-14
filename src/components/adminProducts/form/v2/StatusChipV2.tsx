@@ -15,19 +15,15 @@
  * The chip names; the section body says where (ReadinessV2) and the rate line
  * is the owner's (PricesSectionV2).
  */
-import { isPricingIssueCode, pricingIssueLabel } from '../../../../../packages/contracts/src/pricingIssues';
-import { isPricingFieldName } from '../../../../../packages/contracts/src/pricingFieldLabels';
-import type { V2Answer, V2Lang, V2Missing } from './v2Model';
+import { missingLabel } from './missingLabel';
+import type { V2Answer, V2Lang } from './v2Model';
 import { v2Strings } from './v2Strings';
 import { Chip, useV2Lang } from './v2Ui';
 
 export type V2ChipKind = 'held' | 'paused' | 'hidden' | 'hidden_ready' | 'missing' | 'review' | 'current';
 
 /** What one missing entry is called (the pricing screens' own label for the code; the code itself when unknown). */
-export function missingLabel(m: Pick<V2Missing, 'code' | 'field'>, lang: V2Lang): string {
-  if (!isPricingIssueCode(m.code)) return m.code;
-  return pricingIssueLabel(m.code, lang, isPricingFieldName(m.field) ? { field: m.field } : {});
-}
+export { missingLabel } from './missingLabel';
 
 /** The chip of an answer, or null while there is none yet. Pure: the form's tests read it. */
 export function chipOf(a: V2Answer | null, o: { owner: boolean; hidden: boolean; lang: V2Lang }): { kind: V2ChipKind; tone: 'success' | 'warning' | 'danger' | 'info'; text: string } | null {

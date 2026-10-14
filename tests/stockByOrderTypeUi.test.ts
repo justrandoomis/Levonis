@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 
@@ -106,24 +106,15 @@ test('the product-level selling section keeps delivery and warranty, not stock o
   assert.doesNotMatch(form, /ar="زيادة البيع المباشر"/);
 });
 
-test('Quick Price Edit mirrors fulfilment, route increases and exact direct stock', () => {
-  const quick = read(QUICK);
-  assert.match(quick, /function QuickFulfillmentPanel/);
-  assert.match(quick, /التوفر والزيادة والمخزون حسب الخيار/);
-  // Read from the RESOLVED state, not the raw one: the quick panel routes
-  // through the same save-boundary rule as the full editor, so a blank
-  // direct-sale shelf is a zero here too rather than a wall.
-  assert.match(quick, /const resolved = withBlankDirectStockAsZero\(complete\);/);
-  assert.match(quick, /directStockCombinations\(resolved\)/);
-  assert.doesNotMatch(quick, /أكمل ربط الألوان ومخزونها من التعديل الكامل أولًا/);
-  assert.doesNotMatch(quick, /أدخل مخزون البيع المباشر لكل خيار أو لون مفعّل قبل الحفظ/);
-  assert.match(quick, /scope: 'variant' as const/);
-  assert.match(quick, /scope: 'option' as const/);
-  assert.match(quick, /inventoryMode = exact\.length > 0 \? 'VARIANT_COMBINATION' : 'OPTION'/);
-  assert.match(quick, /Pre-order — بلا مخزون/);
-  assert.match(quick, /stock: enabled && !hasCombinations && v\.stock === null \? 0 : v\.stock/);
-  assert.match(quick, /aria-selected=\{tab === x\.id\}/);
-  assert.doesNotMatch(quick, /preorder\.capacity/);
+test('Quick Price Edit (an old dinar price editor) is gone with the clean start — fulfilment and stock live in the form', () => {
+  // The clean start (DECISIONS row 222, spec addendum A.6) closed every dinar price door: the quick panel that
+  // typed option prices, route increases and stock beside them was deleted (e306ca45), and nothing imports it.
+  assert.equal(existsSync(join(ROOT, QUICK)), false);
+  const imports = (dir: string): string[] =>
+    readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? imports(join(dir, e.name)) : /\.(ts|tsx)$/.test(e.name) && /QuickPricePanel/.test(read(join(dir, e.name))) ? [join(dir, e.name)] : []
+    );
+  assert.deepEqual(imports('src'), []);
 });
 
 test('the product price card does not repeat item price or fulfilment surcharge notes', () => {

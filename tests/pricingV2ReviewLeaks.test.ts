@@ -16,7 +16,8 @@ import { get, json, row, type StubUser } from './fixtures/app';
 import { AMS, pricingWorld } from './fixtures/procurementPricing';
 import { v2App, writeV2 } from './fixtures/pricingV2';
 import { referencePriceOf } from '../worker/lib/inventorySelection';
-import { LEGACY_PRICE_KEY, isLegacyPriceFileKey, nullLegacyPricesDeep, withoutLegacyPriceLines } from '../worker/lib/pricingEngine/v2/legacyMoney';
+import { LEGACY_PRICE_KEY, holdLegacyDocMoney, isLegacyPriceFileKey, nullLegacyPricesDeep, withoutLegacyPriceLines } from '../worker/lib/pricingEngine/v2/legacyMoney';
+import type { ProductDoc } from '../worker/lib/productModel';
 
 const EDITOR: StubUser = { id: 'usr_editor', role: 'admin', email: 'editor@x.co' };
 
@@ -126,4 +127,20 @@ test('the product save\'s audit detail names no price', () => {
   const at = src.indexOf("action: prev ? 'product_v2.update' : 'product_v2.create'");
   assert.ok(at > 0);
   assert.doesNotMatch(src.slice(at, at + 600), /price_iqd: doc\.price_iqd/);
+});
+
+test('an older client echoing the EMPTY prices it loaded keeps the stored archive; a typed different price is still refused', () => {
+  const prev = { price_iqd: 917001, pro_price_iqd: 900000, preorder_transports: [{ method: 'air', commission_iqd: 50000, active: true }] } as unknown as ProductDoc;
+  const echo: Record<string, unknown> = { price_iqd: null, pro_price_iqd: null, preorder_transports: [{ method: 'air', commission_iqd: null, active: true }, { method: 'sea', commission_iqd: null, active: true }] };
+  holdLegacyDocMoney(echo, prev, { costs: false });
+  assert.equal(echo.price_iqd, 917001, 'null is "not carried": the stored price stays');
+  assert.equal(echo.pro_price_iqd, 900000);
+  assert.deepEqual(echo.preorder_transports, [
+    { method: 'air', commission_iqd: 50000, active: true },
+    { method: 'sea', commission_iqd: 0, active: true },
+  ], 'a stored commission stays; a new route is born with none');
+  assert.throws(() => holdLegacyDocMoney({ price_iqd: 1 }, prev, { costs: false }), (e: { code?: string }) => e.code === 'PRICING_V2_MANAGED');
+  // A cost is never read back empty that way: a null against a stored cost is still refused (every cost stays).
+  const withCost = { ...prev, product_cost_iqd: 700000 } as unknown as ProductDoc;
+  assert.throws(() => holdLegacyDocMoney({ product_cost_iqd: null }, withCost, { costs: true }), (e: { code?: string }) => e.code === 'PRICING_V2_MANAGED');
 });

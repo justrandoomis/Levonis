@@ -16,7 +16,7 @@ import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
 import { NEEDS_PRICING as S, tri, type QueueLang } from './needsPricingStrings';
-import { missingLabel } from './form/v2/StatusChipV2';
+import { missingLabel } from './form/v2/missingLabel';
 import { v2Strings } from './form/v2/v2Strings';
 
 type Filter = 'all' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review';
