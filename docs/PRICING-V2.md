@@ -5,6 +5,8 @@ live site and its database were not read.
 
 **Owner's answers (2026-10-13): A1, B1, C1, D1 — every recommended option, and the §7 defaults.**
 
+**Superseding clarifications (2026-10-14, DECISIONS row 222):** a route the discount would put below its cost sells at the direct price; staff who edit prices see and edit USD; a typed USD price below cost + minimum profit saves with a warning; **clean start — the old IQD form and pricing are removed, every product is hidden the moment the release deploys and reappears automatically when its new pricing is complete. §3's "keep current prices" migration is replaced by that queue.**
+
 Built from four local surveys (form P1–P16, engine D1–D25, finance F1–F17, customer C1–C9;
 the P/D/F/C references below point into them). It also uses
 DECISIONS rows 184–220, `FINANCIAL-INTEGRATION-AUDIT.md`, `HANDOFF.md`, the 2026-10-09 USD
