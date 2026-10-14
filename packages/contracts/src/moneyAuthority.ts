@@ -12,7 +12,8 @@
  *   the owner        above that, with a recorded reason flagged in reports;
  *                    and alone for the owner-only acts (any warranty
  *                    lengthening, a later delivery date, a whole-unit
- *                    replacement, the trade-in valuation rules).
+ *                    replacement, the trade-in valuation rules, a public
+ *                    promo code).
  *
  * The server sends `moneyAuthorityMessage(code)` ("ar / en") as the fallback
  * sentence; the client renders the reader's language by CODE
@@ -44,6 +45,13 @@ export const MONEY_AUTHORITY_REFUSALS = {
     ar: 'اكتب سبب هذا القرار (خمسة أحرف على الأقل)؛ يُسجَّل معه ويُعلَّم في التقارير.',
     en: 'Write the reason for this decision (at least five characters); it is recorded with it and flagged in reports.',
     ckb: 'هۆکاری ئەم بڕیارە بنووسە (لانیکەم پێنج پیت)؛ لەگەڵیدا تۆمار دەکرێت و لە ڕاپۆرتەکاندا نیشانە دەکرێت.',
+  },
+  // A trade-in credit is a coupon row, but its figure is the request's: the
+  // coupon editor neither changes nor retires it (the trade-in desk does).
+  TRADE_IN_COUPON_MANAGED: {
+    ar: 'هذا رصيد استبدال مرتبط بطلبه؛ يُدار من مكتب الاستبدال لا من محرر الأكواد.',
+    en: 'This is a trade-in credit tied to its request; it is managed from the trade-in desk, not the code editor.',
+    ckb: 'ئەمە باڵانسی گۆڕینەوەیە و بە داواکارییەکەیەوە بەستراوە؛ لە مێزی گۆڕینەوە بەڕێوە دەبرێت، نەک لە دەستکاریکەری کۆدەکان.',
   },
 } as const satisfies Record<string, MoneyAuthorityRefusal>;
 

@@ -173,7 +173,7 @@ import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/pr
 import { validateCoupon } from '../lib/membershipOps';
 import { allocateCoupon, type CouponContext, type CouponRule } from '@levonis/pricing/coupons';
 import { couponDeliveryMethod, couponLinesOf, couponNamesDelivery, productCouponFactsFromRows, transportOf } from '../lib/couponLines';
-import { TradeInError, tradeInCouponCap } from '../lib/tradeIn';
+import { TradeInError, isTradeInCreditFenceAbort, tradeInCouponCap, tradeInCreditFence } from '../lib/tradeIn';
 import {
   getAvailableBalances,
   readWalletDust,
@@ -1988,6 +1988,8 @@ export interface CheckoutComputation {
    *  earn it (the checkout's hint). */
   walletFreeDelivery: WalletFreeDeliveryOutcome;
   couponId: string | null;
+  /** `couponId` is a trade-in credit (0143): the order batch fences it (`tradeInCreditFence`). */
+  couponTradeIn: boolean;
   couponDiscount: number;
   couponSnapshot: string | null;
   /**
@@ -3325,6 +3327,8 @@ export async function computeCheckout(
     let couponId: string | null = null;
     let couponCode: string | null = null;
     let couponSnapshot: string | null = null;
+    /** The coupon is a trade-in credit: the order batch re-checks it is still the request's (`tradeInCreditFence`). */
+    let couponTradeIn = false;
     const couponLines = couponLinesOf(
       p.lines.map((l) => {
         const member = benefitByLine.get(l.id);
@@ -3377,6 +3381,7 @@ export async function computeCheckout(
         if (e instanceof TradeInError) throw badRequest(e.message, e.code);
         throw e;
       });
+      couponTradeIn = tradeInCap !== null;
       // ---- end TRADE-IN CREDIT
       if (check.payment_in_kind || !check.allocation || !check.rule) {
         // PAYMENT IN KIND (owner decision 5): the credit is one order-level
@@ -3794,6 +3799,7 @@ export async function computeCheckout(
         available_with_wallet: walletRuleConfig.methods.some((m) => walletVerdictAt(m, 0, 'wallet').eligible),
       },
       couponId,
+      couponTradeIn,
       couponDiscount,
       couponSnapshot,
       couponLineDiscounts,
@@ -3936,6 +3942,7 @@ export async function computeCheckout(
     independentFreeDelivery,
     walletFreeDelivery: settled.walletFreeDelivery,
     couponId: settled.couponId,
+    couponTradeIn: settled.couponTradeIn,
     couponDiscount: settled.couponDiscount,
     couponSnapshot: settled.couponSnapshot,
     couponLineDiscounts: settled.couponLineDiscounts,
@@ -4761,6 +4768,12 @@ export async function placeOrder(
     );
   }
 
+  if (comp.couponId && comp.couponTradeIn) {
+    // A TRADE-IN CREDIT IS SPENT ONLY WHILE IT IS STILL THE REQUEST'S (plan
+    // §1.3): a return or a cancel that landed after the checkout read it
+    // retired the coupon and released the device, and the order rolls back.
+    stmts.push(tradeInCreditFence(c.env.DB, comp.couponId, user.id));
+  }
   if (comp.couponId) {
     // UNIQUE(order_id) makes the redemption idempotent with the order itself.
     // The coupon's per-user and global limits are enforced by a BEFORE INSERT
@@ -5227,6 +5240,11 @@ export async function placeOrder(
     }
     if (msg.includes('COUPON_PER_USER_LIMIT')) {
       throw badRequest('Coupon could not be applied (PER_USER_LIMIT_REACHED)', 'PER_USER_LIMIT_REACHED');
+    }
+    // The trade-in request was cancelled (a return, or its owner) after the
+    // checkout read it: the same answer a fresh checkout now gives.
+    if (comp.couponTradeIn && isTradeInCreditFenceAbort(e)) {
+      throw new HttpError(400, 'This trade-in credit applies only to its own new device, bought directly, by its owner.', 'TRADE_IN_COUPON_MISMATCH');
     }
     if (msg.includes('COUPON_GLOBAL_LIMIT')) {
       throw badRequest('Coupon could not be applied (GLOBAL_LIMIT_REACHED)', 'GLOBAL_LIMIT_REACHED');

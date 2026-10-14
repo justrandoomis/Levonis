@@ -419,8 +419,18 @@ export async function validateCoupon(
   if (coupon.trade_in_id) {
     // Payment in kind: the stated credit, never more than the basis. The
     // checkout caps it at one unit of the target line.
+    //
+    // AND NEVER MORE THAN THE REQUEST APPROVED. The coupon row is a carrier;
+    // the figure the money authority approved lives on the request
+    // (`credit_iqd`, written by the approval behind its fence). A coupon row
+    // that says more — or names a request that no longer holds it — pays the
+    // request's figure, or nothing.
+    const approved = await env.DB.prepare('SELECT credit_iqd FROM trade_in_requests WHERE id = ? AND coupon_id = ?')
+      .bind(coupon.trade_in_id, coupon.id)
+      .first<{ credit_iqd: number | null }>();
+    const approvedCredit = Math.max(0, Math.trunc(Number(approved?.credit_iqd) || 0));
     let credit = coupon.kind === 'fixed_iqd' ? coupon.value : Math.floor((totalIqd * coupon.value) / 100);
-    credit = Math.min(credit, totalIqd);
+    credit = Math.min(credit, approvedCredit, totalIqd);
     if (credit <= 0) return refuse('NO_DISCOUNT');
     return { ok: true, coupon_id: coupon.id, code: coupon.code, discount_iqd: credit, payment_in_kind: true, ...facts };
   }

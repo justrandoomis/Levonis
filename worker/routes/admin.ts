@@ -19,6 +19,7 @@ import { newId, sha256Hex } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, canWriteCost, isOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
+import { moneyAuthorityMessage } from '../../packages/contracts/src/moneyAuthority';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, requireFreshSession } from '../lib/costAccess';
 import { degradeIfSchemaMissing, isSchemaMissing } from '../lib/membershipBenefits';
@@ -3901,12 +3902,25 @@ adminRoutes.post('/coupons', async (c) => {
   return c.json({ success: true, id, code });
 });
 
+/**
+ * A TRADE-IN CREDIT IS NOT A PROMO CODE (plan §1.3, owner decision 3). Its
+ * coupon row carries the credit the money authority approved on the request
+ * (`trade_in_requests.credit_iqd`); the trade-in desk mints, re-mints and
+ * retires it behind the request's fence. The code editor neither rewrites it
+ * (a value above the approval, a new end date, more uses) nor retires it (a
+ * request awaiting payment with no live credit).
+ */
+function refuseTradeInCoupon(row: { trade_in_id?: string | null } | null): void {
+  if (row?.trade_in_id) throw new HttpError(409, moneyAuthorityMessage('TRADE_IN_COUPON_MANAGED'), 'TRADE_IN_COUPON_MANAGED');
+}
+
 adminRoutes.patch('/coupons/:id', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const existing = await c.env.DB.prepare('SELECT id FROM coupons WHERE id = ?').bind(id).first<{ id: string }>();
+  const existing = await c.env.DB.prepare('SELECT * FROM coupons WHERE id = ?').bind(id).first<{ id: string; trade_in_id?: string | null }>();
   if (!existing) throw notFound('Coupon not found');
+  refuseTradeInCoupon(existing);
 
   // The CODE is not editable. Customers have it written down and orders
   // already reference it in their snapshots; renaming it would break the
@@ -3932,6 +3946,9 @@ adminRoutes.patch('/coupons/:id', async (c) => {
 adminRoutes.delete('/coupons/:id', async (c) => {
   const adminUser = c.get('user')!;
   const id = c.req.param('id');
+  const existing = await c.env.DB.prepare('SELECT * FROM coupons WHERE id = ?').bind(id).first<{ id: string; trade_in_id?: string | null }>();
+  if (!existing) throw notFound('Coupon not found');
+  refuseTradeInCoupon(existing);
   const res = await c.env.DB.prepare('UPDATE coupons SET active = 0 WHERE id = ?').bind(id).run();
   if (res.meta.changes === 0) throw notFound('Coupon not found');
   await audit(c.env.DB, adminUser.id, 'coupon.deactivate', id);

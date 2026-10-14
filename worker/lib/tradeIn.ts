@@ -1741,6 +1741,9 @@ export async function cancelRequest(
       )
       .bind(req.id, now, reason, actor.id, token, req.status),
     fence(db, req.id, token),
+    // The read above, asked again in the write: an order that spent the
+    // credit between that read and this batch keeps the request (plan §1.3).
+    noLiveCreditOrderFence(db, req.id),
     ...(await releaseStatements(db, req)),
     eventStatement(db, req.id, actor, 'cancel', req.status, 'cancelled', { reason }, now),
   ];
@@ -1765,11 +1768,60 @@ export async function cancelRequest(
   try {
     await db.batch(stmts);
   } catch (e) {
-    if (isAbort(e)) throw refuse('TRADE_IN_STALE');
+    if (isAbort(e)) {
+      const spent = (await creditOrders(db, req.id)).find((o) => o.status !== 'cancelled');
+      if (spent) throw refuse('TRADE_IN_ORDER_ACTIVE', { order_id: spent.order_id });
+      throw refuse('TRADE_IN_STALE');
+    }
     throw e;
   }
   return (await loadRequest(db, req.id))!;
 }
+
+/**
+ * A LIVE ORDER HOLDS THE CREDIT → THE REQUEST STAYS (plan §1.3), inside the
+ * batch that would cancel it: the request's status trips its NOT NULL when an
+ * order that is not cancelled redeemed one of its credit coupons, so the
+ * cancel, the released device and the retired coupon all roll back.
+ */
+function noLiveCreditOrderFence(db: D1Database, requestId: string): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE trade_in_requests SET status = CASE WHEN EXISTS (
+          SELECT 1 FROM coupons c JOIN coupon_redemptions r ON r.coupon_id = c.id JOIN orders o ON o.id = r.order_id
+           WHERE c.trade_in_id = ?1 AND o.status <> 'cancelled') THEN NULL ELSE status END
+        WHERE id = ?1`
+    )
+    .bind(requestId);
+}
+
+/**
+ * THE CREDIT IS STILL THE REQUEST'S, IN THE ORDER'S OWN WRITE (plan §1.3).
+ *
+ * `tradeInCouponCap` read the request before the checkout priced the cart. A
+ * return or a cancel that lands between that read and the order batch cancels
+ * the request, releases the device and retires the coupon — and the
+ * redemption trigger counts uses only. So the checkout batch asks again, in
+ * its own transaction: unless the request still awaits payment, on exactly
+ * this coupon, for this customer, with the coupon still active, the request's
+ * NOT NULL status trips and the whole order rolls back (nothing redeemed,
+ * nothing ordered). It touches no column otherwise.
+ */
+export function tradeInCreditFence(db: D1Database, couponId: string, userId: string): D1PreparedStatement {
+  return db
+    .prepare(
+      `UPDATE trade_in_requests
+          SET status = CASE WHEN status = 'awaiting_payment' AND coupon_id = ?1 AND user_id = ?2
+                             AND EXISTS (SELECT 1 FROM coupons c WHERE c.id = ?1 AND c.active = 1 AND c.trade_in_id = trade_in_requests.id)
+                            THEN status ELSE NULL END
+        WHERE id = (SELECT trade_in_id FROM coupons WHERE id = ?1)`
+    )
+    .bind(couponId, userId);
+}
+
+/** Whether a failed order batch was refused by `tradeInCreditFence`. */
+export const isTradeInCreditFenceAbort = (e: unknown): boolean =>
+  /NOT NULL constraint failed: trade_in_requests\.status/i.test(e instanceof Error ? e.message : String(e));
 
 /** A trade-in holding units of one line, as the return door sees it (plan §1.3). */
 export interface LineTradeIn {
@@ -1857,14 +1909,7 @@ export async function returnWinsStatements(db: D1Database, req: RequestRow, acto
       )
       .bind(req.id, now, actorUserId, token, req.status),
     fence(db, req.id, token),
-    db
-      .prepare(
-        `UPDATE trade_in_requests SET status = CASE WHEN EXISTS (
-            SELECT 1 FROM coupons c JOIN coupon_redemptions r ON r.coupon_id = c.id JOIN orders o ON o.id = r.order_id
-             WHERE c.trade_in_id = ?1 AND o.status <> 'cancelled') THEN NULL ELSE status END
-          WHERE id = ?1`
-      )
-      .bind(req.id),
+    noLiveCreditOrderFence(db, req.id),
     ...(await releaseStatements(db, req)),
     eventStatement(db, req.id, { id: actorUserId, role: 'customer' }, 'cancel', req.status, 'cancelled', { reason: 'return_opened', return_case_id: returnCaseId }, now),
     notifyStatement(db, {
