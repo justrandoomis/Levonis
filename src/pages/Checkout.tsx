@@ -1212,8 +1212,23 @@ export default function Checkout() {
       ? selectedDelivery.home_delivery
       : selectedDelivery.id !== 'pickup'
     : false;
+  /**
+   * BEFORE THE FIRST QUOTE, THE CART'S OWN LINES ANSWER (2). The server types
+   * a cart by its first line (`cartShippingType`, packages/pricing/src/
+   * shippingType.ts — '' is direct, air/sea/land a pre-order) and a cart never
+   * mixes the two, so the lines already on this screen say what the quote
+   * will. Waiting for `quote.shipping_type` drew the picker ~150 ms after the
+   * page and pushed the payment section and the phone's action bar down under
+   * the reader (a layout shift of 0.05 at 390 px, Release A browser walk).
+   * Once a quote has answered, its word is the only one, exactly as before;
+   * a picked day the quote then refuses is cleared by the effect below, and
+   * no order is placed before a quote exists.
+   */
+  const firstLineTransport = String(items[0]?.transport_method ?? '');
+  const cartLooksDirect = items.length > 0 && firstLineTransport !== 'air' && firstLineTransport !== 'sea' && firstLineTransport !== 'land';
   const dayChoiceOffered =
-    settings !== null && endsAtTheDoor && quote?.shipping_type === 'direct' && offeredDays.length > 0;
+    settings !== null && endsAtTheDoor && offeredDays.length > 0 &&
+    (quote ? quote.shipping_type === 'direct' : cartLooksDirect);
 
   // A pick the offer no longer contains must not survive to the POST: the
   // customer switching to pickup, or leaving the tab open past midnight, would
@@ -2218,6 +2233,11 @@ export default function Checkout() {
                                 ? loc('رسم واحد للشحنة كاملة', 'One fee for the whole consignment', 'یەک کرێ بۆ هەموو بارەکە')
                                 : loc('محسوب حسب القطع والكمية', 'Calculated for items and quantity', 'بەپێی پارچە و بڕ هەژمار کراوە')}
                           </p>
+                        ) : selected && !isPickupMethod && !quoteError ? (
+                          /* The line above arrives with the quote. Its height is
+                             held until then, so the chosen card does not grow
+                             under the reader and push everything below it. */
+                          <p aria-hidden="true" data-fee-line-placeholder className="mt-1 text-[11px] font-medium">&nbsp;</p>
                         ) : null}
                       </div>
                     </div>
