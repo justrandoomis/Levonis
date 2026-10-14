@@ -1270,117 +1270,6 @@ export interface FormErrors {
   [key: string]: string;
 }
 
-/** The three selling prices one level of the ladder resolves to. */
-interface Ladder {
-  regular: number;
-  prime: number | null;
-  pro: number | null;
-}
-
-const isNum = (v: number | null | undefined): v is number => v !== null && v !== undefined && Number.isFinite(v);
-const iqd = (n: number | null) => (n === null ? '—' : n.toLocaleString('en-US'));
-
-/**
- * A FAITHFUL COPY of worker/lib/pricing.ts `memberAtRung` + `derivedRung`.
- *
- * The client cannot import worker code, and the server re-validates every
- * save, so this exists for one reason: the form must flag exactly the rows the
- * server refuses, before the round trip, on the number the row RESOLVES to
- * rather than the number typed into it. Change one, change the other —
- * tests/productModelLadder.test.ts runs both over the same fixtures.
- *
- * `regular` is the row's fixed price, else the value beneath moved by its
- * adjustment, else the value beneath. A member field with nothing of its own
- * inherits the value beneath PLUS this row's regular surcharge (the owner's
- * rule); a fixed member price replaces it; a member adjustment applies on top
- * of the carried value, or on the row's regular price when nothing is carried.
- * `consumed` names the member prices the row inherits but reduces to nothing;
- * `inverted` says the derived PRO ended up above the derived PRIME.
- */
-function derivedRung(row: FormPrices, beneath: Ladder): Ladder & { consumed: Array<'PRIME' | 'PRO'>; inverted: boolean } {
-  const regAdj = row.regular_adjust_iqd;
-  const regular = isNum(row.regular_price_iqd)
-    ? row.regular_price_iqd
-    : isNum(regAdj)
-      ? Math.max(0, Math.round(beneath.regular + regAdj))
-      : beneath.regular;
-  const delta = regular - beneath.regular;
-  const consumed: Array<'PRIME' | 'PRO'> = [];
-  const member = (name: 'PRIME' | 'PRO', own: number | null, adj: number | null | undefined, inherited: number | null): number | null => {
-    const carried = inherited === null ? null : inherited + delta > 0 ? Math.round(inherited + delta) : null;
-    const statesOwn = isNum(own) || (adj !== null && adj !== undefined);
-    if (inherited !== null && !statesOwn && regular > 0 && inherited + delta <= 0) consumed.push(name);
-    if (isNum(own)) return own;
-    if (isNum(adj)) return Math.max(0, Math.round((carried !== null ? carried : regular) + adj));
-    return carried;
-  };
-  const prime = member('PRIME', row.prime_price_iqd, row.prime_adjust_iqd, beneath.prime);
-  const pro = member('PRO', row.pro_price_iqd, row.pro_adjust_iqd, beneath.pro);
-  return { regular, prime, pro, consumed, inverted: prime !== null && pro !== null && pro > prime };
-}
-
-/**
- * The member ladder follows the regular one (worker/lib/pricing.ts
- * memberAtRung): a row that states no PRIME/PRO inherits the base member
- * price PLUS its own regular surcharge. When `base` is given the row is judged
- * on what it RESOLVES to, exactly as the server does (productModel
- * memberRules / productRelations validatePriceLadder): a reduction that
- * swallows an inherited member price, a derived member price above the row's
- * own regular price, and a derived PRIME below the derived PRO are all
- * flagged. A colour is judged under each option it can be sold with too
- * (`under`), because the resolver anchors it on the option the customer picks.
- */
-const ladder = (
-  p: FormPrices,
-  where: string,
-  out: FormErrors,
-  key: string,
-  base?: { regular: number | null; prime: number | null; pro: number | null },
-  under: Array<{ name: string; ladder: Ladder }> = []
-) => {
-  const { regular_price_iqd: reg, prime_price_iqd: prime, pro_price_iqd: pro, cost_iqd: cost } = p;
-  if (base && base.regular !== null) {
-    const beneath: Ladder = { regular: base.regular, prime: base.prime, pro: base.pro };
-    const d = derivedRung(p, beneath);
-    for (const name of d.consumed) {
-      out[key] = `${where}: التخفيض أكبر من سعر ${name} الموروث (${iqd(name === 'PRIME' ? beneath.prime : beneath.pro)}) — حدّد سعر ${name} لهذا الصف أو قلّل التخفيض`;
-      return;
-    }
-    if (d.prime !== null && d.prime > d.regular) {
-      out[key] = `${where}: سعر PRIME الناتج (${iqd(d.prime)}) أعلى من السعر الاعتيادي (${iqd(d.regular)})`;
-      return;
-    }
-    if (d.pro !== null && d.pro > d.regular) {
-      out[key] = `${where}: سعر PRO الناتج (${iqd(d.pro)}) أعلى من السعر الاعتيادي (${iqd(d.regular)})`;
-      return;
-    }
-    if (d.inverted) {
-      out[key] = `${where}: سعر PRIME الناتج (${iqd(d.prime)}) أقل من سعر PRO الناتج (${iqd(d.pro)}) — يجب أن يكون PRO ≤ PRIME ≤ الاعتيادي`;
-      return;
-    }
-    for (const u of under) {
-      const c = derivedRung(p, u.ladder);
-      for (const name of c.consumed) {
-        out[key] = `${where} مع الخيار «${u.name}»: التخفيض أكبر من سعر ${name} الموروث (${iqd(name === 'PRIME' ? u.ladder.prime : u.ladder.pro)}) — حدّد سعر ${name} لهذا اللون أو قلّل التخفيض`;
-        return;
-      }
-      if (c.inverted) {
-        out[key] = `${where} مع الخيار «${u.name}»: سعر PRIME الناتج (${iqd(c.prime)}) أقل من سعر PRO الناتج (${iqd(c.pro)}) — يجب أن يكون PRO ≤ PRIME ≤ الاعتيادي`;
-        return;
-      }
-    }
-  }
-  if (reg !== null && prime !== null && prime > reg) {
-    out[key] = `${where}: سعر PRIME أعلى من السعر الاعتيادي`;
-  } else if (reg !== null && pro !== null && pro > reg) {
-    out[key] = `${where}: سعر PRO أعلى من السعر الاعتيادي`;
-  } else if (prime !== null && pro !== null && pro > prime) {
-    out[key] = `${where}: يجب أن يكون PRO ≤ PRIME ≤ الاعتيادي`;
-  } else if (cost !== null && (reg === cost || prime === cost || pro === cost)) {
-    out[key] = `${where}: سعر البيع يساوي التكلفة`;
-  }
-};
-
 /**
  * Client-side mirror of the server's rules — for immediate feedback only. The
  * server re-validates everything (§11: "استخدم validation على الخادم لكل سعر
@@ -1389,10 +1278,6 @@ const ladder = (
  */
 export function validateForm(input: {
   name_en: string;
-  price_iqd: number | null;
-  prime_price_iqd: number | null;
-  pro_price_iqd: number | null;
-  product_cost_iqd: number | null;
   category_id: string | null;
   sale_types: SaleType[];
   rel: RelationsState;
@@ -1408,7 +1293,6 @@ export function validateForm(input: {
   const e: FormErrors = {};
   if (input.warranty) warrantyRules(input.warranty, e);
   if (!input.name_en.trim()) e.name_en = 'الاسم الإنجليزي مطلوب';
-  if (input.price_iqd === null) e.price_iqd = 'السعر الاعتيادي مطلوب';
   if (input.publishing && !input.category_id) e.category_id = 'القسم الرئيسي مطلوب للنشر';
   if (input.sale_types.length === 0) e.sale_types = 'اختر نوع بيع واحدًا على الأقل';
   if (input.delivery_options) {
@@ -1423,69 +1307,31 @@ export function validateForm(input: {
     }
   }
 
-  ladder(
-    {
-      regular_price_iqd: input.price_iqd,
-      prime_price_iqd: input.prime_price_iqd,
-      pro_price_iqd: input.pro_price_iqd,
-      cost_iqd: input.product_cost_iqd,
-    },
-    'الأسعار الأساسية',
-    e,
-    'prices'
-  );
-  const base = { regular: input.price_iqd, prime: input.prime_price_iqd, pro: input.pro_price_iqd };
-
+  // NO PRICE IS CHECKED HERE ANY MORE (Pricing V2, the clean start: DECISIONS row 222). The form types
+  // no dinar price; the dollar prices are judged by the server's V2 evaluation (section ٣'s readiness).
   for (const g of input.rel.groups) {
     if (!g.name_en.trim()) e[`group:${g.id}`] = 'اسم المجموعة مطلوب';
     for (const v of g.values) {
       if (!v.name_en.trim()) e[`value:${v.id}`] = 'اسم الخيار مطلوب';
-      ladder(v, v.name_en || 'خيار', e, `value_price:${v.id}`, base);
       const enabled = v.fulfillments.filter((f) => f.enabled);
       if (v.active && enabled.length === 0) {
         e[`value_availability:${v.id}`] = 'فعّل البيع المباشر أو الطلب المسبق لهذا الخيار';
       }
-      const optionBase = base.regular === null
-        ? null
-        : derivedRung(v, { regular: base.regular, prime: base.prime, pro: base.pro });
       for (const f of enabled) {
-        if (optionBase) {
-          ladder(
-            f,
-            `${v.name_en || 'خيار'} — ${f.fulfillment_type === 'direct_sale' ? 'بيع مباشر' : 'طلب مسبق'}`,
-            e,
-            `value_availability:${v.id}`,
-            optionBase
-          );
-        }
         if (f.fulfillment_type === 'pre_order' && !f.transports.some((t) => t.enabled)) {
           e[`value_availability:${v.id}`] = 'فعّل طريقة واحدة على الأقل للطلب المسبق: بري أو بحري أو جوي';
         }
       }
     }
   }
-  // What every ACTIVE option resolves to on top of the base — the rungs a
-  // colour is checked under. The server's flat option list is every value with
-  // its own `active` flag (productOverlay), so a group flag plays no part here.
-  const optionLadders =
-    base.regular === null
-      ? []
-      : input.rel.groups
-          .flatMap((g) => g.values)
-          .filter((v) => v.active)
-          .map((v) => ({ id: v.id, name: v.name_en || 'خيار', ladder: derivedRung(v, { regular: base.regular as number, prime: base.prime, pro: base.pro }) }));
   for (const c of input.rel.colors) {
     if (!c.name_en.trim()) e[`color:${c.id}`] = 'اسم اللون مطلوب';
     if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c.hex)) e[`color_hex:${c.id}`] = 'كود لون غير صالح';
-    // Its link set when it has one, else every active option.
-    const under = c.option_value_ids.length ? optionLadders.filter((o) => c.option_value_ids.includes(o.id)) : optionLadders;
-    ladder(c, c.name_en || 'لون', e, `color_price:${c.id}`, base, under);
   }
   for (const v of input.rel.variants) {
     if (v.option_value_ids.length === 0 && !v.color_id) {
       e[`variant:${v.id}`] = 'التركيبة تحتاج خيارًا أو لونًا';
     }
-    ladder(v, 'تركيبة', e, `variant_price:${v.id}`);
   }
   const valuesById = new Map(input.rel.groups.flatMap((g) => g.values.map((v) => [v.id, v] as const)));
   const exactDirectStock = directStockCombinations(input.rel);

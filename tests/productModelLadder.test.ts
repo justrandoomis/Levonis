@@ -1,11 +1,14 @@
 /**
- * THE FIVE WRITE-TIME VIEWS OF THE LADDER REFUSE THE SAME INPUTS.
+ * THE WRITE-TIME VIEWS OF THE LADDER REFUSE THE SAME INPUTS.
  *
  *   1. worker/lib/productModel.ts      validateProductDoc      (product save, TXT apply)
  *   2. worker/lib/productRelations.ts  validatePriceLadder     (relations PUT)
  *   3. worker/lib/importCsv.ts         parseImport             (CSV import)
- *   4. src/…/form/model.ts             validateForm            (the form's client mirror)
- *   5. worker/routes/adminPriceGrid.ts (tests/adminPriceGridRoute.test.ts runs the same list through the route)
+ *   4. worker/routes/adminPriceGrid.ts (tests/adminPriceGridRoute.test.ts runs the same list through the route)
+ *
+ * The product form's client mirror (src/…/form/model.ts `validateForm`) left
+ * this list with Pricing V2 (DECISIONS row 222, spec addendum A.6): the form
+ * types no dinar price any more, so it judges none (tests/productFormV2.test.ts).
  *
  * They are fed the shared fixture list (tests/pricingLadderFixtures.ts) and
  * must agree on every verdict, and every refusal must name the row — and, for
@@ -21,7 +24,6 @@ import type { PricingProduct } from '../worker/lib/pricing';
 import { validateProductDoc } from '../worker/lib/productModel';
 import { optionLaddersFor, validatePriceLadder } from '../worker/lib/productRelations';
 import { parseImport, templateShape, toCsv } from '../worker/lib/importCsv';
-import { validateForm, type FormColor, type FormValue, type RelationsState } from '../src/components/adminProducts/form/model';
 import { LADDER_FIXTURES, col, opt, product, type LadderFixture } from './pricingLadderFixtures';
 
 // ------------------------------------------------------------- adapters
@@ -79,39 +81,11 @@ function viaImportCsv(p: PricingProduct): string[] {
   return parseImport(toCsv([shape.columns, ...rows]), shape).issues.filter((i) => i.severity === 'error').map((i) => i.message);
 }
 
-/** 4. The form's own state, judged before the round trip. */
-function viaClient(p: PricingProduct): string[] {
-  const value = (o: PricingProduct['options'][number]): FormValue => ({
-    id: o.id, name_en: o.id, sku_part: '', image: '', sort: 0, active: o.active !== false, stock: null, reserved: 0, low_stock_threshold: null,
-    availability_type: '', lead_time_text: '', lead_time_min_days: null, lead_time_max_days: null, variant_key: '', variant_label: '', fulfillments: [],
-    regular_price_iqd: o.regular_price_iqd, prime_price_iqd: o.prime_price_iqd, pro_price_iqd: o.pro_price_iqd, cost_iqd: o.cost_iqd,
-    regular_adjust_iqd: o.regular_adjust_iqd ?? null, prime_adjust_iqd: o.prime_adjust_iqd ?? null, pro_adjust_iqd: o.pro_adjust_iqd ?? null, cost_adjust_iqd: o.cost_adjust_iqd ?? null,
-  });
-  const colour = (c: PricingProduct['colors'][number]): FormColor => ({
-    id: c.id, name_en: c.id, hex: '#000000', image: '', sku_part: '', sort: 0, active: c.active !== false, stock: null, reserved: 0, low_stock_threshold: null,
-    option_value_ids: linkedOf(c),
-    regular_price_iqd: c.regular_price_iqd, prime_price_iqd: c.prime_price_iqd, pro_price_iqd: c.pro_price_iqd, cost_iqd: c.cost_iqd,
-    regular_adjust_iqd: c.regular_adjust_iqd ?? null, prime_adjust_iqd: c.prime_adjust_iqd ?? null, pro_adjust_iqd: c.pro_adjust_iqd ?? null, cost_adjust_iqd: c.cost_adjust_iqd ?? null,
-  });
-  const rel: RelationsState = {
-    inventory_mode: 'BASE',
-    groups: p.options.length ? [{ id: 'g', name_en: 'Model', sort: 0, active: true, values: p.options.map(value) }] : [],
-    colors: p.colors.map(colour),
-    variants: [],
-    images: [],
-  };
-  const e = validateForm({
-    name_en: 'P', price_iqd: p.price_iqd, prime_price_iqd: p.prime_price_iqd, pro_price_iqd: p.pro_price_iqd, product_cost_iqd: p.product_cost_iqd,
-    category_id: null, sale_types: ['direct_sale'], rel, publishing: false,
-  });
-  return Object.entries(e).filter(([k]) => k === 'prices' || k.startsWith('value_price:') || k.startsWith('color_price:')).map(([, v]) => v);
-}
-
-const VALIDATORS = { productModel: viaProductModel, productRelations: viaProductRelations, importCsv: viaImportCsv, client: viaClient };
+const VALIDATORS = { productModel: viaProductModel, productRelations: viaProductRelations, importCsv: viaImportCsv };
 
 // ---------------------------------------------------------------- tests
 
-test('INVARIANT: the four validators and the client mirror accept and refuse exactly the same fixtures', () => {
+test('INVARIANT: the server validators accept and refuse exactly the same fixtures', () => {
   for (const f of LADDER_FIXTURES) {
     for (const [name, run] of Object.entries(VALIDATORS)) {
       const errors = run(f.product);
@@ -135,16 +109,6 @@ test('H1: the derived-order refusal says which row, and which two numbers', () =
   assert.match(viaProductModel(p)[0], /options\.o1\.prime_price_iqd: the PRIME price this row resolves to \(120000\) is below the PRO price it resolves to \(125000\)/);
   assert.match(viaProductRelations(p)[0], /^o1: the PRIME price this row resolves to \(120000\) is below the PRO price it resolves to \(125000\)/);
   assert.match(viaImportCsv(p)[0], /الخيار o1: سعر PRIME الناتج \(120000\) أقل من سعر PRO الناتج \(125000\)/);
-  assert.match(viaClient(p)[0], /^o1: سعر PRIME الناتج \(120,000\) أقل من سعر PRO الناتج \(125,000\)/);
-});
-
-test('M1: the client mirror derives the member price from an adjustment, and measures a fixed one against the effective regular', () => {
-  const a = product({ prime_price_iqd: null, pro_price_iqd: null, options: [opt('o1', { regular_adjust_iqd: 25_000, pro_adjust_iqd: 10_000 })] });
-  assert.match(viaClient(a)[0], /^o1: سعر PRO الناتج \(185,000\) أعلى من السعر الاعتيادي \(175,000\)/);
-  assert.match(viaProductModel(a)[0], /the PRO price this row resolves to \(185000\) is above its regular price \(175000\)/);
-  const b = product({ prime_price_iqd: null, pro_price_iqd: null, options: [opt('o1', { pro_price_iqd: 180_000 })] });
-  assert.match(viaClient(b)[0], /^o1: سعر PRO الناتج \(180,000\) أعلى من السعر الاعتيادي \(150,000\)/);
-  assert.match(viaProductModel(b)[0], /PRO \(180000\) must not be above the regular price \(150000\)/);
 });
 
 test('M3: a colour is judged under each option it is sold with, and the refusal names both', () => {
@@ -152,7 +116,6 @@ test('M3: a colour is judged under each option it is sold with, and the refusal 
   assert.match(viaProductModel(p)[0], /colors\.c1\.regular_price_iqd: with option "o1", the reduction on this colour is larger than the PRO price it inherits \(40000\) — state a PRO price for this colour, or reduce less/);
   assert.match(viaProductRelations(p)[0], /^c1: with option "o1", the reduction is larger than the PRO price this colour inherits \(40000\)/);
   assert.match(viaImportCsv(p)[0], /اللون c1 مع الخيار Model:o1: التخفيض أكبر من سعر PRO الموروث \(40000\)/);
-  assert.match(viaClient(p)[0], /^c1 مع الخيار «o1»: التخفيض أكبر من سعر PRO الموروث \(40,000\)/);
   // …and stating the colour's own PRO is the way out every message points to.
   const fixed = product({ options: [opt('o1', { regular_adjust_iqd: 100_000, pro_price_iqd: 40_000 })], colors: [col('c1', { option_id: 'o1', option_ids: ['o1'], regular_price_iqd: 130_000, pro_price_iqd: 100_000 })] });
   for (const [name, run] of Object.entries(VALIDATORS)) assert.deepEqual(run(fixed), [], name);

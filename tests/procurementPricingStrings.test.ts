@@ -1,7 +1,8 @@
 /**
  * EVERY WORD OF THE USD PRICING SCREENS EXISTS IN ARABIC, ENGLISH AND REAL
  * SORANI (USD design §5.4, §12 P-C; CLAUDE.md "Languages"; docs/DECISIONS.md
- * row 183): the procurement card's strings and the product form's.
+ * row 183): the procurement card's strings and the product form's (Pricing V2,
+ * form/v2/v2Strings.ts — the V1 form's strings were deleted with it).
  *
  *   - every key has ar, en and ckb, none empty;
  *   - ckb is never the Arabic and never the English;
@@ -14,14 +15,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PROCUREMENT_PRICING_STRINGS } from '../src/components/adminOperations/procurementPricingStrings';
-import { USD_PRICING_FORM_STRINGS } from '../src/components/adminProducts/form/usdPricingStrings';
+import { V2_STRINGS } from '../src/components/adminProducts/form/v2/v2Strings';
 
 const SORANI_ONLY = /[ڕڵێۆەڤ]/;
 const text = (v: unknown): string => (typeof v === 'function' ? (v as (...a: string[]) => string)('X', 'Y', 'Z') : String(v));
 
 for (const [name, table] of [
   ['procurement card', PROCUREMENT_PRICING_STRINGS],
-  ['product form', USD_PRICING_FORM_STRINGS],
+  ['product form', V2_STRINGS],
 ] as const) {
   test(`${name}: every key in ar, en and real Sorani`, () => {
     const keys = Object.keys(table.ar);

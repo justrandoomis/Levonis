@@ -21,7 +21,10 @@ import { LanguageProvider } from '../src/LanguageContext';
 import PricingSummaryBar from '../src/components/adminOperations/PricingSummaryBar';
 import type { PricingSummary } from '../src/components/adminOperations/procurementPricing';
 import { PROCUREMENT_PRICING_STRINGS } from '../src/components/adminOperations/procurementPricingStrings';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { codeOf } from './fixtures/source';
+import { ROOT } from './fixtures/d1';
 
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement(LanguageProvider, { children: el }));
 
@@ -69,7 +72,8 @@ test('the bar, the card and the product form import no pricing or FX maths; they
     'src/components/adminOperations/ProcurementPricingReview.tsx',
     'src/components/adminOperations/procurementPricing.ts',
     'src/components/adminOperations/ProcurementPanel.tsx',
-    'src/components/adminProducts/form/UsdPricingSection.tsx',
+    'src/components/adminProducts/ProductForm.tsx',
+    ...readdirSync(join(ROOT, 'src/components/adminProducts/form/v2')).map((f) => `src/components/adminProducts/form/v2/${f}`),
   ]) {
     const code = codeOf(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
     assert.doesNotMatch(code, /from '[^']*(costToPrice|ruleResolution|legacyTargets|pricingEngine|fxChain|packages\/pricing)[^']*'/, file);

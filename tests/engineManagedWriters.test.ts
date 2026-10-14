@@ -83,7 +83,7 @@ test('the product form: a changed price is refused by the database (ENGINE_MANAG
   assert.equal(row<{ n: string }>(w.raw, 'SELECT name AS n FROM products WHERE id = ?', AMS)!.n, 'AMS HT (renamed)');
 });
 
-test('the CSV import names an engine product’s refused row in words, never the driver’s text; the form locks the price cells', () => {
+test('the CSV import names an engine product’s refused row in words, never the driver’s text; the form has no dinar price cell to lock', () => {
   const src = readFileSync(join(ROOT, 'worker/routes/adminImport.ts'), 'utf8');
   assert.match(src, /reason: importFailureReason\(error\)/);
   const failureReason = src.slice(src.indexOf('function importFailureReason('), src.indexOf('\ninterface PreviewRow'));
@@ -91,12 +91,10 @@ test('the CSV import names an engine product’s refused row in words, never the
     'engine refusals retain their deliberate translated message before the generic error fallback');
   assert.doesNotMatch(failureReason, /String\(error\)|error instanceof Error \? error\.message/,
     'an unexpected driver error must never be serialized into the report');
+  // Pricing V2-4 (2026-10-14, DECISIONS row 222): the product form types no dinar price, so
+  // there is no V1 cell left to lock — a model's and a colour's price is the V2 selector.
   const form = readFileSync(join(ROOT, 'src/components/adminProducts/ProductForm.tsx'), 'utf8');
-  // DI-2 (review 2026-10-13): a product the engine prices for direct sale only keeps its model,
-  // colour and pre-order cells editable; its direct-sale cells stay locked.
-  assert.match(form, /pricesLocked=\{\(engineManaged \|\| \(canSeeCost && pricing\.engine\)\) && !engineDirectOnly\}/);
-  assert.match(form, /directPricesLocked=\{engineManaged \|\| \(canSeeCost && pricing\.engine\)\}/);
+  assert.doesNotMatch(form, /pricesLocked=|directPricesLocked=/);
   const options = readFileSync(join(ROOT, 'src/components/adminProducts/form/OptionsSection.tsx'), 'utf8');
-  assert.match(options, /locked: locked && field !== 'cost'/, 'cost stays editable');
-  assert.match(options, /disabled=\{locked\}/);
+  assert.doesNotMatch(options, /<Money\b|regular_price_iqd|direct_sale_extra_iqd/);
 });

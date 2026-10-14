@@ -44,16 +44,18 @@ test('direct sale and pre-order are independent checkboxes on an option', () => 
   assert.match(editor, /replaceCell\(\{ \.\.\.direct, enabled \}\)/);
   assert.match(editor, /checked=\{preorder\.enabled\}/);
   assert.match(editor, /replaceCell\(\{ \.\.\.preorder, enabled \}\)/);
-  assert.match(editor, /زيادة البيع المباشر/);
-  assert.match(editor, /regular_adjust_iqd/);
+  // Pricing V2-4 (2026-10-14): the direct cell types no dinar extra any more — the
+  // model's price is its V2 selector; the cell keeps only «يُباع» and its stock.
+  assert.doesNotMatch(editor, /زيادة البيع المباشر|regular_adjust_iqd/);
 });
 
-test('pre-order exposes route availability and increases but no inventory control', () => {
+test('pre-order exposes route availability but no inventory control (and, since V2-4, no dinar surcharge)', () => {
   const options = read(OPTIONS);
   const editor = options.slice(options.indexOf('function FulfillmentEditor'));
   assert.match(editor, /Pre-order — بلا مخزون/);
   for (const method of ['land', 'sea', 'air']) assert.match(editor, new RegExp(`method: '${method}'`));
-  assert.match(editor, /current\.surcharge_iqd/);
+  // Pricing V2-4: a route carries its availability and lead time; its dinar surcharge is no longer typed.
+  assert.doesNotMatch(editor, /زيادة هذا المسار/);
   assert.doesNotMatch(editor, /preorder\.capacity|route\.capacity|سعة الطلب المسبق/);
 
   const model = read(MODEL);
