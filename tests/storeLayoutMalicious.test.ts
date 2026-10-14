@@ -112,9 +112,14 @@ test('markup in every text field of every block renders as text — no tag, no h
     for (const banned of ['script', 'style', 'iframe', 'object', 'embed', 'base', 'meta', 'form']) {
       assert.ok(!tags.has(banned), `no <${banned}> element`);
     }
-    // The only <link> is React hoisting a preload for the store's own pictures.
+    // The only <link> is React hoisting a preload for the store's own pictures:
+    // one file (href) or its right-sized copies (imageSrcSet, DECISIONS row 226).
+    const own = String.raw`\/files\/merchants\/owner\/public\/[a-z0-9]+\.webp`;
+    const preload = new RegExp(
+      String.raw`^<link rel="preload" as="image" (?:href="${own}"|imageSrcSet="${own}\?w=\d+ \d+w(?:, ${own}\?w=\d+ \d+w)*" imageSizes="[^"<>]*")( fetchPriority="high")?\/>$`
+    );
     for (const m of html.matchAll(/<link[^>]*>/g)) {
-      assert.match(m[0], /^<link rel="preload" as="image" href="\/files\/merchants\/owner\/public\/[a-z0-9]+\.webp"( fetchPriority="high")?\/>$/, m[0]);
+      assert.match(m[0], preload, m[0]);
     }
     assert.deepEqual([...attributes].filter((a) => /^on/i.test(a)), [], 'no inline event handler of any kind');
     assert.ok(!/javascript:/i.test(html));
