@@ -325,6 +325,8 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   const V2_PRODUCT_SAVE: Readonly<Record<string, readonly string[]>> = {
     'worker/routes/adminProducts.ts': [
       '../lib/pricingEngine/v2/api',
+      // Owner answer Q3 (DECISIONS row 222): an editor's publish below cost + minimum profit rings the owner.
+      '../lib/pricingEngine/v2/bell',
       '../lib/pricingEngine/v2/draft',
       // The clean start (spec addendum A.7): a product's first V2 write retires its old rows in the same batch.
       '../lib/pricingEngine/v2/firstWrite',

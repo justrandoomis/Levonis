@@ -267,3 +267,50 @@ test('§8 / A.12.3: no non-owner V2 answer carries a cost sentinel, a private ke
   }
   void asD1;
 });
+
+test('Q3: a price editor publishing below cost + minimum profit saves it; the owner is warned (bell and preview), the editor is told nothing', async () => {
+  const w = pricingWorld();
+  // AMS price-first at $1,000, with the owner's optional cost (€450, 2.5 kg land) and a $120 minimum profit:
+  // R_stock = 450 × 1,760 + 2.5 × 3,200 = 800,000; R + T = 800,000 + 120 × 1,600 = 992,000.
+  await writeV2(w.db, AMS, {
+    method: 'usd',
+    points: [fixed('1000')],
+    inputs: { supplier_cost_amount: '450', supplier_cost_currency: 'EUR', shipping_profile: 'GERMANY_LAND', shipping_weight_g: 2500 },
+    minimumProfitUsd: '120',
+  });
+  const pricing = { points: [{ scope: 'product', id: '', kind: 'fixed', usd: '500' }] }; // 800,000 < 992,000
+  const owner = await answer(await post(v2App(w.raw), '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing }));
+  assert.equal(owner.status, 200, JSON.stringify(owner.body).slice(0, 300));
+  assert.ok(owner.body.table.every((r: { owner: { v2_below_min_profit: boolean } }) => r.owner.v2_below_min_profit === true), 'the owner’s preview carries the warning on every row');
+  assert.ok(owner.body.publishable, 'a warning never blocks');
+
+  const editor = v2App(w.raw, EDITORS.full);
+  const pre = await answer(await post(editor, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing }));
+  assert.equal(pre.status, 200);
+  assert.doesNotMatch(JSON.stringify(pre.body), /below|BELOW_MIN_PROFIT|minimum/i, 'the editor’s preview says nothing (a cost oracle)');
+  assert.deepEqual(privateKeys(pre.body), []);
+  const saved = await answer(await put(editor, `/api/admin/products-v2/${AMS}/pricing`, { seq: pre.body.seq, pricing, preview_hash: pre.body.review_hash, confirm_large_change: true }));
+  assert.equal(saved.status, 200, JSON.stringify(saved.body).slice(0, 300));
+  assert.doesNotMatch(JSON.stringify(saved.body), /below|BELOW_MIN_PROFIT|minimum/i, 'nor its save');
+  assert.equal((await cartGrid(w.db, AMS))[`o:${MODEL}@direct_sale`]!.prepaid, 800_000, 'saved and on sale at the typed dollars');
+  const stored = w.raw.prepare('SELECT DISTINCT below_min_profit AS b FROM pricing_v2_sku_results WHERE product_id = ?').all(AMS) as Array<{ b: number }>;
+  assert.deepEqual(stored.map((r) => r.b), [1], 'the results row keeps the owner-only flag');
+
+  const bells = w.raw.prepare("SELECT user_id, kind, title_ar, title_en, body_ar, body_en, meta, link FROM user_notifications WHERE kind = 'fx_attention'").all() as Array<Record<string, string>>;
+  assert.equal(bells.length, 1, 'one bell');
+  assert.equal(bells[0]!.user_id, 'usr_owner', 'to the verified owner only');
+  assert.equal(bells[0]!.title_ar, 'سعر تحت الحد الأدنى للربح');
+  const meta = JSON.parse(bells[0]!.meta) as Record<string, string>;
+  assert.equal(meta.reason, 'pricing.v2.below_min_profit');
+  assert.equal(meta.product_id, AMS);
+  assert.match(meta.title_ckb, /[ڕۆێ]/u, 'real Sorani');
+  for (const k of ['title_ar', 'title_en', 'body_ar', 'body_en'] as const) assert.doesNotMatch(bells[0]![k]!, /[0-9٠-٩]/, `${k}: no figure`);
+  assert.match(bells[0]!.link, new RegExp(`edit=${AMS}&section=3$`));
+
+  // The owner's own publish below the floor rings nothing (he saw it in his sheet).
+  const ownerApp = v2App(w.raw);
+  const pre2 = await answer(await post(ownerApp, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing: { points: [fixed('450')].map((p) => ({ scope: p.scope, id: '', kind: p.kind, usd: p.usd })) } }));
+  const put2 = await answer(await put(ownerApp, `/api/admin/products-v2/${AMS}/pricing`, { seq: pre2.body.seq, pricing: { points: [{ scope: 'product', id: '', kind: 'fixed', usd: '450' }] }, preview_hash: pre2.body.review_hash, confirm_large_change: true }));
+  assert.equal(put2.status, 200, JSON.stringify(put2.body).slice(0, 300));
+  assert.equal((w.raw.prepare("SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'fx_attention'").get() as { n: number }).n, 1);
+});

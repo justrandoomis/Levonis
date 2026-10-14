@@ -16,16 +16,20 @@
  *     E_P,r  = E_D − Δ × U      Δ: sku > colour > model > product (B1, one Δ for every route)
  *     P_r    = ceil_1000(E_P,r)
  *
- * THE ROUTE FLOOR (cost-first only, B1 with spec C-5). With R_r the replacement
- * cost of route r (its own shipping profile):
- *   - R_r > D               → the route is blocked (V2_ROUTE_BELOW_COST, an error on
- *                             that channel only; the SKU's other channels stay priced);
- *   - E_P,r < R_r, `direct` → the route sells at D (V2_DISCOUNT_WITHDRAWN). The default:
- *                             a price equal to the cost rounded up would publish the
- *                             cost to every customer (row 220);
- *   - E_P,r < R_r, `cost`   → P_r = ceil_1000(R_r) (V2_LIFTED_TO_COST), §1.3's wording.
- * Price-first never floors (C-6): it only raises the owner's `below_cost` warning
- * when the optional cost is complete.
+ * THE ROUTE FLOOR (cost-first only, B1 with spec C-5 and the owner's answer Q1,
+ * DECISIONS row 222). With R_r the replacement cost of route r (its own shipping
+ * profile):
+ *   - R_r > D      → the route is blocked (V2_ROUTE_BELOW_COST, an error on that
+ *                    channel only; the SKU's other channels stay priced);
+ *   - E_P,r < R_r  → the route sells at the DIRECT price D, no discount on it
+ *                    (V2_DISCOUNT_WITHDRAWN, an owner warning). Never lifted to the
+ *                    cost: a price equal to the cost rounded up would publish the
+ *                    cost to every customer (Q1).
+ * Price-first never floors (C-6, Q3): it only raises the owner's warnings — a
+ * channel below its own known cost (`below_cost`, V2_BELOW_COST) and a direct price
+ * below cost + minimum profit (`below_min_profit`, V2_BELOW_MIN_PROFIT) — when the
+ * optional cost (and, for the second, the minimum profit) resolve. Neither ever
+ * blocks a save or moves a price.
  *
  * A pre-order-only SKU has no discount (C-8, §7 default 3): every route sells at D
  * and a stored Δ that would apply raises V2_DISCOUNT_IGNORED.
@@ -78,12 +82,9 @@ import { ROUTE_PROFILE, SKU_CHANNELS, routeOfChannel, skuComboKey, type Shipping
 
 export type V2Method = 'cost' | 'usd';
 export type V2Scope = 'product' | 'option' | 'color' | 'sku';
-/** Spec C-5 (owner question Q1). Default `direct`. */
-export type V2FloorMode = 'direct' | 'cost';
 
 export const V2_METHODS: readonly V2Method[] = ['cost', 'usd'];
 export const V2_SCOPES: readonly V2Scope[] = ['product', 'option', 'color', 'sku'];
-export const V2_DEFAULT_FLOOR_MODE: V2FloorMode = 'direct';
 /** A USD price, difference or discount: at most this much (the 0189 CHECK, like 0181's minimum profit). */
 export const V2_MAX_USD = 100_000;
 
@@ -113,7 +114,7 @@ export interface V2Sku {
   channels: readonly SkuChannel[];
   /** Cost inputs (`chainOfUnit`): required cost-first, optional price-first (profit reports, `below_cost`). */
   chain?: SkuInputChain;
-  /** Cost-first: `resolveRuleAt(rules, 'target_profit', …)`. Ignored price-first. */
+  /** `resolveRuleAt(rules, 'target_profit', …)`: required cost-first; optional price-first (Q3's owner warning). */
   target?: RuleResolution;
 }
 
@@ -124,7 +125,6 @@ export interface V2Input {
   points: readonly V2PricePoint[];
   discounts: readonly V2Discount[];
   skus: readonly V2Sku[];
-  floorMode?: V2FloorMode;
   /** Default ROUNDING_STEP_IQD (1,000). */
   step?: number;
   /** Previews only: an unconfirmed central rate is a warning instead of an error (as E1). */
@@ -132,14 +132,14 @@ export interface V2Input {
 }
 
 export type V2Anchor = 'sku_fixed' | 'model_fixed' | 'product_fixed' | 'cost';
-export type V2Floor = 'none' | 'discount_withdrawn' | 'lifted_to_cost' | 'direct_min_profit';
+export type V2Floor = 'none' | 'discount_withdrawn' | 'direct_min_profit';
 
 export interface V2Channel {
   channel: SkuChannel;
   /** Final IQD; a multiple of the step; ≥ step; ≤ direct_iqd. */
   price_iqd: number;
-  /** The exact figure `price_iqd` is the ceil_step of: E_P (a route), E_D (direct, or a route
-   * whose discount was withdrawn), or R_r (a route lifted to its cost). */
+  /** The exact figure `price_iqd` is the ceil_step of: E_P (a route), or E_D (direct, or a
+   * route whose discount was withdrawn). */
   exact_iqd: string;
   /** This SKU's D. */
   direct_iqd: number;
@@ -164,6 +164,12 @@ export interface V2Channel {
   target_rule_version: number | null;
   /** Price-first only, owner warning: the exact price is below this channel's known cost. */
   below_cost: boolean;
+  /**
+   * Price-first only, owner warning (Q3): this SKU's exact direct price E_D is below
+   * R_stock + T (its cost on the stock route plus the minimum profit), whatever its
+   * anchor. On every channel of the SKU (they share D). Never blocks, never moves a price.
+   */
+  below_min_profit: boolean;
 }
 
 export interface V2SkuResult {
@@ -352,7 +358,6 @@ function stepOf(step: number | undefined): number {
 
 interface Context {
   method: V2Method;
-  floorMode: V2FloorMode;
   step: number;
   rates: CentralRates;
   allowUnconfirmed: boolean;
@@ -464,6 +469,11 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
       target = targetOf(s.target, ctx);
       errors.push(...target.errors);
       target.warnings.forEach((p) => warn(p));
+    } else if (stock && s.target) {
+      // Q3: price-first reads the minimum profit only for the owner's warning; a missing or
+      // blocked one is no error here (the price is the typed dollars), it just raises nothing.
+      const t = targetOf(s.target, ctx);
+      target = t.errors.length ? null : t;
     }
   }
 
@@ -487,7 +497,8 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
 
   const u = ctx.u;
   const T = target?.exact ?? null;
-  const minDirect = method === 'cost' && stock && T ? addProcurementExact(stock.exact, T) : null; // R_stock + T × U
+  const minProfitAt = stock && T ? addProcurementExact(stock.exact, T) : null; // R_stock + T × U
+  const minDirect = method === 'cost' ? minProfitAt : null;
   if (errors.length || !u || anchor === null || (method === 'cost' && !minDirect) || (anchor !== 'cost' && !anchorUsd)) {
     for (const channel of wanted) fail(channel, [...errors, ...(routeCost.get(channel)?.errors ?? [])]);
     return done([]);
@@ -509,6 +520,10 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
     directFloor = 'direct_min_profit';
     warn({ code: 'V2_DIRECT_MIN_PROFIT' });
   }
+
+  /* Q3: a typed dollar price below cost + minimum profit saves, with the owner's warning. */
+  const belowMinProfit = method === 'usd' && minProfitAt !== null && cmp(eD, minProfitAt) < 0;
+  if (belowMinProfit) warn({ code: 'V2_BELOW_MIN_PROFIT' });
 
   /* 5. D. */
   const tooLarge: Problem = { code: 'AMOUNT_TOO_LARGE' };
@@ -561,6 +576,7 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
         floor: directFloor,
         replacement: stock?.cost ?? null,
         below_cost: below,
+        below_min_profit: belowMinProfit,
         ...common,
       });
       continue;
@@ -587,17 +603,11 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
         continue;
       }
       if (cmp(eP, rExact) < 0) {
-        if (ctx.floorMode === 'direct') {
-          price = D;
-          exact = eD;
-          floor = 'discount_withdrawn';
-          warn({ code: 'V2_DISCOUNT_WITHDRAWN', profile: ROUTE_PROFILE[route] }, channel);
-        } else {
-          price = ceilStep(rExact, step);
-          exact = rExact;
-          floor = 'lifted_to_cost';
-          warn({ code: 'V2_LIFTED_TO_COST', profile: ROUTE_PROFILE[route] }, channel);
-        }
+        // Q1: the direct price, no discount on this route — never lifted to the cost.
+        price = D;
+        exact = eD;
+        floor = 'discount_withdrawn';
+        warn({ code: 'V2_DISCOUNT_WITHDRAWN', profile: ROUTE_PROFILE[route] }, channel);
       }
       invariant(cmp(procurementExact(price), rExact) >= 0, 'a cost-first route is never below its own cost');
     }
@@ -614,6 +624,7 @@ function priceSkuV2(s: V2Sku, ctx: Context): V2SkuResult {
       floor,
       replacement: rR?.cost ?? null,
       below_cost: below,
+      below_min_profit: belowMinProfit,
       ...common,
     });
   }
@@ -641,8 +652,7 @@ export function priceProductV2(input: V2Input): V2Result {
   assertNoFloat(input, 'V2Input');
   const step = stepOf(input.step);
   invariant((V2_METHODS as readonly string[]).includes(input.method), 'method is cost or usd');
-  const floorMode = input.floorMode ?? V2_DEFAULT_FLOOR_MODE;
-  invariant(floorMode === 'direct' || floorMode === 'cost', 'floorMode is direct or cost');
+  invariant(!('floorMode' in input), 'the cost floor mode is retired (owner answer Q1): a floored route sells at D');
   const allowUnconfirmed = input.allowUnconfirmedRates === true;
 
   /* 1. U: present and confirmed (an unconfirmed U is a warning in previews only). */
@@ -655,7 +665,6 @@ export function priceProductV2(input: V2Input): V2Result {
 
   const ctx: Context = {
     method: input.method,
-    floorMode,
     step,
     rates: input.rates,
     allowUnconfirmed,

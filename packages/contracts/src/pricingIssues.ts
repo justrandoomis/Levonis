@@ -91,9 +91,10 @@ export const PRICING_ISSUE_CODES = [
   'V2_POINT_CONFLICT',
   'V2_DISCOUNT_IGNORED',
   'V2_DISCOUNT_WITHDRAWN',
-  'V2_LIFTED_TO_COST',
   'V2_DIRECT_MIN_PROFIT',
   'V2_BELOW_COST',
+  // The owner's answer Q3 (DECISIONS row 222): price-first below cost + minimum profit saves, with a warning.
+  'V2_BELOW_MIN_PROFIT',
 ] as const;
 
 export type PricingIssueCode = (typeof PRICING_ISSUE_CODES)[number];
@@ -446,14 +447,6 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ckb: 'داشکاندنەکە لە قازانجی ئەم ڕێگایە گەورەترە؛ بە نرخی فرۆشتنی ڕاستەوخۆ دەفرۆشرێت',
     },
   },
-  V2_LIFTED_TO_COST: {
-    severity: 'warning',
-    label: {
-      ar: 'الخصم أكبر من ربح هذا المسار؛ رُفع سعره إلى تكلفته',
-      en: "The discount is larger than this route's profit; its price was raised to its cost",
-      ckb: 'داشکاندنەکە لە قازانجی ئەم ڕێگایە گەورەترە؛ نرخەکەی بەرز کرایەوە بۆ تێچووەکەی',
-    },
-  },
   V2_DIRECT_MIN_PROFIT: {
     severity: 'warning',
     label: {
@@ -468,6 +461,14 @@ export const PRICING_ISSUES: Readonly<Record<PricingIssueCode, PricingIssueDefin
       ar: 'السعر أقل من التكلفة المعروفة لمسار البيع هذا',
       en: 'The price is below the known cost of this sale route',
       ckb: 'نرخەکە لە تێچووی زانراوی ئەم ڕێگای فرۆشتنە کەمترە',
+    },
+  },
+  V2_BELOW_MIN_PROFIT: {
+    severity: 'warning',
+    label: {
+      ar: 'سعر البيع المباشر أقل من التكلفة + الحد الأدنى للربح',
+      en: 'The direct price is below cost plus the minimum profit',
+      ckb: 'نرخی فرۆشتنی ڕاستەوخۆ لە تێچوو + کەمترین قازانج کەمترە',
     },
   },
 };

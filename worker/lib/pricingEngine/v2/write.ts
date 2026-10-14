@@ -108,6 +108,8 @@ function resultRow(ev: V2Evaluation, p: V2Evaluation['plan']['prices'][number], 
     discount_scope: p.channel === 'direct_sale' ? null : (c.discount_from?.scope ?? null),
     discount_scope_id: p.channel === 'direct_sale' || !c.discount_from ? null : c.discount_from.scope_id,
     floor: c.floor,
+    below_cost: c.below_cost ? 1 : 0,
+    below_min_profit: c.below_min_profit ? 1 : 0,
     shipping_profile: rep?.shipping_profile ?? null,
     supplier_currency: currency,
     fx_rate: rep ? rep.fx_rate : null,
@@ -209,8 +211,9 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
     ...discountStatements(db, pid, discounts, o.actor, o.now),
     ...(overlay ? [directPurchaseStatement(db, ev.stored, overlay, o.actor, o.now)] : []),
     ...(o.firstWrite ?? []),
-    // 6. The price rows.
+    // 6. The price rows. No compare-at price survives on a V2 product (spec addendum A.7: offers carry discounts).
     ...(writePrices ? priceRowStatements(db, pid, plan, o.now) : []),
+    ...(writePrices ? [db.prepare('UPDATE products SET original_price_iqd = NULL WHERE id = ? AND original_price_iqd IS NOT NULL').bind(pid)] : []),
     // 7. The history: the V2 price and the U it was computed at.
     ...(history.length
       ? [

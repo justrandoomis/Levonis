@@ -493,6 +493,16 @@ export const FINANCIAL_FIELDS = [
   'v2_legacy_snapshot',
   'v2_legacy_payload',
   'v2_discount_scope',
+  // -- The clean start (DECISIONS row 222, spec addendum A.1 Q2, A.9, A.10; migration 0190): the
+  // -- price-first owner warning below cost + minimum profit, an order line's frozen estimate (its
+  // -- channel's replacement cost in dollars, the rate and its version — `estimated_cost_iqd` is
+  // -- reserved above), and a confirmed purchase awaiting the owner's price review with its inputs.
+  'v2_below_min_profit',
+  'estimated_cost_usd',
+  'estimated_usd_iqd_rate',
+  'estimated_fx_version',
+  'purchase_review',
+  'v2_purchase_inputs',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

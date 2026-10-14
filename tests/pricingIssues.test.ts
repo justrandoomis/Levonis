@@ -61,7 +61,8 @@ test('the list holds every readiness code of master plan v2 §2.3 and the writer
   const writer = ['PRICE_SHAPE_UNSUPPORTED', 'DIRECT_PURCHASE_PRICE_SHAPE', 'FX_DERIVED_STALE', 'PRICING_ENGINE_PAUSED']; // the writer, including direct-purchase isolation
   const pricingV2 = [
     'V2_PRICE_MISSING', 'V2_DISCOUNT_TOO_LARGE', 'V2_ROUTE_BELOW_COST', 'V2_SCOPE_INVALID', 'V2_POINT_CONFLICT',
-    'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_LIFTED_TO_COST', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST',
+    'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST',
+    'V2_BELOW_MIN_PROFIT', // the owner's answer Q3 (DECISIONS row 222); V2_LIFTED_TO_COST retired by Q1
   ]; // Pricing V2 (docs/PRICING-V2.md, spec V2-1 §1.1)
   assert.deepEqual([...PRICING_ISSUE_CODES], [...v1, ...c2, ...v2, ...check, ...writer, ...pricingV2]);
   assert.equal(new Set(PRICING_ISSUE_CODES).size, PRICING_ISSUE_CODES.length);
@@ -76,11 +77,11 @@ test('severity: only the never-blocking notices are warnings', () => {
   // CHANNEL_INCOMPLETE is the owner-only notice that one route is unavailable while the
   // product stays live [C2-R10]; MEASURE_FROM_PUBLIC_SPEC: "readiness warns" [C1-G11]
   // (the opt-in's measures_confirmed gate refuses, R1/L4).
-  // Pricing V2: an ignored, withdrawn or lifted discount, a lifted direct price and a price-first
-  // price below its known cost are the owner's notices; the SKU stays priced.
+  // Pricing V2: an ignored or withdrawn discount, a lifted direct price and a price-first price
+  // below its known cost (or below cost + minimum profit, Q3) are the owner's notices; the SKU stays priced.
   assert.deepEqual(warnings, [
     'CHANNEL_INCOMPLETE', 'INPUT_ORPHANED', 'MEASURE_FROM_PUBLIC_SPEC', 'PINNED_BELOW_TARGET', 'PRICE_DROP_REVIEW', 'PRICING_CATEGORY_DIFFERS', 'RULE_ORPHANED', 'RULE_TIE',
-    'V2_BELOW_COST', 'V2_DIRECT_MIN_PROFIT', 'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_LIFTED_TO_COST',
+    'V2_BELOW_COST', 'V2_BELOW_MIN_PROFIT', 'V2_DIRECT_MIN_PROFIT', 'V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN',
   ]);
   for (const c of PRICING_ISSUE_CODES) assert.ok(['error', 'warning'].includes(PRICING_ISSUES[c].severity), c);
 });
@@ -208,7 +209,7 @@ test('pricingMissingEntriesOf: one engine issue → its missing_json entries (ba
 
 test('Pricing V2 codes (spec V2-1 §1.1): each in ar, en and real Sorani, no number in any label, the route ones name no cost', () => {
   const errors = ['V2_PRICE_MISSING', 'V2_DISCOUNT_TOO_LARGE', 'V2_ROUTE_BELOW_COST', 'V2_SCOPE_INVALID', 'V2_POINT_CONFLICT'] as const;
-  const warnings = ['V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_LIFTED_TO_COST', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST'] as const;
+  const warnings = ['V2_DISCOUNT_IGNORED', 'V2_DISCOUNT_WITHDRAWN', 'V2_DIRECT_MIN_PROFIT', 'V2_BELOW_COST', 'V2_BELOW_MIN_PROFIT'] as const;
   for (const code of [...errors, ...warnings]) {
     assert.ok(isPricingIssueCode(code), code);
     const label = PRICING_ISSUES[code].label;
@@ -220,7 +221,10 @@ test('Pricing V2 codes (spec V2-1 §1.1): each in ar, en and real Sorani, no num
   }
   // The owner's own words for the B1 floor (PRICING-V2.md §1.3): «الخصم أكبر من ربح هذا المسار».
   assert.match(PRICING_ISSUES.V2_DISCOUNT_WITHDRAWN.label.ar, /^الخصم أكبر من ربح هذا المسار/);
-  assert.match(PRICING_ISSUES.V2_LIFTED_TO_COST.label.ar, /^الخصم أكبر من ربح هذا المسار/);
+  // Q1 (DECISIONS row 222): a floored route is never lifted to its cost — the code is retired.
+  assert.equal(isPricingIssueCode('V2_LIFTED_TO_COST'), false);
+  // Q3: the owner's sentence, word for word (spec addendum A.13).
+  assert.equal(PRICING_ISSUES.V2_BELOW_MIN_PROFIT.label.ar, 'سعر البيع المباشر أقل من التكلفة + الحد الأدنى للربح');
 });
 
 test('codes are plain SCREAMING_SNAKE identifiers a client can switch on', () => {

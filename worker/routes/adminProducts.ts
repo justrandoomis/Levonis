@@ -79,6 +79,7 @@ import {
 } from '../lib/pricingEngine/v2/api';
 import { firstWriteStatements } from '../lib/pricingEngine/v2/firstWrite';
 import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
+import { belowMinProfitBell, productNameOf } from '../lib/pricingEngine/v2/bell';
 import { inputInvalid } from '../lib/pricingEngine/whatIf';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
 import {
@@ -1371,6 +1372,8 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   });
   if (verdict === 'already') return c.json({ success: true, already: true, ...(await v2StoredAnswer(c, pid)) });
   if (verdict === 'noop') return c.json({ success: true, unchanged: true, ...v2Answer({ viewer, read, ev }) });
+  // Q3 (DECISIONS row 222): a price editor's publish below cost + minimum profit rings the owner in the same batch.
+  const bell = verdict === 'data' ? [] : await belowMinProfitBell(c.env, ev, viewer, productNameOf(read.loaded.row));
   const opts = {
     actor: user.id,
     now,
@@ -1378,6 +1381,7 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
     idempotencyKey: v2PriceKey(pid, ev.hash ?? newId()),
     // The clean start: a product's first complete V2 write retires its Direct Sale Extra and purchase overlay.
     ...(ev.kind === 'v2_create' ? { firstWrite: firstWriteStatements(db, read.stored) } : {}),
+    ...(bell.length ? { extraAudits: bell } : {}),
   };
   const statements = verdict === 'data' ? await v2DataStatements(db, ev, opts) : await v2WriteStatements(db, ev, opts);
   if (statements.length > V2_PRICING_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE', { section: 3 });

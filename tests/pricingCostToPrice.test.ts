@@ -10,7 +10,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -1091,8 +1091,21 @@ test('skuComboKey is byte-identical to the product_variants comboKey (worker/lib
 test('the pricing formula never ships to the browser: src/ imports neither costToPrice, ruleResolution, legacyTargets nor the Pricing V2 maths', () => {
   for (const file of tsFiles(join(ROOT, 'src'))) {
     for (const spec of importSpecifiers(readFileSync(file, 'utf8'))) {
-      // priceV2 and priceV2Migration (spec V2-1 §1.1) are as confidential as costToPrice.
+      // priceV2 (spec V2-1 §1.1) is as confidential as costToPrice.
       assert.ok(!/costToPrice|ruleResolution|legacyTargets|pricingEngine|priceV2/.test(spec), `${file} imports ${spec}`);
+    }
+  }
+});
+
+test('the clean start (DECISIONS row 222): no worker/ or src/ file imports a reproduce helper — no path may publish an old dinar price', () => {
+  // The V2-5 migration's helpers (usdReproducing, discountReproducing, engineKeepTerms, proposeKeepUsd)
+  // turned a dinar price into dollars; they live only in the test fixture tests/fixtures/v2Publish.ts.
+  assert.ok(!existsSync(join(ROOT, 'packages', 'pricing', 'src', 'priceV2Migration.ts')), 'priceV2Migration left the package');
+  for (const dir of ['worker', 'src', join('packages', 'pricing', 'src'), join('packages', 'contracts', 'src')]) {
+    for (const file of tsFiles(join(ROOT, dir))) {
+      const text = readFileSync(file, 'utf8');
+      for (const spec of importSpecifiers(text)) assert.ok(!/priceV2Migration|fixtures\/v2Publish/.test(spec), `${file} imports ${spec}`);
+      assert.ok(!/\b(usdReproducing|discountReproducing|engineKeepTerms|proposeKeepUsd)\b/.test(text), `${file} names a reproduce helper`);
     }
   }
 });
