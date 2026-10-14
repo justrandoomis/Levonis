@@ -716,6 +716,8 @@ export interface SchemaFacts {
   hasOperationalRefunds?: boolean;
   /** 0140's accepted order-price deltas; absent databases keep their old SQL. */
   hasPriceAdjustments?: boolean;
+  /** 0190's frozen V2 line estimate (`order_items.estimated_cost_iqd`); absent databases keep their old SQL. */
+  hasLineEstimates?: boolean;
 }
 
 /**
@@ -895,7 +897,7 @@ const MYSTERY_SPOOL_SQL = `
 const KIDS_SQL = (schema: SchemaFacts): string => `
          SELECT k.bundle_parent_item_id AS pid,
                 MIN(CASE (${schema.has0095
-                  ? costConfidenceSql('k', 'kp')
+                  ? costConfidenceSql('k', 'kp', schema.hasLineEstimates === true)
                   : `CASE WHEN kp.product_cost_iqd IS NULL THEN 'unknown' ELSE 'estimated' END`})
                       WHEN 'recorded' THEN 2 WHEN 'estimated' THEN 1 ELSE 0 END) AS worst
            FROM order_items k
@@ -939,7 +941,7 @@ const KIDS_SQL = (schema: SchemaFacts): string => `
  */
 const costProjection = (schema: SchemaFacts): string => {
   const own = schema.has0095
-    ? { value: costValueSql('i', 'p'), confidence: costConfidenceSql('i', 'p') }
+    ? { value: costValueSql('i', 'p', schema.hasLineEstimates === true), confidence: costConfidenceSql('i', 'p', schema.hasLineEstimates === true) }
     : {
         value: 'p.product_cost_iqd',
         confidence: `CASE WHEN p.product_cost_iqd IS NULL THEN 'unknown' ELSE 'estimated' END`,

@@ -246,8 +246,13 @@ export interface ListingItem {
   status: 'draft' | 'active' | 'hidden';
   name_ar: string;
   name_en: string;
-  price_iqd: number;
+  /** Null while the product needs pricing (its stored ladder is legacy, never shown). */
+  price_iqd: number | null;
   pro_price_iqd: number | null;
+  /** The clean start (A.5): hidden from customers until its first complete V2 write. */
+  needs_pricing?: boolean;
+  /** The lowest final price its V2 results sell at; null while it needs pricing. */
+  from_iqd?: number | null;
   stock: number | null;
   is_featured: boolean;
   brand_id: string | null;

@@ -312,8 +312,22 @@ interface CartMembership {
   cod_tax_exempt: boolean;
 }
 
+/**
+ * A line whose product is not for sale right now (the clean start, DECISIONS row 222): hidden, or not
+ * yet priced in dollars. The server sends names and ids only — no price — and leaves it out of every
+ * total; the checkout refuses it. The customer is told so and can remove it.
+ */
+interface UnavailableLine {
+  cart_item_id: string;
+  product_id: string;
+  name: { ar: string; en: string; ckb: string };
+  image: string;
+  code: 'PRODUCT_CURRENTLY_UNAVAILABLE';
+}
+
 interface CartResponse {
   items: CartItem[];
+  unavailable_lines?: UnavailableLine[];
   membership?: CartMembership | null;
   scope?: { seller_type?: string } | null;
 }
@@ -327,6 +341,7 @@ interface CartResponse {
  */
 interface CartWriteResponse {
   items: CartItem[];
+  unavailable_lines?: UnavailableLine[];
   membership?: CartMembership | null;
 }
 
@@ -355,6 +370,8 @@ export default function Cart() {
   const arrow = dir === 'rtl' ? '←' : '→';
 
   const [items, setItems] = useState<CartItem[]>([]);
+  const [unavailableLines, setUnavailableLines] = useState<UnavailableLine[]>([]);
+  const [removingUnavailable, setRemovingUnavailable] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // One cart, one seller (§14): the server says whose cart this is, and a
   // merchant-store cart gets its own rendering with the shop's own terms.
@@ -531,6 +548,7 @@ export default function Cart() {
   const applyCartWrite = useCallback(
     (data: CartWriteResponse) => {
       applyItems(data.items || []);
+      if (Array.isArray(data.unavailable_lines)) setUnavailableLines(data.unavailable_lines);
       if ('membership' in data) putMembership(data.membership ?? null);
       else void refreshMembership();
     },
@@ -598,6 +616,7 @@ export default function Cart() {
       // cart swaps in.
       setMerchantScope(data.scope?.seller_type === 'merchant');
       applyItems(data.items || [], { detectPriceChange: !!opts?.silent });
+      setUnavailableLines(Array.isArray(data.unavailable_lines) ? data.unavailable_lines : []);
       // §10: the server's own answer about what this membership saved, per
       // line and in total — null for a customer without one, and for one whose
       // membership has lapsed.
@@ -883,6 +902,20 @@ export default function Cart() {
       loadCart();
     } finally {
       actionBusyRef.current -= 1;
+    }
+  };
+
+  /** Remove a line whose product is not for sale now (the server re-reads the cart). */
+  const removeUnavailable = async (line: UnavailableLine) => {
+    setRemovingUnavailable(line.cart_item_id);
+    try {
+      const data = await api.delete<CartWriteResponse>(`/api/cart/items/${line.cart_item_id}`);
+      applyCartWrite(data);
+      if (!Array.isArray(data.unavailable_lines)) setUnavailableLines((prev) => prev.filter((l) => l.cart_item_id !== line.cart_item_id));
+    } catch (err) {
+      setError(cartRefusal(err, 'Failed to remove item'));
+    } finally {
+      setRemovingUnavailable(null);
     }
   };
 
@@ -1455,6 +1488,38 @@ export default function Cart() {
             <span>{error}</span>
             <button type="button" onClick={() => setError('')} className="shrink-0 p-1 hover:text-text-primary"><X className="w-4 h-4" /></button>
           </div>
+        )}
+
+        {!loading && unavailableLines.length > 0 && (
+          <section
+            data-cart-unavailable
+            aria-label={loc('منتجات غير متاحة حاليًا', 'Products not available right now', 'بەرهەمی ئێستا بەردەست نەبوو')}
+            className="lv-surface mx-4 mt-3 flex flex-col gap-2 p-3"
+          >
+            {unavailableLines.map((line) => (
+              <div key={line.cart_item_id} className="flex min-w-0 items-center gap-3" data-cart-unavailable-line={line.cart_item_id}>
+                {line.image ? (
+                  <img src={line.image} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded-lg object-cover opacity-60" />
+                ) : (
+                  <div className="h-14 w-14 shrink-0 rounded-lg bg-surface-raised" aria-hidden="true" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-text-secondary">{lang === 'en' ? line.name.en : lang === 'ckb' ? line.name.ckb : line.name.ar}</p>
+                  <p className="text-xs text-amber-300">
+                    {loc('غير متاح حاليًا — أزله من السلة', 'Not available right now — remove it from your cart', 'ئێستا بەردەست نییە — لە سەبەتەکەت لای ببە')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void removeUnavailable(line)}
+                  disabled={removingUnavailable === line.cart_item_id}
+                  className="lv-button lv-button-secondary shrink-0 px-3 text-sm"
+                >
+                  {loc('أزل', 'Remove', 'لای ببە')}
+                </button>
+              </div>
+            ))}
+          </section>
         )}
 
         {loading ? (

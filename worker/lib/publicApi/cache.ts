@@ -21,6 +21,24 @@
  * simply builds every answer (the pattern of worker/routes/catalog.ts).
  */
 
+/**
+ * THE CATALOGUE CACHE EPOCH (the clean start, DECISIONS row 222; spec addendum A.4.5).
+ *
+ * Every catalogue answer cached at the edge (the anonymous storefront routes,
+ * the catalogue tree and pages, search, the public API) is keyed with this
+ * epoch. Purges are per colo and an anonymous answer lives up to s-maxage +
+ * stale-while-revalidate; a new epoch makes every entry stored before the
+ * release miss in every colo at once — so no page priced in the old dinars is
+ * served after the deploy (they age out unseen). Change it only for a release
+ * that must drop every cached catalogue answer.
+ */
+export const CATALOG_CACHE_EPOCH = 'pv2-clean-start';
+
+/** A cache key URL carrying the epoch (appended last, so the declared params keep their order). */
+export function withCacheEpoch(url: string): string {
+  return `${url}${url.includes('?') ? '&' : '?'}__cv=${CATALOG_CACHE_EPOCH}`;
+}
+
 export function edgeCache(): Cache | null {
   return typeof caches !== 'undefined' ? ((caches as unknown as { default?: Cache }).default ?? null) : null;
 }

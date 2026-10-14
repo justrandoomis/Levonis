@@ -126,26 +126,29 @@ export interface EngineStateRow {
   pricing_method?: 'cost' | 'usd' | null;
 }
 
-const engineStatesSql = (v2: boolean) => `SELECT s.product_id, p.slug, s.inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at,${v2 ? ' s.pricing_method,' : ''}
+// The clean start (DECISIONS row 222, spec addendum A.6): only V2 products are repriced. A V1 engine
+// product is hidden until it is priced in dollars, and repricing it would write `price_history` rows that
+// price protection reads as engine observations — an old dinar price published by the back door.
+const engineStatesSql = () => `SELECT s.product_id, p.slug, s.inputs_seq, s.write_seq, s.reprice_blocked_code, s.reprice_blocked_at, s.pricing_method,
        MAX(COALESCE((SELECT MAX(updated_at) FROM pricing_fx_rates), ''), COALESCE((SELECT MAX(updated_at) FROM pricing_shipping_rates), '')) AS rates_at
   FROM product_pricing_state s JOIN products p ON p.id = s.product_id
- WHERE s.mode = 'engine' AND COALESCE(p.composition, '') = ''
+ WHERE s.mode = 'engine' AND s.pricing_method IS NOT NULL AND COALESCE(p.composition, '') = ''
  ORDER BY s.product_id`;
 
 /**
- * Every engine-priced product (one indexed read: idx_product_pricing_state_engine) — V2 products
- * included: they are `mode = 'engine'` (spec C-1), so the automatic repricing selects them as it
- * always has, and only the code after the selection branches on the method. On a database without
- * 0189 the read is V1's (a second statement, reported through `spent`). Throws on a database without 0181.
+ * Every V2 product (one indexed read: idx_product_pricing_state_engine; spec C-1: `mode = 'engine'`
+ * with a method). Since the clean start a V1 engine product is never repriced (it is hidden until
+ * priced in dollars). A database without 0189 has none: []. Throws on a database without 0181.
  */
 export async function loadEngineStates(db: D1Database, opts: { spent?: (n: number) => void } = {}): Promise<EngineStateRow[]> {
   let rows: EngineStateRow[];
   try {
-    rows = (await db.prepare(engineStatesSql(true)).all<EngineStateRow>()).results ?? [];
+    rows = (await db.prepare(engineStatesSql()).all<EngineStateRow>()).results ?? [];
   } catch (e) {
+    // A database without 0189 has no V2 product: nothing to reprice (the clean start reprices V2 only).
     if (!isMissingV2Schema(e)) throw e;
-    opts.spent?.(1);
-    rows = (await db.prepare(engineStatesSql(false)).all<EngineStateRow>()).results ?? [];
+    void opts;
+    return [];
   }
   return rows.map((r) => ({
     product_id: String(r.product_id),

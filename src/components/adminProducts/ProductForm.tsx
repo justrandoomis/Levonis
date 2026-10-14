@@ -52,7 +52,7 @@ import StatusChipV2 from './form/v2/StatusChipV2';
 import ReviewSheetV2 from './form/v2/ReviewSheetV2';
 import ModelPriceSelector from './form/v2/ModelPriceSelector';
 import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelector';
-import { comboKeyOf, iqdText, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
+import { comboKeyOf, docWithoutLegacyMoney, iqdText, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
 import { v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
@@ -806,10 +806,11 @@ export default function ProductForm({
       const { options: _o, colors: _c, media: _m, ...docFields } = next as EditorDoc & Record<string, unknown>;
       void _o; void _c; void _m;
       const body: Record<string, unknown> = {
-        ...docFields,
+        // The clean start (A.6): no dinar price travels — the server keeps every stored one.
+        ...docWithoutLegacyMoney(docFields),
         // Add-product: the id the V2 preview priced the draft under (the server keeps a sent id).
         ...(next.id ? {} : { id: draftId }),
-        relations: relationsToWire(rel),
+        relations: withoutLegacyMoney(relationsToWire(rel)),
         ...(Object.keys(overrides).length ? { translation_overrides: overrides } : {}),
         // Omitted deliberately when the admin has chosen to overwrite: the
         // server skips the stale check when no expectation is stated, which is
@@ -1463,7 +1464,7 @@ export default function ProductForm({
             cost appears after the save (which keeps every stored cost). */}
         {canSeeCost && !costLoaded && <CostOpensAfterSave />}
 
-        <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} />
+        <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} productId={doc.id || null} />
 
         {/* The real cost layers behind the stock (the owner's batches): renders nothing
             for a product with no batches, or for an admin whose payload carries no costs. */}

@@ -1402,7 +1402,9 @@ export function resolveUnitPrice(input: {
       pro: proResolved.rule_id !== null && proIqd === beforeClamp.pro ? proResolved.rule_id : null,
       prime: primeResolved.rule_id !== null && primeIqd === beforeClamp.prime ? primeResolved.rule_id : null,
     },
-    cost_iqd: cost.value ?? null,
+    // The clean start (DECISIONS row 222, spec addendum A.4.3): a V2 document never yields a legacy cost —
+    // its line's cost is the FIFO allocation, the batch linked on arrival, or the V2 estimate (A.9).
+    cost_iqd: product.sku_strict === true ? null : (cost.value ?? null),
     price_source: regular.source,
     fulfillment: {
       type: lineType,

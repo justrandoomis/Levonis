@@ -36,13 +36,16 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, int, notFound, requireAdmin, str } from '../lib/http';
 import { auditStatements } from '../lib/audit';
+import { v2Managed } from '../lib/engineInstalled';
 import {
+  cleanStartAt,
   INHERITS,
   normalizeUtc,
   offerWindowStatements,
   parseRequiredTiers,
   scheduleState,
   subjectOf,
+  suspendedByCleanStart,
 } from '../lib/offers';
 
 export const adminOffersRoutes = new Hono<AppContext>();
@@ -185,10 +188,11 @@ adminOffersRoutes.get('/', async (c) => {
     .bind(...params)
     .all<Record<string, unknown>>();
   const now = Date.now();
+  const cleanStart = await cleanStartAt(c.env.DB);
   return c.json({
     success: true,
     offers: (results ?? []).map((r) => ({
-      ...windowView(r),
+      ...windowView(r, cleanStart),
       product: {
         id: String(r.subject_id),
         name: r.product_name ?? '',
@@ -207,7 +211,9 @@ adminOffersRoutes.get('/', async (c) => {
   });
 });
 
-function windowView(r: Record<string, unknown>) {
+/** `cleanStart` = the clean start's instant (`cleanStartAt`): a window last saved before it is
+ *  suspended (addendum A.5) — «موقوف: أُنشئ قبل التسعير الجديد» until it is saved again. */
+function windowView(r: Record<string, unknown>, cleanStart: string | null = null) {
   return {
     subject_type: String(r.subject_type ?? 'product'),
     subject_id: String(r.subject_id ?? ''),
@@ -225,6 +231,7 @@ function windowView(r: Record<string, unknown>) {
     max_per_user: (r.max_per_user as number | null) ?? null,
     max_global: (r.max_global as number | null) ?? null,
     updated_at: (r.updated_at as string | null) ?? null,
+    suspended: suspendedByCleanStart(r.updated_at, cleanStart),
   };
 }
 
@@ -260,7 +267,7 @@ adminOffersRoutes.get('/:productId', async (c) => {
   return c.json({
     success: true,
     product,
-    offer: w ? { ...windowView({ ...w, ...(l ?? {}) }) } : null,
+    offer: w ? { ...windowView({ ...w, ...(l ?? {}) }, await cleanStartAt(c.env.DB)) } : null,
     redeemed: Number(redeemed?.n ?? 0),
     released: Number(redeemed?.released ?? 0),
     schedule_state: w
@@ -284,6 +291,12 @@ async function writeOffer(c: Context<AppContext>, productId: string) {
 
   if (input.starts_at && input.ends_at && Date.parse(input.ends_at) < Date.parse(input.starts_at)) {
     refuse('SCHEDULE_INVERTED');
+  }
+  // The clean start (addendum A.6, DECISIONS row 222): an ordinary product's price is its V2 write's.
+  // A typed dinar offer price (or PLUS price) on one waits for Services V2's dollar offers (row 223);
+  // percent and amount discounts stay. A composition keeps its typed prices (Q7).
+  if (product && product.composition === '' && (input.offer_price_mode === 'fixed' || (input.plus_price_iqd ?? null) !== null)) {
+    throw v2Managed(3);
   }
   if (input.offer_price_mode === 'fixed' && input.offer_price_iqd === null) refuse('OFFER_PRICE_INCOMPLETE');
   if (input.offer_price_mode === 'discount_percent' && input.discount_percent === null) refuse('OFFER_PRICE_INCOMPLETE');
@@ -374,7 +387,7 @@ async function writeOffer(c: Context<AppContext>, productId: string) {
 
   return c.json({
     success: true,
-    offer: stored ? windowView(stored) : null,
+    offer: stored ? windowView(stored, await cleanStartAt(c.env.DB)) : null,
     // Kept visible after a successful save, the `ProductForm` pattern (§11.3).
     warnings: warningsFor(input, product ? product.composition : ''),
   });

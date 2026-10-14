@@ -42,6 +42,14 @@ export default {
         'POST /catalogs/:catalogId/reorder': 'op',
         'GET /': 'op',
         'GET /stats': 'op',
+        // «يحتاج تسعيرًا» (the clean start, addendum A.8): codes, counts, names and field names only, projected
+        // per viewer (a price editor never reads a cost code's name or the owner-only filters).
+        'GET /needs-pricing': 'op',
+        // D1 (addendum A.10): a confirmed purchase's cost waits for the owner's review — cost end to end.
+        'GET /:id/purchase-review': { cls: 'cost_read', why: 'the cost inputs a confirmed stock purchase implies, pending the owner’s review' },
+        'POST /:id/purchase-review/:reviewId/preview': { cls: 'cost_read', why: 'the review’s price change: prices in memory, writes nothing; POST only for its path' },
+        'POST /:id/purchase-review/:reviewId/apply': { cls: 'cost_write', why: 'one V2 batch: the purchase’s cost inputs, the prices they move and the review marked applied' },
+        'POST /:id/purchase-review/:reviewId/dismiss': { cls: 'cost_write', why: '«أبقِ التكلفة الحالية»: the review is dismissed, nothing else moves' },
         // «ناقص» / «إخفاء المنتجات الناقصة عن الزبائن» (owner brief 2026-10-10,
         // worker/routes/adminCompleteness.ts): every admin reads a product's
         // missing fields (a non-owner reads one OWNER_DATA item for the private
@@ -61,7 +69,7 @@ export default {
           cls: 'op',
           body: async (read: (p: string) => Promise<Record<string, unknown>>) => (await read('/api/admin/products-v2/p_a1')).product,
         },
-        'POST /:id/reprice': { cls: 'op', body: { mode: 'delta', from_price_iqd: 900000, to_price_iqd: 950000 } },
+        'POST /:id/reprice': { cls: 'op', noBody: 'retired by the clean start (addendum A.6): 409 PRICING_V2_MANAGED for every product and every admin, nothing written' },
         'DELETE /:id': { cls: 'op', noBody: 'removes the product row (refused while history holds it); answers ids only' },
         'PUT /:id/catalogs': { cls: 'op', body: { catalog_ids: [] } },
         // The admin price preview: the owner's carries cost_iqd, everyone else's does not.
@@ -112,7 +120,8 @@ export default {
                 enabled: true,
                 sort: 0,
                 capacity: 5,
-                transports: [{ method: 'air', enabled: true, sort: 0, surcharge_iqd: 25000, capacity: 3 }],
+                // No route surcharge: the clean start (A.6) refuses a dinar cell the stored route does not hold.
+                transports: [{ method: 'air', enabled: true, sort: 0, capacity: 3 }],
               },
             ],
           },
@@ -126,13 +135,11 @@ export default {
       router: adminPriceGridRoutes,
       routes: {
         'GET /:id/price-grid': 'op',
-        'PATCH /:id/price-grid': {
-          cls: 'op',
-          body: { cells: [{ level: 'option', id: 'v_a1', field: 'regular', mode: 'fixed', value: '950000' }] },
-        },
-        'PATCH /:id/price-grid/traits': { cls: 'op', body: { traits: [{ level: 'option', id: 'v_a1', field: 'active', value: true }] } },
-        // Leak L4: a preview below cost must say nothing about the cost to a non-owner.
-        'POST /:id/price-grid/bulk': { cls: 'op', body: { op: 'set', fields: ['regular'], value: 100_000, scope: { levels: ['product'] } } },
+        // The clean start (addendum A.6): the price grid is closed — every route answers 409 PRICING_V2_MANAGED
+        // {section} for every product and every admin, writes nothing and names no figure.
+        'PATCH /:id/price-grid': { cls: 'op', noBody: 'closed by the clean start: 409 PRICING_V2_MANAGED {section: 3}, nothing written' },
+        'PATCH /:id/price-grid/traits': { cls: 'op', noBody: 'closed by the clean start: 409 PRICING_V2_MANAGED {section: 5}, nothing written' },
+        'POST /:id/price-grid/bulk': { cls: 'op', noBody: 'closed by the clean start: 409 PRICING_V2_MANAGED {section: 3}, nothing written' },
         'POST /:id/price-grid/copy': 'cost_write',
         'POST /:id/price-grid/undo': {
           cls: 'op',

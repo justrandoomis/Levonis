@@ -15,6 +15,7 @@
  * refuses — which is the defect the price-change round was about.
  */
 
+import { OFFER_NOT_SUSPENDED_SQL } from './offers';
 import { optimisticListed, runListed } from './listing';
 import { SOLD_STATES_SQL } from './soldStates';
 
@@ -109,6 +110,7 @@ export async function flashDealIds(
           WHERE w.subject_type = 'product'
             AND w.active = 1
             AND w.offer_price_mode <> ''
+            AND ${OFFER_NOT_SUSPENDED_SQL}
             AND ${L.listed('p')} AND p.composition = ''
             AND (w.starts_at IS NULL OR w.starts_at <= ?)
             AND (w.ends_at IS NULL OR w.ends_at > ?)

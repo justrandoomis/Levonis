@@ -15,12 +15,19 @@
  * mutations are written to the audit log.
  */
 
-import { updateSelectionPrice } from '../lib/inventoryReferencePrice';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, notFound, int, str, pickFrom, HttpError } from '../lib/http';
+import {
+  requireAdmin,
+  badRequest,
+  notFound,
+  int,
+  str,
+  pickFrom,
+  HttpError,
+} from '../lib/http';
 import { audit } from '../lib/audit';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { completenessAfterWrite } from '../lib/completenessHooks';
@@ -28,17 +35,12 @@ import { registerCompletenessRoutes } from './adminCompleteness';
 import { completenessInstalled } from '../lib/listing';
 import { parseMissing, projectItems } from '../lib/productCompleteness';
 import { newId } from '../lib/crypto';
-import {
-  DIMENSION_FIELDS,
-  parseProductRow,
-  validateProductDoc,
-  projectAdmin,
-} from '../lib/productModel';
+import { DIMENSION_FIELDS, parseProductRow, validateProductDoc, projectAdmin } from '../lib/productModel';
 import type { ProductDoc, TranslationMeta } from '../lib/productModel';
 import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
 import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { optionValueIdsInRelationOrder } from '../lib/cartSelectionIdentity';
-import { pinnedRows, repriceRow, type PinnedPriceRow, type RepriceMode } from '../lib/pinnedPrices';
+import { pinnedRows, type PinnedPriceRow } from '../lib/pinnedPrices';
 import type { Tier } from '../lib/pricing';
 import { getSettings } from '../lib/settings';
 import { getAppliedUsdRate, getDisplayUsdRate, iqdToUsdCentsAtRate } from '../lib/fx/displayRate';
@@ -53,13 +55,21 @@ import {
   projectForAdmin,
 } from '../lib/adminScope';
 import { costRefusal } from '../lib/costAccess';
-import { pricingV2Installed, productEngineDirectOnly, productEngineManaged, productEngineV2, productV2Flag, refuseEngineManaged } from '../lib/engineInstalled';
+import {
+  pricingV2Installed,
+  productEngineDirectOnly,
+  productEngineManaged,
+  productEngineV2,
+  productV2Flag,
+  v2Managed,
+} from '../lib/engineInstalled';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { limitRoute } from '../lib/ratelimit';
 import { SESSION_CACHE_CONTROL } from '../lib/edgePolicy';
 import { jsonObject } from '../lib/http';
 import { pinV2PriceFields, previewDraft } from '../lib/pricingEngine/v2/draft';
+import { holdLegacyDocMoney, holdLegacyRelationMoney } from '../lib/pricingEngine/v2/legacyMoney';
 import { planV2ProductSave, type V2SaveOutcome } from '../lib/pricingEngine/v2/productSave';
 import {
   desiredFor,
@@ -78,7 +88,9 @@ import {
   type V2Read,
 } from '../lib/pricingEngine/v2/api';
 import { firstWriteStatements } from '../lib/pricingEngine/v2/firstWrite';
-import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
+import { V2_PRICING_STATEMENT_CAP, v2DataStatements, v2StructureStatements, v2WriteStatements } from '../lib/pricingEngine/v2/write';
+import { needsPricingAnswer, QUEUE_FILTERS, type QueueFilter } from '../lib/pricingEngine/v2/queue';
+import { applyPurchaseReview, dismissPurchaseReview, loadPurchaseReview, previewPurchaseReview, reviewView } from '../lib/pricingEngine/v2/purchaseReview';
 import { belowMinProfitBell, productNameOf } from '../lib/pricingEngine/v2/bell';
 import { inputInvalid } from '../lib/pricingEngine/whatIf';
 import { applyPrinterWarrantyRules, mergeOpsPolicy, readOpsWarranty } from '../lib/warrantyPlans';
@@ -95,11 +107,7 @@ import {
 import { isLostRace } from '../lib/gifts/fence';
 import { refuse as serialRefuse } from '../lib/serialAssignments';
 import { bundlesUsing, compositionConflict } from '../lib/bundleComposition';
-import {
-  deleteProductPermanently,
-  invalidateMediaCache,
-  scanProductOrphans,
-} from '../lib/productDeletion';
+import { deleteProductPermanently, invalidateMediaCache, scanProductOrphans } from '../lib/productDeletion';
 /**
  * The full map of where an R2 key can live, and the gate that refuses the
  * destructive sweep until that map is provably complete for the live schema.
@@ -121,18 +129,11 @@ import {
   readTranslationOverrides,
   planProductSave,
   priceHistoryDeltas as sharedPriceHistoryDeltas,
-  recordPriceHistory,
   reloadForVerification,
   saveProductAtomic,
-  type HistoryField,
-  type PriceDelta,
   type ProductWriteIntent,
 } from '../lib/productPersistence';
-import {
-  ProductMediaIngestError,
-  verifyStoredProductMedia,
-  type ProductMediaReference,
-} from '../lib/productMediaIngest';
+import { ProductMediaIngestError, verifyStoredProductMedia, type ProductMediaReference } from '../lib/productMediaIngest';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
 
@@ -152,7 +153,13 @@ adminProductsRoutes.use('*', purgeCatalogueAfterWrite);
 adminProductsRoutes.use('*', completenessAfterWrite);
 
 // Pricing a selection from its purchase writes a price derived from cost: the owner's (decision 2).
-adminProductsRoutes.post('/:id/selection-price',async c=>{const user=c.get('user')!;if(!canWriteCost(c.env,user))throw costRefusal(c.env,user);await refuseEngineManaged(c.env.DB,c.req.param('id'));const result=await updateSelectionPrice(c.env.DB,c.req.param('id'),await c.req.json<Record<string,unknown>>(),user.id);c.set('catalogueSlug',result.slug);return c.json({success:true,...result});});
+// «تحديث سعر هذا الخيار في المتجر» — retired by the clean start (addendum A.6): a selection's price is
+// its V2 write's. The cost gate still answers first (a non-owner learns nothing more than before).
+adminProductsRoutes.post('/:id/selection-price', async (c) => {
+  const user = c.get('user')!;
+  if (!canWriteCost(c.env, user)) throw costRefusal(c.env, user);
+  throw v2Managed(5);
+});
 
 // ---------------------------------------------------------------- helpers
 
@@ -733,6 +740,13 @@ adminProductsRoutes.get('/', async (c) => {
     params.push(new Date(Date.now() - int(q.days, 'days', { min: 1, max: 3650 }) * 86_400_000).toISOString());
   }
   if (q.featured === '1') clauses.push('is_featured = 1');
+  // «يحتاج تسعيرًا» (the clean start, A.5/A.8): not V2-published — hidden from every customer.
+  const v2Cols = await pricingV2Installed(c.env.DB);
+  const v2PublishedSql = v2Cols
+    ? `EXISTS (SELECT 1 FROM product_pricing_state vs WHERE vs.product_id = products.id AND vs.mode = 'engine' AND vs.pricing_method IS NOT NULL
+         AND EXISTS (SELECT 1 FROM pricing_v2_sku_results vr WHERE vr.product_id = products.id))`
+    : '0';
+  if (q.needs_pricing === '1') clauses.push(`NOT ${v2PublishedSql}`);
   // «ناقص» (owner brief 2026-10-10, migration 0184): the products the central
   // required-field list finds incomplete. Without 0184 there is nothing to
   // filter by and the column reads null.
@@ -769,6 +783,8 @@ adminProductsRoutes.get('/', async (c) => {
               ${hasDirectSql} AS has_direct_sale,
               low_stock_threshold, is_featured, brand_id, created_at, updated_at, doc_version,
               composition,
+              ${v2PublishedSql} AS v2_published,
+              ${v2Cols ? '(SELECT MIN(fr.final_price_iqd) FROM pricing_v2_sku_results fr WHERE fr.product_id = products.id)' : 'NULL'} AS v2_from_iqd,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
                         WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold${completenessCols}
@@ -799,8 +815,9 @@ adminProductsRoutes.get('/', async (c) => {
         status: r.status,
         name_ar: r.name_ar,
         name_en: r.name,
-        price_iqd: r.price_iqd,
-        pro_price_iqd: (r.pro_price_iqd as number | null) ?? null,
+        // A product still waiting for its first V2 write shows no dinar figure (its stored ladder is legacy).
+        price_iqd: Number(r.v2_published ?? 0) === 1 ? r.price_iqd : null,
+        pro_price_iqd: Number(r.v2_published ?? 0) === 1 ? ((r.pro_price_iqd as number | null) ?? null) : null,
         // No NULL is ever exposed for an enabled direct sale. A missing row
         // is a configuration error and therefore sold out until fixed.
         stock: r.has_direct_sale ? Number(r.display_stock ?? 0) : null,
@@ -813,6 +830,10 @@ adminProductsRoutes.get('/', async (c) => {
         // row, so the grid BADGES it and sends the admin to the bundles panel
         // instead of opening an editor that will refuse (COMPOSITION_PRODUCT).
         composition: String(r.composition ?? ''),
+        // The clean start (A.5): hidden from customers until its first complete V2 write; and the
+        // lowest final price its V2 results sell at (null while it needs pricing) — never a legacy figure.
+        needs_pricing: Number(r.v2_published ?? 0) !== 1,
+        from_iqd: Number(r.v2_published ?? 0) === 1 && r.v2_from_iqd !== null && r.v2_from_iqd !== undefined ? Number(r.v2_from_iqd) : null,
         // The required-field verdict, projected for this viewer (a non-owner
         // counts the private fields as ONE «owner data» item): null = not
         // evaluated yet (or no 0184). `held`: hidden from customers by the
@@ -839,6 +860,54 @@ adminProductsRoutes.get('/', async (c) => {
  * is a financial figure, so scoped admins get the units without it. There
  * is no view counter on platform products, and none is invented.
  */
+/**
+ * «يحتاج تسعيرًا» (the clean start, addendum A.8): every product hidden until its
+ * first complete V2 write, with its state and the grouped missing items — codes,
+ * counts and names only, projected per viewer (`v2/queue.ts`). No bulk publish.
+ */
+adminProductsRoutes.get('/needs-pricing', limitRoute('pricing-read', 1200), async (c) => {
+  const q = c.req.query();
+  const page = int(q.page, 'page', { min: 1, max: 1000, def: 1 });
+  const raw = q.filter ?? 'all';
+  const filter = (QUEUE_FILTERS as readonly string[]).includes(raw) ? (raw as QueueFilter) : 'all';
+  return c.json(await needsPricingAnswer(c, { page, filter }));
+});
+
+/**
+ * D1 — THE PURCHASE REVIEW (addendum A.10): a confirmed stock purchase's costs wait here until the
+ * owner previews the price change and applies it (or keeps the current cost). Owner-only: the
+ * review is cost; everyone else gets the cost refusal by name, the same for a real and an invented id.
+ */
+const requireReviewOwner = (c: Context<AppContext>) => {
+  const user = c.get('user')!;
+  if (!canWriteCost(c.env, user) || !canViewCost(c.env, user)) throw costRefusal(c.env, user, { fields: ['purchase_review'] });
+};
+adminProductsRoutes.get('/:id/purchase-review', limitRoute('pricing-read', 1200), async (c) => {
+  requireReviewOwner(c);
+  const row = await loadPurchaseReview(c.env.DB, c.req.param('id'));
+  c.header('Cache-Control', 'private, no-store');
+  return c.json({ success: true, purchase_review: row ? reviewView(row) : null });
+});
+adminProductsRoutes.post('/:id/purchase-review/:reviewId/preview', limitRoute('pricing-read', 1200), async (c) => {
+  requireReviewOwner(c);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json(await previewPurchaseReview(c, c.req.param('id'), c.req.param('reviewId')));
+});
+adminProductsRoutes.post('/:id/purchase-review/:reviewId/apply', limitRoute('pricing-write', 600), async (c) => {
+  requireReviewOwner(c);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const result = await applyPurchaseReview(c, c.req.param('id'), c.req.param('reviewId'), body);
+  const slug = await c.env.DB.prepare('SELECT slug FROM products WHERE id = ?').bind(c.req.param('id')).first<{ slug: string }>();
+  if (slug?.slug) c.set('catalogueSlug', slug.slug);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json(result);
+});
+adminProductsRoutes.post('/:id/purchase-review/:reviewId/dismiss', limitRoute('pricing-write', 600), async (c) => {
+  requireReviewOwner(c);
+  c.header('Cache-Control', 'private, no-store');
+  return c.json(await dismissPurchaseReview(c, c.req.param('id'), c.req.param('reviewId')));
+});
+
 adminProductsRoutes.get('/stats', async (c) => {
   const db = c.env.DB;
   const since12w = new Date(Date.now() - 12 * 7 * 86_400_000).toISOString();
@@ -1505,6 +1574,12 @@ adminProductsRoutes.post('/', async (c) => {
   // the panel and the slug.
   if (prev && prev.composition !== '') throw compositionConflict(prev.id, prev.slug);
 
+  // THE CLEAN START (addendum A.6, DECISIONS row 222): no save types a dinar price. A legacy money
+  // field the request leaves out keeps the stored value; one it carries must equal it; anything else
+  // is 409 PRICING_V2_MANAGED {section, field}. Costs are judged only for an actor who may write them.
+  const judgesCost = canWriteCost(c.env, admin) && !(prev !== null && body.cost_loaded === false);
+  holdLegacyDocMoney(body, prev, { costs: judgesCost });
+
   const doc = validateProductDoc(body);
 
   // Product-level dimensions follow the same partial-update contract as the
@@ -1681,6 +1756,7 @@ adminProductsRoutes.post('/', async (c) => {
     body.relations && typeof body.relations === 'object' && !Array.isArray(body.relations)
       ? (body.relations as Record<string, unknown>)
       : null;
+  await holdLegacyRelationMoney(c.env.DB, prev?.id ?? null, relations, { costs: judgesCost });
 
   // PRICING V2-3b (spec §3.5, §4.1): a V2 product's save — or a save with a `pricing_v2` block: a
   // product created V2 from birth, or an existing product's FIRST V2 write (the clean start, DECISIONS
@@ -1693,12 +1769,17 @@ adminProductsRoutes.post('/', async (c) => {
     throw new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE', { section: 3 });
   }
   const v2Stored = prev ? await productEngineV2(c.env.DB, prev.id) : false;
-  const v2Save = v2Stored || v2Sent;
+  const v2Installed = v2Stored || (await pricingV2Installed(c.env.DB));
   // A database before 0189 (a deploy ahead of its migration) has nowhere to put a V2 product's prices.
-  if (v2Save && !v2Stored && !(await pricingV2Installed(c.env.DB))) {
+  if (v2Sent && !v2Installed) {
     throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED', { section: 3 });
   }
-  if (v2Save) pinV2PriceFields(doc, prev);
+  // The clean start (A.6): EVERY ordinary product save is a V2 save. A product with no method and no
+  // `pricing_v2` block (a description edit of a product still in the «يحتاج تسعيرًا» queue) saves its
+  // structure only, under the price token, and stays hidden until its first complete V2 write.
+  const v2Save = (doc.composition ?? '') === '' && v2Installed;
+  const structureOnly = v2Save && !v2Stored && !v2Sent;
+  pinV2PriceFields(doc, prev);
 
   const saveIntent: ProductWriteIntent = {
     mode: prev ? 'update' : 'create',
@@ -1778,7 +1859,18 @@ adminProductsRoutes.post('/', async (c) => {
   if (answerGuard) plan.statements = answerGuard.around(plan.statements);
   // PRICING V2-3b: the V2 gates, then one batch — the planner's statements inside the V2 writer's.
   let v2Outcome: V2SaveOutcome | null = null;
-  if (v2Save) {
+  if (structureOnly) {
+    v2Outcome = {
+      kind: 'data',
+      priced: false,
+      statements: v2StructureStatements(c.env.DB, doc.id, {
+        structure: plan.statements,
+        newProduct: !prev,
+        updatedAt: existingRow?.updated_at === undefined || existingRow?.updated_at === null ? null : String(existingRow.updated_at),
+      }),
+    };
+    plan.statements = v2Outcome.statements;
+  } else if (v2Save) {
     v2Outcome = await planV2ProductSave(c, {
       plan,
       prev,
@@ -1869,165 +1961,18 @@ adminProductsRoutes.post('/', async (c) => {
     ...(priceHistoryWarning ? { price_history_warning: priceHistoryWarning } : {}),
     ...(translationWarning ? { translation_warning: translationWarning } : {}),
     // V2-3b: whether this save wrote prices (`priced`) or stored its data only (incomplete).
-    ...(v2Outcome && 'priced' in v2Outcome ? { pricing_v2: { priced: v2Outcome.priced } } : {}),
+    ...(v2Outcome && 'priced' in v2Outcome && !structureOnly ? { pricing_v2: { priced: v2Outcome.priced } } : {}),
   });
 });
 
 /**
- * MOVE THE PINNED PRICES — the deliberate second half of a base-price change.
- *
- * Nothing here happens on its own. The save response says how many rows kept
- * their own price; this is the owner answering "and move them too". It is one
- * call, it is audited with every before/after pair, and it writes BOTH stores
- * a price can live in: the JSON columns on `products` and the relational
- * option/colour/variant tables, because a product may have either or both and
- * leaving one behind would recreate the very disagreement being fixed.
- *
- * `inherit` is the mode worth reaching for: it clears the pinned prices so the
- * rows follow the base from now on, and the NEXT price change works the way
- * this one was expected to.
+ * MOVE THE PINNED PRICES — retired by the clean start (addendum A.6, DECISIONS
+ * row 222): no dinar price is typed or moved any more; a product's prices are
+ * its V2 write's. Refused for every product (a stale admin bundle gets the
+ * sentence and the section), deleted with the V1 doors in V2-7.
  */
-adminProductsRoutes.post('/:id/reprice', async (c) => {
-  const admin = c.get('user')!;
-  const productId = c.req.param('id');
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const mode = str(body.mode, 'mode', { min: 4, max: 10 }) as RepriceMode;
-  if (mode !== 'delta' && mode !== 'percent' && mode !== 'inherit') {
-    throw badRequest('mode must be one of: delta, percent, inherit', 'BAD_MODE');
-  }
-  const from = int(body.from_price_iqd, 'from_price_iqd', { min: 0, max: 1_000_000_000 });
-  const to = int(body.to_price_iqd, 'to_price_iqd', { min: 0, max: 1_000_000_000 });
-
-  const row = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?')
-    .bind(productId)
-    .first<Record<string, unknown>>();
-  if (!row) throw notFound('Product not found');
-
-  // The JSON side. Read the stored arrays rather than the parsed document so
-  // nothing else about the product is rewritten by this call.
-  const readArr = (v: unknown): Array<Record<string, unknown>> => {
-    try {
-      const x = typeof v === 'string' ? JSON.parse(v) : v;
-      return Array.isArray(x) ? (x as Array<Record<string, unknown>>) : [];
-    } catch {
-      return [];
-    }
-  };
-  const jsonOptions = readArr(row.options);
-  const jsonColors = readArr(row.colors);
-
-  const changes: Array<{ kind: string; id: string; label: string; from: number | null; to: number | null }> = [];
-
-  // EVERY MOVE IS RECORDED IN price_history, exactly as a save through the
-  // product form is. Seven-day price protection reads that table and nothing
-  // else (worker/routes/returns.ts), so a reprice that left no row would make
-  // a real price drop invisible to a customer who is entitled to the
-  // difference — the money is decided by this table, not by the audit log.
-  const jsonHistory: PriceDelta[] = [];
-  const relHistory: PriceDelta[] = [];
-  const deltasFor = (
-    into: PriceDelta[],
-    variantKey: string,
-    before: PinnedPriceRow,
-    after: PinnedPriceRow
-  ) => {
-    const push = (field: HistoryField, oldV: number | null, newV: number | null) => {
-      if (oldV !== newV) into.push({ variant_key: variantKey, field, old_iqd: oldV, new_iqd: newV });
-    };
-    push('regular', before.regular_price_iqd, after.regular_price_iqd);
-    push('prime', before.prime_price_iqd, after.prime_price_iqd);
-    push('pro', before.pro_price_iqd, after.pro_price_iqd);
-  };
-
-  const moveInPlace = (arr: Array<Record<string, unknown>>, kind: 'option' | 'color') => {
-    for (const item of arr) {
-      const pinned = pinnedRows({ [kind === 'option' ? 'options' : 'colors']: [item] } as never);
-      if (!pinned.length) continue;
-      const next = repriceRow(pinned[0], mode, from, to);
-      changes.push({ kind, id: pinned[0].id, label: pinned[0].label, from: pinned[0].regular_price_iqd, to: next.regular_price_iqd });
-      deltasFor(jsonHistory, `${kind}:${pinned[0].id}`, pinned[0], next);
-      item.regular_price_iqd = next.regular_price_iqd;
-      item.prime_price_iqd = next.prime_price_iqd;
-      item.pro_price_iqd = next.pro_price_iqd;
-    }
-  };
-  moveInPlace(jsonOptions, 'option');
-  moveInPlace(jsonColors, 'color');
-
-  const stmts = [
-    c.env.DB.prepare(
-      `UPDATE products SET options = ?, colors = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`
-    ).bind(JSON.stringify(jsonOptions), JSON.stringify(jsonColors), productId),
-  ];
-
-  // The relational side. Each table is updated by row id so an option that
-  // never carried a price is never given one.
-  const relTables: Array<{ table: string; kind: PinnedPriceRow['kind'] }> = [
-    { table: 'product_option_values', kind: 'option' },
-    { table: 'product_colors', kind: 'color' },
-    { table: 'product_variants', kind: 'variant' },
-  ];
-  for (const { table, kind } of relTables) {
-    const { results } = await c.env.DB.prepare(
-      `SELECT id, ${table === 'product_variants' ? 'combo_key AS name_en' : 'name_en'},
-              regular_price_iqd, prime_price_iqd, pro_price_iqd
-         FROM ${table} WHERE product_id = ?`
-    )
-      .bind(productId)
-      .all<Record<string, unknown>>();
-    for (const r of results ?? []) {
-      const asRow = {
-        id: String(r.id),
-        name_en: String(r.name_en ?? ''),
-        regular_price_iqd: r.regular_price_iqd === null ? null : Number(r.regular_price_iqd),
-        prime_price_iqd: r.prime_price_iqd === null ? null : Number(r.prime_price_iqd),
-        pro_price_iqd: r.pro_price_iqd === null ? null : Number(r.pro_price_iqd),
-      };
-      const pinned = pinnedRows({ options: [asRow] });
-      if (!pinned.length) continue;
-      const next = repriceRow({ ...pinned[0], kind }, mode, from, to);
-      changes.push({ kind, id: next.id, label: next.label, from: pinned[0].regular_price_iqd, to: next.regular_price_iqd });
-      deltasFor(relHistory, `${kind}:${next.id}`, pinned[0], next);
-      stmts.push(
-        c.env.DB.prepare(
-          `UPDATE ${table} SET regular_price_iqd = ?, prime_price_iqd = ?, pro_price_iqd = ? WHERE id = ? AND product_id = ?`
-        ).bind(next.regular_price_iqd, next.prime_price_iqd, next.pro_price_iqd, next.id, productId)
-      );
-    }
-  }
-  if (changes.length) await c.env.DB.batch(stmts);
-
-  // The relational row is the one the cart prices from, so where both stores
-  // hold the same option it is the relational move that is recorded; the JSON
-  // pass only fills in products that never grew a relational row.
-  const seen = new Set(relHistory.map((d) => `${d.variant_key}\u0000${d.field}`));
-  const history = [...relHistory, ...jsonHistory.filter((d) => !seen.has(`${d.variant_key}\u0000${d.field}`))];
-  // Never let a history failure lose the reprice the owner just confirmed:
-  // the prices are already written, and the warning is reported honestly.
-  let historyWarning: string | null = null;
-  try {
-    await recordPriceHistory(c.env.DB, productId, admin.id, history);
-  } catch (e) {
-    historyWarning = `price history not recorded: ${e instanceof Error ? e.message : String(e)}`;
-  }
-
-  await audit(c.env.DB, admin.id, 'product_v2.reprice_pinned', productId, {
-    mode,
-    from_price_iqd: from,
-    to_price_iqd: to,
-    moved: changes.length,
-    changes: changes.slice(0, 60),
-    price_history_rows: history.length,
-  });
-
-  return c.json({
-    success: true,
-    mode,
-    moved: changes.length,
-    changes,
-    price_history_rows: history.length,
-    ...(historyWarning ? { price_history_warning: historyWarning } : {}),
-  });
+adminProductsRoutes.post('/:id/reprice', async () => {
+  throw v2Managed(3);
 });
 
 /**

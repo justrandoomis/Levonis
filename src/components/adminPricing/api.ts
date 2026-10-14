@@ -233,40 +233,21 @@ export interface PricingWhatIfAnswer extends PricingRates {
   models: Array<PricingNames & { option_id: string; channels: PricingWhatIfChannel[] }>;
 }
 
-export function fetchPricingOverview(page: number, opts?: RequestOptions): Promise<PricingOverview> {
-  return api.get<PricingOverview>(`${PRICING_API}/overview?page=${Math.max(1, Math.floor(page))}`, opts);
-}
-
-/** Never more pages than this are read for one list (the engine's cap is 60 products). */
-export const OVERVIEW_PAGE_LIMIT = 10;
-
 /**
- * Every product of the overview, for a list the owner can search and filter
- * without paging: page 1 first (it carries the count of pages), the rest in
- * parallel. The counts are the server's, over every product.
+ * The clean start (addendum A.6, A.8): the V1 overview, product sheet and
+ * what-if are closed on the server (PRICING_V2_MANAGED); `/overview` answers
+ * the V2 counts only — how many ordinary products are published and how many
+ * customers cannot see until their first complete V2 write.
  */
-export async function fetchPricingProducts(opts?: RequestOptions): Promise<{ overview: PricingOverview; products: PricingProductSummary[]; truncated: boolean }> {
-  const first = await fetchPricingOverview(1, opts);
-  const last = Math.min(first.pages, OVERVIEW_PAGE_LIMIT);
-  const rest = await Promise.all(Array.from({ length: Math.max(0, last - 1) }, (_, i) => fetchPricingOverview(i + 2, opts)));
-  const seen = new Set<string>();
-  const products: PricingProductSummary[] = [];
-  for (const page of [first, ...rest]) {
-    for (const p of page.products) {
-      if (seen.has(p.id)) continue;
-      seen.add(p.id);
-      products.push(p);
-    }
-  }
-  return { overview: first, products, truncated: first.pages > OVERVIEW_PAGE_LIMIT };
+export interface PricingV2Counts {
+  published: number;
+  needs_pricing: number;
+  saved: number;
+  compositions: number;
 }
 
-export function fetchPricingProduct(id: string, opts?: RequestOptions): Promise<PricingProductDetail> {
-  return api.get<PricingProductDetail>(`${PRICING_API}/products/${encodeURIComponent(id)}`, opts);
-}
-
-export function runPricingWhatIf(id: string, body: PricingWhatIfRequest, opts?: RequestOptions): Promise<PricingWhatIfAnswer> {
-  return api.post<PricingWhatIfAnswer>(`${PRICING_API}/products/${encodeURIComponent(id)}/what-if`, body, opts);
+export function fetchPricingV2Counts(opts?: RequestOptions): Promise<{ success: boolean; v2: PricingV2Counts }> {
+  return api.get<{ success: boolean; v2: PricingV2Counts }>(`${PRICING_API}/overview`, opts);
 }
 
 // ============================================================= FX-1: the central rates
@@ -623,18 +604,3 @@ export interface BulkSaveResult {
   code?: string;
 }
 
-export function fetchSaveList(signal?: AbortSignal): Promise<SaveListAnswer> {
-  return api.get<SaveListAnswer>(`${PRICING_API}/save-list`, { signal, mascot: 'silent' });
-}
-
-export function previewSaveList(productIds: readonly string[]): Promise<{ success: boolean; items: SaveListPreviewItem[] }> {
-  return api.post<{ success: boolean; items: SaveListPreviewItem[] }>(`${PRICING_API}/save-list/preview`, { product_ids: productIds.slice(0, ENGINE_BULK_MAX) }, { mascot: 'silent' });
-}
-
-export function saveBulk(items: ReadonlyArray<{ product_id: string; preview_hash: string }>, confirmLarge: boolean): Promise<{ success: boolean; results: BulkSaveResult[] }> {
-  const body = { items: items.slice(0, ENGINE_BULK_MAX), ...(confirmLarge ? { confirm_large_change: true } : {}) };
-  return api.post<{ success: boolean; results: BulkSaveResult[] }>(`${PRICING_API}/products/save-bulk`, body, { mascot: 'silent' });
-}
-
-/** The products one preview takes: the stale ones first (their stored price is already behind), then the ready ones. */
-export const firstBatch = (list: SaveListAnswer): string[] => [...list.stale.items, ...list.ready.items].map((i) => i.product_id).slice(0, ENGINE_BULK_MAX);

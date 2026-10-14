@@ -162,10 +162,10 @@ export type CostConfidence = 'recorded' | 'estimated' | 'unknown';
  * @param oi alias of `order_items`
  * @param p  alias of `products`, LEFT JOINed on `oi.product_id`
  */
-export function costProjectionSql(oi = 'oi', p = 'p'): string {
+export function costProjectionSql(oi = 'oi', p = 'p', estimates = false): string {
   return `
-    ${costValueSql(oi, p)} AS unit_cost_iqd,
-    ${costConfidenceSql(oi, p)} AS cost_confidence`;
+    ${costValueSql(oi, p, estimates)} AS unit_cost_iqd,
+    ${costConfidenceSql(oi, p, estimates)} AS cost_confidence`;
 }
 
 /**
@@ -185,19 +185,24 @@ export function costProjectionSql(oi = 'oi', p = 'p'): string {
  * question about other rows, which is exactly why this returns an expression a
  * caller can nest rather than a verdict.
  */
-export function costValueSql(oi = 'oi', p = 'p'): string {
+export function costValueSql(oi = 'oi', p = 'p', estimates = false): string {
+  // V2-6 (addendum A.9 step 3): a line's frozen V2 estimate (0190) is the estimate before `unpriced`;
+  // `products.product_cost_iqd` stands in only for an `unrecorded` (pre-0095) row. `estimates` is the
+  // caller's probe of the 0190 column (a deploy ahead of it keeps the old SQL).
   return `CASE
       WHEN ${oi}.cost_basis = '${COST_BASIS.snapshot}'   THEN ${oi}.cost_iqd
-      WHEN ${oi}.cost_basis = '${COST_BASIS.composed}'   THEN 0
+      WHEN ${oi}.cost_basis = '${COST_BASIS.composed}'   THEN 0${estimates ? `
+      WHEN ${oi}.estimated_cost_iqd IS NOT NULL         THEN ${oi}.estimated_cost_iqd` : ''}
       WHEN ${oi}.cost_basis = '${COST_BASIS.unpriced}'   THEN NULL
       ELSE ${p}.product_cost_iqd
     END`;
 }
 
 /** The confidence half of the same rule, without its alias. See `costValueSql`. */
-export function costConfidenceSql(oi = 'oi', p = 'p'): string {
+export function costConfidenceSql(oi = 'oi', p = 'p', estimates = false): string {
   return `CASE
-      WHEN ${oi}.cost_basis IN ('${COST_BASIS.snapshot}','${COST_BASIS.composed}') THEN 'recorded'
+      WHEN ${oi}.cost_basis IN ('${COST_BASIS.snapshot}','${COST_BASIS.composed}') THEN 'recorded'${estimates ? `
+      WHEN ${oi}.estimated_cost_iqd IS NOT NULL THEN 'estimated'` : ''}
       WHEN ${oi}.cost_basis = '${COST_BASIS.unpriced}' THEN 'unknown'
       WHEN ${p}.product_cost_iqd IS NULL THEN 'unknown'
       ELSE 'estimated'

@@ -63,10 +63,17 @@ export function calculateGoods(order: Row, all: GoodsLine[], allocations: Alloca
       const exact = consumed.length > 0 && consumed.every((a) => a.cogs_iqd !== null) && consumed.reduce((sum, a) => sum + a.qty, 0) >= v.qty;
       const basis = normalizeCostBasis(v.cost_basis);
       const savedCost = v.cost_iqd !== null && Number.isSafeInteger(v.cost_iqd) && v.cost_iqd >= 0 ? v.cost_iqd : null;
-      const cost = exact ? consumed.reduce((sum, a) => sum + n(a.cogs_iqd), 0) : consumed.length > 0 || savedCost === null || basis === COST_BASIS.unpriced ? null : savedCost * v.qty;
+      // V2-6 (addendum A.9 step 2): FIFO (a pre-order batch link included) → the line's frozen V2
+      // estimate (0190, never confirmed) → a pre-cut-over recorded snapshot → unknown.
+      const estimate = typeof v.estimated_cost_iqd === 'number' && Number.isSafeInteger(v.estimated_cost_iqd) && v.estimated_cost_iqd >= 0 ? v.estimated_cost_iqd : null;
+      const cost = exact
+        ? consumed.reduce((sum, a) => sum + n(a.cogs_iqd), 0)
+        : estimate !== null
+          ? estimate * v.qty
+          : consumed.length > 0 || savedCost === null || basis === COST_BASIS.unpriced ? null : savedCost * v.qty;
       return { ...v, original_net_goods_iqd: original[i], price_adjustment_iqd: shares[i] ?? 0,
         net_goods_iqd: net[i], cogs_iqd: cost, fifo_cogs_iqd: exact ? cost : null,
-        cost_confidence: exact ? 'fifo' : cost === null ? 'unknown' : basis === COST_BASIS.snapshot ? 'recorded_snapshot' : 'snapshot' } as PricedGoodsLine;
+        cost_confidence: exact ? 'fifo' : estimate !== null ? 'estimated' : cost === null ? 'unknown' : basis === COST_BASIS.snapshot ? 'recorded_snapshot' : 'snapshot' } as PricedGoodsLine;
     }),
   };
 }

@@ -202,6 +202,23 @@ const refusalText = (e: unknown): string => (e instanceof HttpError ? e.message 
  * product as it is stored.
  */
 export async function judgePricing(
+  _db: D1Database,
+  _live: PricingLive,
+  changes: readonly NEntry[],
+  _file: readonly NEntry[],
+  _liveEntries: readonly NEntry[],
+  _opts: { otherChanges: boolean; now: string }
+): Promise<PricingJudgement> {
+  const out: PricingJudgement = { refusals: new Map(), accepted: [], draft: null, writes: null, ev: null, kind: 'none', hash: null, large_change: false, adoption: null, rates: null, ctx: null };
+  if (!changes.length) return out;
+  // The clean start (addendum A.6, DECISIONS row 222): the V1 owner engine block is closed for EVERY
+  // product — prices live in the form's section ٣ (the TXT V2 block is V2-7's). Each changed line is refused.
+  for (const n of changes) out.refusals.set(n.nkey, { status: 'INVALID_VALUE', message: serverMessage('PRICING_V2_MANAGED') });
+  return out;
+}
+
+/** The V1 judgement, kept (unreachable) until V2-7 deletes the module with its other callers. */
+export async function judgePricingV1(
   db: D1Database,
   live: PricingLive,
   changes: readonly NEntry[],
@@ -211,7 +228,6 @@ export async function judgePricing(
 ): Promise<PricingJudgement> {
   const out: PricingJudgement = { refusals: new Map(), accepted: [], draft: null, writes: null, ev: null, kind: 'none', hash: null, large_change: false, adoption: null, rates: null, ctx: null };
   if (!changes.length) return out;
-  // Pricing V2 (spec §3.5): a V2 product's prices live in the form's section ٣; the TXT V2 block is V2-7's.
   if (isV2Product(live.stored)) {
     for (const n of changes) out.refusals.set(n.nkey, { status: 'INVALID_VALUE', message: serverMessage('PRICING_V2_MANAGED') });
     return out;

@@ -678,6 +678,8 @@ export default function Checkout() {
   // is told rather than left to spot the total changing on its own.
   const [pricesMoved, setPricesMoved] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  /** The clean start (DECISIONS row 222): a line's product is not for sale now — the way out is the cart. */
+  const [unavailableInCart, setUnavailableInCart] = useState(false);
 
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
@@ -998,6 +1000,7 @@ export default function Checkout() {
           return;
         }
         setQuote(null);
+        setUnavailableInCart(code === 'PRODUCT_CURRENTLY_UNAVAILABLE');
         setQuoteError(refusalWithCounter(err, lang, 'quote failed'));
       })
       .finally(() => {
@@ -1539,6 +1542,11 @@ export default function Checkout() {
     >
       <AlertCircle aria-hidden="true" className="w-3.5 h-3.5 shrink-0 mt-px" />
       <span>{submitError}</span>
+      {unavailableInCart ? (
+        <button type="button" data-checkout-back-to-cart onClick={() => navigate('/cart')} className="shrink-0 underline underline-offset-2">
+          {loc('العودة إلى السلة', 'Back to cart', 'گەڕانەوە بۆ سەبەتە')}
+        </button>
+      ) : null}
     </p>
   ) : null;
 
@@ -1673,6 +1681,7 @@ export default function Checkout() {
        * back to the server's sentence only for codes that already had one.
        */
       const msg = refusalWithCounter(err, lang, 'Order could not be placed. Please try again.');
+      setUnavailableInCart(err instanceof ApiError && err.code === 'PRODUCT_CURRENTLY_UNAVAILABLE');
       if (err instanceof ApiError && err.code === 'INSUFFICIENT_BALANCE') {
         /* `dir === 'rtl'` is true for Arabic AND for Kurdish, so the ternary
            this replaces was a DIRECTION test wearing a language test's clothes
@@ -3034,6 +3043,11 @@ export default function Checkout() {
               <p className="text-xs text-text-muted font-light flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" strokeWidth={1.5} />
                 {typeof quoteError === 'string' && quoteError.trim() ? quoteError : S.quoteError}
+                {unavailableInCart ? (
+                  <button type="button" data-checkout-back-to-cart onClick={() => navigate('/cart')} className="shrink-0 underline underline-offset-2">
+                    {loc('العودة إلى السلة', 'Back to cart', 'گەڕانەوە بۆ سەبەتە')}
+                  </button>
+                ) : null}
               </p>
             )}
 

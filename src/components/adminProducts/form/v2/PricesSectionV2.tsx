@@ -31,18 +31,22 @@ import ReadinessV2 from './ReadinessV2';
 import FinalPricesTable from './FinalPricesTable';
 import { firstPreorder } from './v2Model';
 import { useV2Strings } from './v2Ui';
+import PurchaseReviewCard from './PurchaseReviewCard';
 
 export default function PricesSectionV2({
   modelNames,
   firstModelId,
   packageDims,
   onJump,
+  productId = null,
 }: {
   modelNames: (id: string) => V2Names | null;
   /** The first active model of section ٥ (its result is the bar's), or null for an option-less product. */
   firstModelId: string | null;
   packageDims: ProductDimensionsV2 | null;
   onJump: (section: 3 | 5) => void;
+  /** The stored product (null: add-product) — the owner's purchase review is read for it (D1, A.10). */
+  productId?: string | null;
 }) {
   const v2 = useV2();
   const s = useV2Strings();
@@ -84,6 +88,7 @@ export default function PricesSectionV2({
           </a>
         </p>
       ) : null}
+      {v2.owner && productId && v2.mode === 'stored' ? <PurchaseReviewCard productId={productId} onApplied={v2.reload} /> : null}
       {codes.includes('FX_RATE_MISSING') ? <p className="lv-alert lv-alert-warning mb-3 px-3 py-2 text-[12px] text-text-primary">{s.rateMissing}</p> : null}
       {codes.includes('PRICING_NOT_INSTALLED') ? <p className="lv-alert lv-alert-warning mb-3 px-3 py-2 text-[12px] text-text-primary">{s.notInstalled}</p> : null}
 

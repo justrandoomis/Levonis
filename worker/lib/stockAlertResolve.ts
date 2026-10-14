@@ -92,6 +92,7 @@ import type { ColorV2, OptionFulfillment, OptionV2 } from './pricing';
 import { availabilityFromName, normalizeAvailability } from './availability';
 import { activePoolProductIds } from './mysteryDraw';
 import { degradeIfSchemaMissing } from './membershipBenefits';
+import { listing } from './listing';
 import { saleAvailability, type SaleAvailability } from '../routes/products';
 
 // ---------------------------------------------------------------- contract
@@ -500,6 +501,11 @@ export async function loadAlertContexts(
     new Set<string>()
   );
 
+  // The clean start (DECISIONS row 222, spec addendum A.5): an active product a customer may not see or
+  // buy yet (held, or not V2-published) is UNAVAILABLE for now — never «عاد للمخزون» — but its alert
+  // stays armed: it can come true the moment the product is priced and published.
+  const unlisted = await (await listing(db)).unlistedIds(products.map((r) => r.id));
+
   const groupsBy = bucket(groups);
   const valuesBy = bucket(values);
   const colorsBy = bucket(colors);
@@ -518,6 +524,7 @@ export async function loadAlertContexts(
       coarse: pooled.has(row.id),
       degraded: degraded.has(row.id),
     }));
+    if (unlisted.has(row.id)) out.get(row.id)!.unlisted = true;
   }
   return out;
 }
@@ -1093,6 +1100,12 @@ export function resolveWish(ctx: AlertProductContext, wish: AlertWish): AlertVer
    * The reason travels so the sweep can kill it WITH an explanation.
    */
   if (c.status !== 'active') return dead('PRODUCT_UNAVAILABLE', label);
+
+  /**
+   * NOT LISTED YET IS NOT DEAD (the clean start): the product is hidden until its dollar price is
+   * published, then it is listed again. Not buyable, no count, no reason — the alert keeps waiting.
+   */
+  if (c.unlisted === true) return { buyable: false, available: null, dead: null, label };
 
   /**
    * §8.2 ROW 18 — A POOL MEMBER PUBLISHES A COARSE STATE AND NOTHING FINER.

@@ -33,8 +33,14 @@ export interface IndexRow {
   hashtags: string[];
   catalog_ids: string[];
   brand_id: string | null;
+  /** Null unless `listed`: an unlisted product's stored figure may be an old dinar price (the clean start). */
   price_iqd: number | null;
   doc_version: number;
+  /**
+   * Listed to customers now (core worker/lib/listing.ts: active, not held, V2-published — the clean
+   * start, DECISIONS row 222). A search index shows only listed rows.
+   */
+  listed: boolean;
 }
 
 export interface CatalogApi {

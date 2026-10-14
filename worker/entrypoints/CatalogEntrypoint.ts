@@ -8,6 +8,7 @@
  *
  * Read-only by construction: this entrypoint writes nothing.
  */
+import { listing } from '../lib/listing';
 import type { CatalogApi, IndexRow } from '@levonis/contracts/rpc/catalog';
 import type { RpcCtx } from '@levonis/contracts/rpc/common';
 import { CoreEntrypoint } from './base';
@@ -57,6 +58,10 @@ export class CatalogEntrypoint extends CoreEntrypoint {
         doc_version: number | null;
         catalog_ids: string | null;
       }>();
+    // The clean start (DECISIONS row 222, spec addendum A.5): whether each row is listed to customers, and
+    // no price unless it is — an unlisted product's stored figure may be an old dinar price.
+    const L = await listing(env.DB);
+    const unlisted = await L.unlistedIds((results ?? []).map((r) => String(r.id)));
     const rows: IndexRow[] = (results ?? []).map((r) => ({
       product_id: String(r.id),
       slug: String(r.slug),
@@ -65,8 +70,9 @@ export class CatalogEntrypoint extends CoreEntrypoint {
       hashtags: safeParse<string[]>(r.hashtags, []),
       catalog_ids: r.catalog_ids ? String(r.catalog_ids).split(',').filter(Boolean) : [],
       brand_id: r.brand_id ? String(r.brand_id) : null,
-      price_iqd: r.price_iqd === null || r.price_iqd === undefined ? null : Number(r.price_iqd),
+      price_iqd: !L.isListedRow(r, unlisted) || r.price_iqd === null || r.price_iqd === undefined ? null : Number(r.price_iqd),
       doc_version: Number(r.doc_version ?? 0),
+      listed: L.isListedRow(r, unlisted),
     }));
     return { rows, next: rows.length === INDEX_PAGE_SIZE ? rows[rows.length - 1].product_id : null };
   }

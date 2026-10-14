@@ -2099,7 +2099,8 @@ adminImportRoutes.post('/confirm', async (c) => {
           action: isCreate ? 'created' : 'updated',
           name: doc.name_en,
           product_id: productId,
-          reason: '',
+          // The clean start (A.6): the row's price cells were not applied (its other columns were).
+          reason: plan.moneyPinned.length ? `PRICING_V2_MANAGED: ${serverMessage('PRICING_V2_MANAGED')} (${plan.moneyPinned.slice(0, 8).join(', ')})` : '',
         };
         // Last in the atomic batch. Its trigger checks the exact live token
         // and lease; a stale executor aborts every preceding product/member

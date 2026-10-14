@@ -43,6 +43,7 @@
  *    card, the detail page, the cart and the door cannot disagree.
  */
 
+import { listing } from './listing';
 import {
   bundleAvailability,
   COMPOSITION_LOW_BUNDLES,
@@ -1200,9 +1201,12 @@ export async function loadCompositionBySlug(
   db: D1Database,
   slug: string
 ): Promise<Record<string, unknown> | null> {
+  // Listed to customers only (worker/lib/listing.ts): a composition is a platform product like any other,
+  // and under the clean start it stays hidden until it has a V2 price (owner question Q7).
+  const listed = (await listing(db)).listed('p');
   const rows = await compositionSelect(
     db,
-    (cols, from) => `SELECT ${cols} ${from} WHERE p.slug = ? AND p.composition <> '' LIMIT 1`,
+    (cols, from) => `SELECT ${cols} ${from} WHERE p.slug = ? AND p.composition <> '' AND ${listed} LIMIT 1`,
     [slug]
   );
   return rows[0] ?? null;

@@ -39,7 +39,6 @@ export default {
         },
         'POST /products/:id/what-if': {
           cls: 'cost_read',
-          body: { supplier_cost: '100.5', currency: 'EUR' },
           why: 'a calculator: it prices in memory and writes nothing; POST only for its body',
         },
         // FX-1 (FX programme plan §8, §14.1(1)): the central exchange and
@@ -112,6 +111,10 @@ export default {
           body: { rate_iqd: '12000' },
           why: 'what a central shipping rate would reprice on that route',
         },
+        // THE CLEAN START (addendum A.6, DECISIONS row 222): every V1 door below — the product sheet, the
+        // what-if, apply-purchase, rules, inputs, preview, the stale list, save-bulk, manual and adopt —
+        // answers 409 PRICING_V2_MANAGED {section} to the owner, so none names a body any more; each keeps
+        // its class (the door still refuses everyone else first).
         // The Inputs stage (USD design §3-§6.3; the owner's request of 2026-10-09:
         // pricing and shipping entered in the product form). Inputs and rules only —
         // never a price; each write with assertCostWrite.
@@ -126,18 +129,15 @@ export default {
         'GET /products/:id/rules': { cls: 'cost_read', why: 'the product’s stored minimum profit (USD) and Direct Sale Extra' },
         'PUT /products/:id/rules': {
           cls: 'cost_write',
-          body: { rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] },
           why: 'the minimum profit in USD and the Direct Sale Extra per product / option',
         },
         'GET /products/:id/inputs': { cls: 'cost_read', why: 'the product form’s «التسعير بالدولار»: inputs and rules per scope, each model’s bar' },
         'POST /products/:id/preview': {
           cls: 'cost_read',
-          body: { draft: { rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] } },
           why: 'the product form’s live preview of a draft: prices in memory, writes nothing; POST only for its body',
         },
         'PUT /products/:id/inputs': {
           cls: 'cost_write',
-          body: { inputs_seq: 0, rules: [{ kind: 'target_profit', scope: 'product', amount_usd: '100' }] },
           why: 'the product form’s save: supplier cost, route, weight or CBM, extras and the two rules, one fenced batch; never a price',
         },
         'POST /products/:id/targets/adopt': {
@@ -153,7 +153,6 @@ export default {
         },
         'POST /save-list/preview': {
           cls: 'cost_read',
-          body: { product_ids: ['p_a1'] },
           why: 'each listed product’s six figures and preview hash: prices in memory, writes nothing; POST only for its body',
         },
         'POST /products/save-bulk': {

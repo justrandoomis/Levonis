@@ -273,6 +273,7 @@ function planOf(statements: D1PreparedStatement[], detachedMedia: string[]): Pro
     hashtagsRegistered: 0,
     hashtagsAdded: [],
     detachedMedia,
+    moneyPinned: [],
     searchTokens: 0,
     translations: null,
     costRefused: [],

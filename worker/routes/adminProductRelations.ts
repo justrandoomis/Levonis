@@ -1,3 +1,4 @@
+import { holdLegacyCellMoney, holdLegacyRelationMoney } from '../lib/pricingEngine/v2/legacyMoney';
 import { Hono } from 'hono';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import type { AppContext } from '../lib/types';
@@ -337,6 +338,9 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
 
   const existingRow = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<Record<string, unknown>>();
   if (!existingRow) throw notFound('Product not found');
+  // The clean start (addendum A.6): structure only — a price, adjustment, cost or surcharge cell that
+  // differs from the stored one is 409 PRICING_V2_MANAGED {section: 5}; an absent one keeps it.
+  await holdLegacyRelationMoney(c.env.DB, productId, body, { costs: canWriteCost(c.env, admin) });
 
   const saveIntent: ProductWriteIntent = {
     mode: 'update',
@@ -527,6 +531,8 @@ adminProductRelationsRoutes.put('/:id/fulfillment', async (c) => {
   const rel = await loadProductRelations(c.env.DB, productId);
   const live = liveValues(rel.values);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // The clean start (addendum A.6): the order types and routes, never their dinar cells (section ٥).
+  await holdLegacyCellMoney(c.env.DB, productId, body, { costs: canWriteCost(c.env, admin) });
   const cells = parseFulfillmentPayload(body, new Set(live.map((v) => v.id)));
 
   /**

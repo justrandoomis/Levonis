@@ -3,17 +3,15 @@
  * (MVP plan §6 P1; master plan v2 E4 chain; owner decision 2).
  *
  * Mounted at /api/admin/pricing:
- *   GET  /overview?page=N             every ordinary product, 20 a page, with its
- *                                      preliminary §2.3 status and the counts
- *   GET  /products/:id                today's price per model × channel (prepaid
- *                                      and cash on delivery), the old landed cost,
- *                                      the minimum profit and Direct Sale Extra derived by
- *                                      answer B, conflicts, measures known or
- *                                      missing, typed member prices (yes/no), and
- *                                      the rate reference
- *   POST /products/:id/what-if        «كم سيصبح السعر؟»: a supplier cost and
- *                                      currency → the engine's new price next to
- *                                      today's, per model × channel
+ *   GET  /overview                    the clean start's counts: products published in
+ *                                      dollars (V2) and products that still need pricing
+ *                                      (hidden from customers; the «يحتاج تسعيرًا» queue
+ *                                      under /api/admin/products-v2/needs-pricing lists them)
+ * The V1 engine's product doors (the product sheet, «كم سيصبح السعر؟», the purchase
+ * apply, the rules and inputs panel, the stale list, the exit to manual, the legacy
+ * adoption) answer 409 PRICING_V2_MANAGED for every product since the clean start
+ * (the owner's answer Q6, DECISIONS row 222; spec addendum A.6) — see «the legacy
+ * doors» at the end of this file.
  *
  * THE DOOR: requireAdmin → limitByMethod → requireCostRead, on `use('*')` above
  * every route — every caller but the verified owner is refused before an id is
@@ -68,13 +66,19 @@ import type { AppContext } from '../lib/types';
 import { HttpError, jsonObject, notFound, requireAdmin } from '../lib/http';
 import { assertCostWrite, requireCostRead, requireFreshSession } from '../lib/costAccess';
 import { limitByMethod, rateLimit } from '../lib/ratelimit';
-import { SESSION_CACHE_CONTROL, afterCatalogueWrite, originOf, purgeCatalogueFromJob } from '../lib/edgePolicy';
+import { SESSION_CACHE_CONTROL, originOf, purgeCatalogueFromJob } from '../lib/edgePolicy';
 import { auditStatements } from '../lib/audit';
 import { fence } from '../lib/operations';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { ratioExceedsPct, sameRate, sumOfMoves } from '@levonis/pricing/fxChain';
 import { fxKeyConfigured, runFxScheduler } from '../lib/fx/scheduler';
-import { iso, isMissingTable, loadPairs, type FxPairId, type FxPairRow } from '../lib/fx/pairs';
+import {
+  iso,
+  isMissingTable,
+  loadPairs,
+  type FxPairId,
+  type FxPairRow,
+} from '../lib/fx/pairs';
 import { isFenceMiss, planPairBatch, refusalCodeOf } from '../lib/fx/commit';
 import { toStatements } from '../lib/fx/write';
 import { historyItemDto, ratesDto } from '../lib/fx/dto';
@@ -82,7 +86,6 @@ import { engineProductCount, loadHistory, loadRatesReadModel } from '../lib/fx/r
 import { notifyOwnerFx } from '../lib/fx/notify';
 import { sweepStaleEnginePrices } from '../lib/fx/reprice';
 import { FX_INVOCATION_STATEMENT_BUDGET, statementBudget } from '../lib/fx/budget';
-import { autoRepriceStatus } from '../lib/pricingEngine/autoReprice';
 import { FX_REFRESH_GLOBAL_KEY } from '../lib/fx/limits';
 import {
   LARGE_CHANGE_PCT,
@@ -98,71 +101,29 @@ import {
   strictBody,
   type PlannedAct,
 } from '../lib/fx/ownerActs';
-import { listPricedProducts, loadPreviewContext, loadProducts, loadRateReference, type LoadedProduct } from '../lib/pricingEngine/load';
-import { evaluateProduct, evaluateProducts } from '../lib/pricingEngine/compute';
-import { overviewDto, productDetailDto, whatIfDto } from '../lib/pricingEngine/dto';
-import { inputInvalid, parseWhatIf, runWhatIf } from '../lib/pricingEngine/whatIf';
+import { loadPreviewContext, loadProducts, type LoadedProduct } from '../lib/pricingEngine/load';
+import { inputInvalid } from '../lib/pricingEngine/whatIf';
 import { engineCoreInstalled } from '../lib/engineInstalled';
 import { loadPricingRates, type PricingRates } from '../lib/pricingEngine/rates';
+import { loadProductsPricing } from '../lib/pricingEngine/store';
+import { directPurchaseStore } from '../lib/pricingEngine/directPurchase';
 import {
-  batchHead,
-  batchTail,
-  inputImage,
-  inputStatements,
-  inputWriteIsNoop,
-  loadProductPricing,
-  loadProductsPricing,
-  nextInputRow,
-  pricingAuditStatement,
-  ruleImage,
-  ruleStatements,
-  ruleWriteIsNoop,
-  storedIqdOf,
-  type ProductPricingData,
-  type RuleWrite,
-} from '../lib/pricingEngine/store';
-import { pruneDirectPurchaseStatements, directPurchaseStore, nextDirectPurchase, directPurchaseStatement, type DirectPurchaseOverlay } from '../lib/pricingEngine/directPurchase';
-import { MinimumProfitError, parseMinimumProfit, purchaseIneligibility, type DirectSaleExtraDraft, type MinimumProfitDraft, type PurchaseForPricing } from '../lib/pricingEngine/fromPurchase';
+  MinimumProfitError,
+  parseMinimumProfit,
+  type DirectSaleExtraDraft,
+  type MinimumProfitDraft,
+  type PurchaseForPricing,
+} from '../lib/pricingEngine/fromPurchase';
 import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
-import { lineDto, productPreviewDto, ratesHeadDto, storedRulesDto } from '../lib/pricingEngine/procurementDto';
-import { legacyAcceptWrites, parseDirectSaleExtraAmount, parseRuleWrites } from '../lib/pricingEngine/ownerRules';
-import { evaluateLegacy, sellableSkus } from '../lib/pricingEngine/legacy';
-import { legacyHashOf } from '../lib/pricingEngine/legacyHash';
+import { lineDto, productPreviewDto, ratesHeadDto } from '../lib/pricingEngine/procurementDto';
+import { parseDirectSaleExtraAmount } from '../lib/pricingEngine/ownerRules';
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { committedPurchaseForPricing, draftForPricing } from '../lib/pricingEngine/purchaseRead';
-import {
-  effectiveWrites,
-  formPreviewHash,
-  formScopeIds,
-  loadEngineReads,
-  parseProductInputs,
-  productEngineEvaluation,
-  productInputsAnswer,
-} from '../lib/pricingEngine/productInputs';
-import {
-  engineEvaluationDto,
-  engineWriteStatements,
-  evaluateEngineWrite,
-  isV2Product,
-  loadEngineControl,
-  loadStoredSkuCosts,
-  priceImageOf,
-  RATES_FENCE_SQL,
-  rateFenceBinds,
-  skuTableOf,
-  skuReadFailed,
-  refuseUnreadSkus,
-  staleReasons,
-  withRuleIds,
-  type EngineEvaluation,
-} from '../lib/pricingEngine/engineWrite';
-import { engineDbRefusal } from '../lib/pricingDbRefusals';
-import { canonical } from '../lib/pricingEngine/procurementPreview';
-import { sha256Hex } from '../lib/crypto';
 import { FX_GUARD_CHANGED, recordSecurityEvent } from '../lib/securityEvents';
 import { previewRateAct, type RateMove, type RatePreview } from '../lib/pricingEngine/ratePreview';
 import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
 import { loadBatches, type BatchFilter } from '../lib/batchSnapshot';
+import { v2PublicationCounts } from '../lib/pricingEngine/v2/queue';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -179,49 +140,22 @@ adminPricingRoutes.use('*', limitByMethod(['pricing-read', 1200], ['pricing-writ
 // re-evaluate the product against the required-field list (completenessHooks.ts).
 adminPricingRoutes.use('*', completenessAfterWrite);
 
-/** The product page's subject: an ordinary product (a bundle or mystery offer is never engine-priced). */
-async function loadOne(db: D1Database, id: string): Promise<LoadedProduct> {
-  const loaded = (await loadProducts(db, [id])).get(id);
-  if (!loaded) throw notFound('Product not found');
-  if ((loaded.doc.composition ?? '') !== '') {
-    throw new HttpError(409, serverMessage('COMPOSITION_NOT_PRICEABLE'), 'COMPOSITION_NOT_PRICEABLE');
-  }
-  return loaded;
-}
-
-/**
- * PRICING V2 (spec §3.5): the V1 doors of a V2 product refuse with a code that
- * names the form section where its prices live — the old panel hides itself on
- * `v2: true`. Codes and the section only, never a value.
- */
-function refuseV2Door(stored: Pick<ProductPricingData, 'state'>, code: 'PRICING_V2_MANAGED' | 'PRICING_V2_NO_MANUAL' = 'PRICING_V2_MANAGED'): void {
-  if (isV2Product(stored)) throw new HttpError(409, serverMessage(code), code, { section: 3, v2: true });
-}
-
-const pageOf = (raw: string | undefined): number => {
-  const n = Number(raw ?? '1');
-  return Number.isSafeInteger(n) && n >= 1 ? n : 1;
+/** 409 PRICING_V2_MANAGED {section}: an old pricing door is closed (codes and the section only; see «the legacy doors» below). */
+const refuseLegacyPricing = (section: 3 | 5) => () => {
+  throw new HttpError(409, serverMessage('PRICING_V2_MANAGED'), 'PRICING_V2_MANAGED', { section, v2: true });
 };
 
+/**
+ * The pricing tab's counts (the clean start, spec addendum A.6): how many ordinary products are
+ * V2-published (listed by their dollar price) and how many still need pricing (hidden from every
+ * customer until published — the «يحتاج تسعيرًا» queue lists them). Counts only, never a figure.
+ */
 adminPricingRoutes.get('/overview', async (c) => {
-  const db = c.env.DB;
-  const [refs, ctx, reference] = await Promise.all([listPricedProducts(db), loadPreviewContext(db), loadRateReference(db)]);
-  // Every product is evaluated for the counts; the catalogue is bounded (41
-  // live products, the engine's cap is 60 per apply) and each evaluation is a
-  // handful of resolver calls on a document already loaded in chunks.
-  const all = await evaluateProducts(db, refs.map((r) => r.id), ctx, reference);
-  const typed = all.filter((p) => p.typed_member_prices).length;
-  return c.json(overviewDto(all, pageOf(c.req.query('page')), typed));
+  const counts = await v2PublicationCounts(c.env.DB);
+  return c.json({ success: true, v2: counts });
 });
 
-adminPricingRoutes.get('/products/:id', async (c) => {
-  const db = c.env.DB;
-  const loaded = await loadOne(db, c.req.param('id'));
-  const [ctx, reference] = await Promise.all([loadPreviewContext(db), loadRateReference(db)]);
-  const evaluation = evaluateProduct(loaded, ctx, reference);
-  // `legacy_hash` fences «قبول القيم المرحّلة» on the values shown here (POST …/targets/adopt).
-  return c.json({ ...productDetailDto(evaluation, reference), legacy_hash: await legacyHashOf(evaluation.rules) });
-});
+adminPricingRoutes.get('/products/:id', refuseLegacyPricing(3));
 
 /**
  * «الدفعات وأسعار الشراء» (FX-6, §16-§19): exactly one of `product_id`,
@@ -241,13 +175,7 @@ adminPricingRoutes.get('/batches', async (c) => {
   return c.json({ success: true, ...(await loadBatches(c.env.DB, filter)) });
 });
 
-adminPricingRoutes.post('/products/:id/what-if', async (c) => {
-  const request = parseWhatIf(await jsonObject(c));
-  const db = c.env.DB;
-  const loaded = await loadOne(db, c.req.param('id'));
-  const [ctx, reference] = await Promise.all([loadPreviewContext(db), loadRateReference(db)]);
-  return c.json(whatIfDto(runWhatIf(evaluateProduct(loaded, ctx, reference), request, reference)));
-});
+adminPricingRoutes.post('/products/:id/what-if', refuseLegacyPricing(3));
 
 // ============================================================= FX-1: the central rates
 //
@@ -806,45 +734,21 @@ async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForP
   const applied = await appliedProducts(db, purchase.purchase_id);
   const products = [];
   const previews = new Map<string, ProductPreview>();
-  const engine = new Map<string, { ev: EngineEvaluation; writes: { inputWrites: InputWriteList; ruleWrites: RuleWriteList }; overlay: DirectPurchaseOverlay }>();
-  const [control, storedCosts] = await Promise.all([loadEngineControl(db), loadStoredSkuCosts(db, ids)]);
   for (const id of ids) {
     const product = loaded.get(id);
     if (!product || (product.doc.composition ?? '') !== '') continue;
     const data = stored.get(id)!;
     const preview = await previewProduct(purchase, { loaded: product, stored: data }, ctx, rates, opts);
-    // Owner decision 8 at the purchase's apply: what applying it would do to the product's prices.
-    const writes = {
-      inputWrites: preview.derived.entries.map((e) => ({ ...e.write, source_ref: `purchase:${purchase.purchase_id}` })).filter((w) => !inputWriteIsNoop(w)),
-      ruleWrites: withRuleIds(preview.rule_writes.filter((w) => !ruleWriteIsNoop(w))),
-    };
-    const overlay = nextDirectPurchase(data, writes.inputWrites, writes.ruleWrites);
-    const ev = await evaluateEngineWrite({
-      loaded: product,
-      stored: data,
-      ctx,
-      rates,
-      control,
-      inputs: data.inputs,
-      inputWrites: [],
-      ruleWrites: [],
-      channel: 'direct_sale',
-      directPurchase: overlay,
-      image: await priceImageOf(db, id),
-      storedCosts: storedCosts.filter((r) => r.product_id === id),
-      allowAdopt: !data.state?.opted_out_at,
-    });
-    engine.set(id, { ev, writes, overlay });
-    if (ev.kind && ev.complete && ev.hash) preview.preview_hash = await sha256Hex(canonical({ purchase: preview.preview_hash, engine: ev.hash }));
-    if (ev.codes.includes('DIRECT_PURCHASE_PRICE_SHAPE')) preview.missing_codes.push('DIRECT_PURCHASE_PRICE_SHAPE');
     previews.set(id, preview);
     const cancelled = purchase.status === 'cancelled' && directPurchaseStore(data).inputs.some((r) => r.source_ref === `purchase:${purchase.purchase_id}`);
-    products.push({ ...productPreviewDto(preview, { applied: applied.has(id), cancelled_source: cancelled, rules: directPurchaseStore(data).rules }), adoption: engineEvaluationDto(ev) });
+    // The clean start (spec addendum A.10, D1): no V1 adoption preview — a confirmed purchase becomes the
+    // product's V2 price review (the owner reviews the price change in section ٣, never here).
+    products.push(productPreviewDto(preview, { applied: applied.has(id), cancelled_source: cancelled, rules: directPurchaseStore(data).rules }));
   }
   const lines = purchase.lines
     .filter((l) => previews.has(l.product_id))
     .map((l) => lineDto(l, lineSummary(purchase, l, { loaded: loaded.get(l.product_id)!, stored: stored.get(l.product_id)! }, previews.get(l.product_id)!, rates)));
-  return { rates, products, lines, previews, stored, loaded, engine };
+  return { rates, products, lines };
 }
 
 adminPricingRoutes.post('/procurement/preview', async (c) => {
@@ -867,654 +771,26 @@ adminPricingRoutes.post('/procurement/preview', async (c) => {
   return c.json({ success: true, rates: ratesHeadDto(rates), lines, products });
 });
 
-const APPLY_STATEMENT_CAP = 200;
-
-adminPricingRoutes.post('/products/:id/apply-purchase', async (c) => {
-  assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['purchase_id', 'use_purchase', 'prefer_purchase_values', 'manual_line_opt_in', 'minimum_profits', 'direct_sale_extras', 'preview_hash', 'confirm_large_change']);
-  const db = c.env.DB;
-  const rates = await engineRates(db);
-  if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
-  const loaded = await loadOne(db, c.req.param('id'));
-  const pid = loaded.id;
-  // Pricing V2 (spec C-11): purchase → price is V2-6's; the receive itself is untouched (the lot is costed).
-  refuseV2Door(await loadProductPricing(db, pid), 'PRICING_V2_MANAGED');
-  if (typeof body.purchase_id !== 'string' || !/^[A-Za-z0-9_-]{8,60}$/.test(body.purchase_id)) throw inputInvalid('purchase_id');
-  if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');
-  if (body.use_purchase !== undefined && typeof body.use_purchase !== 'boolean') throw inputInvalid('use_purchase');
-  if (body.prefer_purchase_values !== undefined && typeof body.prefer_purchase_values !== 'boolean') throw inputInvalid('prefer_purchase_values');
-  if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
-  const purchase = await committedPurchaseForPricing(db, body.purchase_id);
-  if (!purchase) throw notFound('Purchase not found');
-  const usePurchase = body.use_purchase !== false;
-  const productLines = purchase.lines.filter((l) => l.product_id === pid);
-  const reason = productLines.length ? purchaseIneligibility({ status: purchase.status, cost_state: purchase.cost_state, lines: productLines }) : 'no_lines';
-  if (reason && (usePurchase || reason === 'no_lines'))
-    throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE', { reason });
-  const pricing = {
-    minimum_profits: (Array.isArray(body.minimum_profits) ? body.minimum_profits : body.minimum_profits ?? []) as unknown[],
-    manual_line_opt_in: body.manual_line_opt_in,
-    use_purchase: { [pid]: usePurchase },
-    prefer_purchase_values: { [pid]: body.prefer_purchase_values === true },
-  };
-  // The minimum profits and Direct Sale Extras are this product's: each entry names its scope only.
-  const typed = minimumProfits(pricing.minimum_profits, new Map([[pid, loaded]]), pid);
-  const extras = directSaleExtras(body.direct_sale_extras, new Map([[pid, loaded]]), pid);
-  const { previews, stored, products, engine } = await procurementPreview(
-    c,
-    purchase,
-    {
-      ...pricing,
-      minimum_profits: (typed.get(pid) ?? []).map((d) => ({ product_id: pid, ...d })),
-      direct_sale_extras: (extras.get(pid) ?? []).map((d) => ({ product_id: pid, ...d })),
-    },
-    pid
-  );
-  const preview = previews.get(pid);
-  const data = stored.get(pid);
-  const priced = engine.get(pid);
-  if (!preview || !data || !priced) throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE', { reason: 'no_lines' });
-  // A replay first (the same purchase, choices and values: never the purchase version, which a receive bumps).
-  // The key also carries the preview the owner confirmed, whose hash names the
-  // stored versions it was computed against (review 2026-10-13, DI-1): a
-  // double-tap of one confirm is still a replay, but re-applying an earlier
-  // choice after a different one (50,000 → 0 → 50,000) is a new apply.
-  const confirmedPreview = typeof body.preview_hash === 'string' ? body.preview_hash : '';
-  const idempotencyKey = `apply:${purchase.purchase_id}:${pid}:${await sha256Hex(`${preview.derived_hash}:${confirmedPreview}`)}`;
-  const replay = await db.prepare('SELECT 1 AS hit FROM pricing_audit WHERE idempotency_key = ?').bind(idempotencyKey).first<{ hit: number }>();
-  if (replay) return c.json({ success: true, already: true, product_id: pid, rows_changed: 0, priced: false });
-  const productPreview = products.find((p) => p.product_id === pid) ?? null;
-  if (preview.preview_hash !== body.preview_hash) {
-    throw new HttpError(409, serverMessage('PRICING_PREVIEW_STALE'), 'PRICING_PREVIEW_STALE', { preview: productPreview });
-  }
-
-  const actor = c.get('user')!.id;
-  const now = new Date().toISOString();
-  if (!data.direct_purchase_available) throw new HttpError(503, serverMessage('PRICING_NOT_INSTALLED'), 'PRICING_NOT_INSTALLED');
-  if (!preview.models.some((m) => m.channels.some((c) => c.ok && c.channel === 'direct_sale'))) throw new HttpError(409, serverMessage('PRICING_PURCHASE_NOT_ELIGIBLE'), 'PRICING_PURCHASE_NOT_ELIGIBLE');
-  const { ev, writes, overlay } = priced;
-  const inputWrites = writes.inputWrites;
-  const ruleWrites = writes.ruleWrites;
-  const pricesWritten = !!ev.kind && (ev.needs_write || !ev.complete);
-  const audits: D1PreparedStatement[] = [
-    pricingAuditStatement(db, {
-      entity: 'product_write',
-      entity_key: `purchase:${purchase.purchase_id}`,
-      product_id: pid,
-      action: 'input_from_purchase',
-      summary: {
-        purchase_id: purchase.purchase_id,
-        derived_hash: preview.derived_hash,
-        use_purchase: usePurchase,
-        prefer_purchase_values: body.prefer_purchase_values === true,
-        line_ids: [...new Set(preview.derived.entries.flatMap((e) => e.line_ids))],
-        inputs_changed: inputWrites.length,
-        rules_changed: ruleWrites.length,
-        priced: pricesWritten,
-      },
-      idempotency_key: idempotencyKey,
-      actor,
-      now,
-    }),
-    ...inputWrites.map((w) => {
-      const next = nextInputRow(w);
-      return pricingAuditStatement(db, {
-        entity: 'input',
-        entity_key: `${w.scope}:${w.scope_id}`,
-        product_id: pid,
-        action: 'input_from_purchase',
-        before: inputImage(w.existing),
-        after: inputImage(next),
-        summary: { purchase_id: purchase.purchase_id, line_ids: preview.derived.entries.find((e) => e.write.scope === w.scope && e.write.scope_id === w.scope_id)?.line_ids ?? [] },
-        actor,
-        now,
-      });
-    }),
-    ...ruleWrites.map((w) =>
-      pricingAuditStatement(db, {
-        entity: 'rule',
-        entity_key: `${w.kind}:${w.scope}:${w.scope_id}`,
-        product_id: pid,
-        action: 'rule_set',
-        before: ruleImage(w.existing),
-        after: ruleImage(w.next),
-        summary: { purchase_id: purchase.purchase_id },
-        actor,
-        now,
-      })
-    ),
-  ];
-  const rowsChanged = inputWrites.length + ruleWrites.length;
-  const appliedAudit = async (entered: boolean) =>
-    (await auditStatements(db, actor, 'pricing.applied_from_purchase', pid, { product_id: pid, purchase_id: purchase.purchase_id, rows_changed: rowsChanged, entered })).statements;
-
-  // Owner decision 8 at the purchase: the apply that leaves the product complete writes its prices in the same batch.
-  if (pricesWritten) {
-    let status: 'saved' | 'already';
-    try {
-      status = await commitEngine(
-        c,
-        ev,
-        { inputWrites: [], ruleWrites: [] },
-        // The combined hash was checked above; the engine gate reads the engine write's own.
-        { hash: ev.hash, confirm: body.confirm_large_change },
-        { source: 'purchase', preview: async () => productPreview, extraInputs: [directPurchaseStatement(db, data, overlay, actor, now)], extraAudits: [...audits, ...(await appliedAudit(ev.kind === 'adopt'))], auditDetail: { purchase_id: purchase.purchase_id } }
-      );
-    } catch (e) {
-      if (e instanceof Error && /UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(e.message)) return c.json({ success: true, already: true, product_id: pid, rows_changed: 0, priced: false });
-      throw e;
-    }
-    return c.json({ success: true, already: status === 'already', product_id: pid, rows_changed: rowsChanged, priced: status === 'saved', entered: ev.kind === 'adopt' });
-  }
-
-  const statements = [
-    ...batchHead(db, data, now),
-    directPurchaseStatement(db, data, overlay, actor, now),
-    ...audits,
-    ...(await appliedAudit(false)),
-    ...batchTail(db, pid),
-  ];
-  if (statements.length > APPLY_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE');
-  try {
-    await db.batch(statements);
-  } catch (e) {
-    if (isFenceMiss(e)) throw fxRefusal(409, 'PRICING_CHANGED');
-    if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(e instanceof Error ? e.message : String(e)))
-      return c.json({ success: true, already: true, product_id: pid, rows_changed: 0, priced: false });
-    if (/UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
-    throw e;
-  }
-  return c.json({ success: true, already: false, product_id: pid, rows_changed: rowsChanged, priced: false });
-});
-
-/** The product's stored rules (for the sheet and the card) and its counter. */
-adminPricingRoutes.get('/products/:id/rules', async (c) => {
-  const db = c.env.DB;
-  await engineRates(db);
-  const loaded = await loadOne(db, c.req.param('id'));
-  const data = await loadProductPricing(db, loaded.id);
-  return c.json(storedRulesDto(loaded.id, data.rules, data.state?.inputs_seq ?? 0));
-});
-
-adminPricingRoutes.put('/products/:id/rules', async (c) => {
-  assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['rules', 'inputs_seq']);
-  const db = c.env.DB;
-  await engineRates(db);
-  const loaded = await loadOne(db, c.req.param('id'));
-  const pid = loaded.id;
-  const data = await loadProductPricing(db, pid);
-  refuseV2Door(data);
-  if (body.inputs_seq !== undefined && body.inputs_seq !== null) {
-    if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
-    if (body.inputs_seq !== (data.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
-  }
-  const writes = parseRuleWrites(body, pid, formScopeIds(loaded), data).filter((w) => !ruleWriteIsNoop(w));
-  if (writes.length) await commitRuleWrites(c, data, writes, 'rule_set', 'pricing.rule.updated');
-  const after = await loadProductPricing(db, pid);
-  return c.json(storedRulesDto(pid, after.rules, after.state?.inputs_seq ?? 0));
-});
-
-/** The product form's «التسعير بالدولار» (worker/lib/pricingEngine/productInputs.ts). */
-async function productInputsContext(c: Context<AppContext>) {
-  const db = c.env.DB;
-  const rates = await engineRates(db);
-  const loaded = await loadOne(db, c.req.param('id') ?? '');
-  const [stored, ctx, reads] = await Promise.all([loadProductPricing(db, loaded.id), loadPreviewContext(db), loadEngineReads(db, loaded.id)]);
-  return { db, rates, loaded, stored, ctx, reads };
-}
-
-adminPricingRoutes.get('/products/:id/inputs', async (c) => {
-  const { rates, loaded, stored, ctx, reads } = await productInputsContext(c);
-  const answer = await productInputsAnswer(loaded, stored, ctx, rates, undefined, reads);
-  // Pricing V2 (spec §3.5): the old panel of a V2 product reads `v2: true` and hides itself; it
-  // carries no V1 hash, because every V1 write of a V2 product refuses.
-  if (isV2Product(stored)) return c.json({ ...answer, v2: true, preview_hash: null, conversion_hash: null });
-  return c.json(answer);
-});
-
-adminPricingRoutes.post('/products/:id/preview', async (c) => {
-  const body = strictBody(await jsonObject(c), ['draft', 'adopt']);
-  if (body.adopt !== undefined && typeof body.adopt !== 'boolean') throw inputInvalid('adopt');
-  const { rates, loaded, stored, ctx, reads } = await productInputsContext(c);
-  refuseV2Door(stored);
-  const draft = parseProductInputs(strictBody(body.draft ?? {}, ['inputs', 'rules']), loaded, stored, { rates, now: new Date().toISOString() });
-  return c.json(await productInputsAnswer(loaded, stored, ctx, rates, draft, reads, { adopt: body.adopt === true }));
-});
-
-const FORM_STATEMENT_CAP = 200;
-
-// ============================================================= The writer (owner decision 8; USD design §6.1-§6.5)
+// ============================================================= the legacy doors
 //
-// A save that leaves a manual product complete ADOPTS the engine and writes its
-// prices in the same batch; an engine product's save reprices in the same
-// batch; an incomplete manual product stores its data and keeps its manual
-// price. A price write needs the hash of the preview the owner read (409
-// PRICING_PREVIEW_REQUIRED returns the preview when it is missing, 409
-// PRICING_PREVIEW_STALE when the data moved since), a change above 15% the
-// explicit tick and a fresh sign-in. One product, one atomic batch, fenced,
-// idempotent on the preview hash, audited (values in pricing_audit, ids and
-// counts in audit_log), bounded (FORM_STATEMENT_CAP). Only the LAST CONFIRMED
-// central rates price (the versioned reader; a held candidate never does).
+// THE CLEAN START (the owner's answer Q6, DECISIONS row 222; spec addendum A.6). The V1
+// engine's product doors — the product sheet, «كم سيصبح السعر؟», the purchase apply, the
+// rules and inputs panel and its preview, the stale list and its bulk save, the exit to
+// manual pricing and «قبول القيم المرحّلة» — wrote or showed old dinar pricing. Every
+// product is priced in dollars now (section ٣ «الأسعار» of the product form, V2), so each
+// of these answers 409 PRICING_V2_MANAGED naming the section, for EVERY product, real or
+// invented (one release, so a stale admin bundle reads a sentence; deleted in V2-7). A
+// confirmed stock purchase becomes a price review (D1, spec addendum A.10), never a write.
+// The routes stay registered so their classes and the owner-only door still hold.
 
-const ENGINE_STATEMENT_CAP = 200;
-
-const priceKey = (pid: string, hash: string) => `price:${pid}:${hash}`;
-const isHash = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
-
-async function priceReplayed(db: D1Database, pid: string, hash: unknown): Promise<boolean> {
-  if (!isHash(hash)) return false;
-  return !!(await db.prepare('SELECT 1 AS hit FROM pricing_audit WHERE idempotency_key = ?').bind(priceKey(pid, hash)).first<{ hit: number }>());
-}
-
-/**
- * The gates of every price write (see above), then the batch. `preview` builds
- * the preview a refusal returns. Answers 'already' when the same preview was
- * saved before (a replay), 'saved' otherwise.
- */
-async function commitEngine(
-  c: Context<AppContext>,
-  ev: EngineEvaluation,
-  writes: { inputWrites: InputWriteList; ruleWrites: RuleWriteList },
-  gate: { hash: unknown; confirm: unknown; dataHash?: string | null },
-  opts: { source: string; preview: () => Promise<unknown>; extraAudits?: D1PreparedStatement[]; auditDetail?: Record<string, unknown>; extraStatements?: D1PreparedStatement[]; extraInputs?: D1PreparedStatement[] }
-): Promise<'saved' | 'already'> {
-  const db = c.env.DB;
-  const pid = ev.product_id;
-  if (!ev.complete) {
-    // An engine product never loses its price: a save that would leave it incomplete is refused.
-    throw new HttpError(409, serverMessage('PRICING_ENGINE_INCOMPLETE'), 'PRICING_ENGINE_INCOMPLETE', { missing_codes: ev.codes, preview: await opts.preview() });
-  }
-  if (await priceReplayed(db, pid, gate.hash)) return 'already';
-  if (!isHash(gate.hash) || gate.hash !== ev.hash) {
-    // No hash (or only the dinar conversion's): the owner has not seen the new prices yet.
-    const required = !isHash(gate.hash) || gate.hash === gate.dataHash;
-    const code = required ? 'PRICING_PREVIEW_REQUIRED' : 'PRICING_PREVIEW_STALE';
-    throw new HttpError(409, serverMessage(code), code, { preview: await opts.preview() });
-  }
-  if (ev.large_change) {
-    if (gate.confirm !== true) throw new HttpError(409, serverMessage('PRICING_LARGE_CHANGE_CONFIRM'), 'PRICING_LARGE_CHANGE_CONFIRM', { preview: await opts.preview() });
-    requireFreshSession(c);
-  }
-  const statements = [
-    ...(opts.extraStatements ?? []),
-    ...(await engineWriteStatements(db, ev, writes.inputWrites, writes.ruleWrites, {
-      actor: c.get('user')!.id,
-      now: new Date().toISOString(),
-      source: opts.source,
-      idempotencyKey: priceKey(pid, ev.hash!),
-      extraAudits: opts.extraAudits,
-      extraInputs: opts.extraInputs,
-      auditDetail: opts.auditDetail,
-    })),
-  ];
-  if (statements.length > ENGINE_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE');
-  try {
-    await db.batch(statements);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/UNIQUE constraint failed: pricing_audit\.idempotency_key/i.test(msg)) return 'already';
-    if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(msg)) throw fxRefusal(409, 'PRICING_CHANGED');
-    const refusal = engineDbRefusal(e);
-    if (refusal) throw refusal;
-    throw e;
-  }
-  const slug = (await db.prepare('SELECT slug FROM products WHERE id = ?').bind(pid).first<{ slug: string }>())?.slug;
-  await afterCatalogueWrite(c, slug ? [slug] : []);
-  return 'saved';
-}
-
-type InputWriteList = ReturnType<typeof effectiveWrites>['inputWrites'];
-type RuleWriteList = ReturnType<typeof effectiveWrites>['ruleWrites'];
-
-adminPricingRoutes.put('/products/:id/inputs', async (c) => {
-  assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['inputs_seq', 'inputs', 'rules', 'preview_hash', 'confirm_large_change', 'adopt', 'data_only']);
-  if (body.adopt !== undefined && typeof body.adopt !== 'boolean') throw inputInvalid('adopt');
-  if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
-  if (body.data_only !== undefined && typeof body.data_only !== 'boolean') throw inputInvalid('data_only');
-  // Storing data only and adopting the engine in the same request contradict each other.
-  if (body.data_only === true && body.adopt === true) throw inputInvalid('data_only');
-  const { db, rates, loaded, stored, ctx, reads } = await productInputsContext(c);
-  refuseV2Door(stored);
-  if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
-  const pid = loaded.id;
-  if (typeof body.inputs_seq !== 'number' || !Number.isSafeInteger(body.inputs_seq) || body.inputs_seq < 0) throw inputInvalid('inputs_seq');
-  // A replay of a saved preview (the same hash) answers as the first save did.
-  if (await priceReplayed(db, pid, body.preview_hash)) return c.json({ ...(await productInputsAnswer(loaded, stored, ctx, rates, undefined, reads)), already: true });
-  // Fenced on what the owner looked at: a purchase applied or a second tab saved since is a fresh look.
-  if (body.inputs_seq !== (stored.state?.inputs_seq ?? 0)) throw fxRefusal(409, 'PRICING_CHANGED');
-  const now = new Date().toISOString();
-  const draft = parseProductInputs(body, loaded, stored, { rates, now });
-  const writes = effectiveWrites(draft);
-  const ev = await productEngineEvaluation(loaded, stored, ctx, rates, draft, reads, { adopt: body.adopt === true, writes });
-  const actor = c.get('user')!.id;
-  const inputAudits = (source: string) => [
-    ...writes.inputWrites.map((w) =>
-      pricingAuditStatement(db, {
-        entity: 'input',
-        entity_key: `${w.scope}:${w.scope_id}`,
-        product_id: pid,
-        action: 'update',
-        before: inputImage(w.existing ? { ...w.existing, iqd: storedIqdOf(w.existing) } : null),
-        after: inputImage(nextInputRow(w)),
-        summary: { source },
-        actor,
-        now,
-      })
-    ),
-    ...writes.ruleWrites.map((w) =>
-      pricingAuditStatement(db, { entity: 'rule', entity_key: `${w.kind}:${w.scope}:${w.scope_id}`, product_id: pid, action: 'rule_set', before: ruleImage(w.existing), after: ruleImage(w.next), summary: { source }, actor, now })
-    ),
-  ];
-
-  // «البيانات أولاً» (owner report 2026-10-10; docs/DECISIONS.md): the product form stores a MANUAL
-  // product's data as data when it asks (`data_only`), even when the data completes the product — its
-  // store price moves only by the confirming request with the preview's hash (the branch below, with the
-  // 15% tick and the fresh sign-in, unchanged). An engine product ignores the flag: its stored prices must
-  // match its stored inputs, so its save stays one held write behind the preview.
-  const dataOnly = body.data_only === true && stored.state?.mode !== 'engine';
-  // Owner decision 8: the save writes prices (adopt / reprice) — or stores the data only.
-  if (!dataOnly && ev.kind && (ev.needs_write || !ev.complete)) {
-    const dataHash = await formPreviewHash(pid, draft.iqd, rates);
-    await commitEngine(
-      c,
-      ev,
-      writes,
-      { hash: body.preview_hash, confirm: body.confirm_large_change, dataHash },
-      {
-        source: 'product_form',
-        preview: () => productInputsAnswer(loaded, stored, ctx, rates, draft, reads, { evaluation: ev }),
-        extraAudits: inputAudits('product_form'),
-        auditDetail: { inputs_changed: writes.inputWrites.length, rules_changed: writes.ruleWrites.length },
-      }
-    );
-    const after = await loadProductPricing(db, pid);
-    const reloaded = await loadOne(db, pid);
-    return c.json(await productInputsAnswer(reloaded, after, ctx, rates, undefined, await loadEngineReads(db, pid)));
-  }
-
-  // Data only: an incomplete manual product — or a manual product's `data_only` save — keeps its manual price.
-  // Typed dinars convert at the rate the owner was shown (FX plan §12): the preview's hash, recomputed now.
-  if (draft.iqd.length) {
-    if (typeof body.preview_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.preview_hash)) throw inputInvalid('preview_hash');
-    if (body.preview_hash !== (await formPreviewHash(pid, draft.iqd, rates))) throw fxRefusal(409, 'PRICING_PREVIEW_STALE');
-  }
-  if (writes.inputWrites.length || writes.ruleWrites.length) {
-    const statements = [
-      ...batchHead(db, stored, now),
-      // Rates are read before the pricing store. A rate committed between
-      // those reads can leave a fresh config version beside a stale IQD
-      // conversion, so bind both the confirmed rate and its snapshot version.
-      ...(writes.inputWrites.some((w) => w.iqd) ? fence(db,
-        `${RATES_FENCE_SQL} AND (SELECT effective_version FROM fx_rate_pairs WHERE pair = 'USD_IQD') = ?`,
-        [...rateFenceBinds(rates), rates.pair_versions.USD_IQD]) : []),
-      ...inputStatements(db, pid, writes.inputWrites, actor, now),
-      ...ruleStatements(db, pid, writes.ruleWrites, actor, now),
-      ...pruneDirectPurchaseStatements(db, stored, writes.inputWrites, writes.ruleWrites, actor, now),
-      ...inputAudits('product_form'),
-      ...(await auditStatements(db, actor, 'pricing.inputs.updated', pid, { product_id: pid, inputs_changed: writes.inputWrites.length, rules_changed: writes.ruleWrites.length, inputs_seq: stored.state?.inputs_seq ?? 0 })).statements,
-      ...batchTail(db, pid),
-    ];
-    if (statements.length > FORM_STATEMENT_CAP) throw new HttpError(409, serverMessage('PRICING_SET_TOO_LARGE'), 'PRICING_SET_TOO_LARGE');
-    try {
-      await db.batch(statements);
-    } catch (e) {
-      if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
-      throw e;
-    }
-  }
-  const after = await loadProductPricing(db, pid);
-  return c.json(await productInputsAnswer(loaded, after, ctx, rates, undefined, await loadEngineReads(db, pid)));
-});
-
-// ------------------------------------------------------------ the save list: stale engine prices and complete-but-manual products
-//
-//   GET  /save-list                every engine product whose stored price was computed at a confirmed rate
-//                                  that moved since (stale; with the code of one the automatic repricing could
-//                                  not reach), every manual product whose data is complete (ready), and the
-//                                  automatic repricing's status «يُعاد التسعير تلقائياً» (counts, the pause, the
-//                                  last run) — what the «التسعير والشحن» page and the rates panel show
-//   POST /save-list/preview        {product_ids} (≤ 20): each product's preview and hash, for one bulk save
-//   POST /products/save-bulk       {items:[{product_id, preview_hash}], confirm_large_change?} (≤ 20): each
-//                                  product its own atomic batch — the owner's manual tool beside FX-5's
-//                                  automatic repricing, which works through the same stale list
-
-const BULK_MAX = 20;
-
-const productNames = (loaded: LoadedProduct) => ({
-  name_ar: String(loaded.doc.name_ar ?? ''),
-  name_en: String(loaded.doc.name_en ?? ''),
-  name_ckb: String(loaded.doc.name_ckb ?? ''),
-  slug: String(loaded.doc.slug ?? ''),
-});
-
-adminPricingRoutes.get('/save-list', async (c) => {
-  const db = c.env.DB;
-  // Deploy-ahead of 0181 (CLAUDE.md rule 2): without the engine's tables no product is engine-priced
-  // and none holds stored pricing data, so both lists are truthfully empty — the rates panel (FX-1)
-  // and «التسعير والشحن» keep answering exactly as on a migrated database with no engine product.
-  if (!(await engineCoreInstalled(db))) return c.json({ success: true, stale: { count: 0, items: [] }, ready: { count: 0, items: [] }, auto: null });
-  const rates = await engineRates(db);
-  const { results } = await db
-    .prepare(
-      "SELECT s.product_id, s.mode, s.opted_out_at, s.reprice_blocked_code FROM product_pricing_state s JOIN products p ON p.id = s.product_id WHERE COALESCE(p.composition, '') = '' ORDER BY s.product_id"
-    )
-    .all<{ product_id: string; mode: string; opted_out_at: string | null; reprice_blocked_code: string | null }>();
-  const states = results ?? [];
-  const ids = states.map((s) => s.product_id);
-  const [loaded, stores, costs, ctx, control] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadStoredSkuCosts(db, ids), loadPreviewContext(db), loadEngineControl(db)]);
-  const stale: Array<Record<string, unknown>> = [];
-  const ready: Array<Record<string, unknown>> = [];
-  for (const st of states) {
-    const product = loaded.get(st.product_id);
-    if (!product) continue;
-    if (st.mode === 'engine') {
-      const own = costs.filter((r) => r.product_id === st.product_id);
-      const reasons = staleReasons(own, rates);
-      // FX-7: priced per SKU, a SKU added since (a new colour) sells at its model's highest price until
-      // the product is saved again — listed as `SKUS` (codes only).
-      if (own.some((r) => r.combo_key.includes('c:') || r.combo_key.includes('|'))) {
-        const stored = new Set(own.map((r) => r.combo_key));
-        if (sellableSkus(product.doc, product.view).skus.some((k) => !stored.has(k.combo_key))) reasons.push('SKUS');
-      }
-      // `blocked_code`: the automatic repricing could not reach it (a code, never a figure).
-      if (reasons.length) stale.push({ product_id: st.product_id, ...productNames(product), reasons, blocked_code: st.reprice_blocked_code ?? null });
-      continue;
-    }
-    if (st.opted_out_at) continue;
-    // FX-7 gaps: its SKU prices could not be read this time — not listed as ready until a read succeeds.
-    if (skuReadFailed(product)) continue;
-    const stored = stores.get(st.product_id)!;
-    const ev = await evaluateEngineWrite({ loaded: product, stored, ctx, rates, control, inputs: stored.inputs, inputWrites: [], ruleWrites: [], image: '', storedCosts: [] });
-    if (ev.kind === 'adopt') ready.push({ product_id: st.product_id, ...productNames(product), reasons: [] });
-  }
-  const status = await autoRepriceStatus(db, rates);
-  const auto = status
-    ? {
-        // «يُعاد التسعير تلقائياً»: stale engine products are being repriced on the next ticks.
-        active: status.stale > 0 && !status.paused && !status.derived_stale,
-        paused: status.paused,
-        stale: status.stale,
-        blocked: status.blocked,
-        last_run: status.last_run,
-      }
-    : null;
-  return c.json({ success: true, stale: { count: stale.length, items: stale }, ready: { count: ready.length, items: ready }, auto });
-});
-
-/** One product's bulk evaluation (no drafts): its preview and hash. */
-async function bulkEvaluation(db: D1Database, pid: string, rates: PricingRates, ctx: Awaited<ReturnType<typeof loadPreviewContext>>) {
-  const loaded = await loadOne(db, pid);
-  const [stored, reads] = await Promise.all([loadProductPricing(db, pid), loadEngineReads(db, pid)]);
-  const ev = await productEngineEvaluation(loaded, stored, ctx, rates, { inputs: [], rules: [], iqd: [] }, reads);
-  return { loaded, stored, reads, ev };
-}
-
-function productIdList(raw: unknown, field: string): string[] {
-  if (!Array.isArray(raw) || raw.length < 1 || raw.length > BULK_MAX || raw.some((x) => typeof x !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(x))) throw inputInvalid(field);
-  return [...new Set(raw as string[])];
-}
-
-adminPricingRoutes.post('/save-list/preview', async (c) => {
-  const body = strictBody(await jsonObject(c), ['product_ids']);
-  const db = c.env.DB;
-  const rates = await engineRates(db);
-  const ctx = await loadPreviewContext(db);
-  const items = [];
-  for (const pid of productIdList(body.product_ids, 'product_ids')) {
-    const { loaded, ev } = await bulkEvaluation(db, pid, rates, ctx);
-    items.push({ product_id: pid, ...productNames(loaded), preview: engineEvaluationDto(ev) });
-  }
-  return c.json({ success: true, items });
-});
-
-adminPricingRoutes.post('/products/save-bulk', async (c) => {
-  assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['items', 'confirm_large_change']);
-  if (body.confirm_large_change !== undefined && typeof body.confirm_large_change !== 'boolean') throw inputInvalid('confirm_large_change');
-  if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > BULK_MAX) throw inputInvalid('items');
-  const items = body.items.map((raw, i) => {
-    const r = strictBody(raw, ['product_id', 'preview_hash']);
-    if (typeof r.product_id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(r.product_id)) throw inputInvalid(`items[${i}].product_id`);
-    if (!isHash(r.preview_hash)) throw inputInvalid(`items[${i}].preview_hash`);
-    return { product_id: r.product_id, preview_hash: r.preview_hash };
-  });
-  if (new Set(items.map((i) => i.product_id)).size !== items.length) throw inputInvalid('items');
-  const db = c.env.DB;
-  const rates = await engineRates(db);
-  if (rates.derived_stale) throw fxRefusal(409, 'FX_DERIVED_STALE');
-  // One fresh sign-in covers the whole confirmed bulk save of large changes.
-  if (body.confirm_large_change === true) requireFreshSession(c);
-  const ctx = await loadPreviewContext(db);
-  const results: Array<{ product_id: string; status: string; code?: string }> = [];
-  for (const item of items) {
-    try {
-      const { ev } = await bulkEvaluation(db, item.product_id, rates, ctx);
-      // Pricing V2 (spec §3.5): a V2 product is never in V1's bulk save.
-      if (ev.codes.includes('PRICING_V2_MANAGED')) {
-        results.push({ product_id: item.product_id, status: 'refused', code: 'PRICING_V2_MANAGED' });
-        continue;
-      }
-      if (!ev.kind || (!ev.needs_write && ev.complete)) {
-        results.push({ product_id: item.product_id, status: 'unchanged' });
-        continue;
-      }
-      const status = await commitEngine(c, ev, { inputWrites: [], ruleWrites: [] }, { hash: item.preview_hash, confirm: body.confirm_large_change }, { source: 'bulk', preview: async () => engineEvaluationDto(ev) });
-      results.push({ product_id: item.product_id, status });
-    } catch (e) {
-      // FX-7 gaps: a failed read of one product's SKU prices refuses that product (retryable), not the bulk.
-      if (e instanceof HttpError && e.status !== 401 && (e.status < 500 || e.code === 'PRICING_READ_FAILED')) {
-        results.push({ product_id: item.product_id, status: 'refused', code: e.code ?? 'REFUSED' });
-        continue;
-      }
-      throw e;
-    }
-  }
-  c.set('completenessIds', results.filter((r) => r.status !== 'unchanged' && r.status !== 'refused').map((r) => r.product_id));
-  return c.json({ success: true, results });
-});
-
-// ------------------------------------------------------------ back to manual (the owner's way out; MVP «رجوع إلى اليدوي»)
-//
-// The product's mode becomes manual under its mode token; every price stays
-// exactly as the engine wrote it (nothing is restored); inputs and rules stay.
-// Its prices are then edited the old way again, and a later save adopts the
-// engine only when the owner asks for it.
-
-adminPricingRoutes.post('/products/:id/manual', async (c) => {
-  assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['write_seq']);
-  const db = c.env.DB;
-  await engineRates(db);
-  const loaded = await loadOne(db, c.req.param('id'));
-  const pid = loaded.id;
-  const stored = await loadProductPricing(db, pid);
-  // Pricing V2 (spec §3.5): a V2 product never returns to manual pricing here (rollback is V2-7's snapshot tool).
-  refuseV2Door(stored, 'PRICING_V2_NO_MANUAL');
-  if (stored.state?.mode !== 'engine') throw new HttpError(409, serverMessage('PRICING_NOT_MANAGED'), 'PRICING_NOT_MANAGED');
-  if (typeof body.write_seq !== 'number' || body.write_seq !== stored.state.write_seq) throw fxRefusal(409, 'PRICING_CHANGED');
-  // FX-7 gaps: a failed read of the SKU prices is not "none": flipping to manual without deleting them
-  // would leave SKU rows that override every manual price. Refused, retryable; nothing is written.
-  refuseUnreadSkus(loaded);
-  const actor = c.get('user')!.id;
-  const now = new Date().toISOString();
-  // How many per-SKU prices the product carries (0 on a database without 0183, or priced per model).
-  const skuRows = skuTableOf(loaded) ? (loaded.view?.sku_prices?.length ?? 0) : 0;
-  try {
-    await db.batch([
-      ...fence(db, "EXISTS(SELECT 1 FROM product_pricing_state WHERE product_id = ? AND mode = 'engine' AND write_seq = ?)", [pid, stored.state.write_seq]),
-      db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`pricing-mode:${pid}`),
-      db
-        .prepare("UPDATE product_pricing_state SET mode = 'manual', write_seq = write_seq + 1, opted_out_at = ?, opted_out_by = ?, updated_at = ? WHERE product_id = ?")
-        .bind(now, actor, now, pid),
-      db.prepare('DELETE FROM pricing_sku_costs WHERE product_id = ?').bind(pid),
-      // FX-7 (0183): a SKU's own price cannot live in the manual fields; it returns to its model's —
-      // the highest of the model's SKUs, never lower (the confirmation said so). After the mode flip,
-      // so the rows' engine guard lets them go.
-      ...(skuRows ? [db.prepare('DELETE FROM product_sku_prices WHERE product_id = ?').bind(pid)] : []),
-      pricingAuditStatement(db, {
-        entity: 'engine_mode',
-        entity_key: pid,
-        product_id: pid,
-        action: 'engine_exit',
-        before: { mode: 'engine' },
-        after: { mode: 'manual' },
-        ...(skuRows ? { summary: { sku_rows_removed: skuRows } } : {}),
-        actor,
-        now,
-      }),
-      ...(await auditStatements(db, actor, 'pricing.engine.exited', pid, { product_id: pid })).statements,
-      db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`pricing-mode:${pid}`),
-    ]);
-  } catch (e) {
-    if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
-    throw e;
-  }
-  return c.json({ success: true, product_id: pid, mode: 'manual' });
-});
-
-adminPricingRoutes.post('/products/:id/targets/adopt', async (c) => {
-  assertCostWrite(c);
-  const body = strictBody(await jsonObject(c), ['legacy_hash']);
-  const db = c.env.DB;
-  await engineRates(db);
-  const loaded = await loadOne(db, c.req.param('id'));
-  const pid = loaded.id;
-  if (typeof body.legacy_hash !== 'string' || !/^[0-9a-f]{64}$/.test(body.legacy_hash)) throw inputInvalid('legacy_hash');
-  refuseV2Door(await loadProductPricing(db, pid));
-  const ctx = await loadPreviewContext(db);
-  const legacy = evaluateLegacy(pid, loaded.doc, loaded.view, ctx).legacy;
-  const hash = await legacyHashOf(legacy.rules);
-  // Fenced on the image the owner saw: a price edited since then is a fresh look.
-  if (hash !== body.legacy_hash) throw new HttpError(409, serverMessage('PRICING_PREVIEW_STALE'), 'PRICING_PREVIEW_STALE');
-  const data = await loadProductPricing(db, pid);
-  const writes = legacyAcceptWrites(pid, legacy.rules, data, `legacy:${hash.slice(0, 32)}`).filter((w) => !ruleWriteIsNoop(w));
-  if (writes.length) await commitRuleWrites(c, data, writes, 'legacy_accept', 'pricing.legacy.accepted');
-  const after = await loadProductPricing(db, pid);
-  return c.json(storedRulesDto(pid, after.rules, after.state?.inputs_seq ?? 0));
-});
-
-/** One rule batch: fences, token, state row, the rules, their pricing_audit rows and one audit_log row (ids and counts). */
-async function commitRuleWrites(c: Context<AppContext>, data: ProductPricingData, writes: RuleWrite[], action: 'rule_set' | 'legacy_accept', auditAction: string): Promise<void> {
-  const db = c.env.DB;
-  const actor = c.get('user')!.id;
-  const now = new Date().toISOString();
-  const pid = data.product_id;
-  const statements = [
-    ...batchHead(db, data, now),
-    ...ruleStatements(db, pid, writes, actor, now),
-    ...pruneDirectPurchaseStatements(db, data, [], writes, actor, now),
-    ...writes.map((w) =>
-      pricingAuditStatement(db, { entity: 'rule', entity_key: `${w.kind}:${w.scope}:${w.scope_id}`, product_id: pid, action, before: ruleImage(w.existing), after: ruleImage(w.next), actor, now })
-    ),
-    ...(await auditStatements(db, actor, auditAction, pid, { product_id: pid, rules_changed: writes.length, inputs_seq: data.state?.inputs_seq ?? 0 })).statements,
-    ...batchTail(db, pid),
-  ];
-  try {
-    await db.batch(statements);
-  } catch (e) {
-    if (isFenceMiss(e) || /UNIQUE constraint failed: ops_guards/i.test(e instanceof Error ? e.message : String(e))) throw fxRefusal(409, 'PRICING_CHANGED');
-    throw e;
-  }
-}
+adminPricingRoutes.post('/products/:id/apply-purchase', refuseLegacyPricing(3));
+adminPricingRoutes.get('/products/:id/rules', refuseLegacyPricing(3));
+adminPricingRoutes.put('/products/:id/rules', refuseLegacyPricing(3));
+adminPricingRoutes.get('/products/:id/inputs', refuseLegacyPricing(3));
+adminPricingRoutes.post('/products/:id/preview', refuseLegacyPricing(3));
+adminPricingRoutes.put('/products/:id/inputs', refuseLegacyPricing(3));
+adminPricingRoutes.get('/save-list', refuseLegacyPricing(3));
+adminPricingRoutes.post('/save-list/preview', refuseLegacyPricing(3));
+adminPricingRoutes.post('/products/save-bulk', refuseLegacyPricing(3));
+adminPricingRoutes.post('/products/:id/manual', refuseLegacyPricing(3));
+adminPricingRoutes.post('/products/:id/targets/adopt', refuseLegacyPricing(3));

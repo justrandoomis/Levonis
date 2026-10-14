@@ -36,7 +36,6 @@ import FxHistorySheet from './FxHistorySheet';
 import ShippingRatesCard from './ShippingRatesCard';
 import { PricingFailure } from './parts';
 import { fxCount } from './format';
-import EngineSaveList from './EngineSaveList';
 import RatePreviewSheet, { type RateActRequest } from './RatePreview';
 
 export default function RatesPanel({ lang, dir, onChanged, reloadKey = 0 }: { lang: Language; dir: 'rtl' | 'ltr'; onChanged?: () => void; reloadKey?: number }) {
@@ -50,7 +49,7 @@ export default function RatesPanel({ lang, dir, onChanged, reloadKey = 0 }: { la
   // FX-5 (§7.8): the act a card asked to preview — shown, then applied with the preview's hash.
   const [actRequest, setActRequest] = useState<RateActRequest | null>(null);
   // Every rate act answers with the rates: the stale list's count follows it (owner decision 8).
-  const [ratesSeq, setRatesSeq] = useState(0);
+  const [, setRatesSeq] = useState(0);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -163,8 +162,6 @@ export default function RatesPanel({ lang, dir, onChanged, reloadKey = 0 }: { la
         </div>
       )}
 
-      {/* A confirmed rate that moved leaves engine prices behind: their count and the one-click preview + save. */}
-      {data && <EngineSaveList lang={lang} compact reloadKey={ratesSeq + reloadKey} onChanged={onChanged} />}
 
       <FxReviewSheet
         pair={reviewing && reviewing.pending ? reviewing : null}

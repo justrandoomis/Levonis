@@ -1,12 +1,14 @@
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { matchOrderCostSelection } from './inventorySelection';
 import { refreshProfit, type OrderProfitBase, type ProfitLine } from './orderProfit';
+import { cleanStartAt } from './offers';
 
 type Row = Record<string, unknown>;
 export interface OrderCostProjection {
   unit_cost_iqd: number | null;
   total_cost_iqd: number | null;
-  source: 'confirmed_lot' | 'current_catalogue';
+  /** `estimate`: a V2 line's frozen estimate (0190, addendum A.9 step 3) — never today's legacy cells. */
+  source: 'confirmed_lot' | 'current_catalogue' | 'estimate';
   source_id: string | null;
   as_of: string | null;
 }
@@ -38,6 +40,16 @@ export async function enrichOrderCostProjections(db: D1Database, bases: OrderPro
   const candidates = bases.flatMap(base => !terminal.has(String(base.order.status)) ? base.lines.filter(line => !isConfirmedOrderCost(line.cost_confidence) && !line.allocations.length && line.product_id).map(line => ({ base, line })) : []);
   const productIds = [...new Set(candidates.map(({ line }) => line.product_id!))];
   const suggestions = new Map<string, OrderCostProjection>();
+  // The clean start (addendum A.9 step 3): a line sold after it is never forecast from the legacy
+  // catalogue cells — only from its frozen V2 estimate or a fully priced confirmed-lot queue.
+  const cutAt = productIds.length ? await cleanStartAt(db) : null;
+  const cutMs = cutAt ? Date.parse(cutAt) : NaN;
+  const afterCut = (base: OrderProfitBase): boolean => {
+    if (!Number.isFinite(cutMs)) return false;
+    const raw = String(base.order.created_at ?? '');
+    const t = Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+    return Number.isFinite(t) && t >= cutMs;
+  };
   if (productIds.length) {
     const ids = JSON.stringify(productIds);
     const [products, options, colors, variants, fulfillments, transports, groups, links, lots] = await Promise.all([
@@ -65,7 +77,9 @@ export async function enrichOrderCostProjections(db: D1Database, bases: OrderPro
       if (!selection) continue;
       const qty = Math.max(0, line.qty - Number(line.restocked_qty ?? 0));
       const queue = String(base.order.shipping_type ?? 'direct') === 'direct' ? (lots.results ?? []).filter(lot => lot.product_id === line.product_id && lot.scope === selection.scope && lot.scope_id === selection.scope_id) : [];
-      let unit = selection.unit_cost_iqd, total = unit === null ? null : money(unit * qty), source: OrderCostProjection['source'] = 'current_catalogue', sourceId: string | null = selection.scope === 'base' ? line.product_id : selection.scope_id, asOf: string | null = null;
+      const post = afterCut(base);
+      const estimate = money(line.estimated_cost_iqd);
+      let unit = post ? estimate : selection.unit_cost_iqd, total = unit === null ? null : money(unit * qty), source: OrderCostProjection['source'] = post ? 'estimate' : 'current_catalogue', sourceId: string | null = post ? line.id : selection.scope === 'base' ? line.product_id : selection.scope_id, asOf: string | null = null;
       if (queue.length) {
         let left = qty, sum = 0, unknown = false;
         for (const lot of queue) {
@@ -82,6 +96,7 @@ export async function enrichOrderCostProjections(db: D1Database, bases: OrderPro
           unit = qty > 0 && total % qty === 0 ? total / qty : null;
         }
       }
+      if (post && source === 'estimate' && total === null) continue;
       suggestions.set(line.id, { unit_cost_iqd: unit, total_cost_iqd: total, source, source_id: sourceId, as_of: asOf });
     }
   }
