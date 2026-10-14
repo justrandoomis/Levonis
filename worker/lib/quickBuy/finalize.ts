@@ -419,7 +419,10 @@ export async function finalizeQuickBuySession(env: Env, runner: FinalizeRunner, 
   }
   const code = result.ok ? 'QUICK_BUY_NOT_SUBMITTED' : result.code;
   // `session` was read AFTER the claim, so its count already includes this attempt.
-  const terminal = session.finalize_attempts >= QUICK_BUY_FINALIZE_MAX_ATTEMPTS;
+  // The clean start (DECISIONS row 222, spec addendum A.5): a product that is not for sale now (hidden,
+  // or not yet priced in dollars) will not be bought at the price this session held — give up at once,
+  // releasing the hold and the reservation, instead of retrying a refusal that cannot change by itself.
+  const terminal = session.finalize_attempts >= QUICK_BUY_FINALIZE_MAX_ATTEMPTS || code === 'PRODUCT_CURRENTLY_UNAVAILABLE';
   // The lease is kept through a give-up, so no other finaliser starts an order
   // attempt while the release is being written. Otherwise it is shortened to
   // the retry spacing, by the database's clock: the next attempt comes about a

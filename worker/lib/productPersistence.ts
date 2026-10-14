@@ -104,6 +104,7 @@ import { loadPrinterFitIds, planPrinterFits } from './printerFits';
 import { docToEntries } from './template';
 import { localizableSlots } from './translationSlots';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
+import { pinLegacyDocMoney, pinLegacyRelationMoney, selectorsOf } from './pricingEngine/v2/legacyMoney';
 
 // =========================================================================
 // 1. The relations planner (groups, values, colours, links, variants, images)
@@ -2425,6 +2426,8 @@ export interface ProductSavePlan {
    *  root cause 8). Never derived from the stored value. */
   costRefused: string[];
   warnings: string[];
+  /** The clean start (A.6): the legacy money fields this plan put back to the stored value (names only). */
+  moneyPinned: string[];
   money: boolean;
   actorId: string;
   /**
@@ -2633,6 +2636,20 @@ export async function planProductSave(
     doc.selling_type = 'bundle';
   }
 
+  // ---- the clean start: no writer types a dinar price (addendum A.6) -------
+  //
+  // DECISIONS row 222: an ordinary product's prices are its V2 write's, never a
+  // typed IQD figure. Every writer reaches this one planner — the product and
+  // relations saves (which refuse a moved field before they get here), the TXT
+  // and template applies and the CSV import (whose price cells are put back to
+  // the stored value and reported, while their other columns apply). A new
+  // product is born at 0 with no ladder, compare-at, fee or cost cell: hidden
+  // until its first complete V2 write. Compositions keep their own typed
+  // prices (Q7, the bundles panel).
+  const ordinary = nextComposition === '' && prevComposition === '';
+  const moneyPinned: string[] = [];
+  if (doc && ordinary) moneyPinned.push(...pinLegacyDocMoney(doc, prev, actor.money));
+
   // ---- §11: cost is written with cost write only (the owner, decision 2) ---
   //
   // What is REPORTED comes from the request (`costSent`), never from a
@@ -2695,6 +2712,15 @@ export async function planProductSave(
     // Without cost write, a row created for a legacy document-only option or
     // colour takes the cost the stored document holds (S1 review L2).
     if (prev && !actor.money) snap.documentCosts = documentRowCosts(prev);
+    if (ordinary) {
+      moneyPinned.push(
+        ...pinLegacyRelationMoney(
+          intent.relations,
+          selectorsOf(snap.existing, snap.existingVariants as unknown as Array<Record<string, unknown>>),
+          actor.money
+        )
+      );
+    }
     // The base stock a document states must still cover what is reserved.
     if (doc && doc.stock !== null && doc.stock < snap.baseReserved) {
       throw badRequest(
@@ -3238,7 +3264,14 @@ export async function planProductSave(
     searchTokens,
     translations,
     costRefused,
-    warnings,
+    warnings: moneyPinned.length
+      ? [
+          ...warnings,
+          `PRICING_V2_MANAGED: ${moneyPinned.slice(0, 12).join(', ')}${moneyPinned.length > 12 ? ` (+${moneyPinned.length - 12})` : ''} — ` +
+            'الأسعار بالدينار لا تُكتب؛ أُبقيت كما هي / dinar prices are not written; the stored values were kept / نرخی دینار نانووسرێت؛ وەک خۆی هێڵرایەوە',
+        ]
+      : warnings,
+    moneyPinned,
     money: actor.money,
     actorId: actor.adminId,
     view:

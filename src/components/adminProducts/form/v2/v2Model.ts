@@ -567,6 +567,22 @@ export function withoutLegacyMoney(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([k]) => !LEGACY_MONEY_KEY.test(k)).map(([k, v]) => [k, withoutLegacyMoney(v)]));
 }
 
+/**
+ * THE SAVE NEVER CARRIES A DINAR PRICE (the clean start, addendum A.6): the
+ * document's own legacy money keys and the route commissions are left out, so
+ * the server keeps every stored value (a key the request does not carry keeps
+ * the stored one; a differing one is 409 PRICING_V2_MANAGED). Top-level keys
+ * only — the document's other nested objects are not money.
+ */
+export function docWithoutLegacyMoney<T extends Record<string, unknown>>(doc: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(doc)) {
+    if (LEGACY_MONEY_KEY.test(k)) continue;
+    out[k] = k === 'preorder_transports' && Array.isArray(v) ? v.map((t) => (t && typeof t === 'object' ? withoutLegacyMoney(t) : t)) : v;
+  }
+  return out as Partial<T>;
+}
+
 /** Is there anything to send? */
 export const wireIsEmpty = (w: V2DraftWire): boolean => Object.keys(w).length === 0;
 

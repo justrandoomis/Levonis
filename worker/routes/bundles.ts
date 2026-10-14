@@ -48,6 +48,7 @@
  * in the tree and a live write path into the frozen tables.
  */
 
+import { listing } from '../lib/listing';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -127,7 +128,8 @@ export async function listBundles(
 ): Promise<{ ctx: PricingCtx; bundles: ResolvedBundle[] }> {
   const { kind, search, categoryId, family, featured, limit, offset } = f;
   const params: unknown[] = [];
-  let where = "p.status = 'active'";
+  // Listed to customers (worker/lib/listing.ts) — a composition too: hidden until it has a V2 price (Q7).
+  let where = (await listing(db)).listed('p');
   if (kind === 'bundle' || kind === 'mystery') {
     where += ' AND p.composition = ?';
     params.push(kind);
@@ -249,7 +251,7 @@ bundlesRoutes.post('/:productId/view', async (c) => {
   await rateLimit(c, 'bundle_view', 60, 300);
   const productId = str(c.req.param('productId'), 'productId', { min: 1, max: 60 });
   const row = await c.env.DB
-    .prepare("SELECT id FROM products WHERE id = ? AND status = 'active' AND composition <> ''")
+    .prepare(`SELECT p.id AS id FROM products p WHERE p.id = ? AND ${(await listing(c.env.DB)).listed('p')} AND p.composition <> ''`)
     .bind(productId)
     .first<{ id: string }>();
   if (!row) throw notFound('bundle');

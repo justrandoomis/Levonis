@@ -356,10 +356,7 @@ test('every union name is stripped at depth, snake and camel alike; the forbidde
  * else it is. The answers are walked to their last leaf: the overview, the
  * detail of products of every shape, the what-if and its refusals.
  */
-test('MVP P1: every key the pricing router answers is in FINANCIAL_FIELDS, in PRIVATE_NON_FINANCIAL, or shared vocabulary — and every money key is in the net', async () => {
-  const { readFileSync, readdirSync, statSync } = await import('node:fs');
-  const { join } = await import('node:path');
-  const { ROOT } = await import('./fixtures/d1');
+test('the clean start: the pricing router answers the V2 counts and refusals naming a section — no V1 key, no figure', async () => {
   const { OWNER, asD1, freshDb, stubApp } = await import('./fixtures/app');
   const { call } = await import('./fixtures/roleMatrix');
   const { seedLegacyCatalogue, seedProfileRates } = await import('./fixtures/legacyCatalogue');
@@ -368,7 +365,6 @@ test('MVP P1: every key the pricing router answers is in FINANCIAL_FIELDS, in PR
   const raw = freshDb();
   seedLegacyCatalogue(raw);
   seedProfileRates(raw);
-  raw.exec("UPDATE products SET prime_price_iqd = 1 WHERE id = 'lp_08'");
   const app = stubApp(asD1(raw), OWNER, (a) => a.route('/api/admin/pricing', adminPricingRoutes));
   const keys = new Set<string>();
   const walk = (v: unknown) => {
@@ -380,47 +376,25 @@ test('MVP P1: every key the pricing router answers is in FINANCIAL_FIELDS, in PR
       }
     }
   };
-  walk((await call(app, 'GET', '/api/admin/pricing/overview')).body);
-  for (const id of ['lp_01', 'lp_04', 'lp_07', 'lp_08', 'lp_10', 'lp_15', 'lp_31', 'lp_35', 'lp_41']) walk((await call(app, 'GET', `/api/admin/pricing/products/${id}`)).body);
-  for (const body of [
-    { supplier_cost: '500', currency: 'EUR' },
-    { supplier_cost: '500', currency: 'USD' },
-    { supplier_cost: '500', currency: 'CNY', option_id: 'lp_08_o0', additional_cost_iqd: 1, measures: { manual_cbm: '0.5' }, rates: { shipping: { CHINA_SEA: '1' } } },
-    { supplier_cost: '500', currency: 'EUR', nope: 1 },
-    { supplier_cost: 'x', currency: 'EUR' },
-  ]) {
-    walk((await call(app, 'POST', '/api/admin/pricing/products/lp_08/what-if', body)).body);
+  const overview = await call(app, 'GET', '/api/admin/pricing/overview');
+  assert.equal(overview.status, 200);
+  walk(overview.body);
+  for (const [method, path, body] of [
+    ['GET', '/api/admin/pricing/products/lp_08', undefined],
+    ['POST', '/api/admin/pricing/products/lp_08/what-if', { supplier_cost: '500', currency: 'EUR' }],
+    ['GET', '/api/admin/pricing/products/lp_08/inputs', undefined],
+    ['GET', '/api/admin/pricing/save-list', undefined],
+  ] as const) {
+    const res = await call(app, method, path, body);
+    assert.equal(res.status, 409, `${method} ${path}`);
+    assert.equal((res.body as { code?: string }).code, 'PRICING_V2_MANAGED');
+    walk(res.body);
   }
-  assert.ok(keys.size > 60, `only ${keys.size} keys walked`);
-
-  // Shared vocabulary: the key is already written as an object key somewhere
-  // in the Worker outside the pricing router and its modules.
-  const files: string[] = [];
-  const collect = (dir: string) => {
-    for (const name of readdirSync(dir)) {
-      const p = join(dir, name);
-      if (statSync(p).isDirectory()) {
-        if (name !== 'pricingEngine' && name !== 'fx') collect(p);
-      } else if (p.endsWith('.ts') && name !== 'adminPricing.ts') files.push(p);
-    }
-  };
-  collect(join(ROOT, 'worker'));
-  const corpus = files.map((f) => readFileSync(f, 'utf8')).join('\n');
-  const shared = (k: string) => new RegExp(`(^|[^\\w$])${k}\\s*\\??:`, 'm').test(corpus) || new RegExp(`['"]${k}['"]\\s*:`).test(corpus);
-
-  // Not vacuous: the router's own new names are not "shared", the old ones are.
-  assert.equal(shared('preview_only'), false);
-  assert.equal(shared('migration_status'), false);
-  assert.equal(shared('slug'), true);
-  const unclassified = [...keys].filter((k) => !LIST.has(k) && !(k in PRIVATE_NON_FINANCIAL) && !shared(k)).sort();
-  assert.deepEqual(unclassified, [], 'add each to FINANCIAL_FIELDS (both copies) or to PRIVATE_NON_FINANCIAL with its reason');
-  const MONEY = /_iqd$|_mm$|_g$|cbm|^fx_|_rate$|_rates$|^supplier_|^replacement_|^shipping_|^landed_/;
-  const unnetted = [...keys].filter((k) => MONEY.test(k) && !LIST.has(k)).sort();
-  assert.deepEqual(unnetted, [], 'a money, rate or measure key outside FINANCIAL_FIELDS');
-  // Rules are named by kind, never amount_iqd (C2-A6).
-  assert.equal(keys.has('amount_iqd'), false);
-  // Every PRIVATE_NON_FINANCIAL name is really answered (no stale reason).
-  assert.deepEqual(Object.keys(PRIVATE_NON_FINANCIAL).filter((k) => !keys.has(k)), []);
+  // Codes, counts and a section — nothing a V1 sheet carried.
+  const allowed = new Set(['success', 'v2', 'published', 'needs_pricing', 'saved', 'compositions', 'error', 'code', 'details', 'section', 'message', 'ar', 'en', 'ckb', 'mascot', 'messages', 'request_id', 'status', 'hint']);
+  const foreign = [...keys].filter((k) => !allowed.has(k)).sort();
+  assert.deepEqual(foreign, [], 'a key outside the clean-start answers');
+  void PRIVATE_NON_FINANCIAL;
 });
 
 // ------------------------------------------------------------- the rates DTOs (FX-1)

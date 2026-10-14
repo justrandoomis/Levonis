@@ -184,6 +184,8 @@ interface OfferRow {
   max_per_user: number | null;
   max_global: number | null;
   updated_at: string | null;
+  /** The clean start (addendum A.5): last saved before the new pricing — not applied until saved again. */
+  suspended?: boolean;
   product: { id: string; name: string; slug: string; composition: string; status: string };
   redeemed: number;
   /** Slots given back by a genuine cancellation (§17 decision 4). They no
@@ -425,6 +427,11 @@ export default function AdminOffers() {
                   {o.product.name || o.subject_id}
                 </span>
                 {stateChip(o.schedule_state)}
+                {o.suspended && (
+                  <span className="shrink-0 rounded-full lv-chip [--chip:var(--color-warning)] px-2 py-0.5 text-[10px] font-bold" data-offer-suspended>
+                    {loc('موقوف: أُنشئ قبل التسعير الجديد', 'Paused: created before the new pricing', 'ڕاگیراوە: پێش نرخدانانی نوێ دروستکراوە')}
+                  </span>
+                )}
                 {!o.active && (
                   <span className="shrink-0 rounded-full bg-surface-selected px-2 py-0.5 text-[10px] font-bold text-text-muted">
                     {loc('موقوف', 'off', 'ناچالاک')}

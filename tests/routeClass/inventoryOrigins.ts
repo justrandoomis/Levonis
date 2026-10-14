@@ -22,6 +22,8 @@ export default {
     routes: {
       'GET /:id/preorder-origins': 'op',
       'PATCH /:id/preorder-origins': 'op',
+      // «اربط بالدفعة الواصلة» (the clean start's V2-6, addendum A.9 step 4): the lot's cost becomes the line's.
+      'POST /:id/items/:itemId/link-batch': { cls: 'cost_write', why: 'links received lots to a pre-order line: FIFO allocations at the lots’ cost, one batch with the lot decrement' },
     },
   }, {
     prefix: '/api/admin/procurement',

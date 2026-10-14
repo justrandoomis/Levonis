@@ -52,6 +52,7 @@
  * `{ rows: [], total: null, error: true }` and is logged, so one bad column
  * on a fresh deploy does not blank the whole overlay.
  */
+import { withCacheEpoch } from '../lib/publicApi/cache';
 import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -161,7 +162,7 @@ export function cacheKeyUrl(url: string, params: readonly string[]): string {
  */
 async function cached(c: Context<AppContext>, cacheControl: string, params: readonly string[], build: () => Promise<Response>): Promise<Response> {
   const cache = edgeCache();
-  const key = new Request(cacheKeyUrl(c.req.url, params), { method: 'GET' });
+  const key = new Request(withCacheEpoch(cacheKeyUrl(c.req.url, params)), { method: 'GET' });
   if (cache) {
     const hit = await cache.match(key).catch(() => undefined);
     if (hit) {

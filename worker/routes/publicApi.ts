@@ -32,7 +32,7 @@ import type { AppContext } from '../lib/types';
 import { HttpError, requireMainHost } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
 import { ALL_ROUTES, API_VERSION, RATE_LIMIT } from '../lib/publicApi/meta';
-import { conditional, edgeCache, weakEtag } from '../lib/publicApi/cache';
+import { conditional, edgeCache, weakEtag, withCacheEpoch } from '../lib/publicApi/cache';
 import { API_PREFIX, publicUrls } from '../lib/publicApi/urls';
 import type { ParamSpec, PublicRoute } from '../lib/publicApi/types';
 
@@ -135,7 +135,8 @@ async function serve(c: Context<AppContext>, route: PublicRoute): Promise<Respon
   const ifNoneMatch = c.req.header('If-None-Match');
   const cacheControl = `public, max-age=${Math.min(60, route.maxAge)}, s-maxage=${route.maxAge}`;
   const cache = edgeCache();
-  const key = new Request(self, { method: 'GET' });
+  // The catalogue cache epoch (the clean start): no answer stored before the release is ever hit.
+  const key = new Request(withCacheEpoch(self), { method: 'GET' });
 
   if (cache) {
     const hit = await cache.match(key);

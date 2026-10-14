@@ -35,6 +35,7 @@
  *    channel (wallet) is flagged as a configurable default (row 22).
  */
 
+import { listing } from '../lib/listing';
 import { applyReturnSerials, returnedUnits, serialAssignmentsInstalled } from '../lib/serialAssignments';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -1256,6 +1257,11 @@ priceProtectionRoutes.post('/claims', async (c) => {
     .first<Record<string, unknown>>();
   if (!productRow) throw badRequest('The product is no longer available for comparison', 'PRODUCT_MISSING');
 
+  // The clean start (DECISIONS row 222, spec addendum A.5): a product a customer cannot buy today (hidden,
+  // held, or not yet priced in dollars) has no "price a buyer would pay today" — never its old dinar
+  // figure. The window's recorded prices are read as always; placed orders and claims never change.
+  const listingNow = await listing(c.env.DB);
+  const listedNow = listingNow.isListedRow(productRow, await listingNow.unlistedIds([String(productRow.id)]));
   const settings = await getSettings(c.env.DB, ['proPricingPolicy']);
   // THE COMPARISON PRICE IS THE ONE A BUYER WOULD PAY TODAY, so the product is
   // read the way the cart reads it: the relational option/colour rows win over
@@ -1278,13 +1284,14 @@ priceProtectionRoutes.post('/claims', async (c) => {
     tierActive: buyerClass === 'pro',
     proPolicy: proPolicyFrom(settings.proPricingPolicy),
   });
-  if (resolved.errors.some((e) => e !== 'TRANSPORT_REQUIRED')) {
+  if (listedNow && resolved.errors.some((e) => e !== 'TRANSPORT_REQUIRED')) {
     throw badRequest(
       'The purchased variant no longer resolves on the current product — please contact support',
       'VARIANT_UNRESOLVED'
     );
   }
-  const currentApplied = resolved.applied_iqd;
+  // Unlisted: no candidate today (the paid price itself, which is no drop).
+  const currentApplied = listedNow ? resolved.applied_iqd : originalUnit;
 
   // Lowest price WITHIN the window from the persisted price history — a drop
   // that has since been raised back remains inspectable (§6.8). For a PRO
@@ -1341,7 +1348,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
     todayApplied: currentApplied,
     manualMin: hist && hist.m !== null && Number.isInteger(hist.m) && hist.m >= 0 ? hist.m : null,
     engineHistory: observations.history,
-    engineToday: observations.today,
+    engineToday: listedNow ? observations.today : null,
   });
   if (!decision.ok && decision.code === 'FX_ONLY_DROP') {
     throw badRequest('The dinar price fell only because the dollar exchange rate moved — price protection does not cover exchange-rate moves', 'FX_ONLY_DROP');

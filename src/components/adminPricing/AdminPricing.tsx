@@ -1,101 +1,72 @@
 /**
- * «التسعير والشحن» — THE OWNER'S PRICING WORKSPACE
- * (MVP plan §6 P1; owner decision 2; answer B).
+ * «التسعير والشحن» — THE OWNER'S PRICING WORKSPACE, after the clean start
+ * (addendum A.6/A.8, DECISIONS row 222).
  *
  * What the owner sees:
- *   - a status banner distinguishing confirmed writes from read-only previews;
- *   - every ordinary product with its status (worst first), the counts, a
- *     search and a status filter (PricingProducts);
- *   - one product: today's prices per model × channel with the old route fee
- *     and the old landed cost, the minimum profit and the Direct Sale Extra
- *     the old prices carry, conflicts, measures, typed member prices yes/no,
- *     the calculator and the rates it uses (ProductPricingSheet).
+ *   - the exchange and shipping rates (RatesPanel, FX-1): approving one
+ *     reprices every V2-published product automatically (FX-5);
+ *   - the V2 card: how many ordinary products customers can buy, and how many
+ *     stay hidden until their first complete V2 write, with the door to the
+ *     «يحتاج تسعيرًا» queue (the products tab, `?view=needs-pricing`).
+ *
+ * The V1 overview, the product sheet, the what-if calculator and the stale
+ * list are gone (their routes answer PRICING_V2_MANAGED): every price is the
+ * product's own V2 write, opened from the queue and reviewed in its sheet.
  *
  * WHO. Mounted by src/pages/Admin.tsx only on `can_write_cost === true` — a
  * courtesy; the router refuses everyone but the verified owner before a query
- * runs. If the server still refuses (the session changed under the screen),
- * the refusal is said BY CODE: OWNER_EMAIL_UNVERIFIED opens the verification
- * card, anything else says the contract's sentence.
- *
- * NAVIGATION. The list and a product are one stack: opening a product pushes
- * it, «كل المنتجات» pops back to the same search, filter and scroll position.
- * The open product is kept in the address (`?product=`) so a reload reopens it.
- *
- * THE PRODUCT PREVIEW WRITES NOTHING: two GETs and a POST that only answers
- * a question. Two sections write: the exchange-rate panel above it (FX-1,
- * RatesPanel), the owner's rates through their own owner-only routes; and the
- * stale list (EngineSaveList, owner decision 8), which saves the new prices of
- * the products a changed rate left behind — after their preview, in one bulk
- * request. FX-5: a confirmed rate change reprices those engine products on
- * the server by itself (deficit first, every quarter hour until none is
- * left); the list says so — «يُعاد التسعير تلقائياً» — and stays the owner's
- * manual tool.
+ * runs. A refusal is said BY CODE (`PricingFailure`).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
+import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
-import { fetchPricingProducts, OVERVIEW_PAGE_LIMIT, type PricingOverview, type PricingProductSummary } from './api';
-import { PreviewBanner, PricingFailure } from './parts';
-import PricingProducts, { type StatusFilter } from './PricingProducts';
-import ProductPricingSheet from './ProductPricingSheet';
+import { fetchPricingV2Counts, type PricingV2Counts } from './api';
+import { PricingFailure } from './parts';
 import RatesPanel from './RatesPanel';
-import EngineSaveList from './EngineSaveList';
 import { pricingStrings } from './strings';
+import { hiddenBanner, NEEDS_PRICING, tri } from '../adminProducts/needsPricingStrings';
 
-const PRODUCT_PARAM = 'product';
+const V2_CARD = {
+  title: { ar: 'أسعار المنتجات بالدولار', en: 'Product prices in dollars', ckb: 'نرخی بەرهەمەکان بە دۆلار' },
+  published: { ar: 'منشور للزبائن', en: 'Published to customers', ckb: 'بۆ کڕیاران بڵاوکراوەتەوە' },
+  hidden: { ar: 'مخفي حتى يُسعَّر', en: 'Hidden until priced', ckb: 'شاراوەیە تا نرخی بۆ دادەنرێت' },
+  saved: { ar: 'محفوظ، غير مكتمل', en: 'Saved, not complete', ckb: 'پاشەکەوتکراوە، تەواو نییە' },
+  bundles: { ar: 'حزم بانتظار قرار التسعير', en: 'Bundles awaiting a pricing decision', ckb: 'پاکێجەکان چاوەڕێی بڕیاری نرخدانانن' },
+  allPublished: {
+    ar: 'كل المنتجات العادية مسعّرة ومنشورة.',
+    en: 'Every ordinary product is priced and published.',
+    ckb: 'هەموو بەرهەمە ئاساییەکان نرخیان هەیە و بڵاوکراونەتەوە.',
+  },
+} as const;
 
-function initialProduct(): string | null {
+/** The products tab, opened on the «يحتاج تسعيرًا» queue. */
+function openQueue() {
   try {
-    const id = new URLSearchParams(window.location.search).get(PRODUCT_PARAM);
-    return id && /^[\w.:-]{1,100}$/.test(id) ? id : null;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'products');
+    url.searchParams.set('view', 'needs-pricing');
+    window.location.assign(url.toString());
   } catch {
-    return null;
+    /* the link is a courtesy */
   }
 }
 
-function ListSkeleton() {
-  return (
-    <div className="space-y-3" aria-hidden="true">
-      <div className="flex gap-2">
-        <Skeleton className="h-11 w-20" />
-        <Skeleton className="h-11 w-48" />
-        <Skeleton className="h-11 w-40" />
-      </div>
-      <Skeleton className="h-11 w-full" />
-      <div className="lv-surface divide-y divide-border-subtle/60">
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="space-y-2 p-4">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-3 w-1/3" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function AdminPricing() {
-  const { lang, dir } = useLanguage();
-  const s = useMemo(() => pricingStrings(lang), [lang]);
-  const [list, setList] = useState<{ overview: PricingOverview; products: PricingProductSummary[]; truncated: boolean } | null>(null);
+  const { lang: rawLang, dir } = useLanguage();
+  const lang = rawLang === 'en' || rawLang === 'ckb' ? rawLang : 'ar';
+  const s = useMemo(() => pricingStrings(rawLang), [rawLang]);
+  const [counts, setCounts] = useState<PricingV2Counts | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
-  // A successful rate act can reprice the catalogue within that request.
-  // Refresh both sibling views while keeping the current filter and scroll.
-  const refreshPrices = useCallback(() => setReload((n) => n + 1), []);
-  const [productId, setProductId] = useState<string | null>(initialProduct);
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<StatusFilter>('all');
-  const rootRef = useRef<HTMLDivElement>(null);
-  const listScroll = useRef(0);
-  const lastOpened = useRef<string | null>(null);
+  const refresh = useCallback(() => setReload((n) => n + 1), []);
 
   useEffect(() => {
     const ac = new AbortController();
     setError(null);
-    fetchPricingProducts({ signal: ac.signal })
+    fetchPricingV2Counts({ signal: ac.signal })
       .then((r) => {
-        if (!ac.signal.aborted) setList(r);
+        if (!ac.signal.aborted) setCounts(r.v2);
       })
       .catch((e) => {
         if (!ac.signal.aborted) setError(e);
@@ -103,90 +74,53 @@ export default function AdminPricing() {
     return () => ac.abort();
   }, [reload]);
 
-  // The open product lives in the address, beside the admin's own `tab`.
-  useEffect(() => {
-    try {
-      const url = new URL(window.location.href);
-      if (productId) url.searchParams.set(PRODUCT_PARAM, productId);
-      else url.searchParams.delete(PRODUCT_PARAM);
-      window.history.replaceState(window.history.state, '', url);
-    } catch {
-      /* an address that cannot be rewritten changes nothing on screen */
-    }
-  }, [productId]);
-  // Leaving the tab takes the product out of the address.
-  useEffect(
-    () => () => {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete(PRODUCT_PARAM);
-        window.history.replaceState(window.history.state, '', url);
-      } catch {
-        /* nothing to undo */
-      }
-    },
-    []
-  );
-
-  const scroller = () => rootRef.current?.closest('main') ?? null;
-
-  const open = useCallback((id: string) => {
-    listScroll.current = scroller()?.scrollTop ?? 0;
-    lastOpened.current = id;
-    setProductId(id);
-    requestAnimationFrame(() => rootRef.current?.scrollIntoView({ block: 'start' }));
-  }, []);
-
-  const back = useCallback(() => {
-    setProductId(null);
-    requestAnimationFrame(() => {
-      const main = scroller();
-      if (main) main.scrollTop = listScroll.current;
-      const row = lastOpened.current ? rootRef.current?.querySelector<HTMLElement>(`[data-pricing-product="${CSS.escape(lastOpened.current)}"]`) : null;
-      row?.focus({ preventScroll: true });
-    });
-  }, []);
-
   return (
-    <div ref={rootRef} dir={dir} data-admin-pricing className="mx-auto w-full max-w-[1120px] min-w-0 space-y-4 pb-16">
+    <div dir={dir} data-admin-pricing className="mx-auto w-full max-w-[1120px] min-w-0 space-y-4 px-4 pb-16 sm:px-0">
       <header className="space-y-1">
         <h2 className="text-[22px] font-black leading-snug text-text-primary sm:text-[26px]">{s.title}</h2>
-        <p className="max-w-[68ch] text-[14px] leading-relaxed text-text-muted">{s.subtitle}</p>
       </header>
 
-      {/* Approved exchange and shipping rates refresh adopted product prices.
-          Manual products keep their prices until the owner applies a preview. */}
-      {!productId && <RatesPanel lang={lang} dir={dir} onChanged={refreshPrices} reloadKey={reload} />}
+      <RatesPanel lang={rawLang} dir={dir} onChanged={refresh} reloadKey={reload} />
 
-      <PreviewBanner lang={lang} title={productId ? undefined : s.workspaceTitle} body={productId ? s.previewBody : s.workspaceBody} />
-
-      {/* Owner decision 8: the products whose new prices wait for one save (stale rates, complete but manual). */}
-      {!productId && <EngineSaveList lang={lang} reloadKey={reload} onChanged={refreshPrices} />}
-
-      {productId ? (
-        <ProductPricingSheet key={productId} id={productId} lang={lang} dir={dir} s={s} onBack={back} />
-      ) : error ? (
-        <PricingFailure error={error} lang={lang} onRetry={() => setReload((n) => n + 1)} fallback={s.loadFailed} />
-      ) : !list ? (
-        <>
-          <p className="sr-only" role="status">{s.loading}</p>
-          <ListSkeleton />
-        </>
-      ) : (
-        <PricingProducts
-          overview={list.overview}
-          products={list.products}
-          truncatedAt={list.truncated ? OVERVIEW_PAGE_LIMIT * list.overview.page_size : null}
-          query={query}
-          onQuery={setQuery}
-          filter={filter}
-          onFilter={setFilter}
-          onOpen={open}
-          lang={lang}
-          dir={dir}
-          s={s}
-        />
-      )}
+      <section data-pricing-v2-card className="lv-surface space-y-3 p-4">
+        <h3 className="text-[16px] font-bold text-text-primary">{tri(V2_CARD.title, lang)}</h3>
+        {error ? (
+          <PricingFailure error={error} lang={rawLang} onRetry={refresh} fallback={s.loadFailed} />
+        ) : !counts ? (
+          <div className="space-y-2" aria-hidden="true">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-5 w-1/2" />
+          </div>
+        ) : (
+          <>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(
+                [
+                  ['published', V2_CARD.published, counts.published],
+                  ['hidden', V2_CARD.hidden, counts.needs_pricing],
+                  ['saved', V2_CARD.saved, counts.saved],
+                  ['bundles', V2_CARD.bundles, counts.compositions],
+                ] as const
+              ).map(([key, label, n]) => (
+                <div key={key} className="min-w-0 rounded-xl bg-surface-raised p-3" data-pricing-v2-count={key}>
+                  <dt className="text-[12px] text-text-muted">{tri(label, lang)}</dt>
+                  <dd className="text-[20px] font-black text-text-primary" dir="ltr">{n}</dd>
+                </div>
+              ))}
+            </dl>
+            {counts.needs_pricing > 0 ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[13px] text-text-secondary">{hiddenBanner(counts.needs_pricing, lang)}</p>
+                <Button size="sm" variant="primary" className="w-full sm:w-auto" onClick={openQueue} data-pricing-open-queue>
+                  {tri(NEEDS_PRICING.title, lang)}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-[13px] text-text-secondary">{tri(V2_CARD.allPublished, lang)}</p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

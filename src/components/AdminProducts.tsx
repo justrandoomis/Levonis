@@ -42,6 +42,8 @@ import './adminProducts/theme.css';
 import { useAuth } from '../AuthContext';
 import { COMPLETENESS_UI, tri } from './adminProducts/completeness';
 import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncompleteCard';
+import NeedsPricingQueue from './adminProducts/NeedsPricingQueue';
+import { hiddenBanner, NEEDS_PRICING, tri as triQ } from './adminProducts/needsPricingStrings';
 
 // The rebuilt eight-section form (product-form mandate §1). The previous
 // ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
@@ -52,7 +54,6 @@ const ProductForm = React.lazy(() => import('./adminProducts/ProductForm'));
 const ImportPanel = React.lazy(() => import('./adminProducts/ImportPanel'));
 // The daily price change should never require opening the full product form,
 // so Quick Edit is one click from the row and loads only when it is asked for.
-const QuickPricePanel = React.lazy(() => import('./adminProducts/QuickPricePanel'));
 // «ملف بيانات المنتجات» — the page's products as one data file (25 a file),
 // attached back and compared field by field: only what changed is applied.
 const DataFileSheet = React.lazy(() => import('./adminProducts/form/DataFileSheet'));
@@ -258,13 +259,17 @@ export default function AdminProducts() {
   const [importOpen, setImportOpen] = useState(false);
   const [importDirty, setImportDirty] = useState(false);
   const [dataFileOpen, setDataFileOpen] = useState(false);
-  // Quick Edit: which product's price grid is open, and whether it holds cells
-  // the admin has typed but not saved (the modal asks before discarding them).
-  const [pricing, setPricing] = useState<{ id: string; name: string } | null>(null);
-  const [pricingDirty, setPricingDirty] = useState(false);
-  // Escape inside the drawer cancels the typed cells before it closes the
-  // window; the panel decides which, and answers through this handle.
-  const pricingEscape = useRef<(() => boolean) | null>(null);
+  // «يحتاج تسعيرًا» (the clean start, addendum A.8): the queue page, opened from the banner or
+  // `?view=needs-pricing` (the pricing tab's card), and the list's own filter.
+  const [queueOpen, setQueueOpen] = useState<boolean>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('view') === 'needs-pricing';
+    } catch {
+      return false;
+    }
+  });
+  const [needsPricingOnly, setNeedsPricingOnly] = useState(false);
+  const [hiddenCount, setHiddenCount] = useState<number | null>(null);
   // The §10 flow is the default tab; the TXT tools are one click away.
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ item: ListingItem; permanent: boolean; ack: boolean } | null>(null);
@@ -354,6 +359,7 @@ export default function AdminProducts() {
       if (days) params.set('days', days);
       if (featuredOnly) params.set('featured', '1');
       if (incompleteOnly) params.set('incomplete', '1');
+      if (needsPricingOnly) params.set('needs_pricing', '1');
       if (sort !== 'updated') params.set('sort', sort);
       const data = await api.get<ListingResponse>(`/api/admin/products-v2?${params.toString()}`);
       if (seq !== seqRef.current) return;
@@ -372,7 +378,7 @@ export default function AdminProducts() {
       if (seq === seqRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, sort, page, limit]);
+  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, needsPricingOnly, sort, page, limit]);
 
   useEffect(() => {
     load();
@@ -386,6 +392,10 @@ export default function AdminProducts() {
     api.get<{ catalogs: Array<{ id: string; name_ar?: string; name?: string }> }>('/api/admin/taxonomy/catalogs')
       .then((d) => setCatalogs(d.catalogs ?? []))
       .catch(() => {});
+    // The banner's count: one row is enough, `total` is the answer.
+    api.get<ListingResponse>('/api/admin/products-v2?needs_pricing=1&limit=1')
+      .then((d) => setHiddenCount(d.total ?? 0))
+      .catch(() => setHiddenCount(null));
   }, []);
   useEffect(loadAux, [loadAux]);
 
@@ -507,10 +517,10 @@ export default function AdminProducts() {
   const resetFilters = () => {
     setSearch(''); setQuery(''); setStatus(''); setBrand(''); setCatalog('');
     setStockF(''); setPriceBand(''); setPriceMin(''); setPriceMax(''); setPriceMinQ(''); setPriceMaxQ('');
-    setDays(''); setFeaturedOnly(false); setIncompleteOnly(false); setPage(1);
+    setDays(''); setFeaturedOnly(false); setIncompleteOnly(false); setNeedsPricingOnly(false); setPage(1);
   };
 
-  const anyFilter = !!(query || status || brand || catalog || stockF || days || featuredOnly || incompleteOnly || pMin !== undefined || pMax !== undefined);
+  const anyFilter = !!(query || status || brand || catalog || stockF || days || featuredOnly || incompleteOnly || needsPricingOnly || pMin !== undefined || pMax !== undefined);
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
   const pages = Math.max(1, Math.ceil(total / limit));
@@ -546,6 +556,33 @@ export default function AdminProducts() {
     );
   }
 
+  // ------------------------------------------------------- the queue mode
+
+  if (queueOpen) {
+    const closeQueue = () => {
+      setQueueOpen(false);
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('view')) {
+          url.searchParams.delete('view');
+          window.history.replaceState(window.history.state, '', url);
+        }
+      } catch {
+        /* the address is a courtesy */
+      }
+    };
+    return (
+      <NeedsPricingQueue
+        owner={!!user?.is_owner}
+        onBack={closeQueue}
+        onOpen={(id) => {
+          closeQueue();
+          setEditing({ open: true, id });
+        }}
+      />
+    );
+  }
+
   // ------------------------------------------------------------ list mode
 
   const stockLabel = (s: StockState) =>
@@ -556,16 +593,6 @@ export default function AdminProducts() {
 
   const rowActions = (p: ListingItem, compact = false) => (
     <div className="flex items-center gap-1.5">
-      <button
-        data-action="quick-price"
-        data-quick-price={p.id}
-        onClick={() => setPricing({ id: p.id, name: nameOf(p) })}
-        className={T.btnIcon}
-        title={t.quickPrice}
-        aria-label={t.quickPrice}
-      >
-        <Tag className="w-3.5 h-3.5" />
-      </button>
       {!compact && (
         <button
           onClick={() => handleDelete(p)}
@@ -768,6 +795,21 @@ export default function AdminProducts() {
         </div>
       </div>
 
+      {/* «يحتاج تسعيرًا» (the clean start, addendum A.8): how many products customers cannot see until
+          their first complete V2 write, and the door to the queue. */}
+      {hiddenCount !== null && hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setQueueOpen(true)}
+          data-needs-pricing-banner
+          className="lv-alert lv-alert-warning mb-4 flex w-full items-center gap-2 rounded-[var(--ap-radius-md)] p-3 text-start text-[13px] font-semibold"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1">{hiddenBanner(hiddenCount, lang)}</span>
+          <span className="shrink-0 underline">{triQ(NEEDS_PRICING.priceNow, lang)}</span>
+        </button>
+      )}
+
       {/* «إخفاء المنتجات الناقصة عن الزبائن» — the verified owner's switch (owner
           brief 2026-10-10). The server decides who may read or move it; for
           anyone else the card answers 403 and does not draw. */}
@@ -907,6 +949,15 @@ export default function AdminProducts() {
               <AlertTriangle className="w-3 h-3" aria-hidden="true" />
               {tri(COMPLETENESS_UI.filterIncomplete, lang)}
             </button>
+            <button
+              onClick={() => { setNeedsPricingOnly((v) => !v); setPage(1); }}
+              className={T.chip}
+              aria-pressed={needsPricingOnly}
+              data-filter-needs-pricing
+            >
+              <Tag className="w-3 h-3" aria-hidden="true" />
+              {triQ(NEEDS_PRICING.badge, lang)}
+            </button>
             {brands.length > 0 && (
               <select className={`lv-input w-auto min-h-0 ${T.select}`} value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }}>
                 <option value="">{loc('كل العلامات', 'All brands', 'هەموو براندەکان')}</option>
@@ -1044,7 +1095,7 @@ export default function AdminProducts() {
                 <div className="p-3">
                   <p className="text-[13px] font-semibold truncate text-[var(--ap-text-1)]" dir="auto">{nameOf(p)}</p>
                   <div className="flex items-center justify-between gap-2 mt-1">
-                    <span className="text-[13px] font-bold text-[var(--ap-text-1)]"><span dir="ltr">{formatIqd(p.price_iqd || 0)}</span></span>
+                    <span className="text-[13px] font-bold text-[var(--ap-text-1)]"><PriceCell p={p} lang={lang} /></span>
                     <span className={`text-[11px] ${s.key === 'out' ? 'text-[var(--ap-danger)]' : s.key === 'low' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-3)]'}`}>
                       {s.available === null ? stockLabel(s) : <><span dir="ltr">{s.available}</span> {stockLabel(s)}</>}
                     </span>
@@ -1074,7 +1125,7 @@ export default function AdminProducts() {
                 >
                   {s.available === null ? '—' : <span dir="ltr">{s.available}</span>}
                 </span>
-                <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0" dir="ltr">{formatIqd(p.price_iqd || 0)}</span>
+                <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0"><PriceCell p={p} lang={lang} /></span>
                 <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
                 <Badge status={p.status} />
                 {rowActions(p, true)}
@@ -1123,21 +1174,7 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <InlinePrice
-                        product={p}
-                        loc={loc}
-                        onSaved={(price) => {
-                          setItems((list) => list.map((x) => (x.id === p.id ? { ...x, price_iqd: price } : x)));
-                          setNotice(loc('تم تحديث السعر', 'Price updated', 'نرخ نوێکرایەوە'));
-                        }}
-                        onFailed={(msg) => setNotice(msg)}
-                      />
-                      {p.pro_price_iqd !== null && (
-                        <p className="text-[11px] text-[var(--ap-text-3)] whitespace-nowrap mt-0.5">
-                          PRO <span dir="ltr">{formatIqd(p.pro_price_iqd)}</span>
-                          <span className="opacity-70"> · أساسي</span>
-                        </p>
-                      )}
+                      <PriceCell p={p} lang={lang} />
                     </td>
                     <td className="px-3 py-3">
                       <p className={`text-[13.5px] font-bold ${s.key === 'out' ? 'text-[var(--ap-danger)]' : s.key === 'low' ? 'text-[var(--ap-warning)]' : 'text-[var(--ap-text-1)]'}`}>
@@ -1195,32 +1232,6 @@ export default function AdminProducts() {
             </PageBtn>
           </div>
         </div>
-      )}
-
-      {pricing && (
-        <Modal
-          wide
-          workspace
-          titleAr={`${STRINGS.ar.quickPriceTitle} — ${pricing.name}`}
-          titleEn={`${STRINGS.en.quickPriceTitle} — ${pricing.name}`}
-          onClose={() => {
-            setPricing(null);
-            setPricingDirty(false);
-          }}
-          dirty={pricingDirty}
-          onEscape={() => pricingEscape.current?.() ?? false}
-        >
-          <Suspense fallback={<LazyFallback label={t.loading} />}>
-            <QuickPricePanel
-              productId={pricing.id}
-              onChanged={() => reloadAll()}
-              onDirtyChange={setPricingDirty}
-              registerEscape={(fn) => {
-                pricingEscape.current = fn;
-              }}
-            />
-          </Suspense>
-        </Modal>
       )}
 
       {confirmDelete && (
@@ -1355,120 +1366,6 @@ export default function AdminProducts() {
 
 // ----------------------------------------------------------------- pieces
 
-/**
- * THE BASE PRICE, EDITABLE WHERE IT IS READ.
- *
- * Most days the change an admin wants is one number on one product, and making
- * them open a drawer for it is the difference between prices that are kept up
- * to date and prices that are not. Clicking the price turns it into a field;
- * Enter saves, Escape puts it back, and the row updates from the response with
- * no reload.
- *
- * It writes through the SAME dirty-cell endpoint Quick Edit uses, so a price
- * changed here lands in price_history and is undoable exactly like one changed
- * there. It only ever touches the product's own regular price — an option or
- * colour needs the grid, because it needs to be seen next to its siblings.
- */
-function InlinePrice({
-  product,
-  loc,
-  onSaved,
-  onFailed,
-}: {
-  product: ListingItem;
-  loc: Loc;
-  onSaved: (price: number) => void;
-  onFailed: (message: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.select();
-  }, [editing]);
-
-  const start = () => {
-    setText(String(product.price_iqd ?? 0));
-    setEditing(true);
-  };
-
-  const commit = async () => {
-    if (busy) return;
-    const typed = text.trim();
-    if (typed === '' || typed === String(product.price_iqd ?? 0)) {
-      setEditing(false);
-      return;
-    }
-    setBusy(true);
-    try {
-      // `confirm` is deliberately NOT sent: a base price under the cost has to
-      // be seen against the whole product, which is what the drawer is for.
-      const res = await api.patch<{ rows: Array<{ level: string; cells: { regular: { effective: number | null } } }> }>(
-        `/api/admin/products/${product.id}/price-grid`,
-        { cells: [{ level: 'product', id: '', field: 'regular', mode: 'fixed', value: typed }] }
-      );
-      const base = (res.rows ?? []).find((x) => x.level === 'product');
-      onSaved(base?.cells.regular.effective ?? Number(typed));
-      setEditing(false);
-    } catch (e) {
-      onFailed(
-        e instanceof ApiError && e.code === 'PROFIT_GUARD'
-          ? loc(
-              'السعر أقل من التكلفة — افتح التعديل السريع للتأكيد',
-              'The price is below the cost — open Quick Edit to confirm',
-              'نرخ لە تێچووەکە کەمترە — دەستکاری خێرا بکەرەوە'
-            )
-          : e instanceof ApiError
-            ? e.message
-            : 'error'
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        onClick={start}
-        data-inline-price={product.id}
-        title={loc('اضغط لتعديل السعر', 'Click to edit the price', 'کلیک بکە بۆ گۆڕینی نرخ')}
-        className="text-[13.5px] font-bold whitespace-nowrap text-[var(--ap-text-1)] rounded px-1 -mx-1 hover:bg-[var(--ap-surface-3)] transition-colors duration-150"
-      >
-        <span dir="ltr">{formatIqd(product.price_iqd || 0)}</span>
-      </button>
-    );
-  }
-
-  return (
-    <input
-      className={`lv-input min-h-0 ${T.input} h-8 w-28 text-[12.5px]`}
-      ref={inputRef}
-      type="text"
-      inputMode="numeric"
-      dir="ltr"
-      disabled={busy}
-      value={text}
-      data-inline-price-input={product.id}
-      aria-label={loc('السعر الأساسي', 'Base price', 'نرخی بنەڕەتی')}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => void commit()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          void commit();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          setEditing(false);
-        }
-      }}
-    />
-  );
-}
 
 function Thumb({ p, size }: { p: ListingItem; size: string }) {
   return (
@@ -1760,4 +1657,20 @@ function PageBtn({
       {children}
     </button>
   );
+}
+
+/**
+ * The list's price (the clean start, addendum A.5): the lowest final price the product's V2 results
+ * sell at, or «يحتاج تسعيرًا» while customers cannot see it — never a legacy dinar figure.
+ */
+function PriceCell({ p, lang }: { p: ListingItem; lang: string }) {
+  if (p.needs_pricing) {
+    return (
+      <span className="lv-chip [--chip:var(--color-warning)] inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold" data-needs-pricing-badge={p.id}>
+        {triQ(NEEDS_PRICING.badge, lang === 'en' || lang === 'ckb' ? lang : 'ar')}
+      </span>
+    );
+  }
+  const price = p.from_iqd ?? p.price_iqd;
+  return <span className="whitespace-nowrap text-[13.5px] font-bold" dir="ltr">{price === null || price === undefined ? '—' : formatIqd(price)}</span>;
 }

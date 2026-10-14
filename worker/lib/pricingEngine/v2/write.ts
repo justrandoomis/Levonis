@@ -305,6 +305,29 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
  * (a new product's first), the owner's data, the method, the audit, the tail.
  * No price row, no result, no `write_seq` move, no price history.
  */
+/**
+ * THE CLEAN START'S STRUCTURE-ONLY SAVE (addendum A.6): a product with no V2 method, saved without a
+ * `pricing_v2` block — its description, pictures, models or routes, never a price (the legacy money
+ * door, `legacyMoney.ts`, has pinned every dinar field to the stored value). The structure runs under
+ * the `engine-price:` token so a V1-engine product's value-compared 0181/0188 locks let a new model
+ * row in; the fence proves no V2 method arrived in between (a V2 product's structure moves only with
+ * its prices, in `v2WriteStatements`), and the stale-edit fence that the product was not saved since.
+ */
+export function v2StructureStatements(
+  db: D1Database,
+  productId: string,
+  o: { structure: D1PreparedStatement[]; newProduct: boolean; updatedAt: string | null }
+): D1PreparedStatement[] {
+  if (o.newProduct) return [...o.structure];
+  return [
+    ...fence(db, 'NOT EXISTS(SELECT 1 FROM product_pricing_state WHERE product_id = ? AND pricing_method IS NOT NULL)', [productId]),
+    ...fence(db, 'EXISTS(SELECT 1 FROM products WHERE id = ? AND updated_at IS ?)', [productId, o.updatedAt]),
+    db.prepare('INSERT INTO ops_guards (id, ok) VALUES (?, 1)').bind(`engine-price:${productId}`),
+    ...o.structure,
+    db.prepare('DELETE FROM ops_guards WHERE id = ?').bind(`engine-price:${productId}`),
+  ];
+}
+
 export async function v2DataStatements(db: D1Database, ev: V2Evaluation, o: V2WriteOptions): Promise<D1PreparedStatement[]> {
   if (o.auto) throw new Error('v2DataStatements: never an automatic write');
   const pid = ev.product_id;

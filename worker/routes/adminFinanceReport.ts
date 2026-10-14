@@ -175,11 +175,12 @@ export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
     hasFifo: allocations.has('cogs_iqd') && allocations.has('released_at'),
     hasOperationalRefunds: refunds.has('cogs_iqd'),
     hasPriceAdjustments: orders.has('price_adjustment_iqd'),
+    hasLineEstimates: items.has('estimated_cost_iqd'),
   };
   // MEMOISED ONLY WHEN BOTH ARE TRUE. Caching a `hasFifo: false` taken during
   // the minute between the deploy and its migration would keep this isolate
   // reporting snapshot costs long after the lots were there to read.
-  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments) schemaMemo = facts;
+  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments && facts.hasLineEstimates) schemaMemo = facts;
   return facts;
 }
 

@@ -24,7 +24,8 @@ import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig, 
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
 import { COMPOSED_SNAPSHOT, costSnapshot, type CostBasis } from '../lib/financeLedger';
 import { orderInsertStatement, orderItemInsertStatement } from '../lib/orderRows';
-import { engineBasisOf } from '../lib/pricingEngine/orderBasis';
+import { engineBasisOf, v2EstimateOf } from '../lib/pricingEngine/orderBasis';
+import { cleanStartInstalled } from '../lib/engineInstalled';
 import {
   MAX_DELIVERY_DAYS,
   dayLabel,
@@ -126,6 +127,7 @@ import {
   type OrderType,
 } from '../lib/inventory';
 import { dailyUserHash, emitFromRequest, eventsEnabled, outboxStatement, pumpAfter, waitUntilFrom } from '../lib/eventBus';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted';
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
@@ -214,6 +216,14 @@ import { createInvoiceForOrder } from '../lib/invoices';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
+
+/**
+ * 409 PRODUCT_CURRENTLY_UNAVAILABLE naming the products (the clean start, spec addendum A.5): a line
+ * whose product is hidden, held or not V2-published. Ids only — never a price or a legacy number.
+ */
+export function productsUnavailable(productIds: readonly string[]): HttpError {
+  return new HttpError(409, serverMessage('PRODUCT_CURRENTLY_UNAVAILABLE'), 'PRODUCT_CURRENTLY_UNAVAILABLE', { product_ids: [...productIds] });
+}
 
 export const orderRoutes = new Hono<AppContext>();
 orderRoutes.use('*', requireAuth);
@@ -2211,6 +2221,12 @@ export async function computeCheckout(
   // hidden product's. A granted gift's line is honoured as granted.
   const listingNow = await listing(c.env.DB);
   const heldLines = await listingNow.heldIds(rows.map((r) => String(r.id ?? '')));
+  // The clean start (DECISIONS row 222, spec addendum A.5): a line whose product a customer may not see or
+  // buy — hidden, held, or never V2-published (every product until its dollar price is published) — is
+  // refused before anything is priced, naming every such product: 409 PRODUCT_CURRENTLY_UNAVAILABLE, the
+  // sentence the client shows in ar/en/ckb. A granted gift's line is honoured as granted (below).
+  const unavailableIds = [...new Set(rows.filter((r) => !giftEntitlementIdOf(r) && !listingNow.isListedRow(r, heldLines)).map((r) => String(r.id ?? '')))];
+  if (unavailableIds.length) throw productsUnavailable(unavailableIds);
 
   // §1: the cart rule guarantees one shipping type across the lines, so the
   // first line speaks for the cart — the same derivation POST / freezes onto
@@ -2623,7 +2639,7 @@ export async function computeCheckout(
         continue;
       }
 
-      if (!listingNow.isListedRow(row, heldLines)) throw badRequest(`"${displayName}" is no longer available — please remove it from your cart`);
+      if (!listingNow.isListedRow(row, heldLines)) throw productsUnavailable([String(row.id)]);
       const view = views.get(String(row.id));
       const sel = selectionFromCartRow(row);
       const isPrinter = printerIds.has(String(row.id));
@@ -2667,6 +2683,10 @@ export async function computeCheckout(
       }
       // Pricing V2 strict (spec C-13): a SKU × channel not priced yet is not for sale.
       if (resolved.errors.includes(SKU_STRICT_ERROR)) throw badRequest(`"${displayName}" is not available right now`, SKU_STRICT_ERROR);
+      // The clean start's order-line guard (spec addendum A.4.2), belt and braces behind the listing
+      // predicate: an ordinary line is sold only from a V2 document's own SKU row — never from a legacy
+      // ladder number, even if some surface forgot the predicate.
+      if (doc.sku_strict !== true || resolvedLive.price_source !== 'sku') throw productsUnavailable([String(row.id)]);
       if (resolved.errors.length > 0) {
         throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
       }
@@ -4715,8 +4735,27 @@ export async function placeOrder(
       }))
   );
 
+  // V2-6 (addendum A.9 step 1): a V2 line's frozen estimate — the replacement cost of its channel's
+  // V2 result — for every line bought (and every gift line), never a legacy number.
+  const estimates = await v2EstimateOf(
+    c.env.DB,
+    comp.lines
+      .filter((it) => !it.mystery_spool && !it.bundle_parent_item_id && it.product_id)
+      .map((it) => ({
+        key: it.id,
+        product_id: it.product_id,
+        option_id: it.option_id,
+        option_value_ids: it.option_value_ids,
+        color_id: it.color_id || null,
+        pricing_basis: it.pricing_basis,
+        route: (safeParse<{ method?: unknown } | null>(it.transport_snapshot, null)?.method as string | undefined) ?? null,
+      })),
+    await cleanStartInstalled(c.env.DB)
+  );
+
   for (const it of comp.lines) {
     const basis = engineBasis.get(it.id);
+    const estimate = estimates.get(it.id);
     stmts.push(
       orderItemInsertStatement(c.env.DB, orderId, {
         ...it,
@@ -4733,7 +4772,7 @@ export async function placeOrder(
         membership_rule_id: comp.benefits.byLine.get(it.id)?.rule_id ?? null,
       // The two 0175 columns, on a gift line only — and the six 0181 columns on an
       // engine-priced line only; every other line's INSERT is the statement it always was.
-      }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq } : basis ? { ...basis } : undefined)
+      }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined)
     );
     /**
      * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0175, D4).

@@ -11,10 +11,13 @@ import { isMissingTable, loadPairs, type FxPairId } from './pairs';
 import { LOG_COLUMNS, type FxLogRow, type RatesReadModel } from './dto';
 import { FX_REFRESH_GLOBAL_BUCKET, FX_REFRESH_GLOBAL_KEY, FX_REFRESH_GLOBAL_WINDOW_S } from './limits';
 
-/** How many engine-priced products exist (FX-2 creates the table; before it, 0). */
+/**
+ * How many products a rate act reprices: the V2 products (a V2 method, spec C-1). Since the clean start
+ * (DECISIONS row 222) a V1 engine product is never repriced. Before 0189 there is none; before FX-2, 0.
+ */
 export async function engineProductCount(db: D1Database): Promise<number> {
   try {
-    const row = await db.prepare("SELECT COUNT(*) AS n FROM product_pricing_state WHERE mode = 'engine'").first<{ n: number }>();
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM product_pricing_state WHERE mode = 'engine' AND pricing_method IS NOT NULL").first<{ n: number }>();
     return Number(row?.n ?? 0);
   } catch {
     return 0;

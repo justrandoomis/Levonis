@@ -725,6 +725,37 @@ const cartLineRows = (db: D1Database, userId: string) => cartLineSelect(db, cart
 
 // ------------------------------------------------------------------- routes
 
+/**
+ * A cart line whose product a customer may no longer see or buy (the clean start, spec addendum A.5):
+ * the line's own ids, the product's names and its picture — never a price, a fee or a legacy number.
+ */
+export interface UnavailableCartLine {
+  cart_item_id: string;
+  product_id: string;
+  name: { ar: string; en: string; ckb: string };
+  image: string;
+  code: 'PRODUCT_CURRENTLY_UNAVAILABLE';
+}
+
+function unavailableCartLine(row: Record<string, unknown>): UnavailableCartLine {
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  let image = '';
+  try {
+    image = productImageForSelection(parseProductRow(row), { optionValueIds: [], colorId: null });
+  } catch {
+    image = '';
+  }
+  const en = text(row.name);
+  const ar = text(row.name_ar) || en;
+  return {
+    cart_item_id: String(row.cart_item_id),
+    product_id: String(row.id ?? ''),
+    name: { ar, en: en || ar, ckb: text(row.name_ku) || ar },
+    image,
+    code: 'PRODUCT_CURRENTLY_UNAVAILABLE',
+  };
+}
+
 async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
   const { tier, active: tierActive, status, ctx } = await cartPricing(c);
@@ -868,6 +899,7 @@ async function loadCart(c: Context<AppContext>) {
     if (!doc.delivery_options.standard.enabled) unavailableDelivery.standard.add(doc.id);
     if (!doc.delivery_options.personal.enabled) unavailableDelivery.personal.add(doc.id);
   };
+  const unavailableLines: UnavailableCartLine[] = [];
   for (const row of results) {
     // A GIFT LINE, BEFORE the inactive skip: a gift whose product was hidden
     // shows as blocked with its reason instead of vanishing from the cart.
@@ -882,7 +914,14 @@ async function loadCart(c: Context<AppContext>) {
       items.push(gift.item);
       continue;
     }
-    if (row.status !== 'active') continue; // hidden products drop out of the cart view
+    if (row.status !== 'active') {
+      // The clean start (DECISIONS row 222, spec addendum A.5): a line a customer may no longer see or
+      // buy — hidden, held, or not yet priced in dollars — is no longer dropped silently. It is listed
+      // apart, with no price and no old number, and is excluded from every total; the checkout
+      // refuses it (409 PRODUCT_CURRENTLY_UNAVAILABLE). The page shows «غير متاح حاليًا — أزله من السلة».
+      unavailableLines.push(unavailableCartLine(row));
+      continue;
+    }
     const composition = String(row.composition ?? '');
     if (composition !== '') {
       const b = resolvedBundles.get(String(row.cart_item_id));
@@ -1075,6 +1114,7 @@ async function loadCart(c: Context<AppContext>) {
 
   return {
     items,
+    unavailable_lines: unavailableLines,
     tier,
     tierActive,
     membership,
@@ -1153,7 +1193,7 @@ cartRoutes.get('/', async (c) => {
   // holding only a store's goods answered `scope: null`, the cart page never
   // rendered the store cart — the only way to /store-checkout — and the badge
   // was reset to 0 over a full cart.
-  const [{ items, tier, tierActive, delivery_methods, membership }, allLines] = await Promise.all([
+  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, membership }, allLines] = await Promise.all([
     loadCart(c),
     c.env.DB
       .prepare('SELECT seller_type, merchant_id, store_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
@@ -1182,6 +1222,8 @@ cartRoutes.get('/', async (c) => {
   return c.json({
     success: true,
     items,
+    // The clean start (spec addendum A.5): lines whose product is not for sale now — names and ids only.
+    unavailable_lines,
     tier,
     tierActive,
     // §10: the server's own answer about what this membership saved, so the
@@ -2678,8 +2720,8 @@ cartRoutes.delete('/items/:id', async (c) => {
   await c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?')
     .bind(c.req.param('id'), user.id)
     .run();
-  const { items, tier, tierActive } = await loadCart(c);
-  return c.json({ success: true, items, tier, tierActive });
+  const { items, unavailable_lines, tier, tierActive } = await loadCart(c);
+  return c.json({ success: true, items, unavailable_lines, tier, tierActive });
 });
 
 // ---------------------------------------------------------------------------

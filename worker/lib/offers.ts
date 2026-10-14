@@ -58,6 +58,13 @@ export interface OfferWindow {
   plus_price_iqd: number | null;
   locked_preview: boolean;
   active: boolean;
+  /**
+   * The clean start (DECISIONS row 222, spec addendum A.5): the window was last saved before the new
+   * dollar pricing began (`admin_settings.pricingV2CleanStart`). It is SUSPENDED — read as inactive
+   * everywhere, so an old fixed dinar offer price never applies to a V2 product — until an admin
+   * re-saves it («موقوف: أُنشئ قبل التسعير الجديد»).
+   */
+  suspended?: true;
 }
 
 export interface OfferLimits {
@@ -275,6 +282,8 @@ interface WindowRow {
   plus_price_iqd: number | null;
   locked_preview: number;
   active: number;
+  /** 1 when the window was last saved before the clean start (see `OfferWindow.suspended`). */
+  pre_clean_start?: number | null;
 }
 
 interface LimitRow {
@@ -301,9 +310,45 @@ export function windowFromRow(r: WindowRow): OfferWindow {
     discount_iqd: r.discount_iqd ?? null,
     plus_price_iqd: r.plus_price_iqd ?? null,
     locked_preview: !!r.locked_preview,
-    active: !!r.active,
+    active: !!r.active && Number(r.pre_clean_start ?? 0) !== 1,
+    ...(Number(r.pre_clean_start ?? 0) === 1 ? { suspended: true as const } : {}),
   };
 }
+
+/**
+ * SQL on the `offer_windows` row aliased `w`: not suspended by the clean start (saved in or after its second).
+ * A constant string. Without the setting (before 0190) every window passes.
+ */
+export const OFFER_NOT_SUSPENDED_SQL = `CAST(strftime('%s', w.updated_at) AS INTEGER) >= COALESCE((SELECT CAST(strftime('%s', json_extract(value, '$.at')) AS INTEGER) FROM admin_settings WHERE key = 'pricingV2CleanStart' AND json_valid(value)), 0)`;
+
+/** The clean start's instant (`admin_settings.pricingV2CleanStart.at`), or null before 0190. */
+export async function cleanStartAt(db: D1Database): Promise<string | null> {
+  try {
+    const row = await db.prepare("SELECT json_extract(value, '$.at') AS at FROM admin_settings WHERE key = 'pricingV2CleanStart' AND json_valid(value)").first<{ at: string | null }>();
+    return typeof row?.at === 'string' ? row.at : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Was a window last saved before the clean start (whole seconds, as `WINDOWS_SQL`)? */
+export function suspendedByCleanStart(updatedAt: unknown, at: string | null): boolean {
+  if (!at || typeof updatedAt !== 'string') return false;
+  const u = Date.parse(updatedAt.includes('T') ? updatedAt : `${updatedAt.replace(' ', 'T')}Z`);
+  const a = Date.parse(at);
+  return Number.isFinite(u) && Number.isFinite(a) && Math.floor(u / 1000) < Math.floor(a / 1000);
+}
+
+/**
+ * The windows' columns plus whether each was last saved before the clean start — whole seconds, so a
+ * window saved in the deploy's own second is never suspended (its default stamp may carry no fraction).
+ * Without the setting (a database before 0190) nothing is suspended.
+ */
+const WINDOWS_SQL = (where: string) =>
+  `SELECT w.*, CASE WHEN cs.at IS NOT NULL AND CAST(strftime('%s', w.updated_at) AS INTEGER) < CAST(strftime('%s', cs.at) AS INTEGER) THEN 1 ELSE 0 END AS pre_clean_start
+     FROM offer_windows w
+     LEFT JOIN (SELECT json_extract(value, '$.at') AS at FROM admin_settings WHERE key = 'pricingV2CleanStart' AND json_valid(value)) cs ON 1 = 1
+    WHERE ${where}`;
 
 /**
  * Windows and limits for many subjects in TWO queries, chunked. A listing
@@ -331,7 +376,7 @@ export async function loadOffers(db: D1Database, subjects: Subject[]): Promise<M
     const where = part.map(() => '(subject_type = ? AND subject_id = ?)').join(' OR ');
     const args = part.flatMap((s) => [s[0], s[1]]);
     const [windows, limits] = await Promise.all([
-      db.prepare(`SELECT * FROM offer_windows WHERE ${where}`).bind(...args).all<WindowRow>(),
+      db.prepare(WINDOWS_SQL(where)).bind(...args).all<WindowRow>(),
       db.prepare(`SELECT * FROM offer_limits WHERE ${where}`).bind(...args).all<LimitRow>(),
     ]);
     for (const r of windows.results) ensure(`${r.subject_type}:${r.subject_id}`).window = windowFromRow(r);

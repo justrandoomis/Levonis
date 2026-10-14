@@ -1,3 +1,5 @@
+import { purchaseReviewStatements } from '../lib/pricingEngine/v2/purchaseReview';
+import { draftForPricing } from '../lib/pricingEngine/purchaseRead';
 import { Hono, type Context } from 'hono';
 import { allocateProcurementCharges, exactProcurementUnitDefault, procurementSelectionKey } from '../../packages/contracts/src/procurementCost';
 import type { AppContext } from '../lib/types';
@@ -412,7 +414,8 @@ async function planDocument(
 ) {
   // The lines and charges, parsed and computed exactly as the owner's pricing
   // preview reads a draft (worker/lib/procurementDraft.ts).
-  const { profile, profileVersion, shippingRate, currency, rate, lines, charges, shares } = await parseProcurementDraft(db, b);
+  const parsedDraft = await parseProcurementDraft(db, b);
+  const { profile, profileVersion, shippingRate, currency, rate, lines, charges, shares } = parsedDraft;
   // Procurement provenance is deliberately separate from the pricing parser:
   // supplier order/tracking references never participate in prices or COGS.
   const rawLines = b.lines as Record<string, unknown>[];
@@ -554,6 +557,11 @@ async function planDocument(
   // (UNKNOWN), and its next edit must not record the edit day's rates as its
   // purchase-time rates (FX-1 correctness review C7; FX-6's L10 reads them).
   if (status === 'ordered' && previous?.status !== 'ordered') statements.push(...(await fxSnapshotStatements(db, id, now)));
+  // D1 (the clean start, addendum A.10): the FIRST confirm writes one pending purchase review per
+  // product, in this batch — never a price or an input; the owner decides each from the product.
+  if (status === 'ordered' && previous?.status !== 'ordered') {
+    statements.push(...(await purchaseReviewStatements(db, draftForPricing(parsedDraft, { ...b, status: 'ordered' }, id), actor, now)));
+  }
   if (profile) {
     // A concurrent settings save must not be silently overwritten by an older
     // open purchase. The entire document/default transaction is fenced.

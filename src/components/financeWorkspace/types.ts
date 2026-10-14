@@ -157,7 +157,7 @@ export interface ProjectedOrderFinance {
 export interface ProjectedLineCost {
   unit_cost_iqd: number | null;
   total_cost_iqd: number | null;
-  source: 'confirmed_lot' | 'current_catalogue';
+  source: 'confirmed_lot' | 'current_catalogue' | 'estimate';
   source_id: string | null;
   as_of: string | null;
 }
@@ -169,7 +169,7 @@ export interface ProfitCostReview {
   required_qty: number;
   sources: Array<{ allocation_id: string; lot_id: string; incoming_id: string | null; purchase_id: string | null; qty: number; cogs_iqd: number | null; unit_cost_iqd: number | null; returned_qty?: number; returned_cogs_iqd?: number | null; late_cost_iqd?: number; retained_cogs_iqd?: number | null }>;
   issues: ProfitReviewIssue[];
-  suggestion: null | { source: 'order_snapshot' | 'current_catalogue' | 'confirmed_lot'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
+  suggestion: null | { source: 'order_snapshot' | 'current_catalogue' | 'confirmed_lot' | 'estimate'; unit_cost_iqd: number; total_cost_iqd: number; as_of: string | null; requires_confirmation: true };
   can_verify: boolean;
 }
 

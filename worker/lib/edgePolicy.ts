@@ -68,6 +68,7 @@
  * tests/edgeCachePolicy.test.ts proves the headers on the real routes and
  * proves the store/hit path with a stand-in `caches.default`.
  */
+import { withCacheEpoch } from './publicApi/cache';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { AppContext } from './types';
 import { conditional, edgeCache, weakEtag } from './publicApi/cache';
@@ -139,7 +140,8 @@ export function canonicalKey(requestUrl: string, declaredParams: readonly string
   const search = params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const hostname = (host || url.host).trim().toLowerCase();
-  return new Request(`https://${hostname}${path}${search ? `?${search}` : ''}`, { method: 'GET' });
+  // The catalogue cache epoch (the clean start): every key carries it, so no pre-release answer is ever hit.
+  return new Request(withCacheEpoch(`https://${hostname}${path}${search ? `?${search}` : ''}`), { method: 'GET' });
 }
 
 export interface AnonymousCacheOptions {

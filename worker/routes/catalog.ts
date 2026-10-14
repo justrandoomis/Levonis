@@ -20,6 +20,7 @@
  * NO COMPOUND-SELECT LADDERS, ≤ 100 PARAMETERS. Every list of ids is ONE
  * `json_each(?)` parameter; the membership CTE is three terms.
  */
+import { withCacheEpoch } from '../lib/publicApi/cache';
 import { listing } from '../lib/listing';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -62,7 +63,7 @@ function edgeCache(): Cache | null {
   return typeof caches !== 'undefined' ? ((caches as unknown as { default?: Cache }).default ?? null) : null;
 }
 
-const treeCacheKey = (url: string) => new Request(new URL('/api/catalog/tree', url).toString(), { method: 'GET' });
+const treeCacheKey = (url: string) => new Request(withCacheEpoch(new URL('/api/catalog/tree', url).toString()), { method: 'GET' });
 
 /**
  * Drop the cached tree after a taxonomy write — called by the admin taxonomy
@@ -274,5 +275,5 @@ catalogRoutes.get('/:slug', async (c) => {
   // The key is the PATH alone: a query string changes nothing here, so letting
   // it into the key would only let anyone mint unbounded cache entries.
   const u = new URL(c.req.url);
-  return cached(c, new Request(`${u.origin}${u.pathname}`, { method: 'GET' }), PAGE_CACHE_SIGNED_OUT, build);
+  return cached(c, new Request(withCacheEpoch(`${u.origin}${u.pathname}`), { method: 'GET' }), PAGE_CACHE_SIGNED_OUT, build);
 });

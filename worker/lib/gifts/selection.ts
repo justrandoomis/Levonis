@@ -17,6 +17,7 @@
  * product, not per item.
  */
 import { getSettings } from '../settings';
+import { listing } from '../listing';
 import { applyRelations, capacityFrom, loadRelationsViews, snapshotFrom, type ProductRelationsView } from '../productOverlay';
 import { parseProductRow, type ProductDoc } from '../productModel';
 import { canonicalOptionValueIds, optionValueIdsInRelationOrder } from '../cartSelectionIdentity';
@@ -127,6 +128,12 @@ export interface GiftProductContext {
   view: ProductRelationsView | undefined;
   /** Regular pricing only: a gift's value is the regular price, never a member's. */
   ctx: PricingContext;
+  /**
+   * Listed to customers now (worker/lib/listing.ts: active, not held, V2-published — the clean
+   * start). A NEW gift choice offers only listed products; a gift already granted is honoured as
+   * granted whatever this says. Absent = not asked (treated as listed by older callers).
+   */
+  listed?: boolean;
 }
 
 export async function loadGiftProduct(env: { DB: D1Database }, productId: string): Promise<GiftProductContext> {
@@ -138,7 +145,9 @@ export async function loadGiftProduct(env: { DB: D1Database }, productId: string
   const ctx = pricingContextFrom(settings);
   if (!row) return { productId: id, row: null, view: undefined, ctx };
   const views = await loadRelationsViews(env.DB, [{ id, inventory_mode: row.inventory_mode }]);
-  return { productId: id, row, view: views.get(id), ctx };
+  const L = await listing(env.DB);
+  const listed = L.isListedRow(row, await L.unlistedIds([id]));
+  return { productId: id, row, view: views.get(id), ctx, listed };
 }
 
 /** Several products at once, for a list of level items or of gifts. */
@@ -158,9 +167,11 @@ export async function loadGiftProducts(env: { DB: D1Database }, productIds: read
     env.DB,
     [...byId.values()].map((r) => ({ id: text(r.id), inventory_mode: r.inventory_mode }))
   );
+  const L = await listing(env.DB);
+  const unlisted = await L.unlistedIds([...byId.keys()]);
   for (const id of ids) {
     const row = byId.get(id) ?? null;
-    out.set(id, { productId: id, row, view: row ? views.get(id) : undefined, ctx });
+    out.set(id, { productId: id, row, view: row ? views.get(id) : undefined, ctx, listed: !!row && L.isListedRow(row, unlisted) });
   }
   return out;
 }
@@ -540,9 +551,11 @@ export function giftOptionsProjection(p: GiftProductContext) {
       image: productImageForSelection(doc, { optionValueIds: [], colorId: null }, p.view),
       status: text(row.status),
       composition: text(row.composition),
-      price_iqd: Number(row.price_iqd) || 0,
+      // The clean start: never an old dinar figure — the V2 writer's price only while the product is listed.
+      price_iqd: p.listed === false ? null : Number(row.price_iqd) || 0,
     },
-    giftable: text(row.status) === 'active' && text(row.composition) === '',
+    // A new gift choice offers only a product a customer may see and buy (listed, spec addendum A.5).
+    giftable: text(row.status) === 'active' && text(row.composition) === '' && p.listed !== false,
     sale_types: availability.modes.map((m) => m.type),
     groups: groups.length ? groups : legacyOptions.length ? [{ id: '', name_en: '', values: legacyOptions }] : [],
     colors: colors.length ? colors : legacyColors,

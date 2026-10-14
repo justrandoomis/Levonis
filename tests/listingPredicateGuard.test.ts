@@ -67,10 +67,6 @@ const ALLOWED: Record<string, Array<[string, string]>> = {
   ],
   'worker/routes/seo.ts': [["p.lifecycle = 'active' AND p.status = 'active'", "a store's sitemap: community_products"]],
   'worker/routes/orders.ts': [["wr.status = 'active'", 'warranty_receipts']],
-  'worker/routes/bundles.ts': [
-    ["let where = \"p.status = 'active'\"", 'the bundle rows themselves (compositions are never held)'],
-    ["AND status = 'active' AND composition <> ''", 'a composition row (never held)'],
-  ],
   'worker/lib/tradeIn.ts': [["AND status = 'active'`", 'trade-in claims by order item, not products']],
 };
 
@@ -100,10 +96,17 @@ test('each allow-listed line still exists (a stale entry would hide a new raw ch
   assert.deepEqual(stale, []);
 });
 
-test('the predicate itself lives in one place and holds back a held row', () => {
+test('the predicate itself lives in one place, holds back a held row and every product not V2-published (the clean start)', () => {
   const text = readFileSync(join(ROOT, 'worker/lib/listing.ts'), 'utf8');
   assert.match(text, /NOT EXISTS \(SELECT 1 FROM product_completeness pch WHERE pch\.product_id = \$\{alias\}\.id AND pch\.held = 1\)/);
-  for (const file of CUSTOMER_FILES.filter((f) => !['worker/routes/bundles.ts', 'worker/lib/bundleRead.ts'].includes(f))) {
+  // DECISIONS row 222 (spec addendum A.4.1): listed only while V2-published — a method AND complete results.
+  assert.match(
+    text,
+    /AND EXISTS \(SELECT 1 FROM product_pricing_state pv2 WHERE pv2\.product_id = \$\{alias\}\.id AND pv2\.mode = 'engine' AND pv2\.pricing_method IS NOT NULL AND EXISTS \(SELECT 1 FROM pricing_v2_sku_results rv2 WHERE rv2\.product_id = \$\{alias\}\.id\)\)/
+  );
+  assert.match(text, /return `\$\{active\}\$\{held\}\$\{v2 \? v2Clause\(alias\) : ' AND 0'\}`/, 'without 0189 nothing is listed (fail closed)');
+  // Compositions read through the predicate too (bundles are hidden until owner question Q7 is answered).
+  for (const file of CUSTOMER_FILES) {
     const text2 = readFileSync(join(ROOT, file), 'utf8');
     assert.ok(/from '(\.\.\/)*(lib\/)?listing'|from '\.\/listing'|from '\.\.\/listing'|from '\.\.\/\.\.\/listing'|membershipCte|loadCompositionMembers\(/.test(text2), `${file} reads through the predicate`);
   }

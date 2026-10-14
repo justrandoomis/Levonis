@@ -125,3 +125,57 @@ export async function engineBasisOf(db: D1Database, lines: readonly LineForBasis
   }
   return out;
 }
+
+/* ------------------------------------------------- V2-6: the frozen estimate -- */
+
+/**
+ * The four 0190 columns of a V2 line (addendum A.9 step 1): the replacement
+ * cost of THAT channel's V2 result (direct: R_stock; a route: R_route) at the
+ * U it was computed at — the line's estimated cost until FIFO or a linked
+ * batch gives the actual one. A price-first product without a complete cost
+ * has no replacement cost: nothing is written (`unknown`). Never a legacy
+ * number (a V2 line's `cost_iqd` is NULL, `cost_basis` 'unpriced').
+ *
+ * Owner-only figures (FINANCIAL_FIELDS); written once with the line.
+ */
+export interface V2LineEstimate {
+  estimated_cost_iqd: number;
+  estimated_cost_usd: string;
+  estimated_usd_iqd_rate: string;
+  estimated_fx_version: number;
+}
+
+const V2_ESTIMATE_SQL = `SELECT r.product_id, r.combo_key, r.channel, r.replacement_cost_iqd, r.replacement_exact, r.usd_iqd_rate, r.usd_fx_version
+           FROM pricing_v2_sku_results r
+           JOIN product_pricing_state s ON s.product_id = r.product_id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
+          WHERE r.product_id IN (SELECT value FROM json_each(?)) AND r.replacement_cost_iqd IS NOT NULL`;
+
+/** `cleanStart`: the 0190 columns exist (the caller's `cleanStartInstalled`); without them nothing is written. */
+export async function v2EstimateOf(db: D1Database, lines: readonly Omit<LineForBasis, 'regular_iqd'>[], cleanStart: boolean): Promise<Map<string, V2LineEstimate>> {
+  const out = new Map<string, V2LineEstimate>();
+  if (!cleanStart) return out;
+  const wanted = lines.filter((l) => l.product_id && channelOfLine(l) !== null);
+  if (!wanted.length) return out;
+  type Row = { product_id: string; combo_key: string; channel: string; replacement_cost_iqd: number; replacement_exact: string; usd_iqd_rate: string; usd_fx_version: number };
+  let rows: Row[];
+  try {
+    rows = (await db.prepare(V2_ESTIMATE_SQL).bind(JSON.stringify([...new Set(wanted.map((l) => l.product_id))])).all<Row>()).results ?? [];
+  } catch (e) {
+    if (isMissingV2Schema(e) || isMissingTable(e)) return out;
+    throw e;
+  }
+  for (const l of wanted) {
+    const channel = channelOfLine(l)!;
+    const ids = l.option_value_ids && l.option_value_ids.length ? l.option_value_ids : l.option_id ? [l.option_id] : [];
+    const candidates = [...new Set([skuComboKey({ option_value_ids: ids, color_id: l.color_id || null }), skuComboKey({ option_value_ids: l.option_id ? [l.option_id] : [], color_id: null })])];
+    const r = candidates.map((combo) => rows.find((x) => x.product_id === l.product_id && x.combo_key === combo && x.channel === channel)).find((x) => !!x);
+    if (!r || !Number.isSafeInteger(Number(r.replacement_cost_iqd)) || !(Number(r.usd_fx_version) > 0)) continue;
+    out.set(l.key, {
+      estimated_cost_iqd: Number(r.replacement_cost_iqd),
+      estimated_cost_usd: procurementExactText(ceilToPlaces(quotientProcurementExact(procurementExact(r.replacement_exact), procurementExact(r.usd_iqd_rate)), 6)),
+      estimated_usd_iqd_rate: r.usd_iqd_rate,
+      estimated_fx_version: Number(r.usd_fx_version),
+    });
+  }
+  return out;
+}
