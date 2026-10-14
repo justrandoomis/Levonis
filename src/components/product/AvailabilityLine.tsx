@@ -9,7 +9,7 @@ import { cardAvailability, type CardProduct } from '../../lib/productCard';
  * the card's bottom edge «that nobody can read on a phone». This is a line of
  * text — a dot AND a word, never colour alone:
  *
- *   ● متوفر الآن        5 قطع    success, filled dot with a halo
+ *   ● متوفر الآن        5 قطع    success, filled dot with a halo (Sorani: 5 دانە)
  *   ● متوفر الآن        بقي 2    the quantity turns warning at the threshold
  *   ○ طلب مسبق                   warning, hollow dot
  *   ● غير متوفر                  muted, grey dot
@@ -46,13 +46,14 @@ export default function AvailabilityLine({ product, className = '' }: { product:
     // The same digits the price beside it is written in (formatIqd uses the
     // runtime's locale), so one card never mixes ٥ and 5.
     const num = (x: number) => x.toLocaleString();
-    // OWNER: Sorani to be written by hand (the two quantity phrases).
+    // Sorani written, not borrowed (DECISIONS row 183): «تەنها N ماوە» and
+    // «N دانە» — Sorani counts with one form, so there is no plural switch.
     qty = a.low
-      ? loc(`بقي ${num(n)}`, `Only ${n} left`)
+      ? loc(`بقي ${num(n)}`, `Only ${n} left`, `تەنها ${num(n)} ماوە`)
       : n > 99
         ? `${num(99)}+`
         : // Arabic counts 3–10 take the plural, 11 and up the singular.
-          loc(`${num(n)} ${n <= 10 ? 'قطع' : 'قطعة'}`, `${n} units`);
+          loc(`${num(n)} ${n <= 10 ? 'قطع' : 'قطعة'}`, `${n} units`, `${num(n)} دانە`);
   }
 
   return (

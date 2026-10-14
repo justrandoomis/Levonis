@@ -19,10 +19,38 @@ export function dateLocale(lang: string): string {
   return lang === 'en' ? 'en-GB' : 'ar-IQ-u-nu-latn';
 }
 
+/**
+ * THE GREGORIAN MONTHS AS SORANI WRITES THEM — the table the delivery-day chips
+ * already print (worker/lib/deliveryDay.ts `MONTHS.ckb`, pinned equal by
+ * tests/ordersSoraniDates.test.ts).
+ *
+ * WHY NOT `Intl` WITH `ckb-IQ`: Chromium ships no Sorani locale data, and an
+ * unsupported tag silently resolves to the DEVICE's locale — «١٤ تشرين الأول
+ * ٢٠٢٦» on an Arabic phone (the `-u-nu-latn` is lost with it), «Oct 14, 2026»
+ * on an English one. Asking `Intl` for Arabic was the other half of the same
+ * problem: a Sorani order page read «14 تشرين الأول» beside a checkout that
+ * had just said «تشرینی یەکەم». So Sorani is written here by hand, in Latin
+ * digits like every other figure on the card, with a 24-hour clock (there is
+ * no Sorani meridiem in the browser to borrow) — the same form as
+ * src/components/adminPricing/fxParts.tsx `fxDate`.
+ */
+const CKB_MONTHS = [
+  'کانوونی دووەم', 'شوبات', 'ئازار', 'نیسان', 'ئایار', 'حوزەیران',
+  'تەمموز', 'ئاب', 'ئەیلوول', 'تشرینی یەکەم', 'تشرینی دووەم', 'کانوونی یەکەم',
+] as const;
+
+/** «14ی تشرینی یەکەم 2026» (and «، 05:11» with the time), in the device's time zone as `Intl` would be. */
+function soraniDate(d: Date, withTime: boolean): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${d.getDate()}ی ${CKB_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return withTime ? `${date}، ${pad(d.getHours())}:${pad(d.getMinutes())}` : date;
+}
+
 export function formatDate(iso: string | null | undefined, lang: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
+  if (lang === 'ckb') return soraniDate(d, false);
   return new Intl.DateTimeFormat(dateLocale(lang), { year: 'numeric', month: 'short', day: 'numeric' }).format(d);
 }
 
@@ -30,6 +58,7 @@ export function formatDateTime(iso: string | null | undefined, lang: string): st
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
+  if (lang === 'ckb') return soraniDate(d, true);
   return new Intl.DateTimeFormat(dateLocale(lang), {
     year: 'numeric',
     month: 'short',

@@ -63,6 +63,15 @@ export default function ProductPicker({
 }: Props) {
   const { lang, dir } = useLanguage();
   const loc = (ar: string, en: string, ckb?: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb || ar : ar);
+  /** The status in words — the chip printed the stored code («active») before. */
+  const statusLabel = (status: string) =>
+    status === 'active'
+      ? loc('منشور', 'Published', 'بڵاوکراوە')
+      : status === 'draft'
+        ? loc('مسودة', 'Draft', 'ڕەشنووس')
+        : status === 'hidden'
+          ? loc('مخفي', 'Hidden', 'شاراوە')
+          : loc('غير منشور', 'Not published', 'بڵاونەکراوە');
 
   const [term, setTerm] = useState('');
   const [rows, setRows] = useState<PickerProduct[]>([]);
@@ -207,7 +216,7 @@ export default function ProductPicker({
                       p.status === 'active' ? 'lv-chip [--chip:var(--color-success)]' : 'lv-chip [--chip:var(--color-warning)]'
                     }`}
                   >
-                    {p.status}
+                    {statusLabel(p.status)}
                   </span>
                 </button>
               </li>

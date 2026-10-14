@@ -95,7 +95,7 @@ export default function AdminInventory() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'stock', label: s.tabs.stock },
     ...(showsCosts ? [{ id: 'procurement' as const, label: loc('أوامر الشراء والشحنات', 'Purchase orders and shipments', 'داواکاریی کڕین و بارەکان') }] : []),
-    ...(showsCosts ? [{ id: 'reports' as const, label: loc('تقارير ودفعات المخزون', 'Inventory reports and lots') }] : []),
+    ...(showsCosts ? [{ id: 'reports' as const, label: loc('تقارير ودفعات المخزون', 'Inventory reports and lots', 'ڕاپۆرت و کۆمەڵەکانی کۆگا') }] : []),
     ...(!showsCosts ? [{ id: 'receiving' as const, label: loc('استلام الشحنات', 'Receive shipments', 'وەرگرتنی بارەکان') }] : []),
     { id: 'operations', label: loc('الجرد والمستودعات', 'Counts and warehouses', 'ژماردن و کۆگاکان') },
     { id: 'incoming', label: loc('المشتريات المنفردة السابقة', 'Legacy individual purchases', 'کڕینە تاکە کۆنەکان') },
@@ -119,18 +119,18 @@ export default function AdminInventory() {
           amendment). Counting and receiving below work as for any admin. */}
       {user?.owner_email_unverified === true && <OwnerCostVerifyCard compact />}
 
-      <div className="inventory-start" aria-label={loc('ابدأ عملية مخزون', 'Start an inventory operation')}>
+      <div className="inventory-start" aria-label={loc('ابدأ عملية مخزون', 'Start an inventory operation', 'کردارێکی کۆگا دەست پێ بکە')}>
         {showsCosts && <button type="button" onClick={() => begin('purchase')} className="inventory-action">
-          <PackagePlus size={20} aria-hidden /><span><strong>{loc('شراء جديد', 'New purchase')}</strong><small>{loc('مورد ومنتجات وتكلفة', 'Supplier, items and cost')}</small></span>
+          <PackagePlus size={20} aria-hidden /><span><strong>{loc('شراء جديد', 'New purchase', 'کڕینی نوێ')}</strong><small>{loc('مورد ومنتجات وتكلفة', 'Supplier, items and cost', 'دابینکەر و بەرهەم و تێچوو')}</small></span>
         </button>}
         <button type="button" onClick={() => begin('receive')} className="inventory-action">
-          <Truck size={20} aria-hidden /><span><strong>{loc('استلام شحنة', 'Receive shipment')}</strong><small>{loc('اختر الشراء القادم', 'Choose an incoming purchase')}</small></span>
+          <Truck size={20} aria-hidden /><span><strong>{loc('استلام شحنة', 'Receive shipment', 'وەرگرتنی بار')}</strong><small>{loc('اختر الشراء القادم', 'Choose an incoming purchase', 'کڕینی چاوەڕوانکراو هەڵبژێرە')}</small></span>
         </button>
         <button type="button" onClick={() => begin('count')} className="inventory-action">
-          <ClipboardCheck size={20} aria-hidden /><span><strong>{loc('جرد المخزون', 'Count stock')}</strong><small>{loc('قارن الفعلي والمسجل', 'Compare actual and recorded')}</small></span>
+          <ClipboardCheck size={20} aria-hidden /><span><strong>{loc('جرد المخزون', 'Count stock', 'ژماردنی کۆگا')}</strong><small>{loc('قارن الفعلي والمسجل', 'Compare actual and recorded', 'ڕاستەقینە و تۆمارکراو بەراورد بکە')}</small></span>
         </button>
         <button type="button" onClick={() => begin('transfer')} className="inventory-action">
-          <ArrowLeftRight size={20} aria-hidden /><span><strong>{loc('نقل بين المواقع', 'Transfer stock')}</strong><small>{loc('دفعة أو جزء منها', 'Move a lot or part of it')}</small></span>
+          <ArrowLeftRight size={20} aria-hidden /><span><strong>{loc('نقل بين المواقع', 'Transfer stock', 'گواستنەوە لە نێوان شوێنەکان')}</strong><small>{loc('دفعة أو جزء منها', 'Move a lot or part of it', 'کۆمەڵەیەک یان بەشێکی')}</small></span>
         </button>
       </div>
 
@@ -206,10 +206,10 @@ export default function AdminInventory() {
       {tab === 'incoming' && <IncomingTab s={s} onChanged={loadOverview} onNewPurchase={showsCosts ? () => begin('purchase') : undefined} />}
       {tab === 'movements' && <MovementsTab s={s} />}
       {tab === 'suppliers' && <SuppliersTab s={s} />}
-      {tab === 'procurement' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><ProcurementPanel key={action?.key} initialAction={action?.kind === 'purchase' ? 'purchase' : action?.kind === 'receive' ? 'receive' : undefined} onChanged={loadOverview} /></Suspense>}
+      {tab === 'procurement' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><ProcurementPanel key={action?.key} initialAction={action?.kind === 'purchase' ? 'purchase' : action?.kind === 'receive' ? 'receive' : undefined} onChanged={loadOverview} /></Suspense>}
       {tab === 'receiving' && !showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><PurchaseReceivePanel key={action?.key} onChanged={loadOverview} /></Suspense>}
-      {tab === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><StockOperationsPanel key={action?.key} initialTab={action?.kind === 'count' ? 'counts' : action?.kind === 'transfer' ? 'locations' : undefined} onChanged={loadOverview} /></Suspense>}
-      {tab === 'reports' && showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…')}</p>}><InventoryLotPanel onChanged={loadOverview} onOperations={() => { setAction(null); setTab('operations'); }} /></Suspense>}
+      {tab === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><StockOperationsPanel key={action?.key} initialTab={action?.kind === 'count' ? 'counts' : action?.kind === 'transfer' ? 'locations' : undefined} onChanged={loadOverview} /></Suspense>}
+      {tab === 'reports' && showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><InventoryLotPanel onChanged={loadOverview} onOperations={() => { setAction(null); setTab('operations'); }} /></Suspense>}
     </div>
   );
 }

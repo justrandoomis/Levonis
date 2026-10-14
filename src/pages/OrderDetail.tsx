@@ -301,7 +301,10 @@ export default function OrderDetail() {
     if (!opts?.quiet) setLoading(true);
     setOrderError(null);
     const [o, t, u] = await Promise.allSettled([
-      api.get<{ order: ApiOrder }>(`/api/orders/${encodeURIComponent(id)}`),
+      // `?lang=` because the order carries server-written words — the delivery
+      // day chips («الخميس ١٦ تشرين الأول») among them. Without it the route
+      // answered in Arabic to a Sorani and an English reader alike.
+      api.get<{ order: ApiOrder }>(`/api/orders/${encodeURIComponent(id)}?lang=${encodeURIComponent(lang)}`),
       api.get<OrderTrackingPublic>(`/api/orders/${encodeURIComponent(id)}/tracking?lang=${encodeURIComponent(lang)}`),
       api.get<{ units: OrderUnitPublic[] }>(`/api/orders/${encodeURIComponent(id)}/units`),
     ]);
