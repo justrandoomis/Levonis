@@ -4,8 +4,19 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
-## Releases of 2026-10-14 (all live, workflow 7 green, 22/22 live cost probes)
+## Releases of 2026-10-14 (all live, workflow 7 green)
 
+- `a6203c29` — **Pricing V2 clean start** (DECISIONS 233–236; design `docs/PRICING-V2.md`),
+  deployed 22:37 UTC. Migrations 0189 (V2 core) and 0190 (archive of the old values, D1 purchase
+  reviews, line estimate). At this deploy every store product was hidden; each returns on its own
+  when its V2 dollar price is published from the owner's «يحتاج تسعيرًا» queue. The old prices
+  survive only in the invisible audit archive. Restore point taken before 0190: bookmark
+  `00001627-000000dc-00005104-1845ed9527ef215d927a64da448e38e0`. Live checks after the deploy:
+  `/api/health` 0190 current (183/183), `/api/products` lists nothing, the hidden product
+  answers 404, 21 cost probes run / 0 failed / 4 skipped until a product is listed. The empty
+  store is expected: the listing probe relaxes only when the slug read proves an empty catalogue.
+  Bundles and mystery offers stay hidden until the owner answers Q7 (how to price compositions);
+  Q8/Q9 run on their defaults (spec A.14).
 - `059ea69d` — **Release A**: Pricing V2-0 (offer in quote/pills/public API, «from» prices,
   final numbers only in customer JSON — DECISIONS 225; purchase rate from the approved central
   rate with a 6% guard and Sorani finance screens — 224), the image pipeline (right-sized R2
@@ -26,9 +37,9 @@ Owner decisions recorded: rows 221 (Pricing V2 A1/B1/C1/D1), 222 (clean start: e
 hidden at the deploy of Pricing V2 until its new pricing is published; staff see USD; route
 below cost sells at direct), 223 (Services V2 decisions 1–8; perks per printer, admin-set amount).
 
-In flight: **Pricing V2 clean start** on `feat/pricing-v2-core` (worktree
-`/home/user/levonis-v2core`, migrations 0189/0190; workflow `wf_6dfb26c6-4a5`): reviews → fix →
-side-branch CI `ci/pricing-v2` → land. Its deploy hides every store product until priced.
+Open for the owner after Pricing V2: Q7 (bundles/mystery pricing); whether a price drop caused
+only by a membership rule is compensated on new orders (decision 6 compares base USD, so today
+it is not); PRIME has no member price in V2 (`BENEFIT_TIER_NOT_ENTITLED`).
 Next: Services S-P1 … S-P10 (plan in the session scratchpad `services-v2/plan.md`).
 
 Working method (owner asked why work took days, 2026-10-14): local test/check runs on the
