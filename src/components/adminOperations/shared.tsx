@@ -26,7 +26,8 @@ export type Selection = {
   sku: string;
   stock: number | null;
   reserved: number;
-  selling_price_iqd: number;
+  /** The V2 direct price of this stock row; null while the product needs pricing (the clean start). */
+  selling_price_iqd: number | null;
   unit_cost_iqd?: number | null;
   purchase_unit_iqd?: number | null;
   cost_source: string;

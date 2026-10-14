@@ -21,7 +21,7 @@ type Answer = Record<string, any>;
 const summaryOf = (body: Answer, i = 0) => body.lines[i].pricing_summary;
 const productOf = (body: Answer) => body.products[0];
 
-test('the summary is the engine’s: the brief’s $500 / +$120 / $620 / 992,000 IQD, at the CENTRAL rates — never the document’s', async () => {
+test('the summary is the cost at the CENTRAL rates — the brief’s $500 / +$120, never the document’s rates — and no price of the old engine', async () => {
   const w = pricingWorld();
   // The document says 1,800 IQD/EUR and 5,000 IQD/kg; the central rates are EUR 1.1 × 1,600 and 3,200 IQD/kg.
   const r = await w.preview({ draft: w.draft({ exchange_rate: 1800 }), pricing: { minimum_profits: [{ product_id: AMS, scope: 'product', amount_usd: '120' }] } });
@@ -31,14 +31,15 @@ test('the summary is the engine’s: the brief’s $500 / +$120 / $620 / 992,000
   assert.equal(s.state, 'ok');
   assert.equal(s.current_total_cost_cents, 50_000);
   assert.equal(s.target_profit_cents, 12_000);
-  assert.equal(s.final_price_cents, 62_000);
-  assert.equal(s.preorder_base_iqd, 992_000);
+  // The clean start (review 2026-10-14): the card shows no price of the old engine — the V2 review in
+  // section ٣ is the one price sheet; the store price is the V2 one (null: the product needs pricing).
+  for (const k of ['final_price_cents', 'final_price_usd', 'preorder_base_iqd', 'direct_sale_extra_iqd', 'direct_sale_price_iqd', 'rounding_added_iqd', 'store_price_iqd']) assert.equal(s[k], null, k);
   assert.equal(s.shipping_cost_iqd, 8_000, 'the central 3,200 IQD/kg, not the document’s 5,000');
   assert.equal(s.document_rate, '1800', 'N1 names the document’s own rate when it differs');
   assert.equal(s.cross_rate, '1.1');
   assert.equal(s.usd_iqd_rate, '1600');
   // «تفاصيل»: the 13 items are all there, and rows 4 + 7 + 8 = row 9 in cents.
-  for (const k of ['supplier_original_amount', 'supplier_original_currency', 'cross_rate', 'supplier_cost_cents', 'effective_weight_g', 'shipping_cost_iqd', 'shipping_cost_cents', 'additional_cost_iqd', 'current_total_cost_cents', 'minimum_target_profit_usd', 'final_price_cents', 'usd_iqd_rate', 'preorder_base_iqd'])
+  for (const k of ['supplier_original_amount', 'supplier_original_currency', 'cross_rate', 'supplier_cost_cents', 'effective_weight_g', 'shipping_cost_iqd', 'shipping_cost_cents', 'additional_cost_iqd', 'current_total_cost_cents', 'minimum_target_profit_usd', 'usd_iqd_rate'])
     assert.ok(s[k] !== undefined && s[k] !== null, k);
   assert.equal(s.supplier_cost_cents + s.shipping_cost_cents + s.additional_cost_cents, s.current_total_cost_cents);
   assert.equal(s.engine_priced, false, 'a manual product: the bar says «السعر المقترح للزبون»');
@@ -173,38 +174,16 @@ test('shadowing: a product-level value a model’s own row holds is listed as no
 
 const extra = (amount_iqd: unknown, over: Record<string, unknown> = {}) => ({ product_id: AMS, scope: 'product', scope_id: '', amount_iqd, ...over });
 
-test('the typed extra is refused as the rules route refuses it: off the 1,000 step (naming the field, never the value), negative, fractional, another product’s model, a duplicate, an unknown key', async () => {
+test('the clean start: a typed Direct Sale Extra is refused by name (PRICING_V2_FEES_RETIRED), and none is ever suggested', async () => {
   const w = pricingWorld();
-  const send = (entries: unknown[]) => w.preview({ draft: w.draft(), pricing: { direct_sale_extras: entries } });
-  const step = await send([extra(1_500)]);
-  assert.equal(step.status, 400);
-  assert.equal(step.body.code, 'DIRECT_SALE_EXTRA_NOT_ON_STEP');
-  assert.equal(step.body.details.field, 'direct_sale_extra_iqd');
-  assert.ok(!JSON.stringify(step.body).includes('1500') && !JSON.stringify(step.body).includes('1,500'), 'the refusal never repeats the value');
-  for (const bad of [-1000, 1.5, '1000', 2_000_000_000]) {
-    const r = await send([extra(bad)]);
-    assert.equal(r.status, 400, String(bad));
-    assert.equal(r.body.code, 'PRICING_INPUT_INVALID', String(bad));
-  }
-  const other = await send([extra(0, { scope: 'option', scope_id: 'lp_04_o0' })]);
-  assert.equal(other.status, 400);
-  assert.equal(other.body.code, 'PRICING_INPUT_INVALID');
-  assert.equal((await send([extra(0, { product_id: 'lp_04' })])).status, 400, 'a product not on the purchase');
-  assert.equal((await send([extra(0), extra(1000)])).status, 400, 'a duplicate target');
-  assert.equal((await send([extra(0, { scope: 'color', scope_id: 'c1' })])).status, 400, 'colour and SKU levels are not offered on the card');
-  const unknown = await send([extra(0, { amount_usd: '1' })]);
-  assert.equal(unknown.status, 400);
-  assert.equal(unknown.body.code, 'UNKNOWN_FIELD');
-  assert.equal((await send(Array.from({ length: 61 }, () => extra(0)))).status, 400, 'at most 60 entries');
-});
-
-test('today’s Direct Sale Extra is offered only where the old prices give one clean answer (answer B, on the 1,000 step)', async () => {
-  const w = pricingWorld();
+  const r = await w.preview({ draft: w.draft(), pricing: { direct_sale_extras: [extra(1000)] } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.code, 'PRICING_V2_FEES_RETIRED');
+  assert.equal(r.body.details.field, 'direct_sale_extras');
+  assert.ok(!JSON.stringify(r.body).includes('1000'), 'the refusal never repeats the value');
   const look = await w.preview({ draft: w.draft() });
-  assert.deepEqual(productOf(look.body).extra_suggestions, [{ option_id: AMS_MODEL, direct_sale_extra_iqd: 50_000 }], 'today: direct 500,000 − land 450,000');
-  // Today's direct price off the step: no clean answer, no button.
-  w.raw.prepare("UPDATE product_option_fulfillment SET regular_price_iqd = 500500 WHERE option_id = ? AND fulfillment_type = 'direct_sale'").run(AMS_MODEL);
-  const off = await w.preview({ draft: w.draft() });
-  assert.equal(off.status, 200, JSON.stringify(off.body));
-  assert.deepEqual(productOf(off.body).extra_suggestions, []);
+  assert.equal(look.status, 200, JSON.stringify(look.body));
+  assert.deepEqual(productOf(look.body).extra_suggestions, [], 'no Direct Sale Extra is suggested from the old prices');
+  assert.deepEqual(productOf(look.body).direct_sale_extras, []);
+  assert.deepEqual(productOf(look.body).rows, [], 'no per-model price of the old engine');
 });

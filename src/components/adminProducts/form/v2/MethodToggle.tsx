@@ -25,7 +25,7 @@ export default function MethodToggle({ method, editable, onChange }: { method: V
       <span className="text-[12px] font-bold text-text-secondary">{s.method}</span>
       <Segmented
         group="v2-method"
-        size="sm"
+        size="md"
         label={s.method}
         value={method}
         onChange={(id) => onChange(id === 'usd' ? 'usd' : 'cost')}

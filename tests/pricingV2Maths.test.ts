@@ -225,6 +225,22 @@ test('B1 floor, owner answer Q1: air freight above the discounted price → the 
   assert.throws(() => priceProductV2({ ...inputOfWorked(), floorMode: 'cost' } as V2Input), /PRICING_INVARIANT/);
 });
 
+test('Q1 (review 2026-10-14): a cost-first route never sells AT its own cost, even rounded up to the step', () => {
+  const skus = [workedSku('std', null, ['direct_sale', 'pre_order_land', 'pre_order_air'])];
+  // 27,250/kg × 22 kg = 599,500 → R_air = 1,424,500, under E_P = 1,425,000 but on its step: the discount would
+  // sell the route at ceil_1000(R_air) — the cost published. Withdrawn: the route sells at D.
+  const at = worked('1500', '1.08', { skus }, { CHINA_AIR: '27250' });
+  const air = ch(at, STD, 'pre_order_air');
+  assert.equal(air.replacement?.replacement_exact, '1424500');
+  assert.equal(air.price_iqd, 1_500_000);
+  assert.equal(air.floor, 'discount_withdrawn');
+  assert.equal(ch(at, STD, 'pre_order_land').price_iqd, 1_425_000, 'land keeps its discount');
+  // 30,650/kg × 22 kg = 674,300 → R_air = 1,499,300: on D's own step (ceil = D) — blocked, never sold at D = its cost rounded up.
+  const edge = worked('1500', '1.08', { skus }, { CHINA_AIR: '30650' });
+  assert.deepEqual(codes(edge, STD, 'error', 'pre_order_air'), ['V2_ROUTE_BELOW_COST']);
+  for (const c of skuOf(at, STD).channels) if (c.channel !== 'direct_sale' && c.replacement) assert.ok(c.price_iqd > c.replacement.replacement_cost_iqd);
+});
+
 test('B1 block: R_air above D blocks air only; land and direct stay priced', () => {
   // 35,000/kg × 22 kg = 770,000 → R_air = 1,595,000 > D = 1,500,000.
   const r = worked('1500', '1.08', { skus: [workedSku('std', null, ['direct_sale', 'pre_order_land', 'pre_order_air'])] }, { CHINA_AIR: '35000' });
@@ -783,11 +799,13 @@ function oracle(gen: Gen, input: V2Input): Map<string, Map<SkuChannel, Expected>
       let floor = dFloor;
       if (gen.method === 'cost') {
         const r = rR as Q;
-        if (qCmp(r, qi(D)) > 0) {
+        // Q1 (review 2026-10-14): the cost on the step is the line — a route never sells AT its cost rounded up.
+        const rStep = qCeilStep(r);
+        if (rStep >= D) {
           rows.set(c, { error: 'V2_ROUTE_BELOW_COST' });
           continue;
         }
-        if (qCmp(eP, r) < 0) [price, floor] = [D, 'discount_withdrawn']; // Q1: never lifted to the cost
+        if (price <= rStep) [price, floor] = [D, 'discount_withdrawn']; // Q1: never lifted to the cost
       }
       const below = gen.method === 'usd' && rR !== null && typeof rR !== 'string' && qCmp(eP, rR) < 0;
       const discountText = sellsDirect && won ? won.usd : '0';

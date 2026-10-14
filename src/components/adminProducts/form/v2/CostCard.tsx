@@ -61,6 +61,21 @@ export function UnitInput({ id, stored, factor, decimals, onChange, label, data 
   );
 }
 
+/** A box from its three typed axes: all three set, or none at all (a partial box is never sent). */
+export function boxOf(axes: ReadonlyArray<number | null>): [number, number, number] | null {
+  return axes.length === 3 && axes.every((x) => x !== null) ? (axes as [number, number, number]) : null;
+}
+
+/** The folded card's summary, one isolated part each — the number and its localized unit in one run. */
+export function costSummaryParts(cost: Pick<CostDraft, 'supplier_amount' | 'supplier_currency' | 'weight_g' | 'extras_iqd'>, route: string | null, kgUnit: string): string[] {
+  return [
+    cost.supplier_amount && cost.supplier_currency ? `${cost.supplier_currency} ${cost.supplier_amount}` : null,
+    route,
+    cost.weight_g !== null ? `${Number((cost.weight_g / 1000).toFixed(3))} ${kgUnit}` : null,
+    cost.extras_iqd ? `+${iqdText(cost.extras_iqd)}` : null,
+  ].filter((x): x is string => !!x);
+}
+
 /** Wide screens show the card open; a phone folds it to its summary until it is opened. */
 function useWide(): boolean {
   const [wide, setWide] = useState(() => (typeof window === 'undefined' || !window.matchMedia ? true : window.matchMedia('(min-width: 768px)').matches));
@@ -93,26 +108,30 @@ export default function CostCard({
   const [open, setOpen] = useState<boolean | null>(null);
   const shown = open ?? (!optional && wide);
   const route = cost.route ? PRICING_PROFILE_LABELS[cost.route as StockRoute][lang] : null;
-  const summary = [
-    cost.supplier_amount && cost.supplier_currency ? `${cost.supplier_currency} ${cost.supplier_amount}` : null,
-    route,
-    cost.weight_g !== null ? `${Number((cost.weight_g / 1000).toFixed(3))} kg` : null,
-    cost.extras_iqd ? `+${iqdText(cost.extras_iqd)}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const box = cost.box ?? [null, null, null];
+  // Each part its own isolated run (a number stays with its unit, in the reader's language): an RTL summary
+  // never reorders «USD 500 · 9 · الشحن البحري من الصين kg» (review 2026-10-14).
+  const summary = costSummaryParts(cost, route, s.kgUnit);
+  // The box as TYPED: a partly typed box (one or two axes) stays on screen; the draft carries a box only once
+  // all three axes are set — each keystroke no longer starts from an empty box (review 2026-10-14).
+  const [box, setBoxDraft] = useState<Array<number | null>>(() => [...(cost.box ?? [null, null, null])]);
+  const storedBox = cost.box ? cost.box.join(',') : '';
+  useEffect(() => {
+    if (cost.box) setBoxDraft([...cost.box]);
+    // A stored box (loaded, or emitted complete) replaces the typed one; a partial one is kept while typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storedBox]);
   const setBox = (i: 0 | 1 | 2, v: number | null) => {
-    const next = [...box] as Array<number | null>;
+    const next = [...box];
     next[i] = v;
-    onChange({ box: next.every((x) => x !== null) ? (next as [number, number, number]) : null });
+    setBoxDraft(next);
+    onChange({ box: boxOf(next) });
   };
   const invalidAmount = cost.supplier_amount.trim() !== '' && cleanUsdAmount(cost.supplier_amount) === null;
   return (
     <section className="lv-well min-w-0 rounded-lg p-3" data-v2-card="cost" aria-label={optional ? s.costOptional : s.costOwnerOnly}>
       <button
         type="button"
-        className="flex w-full min-w-0 items-center gap-2 text-start"
+        className="flex min-h-11 w-full min-w-0 items-center gap-2 text-start"
         aria-expanded={shown}
         onClick={() => setOpen(!shown)}
         data-v2-toggle="cost"
@@ -122,9 +141,14 @@ export default function CostCard({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[12px] font-bold text-text-primary">{optional ? s.costOptional : s.costOwnerOnly}</span>
-          {!shown && summary ? (
-            <span className="block truncate text-[11px] text-text-muted" dir="auto">
-              {summary}
+          {!shown && summary.length ? (
+            <span className="block truncate text-[11px] text-text-muted" data-v2-cost-summary>
+              {summary.map((part, i) => (
+                <span key={i}>
+                  {i ? ' · ' : null}
+                  <bdi>{part}</bdi>
+                </span>
+              ))}
             </span>
           ) : null}
         </span>

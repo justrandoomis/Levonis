@@ -12,6 +12,12 @@ import type { PurchaseLineForPricing } from './fromPurchase';
 import { INPUT_FIELD_NAMES, type InputFields, type StoredRuleRow } from './store';
 import { ruleDto } from './dto';
 
+/**
+ * THE CLEAN START (DECISIONS row 222; review 2026-10-14): the card shows what the purchase COSTS and the store's
+ * current V2 price (`store_price_iqd`, null while the product needs pricing) — never a price of the old engine.
+ * Its computed final dollars, pre-order base, Direct Sale Extra and direct price are answered null: a confirmed
+ * purchase becomes the product's V2 price review, decided in section ٣ «الأسعار».
+ */
 export function summaryDto(s: LineSummary) {
   return {
     state: s.state,
@@ -26,11 +32,11 @@ export function summaryDto(s: LineSummary) {
     target_profit_iqd: s.target_profit_iqd,
     target_profit_cents: s.target_profit_cents,
     current_total_cost_cents: s.current_total_cost_cents,
-    final_price_cents: s.final_price_cents,
-    preorder_base_iqd: s.preorder_base_iqd,
-    direct_sale_extra_iqd: s.direct_sale_extra_iqd,
-    direct_sale_price_iqd: s.direct_sale_price_iqd,
-    rounding_added_iqd: s.rounding_added_iqd,
+    final_price_cents: null,
+    preorder_base_iqd: null,
+    direct_sale_extra_iqd: null,
+    direct_sale_price_iqd: null,
+    rounding_added_iqd: null,
     supplier_original_amount: s.supplier_original_amount,
     supplier_original_currency: s.supplier_original_currency,
     iqd_converted: s.iqd_converted
@@ -55,7 +61,7 @@ export function summaryDto(s: LineSummary) {
     additional_cost_cents: s.additional_cost_cents,
     excluded_charges: [...s.excluded_charges],
     current_total_cost_usd: s.current_total_cost_usd,
-    final_price_usd: s.final_price_usd,
+    final_price_usd: null,
     usd_iqd_rate: s.usd_iqd_rate,
     document_rate: s.document_rate,
     store_price_iqd: s.store_price_iqd,
@@ -165,12 +171,13 @@ export function productPreviewDto(p: ProductPreview, extra: { applied?: boolean;
     })),
     proposals: p.derived.proposals.map((x) => ({ scope: x.scope, scope_id: x.scope_id, shipping_profile: x.shipping_profile })),
     shadowed: p.derived.shadowed.map((x) => ({ scope: x.scope, scope_id: x.scope_id, field: x.field })),
-    rows: previewRowsDto(p.models),
+    // The old engine's per-model prices are not shown (the V2 review in section ٣ is the one price sheet).
+    rows: [] as ReturnType<typeof previewRowsDto>,
     missing_codes: [...p.missing_codes],
     cod_priced_as_direct: p.cod_as_direct,
     minimum_profits: minimumProfitsDto(p.product_id, extra.rules),
-    direct_sale_extras: directSaleExtrasDto(p.product_id, extra.rules),
-    extra_suggestions: p.extra_suggestions.map((x) => ({ option_id: x.option_id, direct_sale_extra_iqd: x.value_iqd })),
+    direct_sale_extras: [] as ReturnType<typeof directSaleExtrasDto>,
+    extra_suggestions: [] as Array<{ option_id: string; direct_sale_extra_iqd: number }>,
   };
 }
 

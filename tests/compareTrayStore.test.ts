@@ -4,7 +4,7 @@
  *
  * Pinned: max four (the fifth is refused and says so), one product type (a
  * conflict ASKS, it never silently replaces), persistence under
- * `lv_compare_v1` with a version and a 30-day expiry, memory-only when
+ * `lv_compare_v2` with a version and a 30-day expiry, memory-only when
  * storage throws, two tabs converging through the `storage` event, clear +
  * undo, and `replaceAll` for the compare page's URL.
  */
@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   COMPARE_TRAY_KEY,
+  LEGACY_COMPARE_TRAY_KEY,
   COMPARE_TRAY_MAX,
   COMPARE_TRAY_TTL_MS,
   compareHref,
@@ -48,7 +49,16 @@ class ThrowingStorage implements TrayStorage {
 
 const item = (id: string): TrayItem => ({ id, slug: `slug-${id}`, name: `Printer ${id}`, image: `/files/${id}.webp` });
 
-test('adds, persists under lv_compare_v1 with a version, and reads back', () => {
+test('the clean start: a tray saved before it (lv_compare_v1) is dropped and never read back', () => {
+  const storage = new MemoryStorage();
+  storage.setItem(LEGACY_COMPARE_TRAY_KEY, JSON.stringify({ v: 1, type: 'printer', at: 1_000_000, items: [item('hidden')] }));
+  const tray = createCompareTray({ storage, now: () => 1_000_500 });
+  assert.deepEqual(tray.getSnapshot().items, [], 'a product that may be hidden now is not shown');
+  assert.equal(storage.getItem(LEGACY_COMPARE_TRAY_KEY), null);
+  assert.equal(COMPARE_TRAY_KEY, 'lv_compare_v2');
+});
+
+test('adds, persists under lv_compare_v2 with a version, and reads back', () => {
   const storage = new MemoryStorage();
   let now = 1_000_000;
   const tray = createCompareTray({ storage, now: () => now });

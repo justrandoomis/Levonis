@@ -2,7 +2,8 @@
  * THE GIFT IN THE FINANCE WORKSPACE (docs/GIFTS_QUICK_BUY.md §4, D15).
  *
  *   «Orders carry order_kind; finance workspace lists and filters it; the gift
- *    line is a 0 line with its cost.»
+ *    line is a 0 line with its cost.» Since the V2 clean start (DECISIONS row 222)
+ *    that cost is the V2 line-cost precedence's, never a legacy cost cell.
  *
  * A delivered gift order reads as what it is — `order_kind: 'gift'`, no goods
  * revenue, the product's cost recorded on its line — and the delivered-orders
@@ -33,9 +34,12 @@ test('a delivered gift order is listed with its kind, filtered by it, and its li
     raw.prepare("UPDATE orders SET status = 'delivered', delivered_at = '2026-10-03T10:00:00Z' WHERE id = ?").run(id);
   }
 
-  // THE LINE: an ordinary order line at 0 that keeps what the product cost.
-  const line = row<J>(raw, 'SELECT unit_price_iqd, line_total_iqd, cost_iqd, gift_entitlement_id FROM order_items WHERE order_id = ?', giftOrder.id)!;
-  assert.deepEqual([line.unit_price_iqd, line.line_total_iqd, line.cost_iqd], [0, 0, 22000]);
+  // THE LINE: an ordinary order line at 0. The V2 rule (addendum A.9, the clean start): the legacy cost cell
+  // (`product_cost_iqd` 22,000) never feeds a new line — the cost is unknown at order time (`unpriced`) and
+  // only the frozen V2 estimate may stand beside it (none here: the product is priced in dollars, with no cost).
+  const line = row<J>(raw, 'SELECT unit_price_iqd, line_total_iqd, cost_iqd, cost_basis, estimated_cost_iqd, gift_entitlement_id FROM order_items WHERE order_id = ?', giftOrder.id)!;
+  assert.deepEqual([line.unit_price_iqd, line.line_total_iqd, line.cost_iqd, line.cost_basis], [0, 0, null, 'unpriced']);
+  assert.equal(line.estimated_cost_iqd, null, 'a price-first product has no replacement cost to freeze');
   assert.ok(line.gift_entitlement_id);
 
   const finance = stubApp(asD1(raw), { id: 'boss', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (app) =>
@@ -53,7 +57,8 @@ test('a delivered gift order is listed with its kind, filtered by it, and its li
   const gift = every.find((o) => o.id === giftOrder.id)!;
   assert.equal(gift.order_kind, 'gift', 'the list says what made the order');
   assert.equal(gift.net_goods_iqd, 0, 'a gift sells nothing');
-  assert.equal(gift.cogs_iqd, 22000, 'and its cost is still counted');
+  assert.equal(gift.cogs_iqd, null, 'the legacy cost cell is never counted: the cost is unknown, never 22,000');
+  assert.equal(gift.cost_confidence, 'unknown');
   assert.equal(every.find((o) => o.id === paidOrder.id)!.order_kind, 'normal');
 
   assert.deepEqual((await list('&kind=gift')).map((o) => o.id), [giftOrder.id]);

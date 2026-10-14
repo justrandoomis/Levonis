@@ -5,7 +5,7 @@
  *
  * A tiny external store (`useSyncExternalStore`), in the ENTRY chunk because
  * every card toggle and the tray gate read it — so it holds no React, no
- * strings and no UI. Persisted in localStorage under `lv_compare_v1`:
+ * strings and no UI. Persisted in localStorage under `lv_compare_v2`:
  *
  *   {v:1, type:'printer', items:[{id, slug, name, image}], at}
  *
@@ -28,7 +28,10 @@
  * toast, or the «start a new comparison?» dialog.
  */
 
-export const COMPARE_TRAY_KEY = 'lv_compare_v1';
+// v2 since the clean start (DECISIONS row 222): a tray saved before it may hold products that are hidden
+// until priced in dollars (their names and pictures) — it is not read back (review 2026-10-14).
+export const COMPARE_TRAY_KEY = 'lv_compare_v2';
+export const LEGACY_COMPARE_TRAY_KEY = 'lv_compare_v1';
 export const COMPARE_TRAY_VERSION = 1;
 /** worker/routes/compare.ts MAX_COMPARE_IDS. */
 export const COMPARE_TRAY_MAX = 4;
@@ -157,6 +160,12 @@ export function createCompareTray(opts: { storage?: TrayStorage | null; now?: ()
   let expandSeq = 0;
 
   const read = (): string | null => {
+    try {
+      // The tray saved before the clean start is dropped, never read (its products may be hidden now).
+      storage?.removeItem(LEGACY_COMPARE_TRAY_KEY);
+    } catch {
+      /* storage that refuses a removal still reads the current tray */
+    }
     try {
       return storage ? storage.getItem(COMPARE_TRAY_KEY) : null;
     } catch {

@@ -55,11 +55,28 @@ export interface GiftLineVerdict {
   nextOrderSeq: number;
   /** The frozen selection — pricing and stock use THIS, never the row's columns. */
   selection: GiftSelection | null;
+  /**
+   * The value the gift was granted with (`gift_snapshot.value_iqd`, frozen at the grant and already shown to
+   * the customer then) — what a gift line of a product still «يحتاج تسعيرًا» shows instead of any old dinar
+   * figure of the ladder (the clean start, DECISIONS row 222). Null when the snapshot carries none.
+   */
+  frozenValueIqd?: number | null;
 }
 
 /** The gift columns every reader of the cart and the checkout names. */
 export const GIFT_LINE_COLUMNS =
-  'id, user_id, state, grant_mode, level, order_seq, order_id, gift_product_id, gift_option_value_ids, gift_color_id, gift_qty, gift_sale_type, gift_transport_method';
+  'id, user_id, state, grant_mode, level, order_seq, order_id, gift_product_id, gift_option_value_ids, gift_color_id, gift_qty, gift_sale_type, gift_transport_method, gift_snapshot';
+
+/** The value frozen on the entitlement at its grant (display only; never a price), or null. */
+export function frozenGiftValueOf(g: Record<string, unknown> | null | undefined): number | null {
+  if (!g || typeof g.gift_snapshot !== 'string') return null;
+  try {
+    const v = (JSON.parse(g.gift_snapshot) as { value_iqd?: unknown } | null)?.value_iqd;
+    return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Does this cart row hold exactly the gift's frozen line? */
 export function sameGiftLine(row: Record<string, unknown>, giftId: string, sel: GiftSelection): boolean {
@@ -119,6 +136,7 @@ export async function verifyGiftCartLines(
       level: Number(g.level) || 0,
       nextOrderSeq: (Number(g.order_seq) || 0) + 1,
       selection: sel,
+      frozenValueIqd: frozenGiftValueOf(g),
     };
     const state = String(g.state ?? '');
     if (state === 'ordered' || state === 'fulfilled') verdict.code = 'GIFT_ALREADY_ORDERED';
@@ -190,6 +208,46 @@ export function zeroGiftPrice(resolved: ResolvedPrice): ResolvedPrice {
     warranty: null,
     unit_subtotal_iqd: 0,
   };
+}
+
+/**
+ * THE CLEAN START ON A GIFT LINE (DECISIONS row 222; review 2026-10-14). A gift granted on a product that is not
+ * V2-published (no `sku_strict` document: «يحتاج تسعيرًا») is still delivered as granted, but the resolver's
+ * answer for it is the OLD dinar ladder: its regular price, its rungs and its legacy cost cell. None of that may
+ * reach a new order line. The line keeps what the gift IS (type, route, lead time, basis) and carries:
+ *   - the value the gift was granted with (`frozenUnitIqd`, already shown at the grant), never the ladder's;
+ *   - every rung at that one value (no model, route or colour difference of the old ladder);
+ *   - no member price and no cost: `cost_iqd` null (stored as `unpriced`: cost unknown, no estimate).
+ */
+export function unpricedGiftResolved(zeroed: ResolvedPrice, frozenUnitIqd: number): ResolvedPrice {
+  const unit = Math.max(0, Math.round(Number(frozenUnitIqd) || 0));
+  return {
+    ...zeroed,
+    regular_iqd: unit,
+    pro_iqd: null,
+    prime_iqd: null,
+    cost_iqd: null,
+    price_source: 'base',
+    member_rule: { pro: null, prime: null },
+    components: {
+      ...zeroed.components,
+      base_iqd: unit,
+      option_iqd: unit,
+      fulfillment_iqd: unit,
+      transport_iqd: unit,
+      color_iqd: unit,
+      membership_adjustment_iqd: 0,
+      transport_fee_iqd: 0,
+      direct_fee_iqd: 0,
+      warranty_fee_iqd: 0,
+    },
+  };
+}
+
+/** The unit value a gift line shows: the V2 regular price, or — not V2-published — the value frozen at the grant. */
+export function giftUnitValueOf(v2: boolean, regularUnitIqd: number, frozenValueIqd: number | null | undefined, qty: number): number {
+  if (v2) return Math.max(0, Math.round(Number(regularUnitIqd) || 0));
+  return Math.max(0, Math.round((Number(frozenValueIqd) || 0) / Math.max(1, qty)));
 }
 
 /** `order_items.transport_snapshot` of a gift line: the route kept, nothing charged. */

@@ -34,6 +34,7 @@
  * the file still applies.
  */
 
+import { needsPricingIds, nullLegacyPricesDeep } from '../lib/pricingEngine/v2/legacyMoney';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { engineDbRefusal, engineDbRefusalCode } from '../lib/pricingDbRefusals';
 import { productEngineV2 } from '../lib/engineInstalled';
@@ -398,6 +399,10 @@ async function exportProducts(
   money: boolean
 ): Promise<ExportProduct[]> {
   if (productIds.length === 0) return [];
+  // The clean start: the products still «يحتاج تسعيرًا» export their old dinar prices EMPTY (archive only).
+  const unpriced = await needsPricingIds(db, productIds);
+  const archive = <T extends Record<string, unknown>>(rows: T[]): T[] =>
+    rows.map((r) => (unpriced.has(String(r.product_id ?? r.id ?? '')) ? nullLegacyPricesDeep(r) : r));
   const ph = productIds.map(() => '?').join(',');
   const { results: prods } = await db
     .prepare(`SELECT * FROM products WHERE id IN (${ph})`)
@@ -441,6 +446,7 @@ async function exportProducts(
     .prepare(`SELECT * FROM product_variants WHERE product_id IN (${ph}) ORDER BY rowid`)
     .bind(...productIds)
     .all<Record<string, unknown>>();
+  for (const rows of [prods, values, colors, cells, routes, variants]) rows.splice(0, rows.length, ...archive(rows));
   /**
    * §18 — the product-scoped membership discount rules, so an export carries
    * what a member actually pays for these products and not only the regular

@@ -1,6 +1,6 @@
 import { allocateProcurementCharges, procurementSelectionKey, roundProcurementProduct, type ProcurementChargeBasis } from '../../../packages/contracts/src/procurementCost';
 
-export type EstimateLine = { product_id?: string; scope?: string; scope_id?: string | null; qty_ordered: number; source_unit_amount: number | string; source_total_amount?: number | string; purchase_cost_mode?: string; selling_price_iqd: number; weight_g: number; volume_mm3: number };
+export type EstimateLine = { product_id?: string; scope?: string; scope_id?: string | null; qty_ordered: number; source_unit_amount: number | string; source_total_amount?: number | string; purchase_cost_mode?: string; selling_price_iqd: number | null; weight_g: number; volume_mm3: number };
 export type EstimateCharge = { amount_iqd: number; basis: string; scope?: 'shipment' | 'unit'; unit_amount_iqd?: number | null; applies_to?: readonly string[] | null; review?: boolean };
 export type EstimateShipping = { basis: 'weight' | 'volume'; rate: number };
 /** The key a charge's `applies_to` names; a line without a selection is its own. */
@@ -37,7 +37,8 @@ export function purchaseEstimate(lines: EstimateLine[], charges: EstimateCharge[
   return lines.map((l, i) => {
     const extras = shares.reduce((n, row) => n + row[i], 0);
     const freight = autoFreight[i] + extras;
-    const total = costs[i] + freight, profit = l.selling_price_iqd * l.qty_ordered - total;
+    // No store price yet (a product still «يحتاج تسعيرًا»): the profit is not computable — NaN, never «price 0».
+    const total = costs[i] + freight, profit = typeof l.selling_price_iqd === 'number' ? l.selling_price_iqd * l.qty_ordered - total : NaN;
     const investor = !included || included.includes(i) ? Math.floor(Math.max(0, profit) * profitBps / 10000) : 0;
     return { purchase_iqd: costs[i], auto_shipping_iqd: autoFreight[i], extras_iqd: extras, charge_shares: shares.map((row) => row[i]), freight_iqd: freight, total_iqd: total, unit_iqd: total / l.qty_ordered, profit_iqd: profit, investor_iqd: investor, owner_iqd: profit - investor };
   });

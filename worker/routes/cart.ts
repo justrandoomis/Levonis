@@ -138,8 +138,10 @@ import { productImageForSelection } from '../lib/productSelectionImage';
 import {
   giftEntitlementIdOf,
   giftLineDiscriminator,
+  giftUnitValueOf,
   giftVerdictRefusal,
   GIFT_LINE_COLUMNS,
+  unpricedGiftResolved,
   verifyGiftCartLines,
   zeroGiftPrice,
   type GiftLineVerdict,
@@ -1910,11 +1912,12 @@ function giftCartItem(
       is_printer: input.isPrinter,
       cod_reprices: false,
       unit_price_iqd: 0,
-      breakdown: publicBreakdown(facts.zeroed),
+      // The clean start: a gift on a product still «يحتاج تسعيرًا» shows the value frozen at its grant, never the old ladder.
+      breakdown: publicBreakdown(doc.sku_strict === true ? facts.zeroed : unpricedGiftResolved(facts.zeroed, giftUnitValueOf(false, 0, verdict?.frozenValueIqd, sel.qty))),
       gift: {
         id: giftEntitlementIdOf(row),
         level: verdict?.level ?? 0,
-        value_iqd: Math.max(0, Math.round(facts.resolved.regular_iqd)) * sel.qty,
+        value_iqd: giftUnitValueOf(doc.sku_strict === true, facts.resolved.regular_iqd, verdict?.frozenValueIqd, sel.qty) * sel.qty,
       },
       stock: input.coarseStock ? null : row.stock,
       low_stock_threshold: input.coarseStock ? null : ((row.low_stock_threshold as number | null) ?? null),

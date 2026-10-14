@@ -60,7 +60,8 @@ import { engineCoreInstalled } from '../../engineInstalled';
 import { loadEngineControl, priceImageOf, withRuleIds, type EngineControl } from '../engineWrite';
 import { effectiveWrites, FORM_INPUT_FIELDS, formOptionIds, parseProductInputs } from '../productInputs';
 import { parseRuleWrites } from '../ownerRules';
-import { canonical } from '../procurementPreview';
+import { canonical, unitRuleTarget } from '../procurementPreview';
+import { resolveRuleAt, type PricingRuleRow } from '@levonis/pricing/ruleResolution';
 import { inputInvalid } from '../whatIf';
 import { sellableSkus } from '../legacy';
 import { evaluateV2Write, type V2Evaluation } from './evaluate';
@@ -256,6 +257,8 @@ export interface V2Desired {
   discounts: V2Discount[];
   inputWrites: InputWrite[];
   ruleWrites: RuleWrite[];
+  /** A price editor's evaluation: its hash binds no cost value (C-14, `evaluateV2Write`'s `opaqueCost`). */
+  opaqueCost?: boolean;
 }
 
 /** The ids each scope may name on this product (the draft's, when a draft is priced). */
@@ -330,7 +333,7 @@ export function desiredFor(read: V2Read, wire: V2Wire, o: DesiredOptions): V2Des
     const discounts = wire.discounts ?? storedDiscounts;
     if (wire.points) checkScopes(points, ids);
     if (wire.discounts) checkScopes(discounts, ids);
-    return { method, points, discounts, inputWrites: fold, ruleWrites: [] };
+    return { method, points, discounts, inputWrites: fold, ruleWrites: [], opaqueCost: true };
   }
   const method = wire.method ?? stored;
   if (!method) throw inputInvalid('method');
@@ -388,6 +391,7 @@ export async function evaluateDesired(read: V2Read, desired: V2Desired): Promise
     // The answer lists every blocked route to the reader («متوقف: أقل من التكلفة»); the hash binds the set.
     acceptBlocked: true,
     structureDigest: await structureDigestOf(read.loaded),
+    ...(desired.opaqueCost ? { opaqueCost: true } : {}),
   });
 }
 
@@ -496,11 +500,30 @@ export function v2Answer(i: AnswerInput): Record<string, unknown> {
       minimum_profit: ev.stored.rules
         .filter((r) => r.product_id === ev.product_id && r.kind === 'target_profit')
         .map((r) => ({ scope: r.scope, scope_id: r.scope_id, state: r.state, amount_usd: r.amount_usd ?? null })),
+      // §2.1 rule 2: what the product's minimum profit inherits when its own field is empty (the owner's
+      // placeholder «يرث ($40.00)»), resolved as the maths resolves it — never a guess.
+      inherited_minimum_profit: inheritedMinimumProfit(ev.stored.rules, ev.product_id, read.rates?.usd_iqd ?? null),
       // D1: a needs-pricing product's prefill carries this pending purchase review (its first write applies it).
       ...(!storedMethod && read.review ? { purchase_review_id: read.review.id } : {}),
     };
   }
   return answer;
+}
+
+/**
+ * The minimum profit (T) the product's base SKU inherits from above its own product-scope rule (a category
+ * or the store-wide rule): the product's own rows left out, the rest resolved by `resolveRuleAt` as the maths
+ * does. Null when nothing above decides (the field is then required). Owner-only (`v2_cost_inputs`).
+ */
+export function inheritedMinimumProfit(
+  rules: readonly PricingRuleRow[],
+  productId: string,
+  usdIqdRate: string | null
+): { amount_usd: string | null; amount_iqd: number | null } | null {
+  const above = rules.filter((r) => !(r.product_id === productId && r.scope === 'product' && r.kind === 'target_profit'));
+  const got = resolveRuleAt(above, 'target_profit', unitRuleTarget(productId, { option_value_ids: [], color_id: null }), { usdIqdRate });
+  if (got.status !== 'active') return null;
+  return { amount_usd: got.amount_usd ?? null, amount_iqd: got.amount_usd ? null : got.amount_iqd };
 }
 
 /**
@@ -558,12 +581,20 @@ export interface GateInput {
   preview: () => Promise<unknown>;
 }
 
+/** The product is V2-published: it has a method and its last complete write's results (customers see it). */
+export const v2Published = (ev: Pick<V2Evaluation, 'kind' | 'v2'>): boolean => ev.kind === 'v2_reprice' && (ev.v2?.results.length ?? 0) > 0;
+
 /** §4.3 steps 1 and 3-6 (the sequence check is the caller's, before the evaluation). */
 export async function gateV2(g: GateInput): Promise<V2Verdict> {
   const { c, ev } = g;
   if (await v2Replayed(c.env.DB, ev.product_id, g.hash)) return 'already';
   if (!ev.complete) {
-    if (g.publishing) throw refusal(409, 'PRICING_V2_PRICE_MISSING', { missing: ev.missing.map((m) => ({ code: m.code, field: m.field, level: m.level })), preview: await g.preview() });
+    // A data-only save (no hash, no tick, no fresh sign-in) is for a product no customer sees yet. On a
+    // V2-PUBLISHED product it would store an unreviewed price set that the next automatic repricing (FX-5)
+    // publishes: refused, with the preview — its structure alone may still be saved.
+    if (g.publishing || (v2Published(ev) && ev.drafts)) {
+      throw refusal(409, 'PRICING_V2_PRICE_MISSING', { missing: ev.missing.map((m) => ({ code: m.code, field: m.field, level: m.level })), preview: await g.preview() });
+    }
     return 'data';
   }
   if (g.prices_only && !ev.needs_write) return 'noop';

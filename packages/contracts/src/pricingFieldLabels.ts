@@ -32,7 +32,8 @@ export const PRICING_FIELD_LABELS = {
   supplier_cost: { ar: 'تكلفة المورد', en: 'Supplier cost', ckb: 'تێچووی دابینکەر' },
   supplier_cost_delta: { ar: 'فرق تكلفة المورد', en: 'Supplier cost difference', ckb: 'جیاوازیی تێچووی دابینکەر' },
   supplier_currency: { ar: 'عملة المورد', en: 'Supplier currency', ckb: 'دراوی دابینکەر' },
-  shipping_profile: { ar: 'طريقة الشحن الافتراضية', en: 'Default shipping profile', ckb: 'ڕێگای بنەڕەتیی ناردن' },
+  // The V2 form's own words (§1.2): the route the STOCK ships by, never «طريقة الشحن الافتراضية».
+  shipping_profile: { ar: 'مسار شحن المخزون', en: 'Stock shipping route', ckb: 'ڕێڕەوی ناردنی کۆگا' },
   pricing_weight_g: { ar: 'وزن التسعير (غم)', en: 'Pricing weight (g)', ckb: 'کێشی نرخدانان (گرام)' },
   shipping_weight_g: { ar: 'وزن الشحن (غم)', en: 'Shipping weight (g)', ckb: 'کێشی ناردن (گرام)' },
   shipping_length_mm: { ar: 'طول عبوة الشحن (ملم)', en: 'Shipping box length (mm)', ckb: 'درێژیی سندوقی ناردن (میلیمەتر)' },

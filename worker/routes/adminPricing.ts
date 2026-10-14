@@ -110,13 +110,11 @@ import { directPurchaseStore } from '../lib/pricingEngine/directPurchase';
 import {
   MinimumProfitError,
   parseMinimumProfit,
-  type DirectSaleExtraDraft,
   type MinimumProfitDraft,
   type PurchaseForPricing,
 } from '../lib/pricingEngine/fromPurchase';
 import { lineSummary, previewProduct, type PreviewOptions, type ProductPreview } from '../lib/pricingEngine/procurementPreview';
 import { lineDto, productPreviewDto, ratesHeadDto } from '../lib/pricingEngine/procurementDto';
-import { parseDirectSaleExtraAmount } from '../lib/pricingEngine/ownerRules';
 import { parseProcurementDraft } from '../lib/procurementDraft';
 import { committedPurchaseForPricing, draftForPricing } from '../lib/pricingEngine/purchaseRead';
 import { FX_GUARD_CHANGED, recordSecurityEvent } from '../lib/securityEvents';
@@ -677,35 +675,6 @@ function minimumProfits(raw: unknown, loaded: ReadonlyMap<string, LoadedProduct>
   return out;
 }
 
-/**
- * The owner's typed Direct Sale Extras on the review of a stock purchase (owner
- * request 2026-10-10), validated against each product's models: product or an
- * active model (colour and SKU levels are not offered on this card), one entry
- * per target, the amount through the one validator `«التسعير والشحن»` uses
- * (`parseDirectSaleExtraAmount`: whole dinars, the 1,000 step, null = inherit).
- */
-function directSaleExtras(raw: unknown, loaded: ReadonlyMap<string, LoadedProduct>, onlyProduct?: string): Map<string, DirectSaleExtraDraft[]> {
-  const out = new Map<string, DirectSaleExtraDraft[]>();
-  if (raw === undefined || raw === null) return out;
-  if (!Array.isArray(raw) || raw.length > 60) throw inputInvalid('direct_sale_extras');
-  const seen = new Set<string>();
-  for (const item of raw) {
-    const r = strictBody(item, onlyProduct ? ['scope', 'scope_id', 'amount_iqd'] : ['product_id', 'scope', 'scope_id', 'amount_iqd']);
-    const pid = onlyProduct ?? (typeof r.product_id === 'string' ? r.product_id : '');
-    const product = loaded.get(pid);
-    if (!product) throw inputInvalid('direct_sale_extras');
-    const scope = r.scope;
-    if (scope !== 'product' && scope !== 'option') throw inputInvalid('direct_sale_extras');
-    const scopeId = scope === 'product' ? '' : typeof r.scope_id === 'string' ? r.scope_id : '';
-    if (scope === 'option' && !optionIdsOf(product).has(scopeId)) throw inputInvalid('direct_sale_extras');
-    if (scope === 'product' && r.scope_id !== undefined && r.scope_id !== null && r.scope_id !== '') throw inputInvalid('direct_sale_extras');
-    const key = `${pid}:${scope}:${scopeId}`;
-    if (seen.has(key)) throw inputInvalid('direct_sale_extras');
-    seen.add(key);
-    out.set(pid, [...(out.get(pid) ?? []), { scope, scope_id: scopeId, amount_iqd: parseDirectSaleExtraAmount(r.amount_iqd) }]);
-  }
-  return out;
-}
 
 /** Products whose prices this purchase was applied to (an apply audit row exists). */
 async function appliedProducts(db: D1Database, purchaseId: string | null): Promise<Set<string>> {
@@ -722,11 +691,15 @@ async function procurementPreview(c: Context<AppContext>, purchase: PurchaseForP
   const db = c.env.DB;
   const rates = await engineRates(db);
   const pricing = strictBody(pricingRaw ?? {}, ['minimum_profits', 'direct_sale_extras', 'manual_line_opt_in', 'use_purchase', 'prefer_purchase_values']);
+  // The clean start (DECISIONS row 222): no typed dinar Direct Sale Extra exists any more — refused by name.
+  if (pricing.direct_sale_extras !== undefined) {
+    throw new HttpError(400, serverMessage('PRICING_V2_FEES_RETIRED'), 'PRICING_V2_FEES_RETIRED', { section: 3, field: 'direct_sale_extras' });
+  }
   const ids = [...new Set(purchase.lines.map((l) => l.product_id))].filter((id) => !onlyProduct || id === onlyProduct);
   const [loaded, stored, ctx] = await Promise.all([loadProducts(db, ids), loadProductsPricing(db, ids), loadPreviewContext(db)]);
   const opts: PreviewOptions = {
     minimum_profits: minimumProfits(pricing.minimum_profits, loaded),
-    direct_sale_extras: directSaleExtras(pricing.direct_sale_extras, loaded),
+    direct_sale_extras: new Map(),
     opt_in: new Set(stringList(pricing.manual_line_opt_in, 'manual_line_opt_in')),
     use_purchase: booleanMap(pricing.use_purchase, 'use_purchase'),
     prefer: booleanMap(pricing.prefer_purchase_values, 'prefer_purchase_values'),

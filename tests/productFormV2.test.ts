@@ -47,7 +47,7 @@ import {
   type V2TableRow,
 } from '../src/components/adminProducts/form/v2/v2Model';
 import { V2_STRINGS, v2Strings, type V2Strings } from '../src/components/adminProducts/form/v2/v2Strings';
-import { V2PricingProvider, draftStructure, type V2PricingState } from '../src/components/adminProducts/form/v2/useV2Pricing';
+import { V2PricingProvider, draftStructure, saveHashOf, type V2PricingState } from '../src/components/adminProducts/form/v2/useV2Pricing';
 import PricesSectionV2 from '../src/components/adminProducts/form/v2/PricesSectionV2';
 import { chipOf } from '../src/components/adminProducts/form/v2/StatusChipV2';
 import { sectionOfMissing } from '../src/components/adminProducts/form/v2/ReadinessV2';
@@ -200,7 +200,7 @@ test('Q2: the owner sends dollars, method and cost; a price editor sends dollars
     product_usd: '1093.75',
     min_profit_usd: '120',
     cost: { ...base.cost, supplier_amount: '450', supplier_currency: 'EUR' },
-    models: { m2: { price: 'delta', usd: '-43.21', discount: 'exception', discount_usd: '13.79', supplier_amount: '', supplier_currency: '', weight_g: null } },
+    models: { m2: { price: 'delta', usd: '-43.21', discount: 'exception', discount_usd: '13.79', supplier_amount: '', supplier_currency: '', weight_g: null, box: null } },
   };
   const dollars = { points: stored.editor_usd!.points, discounts: stored.editor_usd!.discounts };
   const ownerWire = draftWire(base, typed, dollars, LIVE, { needsMethod: false, cost: true, money: true });
@@ -250,6 +250,23 @@ test('the one review sheet: only the changed rows; the tick when the server flag
   const form = src('src/components/adminProducts/ProductForm.tsx');
   for (const code of ['PRICING_PREVIEW_REQUIRED', 'PRICING_PREVIEW_STALE', 'PRICING_LARGE_CHANGE_CONFIRM']) assert.ok(form.includes(`'${code}'`), code);
   assert.match(form, /save\(r\.status, \{ confirm: \{ hash: r\.preview\.review_hash, confirmLarge \} \}\)/);
+});
+
+test('«نشر» never publishes a price change without the review sheet (§2.6, A.8; review 2026-10-14)', () => {
+  const moving = answer({
+    review_hash: 'a'.repeat(64),
+    changes: [{ combo_key: 'o:m1', names: names('m1'), channel: 'direct_sale', old_iqd: null, new_iqd: 1_750_000, change_percent: null, large: false, drop_flag: false }],
+  });
+  // A price moves (a first publish lists every row): no hash, so the server answers PRICING_PREVIEW_REQUIRED and the sheet opens.
+  assert.equal(saveHashOf(moving), null);
+  // The sheet's confirm carries its own hash.
+  assert.equal(saveHashOf(moving, { hash: 'b'.repeat(64) }), 'b'.repeat(64));
+  // Nothing moves (a structure or data edit): the preview's hash travels unasked.
+  assert.equal(saveHashOf(answer({ review_hash: 'c'.repeat(64), changes: [] })), 'c'.repeat(64));
+  assert.equal(saveHashOf(null), null);
+  const hook = src('src/components/adminProducts/form/v2/useV2Pricing.ts');
+  assert.match(hook, /const hash = saveHashOf\(shown, confirm\);/);
+  assert.doesNotMatch(hook, /confirm\?\.hash \?\? shown\?\.review_hash/);
 });
 
 test('section jumps: a refusal’s section and a missing line’s level open ٣ or ٥', () => {

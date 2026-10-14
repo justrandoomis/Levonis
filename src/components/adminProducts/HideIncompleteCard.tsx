@@ -18,6 +18,7 @@ import { api, ApiError } from '../../lib/api';
 import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
 import { COMPLETENESS_UI, fill, tri } from './completeness';
 import * as T from './theme';
+import { separateListNote } from './needsPricingStrings';
 
 export interface HideSummary {
   enabled: boolean;
@@ -31,7 +32,18 @@ export interface HideSummary {
   sample: Array<{ id: string; name_ar: string; name_en: string; missing_count: number }>;
 }
 
-export default function HideIncompleteCard({ lang, onShowIncomplete, onChanged }: { lang: string; onShowIncomplete: () => void; onChanged?: () => void }) {
+export default function HideIncompleteCard({
+  lang,
+  onShowIncomplete,
+  onChanged,
+  needsPricing = null,
+}: {
+  lang: string;
+  onShowIncomplete: () => void;
+  onChanged?: () => void;
+  /** The products still «يحتاج تسعيرًا» (C5): a separate list, hidden whatever this switch says. */
+  needsPricing?: number | null;
+}) {
   const [summary, setSummary] = useState<HideSummary | null>(null);
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState<'recount' | 'toggle' | null>(null);
@@ -119,6 +131,11 @@ export default function HideIncompleteCard({ lang, onShowIncomplete, onChanged }
           ? fill(t(COMPLETENESS_UI.hiddenNow), { n: summary.held })
           : fill(t(COMPLETENESS_UI.willHide), { n: summary.would_hide, m: summary.bundles_affected })}
       </p>
+      {needsPricing !== null && needsPricing > 0 && (
+        <p className="mt-1 text-[12px] leading-relaxed text-[var(--ap-text-2)]" data-hide-separate-list>
+          {separateListNote(needsPricing, lang === 'en' || lang === 'ckb' ? lang : 'ar')}
+        </p>
+      )}
       {summary.stale > 0 && (
         <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[var(--ap-warning)]">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />

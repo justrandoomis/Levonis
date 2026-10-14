@@ -12,6 +12,13 @@
  */
 import { firstPreorder, iqdText, nameIn, usdText, type SkuLine, type V2Names } from './v2Model';
 import { channelName, Readout, useV2Lang, useV2Strings } from './v2Ui';
+import type { V2Strings } from './v2Strings';
+
+/** «النتيجة (Pro)» for a model; «النتيجة» alone for a product without options (never «النتيجة (—)»). */
+export function resultTitle(name: string, s: Pick<V2Strings, 'result'>): string {
+  const n = name.trim();
+  return n && n !== '—' ? s.result(n) : s.result('').replace(/\s*\(\s*\)\s*$/, '');
+}
 
 export default function ResultBar({ line, owner, title }: { line: SkuLine | null; owner: boolean; title: V2Names | null }) {
   const s = useV2Strings();
@@ -33,7 +40,8 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
   return (
     <section className="min-w-0 mb-3" data-v2-result>
       <p className="mb-1.5 truncate text-[12px] font-bold text-text-secondary" dir="auto">
-        {s.result(nameIn(title ?? line.names, lang) || '—')}
+        {/* A product without options has no model name: the title is «النتيجة» alone, never «النتيجة (—)». */}
+        {resultTitle(nameIn(title ?? line.names, lang), s)}
       </p>
       <div className="grid min-w-0 gap-2 [grid-template-columns:repeat(2,minmax(0,1fr))] md:[grid-template-columns:repeat(4,minmax(0,1fr))]">
         {owner ? (
@@ -47,7 +55,7 @@ export default function ResultBar({ line, owner, title }: { line: SkuLine | null
           <>
             <Readout label={s.direct} value={iqdText(direct?.price_iqd)} sub={priceFirst ? usdText(direct?.editor_usd_price) : undefined} data="direct" />
             <Readout
-              label={pre ? s.preorderVia(channelName(pre.channel, lang)) : s.preorder}
+              label={pre ? channelName(pre.channel, lang) : s.preorder}
               value={pre?.blocked ? s.noPriceYet : iqdText(pre?.price_iqd)}
               sub={priceFirst && pre?.editor_usd_price ? usdText(pre.editor_usd_price) : undefined}
               data="preorder"

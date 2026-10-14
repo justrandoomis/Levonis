@@ -266,7 +266,7 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
       const pricing = withMethod(wire);
       const block: Record<string, unknown> = {};
       if (!wireIsEmpty(pricing)) block.pricing = pricing;
-      const hash = confirm?.hash ?? shown?.review_hash ?? null;
+      const hash = saveHashOf(shown, confirm);
       if (hash) block.preview_hash = hash;
       if (confirm?.confirmLarge) block.confirm_large_change = true;
       return block;
@@ -336,6 +336,18 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
  * plays no part in a price, so a product not yet named is priced under a
  * placeholder name rather than refused.
  */
+/**
+ * The hash a save carries (§2.6, A.8: no path publishes a price change without the review sheet). The sheet's
+ * own confirm carries its hash. Without it, the preview on screen sends its hash only when NO customer price
+ * moves; a save that moves a price goes without one, the server answers PRICING_PREVIEW_REQUIRED with its own
+ * preview, and the form opens the one review sheet on it.
+ */
+export function saveHashOf(shown: Pick<V2Answer, 'review_hash' | 'changes'> | null | undefined, confirm?: { hash: string } | null): string | null {
+  if (confirm?.hash) return confirm.hash;
+  if (!shown?.review_hash) return null;
+  return (shown.changes?.length ?? 0) > 0 ? null : shown.review_hash;
+}
+
 export function draftStructure(
   s: { doc: Record<string, unknown>; relations: Record<string, unknown> },
   draftId: string | null

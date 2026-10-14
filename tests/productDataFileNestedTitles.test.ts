@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { post } from './fixtures/app';
-import { setup, create, download, edit, PRODUCT } from './fixtures/dataFile';
+import { setup, create, download, PRODUCT } from './fixtures/dataFile';
 import { bigWorld, coldApp, setLines } from './fixtures/dataFileLarge';
 import { DATA_FILE_ROUTE_NAMES, pick, rowTitle, type DataFileLabels } from '../src/components/adminProducts/dataFileStrings';
 
@@ -37,8 +37,10 @@ test('a model\'s two pre-order routes (air, sea): two changed lines, two differe
   let t = await download(s.app, id);
   assert.match(t, /^options\.1\.preorder\.transports\.1\.method=air$/m);
   assert.match(t, /^options\.1\.preorder\.transports\.2\.method=sea$/m);
-  t = edit(t, 'options.1.preorder.transports.1.surcharge_iqd', '90000');
-  t = edit(t, 'options.1.preorder.transports.2.surcharge_iqd', '35000');
+  // The file of a product still «يحتاج تسعيرًا» carries no old dinar price (review 2026-10-14): the two route
+  // surcharges are typed by hand, and judged — and titled — exactly as before.
+  assert.doesNotMatch(t, /^options\.1\.preorder\.transports\.\d\.surcharge_iqd=/m);
+  t = t.replace(`=== end ${id} ===`, ['options.1.preorder.transports.1.surcharge_iqd=90000', 'options.1.preorder.transports.2.surcharge_iqd=35000', `=== end ${id} ===`].join('\n'));
   const res = await post(s.app, '/api/admin/template/data-preview', { text: t, product_id: id });
   const p = ((await res.json()) as { products: Card[] }).products[0];
   for (const lang of LANGS) {

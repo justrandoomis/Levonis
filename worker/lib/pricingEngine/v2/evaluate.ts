@@ -68,6 +68,12 @@ export interface V2EvaluationInput {
   structureDigest?: string | null;
   /** FX-5: an automatic repricing (never adopts, never carries drafts). */
   auto?: true;
+  /**
+   * C-14: the reader may not see a cost (a price editor). The hash then binds the cost writes laid over the
+   * store (the purchase overlay's fold) by their scopes and field NAMES only — never a value — so the hash a
+   * price editor receives never moves with a supplier cost alone (the prices it binds still do).
+   */
+  opaqueCost?: boolean;
 }
 
 /** One SKU × channel of the review sheet (the owner extras are private: `dto.ts` projects them). */
@@ -132,6 +138,12 @@ export interface V2Evaluation {
   large_change: boolean;
   drop_flag: boolean;
   needs_write: boolean;
+  /**
+   * The desired set differs from the stored one: the method, a price point, a discount, a cost input or a
+   * minimum-profit rule moves. A V2-PUBLISHED product never stores such a change without a reviewed,
+   * complete write (`gateV2`): an unreviewed set must not wait for FX-5 to publish it.
+   */
+  drafts: boolean;
   /** The SKU × channels blocked by the floor (V2_ROUTE_BELOW_COST). */
   blocked: BlockedChannel[];
   /** What moved since the stored results (FX-5 reasons, codes only). */
@@ -190,8 +202,15 @@ function groupMissing(units: readonly ModelToday[], result: V2Result | null, ext
     });
   }
   for (const code of extra) if (![...out.values()].some((m) => m.code === code)) add({ code: code as PricingIssue['code'] }, null);
-  return [...out.values()];
+  // A consequence is not a separate gap (review 2026-10-14): «السعر المحسوب غير صالح» (PRICE_INVALID) only says
+  // some channel has no price — the inputs named beside it say why. It stands alone only when nothing else does.
+  const all = [...out.values()];
+  const causes = all.filter((m) => !CONSEQUENCE_CODES.has(m.code));
+  return causes.length ? causes : all;
 }
+
+/** Plan codes that only restate that a price is missing (the missing input beside them is the gap). */
+const CONSEQUENCE_CODES: ReadonlySet<string> = new Set(['PRICE_INVALID']);
 
 /** The desired set equals the stored rows (ignoring order and versions). */
 const sameSet = (a: ReadonlyArray<Record<string, string>>, b: ReadonlyArray<Record<string, string>>): boolean =>
@@ -359,7 +378,9 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
           method: a.method,
           points: [...a.points].map((p) => [p.scope, p.scope_id, p.kind, p.usd]).sort(),
           discounts: [...a.discounts].map((d) => [d.scope, d.scope_id, d.usd]).sort(),
-          input_writes: a.inputWrites.map((w) => ({ scope: w.scope, scope_id: w.scope_id, set: w.set })),
+          input_writes: a.opaqueCost
+            ? a.inputWrites.map((w) => ({ scope: w.scope, scope_id: w.scope_id, fields: Object.keys(w.set).sort() }))
+            : a.inputWrites.map((w) => ({ scope: w.scope, scope_id: w.scope_id, set: w.set })),
           rule_writes: a.ruleWrites.map((w) => ({ kind: w.kind, scope: w.scope, scope_id: w.scope_id, next: w.next })),
           blocked: blocked.map((b) => [b.combo_key, b.channel]),
           accept_blocked: a.acceptBlocked === true,
@@ -380,6 +401,7 @@ export async function evaluateV2Write(a: V2EvaluationInput): Promise<V2Evaluatio
     large_change: rows.some((r) => r.large),
     drop_flag: rows.some((r) => r.drop_flag),
     needs_write: needsWrite,
+    drafts,
     blocked,
     stale,
     missing: complete ? [] : groupMissing(units, result, extra),

@@ -12,8 +12,8 @@
  * the per-SKU «سعر خاص $» and «خصم $» — an SKU's own price and discount.
  */
 import { useState, type ReactNode } from 'react';
-import { channelsOf, iqdText, modelBlocks, nameIn, usdText, type PriceDraft, type SkuLine, type V2Channel, type V2Names, type V2TableRow } from './v2Model';
-import { channelName, UsdInput, useV2Lang, useV2Strings } from './v2Ui';
+import { channelsOf, inheritedSkuDiscount, iqdText, modelBlocks, nameIn, usdText, type PriceDraft, type SkuLine, type V2Channel, type V2Names, type V2TableRow } from './v2Model';
+import { channelName, UsdInput, useV2Lang, useV2Strings, V2Field } from './v2Ui';
 import type { V2Strings } from './v2Strings';
 
 function sourceText(line: SkuLine, s: V2Strings, modelName: string): string {
@@ -31,6 +31,16 @@ function sourceText(line: SkuLine, s: V2Strings, modelName: string): string {
     default:
       return s.sourceProduct;
   }
+}
+
+/**
+ * The dollar price an SKU follows (its model's, else the product's) — the server's direct price while the SKU
+ * has no special price of its own; null once it has one (the field then shows its own value).
+ */
+export function inheritedUsd(line: SkuLine, ownFixed: string): string | null {
+  if (ownFixed) return null;
+  const r = line.channels.direct_sale;
+  return r?.editor_usd_price ?? r?.owner?.v2_usd_ceil6 ?? null;
 }
 
 function cell(row: V2TableRow | undefined, s: V2Strings, owner: boolean): string {
@@ -71,7 +81,7 @@ export default function FinalPricesTable({
       else next.add(key);
       return next;
     });
-  const head = (ch: V2Channel) => (ch === 'direct_sale' ? s.direct : s.preorderVia(channelName(ch, lang)));
+  const head = (ch: V2Channel) => (ch === 'direct_sale' ? s.direct : channelName(ch, lang));
   const lineName = (l: SkuLine, block: { names: V2Names }) => nameIn(l.names, lang) || nameIn(block.names, lang) || '—';
   const rowsOf = (b: (typeof blocks)[number]) => [b.lead, ...b.shown, ...(unfolded.has(b.model_id ?? '') ? b.folded : [])];
   const skuSet = (combo: string, patch: Partial<{ fixed_usd: string; discount_usd: string }>) =>
@@ -82,7 +92,7 @@ export default function FinalPricesTable({
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
         <h4 className="min-w-0 truncate text-[13px] font-bold text-text-primary">{s.finalTable}</h4>
         {owner || money ? (
-          <button type="button" className="shrink-0 text-[12px] font-bold underline underline-offset-2 text-text-secondary" aria-expanded={details} onClick={() => setDetails((v) => !v)} data-v2-details>
+          <button type="button" className="inline-flex min-h-11 shrink-0 items-center px-2 text-[12px] font-bold underline underline-offset-2 text-text-secondary" aria-expanded={details} onClick={() => setDetails((v) => !v)} data-v2-details>
             {details ? s.detailsHide : s.details} {details ? '▴' : '▾'}
           </button>
         ) : null}
@@ -119,7 +129,7 @@ export default function FinalPricesTable({
                     <td className="max-w-[12rem] truncate py-1.5 ps-2 text-text-secondary">{sourceText(l, s, nameIn(b.names, lang))}</td>
                     <td className="py-1.5 text-end">
                       {l.source !== 'product' ? (
-                        <button type="button" className="text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => onJump(5)} data-v2-jump={5}>
+                        <button type="button" className="inline-flex min-h-11 items-center px-2 text-[11px] font-bold underline underline-offset-2 text-text-secondary" onClick={() => onJump(5)} data-v2-jump={5}>
                           {s.edit} ↘
                         </button>
                       ) : null}
@@ -129,7 +139,7 @@ export default function FinalPricesTable({
                 {b.folded.length && !unfolded.has(b.model_id ?? '') ? (
                   <tr className="border-t border-border-subtle">
                     <td colSpan={channels.length + 3} className="py-1.5">
-                      <button type="button" className="text-[11px] font-bold text-text-muted" onClick={() => toggleFold(b.model_id ?? '')} data-v2-fold>
+                      <button type="button" className="inline-flex min-h-11 items-center px-1 text-[11px] font-bold text-text-muted" onClick={() => toggleFold(b.model_id ?? '')} data-v2-fold>
                         ▸ {s.foldRows(String(b.folded.length))}
                       </button>
                     </td>
@@ -168,7 +178,7 @@ export default function FinalPricesTable({
               </div>
             ))}
             {b.folded.length && !unfolded.has(b.model_id ?? '') ? (
-              <button type="button" className="mt-2 text-[11px] font-bold text-text-muted" onClick={() => toggleFold(b.model_id ?? '')}>
+              <button type="button" className="mt-2 inline-flex min-h-11 items-center px-1 text-[11px] font-bold text-text-muted" onClick={() => toggleFold(b.model_id ?? '')}>
                 ▸ {s.foldRows(String(b.folded.length))}
               </button>
             ) : null}
@@ -215,11 +225,22 @@ export default function FinalPricesTable({
                       })}
                   </ul>
                   {editable ? (
+                    // Visible labels (two dollar fields must never look alike once typed) and the inherited value
+                    // beside each (§2.1 rule 2): the SKU's price now, the discount of its model or product.
                     <div className="mt-2 grid min-w-0 gap-2 [grid-template-columns:repeat(2,minmax(0,1fr))]">
                       {draft!.method === 'usd' || owner ? (
-                        <UsdInput value={sku.fixed_usd} onChange={(fixed_usd) => skuSet(l.combo_key, { fixed_usd })} label={s.skuSpecial} placeholder={s.skuSpecial} data={`sku-fixed:${l.combo_key}`} />
+                        <V2Field label={s.skuSpecial} hint={inheritedUsd(l, sku.fixed_usd) ? (l.model_id ? s.inheritedModel : s.inheritedProduct)(usdText(inheritedUsd(l, sku.fixed_usd))) : undefined}>
+                          {(fid) => <UsdInput id={fid} value={sku.fixed_usd} onChange={(fixed_usd) => skuSet(l.combo_key, { fixed_usd })} placeholder={inheritedUsd(l, sku.fixed_usd) ?? ''} data={`sku-fixed:${l.combo_key}`} />}
+                        </V2Field>
                       ) : null}
-                      <UsdInput value={sku.discount_usd} onChange={(discount_usd) => skuSet(l.combo_key, { discount_usd })} label={s.skuDiscount} placeholder={s.skuDiscount} data={`sku-discount:${l.combo_key}`} />
+                      {(() => {
+                        const inh = inheritedSkuDiscount(draft!, l.model_id);
+                        return (
+                          <V2Field label={s.skuDiscount} hint={(inh.from === 'model' ? s.inheritedModel : s.inheritedProduct)(usdText(inh.usd))}>
+                            {(fid) => <UsdInput id={fid} value={sku.discount_usd} onChange={(discount_usd) => skuSet(l.combo_key, { discount_usd })} placeholder={inh.usd} data={`sku-discount:${l.combo_key}`} />}
+                          </V2Field>
+                        );
+                      })()}
                     </div>
                   ) : null}
                 </article>

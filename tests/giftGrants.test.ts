@@ -147,7 +147,9 @@ test('a pinned grant — a level item or any store product — starts ready to r
   const stored = giftRow(raw, byProduct.id);
   assert.equal(stored.gift_option_value_ids, '["v_pei"]');
   assert.equal(stored.gift_qty, 2);
-  assert.equal(JSON.parse(stored.gift_snapshot).value_iqd, 120000, 'two units at the regular price');
+  // Two units at the V2 regular price: the fixture publishes the plate at its old prepaid price (60,000 + the
+  // 15,000 air fee, both folded into one dollar price at U = 1,500; route fees are retired in V2) = 75,000.
+  assert.equal(JSON.parse(stored.gift_snapshot).value_iqd, 150000, 'two units at the regular price');
   // The air route's lead time travels as days, so each language words it itself.
   assert.equal(byProduct.chosen.lead_time_min_days, 10);
   assert.equal(byProduct.chosen.lead_time_max_days, 14);

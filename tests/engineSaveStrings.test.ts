@@ -104,7 +104,9 @@ test('the product form (Pricing V2-4): a held save opens the ONE sheet; the conf
   assert.match(form, /e\.code === 'REAUTH_REQUIRED' && v2\.review\) \{\s*v2\.reviewError\(v2s\.reauth, true\)/);
   assert.match(form, /<ReviewSheetV2/);
   const hook = src('src/components/adminProducts/form/v2/useV2Pricing.ts');
-  assert.match(hook, /const hash = confirm\?\.hash \?\? shown\?\.review_hash \?\? null;/);
+  // The sheet's confirm carries its hash; the preview's own hash travels only when no price moves (review 2026-10-14).
+  assert.match(hook, /const hash = saveHashOf\(shown, confirm\);/);
+  assert.match(hook, /return \(shown\.changes\?\.length \?\? 0\) > 0 \? null : shown\.review_hash;/);
   assert.match(hook, /if \(confirm\?\.confirmLarge\) block\.confirm_large_change = true;/);
   // The V1 sheet and its section are gone with the old dinar fields.
   assert.doesNotMatch(form, /UsdPricingSaveSheet|UsdPricingSection/);
