@@ -138,6 +138,9 @@ function kindIcon(kind: string) {
     case 'warranty_reply':
     case 'warranty_stage':
       return ShieldCheck;
+    // A price-protection claim was decided: the same shield as the «حماية السعر» card on the order page.
+    case 'price_protection':
+      return ShieldCheck;
     // A trade-in moved (worker/lib/tradeIn.ts): the same exchange glyph as the
     // /trade-in page and its home tile.
     case 'trade_in':

@@ -150,8 +150,11 @@ export interface ClaimBasisInput {
   orderUsdIqd: string | null;
   /** P0: what the buyer paid per unit (tier-aware). */
   paidUnit: number;
-  /** Today's tier-aware price from the cart's resolver (dinars). */
-  todayApplied: number;
+  /**
+   * Today's tier-aware price from the cart's resolver (dinars), on the line's
+   * own channel; null when that channel is not sold today (nothing to compare).
+   */
+  todayApplied: number | null;
   /** The lowest manual (dinar) price recorded in the window under the product's own keys, tier-aware; null when none. */
   manualMin: number | null;
   /** The engine's `sku:` observations of the line's channel in the window. */
@@ -168,8 +171,17 @@ const minOf = (xs: readonly number[]) => Math.min(...xs);
 
 /** The claim's figures under the order's rule (see the file header). Pure. */
 export function claimBasis(a: ClaimBasisInput): ClaimBasisResult {
-  // The dinar observations: today's applied price, the manual rows, and every engine row as it was charged.
-  const dinar = [a.todayApplied, ...(a.manualMin === null ? [] : [a.manualMin]), ...a.engineHistory.map((h) => h.price_iqd)];
+  // The dinar observations: today's applied price, the manual rows, every engine row as it was charged,
+  // and today's engine price of the line's own channel (PP-B3: a pre-order line's engine price today is
+  // its route's, which the resolver's direct-sale answer never was).
+  const dinar = [
+    ...(a.todayApplied === null ? [] : [a.todayApplied]),
+    ...(a.manualMin === null ? [] : [a.manualMin]),
+    ...a.engineHistory.map((h) => h.price_iqd),
+    ...(a.engineToday ? [a.engineToday.price_iqd] : []),
+  ];
+  // Nothing observed at all (a channel closed today and no row in the window): no fall to compare.
+  if (!dinar.length) return { ok: false, code: 'NO_ELIGIBLE_DROP', observed_unit: a.paidUnit };
   const observedDinar = minOf(dinar);
   const actualDrop = Math.max(0, a.paidUnit - observedDinar);
 
@@ -189,7 +201,7 @@ export function claimBasis(a: ClaimBasisInput): ClaimBasisResult {
   }
   if (a.engineToday) {
     if (u0) restated.push(restate(a.engineToday.price_iqd, a.engineToday.usd_iqd_rate, u0));
-  } else {
+  } else if (a.todayApplied !== null) {
     restated.push(a.todayApplied);
   }
   if (a.manualMin !== null) restated.push(a.manualMin);

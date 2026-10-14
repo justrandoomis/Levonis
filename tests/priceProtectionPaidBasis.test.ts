@@ -73,16 +73,30 @@ function deliverAndLower(w: Awaited<ReturnType<typeof checkout>>, price: number)
 const claim = (w: Awaited<ReturnType<typeof checkout>>, itemId: unknown) => post(w.customer, '/api/price-protection/claims', { orderItemId: itemId });
 const approve = (w: Awaited<ReturnType<typeof checkout>>, claimId: unknown) => post(w.admin, `/api/price-protection/admin/claims/${claimId}/decide`, { decision: 'approved' });
 
-for (const member of ['line', 'unit'] as const) {
-  test(`actual ${member}-applied membership does not turn a higher price into a protected drop`, async () => {
-    const w = await checkout(member);
-    const item = deliverAndLower(w, 24000);
-    const res = await claim(w, item.id);
-    assert.equal(res.status, 400);
-    assert.equal((await json(res)).code, 'NO_ELIGIBLE_DROP');
-    assert.equal(w.raw.prepare('SELECT COUNT(*) n FROM price_protection_claims').get()!.n, 0);
-  });
-}
+test('actual line-applied membership does not turn a higher price into a protected drop', async () => {
+  const w = await checkout('line');
+  const item = deliverAndLower(w, 24000);
+  const res = await claim(w, item.id);
+  assert.equal(res.status, 400);
+  assert.equal((await json(res)).code, 'NO_ELIGIBLE_DROP');
+  assert.equal(w.raw.prepare('SELECT COUNT(*) n FROM price_protection_claims').get()!.n, 0);
+});
+
+test('a unit-applied member price is compared with today’s member price of the same class (PP-B4), never with the regular one', async () => {
+  // Paid 22,500 as a PRO member (25,000 less the 10% unit rule). The regular price falls to
+  // 24,000, so the same class pays 21,600 today: the member is owed that 900 per unit — before
+  // Services V2 S-P0a the member was compared with the regular 24,000 and refused.
+  const w = await checkout('unit');
+  const item = deliverAndLower(w, 24000);
+  const res = await json(await claim(w, item.id));
+  assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(res.claim.original_unit_iqd, 22500);
+  assert.equal(res.claim.observed_unit_iqd, 21600);
+  assert.equal(res.claim.eligible_unit_iqd, 900);
+  const paid = await json(await approve(w, res.claim.id));
+  assert.equal(paid.success, true, JSON.stringify(paid));
+  assert.equal(paid.credit.amount_iqd, 1800, '900 × the 2 units');
+});
 
 test('a real line-membership price drop records and pays only the difference from the frozen paid price', async () => {
   const w = await checkout('line');

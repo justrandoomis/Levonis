@@ -19,6 +19,7 @@ import { asLang, daysLeftLabel, formatDate } from './format';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { useMoney } from '../../CurrencyContext';
 import { StatusChip } from '../ui/Badge';
+import { priceProtectionReasonText } from '../../../packages/contracts/src/priceProtection';
 
 interface Claim {
   id: string;
@@ -31,6 +32,8 @@ interface Claim {
   /** Owner decision 6: what the claim covers per unit when part of the fall came from the exchange rate. */
   eligible_unit_iqd?: number | null;
   state: 'requested' | 'approved' | 'rejected' | 'credited' | string;
+  /** A declined claim's reason (PP-B6): the staff's choice from the list, and their note. */
+  decision_reason?: { code: string | null; note: string } | null;
   requested_at: string;
   decided_at: string | null;
   item?: { name: string; variant: string };
@@ -54,6 +57,7 @@ const STRINGS = {
     observed: 'السعر الملاحَظ',
     credited: 'المقيَّد',
     requestedAt: 'قُدِّمت في',
+    reason: 'السبب',
     covered: (n: string) => `المشمول: ${n} — والباقي من تغيّر سعر الصرف`,
   },
   en: {
@@ -71,6 +75,7 @@ const STRINGS = {
     observed: 'Observed price',
     credited: 'Credited',
     requestedAt: 'Requested',
+    reason: 'Reason',
     covered: (n: string) => `Covered: ${n} — the rest came from the exchange rate`,
   },
   ckb: {
@@ -88,6 +93,7 @@ const STRINGS = {
     observed: 'نرخی بینراو',
     credited: 'دراوە',
     requestedAt: 'داواکراوە لە',
+    reason: 'هۆکار',
     covered: (n: string) => `ئەوەی دەگرێتەوە: ${n} — ئەوی تر لە گۆڕانی نرخی ئاڵوگۆڕەوە هات`,
   },
 } as const;
@@ -188,6 +194,12 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
                   {' · '}
                   {s.requestedAt} {formatDate(c.requested_at, lang)}
                 </p>
+                {/* §12.4 (PP-B6): a declined claim says why, in the reader's language. */}
+                {c.state === 'rejected' && c.decision_reason && (
+                  <p className="mt-1 text-[11.5px] text-text-secondary leading-relaxed" data-pp-reason>
+                    {s.reason}: {priceProtectionReasonText(c.decision_reason.code, c.decision_reason.note, asLang(lang))}
+                  </p>
+                )}
                 {/* Owner decision 6 (policy v5 §11.8): a part of the fall that was only the exchange rate is not covered. */}
                 {typeof c.eligible_unit_iqd === 'number' && c.eligible_unit_iqd < c.original_unit_iqd - c.observed_unit_iqd && (
                   <p className="mt-1 text-[11.5px] text-amber-300/90 tabular-nums" data-pp-covered>

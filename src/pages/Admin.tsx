@@ -115,6 +115,12 @@ const AdminFarmConfig = React.lazy(() => import('../components/adminFarm/AdminFa
  * this page needs.
  */
 const AdminTradeIn = React.lazy(() => import('../components/adminTradeIn/AdminTradeIn'));
+/**
+ * «حماية السعر» — the queue of price-protection claims with each claim's price
+ * evidence, approve and decline (Services V2 S-P0a). Until now a claim could
+ * only be decided through the raw API.
+ */
+const AdminPriceProtection = React.lazy(() => import('../components/adminPriceProtection/AdminPriceProtection'));
 // «الأمان» (DECISIONS row 206): decoys, blocks and the security log — the verified owner's alone.
 const AdminSecurity = React.lazy(() => import('../components/adminSecurity/AdminSecurity'));
 
@@ -139,6 +145,7 @@ type AdminTab =
   | 'inventory'
   | 'orders'
   | 'trade_in'
+  | 'price_protection'
   | 'products'
   | 'pricing'
   | 'bundles'
@@ -178,7 +185,7 @@ type AdminTab =
  * `?tab=products&edit=<id>` opens one product's editor — the link from
  * «صيغ الأرقام التسلسلية» (owner decision 2) to a product with no brand.
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'security'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'security'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -255,6 +262,8 @@ export default function Admin() {
     // is the owner's to write by hand; a Kurdish-reading admin gets the Arabic.
     // OWNER: Sorani to be written by hand.
     { id: 'trade_in', icon: Repeat, label: loc('الاستبدال (Trade-in)', 'Trade-in'), ...section('operations', 'التشغيل', 'Operations') },
+    // «حماية السعر» beside the trade-in desk: a service claim the desk decides with evidence.
+    { id: 'price_protection', icon: ShieldCheck, label: loc('حماية السعر', 'Price protection', 'پاراستنی نرخ'), ...section('operations', 'التشغيل', 'Operations') },
     ...(canSeeFinance || ownerMustVerify
       ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
       : []),
@@ -328,7 +337,7 @@ export default function Admin() {
       onTabChange={(id) => setActiveTab(id as AdminTab)}
     >
       <Toaster />
-      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'pricing' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' ? '' : 'bg-surface border border-border-subtle rounded-2xl p-4 md:p-5'}`}>
+      <div className={`max-w-[1280px] mx-auto text-white ${activeTab === 'products' || activeTab === 'pricing' || activeTab === 'overview' || activeTab === 'finance' || activeTab === 'inventory' || activeTab === 'taxonomy' || activeTab === 'warranties' || activeTab === 'serials' || activeTab === 'membership_benefits' || activeTab === 'trade_in' || activeTab === 'price_protection' ? '' : 'bg-surface border border-border-subtle rounded-2xl p-4 md:p-5'}`}>
         <React.Suspense fallback={<PanelFallback dir={dir} />}>
 
         {activeTab === 'overview' && (
@@ -340,6 +349,7 @@ export default function Admin() {
         )}
 
         {activeTab === 'trade_in' && <AdminTradeIn />}
+        {activeTab === 'price_protection' && <AdminPriceProtection />}
 
         {activeTab === 'finance' && canSeeFinance && (
           <AdminFinance />

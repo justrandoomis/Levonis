@@ -110,7 +110,12 @@ const history = (raw: DatabaseSync, field: 'regular' | 'pro', newIqd: number, ms
     .run(field, newIqd, iso(msAgo));
 const setPrice = (raw: DatabaseSync, regular: number, pro: number | null = 90_000) =>
   raw.prepare("UPDATE products SET price_iqd = ?, pro_price_iqd = ? WHERE id = 'p1'").run(regular, pro);
-const snapshot = (c: Record<string, unknown>) => c.policy as Record<string, unknown>;
+/**
+ * The claim's comparison snapshot is staff material (PP-B7): the customer's
+ * answer no longer carries it, so these pins read the stored row.
+ */
+const snapshot = (raw: DatabaseSync, c: Record<string, unknown>) =>
+  JSON.parse(String(row<{ p: string }>(raw, 'SELECT policy_snapshot AS p FROM price_protection_claims WHERE id = ?', c.id)!.p)) as Record<string, unknown>;
 
 test('10.4 — a drop: the paid unit price against today’s price, times the quantity, in dinars', async () => {
   const raw = world({ buyer: [{ id: 'oi_1', product: 'p1', qty: 2, paid: 100_000 }] });
@@ -125,7 +130,8 @@ test('10.4 — a drop: the paid unit price against today’s price, times the qu
   assert.equal(res.claim.original_unit_iqd, 100_000);
   assert.equal(res.claim.observed_unit_iqd, 92_000);
   assert.equal(res.claim.qty, 2);
-  const policy = snapshot(res.claim);
+  assert.equal('policy' in res.claim, false, 'the customer reads no comparison snapshot (PP-B7)');
+  const policy = snapshot(raw, res.claim);
   assert.equal(policy.basis, 'min(current_applied, price_history window minimum)', 'the rule 10.4 states, by name');
   assert.equal(policy.buyer_class, 'regular');
   assert.equal(policy.eligible_total_iqd, 16_000, '(100,000 − 92,000) × 2');
@@ -144,9 +150,9 @@ test('10.6 — a fall raised back within the window still counts; one before del
   const res = await claim(raw, buyer, 'oi_1');
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.observed_unit_iqd, 85_000);
-  assert.equal(snapshot(res.claim).history_min_iqd, 85_000);
-  assert.equal(snapshot(res.claim).current_applied_iqd, 100_000);
-  assert.equal(snapshot(res.claim).computed_eligible_iqd, 15_000);
+  assert.equal(snapshot(raw, res.claim).history_min_iqd, 85_000);
+  assert.equal(snapshot(raw, res.claim).current_applied_iqd, 100_000);
+  assert.equal(snapshot(raw, res.claim).computed_eligible_iqd, 15_000);
 });
 
 test('10.5 — a regular buyer is never compared with a PRO price; a PRO buyer is compared with the PRO price or the regular one', async () => {
@@ -163,7 +169,7 @@ test('10.5 — a regular buyer is never compared with a PRO price; a PRO buyer i
   // The PRO buyer is measured against the PRO price…
   const pro = await claim(raw, proBuyer, 'oi_p');
   assert.equal(pro.success, true, JSON.stringify(pro));
-  assert.equal(snapshot(pro.claim).buyer_class, 'pro');
+  assert.equal(snapshot(raw, pro.claim).buyer_class, 'pro');
   assert.equal(pro.claim.original_unit_iqd, 90_000);
   assert.equal(pro.claim.observed_unit_iqd, 80_000);
 
@@ -195,7 +201,7 @@ test('bundles — the parent is refused by name; a part is measured from its pai
   assert.equal(res.success, true, JSON.stringify(res));
   assert.equal(res.claim.original_unit_iqd, 80_000, 'the paid share');
   assert.equal(res.claim.observed_unit_iqd, 70_000);
-  assert.equal(snapshot(res.claim).component_value_iqd, 100_000, 'the catalogue value is provenance only');
+  assert.equal(snapshot(raw, res.claim).component_value_iqd, 100_000, 'the catalogue value is provenance only');
 });
 
 test('10.8 and 10.9 — one open claim at a time, and earlier credits are deducted up to the whole difference', async () => {
@@ -214,9 +220,9 @@ test('10.8 and 10.9 — one open claim at a time, and earlier credits are deduct
   setPrice(raw, 85_000);
   const second = await claim(raw, buyer, 'oi_1');
   assert.equal(second.success, true, JSON.stringify(second));
-  assert.equal(snapshot(second.claim).eligible_total_iqd, 15_000);
-  assert.equal(snapshot(second.claim).prior_credited_iqd, 10_000);
-  assert.equal(snapshot(second.claim).computed_eligible_iqd, 5_000);
+  assert.equal(snapshot(raw, second.claim).eligible_total_iqd, 15_000);
+  assert.equal(snapshot(raw, second.claim).prior_credited_iqd, 10_000);
+  assert.equal(snapshot(raw, second.claim).computed_eligible_iqd, 5_000);
   const approved2 = await decide(raw, second.claim.id);
   assert.equal(approved2.claim.credited_iqd, 5_000);
 

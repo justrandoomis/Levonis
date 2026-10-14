@@ -25,29 +25,34 @@
  *
  * Price protection — price_protection_claims + price_history (0003):
  *  - Claim on MY delivered order item within 7 days of delivered_at.
- *  - The drop is computed SERVER-SIDE for the same product/option/color and
- *    the price class the buyer actually had (pricing_snapshot.applied_tier):
- *    a regular buyer is never compared against a PRO-only price.
+ *  - The drop is computed SERVER-SIDE for the same product/option/color, the
+ *    channel the line was priced on and the price class the buyer actually
+ *    had (pricing_snapshot.applied_tier), from the price rows of the rung
+ *    that prices the line (worker/lib/protectionClaims.ts; Services V2
+ *    PP-B2/B3/B4): a regular buyer is never compared against a member price,
+ *    a member is compared with their own class's price, a pre-order with its
+ *    own route, and a model with its own price never with the base price.
  *  - Cumulative cap: total credits for one item can never exceed the eligible
  *    difference; repeated drops/claims deduct prior credits.
- *  - NO automatic payout: an admin approves/rejects with a reason; approval
- *    credits the wallet idempotently (wtx_pp_<claimId>). The compensation
- *    channel (wallet) is flagged as a configurable default (row 22).
+ *  - NO automatic payout: a financial-scope admin approves or declines (with
+ *    a reason the customer reads); approval credits the Levo wallet
+ *    idempotently (wtx_pp_<claimId>; the wallet is the owner's choice, row
+ *    223). The customer's bell row is written in the decision's own batch.
  */
 
 import { applyReturnSerials, returnedUnits, serialAssignmentsInstalled } from '../lib/serialAssignments';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
-import { requireAuth, requireAdmin, badRequest, conflict, notFound, int, str, oneOf } from '../lib/http';
+import { requireAuth, requireAdmin, badRequest, conflict, notFound, int, str, oneOf, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit, auditStatements } from '../lib/audit';
 import { emitFromRequest, eventsEnabled } from '../lib/eventBus';
 import { RefundCompletedV1 } from '@levonis/contracts/events/v1/RefundCompleted';
 import { rateLimit } from '../lib/ratelimit';
-import { getSettings } from '../lib/settings';
 import { parseProductRow } from '../lib/productModel';
-import { resolveUnitPrice, proPolicyFrom } from '../lib/pricing';
+import { resolveUnitPrice } from '../lib/pricing';
 import { applyRelations, loadRelationsView } from '../lib/productOverlay';
 import { reversePointsForOrder, unitMerchandiseIqd } from '../lib/pointsOps';
 import { walletCreditStatement } from '../lib/wallet';
@@ -73,9 +78,27 @@ import { CONDITION_DOC_DEFAULT_SQL, isConditionColumnMissing } from '../lib/cond
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { PRICE_PROTECTION_OWNER_LINE_IQD } from '../../packages/contracts/src/moneyAuthority';
 import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
-import { isOwner } from '../lib/adminScope';
+import { canMoveMoney, isOwner } from '../lib/adminScope';
+import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { closedClaimSql } from '../lib/deviceOps';
 import { returnWinsStatements, tradedUnitsSql, tradeInInstalled, tradeInsOnLine } from '../lib/tradeIn';
+import { loadPricingContext, memberFallbackFor } from './cart';
+import {
+  CHANNEL_CLOSED_ERRORS,
+  buyerClassOf,
+  claimForCustomer,
+  claimForStaff,
+  creditedNotice,
+  historyFieldsOf,
+  historyKeysOf,
+  itemLabel,
+  lineChannelOf,
+  rejectedNotice,
+  tierOfClass,
+} from '../lib/protectionClaims';
+import { PRICE_PROTECTION_NOTICES, PRICE_PROTECTION_REASON_CODES } from '../../packages/contracts/src/priceProtection';
+import { notifyCustomer } from '../lib/customerNotify';
+import type { EmailLang } from '../lib/emailTemplates';
 
 const WINDOW_MS = 7 * 86_400_000;
 
@@ -1179,26 +1202,6 @@ interface ClaimRow extends Record<string, unknown> {
   eligible_unit_iqd?: number | null;
 }
 
-function claimPublic(r: ClaimRow, extra: Record<string, unknown> = {}) {
-  return {
-    id: r.id,
-    order_id: r.order_id,
-    order_item_id: r.order_item_id,
-    original_unit_iqd: r.original_unit_iqd,
-    observed_unit_iqd: r.observed_unit_iqd,
-    qty: r.qty,
-    credited_iqd: r.credited_iqd,
-    state: r.state,
-    policy: safeParse(r.policy_snapshot, {}),
-    // Owner decision 6: the dinars a claim covers per unit when part of the fall came from the exchange
-    // rate (the customer's «المشمول» line); never a USD figure, a rate or a supplier value.
-    eligible_unit_iqd: r.eligible_unit_iqd ?? null,
-    requested_at: r.requested_at,
-    decided_at: r.decided_at,
-    ...extra,
-  };
-}
-
 /** Migration 0181's claim columns (owner decision 6), detected once per isolate; only "present" is remembered. */
 let claimColumnsPresent = false;
 async function claimBasisColumns(db: D1Database): Promise<boolean> {
@@ -1347,12 +1350,16 @@ priceProtectionRoutes.post('/claims', async (c) => {
   if (coveredQty <= 0) throw badRequest('This device is part of a trade-in, so price protection does not cover it.', 'TRADE_IN_UNIT');
 
   // The price CLASS the buyer actually had, from the checkout snapshot — a
-  // regular buyer is never compared against a PRO-only price.
-  const pricing = safeParse<{ applied_tier?: string; applied_iqd?: number } | null>(
-    item.pricing_snapshot as string | null,
-    null
-  );
-  const buyerClass: 'pro' | 'regular' = pricing?.applied_tier === 'pro' ? 'pro' : 'regular';
+  // regular buyer is never compared against a member price, and a PRIME or
+  // PRO buyer is compared with today's price of their own class (PP-B4).
+  const pricing = safeParse<{
+    applied_tier?: string;
+    applied_iqd?: number;
+    pricing_basis?: string;
+    price_source?: string;
+    fulfillment?: { type?: string } | null;
+  } | null>(item.pricing_snapshot as string | null, null);
+  const buyerClass = buyerClassOf(pricing);
   // A BUNDLE COMPONENT'S ORIGINAL UNIT PRICE IS ITS SHARE OF WHAT WAS PAID.
   //
   // §6.2 pins a component's `pricing_snapshot.applied_iqd` to 0 — the money is
@@ -1395,7 +1402,6 @@ priceProtectionRoutes.post('/claims', async (c) => {
     .first<Record<string, unknown>>();
   if (!productRow) throw badRequest('The product is no longer available for comparison', 'PRODUCT_MISSING');
 
-  const settings = await getSettings(c.env.DB, ['proPricingPolicy']);
   // THE COMPARISON PRICE IS THE ONE A BUYER WOULD PAY TODAY, so the product is
   // read the way the cart reads it: the relational option/colour rows win over
   // the JSON mirrors on `products`. This claim decides a real credit — reading
@@ -1406,42 +1412,60 @@ priceProtectionRoutes.post('/claims', async (c) => {
   // The line's whole selection (0018), so a per-SKU engine price (0183) is the one compared.
   const storedValueIds = safeParse<unknown[]>(String(item.option_value_ids ?? '[]'), []).filter((x): x is string => typeof x === 'string' && x !== '');
   const optionValueIds = storedValueIds.length ? storedValueIds : optionId ? [optionId] : [];
+  const transportSnap = safeParse<{ method?: unknown; waived_by?: unknown } | null>(item.transport_snapshot as string | null, null);
+  // LIKE WITH LIKE (worker/lib/protectionClaims.ts): the line's own channel
+  // (PP-B3) and the buyer's own class through the cart's membership rules
+  // (PP-B4), so «today's price» is what this buyer would be charged for this
+  // line today — never another channel's, never another class's.
+  const channel = lineChannelOf(pricing, transportSnap);
+  const ctx = await loadPricingContext(
+    c.env.DB,
+    buyerClass === 'regular' ? null : { tier: tierOfClass(buyerClass), active: true, expires_at: null, pending_launch: null, gated_benefits: [] }
+  );
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: optionId || null,
     optionValueIds,
     colorId: colorId || null,
-    transportMethod: null,
+    transportMethod: channel.transportMethod,
+    fulfillmentType: channel.fulfillmentType,
+    preorderPricing: channel.preorderPricing,
     warrantyPlanId: null,
-    tier: buyerClass === 'pro' ? 'pro' : 'free',
-    tierActive: buyerClass === 'pro',
-    proPolicy: proPolicyFrom(settings.proPricingPolicy),
+    tier: tierOfClass(buyerClass),
+    tierActive: buyerClass !== 'regular',
+    proPolicy: ctx.proPolicy,
+    memberFallback: memberFallbackFor(ctx, doc),
+    transportDefaults: ctx.transportDefaults,
   });
-  if (resolved.errors.some((e) => e !== 'TRANSPORT_REQUIRED')) {
+  // A channel the shop no longer sells has no price today; the window's history still counts.
+  const channelClosed = resolved.errors.some((e) => CHANNEL_CLOSED_ERRORS.has(e));
+  if (resolved.errors.some((e) => e !== 'TRANSPORT_REQUIRED' && !CHANNEL_CLOSED_ERRORS.has(e))) {
     throw badRequest(
       'The purchased variant no longer resolves on the current product — please contact support',
       'VARIANT_UNRESOLVED'
     );
   }
-  const currentApplied = resolved.applied_iqd;
+  const currentApplied = channelClosed ? null : resolved.applied_iqd;
 
   // Lowest price WITHIN the window from the persisted price history — a drop
-  // that has since been raised back remains inspectable (§6.8). For a PRO
-  // buyer both pro and regular price rows count; a regular buyer only regular.
-  const variantKeys = [''];
-  if (optionId) variantKeys.push(`option:${optionId}`);
-  if (colorId) variantKeys.push(`color:${colorId}`);
-  const fields = buyerClass === 'pro' ? ['pro', 'regular'] : ['regular'];
+  // that has since been raised back remains inspectable (§6.8). Only the rows
+  // of the rung that prices this line (PP-B2: a model with its own price is
+  // never compared with the base price), and only its class's fields: a
+  // member's own field and the regular one beside it, a regular buyer regular.
+  const variantKeys = historyKeysOf({ todaySource: resolved.price_source, purchaseSource: pricing?.price_source, optionId, colorId });
+  const fields = historyFieldsOf(buyerClass);
   const windowFrom = new Date(deliveredMs).toISOString();
   const windowTo = new Date(Math.min(now, deliveredMs + WINDOW_MS)).toISOString();
-  const hist = await c.env.DB.prepare(
-    `SELECT MIN(new_iqd) AS m FROM price_history
-      WHERE product_id = ? AND variant_key IN (${variantKeys.map(() => '?').join(',')})
-        AND field IN (${fields.map(() => '?').join(',')})
-        AND new_iqd IS NOT NULL AND changed_at >= ? AND changed_at <= ?`
-  )
-    .bind(item.product_id, ...variantKeys, ...fields, windowFrom, windowTo)
-    .first<{ m: number | null }>();
+  const hist = variantKeys.length
+    ? await c.env.DB.prepare(
+        `SELECT MIN(new_iqd) AS m FROM price_history
+          WHERE product_id = ? AND variant_key IN (${variantKeys.map(() => '?').join(',')})
+            AND field IN (${fields.map(() => '?').join(',')})
+            AND new_iqd IS NOT NULL AND changed_at >= ? AND changed_at <= ?`
+      )
+        .bind(item.product_id, ...variantKeys, ...fields, windowFrom, windowTo)
+        .first<{ m: number | null }>()
+    : null;
 
   /**
    * OWNER DECISION 6: AN FX-ONLY DROP IS NOT PRICE PROTECTION (policy v5
@@ -1453,7 +1477,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
    * line was bought at, so a fall that is only the exchange rate pays nothing,
    * and what is paid never exceeds the actual dinar drop.
    */
-  const transportMethod = safeParse<{ method?: unknown } | null>(item.transport_snapshot as string | null, null)?.method;
+  const transportMethod = transportSnap?.method;
   const engineSnapshot =
     item.price_basis === 'engine' && typeof item.usd_iqd_at_purchase === 'string' && Number.isSafeInteger(Number(item.engine_regular_iqd))
       ? { regular_iqd: Number(item.engine_regular_iqd), usd_iqd_at_purchase: item.usd_iqd_at_purchase, base_usd_at_purchase: (item.base_usd_at_purchase as string | null) ?? null }
@@ -1477,10 +1501,11 @@ priceProtectionRoutes.post('/claims', async (c) => {
     engine: engineSnapshot,
     orderUsdIqd: v5 && !engineSnapshot ? await usdIqdInForceAt(c.env.DB, String(item.order_created_at)) : null,
     paidUnit: originalUnit,
+    // A channel closed today quotes nothing today (the window's history still counts).
     todayApplied: currentApplied,
     manualMin: hist && hist.m !== null && Number.isInteger(hist.m) && hist.m >= 0 ? hist.m : null,
     engineHistory: observations.history,
-    engineToday: observations.today,
+    engineToday: channelClosed ? null : observations.today,
   });
   if (!decision.ok && decision.code === 'FX_ONLY_DROP') {
     throw badRequest('The dinar price fell only because the dollar exchange rate moved — price protection does not cover exchange-rate moves', 'FX_ONLY_DROP');
@@ -1514,7 +1539,14 @@ priceProtectionRoutes.post('/claims', async (c) => {
     eligible_total_iqd: eligibleTotal,
     prior_credited_iqd: prior,
     computed_eligible_iqd: computed,
-    compensation_channel: 'wallet (configurable default — owner decision pending, docs/DECISIONS.md row 22)',
+    // What was compared, for the staff's evidence view (never the customer's — PP-B7).
+    sale_channel: lineChannel ?? 'direct_sale',
+    today_closed: channelClosed,
+    today_rung: resolved.price_source,
+    history_keys: variantKeys,
+    history_fields: fields,
+    // The Levo wallet (owner decision, DECISIONS row 223: «الرصيد للمحفظة»).
+    compensation_channel: 'wallet',
   });
   // A v5 claim stores what it covers and its basis in their own columns (0181), never in the snapshot
   // the customer reads; every older claim — and every claim on a database without 0181 — is the exact
@@ -1554,7 +1586,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();
-  return c.json({ success: true, claim: claimPublic(row!) });
+  return c.json({ success: true, claim: claimForCustomer(row!) });
 });
 
 priceProtectionRoutes.get('/claims', async (c) => {
@@ -1568,31 +1600,198 @@ priceProtectionRoutes.get('/claims', async (c) => {
     .all<ClaimRow>();
   return c.json({
     success: true,
-    claims: results.map((r) => claimPublic(r, { item: { name: r.name_snapshot, variant: r.option_snapshot } })),
+    claims: results.map((r) => claimForCustomer(r, { item: { name: r.name_snapshot, variant: r.option_snapshot } })),
   });
 });
 
+const CLAIM_STATES = ['requested', 'approved', 'rejected', 'credited'] as const;
+
+/**
+ * THE QUEUE (Services V2 S-P0a, «حماية السعر» in Admin → التشغيل). Any admin
+ * reads it — an assistant answers the customer — and only the financial scope
+ * decides (below). Search by claim, order, customer name, phone or email, or
+ * product; the counts per state feed the chips.
+ */
 priceProtectionRoutes.get('/admin/claims', requireAdmin, async (c) => {
   const state = str(c.req.query('state'), 'state', { max: 20, required: false });
-  let sql = `SELECT ppc.*, oi.name_snapshot, oi.option_snapshot, u.email, u.username
+  const q = str(c.req.query('q'), 'q', { max: 80, required: false });
+  let sql = `SELECT ppc.*, oi.name_snapshot, oi.option_snapshot, u.email, u.username, u.name AS customer_name, u.phone_e164 AS customer_phone
                FROM price_protection_claims ppc
                JOIN order_items oi ON oi.id = ppc.order_item_id
                LEFT JOIN users u ON u.id = ppc.user_id`;
+  const where: string[] = [];
   const params: unknown[] = [];
-  if (state && ['requested', 'approved', 'rejected', 'credited'].includes(state)) {
-    sql += ' WHERE ppc.state = ?';
+  if (state && (CLAIM_STATES as readonly string[]).includes(state)) {
+    where.push('ppc.state = ?');
     params.push(state);
   }
+  // A bound pattern (D1 refuses a LIKE pattern over 50 bytes; Arabic is two a letter).
+  const like = likePattern(q);
+  if (like) {
+    where.push(`(ppc.id = ? OR ${sqlLikeClause(['ppc.order_id', 'u.email', 'u.phone_e164', 'u.name', 'oi.name_snapshot'])})`);
+    params.push(q, like, like, like, like, like);
+  }
+  if (where.length) sql += ` WHERE ${where.join(' AND ')}`;
   sql += ' ORDER BY ppc.requested_at DESC LIMIT 200';
-  const { results } = await c.env.DB.prepare(sql).bind(...params).all<ClaimRow>();
+  const [{ results }, counts] = await Promise.all([
+    c.env.DB.prepare(sql).bind(...params).all<ClaimRow>(),
+    c.env.DB.prepare(`SELECT state, COUNT(*) AS n FROM price_protection_claims WHERE state IN ('requested','approved','rejected','credited') GROUP BY state`).all<{ state: string; n: number }>(),
+  ]);
   return c.json({
     success: true,
+    counts: Object.fromEntries((counts.results ?? []).map((r) => [r.state, Number(r.n) || 0])),
     claims: results.map((r) =>
-      claimPublic(r, {
+      claimForStaff(r, {
         item: { name: r.name_snapshot, variant: r.option_snapshot },
         email: r.email, username: r.username, user_id: r.user_id,
+        customer_name: r.customer_name ?? null, customer_phone: r.customer_phone ?? null,
       })
     ),
+  });
+});
+
+/** What deciding this claim would credit NOW, and every reason it would be refused (the decide route's own checks). */
+interface DecisionFigures {
+  coveredQty: number;
+  tradedUnits: number;
+  paid: { unit: number; orderTotal: number };
+  perUnit: number;
+  eligibleTotal: number;
+  prior: number;
+  credit: number;
+}
+async function decisionFigures(db: D1Database, claim: ClaimRow, id: string): Promise<DecisionFigures> {
+  if (claim.state !== 'requested') throw badRequest('This claim was already decided');
+  await refuseReturnedProtection(db, claim.order_item_id, { openReturns: true });
+  // A unit that went into a trade-in since the claim was filed is no longer covered (PP-B8).
+  const lineQty = Number((await db.prepare('SELECT qty FROM order_items WHERE id = ?').bind(claim.order_item_id).first<{ qty: number }>())?.qty) || 1;
+  const tradedUnits = await tradedUnitsOnLine(db, claim.order_item_id);
+  const coveredQty = Math.min(Number(claim.qty) || 1, Math.max(0, lineQty - tradedUnits));
+  if (coveredQty <= 0) throw badRequest('This device is part of a trade-in, so price protection does not cover it.', 'TRADE_IN_UNIT');
+  // Owner decision 6: v5 claims credit their eligible USD-base reduction.
+  // Both this cumulative amount and the absence of a return are checked again
+  // in the same transaction as the decision and actual wallet credit.
+  const paid = await protectionPaidUnit(db, claim.order_id, claim.order_item_id);
+  const actualDrop = Math.max(0, Math.min(claim.original_unit_iqd, paid.unit) - claim.observed_unit_iqd);
+  const perUnit = Math.min(claim.eligible_unit_iqd ?? actualDrop, actualDrop);
+  if (perUnit <= 0) throw badRequest('No eligible price drop remains against the amount paid for this item', 'NO_ELIGIBLE_DROP');
+  const eligibleTotal = Math.max(0, perUnit * coveredQty);
+  const unresolvedPrior = await db.prepare("SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>? LIMIT 1")
+    .bind(claim.order_item_id, id).first();
+  if (unresolvedPrior) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
+  const prior = await priorCreditedIqd(db, claim.order_item_id, id);
+  const credit = Math.max(0, Math.min(eligibleTotal - prior, eligibleTotal));
+  if (credit <= 0) {
+    throw badRequest('Earlier credits already cover the eligible difference — nothing left to credit', 'ALREADY_COMPENSATED');
+  }
+  return { coveredQty, tradedUnits, paid, perUnit, eligibleTotal, prior, credit };
+}
+
+/** The claim's comparison window, as filed (every claim's snapshot carries it). */
+function claimWindow(claim: Pick<ClaimRow, 'policy_snapshot'>): { from: string; to: string } | null {
+  const w = safeParse<{ window?: { from?: unknown; to?: unknown } }>(claim.policy_snapshot, {}).window;
+  return typeof w?.from === 'string' && typeof w?.to === 'string' ? { from: w.from, to: w.to } : null;
+}
+
+/** Four eyes: a non-owner who wrote a price row of this product inside the claim's window. */
+async function approverWrotePrice(c: Context<AppContext>, claim: ClaimRow): Promise<boolean> {
+  const admin = c.get('user')!;
+  const window = claimWindow(claim);
+  if (isOwner(c.env, admin) || !window) return false;
+  return !!(await c.env.DB.prepare(
+    `SELECT 1 FROM price_history WHERE changed_by = ?
+        AND product_id = (SELECT product_id FROM order_items WHERE id = ?)
+        AND changed_at >= ? AND changed_at <= ? LIMIT 1`
+  ).bind(admin.id, claim.order_item_id, window.from, window.to).first());
+}
+
+const EVIDENCE_FIELDS = ['regular', 'prime', 'pro'] as const;
+
+/**
+ * ONE CLAIM, WITH ITS EVIDENCE (design B.4, the minimal sheet). The facts the
+ * decision rests on — what was paid per unit, the price compared, the units —
+ * the price rows of the product inside the claim's window (who wrote each, and
+ * whether it is a row this claim compares: the rung, the class), and what an
+ * approval would credit now or why it would be refused. Price fields only:
+ * never a cost row, a cost or a profit (owner decision 2), never a rate.
+ */
+priceProtectionRoutes.get('/admin/claims/:id', requireAdmin, async (c) => {
+  const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
+  const db = c.env.DB;
+  const claim = await db.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();
+  if (!claim) throw notFound('Claim not found');
+  const [line, order, customer] = await Promise.all([
+    db.prepare('SELECT product_id, name_snapshot, option_snapshot, qty, option_id, color_id FROM order_items WHERE id = ?').bind(claim.order_item_id).first<Record<string, unknown>>(),
+    db.prepare('SELECT id, status, created_at, delivered_at, shipping_type FROM orders WHERE id = ?').bind(claim.order_id).first<Record<string, unknown>>(),
+    db.prepare('SELECT id, name, email, phone_e164 FROM users WHERE id = ?').bind(claim.user_id).first<Record<string, unknown>>(),
+  ]);
+  const policy = safeParse<Record<string, unknown>>(claim.policy_snapshot, {});
+  const window = claimWindow(claim);
+  const keys = Array.isArray(policy.history_keys)
+    ? (policy.history_keys as unknown[]).filter((k): k is string => typeof k === 'string')
+    : ['', ...(line?.option_id ? [`option:${String(line.option_id)}`] : []), ...(line?.color_id ? [`color:${String(line.color_id)}`] : [])];
+  const fields = Array.isArray(policy.history_fields)
+    ? (policy.history_fields as unknown[]).filter((k): k is string => typeof k === 'string')
+    : policy.buyer_class === 'pro' ? ['pro', 'regular'] : ['regular'];
+  const history = line?.product_id && window
+    ? ((await db
+        .prepare(
+          `SELECT h.variant_key, h.field, h.old_iqd, h.new_iqd, h.changed_at, u.name AS author_name, u.email AS author_email
+             FROM price_history h LEFT JOIN users u ON u.id = h.changed_by
+            WHERE h.product_id = ? AND h.field IN ('regular','prime','pro') AND h.changed_at >= ? AND h.changed_at <= ?
+            ORDER BY h.changed_at ASC LIMIT 200`
+        )
+        .bind(line.product_id, window.from, window.to)
+        .all<Record<string, unknown>>()).results ?? [])
+    : [];
+  const evidence = history
+    .filter((h) => (EVIDENCE_FIELDS as readonly string[]).includes(String(h.field)))
+    .map((h) => {
+      const key = String(h.variant_key ?? '');
+      return {
+        at: String(h.changed_at),
+        key,
+        field: String(h.field),
+        old_iqd: h.old_iqd === null || h.old_iqd === undefined ? null : Number(h.old_iqd),
+        new_iqd: h.new_iqd === null || h.new_iqd === undefined ? null : Number(h.new_iqd),
+        author: h.author_name ? String(h.author_name) : null,
+        by_owner: isOwner(c.env, { email: String(h.author_email ?? '') }),
+        counted: (keys.includes(key) || key.startsWith('sku:')) && fields.includes(String(h.field)),
+      };
+    });
+
+  const admin = c.get('user')!;
+  const financial = canMoveMoney(c.env, admin);
+  const owner = isOwner(c.env, admin);
+  let figures: DecisionFigures | null = null;
+  let blocked: string | null = null;
+  try {
+    figures = await decisionFigures(db, claim, id);
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+    blocked = e.code ?? 'DECIDED';
+  }
+  const priceAuthor = figures ? await approverWrotePrice(c, claim) : false;
+  const aboveLine = !!figures && figures.credit > PRICE_PROTECTION_OWNER_LINE_IQD;
+  return c.json({
+    success: true,
+    claim: claimForStaff(claim),
+    item: line ? { name: line.name_snapshot, variant: line.option_snapshot, qty: Number(line.qty) || 1, product_id: line.product_id } : null,
+    order: order ?? null,
+    customer: customer ? { id: customer.id, name: customer.name, email: customer.email, phone: customer.phone_e164 ?? null } : null,
+    evidence,
+    now: figures
+      ? { paid_unit_iqd: figures.paid.unit, per_unit_iqd: figures.perUnit, units: figures.coveredQty, prior_credited_iqd: figures.prior, credit_iqd: figures.credit }
+      : null,
+    blocked,
+    // Who may approve THIS claim, for the screen; the decide route judges again.
+    approval: {
+      financial_scope: financial,
+      owner_scope: owner,
+      needs_owner: aboveLine || priceAuthor,
+      why: aboveLine ? 'above_line' : priceAuthor ? 'price_author' : null,
+    },
+    reasons: PRICE_PROTECTION_REASON_CODES,
   });
 });
 
@@ -1608,74 +1807,72 @@ priceProtectionRoutes.get('/admin/claims', requireAdmin, async (c) => {
  * (`PRICE_PROTECTION_OWNER_LINE_IQD`, computed credit); above it, or when the
  * approver wrote a price row of this product inside the claim's window (four
  * eyes), the owner approves, with a reason.
+ *
+ * THE CUSTOMER IS TOLD (PP-B6): the bell row (ar/en/ckb) is written in the
+ * decision's own batch — credited with the amount, or declined with the
+ * reason the admin chose from the list (and the note, which the customer also
+ * reads). WhatsApp, Telegram and email carry the event and where to read it.
  */
 priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMoneyAuthority('price_protection_decide'), async (c) => {
   const admin = c.get('user')!;
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const body = await c.req.json().catch(() => ({}));
   const decision = oneOf(body.decision, 'decision', ['approved', 'rejected'] as const);
-  const reason = str(body.reason, 'reason', {
-    min: decision === 'rejected' ? 3 : 0,
-    max: 1000,
-    required: decision === 'rejected',
-  });
+  const reasonCode =
+    decision === 'rejected' && body.reason_code !== undefined && body.reason_code !== null && body.reason_code !== ''
+      ? oneOf(body.reason_code, 'reason_code', PRICE_PROTECTION_REASON_CODES)
+      : null;
+  // A declined claim names its reason: a code from the list, or a note of its own («other» needs the note).
+  const noteRequired = decision === 'rejected' && (reasonCode === null || reasonCode === 'other');
+  const reason = str(body.reason, 'reason', { min: noteRequired ? 3 : 0, max: 1000, required: noteRequired });
 
   const claim = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();
   if (!claim) throw notFound('Claim not found');
   const nowIso = new Date().toISOString();
+  const db = c.env.DB;
+  const itemName = itemLabel(
+    (await db.prepare('SELECT name_snapshot FROM order_items WHERE id = ?').bind(claim.order_item_id).first<{ name_snapshot: string }>())?.name_snapshot
+  );
+  // Claims predate ops_guards. Their own state CHECK gives an old-schema-safe
+  // transactional fence: this row trips it when the claim is no longer
+  // `requested`, and no guard row survives a successful transaction.
+  const stillRequested = (extra = '', binds: unknown[] = []) =>
+    db.prepare(`INSERT INTO price_protection_claims
+      (id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
+      SELECT ?,?,?,?,0,0,1,'financial_guard' WHERE
+        NOT EXISTS(SELECT 1 FROM price_protection_claims WHERE id=? AND state='requested')${extra}`)
+      .bind(newId('pp_guard'), claim.user_id, claim.order_id, claim.order_item_id, id, ...binds);
 
   if (decision === 'rejected') {
-    const res = await c.env.DB.prepare(
-      `UPDATE price_protection_claims SET state = 'rejected', decided_by = ?, decided_at = ?,
-          policy_snapshot = json_set(policy_snapshot, '$.decision_reason', ?)
-        WHERE id = ? AND state = 'requested'`
-    )
-      .bind(admin.id, nowIso, reason, id)
-      .run();
-    if (res.meta.changes === 0) throw badRequest('This claim was already decided');
-    await audit(c.env.DB, admin.id, 'price_protection.reject', id, { reason });
+    if (claim.state !== 'requested') throw badRequest('This claim was already decided');
+    // The decline and the customer's notice land together, or neither (the fence trips on a decided claim).
+    const declineBatch = [
+      stillRequested(),
+      db.prepare(
+        `UPDATE price_protection_claims SET state = 'rejected', decided_by = ?, decided_at = ?,
+            policy_snapshot = json_set(COALESCE(policy_snapshot, '{}'), '$.decision_reason', ?, '$.decision_reason_code', ?)
+          WHERE id = ? AND state = 'requested'`
+      ).bind(admin.id, nowIso, reason, reasonCode, id),
+      rejectedNotice(db, { userId: claim.user_id, claimId: id, orderId: claim.order_id, item: itemName, reasonCode, note: reason }),
+    ];
+    try {
+      await db.batch(declineBatch);
+    } catch (e) {
+      if (/CHECK constraint failed:.*state/s.test(String(e))) throw badRequest('This claim was already decided');
+      throw e;
+    }
+    await audit(c.env.DB, admin.id, 'price_protection.reject', id, { reason, reason_code: reasonCode });
+    afterResponse(c, tellCustomerOutside(c.env, claim.user_id, id, itemName));
     const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();
-    return c.json({ success: true, claim: claimPublic(row!) });
+    return c.json({ success: true, claim: claimForStaff(row!) });
   }
 
-  if (claim.state !== 'requested') throw badRequest('This claim was already decided');
-  await refuseReturnedProtection(c.env.DB, claim.order_item_id, { openReturns: true });
-  // A unit that went into a trade-in since the claim was filed is no longer covered (PP-B8).
-  const lineQty = Number((await c.env.DB.prepare('SELECT qty FROM order_items WHERE id = ?').bind(claim.order_item_id).first<{ qty: number }>())?.qty) || 1;
-  const tradedUnits = await tradedUnitsOnLine(c.env.DB, claim.order_item_id);
-  const coveredQty = Math.min(Number(claim.qty) || 1, Math.max(0, lineQty - tradedUnits));
-  if (coveredQty <= 0) throw badRequest('This device is part of a trade-in, so price protection does not cover it.', 'TRADE_IN_UNIT');
-  // Owner decision 6: v5 claims credit their eligible USD-base reduction.
-  // Both this cumulative amount and the absence of a return are checked again
-  // in the same transaction as the decision and actual wallet credit.
-  const paid = await protectionPaidUnit(c.env.DB, claim.order_id, claim.order_item_id);
-  const actualDrop = Math.max(0, Math.min(claim.original_unit_iqd, paid.unit) - claim.observed_unit_iqd);
-  const perUnit = Math.min(claim.eligible_unit_iqd ?? actualDrop, actualDrop);
-  if (perUnit <= 0) throw badRequest('No eligible price drop remains against the amount paid for this item', 'NO_ELIGIBLE_DROP');
-  const eligibleTotal = Math.max(0, perUnit * coveredQty);
-  const unresolvedPrior = await c.env.DB.prepare("SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>? LIMIT 1")
-    .bind(claim.order_item_id, id).first();
-  if (unresolvedPrior) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
-  const prior = await priorCreditedIqd(c.env.DB, claim.order_item_id, id);
-  const credit = Math.max(0, Math.min(eligibleTotal - prior, eligibleTotal));
-  if (credit <= 0) {
-    throw badRequest('Earlier credits already cover the eligible difference — nothing left to credit', 'ALREADY_COMPENSATED');
-  }
-  // Four eyes: a non-owner who wrote a price row of this product inside the
-  // claim's window does not approve the credit that row created.
-  const window = safeParse<{ window?: { from?: unknown; to?: unknown } }>(claim.policy_snapshot, {}).window;
-  const priceAuthor = !isOwner(c.env, admin) && typeof window?.from === 'string' && typeof window?.to === 'string'
-    ? !!(await c.env.DB.prepare(
-        `SELECT 1 FROM price_history WHERE changed_by = ?
-            AND product_id = (SELECT product_id FROM order_items WHERE id = ?)
-            AND changed_at >= ? AND changed_at <= ? LIMIT 1`
-      ).bind(admin.id, claim.order_item_id, window.from, window.to).first())
-    : false;
+  const { coveredQty, tradedUnits, paid, prior, credit } = await decisionFigures(db, claim, id);
   const grant = assertMoneyAuthority(c, {
     act: 'price_protection_decide',
     amountIqd: credit,
     ceilingIqd: PRICE_PROTECTION_OWNER_LINE_IQD,
-    conflictOfInterest: priceAuthor,
+    conflictOfInterest: await approverWrotePrice(c, claim),
     reason,
   });
   const order = await c.env.DB.prepare('SELECT exchange_rate FROM orders WHERE id = ?')
@@ -1685,23 +1882,17 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
   if (!Number.isSafeInteger(credit) || !Number.isSafeInteger(cents) || cents <= 0) {
     throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
   }
-  const db = c.env.DB;
   const ledgerDinars = await walletLedgerDinarsReady(db);
-  // Claims predate ops_guards. Their own state CHECK gives an old-schema-safe
-  // transactional fence. No guard row survives a successful transaction.
-  const guard = db.prepare(`INSERT INTO price_protection_claims
-    (id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,state)
-    SELECT ?,?,?,?,0,0,1,'financial_guard' WHERE
-      NOT EXISTS(SELECT 1 FROM price_protection_claims WHERE id=? AND state='requested')
+  const guard = stillRequested(
+    `
       OR (SELECT COALESCE(SUM(credited_iqd),0) FROM price_protection_claims
         WHERE order_item_id=? AND state IN ('approved','credited') AND id<>?)<>?
       OR EXISTS(SELECT 1 FROM return_cases WHERE order_item_id=? AND ${RETURN_BLOCKS_PROTECTION_SQL})
       OR EXISTS(SELECT 1 FROM price_protection_claims WHERE order_item_id=? AND state='approved' AND id<>?)
       OR (SELECT total_iqd FROM orders WHERE id=?) IS NOT ?
-      OR ${tradedUnitsSql(await tradeInInstalled(db))}<>?`)
-    .bind(newId('pp_guard'), claim.user_id, claim.order_id, claim.order_item_id,
-      id, claim.order_item_id, id, prior, claim.order_item_id, claim.order_item_id, id, claim.order_id, paid.orderTotal,
-      claim.order_item_id, tradedUnits);
+      OR ${tradedUnitsSql(await tradeInInstalled(db))}<>?`,
+    [claim.order_item_id, id, prior, claim.order_item_id, claim.order_item_id, id, claim.order_id, paid.orderTotal, claim.order_item_id, tradedUnits]
+  );
   try {
     await db.batch([
       guard,
@@ -1712,6 +1903,8 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
         note: `Price-protection credit for claim ${id} (order ${claim.order_id})`,
         ref: claim.order_id, nowIso, amountIqd: credit, rate,
       }),
+      // The customer is told in the same batch: the credit and its notice land together, or neither.
+      creditedNotice(db, { userId: claim.user_id, claimId: id, orderId: claim.order_id, item: itemName, creditIqd: credit }),
     ]);
   } catch (e) {
     const message = String(e);
@@ -1732,17 +1925,42 @@ priceProtectionRoutes.post('/admin/claims/:id/decide', requireAdmin, requireMone
   }
 
   await audit(c.env.DB, admin.id, 'price_protection.approve', id, { credited_iqd: credit, usd_cents: cents, reason, units: coveredQty, authority: grant.audit });
+  afterResponse(c, tellCustomerOutside(c.env, claim.user_id, id, itemName));
   const row = await c.env.DB.prepare('SELECT * FROM price_protection_claims WHERE id = ?').bind(id).first<ClaimRow>();
   return c.json({
     success: true,
-    claim: claimPublic(row!),
+    claim: claimForStaff(row!),
     credit: {
       amount_iqd: credit,
       amount_usd_cents: cents,
       credited,
       wallet_tx: `wtx_pp_${id}`,
       channel: 'wallet',
-      channel_note: 'Compensation channel is a configurable default pending the owner decision (docs/DECISIONS.md row 22).',
     },
   });
 });
+
+/** Best effort after the response; the in-app row is already written in the decision batch. */
+function afterResponse(c: Context<AppContext>, work: Promise<void>): void {
+  try {
+    c.executionCtx.waitUntil(work);
+  } catch {
+    // No ExecutionContext on this path. The work is already in flight and never rejects.
+  }
+}
+
+/**
+ * WhatsApp, Telegram and email: the event and where to read it, in the
+ * customer's language — never the amount or the reason (third-party carriers;
+ * the in-app row carries both). Never throws.
+ */
+async function tellCustomerOutside(env: AppContext['Bindings'], userId: string, claimId: string, item: string): Promise<void> {
+  try {
+    const row = await env.DB.prepare('SELECT locale FROM users WHERE id = ?').bind(userId).first<{ locale: string | null }>();
+    const lang: EmailLang = row?.locale === 'en' ? 'en' : row?.locale === 'ku' || row?.locale === 'ckb' ? 'ckb' : 'ar';
+    const t = PRICE_PROTECTION_NOTICES.outbound;
+    await notifyCustomer(env, userId, `pp:${claimId}:decided`, { subject: t.subject[lang], body: t.body(item)[lang] });
+  } catch (e) {
+    console.error('price-protection outbound notice failed for', claimId, e instanceof Error ? e.message : String(e));
+  }
+}

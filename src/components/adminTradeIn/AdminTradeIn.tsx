@@ -378,7 +378,7 @@ function Detail({ id, onClose, onChanged }: { id: string; lang: string; onClose:
                         'سەرووی خەمڵاندنەکە — هۆکاری بڕیارەکەت (تایبەتە: تۆمار دەکرێت و لە ڕاپۆرتەکاندا نیشانە دەکرێت، کڕیار نایبینێت)'
                       )}
                     </span>
-                    <input className={`${T.input} w-full`} maxLength={500} value={ownerReason} onChange={(e) => setOwnerReason(e.target.value)} />
+                    <input className="lv-input w-full text-[13px]" maxLength={500} value={ownerReason} onChange={(e) => setOwnerReason(e.target.value)} />
                   </label>
                 ) : (
                   <p className="text-[12.5px] text-[var(--ap-warning)]" role="status" data-above-estimate>

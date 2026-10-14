@@ -294,6 +294,8 @@ export default {
         'POST /claims': 'open',
         'GET /claims': 'open',
         'GET /admin/claims': 'op',
+        // The queue's detail sheet: the claim, its price rows and what approving would credit — read-only.
+        'GET /admin/claims/:id': 'op',
         // Approving credits a wallet; rejecting ends the claim (owner decision 3, PP-B1). Above the
         // owner line, or for the author of the price that made the drop, the owner decides (handler).
         'POST /admin/claims/:id/decide': 'money',

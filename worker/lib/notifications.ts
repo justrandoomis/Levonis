@@ -107,6 +107,13 @@ export type NotificationKind =
    */
   | 'trade_in'
   /**
+   * «حماية السعر» — a price-protection claim was decided: credited to the
+   * wallet, or declined with its reason (Services V2 S-P0a, PP-B6). Written in
+   * the decision's own batch (worker/lib/protectionClaims.ts); the link opens
+   * the order, whose protection card shows the claim.
+   */
+  | 'price_protection'
+  /**
    * THE MERCHANT'S KINDS (docs/MERCHANT_PLATFORM.md §4.8, stream W2-E). Each
    * is written by worker/lib/merchantNotify.ts from the real event it names,
    * links to its object's workspace address (packages/contracts/src/
@@ -222,6 +229,8 @@ export interface NotificationInput {
     | 'community_comment' | 'user'
     // 0175 — a granted gift ('gift_granted').
     | 'gift'
+    // A price-protection claim ('price_protection').
+    | 'price_protection'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

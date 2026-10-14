@@ -207,6 +207,39 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'No eligible price drop was found for this item within the protection period.',
     ckb: 'هیچ داشکانێکی گونجاومان لە نرخی ئەم پارچەیەدا لە ماوەی پاراستنەکەدا نەدۆزییەوە.',
   },
+  // The claim route's other refusals (PP-B10; row 183): an Arabic or Sorani
+  // customer read the server's English for these six. NOT_DELIVERED is also a
+  // return's and a device link's answer, so its sentence fits all three.
+  NOT_DELIVERED: {
+    ar: 'هذا متاح بعد استلام الطلب.',
+    en: 'This is available once the order has been delivered.',
+    ckb: 'ئەمە دوای گەیاندنی داواکارییەکە بەردەست دەبێت.',
+  },
+  WINDOW_CLOSED: {
+    ar: 'انتهت مدة حماية السعر (7 أيام من الاستلام).',
+    en: 'The 7-day price-protection period has ended.',
+    ckb: 'ماوەی ٧ ڕۆژەی پاراستنی نرخ تەواو بوو.',
+  },
+  CLAIM_PENDING: {
+    ar: 'لديك طلب قيد التدقيق لهذه القطعة.',
+    en: 'A claim for this item is already under review.',
+    ckb: 'داواکارییەک بۆ ئەم کاڵایە لە پشکنیندایە.',
+  },
+  ALREADY_COMPENSATED: {
+    ar: 'التعويضات السابقة تغطي الفرق كاملاً.',
+    en: 'Earlier credits already cover the full difference.',
+    ckb: 'قەرەبووەکانی پێشوو هەموو جیاوازییەکەیان گرتۆتەوە.',
+  },
+  VARIANT_UNRESOLVED: {
+    ar: 'لا يمكن تسعير هذا الخيار الآن — تواصل مع الدعم.',
+    en: 'This option can no longer be priced — please contact support.',
+    ckb: 'ئەم هەڵبژاردنە ئێستا نرخی بۆ دانانرێت — پەیوەندی بە پشتگیرییەوە بکە.',
+  },
+  PRODUCT_MISSING: {
+    ar: 'هذا المنتج لم يعد متاحاً للمقارنة — تواصل مع الدعم.',
+    en: 'This product is no longer available for comparison — please contact support.',
+    ckb: 'ئەم بەرهەمە چیتر بۆ بەراورد بەردەست نییە — پەیوەندی بە پشتگیرییەوە بکە.',
+  },
 
   // ---- the mystery offer (§15.3) -----------------------------------------
   MYSTERY_NO_ELIGIBLE_STOCK: {
