@@ -1,0 +1,833 @@
+{
+ "version": 1,
+ "status": "DRAFT (P0). Machines and filaments only; parts carry none. model = the title's model token; series = the step-4 registry family of that model (a label the store pages use, sightings recorded) or, for a filament, the route's material node only when the title states it; empty when no page names one (R1, PAHT-CF, PPA-CF, PVA); family = the Levonis product_family code (internal, from the type).",
+ "reviewed_by": "p0-agent (draft)",
+ "reviewed_at": "2026-10-15",
+ "entries": {
+  "ams-multicolor-printing": {
+   "model": "AMS",
+   "series": "AMS Series",
+   "family": "bambu_lab_ams",
+   "evidence": {
+    "route": "552709755391528960>552709755685130240>552709755718684672",
+    "title": "Bambu Lab AMS - Automatic Material System",
+    "model_from": "title",
+    "series_from": "registry/models.ts ams_family \"AMS Series\" (form \"All AMS Series\"); its reviewed members in compat-targets.json are the four AMS units",
+    "series_label_on_store_pages": {
+     "label": "All AMS Series",
+     "sightings": 32,
+     "products": 30
+    }
+   }
+  },
+  "support-for-pa-pet": {
+   "model": "Support for PA/PET",
+   "series": "Support",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757392211968>552709757547401216",
+    "title": "Support for PA/PET",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pc-filament": {
+   "model": "PC",
+   "series": "PC",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756834369536>552709756867923968",
+    "title": "PC",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "abs-filament": {
+   "model": "ABS",
+   "series": "ABS",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756595294208>552709756628848640",
+    "title": "ABS",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-basic-filament": {
+   "model": "PLA Basic",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709755890651136",
+    "title": "PLA Basic",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-matte": {
+   "model": "PLA Matte",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709755924205568",
+    "title": "PLA Matte",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-sparkle": {
+   "model": "PLA Sparkle",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756133920768",
+    "title": "PLA Sparkle",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-metal": {
+   "model": "PLA Metal",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756096172032",
+    "title": "PLA Metal",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-marble": {
+   "model": "PLA Marble",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756167475200",
+    "title": "PLA Marble",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-cf": {
+   "model": "PLA-CF",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756364607488",
+    "title": "PLA-CF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "paht-cf": {
+   "model": "PAHT-CF",
+   "series": "",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757065056256>552709757157330944",
+    "title": "PAHT-CF",
+    "model_from": "title",
+    "series_from": "none: the route L2 material (PA) is not stated in the title"
+   }
+  },
+  "petg-cf": {
+   "model": "PETG-CF",
+   "series": "PETG",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756440104960>552709756561739776",
+    "title": "PETG-CF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pet-cf": {
+   "model": "PET-CF",
+   "series": "PET",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757257994240>552709757287354368",
+    "title": "PET-CF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "p1s": {
+   "model": "P1S",
+   "series": "P1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755467026432>552709755534135296",
+    "title": "Bambu Lab P1S 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "P1 Series",
+     "sightings": 147,
+     "products": 84
+    }
+   }
+  },
+  "pla-basic-gradient": {
+   "model": "PLA Basic Gradient",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709755957760000",
+    "title": "PLA Basic Gradient",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "asa-filament": {
+   "model": "ASA",
+   "series": "ASA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756700151808>552709756742094848",
+    "title": "ASA",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-aero": {
+   "model": "PLA Aero",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756263944192",
+    "title": "PLA Aero",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pa6-cf": {
+   "model": "PA6-CF",
+   "series": "PA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757065056256>552709757094416384",
+    "title": "PA6-CF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "a1-mini": {
+   "model": "A1 mini",
+   "series": "A1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755571884032>552709755613827072",
+    "title": "Bambu Lab A1 mini 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "A1 Series",
+     "sightings": 43,
+     "products": 29
+    }
+   }
+  },
+  "tpu-95a-hf": {
+   "model": "TPU 95A HF",
+   "series": "TPU",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756939227136>552709756997947392",
+    "title": "TPU 95A HF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "ams-lite": {
+   "model": "AMS lite",
+   "series": "AMS Series",
+   "family": "bambu_lab_ams",
+   "evidence": {
+    "route": "552709755391528960>552709755685130240>552709755756433408",
+    "title": "Bambu Lab AMS lite - Automatic Material System",
+    "model_from": "title",
+    "series_from": "registry/models.ts ams_family \"AMS Series\" (form \"All AMS Series\"); its reviewed members in compat-targets.json are the four AMS units",
+    "series_label_on_store_pages": {
+     "label": "All AMS Series",
+     "sightings": 32,
+     "products": 30
+    }
+   }
+  },
+  "pla-glow": {
+   "model": "PLA Glow",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756201029632",
+    "title": "PLA Glow",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "a1": {
+   "model": "A1",
+   "series": "A1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755571884032>552709755651575808",
+    "title": "Bambu Lab A1 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "A1 Series",
+     "sightings": 43,
+     "products": 29
+    }
+   }
+  },
+  "pla-silk-multi-color": {
+   "model": "PLA Silk Multi-Color",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756062617600",
+    "title": "PLA Silk Multi-Color",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "petg-translucent": {
+   "model": "PETG Translucent",
+   "series": "PETG",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756440104960>552709756532379648",
+    "title": "PETG Translucent",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-galaxy": {
+   "model": "PLA Galaxy",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756234584064",
+    "title": "PLA Galaxy",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pva": {
+   "model": "PVA",
+   "series": "",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757392211968>552709757518041088",
+    "title": "PVA",
+    "model_from": "title",
+    "series_from": "none: the route L2 material (Support) is not stated in the title"
+   }
+  },
+  "pa6-gf": {
+   "model": "PA6-GF",
+   "series": "PA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757065056256>552709757127970816",
+    "title": "PA6-GF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "asa-aero": {
+   "model": "ASA Aero",
+   "series": "ASA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756700151808>552709756805009408",
+    "title": "ASA Aero",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "abs-gf": {
+   "model": "ABS-GF",
+   "series": "ABS",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756595294208>552709756662403072",
+    "title": "ABS-GF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "support-for-pla-petg": {
+   "model": "Support for PLA/PETG",
+   "series": "Support",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757392211968>552709757455126528",
+    "title": "Support for PLA/PETG",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "support-for-abs": {
+   "model": "Support for ABS",
+   "series": "Support",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757392211968>552709757484486656",
+    "title": "Support for ABS",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "petg-hf": {
+   "model": "PETG HF",
+   "series": "PETG",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756440104960>552709756469465088",
+    "title": "PETG HF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "ppa-cf": {
+   "model": "PPA-CF",
+   "series": "",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757065056256>552709757224439808",
+    "title": "PPA-CF",
+    "model_from": "title",
+    "series_from": "none: the route L2 material (PA) is not stated in the title"
+   }
+  },
+  "pps-cf": {
+   "model": "PPS-CF",
+   "series": "PPS",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757316714496>552709757350268928",
+    "title": "PPS-CF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "asa-cf": {
+   "model": "ASA-CF",
+   "series": "ASA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756700151808>552709756775649280",
+    "title": "ASA-CF",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "tpu-for-ams": {
+   "model": "TPU for AMS",
+   "series": "TPU",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756939227136>552709757027307520",
+    "title": "TPU for AMS",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-wood": {
+   "model": "PLA Wood",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709756406550528",
+    "title": "PLA Wood",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-silk-upgrade": {
+   "model": "PLA Silk+",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>552709755991314432",
+    "title": "PLA Silk+",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pc-fr": {
+   "model": "PC FR",
+   "series": "PC",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756834369536>552709756901478400",
+    "title": "PC FR",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "tpu-85a-tpu-90a": {
+   "model": "TPU 85A / TPU 90A",
+   "series": "TPU",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756939227136>575822806323367936",
+    "title": "TPU 85A / TPU 90A",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "support-for-pla-new": {
+   "model": "Support for PLA (New Version)",
+   "series": "Support",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709757392211968>552709757425766400",
+    "title": "Support for PLA (New Version)",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "ams-2-pro": {
+   "model": "AMS 2 Pro",
+   "series": "AMS Series",
+   "family": "bambu_lab_ams",
+   "evidence": {
+    "route": "552709755391528960>552709755685130240>580875380323446784",
+    "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+    "model_from": "title",
+    "series_from": "registry/models.ts ams_family \"AMS Series\" (form \"All AMS Series\"); its reviewed members in compat-targets.json are the four AMS units",
+    "series_label_on_store_pages": {
+     "label": "All AMS Series",
+     "sightings": 32,
+     "products": 30
+    }
+   }
+  },
+  "ams-ht": {
+   "model": "AMS HT",
+   "series": "AMS Series",
+   "family": "bambu_lab_ams",
+   "evidence": {
+    "route": "552709755391528960>552709755685130240>580875408605990912",
+    "title": "Bambu Lab AMS HT - Automatic Material System",
+    "model_from": "title",
+    "series_from": "registry/models.ts ams_family \"AMS Series\" (form \"All AMS Series\"); its reviewed members in compat-targets.json are the four AMS units",
+    "series_label_on_store_pages": {
+     "label": "All AMS Series",
+     "sightings": 32,
+     "products": 30
+    }
+   }
+  },
+  "h2d": {
+   "model": "H2D",
+   "series": "H2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>666870992645718016>580901793339363328",
+    "title": "Bambu Lab H2D",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "H2 Series",
+     "sightings": 120,
+     "products": 72
+    }
+   }
+  },
+  "pla-translucent": {
+   "model": "PLA Translucent",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>594000098526253056",
+    "title": "PLA Translucent",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "pla-tough-upgrade": {
+   "model": "PLA Tough+",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>624480362170421248",
+    "title": "PLA Tough+",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "h2d-pro": {
+   "model": "H2D Pro",
+   "series": "H2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>666870992645718016>580901793339363328",
+    "title": "Bambu Lab H2D Pro",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "H2 Series",
+     "sightings": 120,
+     "products": 72
+    }
+   }
+  },
+  "h2s": {
+   "model": "H2S",
+   "series": "H2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>666870992645718016>636692373158055936",
+    "title": "Bambu Lab H2S",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "H2 Series",
+     "sightings": 120,
+     "products": 72
+    }
+   }
+  },
+  "p2s": {
+   "model": "P2S",
+   "series": "P2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755467026432>654452894413656064",
+    "title": "Bambu Lab P2S",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "P2 Series",
+     "sightings": 59,
+     "products": 59
+    }
+   }
+  },
+  "h2c": {
+   "model": "H2C",
+   "series": "H2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>666870992645718016>666871141714259968",
+    "title": "Bambu Lab H2C",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "H2 Series",
+     "sightings": 120,
+     "products": 72
+    }
+   }
+  },
+  "petg-basic": {
+   "model": "PETG Basic",
+   "series": "PETG",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756440104960>552709756498825216",
+    "title": "PETG Basic",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "x2d": {
+   "model": "X2D",
+   "series": "X2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755429277696>720070020209332224",
+    "title": "Bambu Lab X2D",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "X2 Series",
+     "sightings": 5,
+     "products": 5
+    }
+   }
+  },
+  "a2l": {
+   "model": "A2L",
+   "series": "A2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755571884032>737833044333592576",
+    "title": "Bambu Lab A2L",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "A2 Series",
+     "sightings": 5,
+     "products": 5
+    }
+   }
+  },
+  "pla-pure": {
+   "model": "PLA Pure",
+   "series": "PLA",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709755857096704>738877045925638144",
+    "title": "PLA Pure",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "refurbished-p1s": {
+   "model": "P1S",
+   "series": "P1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755467026432>552709755534135296",
+    "title": "[Refurbished] Bambu Lab P1S 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "P1 Series",
+     "sightings": 147,
+     "products": 84
+    }
+   }
+  },
+  "refurbished-a1": {
+   "model": "A1",
+   "series": "A1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755571884032>552709755651575808",
+    "title": "[Refurbished] Bambu Lab A1 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "A1 Series",
+     "sightings": 43,
+     "products": 29
+    }
+   }
+  },
+  "refurbished-x1c": {
+   "model": "X1C",
+   "series": "X1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755429277696",
+    "title": "[Refurbished] Bambu Lab X1C 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "X1 Series",
+     "sightings": 139,
+     "products": 77
+    }
+   }
+  },
+  "petg-matte": {
+   "model": "PETG Matte",
+   "series": "PETG",
+   "family": "bambu_filament",
+   "evidence": {
+    "route": "552709755819347968>552709756440104960>773742122711953408",
+    "title": "PETG Matte",
+    "model_from": "title",
+    "series_from": "route L2 material node, stated in the title"
+   }
+  },
+  "refurbished-bambu-lab-h2d-3d-printer": {
+   "model": "H2D",
+   "series": "H2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>666870992645718016>580901793339363328",
+    "title": "[Refurbished] Bambu Lab H2D 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "H2 Series",
+     "sightings": 120,
+     "products": 72
+    }
+   }
+  },
+  "refurbished-bambu-lab-p2s-3d-printer": {
+   "model": "P2S",
+   "series": "P2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755467026432>654452894413656064",
+    "title": "[Refurbished] Bambu Lab P2S 3D Printer",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "P2 Series",
+     "sightings": 59,
+     "products": 59
+    }
+   }
+  },
+  "r1": {
+   "model": "R1",
+   "series": "",
+   "family": "bambu_lab_laser_cutters",
+   "evidence": {
+    "route": "777329586458394624>777329657887391744>777329706679709696",
+    "title": "Bambu Lab R1",
+    "model_from": "title",
+    "series_from": "none: no page names a series for this model"
+   }
+  },
+  "bambu-lab-a1-combo-starter-kit": {
+   "model": "A1",
+   "series": "A1 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755571884032>552709755651575808",
+    "title": "Bambu Lab A1 Combo Starter Kit",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "A1 Series",
+     "sightings": 43,
+     "products": 29
+    }
+   }
+  },
+  "bambu-lab-p2s-combo-starter-kit": {
+   "model": "P2S",
+   "series": "P2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755467026432>654452894413656064",
+    "title": "Bambu Lab P2S Combo Starter Kit",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "P2 Series",
+     "sightings": 59,
+     "products": 59
+    }
+   }
+  },
+  "bambu-lab-x2d-combo-starter-kit": {
+   "model": "X2D",
+   "series": "X2 Series",
+   "family": "bambu_lab_3d_printers",
+   "evidence": {
+    "route": "552709755391528960>552709755429277696>720070020209332224",
+    "title": "Bambu Lab X2D Combo Starter Kit",
+    "model_from": "title",
+    "series_from": "registry/models.ts series of the model",
+    "series_label_on_store_pages": {
+     "label": "X2 Series",
+     "sightings": 5,
+     "products": 5
+    }
+   }
+  }
+ }
+}

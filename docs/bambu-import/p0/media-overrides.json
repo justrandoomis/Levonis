@@ -1,0 +1,7 @@
+{
+ "version": 1,
+ "status": "DRAFT (P0). Empty: no case is PROVEN by the crawl (no image bytes were fetched in P0). Candidates are in scans.json media.override_candidates_by_file_name for visual review.",
+ "reviewed_by": "p0-agent (draft)",
+ "reviewed_at": "2026-10-15",
+ "overrides": []
+}

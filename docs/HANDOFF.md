@@ -6,6 +6,10 @@ force-pushes, or alternate deployment path.
 
 ## Bambu Lab one-time catalogue import (DECISIONS 239–241, in progress)
 
+> **Work paused 2026-10-15 ≈20:20 UTC on the owner's request. Continue from `docs/bambu-import/HANDOFF-PLAN.md`**
+> (the build-plan status, the three saved work-in-progress branches `wip/import-ops`, `wip/import-ui`,
+> `wip/import-pkg`, the exact agent briefs, and every procedure). The spec and the P0 data are in `docs/bambu-import/`.
+
 The owner's brief of 2026-10-15: import every product of us.store.bambulab.com (1,115 in its sitemap) as a
 native, catalog-only Levonis product, one product at a time with a live check before the next, no price,
 cost or stock from the source, no sync afterwards. Row 239 allows reading and writing the production D1/R2

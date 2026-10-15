@@ -1,0 +1,4099 @@
+{
+ "version": 1,
+ "status": "DRAFT (P0 step 3). Not reviewed by the integrator; snapshot_sha256 stays null until the step-2 sealed snapshot confirms the live tree.",
+ "reviewed_by": "p0-agent (draft)",
+ "reviewed_at": "2026-10-15",
+ "snapshot_sha256": null,
+ "tree_source": {
+  "used": "repository seeds at /home/user/Levonis (migrations 0018, 0102, 0147, 0148; worker/lib/templateFamilies.ts:1858-1930)",
+  "live_tree_read": false,
+  "why": "P0 instruction: never contact levonis-iq.com. /api/catalog/tree exists (worker/routes/catalog.ts) but was not read; owner-made nodes and live slugs are unknown until the step-2 sealed snapshot."
+ },
+ "create": [
+  {
+   "key": "printers-refurb",
+   "parent": "cat_printers_fdm",
+   "slug": "factory-refurbished-printers",
+   "name_en": "Factory-refurbished printers",
+   "name_ar": "طابعات مجدَّدة من المصنع",
+   "name_ckb": "چاپکەرە نوێکراوەکانی کارگە",
+   "template_family": "devices",
+   "is_printer_catalog": 1,
+   "sort": 13
+  },
+  {
+   "key": "ams",
+   "parent": "cat_pacc_fdm",
+   "slug": "ams-filament-feeding",
+   "name_en": "AMS & filament feeding",
+   "name_ar": "أنظمة تغذية المواد (AMS)",
+   "name_ckb": "سیستەمەکانی پێدانی کەرەستە (AMS)",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 5
+  },
+  {
+   "key": "printer-acc",
+   "parent": "cat_pacc_fdm",
+   "slug": "printer-accessories-add-ons",
+   "name_en": "Printer accessories & add-ons",
+   "name_ar": "ملحقات وإضافات الطابعات",
+   "name_ckb": "پێداویستی و زیادکراوەکانی چاپکەر",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 6
+  },
+  {
+   "key": "pla",
+   "parent": "cat_materials_fdm",
+   "slug": "pla",
+   "name_en": "PLA",
+   "name_ar": "PLA",
+   "name_ckb": "PLA",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 1
+  },
+  {
+   "key": "petg",
+   "parent": "cat_materials_fdm",
+   "slug": "petg",
+   "name_en": "PETG",
+   "name_ar": "PETG",
+   "name_ckb": "PETG",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 2
+  },
+  {
+   "key": "abs-asa",
+   "parent": "cat_materials_fdm",
+   "slug": "abs-asa",
+   "name_en": "ABS & ASA",
+   "name_ar": "ABS وASA",
+   "name_ckb": "ABS و ASA",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 3
+  },
+  {
+   "key": "tpu",
+   "parent": "cat_materials_fdm",
+   "slug": "tpu",
+   "name_en": "TPU",
+   "name_ar": "TPU",
+   "name_ckb": "TPU",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 4
+  },
+  {
+   "key": "pc",
+   "parent": "cat_materials_fdm",
+   "slug": "pc",
+   "name_en": "PC",
+   "name_ar": "PC",
+   "name_ckb": "PC",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 5
+  },
+  {
+   "key": "engineering",
+   "parent": "cat_materials_fdm",
+   "slug": "engineering-materials",
+   "name_en": "Engineering materials",
+   "name_ar": "مواد هندسية",
+   "name_ckb": "کەرەستەی ئەندازیاری",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 6
+  },
+  {
+   "key": "support",
+   "parent": "cat_materials_fdm",
+   "slug": "support-materials",
+   "name_en": "Support materials",
+   "name_ar": "مواد الدعم",
+   "name_ckb": "کەرەستەی پاڵپشت",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 7
+  },
+  {
+   "key": "fiber",
+   "parent": "cat_materials_fdm",
+   "slug": "fibre-reinforced",
+   "name_en": "Fibre-reinforced",
+   "name_ar": "مواد مقوّاة بالألياف",
+   "name_ckb": "کەرەستەی بەهێزکراو بە ڕیشاڵ",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 8
+  },
+  {
+   "key": "filament-packs",
+   "parent": "cat_materials_fdm",
+   "slug": "filament-packs-bundles",
+   "name_en": "Filament packs & bundles",
+   "name_ar": "باقات ومجموعات الفلامنت",
+   "name_ckb": "پاکێج و کۆمەڵەکانی فیلامێنت",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 9
+  },
+  {
+   "key": "filament-acc",
+   "parent": "cat_materials_fdm",
+   "slug": "filament-accessories",
+   "name_en": "Filament accessories",
+   "name_ar": "ملحقات الفلامنت",
+   "name_ckb": "پێداویستی فیلامێنت",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 10
+  },
+  {
+   "key": "parts-x1p1",
+   "parent": "cat_maint_spare",
+   "slug": "x1-p1-series-parts",
+   "name_en": "X1 & P1 series parts",
+   "name_ar": "قطع غيار سلسلة X1 وP1",
+   "name_ckb": "پارچە یەدەگەکانی زنجیرەی X1 و P1",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 1
+  },
+  {
+   "key": "parts-a1",
+   "parent": "cat_maint_spare",
+   "slug": "a1-a2l-series-parts",
+   "name_en": "A1 & A2L series parts",
+   "name_ar": "قطع غيار سلسلة A1 وA2L",
+   "name_ckb": "پارچە یەدەگەکانی زنجیرەی A1 و A2L",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 2
+  },
+  {
+   "key": "parts-h2",
+   "parent": "cat_maint_spare",
+   "slug": "h2-series-parts",
+   "name_en": "H2 series parts",
+   "name_ar": "قطع غيار سلسلة H2",
+   "name_ckb": "پارچە یەدەگەکانی زنجیرەی H2",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 3
+  },
+  {
+   "key": "parts-p2x2",
+   "parent": "cat_maint_spare",
+   "slug": "p2s-x2d-parts",
+   "name_en": "P2S & X2D parts",
+   "name_ar": "قطع غيار P2S وX2D",
+   "name_ckb": "پارچە یەدەگەکانی P2S و X2D",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 4
+  },
+  {
+   "key": "parts-ams",
+   "parent": "cat_maint_spare",
+   "slug": "ams-parts",
+   "name_en": "AMS parts",
+   "name_ar": "قطع غيار AMS",
+   "name_ckb": "پارچە یەدەگەکانی AMS",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 5
+  },
+  {
+   "key": "parts-laser",
+   "parent": "cat_maint_spare",
+   "slug": "r1-laser-parts",
+   "name_en": "R1 laser parts",
+   "name_ar": "قطع غيار ليزر R1",
+   "name_ckb": "پارچە یەدەگەکانی لەیزەری R1",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 6
+  },
+  {
+   "key": "parts-common",
+   "parent": "cat_maint_spare",
+   "slug": "parts-for-all-series",
+   "name_en": "Parts for all series",
+   "name_ar": "قطع صيانة لكل السلاسل",
+   "name_ckb": "پارچەی چاککردنەوە بۆ هەموو زنجیرەکان",
+   "template_family": "devices",
+   "is_printer_catalog": 0,
+   "sort": 7
+  },
+  {
+   "key": "bundles",
+   "parent": "cat_accessories",
+   "slug": "bundles-kits",
+   "name_en": "Bundles & kits",
+   "name_ar": "الحزم والمجموعات",
+   "name_ckb": "کۆمەڵە و پاکێجەکان",
+   "template_family": "materials",
+   "is_printer_catalog": 0,
+   "sort": 90
+  }
+ ],
+ "routes": {
+  "552709755391528960>552709755429277696": {
+   "primary": "@printers-refurb",
+   "products": 1
+  },
+  "552709755391528960>552709755429277696>720070020209332224": {
+   "primary": "cat_printers_fdm",
+   "products": 2
+  },
+  "552709755391528960>552709755467026432>552709755534135296": {
+   "primary": "cat_printers_fdm",
+   "products": 2
+  },
+  "552709755391528960>552709755467026432>654452894413656064": {
+   "primary": "cat_printers_fdm",
+   "products": 3
+  },
+  "552709755391528960>552709755571884032>552709755613827072": {
+   "primary": "cat_printers_fdm",
+   "products": 1
+  },
+  "552709755391528960>552709755571884032>552709755651575808": {
+   "primary": "cat_printers_fdm",
+   "products": 3
+  },
+  "552709755391528960>552709755571884032>737833044333592576": {
+   "primary": "cat_printers_fdm",
+   "products": 1
+  },
+  "552709755391528960>552709755685130240>552709755718684672": {
+   "primary": "@ams",
+   "products": 1
+  },
+  "552709755391528960>552709755685130240>552709755756433408": {
+   "primary": "@ams",
+   "products": 1
+  },
+  "552709755391528960>552709755685130240>580875380323446784": {
+   "primary": "@ams",
+   "products": 1
+  },
+  "552709755391528960>552709755685130240>580875408605990912": {
+   "primary": "@ams",
+   "products": 1
+  },
+  "552709755391528960>666870992645718016>580901793339363328": {
+   "primary": "cat_printers_fdm",
+   "products": 3
+  },
+  "552709755391528960>666870992645718016>636692373158055936": {
+   "primary": "cat_printers_fdm",
+   "products": 1
+  },
+  "552709755391528960>666870992645718016>666871141714259968": {
+   "primary": "cat_printers_fdm",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709755890651136": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709755924205568": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709755957760000": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709755991314432": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756062617600": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756096172032": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756133920768": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756167475200": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756201029632": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756234584064": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756263944192": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>552709756364607488": {
+   "primary": "@pla",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709755857096704>552709756406550528": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>594000098526253056": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>624480362170421248": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709755857096704>738877045925638144": {
+   "primary": "@pla",
+   "products": 1
+  },
+  "552709755819347968>552709756440104960>552709756469465088": {
+   "primary": "@petg",
+   "products": 1
+  },
+  "552709755819347968>552709756440104960>552709756498825216": {
+   "primary": "@petg",
+   "products": 1
+  },
+  "552709755819347968>552709756440104960>552709756532379648": {
+   "primary": "@petg",
+   "products": 1
+  },
+  "552709755819347968>552709756440104960>552709756561739776": {
+   "primary": "@petg",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709756440104960>773742122711953408": {
+   "primary": "@petg",
+   "products": 1
+  },
+  "552709755819347968>552709756595294208>552709756628848640": {
+   "primary": "@abs-asa",
+   "products": 1
+  },
+  "552709755819347968>552709756595294208>552709756662403072": {
+   "primary": "@abs-asa",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709756700151808>552709756742094848": {
+   "primary": "@abs-asa",
+   "products": 1
+  },
+  "552709755819347968>552709756700151808>552709756775649280": {
+   "primary": "@abs-asa",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709756700151808>552709756805009408": {
+   "primary": "@abs-asa",
+   "products": 1
+  },
+  "552709755819347968>552709756834369536>552709756867923968": {
+   "primary": "@pc",
+   "products": 1
+  },
+  "552709755819347968>552709756834369536>552709756901478400": {
+   "primary": "@pc",
+   "products": 1
+  },
+  "552709755819347968>552709756939227136>552709756997947392": {
+   "primary": "@tpu",
+   "products": 1
+  },
+  "552709755819347968>552709756939227136>552709757027307520": {
+   "primary": "@tpu",
+   "products": 1
+  },
+  "552709755819347968>552709756939227136>575822806323367936": {
+   "primary": "@tpu",
+   "products": 1
+  },
+  "552709755819347968>552709757065056256>552709757094416384": {
+   "primary": "@engineering",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709757065056256>552709757127970816": {
+   "primary": "@engineering",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709757065056256>552709757157330944": {
+   "primary": "@engineering",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709757065056256>552709757224439808": {
+   "primary": "@engineering",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709757257994240>552709757287354368": {
+   "primary": "@engineering",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709757316714496>552709757350268928": {
+   "primary": "@engineering",
+   "products": 1,
+   "also": [
+    "@fiber"
+   ]
+  },
+  "552709755819347968>552709757392211968>552709757425766400": {
+   "primary": "@support",
+   "products": 1
+  },
+  "552709755819347968>552709757392211968>552709757455126528": {
+   "primary": "@support",
+   "products": 1
+  },
+  "552709755819347968>552709757392211968>552709757484486656": {
+   "primary": "@support",
+   "products": 1
+  },
+  "552709755819347968>552709757392211968>552709757518041088": {
+   "primary": "@support",
+   "products": 1
+  },
+  "552709755819347968>552709757392211968>552709757547401216": {
+   "primary": "@support",
+   "products": 1
+  },
+  "552709755819347968>552709757576761344": {
+   "primary": "@filament-packs",
+   "products": 6
+  },
+  "552709755819347968>552709757610315776>552709757639675904": {
+   "primary": "@filament-acc",
+   "products": 1
+  },
+  "552709755819347968>552709757610315776>552709757731950592": {
+   "primary": "@filament-acc",
+   "products": 1
+  },
+  "552709757765505024": {
+   "primary": "@printer-acc",
+   "products": 149
+  },
+  "552709757765505024>552709757794865152": {
+   "primary": "cat_maint_plate",
+   "products": 2
+  },
+  "552709757765505024>552709757794865152>552709757824225280": {
+   "primary": "cat_maint_plate",
+   "products": 1
+  },
+  "552709757765505024>552709757794865152>552709757853585408": {
+   "primary": "cat_maint_plate",
+   "products": 1
+  },
+  "552709757765505024>552709757794865152>552709757887139840": {
+   "primary": "cat_maint_plate",
+   "products": 1
+  },
+  "552709757765505024>552709757794865152>552709757920694272": {
+   "primary": "cat_maint_plate",
+   "products": 1
+  },
+  "552709757765505024>552709757794865152>552709757950054400": {
+   "primary": "cat_maint_plate",
+   "products": 1
+  },
+  "552709757765505024>552709757979414528>552709758012968960": {
+   "primary": "cat_maint_hotend",
+   "products": 2
+  },
+  "552709757765505024>552709757979414528>552709758042329088": {
+   "primary": "cat_maint_hotend",
+   "products": 1
+  },
+  "552709757765505024>552709757979414528>552709758067494912": {
+   "primary": "cat_maint_hotend",
+   "products": 1
+  },
+  "552709757765505024>552709757979414528>581723483511627776": {
+   "primary": "cat_maint_hotend",
+   "products": 4
+  },
+  "552709757765505024>552709757979414528>581723536908771328": {
+   "primary": "cat_maint_hotend",
+   "products": 1
+  },
+  "552709757765505024>552709758101049344": {
+   "primary": "@printer-acc",
+   "products": 2
+  },
+  "552709757765505024>552709758101049344>552709758130409472": {
+   "primary": "@printer-acc",
+   "products": 3
+  },
+  "552709757765505024>552709758101049344>552709758159769600": {
+   "primary": "@printer-acc",
+   "products": 1
+  },
+  "552709757765505024>552709758101049344>552709758193324032": {
+   "primary": "@ams",
+   "products": 1
+  },
+  "552709757765505024>552709758101049344>581723637506146304": {
+   "primary": "cat_laser_acc",
+   "products": 7
+  },
+  "552709757765505024>750510267545833472>750510537066323968": {
+   "primary": "cat_makers_tools",
+   "products": 3
+  },
+  "552709757765505024>750510267545833472>750510638922092544": {
+   "primary": "cat_makers_tools",
+   "products": 4
+  },
+  "552709757765505024>750510267545833472>750510727757451264": {
+   "primary": "cat_makers_tools",
+   "products": 5
+  },
+  "552709757765505024>750510267545833472>750510844571721728": {
+   "primary": "cat_makers_tools",
+   "products": 2
+  },
+  "552709757765505024>774054643595542528": {
+   "primary": "cat_laser_acc",
+   "products": 2
+  },
+  "552709758222684160": {
+   "primary": "@parts-laser",
+   "products": 136
+  },
+  "552709758222684160>552709758252044288": {
+   "primary": "@parts-common",
+   "products": 1
+  },
+  "552709758222684160>552709758252044288>552709758281404416": {
+   "primary": "@parts-common",
+   "products": 3
+  },
+  "552709758222684160>552709758252044288>552709758314958848": {
+   "primary": "@parts-a1",
+   "products": 3
+  },
+  "552709758222684160>552709758252044288>552709758373679104": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709758407233536>552709758436593664": {
+   "primary": "@parts-x1p1",
+   "products": 3
+  },
+  "552709758222684160>552709758407233536>552709758470148096": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709758407233536>552709758503702528": {
+   "primary": "@parts-common",
+   "products": 1
+  },
+  "552709758222684160>552709758407233536>552709758533062656": {
+   "primary": "@parts-a1",
+   "products": 2
+  },
+  "552709758222684160>552709758566617088>552709758608560128": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709758566617088>552709758637920256": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709758566617088>552709758675668992": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709758566617088>552709758709223424": {
+   "primary": "@parts-a1",
+   "products": 3
+  },
+  "552709758222684160>552709758742777856>552709758780526592": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709758742777856>552709758843441152": {
+   "primary": "@parts-a1",
+   "products": 2
+  },
+  "552709758222684160>552709758742777856>552709758876995584": {
+   "primary": "@parts-common",
+   "products": 1
+  },
+  "552709758222684160>552709758910550016>552709758939910144": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709758910550016>552709758973464576": {
+   "primary": "@parts-ams",
+   "products": 2
+  },
+  "552709758222684160>552709759007019008": {
+   "primary": "@parts-p2x2",
+   "products": 1
+  },
+  "552709758222684160>552709759007019008>552709759036379136": {
+   "primary": "@parts-x1p1",
+   "products": 3
+  },
+  "552709758222684160>552709759007019008>552709759065739264": {
+   "primary": "@parts-a1",
+   "products": 1
+  },
+  "552709758222684160>552709759099293696>552709759137042432": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709759099293696>552709759166402560": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709759099293696>552709759199956992": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709759099293696>552709759229317120": {
+   "primary": "@parts-a1",
+   "products": 8
+  },
+  "552709758222684160>552709759271260160>552709759304814592": {
+   "primary": "@parts-x1p1",
+   "products": 5
+  },
+  "552709758222684160>552709759271260160>552709759338369024": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709759271260160>552709759363534848": {
+   "primary": "@parts-a1",
+   "products": 2
+  },
+  "552709758222684160>552709759271260160>552709759397089280": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709759271260160>552709759426449408": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709759271260160>552709759455809536": {
+   "primary": "@parts-ams",
+   "products": 1
+  },
+  "552709758222684160>552709759485169664>552709759514529792": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709759485169664>552709759552278528": {
+   "primary": "@parts-x1p1",
+   "products": 6
+  },
+  "552709758222684160>552709759485169664>552709759581638656": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709759485169664>552709759644553216": {
+   "primary": "@parts-ams",
+   "products": 4
+  },
+  "552709758222684160>552709759485169664>552709759673913344": {
+   "primary": "@parts-ams",
+   "products": 1
+  },
+  "552709758222684160>552709759703273472>552709759732633600": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709759703273472>552709759761993728": {
+   "primary": "@parts-x1p1",
+   "products": 2
+  },
+  "552709758222684160>552709759703273472>552709759787159552": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709759703273472>552709759816519680": {
+   "primary": "@parts-a1",
+   "products": 2
+  },
+  "552709758222684160>552709759845879808>552709759879434240": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709759845879808>552709759908794368": {
+   "primary": "@parts-x1p1",
+   "products": 7
+  },
+  "552709758222684160>552709759845879808>552709759942348800": {
+   "primary": "@parts-x1p1",
+   "products": 3
+  },
+  "552709758222684160>552709759845879808>552709759975903232": {
+   "primary": "@parts-a1",
+   "products": 2
+  },
+  "552709758222684160>552709759845879808>552709760009457664": {
+   "primary": "@parts-ams",
+   "products": 5
+  },
+  "552709758222684160>552709759845879808>552709760038817792": {
+   "primary": "@parts-ams",
+   "products": 2
+  },
+  "552709758222684160>552709760076566528>552709760110120960": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709760076566528>552709760135286784": {
+   "primary": "@parts-x1p1",
+   "products": 3
+  },
+  "552709758222684160>552709760076566528>552709760168841216": {
+   "primary": "@parts-a1",
+   "products": 4
+  },
+  "552709758222684160>552709760198201344>552709760223367168": {
+   "primary": "@parts-x1p1",
+   "products": 3
+  },
+  "552709758222684160>552709760198201344>552709760252727296": {
+   "primary": "@parts-a1",
+   "products": 4
+  },
+  "552709758222684160>552709760345001984>552709760433082368": {
+   "primary": "@parts-x1p1",
+   "products": 7
+  },
+  "552709758222684160>552709760345001984>552709760462442496": {
+   "primary": "@parts-a1",
+   "products": 10
+  },
+  "552709758222684160>552709760491802624>552709760525357056": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709760491802624>552709760584077312": {
+   "primary": "@parts-x1p1",
+   "products": 4
+  },
+  "552709758222684160>552709760491802624>552709760617631744": {
+   "primary": "@parts-a1",
+   "products": 3
+  },
+  "552709758222684160>552709760491802624>552709760646991872": {
+   "primary": "@parts-x1p1",
+   "products": 1
+  },
+  "552709758222684160>552709760676352000>552709760709906432": {
+   "primary": "@parts-ams",
+   "products": 6
+  },
+  "552709758222684160>552709760676352000>552709760739266560": {
+   "primary": "@parts-ams",
+   "products": 5
+  },
+  "552709758222684160>552709760768626688>552709760797986816": {
+   "primary": "@parts-ams",
+   "products": 2
+  },
+  "552709758222684160>552709760768626688>552709760823152640": {
+   "primary": "@parts-ams",
+   "products": 2
+  },
+  "552709758222684160>581727459719290880": {
+   "primary": "@parts-h2",
+   "products": 115
+  },
+  "552709758222684160>581730574607491072": {
+   "primary": "@parts-ams",
+   "products": 32
+  },
+  "552709760852512768>552709760911233024": {
+   "primary": "cat_makers_kits",
+   "products": 106
+  },
+  "552709760852512768>552709760948981760": {
+   "primary": "cat_makers_kits",
+   "products": 1
+  },
+  "552709760852512768>552709760978341888": {
+   "primary": "cat_makers_combo",
+   "products": 17
+  },
+  "552709760852512768>552709761007702016": {
+   "primary": "cat_makers_hw",
+   "products": 3
+  },
+  "552709760852512768>552709761007702016>552709761037062144": {
+   "primary": "cat_makers_hw",
+   "products": 21
+  },
+  "552709760852512768>552709761007702016>552709761062227968": {
+   "primary": "cat_makers_hw",
+   "products": 10
+  },
+  "552709760852512768>552709761007702016>552709761091588096": {
+   "primary": "cat_makers_hw",
+   "products": 6
+  },
+  "552709760852512768>552709761007702016>552709761125142528": {
+   "primary": "cat_makers_hw",
+   "products": 2
+  },
+  "552709760852512768>552709761007702016>552709761154502656": {
+   "primary": "cat_makers_hw",
+   "products": 3
+  },
+  "552709760852512768>552709761007702016>552709761188057088": {
+   "primary": "cat_makers_hw",
+   "products": 5
+  },
+  "552709760852512768>552709761007702016>552709761217417216": {
+   "primary": "cat_makers_hw",
+   "products": 3
+  },
+  "552709760852512768>552709761007702016>552709761246777344": {
+   "primary": "cat_makers_hw",
+   "products": 5
+  },
+  "552709760852512768>552709761007702016>552709761276137472": {
+   "primary": "cat_makers_hw",
+   "products": 6
+  },
+  "552709760852512768>552709761007702016>552709761305497600": {
+   "primary": "cat_makers_hw",
+   "products": 2
+  },
+  "552709760852512768>552709761007702016>552709761334857728": {
+   "primary": "cat_makers_hw",
+   "products": 4
+  },
+  "552709760852512768>552709761007702016>552709761372606464": {
+   "primary": "cat_makers_hw",
+   "products": 2
+  },
+  "552709760852512768>552709761007702016>552709761401966592": {
+   "primary": "cat_makers_hw",
+   "products": 5
+  },
+  "552709760852512768>552709761007702016>552709761431326720": {
+   "primary": "cat_makers_hw",
+   "products": 1
+  },
+  "552709760852512768>552709761460686848": {
+   "primary": "cat_makers_elec",
+   "products": 7
+  },
+  "552709760852512768>552709761460686848>552709761490046976": {
+   "primary": "cat_makers_elec",
+   "products": 18
+  },
+  "552709760852512768>552709761460686848>552709761519407104": {
+   "primary": "cat_makers_elec",
+   "products": 8
+  },
+  "552709760852512768>552709761460686848>552709761544572928": {
+   "primary": "cat_makers_elec",
+   "products": 2
+  },
+  "552709760852512768>552709761460686848>552709761569738752": {
+   "primary": "cat_makers_elec",
+   "products": 6
+  },
+  "552709760852512768>552709761460686848>552709761599098880": {
+   "primary": "cat_makers_elec",
+   "products": 16
+  },
+  "552709760852512768>552709761460686848>552709761636847616": {
+   "primary": "cat_makers_elec",
+   "products": 2
+  },
+  "552709760852512768>552709761666207744": {
+   "primary": "cat_makers_other",
+   "products": 6
+  },
+  "552709760852512768>552709761666207744>552709761695567872": {
+   "primary": "cat_makers_other",
+   "products": 11
+  },
+  "552709760852512768>552709761666207744>552709761724928000": {
+   "primary": "cat_makers_other",
+   "products": 3
+  },
+  "552709760852512768>552709761666207744>552709761754288128": {
+   "primary": "cat_makers_other",
+   "products": 3
+  },
+  "552709760852512768>552709761666207744>552709761787842560": {
+   "primary": "cat_makers_other",
+   "products": 1
+  },
+  "552709760852512768>552709761666207744>552709761813008384": {
+   "primary": "cat_makers_other",
+   "products": 1
+  },
+  "552709760852512768>591521224512909312": {
+   "primary": "cat_makers_cyber",
+   "products": 16
+  },
+  "552709760852512768>591521224512909312>644774372685770752": {
+   "primary": "cat_makers_cyber",
+   "products": 28
+  },
+  "552709760852512768>591521224512909312>644774408119250944": {
+   "primary": "cat_makers_cyber",
+   "products": 3
+  },
+  "552709760852512768>591521224512909312>644774440056221696": {
+   "primary": "cat_makers_cyber",
+   "products": 9
+  },
+  "578424673239986176": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428506985955328>578428544854495232": {
+   "primary": "cat_materials_laser",
+   "products": 5
+  },
+  "578424673239986176>578428506985955328>578428577923391488": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428506985955328>578428613388308480": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428646415355904>578428674014429184": {
+   "primary": "cat_materials_blade",
+   "products": 2
+  },
+  "578424673239986176>578428646415355904>578428703683747840": {
+   "primary": "cat_materials_blade",
+   "products": 2
+  },
+  "578424673239986176>578428646415355904>578428729693306880": {
+   "primary": "cat_materials_blade",
+   "products": 1
+  },
+  "578424673239986176>578428646415355904>737091759872114688": {
+   "primary": "cat_materials_blade",
+   "products": 1
+  },
+  "578424673239986176>578428755571482624": {
+   "primary": "cat_materials_laser",
+   "products": 3
+  },
+  "578424673239986176>578428788331507712>578428830203461632": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428788331507712>578428855230672896": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428788331507712>730659118343921664": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428788331507712>737092122809790464": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428880652304384": {
+   "primary": "cat_materials_laser",
+   "products": 3
+  },
+  "578424673239986176>578428903817916416>667263100597465088": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578428903817916416>730658652486770688": {
+   "primary": "cat_materials_laser",
+   "products": 2
+  },
+  "578424673239986176>578428903817916416>737094864667901952": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>578429003299885056": {
+   "primary": "cat_materials_blade",
+   "products": 3
+  },
+  "578424673239986176>617637179092254720": {
+   "primary": "cat_materials_laser",
+   "products": 3
+  },
+  "578424673239986176>655673634438615040": {
+   "primary": "cat_materials_laser",
+   "products": 3
+  },
+  "578424673239986176>737104553904762880>737104854459842560": {
+   "primary": "cat_materials_laser",
+   "products": 1
+  },
+  "578424673239986176>737104553904762880>737104923774910464": {
+   "primary": "cat_materials_laser",
+   "products": 2
+  },
+  "578424673239986176>778850988797755392": {
+   "primary": "cat_materials_laser",
+   "products": 2
+  },
+  "777329586458394624>777329657887391744>777329706679709696": {
+   "primary": "cat_laser_machines",
+   "products": 1
+  }
+ },
+ "handles": {
+  "refurbished-p1s": {
+   "primary": "@printers-refurb",
+   "route": "552709755391528960>552709755467026432>552709755534135296",
+   "quote": "[Refurbished] Bambu Lab P1S 3D Printer",
+   "quote_kind": "title"
+  },
+  "refurbished-bambu-lab-p2s-3d-printer": {
+   "primary": "@printers-refurb",
+   "route": "552709755391528960>552709755467026432>654452894413656064",
+   "quote": "[Refurbished] Bambu Lab P2S 3D Printer",
+   "quote_kind": "title"
+  },
+  "refurbished-a1": {
+   "primary": "@printers-refurb",
+   "route": "552709755391528960>552709755571884032>552709755651575808",
+   "quote": "[Refurbished] Bambu Lab A1 3D Printer",
+   "quote_kind": "title"
+  },
+  "refurbished-bambu-lab-h2d-3d-printer": {
+   "primary": "@printers-refurb",
+   "route": "552709755391528960>666870992645718016>580901793339363328",
+   "quote": "[Refurbished] Bambu Lab H2D 3D Printer",
+   "quote_kind": "title"
+  },
+  "stronggrip-cutting-mat": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2 Series (Cutting)",
+   "quote_kind": "option_value"
+  },
+  "lightgrip-cutting-mat": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2 Series (Cutting)",
+   "quote_kind": "option_value"
+  },
+  "fine-point-blade": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2 Series (Cutting)",
+   "quote_kind": "option_value"
+  },
+  "material-pins": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2 Series (Laser)",
+   "quote_kind": "option_value"
+  },
+  "smoke-purifier-air-filter": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: Smoke Purifier",
+   "quote_kind": "option_value"
+  },
+  "silicone-desiccant": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: All AMS Series",
+   "quote_kind": "option_value"
+  },
+  "ams-2-pro-switching-adapter": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: AMS 2 Pro",
+   "quote_kind": "option_value"
+  },
+  "ams-2-pro-upgrade-compatibility-kit": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X1/P1 Non-Combo Printers",
+   "quote_kind": "option_value"
+  },
+  "accessory-box-for-ams": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: AMS",
+   "quote_kind": "option_value"
+  },
+  "accessory-box-for-ams-lite": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: AMS lite",
+   "quote_kind": "option_value"
+  },
+  "hotends-combo-h2-series": {
+   "primary": "cat_maint_hotend",
+   "route": "552709757765505024",
+   "quote": "Hotends Combo - H2 Series",
+   "quote_kind": "title"
+  },
+  "nozzle-wiping-pad-h2-series": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2D/H2C",
+   "quote_kind": "option_value"
+  },
+  "ams-hub-a1-series": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A1 Series",
+   "quote_kind": "option_value"
+  },
+  "cutting-mat-combo-3-pcs": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "H2 Series/A2L",
+   "quote_kind": "compat_section"
+  },
+  "induction-hotend-latch-actuator": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2C and H2C Laser",
+   "quote_kind": "option_value"
+  },
+  "induction-hotend-dock-assembly": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2C and H2C Laser",
+   "quote_kind": "option_value"
+  },
+  "induction-heating-assembly-right": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2C and H2C Laser",
+   "quote_kind": "option_value"
+  },
+  "induction-hotend-latch": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2C and H2C Laser",
+   "quote_kind": "option_value"
+  },
+  "induction-hotend-rack-cables-pack": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2C and H2C Laser",
+   "quote_kind": "option_value"
+  },
+  "induction-hotend-rack-control-board": {
+   "primary": "@parts-h2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: H2C and H2C Laser",
+   "quote_kind": "option_value"
+  },
+  "laser-module": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Printer Model: H2D/H2C",
+   "quote_kind": "option_value"
+  },
+  "ams-ams-ht-upgrade-compatibility-kit": {
+   "primary": "@ams",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X1/P1 Non-Combo Printers",
+   "quote_kind": "option_value"
+  },
+  "rotary-attachment": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatible: H2 Series (Laser)",
+   "quote_kind": "option_value"
+  },
+  "h2d-tpu-high-flow-kit": {
+   "primary": "cat_maint_hotend",
+   "route": "552709757765505024",
+   "quote": "H2D TPU High-Flow Kit",
+   "quote_kind": "title"
+  },
+  "auxiliary-extruder-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "auxiliary-extruder-upper-cover-assembly-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "auxiliary-extruder-gear-assembly-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "auxiliary-extruder-housing-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "toolhead-front-cover-assembly-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "toolhead-rear-cover-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "toolhead-middle-housing-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "cooling-fan-for-hotend-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "th-board-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "hotend-heating-assembly-connection-board-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "extruder-connection-board-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-lever-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "hotend-heating-assembly-left-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "auxiliary-hotend-heating-assembly-right-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "eddy-sensor-left-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "eddy-sensor-right-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "toolhead-camera-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "extruder-filament-sensor-left-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "extruder-filament-sensor-right-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "extruder-unit-front-cover-assembly-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "flow-blocker-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "flow-blocker-assembly-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "toolhead-carriage-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "ap-board-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "mc-board-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "ac-board-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "purge-wiper-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "mc-board-fan-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-stopper-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "front-cover-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "left-side-panel-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "right-side-panel-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "rear-panel-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "usb-c-cable-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "filament-buffer-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "live-view-camera-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "chamber-heater-unit-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "tube-organizer-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "chamber-temperature-sensor-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "heatbed-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "power-supply-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "printer-cable-pack-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "x-axis-assembly-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "xy-belt-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "screen-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "screen-rear-housing-with-hinge-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "inner-lining-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "purge-chute-x2-p2": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D/P2S",
+   "quote_kind": "option_value"
+  },
+  "nozzle-offset-calibration-sensor-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "cable-chain-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709757765505024",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "x-axis-motor-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "y-axis-top-cover-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "y-belt-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "y-axis-tensioner-pulley-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "z-axis-motor-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "z-belt-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "4-pin-6-pin-connection-board-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "printer-frame-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "toolhead-front-cover-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "y-axis-motor-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "toolhead-cable-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "power-switch-assembly-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "printer-cable-pack-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "filament-sensor-unit-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "screws-kit-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "toolhead-filament-hub-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "extruder-unit-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "base-housing-assembly-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "cutting-module-adapter-board-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "hotend-heating-assembly-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "supportive-footpad-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "nozzle-wiper-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "spool-holder-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "ptfe-tube-connector-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "ptfe-tube-inlet-connector-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "heatbed-unit-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "mainboard-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "ac-board-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "power-supply-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "base-housing-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "bottom-cover-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "toolhead-board-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "extruder-unit-front-cover-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "extruder-gear-assembly-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "a3508-extruder-motor-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-lever-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "extruder-rear-cover-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "cooling-fan-for-hotend-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "nozzle-eddy-sensor-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "toolhead-rear-housing-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "part-cooling-fan-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "x-belt-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "toolhead-block-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "live-view-camera-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "x-axis-motor-cover-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "x-axis-assembly-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "end-cap-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "purge-wiper-a2l": {
+   "primary": "@parts-a1",
+   "route": "552709757765505024",
+   "quote": "Compatibility: A2L",
+   "quote_kind": "option_value"
+  },
+  "hotend-expansion-kit": {
+   "primary": "cat_maint_hotend",
+   "route": "552709757765505024",
+   "quote": "Hotend Expansion Kit",
+   "quote_kind": "title"
+  },
+  "3d-effect-plate-full-combo": {
+   "primary": "cat_maint_plate",
+   "route": "552709757765505024",
+   "quote": "3D Effect Plate Full Combo",
+   "quote_kind": "title"
+  },
+  "multi-size-hotends-kit": {
+   "primary": "cat_maint_hotend",
+   "route": "552709757765505024",
+   "quote": "Multi-Size Hotends Kit",
+   "quote_kind": "title"
+  },
+  "focusing-lens-medium-long-focal": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "material-pin-r1": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "installation-bracket-for-rotary-attachment": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "guide-rail-extension": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "vision-encoder-r1": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "riser-base": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "automatic-conveyor-feeder": {
+   "primary": "cat_laser_acc",
+   "route": "552709757765505024",
+   "quote": "Compatibility: R1",
+   "quote_kind": "option_value"
+  },
+  "vision-encoder": {
+   "primary": "@printer-acc",
+   "route": "552709757765505024>552709758101049344>581723637506146304",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "sandisk-ultra-fit-usb-3-2-flash-drive": {
+   "primary": "@printer-acc",
+   "route": "552709757765505024>552709758101049344>581723637506146304",
+   "quote": "Compatibility: H2 Series",
+   "quote_kind": "option_value"
+  },
+  "toolhead-enhanced-cooling-fan": {
+   "primary": "@printer-acc",
+   "route": "552709757765505024>552709758101049344>581723637506146304",
+   "quote": "Compatibility: H2D",
+   "quote_kind": "option_value"
+  },
+  "floating-damper-feet": {
+   "primary": "@printer-acc",
+   "route": "552709757765505024>750510267545833472>750510844571721728",
+   "quote": "Printer Model: X1 Series / P1 Series",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-stopper-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "side-panel-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "extruder-filament-sensor-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-lever-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "toolhead-rear-cover-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "extruder-unit-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "extruder-unit-front-cover-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "extruder-gear-assembly-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "hotend-heating-assembly-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "extruder-motor-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "eddy-sensor-h2s": {
+   "primary": "@parts-h2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: H2S and H2S Laser",
+   "quote_kind": "option_value"
+  },
+  "extruder-gear-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "xy-belt-tensioner-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "x-axis-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-lever-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "purge-wiper-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "right-side-panel-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "chamber-temperature-sensor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "eddy-sensor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "screen-rear-housing-with-hinge-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "usb-port-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "extruder-filament-sensor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "ap-board-cover-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "left-side-panel-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "toolhead-carriage-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "air-filter-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "front-glass-door-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "heatbed-lv-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "led-light-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "z-motor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "door-sensor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "xy-motor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "3508-extruder-servo-motor-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "toolhead-middle-housing-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "toolhead-rear-cover-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "adaptive-airflow-switching-unit-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "cable-chain-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "ptfe-tube-bracket-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "screen-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "live-view-camera-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "spool-holder-p2s-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S/X2D",
+   "quote_kind": "option_value"
+  },
+  "ptfe-tube-connector-for-spool-holder-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "front-door-mounting-kit-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "hotend-heating-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "extruder-unit-front-cover-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "z-belt-timing-pulley-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "nozzle-wiping-pad-p2s-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S/X2D",
+   "quote_kind": "option_value"
+  },
+  "idler-pulley-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "ap-board-lv-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "xy-belt-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "mc-board-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "cooling-fan-for-hotend-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "front-cover-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "filament-buffer-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "power-switch-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "screen-fpc-cable-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S/X2D",
+   "quote_kind": "option_value"
+  },
+  "mc-ap-cable-pack-2-in-1-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "th-board-fpc-cable-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "power-supply-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "toolhead-cable-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "air-filter-cover-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "th-board-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "extruder-connection-board-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "ac-board-lv-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "filament-cutter-stopper-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "belt-tensioner-bracket-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "toolhead-front-cover-assembly-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "air-filter-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160>552709758252044288>552709758373679104",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "nozzle-wiping-plate-x2d": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160>552709758252044288>552709758373679104",
+   "quote": "Compatibility: X2D",
+   "quote_kind": "option_value"
+  },
+  "screws-kit-a1-series-and-ams-lite": {
+   "primary": "@parts-a1",
+   "route": "552709758222684160>552709758910550016>552709758973464576",
+   "quote": "Compatibility: A1 Series and AMS lite",
+   "quote_kind": "option_value"
+  },
+  "ams-lite-filament-hub": {
+   "primary": "@parts-ams",
+   "route": "552709758222684160>552709759099293696>552709759229317120",
+   "quote": "Compatibility: AMS lite",
+   "quote_kind": "option_value"
+  },
+  "ams-cable-pack-5-in-1": {
+   "primary": "@parts-ams",
+   "route": "552709758222684160>552709759271260160>552709759426449408",
+   "quote": "Compatibility: AMS",
+   "quote_kind": "option_value"
+  },
+  "glass-cover-plate-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160>552709759845879808>552709759908794368",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "rear-panel-p2s": {
+   "primary": "@parts-p2x2",
+   "route": "552709758222684160>552709759845879808>552709759908794368",
+   "quote": "Compatibility: P2S",
+   "quote_kind": "option_value"
+  },
+  "filament-buffer": {
+   "primary": "@parts-x1p1",
+   "route": "552709758222684160>552709760676352000>552709760709906432",
+   "quote": "Compatibility: X1 Series and P1 Series",
+   "quote_kind": "option_value"
+  },
+  "mini-heat-press": {
+   "primary": "cat_laser_acc",
+   "route": "578424673239986176>578429003299885056",
+   "quote": "Unlock endless DIY possibilities with three precision heat levels, tailored for unusually small or unique projects.",
+   "quote_kind": "description_text"
+  },
+  "cutting-material-kit-–-starter-pack": {
+   "primary": "cat_materials_blade",
+   "route": "578424673239986176>617637179092254720",
+   "quote": "Cutting Material Kit – Starter Pack",
+   "quote_kind": "title"
+  }
+ },
+ "also_by_handle": {
+  "z-belt": [
+   {
+    "also": "@parts-p2x2",
+    "route": "552709758222684160>552709760345001984>552709760433082368",
+    "quote": "Compatibility: X1 Series & P1 Series & P2S",
+    "quote_kind": "option_value"
+   }
+  ],
+  "pla-cmyk-lithophane": [
+   {
+    "also": "@bundles",
+    "route": "552709755819347968>552709757576761344",
+    "quote": "PLA CMYK Lithophane Bundle",
+    "quote_kind": "title"
+   }
+  ],
+  "wifi-antenna-p1-series-and-a1-mini": [
+   {
+    "also": "@parts-a1",
+    "route": "552709758222684160>552709760491802624>552709760646991872",
+    "quote": "Compatibility: P1 Series and A1 mini",
+    "quote_kind": "option_value"
+   }
+  ],
+  "eyewear-parts-bundle": [
+   {
+    "also": "@bundles",
+    "route": "552709760852512768>552709760911233024",
+    "quote": "Eyewear Parts Bundle",
+    "quote_kind": "title"
+   }
+  ],
+  "6500k-white-led-light-strip-combo-kit": [
+   {
+    "also": "@bundles",
+    "route": "552709760852512768>552709760978341888",
+    "quote": "6500K White LED Light Strip Bundle",
+    "quote_kind": "title"
+   }
+  ],
+  "ws2812b-rgb-led-strip-light-bundle": [
+   {
+    "also": "@bundles",
+    "route": "552709760852512768>552709760978341888",
+    "quote": "WS2812B RGB LED Strip Light Bundle",
+    "quote_kind": "title"
+   }
+  ],
+  "makers-supply-electronics-bundle": [
+   {
+    "also": "@bundles",
+    "route": "552709760852512768>552709760978341888",
+    "quote": "Maker's Supply Electronics Bundle",
+    "quote_kind": "title"
+   }
+  ],
+  "white-cct-tunable-cob-led-strip-light-combo-kit": [
+   {
+    "also": "@bundles",
+    "route": "552709760852512768>552709761460686848>552709761490046976",
+    "quote": "White CCT Tunable COB LED Strip Light Combo Kit",
+    "quote_kind": "title"
+   }
+  ],
+  "h2d": [
+   {
+    "also": "cat_laser_machines",
+    "route": "552709755391528960>666870992645718016>580901793339363328",
+    "quote": "Variant: H2D Laser Full Combo",
+    "quote_kind": "option_value"
+   }
+  ],
+  "hardened-steel-upgrade-combo": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024>552709758101049344>552709758130409472",
+    "quote": "Hardened Steel Upgrade Combo",
+    "quote_kind": "title"
+   }
+  ],
+  "cutting-essentials-refill-pack": [
+   {
+    "also": "@parts-a1",
+    "route": "552709758222684160>581727459719290880",
+    "quote": "Compatibility: H2 Series/A2L",
+    "quote_kind": "option_value"
+   }
+  ],
+  "3mm-laser-plywood-bamboo-trial-kit-30pcs": [
+   {
+    "also": "@bundles",
+    "route": "578424673239986176>778850988797755392",
+    "quote": "3mm Laser Plywood & Bamboo Trial Kit (30pcs)",
+    "quote_kind": "title"
+   }
+  ],
+  "laser-material-kit-–-starter-pack-for-h-series": [
+   {
+    "also": "@bundles",
+    "route": "578424673239986176>617637179092254720",
+    "quote": "Laser Material Kit – Starter Pack (For H Series)",
+    "quote_kind": "title"
+   }
+  ],
+  "h2s": [
+   {
+    "also": "cat_laser_machines",
+    "route": "552709755391528960>666870992645718016>636692373158055936",
+    "quote": "Variant: H2S Laser Full Combo",
+    "quote_kind": "option_value"
+   }
+  ],
+  "hotends-combo-h2-series": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024",
+    "quote": "Hotends Combo - H2 Series",
+    "quote_kind": "title"
+   }
+  ],
+  "cutting-material-kit-–-starter-pack": [
+   {
+    "also": "@bundles",
+    "route": "578424673239986176>617637179092254720",
+    "quote": "Cutting Material Kit – Starter Pack",
+    "quote_kind": "title"
+   }
+  ],
+  "cutting-mat-combo-3-pcs": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024",
+    "quote": "Cutting Mat Combo (3 pcs)",
+    "quote_kind": "title"
+   }
+  ],
+  "vortek-utility-hotends-bundle": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024>552709757979414528>581723483511627776",
+    "quote": "Vortek Utility Hotends Bundle",
+    "quote_kind": "title"
+   }
+  ],
+  "h2c": [
+   {
+    "also": "cat_laser_machines",
+    "route": "552709755391528960>666870992645718016>666871141714259968",
+    "quote": "Variant: H2C Laser Full Combo",
+    "quote_kind": "option_value"
+   }
+  ],
+  "material-mystery-box": [
+   {
+    "also": "@bundles",
+    "route": "578424673239986176>617637179092254720",
+    "quote": "Material Mystery Box",
+    "quote_kind": "title"
+   }
+  ],
+  "3d-effect-plate-full-combo": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024",
+    "quote": "3D Effect Plate Full Combo",
+    "quote_kind": "title"
+   }
+  ],
+  "pla-basic-color-trial-set": [
+   {
+    "also": "@bundles",
+    "route": "552709755819347968>552709757576761344",
+    "quote": "PLA Basic Color Trial Set",
+    "quote_kind": "title"
+   }
+  ],
+  "build-plate-combo": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024>552709757794865152",
+    "quote": "Build Plate Combo",
+    "quote_kind": "title"
+   }
+  ],
+  "external-exhaust-fan-bundle-x2d": [
+   {
+    "also": "@bundles",
+    "route": "552709757765505024",
+    "quote": "External Exhaust Fan Bundle - X2D",
+    "quote_kind": "title"
+   }
+  ],
+  "bambu-lab-a1-combo-starter-kit": [
+   {
+    "also": "@bundles",
+    "route": "552709755391528960>552709755571884032>552709755651575808",
+    "quote": "Bambu Lab A1 Combo Starter Kit",
+    "quote_kind": "title"
+   }
+  ],
+  "bambu-lab-p2s-combo-starter-kit": [
+   {
+    "also": "@bundles",
+    "route": "552709755391528960>552709755467026432>654452894413656064",
+    "quote": "Bambu Lab P2S Combo Starter Kit",
+    "quote_kind": "title"
+   }
+  ],
+  "bambu-lab-x2d-combo-starter-kit": [
+   {
+    "also": "@bundles",
+    "route": "552709755391528960>552709755429277696>720070020209332224",
+    "quote": "Bambu Lab X2D Combo Starter Kit",
+    "quote_kind": "title"
+   }
+  ],
+  "laser-material-starter-pack-for-r1": [
+   {
+    "also": "@bundles",
+    "route": "578424673239986176>578428755571482624",
+    "quote": "Laser Material - Starter Pack (For R1)",
+    "quote_kind": "title"
+   }
+  ],
+  "halloween-filament-special-combo": [
+   {
+    "also": "@bundles",
+    "route": "552709755819347968>552709757576761344",
+    "quote": "Halloween Filament Special Combo",
+    "quote_kind": "title"
+   }
+  ],
+  "hwb-pumpkinfamily": [
+   {
+    "also": "@bundles",
+    "route": "552709755819347968>552709757576761344",
+    "quote": "Halloween Special Bundle - Pumpkin Family",
+    "quote_kind": "title"
+   }
+  ],
+  "hwb-hauntedhouse": [
+   {
+    "also": "@bundles",
+    "route": "552709755819347968>552709757576761344",
+    "quote": "Halloween Special Bundle - Haunted House",
+    "quote_kind": "title"
+   }
+  ]
+ },
+ "collections": {
+  "_policy": "The run fetches no collection page (§J.1) and P0 crawled none, so no collection adds a membership; secondaries come only from page evidence (also_by_handle, route also). Non-type collections (marketing, SEO landings, legacy one-product, system) are ignored and their handles are omitted on purpose (they name promotions).",
+  "_ignored_non_type_counts": {
+   "system": 1,
+   "marketing": 57,
+   "legacy_single_product": 20,
+   "seo_landing": 6
+  },
+  "bambu-lab-3d-printer-filament": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bambu-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "3d-printer": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pla": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "petg": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pc-tpu": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "support": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pa-pet": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "functional": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "engineering": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "carbon-fiber": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "reusable-spool": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "all-filaments": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "asa-abs": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-excluding-ams-and-hub": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-strip-light": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "specialty": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "filament-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "starter-packs": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-extruders-parts-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-extruder-parts-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cooling-fans-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cooling-fans-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-parts-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-parts-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-parts-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-motors-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-motors-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-motors-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-parts-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-parts-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-parts-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-parts-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-parts-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-parts-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-ptfe-tubing-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-ptfe-tubing-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-ptfe-tubing-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bambu-lab-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bambu-lab-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bundles": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "all-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bambu-build-plates": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bambu-hotends": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-hotend-parts-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-hotend-parts-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-hotend-parts-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cooling-fans-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-extruder-parts-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "screws": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "machine-screws": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "makers-supply": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "hardware-parts": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "fasteners": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "self-tapping-screws": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "nuts": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "flat-washers": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "compression-spring": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "torsion-spring": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "magnets": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "dowel-pin": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "dowel-pin-1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "brass-dowel-pin": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bearings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plastic-deep-groove-ball-bearings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "steel-deep-groove-ball-bearings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "thrust-ball-bearings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "balls": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "stainless-steel-balls": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plastic-balls": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "electronics": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "motor-servos": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tt-motor": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "springs": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "battery-case-with-ph2-0-connector": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "components-module": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "cable-connector": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "hardware-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "diy-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "jumper-cable": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "round-magnet": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "usb-speed-controller": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "wire-pair-with-ph2-0": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maker-combo-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "n20-series-motor": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "2510-5v-dc-fan": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "fan": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "fiber-reinforced": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "stud": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "stud-1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bronze-bushings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "o-rings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-strip-connector-cable": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "solderless-quick-connector": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "3004-5v-slim-micro-fan": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "rubber-parts": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "timing-belt": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "mxl-timing-belt": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "xl-timing-belt": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "htd-timing-belt": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "rubber-gasket": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "seals-gaskets": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "rectangular-magnet": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "adhesives-tape": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "magnetic-stickers": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "others": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tubes": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "double-sided-foam-tapes": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tapes": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "reclosable-fastener-mounting-tape": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "decorations": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "suction-pad": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "suction-caps": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "rubber-bands": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maker-s-supply-models": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "digital-thermometer-hygrometer": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "temperature-humidity-measurement": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "split-ring-keychain": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "acrylic-tubes": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plastic-hose-barb-fittings": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "nylon-cord": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "candle-light": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "extension-springs": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "makerlab-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-screws-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-screws-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-screws-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-ams-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-screws-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-screws-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "remote-controlled-lights": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-filament-feeding-parts-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-filament-feeding-parts-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-spool-driving-parts-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-spool-driving-parts-ams": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-screen-camera-light-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-screen-camera-light-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-screen-camera-light-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-bundles": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-strip-connectors": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "printing-experience": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pc4-m6-pneumatic-connector": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "engine-model-components-kit": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "abs": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "asa": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pa": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pps": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-light-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "electric-push-rod": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "nfc-tag": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "smooth-ball-spring-plunger": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "helmet": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "030-micro-dc-motor": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "hardware-kits-bundle": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-pack": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maintenance-kit": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-lamp-kit-1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "wireless-mouse-components-kit": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plastic-reduction-gear-kit-1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "regular-maintenance-ams-lite": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "filament-refill": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "makers-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "x1e": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tpu": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "slip-ring": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-board": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "led-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "power-adapter": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "universal-joint-shaft-coupling": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "full-thread-rod": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "makers-supply-electronics-bundle": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "rod-end-boll-joint": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pc": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-ams-2-pro": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-extruder-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-fans-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-camera-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-tubing-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-laser-module": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-hotend-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-touchscreen-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-led-light-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-parts-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-cutting-module": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-ams-2-pro": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-spool-driving-parts-ams-2-pro": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-filament-feeding-parts-ams-2-pro": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-ams-2-pro": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-drying-parts-ams-2-pro": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-drying-parts-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-filament-feeding-parts-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-spool-driving-parts-ams-ht": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bambu-material": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "wood": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plywood": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "cork": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "bamboo": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "sticker-vinyl": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "heat-transfer-vinyl": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "removable-vinyl": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "reflective-decal-sheet": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "acrylic": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pu": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pu-leatherette-fabric": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pu-iron-on-patch": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "paper": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "miscellaneous": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "stainless-steel-tag": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "aluminium-card": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "auxiliary-materials": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "transfer-tape": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "blue-light-laser-engraving": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "blue-light-laser-cutting": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "blade-cutting": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "3mm": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "2mm": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "1-8mm": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "0-5mm": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "%E2%89%A4-0-4mm": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "h2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plastic-gear-kit": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "power-supplies": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "cyberbrick": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "engineering-filament": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "material-bundles": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "stainless-steel-eye-bolt": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessory-box": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "h2d-upgrade-kit": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "cyberbrick-models": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "cyberbrick-parts": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "cyberbrick-combo-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "material-model-kit": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-induction": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-blade-upgrade-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "wood-bamboo": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "filaments-for-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "filaments-for-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "filaments-for-p-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "filaments-for-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "3d-printer-models": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "art": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "education": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "fashion": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "hobby-diy": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "household": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "miniatures": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "props-cosplays": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "toys-games": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "generative-3d-model": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tools": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-h2-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-p1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-x1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-a1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maker-tools": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "workflow-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "parts-components": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "others-bom": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tools-bom": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maker-s-supply-models-bom": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maker-combo-kits-bom": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "makerlab-accessories-bom": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cooling-fans-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-screen-camera-light-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-x2d": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-p1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-p1-series": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-tubing-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cooling-fans-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-motors-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-screen-camera-lights-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-p1-series-and-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-p1-series-and-p2s": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-material": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "blade-cutting-material": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "metal": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-toolhead-parts-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-xyz-axis-parts-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-screen-camera-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-housing-parts-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-others-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-cables-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-circuit-boards-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-ptfe-tubing-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-heatbed-parts-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-consumables-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-a2l": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "aesthetic-filaments": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pu-patch-sticker": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "pu-miscellaneous": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "tumbler": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "felt-fabric-squares": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "rock": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-cutter-engraver": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "refurbished-3d-printers": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "crafting-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-accessories": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-crafting": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "crafting": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-source-optics-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "electronics-sensors-cables-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "motion-mechanical-parts-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "covers-enclosure-safety-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "maintenance-tools-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "air-assist-exhaust-filtration-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "laser-cooling-system-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "work-surface-fixtures-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "conveyor-parts-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "riser-base-parts-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "accessories-for-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "spare-parts-for-r1": {
+   "ignore": "type_collection_membership_not_crawled"
+  },
+  "plywood-acrylic-kits": {
+   "ignore": "type_collection_membership_not_crawled"
+  }
+ },
+ "leaf_limit": 250,
+ "leaf_counts": {
+  "@parts-h2": 133,
+  "@parts-p2x2": 111,
+  "cat_makers_kits": 107,
+  "@parts-a1": 94,
+  "@parts-x1p1": 93,
+  "cat_makers_hw": 78,
+  "@parts-laser": 69,
+  "@parts-ams": 62,
+  "cat_makers_elec": 59,
+  "cat_makers_cyber": 56,
+  "cat_materials_laser": 32,
+  "@printer-acc": 27,
+  "cat_makers_other": 25,
+  "cat_laser_acc": 22,
+  "cat_makers_combo": 17,
+  "@pla": 16,
+  "cat_maint_hotend": 13,
+  "cat_printers_fdm": 13,
+  "cat_makers_tools": 13,
+  "@ams": 12,
+  "cat_materials_blade": 9,
+  "cat_maint_plate": 8,
+  "@parts-common": 6,
+  "@engineering": 6,
+  "@filament-packs": 6,
+  "@support": 5,
+  "@abs-asa": 5,
+  "@petg": 5,
+  "@printers-refurb": 5,
+  "@tpu": 3,
+  "@pc": 2,
+  "@filament-acc": 2,
+  "cat_laser_machines": 1
+ },
+ "secondary_counts": {
+  "@parts-p2x2": 1,
+  "@fiber": 10,
+  "@bundles": 25,
+  "@parts-a1": 2,
+  "cat_laser_machines": 3
+ },
+ "nodes": {
+  "@abs-asa": {
+   "id": "@abs-asa",
+   "name_en": "ABS & ASA",
+   "name_ar": "ABS وASA",
+   "name_ckb": "ABS و ASA",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@ams": {
+   "id": "@ams",
+   "name_en": "AMS & filament feeding",
+   "name_ar": "أنظمة تغذية المواد (AMS)",
+   "name_ckb": "سیستەمەکانی پێدانی کەرەستە (AMS)",
+   "parent": "cat_pacc_fdm",
+   "new": true
+  },
+  "@bundles": {
+   "id": "@bundles",
+   "name_en": "Bundles & kits",
+   "name_ar": "الحزم والمجموعات",
+   "name_ckb": "کۆمەڵە و پاکێجەکان",
+   "parent": "cat_accessories",
+   "new": true
+  },
+  "@engineering": {
+   "id": "@engineering",
+   "name_en": "Engineering materials",
+   "name_ar": "مواد هندسية",
+   "name_ckb": "کەرەستەی ئەندازیاری",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@fiber": {
+   "id": "@fiber",
+   "name_en": "Fibre-reinforced",
+   "name_ar": "مواد مقوّاة بالألياف",
+   "name_ckb": "کەرەستەی بەهێزکراو بە ڕیشاڵ",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@filament-acc": {
+   "id": "@filament-acc",
+   "name_en": "Filament accessories",
+   "name_ar": "ملحقات الفلامنت",
+   "name_ckb": "پێداویستی فیلامێنت",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@filament-packs": {
+   "id": "@filament-packs",
+   "name_en": "Filament packs & bundles",
+   "name_ar": "باقات ومجموعات الفلامنت",
+   "name_ckb": "پاکێج و کۆمەڵەکانی فیلامێنت",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@parts-a1": {
+   "id": "@parts-a1",
+   "name_en": "A1 & A2L series parts",
+   "name_ar": "قطع غيار سلسلة A1 وA2L",
+   "name_ckb": "پارچە یەدەگەکانی زنجیرەی A1 و A2L",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@parts-ams": {
+   "id": "@parts-ams",
+   "name_en": "AMS parts",
+   "name_ar": "قطع غيار AMS",
+   "name_ckb": "پارچە یەدەگەکانی AMS",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@parts-common": {
+   "id": "@parts-common",
+   "name_en": "Parts for all series",
+   "name_ar": "قطع صيانة لكل السلاسل",
+   "name_ckb": "پارچەی چاککردنەوە بۆ هەموو زنجیرەکان",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@parts-h2": {
+   "id": "@parts-h2",
+   "name_en": "H2 series parts",
+   "name_ar": "قطع غيار سلسلة H2",
+   "name_ckb": "پارچە یەدەگەکانی زنجیرەی H2",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@parts-laser": {
+   "id": "@parts-laser",
+   "name_en": "R1 laser parts",
+   "name_ar": "قطع غيار ليزر R1",
+   "name_ckb": "پارچە یەدەگەکانی لەیزەری R1",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@parts-p2x2": {
+   "id": "@parts-p2x2",
+   "name_en": "P2S & X2D parts",
+   "name_ar": "قطع غيار P2S وX2D",
+   "name_ckb": "پارچە یەدەگەکانی P2S و X2D",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@parts-x1p1": {
+   "id": "@parts-x1p1",
+   "name_en": "X1 & P1 series parts",
+   "name_ar": "قطع غيار سلسلة X1 وP1",
+   "name_ckb": "پارچە یەدەگەکانی زنجیرەی X1 و P1",
+   "parent": "cat_maint_spare",
+   "new": true
+  },
+  "@pc": {
+   "id": "@pc",
+   "name_en": "PC",
+   "name_ar": "PC",
+   "name_ckb": "PC",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@petg": {
+   "id": "@petg",
+   "name_en": "PETG",
+   "name_ar": "PETG",
+   "name_ckb": "PETG",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@pla": {
+   "id": "@pla",
+   "name_en": "PLA",
+   "name_ar": "PLA",
+   "name_ckb": "PLA",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@printer-acc": {
+   "id": "@printer-acc",
+   "name_en": "Printer accessories & add-ons",
+   "name_ar": "ملحقات وإضافات الطابعات",
+   "name_ckb": "پێداویستی و زیادکراوەکانی چاپکەر",
+   "parent": "cat_pacc_fdm",
+   "new": true
+  },
+  "@printers-refurb": {
+   "id": "@printers-refurb",
+   "name_en": "Factory-refurbished printers",
+   "name_ar": "طابعات مجدَّدة من المصنع",
+   "name_ckb": "چاپکەرە نوێکراوەکانی کارگە",
+   "parent": "cat_printers_fdm",
+   "new": true
+  },
+  "@support": {
+   "id": "@support",
+   "name_en": "Support materials",
+   "name_ar": "مواد الدعم",
+   "name_ckb": "کەرەستەی پاڵپشت",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "@tpu": {
+   "id": "@tpu",
+   "name_en": "TPU",
+   "name_ar": "TPU",
+   "name_ckb": "TPU",
+   "parent": "cat_materials_fdm",
+   "new": true
+  },
+  "cat_laser_acc": {
+   "id": "cat_laser_acc",
+   "name_en": "Laser Accessories",
+   "name_ar": "ملحقات الليزر وقطع الصيانة",
+   "name_ckb": "پێداویستی لەیزەر",
+   "parent": "cat_laser",
+   "new": false
+  },
+  "cat_laser_machines": {
+   "id": "cat_laser_machines",
+   "name_en": "Laser Machines",
+   "name_ar": "ماكينات الليزر",
+   "name_ckb": "ئامێری لەیزەر",
+   "parent": "cat_laser",
+   "new": false
+  },
+  "cat_maint_hotend": {
+   "id": "cat_maint_hotend",
+   "name_en": "Hotends & Nozzles",
+   "name_ar": "رؤوس الطباعة والفوهات",
+   "name_ckb": "",
+   "parent": "cat_maint",
+   "new": false
+  },
+  "cat_maint_plate": {
+   "id": "cat_maint_plate",
+   "name_en": "Build Plates",
+   "name_ar": "ألواح الطباعة",
+   "name_ckb": "",
+   "parent": "cat_maint",
+   "new": false
+  },
+  "cat_makers_combo": {
+   "id": "cat_makers_combo",
+   "name_en": "Maker Combo Kits",
+   "name_ar": "باقات Maker",
+   "name_ckb": "کۆمبۆی Maker",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_makers_cyber": {
+   "id": "cat_makers_cyber",
+   "name_en": "CyberBrick RC",
+   "name_ar": "CyberBrick RC",
+   "name_ckb": "CyberBrick RC",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_makers_elec": {
+   "id": "cat_makers_elec",
+   "name_en": "Electronics",
+   "name_ar": "إلكترونيات",
+   "name_ckb": "ئەلیکترۆنیات",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_makers_hw": {
+   "id": "cat_makers_hw",
+   "name_en": "Hardware Parts",
+   "name_ar": "قطع هاردوير",
+   "name_ckb": "پارچەی هاردوێر",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_makers_kits": {
+   "id": "cat_makers_kits",
+   "name_en": "Model Kits",
+   "name_ar": "أطقم المجسمات",
+   "name_ckb": "کیتی مۆدێل",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_makers_other": {
+   "id": "cat_makers_other",
+   "name_en": "Others",
+   "name_ar": "أخرى",
+   "name_ckb": "ئەوانی تر",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_makers_tools": {
+   "id": "cat_makers_tools",
+   "name_en": "Maker Tools",
+   "name_ar": "أدوات Maker",
+   "name_ckb": "ئامرازی Maker",
+   "parent": "cat_makers",
+   "new": false
+  },
+  "cat_materials_blade": {
+   "id": "cat_materials_blade",
+   "name_en": "Blade Cutting Materials",
+   "name_ar": "مواد القص بالشفرة",
+   "name_ckb": "کەرەستەی بڕین بە تیغ",
+   "parent": "cat_materials",
+   "new": false
+  },
+  "cat_materials_laser": {
+   "id": "cat_materials_laser",
+   "name_en": "Laser Materials",
+   "name_ar": "مواد الليزر",
+   "name_ckb": "کەرەستەی لەیزەر",
+   "parent": "cat_materials",
+   "new": false
+  },
+  "cat_printers_fdm": {
+   "id": "cat_printers_fdm",
+   "name_en": "FDM Printers",
+   "name_ar": "طابعات FDM",
+   "name_ckb": "چاپکەری FDM",
+   "parent": "cat_printers",
+   "new": false
+  }
+ }
+}
