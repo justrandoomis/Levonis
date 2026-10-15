@@ -1435,6 +1435,16 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Add a photo for each damage you ticked.',
     ckb: 'بۆ هەر زیانێک کە هەڵتبژاردووە وێنەیەک زیاد بکە.',
   },
+  TRADE_IN_VALUE_ABOVE_CEILING: {
+    ar: 'هذه القيمة أعلى مما يستطيع المتجر دفعه للجهاز الآن. سيرسل لك المتجر قيمة جديدة.',
+    en: 'This value is above what the store can give for the device now. The store will send you a new value.',
+    ckb: 'ئەم بەهایە زیاترە لەوەی فرۆشگا ئێستا دەتوانێت بۆ ئامێرەکە بیدات. فرۆشگا بەهایەکی نوێت بۆ دەنێرێت.',
+  },
+  TRADE_IN_COMPLETION_PENDING: {
+    ar: 'الاستبدال الذي دُفع به هذا الطلب لم يكتمل بعد. أكمله أولاً ثم أعد المبلغ.',
+    en: 'The trade-in this order paid with is not complete yet. Complete it first, then refund the return.',
+    ckb: 'ئەو گۆڕینەوەیەی ئەم داواکارییەی پێ دراوە هێشتا تەواو نەبووە. سەرەتا تەواوی بکە، پاشان پارەکە بگەڕێنەوە.',
+  },
   // A Worker ahead of migration 0192: the new trade-in doors answer 503 until it lands.
   TRADE_IN_V2_NOT_INSTALLED: {
     ar: 'خدمة الاستبدال تُحدَّث الآن. حاول بعد قليل.',

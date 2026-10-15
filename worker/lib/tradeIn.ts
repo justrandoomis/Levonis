@@ -190,7 +190,9 @@ export type TradeInCode =
   | 'TRADE_IN_DEVICE_IN_SHOP'
   | 'TRADE_IN_MARGIN_ACK_REQUIRED'
   | 'TRADE_IN_HOURS_PHOTO'
-  | 'TRADE_IN_DAMAGE_PHOTO';
+  | 'TRADE_IN_DAMAGE_PHOTO'
+  | 'TRADE_IN_VALUE_ABOVE_CEILING'
+  | 'TRADE_IN_COMPLETION_PENDING';
 
 export class TradeInError extends Error {
   constructor(
@@ -247,6 +249,8 @@ const MESSAGES: Record<TradeInCode, string> = {
   TRADE_IN_MARGIN_ACK_REQUIRED: 'Confirm you understand the margin shrinks and may be a loss.',
   TRADE_IN_HOURS_PHOTO: 'Photograph the hours screen.',
   TRADE_IN_DAMAGE_PHOTO: 'Add a photo for each damage you ticked.',
+  TRADE_IN_VALUE_ABOVE_CEILING: 'This value is above what the store can give for the device now. The store will send you a new value.',
+  TRADE_IN_COMPLETION_PENDING: 'The trade-in this order paid with is not complete yet. Complete it first, then refund the return.',
 };
 
 const STATUS_OF: Partial<Record<TradeInCode, 400 | 403 | 409 | 429>> = {
@@ -2496,6 +2500,11 @@ async function fixValue(
   // Decision 2 (S-P2): no value is fixed, and no credit minted, before the device is in the shop.
   // The desk hears what to do; a customer accepting a proposal made on photos before S-P2 hears why.
   if (v2 && !req.intake_at) throw refuse(step.actor.role === 'admin' ? 'TRADE_IN_INTAKE_REQUIRED' : 'TRADE_IN_DEVICE_NOT_RECEIVED');
+  // Decision 3, at the one place money is fixed (review F-1/F-9): never above the server's ceiling
+  // unless the OWNER proposed it (`above_ceiling`, written by `changeValue` with the owner's grant).
+  // Whatever door led here — a proposal made on photos before S-P2, a stale tab — no figure above the
+  // ceiling becomes a credit without the owner.
+  if (v2 && value > approvalCeiling(req) && req.above_ceiling !== 1) throw refuse('TRADE_IN_VALUE_ABOVE_CEILING');
   const priced = await priceTarget(env, req.user_id, {
     product_id: req.target_product_id ?? '',
     option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),

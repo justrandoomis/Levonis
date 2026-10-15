@@ -230,6 +230,73 @@ test('a credit fixed before S-P2 and already spent on a live order: the device i
   assert.ok(r.intake_at);
 });
 
+test('review F-1/F-9: a value PROPOSED on photos before S-P2 above the intake ceiling is re-proposed at the ceiling — the old offer number is stale and no credit above the ceiling is fixed', async () => {
+  const raw = seed();
+  serialOnRecord(raw);
+  const id = await submitted(raw);
+  const offer = req(raw, id).offer_iqd as number;
+  const proposed = offer + 200_000;
+  // The state a pre-S-P2 request is in at deploy: v1, a financial admin proposed a value on photos.
+  raw.exec(`UPDATE trade_in_requests SET valuation_version = 1, offer_iqd = NULL, offer_at = NULL, offer_expires_at = NULL, status = 'value_changed',
+                   estimated_iqd = ${proposed}, admin_value_iqd = ${proposed}, admin_reason = 'ok', offer_no = 1 WHERE id = '${id}'`);
+  const res = await intake(raw, id, STAFF, { serial: 'A1SERIAL0001' });
+  assert.equal(res.status, 200, await res.clone().text());
+  await settle();
+  const r = req(raw, id);
+  assert.deepEqual([r.status, r.ceiling_iqd, r.admin_value_iqd, r.offer_no, r.admin_reason], ['value_changed', offer, offer, 2, 'بعد فحص الجهاز في المتجر']);
+  const notice = row<{ body_en: string }>(raw, 'SELECT body_en FROM user_notifications WHERE event_key = ?', `trade_in:${id}:offer:2`);
+  assert.ok(notice?.body_en.includes(`${proposed.toLocaleString('en-US')} IQD`), notice?.body_en);
+  const c = customerApp(raw);
+  // The answer to the old proposal is stale; the answer to the new one fixes the ceiling.
+  assert.deepEqual(await code(await post(c, `/api/trade-in/requests/${id}/accept`, { offer_no: 1 })), [409, 'TRADE_IN_OFFER_STALE']);
+  const ok = await json(await post(c, `/api/trade-in/requests/${id}/accept`, { offer_no: 2 }));
+  assert.equal(ok.request.status, 'awaiting_payment', JSON.stringify(ok));
+  const after = req(raw, id);
+  assert.deepEqual([after.final_value_iqd, after.credit_iqd], [offer, offer]);
+});
+
+test('review F-1/F-9: fixValue itself refuses a value above the ceiling unless the owner proposed it (above_ceiling)', async () => {
+  const raw = seed();
+  serialOnRecord(raw);
+  const id = await submitted(raw);
+  await intake(raw, id, STAFF, { serial: 'A1SERIAL0001' });
+  await settle();
+  const ceiling = req(raw, id).ceiling_iqd as number;
+  // A proposal above the ceiling that the owner did NOT make (a stale tab, a path not yet thought of).
+  raw.exec(`UPDATE trade_in_requests SET status = 'value_changed', admin_value_iqd = ${ceiling + 50_000}, offer_no = 1, above_ceiling = 0 WHERE id = '${id}'`);
+  assert.deepEqual(await code(await post(customerApp(raw), `/api/trade-in/requests/${id}/accept`, { offer_no: 1 })), [409, 'TRADE_IN_VALUE_ABOVE_CEILING']);
+  assert.equal(req(raw, id).status, 'value_changed');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ?', id), 0);
+  // The owner's proposal above the ceiling (recorded with a reason) is the customer's to accept.
+  raw.exec(`UPDATE trade_in_requests SET above_ceiling = 1 WHERE id = '${id}'`);
+  const ok = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/accept`, { offer_no: 1 }));
+  assert.equal(ok.request.status, 'awaiting_payment', JSON.stringify(ok));
+  assert.equal(req(raw, id).final_value_iqd, ceiling + 50_000);
+});
+
+test('review F-14: no offer today (the source model is not sold) is not an offer of zero — a legacy credit is not re-valued, the reason is recorded', async () => {
+  const raw = seed();
+  serialOnRecord(raw);
+  const id = await submitted(raw);
+  const legacy = 400_000;
+  raw.exec(`
+    INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_global, max_per_user, active, created_at, assigned_user_id, scope, product_id, trade_in_id, ends_at)
+      VALUES ('cpn_old', 'TIOLDCREDIT1', 'fixed_iqd', ${legacy}, 0, 1, 1, 1, '${daysAgo(3)}', 'cust', 'product', 'p_p1s', '${id}', NULL);
+    UPDATE trade_in_requests SET status = 'awaiting_payment', valuation_version = 1, offer_iqd = NULL, estimated_iqd = ${legacy}, final_value_iqd = ${legacy},
+                                 credit_iqd = ${legacy}, coupon_id = 'cpn_old' WHERE id = '${id}';
+    UPDATE products SET status = 'hidden' WHERE id = 'p_a1';
+  `);
+  helperRow(raw);
+  const res = await intake(raw, id, ASSISTANT, { serial: 'A1SERIAL0001' });
+  assert.equal(res.status, 200, await res.clone().text());
+  await settle();
+  const r = req(raw, id);
+  assert.deepEqual([r.status, r.ceiling_iqd, r.final_value_iqd, r.offer_no], ['awaiting_payment', legacy, legacy, 0]);
+  assert.equal(JSON.parse(r.intake_json).no_offer_reason, 'no_price_today');
+  assert.equal(row<{ active: number }>(raw, "SELECT active FROM coupons WHERE id = 'cpn_old'")!.active, 1);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE event_key LIKE ?", `trade_in:${id}:offer:%`), 0);
+});
+
 test('concurrency: two desks receive the same device at once — one wins, the other hears TRADE_IN_ALREADY_RECEIVED', async () => {
   const raw = seed();
   serialOnRecord(raw);

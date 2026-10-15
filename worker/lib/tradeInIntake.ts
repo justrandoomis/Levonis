@@ -15,10 +15,14 @@
  *     tolerance (max(+10 %, +50 h) by default);
  *   - recomputes the CEILING = min(the reference figure, the formula on the
  *     intake facts and TODAY's prices) — the most a financial admin may fix;
+ *     no offer today (no public price, below the minimum) keeps the reference
+ *     and records why: a missing price is never an offer of zero;
  *   - re-values a credit minted on photos before S-P2 (cut-over): the same
  *     coupon gets a fresh 7-day end when the ceiling covers it, else the
  *     request goes back to the customer at the ceiling (the coupon switched
- *     off until they accept — the one row for life, row 237).
+ *     off until they accept — the one row for life, row 237); a value only
+ *     PROPOSED on photos goes back to the customer at the ceiling when that
+ *     is lower.
  *
  * ONE BATCH, fenced: the conditional UPDATE (`intake_at IS NULL`, and 0192's
  * `trg_trade_in_intake_once` behind it), the token fence, the one-money-process
@@ -87,7 +91,7 @@ export async function recordedSerial(db: D1Database, req: Pick<RequestRow, 'orde
 
 export interface IntakeOutcome {
   request: RequestRow;
-  /** A credit fixed on photos before S-P2 went back to the customer at the lower ceiling (the value prompt follows). */
+  /** A credit fixed, or a value proposed, on photos before S-P2 went back to the customer at the lower ceiling (the value prompt follows). */
   revalued: boolean;
 }
 
@@ -158,7 +162,12 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
     nowIso,
   });
   const reference = referenceOf(req);
-  const ceiling = Math.max(0, Math.min(reference, o.offer_iqd ?? 0));
+  // NO OFFER TODAY IS NOT AN OFFER OF ZERO (review F-14): when the formula cannot price the device
+  // (no public price today, or below the minimum) the ceiling stays the reference and the reason is
+  // recorded for the desk — a credit minted on photos is never re-valued to nothing «after the
+  // inspection» for a price the device did not cause; the financial admin or the owner decides.
+  const noOffer = o.offer_iqd === null ? (o.no_offer_reason ?? 'no_price_today') : null;
+  const ceiling = noOffer ? reference : Math.max(0, Math.min(reference, o.offer_iqd ?? 0));
   const handover = input.handover;
   const pickupFee = handover === 'pickup' ? policy.pickup_fee_iqd : 0;
   const findings = sanitizeUserText(String(input.findings ?? ''), { max: 1000, singleLine: false });
@@ -168,16 +177,24 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
     hours_flag: hoursFlag,
     findings,
     serial_override: !!override,
+    ...(noOffer ? { no_offer_reason: noOffer } : {}),
     by: admin.id,
   });
 
-  // ---- the cut-over: a credit minted on photos before S-P2
+  // ---- the cut-over (spec §7): what was decided on photos before S-P2 is held to min(it, the ceiling)
+  //   - a credit minted on photos (awaiting payment, not spent): re-valued down, back to the customer;
+  //   - a value PROPOSED on photos (value_changed, review F-1/F-9): re-proposed at the ceiling when
+  //     that is lower — else the customer's «أوافق» would fix the old, higher figure with no owner.
   const legacyCredit = req.status === 'awaiting_payment' && !spent;
   const revalueDown = legacyCredit && ceiling < (req.final_value_iqd ?? 0);
-  const nextStatus = req.status === 'submitted' || req.status === 'under_review' ? 'under_review' : revalueDown ? 'value_changed' : req.status;
+  const reproposeDown = req.status === 'value_changed' && req.admin_value_iqd !== null && ceiling < req.admin_value_iqd;
+  const lowered = revalueDown || reproposeDown;
+  /** The figure the customer was holding before intake (the credit, or the proposal). */
+  const heldFigure = revalueDown ? (req.final_value_iqd ?? 0) : (req.admin_value_iqd ?? 0);
+  const nextStatus = req.status === 'submitted' || req.status === 'under_review' ? 'under_review' : lowered ? 'value_changed' : req.status;
   const creditEnds = new Date(Date.parse(nowIso) + policy.credit_valid_days * 86_400_000).toISOString();
   const token = randomToken(12);
-  const offerNo = revalueDown ? req.offer_no + 1 : req.offer_no;
+  const offerNo = lowered ? req.offer_no + 1 : req.offer_no;
   const reason = 'بعد فحص الجهاز في المتجر';
 
   const stmts: D1PreparedStatement[] = [
@@ -194,7 +211,7 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
                 tg_message_id = CASE WHEN ?12 = 1 THEN NULL ELSE tg_message_id END
           WHERE id = ?1 AND status = ?15 AND intake_at IS NULL`
       )
-      .bind(req.id, nowIso, admin.id, scanned || null, match, intakeJson, handover, pickupFee, ceiling, nextStatus, token, revalueDown ? 1 : 0, reason, offerNo, req.status),
+      .bind(req.id, nowIso, admin.id, scanned || null, match, intakeJson, handover, pickupFee, ceiling, nextStatus, token, lowered ? 1 : 0, reason, offerNo, req.status),
     fence(db, req.id, token),
     serviceFence(db, req.id, slot),
     ...comps.map((c) =>
@@ -215,7 +232,7 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
   stmts.push(
     eventStatement(db, req.id, { id: admin.id, role: 'admin' }, 'intake', req.status, nextStatus, { serial_match: match, hours_flag: hoursFlag, handover }, nowIso)
   );
-  if (revalueDown) {
+  if (lowered) {
     stmts.push(
       eventStatement(db, req.id, { id: admin.id, role: 'admin' }, 'change_value', req.status, 'value_changed', { value_iqd: ceiling, reason, offer_no: offerNo }, nowIso),
       notifyStatement(db, {
@@ -223,12 +240,12 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
         kind: 'trade_in',
         title_ar: 'قيمة جديدة لجهازك — مطلوب موافقتك',
         title_en: 'A new value for your device — your decision is needed',
-        body_ar: `${iqdText(req.final_value_iqd ?? 0, 'ar')} ← ${iqdText(ceiling, 'ar')} — ${reason}.`,
-        body_en: `${iqdText(req.final_value_iqd ?? 0, 'en')} → ${iqdText(ceiling, 'en')} — after the device was inspected at the store.`,
+        body_ar: `${iqdText(heldFigure, 'ar')} ← ${iqdText(ceiling, 'ar')} — ${reason}.`,
+        body_en: `${iqdText(heldFigure, 'en')} → ${iqdText(ceiling, 'en')} — after the device was inspected at the store.`,
         meta: {
           offer_no: offerNo,
           title_ckb: 'بەهایەکی نوێ بۆ ئامێرەکەت — پێویستە بڕیار بدەیت',
-          body_ckb: `${iqdText(req.final_value_iqd ?? 0, 'ckb')} ← ${iqdText(ceiling, 'ckb')} — دوای پشکنینی ئامێرەکە لە فرۆشگا.`,
+          body_ckb: `${iqdText(heldFigure, 'ckb')} ← ${iqdText(ceiling, 'ckb')} — دوای پشکنینی ئامێرەکە لە فرۆشگا.`,
         },
         link: requestPath(req.id),
         entity_type: 'trade_in',
@@ -255,7 +272,8 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
         hours_flag: hoursFlag,
         ceiling_iqd: ceiling,
         ...(override ? { serial_override_reason: override } : {}),
-        ...(revalueDown ? { revalued_to_iqd: ceiling } : {}),
+        ...(lowered ? { revalued_to_iqd: ceiling } : {}),
+        ...(noOffer ? { no_offer_reason: noOffer } : {}),
       })
     ).statements
   );
@@ -271,7 +289,7 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
     }
     throw e;
   }
-  return { request: (await loadRequest(db, req.id))!, revalued: revalueDown };
+  return { request: (await loadRequest(db, req.id))!, revalued: lowered };
 }
 
 /**
