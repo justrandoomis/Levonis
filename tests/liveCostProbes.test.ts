@@ -633,6 +633,22 @@ test('catalog-only: s1.json and leaks.json read their slug as OPTIONAL, and clea
   assert.doesNotMatch(wf.slice(readAt, probesAt), /\$\{\{\s*secrets\./, 'the read and the probes take no secret of their own');
 });
 
+test('workflow 7\'s read, run on the migrated schema: it picks the shown, not-yet-priced product — never one hidden for a missing picture, and still one held only from sale', async () => {
+  const wf = sourceOf('.github/workflows/deploy-staging-code.yml');
+  const read = /--command "([^"]+)"\s*\\\n\s*> \/tmp\/unpriced_slug\.json/.exec(wf);
+  assert.ok(read, 'the read step and its SQL are found');
+  const sql = read![1]!;
+  const w = await catalogOnlyWorld();
+  const picked = () => (w.raw.prepare(sql).all() as Array<{ slug: string }>).map((r) => r.slug);
+  assert.deepEqual(picked(), [CAT.slug], 'the one shown, unpriced product (every other one is priced)');
+  w.raw.exec(`INSERT INTO product_completeness (product_id, complete, held, missing_json, missing_count, computed_at)
+              VALUES ('${CAT.id}', 0, 1, '[{"c":"IMAGE","o":""}]', 1, '2026-10-15T00:00:00.000Z')`);
+  assert.deepEqual(picked(), [], 'held for a missing picture: hidden, so never picked');
+  w.raw.exec(`UPDATE product_completeness SET missing_json = '[{"c":"NAME_AR","o":""}]' WHERE product_id = '${CAT.id}'`);
+  assert.deepEqual(picked(), [CAT.slug], 'held from sale only (an Arabic name missing): still shown, still picked');
+  assert.equal((await w.guest(`/api/products/${CAT.slug}`)).status, 200, 'and its page answers, as cleanstart.json expects');
+});
+
 test('the cut-over, nothing priced yet: cleanstart.json finds the not-yet-priced product SHOWN, unpriced; the whole run is green with only the {slug} probes skipped', async () => {
   const raw = freshDb();
   raw.exec('PRAGMA foreign_keys = OFF;');
