@@ -11,8 +11,9 @@
  *
  * The allow-list names each remaining site and why it is not a product's
  * price: a composition editor's own field, a chat deal's snapshot, an order,
- * an offer row, a SELLABLE-only trade-in target. A new entry needs the same
- * kind of reason.
+ * an offer row. A new entry needs the same kind of reason. (The trade-in
+ * desk's fallback left with Services S-P2's rewrite of AdminTradeIn.tsx, so
+ * its entry went with it.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,7 +27,6 @@ const BANNED = [/price_iqd \?\? 0\b/, /display_price_iqd \?\? 0\b/, /price_iqd\)
 /** file → [how many matches are allowed, why none of them is a catalogue product's price]. */
 const ALLOWED: Record<string, [number, string]> = {
   'src/components/adminOffers/AdminOffers.tsx': [1, "an offer row's own offer_price_iqd in the admin offers editor"],
-  'src/components/adminTradeIn/AdminTradeIn.tsx': [1, 'a trade-in target is SELLABLE-only (spec §2 #50): it always carries a price'],
   'src/components/chat/cards/OrderCards.tsx': [1, "a chat custom order's frozen snapshot price, not a catalogue read"],
   'src/components/chat/cards/DealCards.tsx': [2, "a chat deal's frozen snapshot price, not a catalogue read"],
   'src/components/adminMystery/AdminMystery.tsx': [1, "the mystery composition editor's own owner-set field"],
