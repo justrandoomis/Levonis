@@ -130,7 +130,8 @@ export default function DeviceList({
           <div className="relative">
             <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto h-4 w-4 text-text-muted" aria-hidden />
             <input
-              type="search"
+              type="text"
+              inputMode="search"
               className="lv-input ps-9 pe-11 text-[14px]"
               value={query}
               onChange={(e) => onQuery(e.target.value)}
@@ -185,12 +186,12 @@ export default function DeviceList({
                       <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-bold leading-5 text-text-primary line-clamp-2">{u.name}</span>
                         {u.variant ? <span className="block truncate text-[12px] text-text-muted">{u.variant}</span> : null}
-                        <span className="block text-[12px] text-text-secondary tabular-nums">
-                          <bdi dir="ltr">{t('orderNo', { id: u.order_id })}</bdi>
-                          {' · '}
-                          {t('delivered', {
-                            date: dateText(u.delivered_at, lang),
-                          })}
+                        <span className="flex flex-wrap gap-x-1.5 text-[12px] text-text-secondary tabular-nums">
+                          <bdi dir="ltr" className="whitespace-nowrap">
+                            {t('orderNo', { id: u.order_id })}
+                          </bdi>
+                          <span aria-hidden>·</span>
+                          <span className="whitespace-nowrap">{t('delivered', { date: dateText(u.delivered_at, lang) })}</span>
                         </span>
                         <span className="block text-[12px] text-text-secondary">{warranty(u)}</span>
                         {opens && u.stage ? (

@@ -249,7 +249,7 @@ export default function OfferScreen({
       {!noOffer ? (
         <div className="sticky bottom-[calc(var(--nav-stack,0px)+8px)] z-20 lg:static">
           <div className="rounded-2xl border border-border-subtle bg-surface-raised p-2 shadow-dock lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
-            <Button variant="accent" block onClick={send} disabled={asking || (!offer && !limitReached)} data-trade-in-send>
+            <Button variant="primary" block onClick={send} disabled={asking || (!offer && !limitReached)} data-trade-in-send>
               {t('send')}
             </Button>
           </div>

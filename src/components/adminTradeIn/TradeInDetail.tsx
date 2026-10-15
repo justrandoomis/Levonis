@@ -21,7 +21,7 @@ import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, anglesFor, type TradeInFamily } from '../../../packages/pricing/src/tradeIn';
 import { timeLeftWords, warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 import VariantImg from '../ui/VariantImg';
-import { dateText, nameOf, triText } from '../tradeIn/model';
+import { dateText, labelOf, nameOf, triText } from '../tradeIn/model';
 import { useA } from './useA';
 import { chipTone } from './TradeInQueue';
 import { refreshServicesBadge } from './servicesBadge';
@@ -57,6 +57,23 @@ function chipOf(r: AdminRequestView): QueueChip {
       return 'closed';
   }
 }
+
+/** The customer's answers by name (ComponentInputs keys): the desk never reads a raw key. */
+const ANSWER_LABELS: Record<string, AdminKey> = {
+  hours: 'f.hours',
+  cleanliness: 'f.cleanliness',
+  exterior: 'f.exterior',
+  scratches: 'f.scratches',
+  faults: 'f.faults',
+  repairs_count: 'f.repairs_count',
+  replaced_parts: 'f.replaced_parts',
+  accessory_condition: 'f.accessory_condition',
+  original_accessories: 'f.original_accessories',
+  fault_notes: 'f.fault_notes',
+  repair_notes: 'f.repair_notes',
+  notes: 'f.notes',
+};
+const SCORES = new Set(['cleanliness', 'exterior', 'scratches', 'accessory_condition']);
 
 export default function TradeInDetail({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
   const { a, money, loc, lang } = useA();
@@ -151,6 +168,21 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
     const x = [...anglesFor(family, 2), ...REQUIRED_PHOTOS[family], OPTIONAL_PHOTO].find((p) => p.id === id);
     return x ? loc(x.label_ar, x.label_en, x.label_ckb) : id;
   };
+  const answerLabel = (field: string) => (ANSWER_LABELS[field] ? a(ANSWER_LABELS[field]) : field.replace(/_/g, ' '));
+  /** One answer in words: checklist ids by their names, scores out of five, the accessories by name. */
+  const answerText = (role: string, field: string, v: unknown): string => {
+    if (v === null || v === undefined || v === '') return '—';
+    const family = r?.components.find((c) => c.role === role)?.family;
+    if (Array.isArray(v)) {
+      if (!v.length) return '—';
+      const q = family ? r?.questions?.[family] : undefined;
+      const list = field === 'faults' ? q?.faults : field === 'replaced_parts' ? q?.replaced_parts : undefined;
+      return v.map((id) => list?.find((x) => x.id === id)).map((x, i) => (x ? labelOf(x, loc) : String(v[i]))).join('، ');
+    }
+    if (field === 'original_accessories') return a(v === 'all' ? 'acc.all' : v === 'partial' ? 'acc.some' : 'acc.none');
+    if (SCORES.has(field) && typeof v === 'number') return a('f.score', { n: v });
+    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+  };
   const fact = (k: AdminKey, v: React.ReactNode) => (
     <div className="min-w-0">
       <dt className={`text-[11.5px] ${T.text3}`}>{a(k)}</dt>
@@ -159,7 +191,7 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
   );
 
   return (
-    <Modal titleAr={title} titleEn={lang === 'en' ? '' : 'Trade-in request'} onClose={onClose} wide footer={footer}>
+    <Modal titleAr={title} titleEn={r?.id ?? ''} onClose={onClose} wide footer={footer}>
       {!r ? (
         <p className={`py-10 text-center text-[13px] ${T.text3}`}>{error || a('loading')}</p>
       ) : (
@@ -176,7 +208,7 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                   {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en, FAMILY_LABELS[r.family].ckb)} · {a(scopeKey)}
                 </p>
               </div>
-              <span className={`${T.badgeBase} ${chipTone(chipOf(r))}`}>{triText(r.stage_label, loc)}</span>
+              <span className={`${T.badgeBase} ${chipTone(chipOf(r))}`}>{chipOf(r) === 'closed' ? triText(r.stage_label, loc) : a(`chip.${chipOf(r)}` as AdminKey)}</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1">
               {serialKey ? (
@@ -284,15 +316,12 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                         <tbody>
                           {r.declared_vs_intake.map((d, i) => (
                             <tr key={i} className="border-t border-[var(--ap-hairline)]">
-                              <td className="py-1" dir="ltr">
-                                {d.field}
+                              <td className="py-1">
+                                {answerLabel(d.field)}
+                                {r.components.length > 1 ? <span className={T.text3}> · {a(d.role === 'ams' ? 'part.ams' : 'part.device')}</span> : null}
                               </td>
-                              <td className="py-1" dir="ltr">
-                                {JSON.stringify(d.declared)}
-                              </td>
-                              <td className="py-1 font-semibold" dir="ltr">
-                                {JSON.stringify(d.seen)}
-                              </td>
+                              <td className="py-1 tabular-nums">{answerText(d.role, d.field, d.declared)}</td>
+                              <td className="py-1 font-semibold tabular-nums">{answerText(d.role, d.field, d.seen)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -317,6 +346,12 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                     </div>
                   ) : null}
                 </section>
+              ) : null}
+
+              {ownerScope ? (
+                <Suspense fallback={<p className={`text-[12.5px] ${T.text3}`}>{a('loading')}</p>}>
+                  <OwnerValuationPanel requestId={r.id} />
+                </Suspense>
               ) : null}
 
               {r.components.map((c) => (
@@ -351,11 +386,6 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
             </div>
 
             <aside className="space-y-4">
-              {ownerScope ? (
-                <Suspense fallback={<p className={`text-[12.5px] ${T.text3}`}>{a('loading')}</p>}>
-                  <OwnerValuationPanel requestId={r.id} />
-                </Suspense>
-              ) : null}
               {data?.customer ? (
                 <section className={`${T.surface} space-y-1 p-4 text-[13px]`}>
                   <h3 className="mb-1 text-[14px] font-bold">{a('customer')}</h3>

@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
 import { COPY, copyText } from '../src/components/tradeIn/copy';
+import { dateText } from '../src/components/tradeIn/model';
 import { ADMIN_COPY, adminText } from '../src/components/adminTradeIn/copy';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 
@@ -147,4 +148,21 @@ test('the admin «الخدمات» group holds the trade-in desk and the price-p
   assert.match(admin, /id: 'trade_in', icon: Repeat, label: loc\('الاستبدال', 'Trade-in', 'گۆڕینەوە'\), badge: servicesWaiting\?\.trade_in \?\? 0, \.\.\.section\('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان'\)/);
   assert.match(admin, /id: 'price_protection', icon: ShieldCheck, label: loc\('حماية السعر', 'Price protection', 'پاراستنی نرخ'\), badge: servicesWaiting\?\.price_protection \?\? 0, \.\.\.section\('services'/);
   assert.match(read('src/components/adminTradeIn/servicesBadge.ts'), /\/api\/admin\/services\/badge/);
+});
+
+test('a Sorani date is written in Sorani, never with the Arabic month names (the browser may carry no ckb calendar)', () => {
+  const ckb = dateText('2026-10-15T09:00:00.000Z', 'ckb');
+  assert.match(ckb, /تشرینی یەکەم/);
+  assert.doesNotMatch(ckb, /تشرين الأول/);
+  assert.match(dateText('2026-10-15T09:00:00.000Z', 'ar'), /2026/);
+  assert.equal(dateText(null, 'ckb'), '—');
+});
+
+test('the desk names every answer of the declared-vs-inspected table (no raw key reaches the page)', () => {
+  const detail = read('src/components/adminTradeIn/TradeInDetail.tsx');
+  for (const k of ['hours', 'cleanliness', 'exterior', 'scratches', 'faults', 'repairs_count', 'replaced_parts', 'accessory_condition', 'original_accessories', 'fault_notes', 'repair_notes', 'notes']) {
+    assert.match(detail, new RegExp(`\\b${k}: 'f\\.${k}'`), k);
+    assert.ok(`f.${k}` in ADMIN_COPY, `f.${k}`);
+  }
+  assert.doesNotMatch(detail, /\{d\.field\}|JSON\.stringify\(d\.(declared|seen)\)/);
 });

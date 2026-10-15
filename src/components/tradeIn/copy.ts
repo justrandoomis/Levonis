@@ -67,7 +67,7 @@ export const COPY = {
   // ------------------------------------------------------------ 1 «أجهزتك»
   'tab.devices': ['أجهزتي', 'My devices', 'ئامێرەکانم'],
   'tab.requests': ['طلباتي للاستبدال', 'My trade-ins', 'داواکارییەکانی گۆڕینەوەم'],
-  search: ['ابحث باسم الجهاز أو رقم الطلب', 'Search by device name or order number', 'بە ناوی ئامێر یان ژمارەی داواکاری بگەڕێ'],
+  search: ['ابحث باسم الجهاز أو رقم الطلب', 'Search devices or orders', 'بە ناوی ئامێر یان ژمارەی داواکاری بگەڕێ'],
   clearSearch: ['مسح البحث', 'Clear the search', 'سڕینەوەی گەڕان'],
   orderNo: ['طلب #{id}', 'Order #{id}', 'داواکاری #{id}'],
   delivered: ['استُلم {date}', 'Delivered {date}', 'لە {date} گەیەندرا'],
@@ -172,7 +172,7 @@ export const COPY = {
   'target.change': ['غيّر', 'Change', 'بیگۆڕە'],
   'target.none': ['لا أجهزة تطابق «{q}»', 'No devices match “{q}”', 'هیچ ئامێرێک لەگەڵ «{q}» ناگونجێت'],
   'target.featured': ['أجهزة مقترحة', 'Suggested devices', 'ئامێرە پێشنیارکراوەکان'],
-  'target.results': ['نتائج متوفرة للبيع المباشر', 'Results in stock for direct sale', 'ئەنجامە بەردەستەکان بۆ فرۆشتنی ڕاستەوخۆ'],
+  'target.results': ['النتائج: {n}', 'Results: {n}', 'ئەنجامەکان: {n}'],
   'target.loadError': ['تعذّر تحميل الأجهزة.', 'Could not load the devices.', 'ئامێرەکان بار نەکران.'],
   'target.empty': ['لم تختر جهازاً بعد', 'You have not chosen a device yet', 'هێشتا ئامێرێکت هەڵنەبژاردووە'],
   'target.allResults': ['كل النتائج', 'All results', 'هەموو ئەنجامەکان'],

@@ -216,7 +216,8 @@ export default function ConditionScreen({
           <label id={`hours-${comp.role}`} htmlFor={`hours-input-${comp.role}`} className="block text-[15px] font-bold text-text-primary">
             {t(comp.family === 'laser' ? 'hours.qLaser' : 'hours.q')}
           </label>
-          <div className="relative">
+          {/* One direction for the figure and its unit: the digits never run under «ساعة». */}
+          <div className="relative" dir="ltr">
             <input
               id={`hours-input-${comp.role}`}
               className="lv-input pe-16 text-[18px] font-bold tabular-nums"

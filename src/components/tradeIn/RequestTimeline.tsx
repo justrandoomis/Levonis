@@ -222,7 +222,7 @@ export default function RequestTimeline({ id, onResume, onBack }: { id: string; 
   const ending = ENDINGS[stage];
 
   const buyButton = (label: CopyKey) => (
-    <Button variant="accent" block onClick={() => (stage === 'credit_reissued' ? setAnySheet(true) : pay())} loading={busy === 'pay'} disabled={!req.can.pay} data-pay>
+    <Button variant="primary" block onClick={() => (stage === 'credit_reissued' ? setAnySheet(true) : pay())} loading={busy === 'pay'} disabled={!req.can.pay} data-pay>
       {t(label)}
     </Button>
   );
@@ -306,7 +306,7 @@ export default function RequestTimeline({ id, onResume, onBack }: { id: string; 
                 <Button variant="secondary" onClick={() => setConfirm('reject')} data-reject>
                   {t('reject')}
                 </Button>
-                <Button variant="accent" onClick={() => decide('accept')} loading={busy === 'accept'} data-accept>
+                <Button variant="primary" onClick={() => decide('accept')} loading={busy === 'accept'} data-accept>
                   {t('accept')}
                 </Button>
               </div>

@@ -233,7 +233,9 @@ export default function TargetSearchSheet({
         </p>
       ) : (
         <>
-          <p className="text-[12px] font-semibold text-text-secondary">{q.trim().length >= 2 ? t('target.results') : t('target.featured')}</p>
+          <p className="text-[12px] font-semibold text-text-secondary" role="status">
+            {q.trim().length >= 2 ? t('target.results', { n: list.length }) : t('target.featured')}
+          </p>
           <ul className="space-y-2" data-target-results>
             {list.map((o) => (
               <li key={o.product_id}>
@@ -290,7 +292,8 @@ export default function TargetSearchSheet({
             <div className="relative">
               <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto h-4 w-4 text-text-muted" aria-hidden />
               <input
-                type="search"
+                type="text"
+                inputMode="search"
                 className="lv-input ps-9 pe-11 text-[14px]"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}

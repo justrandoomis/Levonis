@@ -333,14 +333,31 @@ export function dateText(iso: string | null | undefined, lang: Language | string
   if (!iso) return '—';
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return '—';
-  // Sorani first where the browser has it, the Arabic calendar names where it does not.
-  const locales = lang === 'en' ? 'en-GB' : lang === 'ckb' ? ['ckb-IQ-u-nu-latn', 'ar-IQ-u-nu-latn'] : 'ar-IQ-u-nu-latn';
-  return d.toLocaleDateString(locales, {
+  // Sorani month names written here: many browsers carry no `ckb` calendar data and would fall back
+  // to the Arabic names (a ckb slot never shows the Arabic — DECISIONS row 183).
+  if (lang === 'ckb') return `${d.getDate()} ${CKB_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'ar-IQ-u-nu-latn', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
 }
+
+/** The Gregorian months in Sorani, as Iraqi Kurdistan writes them. */
+const CKB_MONTHS = [
+  'کانوونی دووەم',
+  'شوبات',
+  'ئازار',
+  'نیسان',
+  'ئایار',
+  'حوزەیران',
+  'تەممووز',
+  'ئاب',
+  'ئەیلوول',
+  'تشرینی یەکەم',
+  'تشرینی دووەم',
+  'کانوونی یەکەم',
+] as const;
 
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
