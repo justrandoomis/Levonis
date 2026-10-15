@@ -76,6 +76,8 @@ const CUSTOMER_FILES = [
   'worker/routes/reviews.ts',
   'worker/routes/returns.ts',
   'worker/entrypoints/CatalogEntrypoint.ts',
+  // The Bambu import spec §G.1: the knowledge answer links a relation's target only while it is VISIBLE.
+  'worker/lib/knowledge/productKnowledge.ts',
 ];
 
 /** Reviewed lines that are NOT a platform product's visibility: file → substrings, each with its reason. */
@@ -228,7 +230,10 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/orders.ts': { visible: 0, sellable: 3, states: 0 },
   'worker/routes/priceReports.ts': { visible: 1, sellable: 1, states: 0 },
   'worker/routes/printerFinder.ts': { visible: 1, sellable: 1, states: 0 },
-  'worker/routes/products.ts': { visible: 7, sellable: 12, states: 0 },
+  // +1 VISIBLE: `/:slug/knowledge` is gated on the product page's own question (the Bambu import spec §G.1).
+  'worker/routes/products.ts': { visible: 8, sellable: 12, states: 0 },
+  // The knowledge answer's relation targets: a link only to a VISIBLE product (§B.6), else the label alone.
+  'worker/lib/knowledge/productKnowledge.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/routes/profile.ts': { visible: 2, sellable: 1, states: 0 },
   'worker/routes/returns.ts': { visible: 0, sellable: 2, states: 0 },
   'worker/routes/reviews.ts': { visible: 2, sellable: 0, states: 0 },

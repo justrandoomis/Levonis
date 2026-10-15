@@ -29,6 +29,7 @@ import {
   type PhysicalDimensionOverrides,
   type PriceFields,
 } from './pricing';
+import { withKnowledgeFallback } from './knowledge/schema';
 
 export interface OptionGroupRow {
   id: string;
@@ -373,6 +374,52 @@ export const VALUES_ORDER_SQL =
     ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`;
 
 /**
+ * 0194 (the Bambu import spec §G.1): the same values in the same order, each
+ * with its OFFICIAL SWATCH joined in the same statement — so the page body
+ * carries it with no new D1 wave (tests/d1Waves.test.ts). An allow-list: the
+ * picture, its size and a hex the manufacturer published. The swatch row's
+ * owner-only provenance (`source_url`, `hex_source_ref`) and its storage key
+ * are never selected. `where` names the values by `v.product_id`.
+ *
+ * Only a database with 0194 can run it; the readers send it optimistically and
+ * fall back to `VALUES_ORDER_SQL` on the missing-table refusal
+ * (worker/lib/knowledge/schema.ts).
+ */
+export const valuesWithSwatchSql = (where: string): string =>
+  `SELECT v.*, s.url AS swatch_url, s.width AS swatch_width, s.height AS swatch_height, s.published_hex AS swatch_published_hex
+     FROM product_option_values v
+     LEFT JOIN product_option_groups g ON g.id = v.group_id
+     LEFT JOIN product_option_value_swatches s ON s.option_value_id = v.id AND s.product_id = v.product_id
+    WHERE ${where}
+    ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`;
+
+const SWATCH_COLUMNS = ['swatch_url', 'swatch_width', 'swatch_height', 'swatch_published_hex'] as const;
+
+/**
+ * The joined swatch columns folded into one `swatch` object per value (absent
+ * when the value has none), and the flat columns dropped, so a value row reads
+ * exactly as before plus `swatch`.
+ */
+export function foldSwatches<T extends Record<string, unknown>>(rows: readonly T[]): OptionValueRow[] {
+  return rows.map((row) => {
+    const out: Record<string, unknown> = { ...row };
+    for (const k of SWATCH_COLUMNS) delete out[k];
+    const url = typeof row.swatch_url === 'string' ? row.swatch_url : '';
+    const hex = typeof row.swatch_published_hex === 'string' ? row.swatch_published_hex : '';
+    if (url || hex) {
+      const swatch: OptionValueSwatch = {
+        url,
+        width: typeof row.swatch_width === 'number' ? row.swatch_width : null,
+        height: typeof row.swatch_height === 'number' ? row.swatch_height : null,
+        published_hex: hex,
+      };
+      out.swatch = swatch;
+    }
+    return out as unknown as OptionValueRow;
+  });
+}
+
+/**
  * 0073. A MERGED-AWAY ROW IS HISTORY, NOT A MODEL.
  *
  * `merged_into` names the model a duplicate was folded into. Those rows are
@@ -385,17 +432,36 @@ export function liveValues(values: OptionValueRow[]): OptionValueRow[] {
   return values.filter((v) => !String(v.merged_into ?? '').trim());
 }
 
-/** Loads every relational piece of one product in four indexed reads. */
+/**
+ * Loads every relational piece of one product in four indexed reads.
+ *
+ * `swatches` (the customer's view, worker/lib/productOverlay.ts
+ * `loadRelationsView`): each value carries its 0194 swatch, joined in the same
+ * statement. The admin readers (the relations GET, the save path, the legacy
+ * money holds) leave it off and read exactly the rows they always did. The
+ * groups are `SELECT *` either way, so 0194's four group columns (name_ar,
+ * name_ckb, kind, default_value_id) arrive whenever the database has them.
+ */
 export async function loadProductRelations(
   db: D1Database,
-  productId: string
+  productId: string,
+  opts: { swatches?: boolean } = {}
 ): Promise<ProductRelations> {
+  const plainValues = () => db.prepare(VALUES_ORDER_SQL).bind(productId).all<OptionValueRow>();
   const [groups, values, colors, links, fulfillments, transports] = await Promise.all([
     db
       .prepare('SELECT * FROM product_option_groups WHERE product_id = ? ORDER BY sort, name_en')
       .bind(productId)
       .all<OptionGroupRow>(),
-    db.prepare(VALUES_ORDER_SQL).bind(productId).all<OptionValueRow>(),
+    opts.swatches
+      ? withKnowledgeFallback(
+          db,
+          async () => ({
+            results: foldSwatches((await db.prepare(valuesWithSwatchSql('v.product_id = ?')).bind(productId).all<Record<string, unknown>>()).results ?? []),
+          }),
+          plainValues
+        )
+      : plainValues(),
     db
       .prepare('SELECT * FROM product_colors WHERE product_id = ? ORDER BY sort, name_en')
       .bind(productId)
