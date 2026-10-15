@@ -9,10 +9,11 @@ force-pushes, or alternate deployment path.
 Server, client, admin and the local browser e2e (`scripts/e2e-catalog-only.mjs`) are all on the branch.
 Read `docs/PRICING-V2.md` §9.
 
-- Migration **0193_price_requests.sql** (two new tables, additive). S-P2 (trade-in) claims **0192**.
-  `EXPECTED_MIGRATION` / `EXPECTED_MIGRATION_COUNT` are `0193_price_requests.sql` / 185 on this branch;
-  whichever of the two lands second sets the name to 0193 and the count to 186 in its landing commit
-  (`tests/schemaVersion.test.ts`). Either order applies cleanly (wrangler applies every unapplied file).
+- Migration **0193_price_requests.sql** (two new tables, additive). The branch is rebased onto
+  `a1a130dc` (Services S-P2 live, 0192): `EXPECTED_MIGRATION` / `EXPECTED_MIGRATION_COUNT` are
+  `0193_price_requests.sql` / 186 (`tests/schemaVersion.test.ts`). S-P2's new trade-in readers — the target
+  search, the product page's trade-in entry, «سعر اليوم» (`worker/lib/tradeInTargets.ts`,
+  `worker/lib/tradeInToday.ts`) — ask SELLABLE.
 - The listing predicate is two: VISIBLE (catalogue) and SELLABLE (purchase). **What customers see at
   deploy**: every active product that is not V2-published (and every V2 product held by the owner's
   switch for a commercial gap) is SHOWN — listing, search, sections, its page, the public API, the
@@ -26,12 +27,24 @@ Read `docs/PRICING-V2.md` §9.
   does not skip waiting; `UpdateReadyToast` lets the customer choose the moment). No money moves — every
   door refuses — but deploy at a quiet hour and expect the window to last until tabs turn over. A
   two-phase release (client first, the server switch later) was not built.
-- The quarter-hour tick gained a last step (price-request sweep + hourly admin digest to the «البلاغات»
-  topic, 40 statements at most, the digest's routing reads charged). The sweep progresses per row and
+- The quarter-hour tick gained a step after the completeness catch-up and before S-P2's services sweep,
+  which stays last (price-request sweep + hourly admin digest to the «البلاغات» topic, 40 statements at
+  most, the digest's routing reads charged). The sweep progresses per row and
   shares the tick fairly between products. Without 0193 the customer doors answer 503
   `PRICE_REQUESTS_UNAVAILABLE` and the admin sort/filter fall back.
 - Admin: «ظاهر بلا سعر» (badge, banner, Active tile) counts only what customers see (`/stats`
   `shown_unpriced`); the owner's switch card splits «موقوف عن البيع» from «مخفي».
+- **Workflow 7's live probes changed with it (Bambu import spec §K.1 D-1).** «Read one product shown without
+  a price yet» picks an active, VISIBLE, not-V2-published product (read-only, right before the probes);
+  `cleanstart.json` now expects it SHOWN — `/api/products/<slug>` 200 with `price_status: unpriced` and a
+  null price, `/api/public/v1/products/<slug>` 200 — where it used to expect 404. `s1.json` / `leaks.json`
+  read `{slug}` from `/api/products?limit=1&price=1-` (priced only) and hold `price_iqd` to `requirePriceKeys`
+  (an integer, or null only on an object marked unpriced). If the first deploy's probes fail, read the
+  `::error::` lines: they name the path and key, never a value.
+- The import's other hard dependencies are in place: the catalog-only projections keep every id, binding
+  and 0194 label (D-2), `/context` has `products_priced` (D-3), a price range excludes unpriced products
+  (D-4), and `validatePriceRequestSelection` (worker/lib/priceRequests.ts) is the door's validation on its
+  own (D-5). SELLABLE is byte-identical to the old «listed» predicate (D-7).
 
 ## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
