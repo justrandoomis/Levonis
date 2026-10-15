@@ -4,8 +4,20 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
-## Releases of 2026-10-14 (all live, workflow 7 green)
+## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
+- `8a2c3345` — **Services S-P1** (DECISIONS 237), deployed 2026-10-15 03:34 UTC, migration 0191
+  (restore point `00001627-00000700-00005105-2aa1ead2d562b0d83920e8e899724b12`). Triggers, not
+  unique indexes, so old duplicate rows never break the migration: a cancel by any door gives the
+  coupon use back and a reopen takes it back within the limits (or 409
+  `ORDER_REOPEN_COUPON_SPENT`); one trade-in credit coupon for life, never re-minted (the same
+  code returns with its end moved by the time an order held it); an inactive coupon is refused;
+  one open warranty case per device (`CLAIM_ALREADY_OPEN`) and one requested protection claim
+  per order line (`CLAIM_PENDING`); each new warranty claim records the cover it was filed under
+  (four frozen `filed_cover_*` columns). Uses spent by orders cancelled before 0191 stay spent.
+  Open for S-P2: cancelling the order of an already completed trade-in loses its credit.
+  Local note: `communityEscrowReview` F1/F2 and `storeOrderMoneyReview` F7 (race tests) fail on
+  this container on 433537c1 too, but pass on GitHub's runners; they need a deterministic fix.
 - `a6203c29` — **Pricing V2 clean start** (DECISIONS 233–236; design `docs/PRICING-V2.md`),
   deployed 22:37 UTC. Migrations 0189 (V2 core) and 0190 (archive of the old values, D1 purchase
   reviews, line estimate). At this deploy every store product was hidden; each returns on its own
@@ -40,7 +52,7 @@ below cost sells at direct), 223 (Services V2 decisions 1–8; perks per printer
 Open for the owner after Pricing V2: Q7 (bundles/mystery pricing); whether a price drop caused
 only by a membership rule is compensated on new orders (decision 6 compares base USD, so today
 it is not); PRIME has no member price in V2 (`BENEFIT_TIER_NOT_ENTITLED`).
-Next: Services S-P1 … S-P10 (plan in the session scratchpad `services-v2/plan.md`).
+Next: Services S-P2 … S-P10 (plan in the session scratchpad `services-v2/plan.md`).
 
 Working method (owner asked why work took days, 2026-10-14): local test/check runs on the
 4-CPU container took 60–90 min and dominated; agents now run only the tests near their change
