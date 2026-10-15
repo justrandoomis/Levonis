@@ -2,9 +2,10 @@
  * Loaders for the Bambu import fixtures (spec §K.2 step 4): the 8 audit-class
  * samples (identity, options, gallery, description element and JSON-LD, with
  * every money, stock and promotion key removed at capture), the trimmed
- * `filament-buffer` page (real flight data, ≤ 200 KB, with forbidden values
- * replaced by `PLANTED-<key>` so a test can prove none is ever read), and the
- * AMS 2 Pro option structure (options, variants and gallery only).
+ * `filament-buffer` and `ams-2-pro` pages (real flight data, ≤ 200 KB, with
+ * forbidden values replaced by `PLANTED-<key>` so a test can prove none is
+ * ever read), and the AMS 2 Pro option structure (options, variants and
+ * gallery only) with its real manifest row.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,6 +42,16 @@ export function pageHtml(): string {
 
 export function page(): PageExtraction {
   return extractPage(pageHtml());
+}
+
+/** A trimmed real page by handle (`<handle>.page.html`). */
+export function pageOf(handle: 'filament-buffer' | 'ams-2-pro'): PageExtraction {
+  return extractPage(readFileSync(join(BAMBU_FIXTURES, `${handle}.page.html`), 'utf8'));
+}
+
+/** A JSON fixture by file name (a manifest row …). */
+export function fixtureJson<T = unknown>(file: string): T {
+  return JSON.parse(readFileSync(join(BAMBU_FIXTURES, file), 'utf8')) as T;
 }
 
 /**

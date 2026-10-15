@@ -22,7 +22,7 @@
 import { H } from './hash';
 import { collapseWs, hostOf, keptLinkUrl, stripQuery } from './normalize';
 import type { Extraction } from './extract';
-import { buildOptions, type OptionModel } from './options';
+import { buildOptions, sourceTextOf, type OptionModel, type ReviewedValueLabel } from './options';
 import { describe, parseBoxItem, type Described } from './describe';
 import { planMedia, type MediaOverride, type MediaPlan } from './media';
 import { buildSpecs, specRowId, variantNoteRows, type SpecResult, type SpecRow } from './specs';
@@ -614,6 +614,22 @@ export interface IdentityEntry {
   family?: string;
 }
 
+/**
+ * The fields of one manifest row (data/bambu-import/manifest.json `rows[]`)
+ * the builder reads. The runner (step 8) and the writer (step 6) pass the row
+ * exactly as the reviewed file holds it; every other field (queue position,
+ * leaf, curated flag, plan estimate, a label's evidence …) is review data the
+ * builder ignores.
+ */
+export interface ManifestRowInput {
+  source_product_id: string;
+  handle: string;
+  /** Frozen SKU codes (§C.1): source variant id → code. */
+  sku_codes?: Readonly<Record<string, string>> | null;
+  /** Reviewed display labels (owner-questions §E.1, P0-11): source value id → label. */
+  value_labels?: Readonly<Record<string, ReviewedValueLabel>> | null;
+}
+
 export interface BuildInputs {
   extraction: Extraction;
   writeMode: 'create' | 'merge';
@@ -621,7 +637,13 @@ export interface BuildInputs {
   mergeProductId?: string;
   curatedSha256?: string;
   extractionSha256: string;
-  /** The manifest's frozen SKU codes: source variant id → code (§C.1). */
+  /**
+   * The product's manifest row. It must name this page's product (its
+   * `source_product_id` and `handle`), or the build reports
+   * IDENTITY_AMBIGUOUS and applies none of it.
+   */
+  manifestRow?: ManifestRowInput | null;
+  /** The frozen SKU codes for a caller without a manifest row (tests); ignored when `manifestRow` is given. */
   skuCodes?: Readonly<Record<string, string>>;
   identity?: IdentityEntry | null;
   targets: CompatTargets | null;
@@ -737,7 +759,13 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   const newId = `${NEW_PRODUCT_PREFIX}${H(`bambu_us:product:${x.sourceProductId}`)}`;
   const productId = inp.writeMode === 'merge' && inp.mergeProductId ? inp.mergeProductId : newId;
   const productType = productTypeOf(x.route);
-  const model = buildOptions(x, productId);
+  // The manifest row applies only to the product it names (§B.5 IDENTITY_AMBIGUOUS otherwise).
+  const row = inp.manifestRow ?? null;
+  const rowMismatch = !!row && (String(row.source_product_id) !== x.sourceProductId || row.handle !== x.handle);
+  const rowOk = row && !rowMismatch ? row : null;
+  const skuCodes = row ? (rowOk?.sku_codes ?? {}) : (inp.skuCodes ?? {});
+  const model = buildOptions(x, productId, { valueLabels: rowOk?.value_labels ?? null });
+  if (rowMismatch) model.errors.push({ code: 'IDENTITY_AMBIGUOUS', detail: 'the manifest row names another product' });
   const described = describe(x.description);
   const modelToken = modelsInText(x.title)[0]?.token ?? '';
   const ctx = { productId, productType, canonicalUrl: x.canonicalUrl, retrievedAt: inp.retrievedAt, model, modelToken };
@@ -806,13 +834,19 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   let boxImages = 0;
   const valueNamed = (title: string): string => {
     const t = title.toLowerCase();
-    for (const g of model.groups) for (const v of g.values) if (v.nameEn && t.includes(v.nameEn.toLowerCase()) && /add-?ons?|combo|bundle/i.test(title)) return v.id;
+    for (const g of model.groups) {
+      for (const v of g.values) {
+        const name = sourceTextOf(v);
+        if (name && t.includes(name.toLowerCase()) && /add-?ons?|combo|bundle/i.test(title)) return v.id;
+      }
+    }
     return '';
   };
-  const versionWords = new Set(model.groups.flatMap((g) => g.values.map((v) => v.nameEn.toLowerCase())));
+  // The page's own words name values: every match below reads a value's source text, never a reviewed label (§E.1).
+  const versionWords = new Set(model.groups.flatMap((g) => g.values.map((v) => sourceTextOf(v).toLowerCase())));
   // A format-E item lists the versions it ships with: each names a value (exactly, case-insensitive).
   const valueByName = new Map<string, string>();
-  for (const g of model.groups) for (const v of g.values) valueByName.set(v.nameEn.trim().toLowerCase(), v.id);
+  for (const g of model.groups) for (const v of g.values) valueByName.set(sourceTextOf(v).trim().toLowerCase(), v.id);
   /**
    * A line "For H2D/H2C" (or "For LightGrip Cutting Mat:") heads the items after it (review 4, finding 10):
    * they belong to the value(s) it names, and the line is no item. A short line naming no value is a
@@ -835,18 +869,18 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   const valuesNamedBy = (named: string): string[] => {
     const want = normName(named);
     if (!want) return [];
-    const exact = allValues.filter((v) => normName(v.nameEn) === want);
+    const exact = allValues.filter((v) => normName(sourceTextOf(v)) === want);
     if (exact.length) return exact.map((v) => v.id);
     const parts = partsOf(named);
     if (!parts.length) return [];
     const covering = allValues.filter((v) => {
-      const own = new Set(partsOf(v.nameEn));
+      const own = new Set(partsOf(sourceTextOf(v)));
       return parts.every((p) => own.has(p));
     });
     if (covering.length) return covering.map((v) => v.id);
     const ids = new Set<string>();
     for (const part of parts) {
-      const naming = allValues.filter((v) => partsOf(v.nameEn).includes(part));
+      const naming = allValues.filter((v) => partsOf(sourceTextOf(v)).includes(part));
       if (!naming.length) return [];
       for (const v of naming) ids.add(v.id);
     }
@@ -1095,7 +1129,7 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   const externalIds: PayloadExternalId[] = [{ scope_kind: 'product', scope_id: '', id_type: 'bambu_product_id', value: x.sourceProductId, searchable: false }];
   for (const v of model.variants) {
     externalIds.push({ scope_kind: 'variant', scope_id: v.id, id_type: 'bambu_variant_id', value: v.sourceId, searchable: false });
-    const sku = inp.skuCodes?.[v.sourceId];
+    const sku = skuCodes[v.sourceId];
     if (sku) externalIds.push({ scope_kind: 'variant', scope_id: v.id, id_type: 'bambu_sku_code', value: sku.slice(0, 120), searchable: true });
   }
   for (const g of model.groups) for (const v of g.values) if (v.colourCode) externalIds.push({ scope_kind: 'option_value', scope_id: v.id, id_type: 'color_code', value: v.colourCode, searchable: true });
@@ -1104,6 +1138,8 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   const sourceRefs: PayloadSourceRef[] = [];
   for (const g of model.groups) {
     sourceRefs.push({ kind: 'group', source_id: g.sourceId, levonis_id: g.id, source_label: g.sourceLabel.slice(0, 200), binding_rule: '', via_variant_id: '' });
+    // A value's source label is its source text — or its reviewed label, which replaces wording the
+    // classifier refuses (§E.1): `source_label` is checked as customer text, so refused words never stay.
     for (const v of g.values) sourceRefs.push({ kind: 'value', source_id: v.sourceId, levonis_id: v.id, source_label: v.nameEn.slice(0, 200), binding_rule: '', via_variant_id: '' });
   }
   for (const v of model.variants) sourceRefs.push({ kind: 'variant', source_id: v.sourceId, levonis_id: v.id, source_label: '', binding_rule: '', via_variant_id: '' });

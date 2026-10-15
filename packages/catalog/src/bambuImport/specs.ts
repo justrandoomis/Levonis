@@ -16,7 +16,7 @@ import { collapseWs, labelKey, slugOf } from './normalize';
 import type { Described } from './describe';
 import type { TableGrid } from './html';
 import { parseHtml, findAll, textOf, type ElementNode } from './html';
-import type { OptionModel } from './options';
+import { sourceTextOf, type OptionModel } from './options';
 import { keyForLabel, specKey, expectedKeys, isRegionDependent, type SpecDataType } from './registry/specKeys';
 import { isMachine, type ProductType } from './registry/types';
 import { modelsInText } from './registry/models';
@@ -297,7 +297,7 @@ export function scopeOfPrefix(prefix: string, model: OptionModel, modelToken: st
   for (const g of model.groups) {
     if (g.kind !== 'version' && g.kind !== 'printer' && g.kind !== 'other') continue;
     for (const v of g.values) {
-      const name = labelKey(v.nameEn);
+      const name = labelKey(sourceTextOf(v)); // the table names the version in the source's words
       if (name === p) return v.id;
       if (token && (name === `${token} ${p}` || name.replace(new RegExp(`^${token}\\s+`), '') === p)) return v.id;
     }
@@ -735,6 +735,8 @@ function rowsOfOptions(ctx: SpecContext): SpecRow[] {
   const rows: SpecRow[] = [];
   for (const g of ctx.model.groups) {
     for (const v of g.values) {
+      // A value with a reviewed label (§E.1) shows a name the source did not write: nothing is parsed out of it.
+      if (v.labelled) continue;
       const scope = { scopeKind: 'option_value' as const, scopeId: v.id, confidence: 'official_variant' as const, sourceLocator: `option ${g.sourceLabel} › ${v.nameEn}`, sourceExcerpt: v.nameEn, originalLabel: g.sourceLabel, originalValue: v.nameEn };
       if (g.canonical === 'net_weight') {
         const w = findWeights(v.nameEn)[0];

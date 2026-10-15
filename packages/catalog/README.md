@@ -17,6 +17,54 @@ imports it as `@levonis/catalog/<module>`; the SPA by relative path
 | `attributes` | 3D-printing attributes: technology, finish, colour, dimensions, weight (material ids are checked by the Worker against `printMaterials`) |
 | `bambuImport/*` | the one-time Bambu Lab import's pure mapping, shared by the runner and the Worker (import spec §C): `rsc` (flight decoder), `extract` (the product by shape, through the closed read list; description formats A–E), `crossSell` (the one reader of SKU codes), `options`, `media` (binding), `describe`, `sentences` (the classifier), `specs` and `logistics` (typed specs, composite cells, the region rule, CBM), `relations`, `payload` (the closed wire shape and `assertImportPayload`), `fingerprint`, and `registry/` (spec keys, group labels, value words, colours, units, documents, models, product types — every label in ar, en and ckb). No price, cost, stock, discount or promotion of the source can reach its output. |
 
+## The Bambu import builder and its manifest row
+
+`buildImportPayload` (in `bambuImport/payload`) composes one product's payload
+from its extraction and the reviewed files. The runner (step 8) and the
+writer behind `/api/ops/catalog-import` (step 6) call it the same way:
+
+```ts
+buildImportPayload({
+  extraction,                 // extractPage(html).extraction
+  writeMode: 'create',        // or 'merge' with mergeProductId
+  extractionSha256,           // extractionFingerprint(extraction)
+  manifestRow,                // the product's row of manifest.json, as the file holds it
+  targets,                    // compat-targets.json (null: every label unresolvable)
+  overrides, contentKey,      // media-overrides.json; server-side content keys at /write
+  retrievedAt,
+});
+```
+
+`manifestRow` is passed whole; the builder reads four fields and ignores the
+rest (queue position, leaf, plan estimate, a label's evidence …):
+
+- `source_product_id` and `handle` must name the page's product. A row that
+  names another product applies nothing and the report carries
+  `IDENTITY_AMBIGUOUS`.
+- `sku_codes` — the frozen SKU codes by source variant id (spec §C.1). The
+  older `skuCodes` input is read only when no row is given (tests).
+- `value_labels` — reviewed display labels by source value id,
+  `{ group_source_id?, name_en, name_ar, name_ckb }` (owner-questions §E.1,
+  owner question P0-11: a value whose source wording the classifier refuses).
+  The option model applies a label after the ids, the `variant_key` and the
+  SKU join are computed from the source text, and before media binding, so
+  every derived customer string carries it: the value's names and variant
+  label, its `source_refs.source_label`, and the `alt_en/alt_ar/alt_ckb` of
+  every image row whose selection names it (alt texts use each language's
+  value name, the English where none exists). The source text stays on the
+  model (`sourceText`, read through `sourceTextOf`) for matching only: the SKU
+  join, in-the-box and composite-cell scoping, and compat-targets lookups.
+  Nothing is parsed out of a labelled value (no nozzle or weight spec), and
+  the order-type check reads the name the value is written with. A label that
+  cannot be applied as written — a missing language, `name_ckb` equal to
+  `name_ar` (DECISIONS row 183), another group, a name another value of its
+  group already shows, over 200 characters — is a `VALUE_LABEL_INVALID` error
+  (the product is never written with half a label); a label whose value the
+  page no longer lists is a `VALUE_LABEL_UNUSED` note.
+
+`tests/bambuValueLabels.test.ts` proves it on the trimmed real AMS 2 Pro page
+(`tests/fixtures/bambu/ams-2-pro.page.html`) and its real manifest row.
+
 `tests/bambu*.test.ts` pin the import mapping on `tests/fixtures/bambu/`.
 `tests/catalogModel.test.ts` pins the model; `tests/catalogRoutes.test.ts`,
 `tests/catalogCheckout.test.ts` and `tests/catalogMigration.test.ts` pin the

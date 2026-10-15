@@ -161,7 +161,7 @@ export function planMedia(inp: MediaInputs): MediaPlan {
 
   const rows: ImageRow[] = [];
   const valuesWithRow = new Set<string>();
-  const push = (g: SourceMedia, index: number, binding: Binding, rule: BindingRule, selection = '', viaVariantId: string | null = null) => {
+  const push = (g: SourceMedia, index: number, binding: Binding, rule: BindingRule, selection: Tri | '' = '', viaVariantId: string | null = null) => {
     const optionValueId = binding.kind === 'v' || binding.kind === 'r' ? binding.valueId : null;
     const variantId = binding.kind === 'x' ? binding.variantId : null;
     if (optionValueId && binding.kind === 'v') valuesWithRow.add(optionValueId);
@@ -180,8 +180,17 @@ export function planMedia(inp: MediaInputs): MediaPlan {
       alt: altText(inp.title, selection),
     });
   };
-  const valueLabel = (id: string) => model.groups.flatMap((g) => g.values).find((v) => v.id === id)?.nameEn ?? '';
-  const variantLabel = (v: ModelVariant) => v.valueIds.map(valueLabel).join(' / ');
+  // The selection label of a row, in each language: the value's display names (a reviewed label's when it has
+  // one, §E.1), the English where no ar / ckb name exists; a variant's values joined by " / ".
+  const valueById = new Map(model.groups.flatMap((g) => g.values).map((v) => [v.id, v]));
+  const valueLabel = (id: string): Tri => {
+    const v = valueById.get(id);
+    return v ? { en: v.nameEn, ar: v.nameAr || v.nameEn, ckb: v.nameCkb || v.nameEn } : { en: '', ar: '', ckb: '' };
+  };
+  const variantLabel = (v: ModelVariant): Tri => {
+    const parts = v.valueIds.map(valueLabel);
+    return { en: parts.map((p) => p.en).join(' / '), ar: parts.map((p) => p.ar).join(' / '), ckb: parts.map((p) => p.ckb).join(' / ') };
+  };
 
   // 2. Bind every remaining gallery image (index 0 included).
   gallery.forEach((g, index) => {
@@ -227,7 +236,7 @@ export function planMedia(inp: MediaInputs): MediaPlan {
       });
       const union = new Set(S.flatMap((val) => [...variantsOfValue.get(val.id)!]));
       if (S.length >= 2 && sameSet(union, V)) {
-        for (const val of S) push(g, index, { kind: 'v', valueId: val.id }, dupRule('value_set'), val.nameEn);
+        for (const val of S) push(g, index, { kind: 'v', valueId: val.id }, dupRule('value_set'), valueLabel(val.id));
         return;
       }
     }
@@ -248,7 +257,7 @@ export function planMedia(inp: MediaInputs): MediaPlan {
       if (!galleryById.has(rid) && v.heroUrl && galleryUrls.has(v.heroUrl)) rid = galleryUrls.get(v.heroUrl)!;
       const hit = galleryById.get(canonicalId(rid));
       if (!hit) continue;
-      push(hit.g, hit.i, { kind: 'r', valueId: val.id }, 'representative', val.nameEn, v.id);
+      push(hit.g, hit.i, { kind: 'r', valueId: val.id }, 'representative', valueLabel(val.id), v.id);
     }
   }
 

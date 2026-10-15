@@ -20,7 +20,7 @@
  */
 import { H } from './hash';
 import { collapseWs, labelKey } from './normalize';
-import type { OptionModel } from './options';
+import { sourceTextOf, type OptionModel } from './options';
 import type { Described } from './describe';
 import { splitSentences } from './sentences';
 import { modelsInText } from './registry/models';
@@ -200,8 +200,12 @@ export function buildRelations(inp: RelationInputs): RelationResult {
     out.notes.push({ kind: 'relation_unresolvable', field: relation, detail: `label not in compat-targets.json (${ev})` });
   };
 
-  /** A compatibility label, exactly as the source wrote it (an option value or a matched phrase). */
-  const compatLabel = (raw: string, relation: RelationKind, scope: Scope, ev: EvidenceKind, evText: string, splitUnknown: boolean, atom = false): void => {
+  /**
+   * A compatibility label, exactly as the source wrote it (an option value or a matched phrase).
+   * `shown` is a reviewed display label (manifest value_labels): the lookup still reads the source's
+   * words, but a label kept as unresolvable text shows the reviewed one, never refused source wording.
+   */
+  const compatLabel = (raw: string, relation: RelationKind, scope: Scope, ev: EvidenceKind, evText: string, splitUnknown: boolean, atom = false, shown = ''): void => {
     const label = collapseWs(raw);
     if (!label) return;
     const key = labelKey(label);
@@ -219,7 +223,7 @@ export function buildRelations(inp: RelationInputs): RelationResult {
       out.reviewedSkipped.push(reviewed.get(key)![0]);
       return;
     }
-    if (splitUnknown) {
+    if (splitUnknown && !shown) {
       // "X1 Series and P1 Series", "H2D/H2S", "A1, A1 mini": the parts, each by the file.
       const parts = label.split(/\s*(?:\/|,|;|&|\band\b|\bor\b)\s*/i).map((s) => s.trim()).filter(Boolean);
       if (parts.length > 1) {
@@ -227,14 +231,16 @@ export function buildRelations(inp: RelationInputs): RelationResult {
         return;
       }
     }
-    unresolvable(label, relation, scope, ev, evText);
+    unresolvable(shown || label, relation, scope, ev, evText);
   };
 
-  // 1. Option values naming a target.
+  // 1. Option values naming a target: looked up by the source's own words (compat-targets.json is keyed by
+  //    them); the evidence quotes the value as the product shows it (a reviewed label, when it has one).
   for (const g of inp.model.groups) {
     if (g.kind !== 'printer' && g.canonical !== 'compatibility' && g.canonical !== 'printer') continue;
     for (const v of g.values) {
-      compatLabel(v.nameEn, 'compatible_with', { scopeKind: 'option_value', scopeId: v.id }, 'option_value', `${g.sourceLabel}: ${v.nameEn}`, true);
+      const shown = v.labelled ? v.nameEn : '';
+      compatLabel(sourceTextOf(v), 'compatible_with', { scopeKind: 'option_value', scopeId: v.id }, 'option_value', `${g.sourceLabel}: ${v.nameEn}`, true, false, shown);
     }
   }
 
