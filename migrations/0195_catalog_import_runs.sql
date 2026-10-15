@@ -223,9 +223,6 @@ CREATE TABLE IF NOT EXISTS catalog_import_protected (
 -- ---------------------------------------------------------------- 6. The DB-level import guard (§B.4)
 -- BEGIN GENERATED: scripts/gen-import-guard-triggers.mjs (worker/lib/catalogImport/protectedTables.ts). Do not edit by hand.
 -- Armed only while ops_guards holds the row 'catalog-import-batch', which exists only inside an import batch.
--- Not in the schema before this file, so not guarded here (re-run the generator with --write once they land):
---   product_price_requests (0193_price_requests.sql)
---   product_price_request_stats (0193_price_requests.sql)
 
 -- (a) Pricing, stock, orders, wallet and ledger tables: no INSERT, UPDATE or DELETE inside an import batch.
 CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_pricing_state_ins BEFORE INSERT ON product_pricing_state
@@ -388,6 +385,24 @@ CREATE TRIGGER IF NOT EXISTS trg_import_guard_procurement_selection_cost_default
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 CREATE TRIGGER IF NOT EXISTS trg_import_guard_procurement_selection_cost_defaults_del BEFORE DELETE ON procurement_selection_cost_defaults
+WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
+BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_price_requests_ins BEFORE INSERT ON product_price_requests
+WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
+BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_price_requests_upd BEFORE UPDATE ON product_price_requests
+WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
+BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_price_requests_del BEFORE DELETE ON product_price_requests
+WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
+BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_price_request_stats_ins BEFORE INSERT ON product_price_request_stats
+WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
+BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_price_request_stats_upd BEFORE UPDATE ON product_price_request_stats
+WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
+BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_price_request_stats_del BEFORE DELETE ON product_price_request_stats
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
