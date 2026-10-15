@@ -10,6 +10,7 @@ import {
 } from '../../lib/compare';
 import { compareStrings } from './strings';
 import { productTone } from './tones';
+import { isUnpriced, UNPRICED_TEXT } from '../../lib/priceStatus';
 
 /**
  * PRICE ON ITS OWN, AS A TRADE-OFF — NEVER AS A WIN.
@@ -85,7 +86,10 @@ export default function PriceRow({
 
               <span className="flex items-baseline gap-2">
                 {value.missing ? (
-                  <span className="text-[13px] text-[var(--color-text-muted)]">{s.missing}</span>
+                  <span data-price-status={isUnpriced(product) ? 'unpriced' : undefined} className="text-[13px] text-[var(--color-text-muted)]">
+                    {/* A catalog-only column (rows 239-240) says why it has no figure. */}
+                    {isUnpriced(product) ? UNPRICED_TEXT[l] : s.missing}
+                  </span>
                 ) : (
                   <span dir="ltr" className="text-[13px] font-bold tabular-nums text-[var(--color-text-primary)]">
                     {value.text}

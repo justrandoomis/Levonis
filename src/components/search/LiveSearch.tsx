@@ -8,7 +8,6 @@ import { useTheme } from '../../lib/theme';
 import { preloadMotionFeatures } from '../../lib/motionFeatures';
 import SafeImage from '../ui/SafeImage';
 import { Skeleton } from '../ui/Skeleton';
-import CardPrice from '../CardPrice';
 import { acceptOnChange, acceptOnKey, ghostFor, ghostLayers, liveQuery, stepActive, textDirection } from './ghost';
 
 /**
@@ -85,7 +84,10 @@ function remember(query: string, answer: Answer) {
  * THE ANIMATED PANEL IS A LAZY CHUNK (./LiveSearchPanel.tsx), asked for the
  * moment the field is touched or focused: the header is in every first paint,
  * and the motion behind a panel nobody has opened yet is not. The field, the
- * request and the rows stay here; only the surface that grows is deferred.
+ * request and the rows stay here; only the surface that grows is deferred —
+ * and the rows' price block, which the panel hands back (catalog-only,
+ * DECISIONS row 240: the card price and its «السعر غير متوفر حالياً» left the
+ * first paint, measured in the commit that moved them).
  */
 const LiveSearchPanel = React.lazy(() => import('./LiveSearchPanel'));
 
@@ -438,6 +440,8 @@ export default function LiveSearch({
       <Suspense fallback={null}>
         {armed && (
           <LiveSearchPanel shown={panelShown}>
+            {(CardPrice) => (
+            <>
             <div className="max-h-[min(55dvh,26rem)] overflow-y-auto overscroll-contain p-1.5">
               <div
                 role="listbox"
@@ -521,6 +525,8 @@ export default function LiveSearch({
                 <span className="truncate">{loc('عرض كل النتائج', 'See all results', 'هەمووی ببینە')}</span>
                 <Forward className="h-4 w-4 shrink-0" aria-hidden="true" />
               </button>
+            )}
+            </>
             )}
           </LiveSearchPanel>
         )}

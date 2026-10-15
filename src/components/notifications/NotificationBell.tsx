@@ -161,6 +161,9 @@ function kindIcon(kind: string) {
     case 'quick_buy_submitted':
     case 'quick_buy_failed':
       return Zap;
+    // «صار السعر متوفراً» (DECISIONS row 240): the price tag a priced product now carries.
+    case 'price_available':
+      return Tag;
     default:
       return Bell;
   }

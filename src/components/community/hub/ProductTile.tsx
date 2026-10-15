@@ -57,7 +57,7 @@ export default function ProductTile({ product: p, eager = false }: { product: Co
           {sale && (
             <>
               <span className="sr-only">{s.was}</span>
-              <s className="text-[11.5px] tabular-nums text-text-muted">{money(p.original_price_iqd ?? 0)}</s>
+              <s className="text-[11.5px] tabular-nums text-text-muted">{money(p.original_price_iqd as number)}</s>
             </>
           )}
         </p>

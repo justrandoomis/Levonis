@@ -7,6 +7,7 @@ import SafeImage from '../ui/SafeImage';
 import { productPrimaryImage } from '../../lib/productImage';
 import { rankByAffinity, readRecentlyViewed } from '../../lib/recentlyViewed';
 import { useMoney } from '../../CurrencyContext';
+import { isUnpriced } from '../../lib/priceStatus';
 
 /**
  * THE TWO TILES THAT CHANGE WHILE YOU LOOK AT THEM — «سلكشن» and «سوبر ديلز».
@@ -102,7 +103,9 @@ function PricePlate({ p }: { p: ApiProduct }) {
   const { money } = useMoney();
   const display = p.display_price_iqd ?? p.price_iqd;
   const regular = p.display_regular_iqd ?? p.price_iqd;
-  const discounted = display < regular;
+  // Commercial tiles are SELLABLE-only (rule R4, rows 239-240); a null price is never drawn as 0.
+  if (display == null || isUnpriced(p)) return null;
+  const discounted = display < (regular ?? display);
   return (
     // `min-h` reserves the second line so a wrapping price cannot change the
     // tile's height when the set rotates. `flex-wrap` rather than `truncate`:

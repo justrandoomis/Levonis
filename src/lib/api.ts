@@ -481,14 +481,22 @@ export interface ApiProduct {
     standard: { enabled: boolean; quantity_step: number; fee_iqd: number };
     personal: { enabled: boolean; quantity_step: number; fee_iqd: number };
   } | null;
-  price_iqd: number;
+  /**
+   * CATALOG-ONLY (DECISIONS rows 239 (3) and 240): `null` when the product has
+   * no V2 price yet — never 0. Read `price_status` first (src/lib/priceStatus.ts
+   * `isUnpriced`); a price is never invented on the client.
+   */
+  price_iqd: number | null;
+  /** 'unpriced' = shown in the catalogue, not for sale yet. Absent = priced
+   *  (an older server never served an unpriced product). */
+  price_status?: 'priced' | 'unpriced';
   prime_price_iqd?: number | null;
   pro_price_iqd?: number | null;
   /** What this viewer actually pays, and the regular price it is compared
    *  against. Compare-at (§4) no longer exists. The display price is the
    *  CHEAPEST way to buy the product — the minimum tier-resolved price
    *  across the base row and every active option/colour. */
-  display_price_iqd?: number;
+  display_price_iqd?: number | null;
   /** 'plus' is emitted for COMPOSITION rows only (a bundle or a mystery
    *  offer): the shared price resolver has three rungs and no PLUS, so a PLUS
    *  member would be shown the regular price on every card and then charged

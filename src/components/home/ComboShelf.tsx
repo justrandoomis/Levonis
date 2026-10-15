@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { isUnpriced } from '../../lib/priceStatus';
 import { Link } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
@@ -75,7 +76,9 @@ export default function ComboShelf() {
         {combos.map((b) => {
           const parts = b.composition?.main_items ?? [];
           const total = b.composition?.component_total_iqd ?? 0;
-          const price = b.display_price_iqd ?? b.price_iqd ?? 0;
+          const price = b.display_price_iqd ?? b.price_iqd;
+          // A commercial rail is SELLABLE-only (rule R4); an unpriced row is never drawn as 0.
+          if (price == null || isUnpriced(b)) return null;
           const saving = total > price ? total - price : 0;
           return (
             <Link

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
+import { isUnpriced } from '../../lib/priceStatus';
 import AvailabilityLine from '../product/AvailabilityLine';
 import { productMainImage, productPrimaryImage } from '../../lib/productImage';
 import { useTheme } from '../../lib/theme';
@@ -31,7 +32,8 @@ export interface ResultCardProps {
  */
 function useCardBits(result: FinderResult, lang: FinderLang) {
   const base = result.card as CardProduct;
-  const variant = result.variant ?? null;
+  // A catalog-only machine (rows 239-240) carries no configuration price: its own card says so.
+  const variant = isUnpriced(base) ? null : (result.variant ?? null);
   const p: CardProduct = variant
     ? ({
         ...base,

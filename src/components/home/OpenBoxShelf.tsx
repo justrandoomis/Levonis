@@ -10,6 +10,7 @@ import { conditionKindLabel, conditionGradeLabel, type ConditionEntry } from '..
 import { useRail } from '../../lib/useRail';
 import { useMoney } from '../../CurrencyContext';
 import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
+import { isUnpriced } from '../../lib/priceStatus';
 
 /**
  * OPEN BOX, USED AND REFURBISHED — the shelf.
@@ -42,7 +43,8 @@ export default function OpenBoxShelf({ products }: { products: ApiProduct[] }) {
         ref={rail.ref}
         className="flex gap-2.5 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x pb-1 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 sm:gap-3"
       >
-        {products.map((p) => (
+        {/* A commercial shelf is SELLABLE-only (rule R4, rows 239-240): never a 0. */}
+        {products.filter((p) => !isUnpriced(p) && (p.display_price_iqd ?? p.price_iqd) != null).map((p) => (
           <OpenBoxCard key={p.id} p={p} lang={lang} />
         ))}
       </div>

@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { type ApiProduct } from '../lib/api';
 import { useMoney } from '../CurrencyContext';
 import { memberLine, splitMoney } from '../lib/productCard';
+import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
 /**
  * The ONE price block every product card renders (home rails, /products grid,
@@ -39,16 +40,34 @@ export default function CardPrice({
   /** 'compact' is the compact product card's price block (see CompactPrice). */
   density?: 'regular' | 'compact';
 }) {
+  // A priced card always carries its display price; one that does not is never drawn as 0.
+  if (isUnpriced(p) || (p.display_price_iqd ?? p.price_iqd) == null) return <UnpricedPrice rows={density === 'compact'} />;
   if (density === 'compact') return <CompactPrice p={p} />;
   return <RegularPrice p={p} compact={compact} />;
+}
+
+/**
+ * CATALOG-ONLY (DECISIONS rows 239-240): the label in the muted token, and no
+ * number, no unit, no member line — a price is never shown as 0. The compact
+ * card keeps its two fixed rows (20 + 1 + 15 px = h-9), so a grid that mixes
+ * priced and unpriced cards keeps one card height.
+ */
+function UnpricedPrice({ rows }: { rows: boolean }) {
+  const { loc } = useLanguage();
+  return (
+    <p data-price-status="unpriced" className={`text-[12px] font-bold leading-4 text-text-muted${rows ? ' line-clamp-2 h-9' : ''}`}>
+      {loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}
+    </p>
+  );
 }
 
 function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
   const { money } = useMoney();
   const { loc } = useLanguage();
 
-  const main = p.display_price_iqd ?? p.price_iqd;
-  const regular = p.display_regular_iqd ?? p.price_iqd;
+  // Non-null: CardPrice drew the unpriced label for a missing figure.
+  const main = (p.display_price_iqd ?? p.price_iqd) as number;
+  const regular = (p.display_regular_iqd ?? p.price_iqd) as number;
   const appliedTier = p.display_applied_tier ?? 'regular';
   const struck = main < regular ? regular : null;
   const from = !!p.display_from;
@@ -130,8 +149,8 @@ function CompactPrice({ p }: { p: ApiProduct }) {
   const { money } = useMoney();
   const { loc } = useLanguage();
 
-  const main = p.display_price_iqd ?? p.price_iqd;
-  const regular = p.display_regular_iqd ?? p.price_iqd;
+  const main = (p.display_price_iqd ?? p.price_iqd) as number;
+  const regular = (p.display_regular_iqd ?? p.price_iqd) as number;
   const applied = p.display_applied_tier ?? 'regular';
   const [amount, unit] = splitMoney(money(main));
   const line = memberLine(p);

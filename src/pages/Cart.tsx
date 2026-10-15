@@ -323,7 +323,8 @@ interface UnavailableLine {
   product_id: string;
   name: { ar: string; en: string; ckb: string };
   image: string;
-  code: 'PRODUCT_CURRENTLY_UNAVAILABLE';
+  /** `PRICE_NOT_AVAILABLE`: still shown in the shop, with no price yet (catalog-only, DECISIONS rows 239-240). */
+  code: 'PRODUCT_CURRENTLY_UNAVAILABLE' | 'PRICE_NOT_AVAILABLE';
 }
 
 interface CartResponse {
@@ -1506,8 +1507,16 @@ export default function Cart() {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-text-secondary">{lang === 'en' ? line.name.en : lang === 'ckb' ? line.name.ckb : line.name.ar}</p>
-                  <p className="text-xs text-amber-300">
-                    {loc('غير متاح حاليًا — أزله من السلة', 'Not available right now — remove it from your cart', 'ئێستا بەردەست نییە — لە سەبەتەکەت لای ببە')}
+                  <p className="text-xs text-amber-300" data-cart-unavailable-code={line.code}>
+                    {line.code === 'PRICE_NOT_AVAILABLE'
+                      ? // The refusal's own sentence (packages/contracts/src/costRefusals.ts PRICE_NOT_AVAILABLE):
+                        // the product is still in the shop, so «طلب السعر» on its page is the way forward.
+                        loc(
+                          'سعر هذا المنتج غير متوفر حالياً، فلا يمكن شراؤه الآن. اطلب السعر ونخبرك عند توفره.',
+                          'This product’s price is not available yet, so it cannot be bought now. Request the price and we will tell you when it is ready.',
+                          'نرخی ئەم بەرهەمە هێشتا بەردەست نییە، بۆیە ئێستا ناتوانرێت بکڕدرێت. داوای نرخ بکە و کاتێک ئامادە بوو ئاگادارت دەکەینەوە.'
+                        )
+                      : loc('غير متاح حاليًا — أزله من السلة', 'Not available right now — remove it from your cart', 'ئێستا بەردەست نییە — لە سەبەتەکەت لای ببە')}
                   </p>
                 </div>
                 <button

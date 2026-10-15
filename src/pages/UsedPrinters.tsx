@@ -38,6 +38,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, PackageOpen, PackageSearch } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
@@ -366,7 +367,14 @@ function GradedCard({ p, lang }: { p: GradedProduct; lang: string }) {
         ) : null}
 
         <span className="mt-auto flex flex-col pt-1">
-          <span className="text-[14px] leading-5 font-bold text-text-primary tabular-nums">{money(price)}</span>
+          {/* The shelf is SELLABLE-only (rule R4); a catalog-only row (rows 239-240) is never a 0. */}
+          {price == null || isUnpriced(p) ? (
+            <span data-price-status="unpriced" className="text-[12px] leading-5 font-bold text-text-muted">
+              {loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}
+            </span>
+          ) : (
+            <span className="text-[14px] leading-5 font-bold text-text-primary tabular-nums">{money(price)}</span>
+          )}
           {reference ? (
             <span className="text-[11px] leading-4 text-text-muted line-through tabular-nums">
               {money(reference.reference_iqd)}

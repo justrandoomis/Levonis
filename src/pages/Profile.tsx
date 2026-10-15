@@ -27,6 +27,7 @@ import { useCommunityAccess } from './community/access';
 import VariantImg from '../components/ui/VariantImg';
 import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
 import { initialOf } from '../lib/initials';
+import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
 interface FavoriteItem {
   id: string;
@@ -34,7 +35,9 @@ interface FavoriteItem {
   name: string;
   name_ar: string;
   image: string;
-  price_iqd: number;
+  /** NULL for a catalog-only product (DECISIONS rows 239-240): never 0. */
+  price_iqd: number | null;
+  price_status?: 'priced' | 'unpriced';
 }
 
 interface ReferralReward {
@@ -818,14 +821,21 @@ export default function Profile() {
                   <div className="p-2.5 flex flex-col flex-1 w-full text-text-primary">
                     <h3 className="font-medium text-[13px] line-clamp-2 mb-2 leading-[1.3]">{name}</h3>
 
+                    {/* CATALOG-ONLY (rows 239-240): the label, never 0 and never a struck price. */}
+                    {isUnpriced(p) || p.price_iqd == null ? (
+                      <span data-price-status="unpriced" className="mt-auto text-[12px] font-bold text-text-muted">
+                        {loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}
+                      </span>
+                    ) : (
                     <div className="mt-auto flex items-baseline justify-between">
                        <span className="text-text-primary font-bold text-[15px] flex items-baseline gap-0.5">
-                         {money(p.price_iqd || 0)}
+                         {money(p.price_iqd)}
                        </span>
                        {p.display_regular_iqd != null && p.display_regular_iqd > (p.display_price_iqd ?? p.price_iqd) && (
                          <span className="text-[11px] text-text-muted line-through">{money(p.display_regular_iqd)}</span>
                        )}
                     </div>
+                    )}
                   </div>
                   <DirectStockEdge product={p} />
                 </button>
@@ -873,9 +883,15 @@ export default function Profile() {
                            {name}
                          </h3>
 
+                         {isUnpriced(item) || item.price_iqd == null ? (
+                           <div data-price-status="unpriced" className="text-[12px] font-bold text-text-muted mb-1.5 mt-auto">
+                             {loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}
+                           </div>
+                         ) : (
                          <div className="flex items-baseline gap-1.5 text-scarlet font-bold mb-1.5 mt-auto">
-                           <span className="text-[15px] leading-none">{money(item.price_iqd || 0)}</span>
+                           <span className="text-[15px] leading-none">{money(item.price_iqd)}</span>
                          </div>
+                         )}
 
                          <div className="text-text-muted text-[11px] flex items-center gap-0.5">
                            {loc('عرض المنتج', 'View product', 'بینینی بەرهەم')} <ChevronRight className={`w-3 h-3 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />

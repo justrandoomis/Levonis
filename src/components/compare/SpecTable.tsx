@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
+import { isUnpriced, UNPRICED_TEXT } from '../../lib/priceStatus';
 import {
   LENS_FIELDS,
   barRatio,
@@ -112,6 +113,7 @@ function Cell({
   bars,
   delta,
   clamp,
+  unpriced = false,
 }: {
   row: CompareRow;
   i: number;
@@ -122,6 +124,8 @@ function Cell({
   delta?: { cheapest: boolean; moreIqd: number | null };
   /** Long text is held to three lines until the row is opened («المزيد»). */
   clamp: boolean;
+  /** The price cell of a catalog-only column (rows 239-240): the label, never «غير مذكور» or 0. */
+  unpriced?: boolean;
 }) {
   const value = row.values[i];
   const won = row.winners.includes(i) || !!delta?.cheapest;
@@ -129,7 +133,9 @@ function Cell({
   return (
     <div role="cell" className="min-w-0">
       {value.missing ? (
-        <span className="text-[12.5px] leading-5 text-text-muted">{s.missing}</span>
+        <span data-price-status={unpriced ? 'unpriced' : undefined} className="text-[12.5px] leading-5 text-text-muted">
+          {unpriced ? UNPRICED_TEXT[lang] : s.missing}
+        </span>
       ) : (
         <span className={`inline-flex max-w-full items-center gap-1.5 text-[13px] leading-5 [overflow-wrap:anywhere] ${won ? 'font-extrabold text-text-primary' : 'font-medium text-text-secondary'}`}>
           {won ? <WinnerMark s={s} /> : null}
@@ -207,7 +213,7 @@ function Row({
         <span className="shrink-0 text-[11px] font-medium text-text-muted">{isPrice ? ls.priceHint : hintText(row, ls)}</span>
       </div>
       {products.map((p, i) => (
-        <Cell key={p.id} row={row} i={i} s={s} ls={ls} lang={lang} bars={bars} delta={deltas ? deltas[i] : undefined} clamp={long && !open} />
+        <Cell key={p.id} row={row} i={i} s={s} ls={ls} lang={lang} bars={bars} delta={deltas ? deltas[i] : undefined} clamp={long && !open} unpriced={isPrice && isUnpriced(p)} />
       ))}
       {long ? (
         <button

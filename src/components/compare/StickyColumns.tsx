@@ -10,6 +10,7 @@ import { productTone } from './tones';
 import { columnGap, columnsTemplate } from './grid';
 import { useTheme } from '../../lib/theme';
 import { themedImage } from '../../lib/productImage';
+import { isUnpriced, UNPRICED_TEXT } from '../../lib/priceStatus';
 
 /**
  * THE PRODUCT COLUMNS (CATALOG_DISCOVERY §10.3.2; mockup 8).
@@ -140,7 +141,11 @@ export default function StickyColumns({
                       {stripShort[i]}
                     </span>
                   </span>
-                  {prices[i] ? (
+                  {isUnpriced(p) ? (
+                    <span data-price-status="unpriced" className="block truncate text-[11px] font-bold leading-4 text-text-muted">
+                      {UNPRICED_TEXT[l]}
+                    </span>
+                  ) : prices[i] ? (
                     <bdi dir="ltr" className="block truncate text-start text-[11.5px] font-extrabold leading-4 tabular-nums text-text-secondary rtl:text-right">
                       {prices[i]}
                     </bdi>
@@ -202,7 +207,12 @@ export default function StickyColumns({
                     {variantName}
                   </span>
                 ) : null}
-                {prices[i] ? (
+                {/* CATALOG-ONLY (rows 239-240): the label in the muted token, no number. */}
+                {isUnpriced(p) ? (
+                  <span data-price-status="unpriced" className={`mt-1 block font-bold leading-4 text-text-muted ${dense ? 'text-[10.5px]' : 'text-[12px]'}`}>
+                    {UNPRICED_TEXT[l]}
+                  </span>
+                ) : prices[i] ? (
                   <bdi dir="ltr" title={ls.priceAsSold} className={`mt-1 block whitespace-nowrap text-start font-extrabold tabular-nums tracking-[-0.01em] text-text-primary rtl:text-right ${dense ? 'text-[11px]' : 'truncate text-[13px]'}`}>
                     {prices[i]}
                   </bdi>

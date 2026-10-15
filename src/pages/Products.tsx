@@ -10,6 +10,7 @@ import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import ProductCard from '../components/home/ProductCard';
 import { availableFirst, cardAvailability } from '../lib/productCard';
+import { UNPRICED_TEXT } from '../lib/priceStatus';
 import LiveSearch from '../components/search/LiveSearch';
 import { takePrimedJson } from '../lib/bootFetch';
 
@@ -180,7 +181,7 @@ export default function Products() {
    * direct sale today comes first — a STABLE partition, so each group keeps
    * the shop's own order — and a quiet divider names the second group.
    */
-  const ordered = search ? { items: products, splitAt: -1 } : availableFirst(products);
+  const ordered = search ? { items: products, splitAt: -1, unpricedAt: -1 } : availableFirst(products);
   const laterLabel =
     ordered.splitAt > 0 && ordered.items.slice(ordered.splitAt).every((p) => cardAvailability(p).state === 'preorder')
       ? loc('بطلب مسبق', 'Pre-order')
@@ -274,10 +275,12 @@ export default function Products() {
                 other row to its product page (src/lib/productCard.ts). */}
             {ordered.items.map((p, i) => (
               <React.Fragment key={p.id}>
-                {i === ordered.splitAt && (
+                {(i === ordered.splitAt || i === ordered.unpricedAt) && (
                   <div role="separator" className="col-span-full flex items-center gap-3 pb-0.5 pt-2 text-[12px] font-bold text-text-muted">
                     <span className="h-px flex-1 bg-border-subtle" />
-                    <span>{laterLabel}</span>
+                    {/* Catalog-only products (rows 239-240) close the list under their own
+                        label — never a stock word over items whose stock is not set. */}
+                    <span>{i === ordered.unpricedAt ? loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb) : laterLabel}</span>
                     <span className="h-px flex-1 bg-border-subtle" />
                   </div>
                 )}

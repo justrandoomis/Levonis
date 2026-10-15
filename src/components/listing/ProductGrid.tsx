@@ -3,6 +3,7 @@ import { useLanguage } from '../../LanguageContext';
 import ProductCard from '../home/ProductCard';
 import { availableFirst, cardAvailability } from '../../lib/productCard';
 import type { ApiProduct } from '../../lib/api';
+import { UNPRICED_TEXT } from '../../lib/priceStatus';
 import '../../styles/catalog.css';
 
 /**
@@ -12,8 +13,10 @@ import '../../styles/catalog.css';
  *
  * DIRECT SALE FIRST, SAID ONCE. Under the default order the server already
  * puts what can be bought today first; a quiet «بطلب مسبق» divider names the
- * second group (the Products page's wording, §4.2). Any other order is the
- * shopper's own and gets no divider.
+ * second group (the Products page's wording, §4.2), and catalog-only products
+ * (DECISIONS rows 239-240) close the grid under «السعر غير متوفر حالياً» — a
+ * stock word is never printed over items whose stock is not set. Any other
+ * order is the shopper's own and gets no divider.
  *
  * Rows past the first screen use `content-visibility: auto` with the card's
  * fixed 262 px as their intrinsic size, so a long list costs nothing until it
@@ -21,7 +24,7 @@ import '../../styles/catalog.css';
  */
 export default function ProductGrid({ products, divider, withColumn }: { products: ApiProduct[]; divider: boolean; withColumn: boolean }) {
   const { loc } = useLanguage();
-  const ordered = divider ? availableFirst(products) : { items: products, splitAt: -1 };
+  const ordered = divider ? availableFirst(products) : { items: products, splitAt: -1, unpricedAt: -1 };
   const laterLabel =
     ordered.splitAt > 0 && ordered.items.slice(ordered.splitAt).every((p) => cardAvailability(p).state === 'preorder')
       ? loc('بطلب مسبق', 'Pre-order')
@@ -34,12 +37,8 @@ export default function ProductGrid({ products, divider, withColumn }: { product
     >
       {ordered.items.map((p, i) => (
         <React.Fragment key={p.id}>
-          {i === ordered.splitAt ? (
-            <li role="separator" aria-label={laterLabel} className="col-span-full flex items-center gap-3 pt-2 text-[12px] font-bold text-text-muted">
-              <span aria-hidden="true" className="h-px flex-1 bg-border-subtle" />
-              <span aria-hidden="true">{laterLabel}</span>
-              <span aria-hidden="true" className="h-px flex-1 bg-border-subtle" />
-            </li>
+          {i === ordered.splitAt || i === ordered.unpricedAt ? (
+            <Divider label={i === ordered.unpricedAt ? loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb) : laterLabel} />
           ) : null}
           {/* `lv-cv` (content-visibility) goes on the CARD, not this <li>:
               paint containment clips a descendant's ink at the container's
@@ -50,5 +49,15 @@ export default function ProductGrid({ products, divider, withColumn }: { product
         </React.Fragment>
       ))}
     </ul>
+  );
+}
+
+function Divider({ label }: { label: string }) {
+  return (
+    <li role="separator" aria-label={label} className="col-span-full flex items-center gap-3 pt-2 text-[12px] font-bold text-text-muted">
+      <span aria-hidden="true" className="h-px flex-1 bg-border-subtle" />
+      <span aria-hidden="true">{label}</span>
+      <span aria-hidden="true" className="h-px flex-1 bg-border-subtle" />
+    </li>
   );
 }

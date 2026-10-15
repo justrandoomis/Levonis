@@ -13,6 +13,7 @@ import CompareToggle from '../compare/CompareToggle';
 import { useLanguage } from '../../LanguageContext';
 import { conditionKindLabel } from '../../lib/condition';
 import { cardHref, cardName, compareTypeOf, type CardProduct } from '../../lib/productCard';
+import { isUnpriced } from '../../lib/priceStatus';
 
 /**
  * THE SHOP'S PRODUCT CARD — one card for the home rails, the listings and
@@ -128,9 +129,12 @@ function CompactCard({
   const lightShown = image !== '' && image === p.light_image;
   const name = cardName(p);
   const shortened = name !== (p.name ?? '').trim();
+  // CATALOG-ONLY (rows 239-240): no number, so no SALE badge and no offer
+  // countdown — the compare toggle stays (compare is a catalogue read).
+  const priced = !isUnpriced(p);
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
   const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-  const hasSale = displayPrice < regularPrice;
+  const hasSale = priced && displayPrice != null && regularPrice != null && displayPrice < regularPrice;
   const type = compareToggle ? compareTypeOf(p) : null;
   const condition = p.condition?.kind ? conditionKindLabel(p.condition.kind, lang) : '';
 
@@ -154,7 +158,7 @@ function CompactCard({
         {hasSale && <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>}
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
-        {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
+        {priced && p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
           <span className="absolute bottom-1.5 start-1.5 rounded-sm bg-onyx/80 px-1.5 py-0.5">
             <Countdown
               target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}
@@ -206,9 +210,10 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
   const lightShown = firstImage !== '' && firstImage === p.light_image;
   const name = p.name;
 
+  const priced = !isUnpriced(p);
   const displayPrice = p.display_price_iqd ?? p.price_iqd;
   const regularPrice = p.display_regular_iqd ?? p.price_iqd;
-  const hasSale = displayPrice < regularPrice;
+  const hasSale = priced && displayPrice != null && regularPrice != null && displayPrice < regularPrice;
 
   return (
     <Link
@@ -226,7 +231,7 @@ function RegularCard({ p, widthClass }: { p: ApiProduct; widthClass: string }) {
         {hasSale && (
           <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge>
         )}
-        {p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
+        {priced && p.offer && (p.offer.schedule_state === 'upcoming' || p.offer.ends_at) && (
           <span className="absolute bottom-2 start-2 rounded-sm bg-onyx/80 px-1.5 py-0.5">
             <Countdown
               target={p.offer.schedule_state === 'upcoming' ? p.offer.starts_at : p.offer.ends_at}

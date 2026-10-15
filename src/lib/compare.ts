@@ -122,8 +122,11 @@ export interface CompareProductCard {
   image: string | null;
   /** «الصورة الرئيسية للوضع الفاتح» (migration 0138), only when the product has one. */
   light_image?: string;
-  /** The BASE price — the cheapest way to buy it. A «يبدأ من» figure. */
-  price_iqd: number;
+  /** The BASE price — the cheapest way to buy it. A «يبدأ من» figure.
+   *  NULL for a catalog-only product (DECISIONS rows 239-240): never 0. */
+  price_iqd: number | null;
+  /** 'unpriced' = shown without a price; absent reads as priced. */
+  price_status?: 'priced' | 'unpriced';
   /** Mirrors `ProductTypeId` in worker/lib/templateFamilies.ts — the laser
    *  machine and the laser/blade consumable are the two the line added. */
   product_type: 'printer' | 'parts' | 'filament' | 'accessory' | 'laser' | 'laser_material' | null;
@@ -153,8 +156,8 @@ export interface CompareProductCard {
 export interface CompareOptionChoice {
   id: string;
   label: Trilingual;
-  /** The configuration's price from the product page's resolver; absent when not priced. */
-  price_iqd?: number;
+  /** The configuration's price from the product page's resolver; absent or null when not priced. */
+  price_iqd?: number | null;
   available?: number | null;
 }
 

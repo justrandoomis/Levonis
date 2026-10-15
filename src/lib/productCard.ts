@@ -17,6 +17,7 @@
  * that was not told a product's sale types does not claim «طلب مسبق».
  */
 import type { ApiProduct } from './api';
+import { isUnpriced } from './priceStatus';
 
 /**
  * Card fields the catalogue stream (S1) adds to `CARD_FIELDS`. They are
@@ -89,8 +90,11 @@ export const DEFAULT_LOW_STOCK = 2;
  *                says nothing rather than guess «طلب مسبق».
  */
 export function cardAvailability(
-  p: Pick<CardProduct, 'direct_stock_available' | 'sale_types' | 'low_stock_threshold'> & { selling_type?: string }
+  p: Pick<CardProduct, 'direct_stock_available' | 'sale_types' | 'low_stock_threshold' | 'price_status'> & { selling_type?: string }
 ): Availability {
+  // CATALOG-ONLY (rows 239-240): stock is not configured for an unpriced
+  // product, so the card says nothing — never «غير متوفر» or «نفد».
+  if (isUnpriced(p)) return { state: 'unknown', qty: null, low: false };
   const n = p.direct_stock_available;
   if (typeof n === 'number' && Number.isInteger(n) && n > 0) {
     const t = p.low_stock_threshold;
@@ -119,11 +123,11 @@ export type MemberTier = 'PRIME' | 'PRO';
  * Which rung the viewer is on is the server's `display_applied_tier`.
  */
 export function memberLine(
-  p: Pick<ApiProduct, 'display_price_iqd' | 'price_iqd' | 'display_applied_tier' | 'display_prime_iqd' | 'display_pro_iqd'>
+  p: Pick<ApiProduct, 'display_price_iqd' | 'price_iqd' | 'display_applied_tier' | 'display_prime_iqd' | 'display_pro_iqd' | 'price_status'>
 ): { tier: MemberTier; price: number } | null {
   const main = p.display_price_iqd ?? p.price_iqd;
   const applied = p.display_applied_tier ?? 'regular';
-  if (applied === 'pro') return null;
+  if (applied === 'pro' || main == null || isUnpriced(p)) return null;
   const rungs: Array<{ tier: MemberTier; price: number }> = [];
   if (applied !== 'prime' && typeof p.display_prime_iqd === 'number') rungs.push({ tier: 'PRIME', price: p.display_prime_iqd });
   if (typeof p.display_pro_iqd === 'number') rungs.push({ tier: 'PRO', price: p.display_pro_iqd });
@@ -172,15 +176,26 @@ export function cardHref(p: Pick<ApiProduct, 'slug' | 'id' | 'product_slug'>): s
 /**
  * «الأولوية بصريًا لمنتجات البيع المباشر والمتوفرة» — a STABLE partition:
  * products with direct units now first, in their incoming order, then the
- * rest in theirs. Returns the index where the second group starts (the
- * «بطلب مسبق» divider), or -1 when either group is empty.
+ * rest in theirs, and CATALOG-ONLY products last (rule R1, rows 239-240: they
+ * may appear but never crowd what can be bought). `splitAt` is where the
+ * second group starts (the «بطلب مسبق» divider), `unpricedAt` where the
+ * unpriced ones start (their own «السعر غير متوفر حالياً» divider); each is -1
+ * when it would divide nothing.
  */
-export function availableFirst<T extends Pick<ApiProduct, 'direct_stock_available'>>(list: T[]): { items: T[]; splitAt: number } {
+export function availableFirst<T extends Pick<ApiProduct, 'direct_stock_available' | 'price_status'>>(
+  list: T[]
+): { items: T[]; splitAt: number; unpricedAt: number } {
   const now: T[] = [];
   const later: T[] = [];
+  const unpriced: T[] = [];
   for (const p of list) {
     const n = p.direct_stock_available;
-    (typeof n === 'number' && n > 0 ? now : later).push(p);
+    (isUnpriced(p) ? unpriced : typeof n === 'number' && n > 0 ? now : later).push(p);
   }
-  return { items: [...now, ...later], splitAt: now.length && later.length ? now.length : -1 };
+  const at = now.length + later.length;
+  return {
+    items: [...now, ...later, ...unpriced],
+    splitAt: now.length && later.length ? now.length : -1,
+    unpricedAt: at && unpriced.length ? at : -1,
+  };
 }

@@ -6,6 +6,7 @@ import SafeImage from '../ui/SafeImage';
 import SectionHeader from './SectionHeader';
 import { productPrimaryImage } from '../../lib/productImage';
 import { useMoney } from '../../CurrencyContext';
+import { isUnpriced } from '../../lib/priceStatus';
 
 /**
  * THE FILAMENT SHELF — «الفيلمنت العشوائي», a dense swatch wall.
@@ -42,6 +43,8 @@ export default function FilamentShelf({ products }: { products: ApiProduct[] }) 
       <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-2.5">
         {products.map((p) => {
           const price = p.display_price_iqd ?? p.price_iqd;
+          // A priced rail (rule R4, rows 239-240): an unpriced row is never drawn as 0.
+          if (price == null || isUnpriced(p)) return null;
           return (
             <Link
               key={p.id}

@@ -21,6 +21,7 @@ import { communityFavoritesApi, type SavedProduct } from '../lib/merchant';
 import { useCommunityAccess } from './community/access';
 import { ArrowLeft, ArrowRight, ShoppingBag, Heart } from 'lucide-react';
 import VariantImg from '../components/ui/VariantImg';
+import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
 export default function SavedProducts() {
   const navigate = useNavigate();
@@ -141,6 +142,13 @@ export default function SavedProducts() {
                 <div className="text-[12px] text-text-secondary truncate">
                   {p.store_name || loc('متجر Levonis', 'Levonis store', 'فرۆشگای Levonis')}
                 </div>
+                {/* CATALOG-ONLY (rows 239-240): the label, never a number, and no
+                    stock word — its stock is not set. */}
+                {isUnpriced(p) || p.price_iqd == null ? (
+                  <div data-price-status="unpriced" className="text-[12px] font-bold text-text-muted mt-0.5">
+                    {loc(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}
+                  </div>
+                ) : (
                 <div className="text-[12px] text-text-secondary mt-0.5" dir="ltr">
                   {Number(p.price_iqd).toLocaleString('en-US')} IQD
                   {/* `false`, not `null`: unknown says nothing rather than
@@ -149,6 +157,7 @@ export default function SavedProducts() {
                     <span className="text-text-muted"> · {loc('غير متوفر', 'Unavailable', 'بەردەست نییە')}</span>
                   )}
                 </div>
+                )}
               </div>
               <button
                 onClick={(e) => remove(e, p)}

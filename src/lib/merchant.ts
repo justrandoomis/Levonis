@@ -483,7 +483,10 @@ export interface SavedProduct {
   name: string;
   name_ar: string | null;
   image: string | null;
-  price_iqd: number;
+  /** NULL for a catalog-only shop product (DECISIONS rows 239-240) — never 0. */
+  price_iqd: number | null;
+  /** 'unpriced' = shown in the catalogue without a price yet; absent reads as priced. */
+  price_status?: 'priced' | 'unpriced';
   original_price_iqd: number | null;
   /**
    * null on a catalogue product: its availability is the whole availability
