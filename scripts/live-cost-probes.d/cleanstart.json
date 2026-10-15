@@ -1,32 +1,54 @@
 {
-  "step": "Pricing V2 clean start (DECISIONS row 222, spec addendum A.4.6): a product still in «يحتاج تسعيرًا» is neither listed, found nor searchable",
+  "step": "Catalog-only (DECISIONS rows 239-240; Bambu import spec §K.1 D-1), after the Pricing V2 clean start (DECISIONS row 222): a product still waiting for its V2 price is SHOWN with no price — visible, unpriced, unsellable: its page and its public record answer 200 with price_status unpriced, a null price, and nothing that prices or sells it",
   "vars": {
-    "hidden_slug": {
+    "unpriced_slug": {
       "optional": true,
-      "note": "workflow 7 reads one active ordinary product that is not V2-published (read-only), after the deploy and right before the probes (a product published while the deploy ran is not mistaken for a leak), and passes --var hidden_slug=…; once every product is published there is none and these probes skip with a notice"
+      "note": "workflow 7 reads one active, VISIBLE ordinary product that is not V2-published (read-only), after the deploy and right before the probes (a product published while the deploy ran is not mistaken for a leak), and passes --var unpriced_slug=…; once every product is published there is none and these probes skip with a notice"
     }
   },
   "probes": [
     {
-      "path": "/api/products/{hidden_slug}",
-      "status": [
-        404
-      ]
-    },
-    {
-      "path": "/api/public/v1/products/{hidden_slug}",
-      "status": [
-        404
-      ]
-    },
-    {
-      "path": "/api/products?search={hidden_slug}",
+      "path": "/api/products/{unpriced_slug}",
       "status": [
         200
       ],
-      "forbidValues": {
-        "slug": "{hidden_slug}"
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|(premium|extra)_rule|(target|premium|extra)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
+      "requirePriceKeys": [
+        "price_iqd"
+      ],
+      "expectValues": {
+        "price_status": "unpriced",
+        "product.price_status": "unpriced",
+        "product.price_iqd": null,
+        "product.display_price_iqd": null,
+        "pricing": null,
+        "availability": null,
+        "initial_selection": null
       }
+    },
+    {
+      "path": "/api/public/v1/products/{unpriced_slug}",
+      "status": [
+        200
+      ],
+      "forbidKeys": "cost|supplier|replacement|target|profit|margin|(premium|extra)_rule|(target|premium|extra)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
+      "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
+      "expectValues": {
+        "data.price.status": "unpriced",
+        "data.price.amount": null,
+        "data.purchase": null
+      }
+    },
+    {
+      "path": "/api/products?search={unpriced_slug}",
+      "status": [
+        200
+      ],
+      "priceKeys": [
+        "price_iqd"
+      ]
     }
-  ]
+  ],
+  "note": "Anonymous GETs only. Before DECISIONS row 240 such a product was hidden (404); since catalog-only it is shown with «السعر غير متوفر حالياً» and no number: the page body is the catalog-only one (pricing, availability and initial_selection null, the product's price_iqd and display_price_iqd null), the public record says price.status unpriced with a null amount and no purchase block, and a search answer that shows it holds every price to the price rule. The cost and private keys stay forbidden on both. A product held for a catalogue gap (no picture, no section) stays hidden; the predicate's own tests gate that."
 }

@@ -7,10 +7,10 @@
  * programme step, so parallel steps never edit the same file) and, for each
  * probe, issues ONE anonymous GET against the live site:
  *
- *   {"vars":  {"slug": {"from": "/api/products?limit=1", "pick": "products.0.slug"}},
+ *   {"vars":  {"slug": {"from": "/api/products?limit=1&price=1-", "pick": "products.0.slug"}},
  *    "probes":[{"path": "/api/products/{slug}", "status": [200],
  *               "forbidKeys": "regex", "forbidPattern": "regex",
- *               "requireIntegerKeys": ["price_iqd"]}]}
+ *               "requirePriceKeys": ["price_iqd"]}]}
  *
  *   status              the answer must be one of these codes
  *   forbidKeys          no JSON key anywhere in the body may match (case-insensitive)
@@ -40,10 +40,11 @@
  *                       must never pass as an empty one. A var with no `from`
  *                       (the workflow's `--var`) is empty when not given.
  *                       `ran === 0` still fails the run.
- *   requireWhenVar      "name" of an optional var: `requireIntegerKeys` holds
- *                       only while that var has a value. When it is legitimately
- *                       empty (nothing listed yet), the keys may be absent, but
- *                       wherever they appear they are still integers, and
+ *   requireWhenVar      "name" of an optional var: `requireIntegerKeys` and
+ *                       `requirePriceKeys` hold only while that var has a
+ *                       value. When it is legitimately empty (nothing priced
+ *                       yet), the keys may be absent, but wherever they appear
+ *                       they still follow integerKeys / priceKeys, and
  *                       forbidKeys / forbidPattern stay in force
  *   integerKeys         like requireIntegerKeys, without the presence rule:
  *                       every occurrence is an integer, an absent key passes
@@ -51,6 +52,25 @@
  *                       the filled value (a hidden product's slug must not be
  *                       in a search answer). The failure names the key and
  *                       where, never the value
+ *   priceKeys           CATALOG-ONLY (DECISIONS rows 239-240; Bambu import
+ *                       spec §K.1 D-1): a product may be SHOWN before it has
+ *                       a price («السعر غير متوفر حالياً»). Every occurrence of
+ *                       the key is an integer — or null, but ONLY on an object
+ *                       that itself says `"price_status": "unpriced"`; and an
+ *                       object that says so carries null, never a number (its
+ *                       row still holds the archived dinar ladder). A null on
+ *                       a priced object, or on one that says nothing, fails.
+ *                       An absent key passes
+ *   requirePriceKeys    priceKeys plus presence: the key appears at least once.
+ *                       It replaces requireIntegerKeys on an answer that may
+ *                       mix priced and unpriced products (a listing, a page)
+ *   expectValues        {"path": literal}: the value at that dotted path (read
+ *                       from the answer's root, as a var's `pick` is) must be
+ *                       there and equal the literal — text, a number, a
+ *                       boolean or null. `{"price_status": "unpriced",
+ *                       "product.price_iqd": null}` proves a product page is
+ *                       the unpriced one. The failure names the path, never
+ *                       the value
  *
  * WHAT IT NEVER DOES. No cookie, no token, no write, no method but GET, no
  * redirect followed (a redirect is reported as its own status). Nothing it
@@ -76,7 +96,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
-/** Every key in a JSON value, at any depth, with the dotted path it sits at. */
+/** Every key in a JSON value, at any depth, with the dotted path it sits at and the object that holds it. */
 export function* walkKeys(value, path = '') {
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) yield* walkKeys(value[i], `${path}[${i}]`);
@@ -85,7 +105,7 @@ export function* walkKeys(value, path = '') {
   if (value && typeof value === 'object') {
     for (const [key, child] of Object.entries(value)) {
       const at = path ? `${path}.${key}` : key;
-      yield { key, value: child, path: at };
+      yield { key, value: child, path: at, holder: value };
       yield* walkKeys(child, at);
     }
   }
@@ -160,11 +180,11 @@ function isEmptyVar(name, vars, defs, empty) {
  * product yet), or `{ error }` when a var is missing otherwise (a required
  * one, or an optional one whose read failed). A probe whose `requireWhenVar`
  * is legitimately empty runs as `{ path, probe, notice }`: `probe` is the one
- * to judge, its required integer keys allowed to be absent.
+ * to judge, its required integer and price keys allowed to be absent.
  */
 export function planProbe(probe, vars, defs = {}, empty = new Set()) {
   const missing = probeVars(probe).filter((name) => typeof vars[name] !== 'string' || vars[name] === '');
-  if (missing.length && missing.every((name) => isEmptyVar(name, vars, defs, empty))) return { skip: `skipped (no listed product yet: {${missing.join('}, {')}} has no value)` };
+  if (missing.length && missing.every((name) => isEmptyVar(name, vars, defs, empty))) return { skip: `skipped (nothing to probe yet: {${missing.join('}, {')}} has no value)` };
   let path;
   try {
     path = fillPath(probe.path, vars);
@@ -172,12 +192,16 @@ export function planProbe(probe, vars, defs = {}, empty = new Set()) {
     return { error: err.message };
   }
   const when = probe.requireWhenVar;
-  if (when && (probe.requireIntegerKeys ?? []).length && isEmptyVar(when, vars, defs, empty)) {
-    const { requireIntegerKeys, ...rest } = probe;
+  const required = [...(probe.requireIntegerKeys ?? []), ...(probe.requirePriceKeys ?? [])];
+  if (when && required.length && isEmptyVar(when, vars, defs, empty)) {
+    const { requireIntegerKeys, requirePriceKeys, ...rest } = probe;
+    const relaxed = { ...rest };
+    if (requireIntegerKeys?.length) relaxed.integerKeys = [...(probe.integerKeys ?? []), ...requireIntegerKeys];
+    if (requirePriceKeys?.length) relaxed.priceKeys = [...(probe.priceKeys ?? []), ...requirePriceKeys];
     return {
       path,
-      probe: { ...rest, integerKeys: [...(probe.integerKeys ?? []), ...requireIntegerKeys] },
-      notice: `nothing listed yet ({${when}} is empty): ${requireIntegerKeys.join(', ')} may be absent, and wherever present must be integers`,
+      probe: relaxed,
+      notice: `nothing priced yet ({${when}} is empty): ${required.join(', ')} may be absent, and wherever present must follow ${requirePriceKeys?.length ? 'the price rule (an integer, or null on an unpriced object)' : 'the integer rule'}`,
     };
   }
   return { path };
@@ -231,6 +255,33 @@ export function judge(probe, status, text, vars = {}) {
   };
   for (const name of probe.requireIntegerKeys ?? []) integers(name, true);
   for (const name of probe.integerKeys ?? []) integers(name, false);
+  // Catalog-only (DECISIONS row 240): a price is an integer, or null on an object that says it is unpriced.
+  const prices = (name, required) => {
+    let seen = 0;
+    let notInteger = 0;
+    let nullOnPriced = 0;
+    let numberOnUnpriced = 0;
+    for (const { key, value, holder } of walkKeys(body)) {
+      if (key !== name) continue;
+      seen++;
+      const unpriced = holder?.price_status === 'unpriced';
+      if (value === null) {
+        if (!unpriced) nullOnPriced++;
+      } else if (!Number.isSafeInteger(value)) notInteger++;
+      else if (unpriced) numberOnUnpriced++;
+    }
+    if (seen === 0 && required) failures.push(`required key ${name} is absent`);
+    if (notInteger > 0) failures.push(`${notInteger} of ${seen} ${name} value(s) are neither integers nor null`);
+    if (nullOnPriced > 0) failures.push(`${nullOnPriced} of ${seen} ${name} value(s) are null on an object not marked price_status: unpriced`);
+    if (numberOnUnpriced > 0) failures.push(`${numberOnUnpriced} of ${seen} ${name} value(s) are a number on an object marked price_status: unpriced`);
+  };
+  for (const name of probe.requirePriceKeys ?? []) prices(name, true);
+  for (const name of probe.priceKeys ?? []) prices(name, false);
+  for (const [at, literal] of Object.entries(probe.expectValues ?? {})) {
+    const got = body === undefined ? undefined : pick(body, at);
+    if (got === undefined) failures.push(`expected key ${at} is absent`);
+    else if (got !== literal) failures.push(`${at} does not equal the expected ${literal === null ? 'null' : typeof literal === 'string' ? 'text' : typeof literal}`);
+  }
   for (const [name, template] of Object.entries(probe.forbidValues ?? {})) {
     const value = String(template).replace(/\{([a-z_][a-z0-9_]*)\}/gi, (w, v) => String(vars[v] ?? ''));
     if (!value) continue;
@@ -346,7 +397,7 @@ async function main() {
   const base = flag('--base', 'https://levonis-iq.com');
   const dir = resolve(flag('--dir', join(HERE, 'live-cost-probes.d')));
   const { ran, failed, skipped } = await runProbes(loadProbeFiles(dir), (path) => get(base, path), cliVars(args));
-  console.log(`${ran} probe(s) run, ${failed} failed${skipped ? `, ${skipped} skipped (no listed product yet)` : ''}`);
+  console.log(`${ran} probe(s) run, ${failed} failed${skipped ? `, ${skipped} skipped (nothing to probe yet)` : ''}`);
   if (ran === 0) {
     console.log('::error::no probe ran — an empty probe set proves nothing');
     process.exit(1);

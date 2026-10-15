@@ -2,7 +2,7 @@
   "step": "Leak audit 2026-10-10 (DECISIONS row 220) — a stranger reads final values only: no accessory buying price, no print margin or rate, no printer economics, no supplier picture link; Pricing V2 (spec §8): no V2 private key (v2_*, discount_usd, usd_ceil6, exact_iqd), no editor dollar block (editor_usd*, staff only) and no V2 flag on a product page",
   "vars": {
     "slug": {
-      "from": "/api/products?limit=1",
+      "from": "/api/products?limit=1&price=1-",
       "pick": "products.0.slug",
       "optional": true
     }
@@ -71,5 +71,5 @@
       "forbidKeys": "^v2_|^v2$|^editor_usd|discount_usd|deltas_usd|usd_ceil6|exact_iqd|^sku_strict$"
     }
   ],
-  "note": "Anonymous GETs only. `source_url` is held to the empty string wherever it appears: a picture's supplier link is the owner's (projectPublic blanks it; the public API v1 drops the key, and an absent key passes). The print-service rates and the accessory buying price left every public answer with DECISIONS row 220."
+  "note": "Anonymous GETs only. `source_url` is held to the empty string wherever it appears: a picture's supplier link is the owner's (projectPublic blanks it; the public API v1 drops the key, and an absent key passes). The print-service rates and the accessory buying price left every public answer with DECISIONS row 220. `{slug}` is a PRICED product (the listing filtered by `price=1-`, which excludes an unpriced one: DECISIONS row 240); cleanstart.json probes the unpriced one."
 }

@@ -720,38 +720,42 @@ jobs:
             | jq -c '[.plans[] | {id, tier, duration_months, price_iqd}]'
           [ "$fail" = "0" ] || { echo "::error::an endpoint did not answer 200 after the deploy"; exit 1; }
 
-      # THE CLEAN START (DECISIONS row 222, spec addendum A.4.6). One active
-      # ordinary product that is NOT V2-published yet, read-only, so the probes
-      # below can prove the live site neither shows, finds nor searches it
-      # (scripts/live-cost-probes.d/cleanstart.json). Read AFTER the deploy and
-      # right before the probes, never earlier: from the moment the deploy
-      # lands the new Worker accepts V2 publishes, so a product read minutes
-      # before could be published by then and its 200 would turn a good
-      # deploy red. Once every product is published there is none: the var
-      # stays empty and those probes skip with a notice. A failed read is the
-      # same empty var — the predicate's own tests, not this read, are what
-      # gate the deploy.
-      - name: Read one product still waiting for its V2 price (read-only)
+      # CATALOG-ONLY (DECISIONS rows 239-240; Bambu import spec §K.1 D-1),
+      # after the clean start (DECISIONS row 222, spec addendum A.4.6). One
+      # active, VISIBLE ordinary product that is NOT V2-published yet, read-only,
+      # so the probes below can prove the live site SHOWS it with no price:
+      # visible, unpriced, unsellable (scripts/live-cost-probes.d/cleanstart.json).
+      # VISIBLE is worker/lib/listing.ts visibleSql('p', true) byte for byte (a
+      # product the owner's switch holds for a missing picture or section stays
+      # hidden, so it is never picked). Read AFTER the deploy and right before
+      # the probes, never earlier: from the moment the deploy lands the new
+      # Worker accepts V2 publishes, so a product read minutes before could be
+      # priced by then and its priced page would turn a good deploy red. Once
+      # every product is published there is none: the var stays empty and
+      # those probes skip with a notice. A failed read is the same empty var —
+      # the predicate's own tests, not this read, are what gate the deploy.
+      - name: Read one product shown without a price yet (read-only)
         run: |
           npx wrangler d1 execute levonis-db-staging --remote --env staging --json \
-            --command "SELECT slug FROM products p WHERE COALESCE(p.composition, '') = '' AND p.status = 'active' AND NOT EXISTS (SELECT 1 FROM product_pricing_state pv2 WHERE pv2.product_id = p.id AND pv2.mode = 'engine' AND pv2.pricing_method IS NOT NULL AND EXISTS (SELECT 1 FROM pricing_v2_sku_results rv2 WHERE rv2.product_id = p.id)) LIMIT 1" \
-            > /tmp/hidden_slug.json 2>/tmp/hidden_slug.err || {
-              echo "::warning::could not read a product waiting for its V2 price — the clean-start probes will skip"
-              echo '[]' > /tmp/hidden_slug.json
+            --command "SELECT slug FROM products p WHERE COALESCE(p.composition, '') = '' AND p.status = 'active' AND NOT EXISTS (SELECT 1 FROM product_completeness pcv WHERE pcv.product_id = p.id AND pcv.held = 1 AND EXISTS (SELECT 1 FROM json_each(pcv.missing_json) jcv WHERE json_extract(jcv.value, '$.c') IN ('IMAGE','CATEGORY'))) AND NOT EXISTS (SELECT 1 FROM product_pricing_state pv2 WHERE pv2.product_id = p.id AND pv2.mode = 'engine' AND pv2.pricing_method IS NOT NULL AND EXISTS (SELECT 1 FROM pricing_v2_sku_results rv2 WHERE rv2.product_id = p.id)) LIMIT 1" \
+            > /tmp/unpriced_slug.json 2>/tmp/unpriced_slug.err || {
+              echo "::warning::could not read a product shown without a price — the catalog-only probes will skip"
+              echo '[]' > /tmp/unpriced_slug.json
             }
-          slug=$(jq -r '.[0].results[0].slug // empty' /tmp/hidden_slug.json 2>/dev/null || true)
-          if [ -n "$slug" ]; then echo "one product still waits for its V2 price: the clean-start probes will check it is hidden"; else echo "every product is V2-published (or none could be read): the clean-start probes will skip"; fi
+          slug=$(jq -r '.[0].results[0].slug // empty' /tmp/unpriced_slug.json 2>/dev/null || true)
+          if [ -n "$slug" ]; then echo "one product is shown without a price yet: the catalog-only probes will check it is visible, unpriced and unsellable"; else echo "every visible product is V2-published (or none could be read): the catalog-only probes will skip"; fi
 
       # COST PRIVACY, READ-ONLY (owner decision 2, DECISIONS row 185). Every
       # scripts/live-cost-probes.d/*.json file — one per programme step — is a
       # list of ANONYMOUS GETs: the cost routers must refuse a stranger, and
-      # the storefront's product answers must carry their integer prices and
-      # no cost, supplier, rate or profit key. No cookie, no write.
+      # the storefront's product answers must carry their prices (an integer,
+      # or null only on a product marked unpriced) and no cost, supplier, rate
+      # or profit key. No cookie, no write.
       - name: Cost-privacy probes, read-only
         run: |
-          hidden=$(jq -r '.[0].results[0].slug // empty' /tmp/hidden_slug.json 2>/dev/null || true)
-          if [ -n "$hidden" ]; then
-            node scripts/live-cost-probes.mjs --base https://levonis-iq.com --var "hidden_slug=$hidden"
+          unpriced=$(jq -r '.[0].results[0].slug // empty' /tmp/unpriced_slug.json 2>/dev/null || true)
+          if [ -n "$unpriced" ]; then
+            node scripts/live-cost-probes.mjs --base https://levonis-iq.com --var "unpriced_slug=$unpriced"
           else
             node scripts/live-cost-probes.mjs --base https://levonis-iq.com
           fi

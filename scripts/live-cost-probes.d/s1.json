@@ -2,7 +2,7 @@
   "step": "S1 — owner-only cost predicates (0177), owner decision 2",
   "vars": {
     "slug": {
-      "from": "/api/products?limit=1",
+      "from": "/api/products?limit=1&price=1-",
       "pick": "products.0.slug",
       "optional": true
     }
@@ -39,7 +39,7 @@
       ],
       "forbidKeys": "cost|supplier|replacement|target|profit|margin|(premium|extra)_rule|(target|premium|extra)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
       "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
-      "requireIntegerKeys": [
+      "requirePriceKeys": [
         "price_iqd"
       ],
       "requireWhenVar": "slug"
@@ -51,9 +51,12 @@
       ],
       "forbidKeys": "cost|supplier|replacement|target|profit|margin|(premium|extra)_rule|(target|premium|extra)_rule_id|fx|exchange_rate_used|shipping_(rate|cost|weight|length|width|height|cbm)|rate_iqd|manual_cbm|effective_cbm|pricing_(weight|revision)|^pricing_mode$|MANUAL_OVERRIDE",
       "forbidPattern": "MANUAL_OVERRIDE|PRICING_PRIVATE",
-      "requireIntegerKeys": [
+      "requirePriceKeys": [
         "price_iqd"
-      ]
+      ],
+      "expectValues": {
+        "price_status": "priced"
+      }
     },
     {
       "path": "/api/public/v1/products/{slug}",
@@ -73,5 +76,5 @@
       "note": "A bare `margin` is not forbidden here (a layout word could carry it); the print-service rates are, by name: since DECISIONS row 220 printServicePricing is no longer a public setting, so its margin_percent, setup_fee_iqd and machine_iqd_per_hour must never reach the home payload."
     }
   ],
-  "note": "Anonymous GETs only (master plan §4.0). Key regexes are critique A9's; `pricing_mode` is anchored so the public `pricing_modes` (sale modes on a product page) is not mistaken for the private engine flag. A bare `rule_id` is NOT forbidden: the product page's `membership_preview.pro.rule_id` names the public PRO/PRIME discount rule a customer is shown, not a cost, and once PRO is resumed every product page carries it. The cost-rule ids (`target_rule_id`, `extra_rule_id` and its old name `premium_rule_id`, adminScope FINANCIAL_FIELDS) are forbidden by name. The listing probe requires its integer prices only while {slug} has a value (`requireWhenVar`): right after the clean-start cut-over nothing is listed until the first V2 publish (DECISIONS row 222), and an empty list answered 200 is not a leak; its forbidden keys still hold, and any price it does list must be an integer. A listing that cannot be read is a failure, never an empty catalogue."
+  "note": "Anonymous GETs only (master plan §4.0). Key regexes are critique A9's; `pricing_mode` is anchored so the public `pricing_modes` (sale modes on a product page) is not mistaken for the private engine flag. A bare `rule_id` is NOT forbidden: the product page's `membership_preview.pro.rule_id` names the public PRO/PRIME discount rule a customer is shown, not a cost, and once PRO is resumed every product page carries it. The cost-rule ids (`target_rule_id`, `extra_rule_id` and its old name `premium_rule_id`, adminScope FINANCIAL_FIELDS) are forbidden by name. CATALOG-ONLY (DECISIONS rows 239-240; Bambu import spec §K.1 D-1): a product is SHOWN before it has a price, so a listing or a page may mix priced and unpriced products. `{slug}` is read from the listing filtered by a price range (`price=1-`, packages/catalog/src/discovery.ts formatPriceRange), which excludes every unpriced product (R3), so the page probed is a priced one (`expectValues`); the listing and the page carry `price_iqd` under `requirePriceKeys`: an integer, or null only on an object marked `price_status: unpriced`, never a number on one. The listing probe requires its prices only while {slug} has a value (`requireWhenVar`): right after the clean-start cut-over nothing is priced until the first V2 publish (DECISIONS row 222); its forbidden keys still hold, and any price it does show follows the price rule. A listing that cannot be read is a failure, never an empty catalogue."
 }

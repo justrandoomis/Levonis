@@ -11,6 +11,15 @@
  * pinned here on fixed bodies, every probe file is held to its shape, and the
  * workflow is held to the order of its steps.
  *
+ * CATALOG-ONLY (DECISIONS rows 239-240; Bambu import spec §K.1 D-1): a product
+ * is SHOWN before it has a price, so a listing or a page may mix priced and
+ * unpriced products. `priceKeys` / `requirePriceKeys` accept a null price only
+ * on an object marked `price_status: 'unpriced'` (and never a number there),
+ * `expectValues` pins a page as the priced or the unpriced one, `{slug}` is a
+ * priced product (the listing filtered by `price=1-`), and cleanstart.json
+ * proves the not-yet-priced product visible, unpriced and unsellable. Every
+ * probe file runs here against a catalogue that mixes both.
+ *
  * Run: node --import tsx --test tests/liveCostProbes.test.ts
  */
 import { test } from 'node:test';
@@ -18,7 +27,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { ROOT } from './fixtures/d1';
 import { sourceOf } from './fixtures/source';
-import { APEX, asD1, ctx, freshDb } from './fixtures/app';
+import { APEX, asD1, ctx, freshDb, post } from './fixtures/app';
 import { seedCostlyProduct } from './fixtures/costlyProduct';
 import { LIVE_PRODUCTS, seedLiveCatalog } from './fixtures/liveCatalog';
 import { FX_DISPLAY_RATE, FX_SENTINELS, seedFxSentinels } from './fixtures/fxSentinels';
@@ -26,6 +35,9 @@ import worker from '../worker/index';
 // @ts-expect-error - plain ESM script shared with workflow 7, no types
 import * as probesScript from '../scripts/live-cost-probes.mjs';
 import { fetchPublished } from './fixtures/autoPublish';
+import { CAT, catalogOnlyWorld } from './fixtures/catalogOnly';
+import { formatPriceRange, parsePriceRange } from '../packages/catalog/src/discovery';
+import { visibleSql } from '../worker/lib/listing';
 const { cliVars, fillPath, judge, loadProbeFiles, pick, planProbe, readVar, runProbes, walkKeys } = probesScript;
 
 interface Probe {
@@ -36,6 +48,9 @@ interface Probe {
   requireIntegerKeys?: string[];
   requireWhenVar?: string;
   integerKeys?: string[];
+  requirePriceKeys?: string[];
+  priceKeys?: string[];
+  expectValues?: Record<string, string | number | boolean | null>;
   valuePatterns?: Record<string, string>;
   forbidValues?: Record<string, string>;
 }
@@ -45,6 +60,16 @@ const files = loadProbeFiles(join(ROOT, 'scripts/live-cost-probes.d')) as Array<
 }>;
 const s1 = files.find((f) => f.file === 's1.json')!;
 const probe = (path: string) => s1.spec.probes.find((p) => p.path === path);
+
+/**
+ * `{slug}` IS A PRICED PRODUCT (Bambu import spec §K.1 D-1). It is read from the
+ * listing filtered by a price range, in the listing's own syntax
+ * (packages/catalog/src/discovery.ts `formatPriceRange`), and a price range
+ * excludes every unpriced product (catalog-only R3, worker/lib/listingFacets.ts
+ * `passes`) — so the first unpriced card at the top of the default listing can
+ * never become the page the price probes read.
+ */
+const PRICED_LISTING = `/api/products?limit=1&price=${formatPriceRange({ min: 1, max: null })}`;
 
 // ------------------------------------------------------------- the verdicts
 
@@ -89,7 +114,14 @@ test('every probe file has the shape the script reads, and every regex compiles'
         // It relaxes a presence rule, so it must name a var this file reads by GET and may find empty.
         const def = spec.vars?.[p.requireWhenVar];
         assert.ok(def?.optional === true && typeof def.from === 'string' && typeof def.pick === 'string', `${file}: ${p.path} requireWhenVar names an optional var read by GET`);
-        assert.ok((p.requireIntegerKeys ?? []).length > 0, `${file}: ${p.path} requireWhenVar without requireIntegerKeys`);
+        assert.ok([...(p.requireIntegerKeys ?? []), ...(p.requirePriceKeys ?? [])].length > 0, `${file}: ${p.path} requireWhenVar without a required key`);
+      }
+      // Catalog-only: any storefront answer may carry an unpriced product, so a price is held to the price
+      // rule (null only on an unpriced object), never to the bare integer rule that a shown product breaks.
+      for (const list of [p.requireIntegerKeys, p.integerKeys]) assert.equal((list ?? []).includes('price_iqd'), false, `${file}: ${p.path} holds price_iqd to the integer rule; use requirePriceKeys / priceKeys`);
+      for (const [at, literal] of Object.entries(p.expectValues ?? {})) {
+        assert.match(at, /^[a-z_][a-z0-9_]*(\.[a-z0-9_]+)*$/i, `${file}: ${p.path} expectValues path ${at}`);
+        assert.ok(literal === null || ['string', 'number', 'boolean'].includes(typeof literal), `${file}: ${p.path} expectValues ${at} is a literal`);
       }
     }
   }
@@ -101,8 +133,9 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
   }
   const products = probe('/api/products?limit=3')!;
   assert.deepEqual(products.status, [200]);
-  assert.deepEqual(products.requireIntegerKeys, ['price_iqd']);
-  assert.equal(products.requireWhenVar, 'slug', 'the listing needs its prices only while something is listed (the clean start)');
+  assert.deepEqual(products.requirePriceKeys, ['price_iqd'], 'a listing may mix priced and unpriced products (DECISIONS row 240)');
+  assert.equal(products.requireIntegerKeys, undefined);
+  assert.equal(products.requireWhenVar, 'slug', 'the listing needs its prices only while something is priced (the clean start)');
   const keys = new RegExp(products.forbidKeys!, 'i');
   // Critique A9: the narrow regex missed these.
   for (const k of ['cost_iqd', 'supplier_cost', 'replacement_cost_iqd', 'target_profit_iqd', 'margin_iqd', 'premium_rule_id', 'extra_rule_id', 'extra_rule_version', 'fx_rate', 'exchange_rate_used', 'shipping_rate', 'shipping_weight_g', 'shipping_cbm', 'rate_iqd', 'manual_cbm', 'effective_cbm', 'pricing_weight_g', 'pricing_revision', 'pricing_mode']) {
@@ -111,9 +144,72 @@ test('s1.json: the cost routers refuse a stranger; the storefront answers carry 
   // …and must not trip on the public sale modes of a product page.
   assert.equal(keys.test('pricing_modes'), false);
   assert.equal(keys.test('price_iqd'), false);
-  // A product page and the public API are probed too, by a live slug.
+  // A product page and the public API are probed too, by a live slug — a PRICED one (D-1).
   assert.ok(probe('/api/products/{slug}') && probe('/api/public/v1/products/{slug}'));
-  assert.equal(s1.spec.vars?.slug?.from, '/api/products?limit=1');
+  assert.deepEqual(probe('/api/products/{slug}')!.requirePriceKeys, ['price_iqd']);
+  assert.deepEqual(probe('/api/products/{slug}')!.expectValues, { price_status: 'priced' }, 'the page probed is a priced one');
+  assert.equal(s1.spec.vars?.slug?.from, PRICED_LISTING);
+});
+
+test('s1.json and leaks.json read {slug} from the listing filtered by a price range that excludes every unpriced product', () => {
+  assert.equal(PRICED_LISTING, '/api/products?limit=1&price=1-');
+  const range = parsePriceRange(new URL(PRICED_LISTING, 'https://x').searchParams.get('price'));
+  assert.deepEqual(range, { min: 1, max: null }, 'the listing parses the range the probe states');
+  for (const name of ['s1.json', 'leaks.json']) {
+    const f = files.find((x) => x.file === name)!;
+    assert.equal(f.spec.vars?.slug?.from, PRICED_LISTING, name);
+    assert.equal(f.spec.vars?.slug?.pick, 'products.0.slug', name);
+  }
+});
+
+// ------------------------------------------------------------- the price rule (catalog-only, D-1)
+
+test('judge: priceKeys — an integer, or null ONLY on an object marked unpriced; never a number on one; requirePriceKeys adds presence; a failure never carries the value', () => {
+  const p: Probe = { path: '/x', status: [200], requirePriceKeys: ['price_iqd'] };
+  const mixed = {
+    products: [
+      { slug: 'a1', price_status: 'priced', price_iqd: 900_000 },
+      { slug: 'h2d', price_status: 'unpriced', price_iqd: null },
+    ],
+  };
+  assert.deepEqual(judge(p, 200, JSON.stringify(mixed)), [], 'a mixed listing passes');
+  // A PRICED product's page whose body embeds an UNPRICED related product: the null sits on the related
+  // object, which says it is unpriced — the page's own price is still an integer.
+  const page = { product: { slug: 'nozzle', price_status: 'priced', price_iqd: 40_000 }, price_status: 'priced', related: [{ slug: 'h2d', price_status: 'unpriced', price_iqd: null }] };
+  assert.deepEqual(judge(p, 200, JSON.stringify(page)), []);
+  // A priced product with a null price fails — whether it says priced or says nothing.
+  const nullPriced = judge(p, 200, JSON.stringify({ products: [{ slug: 'a1', price_status: 'priced', price_iqd: null }] })).join('\n');
+  assert.match(nullPriced, /1 of 1 price_iqd value\(s\) are null on an object not marked price_status: unpriced/);
+  assert.match(judge(p, 200, JSON.stringify({ products: [{ slug: 'a1', price_iqd: null }] })).join('\n'), /null on an object not marked/);
+  // The page's own unpriced status does not excuse a null on another object: the mark is per object.
+  assert.match(judge(p, 200, JSON.stringify({ price_status: 'unpriced', product: { price_iqd: null } })).join('\n'), /null on an object not marked/);
+  // An unpriced product never carries a number (its row still holds the archived ladder).
+  const archived = judge(p, 200, JSON.stringify({ products: [{ slug: 'h2d', price_status: 'unpriced', price_iqd: 7_101_000 }] })).join('\n');
+  assert.match(archived, /a number on an object marked price_status: unpriced/);
+  assert.doesNotMatch(archived, /7101000|7,101,000/, 'a failure line never carries the value');
+  // Neither an integer nor null.
+  assert.match(judge(p, 200, JSON.stringify({ products: [{ price_status: 'priced', price_iqd: '900000' }] })).join('\n'), /neither integers nor null/);
+  assert.match(judge(p, 200, JSON.stringify({ products: [{ price_status: 'unpriced', price_iqd: 0.5 }] })).join('\n'), /neither integers nor null/);
+  // Presence: required, and not required.
+  assert.match(judge(p, 200, JSON.stringify({ products: [] })).join('\n'), /required key price_iqd is absent/, 'an empty answer is not a pass (G-36)');
+  assert.deepEqual(judge({ path: '/x', status: [200], priceKeys: ['price_iqd'] }, 200, JSON.stringify({ products: [] })), [], 'priceKeys alone: an absent key passes');
+  assert.match(judge({ path: '/x', status: [200], priceKeys: ['price_iqd'] }, 200, JSON.stringify({ products: [{ price_iqd: null }] })).join('\n'), /null on an object not marked/);
+});
+
+test('judge: expectValues — the value at a dotted path is there and equals the literal (null included); the failure names the path, never the value', () => {
+  const p: Probe = { path: '/x', status: [200], expectValues: { price_status: 'unpriced', 'product.price_iqd': null, 'data.price.amount': null } };
+  const unpriced = { price_status: 'unpriced', product: { price_iqd: null }, data: { price: { amount: null } } };
+  assert.deepEqual(judge(p, 200, JSON.stringify(unpriced)), []);
+  const priced = judge(p, 200, JSON.stringify({ price_status: 'priced', product: { price_iqd: 1_600_000 }, data: { price: { amount: 1_600_000 } } })).join('\n');
+  assert.match(priced, /price_status does not equal the expected text/);
+  assert.match(priced, /product\.price_iqd does not equal the expected null/);
+  assert.match(priced, /data\.price\.amount does not equal the expected null/);
+  assert.doesNotMatch(priced, /1600000|1,600,000|"priced"/, 'a failure line never carries the value');
+  assert.match(judge(p, 200, JSON.stringify({ product: {} })).join('\n'), /expected key price_status is absent/);
+  assert.match(judge(p, 200, JSON.stringify({ price_status: 'unpriced', data: { price: { amount: null } } })).join('\n'), /expected key product\.price_iqd is absent/, 'absent is not null');
+  assert.match(judge(p, 200, 'not json').join('\n'), /expected key price_status is absent/);
+  assert.deepEqual(judge({ path: '/x', status: [200], expectValues: { n: 3, ok: true } }, 200, JSON.stringify({ n: 3, ok: true })), []);
+  assert.match(judge({ path: '/x', status: [200], expectValues: { n: 3 } }, 200, JSON.stringify({ n: '3' })).join('\n'), /n does not equal the expected number/);
 });
 
 // ------------------------------------------------------------- the membership rule a page shows (S1 review D2)
@@ -133,7 +229,7 @@ test('s1.json: a membership rule id passes every storefront probe; target_rule_i
     for (const k of ['target_rule_id', 'extra_rule_id', 'premium_rule_id']) assert.ok(keys.test(k), `${path}: the probe would miss ${k}`);
   }
   const page = probe('/api/products/{slug}')!;
-  const shown = { product: { slug: 'a1', price_iqd: 900000, membership_preview: { pro: { rule_id: 'mbr_rule_pro', price_iqd: 850000 }, prime: { rule_id: 'mbr_rule_prime', price_iqd: 880000 } } } };
+  const shown = { price_status: 'priced', product: { slug: 'a1', price_status: 'priced', price_iqd: 900000, membership_preview: { pro: { rule_id: 'mbr_rule_pro', price_iqd: 850000 }, prime: { rule_id: 'mbr_rule_prime', price_iqd: 880000 } } } };
   assert.deepEqual(judge(page, 200, JSON.stringify(shown)), []);
   for (const k of ['target_rule_id', 'extra_rule_id', 'premium_rule_id']) {
     const leak = { product: { slug: 'a1', price_iqd: 900000, pricing: { [k]: 'tr_1' } } };
@@ -383,10 +479,10 @@ test('workflow 7: an empty INITIAL_ADMIN_EMAIL is still refused, no step reads t
 test('optional vars: a probe whose optional var has no value is SKIPPED, a required one still refuses; --var fills a var; forbidValues names the key, never the value', () => {
   const page = { path: '/api/products/{slug}', status: [200] };
   assert.deepEqual(Object.keys(planProbe(page, {}, { slug: { optional: true } })), ['skip']);
-  assert.match(planProbe(page, {}, { slug: { optional: true } }).skip, /no listed product yet/);
-  assert.match(planProbe(page, {}, { slug: { from: '/api/products?limit=1' } }).error, /has no value/);
+  assert.match(planProbe(page, {}, { slug: { optional: true } }).skip, /nothing to probe yet/);
+  assert.match(planProbe(page, {}, { slug: { from: PRICED_LISTING } }).error, /has no value/);
   assert.deepEqual(planProbe(page, { slug: 'a1' }, { slug: { optional: true } }), { path: '/api/products/a1' });
-  assert.deepEqual(cliVars(['--base', 'https://x', '--var', 'hidden_slug=bambu-a1', '--var', 'broken']), { hidden_slug: 'bambu-a1' });
+  assert.deepEqual(cliVars(['--base', 'https://x', '--var', 'unpriced_slug=bambu-a1', '--var', 'broken']), { unpriced_slug: 'bambu-a1' });
   const search: Probe = { path: '/api/products?search={hidden_slug}', status: [200], forbidValues: { slug: '{hidden_slug}' } };
   assert.deepEqual(judge(search, 200, JSON.stringify({ products: [{ slug: 'other' }] }), { hidden_slug: 'secret-slug' }), []);
   const hit = judge(search, 200, JSON.stringify({ products: [{ slug: 'secret-slug' }] }), { hidden_slug: 'secret-slug' }).join('\n');
@@ -414,7 +510,7 @@ test('readVar: only a 200 JSON answer whose picked list is there and empty is an
 });
 
 test('planProbe + judge: requireWhenVar lets the listing\'s prices be absent ONLY while its var is proven empty; integers and forbidden keys still hold; a failed read relaxes nothing', () => {
-  const defs = { slug: { from: '/api/products?limit=1', pick: 'products.0.slug', optional: true } };
+  const defs = { slug: { from: PRICED_LISTING, pick: 'products.0.slug', optional: true } };
   const listing: Probe = { path: '/api/products?limit=3', status: [200], forbidKeys: 'cost|fx', forbidPattern: 'MANUAL_OVERRIDE', requireIntegerKeys: ['price_iqd'], requireWhenVar: 'slug' };
   const page: Probe = { path: '/api/products/{slug}', status: [200], requireIntegerKeys: ['price_iqd'] };
   const empty = new Set(['slug']);
@@ -422,7 +518,7 @@ test('planProbe + judge: requireWhenVar lets the listing\'s prices be absent ONL
   assert.deepEqual(Object.keys(planProbe(page, {}, defs, empty)), ['skip']);
   const relaxed = planProbe(listing, {}, defs, empty);
   assert.equal(relaxed.path, '/api/products?limit=3');
-  assert.match(relaxed.notice, /nothing listed yet/);
+  assert.match(relaxed.notice, /nothing priced yet/);
   assert.deepEqual(relaxed.probe.requireIntegerKeys, undefined);
   assert.deepEqual(relaxed.probe.integerKeys, ['price_iqd']);
   assert.deepEqual(judge(relaxed.probe, 200, JSON.stringify({ success: true, products: [] })), [], 'an empty list answered 200 is not a leak');
@@ -436,8 +532,21 @@ test('planProbe + judge: requireWhenVar lets the listing\'s prices be absent ONL
   // A FAILED read (the var has no value but was not proven empty): nothing is relaxed, the slug probes refuse.
   assert.deepEqual(planProbe(listing, {}, defs, new Set()), { path: '/api/products?limit=3' });
   assert.match(planProbe(page, {}, defs, new Set()).error, /has no value/, 'a failed read is not an empty catalogue');
-  // A workflow var with no `from`, not given: still a legitimate skip (the clean start's hidden slug).
-  assert.deepEqual(Object.keys(planProbe({ path: '/api/products/{hidden_slug}', status: [404] }, {}, { hidden_slug: { optional: true } })), ['skip']);
+  // A workflow var with no `from`, not given: still a legitimate skip (catalog-only's unpriced slug).
+  assert.deepEqual(Object.keys(planProbe({ path: '/api/products/{unpriced_slug}', status: [200] }, {}, { unpriced_slug: { optional: true } })), ['skip']);
+  // The same relaxation for the price rule (catalog-only): requirePriceKeys becomes priceKeys, nothing else.
+  const mixedListing: Probe = { path: '/api/products?limit=3', status: [200], forbidKeys: 'cost|fx', requirePriceKeys: ['price_iqd'], requireWhenVar: 'slug' };
+  const priceRelaxed = planProbe(mixedListing, {}, defs, empty);
+  assert.match(priceRelaxed.notice, /nothing priced yet.*the price rule/);
+  assert.equal(priceRelaxed.probe.requirePriceKeys, undefined);
+  assert.deepEqual(priceRelaxed.probe.priceKeys, ['price_iqd']);
+  assert.equal(priceRelaxed.probe.integerKeys, undefined);
+  const allUnpriced = { products: [{ slug: 'h2d', price_status: 'unpriced', price_iqd: null }] };
+  assert.deepEqual(judge(priceRelaxed.probe, 200, JSON.stringify(allUnpriced)), [], 'the cut-over: every product shown, none priced');
+  assert.deepEqual(judge(priceRelaxed.probe, 200, JSON.stringify({ products: [] })), []);
+  assert.match(judge(priceRelaxed.probe, 200, JSON.stringify({ products: [{ price_iqd: null }] })).join('\n'), /null on an object not marked/, 'the price rule still holds');
+  assert.match(judge(priceRelaxed.probe, 200, JSON.stringify({ products: [], cost_iqd: 1 })).join('\n'), /forbidden key cost_iqd/);
+  assert.deepEqual(planProbe(mixedListing, { slug: 'a1' }, defs, new Set()), { path: '/api/products?limit=3' }, 'a priced slug: the presence rule is back');
 });
 
 /** A fake site for runProbes: answers by path, `throw` for a path that does not answer. */
@@ -450,29 +559,29 @@ function fakeSite(answers: Record<string, { status: number; body: unknown } | 't
   };
 }
 
-test('runProbes: the cut-over run — nothing listed yet — is green with the slug probes skipped; a listing that cannot be read fails the run, never passes as empty', async () => {
+test('runProbes: the cut-over run — nothing priced yet — is green with the slug probes skipped; a listing that cannot be read fails the run, never passes as empty', async () => {
   const lines: string[] = [];
   const log = (l: string) => lines.push(l);
   const emptyList = { status: 200, body: { success: true, products: [] } };
-  const site = (listing: { status: number; body: unknown } | 'throw') => fakeSite({ '/api/products?limit=1': listing, '/api/products?limit=3': emptyList, '/api/home': { status: 200, body: { success: true, sections: [] } } });
+  const site = (listing: { status: number; body: unknown } | 'throw') => fakeSite({ [PRICED_LISTING]: listing, '/api/products?limit=3': emptyList, '/api/home': { status: 200, body: { success: true, sections: [] } } });
   const s1Only = [s1];
   // The clean start: an empty catalogue answered 200.
   const green = await runProbes(s1Only, site(emptyList), {}, log);
   assert.equal(green.failed, 0, lines.filter((l) => l.startsWith('::error::')).join('\n'));
   assert.ok(green.ran > 0 && green.skipped === 2, `ran ${green.ran}, skipped ${green.skipped}`);
-  assert.ok(lines.some((l) => /::notice::s1\.json: \/api\/products\?limit=3 — nothing listed yet/.test(l)), 'the relaxation is said out loud');
+  assert.ok(lines.some((l) => /::notice::s1\.json: \/api\/products\?limit=3 — nothing priced yet/.test(l)), 'the relaxation is said out loud');
   // Every way the read can fail is a failure, and the slug probes do not silently skip.
   for (const [why, listing] of [['no answer', 'throw'], ['a 503', { status: 503, body: { success: true, products: [] } }], ['not JSON', { status: 200, body: '<html>' }], ['no list', { status: 200, body: { success: false } }]] as const) {
     lines.length = 0;
     const red = await runProbes(s1Only, site(listing), {}, log);
     assert.ok(red.failed > 0, `${why}: the run must fail`);
-    assert.ok(lines.some((l) => /^::error::s1\.json: \{slug\} could not be read from \/api\/products\?limit=1/.test(l)), `${why}: the read failure is an error`);
+    assert.ok(lines.some((l) => l.startsWith(`::error::s1.json: {slug} could not be read from ${PRICED_LISTING} (`)), `${why}: the read failure is an error`);
     assert.equal(red.skipped, 0, `${why}: no slug probe skips on a failed read`);
     assert.ok(lines.some((l) => /^::error::s1\.json: \/api\/products\/\{slug\} — variable \{slug\} has no value/.test(l)), `${why}: the product page probe refuses`);
   }
 });
 
-test('the clean start: s1.json and leaks.json read their slug as OPTIONAL, and cleanstart.json probes the hidden product workflow 7 passes in', () => {
+test('catalog-only: s1.json and leaks.json read their slug as OPTIONAL, and cleanstart.json probes the unpriced product workflow 7 passes in — visible, unpriced, unsellable', () => {
   for (const name of ['s1.json', 'leaks.json']) {
     const f = files.find((x) => x.file === name)!;
     assert.equal(f.spec.vars?.slug?.optional, true, `${name}: an empty catalogue right after the cut-over is not a leak`);
@@ -481,66 +590,172 @@ test('the clean start: s1.json and leaks.json read their slug as OPTIONAL, and c
   }
   const clean = files.find((x) => x.file === 'cleanstart.json');
   assert.ok(clean, 'scripts/live-cost-probes.d/cleanstart.json exists');
-  assert.equal(clean!.spec.vars?.hidden_slug?.optional, true);
-  assert.equal(clean!.spec.vars?.hidden_slug?.from, undefined, 'the slug comes from the workflow (--var), never from a public read');
+  assert.equal(clean!.spec.vars?.unpriced_slug?.optional, true);
+  assert.equal(clean!.spec.vars?.unpriced_slug?.from, undefined, 'the slug comes from the workflow (--var), never from a public read');
+  assert.equal(clean!.spec.vars?.hidden_slug, undefined, 'the not-yet-priced product is no longer hidden (DECISIONS row 240)');
   const byPath = new Map(clean!.spec.probes.map((p) => [p.path, p]));
-  assert.deepEqual(byPath.get('/api/products/{hidden_slug}')?.status, [404]);
-  assert.deepEqual(byPath.get('/api/public/v1/products/{hidden_slug}')?.status, [404]);
-  assert.deepEqual(byPath.get('/api/products?search={hidden_slug}')?.forbidValues, { slug: '{hidden_slug}' });
-  // Workflow 7 reads one hidden product, read-only, after the migrations, and hands it to the runner.
+  // Its page: 200, the catalog-only body — price_status unpriced, a null price, nothing that prices or sells it.
+  const page = byPath.get('/api/products/{unpriced_slug}')!;
+  assert.deepEqual(page.status, [200]);
+  assert.equal(page.expectValues?.price_status, 'unpriced');
+  assert.equal(page.expectValues?.['product.price_status'], 'unpriced');
+  for (const at of ['product.price_iqd', 'product.display_price_iqd', 'pricing', 'availability', 'initial_selection']) assert.equal(page.expectValues?.[at], null, at);
+  assert.deepEqual(page.requirePriceKeys, ['price_iqd']);
+  assert.equal(page.forbidKeys, probe('/api/products/{slug}')!.forbidKeys, 'the cost keys stay forbidden on the unpriced page');
+  // Its public record: 200, price.status unpriced, a null amount, no purchase block.
+  const pub = byPath.get('/api/public/v1/products/{unpriced_slug}')!;
+  assert.deepEqual(pub.status, [200]);
+  assert.deepEqual(pub.expectValues, { 'data.price.status': 'unpriced', 'data.price.amount': null, 'data.purchase': null });
+  assert.equal(pub.forbidKeys, probe('/api/public/v1/products/{slug}')!.forbidKeys);
+  // A search that shows it holds every price to the price rule.
+  assert.deepEqual(byPath.get('/api/products?search={unpriced_slug}')?.priceKeys, ['price_iqd']);
+  // Workflow 7 reads one VISIBLE, not-yet-priced product, read-only, after the deploy, and hands it to the runner.
   const wf = sourceOf('.github/workflows/deploy-staging-code.yml');
-  assert.match(wf, /> \/tmp\/hidden_slug\.json/);
-  assert.match(wf, /pv2\.mode = 'engine' AND pv2\.pricing_method IS NOT NULL AND EXISTS \(SELECT 1 FROM pricing_v2_sku_results/);
-  assert.match(wf, /--var "hidden_slug=\$hidden"/);
-  // Read AFTER the deploy and right before the probes: a product the owner publishes while the deploy
+  assert.match(wf, /> \/tmp\/unpriced_slug\.json/);
+  assert.doesNotMatch(wf, /hidden_slug/);
+  assert.ok(
+    wf.includes(`WHERE COALESCE(p.composition, '') = '' AND ${visibleSql('p', true)} AND NOT EXISTS (SELECT 1 FROM product_pricing_state pv2`),
+    'the read asks VISIBLE exactly as worker/lib/listing.ts does (never a product held for a missing picture or section)'
+  );
+  assert.match(wf, /NOT EXISTS \(SELECT 1 FROM product_pricing_state pv2 WHERE pv2\.product_id = p\.id AND pv2\.mode = 'engine' AND pv2\.pricing_method IS NOT NULL AND EXISTS \(SELECT 1 FROM pricing_v2_sku_results/);
+  assert.match(wf, /--var "unpriced_slug=\$unpriced"/);
+  // Read AFTER the deploy and right before the probes: a product the owner prices while the deploy
   // runs (the new Worker accepts V2 publishes the moment it lands) must not turn a good deploy red.
-  const readAt = wf.indexOf('- name: Read one product still waiting for its V2 price (read-only)');
+  const readAt = wf.indexOf('- name: Read one product shown without a price yet (read-only)');
   const deployAt = wf.indexOf('- name: Deploy, carrying every existing var forward');
   const verifyAt = wf.indexOf('- name: Verify the live site, read-only');
   const probesAt = wf.indexOf('- name: Cost-privacy probes, read-only');
   assert.ok(readAt > 0 && deployAt > 0 && verifyAt > 0 && probesAt > 0, 'the four steps are found');
-  assert.ok(wf.indexOf('> /tmp/hidden_slug.json') > deployAt, 'the hidden product is read after the deploy');
+  assert.ok(wf.indexOf('> /tmp/unpriced_slug.json') > deployAt, 'the unpriced product is read after the deploy');
   assert.ok(readAt > verifyAt && readAt < probesAt, 'after the live verification, before the probes');
   assert.equal((wf.slice(readAt, probesAt).match(/^\s*- name: /gm) ?? []).length, 1, 'no step between the read and the probes');
   assert.doesNotMatch(wf.slice(readAt, probesAt), /--yes|--file|INSERT|UPDATE|DELETE/i, 'the read writes nothing');
+  assert.doesNotMatch(wf.slice(readAt, probesAt), /\$\{\{\s*secrets\./, 'the read and the probes take no secret of their own');
 });
 
-test('cleanstart.json against the local Worker: a product still waiting for its V2 price is neither shown, found nor searched', async () => {
+test('the cut-over, nothing priced yet: cleanstart.json finds the not-yet-priced product SHOWN, unpriced; the whole run is green with only the {slug} probes skipped', async () => {
   const raw = freshDb();
   raw.exec('PRAGMA foreign_keys = OFF;');
   seedLiveCatalog(raw);
   const env = { DB: asD1(raw), STORE_ROOT_DOMAIN: APEX, APP_ORIGIN: `https://${APEX}`, INITIAL_ADMIN_EMAIL: 'boss@x.co', EXTRA_ALLOWED_ORIGINS: '', ASSETS: { fetch: async () => new Response('spa') } };
-  // No publish: every seeded product is as the cut-over left it.
-  const hidden = LIVE_PRODUCTS[0]!.slug;
-  const clean = files.find((x) => x.file === 'cleanstart.json')!;
-  const failures: string[] = [];
-  for (const p of clean.spec.probes) {
-    const plan = planProbe(p, { hidden_slug: hidden }, clean.spec.vars ?? {});
-    assert.ok(plan.path, p.path);
-    const res = await worker.fetch(new Request(`https://${APEX}${plan.path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
-    failures.push(...(judge(p, res.status, await res.text(), { hidden_slug: hidden }) as string[]).map((f) => `${plan.path}: ${f}`));
-  }
-  assert.deepEqual(failures, []);
-  // And the whole run workflow 7 makes on the cut-over deploy — every probe file, through the same runner,
-  // against this unpublished Worker — is green: the slug probes skip, the listing runs without requiring a
-  // price nothing lists yet, and every other probe passes.
+  // No publish: every seeded product is as the cut-over left it — shown (catalog-only), never priced.
+  const unpriced = LIVE_PRODUCTS[0]!.slug;
   const localGet = async (path: string) => {
     const res = await worker.fetch(new Request(`https://${APEX}${path}`, { headers: { Host: APEX, accept: 'application/json', 'CF-Connecting-IP': '9.9.9.9' } }), env as never, ctx);
     return { status: res.status, text: await res.text() };
   };
-  const listed = await localGet('/api/products?limit=1');
-  assert.equal(pick(JSON.parse(listed.text), 'products.0.slug'), undefined, 'nothing is listed before the first V2 price');
-  assert.deepEqual(readVar(s1.spec.vars!.slug, listed.status, listed.text), { empty: true }, 'an empty catalogue, not a failed read');
+  const clean = files.find((x) => x.file === 'cleanstart.json')!;
+  const failures: string[] = [];
+  for (const p of clean.spec.probes) {
+    const plan = planProbe(p, { unpriced_slug: unpriced }, clean.spec.vars ?? {});
+    assert.ok(plan.path, p.path);
+    const { status, text } = await localGet(plan.path);
+    failures.push(...(judge(p, status, text, { unpriced_slug: unpriced }) as string[]).map((f) => `${plan.path}: ${f}`));
+  }
+  assert.deepEqual(failures, []);
+  // Nothing is priced: the priced listing {slug} reads is empty — an empty catalogue, not a failed read.
+  const priced = await localGet(PRICED_LISTING);
+  assert.equal(pick(JSON.parse(priced.text), 'products.0.slug'), undefined, 'nothing is priced before the first V2 price');
+  assert.deepEqual(readVar(s1.spec.vars!.slug, priced.status, priced.text), { empty: true }, 'an empty priced catalogue, not a failed read');
+  // …while the default listing SHOWS products, each unpriced with a null price: the price rule passes it, the
+  // old integer rule would have turned this deploy red (not vacuous).
   const listing = await localGet('/api/products?limit=3');
-  assert.match(judge(probe('/api/products?limit=3')!, listing.status, listing.text).join('\n'), /required key price_iqd is absent/, 'not vacuous: without requireWhenVar this probe fails the cut-over deploy');
+  const shown = JSON.parse(listing.text).products as Array<{ price_status: string; price_iqd: number | null }>;
+  assert.equal(shown.length, 3, 'catalog-only: the cut-over catalogue is shown');
+  assert.ok(shown.every((p) => p.price_status === 'unpriced' && p.price_iqd === null));
+  assert.deepEqual(judge(probe('/api/products?limit=3')!, listing.status, listing.text), []);
+  const integerRule: Probe = { ...probe('/api/products?limit=3')!, requirePriceKeys: undefined, requireIntegerKeys: ['price_iqd'] };
+  assert.match(judge(integerRule, listing.status, listing.text).join('\n'), /not integers/, 'the bare integer rule fails a catalogue that shows unpriced products');
+  // And the whole run workflow 7 makes on the cut-over deploy — every probe file, through the same runner.
   const lines: string[] = [];
-  const run = await runProbes(files, localGet, { hidden_slug: hidden }, (l: string) => lines.push(l));
+  const run = await runProbes(files, localGet, { unpriced_slug: unpriced }, (l: string) => lines.push(l));
   assert.deepEqual(lines.filter((l) => l.startsWith('::error::')), []);
   assert.equal(run.failed, 0);
   assert.ok(run.ran > 0, 'some probes ran');
-  assert.ok(lines.some((l) => /::notice::s1\.json: \/api\/products\?limit=3 — nothing listed yet/.test(l)), 'the listing ran relaxed');
+  assert.ok(lines.some((l) => /::notice::s1\.json: \/api\/products\?limit=3 — nothing priced yet/.test(l)), 'the listing ran relaxed');
   assert.ok(lines.some((l) => /^ok {2}GET \/api\/products\?limit=3 -> 200$/.test(l)), 'and passed');
-  assert.ok(lines.some((l) => /^ok {2}GET \/api\/products\/[^ ]+ -> 404$/.test(l)), 'the hidden product was probed');
+  assert.ok(lines.includes(`ok  GET /api/products/${unpriced} -> 200`), 'the unpriced product was probed, and is shown');
+  assert.ok(lines.includes(`ok  GET /api/public/v1/products/${unpriced} -> 200`));
   const slugProbes = files.flatMap((f) => f.spec.probes.filter((p) => /\{slug\}/.test(p.path))).length;
   assert.equal(run.skipped, slugProbes, 'every {slug} probe skipped, nothing else');
+});
+
+// ------------------------------------------------------------- a mixed catalogue (Bambu import spec §K.1 D-1)
+
+/** The live catalogue's Snapmaker nozzle: a part, priced in the mixed world below. */
+const NOZZLE = LIVE_PRODUCTS.find((p) => p.slug === 'snapmaker-u1-hot-end-nozzle-hardened-steel')!;
+
+test('EVERY probe file against a catalogue that mixes priced and unpriced products — including a priced page that embeds an unpriced related product — passes; a priced product with a null price fails', async () => {
+  // Two priced products (the A1 and the nozzle), the rest shown without a price — the H2D among them with a
+  // legacy sentinel on every money column (tests/fixtures/catalogOnly.ts). So the top of the default listing
+  // is MIXED: two priced cards, then the first unpriced one.
+  const A1 = LIVE_PRODUCTS.find((p) => p.slug === 'bambu-lab-a1')!;
+  const w = await catalogOnlyWorld({ alsoUnpriced: LIVE_PRODUCTS.map((p) => p.id).filter((id) => id !== A1.id && id !== NOZZLE.id) });
+  assert.deepEqual([...w.priced].sort(), [A1.id, NOZZLE.id].sort());
+  // «يناسب»: the priced nozzle's page names the catalog-only H2D (VISIBLE) — an unpriced product embedded in a priced page.
+  w.raw.prepare('INSERT INTO product_printer_fits (product_id, printer_id, position) VALUES (?, ?, 0), (?, ?, 1)').run(NOZZLE.id, CAT.id, NOZZLE.id, A1.id);
+  const localGet = async (path: string) => {
+    const res = await w.guest(path, { headers: { accept: 'application/json' } });
+    return { status: res.status, text: await res.text() };
+  };
+  const lines: string[] = [];
+  const run = await runProbes(files, localGet, { unpriced_slug: CAT.slug }, (l: string) => lines.push(l));
+  assert.deepEqual(lines.filter((l) => l.startsWith('::error::')), []);
+  assert.equal(run.failed, 0);
+  assert.equal(run.skipped, 0, 'nothing skipped: a priced {slug} and the unpriced slug both exist');
+  assert.equal(run.ran, files.reduce((n, f) => n + f.spec.probes.length, 0), 'every probe of every file ran');
+
+  // Not vacuous. The listing the s1 probe read is mixed…
+  const listingText = (await localGet('/api/products?limit=3')).text;
+  const listing = JSON.parse(listingText) as { products: Array<{ slug: string; price_status: string; price_iqd: number | null }> };
+  assert.deepEqual(listing.products.map((p) => p.price_status), ['priced', 'priced', 'unpriced'], 'the top of the listing mixes both');
+  // …the {slug} it read is a priced product, never the unpriced card at the top of the default listing…
+  const slug = pick(JSON.parse((await localGet(PRICED_LISTING)).text), 'products.0.slug') as string;
+  assert.ok([A1.slug, NOZZLE.slug].includes(slug), 'the price range excludes every unpriced product');
+  assert.ok(lines.includes(`ok  GET /api/products/${slug} -> 200`));
+  assert.ok(lines.includes(`ok  GET /api/products/${CAT.slug} -> 200`), 'the unpriced page was probed');
+  assert.ok(lines.includes(`ok  GET /api/public/v1/products/${CAT.slug} -> 200`), 'and its public record');
+  // …and the priced nozzle's page embeds the unpriced printer, and passes the priced page's probe.
+  const pageProbe = probe('/api/products/{slug}')!;
+  const partText = (await localGet(`/api/products/${NOZZLE.slug}`)).text;
+  const part = JSON.parse(partText);
+  assert.equal(part.price_status, 'priced');
+  assert.ok((part.fits_printers as Array<{ slug: string }>).some((f) => f.slug === CAT.slug), 'the priced page names the unpriced printer');
+  assert.deepEqual(judge(pageProbe, 200, partText), []);
+  // Every product page of this catalogue passes its own probe: s1's for a priced page, cleanstart's for an unpriced one.
+  const clean = files.find((x) => x.file === 'cleanstart.json')!;
+  const unpricedPage = clean.spec.probes.find((p) => p.path === '/api/products/{unpriced_slug}')!;
+  const unpricedRecord = clean.spec.probes.find((p) => p.path === '/api/public/v1/products/{unpriced_slug}')!;
+  let pricedPages = 0;
+  let unpricedPages = 0;
+  for (const product of LIVE_PRODUCTS) {
+    const page = await localGet(`/api/products/${product.slug}`);
+    const record = await localGet(`/api/public/v1/products/${product.slug}`);
+    const isPriced = JSON.parse(page.text).price_status === 'priced';
+    if (isPriced) pricedPages++;
+    else unpricedPages++;
+    assert.deepEqual(judge(isPriced ? pageProbe : unpricedPage, page.status, page.text), [], `${product.slug} page`);
+    assert.deepEqual(judge(isPriced ? probe('/api/public/v1/products/{slug}')! : unpricedRecord, record.status, record.text), [], `${product.slug} public record`);
+  }
+  assert.equal(pricedPages, 2);
+  assert.equal(unpricedPages, LIVE_PRODUCTS.length - 2);
+
+  // A priced product with a null price FAILS — on its page and in the listing.
+  const nulled = judge(pageProbe, 200, JSON.stringify({ ...part, product: { ...part.product, price_iqd: null } })).join('\n');
+  assert.match(nulled, /price_iqd value\(s\) are null on an object not marked price_status: unpriced/);
+  const listingNulled = { ...listing, products: listing.products.map((p, i) => (i === 0 ? { ...p, price_iqd: null } : p)) };
+  assert.match(judge(probe('/api/products?limit=3')!, 200, JSON.stringify(listingNulled)).join('\n'), /null on an object not marked price_status: unpriced/);
+  // An unpriced page that leaked its archived ladder FAILS.
+  const catText = (await localGet(`/api/products/${CAT.slug}`)).text;
+  const cat = JSON.parse(catText);
+  const leaked = judge(unpricedPage, 200, JSON.stringify({ ...cat, product: { ...cat.product, price_iqd: 7_101_000 } })).join('\n');
+  assert.match(leaked, /a number on an object marked price_status: unpriced/);
+  assert.match(leaked, /product\.price_iqd does not equal the expected null/);
+  // Each page probe refuses the other kind of page: the priced probe an unpriced page, and the reverse.
+  assert.match(judge(pageProbe, 200, catText).join('\n'), /price_status does not equal the expected text/);
+  assert.match(judge(unpricedPage, 200, partText).join('\n'), /price_status does not equal the expected text/);
+  // Unsellable, too: the quote refuses it (a POST — the live probes never send one; the local Worker proves it).
+  const quote = await post(w.as(null), `/api/products/${CAT.slug}/quote`, { qty: 1 });
+  assert.equal(quote.status, 409);
+  assert.equal(((await quote.json()) as { code?: string }).code, 'PRICE_NOT_AVAILABLE');
 });
