@@ -19,7 +19,7 @@
  *   - section jumps: a refusal's or a missing line's section opens ٣ or ٥;
  *   - the editor projection shows no cost card and no cost figure; a
  *     cost-first product is the owner's;
- *   - one status chip, never contradictory, «مخفي: يحتاج تسعيرًا» until published;
+ *   - one status chip, never contradictory, «ظاهر بلا سعر — يحتاج تسعيرًا» until published (row 240);
  *   - every v2Strings key in ar, en and ckb — ckb never the Arabic, with a
  *     Sorani-only letter (row 183).
  *
@@ -350,6 +350,7 @@ test('every v2Strings key in ar, en and ckb — ckb never copies the Arabic and 
     assert.notEqual(ckb, ar, `${k}: the Sorani copies the Arabic`);
     assert.match(ckb, /[ێۆڕڵەڤگچپژ]/, `${k}: no Sorani-only letter in «${ckb}»`);
   }
-  assert.equal(v2Strings('ckb').chipHidden, 'شاراوەیە: پێویستی بە نرخدانانە');
+  // DECISIONS row 240: an unpriced product is shown without a price, no longer hidden.
+  assert.equal(v2Strings('ckb').chipHidden, 'بێ نرخ پیشان دەدرێت — پێویستی بە نرخدانان هەیە');
   assert.equal(v2Strings('en').costFirstNoMoney, 'This product is priced from cost; only the owner prices it');
 });

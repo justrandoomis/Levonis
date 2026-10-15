@@ -21,6 +21,7 @@ import { AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 import {
   COMPLETENESS_ENTRIES,
+  isCatalogBlockingCode,
   type CompletenessItemCode,
 } from '../../../packages/contracts/src/productCompleteness';
 
@@ -35,11 +36,14 @@ export const fill = (s: string, vars: Record<string, string | number>): string =
   s.replace(/\{(\w+)\}/g, (_, k: string) => (k in vars ? String(vars[k]) : `{${k}}`));
 
 export const COMPLETENESS_UI = {
+  // DECISIONS rows 239-240: every code stops SALE; only IMAGE and CATEGORY also hide the product.
   missingField: {
-    ar: 'ناقص — مطلوب لعرض المنتج للزبائن',
-    en: 'Missing — required to show the product to customers',
-    ckb: 'ناتەواوە — پێویستە بۆ نیشاندانی بەرهەمەکە بە کڕیاران',
+    ar: 'ناقص — مطلوب قبل أن يُباع المنتج',
+    en: 'Missing — required before the product can be sold',
+    ckb: 'ناتەواوە — پێش فرۆشتنی بەرهەمەکە پێویستە',
   },
+  blocksDisplay: { ar: 'يمنع الظهور', en: 'Hides it', ckb: 'پیشاندان ڕادەگرێت' },
+  blocksSale: { ar: 'يمنع البيع', en: 'Stops sale', ckb: 'فرۆشتن ڕادەگرێت' },
   missingOn: { ar: 'ناقص في «{name}»', en: 'Missing on «{name}»', ckb: 'لە «{name}» ناتەواوە' },
   badge: { ar: 'ناقص {n}', en: '{n} missing', ckb: '{n} ناتەواو' },
   badgeLabel: {
@@ -47,11 +51,22 @@ export const COMPLETENESS_UI = {
     en: 'This product is missing {n} required fields',
     ckb: 'ئەم بەرهەمە {n} خانەی پێویستی کەمە',
   },
-  heldBadge: { ar: 'مخفي عن الزبائن', en: 'Hidden from customers', ckb: 'لە کڕیاران شاردراوە' },
+  heldBadge: { ar: 'موقوف عن البيع', en: 'Held from sale', ckb: 'لە فرۆشتن ڕاگیراوە' },
   bannerHeld: {
     ar: 'هذا المنتج ناقص ({n}) — مخفي عن الزبائن حتى يكتمل.',
     en: 'This product is incomplete ({n}) — hidden from customers until it is completed.',
     ckb: 'ئەم بەرهەمە ناتەواوە ({n}) — تا تەواو دەبێت لە کڕیاران شاردراوەتەوە.',
+  },
+  /** Held for a commercial gap only (no image or section missing): shown, not sold (rows 239-240). */
+  bannerHeldSale: {
+    ar: 'هذا المنتج ناقص ({n}) — يظهر للزبائن بلا سعر ولا يُباع حتى يكتمل.',
+    en: 'This product is incomplete ({n}) — shown to customers without a price and not sold until it is completed.',
+    ckb: 'ئەم بەرهەمە ناتەواوە ({n}) — بێ نرخ بە کڕیاران پیشان دەدرێت و تا تەواو دەبێت نافرۆشرێت.',
+  },
+  bannerWillHoldSale: {
+    ar: 'هذا المنتج ناقص ({n}) — سيظهر بلا سعر ولا يُباع عند حفظه نشطاً.',
+    en: 'This product is incomplete ({n}) — it will be shown without a price and not sold when saved as active.',
+    ckb: 'ئەم بەرهەمە ناتەواوە ({n}) — کاتێک بە چالاکی پاشەکەوت دەکرێت بێ نرخ پیشان دەدرێت و نافرۆشرێت.',
   },
   bannerShown: {
     ar: 'هذا المنتج ناقص ({n}) — ما زال يظهر للزبائن لأن «إخفاء المنتجات الناقصة» متوقف.',
@@ -79,9 +94,15 @@ export const COMPLETENESS_UI = {
     ckb: 'شاردنەوەی بەرهەمە ناتەواوەکان لە کڕیاران',
   },
   switchExplain: {
-    ar: 'المنتج الذي ينقصه حقل مطلوب (التكلفة، السعر، الصورة، القسم، الوزن أو أبعاد الصندوق…) يختفي من المتجر والبحث والصفحة الرئيسية والرابط المباشر حتى يكتمل. لا يُمس أي طلب أو هدية.',
-    en: 'A product missing a required field (cost, price, image, section, weight or box size…) disappears from the shop, search, the home page and its direct link until it is completed. No order or gift is touched.',
-    ckb: 'ئەو بەرهەمەی خانەیەکی پێویستی کەمە (تێچوو، نرخ، وێنە، بەش، کێش یان قەبارەی سندوق…) لە فرۆشگا، گەڕان، پەڕەی سەرەکی و بەستەری ڕاستەوخۆ ون دەبێت تا تەواو دەبێت. دەست لە هیچ داواکاری و دیارییەک نادرێت.',
+    ar: 'المنتج الذي ينقصه حقل مطلوب (التكلفة، السعر، الصورة، القسم، الوزن أو أبعاد الصندوق…) لا يُباع حتى يكتمل. لا يُمس أي طلب أو هدية.',
+    en: 'A product missing a required field (cost, price, image, section, weight or box size…) is not sold until it is completed. No order or gift is touched.',
+    ckb: 'ئەو بەرهەمەی خانەیەکی پێویستی کەمە (تێچوو، نرخ، وێنە، بەش، کێش یان قەبارەی سندوق…) تا تەواو دەبێت نافرۆشرێت. دەست لە هیچ داواکاری و دیارییەک نادرێت.',
+  },
+  /** The second sentence (DECISIONS rows 239-240): which gaps hide and which only stop sale. */
+  switchScope: {
+    ar: 'النواقص التجارية (السعر، التكلفة، التغليف، الاسم العربي) تمنع البيع فقط؛ الصورة والقسم يمنعان الظهور.',
+    en: 'Commercial gaps (price, cost, packaging, Arabic name) stop sale only; a missing image or section also hides the product.',
+    ckb: 'کەموکوڕییە بازرگانییەکان (نرخ، تێچوو، پاکەتکردن، ناوی عەرەبی) تەنها فرۆشتن ڕادەگرن؛ وێنە و بەش پیشاندانیش ڕادەگرن.',
   },
   switchOff: { ar: 'متوقف', en: 'Off', ckb: 'ڕاگیراوە' },
   switchOn: { ar: 'مُفعّل', en: 'On', ckb: 'چالاکە' },
@@ -272,12 +293,14 @@ export function CompletenessBanner({ read, lang, dirty, status }: { read: Comple
   const items = read.items ?? [];
   if (!items.length) return null;
   const n = items.length;
+  // DECISIONS rows 239-240: only an image or a section gap hides the product; every other gap stops sale only.
+  const hides = items.some((i) => isCatalogBlockingCode(i.code));
   const sentence = read.held
-    ? COMPLETENESS_UI.bannerHeld
+    ? hides ? COMPLETENESS_UI.bannerHeld : COMPLETENESS_UI.bannerHeldSale
     : read.switch_on && status !== 'active'
-      ? COMPLETENESS_UI.bannerWillHide
+      ? hides ? COMPLETENESS_UI.bannerWillHide : COMPLETENESS_UI.bannerWillHoldSale
       : read.switch_on
-        ? COMPLETENESS_UI.bannerHeld
+        ? hides ? COMPLETENESS_UI.bannerHeld : COMPLETENESS_UI.bannerHeldSale
         : COMPLETENESS_UI.bannerShown;
   return (
     <div role="status" className="lv-alert lv-alert-danger mb-2.5 min-w-0 px-3 py-2 text-[12px] leading-snug text-text-primary" data-completeness-banner>
@@ -287,8 +310,9 @@ export function CompletenessBanner({ read, lang, dirty, status }: { read: Comple
       </p>
       <ul className="mt-1 flex flex-wrap gap-1.5 ps-5">
         {[...new Map(items.map((i) => [i.code, i])).values()].map((i) => (
-          <li key={i.code} className="lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)] rounded-md px-1.5 py-0.5 text-[11px]" data-missing={i.code}>
+          <li key={i.code} className="lv-chip [--chip:var(--color-danger)] [--chip-ink:var(--color-error-ink)] rounded-md px-1.5 py-0.5 text-[11px]" data-missing={i.code} data-blocks={isCatalogBlockingCode(i.code) ? 'display' : 'sale'}>
             {completenessLabel(i.code, lang)}
+            <span className="ms-1 font-bold">· {tri(isCatalogBlockingCode(i.code) ? COMPLETENESS_UI.blocksDisplay : COMPLETENESS_UI.blocksSale, lang)}</span>
           </li>
         ))}
       </ul>

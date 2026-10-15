@@ -125,7 +125,9 @@ export default function HideIncompleteCard({
           {on ? t(COMPLETENESS_UI.switchOn) : t(COMPLETENESS_UI.switchOff)}
         </span>
       </div>
-      <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--ap-text-2)]">{t(COMPLETENESS_UI.switchExplain)}</p>
+      <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--ap-text-2)]">
+        {t(COMPLETENESS_UI.switchExplain)} <span data-hide-scope>{t(COMPLETENESS_UI.switchScope)}</span>
+      </p>
       <p className="mt-2 text-[13px] font-semibold text-[var(--ap-text-1)]" aria-live="polite">
         {on
           ? fill(t(COMPLETENESS_UI.hiddenNow), { n: summary.held })

@@ -11,16 +11,17 @@
  * filters). Phone: one card per product, 16px gutters, no horizontal scroll.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, ImageOff, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ImageOff, RefreshCw, Users } from 'lucide-react';
 import { api } from '../../lib/api';
 import VariantImg from '../ui/VariantImg';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
-import { NEEDS_PRICING as S, tri, type QueueLang } from './needsPricingStrings';
+import { agoText, NEEDS_PRICING as S, tri, type QueueLang } from './needsPricingStrings';
+import { requestersText } from '../../../packages/contracts/src/priceRequests';
 import { missingLabel } from './form/v2/missingLabel';
 import { v2Strings } from './form/v2/v2Strings';
 
-type Filter = 'all' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review';
+type Filter = 'all' | 'most_requested' | 'ready' | 'saved' | 'usd' | 'cost' | 'below_min_profit' | 'purchase_review';
 type State = 'needs_pricing' | 'saved' | 'ready' | 'composition_pending' | 'published';
 
 interface Names {
@@ -54,6 +55,16 @@ interface QueueProduct {
   below_min_profit?: boolean;
   purchase_review?: boolean;
   link: string;
+  /**
+   * «طلب السعر» (DECISIONS row 240): distinct signed-in requesters, the latest
+   * request and the per-selection breakdown — counts only, never a requester.
+   * null without migration 0193 (or with no open request).
+   */
+  requests?: {
+    people: number;
+    last_at: string | null;
+    selections: Array<{ selection: string; label: Names; people: number; last_at: string }>;
+  } | null;
 }
 
 interface QueueAnswer {
@@ -63,12 +74,15 @@ interface QueueAnswer {
   products: QueueProduct[];
   page: number;
   pages: number;
+  /** Migration 0193 is not on this database: no request counts, and the order is today's. */
+  requests_unavailable?: boolean;
 }
 
 const OWNER_FILTERS: ReadonlySet<Filter> = new Set(['cost', 'below_min_profit', 'purchase_review']);
-const FILTERS: readonly Filter[] = ['all', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review'];
+const FILTERS: readonly Filter[] = ['all', 'most_requested', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review'];
 const COUNT_OF: Record<Filter, string> = {
   all: 'hidden',
+  most_requested: 'most_requested',
   ready: 'ready',
   saved: 'saved',
   usd: 'editor_can_finish',
@@ -121,6 +135,48 @@ function StateChip({ p, lang }: { p: QueueProduct; lang: QueueLang }) {
   return <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${tone}`} data-queue-state={p.state}>{tri(label, lang)}</span>;
 }
 
+/**
+ * «N شخصاً طلبوا السعر · آخر طلب منذ ٣ ساعات» and, folded under it, the
+ * count per option / colour (DECISIONS row 240). Counts only: no requester's
+ * name or id ever reaches this screen. The queue is already ordered by these
+ * numbers on the server, before the 200-row cap.
+ */
+export function RequestsLine({ r, lang }: { r: NonNullable<QueueProduct['requests']>; lang: QueueLang }) {
+  const parts = r.selections.filter((x) => x.people > 0);
+  const many = parts.length > 1 || (parts.length === 1 && parts[0].selection !== '');
+  return (
+    <div className="space-y-1" data-queue-requests={r.people}>
+      <p className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12.5px] font-bold ${T.text1}`}>
+        <Users className="h-3.5 w-3.5 shrink-0 text-[var(--ap-accent-text)]" aria-hidden />
+        <span>{requestersText(r.people, lang)}</span>
+        {r.last_at ? (
+          <span className={`font-medium ${T.text3}`}>
+            · {tri(S.lastRequest, lang)} {agoText(r.last_at, lang)}
+          </span>
+        ) : null}
+      </p>
+      {many ? (
+        <details className="group text-[12px]" data-queue-selections>
+          <summary className={`inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-[var(--ap-radius-sm)] font-semibold ${T.text2} hover:text-[var(--ap-text-1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}>
+            <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+            {tri(S.bySelection, lang)} <span dir="ltr" className={T.text3}>({parts.length})</span>
+          </summary>
+          <ul className="mt-1 space-y-1 ps-5">
+            {parts.map((x) => (
+              <li key={x.selection} className="flex min-w-0 flex-wrap items-baseline gap-x-2" data-queue-selection={x.selection}>
+                <span className={`min-w-0 break-words font-semibold ${T.text1}`} dir="auto">
+                  {x.selection === '' ? tri(S.wholeProduct, lang) : nameIn(x.label, lang)}
+                </span>
+                <span className={T.text2}>{requestersText(x.people, lang)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: boolean; onOpen: (id: string) => void; onBack: () => void }) {
   const { lang: rawLang, dir } = useLanguage();
   const lang: QueueLang = rawLang === 'en' || rawLang === 'ckb' ? rawLang : 'ar';
@@ -167,6 +223,10 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
         <h2 className="text-[22px] font-black leading-snug sm:text-[26px]">{tri(S.title, lang)}</h2>
         <p className={`max-w-[68ch] text-[14px] leading-relaxed ${T.text2}`}>{tri(S.intro, lang)}</p>
       </header>
+
+      {data?.requests_unavailable && filter === 'most_requested' && (
+        <p className={`${T.surface} p-3 text-[13px] ${T.text2}`} data-queue-requests-unavailable>{tri(S.requestsUnavailable, lang)}</p>
+      )}
 
       {data && !data.rate_ready && (
         <div role="alert" className="lv-alert lv-alert-warning flex items-start gap-2 rounded-[var(--ap-radius-md)] p-3 text-[13px]" data-queue-rate-missing>
@@ -238,6 +298,7 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
                     ) : line ? (
                       <p className={`text-[12px] ${T.text2} break-words`} data-queue-missing>{line}</p>
                     ) : null}
+                    {p.requests && p.requests.people > 0 ? <RequestsLine r={p.requests} lang={lang} /> : null}
                   </div>
                 </div>
                 {p.composition === '' && (

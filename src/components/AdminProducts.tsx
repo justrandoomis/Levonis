@@ -29,7 +29,7 @@ import {
   Plus, Edit2, Trash2, Search, RefreshCw, Upload, Download, Star, LayoutGrid, List,
   AlignJustify, SlidersHorizontal, X, MoreHorizontal, Eye, EyeOff, Link2,
   Copy, ChevronRight, ChevronLeft, Package, PackageX, ShoppingBag, Check, Pencil,
-  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag, FileDown, AlertTriangle,
+  CalendarDays, Loader2, CornerDownLeft, ImageOff, Tag, FileDown, AlertTriangle, Users,
 } from 'lucide-react';
 import { api, ApiError, formatIqd } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
@@ -45,6 +45,7 @@ import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncomp
 import VariantImg from './ui/VariantImg';
 import NeedsPricingQueue from './adminProducts/NeedsPricingQueue';
 import { activeTileSub as activeSub, hiddenBanner, NEEDS_PRICING, tri as triQ } from './adminProducts/needsPricingStrings';
+import { PRICE_REQUEST_ADMIN_TEXT, requestersText } from '../../packages/contracts/src/priceRequests';
 
 // The rebuilt eight-section form (product-form mandate §1). The previous
 // ProductEditor is gone: it carried the ar/ckb fields §3 removes, the
@@ -229,6 +230,8 @@ export default function AdminProducts() {
   const [featuredOnly, setFeaturedOnly] = useState(false);
   /** «الناقصة فقط»: the products the central required-field list finds incomplete. */
   const [incompleteOnly, setIncompleteOnly] = useState(false);
+  /** «طلبات السعر» (DECISIONS row 240): only products someone asked the price of — the per-SKU case included. */
+  const [requestedOnly, setRequestedOnly] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [sort, setSort] = useState('updated');
   const [page, setPage] = useState(1);
@@ -361,6 +364,7 @@ export default function AdminProducts() {
       if (days) params.set('days', days);
       if (featuredOnly) params.set('featured', '1');
       if (incompleteOnly) params.set('incomplete', '1');
+      if (requestedOnly) params.set('requested', '1');
       if (needsPricingOnly) params.set('needs_pricing', '1');
       if (sort !== 'updated') params.set('sort', sort);
       const data = await api.get<ListingResponse>(`/api/admin/products-v2?${params.toString()}`);
@@ -380,7 +384,7 @@ export default function AdminProducts() {
       if (seq === seqRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, needsPricingOnly, sort, page, limit]);
+  }, [query, status, brand, catalog, stockF, pMin, pMax, days, featuredOnly, incompleteOnly, requestedOnly, needsPricingOnly, sort, page, limit]);
 
   useEffect(() => {
     load();
@@ -522,7 +526,7 @@ export default function AdminProducts() {
     setDays(''); setFeaturedOnly(false); setIncompleteOnly(false); setNeedsPricingOnly(false); setPage(1);
   };
 
-  const anyFilter = !!(query || status || brand || catalog || stockF || days || featuredOnly || incompleteOnly || needsPricingOnly || pMin !== undefined || pMax !== undefined);
+  const anyFilter = !!(query || status || brand || catalog || stockF || days || featuredOnly || incompleteOnly || requestedOnly || needsPricingOnly || pMin !== undefined || pMax !== undefined);
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
   const pages = Math.max(1, Math.ceil(total / limit));
@@ -962,6 +966,15 @@ export default function AdminProducts() {
               <Tag className="w-3 h-3" aria-hidden="true" />
               {triQ(NEEDS_PRICING.badge, lang)}
             </button>
+            <button
+              onClick={() => { setRequestedOnly((v) => !v); setPage(1); }}
+              className={T.chip}
+              aria-pressed={requestedOnly}
+              data-filter-requested
+            >
+              <Users className="w-3 h-3" aria-hidden="true" />
+              {loc(PRICE_REQUEST_ADMIN_TEXT.count_chip.ar, PRICE_REQUEST_ADMIN_TEXT.count_chip.en, PRICE_REQUEST_ADMIN_TEXT.count_chip.ckb)}
+            </button>
             {brands.length > 0 && (
               <select className={`lv-input w-auto min-h-0 ${T.select}`} value={brand} onChange={(e) => { setBrand(e.target.value); setPage(1); }}>
                 <option value="">{loc('كل العلامات', 'All brands', 'هەموو براندەکان')}</option>
@@ -1020,6 +1033,8 @@ export default function AdminProducts() {
             <option value="price_desc">{loc('السعر: من الأعلى', 'Price: high→low', 'نرخ ↓')}</option>
             <option value="sales">{loc('الأكثر مبيعًا', 'Best selling', 'زۆرترین فرۆش')}</option>
             <option value="stock">{loc('المخزون الأقل', 'Lowest stock', 'کەمترین کۆگا')}</option>
+            {/* DECISIONS row 240: distinct requesters first, then the latest request (`updated` without 0193). */}
+            <option value="requests">{loc(PRICE_REQUEST_ADMIN_TEXT.sort_requests.ar, PRICE_REQUEST_ADMIN_TEXT.sort_requests.en, PRICE_REQUEST_ADMIN_TEXT.sort_requests.ckb)}</option>
           </select>
           <div className={T.segmented.base} role="group" aria-label={loc('طريقة العرض', 'View', 'شێوازی پیشاندان')}>
             {(
@@ -1104,6 +1119,7 @@ export default function AdminProducts() {
                       {s.available === null ? stockLabel(s) : <><span dir="ltr">{s.available}</span> {stockLabel(s)}</>}
                     </span>
                   </div>
+                  <PriceRequestsChip n={p.price_requests} lang={lang} className="mt-1.5" />
                   <div className="flex items-center justify-between gap-2 mt-2.5 pt-2.5 border-t border-[var(--ap-hairline)]">
                     <span className="text-[11px] text-[var(--ap-text-3)]"><span dir="ltr">{p.sold ?? 0}</span> {loc('مبيع', 'sold', 'فرۆشراو')}</span>
                     {rowActions(p, true)}
@@ -1131,6 +1147,7 @@ export default function AdminProducts() {
                 </span>
                 <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0"><PriceCell p={p} lang={lang} /></span>
                 <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
+                <PriceRequestsChip n={p.price_requests} lang={lang} compact />
                 <Badge status={p.status} needsPricing={!!p.needs_pricing} />
                 {rowActions(p, true)}
               </div>
@@ -1198,6 +1215,7 @@ export default function AdminProducts() {
                       <span className="inline-flex flex-wrap items-center gap-1">
                         <Badge status={p.status} needsPricing={!!p.needs_pricing} />
                         <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
+                        <PriceRequestsChip n={p.price_requests} lang={lang} />
                       </span>
                     </td>
                     <td className="px-3 py-3">
@@ -1404,6 +1422,28 @@ function Badge({ status, needsPricing = false }: { status: string; needsPricing?
     <span className={`${T.badgeBase} ${T.badge[unpriced ? 'draft' : key]}`} data-status-badge={unpriced ? 'needs-pricing' : key}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden />
       {label}
+    </span>
+  );
+}
+
+/**
+ * «طلبات السعر: N» (DECISIONS row 240) — distinct signed-in customers who asked
+ * this product's price (or one of its SKUs'). Counts only, for every admin
+ * role; nothing when there is no open request or no migration 0193.
+ */
+function PriceRequestsChip({ n, lang, compact = false, className = '' }: { n: number | null | undefined; lang: string; compact?: boolean; className?: string }) {
+  if (typeof n !== 'number' || n <= 0) return null;
+  const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  const label = `${triQ(PRICE_REQUEST_ADMIN_TEXT.count_chip, l)}: ${n}`;
+  return (
+    <span
+      className={`lv-chip [--chip:var(--color-info)] inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${className}`}
+      data-price-requests={n}
+      title={requestersText(n, l)}
+    >
+      <Users className="w-3 h-3" aria-hidden="true" />
+      {compact ? <span dir="ltr">{n}</span> : label}
+      {compact ? <span className="sr-only">{label}</span> : null}
     </span>
   );
 }

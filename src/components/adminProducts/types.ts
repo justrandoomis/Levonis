@@ -277,6 +277,8 @@ export interface ListingItem {
   missing_count?: number | null;
   /** Hidden from customers by the owner's «hide incomplete» switch. */
   held?: boolean;
+  /** «طلبات السعر» (DECISIONS row 240): distinct signed-in requesters with an open request; null without 0193. */
+  price_requests?: number | null;
 }
 
 export interface ListingResponse {
@@ -284,6 +286,8 @@ export interface ListingResponse {
   limit: number;
   offset: number;
   products: ListingItem[];
+  /** `requested=1` on a database without migration 0193: the filter answers nothing. */
+  requests_unavailable?: boolean;
 }
 
 export interface ProductResponse {

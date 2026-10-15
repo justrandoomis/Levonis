@@ -110,12 +110,14 @@ test('every queue string exists in ar, en and real Sorani (the Sorani never copi
       if (typeof t.ar === 'string') {
         assert.ok(t.ar && t.en && t.ckb, `${path}.${k}`);
         assert.notEqual(t.ckb, t.ar, `${path}.${k}: ckb copies the Arabic`);
-        assert.match(t.ckb!, /[ڕڵۆێەپچژگڤ]/, `${path}.${k}: no Sorani letter`);
+        // ی (U+06CC) and ک (U+06A9) are Kurdish letters Arabic never writes (it has ي and ك): «دیاریکردنی نرخ».
+        assert.match(t.ckb!, /[ڕڵۆێەپچژگڤیک]/, `${path}.${k}: no Sorani letter`);
       } else walk(v as Record<string, unknown>, `${path}.${k}`);
     }
   };
   walk(NEEDS_PRICING as unknown as Record<string, unknown>, 'NEEDS_PRICING');
-  assert.match(hiddenBanner(3, 'ar'), /^3 منتجًا مخفيًا/);
-  assert.match(hiddenBanner(3, 'en'), /^3 products are hidden/);
-  assert.match(hiddenBanner(3, 'ckb'), /شاردراوەتەوە/);
+  // DECISIONS row 240: an unpriced product is SHOWN without a price, no longer hidden.
+  assert.match(hiddenBanner(3, 'ar'), /^3 منتجًا ظاهرًا للزبائن بلا سعر/);
+  assert.match(hiddenBanner(3, 'en'), /^3 products are shown to customers without a price/);
+  assert.match(hiddenBanner(3, 'ckb'), /بێ نرخ/);
 });
