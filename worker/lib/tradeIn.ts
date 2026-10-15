@@ -1842,6 +1842,13 @@ function noLiveCreditOrderFence(db: D1Database, requestId: string): D1PreparedSt
  * this coupon, for this customer, with the coupon still active, the request's
  * NOT NULL status trips and the whole order rolls back (nothing redeemed,
  * nothing ordered). It touches no column otherwise.
+ *
+ * ONE CREDIT PER REQUEST, ACROSS ITS COUPONS (row 237). Before migration 0191
+ * «إتمام الدفع» could mint a second coupon after a cancel, and that cancelled
+ * order could then be reopened while still holding the first: a live order
+ * already carrying a use of ANOTHER coupon of this request trips the fence
+ * too. (A use of this same coupon is the limit trigger's to refuse.) The
+ * fence runs before this order's own redemption is inserted.
  */
 export function tradeInCreditFence(db: D1Database, couponId: string, userId: string): D1PreparedStatement {
   return db
@@ -1849,6 +1856,11 @@ export function tradeInCreditFence(db: D1Database, couponId: string, userId: str
       `UPDATE trade_in_requests
           SET status = CASE WHEN status = 'awaiting_payment' AND coupon_id = ?1 AND user_id = ?2
                              AND EXISTS (SELECT 1 FROM coupons c WHERE c.id = ?1 AND c.active = 1 AND c.trade_in_id = trade_in_requests.id)
+                             AND NOT EXISTS (SELECT 1 FROM coupons c2
+                                               JOIN coupon_redemptions r ON r.coupon_id = c2.id
+                                               JOIN orders o ON o.id = r.order_id
+                                              WHERE c2.trade_in_id = trade_in_requests.id AND c2.id <> ?1
+                                                AND r.state = 'active' AND o.status <> 'cancelled')
                             THEN status ELSE NULL END
         WHERE id = (SELECT trade_in_id FROM coupons WHERE id = ?1)`
     )

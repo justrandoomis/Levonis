@@ -19,18 +19,28 @@
  *              the minutes before workflow 7's migration step): the claim door
  *              files without the new columns and still keeps one open case per
  *              device, inside its own insert
+ *   legacy     an order cancelled before 0191 (its trade-in use still 'active')
+ *   reopen     and reopened after it: never with a switched-off credit (its
+ *              request cancelled, or a second coupon minted by the old code),
+ *              a live one fences the second coupon, and the time it sat
+ *              cancelled counts against the credit
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
-import { dbThrough, row, all, asD1, stubApp, get, post, json } from './fixtures/app';
+import { dbThrough, row, all, asD1, stubApp, get, post, patch, json, count, pending } from './fixtures/app';
+import { LimitD1 } from './fixtures/d1Limits';
+import { adminRoutes } from '../worker/routes/admin';
 import { deviceRoutes } from '../worker/routes/devices';
 import { claimFiledColumnsInstalled } from '../worker/lib/deviceOps';
 import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { RaceD1 } from './fixtures/raceD1';
 import { ppWorld } from './sv2_price-protection_fixture';
+import { OWNER, adminApp, customerApp, checkoutBody, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+
+test.after(restoreFetch);
 
 const MIGRATION = readFileSync(new URL('../migrations/0191_services_integrity.sql', import.meta.url), 'utf8');
 const LONG_AGO = '2026-01-10T10:00:00.000Z';
@@ -120,8 +130,8 @@ test('old rows: 0191 changes no byte of any existing money or service row', () =
   );
   // No index was built over the old rows: every rule is a trigger.
   assert.deepEqual(indexes(), indexesBefore);
-  const triggers = all<{ name: string }>(raw, "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('trg_claim_filed_cover_frozen','trg_one_open_case_per_unit','trg_one_open_case_per_unit_reopen','ppc_one_open','trg_coupon_redemption_limits','trg_coupon_redemption_reclaim','trg_trade_in_one_credit','trg_orders_coupon_released','trg_orders_coupon_reclaimed') ORDER BY name");
-  assert.equal(triggers.length, 9, JSON.stringify(triggers));
+  const triggers = all<{ name: string }>(raw, "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('trg_claim_filed_cover_frozen','trg_one_open_case_per_unit','trg_one_open_case_per_unit_reopen','ppc_one_open','trg_coupon_redemption_limits','trg_coupon_redemption_reclaim','trg_trade_in_one_credit','trg_orders_coupon_released','trg_orders_coupon_reclaimed','trg_orders_reopen_coupon_inactive') ORDER BY name");
+  assert.equal(triggers.length, 10, JSON.stringify(triggers));
 });
 
 test('workable: the legacy duplicates still advance, close and are decided; an old cancellation keeps its use', () => {
@@ -248,4 +258,154 @@ test('ahead: without 0191\'s ppc_one_open, the protection claim door still recor
   assert.equal(outer.status, 400, JSON.stringify(body));
   assert.equal(body.code, 'CLAIM_PENDING');
   assert.equal(w.n("SELECT COUNT(*) n FROM price_protection_claims WHERE order_item_id = ? AND state = 'requested'", itemId), 1);
+});
+
+// ===================================================================== legacy reopen (trade-in credits)
+
+const DAY = 86_400_000;
+const MINUTE = 60_000;
+/** One CREATE TRIGGER of 0191, as the file writes it. */
+const block = (name: string) => {
+  const i = MIGRATION.indexOf(`CREATE TRIGGER IF NOT EXISTS ${name}`);
+  assert.ok(i >= 0, name);
+  return MIGRATION.slice(i, MIGRATION.indexOf('END;', i) + 4);
+};
+const ownerAdmin = (raw: DatabaseSync) => stubApp(new LimitD1(raw) as unknown as D1Database, OWNER, (a) => a.route('/api/admin', adminRoutes));
+const reopen = (raw: DatabaseSync, door: 'status' | 'stage', orderId: string) =>
+  door === 'status'
+    ? patch(ownerAdmin(raw), `/api/admin/orders/${orderId}`, { status: 'pending' })
+    : patch(ownerAdmin(raw), `/api/admin/orders/${orderId}/stage`, { stage: 'received' });
+const statusOf = (raw: DatabaseSync, orderId: string) => row<{ status: string }>(raw, 'SELECT status FROM orders WHERE id = ?', orderId)!.status;
+const useOf = (raw: DatabaseSync, orderId: string) => row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', orderId)!.state;
+
+/** An approved trade-in with its credit code in hand. */
+async function readyToPay(raw: DatabaseSync) {
+  const id = await submitted(raw);
+  const approved = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`));
+  assert.equal(approved.request.status, 'awaiting_payment', JSON.stringify(approved));
+  const pay = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/checkout`));
+  assert.ok(pay.coupon_code, JSON.stringify(pay));
+  const coupon = row<{ id: string }>(raw, 'SELECT id FROM coupons WHERE trade_in_id = ?', id)!;
+  return { id, code: pay.coupon_code as string, coupon: coupon.id };
+}
+let lineSeq = 0;
+/** The P1S the credit buys, in Sara's cart, ordered with `code`. */
+async function tiOrder(raw: DatabaseSync, code: string) {
+  const line = `c_p1s_m${++lineSeq}`;
+  raw.exec(`INSERT INTO cart_items (id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,warranty_plan_id,qty)
+            VALUES ('${line}','cust','p_p1s','','[]','','','','',1)`);
+  const res = await post(customerApp(raw), '/api/orders', checkoutBody({ couponCode: code, itemIds: [line] }));
+  const body = await json(res);
+  await Promise.all(pending.splice(0));
+  return { status: res.status, body, id: String(body.order?.id ?? '') };
+}
+/**
+ * A cancel as it ran before 0191 — no release trigger, the use stays spent —
+ * by the customer (reopened later through the status door) or through the stage door.
+ */
+async function legacyCancel(raw: DatabaseSync, orderId: string, door: 'status' | 'stage' = 'status') {
+  raw.exec('DROP TRIGGER trg_orders_coupon_released');
+  const res =
+    door === 'status'
+      ? await post(customerApp(raw), `/api/orders/${orderId}/cancel`, {})
+      : await patch(ownerAdmin(raw), `/api/admin/orders/${orderId}/stage`, { stage: 'cancelled' });
+  assert.equal(res.status, 200, await res.clone().text());
+  raw.exec(block('trg_orders_coupon_released'));
+  assert.equal(useOf(raw, orderId), 'active');
+}
+
+test('legacy reopen: an order cancelled before 0191 whose trade-in was cancelled since stays cancelled — through both admin doors', async () => {
+  for (const door of ['status', 'stage'] as const) {
+    const raw = seed({ deliveredDaysAgo: 40 });
+    const t = await readyToPay(raw);
+    const a = await tiOrder(raw, t.code);
+    assert.equal(a.status, 200, JSON.stringify(a.body));
+    await legacyCancel(raw, a.id, door);
+    // No live order holds the credit, so its owner may cancel the trade-in: the device is released, the credit switched off.
+    const tc = await post(customerApp(raw), `/api/trade-in/requests/${t.id}/cancel`, { reason: 'changed my mind' });
+    assert.equal(tc.status, 200, await tc.clone().text());
+    assert.equal(row<{ active: number }>(raw, 'SELECT active FROM coupons WHERE id = ?', t.coupon)!.active, 0);
+
+    const res = await reopen(raw, door, a.id);
+    const body = await json(res);
+    assert.equal(res.status, 409, `${door}: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'ORDER_REOPEN_COUPON_SPENT');
+    assert.equal(statusOf(raw, a.id), 'cancelled', `${door}: the order keeps no credit its request no longer has`);
+  }
+});
+
+test('legacy reopen: a request re-minted before 0191 — its first order is not reopened, and a first order reopened before 0191 fences the second coupon', async () => {
+  const raw = seed({ deliveredDaysAgo: 40 });
+  const t = await readyToPay(raw);
+  const a = await tiOrder(raw, t.code);
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  await legacyCancel(raw, a.id);
+  // The old «إتمام الدفع»: the first coupon switched off, a second minted and named by the request.
+  raw.exec(`DROP TRIGGER trg_trade_in_one_credit;
+    UPDATE coupons SET active = 0 WHERE id = '${t.coupon}';
+    INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_per_user, max_global, active, assigned_user_id, trade_in_id, product_id, option_value_id, color_id, ends_at)
+      SELECT 'cpn_c2', 'TICREDIT2', kind, value, min_total_iqd, max_per_user, max_global, 1, assigned_user_id, trade_in_id, product_id, option_value_id, color_id, ends_at
+        FROM coupons WHERE id = '${t.coupon}';
+    UPDATE trade_in_requests SET coupon_id = 'cpn_c2' WHERE id = '${t.id}';`);
+  raw.exec(block('trg_trade_in_one_credit'));
+
+  // (1) Reopening the first order would put its credit beside the second coupon: refused.
+  const res = await reopen(raw, 'status', a.id);
+  const body = await json(res);
+  assert.equal(res.status, 409, JSON.stringify(body));
+  assert.equal(body.code, 'ORDER_REOPEN_COUPON_SPENT');
+  assert.equal(statusOf(raw, a.id), 'cancelled');
+
+  // (2) The database may already hold that first order reopened before 0191: a live
+  // order carrying the first coupon's use. The second coupon then buys nothing.
+  raw.exec('DROP TRIGGER trg_orders_reopen_coupon_inactive');
+  raw.prepare("UPDATE orders SET status = 'pending' WHERE id = ?").run(a.id);
+  raw.exec(block('trg_orders_reopen_coupon_inactive'));
+  const orders = () => count(raw, "SELECT COUNT(*) AS n FROM orders WHERE user_id = 'cust'");
+  const before = orders();
+  const b = await tiOrder(raw, 'TICREDIT2');
+  assert.equal(b.status, 400, JSON.stringify(b.body));
+  assert.equal(b.body.code, 'TRADE_IN_COUPON_MISMATCH');
+  assert.equal(orders(), before, 'nothing ordered');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = 'cpn_c2'"), 0, 'nothing redeemed');
+  assert.equal(
+    count(raw, "SELECT COUNT(*) AS n FROM coupon_redemptions r JOIN coupons c ON c.id = r.coupon_id JOIN orders o ON o.id = r.order_id WHERE c.trade_in_id = ? AND r.state = 'active' AND o.status <> 'cancelled'", t.id),
+    1,
+    'one live order carries this trade-in credit'
+  );
+});
+
+test('legacy reopen: a trade-in order cancelled before 0191 and reopened after it is charged the time it sat cancelled — its next cancel adds only held time', () => {
+  const raw = dbThrough('0190');
+  const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();
+  const E = ago(13); // the credit's end: seven days after it was minted with the order, 20 days ago
+  raw.exec(`
+    INSERT INTO users (id,name,email,password_hash,role) VALUES ('u_a','Sara','a@x.co','h','customer');
+    INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+                        subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,updated_at)
+      VALUES ('ORD-X','u_a','pending','{}','standard','{}','cash',899000,0,1400,894000,894000,'${ago(20)}','${ago(20)}');
+    INSERT INTO trade_in_requests (id,user_id,status,order_id,order_item_id,family,created_at,updated_at,coupon_id,credit_iqd)
+      VALUES ('tir_1','u_a','awaiting_payment','ORD-OLD','oi_old','fdm','${ago(21)}','${ago(21)}','cpn_t',5000);
+    INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_per_user, max_global, active, ends_at, trade_in_id, assigned_user_id)
+      VALUES ('cpn_t','TRADE1','fixed_iqd',5000,0,1,1,1,'${E}','tir_1','u_a');
+    INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd, created_at) VALUES ('r_x','cpn_t','u_a','ORD-X',5000,'${ago(20)}');
+  `);
+  // Cancelled before 0191, after holding the credit one day: the use stays spent, the end never moved.
+  raw.exec("UPDATE orders SET status = 'cancelled' WHERE id = 'ORD-X'");
+  raw.prepare("UPDATE orders SET cancelled_at = ? WHERE id = 'ORD-X'").run(ago(19));
+  raw.exec(MIGRATION);
+  const end = () => Date.parse(row<{ ends_at: string }>(raw, "SELECT ends_at FROM coupons WHERE id = 'cpn_t'")!.ends_at);
+  const near = (actual: number, expected: number, what: string) =>
+    assert.ok(Math.abs(actual - expected) < MINUTE, `${what}: ${new Date(actual).toISOString()} vs ${new Date(expected).toISOString()}`);
+
+  // Reopened now: the nineteen days it sat cancelled count against the credit.
+  raw.exec("UPDATE orders SET status = 'pending' WHERE id = 'ORD-X'");
+  assert.equal(row<{ state: string }>(raw, "SELECT state FROM coupon_redemptions WHERE id = 'r_x'")!.state, 'active');
+  near(end(), Date.parse(E) - 19 * DAY, 'reopen: the gap is charged');
+  // Held two more days, then cancelled (the trigger reads the real clock: the
+  // order's created_at moves back two days instead).
+  raw.prepare("UPDATE orders SET created_at = ? WHERE id = 'ORD-X'").run(ago(22));
+  raw.exec("UPDATE orders SET status = 'cancelled' WHERE id = 'ORD-X'");
+  near(end(), Date.parse(E) + 3 * DAY, 'cancel: the original end plus the day and the two days an order held it, never the gap');
+  assert.equal(row<{ state: string }>(raw, "SELECT state FROM coupon_redemptions WHERE id = 'r_x'")!.state, 'released');
 });

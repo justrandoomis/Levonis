@@ -17,6 +17,9 @@
  *           by «إتمام الدفع», once, even when pressed twice at once
  *   reopen  cancel → reopen → cancel: the end is the original end plus every
  *           period an order held the credit
+ *   closed  the order of a COMPLETED trade-in is cancelled: the use is released,
+ *           but a credit that can never be spent again is neither extended nor
+ *           announced to the customer as «back»
  *
  * Real routes over every migration; RaceD1 lets a second request finish at
  * the exact moment the first is about to write.
@@ -24,7 +27,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { count, json, patch, post, row, stubApp, pending } from './fixtures/app';
+import { count, get, json, patch, post, row, stubApp, pending } from './fixtures/app';
 import { LimitD1 } from './fixtures/d1Limits';
 import { RaceD1, redeems } from './fixtures/raceD1';
 import { orderRoutes } from '../worker/routes/orders';
@@ -276,4 +279,35 @@ test('reopen: cancel → reopen → cancel moves the end by every period an orde
   near(endOf(raw, t.coupon), E + 2 * DAY + DAY / 2, 'cancel again: + both held periods, never the gap');
   assert.equal(coupons(raw, t.id), 1);
   assert.equal(restored(raw, t.id), 2);
+});
+
+test('closed: cancelling the order of a completed trade-in releases the use, but neither moves the credit\'s end nor tells the customer it is back', async () => {
+  const raw = seed({ deliveredDaysAgo: 40 });
+  const t = await readyToPay(raw);
+  const a = await order(raw, t.code);
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  // The desk took the old device while the order was live: the trade-in is done.
+  const done = await post(adminApp(raw), `/api/admin/trade-in/requests/${t.id}/complete`, { reason: 'handed over at the counter' });
+  assert.equal(done.status, 200, await done.clone().text());
+  raw.prepare('UPDATE orders SET created_at = ? WHERE id = ?').run(new Date(Date.now() - 2 * DAY).toISOString(), a.id);
+  const before = endOf(raw, t.coupon);
+
+  const admin = ownerAdmin(raw);
+  assert.equal((await patch(admin, `/api/admin/orders/${a.id}`, { status: 'cancelled' })).status, 200);
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', a.id)!.state, 'released', 'the release itself is unconditional');
+  assert.equal(endOf(raw, t.coupon), before, 'a credit its completed request can never spend again is not extended');
+  assert.equal(restored(raw, t.id), 0, 'no «credit_restored» in the log');
+  const view = await json(await get(customerApp(raw), `/api/trade-in/requests/${t.id}`));
+  assert.ok(Array.isArray(view.request?.events), JSON.stringify(view).slice(0, 200));
+  assert.equal(
+    (view.request.events as Array<{ action: string }>).filter((e) => e.action === 'credit_restored').length,
+    0,
+    'the customer is not told the credit is back'
+  );
+
+  // Reopened: the use comes back, and the end does not move the other way either.
+  const re = await patch(admin, `/api/admin/orders/${a.id}`, { status: 'pending' });
+  assert.equal(re.status, 200, await re.clone().text());
+  assert.equal(row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', a.id)!.state, 'active');
+  assert.equal(endOf(raw, t.coupon), before);
 });

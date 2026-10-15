@@ -154,8 +154,10 @@ END;
 -- (customer, admin status door, stage door, expiry and Gini sweeps — the 0175
 -- gift pattern). A delivered order that is then cancelled keeps its use: it was
 -- received. A trade-in credit's end moves by exactly the time this order held
--- it, and the request's log says so. All three statements read state =
--- 'active', so the release is last.
+-- it, and the request's log says so — only while the request still awaits
+-- payment: a completed (or otherwise closed) request's credit can never be
+-- spent again, so its end does not move and the customer is not told it came
+-- back. All three statements read state = 'active', so the release is last.
 CREATE TRIGGER IF NOT EXISTS trg_orders_coupon_released
 AFTER UPDATE OF status ON orders
 WHEN NEW.status = 'cancelled' AND OLD.status NOT IN ('cancelled', 'delivered')
@@ -164,6 +166,7 @@ BEGIN
      SET ends_at = strftime('%Y-%m-%dT%H:%M:%fZ',
                             julianday(ends_at) + MAX(0, julianday('now') - julianday(NEW.created_at)))
    WHERE trade_in_id IS NOT NULL AND julianday(ends_at) IS NOT NULL AND julianday(NEW.created_at) IS NOT NULL
+     AND EXISTS (SELECT 1 FROM trade_in_requests t WHERE t.id = coupons.trade_in_id AND t.status = 'awaiting_payment')
      AND id IN (SELECT r.coupon_id FROM coupon_redemptions r WHERE r.order_id = NEW.id AND r.state = 'active');
   INSERT INTO trade_in_events (id, request_id, actor_id, actor_role, action, from_status, to_status, detail_json, created_at)
   SELECT 'tie_' || lower(hex(randomblob(10))), c.trade_in_id, NULL, 'system', 'credit_restored', t.status, t.status,
@@ -172,7 +175,7 @@ BEGIN
     FROM coupon_redemptions r
     JOIN coupons c ON c.id = r.coupon_id
     JOIN trade_in_requests t ON t.id = c.trade_in_id
-   WHERE r.order_id = NEW.id AND r.state = 'active';
+   WHERE r.order_id = NEW.id AND r.state = 'active' AND t.status = 'awaiting_payment';
   UPDATE coupon_redemptions
      SET state = 'released', released_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
    WHERE order_id = NEW.id AND state = 'active';
@@ -181,18 +184,47 @@ END;
 -- ---------------------------------------------------------------- 8. Reopening a cancelled order takes the use back
 -- (trigger 5 decides) and takes back the held-time extension, so across
 -- cancel → reopen → cancel the end is the original end plus every period an
--- order held the credit. A use cancelled before this file is still 'active':
--- both statements skip it.
+-- order held the credit; the time the order sat cancelled counts against it.
+-- A use cancelled before this file is still 'active' and its end never moved:
+-- the first statement charges it the time it sat cancelled (from the order's
+-- cancelled_at, still set in OLD), so its next cancel adds only held time too.
+-- As in trigger 7, only a credit whose request still awaits payment moves.
+-- The legacy statement runs first: the last one turns 'released' into 'active'.
 CREATE TRIGGER IF NOT EXISTS trg_orders_coupon_reclaimed
 AFTER UPDATE OF status ON orders
 WHEN OLD.status = 'cancelled' AND NEW.status <> 'cancelled'
 BEGIN
   UPDATE coupons
      SET ends_at = strftime('%Y-%m-%dT%H:%M:%fZ',
+                            julianday(ends_at) - MAX(0, julianday('now') - julianday(OLD.cancelled_at)))
+   WHERE trade_in_id IS NOT NULL AND julianday(ends_at) IS NOT NULL AND julianday(OLD.cancelled_at) IS NOT NULL
+     AND EXISTS (SELECT 1 FROM trade_in_requests t WHERE t.id = coupons.trade_in_id AND t.status = 'awaiting_payment')
+     AND id IN (SELECT r.coupon_id FROM coupon_redemptions r WHERE r.order_id = NEW.id AND r.state = 'active');
+  UPDATE coupons
+     SET ends_at = strftime('%Y-%m-%dT%H:%M:%fZ',
                             julianday(ends_at) - MAX(0, julianday('now') - julianday(NEW.created_at)))
    WHERE trade_in_id IS NOT NULL AND julianday(ends_at) IS NOT NULL AND julianday(NEW.created_at) IS NOT NULL
+     AND EXISTS (SELECT 1 FROM trade_in_requests t WHERE t.id = coupons.trade_in_id AND t.status = 'awaiting_payment')
      AND id IN (SELECT r.coupon_id FROM coupon_redemptions r WHERE r.order_id = NEW.id AND r.state = 'released');
   UPDATE coupon_redemptions
      SET state = 'active', released_at = NULL
    WHERE order_id = NEW.id AND state = 'released';
+END;
+
+-- ---------------------------------------------------------------- 9. A reopen never brings back a switched-off trade-in credit
+-- An order cancelled before this file still holds its use ('active'), so
+-- trigger 8 reclaims nothing and trigger 5 never runs. If the credit was
+-- switched off since — its request cancelled and the device released, or the
+-- old «إتمام الدفع» minted a second coupon — reopening that order would hand
+-- back a credit its request no longer has, or a second one beside it. Refused
+-- for any trade-in coupon use of the order, whatever the use's state (after
+-- this file trigger 5 already refuses a released one). A promo code switched
+-- off since is left as it was: its use was never given back.
+CREATE TRIGGER IF NOT EXISTS trg_orders_reopen_coupon_inactive
+BEFORE UPDATE OF status ON orders
+WHEN OLD.status = 'cancelled' AND NEW.status <> 'cancelled'
+ AND EXISTS (SELECT 1 FROM coupon_redemptions r JOIN coupons c ON c.id = r.coupon_id
+              WHERE r.order_id = NEW.id AND c.trade_in_id IS NOT NULL AND COALESCE(c.active, 0) <> 1)
+BEGIN
+  SELECT RAISE(ABORT, 'COUPON_INACTIVE');
 END;
