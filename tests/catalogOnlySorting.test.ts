@@ -51,6 +51,35 @@ test('R3: both price sorts put the unpriced product last; price, offer and membe
   assert.deepEqual(catalogLeaks(facets), []);
 });
 
+/**
+ * THE BAMBU IMPORT'S HARD DEPENDENCIES (its spec §K.1): D-4, a price range excludes every unpriced product
+ * — in the exact syntax workflow 7's probes read `{slug}` with (`price=1-`, formatPriceRange) and through the
+ * public API's `min_price` / `max_price`, which build the same range — and D-3, the API context says how
+ * many products are priced (`products_priced`) beside how many are shown (`products`).
+ */
+test('D-4: the probes\' price range (price=1-) and the public API\'s min_price / max_price exclude the unpriced product; D-3: the context counts the priced ones', async () => {
+  const w = await world();
+  const app = w.as(null);
+  const all = listOf(await json(await get(app, '/api/products?limit=50')));
+  assert.ok(all.some((p) => p.id === CAT.id), 'without a range the unpriced product is shown');
+  const ranged = listOf(await json(await get(app, '/api/products?limit=50&price=1-')));
+  assert.equal(ranged.length, all.length - 1, 'every priced product, and only those');
+  assert.ok(ranged.every((p) => p.price_status === 'priced' && Number.isSafeInteger(p.price_iqd)));
+  assert.equal(listOf(await json(await get(app, '/api/products?limit=1&price=1-')))[0]?.price_status, 'priced', 'the probes\' {slug} is a priced product');
+  for (const q of ['min_price=0', 'min_price=1', 'max_price=1000000000', 'min_price=0&max_price=1000000000']) {
+    const body = await json(await get(app, `/api/public/v1/products?limit=50&${q}`));
+    assert.deepEqual(catalogLeaks(body), []);
+    const slugs = (body.data as Array<{ slug: string; price: { status: string } }>).map((p) => p.slug);
+    assert.ok(slugs.length > 0, `${q}: not vacuous`);
+    assert.equal(slugs.includes(CAT.slug), false, `${q} excludes a product with no price`);
+  }
+  const plain = await json(await get(app, '/api/public/v1/products?limit=50'));
+  assert.ok((plain.data as Array<{ slug: string }>).some((p) => p.slug === CAT.slug), 'without a price filter the API shows it');
+  const context = (await json(await get(app, '/api/public/v1/context'))).content as { products: number; products_priced: number };
+  assert.equal(context.products, all.length);
+  assert.equal(context.products_priced, all.length - 1);
+});
+
 test('R1: the default browse is a stable partition, priced first', async () => {
   const w = await world();
   const list = listOf(await json(await get(w.as(null), '/api/products?limit=50')));
