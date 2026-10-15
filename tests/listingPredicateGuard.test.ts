@@ -257,6 +257,9 @@ const NOT_CUSTOMER_CALLERS = new Set<string>([
   'worker/lib/listing.ts',
   // The admin's «ظاهر بلا سعر» count (stats `shown_unpriced`): visible and not sellable, an owner screen.
   'worker/routes/adminProducts.ts',
+  // The Bambu import's own D1 recompute before COMPLETE (import spec §I.1.10): one `statesOf` asks whether the
+  // product it just wrote is visible and not sellable. A check the Worker runs for the import, not a customer read.
+  'worker/lib/catalogImport/verifyD1.ts',
 ]);
 
 test('the count of each predicate family per file is the reviewed one (reclassify this site in docs and here)', () => {
