@@ -106,6 +106,7 @@ import {
   CLAIM_TRANSITIONS,
   claimIsOpen,
   closedClaimSql,
+  claimFiledColumnsInstalled,
   type ClaimStage,
   type UnitRow,
   type WarrantySnapshotLite,
@@ -123,6 +124,7 @@ import { isLostRace } from '../lib/gifts/fence';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
+import { warranty as WARRANTY_POLICY } from '../lib/policies/warranty';
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
@@ -205,6 +207,22 @@ const RETURN_CASE_OPEN = () =>
     'على هذا الجهاز طلب إرجاع مفتوح؛ يُعالَج العيب هناك. / This device has an open return case; the fault is handled there.',
     'RETURN_CASE_OPEN'
   );
+/**
+ * W-3 (0191, row 237): a device is followed in ONE open case at a time. The
+ * open claim's id rides along only when it is the caller's own (or staff's to
+ * see) — never another account's claim id. The client shows its own copy by
+ * code, and offers «افتح الطلب المفتوح» when the id is there.
+ */
+const CLAIM_ALREADY_OPEN = (claimId?: string) =>
+  new HttpError(
+    409,
+    'على هذا الجهاز طلب ضمان مفتوح آخر. يُتابَع الجهاز في طلب مفتوح واحد: أكمل ذلك الطلب، أو أغلقه أولاً. / This device already has another open warranty request. A device is followed in one open request at a time: continue that one, or close it first.',
+    'CLAIM_ALREADY_OPEN',
+    claimId ? { claim_id: claimId } : undefined
+  );
+/** Another OPEN claim on the unit `unitSql` names, other than `idSql` — the one «open» (W-5). */
+const otherOpenClaimOnUnitSql = (unitSql: string, idSql: string) =>
+  `EXISTS (SELECT 1 FROM warranty_claims oc WHERE oc.unit_id = ${unitSql} AND oc.id <> ${idSql} AND NOT ${closedClaimSql('oc')})`;
 
 /**
  * WHAT A CLAIM DECISION MAY SAY AT EACH STAGE (G-3): an accepted claim is
@@ -493,6 +511,11 @@ interface ClaimRow extends Record<string, unknown> {
   last_message_at?: string | null;
   last_staff_message_at?: string | null;
   last_customer_message_at?: string | null;
+  /** 0191 (W-1): the cover the claim was filed under — written once by the claim INSERT. NULL on older claims. */
+  filed_cover_state?: string | null;
+  filed_cover_via?: string | null;
+  filed_cover_end_at?: string | null;
+  filed_policy_version?: string | null;
 }
 
 /**
@@ -557,6 +580,18 @@ function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
     admin_note: row.admin_note ?? '',
     evidence: evidenceKeys.map((key) => ({ key, url: `/api/devices/claim-files/${key}` })),
     created_at: row.created_at,
+    // W-1 (policy 5.16 counts «the date the claim was filed»): the cover the
+    // claim was filed under, as recorded by its INSERT — never recomputed from
+    // today's clock. Null for a claim filed before 0191: nothing pretends to
+    // know what its cover was.
+    coverage_at_filing: row.filed_cover_state
+      ? {
+          state: row.filed_cover_state,
+          via: row.filed_cover_via ?? null,
+          end_at: row.filed_cover_end_at ?? null,
+          policy_version: row.filed_policy_version ?? null,
+        }
+      : null,
     priority: Number(row.priority ?? 0) === 1,
     serial: row.serial_raw ? (opts.admin ? row.serial_raw : maskSerial(row.serial_raw)) : null,
     ...(thread ?? {}),
@@ -1005,26 +1040,53 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
     ? `wc_${(await sha256Hex(`${user.id}\n${idempotencyKey}`)).slice(0, 20)}`
     : newId('wc');
   const productName = String(unit.name_snapshot || unit.p_name_ar || unit.p_name || 'Device');
+  // The coverage the customer is shown is read from the unit, so it is the
+  // same answer on a first submit and on a replay of it — covered while the
+  // original warranty or a used-sale cover is in force (policy v4). The same
+  // reading is what the claim records as the cover it was filed under (W-1).
+  const cov = unitCoverage(unit);
   /**
    * ONE DOOR PER DEFECT (Services V2 plan §1.3): a device with an OPEN return
    * case is handled by that return — the same defect is never on the return
    * desk and the repair desk at once. Asked INSIDE the insert (the return
    * door asks the mirror question of an open claim), so a return opened
    * between any read and this write still wins.
+   *
+   * ONE OPEN CASE PER DEVICE (W-3, row 237): asked inside the same insert, so
+   * two forms sent at once cannot both open one — and it holds on a database
+   * without 0191's trigger too. The claim's own id is excluded: a replay of
+   * it still lands on ON CONFLICT and answers as a replay.
+   *
+   * THE COVER AT FILING (W-1): written by this INSERT and by nothing else
+   * (0191's trigger forbids any later change), where the columns exist.
    */
-  const written = await c.env.DB.prepare(
-    `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority)
-     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9
-      WHERE NOT ${openReturnOnUnitSql('?3', '?6')}
-     ON CONFLICT(id) DO NOTHING`
-  )
-    .bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority)
-    .run();
+  const claimFence = `WHERE NOT ${openReturnOnUnitSql('?3', '?6')} AND NOT ${otherOpenClaimOnUnitSql('?6', '?1')}`;
+  const insert = (await claimFiledColumnsInstalled(c.env.DB))
+    ? c.env.DB.prepare(
+        `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority,
+                                      filed_cover_state, filed_cover_via, filed_cover_end_at, filed_policy_version)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9, ?10, ?11, ?12, ?13
+          ${claimFence}
+         ON CONFLICT(id) DO NOTHING`
+      ).bind(
+        id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority,
+        cov.state, cov.via, cov.end_at, `${WARRANTY_POLICY.key}@${WARRANTY_POLICY.version}`
+      )
+    : c.env.DB.prepare(
+        `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9
+          ${claimFence}
+         ON CONFLICT(id) DO NOTHING`
+      ).bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority);
+  let written: { meta: { changes?: number } };
+  try {
+    written = await insert.run();
+  } catch (e) {
+    // 0191's trigger: the same refusal as the fence above, from the database.
+    if (!/CLAIM_ALREADY_OPEN/.test(e instanceof Error ? e.message : String(e))) throw e;
+    written = { meta: { changes: 0 } };
+  }
 
-  // The coverage the customer is shown is read from the unit, so it is the
-  // same answer on a first submit and on a replay of it — covered while the
-  // original warranty or a used-sale cover is in force (policy v4).
-  const cov = unitCoverage(unit);
   const warrantyFacts = {
     // The buyer's order id is the buyer's to see; a later holder gets the
     // coverage facts alone.
@@ -1081,6 +1143,15 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
         .bind(unit.order_item_id, unit.id)
         .first<{ open: number }>();
       if (returnOpen?.open) throw RETURN_CASE_OPEN();
+      // Another open case on this device (W-3). Its id only when it is the caller's own.
+      const open = await c.env.DB.prepare(
+        `SELECT wc.id, wc.user_id FROM warranty_claims wc
+          WHERE wc.unit_id = ?1 AND wc.id <> ?2 AND NOT ${closedClaimSql('wc')}
+          ORDER BY (wc.user_id = ?3) DESC, wc.created_at DESC LIMIT 1`
+      )
+        .bind(unit.id, id, user.id)
+        .first<{ id: string; user_id: string }>();
+      if (open) throw CLAIM_ALREADY_OPEN(open.user_id === user.id ? open.id : undefined);
       throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
     }
     return c.json({
@@ -2328,25 +2399,52 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
     }
   }
 
-  const res = await c.env.DB.prepare(
-    `UPDATE warranty_claims
-        SET stage = ?, status = ?, decision = ?, decision_reason = ?, assigned_staff = ?, admin_note = ?
-      WHERE id = ? AND COALESCE(stage, '') = COALESCE(?, '')
-        AND (? = 0 OR EXISTS (SELECT 1 FROM order_item_units u WHERE u.id = warranty_claims.unit_id AND u.replaced_by_unit_id IS NOT NULL))`
-  )
-    .bind(
-      nextStage,
-      stageToLegacyStatus(nextStage),
-      decision,
-      reason || claim.decision_reason || '',
-      admin.id,
-      reason || claim.admin_note || '',
-      id,
-      claim.stage,
-      toReplaced ? 1 : 0
+  // W-3 (row 237): reopening a closed claim (a rejected one, for another look)
+  // beside another OPEN case on the same device is refused — asked inside the
+  // update, so it also holds on a database without 0191's trigger. Moves
+  // between open stages, and closing, are never refused: duplicate open
+  // claims from before 0191 stay workable until each is closed.
+  const reopening = !claimIsOpen(claim.stage, claim.status) && claimIsOpen(nextStage, stageToLegacyStatus(nextStage));
+  const openBeside = async () =>
+    claim.unit_id
+      ? c.env.DB.prepare(
+          `SELECT oc.id FROM warranty_claims oc WHERE oc.unit_id = ?1 AND oc.id <> ?2 AND NOT ${closedClaimSql('oc')} ORDER BY oc.created_at DESC LIMIT 1`
+        )
+          .bind(claim.unit_id, id)
+          .first<{ id: string }>()
+      : null;
+  let res: { meta: { changes?: number } };
+  try {
+    res = await c.env.DB.prepare(
+      `UPDATE warranty_claims
+          SET stage = ?, status = ?, decision = ?, decision_reason = ?, assigned_staff = ?, admin_note = ?
+        WHERE id = ? AND COALESCE(stage, '') = COALESCE(?, '')
+          AND (? = 0 OR EXISTS (SELECT 1 FROM order_item_units u WHERE u.id = warranty_claims.unit_id AND u.replaced_by_unit_id IS NOT NULL))
+          AND (? = 0 OR NOT ${otherOpenClaimOnUnitSql('warranty_claims.unit_id', 'warranty_claims.id')})`
     )
-    .run();
-  if (res.meta.changes === 0) throw conflict('The claim changed while you were editing — reload and retry');
+      .bind(
+        nextStage,
+        stageToLegacyStatus(nextStage),
+        decision,
+        reason || claim.decision_reason || '',
+        admin.id,
+        reason || claim.admin_note || '',
+        id,
+        claim.stage,
+        toReplaced ? 1 : 0,
+        reopening ? 1 : 0
+      )
+      .run();
+  } catch (e) {
+    if (!/CLAIM_ALREADY_OPEN/.test(e instanceof Error ? e.message : String(e))) throw e;
+    res = { meta: { changes: 0 } };
+  }
+  if (res.meta.changes === 0) {
+    const other = reopening ? await openBeside() : null;
+    // Staff may see which claim holds the device.
+    if (other) throw CLAIM_ALREADY_OPEN(other.id);
+    throw conflict('The claim changed while you were editing — reload and retry');
+  }
 
   await audit(c.env.DB, admin.id, 'warranty.claim_stage', id, {
     from: current,

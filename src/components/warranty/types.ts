@@ -107,6 +107,35 @@ export interface Claim {
   last_staff_message_at?: string | null;
   /** The warranty team wrote after the customer last opened or answered the thread. */
   unread?: boolean;
+  /**
+   * W-1 (row 237): the cover the claim was filed under, as its INSERT recorded
+   * it. Null for a claim filed before 0191 (nothing is shown for it); absent
+   * from an older server.
+   */
+  coverage_at_filing?: {
+    state: string;
+    via: 'original' | 'used_sale' | null;
+    end_at: string | null;
+    policy_version: string | null;
+  } | null;
+}
+
+/**
+ * The «filed in cover» line for a claim, or null when there is nothing honest
+ * to say: an older claim records no cover, and a state other than active or
+ * expired (needs configuration, not delivered, closed) is not a filing fact the
+ * customer can act on.
+ */
+export function filedCoverLine(
+  claim: Pick<Claim, 'coverage_at_filing'>,
+  s: { filedInCover: (end: string) => string; filedInUsedSale: (end: string) => string; filedOutOfCover: string },
+  date: (iso: string | null) => string
+): string | null {
+  const f = claim.coverage_at_filing;
+  if (!f) return null;
+  if (f.state === 'active') return f.via === 'used_sale' ? s.filedInUsedSale(date(f.end_at)) : s.filedInCover(date(f.end_at));
+  if (f.state === 'expired') return s.filedOutOfCover;
+  return null;
 }
 
 export interface ClaimMessage {

@@ -166,6 +166,12 @@ export interface WarrantyStrings {
   threadIntro: string;
   /** In place of the reply box once the claim is closed (rejected, replaced or resolved). */
   threadClosed: string;
+  /** W-1 (row 237): the cover the claim was FILED under, as its INSERT recorded it (policy 5.16). */
+  filedInCover: (end: string) => string;
+  filedInUsedSale: (end: string) => string;
+  filedOutOfCover: string;
+  /** W-3: the device already has an open request — open that one instead. */
+  openThatRequest: string;
 }
 
 const ar: WarrantyStrings = {
@@ -319,6 +325,10 @@ const ar: WarrantyStrings = {
   newReply: 'رد جديد من الفريق',
   threadIntro: 'هنا تتحدث مع فريق الضمان، ويصلك إشعار عند كل رد منهم.',
   threadClosed: 'هذه المطالبة مغلقة، فلا تُضاف إليها رسائل. إن عادت المشكلة فافتح مطالبة جديدة من بطاقة الطابعة.',
+  filedInCover: (end) => `قُدِّم الطلب والجهاز ضمن الضمان (حتى ${end})`,
+  filedInUsedSale: (end) => `قُدِّم الطلب ضمن مدة بيع المستعمل (حتى ${end})`,
+  filedOutOfCover: 'قُدِّم الطلب بعد انتهاء الضمان',
+  openThatRequest: 'افتح الطلب المفتوح',
 };
 
 const en: WarrantyStrings = {
@@ -461,6 +471,10 @@ const en: WarrantyStrings = {
   newReply: 'New reply from the team',
   threadIntro: 'This is your conversation with the warranty team; you are notified of every reply.',
   threadClosed: 'This claim is closed, so no more messages can be added. If the problem comes back, open a new claim from the printer’s card.',
+  filedInCover: (end) => `Filed within the warranty (until ${end})`,
+  filedInUsedSale: (end) => `Filed within the used-sale period (until ${end})`,
+  filedOutOfCover: 'Filed after the warranty had ended',
+  openThatRequest: 'Open that request',
 };
 
 const ckb: WarrantyStrings = {
@@ -611,6 +625,10 @@ const ckb: WarrantyStrings = {
   // Zero says «no messages yet» rather than «0 نامە».
   messagesCount: (n, f) => (n === 0 ? 'هێشتا هیچ نامەیەک نییە' : `${f} نامە`),
   newReply: 'وەڵامی نوێ',
+  filedInCover: (end) => `داواکارییەکە لە ماوەی گەرەنتیدا پێشکەشکرا (تا ${end})`,
+  filedInUsedSale: (end) => `داواکارییەکە لە ماوەی فرۆشتنی بەکارهاتوودا پێشکەشکرا (تا ${end})`,
+  filedOutOfCover: 'داواکارییەکە دوای تەواوبوونی گەرەنتی پێشکەشکرا',
+  openThatRequest: 'داواکارییە کراوەکە بکەرەوە',
 };
 
 export const WARRANTY_STRINGS: Record<Language, WarrantyStrings> = { ar, en, ckb };

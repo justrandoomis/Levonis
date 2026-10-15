@@ -409,6 +409,11 @@ export default function Warranty() {
         s={s}
         onClose={() => setClaimForDevice(null)}
         onSubmitted={onClaimSubmitted}
+        onOpenClaim={(claimId) => {
+          // W-3: the device's open request — continue there instead of opening a second.
+          setClaimForDevice(null);
+          openThread(claimId, claimAnchor.current);
+        }}
       />
       <ClaimThreadOverlay
         claimId={openClaimId}

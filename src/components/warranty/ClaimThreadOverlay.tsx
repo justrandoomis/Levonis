@@ -8,7 +8,7 @@ import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { ErrorState } from '../ui/AsyncStates';
 import { ClaimProgress, PriorityBadge } from './ClaimCard';
 import type { ClaimDetail, ClaimMessage } from './types';
-import { claimOpen, fmtDate, fmtDateTime, isVideoUrl } from './types';
+import { claimOpen, filedCoverLine, fmtDate, fmtDateTime, isVideoUrl } from './types';
 import type { WarrantyStrings } from './strings';
 import { ERROR_BOX, FOCUS } from './ui';
 
@@ -150,6 +150,8 @@ export function ClaimThreadOverlay({
   const facts = detail?.warranty_facts;
   // W-4: a rejected, replaced or resolved claim is read, not written in.
   const closed = !!detail && !claimOpen(detail.claim);
+  // W-1: the cover the claim was filed under (policy 5.16), as recorded at filing.
+  const filed = detail ? filedCoverLine(detail.claim, s, (iso) => fmtDate(iso, lang)) : null;
 
   return (
     <Overlay
@@ -188,6 +190,11 @@ export function ClaimThreadOverlay({
                   {s.usedSaleUntil(fmtDate(facts.cover_end_at, lang))}
                 </>
               ) : null}
+            </p>
+          )}
+          {filed && (
+            <p className="text-text-secondary text-[11px] mt-1" data-claim-filed-cover>
+              {filed}
             </p>
           )}
         </div>

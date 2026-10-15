@@ -9,25 +9,29 @@
  *   - W-4 a closed claim takes no more messages;
  *   - W-5 one definition of «open» for the desk and the device;
  *   - W-6 a returned device answers its buyer with DEVICE_NOT_WITH_CUSTOMER.
- * Left for later phases: W-1 (coverage recorded at filing) and W-3 (one open
- * case per device, with its trigger) land with S-P1's migration; W-2 (an
- * expired device files a paid-repair request) lands with the service desk
- * (S-P3) and paid repair (S-P9).
+ * Landed with S-P1 (migration 0191, DECISIONS row 237):
+ *   - W-1 the claim records the cover it was filed under, once (policy 5.16);
+ *   - W-3 one open case per device — inside the claim insert, the desk's
+ *     reopen and two triggers — with the database's «open» checked against
+ *     claimIsOpen() for every stage and legacy status (no drift).
+ * Left for later phases: W-2 (an expired device files a paid-repair request)
+ * lands with the service desk (S-P3) and paid repair (S-P9).
  *
  * Run: node --import tsx --test tests/sv2_warranty_claims.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, asD1, stubApp, get, post, patch, json } from './fixtures/app';
+import { readFileSync } from 'node:fs';
+import { freshDb, dbThrough, asD1, stubApp, get, post, patch, json, row, all } from './fixtures/app';
 import { deviceRoutes } from '../worker/routes/devices';
+import { CLAIM_STAGES, claimIsOpen } from '../worker/lib/deviceOps';
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 /** One delivered, linked A1 whose warranty ends `endInDays` from now. */
-function seed(endInDays: number): DatabaseSync {
-  const raw = freshDb();
+function seed(endInDays: number, raw: DatabaseSync = freshDb()): DatabaseSync {
   const now = Date.now();
   const delivered = iso(now - 300 * DAY);
   raw.exec(`
@@ -123,6 +127,183 @@ test('W-6 a returned device answers its buyer with DEVICE_NOT_WITH_CUSTOMER, not
     // Before: 400 NOT_REGISTERED («Register this device first») — and the
     // register door then refused with DEVICE_NOT_WITH_CUSTOMER: a loop.
     assert.equal(body.code, 'DEVICE_NOT_WITH_CUSTOMER', JSON.stringify(body));
+  } finally {
+    raw.close();
+  }
+});
+
+// ---------------------------------------------------------------- W-1 (S-P1)
+test('W-1 a claim filed inside the warranty stays «filed in cover» after the end date passes (policy 5.16)', async () => {
+  const raw = seed(5); // five days of cover left
+  try {
+    const filed = await fileClaim(raw, 'sv2-w1-key-0001');
+    assert.equal(filed.success, true, JSON.stringify(filed));
+    assert.equal(filed.warranty_facts.state, 'active');
+    const unitEnd = row<{ warranty_end_at: string }>(raw, "SELECT warranty_end_at FROM order_item_units WHERE id = 'u1'")!.warranty_end_at;
+
+    // Ten days later the admin opens the claim to diagnose it.
+    const realNow = Date.now;
+    Date.now = () => realNow() + 10 * DAY;
+    try {
+      const seen = await json(await get(owner(raw), `/api/devices/claims/${filed.id}`));
+      assert.equal(seen.success, true, JSON.stringify(seen));
+      assert.equal(seen.warranty_facts.state, 'expired', 'today the cover is over…');
+      // …and the claim still says what it was filed under, recorded by its INSERT.
+      assert.deepEqual(seen.claim.coverage_at_filing, { state: 'active', via: 'original', end_at: unitEnd, policy_version: 'warranty@4' });
+      const queue = await json(await get(owner(raw), '/api/devices/admin/claims?stage=all'));
+      assert.equal(queue.claims.find((c: { id: string }) => c.id === filed.id).coverage_at_filing.state, 'active', 'the desk queue reads the same');
+    } finally {
+      Date.now = realNow;
+    }
+
+    // Written once: nothing rewrites it, not even a back-fill.
+    assert.throws(() => raw.exec(`UPDATE warranty_claims SET filed_cover_state = 'expired' WHERE id = '${filed.id}'`), /CLAIM_FILED_COVER_FROZEN/);
+    assert.throws(() => raw.exec(`UPDATE warranty_claims SET filed_policy_version = 'warranty@5' WHERE id = '${filed.id}'`), /CLAIM_FILED_COVER_FROZEN/);
+
+    // A claim written without them (every claim filed before 0191) shows nothing.
+    raw.exec(`INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status)
+              VALUES ('wc_old','buyer','oi1','Bambu A1','filed before 0191',NULL,'received','submitted')`);
+    const old = await json(await get(owner(raw), '/api/devices/claims/wc_old'));
+    assert.equal(old.claim.coverage_at_filing, null);
+  } finally {
+    raw.close();
+  }
+});
+
+test('W-1 a claim filed after the warranty ended records «expired» — the desk sees it was filed out of cover', async () => {
+  const raw = seed(-3);
+  try {
+    const filed = await fileClaim(raw, 'sv2-w1-key-0002');
+    assert.equal(filed.success, true, JSON.stringify(filed));
+    const seen = await json(await get(customer(raw), `/api/devices/claims/${filed.id}`));
+    assert.equal(seen.claim.coverage_at_filing.state, 'expired');
+  } finally {
+    raw.close();
+  }
+});
+
+// ---------------------------------------------------------------- W-3 (S-P1)
+test('W-3 one open case per device: a second claim while the first is open is refused and points at it', async () => {
+  const raw = seed(120);
+  try {
+    const first = await fileClaim(raw, 'sv2-w3-key-0001');
+    assert.equal(first.success, true);
+    const res = await post(customer(raw), '/api/devices/units/u1/claims', {
+      subject: 'Extruder clicks again',
+      description: 'Same printer, opened from another tab.',
+      idempotencyKey: 'sv2-w3-key-0002',
+    });
+    const body = await json(res);
+    assert.equal(res.status, 409, JSON.stringify(body));
+    assert.equal(body.code, 'CLAIM_ALREADY_OPEN');
+    assert.equal(body.details?.claim_id, first.id, 'the caller\'s own open claim is named');
+    assert.equal(all(raw, "SELECT id FROM warranty_claims WHERE unit_id = 'u1'").length, 1);
+
+    // The same key replays the first claim, as before.
+    const replay = await json(await post(customer(raw), '/api/devices/units/u1/claims', {
+      subject: 'Extruder clicks', description: 'The extruder clicks and under-extrudes on every print.', idempotencyKey: 'sv2-w3-key-0001',
+    }));
+    assert.deepEqual([replay.success, replay.replay, replay.id], [true, true, first.id]);
+
+    // Once the first is resolved, a new case opens.
+    raw.exec(`UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = '${first.id}'`);
+    const second = await fileClaim(raw, 'sv2-w3-key-0003');
+    assert.equal(second.success, true, JSON.stringify(second));
+
+    // The desk cannot reopen the old one beside it.
+    raw.exec(`UPDATE warranty_claims SET stage = 'rejected', status = 'rejected' WHERE id = '${first.id}'`);
+    const reopen = await patch(owner(raw), `/api/devices/admin/claims/${first.id}`, { stage: 'diagnosing' });
+    const rb = await json(reopen);
+    assert.equal(reopen.status, 409, JSON.stringify(rb));
+    assert.equal(rb.code, 'CLAIM_ALREADY_OPEN');
+    assert.equal(row<{ stage: string }>(raw, 'SELECT stage FROM warranty_claims WHERE id = ?', first.id)!.stage, 'rejected');
+    // Closing the open one lets the desk reopen the other.
+    raw.exec(`UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = '${second.id}'`);
+    assert.equal((await patch(owner(raw), `/api/devices/admin/claims/${first.id}`, { stage: 'diagnosing' })).status, 200);
+  } finally {
+    raw.close();
+  }
+});
+
+test('W-3 another account\'s open claim on the device is never named', async () => {
+  const raw = seed(120);
+  try {
+    // The device was handed on: an open claim of the previous holder is still on it.
+    raw.exec(`INSERT INTO users (id,name,email,username,password_hash,role) VALUES ('prev','Prev','prev@x.co','prev','h','customer');
+              INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status)
+              VALUES ('wc_prev','prev','oi1','Bambu A1','previous holder','u1','diagnosing','in_review')`);
+    const res = await post(customer(raw), '/api/devices/units/u1/claims', {
+      subject: 'Extruder clicks', description: 'The extruder clicks and under-extrudes on every print.', idempotencyKey: 'sv2-w3-key-0010',
+    });
+    const body = await json(res);
+    assert.equal(res.status, 409, JSON.stringify(body));
+    assert.equal(body.code, 'CLAIM_ALREADY_OPEN');
+    assert.equal(body.details, undefined, JSON.stringify(body));
+    assert.ok(!JSON.stringify(body).includes('wc_prev'));
+  } finally {
+    raw.close();
+  }
+});
+
+test('W-3 two open claims on one device from before 0191 stay workable: each moves through its stages and closes', async () => {
+  // A database at 0190 with the duplicate already in it, then 0191 applied (the live upgrade).
+  const raw = seed(120, dbThrough('0190'));
+  try {
+    raw.exec(`INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status) VALUES
+                ('wc_a','buyer','oi1','Bambu A1','first','u1','received','submitted'),
+                ('wc_b','buyer','oi1','Bambu A1','second','u1','received','submitted')`);
+    raw.exec(readFileSync(new URL('../migrations/0191_services_integrity.sql', import.meta.url), 'utf8'));
+    for (const id of ['wc_a', 'wc_b']) {
+      for (const body of [{ stage: 'diagnosing' }, { stage: 'approved', decision: 'repair', reason: 'Bench test done' }, { stage: 'resolved', reason: 'Repaired and returned' }]) {
+        const res = await patch(owner(raw), `/api/devices/admin/claims/${id}`, body);
+        assert.equal(res.status, 200, `${id} → ${body.stage}: ${await res.clone().text()}`);
+      }
+    }
+    assert.deepEqual(all(raw, "SELECT id, stage FROM warranty_claims WHERE unit_id = 'u1' ORDER BY id"), [
+      { id: 'wc_a', stage: 'resolved' },
+      { id: 'wc_b', stage: 'resolved' },
+    ]);
+  } finally {
+    raw.close();
+  }
+});
+
+test('W-3 drift: the database refuses exactly the claims claimIsOpen() calls open — every stage, every legacy status', () => {
+  const raw = seed(120);
+  try {
+    raw.exec(`INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status)
+              VALUES ('anchor','buyer','oi1','Bambu A1','the open case','u1','received','submitted')`);
+    const stages: Array<string | null> = [...CLAIM_STAGES, null, 'unknown_stage'];
+    const statuses = ['submitted', 'in_review', 'approved', 'rejected'];
+    const insert = raw.prepare(
+      `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status)
+       VALUES (?, 'buyer', 'oi1', 'Bambu A1', 'matrix row', 'u1', ?, ?)`
+    );
+    let n = 0;
+    const closedRows: string[] = [];
+    for (const stage of stages) {
+      for (const status of statuses) {
+        const id = `wc_d${n++}`;
+        let refused = false;
+        try {
+          insert.run(id, stage, status);
+        } catch (e) {
+          assert.match(String((e as Error).message), /CLAIM_ALREADY_OPEN/);
+          refused = true;
+        }
+        assert.equal(refused, claimIsOpen(stage, status), `insert (${stage}, ${status})`);
+        if (!refused) closedRows.push(id);
+      }
+    }
+    // The reopen trigger agrees too: a closed claim moved to an open stage beside the anchor is refused…
+    for (const id of closedRows) {
+      assert.throws(() => raw.exec(`UPDATE warranty_claims SET stage = 'diagnosing', status = 'in_review' WHERE id = '${id}'`), /CLAIM_ALREADY_OPEN/, id);
+      // …and a move that stays closed is not.
+      raw.exec(`UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = '${id}'`);
+    }
+    // Moves of the open anchor between open stages are never refused.
+    raw.exec("UPDATE warranty_claims SET stage = 'diagnosing', status = 'in_review' WHERE id = 'anchor'");
+    raw.exec("UPDATE warranty_claims SET stage = 'repairing', status = 'approved' WHERE id = 'anchor'");
   } finally {
     raw.close();
   }

@@ -4300,9 +4300,22 @@ adminRoutes.patch('/warranty-claims/:id', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const status = oneOf(body.status, 'status', ['submitted', 'in_review', 'approved', 'rejected'] as const);
   const adminNote = str(body.adminNote, 'adminNote', { max: 500, required: false });
-  const res = await c.env.DB.prepare('UPDATE warranty_claims SET status = ?, admin_note = ? WHERE id = ?')
-    .bind(status, adminNote, c.req.param('id'))
-    .run();
+  let res: { meta: { changes?: number } };
+  try {
+    res = await c.env.DB.prepare('UPDATE warranty_claims SET status = ?, admin_note = ? WHERE id = ?')
+      .bind(status, adminNote, c.req.param('id'))
+      .run();
+  } catch (e) {
+    // 0191 (W-3): a closed claim reopened beside another open case on its device.
+    if (/CLAIM_ALREADY_OPEN/.test(e instanceof Error ? e.message : String(e))) {
+      throw new HttpError(
+        409,
+        'على هذا الجهاز طلب ضمان مفتوح آخر. يُتابَع الجهاز في طلب مفتوح واحد: أكمل ذلك الطلب، أو أغلقه أولاً. / This device already has another open warranty request. A device is followed in one open request at a time: continue that one, or close it first.',
+        'CLAIM_ALREADY_OPEN'
+      );
+    }
+    throw e;
+  }
   if (res.meta.changes === 0) throw notFound('Claim not found');
   await audit(c.env.DB, adminUser.id, 'warranty.decide', c.req.param('id'), { status });
   return c.json({ success: true });

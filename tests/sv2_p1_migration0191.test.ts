@@ -15,13 +15,19 @@
  *   workable   the legacy duplicates still advance, close and are decided; a
  *              cancelled order's use from before 0191 stays spent (no backfill)
  *              and its reopen takes nothing twice
+ *   ahead      this code over a database still at 0190 (a manual redeploy, or
+ *              the minutes before workflow 7's migration step): the claim door
+ *              files without the new columns and still keeps one open case per
+ *              device, inside its own insert
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
-import { dbThrough, row, all } from './fixtures/app';
+import { dbThrough, row, all, asD1, stubApp, get, post, json } from './fixtures/app';
+import { deviceRoutes } from '../worker/routes/devices';
+import { claimFiledColumnsInstalled } from '../worker/lib/deviceOps';
 
 const MIGRATION = readFileSync(new URL('../migrations/0191_services_integrity.sql', import.meta.url), 'utf8');
 const LONG_AGO = '2026-01-10T10:00:00.000Z';
@@ -171,4 +177,48 @@ test('the rules refuse NEW writes only, with the codes the routes map', () => {
     () => raw.exec("INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd) VALUES ('r_x','cpn_off','u_b','ORD-P',5000)"),
     /COUPON_INACTIVE/
   );
+});
+
+test('ahead: the claim door over a database at 0190 files without the new columns and still keeps one open case per device', async () => {
+  const raw = dbThrough('0190');
+  const now = Date.now();
+  const delivered = new Date(now - 30 * 86_400_000).toISOString();
+  const end = new Date(now + 300 * 86_400_000).toISOString();
+  raw.exec(`
+    INSERT INTO users (id,name,email,username,password_hash,role) VALUES ('buyer','Sara','sara@x.co','sara','h','customer');
+    INSERT INTO products (id,slug,name,price_iqd) VALUES ('p1','a1','Bambu A1',899000);
+    INSERT INTO orders (id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+                        subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,delivered_at)
+      VALUES ('ORD-1','buyer','delivered','{}','standard','{}','cash',899000,0,1400,899000,0,'${delivered}');
+    INSERT INTO order_items (id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd) VALUES ('oi1','ORD-1','p1','Bambu A1',1,899000,899000);
+    INSERT INTO order_item_units (id,order_id,order_item_id,product_id,owner_user_id,unit_index,delivered_at,warranty_base_months,warranty_start_at,warranty_end_at)
+      VALUES ('u1','ORD-1','oi1','p1','buyer',1,'${delivered}',12,'${delivered}','${end}');
+    INSERT INTO device_registrations (unit_id, user_id) VALUES ('u1','buyer');
+  `);
+  const db = asD1(raw);
+  const app = stubApp(db, { id: 'buyer', role: 'customer', email: 'sara@x.co' }, (a) => a.route('/api/devices', deviceRoutes));
+  const claim = (key: string) =>
+    post(app, '/api/devices/units/u1/claims', { subject: 'Extruder clicks', description: 'The extruder clicks on every print.', idempotencyKey: key });
+
+  const first = await json(await claim('ahead-key-0001'));
+  assert.equal(first.success, true, JSON.stringify(first));
+  const seen = await json(await get(app, `/api/devices/claims/${first.id}`));
+  assert.equal(seen.claim.coverage_at_filing, null, 'no column, nothing claimed');
+
+  // No trigger on this database: the insert's own fence keeps one open case per device.
+  const second = await claim('ahead-key-0002');
+  const body = await json(second);
+  assert.equal(second.status, 409, JSON.stringify(body));
+  assert.equal(body.code, 'CLAIM_ALREADY_OPEN');
+  assert.equal(body.details?.claim_id, first.id);
+  assert.equal(row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM warranty_claims WHERE unit_id = 'u1'")!.n, 1);
+
+  // The probe never remembers «absent»: once 0191 lands, the same database object records the cover.
+  assert.equal(await claimFiledColumnsInstalled(db), false);
+  raw.exec(MIGRATION);
+  assert.equal(await claimFiledColumnsInstalled(db), true);
+  raw.exec(`UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = '${first.id}'`);
+  const third = await json(await claim('ahead-key-0003'));
+  assert.equal(third.success, true, JSON.stringify(third));
+  assert.equal(row<{ s: string }>(raw, 'SELECT filed_cover_state AS s FROM warranty_claims WHERE id = ?', third.id)!.s, 'active');
 });

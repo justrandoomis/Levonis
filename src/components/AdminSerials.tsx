@@ -125,6 +125,10 @@ const STRINGS = {
     hideHistory: 'إخفاء السجل',
     loadMore: 'عرض المزيد',
     awaitingStaff: 'الزبون ينتظر الرد',
+    // W-1 (row 237): the cover the claim was filed under, as its INSERT recorded it.
+    filedInCover: 'قُدِّمت ضمن الضمان',
+    filedInUsedSale: 'قُدِّمت ضمن مدة المستعمل',
+    filedOutOfCover: 'قُدِّمت بعد انتهاء الضمان',
     messagesN: (n: number) => `${n} رسالة`,
     compatibleParts: (n: number) => `قطع الغيار المتوافقة (${n})`,
     stageLabels: {
@@ -253,6 +257,9 @@ const STRINGS = {
     hideHistory: 'Hide history',
     loadMore: 'Load more',
     awaitingStaff: 'Customer waiting for a reply',
+    filedInCover: 'Filed in warranty',
+    filedInUsedSale: 'Filed in used-sale period',
+    filedOutOfCover: 'Filed out of warranty',
     messagesN: (n: number) => (n === 1 ? '1 message' : `${n} messages`),
     compatibleParts: (n: number) => `Compatible spare parts (${n})`,
     stageLabels: {
@@ -389,6 +396,9 @@ const STRINGS = {
     hideHistory: 'شاردنەوەی مێژوو',
     loadMore: 'زیاتر پیشان بدە',
     awaitingStaff: 'کڕیار چاوەڕێی وەڵامە',
+    filedInCover: 'لە ماوەی گەرەنتیدا پێشکەشکرا',
+    filedInUsedSale: 'لە ماوەی بەکارهاتوودا پێشکەشکرا',
+    filedOutOfCover: 'دوای گەرەنتی پێشکەشکرا',
     messagesN: (n: number) => `${n} نامە`,
     compatibleParts: (n: number) => `پارچە یەدەگە گونجاوەکان (${n})`,
     stageLabels: {
@@ -513,6 +523,8 @@ interface AdminClaim {
   awaiting_staff?: boolean;
   /** 0148 — the spare parts that fit the claimed printer's model, and where they are listed. */
   maintenance?: { printer_slug: string; count: number; path: string | null } | null;
+  /** 0191 (W-1) — the cover the claim was filed under; null for a claim filed before it. */
+  coverage_at_filing?: { state: string; via: 'original' | 'used_sale' | null; end_at: string | null; policy_version: string | null } | null;
 }
 
 interface AdminClaimsPage {
@@ -1775,6 +1787,20 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-warning" data-claim-awaiting={cl.id}>
                         <MessageSquare className="w-3 h-3" aria-hidden="true" />
                         {s.awaitingStaff}
+                      </div>
+                    )}
+                    {/* W-1 (policy 5.16): the cover the claim was FILED under — never today's. Nothing for an older claim. */}
+                    {(cl.coverage_at_filing?.state === 'active' || cl.coverage_at_filing?.state === 'expired') && (
+                      <div
+                        className={`mt-1 ms-2 inline-flex items-center gap-1 text-[11px] font-bold ${cl.coverage_at_filing.state === 'active' ? 'text-success' : 'text-text-muted'}`}
+                        data-claim-filed-cover={cl.id}
+                        title={cl.coverage_at_filing.end_at ? fmtDate(cl.coverage_at_filing.end_at, lang) : undefined}
+                      >
+                        {cl.coverage_at_filing.state === 'expired'
+                          ? s.filedOutOfCover
+                          : cl.coverage_at_filing.via === 'used_sale'
+                            ? s.filedInUsedSale
+                            : s.filedInCover}
                       </div>
                     )}
                     {/* «تفيد في صيانة الطابعة» (0148): what the shop stocks

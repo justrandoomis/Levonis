@@ -657,6 +657,29 @@ export function closedClaimSql(alias = ''): string {
 }
 
 /**
+ * DOES THIS DATABASE RECORD THE COVER A CLAIM WAS FILED UNDER (0191, W-1)?
+ *
+ * The claim INSERT writes `filed_cover_*` and `filed_policy_version` only
+ * where the columns exist; new code over a database still at 0190 (a manual
+ * redeploy, a deploy that ran ahead of its migration step) keeps today's
+ * column list. Memoised PER DATABASE OBJECT, and only «present» is
+ * remembered — the `serialAssignmentsInstalled` pattern: a cached «absent»
+ * would keep writing NULL after the migration landed under a live isolate,
+ * and a module-wide boolean would leak between test databases.
+ */
+const filedColumns = new WeakMap<object, true>();
+export async function claimFiledColumnsInstalled(db: D1Database): Promise<boolean> {
+  if (filedColumns.has(db as object)) return true;
+  try {
+    await db.prepare('SELECT filed_cover_state FROM warranty_claims LIMIT 0').all();
+    filedColumns.set(db as object, true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * `effectiveClaimStage`, spelled in SQL, for a WHERE clause.
  *
  * The admin queue filtered by stage in JavaScript AFTER `LIMIT 300`, so once

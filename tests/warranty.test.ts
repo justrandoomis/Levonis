@@ -624,7 +624,14 @@ test('a second, genuinely different device claim is recorded, and a client with 
   try {
     const app = deviceApp(raw, 'buyer');
     const first = (await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: KEY }))).id as string;
-    // One open case per device (0191, W-3): the first is closed before the next is filed.
+    // One open case per device (0191, W-3): while the first is open, a new key is refused and pointed at it…
+    const refused = await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: 'idem-key-cccccccc' });
+    const rb = await json(refused);
+    assert.equal(refused.status, 409, JSON.stringify(rb));
+    assert.equal(rb.code, 'CLAIM_ALREADY_OPEN');
+    assert.equal(rb.details?.claim_id, first);
+    assert.equal(count(raw, 'SELECT COUNT(*) n FROM warranty_claims'), 1);
+    // …so the first is closed before the next is filed.
     raw.prepare("UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = ?").run(first);
     // A new overlay-open mints a new key, even for the same printer and text.
     const again = await json(await post(app, '/api/devices/units/u1/claims', { ...DEVICE_CLAIM, idempotencyKey: 'idem-key-bbbbbbbb' }));

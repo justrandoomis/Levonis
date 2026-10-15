@@ -66,6 +66,7 @@ export function DeviceClaimOverlay({
   s,
   onClose,
   onSubmitted,
+  onOpenClaim,
 }: {
   /** The device the claim is about; null when the window is closed. */
   device: Device | null;
@@ -78,6 +79,11 @@ export function DeviceClaimOverlay({
    * ALREADY recorded under this window's key — see `submit` below.
    */
   onSubmitted: (result: { id: string; replay: boolean }) => void;
+  /**
+   * W-3: the device already has an open request of the caller's own — the
+   * refusal carries its id, and the form offers to open that conversation.
+   */
+  onOpenClaim?: (claimId: string) => void;
 }) {
   // The window must keep its contents while it animates OUT: `device` is the
   // open flag AND the data, so the last one is held for the exit.
@@ -91,6 +97,8 @@ export function DeviceClaimOverlay({
   const [uploadBusy, setUploadBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  /** The caller's own open request on this device (CLAIM_ALREADY_OPEN), when the refusal names it. */
+  const [openElsewhere, setOpenElsewhere] = useState<string | null>(null);
 
   /**
    * ONE KEY PER OPEN — the overlay's half of the replay guard the route
@@ -118,6 +126,7 @@ export function DeviceClaimOverlay({
       setDescription('');
       setAttachments([]);
       setError('');
+      setOpenElsewhere(null);
       claimKey.current = newIdempotencyKey();
     }
   }, [unitId]);
@@ -165,6 +174,7 @@ export function DeviceClaimOverlay({
     if (!device || busy || uploadBusy) return;
     setBusy(true);
     setError('');
+    setOpenElsewhere(null);
     try {
       const res = await api.post<{ id: string; replay?: boolean }>(`/api/devices/units/${encodeURIComponent(device.unit_id)}/claims`, {
         subject: subject.trim(),
@@ -191,6 +201,9 @@ export function DeviceClaimOverlay({
       // traded in since the list loaded, has its own ar/en/ckb sentence);
       // any other code keeps the server's own sentence.
       setError(e2 instanceof ApiError ? apiRefusal(e2, refusalLang(lang), s.error) : s.error);
+      // W-3: one open request per device. The id is there only when it is the caller's own.
+      const existing = e2 instanceof ApiError && e2.code === 'CLAIM_ALREADY_OPEN' ? e2.details?.claim_id : undefined;
+      setOpenElsewhere(typeof existing === 'string' && existing ? existing : null);
     } finally {
       setBusy(false);
     }
@@ -226,6 +239,16 @@ export function DeviceClaimOverlay({
             <div role="alert" className={ERROR_BOX}>
               {error}
             </div>
+          )}
+          {openElsewhere && onOpenClaim && (
+            <button
+              type="button"
+              onClick={() => onOpenClaim(openElsewhere)}
+              className="lv-button lv-button-secondary w-full"
+              data-claim-open-existing
+            >
+              {s.openThatRequest}
+            </button>
           )}
           <Field id="warranty-claim-subject" label={s.subject}>
             <input
