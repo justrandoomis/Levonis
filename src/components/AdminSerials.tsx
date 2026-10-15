@@ -125,10 +125,12 @@ const STRINGS = {
     hideHistory: 'إخفاء السجل',
     loadMore: 'عرض المزيد',
     awaitingStaff: 'الزبون ينتظر الرد',
-    // W-1 (row 237): the cover the claim was filed under, as its INSERT recorded it.
-    filedInCover: 'قُدِّمت ضمن الضمان',
-    filedInUsedSale: 'قُدِّمت ضمن مدة المستعمل',
+    // W-1 (row 237): the cover the claim was filed under, as its INSERT recorded it — with its end on the chip itself.
+    filedInCover: (end: string | null) => (end ? `قُدِّمت ضمن الضمان (حتى ${end})` : 'قُدِّمت ضمن الضمان'),
+    filedInUsedSale: (end: string | null) => (end ? `قُدِّمت ضمن مدة المستعمل (حتى ${end})` : 'قُدِّمت ضمن مدة المستعمل'),
     filedOutOfCover: 'قُدِّمت بعد انتهاء الضمان',
+    // W-3: the desk reopens a claim beside another open one on the device.
+    claimAlreadyOpen: 'على هذا الجهاز مطالبة مفتوحة أخرى، والجهاز يُتابَع في مطالبة مفتوحة واحدة. أغلق تلك المطالبة أولاً، ثم أعد فتح هذه.',
     messagesN: (n: number) => `${n} رسالة`,
     compatibleParts: (n: number) => `قطع الغيار المتوافقة (${n})`,
     stageLabels: {
@@ -257,9 +259,10 @@ const STRINGS = {
     hideHistory: 'Hide history',
     loadMore: 'Load more',
     awaitingStaff: 'Customer waiting for a reply',
-    filedInCover: 'Filed in warranty',
-    filedInUsedSale: 'Filed in used-sale period',
+    filedInCover: (end: string | null) => (end ? `Filed in warranty (until ${end})` : 'Filed in warranty'),
+    filedInUsedSale: (end: string | null) => (end ? `Filed in used-sale period (until ${end})` : 'Filed in used-sale period'),
     filedOutOfCover: 'Filed out of warranty',
+    claimAlreadyOpen: 'This device has another open claim, and a device is followed in one open claim at a time. Close that claim first, then reopen this one.',
     messagesN: (n: number) => (n === 1 ? '1 message' : `${n} messages`),
     compatibleParts: (n: number) => `Compatible spare parts (${n})`,
     stageLabels: {
@@ -396,9 +399,10 @@ const STRINGS = {
     hideHistory: 'شاردنەوەی مێژوو',
     loadMore: 'زیاتر پیشان بدە',
     awaitingStaff: 'کڕیار چاوەڕێی وەڵامە',
-    filedInCover: 'لە ماوەی گەرەنتیدا پێشکەشکرا',
-    filedInUsedSale: 'لە ماوەی بەکارهاتوودا پێشکەشکرا',
+    filedInCover: (end: string | null) => (end ? `لە ماوەی گەرەنتیدا پێشکەشکرا (تا ${end})` : 'لە ماوەی گەرەنتیدا پێشکەشکرا'),
+    filedInUsedSale: (end: string | null) => (end ? `لە ماوەی بەکارهاتوودا پێشکەشکرا (تا ${end})` : 'لە ماوەی بەکارهاتوودا پێشکەشکرا'),
     filedOutOfCover: 'دوای گەرەنتی پێشکەشکرا',
+    claimAlreadyOpen: 'داواکارییەکی کراوەی تر لەسەر ئەم ئامێرە هەیە، و هەر ئامێرێک لە یەک کاتدا تەنها یەک داواکاریی کراوەی هەیە. سەرەتا ئەو داواکارییە دابخە، پاشان ئەمە دووبارە بکەرەوە.',
     messagesN: (n: number) => `${n} نامە`,
     compatibleParts: (n: number) => `پارچە یەدەگە گونجاوەکان (${n})`,
     stageLabels: {
@@ -1009,7 +1013,14 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
     } catch (e) {
       // A decision needs the financial scope; «replaced» needs the replacement
       // first; a decision must fit its stage — said in the admin's language.
-      setMoveError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error);
+      // W-3 has its own desk sentence: the customer's asks them to wait; the desk can close the other claim.
+      setMoveError(
+        e instanceof ApiError
+          ? e.code === 'CLAIM_ALREADY_OPEN'
+            ? s.claimAlreadyOpen
+            : apiRefusal(e, refusalLang(lang), e.message)
+          : s.error
+      );
     } finally {
       setMoveBusy(false);
     }
@@ -1794,13 +1805,12 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       <div
                         className={`mt-1 ms-2 inline-flex items-center gap-1 text-[11px] font-bold ${cl.coverage_at_filing.state === 'active' ? 'text-success' : 'text-text-muted'}`}
                         data-claim-filed-cover={cl.id}
-                        title={cl.coverage_at_filing.end_at ? fmtDate(cl.coverage_at_filing.end_at, lang) : undefined}
                       >
                         {cl.coverage_at_filing.state === 'expired'
                           ? s.filedOutOfCover
-                          : cl.coverage_at_filing.via === 'used_sale'
-                            ? s.filedInUsedSale
-                            : s.filedInCover}
+                          : (cl.coverage_at_filing.via === 'used_sale' ? s.filedInUsedSale : s.filedInCover)(
+                              cl.coverage_at_filing.end_at ? fmtDate(cl.coverage_at_filing.end_at, lang) : null
+                            )}
                       </div>
                     )}
                     {/* «تفيد في صيانة الطابعة» (0148): what the shop stocks

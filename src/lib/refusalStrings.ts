@@ -1388,11 +1388,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This order cannot be re-opened: the code or trade-in credit it used came back when it was cancelled and has since been used again or switched off. Create a new order.',
     ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: ئەو کۆد یان باڵانسی گۆڕینەوەیەی بەکاری هێنابوو لە کاتی هەڵوەشاندنەوەدا گەڕایەوە و دواتر دووبارە بەکارهات یان ناچالاک کرا. داواکارییەکی نوێ دروست بکە.',
   },
-  // W-3 (row 237): one open warranty case per device — a second one, or a closed one reopened beside it.
+  // W-3 (row 237): one open warranty case per device. The customer cannot close a
+  // claim, so this sentence never asks them to; the desk has its own (AdminSerials).
   CLAIM_ALREADY_OPEN: {
-    ar: 'على هذا الجهاز طلب ضمان مفتوح آخر. يُتابَع الجهاز في طلب مفتوح واحد: أكمل ذلك الطلب، أو أغلقه أولاً.',
-    en: 'This device already has another open warranty request. A device is followed in one open request at a time: continue that one, or close it first.',
-    ckb: 'داواکارییەکی گەرەنتیی کراوەی تر لەسەر ئەم ئامێرەیە هەیە. هەر ئامێرێک لە یەک کاتدا تەنها یەک داواکاریی کراوەی هەیە: هەمان داواکاری بەردەوام بکە، یان سەرەتا دایبخە.',
+    ar: 'على هذا الجهاز مطالبة ضمان مفتوحة أخرى، والجهاز يُتابَع في مطالبة مفتوحة واحدة. تابعها من «مطالباتي»، أو انتظر إغلاقها، أو تواصل مع الدعم.',
+    en: 'This device already has another open warranty claim, and a device is followed in one open claim at a time. Follow it from «My claims», wait for it to close, or contact support.',
+    ckb: 'داواکارییەکی گەرەنتیی کراوەی تر لەسەر ئەم ئامێرە هەیە، و هەر ئامێرێک لە یەک کاتدا تەنها یەک داواکاریی کراوەی هەیە. لە «داواکارییەکانم» بەدوایدا بچۆ، یان چاوەڕوانی داخستنی بکە، یان پەیوەندی بە پشتگیری بکە.',
   },
   // W-4: a rejected, replaced or resolved claim takes no more messages (the desk can reopen a rejected one).
   CLAIM_CLOSED: {

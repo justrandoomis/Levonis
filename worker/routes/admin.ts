@@ -53,7 +53,7 @@ import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGate, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
-import type { CreateUnitsResult } from '../lib/deviceOps';
+import { CLAIM_ALREADY_OPEN_DESK, type CreateUnitsResult } from '../lib/deviceOps';
 import { originStarts, unitIdentity } from '../lib/deviceCustody';
 import { runOrderDeliveredEffects } from '../lib/orderDeliveredEffects';
 import { walletTxPublic } from '../lib/wallet';
@@ -4308,11 +4308,7 @@ adminRoutes.patch('/warranty-claims/:id', async (c) => {
   } catch (e) {
     // 0191 (W-3): a closed claim reopened beside another open case on its device.
     if (/CLAIM_ALREADY_OPEN/.test(e instanceof Error ? e.message : String(e))) {
-      throw new HttpError(
-        409,
-        'على هذا الجهاز طلب ضمان مفتوح آخر. يُتابَع الجهاز في طلب مفتوح واحد: أكمل ذلك الطلب، أو أغلقه أولاً. / This device already has another open warranty request. A device is followed in one open request at a time: continue that one, or close it first.',
-        'CLAIM_ALREADY_OPEN'
-      );
+      throw new HttpError(409, CLAIM_ALREADY_OPEN_DESK, 'CLAIM_ALREADY_OPEN');
     }
     throw e;
   }

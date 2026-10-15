@@ -25,7 +25,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { freshDb, dbThrough, asD1, stubApp, get, post, patch, json, row, all } from './fixtures/app';
 import { deviceRoutes } from '../worker/routes/devices';
-import { CLAIM_STAGES, claimIsOpen } from '../worker/lib/deviceOps';
+import { adminRoutes } from '../worker/routes/admin';
+import { CLAIM_ALREADY_OPEN_CUSTOMER, CLAIM_ALREADY_OPEN_DESK, CLAIM_STAGES, claimIsOpen } from '../worker/lib/deviceOps';
+import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -216,6 +218,8 @@ test('W-3 one open case per device: a second claim while the first is open is re
     const rb = await json(reopen);
     assert.equal(reopen.status, 409, JSON.stringify(rb));
     assert.equal(rb.code, 'CLAIM_ALREADY_OPEN');
+    assert.equal(rb.error, CLAIM_ALREADY_OPEN_DESK, 'the desk is told to close the other claim first');
+    assert.equal(rb.details?.claim_id, second.id, 'staff see which claim holds the device');
     assert.equal(row<{ stage: string }>(raw, 'SELECT stage FROM warranty_claims WHERE id = ?', first.id)!.stage, 'rejected');
     // Closing the open one lets the desk reopen the other.
     raw.exec(`UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = '${second.id}'`);
@@ -240,6 +244,45 @@ test('W-3 another account\'s open claim on the device is never named', async () 
     assert.equal(body.code, 'CLAIM_ALREADY_OPEN');
     assert.equal(body.details, undefined, JSON.stringify(body));
     assert.ok(!JSON.stringify(body).includes('wc_prev'));
+    // No customer route closes a claim, and this one is not even theirs to see:
+    // the sentence never asks them to close it, and points to «مطالباتي» and support.
+    assert.equal(body.error, CLAIM_ALREADY_OPEN_CUSTOMER);
+    for (const said of [body.error as string, ...Object.values(REFUSAL_STRINGS.CLAIM_ALREADY_OPEN)]) {
+      assert.ok(!/أغلقه|close it first|دایبخە/i.test(said), said);
+    }
+    assert.match(REFUSAL_STRINGS.CLAIM_ALREADY_OPEN.ar, /مطالبة/);
+    assert.match(REFUSAL_STRINGS.CLAIM_ALREADY_OPEN.ar, /«مطالباتي»/);
+    assert.match(REFUSAL_STRINGS.CLAIM_ALREADY_OPEN.en, /claim/);
+    assert.match(REFUSAL_STRINGS.CLAIM_ALREADY_OPEN.ckb, /«داواکارییەکانم»/);
+    assert.ok(!REFUSAL_STRINGS.CLAIM_ALREADY_OPEN.ckb.includes('ئامێرەیە هەیە'), 'one «is», not two');
+    // The form offers support when the refusal names no claim of the caller's own,
+    // and the desk reads its own sentence, not the customer's.
+    const form = readFileSync(new URL('../src/components/warranty/ClaimForms.tsx', import.meta.url), 'utf8');
+    assert.match(form, /openElsewhere\?\.id && onOpenClaim[\s\S]*?data-claim-open-support/);
+    const desk = readFileSync(new URL('../src/components/AdminSerials.tsx', import.meta.url), 'utf8');
+    assert.match(desk, /e\.code === 'CLAIM_ALREADY_OPEN'\s*\?\s*s\.claimAlreadyOpen/);
+  } finally {
+    raw.close();
+  }
+});
+
+test('W-3 the legacy desk door (PATCH /api/admin/warranty-claims/:id) cannot reopen a claim beside an open one', async () => {
+  const raw = seed(120);
+  try {
+    // A claim from before stages (stage NULL), rejected; a newer one is open on the same device.
+    raw.exec(`INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, stage, status)
+              VALUES ('wc_old','buyer','oi1','Bambu A1','old','u1',NULL,'rejected'),
+                     ('wc_open','buyer','oi1','Bambu A1','open','u1','diagnosing','in_review')`);
+    const legacy = stubApp(asD1(raw), { id: 'boss', role: 'admin', email: 'boss@x.co' }, (a) => a.route('/api/admin', adminRoutes));
+    const res = await patch(legacy, '/api/admin/warranty-claims/wc_old', { status: 'in_review', adminNote: 'looking again' });
+    const body = await json(res);
+    assert.equal(res.status, 409, JSON.stringify(body));
+    assert.equal(body.code, 'CLAIM_ALREADY_OPEN');
+    assert.equal(body.error, CLAIM_ALREADY_OPEN_DESK);
+    assert.equal(row<{ status: string }>(raw, "SELECT status FROM warranty_claims WHERE id = 'wc_old'")!.status, 'rejected');
+    // Once the open one is closed, the old one may be looked at again.
+    raw.exec("UPDATE warranty_claims SET stage = 'resolved', status = 'approved' WHERE id = 'wc_open'");
+    assert.equal((await patch(legacy, '/api/admin/warranty-claims/wc_old', { status: 'in_review', adminNote: 'looking again' })).status, 200);
   } finally {
     raw.close();
   }

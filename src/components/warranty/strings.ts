@@ -170,8 +170,8 @@ export interface WarrantyStrings {
   filedInCover: (end: string) => string;
   filedInUsedSale: (end: string) => string;
   filedOutOfCover: string;
-  /** W-3: the device already has an open request — open that one instead. */
-  openThatRequest: string;
+  /** W-3: the device already has an open claim of the caller's own — open that one instead. */
+  openThatClaim: string;
 }
 
 const ar: WarrantyStrings = {
@@ -328,7 +328,7 @@ const ar: WarrantyStrings = {
   filedInCover: (end) => `قُدِّم الطلب والجهاز ضمن الضمان (حتى ${end})`,
   filedInUsedSale: (end) => `قُدِّم الطلب ضمن مدة بيع المستعمل (حتى ${end})`,
   filedOutOfCover: 'قُدِّم الطلب بعد انتهاء الضمان',
-  openThatRequest: 'افتح الطلب المفتوح',
+  openThatClaim: 'افتح المطالبة المفتوحة',
 };
 
 const en: WarrantyStrings = {
@@ -474,7 +474,7 @@ const en: WarrantyStrings = {
   filedInCover: (end) => `Filed within the warranty (until ${end})`,
   filedInUsedSale: (end) => `Filed within the used-sale period (until ${end})`,
   filedOutOfCover: 'Filed after the warranty had ended',
-  openThatRequest: 'Open that request',
+  openThatClaim: 'Open that claim',
 };
 
 const ckb: WarrantyStrings = {
@@ -628,7 +628,7 @@ const ckb: WarrantyStrings = {
   filedInCover: (end) => `داواکارییەکە لە ماوەی گەرەنتیدا پێشکەشکرا (تا ${end})`,
   filedInUsedSale: (end) => `داواکارییەکە لە ماوەی فرۆشتنی بەکارهاتوودا پێشکەشکرا (تا ${end})`,
   filedOutOfCover: 'داواکارییەکە دوای تەواوبوونی گەرەنتی پێشکەشکرا',
-  openThatRequest: 'داواکارییە کراوەکە بکەرەوە',
+  openThatClaim: 'داواکارییە کراوەکە بکەرەوە',
 };
 
 export const WARRANTY_STRINGS: Record<Language, WarrantyStrings> = { ar, en, ckb };

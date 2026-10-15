@@ -106,6 +106,8 @@ import {
   CLAIM_TRANSITIONS,
   claimIsOpen,
   closedClaimSql,
+  CLAIM_ALREADY_OPEN_CUSTOMER,
+  CLAIM_ALREADY_OPEN_DESK,
   claimFiledColumnsInstalled,
   type ClaimStage,
   type UnitRow,
@@ -211,12 +213,13 @@ const RETURN_CASE_OPEN = () =>
  * W-3 (0191, row 237): a device is followed in ONE open case at a time. The
  * open claim's id rides along only when it is the caller's own (or staff's to
  * see) — never another account's claim id. The client shows its own copy by
- * code, and offers «افتح الطلب المفتوح» when the id is there.
+ * code, and offers «افتح المطالبة المفتوحة» when the id is there (support
+ * otherwise). A customer cannot close a claim, so only the desk is told to.
  */
-const CLAIM_ALREADY_OPEN = (claimId?: string) =>
+const CLAIM_ALREADY_OPEN = (claimId: string | undefined, audience: 'customer' | 'desk') =>
   new HttpError(
     409,
-    'على هذا الجهاز طلب ضمان مفتوح آخر. يُتابَع الجهاز في طلب مفتوح واحد: أكمل ذلك الطلب، أو أغلقه أولاً. / This device already has another open warranty request. A device is followed in one open request at a time: continue that one, or close it first.',
+    audience === 'desk' ? CLAIM_ALREADY_OPEN_DESK : CLAIM_ALREADY_OPEN_CUSTOMER,
     'CLAIM_ALREADY_OPEN',
     claimId ? { claim_id: claimId } : undefined
   );
@@ -1151,7 +1154,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
       )
         .bind(unit.id, id, user.id)
         .first<{ id: string; user_id: string }>();
-      if (open) throw CLAIM_ALREADY_OPEN(open.user_id === user.id ? open.id : undefined);
+      if (open) throw CLAIM_ALREADY_OPEN(open.user_id === user.id ? open.id : undefined, 'customer');
       throw conflict('That claim could not be recorded; please try again', 'CLAIM_KEY_COLLISION');
     }
     return c.json({
@@ -2442,7 +2445,7 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
   if (res.meta.changes === 0) {
     const other = reopening ? await openBeside() : null;
     // Staff may see which claim holds the device.
-    if (other) throw CLAIM_ALREADY_OPEN(other.id);
+    if (other) throw CLAIM_ALREADY_OPEN(other.id, 'desk');
     throw conflict('The claim changed while you were editing — reload and retry');
   }
 

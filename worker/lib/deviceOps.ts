@@ -680,6 +680,15 @@ export async function claimFiledColumnsInstalled(db: D1Database): Promise<boolea
 }
 
 /**
+ * W-3's refusal (CLAIM_ALREADY_OPEN), as the server words it: the customer
+ * cannot close a claim, so only the desk is told to close the other one. The
+ * apps show their own ar/en/ckb copy by code (refusalStrings, AdminSerials).
+ */
+export const CLAIM_ALREADY_OPEN_CUSTOMER =
+  'على هذا الجهاز مطالبة ضمان مفتوحة أخرى، والجهاز يُتابَع في مطالبة مفتوحة واحدة. تابعها من «مطالباتي»، أو انتظر إغلاقها، أو تواصل مع الدعم. / This device already has another open warranty claim, and a device is followed in one open claim at a time. Follow it from «My claims», wait for it to close, or contact support.';
+export const CLAIM_ALREADY_OPEN_DESK =
+  'على هذا الجهاز مطالبة مفتوحة أخرى، والجهاز يُتابَع في مطالبة مفتوحة واحدة. أغلق تلك المطالبة أولاً، ثم أعد فتح هذه. / This device has another open claim, and a device is followed in one open claim at a time. Close that claim first, then reopen this one.';
+/**
  * `effectiveClaimStage`, spelled in SQL, for a WHERE clause.
  *
  * The admin queue filtered by stage in JavaScript AFTER `LIMIT 300`, so once
