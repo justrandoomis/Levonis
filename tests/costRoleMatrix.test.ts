@@ -35,12 +35,17 @@ import {
   OWNER,
   OWNER_UNVERIFIED,
   ROLES,
+  appFor,
   getPaths,
+  leaks,
+  seededCopy,
   seededCopyUnverifiedOwner,
   sweepGets,
   type RoleName,
   type SweepResult,
 } from './fixtures/roleMatrix';
+import { get as getPath, json as jsonOf, post as postPath } from './fixtures/app';
+import { LEGACY_NUMBERS } from './fixtures/catalogOnly';
 
 const PATHS = getPaths();
 
@@ -202,4 +207,38 @@ test('«التسعير والشحن» (pricing engine MVP P1): the owner reads t
   for (const p of routes) assert.equal(guest.statuses[p], 401, `guest ${p}`);
   const unverified = await sweep('owner_unverified');
   for (const p of routes) assert.equal(unverified.codes[p], 'OWNER_EMAIL_UNVERIFIED', `unverified owner ${p}`);
+});
+
+test('«طلب السعر» (DECISIONS row 240): mine, the queue’s counts, the list column and the notice carry no cost, no legacy figure and no one else', async () => {
+  const raw = seededCopy();
+  // The costly product shown but not sold (no V2 publication), its legacy ladder still in the row; one open
+  // request by the customer and one by the employee, and a delivered notice.
+  raw.exec(`
+    DELETE FROM pricing_v2_sku_results WHERE product_id = 'p_a1';
+    UPDATE products SET price_iqd = ${LEGACY_NUMBERS[0]}, prime_price_iqd = ${LEGACY_NUMBERS[1]} WHERE id = 'p_a1';
+    INSERT INTO product_price_requests (id, user_id, product_id, selection, notify) VALUES
+      ('prq_rm_1', 'u1', 'p_a1', '', 1), ('prq_rm_2', 'usr_emp', 'p_a1', '', 0);
+    INSERT INTO product_price_request_stats (product_id, requesters, selections, clicks, last_request_at) VALUES ('p_a1', 2, 1, 2, '2026-10-15T09:00:00.000Z');
+    INSERT INTO user_notifications (id, user_id, kind, title_ar, title_en, body_ar, body_en, link, entity_type, entity_id, meta, event_key)
+      VALUES ('n_rm', 'u1', 'price_available', 'صار السعر متوفراً', 'The price is now available', 'x', 'x', '/product/a1', 'product', 'p_a1',
+              '{"title_ckb":"نرخ ئێستا بەردەستە","body_ckb":"x"}', 'price_available:prq_rm_1:1');
+  `);
+  const extra = { numbers: LEGACY_NUMBERS };
+  for (const [role, user] of Object.entries(ROLES)) {
+    const app = appFor(raw, user, BASE_MOUNTS, { publishV2: false });
+    for (const path of ['/api/price-requests/mine', '/api/notifications', '/api/products/a1', '/api/products?limit=50', '/api/admin/products-v2/needs-pricing?filter=most_requested', '/api/admin/products-v2?sort=requests']) {
+      const res = await getPath(app, path);
+      const text = await res.text();
+      const body = text.startsWith('{') ? JSON.parse(text) : text;
+      assert.deepEqual(leaks(body, extra), [], `${role} ${path}`);
+      if (path === '/api/price-requests/mine' && res.status === 200) {
+        assert.ok(!text.includes('usr_emp') || user?.id === 'usr_emp', `${role}: never another person’s request`);
+        assert.ok(!text.includes('u1"') || user?.id === 'u1', `${role}: never another person’s request`);
+        assert.doesNotMatch(text, /click_count|requesters/, `${role}: no counter`);
+      }
+    }
+    // A request answer, refused or not, carries none either.
+    const asked = await postPath(app, '/api/price-requests', { product_id: 'p_a1' });
+    assert.deepEqual(leaks(await jsonOf(asked), extra), [], `${role} POST /api/price-requests`);
+  }
 });

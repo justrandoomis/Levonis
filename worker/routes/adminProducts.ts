@@ -33,6 +33,7 @@ import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { registerCompletenessRoutes } from './adminCompleteness';
 import { completenessInstalled } from '../lib/listing';
+import { priceRequestsInstalled } from '../lib/priceRequests';
 import { parseMissing, projectItems } from '../lib/productCompleteness';
 import { newId } from '../lib/crypto';
 import { DIMENSION_FIELDS, parseProductRow, validateProductDoc, projectAdmin } from '../lib/productModel';
@@ -760,7 +761,18 @@ adminProductsRoutes.get('/', async (c) => {
   if (q.incomplete === '1' && completeness) {
     clauses.push('EXISTS (SELECT 1 FROM product_completeness pcf WHERE pcf.product_id = products.id AND pcf.complete = 0)');
   }
+  /**
+   * «طلبات السعر» (DECISIONS row 240, migration 0193): the distinct people with an open request, a sort by
+   * them and a filter. Published products with an open per-SKU request show here too (the queue lists only
+   * the unpublished ones, default D9). Without 0193 the column reads null, the sort is `updated` and the
+   * filter answers nothing (`requests_unavailable`).
+   */
+  const requestsInstalled = await priceRequestsInstalled(c.env.DB);
+  const requestersSql = '(SELECT st.requesters FROM product_price_request_stats st WHERE st.product_id = products.id)';
+  if (q.requested === '1') clauses.push(requestsInstalled ? `COALESCE(${requestersSql}, 0) > 0` : '0');
   const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
+  const requestCols = requestsInstalled ? `,
+              ${requestersSql} AS price_requests` : '';
   const completenessCols = completeness
     ? `,
               (SELECT pcl.missing_json FROM product_completeness pcl WHERE pcl.product_id = products.id) AS completeness_missing,
@@ -777,6 +789,10 @@ adminProductsRoutes.get('/', async (c) => {
     price_desc: `${v2FromSql} IS NULL, ${v2FromSql} DESC, updated_at DESC`,
     sales: 'sold DESC, updated_at DESC',
     stock: `${displayStockSql} IS NULL, ${displayStockSql} - ${displayReservedSql} ASC, updated_at DESC`,
+    // The most-requested first, then the latest request (DECISIONS row 240); `updated` without 0193.
+    requests: requestsInstalled
+      ? `COALESCE(${requestersSql}, 0) DESC, COALESCE((SELECT st.last_request_at FROM product_price_request_stats st WHERE st.product_id = products.id), '') DESC, updated_at DESC`
+      : 'updated_at DESC',
   };
   // Own-property lookup only: a plain object literal would otherwise answer
   // ?sort=constructor with a stringified builtin inside the SQL text.
@@ -794,7 +810,7 @@ adminProductsRoutes.get('/', async (c) => {
               ${v2FromSql} AS v2_from_iqd,
               COALESCE((SELECT SUM(i.qty) FROM order_items i
                          JOIN orders o ON o.id = i.order_id
-                        WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold${completenessCols}
+                        WHERE i.product_id = products.id AND o.status != 'cancelled'), 0) AS sold${completenessCols}${requestCols}
          FROM products${where}
         ORDER BY ${orderBy} LIMIT ? OFFSET ?`
     )
@@ -814,6 +830,7 @@ adminProductsRoutes.get('/', async (c) => {
     total: count?.n ?? 0,
     limit,
     offset,
+    ...(q.requested === '1' && !requestsInstalled ? { requests_unavailable: true } : {}),
     products: list.results.map((r) => {
       return {
         id: r.id,
@@ -850,6 +867,8 @@ adminProductsRoutes.get('/', async (c) => {
             ? null
             : projectItems(parseMissing(r.completeness_missing), seesPrivate).length,
         held: Number(r.completeness_held ?? 0) === 1,
+        // Distinct people with an open «طلب السعر» (a count, never who): null without 0193.
+        price_requests: requestsInstalled ? Number(r.price_requests ?? 0) : null,
         brand_id: (r.brand_id as string | null) ?? null,
         image: images.get(String(r.id)) ?? '',
         created_at: (r.created_at as string | null) ?? null,

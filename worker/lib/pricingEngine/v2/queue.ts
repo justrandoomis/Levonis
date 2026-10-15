@@ -21,6 +21,8 @@ import { priceImagesEach } from '../engineWrite';
 import { defaultMethodOf, desiredFor, evaluateDesired, loadV2Stores, storedMethodOf, v2ViewerOf, type V2Read } from './api';
 import { v2EditorAnswer } from './dto';
 import type { V2Method } from '@levonis/pricing/priceV2';
+import { PRICE_REQUEST_ADMIN_TEXT } from '@levonis/contracts/priceRequests';
+import { selectionLabel } from '../../priceRequests';
 
 
 /** How many ordinary products are V2-published, and how many still need pricing (codes and counts only). */
@@ -62,7 +64,7 @@ export async function v2PublicationCounts(db: D1Database): Promise<{ published: 
 /** The queue reads at most this many products per request (the statement budget: one load per kind, chunked). */
 export const QUEUE_LIST_MAX = 200;
 export const QUEUE_PAGE_SIZE = 20;
-export const QUEUE_FILTERS = ['all', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review'] as const;
+export const QUEUE_FILTERS = ['all', 'ready', 'saved', 'usd', 'cost', 'below_min_profit', 'purchase_review', 'most_requested'] as const;
 export type QueueFilter = (typeof QUEUE_FILTERS)[number];
 /** Filters only the owner may ask for (they name cost-derived facts). */
 const OWNER_FILTERS: ReadonlySet<QueueFilter> = new Set(['cost', 'below_min_profit', 'purchase_review']);
@@ -99,6 +101,9 @@ interface Candidate {
   published: boolean;
   below_min_profit: boolean;
   purchase_review: boolean;
+  /** Distinct people with an open «طلب السعر» (migration 0193); null without the table. */
+  requesters: number | null;
+  last_request_at: string | null;
 }
 
 const softAll = async <T>(run: () => Promise<{ results?: T[] }>): Promise<T[] | null> => {
@@ -110,34 +115,64 @@ const softAll = async <T>(run: () => Promise<{ results?: T[] }>): Promise<T[] | 
   }
 };
 
-async function queueCandidates(db: D1Database, owner: boolean): Promise<{ rows: Candidate[]; truncated: boolean }> {
+/**
+ * THE CANDIDATES, MOST REQUESTED FIRST (DECISIONS row 240): the order is in
+ * SQL — distinct requesters, then the latest request, then the last edit — so
+ * the 200-row cap always keeps the products customers asked about, among ~1,100
+ * unpriced ones. Which products are listed is unchanged; `mostRequested` keeps
+ * only those with an open request. Without 0193 the order is today's.
+ */
+async function queueCandidates(
+  db: D1Database,
+  owner: boolean,
+  mostRequested = false
+): Promise<{ rows: Candidate[]; truncated: boolean; requestsInstalled: boolean }> {
   const published = `EXISTS (SELECT 1 FROM product_pricing_state s WHERE s.product_id = p.id AND s.mode = 'engine' AND s.pricing_method IS NOT NULL
                        AND EXISTS (SELECT 1 FROM pricing_v2_sku_results r WHERE r.product_id = p.id))`;
   const below = `EXISTS (SELECT 1 FROM pricing_v2_sku_results b WHERE b.product_id = p.id AND b.below_min_profit = 1)`;
   const head = `SELECT p.id, p.slug, p.status, COALESCE(p.composition, '') AS composition,
                        COALESCE(p.name_ar, '') AS name_ar, COALESCE(p.name, '') AS name_en, COALESCE(p.name_ku, '') AS name_ckb`;
-  type Row = Omit<Candidate, 'method' | 'published' | 'below_min_profit' | 'purchase_review'> & { method: string | null; published: number; below: number; review: number };
+  type Row = Omit<Candidate, 'method' | 'published' | 'below_min_profit' | 'purchase_review' | 'requesters' | 'last_request_at'> & {
+    method: string | null;
+    published: number;
+    below: number;
+    review: number;
+    requesters: number | null;
+    last_request_at: string | null;
+  };
   const review = `EXISTS (SELECT 1 FROM pricing_v2_purchase_reviews pr WHERE pr.product_id = p.id AND pr.state = 'pending')`;
-  const sql = (withReview: boolean) =>
+  const requesters = '(SELECT st.requesters FROM product_price_request_stats st WHERE st.product_id = p.id)';
+  const lastRequest = '(SELECT st.last_request_at FROM product_price_request_stats st WHERE st.product_id = p.id)';
+  const sql = (withReview: boolean, withRequests: boolean) =>
     `${head},
             (SELECT s.pricing_method FROM product_pricing_state s WHERE s.product_id = p.id AND s.mode = 'engine') AS method,
             ${published} AS published,
             ${owner ? below : '0'} AS below,
-            ${owner && withReview ? review : '0'} AS review
+            ${owner && withReview ? review : '0'} AS review,
+            ${withRequests ? requesters : 'NULL'} AS requesters,
+            ${withRequests ? lastRequest : 'NULL'} AS last_request_at
        FROM products p
-      WHERE NOT ${published}${owner ? ` OR ${below}${withReview ? ` OR ${review}` : ''}` : ''}
-      ORDER BY p.updated_at DESC, p.id
+      WHERE (NOT ${published}${owner ? ` OR ${below}${withReview ? ` OR ${review}` : ''}` : ''})${mostRequested && withRequests ? ` AND NOT ${published} AND COALESCE(${requesters}, 0) > 0` : ''}
+      ORDER BY ${withRequests ? `COALESCE(${requesters}, 0) DESC, COALESCE(${lastRequest}, '') DESC, ` : ''}p.updated_at DESC, p.id
       LIMIT ${QUEUE_LIST_MAX + 1}`;
-  let rows = await softAll(() => db.prepare(sql(true)).all<Row>());
+  let requestsInstalled = true;
+  let rows = await softAll(() => db.prepare(sql(true, true)).all<Row>());
+  // A database before 0193 has no request stats: today's order (and no most-requested list).
+  if (rows === null) {
+    requestsInstalled = false;
+    if (mostRequested) return { rows: [], truncated: false, requestsInstalled };
+    rows = await softAll(() => db.prepare(sql(true, false)).all<Row>());
+  }
   // A database before 0190 has no purchase reviews: the rest of the queue still answers.
-  if (rows === null) rows = await softAll(() => db.prepare(sql(false)).all<Row>());
+  if (rows === null) rows = await softAll(() => db.prepare(sql(false, false)).all<Row>());
   if (rows === null) {
     // Before 0189: nothing is published; every product needs pricing.
-    rows = ((await db.prepare(`${head}, NULL AS method, 0 AS published, 0 AS below, 0 AS review FROM products p ORDER BY p.updated_at DESC, p.id LIMIT ${QUEUE_LIST_MAX + 1}`).all<Row>()).results ?? []);
+    rows = ((await db.prepare(`${head}, NULL AS method, 0 AS published, 0 AS below, 0 AS review, NULL AS requesters, NULL AS last_request_at FROM products p ORDER BY p.updated_at DESC, p.id LIMIT ${QUEUE_LIST_MAX + 1}`).all<Row>()).results ?? []);
   }
   const truncated = rows.length > QUEUE_LIST_MAX;
   return {
     truncated,
+    requestsInstalled,
     rows: rows.slice(0, QUEUE_LIST_MAX).map((r) => ({
       id: String(r.id),
       slug: String(r.slug ?? ''),
@@ -150,8 +185,17 @@ async function queueCandidates(db: D1Database, owner: boolean): Promise<{ rows: 
       published: Number(r.published) === 1,
       below_min_profit: Number(r.below) === 1,
       purchase_review: Number(r.review) === 1,
+      requesters: requestsInstalled ? Number(r.requesters ?? 0) : null,
+      last_request_at: requestsInstalled && r.last_request_at ? String(r.last_request_at) : null,
     })),
   };
+}
+
+/** One product's open requests in the queue: distinct people, the latest, and the per-selection breakdown. */
+export interface QueueRequests {
+  people: number;
+  last_at: string | null;
+  selections: Array<{ selection: string; label: { ar: string; en: string; ckb: string }; people: number; last_at: string }>;
 }
 
 /** A missing item as the queue lists it (codes and field NAMES, never a value). */
@@ -179,6 +223,8 @@ export interface QueueRow {
   missing: QueueMissing[];
   below_min_profit?: boolean;
   purchase_review?: boolean;
+  /** «طلب السعر» (DECISIONS row 240): counts only, never who. Null without 0193. */
+  requests: QueueRequests | null;
   link: string;
 }
 
@@ -196,7 +242,9 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
   const viewer = v2ViewerOf(c.env, user);
   const owner = viewer === 'owner';
   const filter: QueueFilter = !owner && OWNER_FILTERS.has(q.filter) ? 'all' : q.filter;
-  const { rows: candidates, truncated } = await queueCandidates(db, owner);
+  const requestsOf = (cand: Candidate): QueueRequests | null =>
+    cand.requesters === null ? null : { people: cand.requesters, last_at: cand.last_request_at, selections: [] };
+  const { rows: candidates, truncated, requestsInstalled } = await queueCandidates(db, owner, filter === 'most_requested');
   const reads = await loadQueueReads(db, candidates.filter((r) => r.composition === '').map((r) => r.id));
   const rates = reads.values().next().value?.rates ?? (await loadPricingRates(db));
   const now = new Date().toISOString();
@@ -207,7 +255,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
     const link = `/admin?tab=products&edit=${encodeURIComponent(cand.id)}&section=3`;
     const names = { ar: cand.name_ar, en: cand.name_en, ckb: cand.name_ckb };
     if (cand.composition !== '') {
-      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: cand.composition, state: 'composition_pending', method: null, default_method: 'usd', can_finish: false, sellable_skus: 0, channels: [], missing: [], link });
+      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: cand.composition, state: 'composition_pending', method: null, default_method: 'usd', can_finish: false, sellable_skus: 0, channels: [], missing: [], requests: requestsOf(cand), link });
       continue;
     }
     const read = reads.get(cand.id);
@@ -219,7 +267,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       ev = await evaluateDesired(read, desiredFor(read, owner && !stored ? { method, sent: ['method'] } : { sent: [] }, o));
     } catch {
       // A product the engine cannot read yet (a malformed legacy row) is still listed, with nothing to say but its name.
-      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: '', state: stored ? 'saved' : 'needs_pricing', method: stored, default_method: method, can_finish: owner || method === 'usd', sellable_skus: 0, channels: [], missing: [], link });
+      rows.push({ id: cand.id, slug: cand.slug, names, image: '', status: cand.status, composition: '', state: stored ? 'saved' : 'needs_pricing', method: stored, default_method: method, can_finish: owner || method === 'usd', sellable_skus: 0, channels: [], missing: [], requests: requestsOf(cand), link });
       continue;
     }
     const answer = v2EditorAnswer(ev);
@@ -247,6 +295,7 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
       channels: [...new Set(ev.rows.map((r) => r.channel))],
       missing,
       ...(owner ? { below_min_profit: cand.below_min_profit, purchase_review: cand.purchase_review } : {}),
+      requests: requestsOf(cand),
       link,
     });
   }
@@ -263,6 +312,8 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
     counts.below_min_profit = rows.filter((r) => r.below_min_profit).length;
     counts.purchase_review = rows.filter((r) => r.purchase_review).length;
   }
+  // Unpublished products with an open «طلب السعر» (not owner-only: counts, never who).
+  counts.most_requested = hiddenRows.filter((r) => (r.requests?.people ?? 0) > 0).length;
 
   const published = new Set(candidates.filter((cand) => cand.published).map((cand) => cand.id));
   const pick = (r: QueueRow): boolean => {
@@ -281,6 +332,8 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
         return r.below_min_profit === true;
       case 'purchase_review':
         return r.purchase_review === true;
+      case 'most_requested':
+        return !published.has(r.id) && (r.requests?.people ?? 0) > 0;
     }
   };
   const listed = rows.filter(pick);
@@ -290,6 +343,28 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
   // The product's real picture, from the one authority the products list reads (product_images).
   const pictures = await loadAuthoritativeProductImages(db, shown.map((r) => r.id));
   for (const r of shown) r.image = pictures.get(r.id) ?? '';
+  // The page's per-selection breakdown: ONE grouped read for the shown ids, labelled from the docs this
+  // queue already loaded (the UNIQUE (user, product, selection) index makes COUNT(*) a count of people).
+  const requested = shown.filter((r) => (r.requests?.people ?? 0) > 0);
+  if (requestsInstalled && requested.length) {
+    const grouped = await softAll(() =>
+      db
+        .prepare(
+          `SELECT product_id, selection, COUNT(*) AS people, MAX(requested_at) AS last_at FROM product_price_requests
+            WHERE product_id IN (SELECT value FROM json_each(?)) AND state = 'open'
+            GROUP BY product_id, selection ORDER BY people DESC, last_at DESC`
+        )
+        .bind(JSON.stringify(requested.map((r) => r.id)))
+        .all<{ product_id: string; selection: string; people: number; last_at: string }>()
+    );
+    for (const g of grouped ?? []) {
+      const row = requested.find((r) => r.id === g.product_id);
+      const doc = reads.get(g.product_id)?.loaded.doc;
+      if (!row?.requests) continue;
+      const label = doc ? selectionLabel(doc, String(g.selection)) : { ...PRICE_REQUEST_ADMIN_TEXT.whole_product };
+      row.requests.selections.push({ selection: String(g.selection), label, people: Number(g.people) || 0, last_at: String(g.last_at ?? '') });
+    }
+  }
   return {
     success: true,
     rate_ready: !!rates?.usd_iqd,
@@ -299,5 +374,6 @@ export async function needsPricingAnswer(c: Context<AppContext>, q: { page: numb
     page,
     pages,
     truncated,
+    ...(filter === 'most_requested' && !requestsInstalled ? { requests_unavailable: true } : {}),
   };
 }
