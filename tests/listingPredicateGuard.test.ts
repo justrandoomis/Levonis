@@ -128,7 +128,7 @@ test('each allow-listed line still exists (a stale entry would hide a new raw ch
 
 const VISIBLE_CALL = /\.visible\(|optimisticVisible\(|visibleSql\(|invisibleIds\(|isVisibleRow\(|visibleProductBySlug\(|refuseIfOnlyCatalog\(/g;
 const SELLABLE_CALL =
-  /\.sellable\(|\.sellableFlag\(|optimisticSellable\(|optimisticSellableFlag\(|sellableSql\(|sellableFlagSql\(|unsellableIds\(|isSellableRow\(|sellableProductBySlug\(|isUnsellable\(/g;
+  /\.sellable\(|\.sellableFlag\(|optimisticSellable\(|optimisticSellableFlag\(|sellableSql\(|sellableFlagSql\(|unsellableIds\(|isSellableRow\(|sellableProductBySlug\(|isUnsellable\(|sellableAndCatalogOnly\(/g;
 const STATES_CALL = /statesOf\(/g;
 
 function countCalls(file: string): { visible: number; sellable: number; states: number } {
@@ -168,9 +168,17 @@ const SELLABLE_ONLY: Record<string, number> = {
   'worker/routes/returns.ts': 0,
 };
 
+/**
+ * BANNED IN A PURCHASE FILE: every VISIBLE question, and `statesOf` — it answers 'catalog_only', a VISIBLE
+ * fact, so a door admitting `!== 'hidden'` would sell a product with no price while every count stayed the
+ * same. A purchase door asks `sellableAndCatalogOnly` instead: a sellable set to admit with, and the
+ * catalog-only set only to name its refusal.
+ */
+const PURCHASE_BANNED = /\.visible\(|optimisticVisible\(|visibleSql\(|invisibleIds\(|isVisibleRow\(|visibleProductBySlug\(|statesOf\(/;
+
 test('a purchase door never asks VISIBLE — only the named visible-then-refuse helper, counted', () => {
   const problems: string[] = [];
-  const banned = /\.visible\(|optimisticVisible\(|visibleSql\(|invisibleIds\(|isVisibleRow\(|visibleProductBySlug\(/;
+  const banned = PURCHASE_BANNED;
   for (const [file, refusals] of Object.entries(SELLABLE_ONLY)) {
     let seen = 0;
     for (const { line, n } of codeLines(file)) {
@@ -211,7 +219,7 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/lib/tradeInTargets.ts': { visible: 0, sellable: 2, states: 0 },
   'worker/lib/tradeInToday.ts': { visible: 0, sellable: 1, states: 0 },
   'worker/routes/bundles.ts': { visible: 0, sellable: 2, states: 0 },
-  'worker/routes/cart.ts': { visible: 1, sellable: 1, states: 1 },
+  'worker/routes/cart.ts': { visible: 1, sellable: 3, states: 0 },
   'worker/routes/catalog.ts': { visible: 2, sellable: 2, states: 0 },
   'worker/routes/communityFavorites.ts': { visible: 1, sellable: 1, states: 0 },
   'worker/routes/communityPosts.ts': { visible: 3, sellable: 0, states: 0 },

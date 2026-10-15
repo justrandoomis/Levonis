@@ -307,6 +307,12 @@ export interface Listing {
    * a composition that is not sellable (default D6).
    */
   statesOf(ids: readonly string[]): Promise<Map<string, CommercialState>>;
+  /**
+   * THE PURCHASE DOORS' FORM of `statesOf` (tests/listingPredicateGuard.test.ts bans `statesOf` there): the
+   * ids a customer may BUY, and apart from them the ids still SHOWN without a price — only ever the reason
+   * a door names for its refusal (409 PRICE_NOT_AVAILABLE), never a way in. Same statement, same fail-closed.
+   */
+  sellableAndCatalogOnly(ids: readonly string[]): Promise<{ sellable: Set<string>; catalogOnly: Set<string> }>;
   /** A `products` row as read (status, id) is VISIBLE. Needs `invisible` from `invisibleIds`. */
   isVisibleRow(row: { id?: unknown; status?: unknown } | null | undefined, invisible: ReadonlySet<string>): boolean;
   /** A `products` row as read (status, id) is SELLABLE. Needs `unsellable` from `unsellableIds`. */
@@ -332,6 +338,16 @@ export async function listing(db: D1Database): Promise<Listing> {
     invisibleIds: (ids) => invisibleIdsOf(db, installed, v2, ids),
     unsellableIds: (ids) => unsellableIdsOf(db, installed, v2, ids),
     statesOf: (ids) => statesOfIds(db, installed, v2, ids),
+    sellableAndCatalogOnly: async (ids) => {
+      const states = await statesOfIds(db, installed, v2, ids);
+      const sellable = new Set<string>();
+      const catalogOnly = new Set<string>();
+      for (const [id, state] of states) {
+        if (state === 'sellable') sellable.add(id);
+        else if (state === 'catalog_only') catalogOnly.add(id);
+      }
+      return { sellable, catalogOnly };
+    },
     isVisibleRow: activeRow,
     isSellableRow: activeRow,
   };

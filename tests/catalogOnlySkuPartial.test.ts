@@ -108,3 +108,38 @@ test('a colour added after publication: its SKUs are unpriced on their own, the 
   assert.equal(priced.unpriced_selections ?? undefined, undefined);
   assert.ok(priced.price_levels.combo['v_a|c_new']?.applied_iqd > 0);
 });
+
+test('an old cart line on a SKU with no price is listed apart with no number; an incomplete quote naming that colour answers unpriced', async () => {
+  const { raw, app } = await world();
+  raw.exec(`INSERT INTO product_colors (id, product_id, name_en, name_ar, name_ckb, hex, sort, active)
+            VALUES ('c_new', 'p_sku', 'Jade', 'يشمي', 'یەشم', '#00a86b', 0, 1)`);
+  // A line saved before the colour lost (or never had) its price row, and a priced line beside it.
+  raw.exec(`INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id, qty)
+            VALUES ('ci_new', 'u_buy', 'p_sku', 'v_b', '["v_b"]', 'c_new', 1),
+                   ('ci_ok', 'u_buy', 'p_sku', 'v_a', '["v_a"]', 'c_black', 1)`);
+  const cart = await json(await get(app, '/api/cart'));
+  const items = cart.items as Array<Record<string, unknown>>;
+  assert.deepEqual(
+    items.map((i) => i.id),
+    ['ci_ok'],
+    'only the priced line is a priced item'
+  );
+  const lines = cart.unavailable_lines as Array<Record<string, unknown>>;
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].cart_item_id, 'ci_new');
+  assert.equal(lines[0].code, 'PRICE_NOT_AVAILABLE', 'the customer can ask for this SKU’s price');
+  assert.equal(lines[0].slug, 'sku-printer', 'linked to the page where the price is asked for');
+  assert.doesNotMatch(JSON.stringify(lines[0]), /_iqd|650000/, 'no number on the line');
+  const okUnit = Number(items[0].unit_price_iqd);
+  assert.ok(okUnit > 0);
+  if (cart.membership) assert.equal(cart.membership.merchandise_iqd, okUnit, 'kept out of every total');
+
+  // The quote door: a colour-only (incomplete) selection naming the unpriced colour has no price either.
+  const q = await json(await post(app, '/api/products/sku-printer/quote', { qty: 1, colorId: 'c_new' }));
+  assert.equal(q.price_status, 'unpriced');
+  for (const k of ['quote', 'membership_preview', 'pricing_modes', 'availability']) assert.equal(q[k], null, k);
+  assert.doesNotMatch(JSON.stringify(q), /_iqd"\s*:\s*\d/, 'no number at all');
+  // A colour-only selection naming a PRICED colour keeps today's answer.
+  const qp = await json(await post(app, '/api/products/sku-printer/quote', { qty: 1, colorId: 'c_black' }));
+  assert.equal(qp.price_status, 'priced');
+});

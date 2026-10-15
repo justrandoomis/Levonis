@@ -19,7 +19,7 @@ import {
   runListed,
   visibleProductBySlug,
 } from '../lib/listing';
-import { checkSelection, sellableNowOf, selectionKey, skuPriced, unpricedSkuKeys } from '../lib/commercialState';
+import { checkSelection, namesUnpricedChoice, sellableNowOf, selectionKey, skuPriced, unpricedSkuKeys } from '../lib/commercialState';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -4489,14 +4489,19 @@ productRoutes.post('/:slug/quote', async (c) => {
 
   /**
    * PER SKU (DECISIONS row 240): a COMPLETE selection whose SKU the engine has
-   * not priced is answered with no number at all — never the ladder, which is
-   * another SKU's price or the archive. The page shows «السعر غير متوفر حالياً»
-   * and «طلب السعر» for this selection; the others price and sell as before. A
-   * SKU priced on another channel only keeps today's `VARIANT_UNAVAILABLE`.
+   * not priced — or ANY selection naming a value or colour no priced SKU
+   * carries, so every way to finish it is unpriced — is answered with no
+   * number at all, never the ladder, which is another SKU's price or the
+   * archive. The page shows «السعر غير متوفر حالياً» and «طلب السعر» for this
+   * selection; the others price and sell as before. A SKU priced on another
+   * channel only keeps today's `VARIANT_UNAVAILABLE`.
    */
   if (doc.sku_strict === true) {
     const key = selectionKey(optionValueIds, colorId);
-    if (!skuPriced(doc, key) && checkSelection(doc, relations, optionValueIds, colorId).ok) {
+    if (
+      !skuPriced(doc, key) &&
+      (namesUnpricedChoice(doc, relations, optionValueIds, colorId) || checkSelection(doc, relations, optionValueIds, colorId).ok)
+    ) {
       return c.json({
         success: true,
         price_status: 'unpriced',

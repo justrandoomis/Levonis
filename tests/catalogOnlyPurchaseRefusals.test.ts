@@ -102,6 +102,42 @@ test('an open cart line: shown apart with PRICE_NOT_AVAILABLE and no number; che
   w.raw.exec("DELETE FROM cart_items WHERE id = 'ci_cat'");
 });
 
+test('an open cart line cannot be edited: PATCH answers PRICE_NOT_AVAILABLE before any stock claim, and writes nothing', async () => {
+  const w = await world();
+  const stockBefore = (w.raw.prepare('SELECT stock FROM products WHERE id = ?').get(CAT.id) as { stock: number }).stock;
+  w.raw.exec(`UPDATE products SET stock = 3 WHERE id = '${CAT.id}'`);
+  w.raw.exec(`INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id, qty)
+              VALUES ('ci_cat_p', 'u_cust', '${CAT.id}', '${CAT_SEL.std}', '["${CAT_SEL.std}"]', '${CAT_SEL.grey}', 1)`);
+  try {
+    const app = w.as(CUSTOMER);
+    // The page can link the line to the product, where the price is asked for.
+    const cart = await json(await get(app, '/api/cart'));
+    const line = (cart.unavailable_lines as Array<Record<string, unknown>>).find((l) => l.cart_item_id === 'ci_cat_p')!;
+    assert.equal(line.slug, CAT.slug);
+    const patch = (body: Record<string, unknown>) =>
+      app.request('/api/cart/items/ci_cat_p', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    for (const body of [{ qty: 2 }, { qty: 50 }, { colorId: CAT_SEL.white }]) {
+      const res = await patch(body);
+      await refusedNotAvailable(res, `PATCH ${JSON.stringify(body)}`);
+    }
+    const stored = w.raw.prepare("SELECT qty, color_id FROM cart_items WHERE id = 'ci_cat_p'").get() as { qty: number; color_id: string };
+    assert.deepEqual({ ...stored }, { qty: 1, color_id: CAT_SEL.grey }, 'the row is not written');
+
+    // Hidden for a catalogue gap: the checkout's answer, still no stock claim.
+    w.raw.exec(`INSERT INTO product_completeness (product_id, complete, held, missing_json, missing_count, computed_at)
+                VALUES ('${CAT.id}', 0, 1, '[{"c":"IMAGE","o":""}]', 1, '2026-10-15T00:00:00.000Z')`);
+    const hidden = await patch({ qty: 50 });
+    assert.equal(hidden.status, 409);
+    const hb = await json(hidden);
+    assert.equal(hb.code, 'PRODUCT_CURRENTLY_UNAVAILABLE');
+    assert.doesNotMatch(JSON.stringify(hb), /left|available"\s*:\s*\d/);
+  } finally {
+    w.raw.exec(`DELETE FROM product_completeness WHERE product_id = '${CAT.id}'`);
+    w.raw.exec("DELETE FROM cart_items WHERE id = 'ci_cat_p'");
+    w.raw.prepare('UPDATE products SET stock = ? WHERE id = ?').run(stockBefore, CAT.id);
+  }
+});
+
 test('trade-in: the catalog-only product is not a target, and pricing it is refused', async () => {
   const w = await world();
   const app = w.as(CUSTOMER);

@@ -749,13 +749,15 @@ IQD, with a pre-order discount of $50 = 75,000.
   the listing, search, sections, the product page, the public API, the sitemap, the bot preview, the
   comparison, both favourites lists, the community search, the printer finder, «يناسب» and the RPC feed.
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
-  V2-published. Every PURCHASE path asks it: cart add and read, the quote, checkout, Quick Buy, new
+  V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
   gifts, bundles and mystery offers, the trade-in target, «لكيتها بمكان أرخص», the print calculator's
   materials and the stock-alert arming.
 - **Catalog-only** = visible and not sellable. It is derived, never stored. A database without 0189
   shows every active product catalog-only and sells nothing; one without 0184 drops both held clauses
   (`runListed` retries once per missing piece). `tests/listingPredicateGuard.test.ts` counts every
-  call site per family; `tests/listingSplit.test.ts` holds the matrix.
+  call site per family and bans every VISIBLE question — `statesOf` included — in a purchase file,
+  which asks `sellableAndCatalogOnly` (admit on the sellable set; the catalog-only set only names the
+  refusal); `tests/listingSplit.test.ts` holds the matrix.
 
 **No number for an unpriced product.** Every customer projection carries `price_status`
 (`priced` / `unpriced`). An unpriced card is an allow-list (`catalogOnlyCard`): identity, text, media,
@@ -768,8 +770,11 @@ honoured at its frozen value.
 **Per SKU.** A V2 product whose engine priced some SKUs and not others (a colour added after
 publication) stays sellable. The page lists `unpriced_selections`; `price_levels.combo` for those keys
 and the levels with no priced SKU are `null` (never the ladder, which is another SKU's price); the
-quote answers 200 `price_status: 'unpriced'` with no number for such a selection; the cart keeps
-`VARIANT_UNAVAILABLE` for it; `initial_selection` is always a priced SKU.
+quote answers 200 `price_status: 'unpriced'` with no number for such a selection, and for any
+selection naming a value or colour no priced SKU carries (`namesUnpricedChoice`); the cart add keeps
+`VARIANT_UNAVAILABLE` for it, and a saved cart line on such a SKU is listed apart
+(`PRICE_NOT_AVAILABLE`, with the product's `slug`) with no number and out of every total;
+`initial_selection` is always a priced SKU.
 
 **Order rules.** Browse lists (the listing without search, sections, home new arrivals, the finder)
 put sellable first (`sellable_now DESC` in SQL, so the 300-candidate cap keeps priced items); search
@@ -793,6 +798,7 @@ cursor and the stats; a product with many people to tell takes a fair share of t
 wait first in line, never blocking the products after it. Then `digestPriceRequests` sends at most one
 Arabic digest an hour to the «البلاغات» topic, at 1, 3, 10, 25, 50, 100 people and every 100 after,
 claim-then-send; the threshold test is SQL before the candidate LIMIT, the high-water mark follows the
-open count down (returning demand is news again), and the routing's two reads are charged. The needs-pricing queue orders by distinct requesters then the latest
-request in SQL (inside the 200 cap) and offers «الأكثر طلباً» with per-selection counts; the products
-list has a `price_requests` column, a `requests` sort and `requested=1`. Customers never see counts.
+open count down (returning demand is news again), and the routing's two reads are charged. The
+needs-pricing queue orders by distinct requesters then the latest request in SQL (inside the 200
+cap) and offers «الأكثر طلباً» with per-selection counts; the products list has a `price_requests`
+column, a `requests` sort and `requested=1`. Customers never see counts.

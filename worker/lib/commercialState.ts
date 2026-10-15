@@ -23,6 +23,7 @@ import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
 import { sellableSkus } from './pricingEngine/legacy';
 import { validateSelection } from './productRelations';
+import { skuLevelSelections } from './skuLevels';
 
 export type PriceStatus = 'priced' | 'unpriced';
 
@@ -134,4 +135,27 @@ export function checkSelection(
     }
   }
   return { ok: true, key, optionValueIds: ids, colorId };
+}
+
+/**
+ * THE SELECTION NAMES A CHOICE NO PRICED SKU CARRIES (DECISIONS row 240): a
+ * live option value or colour that is part of no SKU with a price row, so
+ * every way to finish the selection is unpriced and no figure may stand for
+ * it — the test `partialPriceLevels` paints its null levels with, and the page
+ * mirrors (`choiceUnpriced`). False on a document that is not strict, and for
+ * an id the document does not carry live (the resolver's own errors answer
+ * that).
+ */
+export function namesUnpricedChoice(
+  doc: ProductDoc,
+  view: ProductRelationsView | undefined,
+  optionValueIds: readonly string[],
+  colorId: string | null
+): boolean {
+  if (doc.sku_strict !== true) return false;
+  const priced = skuLevelSelections(doc, view);
+  const liveOption = new Set(doc.options.filter((o) => o.active !== false && !o.merged_into).map((o) => o.id));
+  if (optionValueIds.some((id) => liveOption.has(id) && !priced.some((sku) => sku.option_value_ids.includes(id)))) return true;
+  if (!colorId || !doc.colors.some((c) => c.id === colorId && c.active !== false)) return false;
+  return !priced.some((sku) => sku.color_id === colorId);
 }

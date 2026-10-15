@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
-import { listing, refuseIfOnlyCatalog } from '../lib/listing';
+import { listing, priceNotAvailable, refuseIfOnlyCatalog } from '../lib/listing';
+import { checkSelection, namesUnpricedChoice, selectionKey, skuPriced } from '../lib/commercialState';
+import { serverMessage } from '@levonis/contracts/costRefusals';
 import { cartShippingType, typeForTransport, type ShippingType } from '../lib/shippingType';
 import {
   cartSellerScope,
@@ -723,8 +725,13 @@ export interface UnavailableCartLine {
   product_id: string;
   name: { ar: string; en: string; ckb: string };
   image: string;
-  /** DECISIONS row 240: `PRICE_NOT_AVAILABLE` while the product is still shown (catalog-only, no price yet). */
+  /**
+   * DECISIONS row 240: `PRICE_NOT_AVAILABLE` while the product is still shown without a price (catalog-only,
+   * or a sellable product whose chosen SKU has none yet) — the page links it to the product to ask for it.
+   */
   code: 'PRODUCT_CURRENTLY_UNAVAILABLE' | 'PRICE_NOT_AVAILABLE';
+  /** The product page to ask for the price on: a `PRICE_NOT_AVAILABLE` line only (a hidden product has none). */
+  slug: string | null;
 }
 
 function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false): UnavailableCartLine {
@@ -743,6 +750,7 @@ function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false):
     name: { ar, en: en || ar, ckb: text(row.name_ku) || ar },
     image,
     code: catalogOnly ? 'PRICE_NOT_AVAILABLE' : 'PRODUCT_CURRENTLY_UNAVAILABLE',
+    slug: catalogOnly ? text(row.slug) || null : null,
   };
 }
 
@@ -757,12 +765,12 @@ async function loadCart(c: Context<AppContext>) {
   // SELLABLE, with each product's state in ONE statement (DECISIONS row 240): a line whose product is still
   // shown but has no price yet is listed apart with code PRICE_NOT_AVAILABLE, never priced.
   const L = await listing(c.env.DB);
-  const cartStates = await L.statesOf(results.map((r) => String(r.id ?? '')));
+  const cartStates = await L.sellableAndCatalogOnly(results.map((r) => String(r.id ?? '')));
   const catalogOnlyInCart = new Set<string>();
   for (const r of results) {
     const id = String(r.id ?? '');
-    if ((cartStates.get(id) ?? 'hidden') === 'sellable' || giftEntitlementIdOf(r)) continue;
-    if (cartStates.get(id) === 'catalog_only' && r.status === 'active') catalogOnlyInCart.add(String(r.cart_item_id));
+    if (cartStates.sellable.has(id) || giftEntitlementIdOf(r)) continue;
+    if (cartStates.catalogOnly.has(id) && r.status === 'active') catalogOnlyInCart.add(String(r.cart_item_id));
     r.status = 'hidden';
   }
 
@@ -952,6 +960,18 @@ async function loadCart(c: Context<AppContext>) {
       isPrinter,
       offerInput
     );
+    // PER SKU (DECISIONS row 240): a line whose own SKU has no live V2 price — a colour added after publication,
+    // a line saved while its SKU was priced — is never priced from the ladder, which is another SKU's figure.
+    // It is listed apart with no number and kept out of every total; the checkout refuses it as well
+    // (VARIANT_UNAVAILABLE). PRICE_NOT_AVAILABLE when the customer can ask for that price on the page.
+    if (resolved.errors.includes(SKU_STRICT_ERROR)) {
+      const ids = sel.optionValueIds ?? [];
+      const colour = sel.colorId || null;
+      const askable =
+        !skuPriced(doc, selectionKey(ids, colour)) && (namesUnpricedChoice(doc, view, ids, colour) || checkSelection(doc, view, ids, colour).ok);
+      unavailableLines.push(unavailableCartLine(row, askable));
+      continue;
+    }
     constrainDelivery(doc);
     benefitLines.push({
       product_id: String(row.id),
@@ -2570,6 +2590,17 @@ cartRoutes.patch('/items/:id', async (c) => {
     .first<Record<string, unknown>>();
   if (lineProduct && String(lineProduct.composition ?? '') !== '') {
     return await patchCompositionLine(c, existing, lineProduct, body);
+  }
+
+  // SELLABLE, BEFORE ANYTHING IS RESOLVED OR STOCKED (DECISIONS row 240): a line whose product is not for sale
+  // is never edited, and this door makes no stock claim for it («Only N left», OUT_OF_STOCK) — none exists for
+  // a product nobody priced. 409 PRICE_NOT_AVAILABLE while it is still shown, else 409
+  // PRODUCT_CURRENTLY_UNAVAILABLE (the checkout's answer). The row is not written.
+  const lineProductId = String(existing.product_id ?? '');
+  const lineState = await (await listing(c.env.DB)).sellableAndCatalogOnly([lineProductId]);
+  if (!lineState.sellable.has(lineProductId)) {
+    if (lineState.catalogOnly.has(lineProductId)) throw priceNotAvailable();
+    throw new HttpError(409, serverMessage('PRODUCT_CURRENTLY_UNAVAILABLE'), 'PRODUCT_CURRENTLY_UNAVAILABLE', { product_ids: [lineProductId] });
   }
 
   const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX }) : (existing.qty as number);
