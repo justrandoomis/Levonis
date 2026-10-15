@@ -4,19 +4,34 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
-## Catalog-only products and price requests — server half (branch `feat/catalog-only`, DECISIONS 240, not yet landed)
+## Catalog-only products and price requests (branch `feat/catalog-only`, DECISIONS 240, not yet landed)
 
-- Migration **0193_price_requests.sql** (two new tables, additive). `EXPECTED_MIGRATION_COUNT` is 185 on
-  this branch; it becomes 186 if S-P2's 0192 lands first — the integrator settles it in the landing commit
-  (`tests/schemaVersion.test.ts`).
-- The listing predicate is two: VISIBLE (catalogue) and SELLABLE (purchase). After deploy, every active
-  unpriced product is SHOWN with «السعر غير متوفر حالياً» and no number, and sells nowhere. The edge
-  cache epoch moved (`catalog-only-2026-10-15`), so no pre-release body is served.
+Server, client, admin and the local browser e2e (`scripts/e2e-catalog-only.mjs`) are all on the branch.
+Read `docs/PRICING-V2.md` §9.
+
+- Migration **0193_price_requests.sql** (two new tables, additive). S-P2 (trade-in) claims **0192**.
+  `EXPECTED_MIGRATION` / `EXPECTED_MIGRATION_COUNT` are `0193_price_requests.sql` / 185 on this branch;
+  whichever of the two lands second sets the name to 0193 and the count to 186 in its landing commit
+  (`tests/schemaVersion.test.ts`). Either order applies cleanly (wrangler applies every unapplied file).
+- The listing predicate is two: VISIBLE (catalogue) and SELLABLE (purchase). **What customers see at
+  deploy**: every active product that is not V2-published (and every V2 product held by the owner's
+  switch for a commercial gap) is SHOWN — listing, search, sections, its page, the public API, the
+  sitemap — with «السعر غير متوفر حالياً», no number, no stock word, and «طلب السعر» for signed-in
+  customers; every purchase door refuses it (409 `PRICE_NOT_AVAILABLE`, checkout keeps
+  `PRODUCT_CURRENTLY_UNAVAILABLE`). An old cart line of such a product is listed apart with a «طلب السعر»
+  link. A product missing a picture or a section stays hidden while the switch is on. The edge cache epoch
+  moved (`catalog-only-2026-10-15`), so no pre-release body is served.
+- **Open tabs on the old client show «0 د.ع»**: the SPA built at 0988169f renders a null price as
+  `formatIqd(null)` → «0 د.ع» on every catalog-only card and page until the tab reloads (`public/sw.js`
+  does not skip waiting; `UpdateReadyToast` lets the customer choose the moment). No money moves — every
+  door refuses — but deploy at a quiet hour and expect the window to last until tabs turn over. A
+  two-phase release (client first, the server switch later) was not built.
 - The quarter-hour tick gained a last step (price-request sweep + hourly admin digest to the «البلاغات»
-  topic, 40 statements at most). Without 0193 the customer doors answer 503 `PRICE_REQUESTS_UNAVAILABLE`
-  and the admin sort/filter fall back.
-- The client half (cards, the product page's «طلب السعر» panel, the admin queue column) and the local
-  browser e2e (`scripts/e2e-catalog-only.mjs`) are a separate lane. Read `docs/PRICING-V2.md` §9.
+  topic, 40 statements at most, the digest's routing reads charged). The sweep progresses per row and
+  shares the tick fairly between products. Without 0193 the customer doors answer 503
+  `PRICE_REQUESTS_UNAVAILABLE` and the admin sort/filter fall back.
+- Admin: «ظاهر بلا سعر» (badge, banner, Active tile) counts only what customers see (`/stats`
+  `shown_unpriced`); the owner's switch card splits «موقوف عن البيع» from «مخفي».
 
 ## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
