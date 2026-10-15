@@ -95,7 +95,7 @@ export const variantIdOf = (productId: string, sourceVariantId: string) => `pv_$
  */
 export function orderTypeWord(name: string): 'pre_order' | 'direct_sale' | '' {
   if (/pre[\s-]?order|طلب\s*مسبق/i.test(name)) return 'pre_order';
-  if (/direct(\s*sale)?|بيع\s*مباشر/i.test(name)) return 'direct_sale';
+  if (/(?<![a-z])direct(\s*sale)?(?![a-z])|بيع\s*مباشر/i.test(name)) return 'direct_sale';
   return '';
 }
 
