@@ -752,6 +752,9 @@ type Lang = 'ar' | 'en' | 'ckb';
  */
 const PRO_LABEL = tierLabel('pro');
 
+/** A `price_levels` entry the server nulled: no priced SKU carries this value or colour (row 240). */
+const levelIsNull = (map: unknown, id: string): boolean => !!map && (map as Record<string, unknown>)[id] === null;
+
 /**
  * The product, option and colour NAMES are English in every language
  * (product-form mandate §3: "عنوان/اسم المنتج يبقى باللغة الإنجليزية في جميع
@@ -1370,8 +1373,16 @@ export default function Product() {
   const catalogOnly = priceStatus === 'unpriced';
   /** The canonical key of what is chosen — the key `unpriced_selections` and the request door speak. */
   const selectionKey = selectionKeyOf(optionValueIds, colorId);
-  /** The page body already named this SKU as having no V2 price: there is no figure to confirm. */
-  const knownUnpriced = !catalogOnly && unpricedSelections.includes(selectionKey);
+  /**
+   * The page body already named this SKU as having no V2 price — or a chosen
+   * value or colour has no priced SKU at all (`price_levels` null), so every
+   * way to finish the choice is unpriced and no figure may stand for it.
+   */
+  const choiceUnpriced =
+    !catalogOnly &&
+    unpricedSelections.length > 0 &&
+    ((!!colorId && levelIsNull(priceLevels?.color, colorId)) || optionValueIds.some((id) => levelIsNull(priceLevels?.option, id)));
+  const knownUnpriced = !catalogOnly && (unpricedSelections.includes(selectionKey) || choiceUnpriced);
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
     if (catalogOnly || knownUnpriced) {
@@ -2963,7 +2974,6 @@ export default function Product() {
    * it. Catalog-only products carry no tag: the whole page already says so.
    */
   const unpricedKeys = new Set(catalogOnly ? [] : unpricedSelections);
-  const levelIsNull = (map: unknown, id: string) => !!map && (map as Record<string, unknown>)[id] === null;
   const optionNoPrice = (candidate: string[], id: string): boolean =>
     unpricedKeys.size > 0 && (unpricedKeys.has(selectionKeyOf(candidate, colorId)) || levelIsNull(priceLevels?.option, id));
   const colorNoPrice = (id: string): boolean =>
@@ -4165,7 +4175,8 @@ export default function Product() {
 
               {/* Only honest when the counter really is product-wide: with
                   OPTION/COLOR inventory the pills carry their own counts. */}
-              {availability?.stock.tracked &&
+              {!noPrice &&
+              availability?.stock.tracked &&
               (availability.stock.scope === 'product' || availability.stock.scope === 'base') &&
               invMode === 'BASE' &&
               (options.length > 0 || (product.colors ?? []).length > 0) ? (

@@ -195,7 +195,8 @@ test('«طريقة التوفر» is asked once, never twice on the same screen'
   // control, so answering one left the other looking unanswered.
   assert.match(
     PRODUCT,
-    /\{offersBoth && !routeAskedPerVersion \? \(\n\s*<fieldset className="lv-section" data-fulfilment-chooser>/,
+    // `!noPrice` (DECISIONS row 240): nothing is fulfilled without a price, so the cards step aside too.
+    /\{offersBoth && !routeAskedPerVersion && !noPrice \? \(\n\s*<fieldset className="lv-section" data-fulfilment-chooser>/,
     'the top fulfilment cards can appear beside the per-version row again'
   );
   // Read from `models` as a whole, not the SELECTED model: a gate on the

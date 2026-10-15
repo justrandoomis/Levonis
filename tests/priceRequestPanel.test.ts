@@ -169,6 +169,9 @@ test('the page: the panel is lazy, a catalog-only product never asks the quote, 
   assert.match(src, /const PriceRequestPanel = React\.lazy\(\(\) => import\('\.\.\/components\/product\/PriceRequestPanel'\)\);/);
   assert.match(src, /if \(catalogOnly \|\| knownUnpriced\) \{\s*setQuoteLoading\(false\);\s*return;/);
   assert.match(src, /const noPrice = catalogOnly \|\| selectionUnpriced;/);
+  // A chosen colour or value with no priced SKU at all: no figure stands for it while the choice is unfinished.
+  assert.match(src, /const knownUnpriced = !catalogOnly && \(unpricedSelections\.includes\(selectionKey\) \|\| choiceUnpriced\);/);
+  assert.match(src, /levelIsNull\(priceLevels\?\.color, colorId\)\) \|\| optionValueIds\.some\(\(id\) => levelIsNull\(priceLevels\?\.option, id\)\)/);
   assert.match(src, /const canBuy =\s*source === 'catalog' &&\s*!noPrice &&/);
   assert.match(src, /const stockAlertOffered = source === 'catalog' && !noPrice && directOutOfStock;/);
   assert.match(src, /const priceBlock = noPrice \? null : \(/);

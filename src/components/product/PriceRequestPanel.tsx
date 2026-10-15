@@ -321,8 +321,9 @@ export default function PriceRequestPanel({
         </>
       )}
 
-      {/* The 48 px action: in the phone's bottom bar when the page gives one, here otherwise. */}
-      {barSlot ? createPortal(cta, barSlot) : cta}
+      {/* The 48 px action: in the phone's bottom bar when the page gives one, here otherwise. Once
+          requested, the status line above IS the replacement here; only the bar keeps a chip in its place. */}
+      {barSlot ? createPortal(cta, barSlot) : request ? null : cta}
 
       {error ? (
         <p role="alert" className="text-[12.5px] font-medium leading-relaxed text-danger">
