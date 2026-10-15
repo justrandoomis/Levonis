@@ -16,6 +16,7 @@
 import { normalizeSerial } from '@levonis/catalog/deviceSerials';
 import { stageOf, type TradeInStage, type TradeInStatus } from '@levonis/pricing/tradeIn';
 import { safeParse } from './types';
+import { likePattern } from './sqlLike';
 
 export const QUEUE_CHIPS = ['awaiting_device', 'inspecting', 'decision', 'credit_ready', 'awaiting_new_device', 'completed', 'closed', 'device_to_collect', 'overdue'] as const;
 export type QueueChip = (typeof QUEUE_CHIPS)[number];
@@ -46,7 +47,6 @@ const OVERDUE_SQL = (soon: string, stale: string) =>
                                                   WHERE dr.coupon_id = r.coupon_id AND dr.state = 'active' AND dlo.status = 'delivered'))`;
 const SORT_AT = `COALESCE(r.submitted_at, r.created_at)`;
 
-const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);
 
 export interface QueueQuery {
   q: string | null;
@@ -95,7 +95,7 @@ export async function adminQueue(db: D1Database, query: QueueQuery): Promise<{ r
   const where: string[] = [`r.status <> 'draft'`];
   const q = (query.q ?? '').trim().slice(0, 80);
   if (q.length >= 2) {
-    args.push(`%${escapeLike(q.toLowerCase())}%`);
+    args.push(likePattern(q.toLowerCase()));
     const like = `?${args.length}`;
     const parts = [
       `lower(COALESCE(u.name, '')) LIKE ${like} ESCAPE '\\'`,
@@ -107,12 +107,12 @@ export async function adminQueue(db: D1Database, query: QueueQuery): Promise<{ r
     ];
     const digits = q.replace(/\D/g, '').replace(/^0+/, '');
     if (digits.length >= 4) {
-      args.push(`%${digits}`);
-      parts.push(`COALESCE(u.phone_e164, '') LIKE ?${args.length}`);
+      args.push(likePattern(digits, 'suffix'));
+      parts.push(`COALESCE(u.phone_e164, '') LIKE ?${args.length} ESCAPE '\\'`);
     }
     const serial = normalizeSerial(q).slice(0, 64);
     if (serial.length >= 4) {
-      args.push(`%${escapeLike(serial)}%`);
+      args.push(likePattern(serial));
       const s = `?${args.length}`;
       parts.push(`COALESCE(r.intake_serial_norm, '') LIKE ${s} ESCAPE '\\'`);
       parts.push(`EXISTS (SELECT 1 FROM order_item_units su JOIN device_serials ds ON ds.unit_id = su.id

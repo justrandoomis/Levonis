@@ -22,6 +22,7 @@ import { catalogIndexFor } from './catalogPresentation';
 import { familyOfProduct } from './tradeIn';
 import { benefitFallbackFor, pricingCtxForUser, type PricingCtx } from '../routes/products';
 import type { TradeInFamily } from '@levonis/pricing/tradeIn';
+import { likePattern } from './sqlLike';
 
 export const TARGET_PAGE = 20;
 const SCAN = 80;
@@ -34,7 +35,6 @@ function parseCursor(raw: string | null | undefined): { order: number; id: strin
   return m ? { order: Number(m[1]), id: m[2] } : null;
 }
 
-const escapeLike = (q: string) => q.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 
 const coverOf = (doc: ReturnType<typeof parseProductRow>): string => {
   const media = [...(doc.media ?? [])].sort((a, b) => Number(b.primary) - Number(a.primary) || a.order - b.order);
@@ -83,7 +83,7 @@ export async function searchTargets(env: Env, userId: string, q: { q: string; fa
     where.push(`id = ?${args.length}`);
   }
   if (searching) {
-    args.push(`%${escapeLike(term)}%`);
+    args.push(likePattern(term));
     const n = args.length;
     where.push(`(name LIKE ?${n} ESCAPE '\\' OR name_ar LIKE ?${n} ESCAPE '\\' OR name_ku LIKE ?${n} ESCAPE '\\' OR slug LIKE ?${n} ESCAPE '\\' OR brand LIKE ?${n} ESCAPE '\\')`);
   }

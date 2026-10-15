@@ -82,6 +82,9 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/returns': 'COMMERCE',
   '/api/price-protection': 'COMMERCE',
   '/api/trade-in': 'COMMERCE',
+  // S-P2 (DECISIONS row 238): «خدماتي» card and the desk's services badge — served by the core until the services phases settle an owner.
+  '/api/me/services': 'CORE',
+  '/api/admin/services': 'CORE',
   '/api/admin/trade-in': 'COMMERCE',
   '/api/quick-buy': 'COMMERCE',
   '/api/policies': 'POLICIES',
