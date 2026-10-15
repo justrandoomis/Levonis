@@ -15,12 +15,14 @@
  *       the customer's devices and the «خدماتي» card (`GET /api/me/services`), allow-listed:
  *       never a paid split, never a serial beyond its last four, never a cost.
  *
- * Every read here names its columns; a database without 0192 has no intake (in-shop is never true).
+ * Every read here names its columns; a database without 0192 has no intake (in-shop is never true),
+ * and one without 0178 no unit closure (the device routes' own `serialAssignmentsInstalled` rule).
  */
 import type { Env } from '../types';
 import { closedClaimSql } from '../deviceOps';
 import { MAX_REPLACEMENT_HOPS, tradedInSql } from '../deviceCustody';
 import { tradeInV2Installed } from '../tradeInSchema';
+import { serialAssignmentsInstalled } from '../serialPolicy';
 import { catalogIndexFor } from '../catalogPresentation';
 // A cycle (tradeIn.ts imports the fence SQL below): safe, because neither module reads the other's
 // bindings while it is first evaluated — only inside functions, at call time.
@@ -106,10 +108,12 @@ const monthsLeft = (end: string | null, nowMs: number) => (end && Date.parse(end
  */
 export async function listMyDevices(env: Env, userId: string, nowIso = new Date().toISOString()): Promise<DeviceFacts[]> {
   const db = env.DB;
-  const v2 = await tradeInV2Installed(db);
+  const [v2, closure] = await Promise.all([tradeInV2Installed(db), serialAssignmentsInstalled(db)]);
+  // A unit's closure (a returned device) is migration 0178's column — the device routes' own rule.
+  const closedAt = closure ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
   const { results: units } = await db
     .prepare(
-      `SELECT u.id, u.order_id, u.order_item_id, u.unit_index, u.product_id, u.delivered_at, u.warranty_end_at, u.warranty_closed_at,
+      `SELECT u.id, u.order_id, u.order_item_id, u.unit_index, u.product_id, u.delivered_at, u.warranty_end_at, ${closedAt},
               oi.name_snapshot, oi.option_snapshot, oi.image_snapshot, oi.gift_entitlement_id,
               ${tradedInSql('u')} AS traded_in_at, ${inShopSql('u', v2)} AS in_shop_at
          FROM order_item_units u
@@ -227,11 +231,29 @@ export function publicDevice(f: DeviceFacts): PublicDevice {
  * the customer's trade-ins ask of them (hand the device in, decide on a value, spend the credit,
  * collect the device back, a credit given back), with its date. Price protection and perks arrive
  * with their phases (null now).
+ *
+ * A database without 0192 (code ahead of its migration, CLAUDE.md rule 2) answers the same card
+ * from what it has: the devices without the 0192 facts, and its trade-ins counted while open. The
+ * old flow has no stages — no intake, no offer window, no credit given back — so no next thing is
+ * named there (`listMine` gives its requests no stage either).
  */
 export async function servicesSummary(env: Env, userId: string, nowIso = new Date().toISOString()): Promise<ServicesSummary> {
   const db = env.DB;
-  const devices = await listMyDevices(env, userId, nowIso);
+  const [devices, v2] = await Promise.all([listMyDevices(env, userId, nowIso), tradeInV2Installed(db)]);
   const openCases = devices.filter((d) => d.open.return || d.open.service || d.open.protection).length;
+  if (!v2) {
+    // Open exactly as `stageOf` reads a request with no intake and no credit given back.
+    const old = await db
+      .prepare(`SELECT COUNT(*) AS n FROM trade_in_requests WHERE user_id = ? AND status NOT IN ('draft','completed','cancelled','customer_rejected')`)
+      .bind(userId)
+      .first<{ n: number }>();
+    return {
+      devices: { count: devices.length, open_cases: openCases },
+      trade_in: { open: Number(old?.n ?? 0), next_action: null, next_at: null },
+      protection: null,
+      perks: null,
+    };
+  }
   const { results } = await db
     .prepare(
       `SELECT t.id, t.status, t.cancel_reason, t.intake_at, t.device_returned_at, t.offer_expires_at,

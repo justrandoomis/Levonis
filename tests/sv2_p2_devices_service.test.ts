@@ -137,7 +137,7 @@ test('X10 intake on the only printer drops the printer perk at once; the new pri
   assert.ok(!perkUnits(raw, new Date(Date.now() + 8 * DAY).toISOString()).includes('unit_a1'));
 });
 
-test('GET /api/me/services: device count, open cases, and the one next thing the trade-in asks — signed in only, 503 before 0192', async () => {
+test('GET /api/me/services: device count, open cases, and the one next thing the trade-in asks — signed in only; before 0192 the same card without the 0192 facts', async () => {
   const raw = world();
   const card = async () => {
     const res = await get(doors(raw), '/api/me/services');
@@ -161,7 +161,18 @@ test('GET /api/me/services: device count, open cases, and the one next thing the
   // Signed out: refused.
   const guest = stubApp(new LimitD1(raw) as unknown as D1Database, null, (a) => a.route('/api/me/services', myServicesRoutes));
   assert.equal((await get(guest, '/api/me/services')).status, 401);
-  // A database without 0192.
-  const res = await get(doors(seed({ through: '0191' })), '/api/me/services');
-  assert.deepEqual([res.status, (await json(res)).code], [503, 'TRADE_IN_V2_NOT_INSTALLED']);
+  // A database without 0192 (code ahead of its migration): the card still answers — the devices, and the
+  // old flow's open requests counted, with no next thing named (the old flow has no stages) — never a refusal.
+  const old = world({ through: '0191' });
+  const oldCard = async () => {
+    const r = await get(doors(old), '/api/me/services');
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.match(r.headers.get('Cache-Control') ?? '', /no-store/);
+    return json(r);
+  };
+  const before = await oldCard();
+  assert.deepEqual([before.devices, before.trade_in, before.protection, before.perks], [{ count: 1, open_cases: 0 }, { open: 0, next_action: null, next_at: null }, null, null]);
+  await submitted(old);
+  assert.deepEqual((await oldCard()).trade_in, { open: 1, next_action: null, next_at: null });
+  assert.ok(!/_iqd|cost|margin|serial/.test(JSON.stringify(await oldCard())));
 });

@@ -263,12 +263,14 @@ tradeInRoutes.get('/targets', async (c) => {
 /**
  * THE PRODUCT-PAGE ENTRY (S-P2 §10.2): how many of the caller's units can be
  * traded in now, and whether this product is a listed device a credit can buy.
- * Signed in only (the router); a database without 0192 answers 503.
+ * Signed in only (the router). A database without 0192 has no v2 trade-in to
+ * enter: no unit and no target, so the product page draws no entry — the same
+ * answer shape as the migrated database, never a refusal on the product page.
  */
 tradeInRoutes.get('/entry', async (c) => {
   const user = c.get('user')!;
   await rateLimit(c, 'trade_in_read', 120, 60);
-  await requireTradeInV2(c.env.DB);
+  if (!(await tradeInV2Installed(c.env.DB))) return c.json({ success: true, eligible_units: 0, target_ok: false });
   const productId = c.req.query('product_id') ?? '';
   const [units, targetOk] = await Promise.all([
     listEligible(c.env, user.id),
@@ -776,9 +778,10 @@ adminTradeInRoutes.get('/rules', requireCostRead, async (c) => {
  * it became (lot, hidden draft, cost basis). The same refusal for a real and an invented id.
  */
 adminTradeInRoutes.get('/requests/:id/valuation', requireCostRead, async (c) => {
-  await requireTradeInV2(c.env.DB);
   c.header('Cache-Control', 'private, no-store');
+  // The request first (a 404 is a 404 on every database), then the 0192 tables it reads.
   const req = await adminRequest(c);
+  await requireTradeInV2(c.env.DB);
   const [valuations, stock] = await Promise.all([
     valuationsOf(c.env.DB, req.id),
     c.env.DB.prepare('SELECT lot_id, product_id, cost_basis_iqd, order_id, created_at FROM trade_in_stock WHERE request_id = ?')
@@ -829,8 +832,9 @@ adminTradeInRoutes.put('/policy', requireMoneyAuthority('trade_in_rules'), async
  * Read with the costs; written by the owner.
  */
 adminTradeInRoutes.get('/component-refs', requireCostRead, async (c) => {
-  await requireTradeInV2(c.env.DB);
+  // Its one table is 0192's: before it, the designed refusal (tests/fixtures/deployAhead.ts) — never cached.
   c.header('Cache-Control', 'private, no-store');
+  await requireTradeInV2(c.env.DB);
   return c.json({ success: true, refs: await listComponentRefs(c.env.DB) });
 });
 

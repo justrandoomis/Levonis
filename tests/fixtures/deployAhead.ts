@@ -43,6 +43,11 @@ export const DESIGNED_ON_OLDER_DB: readonly DesignedRefusal[] = [
   // The Inputs stage's /products/:id/rules and /inputs were listed here (0181);
   // the clean start (spec addendum A.6) closed both: 409 PRICING_V2_MANAGED on
   // every database, so they are held to strict equality like any other route.
+  // Services S-P2 (DECISIONS row 238): the owner's component references read
+  // only trade_in_component_refs, which 0192 creates. A non-owner gets the same
+  // 403 on both databases (the cost door comes first) and stays strict; every
+  // other S-P2 door answers an older database as it answers the migrated one.
+  { path: '/api/admin/trade-in/component-refs', who: ['owner'], status: 503, code: 'TRADE_IN_V2_NOT_INSTALLED', migration: '0192_trade_in_v2.sql' },
 ];
 
 /** The listed refusal for this user and path on a database migrated through `through` (e.g. '0176'), if any. */

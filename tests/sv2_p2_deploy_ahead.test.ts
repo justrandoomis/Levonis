@@ -6,7 +6,9 @@
  *   - the schema probe says «absent» (and asks again after a minute, never caching a failure for good);
  *   - every existing door behaves as it did before S-P2: a request is drafted, sent,
  *     approved and its credit spent at checkout with no intake;
- *   - every new door answers 503 TRADE_IN_V2_NOT_INSTALLED, never a 500.
+ *   - every new door answers 503 TRADE_IN_V2_NOT_INSTALLED, never a 500 — except the two a
+ *     customer meets on every page, which answer as before S-P2: the product page's entry
+ *     (no unit, no target: nothing drawn) and «خدماتي» (tests/sv2_p2_devices_service.test.ts).
  *
  * Run: node --import tsx --test tests/sv2_p2_deploy_ahead.test.ts
  */
@@ -44,7 +46,7 @@ test('at 0191 the old flow runs whole: submit, approve without intake, spend the
   assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'awaiting_payment');
 });
 
-test('at 0191 every new door answers 503 TRADE_IN_V2_NOT_INSTALLED — never a 500; the retired inspect door still works', async () => {
+test('at 0191 every new door answers 503 TRADE_IN_V2_NOT_INSTALLED — never a 500; the product-page entry draws nothing; the retired inspect door still works', async () => {
   const raw = seed({ through: '0191' });
   const id = await submitted(raw);
   for (const [path, body] of [
@@ -54,8 +56,19 @@ test('at 0191 every new door answers 503 TRADE_IN_V2_NOT_INSTALLED — never a 5
     const res = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/${path}`, body);
     assert.deepEqual([res.status, (await json(res)).code], [503, 'TRADE_IN_V2_NOT_INSTALLED'], path);
   }
+  // The product page's entry: no v2 trade-in to enter on this database — the page draws nothing, never a refusal.
   const entry = await (await import('./fixtures/app')).get(customerApp(raw), '/api/trade-in/entry?product_id=p_p1s');
-  assert.deepEqual([entry.status, (await json(entry)).code], [503, 'TRADE_IN_V2_NOT_INSTALLED']);
+  assert.equal(entry.status, 200, await entry.clone().text());
+  const entryBody = await json(entry);
+  assert.deepEqual([entryBody.eligible_units, entryBody.target_ok], [0, false]);
+  // The owner's component references read only 0192's table: the designed refusal, never cached.
+  const refs = await (await import('./fixtures/app')).get(adminApp(raw), '/api/admin/trade-in/component-refs');
+  assert.deepEqual([refs.status, (await json(refs)).code, refs.headers.get('Cache-Control')], [503, 'TRADE_IN_V2_NOT_INSTALLED', 'private, no-store']);
+  // The owner's valuation record: the request first (an invented id is a 404 on every database), then the refusal.
+  const ghost = await (await import('./fixtures/app')).get(adminApp(raw), '/api/admin/trade-in/requests/tin_00000000000000000000/valuation');
+  assert.equal(ghost.status, 404);
+  const valuation = await (await import('./fixtures/app')).get(adminApp(raw), `/api/admin/trade-in/requests/${id}/valuation`);
+  assert.deepEqual([valuation.status, (await json(valuation)).code], [503, 'TRADE_IN_V2_NOT_INSTALLED']);
   // The old «بدأ الفحص» is the old flow's door on an old database.
   const inspected = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/inspect`);
   assert.equal(inspected.status, 200, await inspected.clone().text());
