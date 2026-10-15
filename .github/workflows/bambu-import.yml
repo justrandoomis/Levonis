@@ -19,8 +19,7 @@
 # (row 184). It is dispatched by hand, on the default branch only, and nothing
 # schedules it: a one-time import, never a sync.
 #
-# BUILD STEP 2 OF THE SPEC: THE SKELETON. Two modes run today; the others are
-# refused with "not yet" until build step 8 brings the importer:
+# THE MODES (spec §K.2 steps 2, 8, 10, 11, 13, 14; §K.3):
 #
 #   snapshot  reads the live catalogue (scripts/bambu-import/snapshot.sql: the
 #             sections, brands, products of every status with their identity
@@ -29,9 +28,38 @@
 #             column), seals it in the same step to `seal_pubkey`, and uploads
 #             only snapshot.sealed. The log carries row counts and migration
 #             names.
+#   preflight writes nothing: the live migrations equal the repository's, no
+#             import run is active, no CSV import holds an apply lease, the
+#             public context carries products_priced (catalog-only is live),
+#             and the Time Travel bookmark is printed.
+#   open      (confirm=IMPORT-LIVE) creates the run row `cir_` + 24 hex with a
+#             per-job token, then the importer: /hello, the whole manifest,
+#             the taxonomy nodes, brand and synonyms, the protected snapshot
+#             `before`. The token is revoked at the end of the job.
+#   run       (confirm=IMPORT-LIVE, run_id) the queue, ONE product at a time:
+#             max_items (0 = until the deadline), resume (continue a BLOCKED
+#             product once its cause is fixed), chain (dispatch the next job
+#             when this one stops at its deadline, at most 12 in a row).
+#   close     (confirm=IMPORT-LIVE, run_id) the end-of-run audit (§I.3), the
+#             protected snapshot `after`, /run/finish (closed or partial),
+#             the old token now answers 404, the sealed close report.
+#   report    (run_id) the run's ledger read from D1, sealed; counts by state
+#             in the log.
+#   dryrun    no Cloudflare credential at all: the importer against a local
+#             Worker (wrangler dev --local, a fresh database) with fixture
+#             pages and real store images; screenshots sealed.
+#   withdraw  (confirm=IMPORT-LIVE, run_id, item) an owner-approved withdrawal
+#             of a product the store removed (BLOCKED SOURCE_WITHDRAWN): the
+#             second fetch and the sitemap absence are the evidence.
 #   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
 #             `run_id`, so every ops path answers 404. Before migration 0195
 #             there is no run table: a notice, and green.
+#
+# Every job that writes starts with the preflight step and its restore point,
+# mints a fresh token into a 0600 file that only the importer step reads (and
+# deletes), and revokes it in an always() step whatever happened. The chain
+# job has `actions: write` and nothing else: no checkout, no npm, no
+# repository code; it re-validates what it dispatches.
 #
 # HOW TO RUN A SNAPSHOT
 #   1. In the sandbox: node scripts/bambu-import/seal.mjs --keygen <dir>
@@ -41,14 +69,19 @@
 #      node scripts/bambu-import/unseal.mjs --key <dir>/bambu-seal-<id>.pem snapshot.sealed snapshot.json
 #
 # HARDENING (pinned by tests/bambuImportWorkflow.test.ts)
-#   - The token is read-only (contents: read) and the checkout keeps no
-#     credential (persist-credentials: false).
+#   - The import job's GitHub token is read-only (contents: read) and the
+#     checkout keeps no credential (persist-credentials: false). Only the chain
+#     job holds `actions: write`, and it runs no repository code.
 #   - Inputs reach the shell ONLY through the job's IN_* environment, and the
 #     first step validates every one of them against a fixed pattern before
 #     anything else runs. No run script interpolates an expression.
 #   - CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID exist only in the
 #     step-level env of the steps that run scripts/bambu-import/cf.mjs, the one
-#     piece of code that holds them. npm ci runs without them.
+#     piece of code that holds them. npm ci, the browser install and the
+#     importer run without them.
+#   - The import token travels only through a 0600 file under the runner's
+#     temp directory, read and deleted by the importer step; never through
+#     GITHUB_ENV, a job env or a log. Its hash is cleared in an always() step.
 #   - Actions logs and artifacts of this repository are PUBLIC: every artifact
 #     is sealed in the job to the dispatch's one-time X25519 key, and only
 #     `*.sealed` files are uploaded (kept 3 days).
@@ -60,7 +93,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'snapshot (sealed read of the live catalogue) or revoke (kill switch); the other modes arrive with build step 8'
+        description: 'snapshot, preflight, open, run, close, report, dryrun, withdraw or revoke (see the header of this file)'
         type: choice
         required: true
         options:
@@ -74,7 +107,7 @@ on:
           - withdraw
           - revoke
       run_id:
-        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (revoke needs it)'
+        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (run, close, report, withdraw and revoke need it; open creates it)'
         required: false
         default: ''
       max_items:
@@ -125,6 +158,10 @@ jobs:
     timeout-minutes: 350
     permissions:
       contents: read
+    outputs:
+      more: ${{ steps.run.outputs.more }}
+      blocked: ${{ steps.run.outputs.blocked }}
+      run_id: ${{ steps.run.outputs.run_id }}
     # Inputs reach the shell ONLY through these variables; never as an
     # expression inside a run script.
     env:
@@ -155,15 +192,13 @@ jobs:
           [[ -z "$IN_CONFIRM" || "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail 'confirm is IMPORT-LIVE or empty'
           case "$IN_MODE" in
             open|run|close|withdraw) [[ "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail "mode $IN_MODE writes the live catalogue: confirm must be IMPORT-LIVE" ;;
-            revoke) [[ -n "$IN_RUN_ID" ]] || fail 'revoke needs the run_id whose token it clears' ;;
           esac
+          case "$IN_MODE" in
+            run|close|report|withdraw|revoke) [[ -n "$IN_RUN_ID" ]] || fail "mode $IN_MODE needs the run_id" ;;
+            open) [[ -z "$IN_RUN_ID" ]] || fail 'open creates a new run: run_id must be empty' ;;
+          esac
+          if [[ "$IN_MODE" == "withdraw" ]]; then [[ -n "$IN_ITEM" ]] || fail 'withdraw needs the item (a source product id)'; fi
           echo "inputs valid: mode $IN_MODE"
-
-      - name: Refuse a mode this skeleton does not run yet
-        if: env.IN_MODE != 'snapshot' && env.IN_MODE != 'revoke'
-        run: |
-          echo "::error::mode $IN_MODE is not yet built: workflow 60 runs only snapshot and revoke until build step 8 of the import spec"
-          exit 1
 
       - uses: actions/checkout@v4
         with:
@@ -177,12 +212,75 @@ jobs:
       # No Cloudflare credential exists in this step's environment.
       - run: npm ci --no-audit --no-fund
 
+      # The browser checks of §I.1.7 (Playwright, the public site only). No
+      # credential exists yet: the token is minted after this step.
+      - name: Chromium for the browser checks
+        if: env.IN_MODE == 'run' || env.IN_MODE == 'dryrun'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser" --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+          "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Live database id (masked), preflight and the Time Travel restore point
+        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs preflight --mode "$IN_MODE" --run "$IN_RUN_ID"
+
       - name: Snapshot of the live catalogue, sealed in the same step (row counts only in this log)
         if: env.IN_MODE == 'snapshot'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/bambu-import/cf.mjs snapshot --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"
+
+      - name: The run's ledger, sealed in the same step (counts by state only in this log)
+        if: env.IN_MODE == 'report'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs report --run "$IN_RUN_ID" --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"
+
+      - name: Open the run and mint the job token (0600 file; only its hash is stored)
+        if: env.IN_MODE == 'open'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs open --token-file "$RUNNER_TEMP/import-token" --run-file "$RUNNER_TEMP/import-run"
+
+      - name: Mint the job token (0600 file; only its hash is stored on the run row)
+        if: env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs mint --run "$IN_RUN_ID" --token-file "$RUNNER_TEMP/import-token" --run-file "$RUNNER_TEMP/import-run"
+
+      # The importer reads the token file and deletes it at once. No Cloudflare
+      # credential exists here: the ops endpoint is its only door.
+      - id: run
+        name: Importer
+        if: env.IN_MODE == 'preflight' || env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw'
+        env:
+          IMPORT_TOKEN_FILE: ${{ runner.temp }}/import-token
+          IMPORT_RUN_FILE: ${{ runner.temp }}/import-run
+          IMPORT_OUT_DIR: ${{ runner.temp }}/out
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser/node_modules/playwright
+        run: node --import tsx scripts/bambu-import/run.ts
+
+      # Step 10 (c): no Cloudflare credential is referenced; the Worker runs locally.
+      - name: Dry run against a local Worker (fixture pages, real store images, sealed screenshots)
+        if: env.IN_MODE == 'dryrun'
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser/node_modules/playwright
+        run: node scripts/e2e-bambu-import.mjs --build --images real --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"
+
+      # Whatever happened above: the job's token stops working now.
+      - name: Revoke the job token (always, after every mode that minted one)
+        if: always() && (env.IN_MODE == 'open' || env.IN_MODE == 'run' || env.IN_MODE == 'close' || env.IN_MODE == 'withdraw')
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs revoke --run-file "$RUNNER_TEMP/import-run"
 
       - name: Revoke the run's token (kill switch)
         if: env.IN_MODE == 'revoke'
@@ -193,7 +291,7 @@ jobs:
 
       # Artifacts of this repository are public: sealed files only.
       - name: Upload the sealed files, and nothing else
-        if: always() && env.IN_MODE == 'snapshot'
+        if: always() && env.IN_MODE != 'revoke'
         uses: actions/upload-artifact@v4
         with:
           name: bambu-import-sealed
@@ -201,3 +299,36 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           overwrite: true
+
+  # §J.5: the next job of a long run. It dispatches and does nothing else: no
+  # checkout, no npm, no repository code; every value it sends is validated
+  # here again. Nothing is ever scheduled: a stopped chain is resumed by hand.
+  chain:
+    needs: import
+    if: ${{ needs.import.result == 'success' && needs.import.outputs.more == 'true' && needs.import.outputs.blocked != 'true' && inputs.mode == 'run' && inputs.chain && fromJSON(inputs.chain_count) < 12 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the next import job of this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ needs.import.outputs.run_id }}
+          COUNT: ${{ inputs.chain_count }}
+          KEY: ${{ inputs.seal_pubkey }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$RUN_ID" =~ ^cir_[0-9a-f]{24}$ ]] || fail 'the import job named no run'
+          [[ "$COUNT" =~ ^([0-9]|1[01])$ ]] || fail 'chain_count must be below 12 to chain again'
+          [[ "$KEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is not a one-time public key'
+          [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail 'the repository name is malformed'
+          [[ -n "$REF" && "$REF" == "$DEFAULT_BRANCH" ]] || fail 'the chain runs on the default branch only'
+          body=$(jq -nc --arg ref "$REF" --arg run "$RUN_ID" --arg c "$((COUNT + 1))" --arg k "$KEY" \
+            '{ref: $ref, inputs: {mode: "run", run_id: $run, max_items: "0", resume: "false", chain: "true", chain_count: $c, seal_pubkey: $k, confirm: "IMPORT-LIVE"}}')
+          curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/actions/workflows/bambu-import.yml/dispatches" -d "$body"
+          echo "dispatched job $((COUNT + 1)) of run $RUN_ID"

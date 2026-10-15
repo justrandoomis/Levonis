@@ -1,6 +1,6 @@
 /**
  * WORKFLOW 60 — THE ONE-TIME BAMBU IMPORT — HAS THE SHAPE §K.3 OF THE IMPORT
- * SPEC REQUIRES (DECISIONS row 239; build step 2: snapshot and revoke only).
+ * SPEC REQUIRES (DECISIONS row 239; build steps 2 and 8: every mode).
  *
  * The workflow reads, and from build step 8 writes, the LIVE database of a
  * PUBLIC repository's Actions, so its shape is security, and this test reads
@@ -11,7 +11,9 @@
  *
  *   - dispatch only, on the default branch only; nothing scheduled;
  *   - top-level `permissions: contents: read`; the import job has no
- *     `actions: write`; a chain job, when it exists, has nothing else;
+ *     `actions: write`; the chain job has `actions: write` and nothing else:
+ *     no checkout, no npm, no repository code, validated inputs, run under
+ *     bash with stand-ins for curl;
  *   - every checkout keeps no credential (`persist-credentials: false`);
  *   - inputs reach the shell only through the job's IN_* env, the first step
  *     validates every one against its listed pattern, and no run script holds
@@ -19,9 +21,15 @@
  *   - CLOUDFLARE_* only in the step-level env of steps that run
  *     scripts/bambu-import/cf.mjs, and nowhere else;
  *   - no token in job env or GITHUB_ENV; GITHUB_ENV carries the deadline only;
+ *     the job token reaches only the importer step, through the 0600 file the
+ *     open / mint step wrote, and every mode that minted one revokes it in an
+ *     always() step;
  *   - every upload-artifact path ends in `.sealed`;
  *   - concurrency group `bambu-import`, `timeout-minutes` 350, deadline 330;
- *   - only snapshot and revoke run; every other mode stops with "not yet";
+ *   - for each of the nine modes, exactly the steps it needs run (the `if:`
+ *     expressions are evaluated here), in a safe order: validation first, the
+ *     browser installed before any credential, the preflight and its restore
+ *     point before a token is minted, the revoke after the importer;
  *   - actions are pinned the way every other workflow here pins them.
  *
  * Run: node --import tsx --test tests/bambuImportWorkflow.test.ts
@@ -184,7 +192,9 @@ const INPUTS = ['mode', 'run_id', 'max_items', 'resume', 'chain', 'chain_count',
 const MODES = ['snapshot', 'preflight', 'open', 'run', 'close', 'report', 'dryrun', 'withdraw', 'revoke'];
 const envName = (input: string) => `IN_${input.toUpperCase()}`;
 const DEFAULT_BRANCH_ONLY = "${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}";
-const CF_STEP = /^node scripts\/bambu-import\/cf\.mjs [a-z]+(?: --[a-z]+ "\$[A-Z_]+(?:\/[a-z]+)?")+$/;
+const CF_STEP = /^node scripts\/bambu-import\/cf\.mjs [a-z]+(?: --[a-z-]+ "\$[A-Z_]+(?:\/[a-z-]+)?")+$/;
+const CHAIN = map(JOBS.chain, 'jobs.chain');
+const CHAIN_STEPS = list(CHAIN.steps, 'jobs.chain.steps').map((step, index) => map(step, `chain step ${index + 1}`));
 
 // ------------------------------------------------------------------ the tests
 
@@ -237,17 +247,33 @@ test('permissions: contents read at the top and on the import job; actions write
   assert.deepEqual(IMPORT.permissions, { contents: 'read' });
   assert.equal(WF.env, undefined, 'no workflow-level environment');
   for (const name of Object.keys(JOBS)) assert.ok(['import', 'chain'].includes(name), `unexpected job ${name}`);
-  // The chain job arrives with build step 8 (§J.5). When it does, it may dispatch and do nothing else.
-  if (JOBS.chain !== undefined) {
-    const chain = map(JOBS.chain, 'jobs.chain');
-    assert.deepEqual(chain.permissions, { actions: 'write' });
-    assert.equal(chain.needs, 'import');
-    for (const step of list(chain.steps, 'chain steps').map((s) => map(s, 'chain step'))) {
-      assert.equal(step.uses, undefined, 'the chain job checks nothing out and runs no action');
-      assert.doesNotMatch(run(step), /\bnpm\b|\bnode\b|scripts\/|\.\/|\$\{\{/, 'no repository code, and no expression in its script');
-      assert.ok(!Object.keys(envOf(step)).some((k) => k.startsWith('CLOUDFLARE_')));
-    }
+  // The chain job (§J.5): it may dispatch and do nothing else.
+  assert.deepEqual(CHAIN.permissions, { actions: 'write' });
+  assert.equal(CHAIN.needs, 'import');
+  assert.equal(CHAIN['runs-on'], 'ubuntu-latest');
+  assert.ok(Number(CHAIN['timeout-minutes']) <= 10);
+  assert.equal(CHAIN_STEPS.length, 1);
+  for (const step of CHAIN_STEPS) {
+    assert.equal(step.uses, undefined, 'the chain job checks nothing out and runs no action');
+    assert.doesNotMatch(run(step), /\bnpm\b|\bnode\b|scripts\/|\.\/|\$\{\{/, 'no repository code, and no expression in its script');
+    assert.ok(!Object.keys(envOf(step)).some((k) => k.startsWith('CLOUDFLARE_')));
   }
+  const when = String(CHAIN.if);
+  for (const part of [
+    "needs.import.result == 'success'",
+    "needs.import.outputs.more == 'true'",
+    "needs.import.outputs.blocked != 'true'",
+    "inputs.mode == 'run'",
+    'inputs.chain',
+    'fromJSON(inputs.chain_count) < 12',
+  ]) {
+    assert.ok(when.includes(part), `the chain condition holds ${part}`);
+  }
+  assert.deepEqual(map(IMPORT.outputs, 'import outputs'), {
+    more: '${{ steps.run.outputs.more }}',
+    blocked: '${{ steps.run.outputs.blocked }}',
+    run_id: '${{ steps.run.outputs.run_id }}',
+  });
   assert.doesNotMatch(JSON.stringify(IMPORT), /"actions":"write"/);
 });
 
@@ -266,9 +292,15 @@ test('concurrency, the 350-minute timeout and the 330-minute deadline', () => {
 
 test('inputs reach the shell only through the job env, and no run script holds an expression', () => {
   assert.deepEqual(map(IMPORT.env, 'jobs.import.env'), Object.fromEntries(INPUTS.map((input) => [envName(input), `\${{ inputs.${input} }}`])));
-  // Every `inputs.` in the file is one of those env lines.
+  // Every `inputs.` in the file is one of those env lines, or the chain job's condition and step env.
   const uses = ACTIVE.filter((line) => /\binputs\./.test(line));
-  assert.deepEqual(uses.map((line) => line.trim()), INPUTS.map((input) => `${envName(input)}: \${{ inputs.${input} }}`));
+  assert.deepEqual(uses.map((line) => line.trim()), [
+    ...INPUTS.map((input) => `${envName(input)}: \${{ inputs.${input} }}`),
+    `if: ${String(CHAIN.if)}`,
+    'COUNT: ${{ inputs.chain_count }}',
+    'KEY: ${{ inputs.seal_pubkey }}',
+  ]);
+  for (const step of CHAIN_STEPS) assert.doesNotMatch(run(step), /\$\{\{/);
   assert.doesNotMatch(TEXT, /github\.event\.inputs/);
   for (const step of STEPS) {
     assert.doesNotMatch(run(step), /\$\{\{/, `${String(step.name ?? step.run)}: an expression inside a run script`);
@@ -314,17 +346,26 @@ test('CLOUDFLARE_* only in the step env of steps that run cf.mjs, and those step
   assert.ok(install && Object.keys(envOf(install)).length === 0);
 });
 
-test('no token travels through the job env or GITHUB_ENV; an importer step, once it exists, reads it from a file', () => {
+test('no token travels through the job env or GITHUB_ENV; the importer alone reads it, from the file the open / mint step wrote', () => {
   assert.ok(!Object.keys(map(IMPORT.env, 'env')).some((k) => /TOKEN/.test(k)));
-  for (const step of STEPS) {
-    const tokenKeys = Object.keys(envOf(step)).filter((k) => /TOKEN/.test(k) && k !== 'CLOUDFLARE_API_TOKEN');
-    if (!tokenKeys.length) continue;
-    // Build step 8: the importer alone, through a file under the runner's temp directory.
-    assert.equal(step.id, 'run');
-    assert.deepEqual(tokenKeys, ['IMPORT_TOKEN_FILE']);
-    assert.match(String(envOf(step).IMPORT_TOKEN_FILE), /^\$\{\{ runner\.temp \}\}\//);
-    assert.match(run(step), /scripts\/bambu-import\/run\.ts/);
-  }
+  const holders = STEPS.filter((step) => Object.keys(envOf(step)).some((k) => /TOKEN/.test(k) && k !== 'CLOUDFLARE_API_TOKEN'));
+  assert.equal(holders.length, 1, 'one step holds the token file path');
+  const importer = holders[0];
+  assert.equal(importer.id, 'run');
+  assert.deepEqual(Object.keys(envOf(importer)).filter((k) => /TOKEN/.test(k)), ['IMPORT_TOKEN_FILE']);
+  assert.equal(envOf(importer).IMPORT_TOKEN_FILE, '${{ runner.temp }}/import-token');
+  assert.equal(envOf(importer).IMPORT_RUN_FILE, '${{ runner.temp }}/import-run');
+  assert.equal(run(importer).trim(), 'node --import tsx scripts/bambu-import/run.ts');
+  assert.ok(!Object.keys(envOf(importer)).some((k) => k.startsWith('CLOUDFLARE_')), 'the importer holds no Cloudflare credential');
+  // The minting steps write exactly that file (and the run id beside it); the revoke reads the run id.
+  const minting = STEPS.filter((s) => /cf\.mjs (?:open|mint)\b/.test(run(s)));
+  assert.equal(minting.length, 2);
+  for (const step of minting) assert.match(run(step), /--token-file "\$RUNNER_TEMP\/import-token" --run-file "\$RUNNER_TEMP\/import-run"$/);
+  const revoke = STEPS.find((s) => /cf\.mjs revoke --run-file/.test(run(s)));
+  assert.ok(revoke);
+  assert.equal(run(revoke).trim(), 'node scripts/bambu-import/cf.mjs revoke --run-file "$RUNNER_TEMP/import-run"');
+  assert.match(String(revoke.if), /^always\(\) && \(/, 'the revoke runs whatever happened before it');
+  assert.ok(STEPS.indexOf(revoke) > STEPS.indexOf(importer));
 });
 
 test('only sealed files are uploaded, for three days at most', () => {
@@ -339,31 +380,99 @@ test('only sealed files are uploaded, for three days at most', () => {
     assert.equal(options.name, 'bambu-import-sealed');
     assert.equal(options['include-hidden-files'], undefined);
   }
-  // The snapshot is written exactly where the upload looks.
-  const snapshot = STEPS.find((s) => /cf\.mjs snapshot/.test(run(s)));
-  assert.ok(snapshot);
-  assert.match(run(snapshot), /--out "\$RUNNER_TEMP\/out"$/);
+  // Every producer writes exactly where the upload looks.
+  for (const producer of [/cf\.mjs snapshot/, /cf\.mjs report/, /e2e-bambu-import\.mjs/]) {
+    const step = STEPS.find((s) => producer.test(run(s)));
+    assert.ok(step, String(producer));
+    assert.match(run(step), /--out "\$RUNNER_TEMP\/out"$/);
+  }
+  assert.equal(envOf(STEPS.find((s) => s.id === 'run')!).IMPORT_OUT_DIR, '${{ runner.temp }}/out');
+  assert.equal(uploads[0].if, "always() && env.IN_MODE != 'revoke'");
   assert.doesNotMatch(ACTIVE.join('\n'), /actions\/cache\b/, 'nothing produced by the job leaves it through a cache');
 });
 
-test('only snapshot and revoke run in this skeleton; every other mode stops with "not yet" after validation', () => {
-  const refuse = STEPS[1];
-  assert.equal(refuse.if, "env.IN_MODE != 'snapshot' && env.IN_MODE != 'revoke'");
-  assert.match(run(refuse), /not yet built/);
-  assert.match(run(refuse).trimEnd(), /\bexit 1$/);
-  const credentialed = STEPS.filter((s) => /cf\.mjs/.test(run(s)));
-  assert.deepEqual(credentialed.map((s) => [s.if, run(s)]), [
-    ["env.IN_MODE == 'snapshot'", 'node scripts/bambu-import/cf.mjs snapshot --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"'],
-    ["env.IN_MODE == 'revoke'", 'node scripts/bambu-import/cf.mjs revoke --run "$IN_RUN_ID"'],
-  ]);
-  assert.ok(STEPS.indexOf(credentialed[0]) > 1, 'nothing reaches Cloudflare before validation and the refusal');
-  assert.ok(!STEPS.some((s) => /run\.ts|playwright/.test(run(s))), 'the importer arrives with build step 8');
+/** Evaluates a step's `if:` for a mode: the file uses only env.IN_MODE comparisons, ||, && and always(). */
+function runsIn(step: Map, mode: string): boolean {
+  if (step.if === undefined) return true;
+  const expr = String(step.if);
+  assert.match(expr, /^[a-zA-Z_.()'=!&| ]+$/, `an if: this test cannot read: ${expr}`);
+  const js = expr
+    .replace(/always\(\)/g, 'true')
+    .replace(/env\.IN_MODE/g, JSON.stringify(mode))
+    .replace(/==/g, '===')
+    .replace(/!===/g, '!==');
+  return Function(`"use strict"; return (${js});`)() === true;
+}
+const label = (s: Map) => {
+  const r = run(s).trim();
+  if (/^node scripts\/bambu-import\/cf\.mjs /.test(r)) return `cf ${r.split(' ').slice(2, 4).join(' ')}`;
+  if (s.id === 'run') return 'importer';
+  if (/e2e-bambu-import/.test(r)) return 'dryrun';
+  if (/playwright/.test(r)) return 'chromium';
+  if (s.uses) return String(s.uses).split('@')[0];
+  if (/^npm ci/.test(r)) return 'npm ci';
+  return String(s.name);
+};
 
-  // The refusal, run as GitHub runs it.
-  for (const mode of MODES.filter((m) => m !== 'snapshot' && m !== 'revoke')) {
-    const result = bash(run(refuse), { IN_MODE: mode });
-    assert.equal(result.status, 1, mode);
-    assert.match(result.stdout, new RegExp(`^::error::mode ${mode} is not yet built`));
+test('every mode runs exactly the steps it needs, in a safe order', () => {
+  const common = ['Deadline and input validation', 'actions/checkout', 'actions/setup-node', 'npm ci'];
+  const expected: Record<string, string[]> = {
+    snapshot: [...common, 'cf snapshot --seal', 'actions/upload-artifact'],
+    preflight: [...common, 'cf preflight --mode', 'importer', 'actions/upload-artifact'],
+    open: [...common, 'cf preflight --mode', 'cf open --token-file', 'importer', 'cf revoke --run-file', 'actions/upload-artifact'],
+    run: [...common, 'chromium', 'cf preflight --mode', 'cf mint --run', 'importer', 'cf revoke --run-file', 'actions/upload-artifact'],
+    close: [...common, 'cf preflight --mode', 'cf mint --run', 'importer', 'cf revoke --run-file', 'actions/upload-artifact'],
+    report: [...common, 'cf report --run', 'actions/upload-artifact'],
+    dryrun: [...common, 'chromium', 'dryrun', 'actions/upload-artifact'],
+    withdraw: [...common, 'cf preflight --mode', 'cf mint --run', 'importer', 'cf revoke --run-file', 'actions/upload-artifact'],
+    revoke: [...common, 'cf revoke --run'],
+  };
+  assert.deepEqual(Object.keys(expected), MODES);
+  for (const mode of MODES) {
+    assert.deepEqual(STEPS.filter((s) => runsIn(s, mode)).map(label), expected[mode], mode);
+  }
+  // No Cloudflare credential at all in a dry run; the browser is installed before any credential or token exists.
+  assert.ok(!STEPS.filter((s) => runsIn(s, 'dryrun')).some((s) => Object.keys(envOf(s)).some((k) => k.startsWith('CLOUDFLARE_'))));
+  const chromium = STEPS.find((s) => label(s) === 'chromium')!;
+  assert.deepEqual(envOf(chromium), {}, 'the browser install runs without any credential');
+  assert.ok(STEPS.indexOf(chromium) < STEPS.findIndex((s) => /cf\.mjs/.test(run(s))));
+  assert.match(run(chromium), /playwright@1\.\d+\.\d+\b/, 'a pinned Playwright');
+  // The preflight (with its restore point) comes before a token is minted.
+  const preflight = STEPS.findIndex((s) => /cf\.mjs preflight/.test(run(s)));
+  for (const s of STEPS.filter((x) => /cf\.mjs (?:open|mint)\b/.test(run(x)))) assert.ok(preflight < STEPS.indexOf(s));
+  assert.ok(!STEPS.some((s) => /not yet/.test(run(s))), 'no mode is refused any more');
+  assert.equal(run(STEPS.find((s) => label(s) === 'dryrun')!).trim(), 'node scripts/e2e-bambu-import.mjs --build --images real --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"');
+});
+
+test('the chain step, run under bash: it validates what it dispatches and sends one dispatch of mode run', () => {
+  const step = CHAIN_STEPS[0];
+  assert.deepEqual(Object.keys(envOf(step)).sort(), ['COUNT', 'DEFAULT_BRANCH', 'GH_TOKEN', 'KEY', 'REF', 'REPO', 'RUN_ID']);
+  assert.equal(envOf(step).GH_TOKEN, '${{ github.token }}');
+  const dir = mkdtempSync(join(tmpdir(), 'levonis-wf60-chain-'));
+  try {
+    const curl = join(dir, 'curl');
+    writeFileSync(curl, `#!/bin/bash\nprintf '%s\\0' "$@" > "${join(dir, 'args')}"\n`, { mode: 0o755 });
+    const good = { RUN_ID: RUN, COUNT: '3', KEY, REPO: 'owner/repo', REF: 'claude/new-session-2hq4ci', DEFAULT_BRANCH: 'claude/new-session-2hq4ci', GH_TOKEN: 'ghs_planted', PATH: `${dir}:${process.env.PATH}` };
+    const runStep = (env: Record<string, string>) => spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run(step)], { encoding: 'utf8', timeout: 10_000, env });
+    const ok = runStep(good);
+    assert.equal(ok.status, 0, ok.stderr);
+    const args = readFileSync(join(dir, 'args'), 'utf8').split('\0').filter(Boolean);
+    assert.ok(args.includes('https://api.github.com/repos/owner/repo/actions/workflows/bambu-import.yml/dispatches'));
+    const body = JSON.parse(args[args.indexOf('-d') + 1]);
+    assert.deepEqual(body, {
+      ref: 'claude/new-session-2hq4ci',
+      inputs: { mode: 'run', run_id: RUN, max_items: '0', resume: 'false', chain: 'true', chain_count: '4', seal_pubkey: KEY, confirm: 'IMPORT-LIVE' },
+    });
+    assert.ok(!ok.stdout.includes('ghs_planted'), 'the GitHub token is never printed');
+    rmSync(join(dir, 'args'));
+    for (const bad of [{ RUN_ID: '' }, { RUN_ID: `${RUN}' x` }, { COUNT: '12' }, { COUNT: '1;id' }, { KEY: 'short' }, { REF: 'feature', DEFAULT_BRANCH: 'main' }, { REPO: 'a/b c' }]) {
+      const r = runStep({ ...good, ...bad });
+      assert.equal(r.status, 1, JSON.stringify(bad));
+      assert.match(r.stdout, /^::error::/m);
+      assert.ok(!existsSync(join(dir, 'args')), 'nothing was dispatched');
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
@@ -447,6 +556,12 @@ test('the validation step refuses every malformed or hostile input, and never ec
     assert.equal(bash(script, { ...GOOD, IN_MODE: mode, IN_RUN_ID: RUN }).status, 1, `${mode} without IMPORT-LIVE`);
   }
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'revoke' }).status, 1, 'revoke without run_id');
+  for (const mode of ['run', 'close', 'withdraw']) {
+    assert.equal(bash(script, { ...GOOD, IN_MODE: mode, IN_CONFIRM: 'IMPORT-LIVE', IN_ITEM: '1' }).status, 1, `${mode} without run_id`);
+  }
+  assert.equal(bash(script, { ...GOOD, IN_MODE: 'report' }).status, 1, 'report without run_id');
+  assert.equal(bash(script, { ...GOOD, IN_MODE: 'withdraw', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' }).status, 1, 'withdraw without the item');
+  assert.equal(bash(script, { ...GOOD, IN_MODE: 'open', IN_RUN_ID: RUN, IN_CONFIRM: 'IMPORT-LIVE' }).status, 1, 'open with a run_id');
   assert.equal(bash(script, { ...GOOD, IN_MODE: 'snapshot', IN_CONFIRM: 'IMPORT-LIVE' }).status, 0, 'a read may carry the phrase');
   assert.ok(!existsSync(marker), 'no input was ever evaluated');
 });

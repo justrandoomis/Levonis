@@ -629,3 +629,28 @@ test('workflow 60 says it writes the live catalogue and deploys nothing, and it 
   assert.match(text, /studio\.levonis-iq\.com {2}-> Worker {2}levonis-studio-staging {3}\[LIVE\]/);
   assert.match(text, /levonis-db-staging is the LIVE database/);
 });
+
+/**
+ * WORKFLOW 60 CHAINS ONLY ITSELF, AND ITS DRY RUN DEPLOYS NOTHING.
+ *
+ * Build step 8 gave workflow 60 a `chain` job with `actions: write` (import
+ * spec §J.5) and a `dryrun` mode that starts a LOCAL Worker. Neither may
+ * become a deploy: the chain dispatches workflow 60 itself in `run` mode and
+ * nothing else (never workflow 7 or any deploy workflow), and the dry run's
+ * only door to a Worker is scripts/e2e-bambu-import.mjs, which runs
+ * `wrangler dev --local` and refuses to start with a Cloudflare credential.
+ */
+test('workflow 60 dispatches only itself, and its dry run is local with no credential', () => {
+  const text = read('bambu-import.yml');
+  const active = text.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+  const dispatches = [...active.matchAll(/actions\/workflows\/([A-Za-z0-9_.-]+)\/dispatches/g)].map((m) => m[1]);
+  assert.deepEqual(dispatches, ['bambu-import.yml'], 'the chain re-dispatches workflow 60 and nothing else');
+  assert.doesNotMatch(active, /gh workflow run|deploy-staging|deploy-production|_deploy-worker/);
+  assert.match(active, /mode: "run"/);
+  const dryrun = active.split('\n').filter((l) => /e2e-bambu-import\.mjs/.test(l));
+  assert.equal(dryrun.length, 1);
+  const script = readFileSync(new URL('../../scripts/e2e-bambu-import.mjs', dir), 'utf8');
+  assert.match(script, /'dev', '--local'/, 'the dry run starts wrangler dev --local only');
+  assert.doesNotMatch(script, /'deploy'|wrangler deploy|--remote/, 'the dry run never deploys or reads a remote database');
+  assert.match(script, /refuseCredentials\(process\.env\)/);
+});
