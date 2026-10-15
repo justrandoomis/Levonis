@@ -7,10 +7,11 @@
  *
  *   C1  a cancelled order gives its coupon use back (S-P1, migration 0191's
  *       trg_orders_coupon_released, DECISIONS row 237) — through every door
- *       that cancels: the customer, the admin's status door, the stage door
- *       and the expiry sweep. A delivered order that is then cancelled keeps
- *       its use; re-opening a cancelled order takes the use back inside the
- *       limits, or is refused (ORDER_REOPEN_COUPON_SPENT) and stays cancelled.
+ *       that cancels: the customer, the admin's status door, the stage door,
+ *       the expiry sweep and the Gini hold sweep. A delivered order that is
+ *       then cancelled keeps its use; re-opening a cancelled order takes the
+ *       use back inside the limits — its buyer's and the code's global one —
+ *       or is refused (ORDER_REOPEN_COUPON_SPENT) and stays cancelled.
  *   C2  the 0077 targeting columns are stored but the checkout's validateCoupon
  *       ignores them: a product-scoped, one-unit, 10% coupon takes 10% of the
  *       whole order (other products and the delivery fee included)
@@ -27,6 +28,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { asD1, count, row } from './fixtures/app';
 import { validateCoupon } from '../worker/lib/membershipOps';
 import { sweepExpiredOrders } from '../worker/lib/orderExpirySweep';
+import { sweepGiniHolds } from '../worker/lib/giniSweep';
 import { apps, get, giftWorld, json, orderBody, paidLine, patch, placeOrder, post, send } from './fixtures/giftWorld';
 import type { Env } from '../worker/lib/types';
 
@@ -82,11 +84,11 @@ test('C4: someone else\'s personal coupon answers exactly like an unknown code a
 
 // ===================================================================== C1 (S-P1)
 
-/** A single-use promo code, one order that spent it, and the apps. */
-async function spentOnce(code = 'ONCE5K', extra = '') {
+/** A promo code (one use per customer; `maxGlobal` uses in all, when given), one order that spent it, and the apps. */
+async function spentOnce(code = 'ONCE5K', maxGlobal?: number) {
   const raw = giftWorld();
-  raw.exec(`INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_per_user, active${extra ? ', max_global' : ''})
-            VALUES ('cpn_once', '${code}', 'fixed_iqd', 5000, 0, 1, 1${extra ? `, ${extra}` : ''})`);
+  raw.exec(`INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_per_user, active, max_global)
+            VALUES ('cpn_once', '${code}', 'fixed_iqd', 5000, 0, 1, 1, ${maxGlobal ?? 'NULL'})`);
   const a = apps(raw);
   paidLine(raw, 'ci_1', 'p_plain', { qty: 1 });
   const order = await placeOrder(a.buyer, { couponCode: code });
@@ -143,6 +145,15 @@ test('C1: every door that cancels gives the use back — the admin status door, 
     assert.equal(report.cancelled, 1, JSON.stringify(report));
     assert.equal(statusOf(raw, orderId), 'cancelled');
     assert.equal(useOf(raw, orderId).state, 'released', 'expiry sweep');
+  }
+  {
+    // A Gini purchase whose receipt was never scanned before its hold ran out.
+    const { raw, orderId } = await spentOnce();
+    raw.prepare("UPDATE orders SET gini_order_no = '555666', gini_state = 'awaiting_receipt', gini_hold_until = '2026-01-01T00:00:00.000Z' WHERE id = ?").run(orderId);
+    const report = await sweepGiniHolds({ DB: asD1(raw) } as unknown as Env, new Date().toISOString());
+    assert.equal(report.cancelled, 1, JSON.stringify(report));
+    assert.equal(statusOf(raw, orderId), 'cancelled');
+    assert.equal(useOf(raw, orderId).state, 'released', 'Gini hold sweep');
   }
 });
 
@@ -216,6 +227,28 @@ test('C1: a re-open whose use was spent again, or whose code was switched off, i
     assert.equal(body.code, 'ORDER_REOPEN_COUPON_SPENT');
     assert.equal(statusOf(raw, orderId), 'cancelled');
     assert.equal(liveUses(raw), 0);
+  }
+});
+
+test('C1: a re-open whose code another customer spent meanwhile (its global limit) is refused, through both admin doors', async () => {
+  for (const door of ['status', 'stage'] as const) {
+    // One use in all: the buyer's order spent it, then gave it back by cancelling.
+    const { raw, a, orderId } = await spentOnce('ONCE5K', 1);
+    assert.equal((await cancelBy(a, door, orderId)).status, 200);
+    assert.equal(liveUses(raw), 0);
+    // Another customer takes the one use.
+    paidLine(raw, `ci_other_${door}`, 'p_plain', { qty: 1, userId: 'other' });
+    await placeOrder(a.other, { couponCode: 'ONCE5K', addressId: 'addr_o' });
+    assert.equal(liveUses(raw), 1);
+    const reopen = door === 'status'
+      ? await patch(a.admin, `/api/admin/orders/${orderId}`, { status: 'pending' })
+      : await patch(a.admin, `/api/admin/orders/${orderId}/stage`, { stage: 'received' });
+    const body = (await json(reopen)) as J;
+    assert.equal(reopen.status, 409, `${door}: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'ORDER_REOPEN_COUPON_SPENT');
+    assert.equal(statusOf(raw, orderId), 'cancelled');
+    assert.equal(useOf(raw, orderId).state, 'released');
+    assert.equal(liveUses(raw), 1, 'one live use: the other customer\'s');
   }
 });
 

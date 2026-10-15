@@ -12,7 +12,10 @@
  *   X1      cancel the order that spent the credit, then type the old code and
  *           press «إتمام الدفع» at the same moment: one usable credit
  *   X1      two orders typing the same code at the same moment: one wins
- *   X1      an inactive coupon is refused by the trigger itself
+ *   X1      an inactive coupon is refused by the trigger itself, and a
+ *           personal code handed to someone else mid-checkout reads as unknown
+ *   X1      a request that somehow already holds a coupon is not minted a
+ *           second at approval: the trigger's refusal reads TRADE_IN_STALE
  *   legacy  an order cancelled before 0191 (its use still spent) is released
  *           by «إتمام الدفع», once, even when pressed twice at once
  *   reopen  cancel → reopen → cancel: the end is the original end plus every
@@ -194,6 +197,33 @@ test('X1: an inactive coupon is refused by the trigger — by SQL, mid-checkout 
       /COUPON_INACTIVE/
     );
   }
+});
+
+test('X1: a personal code reassigned between the checkout\'s read and its batch is refused by the trigger, answered as an unknown code', async () => {
+  const raw = seed();
+  raw.exec(`INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_per_user, active, assigned_user_id)
+            VALUES ('cpn_mine', 'MINE5K', 'fixed_iqd', 5000, 0, 1, 1, 'cust')`);
+  const race = new RaceD1(raw);
+  race.when = redeems;
+  race.hook = async () => void raw.exec("UPDATE coupons SET assigned_user_id = 'boss' WHERE id = 'cpn_mine'");
+  const res = await order(raw, 'MINE5K', stubApp(race as unknown as D1Database, CUSTOMER, (x) => x.route('/api/orders', orderRoutes)));
+  assert.equal(res.status, 400, JSON.stringify(res.body));
+  assert.equal(res.body.code, 'CODE_NOT_FOUND', 'COUPON_NOT_YOURS reads exactly like a code that does not exist');
+  assert.equal(ordersOf(raw), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = 'cpn_mine'"), 0);
+});
+
+test('X1: approving a request that somehow already holds a credit coupon mints no second one — TRADE_IN_STALE', async () => {
+  const raw = seed({ deliveredDaysAgo: 40 });
+  const id = await submitted(raw);
+  raw.exec(`INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_global, max_per_user, active, assigned_user_id, trade_in_id)
+            VALUES ('cpn_pre', 'TIPRE0000000', 'fixed_iqd', 1000, 0, 1, 1, 0, 'cust', '${id}')`);
+  const res = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`);
+  const body = await json(res);
+  assert.equal(res.status, 409, JSON.stringify(body));
+  assert.equal(body.code, 'TRADE_IN_STALE', 'trg_trade_in_one_credit (TRADE_IN_CREDIT_EXISTS) is answered as the stale refusal, never a 500');
+  assert.equal(coupons(raw, id), 1);
+  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'submitted');
 });
 
 test('legacy: an order cancelled before 0191 still holds the use; «إتمام الدفع» releases it once, with the time that order held it', async () => {
