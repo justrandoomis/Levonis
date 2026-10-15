@@ -25,8 +25,11 @@
  */
 import {
   FACET_FIELD_IDS,
+  FACET_MULTI_SEPARATOR,
   SIZE_BUCKETS,
+  familyToken,
   readRangeToken,
+  spoolToken,
   type FacetField,
   type ListingFilters,
   type ListingSort,
@@ -99,6 +102,20 @@ export function techOf(specs: Record<string, unknown>): 'fdm' | 'resin' | null {
 
 const MAX_COLOR_BUCKETS = ['1-4', '5-15', '16-20', '21-23', '24-'] as const;
 
+/**
+ * The pieces of a multi-valued mirror: the importer writes the base colours of
+ * a colour group as "white | black" (the Bambu import spec §G.5). A value with
+ * no separator — every colour an admin typed — is one piece, read as before.
+ */
+function pieces(text: string): string[] {
+  return text
+    .split(FACET_MULTI_SEPARATOR)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+const uniq = (list: string[]): string[] => [...new Set(list)];
+
 /** The canonical tokens this product answers for one facet ([] = unknown). */
 export function facetTokensOf(field: FacetField, specs: Record<string, unknown>): string[] {
   switch (field) {
@@ -131,6 +148,21 @@ export function facetTokensOf(field: FacetField, specs: Record<string, unknown>)
     case 'diameter': {
       const n = readNumber(specText(specs, 'diameter'), 'mm');
       return n === null ? [] : [String(n)];
+    }
+    // The Bambu import spec §G.5: multi-valued mirrors, one token per piece.
+    case 'color_name':
+      return uniq(pieces(specText(specs, 'color_name')).map((p) => p.toLowerCase().replace(/\s+/g, ' ')));
+    case 'spool_type':
+      // A product sold both ways says so in one value: "Refill | With spool" (or the form's "Refill, With spool").
+      return uniq(
+        pieces(specText(specs, 'spool_type'))
+          .flatMap((p) => p.split(','))
+          .map((p): string | null => spoolToken(p))
+          .filter((t): t is string => t !== null)
+      ).sort();
+    case 'product_family': {
+      const t = familyToken(specText(specs, 'product_family'));
+      return t ? [t] : [];
     }
     default: {
       const v = specText(specs, field).toLowerCase().replace(/\s+/g, ' ');
@@ -280,8 +312,17 @@ function specOptions(field: FacetField, all: ListingItem[]): Array<{ value: stri
     return [...seen].map(([value, label]) => ({ value, label }));
   }
   for (const item of all) {
+    const words = field === 'color_name' ? pieces(specText(item.specs, field)) : [];
     for (const t of facetTokensOf(field, item.specs)) {
-      if (!seen.has(t)) seen.set(t, field === 'material_type' || field === 'color_name' ? specText(item.specs, field) : t);
+      if (seen.has(t)) continue;
+      // The admin's own words for a free-text value; a piece of a multi-valued colour is its own label.
+      const label =
+        field === 'material_type'
+          ? specText(item.specs, field)
+          : field === 'color_name'
+            ? (words.find((w) => w.toLowerCase().replace(/\s+/g, ' ') === t) ?? t)
+            : t;
+      seen.set(t, label);
     }
   }
   return [...seen]

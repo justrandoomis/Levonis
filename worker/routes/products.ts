@@ -38,7 +38,9 @@ import { resolveUnitPrice, proPolicyFrom, DEFAULT_PRO_POLICY, type MemberFallbac
 import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
 import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
-import { anonymousCached } from '../lib/edgePolicy';
+import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
+import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
+import { withCardKnowledge } from '../lib/knowledge/cards';
 import { isConditionColumnMissing } from '../lib/conditionProjection';
 import { catalogSubtreeFilter, homeCategoryTree } from '../lib/catalogMembership';
 import { FACET_FIELD_IDS, parseListingParams } from '@levonis/catalog/discovery';
@@ -3173,6 +3175,11 @@ export function compositionCard(b: ResolvedBundle, ctx: PricingCtx): Record<stri
  * classification and `template_family`) and the taxonomy index — the compare
  * page's own rule (`productTypeOf`), so a card never offers a comparison the
  * page would refuse as a type mismatch. Never set on a composition card.
+ *
+ * With the same index and the same row, the card's knowledge line (the Bambu
+ * import spec §G.5; worker/lib/knowledge/cards.ts): `section_name` and
+ * `key_specs` — no query of their own, so every route that resolves a card's
+ * type (the listing, the catalog pages, the printer finder) carries them too.
  */
 export function withCompareType(
   card: Record<string, unknown>,
@@ -3182,7 +3189,7 @@ export function withCompareType(
   if (!idx) return card;
   const t = productTypeOf(row, idx);
   if (t) card.compare_type = t;
-  return card;
+  return withCardKnowledge(card, row, idx, t);
 }
 
 /**
@@ -4229,6 +4236,30 @@ export async function catalogProductDetail(
 // (`ProductViewed` is sampled 1:5 for guests and best-effort; a cache hit
 // emits none, which the sample already tolerates.)
 productRoutes.get('/:slug', (c) => anonymousCached(c, { perViewer: true }, () => productDetail(c)));
+
+/**
+ * THE KNOWLEDGE ANSWER (the Bambu import spec §G.1; worker/lib/knowledge/
+ * productKnowledge.ts): the product's typed specifications with their sources
+ * and statuses, logistics, the box, compatibility, documents and completeness —
+ * read by the page's lazy tabs, never on first paint.
+ *
+ * VISIBLE-GATED, ONE 404: a missing slug, a hidden or catalog-held product, a
+ * composition and a community listing all answer the same `NOT_FOUND`, so the
+ * route says nothing about what exists. The answer is the same for every viewer
+ * (no price, no stock, no viewer fact), so a guest's is served from the colo for
+ * five minutes; the catalogue seam purges it with the product page
+ * (`cataloguePaths`). Without 0194 it is 200 and empty.
+ */
+export const KNOWLEDGE_LIFETIME: EdgeLifetime = { maxAge: 60, sMaxAge: 300, staleWhileRevalidate: 600 };
+
+productRoutes.get('/:slug/knowledge', (c) => anonymousCached(c, { lifetime: KNOWLEDGE_LIFETIME }, () => productKnowledge(c)));
+
+async function productKnowledge(c: Context<AppContext>): Promise<Response> {
+  const slug = c.req.param('slug') ?? '';
+  const row = await visibleProductBySlug(c.env.DB, slug);
+  if (!row || String(row.composition ?? '') !== '') throw notFound('Product not found');
+  return c.json({ success: true, ...(await loadProductKnowledge(c.env.DB, String(row.id))) });
+}
 
 async function productDetail(c: Context<AppContext>): Promise<Response> {
   const slug = c.req.param('slug') ?? '';

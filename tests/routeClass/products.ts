@@ -58,6 +58,8 @@ export default {
         'POST /completeness/refresh': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' } },
         'PUT /completeness/hide': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' } },
         'GET /:id/completeness': 'op',
+        // «اكتمال المعلومات» (the Bambu import spec §H.2): key names, statuses and counts — never a value or a cost.
+        'GET /:id/info-completeness': 'op',
         'GET /maintenance/orphans': 'op',
         'POST /maintenance/orphans/cleanup': { cls: 'op', noBody: NB.MEDIA },
         'POST /maintenance/media-cleanup/retry': { cls: 'op', noBody: NB.MEDIA },

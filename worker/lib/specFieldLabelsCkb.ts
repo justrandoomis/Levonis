@@ -172,6 +172,7 @@ export const SPEC_FIELD_LABEL_CKB: Readonly<Record<string, string>> = {
   storage: 'مەرجەکانی هەڵگرتن',
   certifications: 'بڕوانامەکان',
   spool_type: 'جۆری بەکرە',
+  product_family: 'خێزانی بەرهەم',
   drying: 'وشککردنەوە',
   tolerance: 'ڕێژەی جیاوازیی ڕێگەپێدراو',
   density: 'چڕی (density)',

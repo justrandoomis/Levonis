@@ -39,8 +39,10 @@ import type {
 import { parsePhysicalDimensions } from './physicalDimensions';
 import { PRODUCT_SKU_ROW_KEY, skuKeyOfStored } from '@levonis/pricing/skuChannel';
 import {
+  foldSwatches,
   liveValues,
   loadProductRelations,
+  valuesWithSwatchSql,
   type ColorLinkRow,
   type ColorRow,
   type OptionFulfillmentRow,
@@ -48,6 +50,7 @@ import {
   type OptionTransportRow,
   type OptionValueRow,
 } from './productRelations';
+import { withKnowledgeFallback } from './knowledge/schema';
 import {
   isInventoryMode,
   type CapacitySnapshot,
@@ -108,6 +111,15 @@ export interface ImageRow {
   /** 0099. Quarantined rows are provenance, never display media. */
   quarantined?: number | boolean | null;
   quarantine_reason?: string | null;
+  /**
+   * 0194 (the Bambu import spec §C.4 step 3, §G.3): a REPRESENTATIVE image row
+   * is bound to a value but shows the hero picture of one variant; this names
+   * that variant (`product_option_source_refs.via_variant_id`), so the page can
+   * drop the picture when the selection chose another value of any group of
+   * that variant (R6). Read by the customer's view only; absent before 0194 and
+   * on every row that is not a representative.
+   */
+  via_variant_id?: string | null;
 }
 
 /**
@@ -357,13 +369,31 @@ export function isMissingV2Schema(e: unknown): boolean {
 }
 
 /** Loads everything relational for one product in four batched reads. */
+/**
+ * 0194 (the Bambu import spec §C.4 step 3, §G.3): the image rows with the
+ * source variant of a REPRESENTATIVE binding, read in the same statement (a
+ * correlated lookup on `ix_posr_levonis`) — no new D1 wave. `where` names the
+ * rows by `i.product_id`. Only a database with 0194 can run it; the readers
+ * fall back to today's statement on the missing-table refusal
+ * (worker/lib/knowledge/schema.ts).
+ */
+const imagesWithSourceVariantSql = (where: string): string =>
+  `SELECT i.*,
+          (SELECT r.via_variant_id FROM product_option_source_refs r
+            WHERE r.levonis_id = i.id AND r.product_id = i.product_id AND r.kind = 'image' AND r.via_variant_id <> ''
+            ORDER BY r.via_variant_id LIMIT 1) AS via_variant_id
+     FROM product_images i
+    WHERE ${where}
+    ORDER BY i.sort_order, i.id`;
+
 export async function loadRelationsView(
   db: D1Database,
   productId: string,
   inventoryMode: unknown
 ): Promise<ProductRelationsView> {
   const [rel, variants, images, skuPrices] = await Promise.all([
-    loadProductRelations(db, productId).catch((e) => {
+    // The customer's view: each value with its 0194 swatch (same statement, see loadProductRelations).
+    loadProductRelations(db, productId, { swatches: true }).catch((e) => {
       console.error(
         `product relations unavailable (one product ${productId}): ${e instanceof Error ? e.message : String(e)}`
       );
@@ -376,10 +406,15 @@ export async function loadRelationsView(
         .all<VariantRow>()
     ),
     softAll<ImageRow>('images', () =>
-      db
-        .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order, id')
-        .bind(productId)
-        .all<ImageRow>()
+      withKnowledgeFallback(
+        db,
+        () => db.prepare(imagesWithSourceVariantSql('i.product_id = ?')).bind(productId).all<ImageRow>(),
+        () =>
+          db
+            .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order, id')
+            .bind(productId)
+            .all<ImageRow>()
+      )
     ),
     skuPriceRows(
       () => db.prepare(skuRowsV2Sql('product_id = ?')).bind(productId, productId).all<SkuPriceReadRow>(),
@@ -422,17 +457,27 @@ export async function loadRelationsViews(
       db.prepare(`SELECT * FROM product_option_groups WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, name_en`).bind(JSON.stringify(ids)).all<OptionGroupRow>()
     ),
     // Group by group, then value sort — the same order loadProductRelations
-    // reads, so a listing and a product page never disagree about it.
+    // reads, so a listing and a product page never disagree about it. Each
+    // value with its 0194 swatch, joined in the same statement.
     softAll<OptionValueRow>('values', () =>
-      db
-        .prepare(
-          `SELECT v.* FROM product_option_values v
-             LEFT JOIN product_option_groups g ON g.id = v.group_id
-            WHERE v.product_id IN (SELECT value FROM json_each(?))
-            ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`
-        )
-        .bind(JSON.stringify(ids))
-        .all<OptionValueRow>()
+      withKnowledgeFallback(
+        db,
+        async () => ({
+          results: foldSwatches(
+            (await db.prepare(valuesWithSwatchSql('v.product_id IN (SELECT value FROM json_each(?))')).bind(JSON.stringify(ids)).all<Record<string, unknown>>()).results ?? []
+          ),
+        }),
+        () =>
+          db
+            .prepare(
+              `SELECT v.* FROM product_option_values v
+                 LEFT JOIN product_option_groups g ON g.id = v.group_id
+                WHERE v.product_id IN (SELECT value FROM json_each(?))
+                ORDER BY COALESCE(g.sort, 0), COALESCE(g.name_en, ''), v.sort, v.name_en`
+            )
+            .bind(JSON.stringify(ids))
+            .all<OptionValueRow>()
+      )
     ),
     softAll<ColorRow>('colors', () =>
       db.prepare(`SELECT * FROM product_colors WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort, name_en`).bind(JSON.stringify(ids)).all<ColorRow>()
@@ -452,7 +497,11 @@ export async function loadRelationsViews(
       db.prepare(`SELECT * FROM product_variants WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY combo_key`).bind(JSON.stringify(ids)).all<VariantRow>()
     ),
     softAll<ImageRow>('images', () =>
-      db.prepare(`SELECT * FROM product_images WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort_order, id`).bind(JSON.stringify(ids)).all<ImageRow>()
+      withKnowledgeFallback(
+        db,
+        () => db.prepare(imagesWithSourceVariantSql('i.product_id IN (SELECT value FROM json_each(?))')).bind(JSON.stringify(ids)).all<ImageRow>(),
+        () => db.prepare(`SELECT * FROM product_images WHERE product_id IN (SELECT value FROM json_each(?)) ORDER BY sort_order, id`).bind(JSON.stringify(ids)).all<ImageRow>()
+      )
     ),
     softAll<OptionFulfillmentRow>('fulfillments', () =>
       db
@@ -1063,7 +1112,7 @@ function relationsBlock(view: ProductRelationsView, coarse: boolean) {
         id: g.id,
         name_en: g.name_en,
         sort: g.sort,
-        ...groupKnowledge(g),
+        ...groupKnowledge(g, view.values),
         values: view.values
           .filter((v) => v.group_id === g.id && truthy(v.active))
           .map((v) => ({
@@ -1116,6 +1165,9 @@ function relationsBlock(view: ProductRelationsView, coarse: boolean) {
       option_value_id: i.option_value_id,
       color_id: i.color_id,
       variant_id: i.variant_id,
+      // 0194: a representative row's source variant (the import spec §C.4 step 3, §G.3) — only where the
+      // row has one, so every other product's answer is byte-identical to before.
+      ...(typeof i.via_variant_id === 'string' && i.via_variant_id !== '' ? { via_variant_id: i.via_variant_id } : {}),
       width: i.width,
       height: i.height,
     })),
@@ -1129,13 +1181,18 @@ function relationsBlock(view: ProductRelationsView, coarse: boolean) {
  * returns them) — and never invented before. The same block feeds the priced
  * and the catalog-only page, so neither drops them; none of them is a price,
  * a cost or a stock fact.
+ *
+ * THE DEFAULT IS A VALUE THE CHOOSER CAN SHOW, OR NOTHING (0194: "'' = none; an
+ * unknown id is ignored"): an id that names no live, active value of this very
+ * group is answered '' — the page then preselects nothing from it (§G.3).
  */
 const GROUP_KNOWLEDGE_KEYS = ['name_ar', 'name_ckb', 'kind', 'default_value_id'] as const;
-function groupKnowledge(g: OptionGroupRow): Partial<Record<(typeof GROUP_KNOWLEDGE_KEYS)[number], string>> {
+function groupKnowledge(g: OptionGroupRow, values: readonly OptionValueRow[]): Partial<Record<(typeof GROUP_KNOWLEDGE_KEYS)[number], string>> {
   const out: Partial<Record<(typeof GROUP_KNOWLEDGE_KEYS)[number], string>> = {};
   for (const k of GROUP_KNOWLEDGE_KEYS) {
     const v = g[k];
-    if (typeof v === 'string') out[k] = v;
+    if (typeof v !== 'string') continue;
+    out[k] = k === 'default_value_id' && v !== '' && !values.some((x) => x.id === v && x.group_id === g.id && truthy(x.active)) ? '' : v;
   }
   return out;
 }

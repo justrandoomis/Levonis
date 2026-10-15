@@ -49,6 +49,14 @@ export const FACET_FIELDS = {
   material_type: 'material',
   diameter: 'diameter',
   color_name: 'color',
+  /**
+   * The Bambu import spec §G.5: the product's family (identity.family, mirrored
+   * by the importer into the template field `product_family` — every family)
+   * and the spool (`spool_type`, the materials family: «عبوة بدون بكرة» or
+   * «مع بكرة»). Both say nothing for a product nobody filled them in for.
+   */
+  product_family: 'family',
+  spool_type: 'spool',
 } as const;
 export type FacetField = keyof typeof FACET_FIELDS;
 export const FACET_FIELD_IDS = Object.keys(FACET_FIELDS) as FacetField[];
@@ -64,6 +72,37 @@ export const SIZE_BUCKETS = {
 export type SizeBucket = keyof typeof SIZE_BUCKETS;
 
 export const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'professional'] as const;
+/** `spool_type` (§G.5): a refill without a spool, or the filament on its spool. */
+export const SPOOL_FACETS = ['refill', 'spool'] as const;
+export type SpoolFacet = (typeof SPOOL_FACETS)[number];
+
+/**
+ * One piece of a `spool_type` value in words → its token. The template field
+ * (the materials family's «نوع البكرة»: With spool / Refill / Cardboard) and
+ * the importer's mirror both read through here: «Refill», «Refill (No Spool)»
+ * → refill; «With spool», «Filament with spool», «Cardboard» (a cardboard
+ * spool) → spool; anything else says nothing (never guessed).
+ */
+export function spoolToken(raw: string): SpoolFacet | null {
+  const t = raw.trim().toLowerCase();
+  if (t === '') return null;
+  if (/\brefill\b|\bno spool\b|\bwithout spool\b/.test(t)) return 'refill';
+  if (/\bspool\b|\bcardboard\b/.test(t)) return 'spool';
+  return null;
+}
+
+/**
+ * A `product_family` mirror → its token: the family code as the import writes
+ * it (`bambu_lab_3d_printers`), or the same words with spaces — lower case,
+ * one underscore between words.
+ */
+export function familyToken(raw: string): string | null {
+  const t = raw.trim().toLowerCase().replace(/[\s-]+/g, '_').replace(/_+/g, '_');
+  return /^[a-z0-9][a-z0-9_]{0,39}$/.test(t) ? t : null;
+}
+
+/** The separator of a multi-valued facet mirror (`color_name`, `spool_type`: "white | black"). */
+export const FACET_MULTI_SEPARATOR = ' | ';
 export const TECH_FACETS = ['fdm', 'resin'] as const;
 
 export const MAX_BRANDS = 10;
@@ -178,6 +217,10 @@ export function facetToken(field: FacetField, raw: string): string | null {
       return numericRangeToken(t);
     case 'diameter':
       return /^\d{1,2}(?:\.\d{1,3})?$/.test(t) ? String(Number(t)) : null;
+    case 'spool_type':
+      return oneOf(SPOOL_FACETS, t);
+    case 'product_family':
+      return familyToken(t);
     default:
       return FREE_TOKEN.test(t) ? t.replace(/\s+/g, ' ') : null;
   }

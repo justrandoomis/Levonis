@@ -747,7 +747,9 @@ IQD, with a pre-order discount of $50 = 75,000.
 - **VISIBLE**: the product is `active` and the owner's «إخفاء المنتجات الناقصة» switch does not hold it
   for a catalogue gap (`IMAGE` or `CATEGORY`, `CATALOG_BLOCKING_CODES`). Every customer READ asks it:
   the listing, search, sections, the product page, the public API, the sitemap, the bot preview, the
-  comparison, both favourites lists, the community search, the printer finder, «يناسب» and the RPC feed.
+  comparison, both favourites lists, the community search, the printer finder, «يناسب», the RPC feed and
+  the knowledge answer (`/api/products/:slug/knowledge`, its gate and its relation links; the Bambu
+  import spec §G.1).
 - **SELLABLE**: the old «listed» predicate byte for byte — visible, not held for ANY gap, and
   V2-published. Every PURCHASE path asks it: cart add, read and edit, the quote, checkout, Quick Buy, new
   gifts, bundles and mystery offers, the trade-in target (and, since Services S-P2, its search, the

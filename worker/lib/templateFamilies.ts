@@ -126,6 +126,17 @@ const t = (
 ): TemplateField => ({ id, label_ar, label_en, type, ...extra });
 
 /**
+ * «العائلة» — THE PRODUCT'S FAMILY, A FILTER (the Bambu import spec §G.5, §C.1).
+ * Shared by every family: the importer mirrors `identity.family` here
+ * (`bambu_lab_3d_printers`, `bambu_filament` …) and the listing offers it as
+ * the `family` facet (packages/catalog/src/discovery.ts FACET_FIELDS). A code
+ * for the filter, not a line of the specification table.
+ */
+const PRODUCT_FAMILY_FIELD: TemplateField = t('product_family', 'العائلة', 'Family', 'text', {
+  hint_ar: 'رمز العائلة للفلترة، مثال: bambu_filament',
+});
+
+/**
  * The values `use_cases` may hold, in the order the admin form offers them.
  * English by house rule (§3), and readable as they stand on the product page.
  * The printer finder maps its first question onto these (worker/lib/printerFinder.ts).
@@ -274,6 +285,7 @@ export const DEVICES: TemplateFamilyDef = {
         compare: { parse: 'list', better: 'none' },
         hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
       }),
+      PRODUCT_FAMILY_FIELD,
     ],
   },
   sections: {
@@ -1139,6 +1151,7 @@ export const MATERIALS: TemplateFamilyDef = {
         compare: { parse: 'list', better: 'none' },
         hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
       }),
+      PRODUCT_FAMILY_FIELD,
     ],
   },
   sections: {
@@ -1510,6 +1523,7 @@ const PHYSICAL_CORE: TemplateGroup = {
       compare: { parse: 'list', better: 'none' },
       hint_ar: 'عنصر في كل سطر — تُعرض للزبون كنقاط',
     }),
+    PRODUCT_FAMILY_FIELD,
   ],
 };
 
@@ -1567,7 +1581,7 @@ const LASER_CORE: TemplateGroup = {
     'model', 'release_year', 'skill_level', 'supported_materials',
     'power', 'dimensions', 'weight', 'connectivity', 'compatibility', 'display',
     'camera', 'camera_resolution', 'camera_fps', 'noise_level',
-    'companion_app', 'assembly', 'warranty', 'in_the_box'
+    'companion_app', 'assembly', 'warranty', 'in_the_box', 'product_family'
   ),
 };
 
@@ -1593,7 +1607,7 @@ const LASER_MATERIAL_CORE: TemplateGroup = {
     MATERIALS,
     'material_type', 'processing_mode', 'color_name', 'color_hex', 'finish',
     'compatibility', 'quantity_per_pack', 'operating_temp', 'storage',
-    'certifications', 'in_the_box'
+    'certifications', 'in_the_box', 'product_family'
   ),
 };
 

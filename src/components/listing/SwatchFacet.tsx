@@ -23,6 +23,8 @@ export default function SwatchFacet(props: {
   onToggle: (value: string) => void;
   labelledBy: string;
 }) {
-  const options = props.options.map((o) => ({ ...o, swatch: swatchFor(o.label) }));
+  // A base colour the importer mirrored is a token («white») drawn in the reader's words (the Bambu import
+  // spec §G.5): its dot comes from the token, since «أبيض» is no colour a browser knows.
+  const options = props.options.map((o) => ({ ...o, swatch: (o.value !== 'transparent' ? swatchFor(o.value) : undefined) ?? swatchFor(o.label) }));
   return <ChipFacet {...props} options={options} />;
 }

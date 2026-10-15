@@ -23,7 +23,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freshDb, stubApp, get, type Mount, type StubUser } from './fixtures/app';
 import { wavesD1 } from './fixtures/wavesD1';
-import { seedLiveCatalog, LIVE_PRODUCTS } from './fixtures/liveCatalog';
+import { seedLiveCatalog, LIVE_PRODUCTS, P } from './fixtures/liveCatalog';
 import { seedLayoutStore, SLUG } from './fixtures/storeLayout';
 import { homeRoutes, productRoutes, pricingCtxForUser } from '../worker/routes/products';
 import { storefrontRoutes } from '../worker/routes/storefront';
@@ -32,6 +32,7 @@ import { communityRoutes } from '../worker/routes/community';
 import { printQuoteRoutes } from '../worker/routes/printQuote';
 import { printRequestRoutes } from '../worker/routes/printRequests';
 import { PRICING_INPUTS_TTL_MS, forgetPricingInputs, pricingInputsFor } from '../worker/lib/membershipBenefits';
+import { compareRoutes } from '../worker/routes/compare';
 
 const ENV = { STORE_ROOT_DOMAIN: 'levonis-iq.com' };
 const HOST = `${SLUG}.levonis-iq.com`;
@@ -44,6 +45,7 @@ const mount: Mount = (a) => {
   a.route('/api/community', communityRoutes);
   a.route('/api/print-quote', printQuoteRoutes);
   a.route('/api/marketplace/print', printRequestRoutes);
+  a.route('/api/compare', compareRoutes);
   a.route('/api', miscRoutes);
 };
 
@@ -81,7 +83,17 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   { path: '/api/print-quote/printers', waves: [2, 2, 3], prepares: 3 },
   { path: '/api/print-quote/accessories', waves: [1, 1, 1], prepares: 1 },
   { path: '/api/marketplace/print/catalog', waves: [1, 1, 1], prepares: 3 },
+  // The Bambu import (spec §G.1): the knowledge answer — the VISIBLE gate, then its five reads in one wave
+  // (the relation targets' pictures only when a relation links a visible product). Measured 2 / 2 / 2.
+  { path: `/api/products/${LIVE_PRODUCTS[0].slug}/knowledge`, waves: [2, 2, 2], prepares: 6 },
 ];
+
+/**
+ * THE COMPARISON (not first paint; the Bambu import spec §G.5): the knowledge model's facts for the
+ * compare-flagged keys are ONE `IN` read in the wave that already reads the taxonomy and the pictures.
+ * Measured with 0194 on the database: warm 5, cold 6, member 8 waves; 25 statements cold.
+ */
+const COMPARE = { path: `/api/compare?ids=${P.H2D},${P.X2D}`, waves: [5, 6, 8] as const, prepares: 25 };
 
 test('every hot public route stays under its measured wave and prepare ceilings — cold isolate, warm isolate, signed in', async () => {
   const w = world();
@@ -97,6 +109,51 @@ test('every hot public route stays under its measured wave and prepare ceilings 
     for (const c of [cold, warm, member]) assert.ok(c.prepares <= r.prepares + (c === member ? 5 : 0), `${r.path}: ${c.prepares} prepares > ${r.prepares}`);
   }
   console.log(report.join('\n'));
+});
+
+test('the comparison stays under its measured ceiling with the knowledge read, which rides an existing wave', async () => {
+  const w = world();
+  const random = Math.random;
+  Math.random = () => 0.5; // the rate limiter's 2 % sweep is its own statement, not the comparison's
+  try {
+    const cold = await w.measure(COMPARE.path);
+    const warm = await w.measure(COMPARE.path);
+    const member = await w.measure(COMPARE.path, MEMBER);
+    assert.ok(warm.waves <= COMPARE.waves[0], `warm ${warm.waves}\n${warm.sqls.join('\n')}`);
+    assert.ok(cold.waves <= COMPARE.waves[1], `cold ${cold.waves}\n${cold.sqls.join('\n')}`);
+    assert.ok(member.waves <= COMPARE.waves[2], `member ${member.waves}\n${member.sqls.join('\n')}`);
+    assert.ok(cold.prepares <= COMPARE.prepares, `${cold.prepares} prepares`);
+    // (the adapter keeps a statement's first 90 characters)
+    assert.ok(cold.sqls.some((q) => q.startsWith('SELECT product_id, canonical_key, scope_kind')), `the knowledge read is sent\n${cold.sqls.join('\n')}`);
+  } finally {
+    Math.random = random;
+  }
+});
+
+test('the Bambu import adds no wave: the page body carries swatches and source variants, the cards their knowledge line', async () => {
+  const w = world();
+  const slug = LIVE_PRODUCTS.find((p) => p.id === P.H2D)!.slug;
+  w.raw.exec(`
+    INSERT INTO product_option_groups (id, product_id, name_en, sort, active, kind, default_value_id) VALUES ('g_w_ver', '${P.H2D}', 'Version', 0, 1, 'color', 'v_w_a');
+    INSERT INTO product_option_values (id, product_id, group_id, name_en, sort, active) VALUES
+      ('v_w_a', '${P.H2D}', 'g_w_ver', 'Jade White', 0, 1), ('v_w_b', '${P.H2D}', 'g_w_ver', 'Black', 1, 1);
+    INSERT INTO product_option_value_swatches (option_value_id, product_id, url, r2_key, width, height, published_hex, hex_source_ref, source_url)
+      VALUES ('v_w_a', '${P.H2D}', '/files/products/import/swatch/${'aa'.repeat(32)}.webp', 'products/import/swatch/${'aa'.repeat(32)}.webp', 128, 128, '', '', 'https://store.example/s.png');
+  `);
+  const page = await w.measure(`/api/products/${slug}`);
+  assert.ok(page.waves <= 2, `the product page: ${page.waves} waves\n${page.sqls.join('\n')}`);
+  // (the adapter keeps a statement's first 90 characters)
+  assert.ok(page.sqls.some((q) => q.startsWith('SELECT v.*, s.url AS swatch_url')), `the swatch is joined in the values statement\n${page.sqls.join('\n')}`);
+  assert.ok(page.sqls.some((q) => q.startsWith('SELECT i.*, (SELECT r.via_variant_id FROM product_option_source_refs')), 'the source variant rides the images statement');
+  assert.equal(page.sqls.filter((q) => q.includes('product_option_source_refs')).length, 1, 'and has no statement of its own');
+  const body = await (await get(stubApp(w.db, null, mount, { env: ENV }), `/api/products/${slug}`)).json() as { relations: { option_groups: Array<{ id: string; kind?: string; values: Array<{ id: string; swatch?: unknown }> }> } };
+  const group = body.relations.option_groups.find((g) => g.id === 'g_w_ver')!;
+  assert.equal(group.kind, 'color');
+  assert.ok(group.values.find((v) => v.id === 'v_w_a')?.swatch, 'the swatch rides the page body');
+  const list = await w.measure('/api/products');
+  assert.ok(list.waves <= 2, `the listing: ${list.waves} waves`);
+  const cards = (await (await get(stubApp(w.db, null, mount, { env: ENV }), '/api/products')).json() as { products: Array<Record<string, unknown>> }).products;
+  assert.ok(cards.some((c) => Array.isArray(c.key_specs) && c.section_name), 'the cards carry key_specs and section_name from the row and the taxonomy already read');
 });
 
 test('the pricing inputs: one wave cold, no statement warm, forgotten at once by the seam, re-read after the TTL', async () => {

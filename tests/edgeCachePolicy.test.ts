@@ -551,6 +551,9 @@ test('P2 review: an admin product write and a benefit rule purge the listing, th
       '/api/products',
       '/api/products/a',
       '/api/products/b c',
+      // The knowledge answer of each product named (the Bambu import spec §G.1).
+      '/api/products/a/knowledge',
+      '/api/products/b c/knowledge',
       '/api/public/v1/products',
       '/api/public/v1/products/a',
       '/api/public/v1/products/b%20c',

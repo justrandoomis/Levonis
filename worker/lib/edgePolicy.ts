@@ -323,7 +323,9 @@ export function storefrontDocumentPaths(slug: string, id?: string): string[] {
  * The apex answers a catalogue or pricing write changes: the first screen, the shelves, the listing, and the
  * product pages named — and, since a product with no price yet is SHOWN (DECISIONS row 240), the public API's
  * list and its pages named and the sitemap, so every price-state flip (a V2 write, FX-5, a completeness flip in
- * either direction) drops their copies too.
+ * either direction) drops their copies too. Each product named also drops its knowledge answer (the Bambu
+ * import spec §G.1: `/api/products/<slug>/knowledge`, five minutes at the edge), so a product write — its
+ * specifications, its documents, its visibility — is never answered from an older copy in this colo.
  */
 export function cataloguePaths(slugs: readonly string[] = []): string[] {
   const named = slugs.filter(Boolean);
@@ -332,6 +334,7 @@ export function cataloguePaths(slugs: readonly string[] = []): string[] {
     '/api/home/sections',
     '/api/products',
     ...named.map((s) => `/api/products/${s}`),
+    ...named.map((s) => `/api/products/${s}/knowledge`),
     '/api/public/v1/products',
     ...named.map((s) => `/api/public/v1/products/${encodeURIComponent(s)}`),
     '/sitemap.xml',

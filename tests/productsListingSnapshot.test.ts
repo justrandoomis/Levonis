@@ -24,7 +24,9 @@ import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { productRoutes } from '../worker/routes/products';
 
 // `price_status` (DECISIONS row 240): every card says whether it is priced; the snapshot predates it.
-const NEW_CARD_FIELDS = ['sale_types', 'created_at', 'compare_type', 'price_status'];
+// `section_name` and `key_specs` (the Bambu import spec §G.5): the card's knowledge line, from the row and the
+// taxonomy the listing already holds — asserted in the test below and in tests/productCardKnowledge.test.ts.
+const NEW_CARD_FIELDS = ['sale_types', 'created_at', 'compare_type', 'price_status', 'section_name', 'key_specs'];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withoutNewFields(body: Record<string, any>) {
@@ -115,6 +117,10 @@ test('the new card fields are there, and say what the row says', async () => {
   assert.equal(root.category.path, '/categories/printers');
   const pla = (await json(await get(app, '/api/products?category=cat_materials'))).products[0];
   assert.equal(pla.compare_type, 'filament');
+  // The card's knowledge line (§G.5): the section it is filed in and the registry's card keys for its type.
+  assert.deepEqual(x2d.key_specs, ['256 × 256 × 260 mm (Main nozzle)']);
+  assert.equal(x2d.section_name.en, 'FDM Printers');
+  assert.deepEqual(pla.key_specs, ['PLA', '1.75 mm', '1,000 g']);
   // No listing parameter → no listing envelope.
   assert.equal('total' in body, false);
   assert.equal('facets' in body, false);

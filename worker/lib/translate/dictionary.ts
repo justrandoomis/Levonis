@@ -393,6 +393,7 @@ export const PHRASES: Record<string, TermEntry> = {
   'not applicable': { ar: 'لا ينطبق', ckb: 'پەیوەندی نییە' },
   'operating temperature': { ar: 'درجة حرارة التشغيل', ckb: 'پلەی گەرمی کارکردن' },
   'spool type': { ar: 'نوع البكرة', ckb: 'جۆری بۆبین' },
+  'family': { ar: 'العائلة', ckb: 'خێزان' },
   'with spool': { ar: 'مع بكرة', ckb: 'لەگەڵ بۆبین' },
   'refill': { ar: 'تعبئة', ckb: 'پڕکردنەوە' },
   'cardboard': { ar: 'كرتون', ckb: 'کارتۆن' },

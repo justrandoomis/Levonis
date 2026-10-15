@@ -77,6 +77,7 @@ import { parseProductRow } from '../lib/productModel';
 import { applyRelations, loadRelationsViews } from '../lib/productOverlay';
 import { multicolorBadge, multicolorProfile, variantSheet, type MulticolorBadge, type MulticolorProfile } from '../lib/multicolor';
 import { pricingCtx, resolveVariantPricing, type PricingCtx } from './products';
+import { hasKnowledgeValue, knowledgeCellsFor, loadCompareKnowledge } from '../lib/knowledge/compare';
 
 export const compareRoutes = new Hono<AppContext>();
 
@@ -529,7 +530,7 @@ compareRoutes.get('/', async (c) => {
     );
   }
 
-  const [catalogRows, images, ctx, full] = await Promise.all([
+  const [catalogRows, images, ctx, full, knowledge] = await Promise.all([
     loadCatalogs(c.env.DB),
     loadCompareImages(c.env.DB, ids),
     pricingCtx(c),
@@ -539,6 +540,9 @@ compareRoutes.get('/', async (c) => {
       .bind(...ids)
       .all<Record<string, unknown>>()
       .then((r) => r.results ?? []),
+    // The knowledge model's facts for the compare-flagged keys (0194; the Bambu
+    // import spec §G.5): one IN read in this wave, null on a database without it.
+    loadCompareKnowledge(c.env.DB, ids),
   ]);
   /**
    * THE OPTIONS AND THEIR PRICES COME FROM THE TABLES, through the product
@@ -610,6 +614,14 @@ compareRoutes.get('/', async (c) => {
 
   /** The spec sheet of the CONFIGURATION: the product's, then the option's allow-listed differences. */
   const sheets = placed.map((p, i) => variantSheet(p.specs, picked[i]?.option ?? null));
+  /**
+   * THE KNOWLEDGE CELLS OF THE CONFIGURATION, by template field: the option's
+   * own facts first, then the product's — the same option the sheet above is
+   * narrowed to. Empty for a product nobody imported and before 0194.
+   */
+  const cells = slots.map((slot, i) =>
+    knowledgeCellsFor(knowledge?.get(slot.productId) ?? [], picked[i]?.option?.id ?? null)
+  );
 
   /**
    * «في المقارنة … يجب أن يكون الفيلمنت مقابل الفيلمنت الطابعة مقابل الطابعة».
@@ -667,7 +679,8 @@ compareRoutes.get('/', async (c) => {
     }
   }
 
-  const blank = placed.find((p) => !hasAnySpec(p.specs));
+  // A fact of the knowledge model is a spec to compare on, as much as a typed one.
+  const blank = placed.find((p, i) => !hasAnySpec(p.specs) && !hasKnowledgeValue(cells[i]));
   if (blank) {
     throw badRequest(
       `ما عدنا مواصفات مسجلة لـ«${label(blank.row)}»، فما تصير مقارنة عادلة. / ` +
@@ -740,6 +753,8 @@ compareRoutes.get('/', async (c) => {
       price_iqd: priceOf(i),
       // Open box / used / refurbished: the table opens with «الحالة» (0147).
       condition: parseConditionDoc(p.row.condition_doc),
+      // The knowledge model's cells: unit, test method, and a state's words instead of a blank.
+      knowledge: cells[i],
     })),
   });
 

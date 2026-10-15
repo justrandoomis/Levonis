@@ -56,8 +56,10 @@ import {
 } from './templateFamilies';
 import type { ConditionDoc } from './condition';
 import { translateText } from './translate/index';
+import { stateLabel, type SpecStatus } from './knowledge/labels';
 
 import type { CompareLens } from '@levonis/catalog/discoveryTypes';
+import { unitOf, round as roundUnit } from '@levonis/catalog/bambuImport/registry/units';
 
 export type CompareBasis = 'same_section' | 'same_type' | 'mixed';
 
@@ -93,6 +95,40 @@ export interface CompareValue {
    * the same products should not switch the reader to English.
    */
   i18n?: { ar?: string; ckb?: string };
+  /**
+   * THE KNOWLEDGE MODEL ANSWERED THIS CELL (0194 `product_spec_values`, the
+   * Bambu import spec §G.5 «Compare»): the fact's status. Absent on a cell read
+   * from `spec_fields`.
+   */
+  state?: SpecStatus;
+  /**
+   * The words a state shows INSTEAD OF A BLANK («غير متوفر في المصادر التي
+   * رُوجعت», «لم تنشره الشركة المصنّعة» …) or beside an unverified value
+   * («غير مؤكَّد»). Never set for a verified value. A cell carrying one with
+   * `missing: true` is still never a loss (D1).
+   */
+  state_label?: Trilingual;
+  /** The unit the cell's value is stated in, when the knowledge model gave one. */
+  unit?: string;
+  /** How the manufacturer measured the value (ISO 527, …), when it says. */
+  test_method?: string;
+}
+
+/**
+ * ONE FACT OF THE KNOWLEDGE MODEL, ready for a column (worker/lib/knowledge/
+ * compare.ts builds them, keyed by the template field the registry key
+ * mirrors). Public rows only, never the US 110 V table. An absent state
+ * (`not_found` …) carries `text: ''` and null numbers.
+ */
+export interface KnowledgeCell {
+  /** The registry key (`motion.max_speed`). */
+  key: string;
+  status: SpecStatus;
+  text: string;
+  num: number | null;
+  num_max: number | null;
+  unit: string;
+  test_method: string;
 }
 
 export interface CompareRow {
@@ -176,6 +212,13 @@ export interface CompareInputProduct {
    * running hours — the first thing a buyer of a used machine compares.
    */
   condition?: ConditionDoc | null;
+  /**
+   * The column's facts from the knowledge model, by template field id
+   * (worker/lib/knowledge/compare.ts `knowledgeCellsFor`). A field it answers
+   * is read from here; every other field from `spec_fields`, as before.
+   * Absent on a database without 0194 and for a product nobody imported.
+   */
+  knowledge?: Record<string, KnowledgeCell>;
 }
 
 /** A field nobody annotated: shown, read as text, never scored. */
@@ -575,6 +618,81 @@ export function readCompareValue(field: TemplateField, raw: string): CompareValu
   }
 }
 
+// ------------------------------------------------------- the knowledge model
+
+/** The states that carry a value; every other state says why there is none. */
+const VALUE_STATES: ReadonlySet<SpecStatus> = new Set<SpecStatus>(['verified', 'unverified']);
+
+/** True when a knowledge cell states a value (not merely why there is none). */
+export function knowledgeHasValue(cell: KnowledgeCell | undefined): boolean {
+  return !!cell && VALUE_STATES.has(cell.status) && (cell.text !== '' || cell.num !== null);
+}
+
+/**
+ * A number in the field's own unit: millimetres from centimetres or metres,
+ * grams from kilograms (registry/units.ts), as stated when the two units are
+ * the same. Null when they cannot be converted — such a value is shown as
+ * published and never scored against a number in another unit.
+ */
+export function inFieldUnit(value: number, from: string, to: string): number | null {
+  const a = from.trim();
+  const b = to.trim();
+  if (a === '' || b === '' || a === b) return value;
+  const ua = unitOf(a);
+  const ub = unitOf(b);
+  if (!ua || !ub) return a.toLowerCase() === b.toLowerCase() ? value : null;
+  if (ua.base && ub.base) return ua.base === ub.base ? roundUnit((value * (ua.factor ?? 1)) / (ub.factor ?? 1)) : null;
+  return ua.unit === ub.unit ? value : null;
+}
+
+/**
+ * One cell from a knowledge fact, read through the SAME parser as a typed
+ * value, so a fact and a typed value of the same field are formatted, ranked
+ * and charted alike. A verified value carries its state and its test method;
+ * an unverified one also says so in words.
+ */
+function readKnowledgeValue(field: TemplateField, cell: KnowledgeCell): CompareValue {
+  const cmp = field.compare ?? SHOWN_ONLY;
+  const fieldUnit = (field.unit ?? '').trim();
+  const label = stateLabel(cell.status);
+  const extras = {
+    state: cell.status,
+    ...(label ? { state_label: label } : {}),
+    ...(cell.test_method ? { test_method: cell.test_method } : {}),
+  };
+  let raw = cell.text;
+  let unit = fieldUnit || cell.unit;
+  if ((cmp.parse === 'number' || cmp.parse === 'range') && cell.num !== null) {
+    const lo = inFieldUnit(cell.num, cell.unit, fieldUnit);
+    const hi = cell.num_max === null ? null : inFieldUnit(cell.num_max, cell.unit, fieldUnit);
+    if (lo === null || (cell.num_max !== null && hi === null)) {
+      // A unit this field cannot take: the fact as published, unscored.
+      const shown = cell.text || withUnit(formatNumber(cell.num), cell.unit);
+      return { raw: shown, num: null, text: shown, missing: false, ...(cell.unit ? { unit: cell.unit } : {}), ...extras };
+    }
+    raw = hi === null ? String(lo) : `${lo} - ${hi}`;
+  } else if (cell.text === '' && cell.num !== null) {
+    raw = String(cell.num);
+    unit = cell.unit || fieldUnit;
+  }
+  const value = readCompareValue(unit === fieldUnit ? field : { ...field, unit }, raw);
+  return { ...value, ...(unit ? { unit } : {}), ...extras };
+}
+
+/**
+ * THE CELL OF ONE COLUMN (the Bambu import spec §G.5): the knowledge model's
+ * value first; failing one, the value the shop typed into `spec_fields`;
+ * failing both, the state's words instead of a blank. Without a knowledge cell
+ * this is `readCompareValue` exactly as before.
+ */
+function columnValue(field: TemplateField, raw: string, cell: KnowledgeCell | undefined): CompareValue {
+  if (!cell) return readCompareValue(field, raw);
+  if (knowledgeHasValue(cell)) return readKnowledgeValue(field, cell);
+  if (raw.trim() !== '') return readCompareValue(field, raw);
+  const label = stateLabel(cell.status);
+  return { raw: '', num: null, text: MISSING_TEXT, missing: true, state: cell.status, ...(label ? { state_label: label } : {}) };
+}
+
 // ------------------------------------------------------------------- scoring
 
 const same = (a: number, b: number): boolean =>
@@ -948,11 +1066,14 @@ export function compareProducts(input: { products: CompareInputProduct[] }): Com
       // An instruction to the engine (`variant_specs`), never a row.
       if (f.compare?.hidden) continue;
       const raws = products.map((p) => rawOf(p.spec_fields, f.id));
-      // A row nobody filled teaches nothing; it is not shown as two «غير مذكور».
-      if (raws.every((r) => r === '')) continue;
+      // The knowledge model's fact for this field, per column (0194; absent before it).
+      const cells = products.map((p) => p.knowledge?.[f.id]);
+      // A row nobody filled teaches nothing; it is not shown as two «غير مذكور» —
+      // nor as two «غير متوفر في المصادر التي رُوجعت»: a state alone is no row.
+      if (raws.every((r, i) => r === '' && !knowledgeHasValue(cells[i]))) continue;
       claimed.add(f.id);
       const cmp = f.compare ?? SHOWN_ONLY;
-      const values = raws.map((raw) => withTranslation(readCompareValue(f, raw), cmp.parse));
+      const values = raws.map((raw, i) => withTranslation(columnValue(f, raw, cells[i]), cmp.parse));
       const { winners, losers } = rankRow(cmp.better, cmp.parse, values);
       const weight = cmp.better === 'none' ? 0 : cmp.weight ?? 0;
       rows.push({

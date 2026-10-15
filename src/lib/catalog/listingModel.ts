@@ -28,12 +28,21 @@ import {
 import type { CatalogTreeNode, FacetField, FacetSet, ListingSort, ListingState } from './types';
 import { groupedNumber } from '../localeNumber';
 import type { CatalogLang } from './copy';
+import {
+  IMPORT_FACET_TITLES,
+  SPOOL_LABELS,
+  baseColourLabel,
+  familyLabel,
+  type FacetWords,
+} from '../../../packages/catalog/src/facetVocabulary';
 
 // OWNER: Sorani to be written by hand — every ar/en pair in this file falls
 // back to Arabic in Sorani, except the words reused verbatim from existing
 // hand-written copy (noted where they are).
 
 const L = (lang: CatalogLang, ar: string, en: string) => (lang === 'en' ? en : ar);
+/** The import's facet words (the Bambu import spec §G.5), authored in all three languages. */
+const W = (lang: CatalogLang, w: FacetWords) => w[lang];
 
 export type SectionType = 'printer' | 'filament' | 'default';
 
@@ -235,6 +244,16 @@ export function specValueLabel(field: FacetField, token: string, lang: CatalogLa
       return levelLabel(token, lang);
     case 'diameter':
       return lang === 'en' ? `${token} mm` : `${token} مم`;
+    case 'spool_type':
+      return token === 'refill' || token === 'spool' ? W(lang, SPOOL_LABELS[token]) : token;
+    case 'product_family':
+      return W(lang, familyLabel(token));
+    case 'color_name': {
+      // A base colour the importer mirrored («white») in the reader's words; an admin's own colour as typed.
+      const base = baseColourLabel(token);
+      if (base) return W(lang, base);
+      return (label ?? '').trim() || token;
+    }
     default: {
       const text = (label ?? '').trim();
       if (text) return text;
@@ -262,6 +281,10 @@ export function facetTitle(field: FacetField, lang: CatalogLang): string {
       return L(lang, 'القطر', 'Diameter');
     case 'color_name':
       return L(lang, 'اللون', 'Colour');
+    case 'product_family':
+      return W(lang, IMPORT_FACET_TITLES.product_family);
+    case 'spool_type':
+      return W(lang, IMPORT_FACET_TITLES.spool_type);
   }
 }
 
@@ -486,8 +509,8 @@ export function quickChips(type: SectionType, f: FacetSet | null, s: ListingStat
 
 export type SheetSection = 'availability' | 'printers' | 'price' | 'brands' | 'offers' | FacetField;
 
-const PRINTER_FACETS: FacetField[] = ['technology', 'max_colors', 'build_volume', 'enclosed', 'skill_level'];
-const FILAMENT_FACETS: FacetField[] = ['material_type', 'diameter', 'color_name'];
+const PRINTER_FACETS: FacetField[] = ['technology', 'max_colors', 'build_volume', 'enclosed', 'skill_level', 'product_family'];
+const FILAMENT_FACETS: FacetField[] = ['material_type', 'diameter', 'color_name', 'spool_type', 'product_family'];
 
 /** Does a facet offer a real choice here (≥ 2 values with products), or is it on? */
 export function specDiscriminates(f: FacetSet, s: ListingState, field: FacetField): boolean {

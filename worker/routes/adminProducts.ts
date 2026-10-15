@@ -33,6 +33,7 @@ import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { registerCompletenessRoutes } from './adminCompleteness';
 import { completenessInstalled, listing } from '../lib/listing';
+import { loadInfoCompleteness, loadInfoCompletenessCard } from '../lib/knowledge/infoCompleteness';
 import { isCatalogBlockingCode } from '@levonis/contracts/productCompleteness';
 import { priceRequestsInstalled } from '../lib/priceRequests';
 import { parseMissing, projectItems } from '../lib/productCompleteness';
@@ -822,10 +823,13 @@ adminProductsRoutes.get('/', async (c) => {
       .bind(...params)
       .first<{ n: number }>(),
   ]);
-  const images = await loadAuthoritativeProductImages(
-    c.env.DB,
-    list.results.map((product) => String(product.id))
-  );
+  const pageIds = list.results.map((product) => String(product.id));
+  const [images, info] = await Promise.all([
+    loadAuthoritativeProductImages(c.env.DB, pageIds),
+    // «اكتمال المعلومات» (the Bambu import spec §H.2): one GROUP BY for the page, beside the pictures — no
+    // new wave; null without 0194. Separate from the commercial «ناقص» above.
+    loadInfoCompleteness(c.env.DB, pageIds),
+  ]);
 
   return c.json({
     success: true,
@@ -874,6 +878,9 @@ adminProductsRoutes.get('/', async (c) => {
           Number(r.completeness_held ?? 0) === 1 && parseMissing(r.completeness_missing).some((i) => isCatalogBlockingCode(String(i.code))),
         // Distinct people with an open «طلب السعر» (a count, never who): null without 0193.
         price_requests: requestsInstalled ? Number(r.price_requests ?? 0) : null,
+        // «اكتمال المعلومات» (import spec §H.2): how well the knowledge model describes the product — null for a
+        // product with no knowledge row (and without 0194). Counts and a ratio, never a value.
+        info_completeness: info?.get(String(r.id)) ?? null,
         brand_id: (r.brand_id as string | null) ?? null,
         image: images.get(String(r.id)) ?? '',
         created_at: (r.created_at as string | null) ?? null,
@@ -1529,6 +1536,19 @@ adminProductsRoutes.put('/:id/pricing', limitRoute('pricing-write', 600), async 
   const slug = typeof read.loaded.row.slug === 'string' ? read.loaded.row.slug : null;
   if (slug) c.set('catalogueSlug', slug);
   return c.json({ success: true, already: false, saved: verdict === 'data' ? 'data' : 'prices', ...(await v2StoredAnswer(c, pid)) });
+});
+
+/**
+ * «اكتمال المعلومات» — THE FORM CARD (the Bambu import spec §H.2): the counts by status over the expected keys
+ * of the product's type, and every applicable key that is not verified, by name. Staff only (this router's
+ * requireAdmin); key names and statuses, never a value or a source. `null` for a product with no knowledge row
+ * and on a database without 0194. Separate from the commercial `/:id/completeness`.
+ */
+adminProductsRoutes.get('/:id/info-completeness', async (c) => {
+  const id = c.req.param('id');
+  const exists = await c.env.DB.prepare('SELECT 1 AS ok FROM products WHERE id = ?').bind(id).first<{ ok: number }>();
+  if (!exists) throw notFound('Product not found');
+  return c.json({ success: true, info_completeness: await loadInfoCompletenessCard(c.env.DB, id) });
 });
 
 adminProductsRoutes.get('/:id', async (c) => {
