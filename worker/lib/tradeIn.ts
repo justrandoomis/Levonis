@@ -2157,7 +2157,9 @@ async function fixValue(
   try {
     await db.batch(stmts);
   } catch (e) {
-    if (isAbort(e)) {
+    // 0191's trg_trade_in_one_credit (a second credit coupon for this request) is an
+    // invariant no path reaches — a request mints once — and reads as the stale answer if it ever does.
+    if (isAbort(e) || /TRADE_IN_CREDIT_EXISTS/.test(e instanceof Error ? e.message : String(e))) {
       const now2 = await loadRequest(db, req.id);
       if (now2 && now2.offer_no !== req.offer_no) throw refuse('TRADE_IN_OFFER_STALE');
       throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
