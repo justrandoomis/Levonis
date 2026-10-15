@@ -3329,7 +3329,8 @@ export default function Product() {
                         ) : null}
                         <span className="min-w-0 text-start">
                           <span className="block truncate max-w-[10rem]">{label}</span>
-                          {chip ? <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span> : null}
+                          {/* No stock word beside «بلا سعر»: nobody claims stock for a choice with no price (row 240). */}
+                          {chip && !unpricedChoice ? <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span> : null}
                           {unpricedChoice ? noPriceTag : null}
                         </span>
                         <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
@@ -3481,7 +3482,9 @@ export default function Product() {
             {options.map((opt) => {
               const selected = optionId === opt.id;
               const label = pickName(opt.name_en, opt.name, opt.name_ar) || opt.id;
-              const chip = !optionSellsDirect(opt)
+              // No stock word beside «بلا سعر» (row 240): the tag wins.
+              const noPrice = optionNoPrice([opt.id], opt.id);
+              const chip = noPrice || !optionSellsDirect(opt)
                 ? null
                 : invMode === 'OPTION'
                   ? levelChip(availByValue.get(opt.id))
@@ -3515,7 +3518,7 @@ export default function Product() {
                   <span className="min-w-0 text-start">
                     <span className="block truncate max-w-[10rem]">{label}</span>
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
-                    {optionNoPrice([opt.id], opt.id) ? noPriceTag : null}
+                    {noPrice ? noPriceTag : null}
                   </span>
                   <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
@@ -3546,11 +3549,15 @@ export default function Product() {
               const comboKey = optionValueIds.length
                 ? [...optionValueIds].sort().map((id) => `o:${id}`).concat(`c:${col.id}`).join('|')
                 : '';
-              const chip = invMode === 'COLOR'
-                ? levelChip(availByColor.get(col.id))
-                : invMode === 'VARIANT_COMBINATION' && comboKey
-                  ? levelChip(variantAvailable.get(comboKey))
-                  : null;
+              // No stock word beside «بلا سعر» (row 240): the tag wins.
+              const noPrice = colorNoPrice(col.id);
+              const chip = noPrice
+                ? null
+                : invMode === 'COLOR'
+                  ? levelChip(availByColor.get(col.id))
+                  : invMode === 'VARIANT_COMBINATION' && comboKey
+                    ? levelChip(variantAvailable.get(comboKey))
+                    : null;
               return (
                 <button
                   key={col.id}
@@ -3587,7 +3594,7 @@ export default function Product() {
                   <span className="min-w-0 text-start">
                     <span className="block truncate max-w-[9rem]">{label}</span>
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
-                    {colorNoPrice(col.id) ? noPriceTag : null}
+                    {noPrice ? noPriceTag : null}
                   </span>
                   <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>

@@ -21,7 +21,7 @@ import { LanguageProvider } from '../src/LanguageContext';
 import CardPrice from '../src/components/CardPrice';
 import ProductCard from '../src/components/home/ProductCard';
 import PriceRow from '../src/components/compare/PriceRow';
-import { availableFirst, cardAvailability, memberLine, type CardProduct } from '../src/lib/productCard';
+import { availableFirst, cardAvailability, laterIsPreorder, memberLine, type CardProduct } from '../src/lib/productCard';
 import { isUnpriced, UNPRICED_TEXT } from '../src/lib/priceStatus';
 import type { CompareProductCard, CompareRow } from '../src/lib/compare';
 
@@ -161,6 +161,23 @@ test('availableFirst (rule R1): direct stock, then the rest, then catalog-only �
   assert.deepEqual([r2.splitAt, r2.unpricedAt], [-1, 1]);
   // Nothing but unpriced: no divider at all.
   assert.deepEqual([availableFirst([u1, u2]).splitAt, availableFirst([u1, u2]).unpricedAt], [-1, -1]);
+});
+
+test('the «بطلب مسبق» divider reads its own group, never the catalog-only tail after it', () => {
+  const now = priced({ id: 'now', direct_stock_available: 3 });
+  const pre = priced({ id: 'pre', direct_stock_available: 0, sale_types: ['pre_order'] });
+  const u = unpriced({ id: 'u' });
+  assert.equal(cardAvailability(pre).state, 'preorder');
+  assert.equal(cardAvailability(u).state, 'unknown', 'an unpriced card names no stock state');
+  const ordered = availableFirst([now, pre, u]);
+  assert.deepEqual([ordered.splitAt, ordered.unpricedAt], [1, 2]);
+  assert.equal(laterIsPreorder(ordered), true, 'pre-order, not «ليست في المخزون الآن», with catalog-only products after it');
+  assert.equal(laterIsPreorder(availableFirst([now, pre])), true);
+  // A later group that is not all pre-order keeps the stock wording.
+  const out = priced({ id: 'out', direct_stock_available: 0, sale_types: ['direct_sale'] });
+  assert.equal(laterIsPreorder(availableFirst([now, pre, out, u])), false);
+  // No second group: no divider to label.
+  assert.equal(laterIsPreorder(availableFirst([now, u])), false);
 });
 
 test('compare: a catalog-only column says why it has no figure, and is never «الأرخص»', () => {

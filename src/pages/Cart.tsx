@@ -325,6 +325,8 @@ interface UnavailableLine {
   image: string;
   /** `PRICE_NOT_AVAILABLE`: still shown in the shop, with no price yet (catalog-only, DECISIONS rows 239-240). */
   code: 'PRODUCT_CURRENTLY_UNAVAILABLE' | 'PRICE_NOT_AVAILABLE';
+  /** Its page, where «طلب السعر» is: a `PRICE_NOT_AVAILABLE` line only (absent from an older server). */
+  slug?: string | null;
 }
 
 interface CartResponse {
@@ -1519,14 +1521,26 @@ export default function Cart() {
                       : loc('غير متاح حاليًا — أزله من السلة', 'Not available right now — remove it from your cart', 'ئێستا بەردەست نییە — لە سەبەتەکەت لای ببە')}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void removeUnavailable(line)}
-                  disabled={removingUnavailable === line.cart_item_id}
-                  className="lv-button lv-button-secondary shrink-0 px-3 text-sm"
-                >
-                  {loc('أزل', 'Remove', 'لای ببە')}
-                </button>
+                {/* The sentence names a next step, so the line offers it: the product's page, where «طلب السعر» is. */}
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  {line.code === 'PRICE_NOT_AVAILABLE' && line.slug ? (
+                    <Link
+                      to={`/product/${encodeURIComponent(line.slug)}`}
+                      data-cart-unavailable-request
+                      className="lv-button lv-button-primary px-3 text-sm"
+                    >
+                      {loc('طلب السعر', 'Request price', 'داوای نرخ بکە')}
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void removeUnavailable(line)}
+                    disabled={removingUnavailable === line.cart_item_id}
+                    className="lv-button lv-button-secondary px-3 text-sm"
+                  >
+                    {loc('أزل', 'Remove', 'لای ببە')}
+                  </button>
+                </div>
               </div>
             ))}
           </section>

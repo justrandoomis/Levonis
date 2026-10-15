@@ -895,9 +895,12 @@ function fmtIqd(loc: Locale, n: number): string {
   return loc === 'en' ? `${num} IQD` : `${num} د.ع`;
 }
 
-/** «السعر: …» — or «السعر غير متوفر حالياً» for a catalog-only product (DECISIONS row 240): never a 0. */
-function priceSubtitle(loc: Locale, price: number | null): string {
-  return price === null || !(price > 0) ? `${tr(loc, 'f_price')}: ${tr(loc, 'price_unavailable')}` : `${tr(loc, 'f_price')}: ${fmtIqd(loc, price)}`;
+/**
+ * «السعر: …» — or «السعر غير متوفر حالياً» alone for a catalog-only product (DECISIONS row 240): never a 0, and
+ * never «السعر: السعر غير متوفر…» (the sentence already names the price).
+ */
+export function priceSubtitle(loc: Locale, price: number | null): string {
+  return price === null || !(price > 0) ? tr(loc, 'price_unavailable') : `${tr(loc, 'f_price')}: ${fmtIqd(loc, price)}`;
 }
 
 function fmtDate(iso: unknown): string {

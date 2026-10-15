@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../../LanguageContext';
 import ProductCard from '../home/ProductCard';
-import { availableFirst, cardAvailability } from '../../lib/productCard';
+import { availableFirst, laterIsPreorder } from '../../lib/productCard';
 import type { ApiProduct } from '../../lib/api';
 import { UNPRICED_TEXT } from '../../lib/priceStatus';
 import '../../styles/catalog.css';
@@ -25,8 +25,7 @@ import '../../styles/catalog.css';
 export default function ProductGrid({ products, divider, withColumn }: { products: ApiProduct[]; divider: boolean; withColumn: boolean }) {
   const { loc } = useLanguage();
   const ordered = divider ? availableFirst(products) : { items: products, splitAt: -1, unpricedAt: -1 };
-  const laterLabel =
-    ordered.splitAt > 0 && ordered.items.slice(ordered.splitAt).every((p) => cardAvailability(p).state === 'preorder')
+  const laterLabel = laterIsPreorder(ordered)
       ? loc('بطلب مسبق', 'Pre-order')
       : loc('ليست في المخزون الآن', 'Not in stock right now');
   // OWNER: Sorani to be written by hand (the two divider labels above — the Products page's own wording).

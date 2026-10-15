@@ -24,7 +24,8 @@
  *      «بلا سعر» and «طلب السعر» for Jade only — never another SKU's price,
  *      not even while Jade is chosen and the model is not.
  *   5  THE CART REFUSES IT. The door answers 409 PRICE_NOT_AVAILABLE, and an
- *      old cart line reads that refusal's sentence with no number.
+ *      old cart line reads that refusal's sentence with no number and links
+ *      «طلب السعر» to the product page.
  *   6  ENGLISH AND SORANI: the card, the page, «طلب السعر» and the requested
  *      state in en and ckb (and never the Arabic in a ckb slot).
  *   7  THE PRICE ARRIVES. The owner's «تحديد السعر» opens the product form;
@@ -542,6 +543,7 @@ try {
         check('…and no legacy sentinel', legacyHits(text, W.legacy).length === 0, legacyHits(text, W.legacy));
         const cta = guest.page.locator('[data-price-request-bar] [data-price-request-cta]');
         check('the phone bar holds «طلب السعر», waiting for the choice (aria-disabled)', (await cta.count()) === 1 && (await cta.getAttribute('aria-disabled')) === 'true');
+        check('…with «اختر الخيارات أولاً» right above it, in the bar (never off-screen in the card)', (await guest.page.locator('[data-price-request-bar] [data-price-request-helper]').count()) === 1 && (await guest.page.locator('[data-price-request] [data-price-request-helper]').count()) === 0);
       }
       check(`${view}/${theme}: no horizontal scroll on the product page`, await noSideScroll(guest.page));
       await shot(guest.page, `1-product-${view}-${theme}`);
@@ -587,6 +589,7 @@ try {
     const post = g.answers.find((a) => a.method === 'POST' && a.path === '/api/price-requests');
     check('one tap = one POST, which the server answers open', post?.status === 200 && JSON.parse(post.text)?.request?.state === 'open', post?.text?.slice(0, 200));
     check('«طلبت السعر» replaces the button', (await g.page.locator('[data-price-request="requested"]').count()) === 1 && (await bodyText(g.page)).includes(REQUESTED.ar));
+    check('…focus moves to the bar’s «طلبت السعر», and the live region says so', (await g.page.evaluate(() => document.activeElement?.hasAttribute('data-price-request-done') === true)) && (await g.page.locator('[data-price-request-said]').innerText().catch(() => '')).includes(REQUESTED.ar));
     await g.page.waitForTimeout(600); // the switch's own transition
     await shot(g.page, '2-requested-phone-light');
     await visit(g.page, `/product/${W.catalog.slug}`);
@@ -597,6 +600,7 @@ try {
     await g.page.locator('[data-price-request-withdraw]').click();
     await g.page.locator('[data-price-request="ready"]').waitFor({ timeout: 10000 }).catch(() => {});
     check('«سحب الطلب» → back to the button', (await g.page.locator('[data-price-request="ready"]').count()) === 1);
+    check('…with focus on «طلب السعر» again', await g.page.evaluate(() => document.activeElement?.getAttribute('data-price-request-cta') === 'ready'));
     // Ask again for the queue (the server reopens the same row).
     await g.page.locator('[data-price-request-bar] [data-price-request-cta]').click();
     await g.page.locator('[data-price-request="requested"]').waitFor({ timeout: 10000 }).catch(() => {});
@@ -743,7 +747,11 @@ try {
     }
     await visit(s.page, '/cart');
     const text = await bodyText(s.page);
-    if (theme === 'light') check('the cart page says the refusal’s sentence, with no number', text.includes('سعر هذا المنتج غير متوفر حالياً') && legacyHits(text, W.legacy).length === 0);
+    if (theme === 'light') {
+      check('the cart page says the refusal’s sentence, with no number', text.includes('سعر هذا المنتج غير متوفر حالياً') && legacyHits(text, W.legacy).length === 0);
+      const ask = s.page.locator('[data-cart-unavailable-request]').first();
+      check('…and offers the step it names: «طلب السعر» links to the product page', (await ask.count()) === 1 && (await ask.getAttribute('href')) === `/product/${W.catalog.slug}`);
+    }
     await shot(s.page, `5-cart-phone-${theme}`);
     await s.ctx.close();
   }

@@ -199,3 +199,7 @@ export function availableFirst<T extends Pick<ApiProduct, 'direct_stock_availabl
     unpricedAt: at && unpriced.length ? at : -1,
   };
 }
+
+/** The «بطلب مسبق» divider's group is pre-order only — its own slice, never the catalog-only tail after it. */
+export const laterIsPreorder = (o: { items: Parameters<typeof cardAvailability>[0][]; splitAt: number; unpricedAt: number }): boolean =>
+  o.splitAt > 0 && o.items.slice(o.splitAt, o.unpricedAt < 0 ? undefined : o.unpricedAt).every((p) => cardAvailability(p).state === 'preorder');

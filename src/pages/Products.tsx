@@ -9,7 +9,7 @@ import { Skeleton, ProductGridSkeleton } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { readPageCache, writePageCache } from '../lib/pageCache';
 import ProductCard from '../components/home/ProductCard';
-import { availableFirst, cardAvailability } from '../lib/productCard';
+import { availableFirst, laterIsPreorder } from '../lib/productCard';
 import { UNPRICED_TEXT } from '../lib/priceStatus';
 import LiveSearch from '../components/search/LiveSearch';
 import { takePrimedJson } from '../lib/bootFetch';
@@ -182,8 +182,7 @@ export default function Products() {
    * the shop's own order — and a quiet divider names the second group.
    */
   const ordered = search ? { items: products, splitAt: -1, unpricedAt: -1 } : availableFirst(products);
-  const laterLabel =
-    ordered.splitAt > 0 && ordered.items.slice(ordered.splitAt).every((p) => cardAvailability(p).state === 'preorder')
+  const laterLabel = laterIsPreorder(ordered)
       ? loc('بطلب مسبق', 'Pre-order')
       : loc('ليست في المخزون الآن', 'Not in stock right now');
   // OWNER: Sorani to be written by hand (the two divider labels above).

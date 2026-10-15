@@ -26,6 +26,7 @@ import { get, json, put } from './fixtures/app';
 import { P } from './fixtures/liveCatalog';
 import { CAT, CUSTOMER_ROLES, LEGACY_NUMBERS, catalogLeaks, catalogOnlyWorld, type CatalogOnlyWorld } from './fixtures/catalogOnly';
 import { CatalogEntrypoint } from '../worker/entrypoints/CatalogEntrypoint';
+import { priceSubtitle } from '../worker/routes/support';
 import { toSearchDoc } from '../worker/lib/search/document';
 import { planSearchIndex } from '../worker/lib/search/store';
 
@@ -288,4 +289,16 @@ test('the quote refuses it at the door: 409 PRICE_NOT_AVAILABLE, no number', asy
     assertClean(body, `${role} quote`);
     assert.equal(body.code, 'PRICE_NOT_AVAILABLE');
   }
+});
+
+test('the assistant card of an unpriced product says the sentence once — never «السعر: السعر غير متوفر»', () => {
+  const words = { ar: 'السعر', en: 'Price', ckb: 'نرخ' } as const;
+  for (const loc of ['ar', 'en', 'ckb'] as const) {
+    const none = priceSubtitle(loc, null);
+    assert.equal(none.split(words[loc]).length - 1, 1, `${loc}: «${none}»`);
+    assert.doesNotMatch(none, /[0-9٠-٩]/);
+    assert.equal(priceSubtitle(loc, 0), none, 'never a 0');
+    assert.match(priceSubtitle(loc, 1_250_000), /1,250,000/);
+  }
+  assert.equal(priceSubtitle('en', null), 'Price not available yet');
 });

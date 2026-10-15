@@ -152,6 +152,42 @@ test('signed in, rows still loading: the switch is visible and ON before the fir
   assert.match(text(html), new RegExp(PRICE_REQUEST_TEXT.ar.notifyMe));
 });
 
+test('one live region in every view, mounted before it has words (a region born with its text is often not read)', () => {
+  for (const html of [render({}), render({ selectionComplete: false }), render({}, true)]) {
+    const regions = html.match(/role="status"/g) ?? [];
+    assert.equal(regions.length, 1, html);
+    assert.match(html, /<p role="status" aria-live="polite" data-price-request-said="true" class="sr-only"><\/p>/);
+  }
+});
+
+test('the answer lives where the tap happened: on a phone the helper and a refusal sit in the bar above the button; focus follows', () => {
+  const src = readFileSync(join(ROOT, 'src/components/product/PriceRequestPanel.tsx'), 'utf8');
+  // In the bar: the helper, the refusal, then the button — the card keeps neither while the bar exists.
+  assert.match(src, /createPortal\(\s*<>\s*\{helper\}\s*\{alert\}\s*\{cta\}\s*<\/>,\s*barSlot\s*\)/);
+  assert.match(src, /\{barSlot \? null : helper\}/);
+  assert.match(src, /\{request \? null : cta\}\s*\{alert\}/);
+  // After a send focus goes to what replaced the button (the bar's chip on a phone, «سحب الطلب» on a desktop);
+  // after a withdrawal, back to «طلب السعر».
+  assert.match(src, /setFocusTo\('done'\)/);
+  assert.match(src, /setFocusTo\('cta'\)/);
+  assert.match(src, /focusTo === 'cta' \? ctaRef\.current : barSlot \? doneRef\.current : withdrawRef\.current/);
+  assert.match(src, /ref=\{doneRef\}\s*tabIndex=\{-1\}/);
+  for (const l of ['ar', 'en', 'ckb'] as const) assert.ok(PRICE_REQUEST_TEXT[l].withdrawn, `${l}.withdrawn`);
+});
+
+test('no stock word beside «بلا سعر»: a choice with no price never carries «نفد» or «باقي N»', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
+  assert.match(src, /\{chip && !unpricedChoice \? <span/);
+  assert.equal((src.match(/const noPrice = (optionNoPrice\(\[opt\.id\], opt\.id\)|colorNoPrice\(col\.id\));/g) ?? []).length, 2);
+  assert.equal((src.match(/const chip = noPrice(\s*\|\| !optionSellsDirect\(opt\))?\s*\? null/g) ?? []).length, 2);
+});
+
+test('the cart: a line with no price links to its page, where the price is asked for', () => {
+  const src = readFileSync(join(ROOT, 'src/pages/Cart.tsx'), 'utf8');
+  assert.match(src, /line\.code === 'PRICE_NOT_AVAILABLE' && line\.slug \? \(\s*<Link\s*to=\{`\/product\/\$\{encodeURIComponent\(line\.slug\)\}`\}/);
+  assert.match(src, /loc\('طلب السعر', 'Request price', 'داوای نرخ بکە'\)/);
+});
+
 test('a priced selection draws no panel at all', () => {
   assert.equal(render({ productStatus: 'priced', selectionUnpriced: false }), '');
 });
