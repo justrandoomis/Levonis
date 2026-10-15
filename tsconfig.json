@@ -38,6 +38,10 @@
     "services",
     // The perf lab's scratch directory (gitignored): another builder's
     // fixture .ts files there once put hundreds of errors into this project.
-    "scratchpad"
+    "scratchpad",
+    // Handoff material (the Bambu import's P0 corpus tools and agent briefs):
+    // reference copies that import the sandbox they ran in, never shipped and
+    // never run by CI.
+    "docs"
   ]
 }
