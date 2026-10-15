@@ -86,6 +86,7 @@ import { returnWinsStatements, tradedUnitsSql, tradeInInstalled, tradeInsOnLine 
 import { tradeInV2Installed } from '../lib/tradeInSchema';
 import { completeTradeInsForOrder } from '../lib/tradeInStock';
 import { returnReissueStatements, tradeInCreditOf } from '../lib/tradeInReissue';
+import { inShopOnLine, inShopSlotsSql } from '../lib/services/myDevices';
 import { loadPricingContext, memberFallbackFor } from './cart';
 import {
   CHANNEL_CLOSED_ERRORS,
@@ -604,6 +605,13 @@ returnRoutes.post('/', async (c) => {
     }
     tradeInCancels.push(...affected);
   }
+  // S-P2 (§1.3, §6.14): a device a trade-in RECEIVED is with the shop until it is handed back —
+  // even after that request was cancelled or declined. Asked again inside the batch (below).
+  const inShop = bundleChildren.length ? { unitIds: [], slots: 0 } : await inShopOnLine(c.env.DB, orderItemId);
+  if (inShop.slots > 0) {
+    const held = unitId ? inShop.unitIds.includes(unitId) : inShop.slots + (usedByItem.get(orderItemId) ?? 0) + qty > Number(item.item_qty);
+    if (held) throw conflict('This device is part of a trade-in whose credit is in use or which is complete, so it cannot be returned here. Contact support.', 'TRADE_IN_ACTIVE');
+  }
 
   const nowIso = new Date(now).toISOString();
   const caseFor = (targetItemId: string, caseQty: number) => {
@@ -654,8 +662,12 @@ returnRoutes.post('/', async (c) => {
     : c.env.DB.prepare(
         `UPDATE return_cases SET qty = -1 WHERE id = ?2 AND ${openClaimOnCaseSql(!!claimScope.unitId)}`
       ).bind(claimScope.unitId ?? claimScope.lineIds, id);
+  // An intake recorded between the read above and this batch turns the case's quantity negative.
+  const inShopFence = !bundleChildren.length && (await tradeInV2Installed(c.env.DB))
+    ? [c.env.DB.prepare(`UPDATE return_cases SET qty = -1 WHERE id = ? AND ${inShopSlotsSql} <> ?`).bind(id, orderItemId, inShop.slots)]
+    : [];
   try {
-    await c.env.DB.batch([...cases.map((k) => k.statement), claimFence, ...cancels]);
+    await c.env.DB.batch([...cases.map((k) => k.statement), claimFence, ...inShopFence, ...cancels]);
   } catch (e) {
     if (!/NOT NULL|constraint/i.test(e instanceof Error ? e.message : String(e))) throw e;
     // Nothing was written. A warranty request opened on the device meanwhile:

@@ -68,6 +68,7 @@ import { adminOrderInventoryOriginRoutes } from './routes/adminOrderInventoryOri
 import { adminPreorderOriginRoutes } from './routes/adminPreorderOrigins';
 import { adminSerialRulesRoutes } from './routes/adminSerialRules';
 import { adminTradeInRoutes, tradeInRoutes } from './routes/tradeIn';
+import { myServicesRoutes } from './routes/myServices';
 import { adminProductsRoutes } from './routes/adminProducts';
 import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
@@ -420,6 +421,8 @@ app.route('/api/admin/serial-rules', adminSerialRulesRoutes);
 // «الاستبدال» (0143): a delivered LEVONIS device traded against a new one —
 // the customer's wizard and requests, and the admin's review and rules.
 app.route('/api/trade-in', tradeInRoutes);
+// «خدماتي» (Services S-P2): the caller's devices, open cases and the next trade-in step.
+app.route('/api/me/services', myServicesRoutes);
 app.route('/api/admin/trade-in', adminTradeInRoutes);
 app.route('/api/addresses', addressRoutes);
 app.route('/api/wallet', walletRoutes);

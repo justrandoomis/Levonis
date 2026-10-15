@@ -122,6 +122,8 @@ import { isOwner } from '../lib/adminScope';
 import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
 import { fence, requireSerialWrite } from '../lib/operations';
 import { custodyHistory, originStartFrom, tradedInSql, unitCoverage, unitIdentity, type CustodyStep } from '../lib/deviceCustody';
+import { inShopSql } from '../lib/services/myDevices';
+import { tradeInV2Installed } from '../lib/tradeInSchema';
 import { isLostRace } from '../lib/gifts/fence';
 import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
@@ -273,6 +275,8 @@ interface DeviceRow extends UnitRow {
   warranty_closed_at?: string | null;
   /** Owner decision 3: when the unit was traded in to Levonis (derived), or null. */
   traded_in_at?: string | null;
+  /** S-P2: a trade-in received the device (it is with the shop until handed back or completed). */
+  in_shop_at?: string | null;
   registered_at?: string | null;
   revoked_at?: string | null;
   reg_user_id?: string | null;
@@ -380,7 +384,9 @@ function devicePublic(row: DeviceRow, opts: { admin?: boolean; viewerId?: string
 /** The unit columns plus, once migration 0178 has applied, its closure (a returned device). */
 async function deviceSelect(db: D1Database): Promise<string> {
   const closed = (await serialAssignmentsInstalled(db)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
-  return DEVICE_SELECT.replace('u.replacement_of_unit_id, u.created_at,', `u.replacement_of_unit_id, u.created_at, ${closed},`);
+  // S-P2 (§1.3, §6.14): a device a trade-in has RECEIVED is with the shop — no claim, no re-link.
+  const inShop = `${inShopSql('u', await tradeInV2Installed(db))} AS in_shop_at`;
+  return DEVICE_SELECT.replace('u.replacement_of_unit_id, u.created_at,', `u.replacement_of_unit_id, u.created_at, ${closed}, ${inShop},`);
 }
 
 const DEVICE_SELECT = `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
@@ -794,7 +800,7 @@ deviceRoutes.post('/units/:unitId/register', async (c) => {
   if (row.replaced_by_unit_id) throw badRequest('This device was replaced — the replacement carries the coverage', 'UNIT_REPLACED');
   // Owner decision 3: a device that came back — traded in, or returned (its
   // unit closed, 0178) — is the shop's again; its buyer cannot re-link it.
-  if (row.traded_in_at || row.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
+  if (row.traded_in_at || row.in_shop_at || row.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
   if (row.reg_user_id && row.reg_user_id !== user.id && !row.revoked_at) {
     // The buyer already knows this device exists; saying WHY it cannot be
     // linked is honest, and still names nobody.
@@ -947,11 +953,12 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
 
   // 0178: the unit's warranty was closed by a return (null before it applied).
   const closedCol = (await serialAssignmentsInstalled(c.env.DB)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
+  const v2 = await tradeInV2Installed(c.env.DB);
   const unit = await c.env.DB.prepare(
     `SELECT u.id, u.order_id, u.order_item_id, u.product_id, u.owner_user_id, u.unit_index,
             u.delivered_at, u.warranty_base_months, u.warranty_ext_months, u.warranty_start_at,
             u.warranty_end_at, u.policy_version, u.replaced_by_unit_id, u.replacement_of_unit_id, u.created_at, ${closedCol},
-            r.revoked_at AS reg_revoked, r.user_id AS reg_user, ${tradedInSql('u')} AS traded_in_at,
+            r.revoked_at AS reg_revoked, r.user_id AS reg_user, ${tradedInSql('u')} AS traded_in_at, ${inShopSql('u', v2)} AS in_shop_at,
             oi.name_snapshot, p.name AS p_name, p.name_ar AS p_name_ar
        FROM order_item_units u
        LEFT JOIN device_registrations r ON r.unit_id = u.id
@@ -960,7 +967,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
       WHERE u.id = ?`
   )
     .bind(unitId)
-    .first<UnitRow & { warranty_closed_at: string | null; reg_revoked: string | null; reg_user: string | null; traded_in_at: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
+    .first<UnitRow & { warranty_closed_at: string | null; reg_revoked: string | null; reg_user: string | null; traded_in_at: string | null; in_shop_at: string | null; name_snapshot: string | null; p_name: string | null; p_name_ar: string | null }>();
   // The account that HOLDS the device (its active registration) may claim on
   // it; the buyer who has not linked it yet is told to link it first; anyone
   // else sees nothing.
@@ -971,7 +978,8 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   // RETURNED to Levonis (its warranty closed) is not claimed either, and its
   // buyer is told so (W-6): «register it first» sent them to the register
   // door, which refuses a returned device with this same answer — a loop.
-  if (unit.traded_in_at || unit.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
+  // S-P2 (§6.14): from the moment the shop RECEIVED it for a trade-in, too — until it is handed back.
+  if (unit.traded_in_at || unit.in_shop_at || unit.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
   if (!holds) {
     throw badRequest('Register this device first (Warranty → Add device), then open the claim from it.', 'NOT_REGISTERED');
   }
@@ -1063,7 +1071,10 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
    * THE COVER AT FILING (W-1): written by this INSERT and by nothing else
    * (0191's trigger forbids any later change), where the columns exist.
    */
-  const claimFence = `WHERE NOT ${openReturnOnUnitSql('?3', '?6')} AND NOT ${otherOpenClaimOnUnitSql('?6', '?1')}`;
+  const claimFence = `WHERE NOT ${openReturnOnUnitSql('?3', '?6')} AND NOT ${otherOpenClaimOnUnitSql('?6', '?1')}${
+    // S-P2: an intake recorded between the read above and this write keeps the claim out (§6.14).
+    v2 ? ` AND NOT EXISTS (SELECT 1 FROM order_item_units iu WHERE iu.id = ?6 AND ${inShopSql('iu', true)} IS NOT NULL)` : ''
+  }`;
   const insert = (await claimFiledColumnsInstalled(c.env.DB))
     ? c.env.DB.prepare(
         `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority,

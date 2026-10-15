@@ -87,6 +87,8 @@ import { deviceReturned, intakeRequest } from '../lib/tradeInIntake';
 import { bookTradeInStock } from '../lib/tradeInStock';
 import { overrideRecord } from '../lib/tradeInOffer';
 import { isListedDeviceTarget, searchTargets } from '../lib/tradeInTargets';
+import { listMyDevices } from '../lib/services/myDevices';
+import type { DeviceFacts } from '../../packages/contracts/src/myDevices';
 import {
   MAX_DAMAGE_PHOTOS,
   MAX_PHOTOS_PER_ANGLE,
@@ -219,11 +221,16 @@ tradeInRoutes.get('/eligible', async (c) => {
   const user = c.get('user')!;
   const units = await run(() => listEligible(c.env, user.id));
   const book = await loadRuleBook(c.env.DB);
+  // S-P2: where each device is and the stage of its open trade-in, from the device service.
+  const facts = (await tradeInV2Installed(c.env.DB)) ? new Map((await listMyDevices(c.env, user.id)).map((f) => [f.key, f])) : new Map<string, DeviceFacts>();
   return c.json({
     success: true,
     // Never the AMS split or the bases it priced from: on a Combo they carry
     // the owner's private AMS reference (DECISIONS row 220, `publicUnit`).
-    units: units.map(publicUnit),
+    units: units.map((u) => {
+      const f = facts.get(u.key);
+      return publicUnit(u, f ? { in_shop: f.in_shop, stage: f.open.trade_in?.stage ?? null } : undefined);
+    }),
     // What the wizard asks for each family — never the numbers the answers
     // are valued with (DECISIONS row 220): the Worker prices the answers
     // (POST /requests/:id/preview) and the customer reads the final figure.

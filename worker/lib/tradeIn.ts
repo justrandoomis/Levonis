@@ -135,11 +135,13 @@ import {
   type TradeInScope,
   type TradeInSettlement,
   type TradeInStatus,
+  type TradeInStage,
 } from '@levonis/pricing/tradeIn';
 import { DEFAULT_RULE_SETS } from '@levonis/pricing/tradeInDefaults';
 import { paidNetPerUnit } from '@levonis/pricing/paidNet';
 import { OFFER_PARAM_COLUMNS, settlement as offerSettlement, validateOfferParams, type OfferParamColumn } from '@levonis/pricing/tradeInOffer';
 import { tradeInV2Installed } from './tradeInSchema';
+import { openProtectionSql, openReturnSql, openServiceSql } from './services/myDevices';
 import { offerFor, storedInputs, valuationStatement, type ValuationDraft } from './tradeInOffer';
 import { getSetting } from './settings';
 
@@ -923,8 +925,12 @@ export interface PublicEligibleUnit {
   available: boolean;
   reason: TradeInCode | null;
   open_request_id: string | null;
+  /** S-P2: the shop holds this device (received for a trade-in, not handed back yet). */
+  in_shop: boolean;
+  /** S-P2: the stage of the open trade-in on this device, or null (`listMyDevices`). */
+  stage: TradeInStage | null;
 }
-export function publicUnit(u: EligibleUnit): PublicEligibleUnit {
+export function publicUnit(u: EligibleUnit, facts?: { in_shop: boolean; stage: TradeInStage | null }): PublicEligibleUnit {
   return {
     key: u.key,
     order_item_id: u.order_item_id,
@@ -955,6 +961,8 @@ export function publicUnit(u: EligibleUnit): PublicEligibleUnit {
     available: u.available,
     reason: u.reason,
     open_request_id: u.open_request_id,
+    in_shop: facts?.in_shop ?? false,
+    stage: facts?.stage ?? null,
   };
 }
 
@@ -1186,27 +1194,10 @@ export const isAbort = (e: unknown) => /NOT NULL|constraint|UNIQUE/i.test(e inst
  * this batch aborts it (status → NULL on the NOT NULL column) instead of
  * landing a draft, an estimate or a credit on a device that is on the repair
  * desk or whose price is being compensated. `?2` the line, `?3` the slot's
- * unit ids (JSON).
+ * unit ids (JSON). The three questions (an open return holding the slot's
+ * device — review R1's count rule —, an open warranty claim, a protection claim
+ * being decided) live in worker/lib/services/myDevices.ts, shared by every service.
  */
-/**
- * An OPEN return case holding the slot's device (review R1): a case that names
- * one of the slot's devices; or a case that names no device of the line when
- * the line's open cases and its traded slots (this one included) need more
- * devices than the line holds — the return door's own count rule. A finished
- * case (resolved, rejected) holds nothing, and a case on ANOTHER device of
- * the line does not hold this one.
- */
-const RETURN_OPEN_SQL = `(EXISTS (SELECT 1 FROM return_cases rc
-     WHERE rc.order_item_id = ?2 AND rc.state NOT IN ('rejected','resolved') AND rc.unit_id IN (SELECT value FROM json_each(?3)))
-  OR (EXISTS (SELECT 1 FROM return_cases rc WHERE rc.order_item_id = ?2 AND rc.state NOT IN ('rejected','resolved') AND rc.unit_id IS NULL)
-      AND (SELECT COALESCE(SUM(rc.qty), 0) FROM return_cases rc WHERE rc.order_item_id = ?2 AND rc.state NOT IN ('rejected','resolved'))
-        + (SELECT COUNT(DISTINCT tc.unit_index) FROM trade_in_claims tc WHERE tc.order_item_id = ?2)
-        > (SELECT qty FROM order_items WHERE id = ?2)))`;
-const SERVICE_OPEN_SQL = `EXISTS (SELECT 1 FROM warranty_claims wc
-   WHERE (wc.unit_id IN (SELECT value FROM json_each(?3)) OR (wc.unit_id IS NULL AND wc.order_item_id = ?2))
-     AND NOT ${closedClaimSql('wc')})`;
-const PROTECTION_OPEN_SQL = `EXISTS (SELECT 1 FROM price_protection_claims pc WHERE pc.order_item_id = ?2 AND pc.state IN ('requested','approved'))`;
-
 export interface Slot {
   orderItemId: string;
   unitIds: string[];
@@ -1231,7 +1222,7 @@ export async function slotOf(db: D1Database, orderItemId: string, unitIndex: num
 export function serviceFence(db: D1Database, requestId: string, slot: Slot): D1PreparedStatement {
   return db
     .prepare(
-      `UPDATE trade_in_requests SET status = CASE WHEN ${RETURN_OPEN_SQL} OR ${SERVICE_OPEN_SQL} OR ${PROTECTION_OPEN_SQL} THEN NULL ELSE status END
+      `UPDATE trade_in_requests SET status = CASE WHEN ${openReturnSql} OR ${openServiceSql} OR ${openProtectionSql} THEN NULL ELSE status END
         WHERE id = ?1`
     )
     .bind(requestId, slot.orderItemId, JSON.stringify(slot.unitIds));
@@ -1240,7 +1231,7 @@ export function serviceFence(db: D1Database, requestId: string, slot: Slot): D1P
 /** Which process holds the unit now, after a fenced batch aborted — the honest refusal, or null. */
 export async function serviceBlocker(db: D1Database, slot: Slot): Promise<TradeInCode | null> {
   const row = await db
-    .prepare(`SELECT ${RETURN_OPEN_SQL} AS ret, ${SERVICE_OPEN_SQL} AS svc, ${PROTECTION_OPEN_SQL} AS pp WHERE ?1 IS NULL OR ?1 IS NOT NULL`)
+    .prepare(`SELECT ${openReturnSql} AS ret, ${openServiceSql} AS svc, ${openProtectionSql} AS pp WHERE ?1 IS NULL OR ?1 IS NOT NULL`)
     .bind(null, slot.orderItemId, JSON.stringify(slot.unitIds))
     .first<{ ret: number; svc: number; pp: number }>();
   if (row?.svc) return 'TRADE_IN_SERVICE_OPEN';
