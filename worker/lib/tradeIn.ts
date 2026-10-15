@@ -2075,7 +2075,7 @@ async function submitV2(env: Env, req: RequestRow, comps: ComponentRow[], book: 
 
 // ================================================================= transitions
 
-async function releaseStatements(db: D1Database, req: RequestRow): Promise<D1PreparedStatement[]> {
+export async function releaseStatements(db: D1Database, req: Pick<RequestRow, 'id'>): Promise<D1PreparedStatement[]> {
   const out = [db.prepare('DELETE FROM trade_in_claims WHERE request_id = ?').bind(req.id)];
   // The credit coupon, if one was minted, dies with the request.
   out.push(db.prepare('UPDATE coupons SET active = 0 WHERE trade_in_id = ? AND active = 1').bind(req.id));
@@ -2191,7 +2191,7 @@ export function deviceReadyNotice(db: D1Database, req: Pick<RequestRow, 'id' | '
  * order that is not cancelled redeemed one of its credit coupons, so the
  * cancel, the released device and the retired coupon all roll back.
  */
-function noLiveCreditOrderFence(db: D1Database, requestId: string): D1PreparedStatement {
+export function noLiveCreditOrderFence(db: D1Database, requestId: string): D1PreparedStatement {
   return db
     .prepare(
       `UPDATE trade_in_requests SET status = CASE WHEN EXISTS (
@@ -3374,7 +3374,7 @@ export async function listMine(db: D1Database, userId: string) {
 
 // ================================================================= notifications
 
-function appOrigin(env: Env): string | null {
+export function appOrigin(env: Env): string | null {
   const origin = (env.APP_ORIGIN || '').trim().replace(/\/+$/, '');
   return origin.startsWith('https://') ? origin : null;
 }

@@ -17,12 +17,16 @@
  *      tick (worker/lib/search/store.ts `backfillSearchIndex`).
  *   3. FX-5's engine sweep: its own 200, cut to what is left
  *      (`quarterHourSweepBudget`, worker/lib/fx/reprice.ts).
- *   4. LAST, the product-completeness catch-up (owner brief 2026-10-10,
+ *   4. the product-completeness catch-up (owner brief 2026-10-10,
  *      worker/lib/productCompleteness.ts): its own 60, cut to what is left
  *      after the engine sweep (`quarterHourCompletenessBudget`).
+ *   5. LAST, the services sweep (Services S-P2, worker/lib/tradeInSweep.ts:
+ *      trade-in offer and credit expiry, the cut-over stamp, completion
+ *      catch-up, re-issue notices): its own 120, cut to what is left after the
+ *      completeness catch-up (`quarterHourServicesBudget`).
  *
  * So the invocation's total is at most max(step 1, `QUARTER_HOUR_TICK_LIMIT`):
- * steps 2, 3 and 4 never take it over the limit, and step 1 is bounded by its
+ * steps 2 to 5 never take it over the limit, and step 1 is bounded by its
  * jobs' own bounds — measured at those bounds, together with steps 2 and 3,
  * by tests/fxSweepBudget.test.ts on the real `scheduled()`.
  *
@@ -73,4 +77,15 @@ export const COMPLETENESS_TICK_BUDGET = 60;
  */
 export function quarterHourCompletenessBudget(usedBefore: number): number {
   return Math.max(0, Math.min(COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
+}
+
+/** The services sweep's own sub-budget (Services S-P2 spec §6.10). */
+export const SERVICES_TICK_BUDGET = 120;
+
+/**
+ * THE SERVICES SWEEP'S SHARE: its own 120, cut to what everything before it
+ * left of `QUARTER_HOUR_TICK_LIMIT`, never below zero. It runs last.
+ */
+export function quarterHourServicesBudget(usedBefore: number): number {
+  return Math.max(0, Math.min(SERVICES_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT - Math.max(0, Math.ceil(usedBefore))));
 }

@@ -32,7 +32,7 @@
  */
 import type { Env } from './types';
 import { safeParse } from './types';
-import { randomToken } from './crypto';
+import { newId, randomToken } from './crypto';
 import { notifyStatement } from './notifications';
 import { auditStatements } from './audit';
 import { tradeInV2Installed } from './tradeInSchema';
@@ -306,7 +306,18 @@ export async function bookTradeInStock(env: Env, req: RequestRow, actor: Complet
       .bind(req.id)
       .first<{ order_id: string }>())?.order_id ?? '';
   const stock = await stockStatements(env, req, { orderId, actorId: actor.id, now });
-  if (!stock) return false;
+  if (!stock) {
+    // The source model is gone: recorded once, so the services sweep stops asking (the owner books it by hand).
+    await db
+      .prepare(
+        `INSERT INTO trade_in_events (id, request_id, actor_id, actor_role, action, from_status, to_status, detail_json, created_at)
+         SELECT ?1, ?2, ?3, ?4, 'stock_skipped', 'completed', 'completed', '{"reason":"source_missing"}', ?5
+          WHERE NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = ?2 AND e.action = 'stock_skipped')`
+      )
+      .bind(newId('tie'), req.id, actor.id, actor.role, now)
+      .run();
+    return false;
+  }
   try {
     await db.batch([
       db.prepare(`UPDATE trade_in_requests SET status = CASE WHEN status = 'completed' AND intake_at IS NOT NULL THEN status ELSE NULL END WHERE id = ?`).bind(req.id),

@@ -36,7 +36,8 @@ import { runFxScheduler } from './lib/fx/scheduler';
 import { quarterHourSweepBudget, sweepStaleEnginePrices } from './lib/fx/reprice';
 import { statementBudget } from './lib/fx/budget';
 import { countingD1 } from './lib/d1Count';
-import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget } from './lib/quarterHourBudget';
+import { QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget, quarterHourServicesBudget } from './lib/quarterHourBudget';
+import { runServicesSweep } from './lib/tradeInSweep';
 import { sweepCompleteness } from './lib/productCompleteness';
 import { authRoutes } from './routes/auth';
 import { productRoutes, homeRoutes } from './routes/products';
@@ -1294,6 +1295,13 @@ export default {
         .then((report) => (report && report.flipped.length ? purgeCatalogueFromJob(env, report.flipped) : undefined))
         .catch((error) => {
           console.error('scheduled completeness sweep rejected:', error instanceof Error ? error.name : 'unknown');
+        })
+        // LAST (Services S-P2): trade-in offers and credits that ended, the cut-over
+        // stamp, completions the delivered hook missed, credits given back — its own
+        // 120 statements, cut to what the completeness catch-up left. Never throws.
+        .then(() => runServicesSweep(tickEnv, statementBudget(quarterHourServicesBudget(used()))))
+        .catch((error) => {
+          console.error('scheduled services sweep rejected:', error instanceof Error ? error.name : 'unknown');
         })
     );
   },

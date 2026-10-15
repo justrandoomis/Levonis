@@ -46,7 +46,7 @@ import { listPricedProducts } from '../worker/lib/pricingEngine/load';
 import { AUTO_REPRICE_SWEEP_BUDGET, D1_INVOCATION_STATEMENT_LIMIT, QUARTER_HOUR_RESERVE, quarterHourSweepBudget, sweepStaleEnginePrices } from '../worker/lib/fx/reprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { countingD1, d1Base } from '../worker/lib/d1Count';
-import { COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget } from '../worker/lib/quarterHourBudget';
+import { COMPLETENESS_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, SERVICES_TICK_BUDGET, STAFF_RECONCILIATION_TICK, quarterHourCompletenessBudget, quarterHourSearchBudget, quarterHourServicesBudget } from '../worker/lib/quarterHourBudget';
 import { drainStaffReconciliations } from '../worker/lib/financeStaffAccrual';
 import { INDEX_FAILED_MARK, INDEX_STAMP, backfillSearchIndex } from '../worker/lib/search/store';
 import { resetEventBus } from '../worker/lib/eventBus';
@@ -64,6 +64,11 @@ const CATCH_UP_FIRST = 'PRAGMA table_info("search_tokens")';
  * sweep): its presence probe on the tick's counted binding, or its facts read once the table is known.
  */
 const COMPLETENESS_FIRST = /^SELECT 1 AS x FROM product_completeness LIMIT 1$|^SELECT p\.id AS id, p\.slug AS slug, p\.status AS status/;
+/**
+ * The services sweep's first statement (Services S-P2, worker/lib/tradeInSweep.ts, after the completeness
+ * catch-up): the 0192 probe on a fresh binding, or its settings read and first trade-in read once known.
+ */
+const SERVICES_FIRST = /^SELECT intake_at, valuation_version FROM trade_in_requests LIMIT 0$|WHERE status IN \('submitted','under_review','value_changed'\) AND intake_at IS NULL AND offer_expires_at IS NULL/;
 
 class CountStmt {
   constructor(
@@ -132,16 +137,18 @@ async function tick(raw: DatabaseSync) {
   } finally {
     console.error = original;
   }
-  // The completeness catch-up runs last of all (worker/index.ts), on what the engine sweep left.
-  const last = d1.log.findIndex((sql) => COMPLETENESS_FIRST.test(sql));
-  const end = last === -1 ? d1.log.length : last;
+  // The services sweep runs last of all (worker/index.ts), the completeness catch-up before it, on what the engine sweep left.
+  const svc = d1.log.findIndex((sql) => SERVICES_FIRST.test(sql));
+  const stop = svc === -1 ? d1.log.length : svc;
+  const last = d1.log.slice(0, stop).findIndex((sql) => COMPLETENESS_FIRST.test(sql));
+  const end = last === -1 ? stop : last;
   const first = d1.log.slice(0, end).findIndex((sql) => SWEEP_FIRST.test(sql));
   const jobs = first === -1 ? end : first;
   // The tick's own jobs end where the catch-up's probe begins (it runs once, after them, or not at all).
   const probes = d1.log.flatMap((sql, i) => (sql === CATCH_UP_FIRST ? [i] : []));
   assert.ok(probes.length <= 1, 'the catch-up probe runs once a tick, and no other job runs it');
   const own = probes.length === 1 && probes[0] < jobs ? probes[0] : jobs;
-  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: end - jobs, completeness: d1.log.length - end, log: d1.log, errors };
+  return { total: d1.log.length, own, catchUp: jobs - own, jobs, sweep: end - jobs, completeness: stop - end, services: d1.log.length - stop, log: d1.log, errors };
 }
 
 // ------------------------------------------------------------- the world, every job at its bound
@@ -309,7 +316,64 @@ test('the usual tick at its bounds — 200 upload sessions expired and 200 delet
   assert.ok(withSweep.completeness <= completenessShare && completenessShare <= COMPLETENESS_TICK_BUDGET, `the completeness catch-up spent ${withSweep.completeness} of its ${completenessShare}`);
   const lateSweep = withSweep.log.slice(withSweep.jobs + withSweep.sweep).filter((sql) => /(?:INSERT INTO|UPDATE) pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens/.test(sql));
   assert.deepEqual(lateSweep, [], 'nothing of the sweep or the jobs after the completeness catch-up began');
-  console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), completeness ${withSweep.completeness} (share ${completenessShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
+  // The services sweep (S-P2) last of all, within its own share of what everything before it left.
+  const servicesShare = quarterHourServicesBudget(withSweep.total - withSweep.services);
+  assert.ok(withSweep.services > 0, 'the services sweep looked');
+  assert.ok(withSweep.services <= servicesShare && servicesShare <= SERVICES_TICK_BUDGET, `the services sweep spent ${withSweep.services} of its ${servicesShare}`);
+  console.log(`usual quarter-hour tick at its bounds: jobs ${withSweep.jobs}, sweep ${withSweep.sweep} (share ${share}), completeness ${withSweep.completeness} (share ${completenessShare}), services ${withSweep.services} (share ${servicesShare}), total ${withSweep.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
+});
+
+/**
+ * Services S-P2 work at every sub-step's bound (worker/lib/tradeInSweep.ts): 30 requests open since
+ * before the cut-over, 30 offers ending today, 30 ended, 30 credits ending today, 30 ended — more
+ * than one tick takes of each.
+ */
+function seedServicesWork(raw: DatabaseSync) {
+  const now = Date.now();
+  const at = (h: number) => new Date(now + h * 3_600_000).toISOString();
+  raw.exec(`INSERT INTO users (id, email, name, role) VALUES ('svc_cust', 'svc@example.test', 'Svc', 'customer');
+    INSERT INTO orders (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot, payment_method_id, subtotal_iqd, exchange_rate, total_iqd, due_on_delivery_iqd, shipping_iqd, created_at, delivered_at)
+      VALUES ('svc_ord', 'svc_cust', 'delivered', '{}', 'standard', '{}', 'cash', 0, 1500, 0, 0, 0, '2026-09-01T10:00:00.000Z', '2026-09-02T10:00:00.000Z');`);
+  const line = raw.prepare(`INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd) VALUES (?, 'svc_ord', 'q_printer', 'Printer', 1, 0, 0)`);
+  const request = raw.prepare(
+    `INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, family, scope, created_at, updated_at, submitted_at, offer_expires_at, intake_at, coupon_id, credit_iqd)
+     VALUES (?, 'svc_cust', ?, 'svc_ord', ?, 1, 'fdm', 'whole', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', ?, ?, ?, ?)`
+  );
+  const coupon = raw.prepare(
+    `INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_global, max_per_user, active, created_at, assigned_user_id, scope, trade_in_id, ends_at)
+     VALUES (?, ?, 'fixed_iqd', 100000, 0, 1, 1, 1, '2026-10-01T00:00:00.000Z', 'svc_cust', 'product', ?, ?)`
+  );
+  const kinds: Array<[string, string | null, string | null, string | null]> = [
+    ['submitted', null, null, null], // cut-over
+    ['submitted', at(12), null, null], // offer ending today
+    ['submitted', at(-24), null, null], // offer ended
+    ['awaiting_payment', at(72), at(-48), at(12)], // credit ending today
+    ['awaiting_payment', at(72), at(-48), at(-24)], // credit ended
+  ];
+  kinds.forEach(([status, offerEnds, intake, creditEnds], k) => {
+    for (let i = 0; i < 30; i++) {
+      const id = `tin_svc_${k}_${i}`;
+      line.run(`svc_oi_${k}_${i}`);
+      const cpn = status === 'awaiting_payment' ? `cpn_svc_${k}_${i}` : null;
+      request.run(id, status, `svc_oi_${k}_${i}`, offerEnds, intake, cpn, cpn ? 100000 : null);
+      if (cpn) coupon.run(cpn, `TISVC${k}${String(i).padStart(3, '0')}`, id, creditEnds);
+    }
+  });
+}
+
+test('the services sweep LAST, with every sub-step at its bound: within its own 120 of what the tick left, and the tick under 1,000', async () => {
+  const { current } = await copies({ steady: true, staff: false });
+  seedServicesWork(current);
+  const t = await tick(current);
+  assert.deepEqual(t.errors, [], 'no job reported an error');
+  const share = quarterHourServicesBudget(t.total - t.services);
+  assert.ok(t.total < D1_INVOCATION_STATEMENT_LIMIT, `the tick executed ${t.total} statements`);
+  assert.ok(t.services <= share && share <= SERVICES_TICK_BUDGET, `the services sweep spent ${t.services} of its ${share}`);
+  assert.ok(t.services > 60, `the sweep worked up to its share (${t.services})`);
+  assert.ok(count(current, "SELECT COUNT(*) AS n FROM trade_in_requests WHERE id LIKE 'tin_svc_0_%' AND offer_expires_at IS NOT NULL") > 0, 'cut-over stamps landed');
+  // Nothing of the earlier steps after the services sweep began.
+  assert.ok(t.log.slice(t.total - t.services).every((sql) => !/pricing_(?:sku_costs|v2_sku_results)|upload_sessions|FROM outbox|search_tokens|product_completeness/.test(sql)));
+  console.log(`services sweep at its bound: ${t.services} of ${share}, total ${t.total} < ${D1_INVOCATION_STATEMENT_LIMIT}`);
 });
 
 /** Active products whose index rows are missing or stale — the catch-up's work. */
