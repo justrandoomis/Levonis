@@ -151,3 +151,39 @@ test('every customer and staff answer of the trade-in v2 doors carries no privat
 
   assert.deepEqual(problems, []);
 });
+
+test('review F-6: a Combo traded part by part, its AMS priced by the owner’s private reference — the request carries no paid split that would give the reference away', async () => {
+  const { all, withoutTriggers } = await import('./fixtures/app');
+  // Combo cheaper than the plain model today: no public gap, so the owner's USD reference prices the AMS.
+  const raw = seed({ a1Now: 1_100_000, comboNow: 1_000_000 });
+  const paid = 1_000_000;
+  const d = new Date(Date.now() - 20 * 86_400_000).toISOString();
+  const end = new Date(Date.now() + 345 * 86_400_000).toISOString();
+  raw.exec(`
+    INSERT INTO orders (id,user_id,status,stage,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,updated_at,delivered_at)
+      VALUES ('ORD-C','cust','delivered','delivered','{}','standard','{}','cash',${paid},0,1400,${paid},0,'${d}','${d}','${d}');
+    INSERT INTO order_items (id,order_id,product_id,name_snapshot,image_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,option_id,option_value_ids)
+      VALUES ('oi_c','ORD-C','p_a1','Bambu Lab A1 Combo','','A1 Combo',1,${paid},${paid},'v_a1c','["v_a1c"]');
+    INSERT INTO order_item_units (id,order_id,order_item_id,product_id,owner_user_id,unit_index,delivered_at,warranty_base_months,warranty_ext_months,warranty_start_at,warranty_end_at,policy_version)
+      VALUES ('unit_c','ORD-C','oi_c','p_a1','cust',1,'${d}',12,0,'${d}','${end}','{}');
+    INSERT INTO trade_in_component_refs (product_id, option_value_id, role, ref_product_id, ref_price_usd, updated_by, updated_at)
+      VALUES ('p_a1', '', 'ams', NULL, '213.37', 'boss', '${d}');
+  `);
+  await get(customerApp(raw), '/api/trade-in/eligible'); // publishes the seeded catalogue (V2)
+  const triggers = all<{ name: string }>(raw, "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('product_option_values')").map((t) => t.name);
+  withoutTriggers(raw, triggers, `UPDATE product_option_values SET regular_price_iqd = 2000000 WHERE id = 'v_a1c'; UPDATE product_option_values SET regular_price_iqd = 1000000 WHERE id = 'v_a1';`);
+  const id = await submitted(raw, 'oi_c', 'ams_only');
+  // The owner's record holds the AMS's private price; the request itself carries no split of what was paid.
+  const val = raw.prepare('SELECT components_json FROM trade_in_valuations WHERE request_id = ?').get(id) as { components_json: string };
+  const ams = (JSON.parse(val.components_json) as Array<{ role: string; now_source: string }>).find((c) => c.role === 'ams');
+  assert.equal(ams?.now_source, 'owner_usd');
+  assert.equal((raw.prepare('SELECT paid_net_iqd FROM trade_in_requests WHERE id = ?').get(id) as { paid_net_iqd: number | null }).paid_net_iqd, null);
+  for (const [label, res] of [
+    ['customer', await get(customerApp(raw), `/api/trade-in/requests/${id}`)],
+    ['staff', await get(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${id}`)],
+  ] as const) {
+    const body = await json(res);
+    assert.equal(res.status, 200, `${label}: ${JSON.stringify(body)}`);
+    assert.equal(body.request.paid_net_iqd, null, label);
+  }
+});

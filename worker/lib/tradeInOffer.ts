@@ -204,7 +204,7 @@ export interface OfferOutcome {
   now_price_iqd: number | null;
   now_price_channel: NowChannel | null;
   /** What was paid for the scope (paid net, split by today's prices). */
-  paid_net_iqd: number;
+  paid_net_iqd: number | null;
   usage_months: number;
   warranty_remaining_months: number;
   rule_versions: Partial<Record<TradeInFamily, number>>;
@@ -303,6 +303,8 @@ export async function offerFor(
   });
   const inScope = comps.map((c) => nowOf(c.role)).filter((x): x is PartNow => !!x);
   const allPublic = inScope.every((x) => PUBLIC_SOURCES.has(x.source));
+  const splitPrivate =
+    unit.is_combo && !nows.split_unavailable && req.scope !== 'whole' && [nows.ams, nows.device].some((x) => !!x && !PUBLIC_SOURCES.has(x.source));
   const nowSum = unit.is_combo && req.scope === 'whole' && !nows.split_unavailable ? (nows.combo_now ?? 0) : inScope.reduce((n, x) => n + x.now_iqd, 0);
   const channel = roles.has('device') ? nows.device.channel : (nows.ams?.channel ?? null);
   const components = parts.map((x) => ({ ...x, now_source: nowOf(x.role)?.source ?? null, now_channel: nowOf(x.role)?.channel ?? null }));
@@ -311,7 +313,10 @@ export async function offerFor(
     no_offer_reason: r.offer_iqd === null ? 'below_minimum' : null,
     now_price_iqd: allPublic ? nowSum : null,
     now_price_channel: allPublic ? channel : null,
-    paid_net_iqd: parts.reduce((n, x) => n + x.paid_iqd, 0),
+    // What was paid for the parts in scope: the customer's own figure — unless it is a Combo's part
+    // split by today's prices and one of those prices is the owner's private reference (review F-6):
+    // the split would give the reference away (paid × part ÷ whole). Then the request carries none.
+    paid_net_iqd: splitPrivate ? null : parts.reduce((n, x) => n + x.paid_iqd, 0),
     usage_months: usage,
     warranty_remaining_months: left,
     rule_versions: versions,
