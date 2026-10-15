@@ -63,3 +63,26 @@ test('the order freezes the line the credit pays for (coupon_snapshot.trade_in_l
   assert.equal(snap.trade_in_line_id, line.id);
   assert.equal(snap.discount_iqd, req(raw, id).credit_iqd);
 });
+
+test('review F-15: re-opening a cancelled order whose released use is a credit not yet received is a mapped refusal, not a database error — the order stays cancelled', async () => {
+  const { daysAgo, daysAhead } = await import('./sv2_tradein_fixture');
+  const { LimitD1 } = await import('./fixtures/d1Limits');
+  const { moveOrderStage } = await import('../worker/lib/orderStageOps');
+  const raw = seed();
+  const id = await submitted(raw);
+  const offer = (raw.prepare('SELECT offer_iqd FROM trade_in_requests WHERE id = ?').get(id) as { offer_iqd: number }).offer_iqd;
+  // A credit minted on photos before S-P2 (no intake), spent on an order that was cancelled after 0191.
+  raw.exec(`
+    INSERT INTO orders (id,user_id,status,stage,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,cancelled_at)
+      VALUES ('ORD-X','cust','cancelled','cancelled','{}','standard','{}','cash',1500000,0,1400,${1_500_000 - offer},${1_500_000 - offer},'${daysAgo(2)}','${daysAgo(1)}');
+    INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_global, max_per_user, active, created_at, assigned_user_id, scope, product_id, trade_in_id, ends_at)
+      VALUES ('cpn_l', 'TILEGACY0001', 'fixed_iqd', ${offer}, 0, 1, 1, 1, '${daysAgo(3)}', 'cust', 'product', 'p_p1s', '${id}', '${daysAhead(4)}');
+    UPDATE trade_in_requests SET status = 'awaiting_payment', final_value_iqd = ${offer}, credit_iqd = ${offer}, coupon_id = 'cpn_l' WHERE id = '${id}';
+  `);
+  raw.exec('DROP TRIGGER trg_trade_in_credit_needs_intake');
+  raw.exec(`INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd, state, released_at) VALUES ('red_l', 'cpn_l', 'cust', 'ORD-X', ${offer}, 'released', '${daysAgo(1)}')`);
+  const env = { DB: new LimitD1(raw) as unknown as D1Database } as never;
+  const res = await moveOrderStage(env, { orderId: 'ORD-X', to: 'received', source: 'admin', changedBy: 'boss' } as never);
+  assert.deepEqual([res.moved, res.reason], [false, 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED']);
+  assert.equal((raw.prepare("SELECT status FROM orders WHERE id = 'ORD-X'").get() as { status: string }).status, 'cancelled');
+});

@@ -123,7 +123,8 @@ export interface MoveResult {
     | 'GIFT_ORDER_REOPEN_REFUSED'
     | 'SERIALS_REQUIRED'
     | 'ORDER_REOPEN_COUPON_SPENT'
-    | 'TRADE_IN_ORDER_DELIVERED';
+    | 'TRADE_IN_ORDER_DELIVERED'
+    | 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED';
 }
 
 export interface MoveOptions {
@@ -504,6 +505,14 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     // The coupon use this order gave back at its cancellation was spent again,
     // or the coupon was switched off (0191, trg_coupon_redemption_reclaim): the
     // order stays cancelled rather than hold a discount whose use is gone.
+    // 0192 (review F-15): the use it would take back is a trade-in credit whose old device the shop
+    // has not received (trg_trade_in_credit_needs_intake_reclaim) — the order stays cancelled.
+    if (reopening && msg.includes('TRADE_IN_DEVICE_NOT_RECEIVED')) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED',
+      };
+    }
     if (reopening && /COUPON_(PER_USER_LIMIT|GLOBAL_LIMIT|INACTIVE)/.test(msg)) {
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,

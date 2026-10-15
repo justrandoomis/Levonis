@@ -1475,6 +1475,11 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This order cannot be re-opened: the code or trade-in credit it used came back when it was cancelled and has since been used again or switched off. Create a new order.',
     ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: ئەو کۆد یان باڵانسی گۆڕینەوەیەی بەکاری هێنابوو لە کاتی هەڵوەشاندنەوەدا گەڕایەوە و دواتر دووبارە بەکارهات یان ناچالاک کرا. داواکارییەکی نوێ دروست بکە.',
   },
+  ORDER_REOPEN_TRADE_IN_NOT_RECEIVED: {
+    ar: 'لا يمكن إعادة فتح هذا الطلب: رصيد الاستبدال الذي استخدمه لا يُصرف قبل استلام الجهاز القديم. أنشئ طلباً جديداً بعد الاستلام.',
+    en: 'This order cannot be re-opened: the trade-in credit it used cannot be spent before the old device is received. Create a new order once it is.',
+    ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: ئەو باڵانسی گۆڕینەوەیەی بەکاری هێناوە پێش وەرگرتنی ئامێرە کۆنەکە بەکارنایەت. دوای وەرگرتن داواکارییەکی نوێ دروست بکە.',
+  },
   // W-3 (row 237): one open warranty case per device. The customer cannot close a
   // claim, so this sentence never asks them to; the desk has its own (AdminSerials).
   CLAIM_ALREADY_OPEN: {

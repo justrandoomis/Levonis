@@ -2579,6 +2579,19 @@ function couponSpentReopenRefusal(): HttpError {
   );
 }
 
+/**
+ * 409 for every admin door that would re-open a cancelled order whose released use is a trade-in
+ * credit whose old device the shop has not received (0192, trg_trade_in_credit_needs_intake_reclaim;
+ * review F-15). The order stays cancelled.
+ */
+function tradeInNotReceivedReopenRefusal(): HttpError {
+  return new HttpError(
+    409,
+    'لا يمكن إعادة فتح هذا الطلب: رصيد الاستبدال الذي استخدمه لا يُصرف قبل استلام الجهاز القديم. أنشئ طلباً جديداً بعد الاستلام. / This order cannot be re-opened: the trade-in credit it used cannot be spent before the old device is received. Create a new order once it is.',
+    'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED'
+  );
+}
+
 /** 409 for every admin door that would cancel a delivered order that completed a trade-in (0192): it is returned instead. */
 function tradeInDeliveredRefusal(): HttpError {
   return new HttpError(409, 'A delivered order that completed a trade-in is not cancelled; open a return instead.', 'TRADE_IN_ORDER_DELIVERED');
@@ -3424,6 +3437,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
     if (res.reason === 'GIFT_ORDER_REOPEN_REFUSED') throw giftReopenRefusal();
     if (res.reason === 'ORDER_REOPEN_COUPON_SPENT') throw couponSpentReopenRefusal();
+    if (res.reason === 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED') throw tradeInNotReceivedReopenRefusal();
     if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
@@ -3601,6 +3615,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
       }
       if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) throw giftReopenRefusal();
       if (ORDER_REOPEN_COUPON_SPENT_RE.test(msg)) throw couponSpentReopenRefusal();
+      if (msg.includes('TRADE_IN_DEVICE_NOT_RECEIVED')) throw tradeInNotReceivedReopenRefusal();
       throw e;
     }
   } else if (serialGate.statements.length) {
