@@ -32,6 +32,10 @@
  *      the condition, the target search and the offer, in dark; the list and
  *      the timeline on a desktop in light and dark; the timeline in Sorani and
  *      the list in English.
+ *   7  360 PX AND REDUCED MOTION. The five screens and the timeline at 360×780
+ *      (no horizontal scroll, the document's nor the app's scroller's), once
+ *      more with `reducedMotion: 'reduce'`; the Combo sent at 360 px and the
+ *      desk's intake sheet opened at the same width.
  *
  * LOCAL ONLY. The Worker listens on 127.0.0.1; every browser request to any
  * other host is aborted and counted, and the run fails unless that count is 0
@@ -323,16 +327,19 @@ const one = (sql, ...params) => rows(sql, ...params)[0] ?? null;
 
 const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), args: ['--no-sandbox'] });
 const PHONE = { width: 390, height: 844 };
+/** The spec's narrowest phone (§10, «phone first at 360 px»). */
+const NARROW = { width: 360, height: 780 };
 const DESKTOP = { width: 1280, height: 900 };
 
 /** A browser session for one person. Every non-local request is aborted and counted. */
-async function session(who, { size = DESKTOP, lang = 'ar', dark = false } = {}) {
+async function session(who, { size = DESKTOP, lang = 'ar', dark = false, reducedMotion = false } = {}) {
   const phone = size.width < 600;
   const ctx = await browser.newContext({
     viewport: size,
     deviceScaleFactor: phone ? 2 : 1,
     locale: lang === 'en' ? 'en-US' : 'ar-IQ',
     colorScheme: dark ? 'dark' : 'light',
+    reducedMotion: reducedMotion ? 'reduce' : 'no-preference',
     serviceWorkers: 'block',
     hasTouch: phone,
     isMobile: phone,
@@ -478,21 +485,45 @@ async function upload(who, selector) {
   return res?.status ?? 0;
 }
 
-/** The condition of one part: hours (and its photo), «جيدة», no damage, every required angle. */
+/**
+ * The condition of one part: hours (and its photo), «جيدة», no damage, all accessories, every
+ * required angle. Nothing is chosen before she chooses it (review F-23): «متابعة» waits for each.
+ */
 async function answerCondition(who, hours) {
   const page = who.page;
+  const pressed = await page.locator('[data-overall][aria-checked="true"], [data-accessories][aria-checked="true"], [data-damage][aria-checked="true"]').count();
+  check('nothing on the condition screen reads as chosen before she chose it', pressed === 0, pressed);
   const hoursInput = page.locator('[data-hours]');
   if (await hoursInput.count()) {
+    check('the hours field starts empty', (await hoursInput.first().inputValue()) === '');
     await hoursInput.first().fill(String(hours));
     if (await page.locator('input[data-upload="hours"]').count()) check('the hours photo uploads', (await upload(who, 'input[data-upload="hours"]')) === 201);
   }
   await page.locator('[data-overall="good"]').first().click();
   if (await page.locator('[data-damage="none"]').count()) await page.locator('[data-damage="none"]').first().click();
+  await page.locator('[data-accessories="all"]').first().click();
   const angles = await page.locator('input[data-upload^="angle:"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-upload')));
   let ok = 0;
   for (const a of angles) if ((await upload(who, `input[data-upload="${a}"]`)) === 201) ok += 1;
   check(`every required angle uploads (${ok}/${angles.length})`, angles.length > 0 && ok === angles.length);
   await settle(page, 600);
+}
+
+/** No horizontal scroll (spec §10): neither the document nor the app's own scroller is wider than the screen. */
+async function noSideScroll(page, label) {
+  const o = await page
+    .evaluate(() => {
+      const main = document.getElementById('main-scroll-container');
+      const dialogs = [...document.querySelectorAll('[role="dialog"]')].map((d) => d.scrollWidth - d.clientWidth);
+      return {
+        doc: document.documentElement.scrollWidth,
+        inner: window.innerWidth,
+        main: main ? main.scrollWidth - main.clientWidth : 0,
+        dialog: dialogs.length ? Math.max(...dialogs) : 0,
+      };
+    })
+    .catch(() => null);
+  check(`${label}: no horizontal scroll at ${o?.inner ?? '?'} px`, !!o && o.doc <= o.inner && o.main <= 1 && o.dialog <= 1, o);
 }
 
 // ================================================================== run
@@ -821,6 +852,74 @@ try {
     const dir = await s.page.evaluate(() => document.documentElement.dir);
     check(`${lang}: the document direction is ${lang === 'en' ? 'ltr' : 'rtl'}`, dir === (lang === 'en' ? 'ltr' : 'rtl'), dir);
     await shot(s.page, name);
+    await s.ctx.close();
+  }
+
+  // ---------------------------------------------------------------- 7. 360 px, and reduced motion (spec §10; review F-34)
+  for (const reduced of [false, true]) {
+    current = reduced ? '7-narrow-reduced-motion' : '7-narrow';
+    const tag = reduced ? 'phone360-reduced' : 'phone360';
+    const s = await session(SARA, { size: NARROW, reducedMotion: reduced });
+    const page = s.page;
+    if (reduced) check('reduced motion is what the page sees', await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches));
+    await page.goto(`${BASE}/trade-in`, { waitUntil: 'domcontentloaded' });
+    check(`${tag}: «أجهزتك»`, await visible(page.locator('[data-trade-in-devices]'), 30000));
+    await settle(page);
+    await noSideScroll(page, `${tag} devices`);
+    await shot(page, `${tag}-1-devices`, false);
+    await page.locator(`[data-unit="${COMBO_ITEM}:1"]`).first().click();
+    if (await visible(page.locator('[data-overlay="trade-in-scope"]'), 15000)) {
+      await settle(page, 500);
+      await noSideScroll(page, `${tag} scope sheet`);
+      await shot(page, `${tag}-2-scope`, false);
+      await page.keyboard.press('Escape');
+      await page.locator('[data-overlay="trade-in-scope"]').first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+    }
+    if (comboDraft) {
+      for (const [n, step, probe] of [
+        [3, 'condition', '[data-condition]'],
+        [4, 'target', '[data-trade-in-target]'],
+        [5, 'offer', '[data-offer-figure]'],
+      ]) {
+        await page.goto(`${BASE}/trade-in?draft=${encodeURIComponent(comboDraft)}&step=${step}`, { waitUntil: 'domcontentloaded' });
+        check(`${tag}: the draft's ${step} step`, await visible(page.locator(probe), 30000));
+        await settle(page, 800);
+        await noSideScroll(page, `${tag} ${step}`);
+        await shot(page, `${tag}-${n}-${step}`, false);
+      }
+    }
+    await page.goto(`${BASE}/trade-in?request=${encodeURIComponent(requestId)}`, { waitUntil: 'domcontentloaded' });
+    check(`${tag}: the timeline`, await visible(page.locator(`[data-trade-in-request="${requestId}"]`), 30000));
+    await settle(page);
+    await noSideScroll(page, `${tag} timeline`);
+    await shot(page, `${tag}-6-timeline`, false);
+    // The Combo is sent at 360 px (on the last pass), so the desk can open its intake sheet at the same width.
+    if (reduced && comboDraft) {
+      await page.goto(`${BASE}/trade-in?draft=${encodeURIComponent(comboDraft)}&step=offer`, { waitUntil: 'domcontentloaded' });
+      await visible(page.locator('[data-trade-in-send]'), 30000);
+      await settle(page, 800);
+      await page.locator('[data-trade-in-send]').first().click();
+      await page.waitForURL(/request=/, { timeout: 30000 }).catch(() => {});
+    }
+    await s.ctx.close();
+  }
+  {
+    current = '7-narrow-intake';
+    const sent = one("SELECT id FROM trade_in_requests WHERE status = 'submitted' AND intake_at IS NULL ORDER BY created_at DESC LIMIT 1")?.id ?? null;
+    check('the Combo was sent at 360 px', !!sent, sent);
+    const s = await session(ASSIST, { size: NARROW });
+    await s.page.goto(`${BASE}/admin?tab=trade_in`, { waitUntil: 'domcontentloaded' });
+    check('phone360: the desk queue', await visible(s.page.locator('[data-trade-in-queue]'), 30000));
+    await settle(s.page);
+    await noSideScroll(s.page, 'phone360 desk queue');
+    if (sent && (await visible(s.page.locator(`[data-row="${sent}"]`), 20000))) {
+      await s.page.locator(`[data-row="${sent}"]`).first().click();
+      check('phone360: the intake sheet opens', await visible(s.page.locator('[data-intake-sheet]'), 20000));
+      await settle(s.page);
+      await noSideScroll(s.page, 'phone360 intake sheet');
+      check('phone360: «سجّل الاستلام» waits for the hours read off the device', !(await s.page.locator('[data-intake-submit]').first().isEnabled()));
+      await shot(s.page, 'phone360-a1-intake');
+    }
     await s.ctx.close();
   }
 } catch (e) {
