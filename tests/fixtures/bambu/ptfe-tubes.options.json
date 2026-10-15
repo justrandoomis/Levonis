@@ -1,0 +1,1175 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/ptfe-tubes",
+  "fetched_at": "2026-10-15",
+  "extracted_from": "P0 crawl, read through packages/catalog/src/bambuImport/extract.ts (the closed read list): identity, options, variants and the gallery only",
+  "notes": "Option, variant and gallery structure only (variant notes and sold-out flags blanked). No price, stock, promotion or description."
+ },
+ "product": {
+  "id": "7189624127624",
+  "seoCode": "ptfe-tubes",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/ptfe-tubes",
+  "name": "PTFE Tubes",
+  "currentAllIdRoute": "552709758222684160>552709758742777856>552709758876995584",
+  "isFilament": false,
+  "productPropertyList": [
+   {
+    "propertyKey": "Device",
+    "propertyKeyId": "723049025633329153",
+    "type": 1,
+    "title": "Device",
+    "position": 1,
+    "productPropertyValueList": [
+     {
+      "id": "737978462844637184",
+      "value": "A2L",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723056515997880320",
+      "value": "X2D",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329155",
+      "value": "P2S",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329156",
+      "value": "H2C",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329157",
+      "value": "H2S",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329158",
+      "value": "H2D",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329159",
+      "value": "A1",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329160",
+      "value": "A1 mini",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329161",
+      "value": "P1S",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329162",
+      "value": "P1P",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329163",
+      "value": "X1C",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329166",
+      "value": "AMS HT",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329165",
+      "value": "AMS 2 Pro",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025633329164",
+      "value": "AMS",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   },
+   {
+    "propertyKey": "Length",
+    "propertyKeyId": "9266653462664",
+    "type": 1,
+    "title": "",
+    "position": 2,
+    "productPropertyValueList": [
+     {
+      "id": "564681909799251975",
+      "value": "4000mm*1 White (Cut-to-length)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523456",
+      "value": "4000mm*1 Gray (Cut-to-length)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523457",
+      "value": "370mm*1 + 550mm*2",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523458",
+      "value": "530mm*2 + 30mm*2",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "564681909799251978",
+      "value": "195mm*4 + 230mm*4 (AMS Internal)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523459",
+      "value": "580mm*2 + 700mm*2",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523460",
+      "value": "730mm*2 + 830mm*2",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523461",
+      "value": "263mm*1 (AMS HT Internal)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523462",
+      "value": "590mm*1 (Gray) + 610mm*1 (White)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523463",
+      "value": "185mm*2 + 225mm*2 (AMS 2 Pro Internal)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723049025637523464",
+      "value": "900mm*1 + 340mm*1 (AMS 2 Pro to H2 Series)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "723057323934076928",
+      "value": "590mm*1",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "737978462844637185",
+      "value": "975mm*2 + 905mm*2 + 925mm*1",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "723049025637523485",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P2S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523490",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P2S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523495",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523500",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523505",
+    "mediaFile": {
+     "resourceFileId": "723060213064896512",
+     "url": "https://store.bblcdn.com/s7/default/2e2dc7858522421e9084b4e2e2dfdee0/FAT009-V1.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "590mm*1 (Gray) + 610mm*1 (White)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523510",
+    "mediaFile": {
+     "resourceFileId": "723060213577912320",
+     "url": "https://store.bblcdn.com/s7/default/4aaae7d400f04d2581b85b1fe1723332/FAT010.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "900mm*1 + 340mm*1 (AMS 2 Pro to H2 Series)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523515",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523520",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523525",
+    "mediaFile": {
+     "resourceFileId": "723060213577912320",
+     "url": "https://store.bblcdn.com/s7/default/4aaae7d400f04d2581b85b1fe1723332/FAT010.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "900mm*1 + 340mm*1 (AMS 2 Pro to H2 Series)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523530",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2D"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523535",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2D"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523540",
+    "mediaFile": {
+     "resourceFileId": "723060213064896512",
+     "url": "https://store.bblcdn.com/s7/default/2e2dc7858522421e9084b4e2e2dfdee0/FAT009-V1.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2D"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "590mm*1 (Gray) + 610mm*1 (White)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523545",
+    "mediaFile": {
+     "resourceFileId": "723060213577912320",
+     "url": "https://store.bblcdn.com/s7/default/4aaae7d400f04d2581b85b1fe1723332/FAT010.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2D"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "900mm*1 + 340mm*1 (AMS 2 Pro to H2 Series)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523550",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A1"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523555",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A1"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523560",
+    "mediaFile": {
+     "resourceFileId": "33981937254536",
+     "url": "https://store.bblcdn.com/s7/default/9b6174581e2049f1b8886e16547b1c98/FAT007.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A1"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "730mm*2 + 830mm*2"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523565",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A1 mini"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523570",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A1 mini"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523575",
+    "mediaFile": {
+     "resourceFileId": "33981937221768",
+     "url": "https://store.bblcdn.com/s7/default/415b2fbaa1294a06b14076ac71cfa818/FAT006.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A1 mini"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "580mm*2 + 700mm*2"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523580",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P1S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523585",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P1S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523590",
+    "mediaFile": {
+     "resourceFileId": "33990237651080",
+     "url": "https://store.bblcdn.com/s7/default/2df28dab6df4477bb72a9fcd16bdbdb1/20240328-094138.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P1S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "370mm*1 + 550mm*2"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523595",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P1P"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523600",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P1P"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523605",
+    "mediaFile": {
+     "resourceFileId": "32129287094408",
+     "url": "https://store.bblcdn.com/s7/default/2280e7586e064c9c900d1b6c45728e99/P.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "P1P"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "530mm*2 + 30mm*2"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523610",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "X1C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025637523615",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "X1C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717765",
+    "mediaFile": {
+     "resourceFileId": "33990237651080",
+     "url": "https://store.bblcdn.com/s7/default/2df28dab6df4477bb72a9fcd16bdbdb1/20240328-094138.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "X1C"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "370mm*1 + 550mm*2"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717770",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717775",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717780",
+    "mediaFile": {
+     "resourceFileId": "32646994329736",
+     "url": "https://store.bblcdn.com/s7/default/256271eb85994dd5802cd2c5e79874a7/PTFE_f8524ab8-01ae-4c53-9092-5d259103307b.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "195mm*4 + 230mm*4 (AMS Internal)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717785",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS 2 Pro"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717790",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS 2 Pro"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717795",
+    "mediaFile": {
+     "resourceFileId": "723060213786316800",
+     "url": "https://store.bblcdn.com/s7/default/b9703a58c89545e29efc7a9fdf406edb/FAT008.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS 2 Pro"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "185mm*2 + 225mm*2 (AMS 2 Pro Internal)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717800",
+    "mediaFile": {
+     "resourceFileId": "723060213577912320",
+     "url": "https://store.bblcdn.com/s7/default/4aaae7d400f04d2581b85b1fe1723332/FAT010.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS 2 Pro"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "900mm*1 + 340mm*1 (AMS 2 Pro to H2 Series)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717805",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS HT"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717810",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS HT"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723049025641717815",
+    "mediaFile": {
+     "resourceFileId": "723060212892930048",
+     "url": "https://store.bblcdn.com/s7/default/54927e21d24045ca82de8450142edcea/FAT011.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "AMS HT"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "263mm*1 (AMS HT Internal)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723056515997880321",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "X2D"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723056515997880326",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "X2D"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "723057323934076929",
+    "mediaFile": null,
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "H2S"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "590mm*1"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "737978462844637186",
+    "mediaFile": {
+     "resourceFileId": "32646993969288",
+     "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A2L"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 White (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "737978462844637191",
+    "mediaFile": {
+     "resourceFileId": "33981937352840",
+     "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A2L"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "4000mm*1 Gray (Cut-to-length)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "737978462844637196",
+    "mediaFile": {
+     "resourceFileId": "738147470250651648",
+     "url": "https://store.bblcdn.com/s7/default/2d2f760a03ce461d867adbcb69c113a0/FAZ082.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Device",
+      "propertyKeyId": "723049025633329153",
+      "propertyValue": "A2L"
+     },
+     {
+      "propertyKey": "Length",
+      "propertyKeyId": "9266653462664",
+      "propertyValue": "975mm*2 + 905mm*2 + 925mm*1"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   }
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "32646993969288",
+    "url": "https://store.bblcdn.com/s7/default/b560dbe603bd41699eff836033a6366f/4mPTFE_5c72c868-fc7c-4e4a-8a34-f8d9094a4167.png"
+   },
+   {
+    "resourceFileId": "33981937352840",
+    "url": "https://store.bblcdn.com/s7/default/251fb9c0b52846968c4754eedc405301/FAT005.png"
+   },
+   {
+    "resourceFileId": "33990237651080",
+    "url": "https://store.bblcdn.com/s7/default/2df28dab6df4477bb72a9fcd16bdbdb1/20240328-094138.jpg"
+   },
+   {
+    "resourceFileId": "32129287094408",
+    "url": "https://store.bblcdn.com/s7/default/2280e7586e064c9c900d1b6c45728e99/P.png"
+   },
+   {
+    "resourceFileId": "32646994329736",
+    "url": "https://store.bblcdn.com/s7/default/256271eb85994dd5802cd2c5e79874a7/PTFE_f8524ab8-01ae-4c53-9092-5d259103307b.png"
+   },
+   {
+    "resourceFileId": "33981937221768",
+    "url": "https://store.bblcdn.com/s7/default/415b2fbaa1294a06b14076ac71cfa818/FAT006.png"
+   },
+   {
+    "resourceFileId": "33981937254536",
+    "url": "https://store.bblcdn.com/s7/default/9b6174581e2049f1b8886e16547b1c98/FAT007.png"
+   },
+   {
+    "resourceFileId": "723060213786316800",
+    "url": "https://store.bblcdn.com/s7/default/b9703a58c89545e29efc7a9fdf406edb/FAT008.png"
+   },
+   {
+    "resourceFileId": "723060213577912320",
+    "url": "https://store.bblcdn.com/s7/default/4aaae7d400f04d2581b85b1fe1723332/FAT010.jpg"
+   },
+   {
+    "resourceFileId": "723060213064896512",
+    "url": "https://store.bblcdn.com/s7/default/2e2dc7858522421e9084b4e2e2dfdee0/FAT009-V1.jpg"
+   },
+   {
+    "resourceFileId": "723060212892930048",
+    "url": "https://store.bblcdn.com/s7/default/54927e21d24045ca82de8450142edcea/FAT011.png"
+   },
+   {
+    "resourceFileId": "738147470250651648",
+    "url": "https://store.bblcdn.com/s7/default/2d2f760a03ce461d867adbcb69c113a0/FAZ082.png"
+   }
+  ]
+ },
+ "description": {
+  "kind": "none"
+ },
+ "jsonld": []
+}

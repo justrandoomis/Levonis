@@ -12,6 +12,11 @@
  *   - `to.source_handle`       → `pending` on that handle (resolved by the target's own batch);
  *   - `family` + `members`     → one row per member, each pending or resolved, all carrying the
  *                                family key and the source's own label;
+ *   - `by_subject` / `default` → a label whose members depend on the product that names it
+ *                                ("A1 Series": the A1 mini only where the subject's own evidence
+ *                                says so, owner question P0-1): `by_subject[<subject handle>]`
+ *                                first, else `default`; such an entry has no `to` and no
+ *                                top-level `members` on purpose (owner-questions §E.2);
  *   - `alias_of`               → the aliased entry;
  *   - a `compounds` entry      → its atoms (compatible) and not-atoms (not compatible);
  *   - `reviewed_unresolvable`  → no row (reviewed: not a product target);
@@ -68,6 +73,13 @@ interface TargetRef {
   levonis_product_id?: string | null;
   levonis_model?: string;
 }
+/** The members of a label for one subject product (or the default), as the reviewed file states them. */
+export interface CompatMembers {
+  to?: TargetRef;
+  members?: readonly TargetRef[];
+  basis?: string;
+  reason?: string;
+}
 export interface CompatEntry {
   kind?: string;
   reason?: string;
@@ -76,6 +88,10 @@ export interface CompatEntry {
   members?: readonly TargetRef[];
   alias_of?: string;
   qualifier?: string;
+  /** Members by the handle of the product that names the label (read before anything else). */
+  by_subject?: Readonly<Record<string, CompatMembers>>;
+  /** Members for a subject with no entry of its own (read only when the entry has no `to` / `members`). */
+  default?: CompatMembers;
 }
 /** The reviewed label file (only the fields this module reads). */
 export interface CompatTargets {
@@ -106,6 +122,39 @@ export interface RelationInputs {
   /** Spec rows that state compatibility (`compat.statement`). */
   compatStatements?: ReadonlyArray<{ text: string; locator: string }>;
   targets: CompatTargets | null;
+}
+
+/**
+ * Whether the reviewed file knows a label: it maps it (`labels`, or a raw
+ * string under `compounds`) or lists it as reviewed-unresolvable. Case- and
+ * punctuation-insensitive, as every lookup here. The printer matcher reads a
+ * "Select your printer series" or "Device" group as a printer group only
+ * when every value passes (owner-questions §E.9).
+ */
+export function compatLabelReviewed(targets: CompatTargets | null | undefined, label: string): boolean {
+  if (!targets) return false;
+  let keys = REVIEWED_KEYS.get(targets);
+  if (!keys) {
+    keys = new Set([targets.labels, targets.compounds, targets.reviewed_unresolvable].flatMap((t) => Object.keys(t ?? {}).map(labelKey)));
+    REVIEWED_KEYS.set(targets, keys);
+  }
+  const key = labelKey(label);
+  return !!key && keys.has(key);
+}
+const REVIEWED_KEYS = new WeakMap<CompatTargets, Set<string>>();
+
+/**
+ * The target refs of an entry for one subject product: its `by_subject`
+ * members first, then its own `to` / `members`, then its `default`
+ * (owner-questions §E.2). Never a guess: an entry with none of these resolves
+ * to nothing, and the label stays unresolvable.
+ */
+export function entryTargetsFor(entry: CompatEntry, subjectHandle: string): { to?: TargetRef; members?: readonly TargetRef[] } {
+  const own = entry.by_subject && Object.prototype.hasOwnProperty.call(entry.by_subject, subjectHandle) ? entry.by_subject[subjectHandle] : undefined;
+  if (own && (own.to || own.members?.length)) return { to: own.to, members: own.members };
+  if (entry.to || entry.members?.length) return { to: entry.to, members: entry.members };
+  if (entry.default && (entry.default.to || entry.default.members?.length)) return { to: entry.default.to, members: entry.default.members };
+  return {};
 }
 
 const TARGET_KINDS: ReadonlySet<string> = new Set(['printer', 'ams', 'hub', 'buffer', 'laser_module', 'toolhead', 'spool', 'family', 'part', 'material', 'other']);
@@ -181,10 +230,11 @@ export function buildRelations(inp: RelationInputs): RelationResult {
       }
       return false;
     };
-    if (entry.to && one(entry.to, asTargetKind(entry.kind), '')) return;
-    if (entry.members?.length) {
+    const refs = entryTargetsFor(entry, selfHandle);
+    if (refs.to && one(refs.to, asTargetKind(entry.kind), '')) return;
+    if (refs.members?.length) {
       let any = false;
-      for (const m of entry.members) {
+      for (const m of refs.members) {
         const ok = one(m, 'family', entry.family ?? labelKey(label).replace(/\s+/g, '_'));
         // A member the reviewed file names without a resolvable id yet (an existing Levonis model awaiting the snapshot).
         if (!ok) out.notes.push({ kind: 'relation_unresolvable', field: relation, detail: 'family member without a resolvable target' });

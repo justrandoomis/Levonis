@@ -11,10 +11,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRelations, type CompatTargets } from '../packages/catalog/src/bambuImport/relations';
+import { buildRelations, compatLabelReviewed, entryTargetsFor, type CompatTargets } from '../packages/catalog/src/bambuImport/relations';
 import { buildOptions, newProductId } from '../packages/catalog/src/bambuImport/options';
 import { describe } from '../packages/catalog/src/bambuImport/describe';
-import { sample } from './fixtures/bambu/load';
+import { fixtureJson, sample } from './fixtures/bambu/load';
 
 const TARGETS: CompatTargets = {
   version: 1,
@@ -96,4 +96,94 @@ test('a product is never related to itself, and without the reviewed file every 
   assert.ok(!self.rows.some((row) => row.targetSourceHandle === 'h2c'));
   const none = buildRelations({ productId, handle: 'x', model, described, relationBullets: [], targets: null });
   assert.ok(none.rows.length > 0 && none.rows.every((row) => row.state === 'unresolvable'));
+});
+
+// ---------------------------------------------------------------- the real reviewed file (P0 DRAFT, owner-questions §E.2, §E.9)
+
+/**
+ * "A1 SERIES" PER SUBJECT (owner-questions §E.2, owner question P0-1). The
+ * reviewed entry has no `to` and no top-level `members` on purpose: whether
+ * the A1 mini is in the A1 Series depends on the product that names it, so
+ * relations.ts reads `by_subject[<subject handle>].members` first and
+ * `default.members` otherwise. One subject of each basis, on the real file.
+ */
+const REAL = fixtureJson<CompatTargets>('compat-targets.json');
+
+function relationsOf(h: Parameters<typeof sample>[0]) {
+  const x = sample(h);
+  const productId = newProductId(x.sourceProductId);
+  const model = buildOptions(x, productId, { isReviewedTarget: (label) => compatLabelReviewed(REAL, label) });
+  return { x, model, r: buildRelations({ productId, handle: x.handle, model, described: describe(x.description), relationBullets: [], targets: REAL }) };
+}
+const a1SeriesTargets = (rows: ReturnType<typeof buildRelations>['rows']) =>
+  [...new Set(rows.filter((row) => row.targetLabel === 'A1 Series').map((row) => `${row.state}:${row.targetSourceHandle}:${row.targetFamily}`))].sort();
+
+test('the real "A1 Series" entry has no `to` and no top-level members: it resolves only per subject', () => {
+  const entry = REAL.labels['A1 Series'];
+  assert.equal(entry.to, undefined);
+  assert.equal(entry.members, undefined);
+  assert.ok(entry.by_subject && entry.default);
+  assert.equal(entry.by_subject!['bambu-hotend-a1-a2'].basis, 'includes_a1_mini');
+  assert.equal(entry.by_subject!['ams-2-pro'].basis, 'excludes_a1_mini');
+  assert.equal(entry.by_subject!['cyberbrick-timelapse-kit'], undefined, 'a subject on the default');
+  assert.deepEqual(entryTargetsFor(entry, 'no-such-subject').members, entry.default!.members);
+});
+
+test('includes: bambu-hotend-a1-a2 names "A1 Series" in its compatibility section — the A1, the refurbished A1 and the A1 mini', () => {
+  const { r } = relationsOf('bambu-hotend-a1-a2');
+  assert.deepEqual(a1SeriesTargets(r.rows), ['pending:a1-mini:a1_series', 'pending:a1:a1_series', 'pending:refurbished-a1:a1_series']);
+  assert.ok(!r.rows.some((row) => row.targetLabel === 'A1 Series' && row.state === 'unresolvable'));
+});
+
+test('excludes: the AMS 2 Pro printer question offers "A1 Series" — the A1 and the refurbished A1, never the A1 mini', () => {
+  const { r, model } = relationsOf('ams-2-pro.options');
+  assert.deepEqual(a1SeriesTargets(r.rows), ['pending:a1:a1_series', 'pending:refurbished-a1:a1_series']);
+  const a1Series = model.groups.flatMap((g) => g.values).find((v) => v.nameEn === 'A1 Series')!;
+  assert.ok(r.rows.filter((row) => row.targetLabel === 'A1 Series').every((row) => row.scopeKind === 'option_value' && row.scopeId === a1Series.id));
+  const plate = relationsOf('build-plate-combo');
+  assert.deepEqual(a1SeriesTargets(plate.r.rows), ['pending:a1:a1_series', 'pending:refurbished-a1:a1_series'], 'build-plate-combo, also excludes');
+});
+
+test('default: the CyberBrick time-lapse kit has no evidence either way — the narrow default, the A1 and the refurbished A1', () => {
+  const { r } = relationsOf('cyberbrick-timelapse-kit.options');
+  assert.deepEqual(a1SeriesTargets(r.rows), ['pending:a1:a1_series', 'pending:refurbished-a1:a1_series']);
+});
+
+/**
+ * PRINTER QUESTIONS THE REGISTRY CANNOT READ ALONE (owner-questions §E.9).
+ * "Select your printer series" (cyberbrick-timelapse-kit) and "Device"
+ * (ptfe-tubes) are printer groups only when every value is a label the
+ * reviewed file maps or lists as reviewed-unresolvable; then their values are
+ * relation evidence like any printer question's.
+ */
+test('"Select your printer series" and "Device" are printer groups when the reviewed file knows every value', () => {
+  const kit = relationsOf('cyberbrick-timelapse-kit.options');
+  const series = kit.model.groups.find((g) => g.sourceLabel === 'Select your printer series')!;
+  assert.deepEqual([series.kind, series.canonical, series.nameAr, series.nameEn, series.nameCkb], ['printer', 'printer', 'الطابعة', 'Printer', 'چاپکەر']);
+  // The two kit choices the store put in the printer question are reviewed-unresolvable: no row, never a guess.
+  assert.deepEqual([...kit.r.reviewedSkipped].sort(), ['CyberBrick Time-lapse Kit - ZK005', 'Expansion Board Only - XA015']);
+  assert.ok(!kit.r.rows.some((row) => row.state === 'unresolvable'), 'every printer value resolves');
+  const p2 = kit.r.rows.filter((row) => row.targetLabel === 'P2 Series').map((row) => row.targetSourceHandle).sort();
+  assert.deepEqual(p2, ['p2s', 'refurbished-bambu-lab-p2s-3d-printer']);
+  assert.ok(kit.r.rows.some((row) => row.targetLabel === 'X2 Series') && kit.r.rows.some((row) => row.targetLabel === 'H2 Series'), 'compounds expand to their atoms');
+
+  const tubes = relationsOf('ptfe-tubes.options');
+  const device = tubes.model.groups.find((g) => g.sourceLabel === 'Device')!;
+  assert.deepEqual([device.kind, device.canonical, device.nameAr, device.nameEn, device.nameCkb], ['printer', 'device', 'الجهاز', 'Device', 'ئامێر']);
+  const byValue = new Map(device.values.map((v) => [v.id, v.nameEn]));
+  const targeted = new Set(tubes.r.rows.filter((row) => row.scopeKind === 'option_value' && byValue.has(row.scopeId)).map((row) => byValue.get(row.scopeId)));
+  assert.equal(targeted.size, device.values.length, 'every device value carries a relation row');
+  assert.ok(tubes.r.rows.some((row) => row.targetSourceHandle === 'ams-ht' && row.targetKind === 'ams'), 'AMS values target AMS products (never mirrored as printer fits)');
+});
+
+test('without the reviewed file, or with one value it does not know, the groups stay unread (kind other, no rows)', () => {
+  const x = sample('ptfe-tubes.options');
+  const productId = newProductId(x.sourceProductId);
+  const none = buildOptions(x, productId).groups.find((g) => g.sourceLabel === 'Device')!;
+  assert.deepEqual([none.kind, none.canonical], ['other', null]);
+  const partial = buildOptions(x, productId, { isReviewedTarget: (label) => label !== 'P1P' && compatLabelReviewed(REAL, label) }).groups.find((g) => g.sourceLabel === 'Device')!;
+  assert.equal(partial.kind, 'other');
+  assert.equal(compatLabelReviewed(REAL, 'h2 / p1 / x1 series'), true, 'case and punctuation do not matter');
+  assert.equal(compatLabelReviewed(REAL, 'Not a label'), false);
+  assert.equal(compatLabelReviewed(null, 'A1'), false);
 });
