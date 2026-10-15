@@ -300,6 +300,34 @@ const A1 = () =>
     assert.equal(availabilityFromName('P1S'), '');
   });
 
+  /**
+   * "direct" is an order type only as a word of its own (Bambu import owner
+   * question H-1, option b). The CyberBrick omnidirectional forklift's two
+   * option values are product names: before the word boundary they read as a
+   * direct sale, and legacyShapeErrors refused them for a new product.
+   */
+  test('"direct" reads as a direct sale only when no Latin letter touches it', () => {
+    for (const name of ['Direct', 'direct', 'DIRECT', 'Direct sale', 'Direct Sale', 'direct-sale', 'directsale', 'direct_sale', 'A1 - Direct', 'A1 (direct)', 'Direct Sales', 'بيع مباشر', 'A1 - بيع مباشر']) {
+      assert.equal(availabilityFromName(name), 'direct_sale', name);
+    }
+    for (const name of [
+      'Omnidirectional',
+      'Omnidirectional forklift - Remote included - ZL031',
+      'Omnidirectional forklift - Remote not included - ZL031-1',
+      'indirect',
+      'Indirect lighting',
+      'directional',
+      'Directional fan',
+      'directly',
+      'Mounts directly on the frame',
+      'Directsales',
+    ]) {
+      assert.equal(availabilityFromName(name), '', name);
+    }
+    // The pre-order reading is unchanged, and wins over a direct word in the same name.
+    for (const name of ['Pre-order', 'preorder', 'PRE ORDER', 'pre order', 'طلب مسبق', 'Direct pre-order']) assert.equal(availabilityFromName(name), 'pre_order', name);
+  });
+
   test('a key is derived from a label, latin or arabic', () => {
     assert.equal(variantKeyFrom('A1 Combo'), 'a1-combo');
     assert.equal(variantKeyFrom('  A1  '), 'a1');

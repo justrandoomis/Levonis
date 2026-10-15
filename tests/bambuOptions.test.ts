@@ -90,9 +90,27 @@ test('the default value is the source selectedDefault; groups map to the registr
 });
 
 test('orderTypeWord reads exactly as availabilityFromName on every word of interest', () => {
-  const words = ['Pre-order', 'preorder', 'PRE ORDER', 'Direct Sale', 'direct', 'طلب مسبق', 'بيع مباشر', 'Standard', 'AMS Combo', 'Directional fan', 'Combo', ''];
+  const words = [
+    'Pre-order', 'preorder', 'PRE ORDER', 'Direct Sale', 'direct', 'Direct sale', 'direct-sale', 'directsale', 'Direct Sales', 'طلب مسبق', 'بيع مباشر',
+    'Standard', 'AMS Combo', 'Directional fan', 'directly', 'indirect', 'Omnidirectional forklift - Remote included - ZL031', 'Combo', '',
+  ];
   for (const w of words) assert.equal(orderTypeWord(w), availabilityFromName(w), w);
   for (const h of SAMPLE_HANDLES) assert.equal(modelOf(h).m.hold, '', `${h} carries no order-type word`);
+});
+
+/**
+ * Owner question H-1, option b: `availabilityFromName` reads "direct" only as
+ * a word of its own, so the CyberBrick omnidirectional forklift (queue
+ * position 1115, the only ORDER_TYPE_WORD hold P0 found) is no longer held,
+ * and the save path's legacyShapeErrors accepts its two values as new.
+ */
+test('H-1: the omnidirectional forklift values are no order type; the save path accepts them', () => {
+  const names = ['Omnidirectional forklift - Remote included - ZL031', 'Omnidirectional forklift - Remote not included - ZL031-1'];
+  for (const n of names) assert.equal(orderTypeWord(n), '', n);
+  const incoming = names.map((n, i) => ({ id: `ov_${i}`, name_en: n, variant_key: variantKeyOf(`75918661034343629${i}`), active: 1 }));
+  assert.deepEqual(legacyShapeErrors(incoming, new Map(), availabilityFromName), []);
+  // A real order-type word is still refused for a new value.
+  assert.equal(legacyShapeErrors([{ id: 'ov_x', name_en: 'A1 - Direct Sale', variant_key: 'k', active: 1 }], new Map(), availabilityFromName).length, 1);
 });
 
 test('colour vocabulary: base colours and codes', () => {

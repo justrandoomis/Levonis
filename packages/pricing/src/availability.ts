@@ -140,10 +140,19 @@ export function variantLabelFallback(name: string): string {
   return out || name.trim();
 }
 
-/** The availability a legacy name implies, when it names one at all. */
+/**
+ * The availability a legacy name implies, when it names one at all.
+ *
+ * "direct" counts only as a word of its own: no Latin letter may touch it on
+ * either side, so "Direct", "Direct sale", "direct-sale" and "directsale"
+ * read as a direct sale while "Omnidirectional", "indirect", "directional"
+ * and "directly" do not (Bambu import owner question H-1: the CyberBrick
+ * omnidirectional forklift's option names are product names, not order
+ * types). The pre-order reading is unchanged.
+ */
 export function availabilityFromName(name: string): AvailabilityType {
   if (/pre[\s-]?order|طلب\s*مسبق/i.test(name)) return 'pre_order';
-  if (/direct(\s*sale)?|بيع\s*مباشر/i.test(name)) return 'direct_sale';
+  if (/(?<![a-z])direct(\s*sale)?(?![a-z])|بيع\s*مباشر/i.test(name)) return 'direct_sale';
   return '';
 }
 
