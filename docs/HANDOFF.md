@@ -6,6 +6,21 @@ force-pushes, or alternate deployment path.
 
 ## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
+- `abd1d411` — **Services S-P2, trade-in v2** (DECISIONS 238), deployed 2026-10-15 15:20 UTC, migration
+  0192 (restore point `0000162c-0000005a-00005105-86d5325af4632a5f14b13b3fe9380172`; 21 probes, 0
+  failed). Store-safe offer from today's V2 published price (owner parameters, owner-only valuation);
+  device first: intake with serial and hours, the ceiling recomputed at intake, credit only after
+  intake; tiered money authority (financial admin up to the ceiling, owner above with a reason);
+  completion when the new order is delivered books the device into stock (lot at cost = credit used,
+  a hidden «used» draft); a cancel or return never loses the credit (same coupon row, 30 days);
+  expiry/reminder sweep in the quarter-hour tick; finance counts the credit as a payment; the desk's
+  «الخدمات» group (queue v2, intake, value, owner panels) and five customer phone screens. Safe
+  defaults the owner has not ruled on (S-P2 spec §16): an expired credit returns the device; one
+  5,000 collection fee outside Baghdad, deducted from the credit; the used draft is hidden with 1
+  month of warranty; no grace on an expired offer. The offer reads the approved USD/IQD rate through
+  the no-price helper `worker/lib/pricingEngine/approvedRate.ts` (pinned in
+  `tests/pricingCostToPriceUsd.test.ts`). Old-database behaviour: the customer routes degrade, only
+  the owner's component references answer 503 `TRADE_IN_V2_NOT_INSTALLED`.
 - `8a2c3345` — **Services S-P1** (DECISIONS 237), deployed 2026-10-15 03:34 UTC, migration 0191
   (restore point `00001627-00000700-00005105-2aa1ead2d562b0d83920e8e899724b12`). Triggers, not
   unique indexes, so old duplicate rows never break the migration: a cancel by any door gives the
@@ -55,7 +70,7 @@ below cost sells at direct), 223 (Services V2 decisions 1–8; perks per printer
 Open for the owner after Pricing V2: Q7 (bundles/mystery pricing); whether a price drop caused
 only by a membership rule is compensated on new orders (decision 6 compares base USD, so today
 it is not); PRIME has no member price in V2 (`BENEFIT_TIER_NOT_ENTITLED`).
-Next: Services S-P2 … S-P10 (plan in the session scratchpad `services-v2/plan.md`).
+Next: catalog-only (0193, branch feat/catalog-only) and the Bambu Lab import (DECISIONS 239; spec in the session scratchpad `bambu/import-spec.md`); then Services S-P3 … S-P10 (plan in the session scratchpad `services-v2/plan.md`).
 
 Working method (owner asked why work took days, 2026-10-14): local test/check runs on the
 4-CPU container took 60–90 min and dominated; agents now run only the tests near their change
