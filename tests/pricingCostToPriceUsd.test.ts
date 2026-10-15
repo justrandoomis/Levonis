@@ -376,7 +376,14 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   // row 204), and «ناقص» asks the engine's resolvers whether a cost or a minimum profit EXISTS; it
   // computes no price (row 205). None of them is reachable from a customer route.
   const OWNER_TOOLS = ['worker/lib/productDataFilePricing.ts', 'worker/routes/templateDataFile.ts', 'worker/lib/productCompleteness.ts'];
-  const TOOL_IMPORT = /from\s+['"][^'"]*\/(?:productDataFilePricing|templateDataFile|productCompleteness|completenessHooks)['"]/;
+  // The worker's own modules only (a relative import): `@levonis/contracts/productCompleteness` is the shared
+  // list of codes — constants the client reads too, no resolver — and the catalog-only predicate
+  // (worker/lib/listing.ts, DECISIONS row 240) reads its CATALOG_BLOCKING_CODES from there.
+  const TOOL_IMPORT = /from\s+['"]\.{1,2}\/(?:[^'"]*\/)?(?:productDataFilePricing|templateDataFile|productCompleteness|completenessHooks)['"]/;
+  for (const tool of ["from './productCompleteness'", "from '../lib/productCompleteness'", "from '../lib/completenessHooks'", "from './templateDataFile'"]) {
+    assert.match(tool, TOOL_IMPORT, `the guard still sees ${tool}`);
+  }
+  assert.doesNotMatch("from '@levonis/contracts/productCompleteness'", TOOL_IMPORT);
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, TOOL_IMPORT, `${f} reaches no owner tool`);
   }
@@ -403,10 +410,25 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
     assert.deepEqual(engine, [...helpers].sort(), f);
   }
+  // Catalog-only and «طلب السعر» (DECISIONS row 240): which SKUs a product structurally has — the V2 writer's
+  // own universe, `sellableSkus` — and their names, `unitNamesOf`. Neither resolves a figure: the
+  // commercial state and a request's selection check read the structure, never a price, and import nothing
+  // else from the engine.
+  const CATALOG_ONLY_STRUCTURE: Readonly<Record<string, readonly string[]>> = {
+    'worker/lib/commercialState.ts': ['sellableSkus'],
+    'worker/lib/priceRequests.ts': ['unitNamesOf'],
+  };
+  for (const [f, names] of Object.entries(CATALOG_ONLY_STRUCTURE)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]);
+    assert.deepEqual(engine, ['./pricingEngine/legacy'], f);
+    const imported = /import\s*\{([^}]*)\}\s*from\s*['"]\.\/pricingEngine\/legacy['"]/.exec(src)![1]!.split(',').map((x) => x.trim()).filter(Boolean);
+    assert.deepEqual(imported, [...names], `${f} reads the structure only`);
+  }
   const approvedRate = files.find((x) => x.f === 'worker/lib/pricingEngine/approvedRate.ts')!.src;
   assert.deepEqual([...approvedRate.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]), ['./rates'], 'the approved-rate helper imports the engine\'s rate reader and nothing else');
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !OWNER_TOOLS.includes(f)), []);
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !OWNER_TOOLS.includes(f)), []);
 });
