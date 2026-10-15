@@ -2365,6 +2365,12 @@ export interface FinanceTotals {
    * there is never such a gap.
    */
   coupon_discount_iqd: number;
+  /** S-P2: trade-in credits whose device is stock at cost — shown, not subtracted (0 before S-P2). */
+  trade_in_credit_iqd: number;
+  /** Trade-in credits with no device in stock (before S-P2) — subtracted. */
+  legacy_trade_in_credit_iqd: number;
+  /** S-P2: credits given back by returns, reversed inside `refunded_revenue_iqd` (0 before S-P2). */
+  trade_in_reissued_iqd: number;
   operating_expenses_iqd: number;
   net_profit_iqd: number;
   net_margin_percent: number | null;
@@ -2409,6 +2415,9 @@ export type FinancePeriodOnlyField =
   | 'cod_tax_collected_iqd'
   | 'points_redeemed_iqd'
   | 'coupon_discount_iqd'
+  | 'trade_in_credit_iqd'
+  | 'legacy_trade_in_credit_iqd'
+  | 'trade_in_reissued_iqd'
   | 'operating_expenses_iqd'
   | 'net_profit_iqd'
   | 'net_margin_percent'

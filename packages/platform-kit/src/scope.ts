@@ -503,6 +503,20 @@ export const FINANCIAL_FIELDS = [
   'estimated_fx_version',
   'purchase_review',
   'v2_purchase_inputs',
+  // -- Services S-P2, trade-in v2 (DECISIONS row 238; migration 0192): the owner's valuation record — the
+  // -- store's cap, the expected resale, its costs and margin, the condition factor, a component's owner
+  // -- USD reference, the stock cost basis and the record/parameter containers. The staff ceiling
+  // -- (`ceiling_iqd`) is NOT here: every admin reads it.
+  'store_cap_iqd',
+  'resale_iqd',
+  'costs_iqd',
+  'trade_in_margin_iqd',
+  'expected_margin_iqd',
+  'cost_basis_iqd',
+  'ref_price_usd',
+  'trade_in_valuation',
+  'trade_in_params',
+  'q_bp',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

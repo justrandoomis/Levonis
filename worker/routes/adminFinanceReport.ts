@@ -82,6 +82,8 @@ import {
   GRANULARITIES,
   MAX_BREAKDOWN_ROWS,
   ordersByDaySql,
+  REISSUES_BY_DAY_SQL,
+  reissueFactOf,
   UNRECOGNIZED_ORDERS_SQL,
   buildPeriodReport,
   combineBreakdown,
@@ -168,11 +170,14 @@ export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
   // not 0098 (every database did, until 0098 ran), so one flag cannot stand in
   // for the other. `columnsOf` answers an empty set for a table that is not
   // there, which is exactly the signal wanted.
-  const [items, allocations, refunds, orders] = await Promise.all([
+  const [items, allocations, refunds, orders, coupons, tradeInStock, reissues] = await Promise.all([
     columnsOf(db, 'order_items'),
     columnsOf(db, 'order_item_inventory_allocations'),
     columnsOf(db, 'finance_refund_facts'),
     columnsOf(db, 'orders'),
+    columnsOf(db, 'coupons'),
+    columnsOf(db, 'trade_in_stock'),
+    columnsOf(db, 'trade_in_credit_reissues'),
   ]);
   const facts: SchemaFacts = {
     has0095: items.has('cost_basis') && items.has('cost_iqd'),
@@ -180,11 +185,16 @@ export async function probeSchema(db: D1Database): Promise<SchemaFacts> {
     hasOperationalRefunds: refunds.has('cogs_iqd'),
     hasPriceAdjustments: orders.has('price_adjustment_iqd'),
     hasLineEstimates: items.has('estimated_cost_iqd'),
+    hasTradeInCoupons: coupons.has('trade_in_id'),
+    hasTradeInStock: tradeInStock.has('cost_basis_iqd'),
+    hasTradeInReissues: reissues.has('amount_iqd'),
   };
   // MEMOISED ONLY WHEN BOTH ARE TRUE. Caching a `hasFifo: false` taken during
   // the minute between the deploy and its migration would keep this isolate
   // reporting snapshot costs long after the lots were there to read.
-  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments && facts.hasLineEstimates) schemaMemo.set(db, facts);
+  if (facts.has0095 && facts.hasFifo && facts.hasOperationalRefunds && facts.hasPriceAdjustments && facts.hasLineEstimates && facts.hasTradeInStock && facts.hasTradeInReissues) {
+    schemaMemo.set(db, facts);
+  }
   return facts;
 }
 
@@ -218,6 +228,12 @@ function rangeFrom(c: Context<AppContext>): DayRange {
 }
 
 type Row = Record<string, unknown>;
+
+/** A table the probe saw vanish in between (a migration racing the request) reads as empty; anything else is real. */
+const missingTableIsEmpty = (e: unknown): Row[] => {
+  if (/no such table\b/i.test(e instanceof Error ? e.message : String(e))) return [];
+  throw e;
+};
 
 const rowsOf = async (db: D1Database, sql: string, binds: unknown[]): Promise<Row[]> => {
   const r = await db.prepare(sql).bind(...binds).all<Row>();
@@ -274,10 +290,12 @@ adminFinanceReportRoutes.get('/summary', async (c) => {
   const window = utcWindowFor({ from: previous.from, to: range.to, days: range.days * 2 });
   const binds = [window.startIso, window.endIso];
 
-  const [sales, refunds, orders, expenses, expenseCategories, unrecognized] = await Promise.all([
+  const [sales, refunds, orders, reissues, expenses, expenseCategories, unrecognized] = await Promise.all([
     rowsOf(c.env.DB, salesByDaySql(schema), binds),
     rowsOf(c.env.DB, refundsByDaySql(schema), binds),
     rowsOf(c.env.DB, ordersByDaySql(schema), binds),
+    // S-P2: credits given back by returns; none on a database without 0192.
+    schema.hasTradeInReissues ? rowsOf(c.env.DB, REISSUES_BY_DAY_SQL, binds).catch(missingTableIsEmpty) : Promise.resolve([] as Row[]),
     // Days are fetched across the WIDENED window so the comparison period has
     // its expenses too; the category breakdown is only ever asked of the
     // requested range, because nothing on the screen breaks down last month's
@@ -294,6 +312,7 @@ adminFinanceReportRoutes.get('/summary', async (c) => {
     sales: sales.map(saleFactOf),
     refunds: refunds.map(refundFactOf),
     orders: orders.map(orderFactOf),
+    reissues: reissues.map(reissueFactOf),
     expenses: expenses.map(expenseFactOf),
     expenseCategories: expenseCategories.map(expenseCategoryTotalOf),
     schema,

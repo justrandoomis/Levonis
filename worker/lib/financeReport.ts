@@ -578,6 +578,17 @@ export interface OrderFact {
   cod_tax_iqd: number;
   points_iqd: number;
   coupon_iqd: number;
+  /** S-P2: a trade-in credit whose device is in stock at cost = the credit — non-cash consideration, shown, not subtracted. */
+  trade_in_credit_iqd: number;
+  /** A trade-in credit with no device in stock (before S-P2, or not yet received) — subtracted, on its own line. */
+  legacy_trade_in_credit_iqd: number;
+}
+
+/** One day's trade-in credits given back by a return (S-P2, `trade_in_credit_reissues.reason = 'returned'`). */
+export interface ReissueFact {
+  day: string;
+  reissues: number;
+  amount_iqd: number;
 }
 
 /** One day's operating expenses, from the admin's own ledger. */
@@ -642,6 +653,14 @@ export const orderFactOf = (r: Record<string, unknown>): OrderFact => ({
   cod_tax_iqd: num(r.cod_tax_iqd),
   points_iqd: num(r.points_iqd),
   coupon_iqd: num(r.coupon_iqd),
+  trade_in_credit_iqd: num(r.trade_in_credit_iqd),
+  legacy_trade_in_credit_iqd: num(r.legacy_trade_in_credit_iqd),
+});
+
+export const reissueFactOf = (r: Record<string, unknown>): ReissueFact => ({
+  day: dayOf(r.day),
+  reissues: num(r.reissues),
+  amount_iqd: num(r.amount_iqd),
 });
 
 export const expenseFactOf = (r: Record<string, unknown>): ExpenseFact => ({
@@ -718,6 +737,12 @@ export interface SchemaFacts {
   hasPriceAdjustments?: boolean;
   /** 0190's frozen V2 line estimate (`order_items.estimated_cost_iqd`); absent databases keep their old SQL. */
   hasLineEstimates?: boolean;
+  /** 0143's `coupons.trade_in_id`: which order-level coupon is a trade-in credit. Absent: every coupon is a coupon. */
+  hasTradeInCoupons?: boolean;
+  /** 0192's `trade_in_stock` (S-P2): a trade-in credit whose device is stock is not a discount. Absent: today's figures. */
+  hasTradeInStock?: boolean;
+  /** 0192's `trade_in_credit_reissues`: a returned sale's credit part is reversed. Absent: nothing to reverse. */
+  hasTradeInReissues?: boolean;
 }
 
 /**
@@ -1358,23 +1383,60 @@ const ORDER_COUPON_RESIDUAL_IQD = `MAX(0, COALESCE(json_extract(o.coupon_snapsho
                 - COALESCE((SELECT SUM(ci.coupon_discount_iqd) FROM order_items ci WHERE ci.order_id = o.id), 0))`;
 
 /**
+ * THE RESIDUAL, SPLIT THREE WAYS (Services S-P2 spec §6.11; DECISIONS row 238, decision 5).
+ *
+ *   coupon_iqd                  every coupon that is not a trade-in credit — subtracted, as before;
+ *   trade_in_credit_iqd         a trade-in credit whose device is STOCK at cost = the credit
+ *                               (`trade_in_stock`): a payment in kind, not a discount — shown, NOT
+ *                               subtracted; its margin appears when the device is resold;
+ *   legacy_trade_in_credit_iqd  a trade-in credit with no device in stock (before S-P2, or not yet
+ *                               received) — still subtracted, on its own line.
+ * The three add up to the old residual, to the dinar. A database without 0192 has no stock: every
+ * trade-in credit is legacy (today's net profit).
+ */
+const TRADE_IN_OF_ORDER = `(SELECT tc.trade_in_id FROM coupons tc WHERE tc.id = json_extract(o.coupon_snapshot, '$.coupon_id'))`;
+const orderCouponColumns = (schema: SchemaFacts): string => {
+  if (schema.hasTradeInCoupons === false) {
+    return `SUM(${ORDER_COUPON_RESIDUAL_IQD}) AS coupon_iqd, 0 AS trade_in_credit_iqd, 0 AS legacy_trade_in_credit_iqd`;
+  }
+  const stocked = schema.hasTradeInStock ? `EXISTS (SELECT 1 FROM trade_in_stock ts WHERE ts.request_id = ${TRADE_IN_OF_ORDER})` : '0';
+  return `SUM(CASE WHEN ${TRADE_IN_OF_ORDER} IS NULL THEN ${ORDER_COUPON_RESIDUAL_IQD} ELSE 0 END) AS coupon_iqd,
+         SUM(CASE WHEN ${TRADE_IN_OF_ORDER} IS NOT NULL AND ${stocked} THEN ${ORDER_COUPON_RESIDUAL_IQD} ELSE 0 END) AS trade_in_credit_iqd,
+         SUM(CASE WHEN ${TRADE_IN_OF_ORDER} IS NOT NULL AND NOT ${stocked} THEN ${ORDER_COUPON_RESIDUAL_IQD} ELSE 0 END) AS legacy_trade_in_credit_iqd`;
+};
+
+/**
+ * Trade-in credits given back by a RETURN, by the Baghdad day they were given back (S-P2 §6.11):
+ * the returned sale's credit part is reversed in that day's refunds, so the next sale the same
+ * credit pays for is not revenue twice. Binds: startIso, endIso.
+ */
+export const REISSUES_BY_DAY_SQL = `
+  SELECT COALESCE(date(x.created_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
+         COUNT(*) AS reissues,
+         SUM(x.amount_iqd) AS amount_iqd
+    FROM trade_in_credit_reissues x
+   WHERE x.reason = 'returned' AND x.created_at >= ?1 AND x.created_at < ?2
+   GROUP BY day`;
+
+/**
  * Order-level collections, on the SAME recognition rule as the lines so the
  * two can be added without asking a second question. Binds: startIso, endIso.
  */
-export const ORDERS_BY_DAY_SQL = `
+export const ordersByDayBaseSql = (schema: SchemaFacts): string => `
   SELECT COALESCE(date(o.delivered_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
          COUNT(*) AS orders,
          SUM(COALESCE(o.shipping_iqd, 0)) AS shipping_iqd,
          SUM(COALESCE(o.cod_tax_iqd, 0)) AS cod_tax_iqd,
          SUM(COALESCE(o.points_discount_iqd, 0)) AS points_iqd,
-         SUM(${ORDER_COUPON_RESIDUAL_IQD}) AS coupon_iqd
+         ${orderCouponColumns(schema)}
     FROM orders o
    WHERE ${DELIVERED_WHERE}
    GROUP BY day`;
 
+
 /** An excessive goods reduction reaches delivery first and COD second, exactly
  * as calculateGoods does. The original points column is still deducted once. */
-export const ordersByDaySql = (schema: SchemaFacts): string => !schema.hasPriceAdjustments ? ORDERS_BY_DAY_SQL : `
+export const ordersByDaySql = (schema: SchemaFacts): string => !schema.hasPriceAdjustments ? ordersByDayBaseSql(schema) : `
   WITH ap_order_goods AS (
     SELECT i.order_id,SUM(${NET_LINE_IQD}) AS goods_iqd
       FROM order_items i WHERE i.bundle_parent_item_id IS NULL GROUP BY i.order_id
@@ -1388,7 +1450,7 @@ export const ordersByDaySql = (schema: SchemaFacts): string => !schema.hasPriceA
          SUM(MAX(0,COALESCE(o.shipping_iqd,0)-o.excess_cut)) AS shipping_iqd,
          SUM(MAX(0,COALESCE(o.cod_tax_iqd,0)-MAX(0,o.excess_cut-COALESCE(o.shipping_iqd,0)))) AS cod_tax_iqd,
          SUM(COALESCE(o.points_discount_iqd,0)) AS points_iqd,
-         SUM(${ORDER_COUPON_RESIDUAL_IQD}) AS coupon_iqd
+         ${orderCouponColumns(schema)}
     FROM ap_order_cuts o GROUP BY day`;
 
 /**
@@ -1587,8 +1649,14 @@ export interface Totals {
   cod_tax_collected_iqd: number;
   /** Points spent by customers, 1 point = 1 IQD. A settled liability (§3). */
   points_redeemed_iqd: number;
-  /** Order-level coupon discounts. Belongs to no product today (§3). */
+  /** Order-level coupon discounts. Belongs to no product today (§3). Trade-in credits are on their own lines (S-P2). */
   coupon_discount_iqd: number;
+  /** S-P2: trade-in credits whose device is in stock at cost = the credit — a payment in kind, shown, NOT subtracted. */
+  trade_in_credit_iqd: number;
+  /** Trade-in credits with no device in stock (before S-P2) — subtracted, as every credit was before. */
+  legacy_trade_in_credit_iqd: number;
+  /** S-P2: credits given back by a return — the returned sale's credit part, reversed in `refunded_revenue_iqd`. */
+  trade_in_reissued_iqd: number;
   /** The admin's own operating expenses for this bucket (§5). */
   operating_expenses_iqd: number;
   /** Gross + collections − points − opex. Period-level only (§5). */
@@ -1649,6 +1717,9 @@ const zeroTotals = (): Totals => ({
   cod_tax_collected_iqd: 0,
   points_redeemed_iqd: 0,
   coupon_discount_iqd: 0,
+  trade_in_credit_iqd: 0,
+  legacy_trade_in_credit_iqd: 0,
+  trade_in_reissued_iqd: 0,
   operating_expenses_iqd: 0,
   net_profit_iqd: 0,
   net_margin_percent: null,
@@ -1702,6 +1773,7 @@ function seal(t: Totals): Totals {
     t.cod_tax_collected_iqd -
     t.points_redeemed_iqd -
     t.coupon_discount_iqd -
+    t.legacy_trade_in_credit_iqd -
     t.operating_expenses_iqd;
   t.net_margin_percent = marginPercent(
     t.net_profit_iqd,
@@ -1844,6 +1916,8 @@ export interface ReportInput {
   sales: SaleFact[];
   refunds: RefundFact[];
   orders: OrderFact[];
+  /** S-P2: trade-in credits given back by returns (empty on a database without 0192). */
+  reissues?: ReissueFact[];
   expenses: ExpenseFact[];
   /** Per-category totals for the REQUESTED range only — never the comparison
    *  window, which nothing on the screen breaks down. */
@@ -1979,6 +2053,20 @@ export function buildPeriodReport(input: ReportInput): PeriodReport {
       t.cod_tax_collected_iqd += f.cod_tax_iqd;
       t.points_redeemed_iqd += f.points_iqd;
       t.coupon_discount_iqd += f.coupon_iqd;
+      t.trade_in_credit_iqd += f.trade_in_credit_iqd;
+      t.legacy_trade_in_credit_iqd += f.legacy_trade_in_credit_iqd;
+    });
+  }
+  // A credit given back by a return reverses the returned sale's credit part (S-P2 §6.11): the
+  // cash refund reversed the rest, so the line's whole revenue is reversed once — and the next
+  // sale the credit pays for is revenue once. Costed revenue moves with it, or the parts stop
+  // adding up to the whole.
+  for (const f of input.reissues ?? []) {
+    if (f.day === UNBUCKETED) continue;
+    place(f.day, (t) => {
+      t.refunded_revenue_iqd += f.amount_iqd;
+      t.costed_revenue_iqd -= f.amount_iqd;
+      t.trade_in_reissued_iqd += f.amount_iqd;
     });
   }
   for (const f of input.expenses) {
@@ -2142,6 +2230,9 @@ export const PERIOD_ONLY_FIELDS = [
   'cod_tax_collected_iqd',
   'points_redeemed_iqd',
   'coupon_discount_iqd',
+  'trade_in_credit_iqd',
+  'legacy_trade_in_credit_iqd',
+  'trade_in_reissued_iqd',
   'operating_expenses_iqd',
   'net_profit_iqd',
   'net_margin_percent',

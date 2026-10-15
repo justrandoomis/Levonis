@@ -31,8 +31,14 @@ const n = (v: unknown) => {
 };
 
 export interface ReportAdjustments {
-  /** Order-level coupon not carried by any line, ≥ 0. */
+  /** Order-level coupon not carried by any line, ≥ 0 — a trade-in credit whose device is stock excluded (S-P2). */
   coupon_iqd: number;
+  /**
+   * S-P2 (DECISIONS row 238, decision 5): the order's trade-in credit whose old device is in stock
+   * at cost = the credit — a payment in kind, shown and NOT deducted; its margin appears when the
+   * device is resold. 0 on a database without 0192.
+   */
+  trade_in_credit_iqd: number;
   /** Credited price-protection amount per order line id. */
   price_protection_by_line: Map<string, number>;
   /** Their sum. */
@@ -42,19 +48,31 @@ export interface ReportAdjustments {
 export async function reportAdjustments(db: D1Database, orderIds: readonly string[]): Promise<Map<string, ReportAdjustments>> {
   const out = new Map<string, ReportAdjustments>();
   const ids = [...new Set(orderIds)];
-  for (const id of ids) out.set(id, { coupon_iqd: 0, price_protection_by_line: new Map(), price_protection_iqd: 0 });
+  for (const id of ids) out.set(id, { coupon_iqd: 0, trade_in_credit_iqd: 0, price_protection_by_line: new Map(), price_protection_iqd: 0 });
   if (!ids.length) return out;
   const bound = JSON.stringify(ids);
-  const [coupons, claims] = await Promise.all([
+  const residual = `MAX(0, COALESCE(json_extract(o.coupon_snapshot, '$.discount_iqd'), o.coupon_discount_iqd, 0)
+                       - COALESCE((SELECT SUM(i.coupon_discount_iqd) FROM order_items i WHERE i.order_id = o.id), 0))`;
+  const couponRows = () =>
     db
       .prepare(
-        `SELECT o.id order_id,
-                MAX(0, COALESCE(json_extract(o.coupon_snapshot, '$.discount_iqd'), o.coupon_discount_iqd, 0)
-                       - COALESCE((SELECT SUM(i.coupon_discount_iqd) FROM order_items i WHERE i.order_id = o.id), 0)) coupon_iqd
+        `SELECT o.id order_id, ${residual} coupon_iqd,
+                EXISTS (SELECT 1 FROM coupons tc JOIN trade_in_stock ts ON ts.request_id = tc.trade_in_id
+                         WHERE tc.id = json_extract(o.coupon_snapshot, '$.coupon_id')) stocked
            FROM orders o WHERE o.id IN (SELECT value FROM json_each(?))`
       )
       .bind(bound)
-      .all<Row>(),
+      .all<Row>()
+      .catch((e: unknown) => {
+        // A database without 0192: no trade-in stock, every credit is deducted as before.
+        if (!/no such table\b/i.test(e instanceof Error ? e.message : String(e))) throw e;
+        return db
+          .prepare(`SELECT o.id order_id, ${residual} coupon_iqd, 0 stocked FROM orders o WHERE o.id IN (SELECT value FROM json_each(?))`)
+          .bind(bound)
+          .all<Row>();
+      });
+  const [coupons, claims] = await Promise.all([
+    couponRows(),
     db
       .prepare(
         `SELECT order_id, order_item_id, COALESCE(SUM(credited_iqd), 0) credited_iqd
@@ -67,7 +85,10 @@ export async function reportAdjustments(db: D1Database, orderIds: readonly strin
   ]);
   for (const r of coupons.results ?? []) {
     const entry = out.get(String(r.order_id));
-    if (entry) entry.coupon_iqd = Math.max(0, n(r.coupon_iqd));
+    if (!entry) continue;
+    const amount = Math.max(0, n(r.coupon_iqd));
+    if (n(r.stocked) === 1) entry.trade_in_credit_iqd = amount;
+    else entry.coupon_iqd = amount;
   }
   for (const r of claims.results ?? []) {
     const entry = out.get(String(r.order_id));

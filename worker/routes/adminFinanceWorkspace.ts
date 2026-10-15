@@ -120,6 +120,8 @@ function applyReportAdjustments(bases:OrderProfitBase[],adjustments:Map<string,R
       l.net_after_report_adjustments_iqd=l.owner_net_iqd===null||l.owner_net_iqd===undefined?null:n(l.owner_net_iqd)-share-credit;});
     const credited=a?.price_protection_iqd??0;
     b.totals.coupon_iqd=coupon;b.totals.price_protection_iqd=credited;
+    // S-P2: a trade-in credit whose device is stock is shown, never deducted (DECISIONS row 238).
+    (b.totals as Record<string,unknown>).trade_in_credit_iqd=a?.trade_in_credit_iqd??0;
     b.totals.net_after_report_adjustments_iqd=b.totals.owner_net_iqd===null||b.totals.owner_net_iqd===undefined?null:n(b.totals.owner_net_iqd)-coupon-credited;
   }
   return bases;
