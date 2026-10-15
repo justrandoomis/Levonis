@@ -79,8 +79,20 @@ test('E (component list): sections by component, version-scoped in-the-box items
           ],
         },
       },
-      { componentType: 'FAQ', data: { anchorId: '3', title: 'Frequently Asked Questions', faqItems: [{ question: 'Q?', answer: '<div>A.</div>' }] } },
-      { componentType: 'EndlessModels', data: { title: 'Models', list: [{ name: 'Benchy' }] } },
+      { componentType: 'FAQ', data: { anchorId: '3', title: 'Frequently Asked Questions', faqItems: [{ question: 'Q?', answer: '<div>A. See the <a href="https://wiki.bambulab.com/en/x/faq">wiki</a>.</div>' }] } },
+      // The MakerWorld model showcase (EndlessModels on the H2S, MakerWorldDialog on the P2S) is no description …
+      { componentType: 'EndlessModels', componentName: 'MakerWorldDialog', data: { title: 'Models', items: [{ featureTitle: 'Over a Million Models', featureSubtitle: 'MakerWorld', description: 'Print anything.' }] } },
+      // … but the same component type carries real product content elsewhere (the H2C's "Vortek Hotend Change System").
+      {
+        componentType: 'EndlessModels',
+        componentName: 'WhatIs1',
+        data: {
+          title: 'Vortek Hotend Change System',
+          items: [{ featureTitle: 'Fully Automatic Filament Change', description: 'Swaps the whole hotend.', featureImage: { src: { url: 'https://store.bblcdn.com/s7/v.jpg' } }, link: { text: 'Learn More', url: 'https://bambulab.com' } }],
+        },
+      },
+      // Sections titled by a {text} object; pictures on the store's test CDN are never taken.
+      { componentType: 'SellPoint', componentName: 'SellPoints1', data: { mainTitle: { text: 'Top Tier Printing' }, infoList: [{ title: 'Fast', leftImage: { url: 'https://store-test.bblcdn.com/s7/t.png' }, mainImage: { url: 'https://store-dev.bblcdn.com/s1/d.mp4' } }] } },
     ],
   });
   assert.equal(d.format, 'component_list');
@@ -95,7 +107,73 @@ test('E (component list): sections by component, version-scoped in-the-box items
     [['Printer', null, true], ['AMS 2 Pro', ['X AMS Combo'], false]]
   );
   assert.equal(blocks(d, 'faq', 'faq').length, 1);
-  assert.ok(!d.sections.some((s) => /Models/.test(s.title)), 'EndlessModels is not a description');
+  assert.ok(!d.sections.some((s) => /Models/.test(s.title)), 'the MakerWorld showcase is not a description');
+  const vortek = d.sections.find((s) => s.title === 'Vortek Hotend Change System');
+  assert.ok(vortek, 'an EndlessModels component with product content is kept');
+  assert.ok(vortek!.blocks.some((b) => b.t === 'text' && /Swaps the whole hotend/.test(b.text)));
+  assert.ok(!vortek!.blocks.some((b) => b.t === 'image' && /bambulab\.com$/.test(b.url)), 'a "Learn More" button is a link, never a picture');
+  assert.ok(vortek!.blocks.some((b) => b.t === 'link' && b.text === 'Learn More'));
+  const sell = d.sections.find((s) => s.title === 'Top Tier Printing');
+  assert.ok(sell, 'a {text} title object titles its section');
+  assert.ok(!d.sections.flatMap((s) => s.blocks).some((b) => (b.t === 'image' || b.t === 'video') && /store-(?:test|dev)\./.test(b.url)), 'no test or dev CDN media');
+  assert.deepEqual(d.wikiLinks.map((x) => x.url), ['https://wiki.bambulab.com/en/x/faq'], 'a wiki link inside an FAQ answer is a document');
+});
+
+/**
+ * FORMAT E ON THE REAL H2C (owner-questions §E.5): the component list as the
+ * closed read list keeps it (tests/fixtures/bambu/h2c.json). SpecTable,
+ * Inbox with per-version columns, FAQ, anchor-named sections, the Vortek
+ * sections, the wiki links of the FAQ answers; no picture from the store's
+ * test or dev CDN (SellPoints1/2 still point at them).
+ */
+test('E (real H2C): spec table, version-scoped box items, FAQ with its wiki links, the Vortek sections, no test-CDN media', () => {
+  const x = sample('h2c');
+  assert.equal(x.description.kind, 'component_list');
+  const d = describe(x.description);
+  assert.equal(d.format, 'component_list');
+  const spec = blocks(d, 'specs', 'table');
+  assert.equal(spec.length, 1);
+  assert.ok(spec[0].t === 'table' && spec[0].grid.rows.length >= 20, 'the H2C spec table');
+  const box = d.sections.filter((s) => s.kind === 'in_the_box').flatMap((s) => s.blocks.filter((b) => b.t === 'box_item'));
+  assert.equal(box.length, 20);
+  const scoped = box.filter((b) => b.t === 'box_item' && b.scopes);
+  assert.ok(scoped.length > 0 && scoped.every((b) => b.t === 'box_item' && b.scopes!.every((sc) => ['H2C AMS Combo', 'H2C Laser Full Combo'].includes(sc))), 'per-version columns name the versions');
+  assert.equal(blocks(d, 'faq', 'faq').length, 8);
+  assert.deepEqual(
+    d.wikiLinks.map((l) => l.url).sort(),
+    ['https://wiki.bambulab.com/en/h2/h2d-tpu-printing-guide', 'https://wiki.bambulab.com/en/h2c/h2c-filament-printing-guide', 'https://wiki.bambulab.com/en/h2c/manual/h2c-faq']
+  );
+  for (const t of ['Vortek Hotend Change System', 'Why Vortek?']) assert.ok(d.sections.some((s) => s.title === t), t);
+  assert.ok(d.sections.every((s) => s.title), 'every section has a title (its own or its anchor)');
+  const media = d.sections.flatMap((s) => s.blocks).filter((b) => b.t === 'image' || b.t === 'video');
+  assert.ok(media.length > 20);
+  assert.ok(media.every((b) => (b.t === 'image' || b.t === 'video') && /^https:\/\/store\.bblcdn\.com\//.test(b.url)), 'every picture and video on the production CDN');
+});
+
+test('E: the P2S in-the-box shape (a list of titled pictures, no version columns)', () => {
+  const d = describe({
+    kind: 'component_list',
+    components: [
+      {
+        componentType: 'Inbox',
+        componentName: 'InboxInfo',
+        data: {
+          anchorId: '593648',
+          title: "What's in the box",
+          items: [
+            { title: 'Bambu Lab P2S', imageSrc: { url: 'https://store.bblcdn.com/s7/default/d8e274a920d548ad95abfc3a0bc96504/P2S.jpg' } },
+            { title: 'AMS 2 Pro (combo version)', imageSrc: { url: 'https://store.bblcdn.com/s7/default/618a560d51c74cbd83e50fc44a018807/AMS_2_Pro_(combo_version).jpg' } },
+            { title: 'Spool Holder' },
+          ],
+        },
+      },
+    ],
+  });
+  const box = blocks(d, 'in_the_box', 'box_item');
+  assert.deepEqual(
+    box.map((b) => (b.t === 'box_item' ? [b.text, b.qty, !!b.image, b.scopes ?? null] : null)),
+    [['Bambu Lab P2S', null, true, null], ['AMS 2 Pro (combo version)', null, true, null], ['Spool Holder', null, false, null]]
+  );
 });
 
 test('links are sorted: tracker links keep their query, store links become handles, the placeholder alt is dropped', () => {

@@ -645,6 +645,9 @@ export function extractionFromSample(sample: { product: unknown; description: un
         tree: pickDescription(rows, d.tree),
       };
       break;
+    case 'component_list':
+      description = { kind: 'component_list', components: pickComponents(rows, d.components) };
+      break;
   }
   const jsonld = readJsonLd(Array.isArray(sample.jsonld) ? sample.jsonld : [sample.jsonld], record);
   return {
