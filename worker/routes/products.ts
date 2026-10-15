@@ -2589,7 +2589,13 @@ const CATALOG_ONLY_KEYS = [
   'description_images', 'description_videos', 'content_blocks', 'usage_guide',
   'how_to_use', 'how_to_use_ar', 'how_to_use_ckb', 'gini_url', 'is_featured', 'display_order', 'created_at',
 ] as const;
-/** What a chooser draws for an option or a colour of a catalog-only product: names and pictures. No price, no stock, no route. */
+/**
+ * What a chooser draws for an option or a colour of a catalog-only product: names, pictures and the ids
+ * that bind them (the value id, the colour's option links; `media[]` keeps each picture's
+ * `option_value_id` / `color_id` / `variant_id`). No price, no stock, no route. Every other key the priced
+ * card shows is kept too, so a structural key added later is never silently dropped here
+ * (tests/catalogOnlyProjectionKeys.test.ts; the Bambu import spec §K.1 D-2).
+ */
 const CATALOG_ONLY_OPTION_KEYS = [
   'id', 'name_ar', 'name_en', 'name_ckb', 'image', 'order', 'active', 'variant_key', 'variant_label', 'merged_into', 'group_en', ...DIMENSION_FIELDS,
 ] as const;

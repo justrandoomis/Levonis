@@ -1063,6 +1063,7 @@ function relationsBlock(view: ProductRelationsView, coarse: boolean) {
         id: g.id,
         name_en: g.name_en,
         sort: g.sort,
+        ...groupKnowledge(g),
         values: view.values
           .filter((v) => v.group_id === g.id && truthy(v.active))
           .map((v) => ({
@@ -1071,6 +1072,7 @@ function relationsBlock(view: ProductRelationsView, coarse: boolean) {
             image: canonicalProductMediaUrl(v.image),
             sort: v.sort,
             ...parsePhysicalDimensions(v as unknown as Record<string, unknown>),
+            ...swatchOf(v),
             available: availableOf(v.stock, v.reserved),
             ...(coarse ? { stock_state: stateOf(v.stock, v.reserved, v.low_stock_threshold) } : {}),
           })),
@@ -1118,6 +1120,40 @@ function relationsBlock(view: ProductRelationsView, coarse: boolean) {
       height: i.height,
     })),
   };
+}
+
+/**
+ * 0194 (the Bambu import, DECISIONS row 241; its spec §B.2, §G.1, §K.1 D-2): a
+ * group's Arabic and Sorani labels, its kind and the source's default value,
+ * passed through WHEN THE ROW CARRIES THEM — a database with 0194 (`SELECT *`
+ * returns them) — and never invented before. The same block feeds the priced
+ * and the catalog-only page, so neither drops them; none of them is a price,
+ * a cost or a stock fact.
+ */
+const GROUP_KNOWLEDGE_KEYS = ['name_ar', 'name_ckb', 'kind', 'default_value_id'] as const;
+function groupKnowledge(g: OptionGroupRow): Partial<Record<(typeof GROUP_KNOWLEDGE_KEYS)[number], string>> {
+  const out: Partial<Record<(typeof GROUP_KNOWLEDGE_KEYS)[number], string>> = {};
+  for (const k of GROUP_KNOWLEDGE_KEYS) {
+    const v = g[k];
+    if (typeof v === 'string') out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * 0194: a value's official colour swatch, when the loader joined one. An
+ * allow-list — the picture (our own `/files/…webp` only, as every product
+ * picture), its size and a hex the manufacturer published; never the row's
+ * owner-only provenance (`source_url`, `hex_source_ref`) or its storage key.
+ */
+function swatchOf(v: OptionValueRow): { swatch?: { url: string; width: number | null; height: number | null; published_hex: string } } {
+  const s = v.swatch;
+  if (!s || typeof s !== 'object') return {};
+  const url = canonicalProductMediaUrl(s.url);
+  const hex = typeof s.published_hex === 'string' && /^#[0-9A-F]{6}$/.test(s.published_hex) ? s.published_hex : '';
+  if (!url && !hex) return {};
+  const dim = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.trunc(n) : null);
+  return { swatch: { url, width: dim(s.width), height: dim(s.height), published_hex: hex } };
 }
 
 /** A relations block with every stock fact removed (the catalog-only page). */

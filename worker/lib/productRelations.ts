@@ -36,6 +36,23 @@ export interface OptionGroupRow {
   name_en: string;
   sort: number;
   active: number | boolean;
+  /** 0194 (the Bambu import, DECISIONS row 241; its spec §B.2): the group's
+   *  Arabic and Sorani labels, its semantic kind ('color', 'nozzle', …) and
+   *  the source's default value ('' = none). Optional: a database without 0194
+   *  has none of them, and `SELECT *` simply returns no such key. */
+  name_ar?: string | null;
+  name_ckb?: string | null;
+  kind?: string | null;
+  default_value_id?: string | null;
+}
+
+/** 0194: a value's official colour swatch, joined by the relations loader once 0194 is installed. */
+export interface OptionValueSwatch {
+  url?: string | null;
+  width?: number | null;
+  height?: number | null;
+  /** Only where the manufacturer publishes one ('' = none). */
+  published_hex?: string | null;
 }
 
 export interface OptionValueRow extends PhysicalDimensionOverrides {
@@ -48,6 +65,8 @@ export interface OptionValueRow extends PhysicalDimensionOverrides {
    *  still parses. */
   name_ar?: string | null;
   name_ckb?: string | null;
+  /** 0194: the official swatch (see `OptionValueSwatch`); absent before 0194. */
+  swatch?: OptionValueSwatch | null;
   sku_part: string;
   image: string;
   sort: number;
