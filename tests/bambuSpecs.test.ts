@@ -19,7 +19,8 @@ import { describe } from '../packages/catalog/src/bambuImport/describe';
 import { buildSpecs, compositeCell, typeValue, type SpecResult, type SpecRow } from '../packages/catalog/src/bambuImport/specs';
 import { productTypeOf } from '../packages/catalog/src/bambuImport/registry/types';
 import { modelsInText } from '../packages/catalog/src/bambuImport/registry/models';
-import { keyForLabel } from '../packages/catalog/src/bambuImport/registry/specKeys';
+import { keyForLabel, SPEC_KEYS } from '../packages/catalog/src/bambuImport/registry/specKeys';
+import { labelKey } from '../packages/catalog/src/bambuImport/normalize';
 import { sample, type SampleHandle } from './fixtures/bambu/load';
 
 function specsOf(h: SampleHandle): { r: SpecResult; m: OptionModel; name: (id: string) => string } {
@@ -206,4 +207,108 @@ test('hotend: per-value nozzle diameter and material; bare "0.4 mm" values; pare
   assert.equal(pick(r2.rows, 'nozzle.diameter', '0.4 mm', nameOf)[0]?.valueNum, 0.4);
   assert.equal(pick(r2.rows, 'nozzle.material', '0.4 mm', nameOf).length, 0, 'a bare value names no material');
   assert.equal(pick(r2.rows, 'nozzle.material', '0.8mm Hardened Steel (Standard Included)', nameOf)[0]?.valueText, 'Hardened Steel');
+});
+
+/**
+ * THE LABELS P0 LEFT UNKNOWN (owner-questions §E.7). scans.md §5's top 50
+ * join the registry with three-language labels, a type and a unit, by the
+ * product type the label was seen on; "Specification" and "Parameter" are
+ * table-header words (the parser drops them as labels) and stay out.
+ */
+test('the top 50 unknown labels of the P0 scan resolve to registry keys', () => {
+  const cases: Array<[string, Parameters<typeof keyForLabel>[1], string]> = [
+    ['Shape', 'makers_supply', 'part.shape'],
+    ['Electrical Requirements', 'printer', 'electrical.requirements'],
+    ['L (mm) Length', 'makers_supply', 'product.length'],
+    ['Connectivity', 'makers_supply', 'part.connection'],
+    ['LED Board Type', 'makers_supply', 'part.led_board_type'],
+    ['Rate of Fire', 'makers_supply', 'part.rate_of_fire'],
+    ['Lanyard Circumference', 'makers_supply', 'part.lanyard_circumference'],
+    ['Supported Filament Type', 'printer', 'printing.supported_filament'],
+    ['Main Extruder Gear', 'printer', 'extrusion.main_extruder_gear'],
+    ['Main Extruder Motor', 'printer', 'extrusion.main_extruder_motor'],
+    ['Auxiliary Extruder Gear', 'printer', 'extrusion.aux_extruder_gear'],
+    ['Auxiliary Extruder Motor', 'printer', 'extrusion.aux_extruder_motor'],
+    ['Main Hotend', 'printer', 'printing.filament_main_hotend'],
+    ['Auxiliary Hotend', 'printer', 'printing.filament_aux_hotend'],
+    ['Auxiliary Hotend (print with caution¹)', 'printer', 'printing.filament_aux_hotend_caution'],
+    ['Steady-State Power', 'printer', 'electrical.steady_state_power'],
+    ['Working area', 'laser_machine', 'printing.working_area'],
+    ['Software', 'laser_machine', 'connectivity.software'],
+    ['Screen ratio', 'part', 'part.screen_ratio'],
+    ['External interface', 'part', 'part.external_interface'],
+    ['Rotating angle', 'part', 'part.rotating_angle'],
+    ['Feature', 'accessory', 'part.feature'],
+    ['Life Cycle', 'accessory', 'part.life_cycle'],
+    ['Cable width', 'part', 'part.cable_width'],
+    ['LCD type', 'part', 'part.lcd_type'],
+    ['Module power consumption', 'part', 'part.module_power'],
+    ['Recommended viewing direction', 'part', 'part.viewing_direction'],
+    ['Backlight type', 'part', 'part.backlight'],
+    ['Viewing area (W*H)', 'part', 'part.viewing_area'],
+    ['Active area (W*H)', 'part', 'part.active_area'],
+    ['Humidity', 'part', 'part.humidity'],
+    ['Number of Dots', 'part', 'part.resolution'],
+    ['Constrast ratio', 'part', 'part.contrast_ratio'],
+    ['Luminance uniformity', 'part', 'part.luminance_uniformity'],
+    ['Surface Luminance', 'part', 'part.luminance'],
+    ['Viewing angle range', 'part', 'part.viewing_angle'],
+    ['Package volume', 'accessory', 'part.capacity'],
+    ['Button', 'makers_supply', 'part.buttons'],
+    ['DPI', 'makers_supply', 'part.dpi'],
+    ['Hardware Platform', 'makers_supply', 'part.platforms'],
+    ['Sensor', 'makers_supply', 'part.sensor_type'],
+    ['Operating Systems', 'makers_supply', 'connectivity.operating_systems'],
+    ['Power Source', 'makers_supply', 'part.power_source'],
+    ['Batteries', 'makers_supply', 'electrical.battery'],
+    ['Resolution', 'part', 'part.resolution'],
+    ['Display Color', 'part', 'part.display_colours'],
+    ['Active Area', 'part', 'part.active_area'],
+    ['LED life time', 'part', 'part.expected_life'],
+  ];
+  for (const [label, type, key] of cases) assert.equal(keyForLabel(label, type)?.key, key, `${label} (${type})`);
+  // The step-4 corpus report's most frequent unknowns, too.
+  for (const [label, type, key] of [
+    ['Surface Treatment', 'makers_supply', 'part.surface_treatment'],
+    ['Thread Ridge Type', 'makers_supply', 'part.thread_type'],
+    ['Quantity', 'part', 'contents.pieces'],
+    ['Mounting Hole Shape', 'makers_supply', 'part.drive_shape'],
+    ['Screw Type', 'makers_supply', 'part.screw_type'],
+    ['Door Sensor', 'printer', 'printing.door_sensor'],
+    ['Cooling Fan for Hotend', 'printer', 'thermal.hotend_fan'],
+    ['Network Kill Switch', 'printer', 'connectivity.network_kill_switch'],
+  ] as const) {
+    assert.equal(keyForLabel(label, type)?.key, key, `${label} (${type})`);
+  }
+});
+
+test('a synonym two keys share resolves by product type; generic part labels never take a printer label', () => {
+  assert.equal(keyForLabel('Part Cooling Fan', 'printer')?.key, 'thermal.part_cooling_fan');
+  assert.equal(keyForLabel('Part Cooling Fan', 'filament')?.key, 'print_settings.fan_speed');
+  assert.equal(keyForLabel('Max Temperature', 'makers_supply')?.key, 'part.max_temperature');
+  // A printer's "Chamber Temperature Control › Max Temperature" still reaches the chamber key through its group.
+  assert.equal(keyForLabel('Max Temperature', 'printer'), null);
+  assert.equal(keyForLabel('Chamber Max Temperature', 'printer')?.key, 'thermal.chamber_temp');
+  for (const generic of ['Shape', 'Type', 'Style', 'Feature', 'Sensor', 'Temperature', 'Quantity', 'Thickness']) assert.equal(keyForLabel(generic, 'printer'), null, generic);
+  // Keys that share a synonym never both apply to one product type.
+  const byLabel = new Map<string, Array<{ key: string; appliesTo: readonly string[] }>>();
+  for (const s of SPEC_KEYS) {
+    for (const syn of new Set(s.synonyms.map(labelKey))) byLabel.set(syn, [...(byLabel.get(syn) ?? []), s]);
+  }
+  for (const [label, keys] of byLabel) {
+    if (keys.length < 2) continue;
+    assert.ok(keys.every((k) => k.appliesTo.length > 0), `"${label}" is shared by a key that applies to every type`);
+    const types = keys.flatMap((k) => k.appliesTo);
+    assert.equal(new Set(types).size, types.length, `"${label}" resolves to two keys for one type`);
+  }
+  // Three cameras in one table are three keys.
+  assert.deepEqual(['Live View Camera', 'Toolhead Camera', 'Nozzle Camera', 'BirdsEye Camera'].map((l) => keyForLabel(l, 'printer')?.key), [
+    'printing.camera', 'printing.camera_toolhead', 'printing.camera_nozzle', 'printing.camera_birdseye',
+  ]);
+});
+
+test('a section titled "Parameter" (R1 accessories) is a specification section', async () => {
+  const { sectionKindOf } = await import('../packages/catalog/src/bambuImport/registry/sections');
+  assert.equal(sectionKindOf('Parameter'), 'specs');
+  assert.equal(sectionKindOf('Parameters'), 'specs');
 });

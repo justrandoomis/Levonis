@@ -7,7 +7,7 @@ export type SectionKind = 'overview' | 'features' | 'specs' | 'in_the_box' | 'co
 
 const RULES: ReadonlyArray<[RegExp, SectionKind]> = [
   [/\b(in the box|what s in the box|whats in the box|package (list|contents?)|packing list|what is in the box|box contents|included|unboxing|add ons|witb)\b/, 'in_the_box'],
-  [/\b(specifications?|specs?|basic information|technical (data|details|parameters)|parameters|product parameters|special)\b/, 'specs'],
+  [/\b(specifications?|specs?|basic information|technical (data|details|parameters)|parameters?|product parameters|special)\b/, 'specs'],
   [/\b(compatib\w*|works with|applicable (models?|printers?)|supported printers?|fits)\b/, 'compat'],
   [/\b(faq|frequently asked|questions|printing tips|q a)\b/, 'faq'],
   [/\b(instructions?|installation|how to|user guide|usage|tutorial|setup|steps|maintenance)\b/, 'instructions'],
