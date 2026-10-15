@@ -31,10 +31,16 @@ export const REGION_LABELS: Readonly<Record<'us_110v' | 'intl_220v', Tri>> = {
 /** The test condition written on every us_110v row (§C.6). */
 export const US_VERSION_CONDITION = 'US version (100–120 V)';
 
-/** Image alt text (§C.4): the source has none worth keeping. */
-export function altText(title: string, selection = ''): Tri {
-  const tail = selection ? ` — ${selection}` : '';
-  return { en: `${title}${tail}`, ar: `صورة ${title}${tail}`, ckb: `وێنەی ${title}${tail}` };
+/**
+ * Image alt text (§C.4): the source has none worth keeping. The selection
+ * label is the bound value's (or variant's values') name in each language —
+ * its authored or reviewed ar / ckb name where it has one, else the English
+ * — so a reviewed value label reaches all three alt texts (owner-questions §E.1).
+ */
+export function altText(title: string, selection: string | Tri = ''): Tri {
+  const sel: Tri = typeof selection === 'string' ? { ar: selection, en: selection, ckb: selection } : selection;
+  const tail = (s: string) => (s ? ` — ${s}` : '');
+  return { en: `${title}${tail(sel.en)}`, ar: `صورة ${title}${tail(sel.ar)}`, ckb: `وێنەی ${title}${tail(sel.ckb)}` };
 }
 
 /** Section titles the import writes as content blocks (§C.5). */

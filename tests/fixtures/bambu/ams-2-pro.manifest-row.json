@@ -1,0 +1,63 @@
+{
+ "_meta": {
+  "source": "p0/manifest.json rows[] (DRAFT, 2026-10-15), the ams-2-pro row as the runner (step 8) and the writer (step 6) pass it to buildImportPayload (manifestRow)",
+  "notes": "value_labels carries the reviewed neutral label of owner question P0-11; the refused source wording is not stored, its value id is."
+ },
+ "queue_position": 4,
+ "source": "bambu_us",
+ "source_product_id": "580876092009701376",
+ "handle": "ams-2-pro",
+ "seo_code_raw": "ams-2-pro",
+ "canonical_url": "https://us.store.bambulab.com/products/ams-2-pro",
+ "title": "Bambu Lab AMS 2 Pro - Automatic Material System",
+ "type": "ams",
+ "subtype": "ams_unit",
+ "currentAllIdRoute": "552709755391528960>552709755685130240>580875380323446784",
+ "leaf": "@ams",
+ "also": [],
+ "curated": true,
+ "hold_code": "",
+ "sku_codes": {},
+ "value_labels": {
+  "758126084595167233": {
+   "group_source_id": "580876092018089985",
+   "refused_class": "promotion",
+   "name_en": "Upgrade bundle (accessories included)",
+   "name_ar": "باقة ترقية (تشمل الملحقات)",
+   "name_ckb": "پاکێجی بەرزکردنەوە (لەگەڵ پێداویستییەکان)",
+   "evidence": {
+    "evidence_kind": "variant_note",
+    "variant_ids": [
+     "758126084595167234",
+     "758126084595167239"
+    ],
+    "quote": "We've put together the most common AMS 2 Pro upgrades (accessories included)."
+   },
+   "reason": "source_label_refused_by_classifier",
+   "apply_in": "option model, after ids / variant_key / SKU join, before media binding",
+   "applies_to": [
+    "groups[].values[].name_en",
+    "groups[].values[].name_ar",
+    "groups[].values[].name_ckb",
+    "groups[].values[].variant_label",
+    "source_refs[kind=value].source_label",
+    "images[].alt_en",
+    "images[].alt_ar",
+    "images[].alt_ckb"
+   ]
+  }
+ },
+ "audit_classes": [
+  "ams_units_and_spare_parts"
+ ],
+ "description_format": "D2",
+ "sitemap_index": 627,
+ "plan": {
+  "statements_estimate": 375,
+  "statements_estimate_multirow_side_inserts": 303,
+  "option_groups": 2,
+  "option_values": 13,
+  "variants": 15,
+  "images": 20
+ }
+}
