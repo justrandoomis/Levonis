@@ -182,6 +182,11 @@ test('partial returns require review only on the overlapping item, not another i
 
 test('atomic protection approval does not require the newer operations guard table', async () => {
   const w = world(); w.claim();
+  // A database without ops_guards (0162) predates the import guard triggers of
+  // 0195 too, which read it on every write to the money tables: drop them with it.
+  for (const { name } of w.raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_import_guard_%'").all() as Array<{ name: string }>) {
+    w.raw.exec(`DROP TRIGGER ${name}`);
+  }
   w.raw.exec('DROP TABLE ops_guards');
   assert.equal((await approve(w.db)).status, 200);
   assert.equal(w.creditTotal(), 10000);
