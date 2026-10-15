@@ -184,12 +184,13 @@ WHEN NEW.status = 'cancelled' AND OLD.status NOT IN ('cancelled', 'delivered') A
 BEGIN
   INSERT INTO trade_in_credit_reissues (id, request_id, coupon_id, order_id, reason, return_case_id, amount_iqd, ends_at, created_at)
   SELECT 'tcr_' || lower(hex(randomblob(10))), t.id, c.id, NEW.id, 'order_cancelled', NULL, COALESCE(t.credit_iqd, 0),
+         -- No earlier re-issue: julianday(NULL) makes the carried end NULL, MIN() NULL, and COALESCE
+         -- falls back to 30 days (kept free of conditional blocks: Wrangler's statement splitter, sqlSplit test).
          COALESCE(
-           CASE WHEN (SELECT MAX(p.ends_at) FROM trade_in_credit_reissues p WHERE p.request_id = t.id AND p.order_id <> NEW.id) IS NULL THEN NULL
-                ELSE MIN(strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'),
-                         strftime('%Y-%m-%dT%H:%M:%fZ',
-                                  julianday((SELECT MAX(p.ends_at) FROM trade_in_credit_reissues p WHERE p.request_id = t.id AND p.order_id <> NEW.id))
-                                  + MAX(0, COALESCE(julianday('now') - julianday(NEW.created_at), 0)))) END,
+           MIN(strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'),
+               strftime('%Y-%m-%dT%H:%M:%fZ',
+                        julianday((SELECT MAX(p.ends_at) FROM trade_in_credit_reissues p WHERE p.request_id = t.id AND p.order_id <> NEW.id))
+                        + MAX(0, COALESCE(julianday('now') - julianday(NEW.created_at), 0)))),
            strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days')),
          strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     FROM coupon_redemptions r JOIN coupons c ON c.id = r.coupon_id JOIN trade_in_requests t ON t.id = c.trade_in_id
