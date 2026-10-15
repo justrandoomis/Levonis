@@ -109,6 +109,7 @@ import {
   valuateComponent,
   type TradeInFamily,
 } from '@levonis/pricing/tradeIn';
+import { DEFAULT_OFFER_PARAMS, OFFER_PARAM_RANGES } from '@levonis/pricing/tradeInOffer';
 
 
 const REQ_ID_RE = /^tin_[0-9a-f]{20}$/;
@@ -243,7 +244,8 @@ tradeInRoutes.get('/eligible', async (c) => {
 
 /**
  * The devices a credit can buy. v2 (0192): the server's search — `q` (≥ 2
- * characters; else the featured twenty), `family`, keyset `cursor` — each with
+ * characters; else the featured twenty), `family`, keyset `cursor`, or one
+ * `product_id` (the product page's entry preselects it) — each with
  * THIS customer's lowest direct-sale price (never `products.price_iqd`).
  */
 tradeInRoutes.get('/targets', async (c) => {
@@ -252,7 +254,9 @@ tradeInRoutes.get('/targets', async (c) => {
   if (!(await tradeInV2Installed(c.env.DB))) return c.json({ success: true, targets: await listTargets(c.env) });
   const family = c.req.query('family') || null;
   if (family && !(['fdm', 'resin', 'laser', 'ams'] as const).includes(family as 'fdm')) throw badRequest('Unknown family');
-  const out = await searchTargets(c.env, user.id, { q: c.req.query('q') ?? '', family: family as TradeInFamily | null, cursor: c.req.query('cursor') ?? null });
+  const productId = c.req.query('product_id') || null;
+  if (productId && !ITEM_ID_RE.test(productId)) return c.json({ success: true, targets: [], next_cursor: null });
+  const out = await searchTargets(c.env, user.id, { q: c.req.query('q') ?? '', family: family as TradeInFamily | null, cursor: c.req.query('cursor') ?? null, productId });
   return c.json({ success: true, ...out });
 });
 
@@ -754,7 +758,11 @@ adminTradeInRoutes.get('/rules', requireCostRead, async (c) => {
   const history = Object.fromEntries(await Promise.all(TRADE_IN_FAMILIES.map(async (f) => [f, await ruleSetHistory(c.env.DB, f)] as const)));
   return c.json({
     success: true,
-    rules: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, { ...publicRules(book[f]), id: book[f].id, note: book[f].note, created_at: book[f].created_at }])),
+    rules: Object.fromEntries(TRADE_IN_FAMILIES.map((f) => [f, { ...publicRules(book[f]), id: book[f].id, note: book[f].note, created_at: book[f].created_at, offer_params: book[f].offer_params ?? {} }])),
+    // The owner's offer parameters (0192): what each family stores (NULL = the default below), the
+    // code defaults and the CHECK ranges — read here, with the costs, never shipped in a bundle.
+    offer_defaults: DEFAULT_OFFER_PARAMS,
+    offer_ranges: OFFER_PARAM_RANGES,
     history,
     financial_scope: canMoveMoney(c.env, c.get('user')),
     // The valuation rules decide every estimate a financial admin may approve: the owner's alone (decision 3).

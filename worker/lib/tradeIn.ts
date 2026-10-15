@@ -3351,28 +3351,49 @@ export function publicRules(r: StoredRuleSet): TradeInRuleSet {
 }
 
 export async function listMine(db: D1Database, userId: string) {
+  // v2 (0192): where each request stands, as its customer reads it (`stageOf`) — the facts it is
+  // derived from read beside the row (the credit's live order, a credit given back still valid).
+  const v2 = await tradeInV2Installed(db);
+  const nowIso = new Date().toISOString();
   const { results } = await db
     .prepare(
-      `SELECT id, status, scope, family, source_snapshot_json, target_snapshot_json, estimated_iqd, admin_value_iqd, final_value_iqd,
-              difference_iqd, offer_no, created_at, updated_at
-         FROM trade_in_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`
+      `SELECT t.id, t.status, t.scope, t.family, t.source_snapshot_json, t.target_snapshot_json, t.estimated_iqd, t.admin_value_iqd, t.final_value_iqd,
+              t.difference_iqd, t.offer_no, t.created_at, t.updated_at${
+                v2
+                  ? `, t.offer_iqd, t.intake_at, t.cancel_reason, t.device_returned_at,
+              EXISTS (SELECT 1 FROM coupons c JOIN coupon_redemptions r ON r.coupon_id = c.id JOIN orders o ON o.id = r.order_id
+                       WHERE c.trade_in_id = t.id AND r.state = 'active' AND o.status <> 'cancelled') AS live_order,
+              EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = t.id AND x.ends_at > ?2) AS live_reissue`
+                  : ''
+              }
+         FROM trade_in_requests t WHERE t.user_id = ?1 ORDER BY t.created_at DESC LIMIT 50`
     )
-    .bind(userId)
+    .bind(userId, ...(v2 ? [nowIso] : []))
     .all<Record<string, unknown>>();
   return (results ?? []).map((r) => {
     const src = safeParse<Record<string, unknown>>(r.source_snapshot_json, {});
     const tgt = safeParse<Record<string, unknown>>(r.target_snapshot_json, {});
+    const stage = v2
+      ? stageOf(
+          { status: r.status as TradeInStatus, intake_at: (r.intake_at as string | null) ?? null, cancel_reason: (r.cancel_reason as string | null) ?? null, device_returned_at: (r.device_returned_at as string | null) ?? null },
+          r.live_order === 1,
+          r.live_reissue === 1 && r.live_order !== 1
+        )
+      : null;
     return {
       id: r.id,
       status: r.status,
       status_label: STATUS_LABELS[r.status as TradeInStatus],
+      ...(stage ? { stage, stage_label: STAGE_LABELS[stage] } : {}),
       scope: r.scope,
       family: r.family,
       name: src.name ?? '',
       image: src.image ?? '',
       target_name: tgt.name ?? null,
       target_name_ar: tgt.name_ar ?? null,
+      ...(tgt.name_ckb ? { target_name_ckb: tgt.name_ckb } : {}),
       estimated_iqd: r.estimated_iqd,
+      ...(v2 ? { offer_iqd: r.offer_iqd ?? null } : {}),
       admin_value_iqd: r.admin_value_iqd,
       final_value_iqd: r.final_value_iqd,
       difference_iqd: r.difference_iqd,

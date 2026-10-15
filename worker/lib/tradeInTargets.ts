@@ -68,13 +68,20 @@ function lowestDirect(doc: ReturnType<typeof parseProductRow>, relations: Parame
   return best;
 }
 
-export async function searchTargets(env: Env, userId: string, q: { q: string; family: TradeInFamily | null; cursor: string | null }) {
+export async function searchTargets(env: Env, userId: string, q: { q: string; family: TradeInFamily | null; cursor: string | null; productId?: string | null }) {
   const db = env.DB;
-  const term = q.q.trim().slice(0, 80);
+  // One product by id (the product page's entry, `/trade-in?target=<id>`): the same listing and
+  // device rules, the same price — the search term and the cursor do not apply.
+  const productId = q.productId ?? null;
+  const term = productId ? '' : q.q.trim().slice(0, 80);
   const searching = term.length >= 2;
   const cursor = searching ? parseCursor(q.cursor) : null;
   const where = [(await listing(db)).listed('products'), "COALESCE(composition, '') = ''"];
   const args: unknown[] = [];
+  if (productId) {
+    args.push(productId);
+    where.push(`id = ?${args.length}`);
+  }
   if (searching) {
     args.push(`%${escapeLike(term)}%`);
     const n = args.length;
