@@ -1,0 +1,203 @@
+# ---------------------------------------------------------------------------
+# WHICH WORKER SERVES WHOM (read this before running any deploy)
+#
+#   levonis-iq.com         -> Worker  levonis-staging          [LIVE]
+#   studio.levonis-iq.com  -> Worker  levonis-studio-staging   [LIVE]
+#   *.levonis-iq.com       -> Worker  levonis-staging          [LIVE]
+#   Worker  levonis-studio  -> workers.dev only, NO domain     [alternate]
+#   Worker  levonis         -> does not exist on the account
+#
+# The "-staging" names are historical. They are the production Workers, and
+# levonis-db-staging is the LIVE database behind levonis-iq.com.
+# Full table: docs/WORKERS.md
+# ---------------------------------------------------------------------------
+# THE ONE-TIME BAMBU LAB CATALOGUE IMPORT (owner brief of 2026-10-15,
+# docs/DECISIONS.md row 239; design: the Bambu import spec §A, §D.1, §K.3).
+#
+# Row 239 allows reading and writing the production D1 and R2 for this import
+# only. This workflow DEPLOYS NOTHING: only workflow 7 deploys the live Worker
+# (row 184). It is dispatched by hand, on the default branch only, and nothing
+# schedules it: a one-time import, never a sync.
+#
+# BUILD STEP 2 OF THE SPEC: THE SKELETON. Two modes run today; the others are
+# refused with "not yet" until build step 8 brings the importer:
+#
+#   snapshot  reads the live catalogue (scripts/bambu-import/snapshot.sql: the
+#             sections, brands, products of every status with their identity
+#             fields, memberships, printer fits, option values, colours and
+#             Bambu image provenance; no price, cost, stock, user or order
+#             column), seals it in the same step to `seal_pubkey`, and uploads
+#             only snapshot.sealed. The log carries row counts and migration
+#             names.
+#   revoke    the kill switch: clears catalog_import_runs.token_sha256 of
+#             `run_id`, so every ops path answers 404. Before migration 0195
+#             there is no run table: a notice, and green.
+#
+# HOW TO RUN A SNAPSHOT
+#   1. In the sandbox: node scripts/bambu-import/seal.mjs --keygen <dir>
+#      prints a one-time public key; the 0600 private key stays in <dir>.
+#   2. Dispatch on the default branch: mode=snapshot, seal_pubkey=<that key>.
+#   3. Download the artifact bambu-import-sealed and, in the sandbox only:
+#      node scripts/bambu-import/unseal.mjs --key <dir>/bambu-seal-<id>.pem snapshot.sealed snapshot.json
+#
+# HARDENING (pinned by tests/bambuImportWorkflow.test.ts)
+#   - The token is read-only (contents: read) and the checkout keeps no
+#     credential (persist-credentials: false).
+#   - Inputs reach the shell ONLY through the job's IN_* environment, and the
+#     first step validates every one of them against a fixed pattern before
+#     anything else runs. No run script interpolates an expression.
+#   - CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID exist only in the
+#     step-level env of the steps that run scripts/bambu-import/cf.mjs, the one
+#     piece of code that holds them. npm ci runs without them.
+#   - Actions logs and artifacts of this repository are PUBLIC: every artifact
+#     is sealed in the job to the dispatch's one-time X25519 key, and only
+#     `*.sealed` files are uploaded (kept 3 days).
+#   - One import job at a time (concurrency bambu-import), 350 minutes at most,
+#     with an absolute deadline at 330 minutes that the scripts honour.
+name: 60 - Bambu one-time import (writes live D1/R2 catalogue, no deployment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'snapshot (sealed read of the live catalogue) or revoke (kill switch); the other modes arrive with build step 8'
+        type: choice
+        required: true
+        options:
+          - snapshot
+          - preflight
+          - open
+          - run
+          - close
+          - report
+          - dryrun
+          - withdraw
+          - revoke
+      run_id:
+        description: 'catalog_import_runs.id: cir_ followed by 24 lowercase hex characters (revoke needs it)'
+        required: false
+        default: ''
+      max_items:
+        description: '0 = until the deadline'
+        required: false
+        default: '1'
+      resume:
+        description: 'resume the run after a BLOCKED item was fixed'
+        type: boolean
+        required: false
+        default: false
+      chain:
+        description: 'dispatch the next job when this one stops at its deadline'
+        type: boolean
+        required: false
+        default: false
+      chain_count:
+        description: 'jobs chained so far, 0 to 12'
+        required: false
+        default: '0'
+      item:
+        description: 'source product id (withdraw only)'
+        required: false
+        default: ''
+      seal_pubkey:
+        description: 'one-time X25519 public key (43 base64url characters) that seals every artifact: node scripts/bambu-import/seal.mjs --keygen <dir>'
+        required: true
+      confirm:
+        description: 'IMPORT-LIVE for open, run, close and withdraw'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bambu-import
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  import:
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: read
+    # Inputs reach the shell ONLY through these variables; never as an
+    # expression inside a run script.
+    env:
+      IN_MODE: ${{ inputs.mode }}
+      IN_RUN_ID: ${{ inputs.run_id }}
+      IN_MAX_ITEMS: ${{ inputs.max_items }}
+      IN_RESUME: ${{ inputs.resume }}
+      IN_CHAIN: ${{ inputs.chain }}
+      IN_CHAIN_COUNT: ${{ inputs.chain_count }}
+      IN_ITEM: ${{ inputs.item }}
+      IN_SEAL_PUBKEY: ${{ inputs.seal_pubkey }}
+      IN_CONFIRM: ${{ inputs.confirm }}
+    steps:
+      # The deadline is absolute (spec §A.7): job start + 330 minutes, inside
+      # the 350-minute timeout. A rejected value is named, never echoed.
+      - name: Deadline and input validation
+        run: |
+          echo "DEADLINE_EPOCH=$(( $(date +%s) + 330*60 ))" >> "$GITHUB_ENV"
+          fail() { echo "::error::$1"; exit 1; }
+          [[ "$IN_MODE" =~ ^(snapshot|preflight|open|run|close|report|dryrun|withdraw|revoke)$ ]] || fail 'mode is not one of the nine modes'
+          [[ -z "$IN_RUN_ID" || "$IN_RUN_ID" =~ ^cir_[0-9a-f]{24}$ ]] || fail 'run_id is cir_ followed by 24 lowercase hex characters, or empty'
+          [[ "$IN_MAX_ITEMS" =~ ^[0-9]{1,4}$ ]] || fail 'max_items is a whole number from 0 to 9999'
+          [[ "$IN_RESUME" =~ ^(true|false)$ ]] || fail 'resume is true or false'
+          [[ "$IN_CHAIN" =~ ^(true|false)$ ]] || fail 'chain is true or false'
+          [[ "$IN_CHAIN_COUNT" =~ ^([0-9]|1[0-2])$ ]] || fail 'chain_count is a whole number from 0 to 12'
+          [[ -z "$IN_ITEM" || "$IN_ITEM" =~ ^[0-9]{1,20}$ ]] || fail 'item is a source product id (digits only), or empty'
+          [[ "$IN_SEAL_PUBKEY" =~ ^[A-Za-z0-9_-]{43}$ ]] || fail 'seal_pubkey is a one-time X25519 public key of 43 base64url characters'
+          [[ -z "$IN_CONFIRM" || "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail 'confirm is IMPORT-LIVE or empty'
+          case "$IN_MODE" in
+            open|run|close|withdraw) [[ "$IN_CONFIRM" == "IMPORT-LIVE" ]] || fail "mode $IN_MODE writes the live catalogue: confirm must be IMPORT-LIVE" ;;
+            revoke) [[ -n "$IN_RUN_ID" ]] || fail 'revoke needs the run_id whose token it clears' ;;
+          esac
+          echo "inputs valid: mode $IN_MODE"
+
+      - name: Refuse a mode this skeleton does not run yet
+        if: env.IN_MODE != 'snapshot' && env.IN_MODE != 'revoke'
+        run: |
+          echo "::error::mode $IN_MODE is not yet built: workflow 60 runs only snapshot and revoke until build step 8 of the import spec"
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # No Cloudflare credential exists in this step's environment.
+      - run: npm ci --no-audit --no-fund
+
+      - name: Snapshot of the live catalogue, sealed in the same step (row counts only in this log)
+        if: env.IN_MODE == 'snapshot'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs snapshot --seal "$IN_SEAL_PUBKEY" --out "$RUNNER_TEMP/out"
+
+      - name: Revoke the run's token (kill switch)
+        if: env.IN_MODE == 'revoke'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/bambu-import/cf.mjs revoke --run "$IN_RUN_ID"
+
+      # Artifacts of this repository are public: sealed files only.
+      - name: Upload the sealed files, and nothing else
+        if: always() && env.IN_MODE == 'snapshot'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bambu-import-sealed
+          path: ${{ runner.temp }}/out/*.sealed
+          if-no-files-found: warn
+          retention-days: 3
+          overwrite: true

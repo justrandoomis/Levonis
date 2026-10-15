@@ -604,3 +604,28 @@ test('every live check that greps served modules uses the transitive crawler', (
     assert.match(text, /actions\/checkout/, `${file} calls the crawler without checking the repo out`);
   }
 });
+
+/**
+ * WORKFLOW 60 IS NOT A DEPLOY, AND IT TOUCHES THE LIVE CATALOGUE.
+ *
+ * The one-time Bambu import (DECISIONS row 239) reads, and from its build step
+ * 8 writes, the live D1 database and R2 bucket, while only workflow 7 deploys
+ * the live Worker (row 184). Its name must say both halves, so nobody runs it
+ * believing it is harmless or expecting it to ship code; and it must really
+ * deploy nothing: no wrangler command at all appears in it, because
+ * scripts/bambu-import/cf.mjs is its only door to Cloudflare. The banner
+ * names the live database, whose "-staging" suffix is historical.
+ */
+test('workflow 60 says it writes the live catalogue and deploys nothing, and it deploys nothing', () => {
+  const text = read('bambu-import.yml');
+  const name = displayName(text);
+  assert.equal(name, '60 - Bambu one-time import (writes live D1/R2 catalogue, no deployment)');
+  assert.match(name, /writes live D1\/R2 catalogue/);
+  assert.match(name, /no deployment/);
+  assert.deepEqual(wranglerLines(text), [], 'cf.mjs is the only door to Cloudflare; the workflow runs no wrangler command');
+  const active = text.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+  assert.ok(!/\bdeploy\b|npm run build|wrangler/.test(active.replace(/^name: .*$/m, '')), 'nothing in the workflow builds or deploys');
+  assert.match(text, /WHICH WORKER SERVES WHOM/);
+  assert.match(text, /studio\.levonis-iq\.com {2}-> Worker {2}levonis-studio-staging {3}\[LIVE\]/);
+  assert.match(text, /levonis-db-staging is the LIVE database/);
+});
