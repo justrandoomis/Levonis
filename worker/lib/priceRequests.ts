@@ -33,6 +33,7 @@
  */
 import { parseSkuComboKey } from '@levonis/pricing/skuChannel';
 import {
+  DIGEST_STEPS,
   PRICE_REQUEST_ADMIN_TEXT,
   crossedDigestThreshold,
   priceAvailableMessage,
@@ -85,13 +86,17 @@ export function rememberPriceRequestsPresent(db: object): void {
 
 /**
  * The per-product aggregates, RECOMPUTED FROM SOURCE over the open rows — one
- * statement, appended to every batch that writes requests.
+ * statement, appended to every batch that writes requests. The digest's
+ * high-water mark follows the count DOWN (never up: only the digest's claim
+ * raises it), so demand that returns after the open rows were told or
+ * withdrawn is announced again from its new start.
  */
 const STATS_SQL = `INSERT INTO product_price_request_stats (product_id, requesters, selections, clicks, last_request_at, updated_at)
 SELECT ?1, COUNT(DISTINCT user_id), COUNT(DISTINCT selection), COALESCE(SUM(click_count), 0), COALESCE(MAX(requested_at), ''), ?2
   FROM product_price_requests WHERE product_id = ?1 AND state = 'open'
 ON CONFLICT(product_id) DO UPDATE SET requesters = excluded.requesters, selections = excluded.selections,
-  clicks = excluded.clicks, last_request_at = excluded.last_request_at, updated_at = excluded.updated_at`;
+  clicks = excluded.clicks, last_request_at = excluded.last_request_at, updated_at = excluded.updated_at,
+  digest_requesters = MIN(product_price_request_stats.digest_requesters, excluded.requesters)`;
 
 export const statsRecompute = (db: D1Database, productId: string, now: string): D1PreparedStatement =>
   db.prepare(STATS_SQL).bind(productId, now);
@@ -116,9 +121,11 @@ export function productNames(doc: ProductDoc): PriceRequestText {
 
 // ------------------------------------------------------------- the sweep
 
-/** Products a pass looks at, and rows it reads for them. */
+/** Products a pass looks at, and the rows it reads for each (10 × 20: the read stays one bounded statement). */
 const SWEEP_PRODUCTS = 10;
-const SWEEP_ROWS = 200;
+const ROWS_PER_PRODUCT = 20;
+/** The cursor and the stats recompute closing every write batch of the sweep. */
+const SWEEP_TAIL = 2;
 /** Statements per batch: well under D1's per-invocation ceiling, small enough to retry. */
 const BATCH_MAX = 50;
 /** What the relations loader sends for a page of products (worker/lib/productOverlay.ts `loadRelationsViews`). */
@@ -155,11 +162,14 @@ export const priceAvailableEventKey = (requestId: string, cycle: number) => `pri
 
 /**
  * ONE PASS: up to 10 products with open (or delivery-pending) requests, the
- * least recently checked first. A request is priced iff its product is
- * SELLABLE and its selection has a live SKU price (`skuPriced`; a sellable
- * product that is not strict prices every selection). Every statement is
- * charged before it is sent; a pass that cannot afford a step stops there and
- * the cursor (`checked_at`) carries the rest to the next tick. Never throws.
+ * least recently checked first, and up to 20 rows of each. A request is
+ * priced iff its product is SELLABLE and its selection has a live SKU price
+ * (`skuPriced`; a sellable product that is not strict prices every
+ * selection). Every statement is charged before it is sent. PROGRESS PER ROW:
+ * the cursor (`checked_at`) moves only for the rows a pass actually decided,
+ * so a row the budget could not carry is first in line next tick, and a
+ * product with many people to tell takes a fair share of the pass and never
+ * blocks the products after it. Never throws.
  */
 export async function sweepPriceRequests(
   env: Env,
@@ -215,13 +225,18 @@ export async function sweepPriceRequests(
       }
     }
 
-    // 4. The rows (one statement, bounded).
+    // 4. The rows: at most ROWS_PER_PRODUCT of each product, its least recently checked first (one statement).
+    //    A per-product bound, so a product with hundreds of open rows never crowds the others out of the read.
     if (!spend(1)) return report;
     const { results: rowResults } = await db
       .prepare(
-        `SELECT id, user_id, product_id, selection, state, notify, cycle FROM product_price_requests
-          WHERE product_id IN (SELECT value FROM json_each(?)) AND state IN ('open','priced')
-          ORDER BY product_id, requested_at, id LIMIT ${SWEEP_ROWS}`
+        `SELECT id, user_id, product_id, selection, state, notify, cycle FROM (
+           SELECT id, user_id, product_id, selection, state, notify, cycle,
+                  ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY checked_at, requested_at, id) AS rn
+             FROM product_price_requests
+            WHERE product_id IN (SELECT value FROM json_each(?)) AND state IN ('open','priced'))
+          WHERE rn <= ${ROWS_PER_PRODUCT}
+          ORDER BY product_id, rn`
       )
       .bind(JSON.stringify(ids))
       .all<RequestRow>();
@@ -248,52 +263,57 @@ export async function sweepPriceRequests(
       }
     }
 
-    // 6. One batch (or a few, ≤ 50 statements) per product, the stats recomputed in each.
-    for (const productId of ids) {
-      const mine = rows.filter((r) => r.product_id === productId);
-      const doc = docs.get(productId) ?? null;
-      const groups: D1PreparedStatement[][] = [];
-      let current: D1PreparedStatement[] = [];
-      const counts = { notified: 0, closed: 0, priced: 0, reopened: 0 };
-      const flush = () => {
-        if (current.length) groups.push(current);
-        current = [];
-      };
-      for (const r of mine) {
-        const stmts: D1PreparedStatement[] = [];
-        if (!isPriced(r)) {
-          // A delivery-pending row whose product is no longer priced waits again as an open request.
-          if (r.state === 'priced') {
-            stmts.push(
-              db.prepare("UPDATE product_price_requests SET state = 'open', priced_at = '' WHERE id = ? AND state = 'priced'").bind(r.id)
-            );
-            counts.reopened += 1;
-          }
-        } else if (Number(r.notify) !== 1) {
-          stmts.push(
+    // 6a. Each row's own writes (a unit: self-contained, so units of one product may go in different batches).
+    interface Unit {
+      id: string;
+      stmts: D1PreparedStatement[];
+      kind: 'notified' | 'closed' | 'priced' | 'reopened';
+    }
+    const waiting: string[] = [];
+    const work = new Map<string, Unit[]>();
+    for (const r of rows) {
+      const doc = docs.get(r.product_id) ?? null;
+      let unit: Unit | null = null;
+      if (!isPriced(r)) {
+        // A delivery-pending row whose product is no longer priced waits again as an open request.
+        if (r.state === 'priced') {
+          unit = {
+            id: r.id,
+            kind: 'reopened',
+            stmts: [db.prepare("UPDATE product_price_requests SET state = 'open', priced_at = '' WHERE id = ? AND state = 'priced'").bind(r.id)],
+          };
+        }
+      } else if (Number(r.notify) !== 1) {
+        unit = {
+          id: r.id,
+          kind: 'closed',
+          stmts: [
             db
               .prepare(
                 "UPDATE product_price_requests SET state = 'closed', close_reason = 'priced', priced_at = ?, closed_at = ? WHERE id = ? AND state IN ('open','priced')"
               )
-              .bind(now, now, r.id)
-          );
-          counts.closed += 1;
-        } else if (reaches && live && doc) {
-          const name = productNames(doc);
-          const label = r.selection ? selectionLabel(doc, r.selection) : null;
-          const full: PriceRequestText = label
-            ? { ar: `${name.ar} — ${label.ar}`, en: `${name.en} — ${label.en}`, ckb: `${name.ckb} — ${label.ckb}` }
-            : name;
-          const { title, body } = priceAvailableMessage(full);
-          const reach = reaches.get(r.user_id);
-          const lang = reach?.lang ?? 'ar';
-          const slug = String(doc.slug ?? '');
-          const link = slug ? `/product/${slug}` : '/';
-          const eventKey = priceAvailableEventKey(r.id, Number(r.cycle) || 1);
-          const msg: CustomerMessage = { subject: title[lang], body: `${title[lang]}\n${body[lang]}` };
-          // No reach row (an account gone since it asked): the in-app row alone, never a second read here.
-          const plan = reach ? await planNotifyCustomer(env, r.user_id, eventKey, msg, { reach, live }) : { statements: [] as D1PreparedStatement[] };
-          stmts.push(
+              .bind(now, now, r.id),
+          ],
+        };
+      } else if (reaches && live && doc) {
+        const name = productNames(doc);
+        const label = r.selection ? selectionLabel(doc, r.selection) : null;
+        const full: PriceRequestText = label
+          ? { ar: `${name.ar} — ${label.ar}`, en: `${name.en} — ${label.en}`, ckb: `${name.ckb} — ${label.ckb}` }
+          : name;
+        const { title, body } = priceAvailableMessage(full);
+        const reach = reaches.get(r.user_id);
+        const lang = reach?.lang ?? 'ar';
+        const slug = String(doc.slug ?? '');
+        const link = slug ? `/product/${slug}` : '/';
+        const eventKey = priceAvailableEventKey(r.id, Number(r.cycle) || 1);
+        const msg: CustomerMessage = { subject: title[lang], body: `${title[lang]}\n${body[lang]}` };
+        // No reach row (an account gone since it asked): the in-app row alone, never a second read here.
+        const plan = reach ? await planNotifyCustomer(env, r.user_id, eventKey, msg, { reach, live }) : { statements: [] as D1PreparedStatement[] };
+        unit = {
+          id: r.id,
+          kind: 'notified',
+          stmts: [
             db
               .prepare(
                 "UPDATE product_price_requests SET state = 'notified', priced_at = ?, notified_at = ? WHERE id = ? AND state IN ('open','priced')"
@@ -308,37 +328,89 @@ export async function sweepPriceRequests(
               body_en: body.en,
               link,
               entity_type: 'product',
-              entity_id: productId,
+              entity_id: r.product_id,
               meta: { request_id: r.id, selection: r.selection, title_ckb: title.ckb, body_ckb: body.ckb },
               eventKey,
             }).stmt,
-            ...plan.statements
-          );
-          counts.notified += 1;
-        } else {
-          // The delivery plan cannot be built this tick (the reach read failed or was not affordable): flip to
-          // `priced` only — the next tick builds it.
-          stmts.push(
-            db.prepare("UPDATE product_price_requests SET state = 'priced', priced_at = ? WHERE id = ? AND state = 'open'").bind(now, r.id)
-          );
-          counts.priced += 1;
-        }
-        if (current.length + stmts.length > BATCH_MAX - 2) flush();
-        current.push(...stmts);
+            ...plan.statements,
+          ],
+        };
+      } else {
+        // The delivery plan cannot be built this tick (the reach read failed or was not affordable): flip to
+        // `priced` only — the next tick builds it.
+        unit = {
+          id: r.id,
+          kind: 'priced',
+          stmts: [db.prepare("UPDATE product_price_requests SET state = 'priced', priced_at = ? WHERE id = ? AND state = 'open'").bind(now, r.id)],
+        };
       }
-      // The cursor moves for every row still waiting, and the stats follow the source.
-      current.push(
-        db.prepare("UPDATE product_price_requests SET checked_at = ? WHERE product_id = ? AND state IN ('open','priced')").bind(now, productId),
-        statsRecompute(db, productId, now)
-      );
-      flush();
-      const cost = groups.reduce((n, g) => n + g.length, 0);
-      if (!spend(cost)) break;
-      for (const g of groups) await db.batch(g);
-      report.notified += counts.notified;
-      report.closed += counts.closed;
-      report.priced += counts.priced;
-      report.reopened += counts.reopened;
+      if (unit) {
+        const list = work.get(r.product_id) ?? [];
+        list.push(unit);
+        work.set(r.product_id, list);
+      } else {
+        waiting.push(r.id);
+      }
+    }
+
+    // 6b. The rows that only wait (nothing to write): their cursor moves in ONE statement, first, so a product
+    //     with nothing to do rotates out of the next pick whatever the rest of the pass can afford.
+    if (waiting.length) {
+      if (!spend(1)) return report;
+      await db
+        .prepare("UPDATE product_price_requests SET checked_at = ? WHERE id IN (SELECT value FROM json_each(?)) AND state IN ('open','priced')")
+        .bind(now, JSON.stringify(waiting))
+        .run();
+    }
+
+    // 6c. The rows with writes, product by product, each product taking a fair share of what is left (never less
+    //     than its first row and the tail). A batch carries its rows' writes, THEIR cursor and the stats
+    //     recompute (the tail, 2 statements), and is charged before it is sent. A row that does not fit waits
+    //     with its cursor unmoved, so the next tick starts there; a product never blocks the ones after it.
+    const busy = ids.filter((id) => work.has(id));
+    for (let i = 0; i < busy.length; i++) {
+      const productId = busy[i];
+      const units = work.get(productId) ?? [];
+      const remaining = budget.remaining();
+      const first = units[0] ? units[0].stmts.length + SWEEP_TAIL : SWEEP_TAIL;
+      if (first > remaining) continue;
+      const allowance = Math.min(remaining, Math.max(Math.floor(remaining / (busy.length - i)), first));
+      let used = 0;
+      let current: Unit[] = [];
+      let size = 0;
+      const send = async (): Promise<boolean> => {
+        if (!current.length) return true;
+        const stmts = current.flatMap((u) => u.stmts);
+        stmts.push(
+          db
+            .prepare("UPDATE product_price_requests SET checked_at = ? WHERE id IN (SELECT value FROM json_each(?)) AND state IN ('open','priced')")
+            .bind(now, JSON.stringify(current.map((u) => u.id))),
+          statsRecompute(db, productId, now)
+        );
+        if (!spend(stmts.length)) return false;
+        await db.batch(stmts);
+        for (const u of current) report[u.kind] += 1;
+        used += stmts.length;
+        current = [];
+        size = 0;
+        return true;
+      };
+      let stop = false;
+      for (const u of units) {
+        const need = u.stmts.length;
+        // A batch stays within BATCH_MAX with its tail.
+        if (current.length && size + need + SWEEP_TAIL > BATCH_MAX) {
+          if (!(await send())) {
+            stop = true;
+            break;
+          }
+        }
+        // The product's share: the rows planned so far, this one, and the open batch's tail.
+        if (used + size + need + SWEEP_TAIL > allowance) break;
+        current.push(u);
+        size += need;
+      }
+      if (stop || !(await send())) break;
     }
   } catch (error) {
     console.error('price request sweep failed:', error instanceof Error ? error.name : 'unknown');
@@ -352,6 +424,28 @@ export async function sweepPriceRequests(
 export const DIGEST_INTERVAL_MS = 60 * 60 * 1000;
 const DIGEST_CANDIDATES = 20;
 const DIGEST_LINES = 10;
+/** The reads the admin routing makes before it sends (worker/lib/telegramAdmin.ts: the bound group and its topics). */
+const ANNOUNCE_READS = 2;
+
+const COLUMN = /^(?:[a-z]+\.)?[a-z_]+$/;
+
+/**
+ * `digestThreshold` (packages/contracts/src/priceRequests.ts) as SQL over the
+ * integer column `col`: the highest step at or below it, every further 100
+ * past the last. A constant built from the contract's steps, never from input.
+ */
+export function digestThresholdSql(col: string): string {
+  if (!COLUMN.test(col)) throw new Error(`PRICE_REQUEST_INVARIANT: bad column ${JSON.stringify(col)}`);
+  const top = DIGEST_STEPS[DIGEST_STEPS.length - 1];
+  const steps = [...DIGEST_STEPS].reverse().filter((s) => s !== top);
+  return `(CASE WHEN ${col} >= ${top} THEN (${col} / ${top}) * ${top}${steps.map((s) => ` WHEN ${col} >= ${s} THEN ${s}`).join('')} ELSE 0 END)`;
+}
+
+/** «crossed a threshold since its last announcement», as SQL over a stats row (alias optional). */
+const crossedSql = (alias = ''): string => {
+  const a = alias ? `${alias}.` : '';
+  return `${digestThresholdSql(`${a}requesters`)} > ${digestThresholdSql(`${a}digest_requesters`)}`;
+};
 
 export interface PriceRequestDigestReport {
   sent: boolean;
@@ -398,7 +492,7 @@ export async function digestPriceRequests(env: Env, budget: PriceRequestBudget, 
       .prepare(
         `SELECT st.product_id, st.requesters, st.digest_requesters, st.last_request_at, p.name, p.name_ar
            FROM product_price_request_stats st JOIN products p ON p.id = st.product_id
-          WHERE st.requesters > st.digest_requesters
+          WHERE ${crossedSql('st')}
           ORDER BY st.requesters DESC, st.last_request_at DESC
           LIMIT ${DIGEST_CANDIDATES}`
       )
@@ -406,12 +500,13 @@ export async function digestPriceRequests(env: Env, budget: PriceRequestBudget, 
     const crossing = (results ?? []).filter((r) => crossedDigestThreshold(Number(r.requesters), Number(r.digest_requesters)));
     if (!crossing.length) return report;
 
-    if (!spend(1)) return report;
+    // The claim and the routing's own reads before the send, charged together: no claim the send cannot follow.
+    if (!spend(1 + ANNOUNCE_READS)) return report;
     const nowIso = new Date(nowMs).toISOString();
     const claim = await db
       .prepare(
         `UPDATE product_price_request_stats SET digest_requesters = requesters, digest_at = ?
-          WHERE product_id IN (SELECT value FROM json_each(?)) AND requesters > digest_requesters`
+          WHERE product_id IN (SELECT value FROM json_each(?)) AND ${crossedSql()}`
       )
       .bind(nowIso, JSON.stringify(crossing.map((r) => r.product_id)))
       .run();

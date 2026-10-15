@@ -787,8 +787,12 @@ server against the product's real SKUs (`checkSelection`, worker/lib/commercialS
 a person, 20 a product; rate limits 20 / 600 s (ask), 120 / 60 s (read), 30 / 600 s (change). The
 quarter-hour tick runs `sweepPriceRequests` last (its own 40 statements): a selection that became
 sellable through any door is `notified` (in-app with Sorani in `meta`, plus outbox rows, key
-`price_available:<id>:<cycle>`) or `closed(priced)` without consent; then `digestPriceRequests` sends
-at most one Arabic digest an hour to the «البلاغات» topic, at 1, 3, 10, 25, 50, 100 people and every
-100 after, claim-then-send. The needs-pricing queue orders by distinct requesters then the latest
+`price_available:<id>:<cycle>`) or `closed(priced)` without consent. It reads 20 rows a product
+(least recently checked first) and progresses PER ROW: each batch carries its rows' writes, their
+cursor and the stats; a product with many people to tell takes a fair share of the tick and the rest
+wait first in line, never blocking the products after it. Then `digestPriceRequests` sends at most one
+Arabic digest an hour to the «البلاغات» topic, at 1, 3, 10, 25, 50, 100 people and every 100 after,
+claim-then-send; the threshold test is SQL before the candidate LIMIT, the high-water mark follows the
+open count down (returning demand is news again), and the routing's two reads are charged. The needs-pricing queue orders by distinct requesters then the latest
 request in SQL (inside the 200 cap) and offers «الأكثر طلباً» with per-selection counts; the products
 list has a `price_requests` column, a `requests` sort and `requested=1`. Customers never see counts.

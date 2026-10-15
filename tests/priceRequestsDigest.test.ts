@@ -19,7 +19,8 @@ import type { Env } from '../worker/lib/types';
 import type { DatabaseSync } from 'node:sqlite';
 import { all, asD1, freshDb, row } from './fixtures/app';
 import { serialD1 } from './fixtures/serialD1';
-import { DIGEST_INTERVAL_MS, digestPriceRequests, type PriceRequestBudget } from '../worker/lib/priceRequests';
+import { SqliteD1, type SqliteStatement } from './fixtures/d1';
+import { DIGEST_INTERVAL_MS, digestPriceRequests, digestThresholdSql, statsRecompute, type PriceRequestBudget } from '../worker/lib/priceRequests';
 import { crossedDigestThreshold, digestThreshold, requestersText } from '@levonis/contracts/priceRequests';
 
 const GROUP = '-1001234567890';
@@ -180,6 +181,120 @@ test('a budget too small, or a database without 0193: no message, no throw', asy
     bare.exec('DROP TABLE product_price_request_stats; DROP TABLE product_price_requests;');
     assert.equal((await digestPriceRequests(envOf(asD1(bare)), budget())).sent, false);
     assert.equal(tg.sent.length, 0);
+  } finally {
+    tg.restore();
+  }
+});
+
+test('the threshold test is SQL, before the LIMIT: 20 products grown between thresholds never hide one that crossed', async () => {
+  const raw = world();
+  for (let i = 0; i < 20; i++) {
+    raw.prepare("INSERT INTO products (id, slug, name, status, price_iqd) VALUES (?, ?, ?, 'active', 0)").run(`p_hot${i}`, `hot-${i}`, `Hot ${i}`);
+    // Announced at 3, now 5: no new threshold, and they outrank the newcomer.
+    raw
+      .prepare("INSERT INTO product_price_request_stats (product_id, requesters, digest_requesters, last_request_at) VALUES (?, 5, 3, '2026-10-15T00:00:00.000Z')")
+      .run(`p_hot${i}`);
+  }
+  asked(raw, 'p_two', 1, '2026-10-15T01:00:00.000Z');
+  const tg = stubTelegram();
+  try {
+    const r = await digestPriceRequests(envOf(asD1(raw)), budget(), Date.parse('2026-10-15T02:00:00.000Z'));
+    assert.equal(r.sent, true);
+    assert.equal(r.products, 1);
+    assert.match(tg.sent[0]!.text, /الطابعة الثانية: شخص واحد طلب السعر/);
+    assert.doesNotMatch(tg.sent[0]!.text, /Hot \d/);
+    assert.equal(row<{ n: number }>(raw, "SELECT digest_requesters AS n FROM product_price_request_stats WHERE product_id = 'p_two'")!.n, 1);
+    assert.equal(row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM product_price_request_stats WHERE product_id LIKE 'p_hot%' AND digest_requesters = 3")!.n, 20, 'the claim takes only the crossing row');
+  } finally {
+    tg.restore();
+  }
+});
+
+test('the SQL threshold is the contract’s, count for count', () => {
+  const raw = freshDb();
+  raw.exec('CREATE TABLE n_probe (requesters INTEGER NOT NULL)');
+  const ins = raw.prepare('INSERT INTO n_probe (requesters) VALUES (?)');
+  for (let n = 0; n <= 1050; n++) ins.run(n);
+  const got = all<{ n: number; t: number }>(raw, `SELECT requesters AS n, ${digestThresholdSql('requesters')} AS t FROM n_probe ORDER BY requesters`);
+  assert.equal(got.length, 1051);
+  for (const g of got) assert.equal(g.t, digestThreshold(g.n), `n=${g.n}`);
+  assert.throws(() => digestThresholdSql('requesters; DROP TABLE x'), /PRICE_REQUEST_INVARIANT/);
+});
+
+test('the high-water mark follows the count down: demand that returns after everyone was told is announced again', async () => {
+  const raw = world();
+  asked(raw, 'p_one', 12);
+  const db = asD1(raw);
+  const tg = stubTelegram();
+  try {
+    const t0 = Date.parse('2026-10-15T10:00:00.000Z');
+    assert.equal((await digestPriceRequests(envOf(db), budget(), t0)).sent, true);
+    assert.equal(row<{ n: number }>(raw, "SELECT digest_requesters AS n FROM product_price_request_stats WHERE product_id = 'p_one'")!.n, 12);
+    // The price arrives and the sweep tells everyone: no open row is left, and the recompute follows.
+    raw.exec("UPDATE product_price_requests SET state = 'notified' WHERE product_id = 'p_one'");
+    await db.batch([statsRecompute(db, 'p_one', '2026-10-15T10:15:00.000Z')]);
+    assert.deepEqual(row(raw, "SELECT requesters, digest_requesters FROM product_price_request_stats WHERE product_id = 'p_one'"), {
+      requesters: 0,
+      digest_requesters: 0,
+    });
+    // A new colour, unpriced, and one new person asks about it: news again.
+    raw.prepare("INSERT INTO users (id, name, email, password_hash, role) VALUES ('u_late', 'Late', 'late@x.co', 'h', 'customer')").run();
+    raw
+      .prepare("INSERT INTO product_price_requests (id, user_id, product_id, selection, requested_at) VALUES ('prq_late', 'u_late', 'p_one', 'c:c_new', '2026-10-15T11:00:00.000Z')")
+      .run();
+    await db.batch([statsRecompute(db, 'p_one', '2026-10-15T11:00:00.000Z')]);
+    const later = await digestPriceRequests(envOf(db), budget(), t0 + DIGEST_INTERVAL_MS + 1000);
+    assert.equal(later.sent, true);
+    assert.match(tg.sent[1]!.text, /الطابعة الأولى: شخص واحد طلب السعر/);
+    // The claim alone raises it.
+    raw.exec("UPDATE product_price_requests SET click_count = click_count + 1 WHERE id = 'prq_late'");
+    await db.batch([statsRecompute(db, 'p_one', '2026-10-15T11:30:00.000Z')]);
+    assert.equal(row<{ n: number }>(raw, "SELECT digest_requesters AS n FROM product_price_request_stats WHERE product_id = 'p_one'")!.n, 1);
+  } finally {
+    tg.restore();
+  }
+});
+
+/** A D1 that counts every statement it executes (a batch counts its statements). */
+class CountingD1 {
+  count = 0;
+  constructor(private readonly inner: SqliteD1) {}
+  prepare(sql: string) {
+    return this.wrap(this.inner.prepare(sql));
+  }
+  private wrap(st: SqliteStatement): Record<string, unknown> {
+    return {
+      inner: st,
+      bind: (...v: unknown[]) => this.wrap(st.bind(...v)),
+      run: () => ((this.count += 1), st.run()),
+      first: <T>() => ((this.count += 1), st.first<T>()),
+      all: () => ((this.count += 1), st.all()),
+    };
+  }
+  batch(stmts: Array<{ inner: SqliteStatement }>) {
+    this.count += stmts.length;
+    return this.inner.batch(stmts.map((s) => s.inner));
+  }
+}
+
+test('every statement the digest runs is charged, the admin routing’s own reads included', async () => {
+  const raw = world();
+  asked(raw, 'p_one', 3);
+  const d1 = new CountingD1(new SqliteD1(raw));
+  const tg = stubTelegram();
+  try {
+    const b = budget(40);
+    const r = await digestPriceRequests(envOf(d1 as unknown as D1Database), b, Date.parse('2026-10-15T10:00:00.000Z'));
+    assert.equal(r.sent, true);
+    assert.equal(tg.sent.length, 1);
+    assert.ok(d1.count <= r.statements, `executed ${d1.count}, charged ${r.statements}`);
+    // Cut to exactly what was charged before the claim: no claim, no send, nothing over.
+    asked(raw, 'p_two', 1);
+    const at = d1.count;
+    const short = await digestPriceRequests(envOf(d1 as unknown as D1Database), budget(4), Date.parse('2026-10-15T11:30:00.000Z'));
+    assert.equal(short.sent, false);
+    assert.ok(d1.count - at <= 4);
+    assert.equal(row<{ n: number }>(raw, "SELECT digest_requesters AS n FROM product_price_request_stats WHERE product_id = 'p_two'")!.n, 0, 'not claimed');
   } finally {
     tg.restore();
   }

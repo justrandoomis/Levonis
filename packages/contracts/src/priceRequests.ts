@@ -92,7 +92,7 @@ export function priceAvailableMessage(name: PriceRequestText): { title: PriceReq
  * distinct requesters cross one of these since its last announcement — 1, 3,
  * 10, 25, 50, 100, then every further 100 — never once per request.
  */
-const DIGEST_STEPS = [1, 3, 10, 25, 50, 100] as const;
+export const DIGEST_STEPS = [1, 3, 10, 25, 50, 100] as const;
 
 /** The highest threshold at or below `n` (0 below the first). */
 export function digestThreshold(n: number): number {

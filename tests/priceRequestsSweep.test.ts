@@ -263,6 +263,77 @@ test('the pass spends no statement its budget did not grant; ten products a pass
   }
 });
 
+/** `n` signed-in people (email verified) asking about `productId`, all wanting to be told. */
+function crowd(raw: DatabaseSync, productId: string, n: number, prefix: string, selection = ''): void {
+  const at = '2026-10-15T00:00:00.000Z';
+  for (let i = 0; i < n; i++) {
+    const user = `u_${prefix}_${i}`;
+    raw
+      .prepare("INSERT OR IGNORE INTO users (id, name, email, password_hash, role, email_verified_at) VALUES (?, ?, ?, 'h', 'customer', ?)")
+      .run(user, `Crowd ${i}`, `${user}@x.co`, at);
+    raw
+      .prepare(
+        `INSERT INTO product_price_requests (id, user_id, product_id, selection, notify, requested_at, last_clicked_at, first_requested_at)
+         VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
+      )
+      .run(`prq_${prefix}_${i}`, user, productId, selection, at, at, at);
+  }
+}
+
+test('progress per row: a priced product with 20 people to tell never blocks the product after it, and all are told within a few ticks', async () => {
+  // U1 sorts before the PLA: the old all-or-nothing batch for U1 (20 × 3 statements) never fit the tick, froze the
+  // cursor on U1 and stopped the PLA too, tick after tick.
+  assert.ok(U1 < P.PLA);
+  const w = await catalogOnlyWorld({ alsoUnpriced: [U1, P.PLA] });
+  crowd(w.raw, U1, 20, 'many');
+  crowd(w.raw, P.PLA, 1, 'one');
+  await publishV2(w.raw, U1);
+  await publishV2(w.raw, P.PLA);
+  const d1 = new CountingD1(new SqliteD1(w.raw));
+  const env = { ...envOf(w), DB: d1 as unknown as D1Database } as unknown as Env;
+  const state = (id: string) => row<{ state: string }>(w.raw, 'SELECT state FROM product_price_requests WHERE id = ?', id)!.state;
+
+  const b = budget(PRICE_REQUEST_TICK_BUDGET);
+  const first = await sweepPriceRequests(env, b);
+  assert.ok(d1.count <= b.used() && b.used() <= PRICE_REQUEST_TICK_BUDGET, `executed ${d1.count}, charged ${b.used()}`);
+  assert.equal(state('prq_one_0'), 'notified', 'the PLA is told on the first tick, beside the crowded U1');
+  assert.ok(first.notified >= 2, 'the U1 progresses too');
+  statsEqualSource(w.raw, U1);
+
+  let ticks = 1;
+  while (all(w.raw, "SELECT id FROM product_price_requests WHERE state <> 'notified'").length && ticks < 8) {
+    const at = d1.count;
+    const tick = budget(PRICE_REQUEST_TICK_BUDGET);
+    const r = await sweepPriceRequests(env, tick);
+    assert.ok(r.notified > 0, `tick ${ticks} makes progress`);
+    assert.ok(d1.count - at <= tick.used(), 'never a statement the budget did not grant');
+    ticks += 1;
+  }
+  assert.equal(all(w.raw, "SELECT id FROM product_price_requests WHERE state <> 'notified'").length, 0, `all 21 told within ${ticks} ticks`);
+  assert.ok(ticks <= 5, `${ticks} ticks`);
+  assert.equal(all(w.raw, "SELECT id FROM user_notifications WHERE kind = 'price_available'").length, 21, 'one notice each, never twice');
+  assert.equal(all(w.raw, "SELECT id FROM outbox WHERE event_key LIKE 'price_available:%'").length, 21, 'one email each');
+  statsEqualSource(w.raw, U1);
+  statsEqualSource(w.raw, P.PLA);
+});
+
+test('the rows read is bounded per product: 205 waiting rows on one product never hide a priced request on another', async () => {
+  assert.ok(CAT.id < P.PLA, 'the crowded product sorts first');
+  const w = await catalogOnlyWorld({ alsoUnpriced: [P.PLA] });
+  crowd(w.raw, CAT.id, 205, 'wait', CAT_SEL.key(CAT_SEL.std, CAT_SEL.grey));
+  crowd(w.raw, P.PLA, 1, 'pla');
+  await publishV2(w.raw, P.PLA);
+  const report = await sweepPriceRequests(envOf(w), budget(40));
+  assert.equal(report.notified, 1);
+  assert.equal(row<{ state: string }>(w.raw, "SELECT state FROM product_price_requests WHERE id = 'prq_pla_0'")!.state, 'notified');
+  // The cursor moved only for the rows the pass read (20 of the H2D's 205); the rest are first next time.
+  const moved = all(w.raw, "SELECT id FROM product_price_requests WHERE product_id = ? AND checked_at <> ''", CAT.id).length;
+  assert.equal(moved, 20);
+  await sweepPriceRequests(envOf(w), budget(40));
+  assert.equal(all(w.raw, "SELECT id FROM product_price_requests WHERE product_id = ? AND checked_at <> ''", CAT.id).length, 40, 'the next pass reads the next 20');
+  assert.equal(all(w.raw, "SELECT id FROM product_price_requests WHERE product_id = ? AND state <> 'open'", CAT.id).length, 0, 'still unpriced: all wait');
+});
+
 test('the quarter-hour tick: the price-request share is its own 40 cut to what was left, so the tick stays at or under 950', () => {
   assert.equal(PRICE_REQUEST_TICK_BUDGET, 40);
   assert.equal(QUARTER_HOUR_TICK_LIMIT, 950);
