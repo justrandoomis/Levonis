@@ -4,50 +4,45 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
-## Catalog-only products and price requests (branch `feat/catalog-only`, DECISIONS 240, not yet landed)
+## Bambu Lab one-time catalogue import (DECISIONS 239–241, in progress)
 
-Server, client, admin and the local browser e2e (`scripts/e2e-catalog-only.mjs`) are all on the branch.
-Read `docs/PRICING-V2.md` §9.
+The owner's brief of 2026-10-15: import every product of us.store.bambulab.com (1,115 in its sitemap) as a
+native, catalog-only Levonis product, one product at a time with a live check before the next, no price,
+cost or stock from the source, no sync afterwards. Row 239 allows reading and writing the production D1/R2
+for this import only. Catalog-only visibility and «طلب السعر» (row 240, 0193) are live.
 
-- Migration **0193_price_requests.sql** (two new tables, additive). The branch is rebased onto
-  `a1a130dc` (Services S-P2 live, 0192): `EXPECTED_MIGRATION` / `EXPECTED_MIGRATION_COUNT` are
-  `0193_price_requests.sql` / 186 (`tests/schemaVersion.test.ts`). S-P2's new trade-in readers — the target
-  search, the product page's trade-in entry, «سعر اليوم» (`worker/lib/tradeInTargets.ts`,
-  `worker/lib/tradeInToday.ts`) — ask SELLABLE.
-- The listing predicate is two: VISIBLE (catalogue) and SELLABLE (purchase). **What customers see at
-  deploy**: every active product that is not V2-published (and every V2 product held by the owner's
-  switch for a commercial gap) is SHOWN — listing, search, sections, its page, the public API, the
-  sitemap — with «السعر غير متوفر حالياً», no number, no stock word, and «طلب السعر» for signed-in
-  customers; every purchase door refuses it (409 `PRICE_NOT_AVAILABLE`, checkout keeps
-  `PRODUCT_CURRENTLY_UNAVAILABLE`). An old cart line of such a product is listed apart with a «طلب السعر»
-  link. A product missing a picture or a section stays hidden while the switch is on. The edge cache epoch
-  moved (`catalog-only-2026-10-15`), so no pre-release body is served.
-- **Open tabs on the old client show «0 د.ع»**: the SPA built at 0988169f renders a null price as
-  `formatIqd(null)` → «0 د.ع» on every catalog-only card and page until the tab reloads (`public/sw.js`
-  does not skip waiting; `UpdateReadyToast` lets the customer choose the moment). No money moves — every
-  door refuses — but deploy at a quiet hour and expect the window to last until tabs turn over. A
-  two-phase release (client first, the server switch later) was not built.
-- The quarter-hour tick gained a step after the completeness catch-up and before S-P2's services sweep,
-  which stays last (price-request sweep + hourly admin digest to the «البلاغات» topic, 40 statements at
-  most, the digest's routing reads charged). The sweep progresses per row and
-  shares the tick fairly between products. Without 0193 the customer doors answer 503
-  `PRICE_REQUESTS_UNAVAILABLE` and the admin sort/filter fall back.
-- Admin: «ظاهر بلا سعر» (badge, banner, Active tile) counts only what customers see (`/stats`
-  `shown_unpriced`); the owner's switch card splits «موقوف عن البيع» from «مخفي».
-- **Workflow 7's live probes changed with it (Bambu import spec §K.1 D-1).** «Read one product shown without
-  a price yet» picks an active, VISIBLE, not-V2-published product (read-only, right before the probes);
-  `cleanstart.json` now expects it SHOWN — `/api/products/<slug>` 200 with `price_status: unpriced` and a
-  null price, `/api/public/v1/products/<slug>` 200 — where it used to expect 404. `s1.json` / `leaks.json`
-  read `{slug}` from `/api/products?limit=1&price=1-` (priced only) and hold `price_iqd` to `requirePriceKeys`
-  (an integer, or null only on an object marked unpriced). If the first deploy's probes fail, read the
-  `::error::` lines: they name the path and key, never a value.
-- The import's other hard dependencies are in place: the catalog-only projections keep every id, binding
-  and 0194 label (D-2), `/context` has `products_priced` (D-3), a price range excludes unpriced products
-  (D-4), and `validatePriceRequestSelection` (worker/lib/priceRequests.ts) is the door's validation on its
-  own (D-5). SELLABLE is byte-identical to the old «listed» predicate (D-7).
+- **Live:** migrations **0194** (the product knowledge model: source refs and stock decision, option/image
+  source map, typed specs with provenance, documents, external ids, relations, swatches; four new group
+  columns) and **0195** (the run ledger: one open run per source, one item in flight, the legal state graph,
+  the lease fence, and generated guard triggers armed only by `ops_guards('catalog-import-batch')`), plus the
+  package `packages/catalog/src/bambuImport` (extraction and mapping; 1,113 of the 1,115 crawled pages parse,
+  2 on hold). Nothing reads or writes the new tables yet; the live site is unchanged.
+- **Workflow 60** (`.github/workflows/bambu-import.yml`, dispatch-only, default branch only, deploys nothing):
+  `snapshot` (a sealed read of the live catalogue: sections, brands, products of every status with identity
+  fields only, memberships, printer fits, option values, colours, Bambu image provenance; row counts only in
+  the public log) and `revoke` (the run-token kill switch). Every artifact is sealed to a one-time X25519 key
+  (`scripts/bambu-import/seal.mjs --keygen <dir>` outside any checkout; open with `unseal.mjs`); only
+  `*.sealed` files are uploaded. `scripts/bambu-import/cf.mjs` is the only code that holds Cloudflare
+  credentials. The other modes refuse "not yet" until build step 8.
+- **Next (spec §K.2):** step 5 search aliases + the import stock gate; step 6 the token-protected ops endpoint
+  and writer; step 7 the product page's knowledge tabs, swatches and gallery; step 8 the runner and the other
+  workflow 60 modes; then the reviewed data files, dry runs, the canary `filament-buffer`, the eight audit
+  classes and the bulk run. Every code step deploys through workflow 7 like any other push.
+- **Holds and owner questions with safe defaults:** `cyberbrick-omnidirectional-forklift` (an option name
+  read as an order type: "Omni**direct**ional"), `ams-2-pro` (an option value worded as a promotion, shown
+  under a reviewed neutral label), «A1 Series» read per product, the Sorani names of the four seeded
+  «مواد الصيانة» shelves (empty since 0148).
 
 ## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
+- `c65cdf58` — **Bambu import foundation** (DECISIONS 241), deployed 2026-10-15 19:47 UTC, migrations
+  0194 and 0195 (restore point `0000162d-0000006e-00005105-46aed4dbc52a01040b2de5a0d8bc24e1`; 21 probes, 0
+  failed). Additive and inert: thirteen new tables and four defaulted group columns, the run ledger's
+  one-item-at-a-time index and state-graph triggers, and guard triggers that refuse any write to money,
+  stock, order, wallet and ledger tables (the price-request tables included) inside an import batch only.
+  Two tests changed with it: a catalog-only fixture now finds the 0194 columns already present, and the
+  deploy-ahead price-protection test drops 0195's guard triggers with `ops_guards`, since no real database
+  has one without the other. Shard timings were re-measured for the new test files.
 - `711d1b9e` — **Catalog-only + price requests** (DECISIONS 239/240), deployed 2026-10-15 18:25 UTC,
   migration 0193 (restore point `0000162c-000003c8-00005105-45cba74b6e57de3cd17f0626180fab0e`). Every
   active product without a V2 price — the old ones hidden since the clean start and every new one —
