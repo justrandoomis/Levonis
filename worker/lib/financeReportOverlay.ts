@@ -39,6 +39,15 @@ export interface ReportAdjustments {
    * device is resold. 0 on a database without 0192.
    */
   trade_in_credit_iqd: number;
+  /**
+   * S-P2 (review F-12): the part of that in-stock credit a RETURN gave back (`trade_in_credit_reissues`,
+   * reason 'returned'), per returned line — the cash refund is net of it, so the line's retained
+   * revenue still carries it; deducted here so this report and the period report agree, and the
+   * next sale the same credit pays for is not revenue twice. A legacy credit is already deducted
+   * as a coupon above.
+   */
+  trade_in_credit_returned_by_line: Map<string, number>;
+  trade_in_credit_returned_iqd: number;
   /** Credited price-protection amount per order line id. */
   price_protection_by_line: Map<string, number>;
   /** Their sum. */
@@ -48,7 +57,7 @@ export interface ReportAdjustments {
 export async function reportAdjustments(db: D1Database, orderIds: readonly string[]): Promise<Map<string, ReportAdjustments>> {
   const out = new Map<string, ReportAdjustments>();
   const ids = [...new Set(orderIds)];
-  for (const id of ids) out.set(id, { coupon_iqd: 0, trade_in_credit_iqd: 0, price_protection_by_line: new Map(), price_protection_iqd: 0 });
+  for (const id of ids) out.set(id, { coupon_iqd: 0, trade_in_credit_iqd: 0, trade_in_credit_returned_by_line: new Map(), trade_in_credit_returned_iqd: 0, price_protection_by_line: new Map(), price_protection_iqd: 0 });
   if (!ids.length) return out;
   const bound = JSON.stringify(ids);
   const residual = `MAX(0, COALESCE(json_extract(o.coupon_snapshot, '$.discount_iqd'), o.coupon_discount_iqd, 0)
@@ -71,7 +80,23 @@ export async function reportAdjustments(db: D1Database, orderIds: readonly strin
           .bind(bound)
           .all<Row>();
       });
-  const [coupons, claims] = await Promise.all([
+  const returnedRows = () =>
+    db
+      .prepare(
+        `SELECT rc.order_id, rc.order_item_id, COALESCE(SUM(x.amount_iqd), 0) amount_iqd
+           FROM trade_in_credit_reissues x JOIN return_cases rc ON rc.id = x.return_case_id
+          WHERE x.reason = 'returned' AND rc.order_id IN (SELECT value FROM json_each(?))
+            AND EXISTS (SELECT 1 FROM trade_in_stock ts WHERE ts.request_id = x.request_id)
+          GROUP BY rc.order_id, rc.order_item_id`
+      )
+      .bind(bound)
+      .all<Row>()
+      .catch((e: unknown) => {
+        // A database without 0192: nothing was given back.
+        if (!/no such table\b/i.test(e instanceof Error ? e.message : String(e))) throw e;
+        return { results: [] as Row[] };
+      });
+  const [coupons, claims, returned] = await Promise.all([
     couponRows(),
     db
       .prepare(
@@ -82,7 +107,16 @@ export async function reportAdjustments(db: D1Database, orderIds: readonly strin
       )
       .bind(bound)
       .all<Row>(),
+    returnedRows(),
   ]);
+  for (const r of returned.results ?? []) {
+    const entry = out.get(String(r.order_id));
+    if (!entry) continue;
+    const amount = Math.max(0, n(r.amount_iqd));
+    const line = String(r.order_item_id);
+    entry.trade_in_credit_returned_by_line.set(line, (entry.trade_in_credit_returned_by_line.get(line) ?? 0) + amount);
+    entry.trade_in_credit_returned_iqd += amount;
+  }
   for (const r of coupons.results ?? []) {
     const entry = out.get(String(r.order_id));
     if (!entry) continue;

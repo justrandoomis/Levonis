@@ -116,3 +116,59 @@ test('the owner’s P&L sees the resale of a traded-in device at a cost = the cr
   const pnl = (await json(await get(adminApp(raw, OWNER), '/api/admin/trade-in/pnl'))).pnl;
   assert.deepEqual(pnl.resold, { count: 1, revenue_iqd: 450_000, cogs_iqd: t.credit, margin_iqd: 450_000 - t.credit });
 });
+
+test('review F-12/F-13: a returned in-stock credit line — the period report and the per-order report agree, and an uncosted line shows no gross loss', async () => {
+  const raw = seed();
+  const t = await completed(raw);
+  const line = row<{ id: string }>(raw, "SELECT id FROM order_items WHERE order_id = ? AND product_id = 'p_p1s'", t.orderId)!;
+  raw.prepare(
+    `INSERT INTO return_cases (id, order_id, order_item_id, user_id, qty, reason, state, within_window, delivered_at_snapshot)
+     VALUES ('ret_agree', ?, ?, 'cust', 1, 'defective', 'inspected', 1, ?)`
+  ).run(t.orderId, line.id, new Date().toISOString());
+  const res = await post(adminApp(raw, OWNER), '/api/returns/admin/ret_agree/transition', { to: 'resolved', resolution: 'refund' });
+  assert.equal(res.status, 200, await res.clone().text());
+  const p = await summary(raw);
+  // The sale is fully reversed: no revenue is left, and the reversal sits with its (uncosted) case.
+  assert.equal(p.revenue_iqd, 0);
+  assert.equal(p.costed_revenue_iqd + p.uncosted_revenue_iqd + p.estimated_revenue_iqd, p.revenue_iqd);
+  assert.equal(p.costed_revenue_iqd, 0, 'an uncosted line is never reversed out of costed revenue');
+  assert.ok(p.gross_profit_iqd >= 0, `gross ${p.gross_profit_iqd}`);
+  assert.equal(p.trade_in_reissued_iqd, t.credit);
+  // The per-order report: retained revenue less the credit the return gave back = the period's revenue.
+  const { getOrderProfitBases } = await import('../worker/lib/orderProfit');
+  const [base] = await getOrderProfitBases(asD1(raw), [t.orderId]);
+  const l = base.lines.find((x) => x.id === line.id)!;
+  const adj = (await reportAdjustments(asD1(raw), [t.orderId])).get(t.orderId)!;
+  assert.equal(adj.trade_in_credit_returned_by_line.get(line.id), t.credit);
+  assert.equal(l.retained_revenue_iqd - adj.trade_in_credit_returned_iqd - adj.coupon_iqd, p.revenue_iqd);
+});
+
+test('review F-13: a legacy credit (no device in stock) fully returned after S-P2 — the sale and its return net to nothing', async () => {
+  const raw = seed();
+  const id = await submitted(raw);
+  const C = 300_000;
+  const now = new Date().toISOString();
+  raw.exec(`
+    INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_global, max_per_user, active, created_at, assigned_user_id, scope, product_id, trade_in_id, ends_at)
+      VALUES ('cpn_lg', 'TILEGRET0001', 'fixed_iqd', ${C}, 0, 1, 1, 1, '${now}', 'cust', 'product', 'p_p1s', '${id}', NULL);
+    UPDATE trade_in_requests SET status='completed', valuation_version=1, final_value_iqd=${C}, credit_iqd=${C}, coupon_id='cpn_lg', completed_at='${now}' WHERE id='${id}';
+    INSERT INTO orders (id,user_id,status,stage,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+                        subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,updated_at,delivered_at,coupon_snapshot,seller_type)
+      VALUES ('ORD-LR','cust','delivered','delivered','{}','standard','{}','cash',1500000,0,1400,${1_500_000 - C},0,'${now}','${now}','${now}','{"coupon_id":"cpn_lg","discount_iqd":${C}}','levonis');
+    INSERT INTO order_items (id,order_id,product_id,name_snapshot,image_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,option_id,option_value_ids)
+      VALUES ('oi_lr','ORD-LR','p_p1s','Bambu Lab P1S','','',1,1500000,1500000,'','[]');
+  `);
+  // The use predates 0192 (a credit spent on photos): written with the intake trigger aside.
+  raw.exec('DROP TRIGGER trg_trade_in_credit_needs_intake');
+  raw.exec(`INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd) VALUES ('red_lr','cpn_lg','cust','ORD-LR',${C})`);
+  const before = await summary(raw);
+  assert.equal(before.legacy_trade_in_credit_iqd, C);
+  raw.prepare(`INSERT INTO return_cases (id, order_id, order_item_id, user_id, qty, reason, state, within_window, delivered_at_snapshot) VALUES ('rlr','ORD-LR','oi_lr','cust',1,'defective','inspected',1,?)`).run(now);
+  const res = await post(adminApp(raw, OWNER), '/api/returns/admin/rlr/transition', { to: 'resolved', resolution: 'refund' });
+  assert.equal(res.status, 200, await res.clone().text());
+  const after = await summary(raw);
+  assert.equal(after.trade_in_reissued_iqd, C);
+  assert.equal(after.revenue_iqd, 0);
+  assert.equal(after.legacy_trade_in_credit_iqd, 0, 'the deduction taken at the sale is given back with the credit');
+  assert.equal(after.net_profit_iqd, 0, `net ${after.net_profit_iqd}`);
+});

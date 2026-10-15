@@ -115,14 +115,18 @@ function applyReportAdjustments(bases:OrderProfitBase[],adjustments:Map<string,R
     const a=adjustments.get(b.order_id);const coupon=a?.coupon_iqd??0,claims=a?.price_protection_by_line??new Map<string,number>();
     const goods=b.lines.map((l)=>Math.max(0,n(l.net_goods_iqd))),toLines=Math.min(coupon,goods.reduce((v,x)=>v+x,0));
     const shares=spread(toLines,goods);
-    b.lines.forEach((l,i)=>{const share=shares[i]??0,credit=claims.get(l.id)??0;
-      l.coupon_iqd=share;l.price_protection_iqd=credit;
-      l.net_after_report_adjustments_iqd=l.owner_net_iqd===null||l.owner_net_iqd===undefined?null:n(l.owner_net_iqd)-share-credit;});
-    const credited=a?.price_protection_iqd??0;
+    // S-P2 (review F-12): an in-stock credit a return gave back is deducted from the line it paid for —
+    // the cash refund is net of it — so this report and the period report agree.
+    const returnedBy=a?.trade_in_credit_returned_by_line??new Map<string,number>();
+    b.lines.forEach((l,i)=>{const share=shares[i]??0,credit=claims.get(l.id)??0,back=returnedBy.get(l.id)??0;
+      l.coupon_iqd=share;l.price_protection_iqd=credit;(l as unknown as Record<string,unknown>).trade_in_credit_returned_iqd=back;
+      l.net_after_report_adjustments_iqd=l.owner_net_iqd===null||l.owner_net_iqd===undefined?null:n(l.owner_net_iqd)-share-credit-back;});
+    const credited=a?.price_protection_iqd??0,returned=a?.trade_in_credit_returned_iqd??0;
     b.totals.coupon_iqd=coupon;b.totals.price_protection_iqd=credited;
     // S-P2: a trade-in credit whose device is stock is shown, never deducted (DECISIONS row 238).
     (b.totals as Record<string,unknown>).trade_in_credit_iqd=a?.trade_in_credit_iqd??0;
-    b.totals.net_after_report_adjustments_iqd=b.totals.owner_net_iqd===null||b.totals.owner_net_iqd===undefined?null:n(b.totals.owner_net_iqd)-coupon-credited;
+    (b.totals as Record<string,unknown>).trade_in_credit_returned_iqd=returned;
+    b.totals.net_after_report_adjustments_iqd=b.totals.owner_net_iqd===null||b.totals.owner_net_iqd===undefined?null:n(b.totals.owner_net_iqd)-coupon-credited-returned;
   }
   return bases;
 }

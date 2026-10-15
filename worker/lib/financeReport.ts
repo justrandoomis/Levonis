@@ -589,6 +589,8 @@ export interface ReissueFact {
   day: string;
   reissues: number;
   amount_iqd: number;
+  /** The part whose request has no device in stock (a legacy credit, deducted at the sale). */
+  legacy_iqd: number;
 }
 
 /** One day's operating expenses, from the admin's own ledger. */
@@ -661,6 +663,7 @@ export const reissueFactOf = (r: Record<string, unknown>): ReissueFact => ({
   day: dayOf(r.day),
   reissues: num(r.reissues),
   amount_iqd: num(r.amount_iqd),
+  legacy_iqd: num(r.legacy_iqd),
 });
 
 export const expenseFactOf = (r: Record<string, unknown>): ExpenseFact => ({
@@ -1303,8 +1306,21 @@ export const salesByDaySql = (schema: SchemaFacts): string => `
  * screen fail. Binds: startIso, endIso.
  */
 const refundJoin = (schema: SchemaFacts) => schema.hasOperationalRefunds ? ' LEFT JOIN finance_refund_facts rf ON rf.case_id=rc.id' : '';
+/**
+ * THE CREDIT A RETURN GAVE BACK (S-P2; review F-12/F-13): the refund of a line a trade-in credit
+ * paid for is cash NET of the credit (`finance_refund_facts.refund_iqd`, what the accounting posts),
+ * and the credit itself comes back as the same coupon (`trade_in_credit_reissues`, reason
+ * 'returned', on THIS case). The revenue the case reverses is both — filed with the case, so it is
+ * costed, uncosted or estimated exactly as the case is. A case without an operational fact already
+ * reverses the line's whole share. None on a database without 0192.
+ */
+const creditBackSql = (schema: SchemaFacts) =>
+  schema.hasTradeInReissues
+    ? `(SELECT COALESCE(SUM(x.amount_iqd), 0) FROM trade_in_credit_reissues x WHERE x.return_case_id = rc.id AND x.reason = 'returned') AS credit_back_iqd`
+    : '0 AS credit_back_iqd';
 const refundProjection = (schema: SchemaFacts) => `${costProjection(schema)},
-  ${schema.hasOperationalRefunds ? 'CASE WHEN rf.case_id IS NOT NULL THEN 1 ELSE 0 END AS operational,rf.cogs_iqd AS restored_cogs_iqd,rf.refund_iqd AS actual_refund_iqd' : '0 AS operational,NULL AS restored_cogs_iqd,NULL AS actual_refund_iqd'}`;
+  ${schema.hasOperationalRefunds ? 'CASE WHEN rf.case_id IS NOT NULL THEN 1 ELSE 0 END AS operational,rf.cogs_iqd AS restored_cogs_iqd,rf.refund_iqd AS actual_refund_iqd' : '0 AS operational,NULL AS restored_cogs_iqd,NULL AS actual_refund_iqd'},
+  ${creditBackSql(schema)}`;
 
 export const refundsByDaySql = (schema: SchemaFacts): string => `
   WITH RECURSIVE ${refundPriceCtes(schema)} r AS (
@@ -1348,7 +1364,7 @@ const REFUND_COGS = `CASE
         ELSE r.unit_cost_iqd * r.ref_qty END`;
 const UNCOSTED_R = `(${REFUND_COGS}) IS NULL`;
 
-const REFUND_REVENUE = `CASE WHEN r.operational=1 THEN r.actual_refund_iqd ELSE r.net_iqd * r.ref_qty / r.line_qty END`;
+const REFUND_REVENUE = `CASE WHEN r.operational=1 THEN r.actual_refund_iqd + r.credit_back_iqd ELSE r.net_iqd * r.ref_qty / r.line_qty END`;
 /** F1 again: a refund of an estimated line reverses the ESTIMATE, never the measured margin. */
 const ESTIMATED_R = `r.cost_confidence = 'estimated'`;
 const REFUND_AGGREGATES = `
@@ -1406,16 +1422,21 @@ const orderCouponColumns = (schema: SchemaFacts): string => {
 };
 
 /**
- * Trade-in credits given back by a RETURN, by the Baghdad day they were given back (S-P2 §6.11):
- * the returned sale's credit part is reversed in that day's refunds, so the next sale the same
- * credit pays for is not revenue twice. Binds: startIso, endIso.
+ * Trade-in credits given back by a RETURN, by the Baghdad day the case was decided (S-P2 §6.11),
+ * on the refund's own recognition rule (the sale was recognised). The revenue part is already in
+ * the refunds (`creditBackSql`, filed with its case); this says how much of it was a credit, and
+ * how much of that was a LEGACY credit — one with no device in stock, which the sale deducted as
+ * `legacy_trade_in_credit_iqd` and whose return therefore gives that deduction back (review F-13).
+ * Binds: startIso, endIso.
  */
 export const REISSUES_BY_DAY_SQL = `
-  SELECT COALESCE(date(x.created_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
+  SELECT COALESCE(date(rc.decided_at, '${BAGHDAD_SQL_SHIFT}'), '') AS day,
          COUNT(*) AS reissues,
-         SUM(x.amount_iqd) AS amount_iqd
+         SUM(x.amount_iqd) AS amount_iqd,
+         SUM(CASE WHEN EXISTS (SELECT 1 FROM trade_in_stock ts WHERE ts.request_id = x.request_id) THEN 0 ELSE x.amount_iqd END) AS legacy_iqd
     FROM trade_in_credit_reissues x
-   WHERE x.reason = 'returned' AND x.created_at >= ?1 AND x.created_at < ?2
+    JOIN return_cases rc ON rc.id = x.return_case_id${REFUND_ORDER_JOIN}
+   WHERE x.reason = 'returned' AND ${REFUND_WHERE}
    GROUP BY day`;
 
 /**
@@ -2057,16 +2078,16 @@ export function buildPeriodReport(input: ReportInput): PeriodReport {
       t.legacy_trade_in_credit_iqd += f.legacy_trade_in_credit_iqd;
     });
   }
-  // A credit given back by a return reverses the returned sale's credit part (S-P2 §6.11): the
-  // cash refund reversed the rest, so the line's whole revenue is reversed once — and the next
-  // sale the credit pays for is revenue once. Costed revenue moves with it, or the parts stop
-  // adding up to the whole.
+  // A credit given back by a return (S-P2 §6.11; review F-13): its revenue reversal is already in
+  // the refunds, filed with its case (costed, uncosted or estimated, as the case is), so the
+  // returned line's whole revenue is reversed once and the next sale the credit pays for is
+  // revenue once. Here it is only SHOWN — and a legacy credit's deduction (taken at the sale, no
+  // device in stock) is given back with it, so a fully returned legacy sale nets to nothing.
   for (const f of input.reissues ?? []) {
     if (f.day === UNBUCKETED) continue;
     place(f.day, (t) => {
-      t.refunded_revenue_iqd += f.amount_iqd;
-      t.costed_revenue_iqd -= f.amount_iqd;
       t.trade_in_reissued_iqd += f.amount_iqd;
+      t.legacy_trade_in_credit_iqd -= f.legacy_iqd;
     });
   }
   for (const f of input.expenses) {
