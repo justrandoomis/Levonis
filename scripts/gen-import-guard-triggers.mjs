@@ -64,9 +64,30 @@ function nonDefault(col, ref) {
       return `COALESCE(${ref}.${col.name}, 0) <> 0`;
     case 'empty_object':
       return `${ref}.${col.name} IS NOT '{}'`;
+    case 'empty_array':
+      return `${ref}.${col.name} IS NOT '[]'`;
     default:
       throw new Error(`unknown insertDefault ${col.insertDefault} for ${col.name}`);
   }
+}
+
+/**
+ * The money a JSON array column carries, as one comparable value: the sorted
+ * multiset of its object elements' money tuples (`jsonElementMoney`). NULL for
+ * an empty array, a non-array or invalid JSON — the same on both sides of a
+ * save that keeps every fee, whatever the text.
+ */
+function jsonMoney(col, ref) {
+  const tuple = col.jsonElementMoney.join(" || '|' || ");
+  return (
+    `(SELECT group_concat(m, ',') FROM (SELECT ${tuple} AS m` +
+    ` FROM json_each(CASE WHEN json_valid(${ref}.${col.name}) THEN ${ref}.${col.name} ELSE '[]' END ) j` +
+    ` WHERE j.type = 'object' ORDER BY m))`
+  );
+}
+
+function changed(col) {
+  return col.jsonElementMoney ? `${jsonMoney(col, 'NEW')} IS NOT ${jsonMoney(col, 'OLD')}` : `NEW.${col.name} IS NOT OLD.${col.name}`;
 }
 
 function orJoin(parts, indent) {
@@ -96,25 +117,22 @@ export function generateGuardBlock(schema) {
     }
   }
   lines.push('');
-  lines.push('-- (b) Catalogue rows the import writes: money, stock and package columns stay at their defaults on a new row,');
-  lines.push('--     equal to the stored row on an upsert, and unchanged on an UPDATE.');
+  lines.push('-- (b) Catalogue rows the import writes: money, stock and package columns stay at their defaults on a row the');
+  lines.push('--     INSERT creates (AFTER INSERT: an upsert that resolves to DO UPDATE fires none, a REPLACE does) and');
+  lines.push('--     unchanged on an UPDATE, the DO UPDATE of an upsert included.');
   for (const t of GUARDED_ROW_TABLES) {
     const cols = schema.get(t.table);
     if (!cols) throw new Error(`guarded row table ${t.table} is missing from the schema`);
     const all = [...t.money, ...t.stock, ...t.package];
     for (const c of all) if (!cols.has(c.name)) throw new Error(`guarded column ${t.table}.${c.name} is missing from the schema`);
     const fresh = all.map((c) => nonDefault(c, 'NEW'));
-    const differs = all.map((c) => `NEW.${c.name} IS NOT o.${c.name}`);
-    lines.push(`CREATE TRIGGER IF NOT EXISTS trg_import_guard_${t.table}_ins BEFORE INSERT ON ${t.table}`);
+    lines.push(`CREATE TRIGGER IF NOT EXISTS trg_import_guard_${t.table}_ins AFTER INSERT ON ${t.table}`);
     lines.push(`WHEN ${GUARD}`);
-    lines.push(` AND ((NOT EXISTS (SELECT 1 FROM ${t.table} o WHERE o.id = NEW.id)`);
-    lines.push(`       AND (${orJoin(fresh, '            ')}))`);
-    lines.push(`   OR EXISTS (SELECT 1 FROM ${t.table} o WHERE o.id = NEW.id`);
-    lines.push(`       AND (${orJoin(differs, '            ')})))`);
+    lines.push(` AND (${orJoin(fresh, '      ')})`);
     lines.push(RAISE);
     lines.push(`CREATE TRIGGER IF NOT EXISTS trg_import_guard_${t.table}_upd BEFORE UPDATE OF ${all.map((c) => c.name).join(', ')} ON ${t.table}`);
     lines.push(`WHEN ${GUARD}`);
-    lines.push(` AND (${orJoin(all.map((c) => `NEW.${c.name} IS NOT OLD.${c.name}`), '      ')})`);
+    lines.push(` AND (${orJoin(all.map(changed), '      ')})`);
     lines.push(RAISE);
   }
   lines.push('');

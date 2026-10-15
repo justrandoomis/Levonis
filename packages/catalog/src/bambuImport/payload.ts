@@ -20,7 +20,7 @@
  * stock, discount or promotion from the source can reach it.
  */
 import { H } from './hash';
-import { collapseWs, hostOf, stripQuery } from './normalize';
+import { collapseWs, hostOf, keptLinkUrl, stripQuery } from './normalize';
 import type { Extraction } from './extract';
 import { buildOptions, type OptionModel } from './options';
 import { describe, parseBoxItem, type Described } from './describe';
@@ -119,6 +119,8 @@ export interface PayloadImage {
   is_primary: boolean;
   option_value_id: string | null;
   variant_id: string | null;
+  /** A representative row's source variant (media.ts viaVariantId): the client drops the row when it clashes (§G.3, R6). */
+  via_variant_id: string | null;
   binding_rule: string;
   alt_en: string;
   alt_ar: string;
@@ -149,6 +151,8 @@ export interface PayloadBoxItem {
   qty: number | null;
   source_media_id: string;
   source_url: string;
+  /** The source's own sub-title over this item ("For Only Laser Module") when it names no option value; else ''. */
+  section: string;
 }
 export interface PayloadSpec {
   id: string;
@@ -222,6 +226,8 @@ export interface PayloadSourceRef {
   levonis_id: string;
   source_label: string;
   binding_rule: string;
+  /** product_option_source_refs.via_variant_id: a representative image row's source variant, else ''. */
+  via_variant_id: string;
 }
 export interface PayloadNote {
   kind: string;
@@ -290,7 +296,7 @@ const arr = (of: Field, max = 2000): Field => ({ t: 'arr', of, max });
 
 const SCOPES = ['product', 'option_value', 'variant'] as const;
 
-const BOX_ITEM = obj({ text: cust(300), qty: { t: 'num', nullable: true, int: true }, source_media_id: code(200), source_url: code(1000) });
+const BOX_ITEM = obj({ text: cust(300), qty: { t: 'num', nullable: true, int: true }, source_media_id: code(200), source_url: code(1000), section: cust(200) });
 
 const SPEC = obj(
   {
@@ -382,6 +388,7 @@ export const PAYLOAD_SCHEMA: Field = obj({
       is_primary: bool,
       option_value_id: codeN(40),
       variant_id: codeN(40),
+      via_variant_id: codeN(40),
       binding_rule: oneOf(['general', 'value', 'value_set', 'variant', 'representative', 'content_duplicate', 'reviewed_override']),
       alt_en: cust(300),
       alt_ar: cust(300),
@@ -460,6 +467,7 @@ export const PAYLOAD_SCHEMA: Field = obj({
       levonis_id: code(40),
       source_label: cust(200),
       binding_rule: oneOf(['', 'general', 'value', 'value_set', 'variant', 'representative', 'content_duplicate', 'reviewed_override']),
+      via_variant_id: code(40),
     }),
     6000
   ),
@@ -664,6 +672,24 @@ function tally<T>(xs: readonly T[], key: (x: T) => string): Record<string, numbe
   return out;
 }
 
+/** A table header that names money: "Price", "Cost", "MSRP" (optionally "Unit price", "Price (USD)"). */
+const MONEY_HEADER = /^\s*(?:(?:unit|retail|list|sale|regular|reference)\s+)?(?:prices?|costs?|msrp|rrp)\s*(?:\([^)]*\))?\s*:?\s*$/i;
+
+/**
+ * A comparison table without its money: a column headed "Price" (or a row labelled so) never reaches a
+ * customer, whatever its cells say. The bearing pages' "Comparison of Bearing Materials" grades each
+ * material "Very affordable" … "Expensive"; the sentence classifier blanks those cells one by one, and
+ * this drops the column itself, so no empty "Price" column is left behind.
+ */
+export function withoutMoneyColumns(rows: readonly string[][]): string[][] {
+  const head = rows[0] ?? [];
+  const drop = new Set<number>();
+  head.forEach((c, i) => {
+    if (i > 0 && MONEY_HEADER.test(c)) drop.add(i); // a column headed "Price"
+  });
+  return rows.filter((r) => !MONEY_HEADER.test(r[0] ?? '')).map((r) => r.filter((_, i) => !drop.has(i))); // and a row labelled so
+}
+
 /** The YouTube embed URL of a link, or '' (only YouTube is embedded, §C.5). */
 export function youtubeEmbed(url: string): string {
   const m = YOUTUBE.exec(httpsOf(url.trim()));
@@ -787,6 +813,56 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   // A format-E item lists the versions it ships with: each names a value (exactly, case-insensitive).
   const valueByName = new Map<string, string>();
   for (const g of model.groups) for (const v of g.values) valueByName.set(v.nameEn.trim().toLowerCase(), v.id);
+  /**
+   * A line "For H2D/H2C" (or "For LightGrip Cutting Mat:") heads the items after it (review 4, finding 10):
+   * they belong to the value(s) it names, and the line is no item. A short line naming no value is a
+   * sub-title of the items after it (`section`), never an item.
+   *
+   * Naming, in this order: the whole name (without a parenthetical or a leading "For"); else the values
+   * that name EVERY part of it ("For A2L/X2D/P2S/P1 Series/X1 Series" is the value "A2L/X2D/P2S/P1/X1",
+   * not also "H2 Series/P1 Series/X1 Series", which shares two of its parts; "For H2D" is "H2D and H2D
+   * Laser"); else, part by part, the values naming each ("For H2D/H2C" over the values H2D and H2C).
+   * A word such as "Series" never decides it.
+   */
+  const normName = (n: string) =>
+    n.toLowerCase().replace(/[(（][^)）]*[)）]/g, ' ').replace(/^\s*for\s+/, '').replace(/\s+/g, ' ').trim();
+  const partsOf = (n: string) =>
+    normName(n)
+      .split(/\s*(?:\/|,|&|\+|\band\b)\s*/)
+      .map((p) => p.replace(/\b(?:series|printers?)\b/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+  const allValues = model.groups.flatMap((g) => g.values);
+  const valuesNamedBy = (named: string): string[] => {
+    const want = normName(named);
+    if (!want) return [];
+    const exact = allValues.filter((v) => normName(v.nameEn) === want);
+    if (exact.length) return exact.map((v) => v.id);
+    const parts = partsOf(named);
+    if (!parts.length) return [];
+    const covering = allValues.filter((v) => {
+      const own = new Set(partsOf(v.nameEn));
+      return parts.every((p) => own.has(p));
+    });
+    if (covering.length) return covering.map((v) => v.id);
+    const ids = new Set<string>();
+    for (const part of parts) {
+      const naming = allValues.filter((v) => partsOf(v.nameEn).includes(part));
+      if (!naming.length) return [];
+      for (const v of naming) ids.add(v.id);
+    }
+    return [...ids];
+  };
+  const HEADER = /^for\s+(.+?)\s*:?\s*$/i;
+  const headerOf = (text: string, qty: number | null, image: string | null): { scopes: string[]; title: string } | null => {
+    if (qty !== null || image) return null;
+    // Not `scrub`: a line that turns out to be an item is scrubbed (and counted) once, by `take`.
+    const m = HEADER.exec(collapseWs(scrubProse(text).kept));
+    if (!m) return null;
+    const scopes = valuesNamedBy(m[1]);
+    if (scopes.length) return { scopes, title: '' };
+    // Unresolved: only a short label, not a sentence ("For best results, …" stays an item).
+    return m[1].length <= 60 && !/[.,;!?]/.test(m[1]) ? { scopes: [], title: m[1] } : null;
+  };
   for (const sec of described.sections) {
     if (sec.kind !== 'in_the_box') continue;
     const sectionScope = valueNamed(sec.title);
@@ -795,32 +871,39 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
       boxByScope.set(scope, slot);
       return slot;
     };
+    let headerScopes: string[] | null = null;
+    let heading = '';
+    const take = (text: string, qty: number | null, image: string | null, itemScopes?: string[]) => {
+      const header = itemScopes?.length ? null : headerOf(text, qty, image);
+      if (header) {
+        headerScopes = header.scopes.length ? header.scopes : null;
+        heading = header.title;
+        return;
+      }
+      const named = itemScopes?.length ? itemScopes.map((n) => valueByName.get(n.trim().toLowerCase()) ?? '') : headerScopes ?? [sectionScope];
+      const targets = named.includes('') ? [sectionScope] : named;
+      const t = collapseWs(scrub(text));
+      // A bare value name is a label, not an item; with a count it is the item itself
+      // ("For LightGrip Cutting Mat:" then "LightGrip Cutting Mat*3", cutting-mat-combo-3-pcs).
+      if (!t || (qty === null && versionWords.has(t.toLowerCase())) || /depending on (the )?selected/i.test(t)) return;
+      let mid = '';
+      let src = '';
+      if (image && boxImages < BOX_IMAGE_CAP) {
+        src = httpsOf(stripQuery(image));
+        mid = mediaIdOf('box', src);
+        boxImages++;
+      }
+      for (const scope of targets) slotOf(scope).items.push({ text: t.slice(0, 300), qty, source_media_id: mid, source_url: src, section: heading.slice(0, 200) });
+    };
     for (const b of sec.blocks) {
-      const scopes = b.t === 'box_item' && b.scopes?.length ? b.scopes.map((n) => valueByName.get(n.trim().toLowerCase()) ?? '') : [sectionScope];
-      const targets = scopes.includes('') ? [sectionScope] : scopes;
-      for (const scope of targets) {
-      const slot = slotOf(scope);
-      const add = (text: string, qty: number | null, image: string | null) => {
-        const t = collapseWs(scrub(text));
-        if (!t || versionWords.has(t.toLowerCase()) || /depending on (the )?selected/i.test(t)) return;
-        let mid = '';
-        let src = '';
-        if (image && boxImages < BOX_IMAGE_CAP) {
-          src = httpsOf(stripQuery(image));
-          mid = mediaIdOf('box', src);
-          boxImages++;
-        }
-        slot.items.push({ text: t.slice(0, 300), qty, source_media_id: mid, source_url: src });
-      };
-      if (b.t === 'box_item') add(b.text, b.qty, b.image);
+      if (b.t === 'box_item') take(b.text, b.qty, b.image, b.scopes);
       else if (b.t === 'list') for (const i of b.items) {
         const p = parseBoxItem(i);
-        add(p.text, p.qty, null);
+        take(p.text, p.qty, null);
       }
       else if (b.t === 'text') for (const line of b.text.split(/\n+/)) {
         const p = parseBoxItem(line);
-        if (p.text && p.text.length <= 120) add(p.text, p.qty, null);
-      }
+        if (p.text && p.text.length <= 120) take(p.text, p.qty, null);
       }
     }
   }
@@ -906,7 +989,9 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
         const items = b.items.map((i) => scrub(i)).filter(Boolean);
         if (items.length) parts.push(items.map((i) => `• ${i}`).join('\n'));
       } else if (b.t === 'table' && sec.kind !== 'specs') {
-        const rows = b.grid.rows.map((r) => r.map((c) => collapseWs(scrub(c))).join(' | ')).filter((r) => r.replace(/[\s|]/g, ''));
+        const rows = withoutMoneyColumns(b.grid.rows)
+          .map((r) => r.map((c) => collapseWs(scrub(c))).join(' | '))
+          .filter((r) => r.replace(/[\s|]/g, ''));
         if (rows.length) parts.push(rows.join('\n'));
       } else if (b.t === 'image') {
         const url = httpsOf(stripQuery(b.url));
@@ -943,7 +1028,7 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   const docSeen = new Set<string>();
   let usageOfficialUrl = '';
   const addDoc = (rawUrl: string, text: string) => {
-    const url = httpsOf(stripQuery(rawUrl.trim()));
+    const url = httpsOf(keptLinkUrl(rawUrl.trim()));
     const host = hostOf(url);
     if (!url.startsWith('https://') || !DOCUMENT_HOSTS.has(host)) return;
     const kind = host.endsWith('youtube.com') || host === 'youtu.be' ? 'video' : documentKindOf(text, url);
@@ -1018,11 +1103,11 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   // Source references.
   const sourceRefs: PayloadSourceRef[] = [];
   for (const g of model.groups) {
-    sourceRefs.push({ kind: 'group', source_id: g.sourceId, levonis_id: g.id, source_label: g.sourceLabel.slice(0, 200), binding_rule: '' });
-    for (const v of g.values) sourceRefs.push({ kind: 'value', source_id: v.sourceId, levonis_id: v.id, source_label: v.nameEn.slice(0, 200), binding_rule: '' });
+    sourceRefs.push({ kind: 'group', source_id: g.sourceId, levonis_id: g.id, source_label: g.sourceLabel.slice(0, 200), binding_rule: '', via_variant_id: '' });
+    for (const v of g.values) sourceRefs.push({ kind: 'value', source_id: v.sourceId, levonis_id: v.id, source_label: v.nameEn.slice(0, 200), binding_rule: '', via_variant_id: '' });
   }
-  for (const v of model.variants) sourceRefs.push({ kind: 'variant', source_id: v.sourceId, levonis_id: v.id, source_label: '', binding_rule: '' });
-  for (const r of media.rows) sourceRefs.push({ kind: 'image', source_id: r.resourceFileId, levonis_id: r.id, source_label: '', binding_rule: r.rule });
+  for (const v of model.variants) sourceRefs.push({ kind: 'variant', source_id: v.sourceId, levonis_id: v.id, source_label: '', binding_rule: '', via_variant_id: '' });
+  for (const r of media.rows) sourceRefs.push({ kind: 'image', source_id: r.resourceFileId, levonis_id: r.id, source_label: '', binding_rule: r.rule, via_variant_id: r.viaVariantId ?? '' });
 
   const payload: ImportPayload = {
     protocol: 2,
@@ -1072,6 +1157,7 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
       is_primary: r.isPrimary,
       option_value_id: r.optionValueId,
       variant_id: r.variantId,
+      via_variant_id: r.viaVariantId,
       binding_rule: r.rule,
       alt_en: r.alt.en,
       alt_ar: r.alt.ar,
@@ -1094,7 +1180,10 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
       target_label: r.targetLabel.slice(0, 200),
       state: r.state,
       evidence_kind: r.evidenceKind,
-      evidence_text: r.evidenceText,
+      // The evidence quotes the source's own sentence, which can carry store words around the fact it proves
+      // ("If you require a filament buffer, you can add it to your shopping cart below."): the relation stands,
+      // the refused words do not reach a customer (and so never refuse the whole payload).
+      evidence_text: scrubProse(r.evidenceText).kept,
     })),
     external_ids: externalIds,
     source_refs: sourceRefs,

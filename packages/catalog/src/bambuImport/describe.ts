@@ -27,7 +27,7 @@ import {
   type HtmlNode,
   type TableGrid,
 } from './html';
-import { absolutize, collapseWs, decodeEntities, decodeHandle, hostOf, stripQuery } from './normalize';
+import { absolutize, collapseWs, decodeEntities, decodeHandle, hostOf, keptLinkUrl } from './normalize';
 import { sectionKindOf, type SectionKind } from './registry/sections';
 
 export type Block =
@@ -376,8 +376,8 @@ function collectLinks(d: Described): void {
       seen.add(url0);
       return;
     }
-    const url = stripQuery(url0);
-    if (seen.has(url)) return;
+    const url = keptLinkUrl(url0);
+    if (!url || seen.has(url)) return;
     seen.add(url);
     if (STORE_HOST.test(host)) {
       const m = /\/products\/([^/?#]+)/.exec(url);

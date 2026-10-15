@@ -31,6 +31,13 @@ export interface ImageRow {
   rule: BindingRule;
   optionValueId: string | null;
   variantId: string | null;
+  /**
+   * A REPRESENTATIVE row's source variant: the variant whose hero the image
+   * is (§C.4 step 3). The row is bound to a value, but the picture shows that
+   * variant, so a selection that chose another value in any of its groups
+   * must not see it (R6; review 4, finding 3). Null on every other row.
+   */
+  viaVariantId: string | null;
   isPrimary: boolean;
   sortOrder: number;
   alt: Tri;
@@ -154,7 +161,7 @@ export function planMedia(inp: MediaInputs): MediaPlan {
 
   const rows: ImageRow[] = [];
   const valuesWithRow = new Set<string>();
-  const push = (g: SourceMedia, index: number, binding: Binding, rule: BindingRule, selection = '') => {
+  const push = (g: SourceMedia, index: number, binding: Binding, rule: BindingRule, selection = '', viaVariantId: string | null = null) => {
     const optionValueId = binding.kind === 'v' || binding.kind === 'r' ? binding.valueId : null;
     const variantId = binding.kind === 'x' ? binding.variantId : null;
     if (optionValueId && binding.kind === 'v') valuesWithRow.add(optionValueId);
@@ -167,6 +174,7 @@ export function planMedia(inp: MediaInputs): MediaPlan {
       rule,
       optionValueId,
       variantId,
+      viaVariantId,
       isPrimary: false,
       sortOrder: 0,
       alt: altText(inp.title, selection),
@@ -240,7 +248,7 @@ export function planMedia(inp: MediaInputs): MediaPlan {
       if (!galleryById.has(rid) && v.heroUrl && galleryUrls.has(v.heroUrl)) rid = galleryUrls.get(v.heroUrl)!;
       const hit = galleryById.get(canonicalId(rid));
       if (!hit) continue;
-      push(hit.g, hit.i, { kind: 'r', valueId: val.id }, 'representative', val.nameEn);
+      push(hit.g, hit.i, { kind: 'r', valueId: val.id }, 'representative', val.nameEn, v.id);
     }
   }
 
@@ -304,10 +312,17 @@ export type Selection = readonly string[];
  * a value of a group in which another value is selected; or to a variant
  * whose combination contains such a value; or to a value that forms no
  * variant at all with the selection (an impossible combination — the page
- * shows that value disabled, so its picture must not lead or linger).
+ * shows that value disabled, so its picture must not lead or linger); or it
+ * is a representative whose source variant (`viaVariantId`) contains such a
+ * value — its picture shows that variant, not merely the value it is bound
+ * to (review 4, finding 3: PLA Basic Orange + Refill showed Jade White).
  * Unbound rows never contradict.
  */
-export function contradicts(row: Pick<ImageRow, 'optionValueId' | 'variantId'>, model: OptionModel, selection: Selection): boolean {
+export function contradicts(
+  row: Pick<ImageRow, 'optionValueId' | 'variantId'> & { viaVariantId?: string | null },
+  model: OptionModel,
+  selection: Selection
+): boolean {
   if (!selection.length) return false;
   const groupOf = new Map<string, string>();
   for (const g of model.groups) for (const v of g.values) groupOf.set(v.id, g.id);
@@ -323,6 +338,10 @@ export function contradicts(row: Pick<ImageRow, 'optionValueId' | 'variantId'>, 
   if (row.variantId) {
     const v = model.variants.find((x) => x.id === row.variantId);
     return !!v && v.valueIds.some(clash);
+  }
+  if (row.viaVariantId) {
+    const via = model.variants.find((x) => x.id === row.viaVariantId);
+    if (via && via.valueIds.some(clash)) return true;
   }
   if (row.optionValueId) {
     if (clash(row.optionValueId)) return true;

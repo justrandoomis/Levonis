@@ -94,6 +94,26 @@ export function stripQuery(url: string): string {
   return cut < 0 ? u : u.slice(0, cut);
 }
 
+/**
+ * A link as the import keeps it: without its query and fragment — except a
+ * YouTube watch link, whose video id IS the query (`?v=`). That one becomes
+ * `https://www.youtube.com/watch?v=<id>`, and '' (no link) when it names no
+ * video (review 4, finding 11: obxidian-high-flow-hotend kept the bare
+ * https://www.youtube.com/watch). A tracker link is kept whole elsewhere.
+ */
+export function keptLinkUrl(url: string): string {
+  const u = url.trim();
+  const host = hostOf(absolutize(u));
+  if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+    const path = /^(?:https?:)?\/\/[^/?#]+(\/[^?#]*)?/i.exec(u)?.[1] ?? '';
+    if (path.replace(/\/+$/, '') === '/watch') {
+      const id = /[?&]v=([A-Za-z0-9_-]{6,20})(?:[&#]|$)/.exec(u)?.[1];
+      return id ? `https://www.youtube.com/watch?v=${id}` : '';
+    }
+  }
+  return stripQuery(u);
+}
+
 /** `//host/path` → `https://host/path`; anything else unchanged. */
 export function absolutize(url: string): string {
   const u = url.trim();

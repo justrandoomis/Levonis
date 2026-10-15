@@ -514,6 +514,63 @@ test('media collection reads relations and JSON, and never claims a vendor URL',
   assert.equal(owned.length, keys.size);
 });
 
+/**
+ * THE IMPORT'S MEDIA HOLDERS (0194/0195, review 4 finding 6). The catalogue
+ * import shares R2 objects by content hash across products, and two holders
+ * are new: an in-the-box item's picture inside `product_spec_values.value_list`
+ * and the staged media of an import item (`catalog_import_media.r2_key`), which
+ * may sit BLOCKED between /media and /write for days. Deleting product A must
+ * keep an object either one still names — and must collect A's own box
+ * pictures, or they are left orphaned in the bucket.
+ */
+test('an object another product shows in the box, or an import item has staged, survives; the product\'s own box picture goes', async () => {
+  const db = freshSchema();
+  const boxShared = 'products/import/witb-1111aaaa.webp';
+  const staged = 'products/import/gallery-2222bbbb.webp';
+  const ownBox = 'products/import/witb-3333cccc.webp';
+  buildFullProduct(db, 'p-a', 'product-a', boxShared);
+  // A's gallery JSON also names the staged object (the same image by content hash).
+  const aImages = JSON.parse((db.prepare("SELECT images FROM products WHERE id = 'p-a'").get() as { images: string }).images) as string[];
+  db.prepare("UPDATE products SET images = ? WHERE id = 'p-a'").run(JSON.stringify([...aImages, `/files/${staged}`]));
+  const spec = (id: string, productId: string, mediaKey: string) =>
+    insert(db, 'product_spec_values', {
+      id, product_id: productId, canonical_key: 'package.contents', group_key: 'contents', data_type: 'list',
+      value_list: JSON.stringify([{ text: 'Spool holder', qty: 1, media_key: mediaKey }]),
+      status: 'verified', confidence: 'official_page', source_kind: 'store_page',
+      source_ref: 'https://us.store.bambulab.com/products/x', retrieved_at: '2026-10-15T00:00:00Z',
+    });
+  spec('sv-a', 'p-a', ownBox);
+  buildFullProduct(db, 'p-b', 'product-b');
+  spec('sv-b', 'p-b', boxShared);
+  insert(db, 'catalog_import_media', {
+    run_id: 'cir_0123456789abcdef01234567', source_product_id: '999', source_media_id: 'r1', role: 'gallery',
+    source_url: 'https://store.bambulab.com/x.webp', status: 'stored', r2_key: staged,
+  });
+
+  const keys = await collectProductMediaKeys(sqlite(db), 'p-a');
+  assert.ok(keys.has(ownBox), "A's own in-the-box picture is one of its keys");
+  const { shared, owned } = await partitionSharedMedia(sqlite(db), 'p-a', keys);
+  assert.ok(shared.includes(boxShared), "B's in-the-box item still shows it");
+  assert.ok(shared.includes(staged), 'an import item has it staged');
+  assert.ok(owned.includes(ownBox) && !shared.includes(ownBox), "A's own box picture is A's alone");
+
+  const bucket = new FakeBucket();
+  for (const k of [boxShared, staged, ownBox]) bucket.put(k);
+  const env = { DB: sqlite(db) as never, BUCKET: bucket as never, R2_PUBLIC: bucket as never, R2_PRIVATE: bucket as never };
+  const result = await deleteProductPermanently(sqlite(db), 'p-a', { newId: () => `j-${Math.random()}` });
+  assert.equal(result.product_deleted, true);
+  await runMediaCleanup(env, result.media_jobs);
+  assert.ok(bucket.objects.has(boxShared), "B's box picture is still in the bucket");
+  assert.ok(bucket.objects.has(staged), 'the staged object is still in the bucket');
+  assert.ok(!bucket.objects.has(ownBox), "A's own box picture went with A");
+
+  // The orphan sweep reads the same holders: neither surviving object is an orphan.
+  const report = await scanProductOrphans(sqlite(db), bucket as never, { dryRun: true });
+  const orphanKeys = report.orphan_r2_objects.map((o) => o.key);
+  assert.ok(!orphanKeys.includes(boxShared), 'an in-the-box picture is not an orphan');
+  assert.ok(!orphanKeys.includes(staged), 'staged import media is not an orphan');
+});
+
 test('a blocked product is refused with a reason, and nothing is deleted', async () => {
   const db = freshSchema();
   buildFullProduct(db, 'p-pooled', 'product-pooled');

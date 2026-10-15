@@ -41,6 +41,17 @@ export const SPOOL_WORDS: ReadonlySet<string> = new Set(
 
 const WEIGHT_VALUE = /^\s*\d+(?:\.\d+)?\s*(?:kg|g)\s*$/i;
 const NOZZLE_VALUE = /\b\d(?:\.\d+)?\s*mm\b.*\b(?:steel|brass|hardened|stainless|tungsten|carbide|high[\s-]?flow|nozzle|hotend|copper)\b|\b(?:hardened|stainless)\s+steel\b.*\b\d(?:\.\d+)?\s*mm\b/i;
+/**
+ * A bare nozzle diameter ("0.4 mm"): accepted only under a NOZZLE label and
+ * only up to 1.2 mm, so a filament's 1.75 mm or a sheet's 0.2 mm thickness is
+ * never read as a nozzle (review 4, finding 8: obxidian-high-flow-hotend).
+ */
+const BARE_DIAMETER = /^\s*(\d*\.?\d+)\s*mm\s*$/i;
+const bareNozzleDiameter = (v: string) => {
+  const m = BARE_DIAMETER.exec(v);
+  const n = m ? Number(m[1]) : NaN;
+  return n > 0 && n <= 1.2;
+};
 
 export interface GroupInput {
   propertyKey: string;
@@ -68,6 +79,7 @@ export function classifyGroup(g: GroupInput): GroupClass {
   if (g.type === 4 || /^variant$|^version$|^model$/.test(key)) return hit('version');
   if (/^how many .*unit/.test(key) || /^units?$|^quantity$/.test(key)) return hit('units');
   if (/^(size|nozzle|nozzle size|nozzle diameter|diameter)$/.test(key) && values.length > 0 && values.every((v) => NOZZLE_VALUE.test(v))) return hit('nozzle');
+  if (/^(nozzle|nozzle size|nozzle diameter)$/.test(key) && values.length > 0 && values.every(bareNozzleDiameter)) return hit('nozzle');
   if (/^size$|^dimensions?$|^thickness$|^length$/.test(key)) return hit('size');
   if (/plate/.test(key)) return hit('plate_type');
   if (/^items?$/.test(key)) return hit('item');

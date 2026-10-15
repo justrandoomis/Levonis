@@ -65,7 +65,11 @@ CREATE TABLE IF NOT EXISTS product_option_source_refs (
   source_label TEXT NOT NULL DEFAULT '',
   binding_rule TEXT NOT NULL DEFAULT '' CHECK (binding_rule IN
     ('','general','value','value_set','variant','representative','content_duplicate','reviewed_override')),
+  -- A representative image row is bound to a value but shows the hero of this variant (§C.4 step 3); the page drops
+  -- the row when a selection chose another value of any of its groups (§G.3, R6). Set exactly on representatives.
+  via_variant_id TEXT NOT NULL DEFAULT '',
   import_run_id TEXT NOT NULL,
+  CHECK ((binding_rule = 'representative') = (via_variant_id <> '')),
   PRIMARY KEY (product_id, kind, source, source_id, levonis_id)
 );
 CREATE INDEX IF NOT EXISTS ix_posr_levonis ON product_option_source_refs(levonis_id);

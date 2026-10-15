@@ -11,7 +11,9 @@
 -- ux_cii_inflight one item of a run between DISCOVERED and a terminal state
 -- (BLOCKED and RETRYING count as in flight). trg_cii_transition admits only the
 -- edges of §B.5; trg_cii_stage_monotonic lets a stage be completed only by
--- leaving it; trg_cie_lease_fence aborts the whole batch of a stale executor.
+-- leaving it forward; trg_cii_insert lets a row be born only DISCOVERED and
+-- never be put back over one that has moved on; trg_cie_lease_fence aborts the
+-- whole batch of a stale executor.
 --
 -- THE GUARDS FIRE ONLY INSIDE AN IMPORT BATCH. They are armed by the row
 -- ops_guards(id = 'catalog-import-batch') that an import batch inserts first and
@@ -134,13 +136,37 @@ BEGIN
   );
 END;
 
--- A stage is completed only by leaving it: last_completed_stage can only become the state the item was in.
+-- A stage is completed only by leaving it FORWARD: last_completed_stage becomes the state the item was in, and
+-- only together with the edge to that stage's successor. Neither in place nor on the way to RETRYING or BLOCKED:
+-- a write that failed is not a completed write (the resume edge would skip it), and VERIFYING_LIVE recorded on a
+-- RETRYING item would leave it no resume edge at all while it keeps the run's one in-flight slot (review 4).
 CREATE TRIGGER IF NOT EXISTS trg_cii_stage_monotonic BEFORE UPDATE OF last_completed_stage ON catalog_import_items
 WHEN NEW.last_completed_stage IS NOT OLD.last_completed_stage
 BEGIN
   SELECT RAISE(ABORT, 'IMPORT_ILLEGAL_TRANSITION') WHERE NOT (
-       NEW.last_completed_stage = OLD.processing_state
+       (NEW.last_completed_stage = OLD.processing_state AND NEW.processing_state = CASE OLD.processing_state
+          WHEN 'EXTRACTING' THEN 'ENRICHING' WHEN 'ENRICHING' THEN 'VALIDATING' WHEN 'VALIDATING' THEN 'INGESTING_MEDIA'
+          WHEN 'INGESTING_MEDIA' THEN 'WRITING' WHEN 'WRITING' THEN 'PUBLISHING' WHEN 'PUBLISHING' THEN 'VERIFYING_LIVE'
+          WHEN 'VERIFYING_LIVE' THEN 'COMPLETE' ELSE '' END )
     OR (NEW.last_completed_stage = '' AND OLD.processing_state = 'COMPLETE' AND NEW.processing_state = 'DISCOVERED'));
+END;
+
+-- No INSERT enters the graph anywhere but at its start (review 4): a row is born DISCOVERED with no completed
+-- stage, in an open run, and is never put back over an item that has left DISCOVERED. That last term is what
+-- refuses a REPLACE, which deletes the old row and fires no UPDATE trigger; it looks at every key a REPLACE
+-- resolves on (the id, the source key, the queue position). /manifest's upsert (§A.3) therefore re-sends a row
+-- only while its item is new or still DISCOVERED — which is also the only case in which its DO UPDATE writes.
+CREATE TRIGGER IF NOT EXISTS trg_cii_insert BEFORE INSERT ON catalog_import_items
+BEGIN
+  SELECT RAISE(ABORT, 'IMPORT_RUN_NOT_OPEN') WHERE NOT EXISTS (
+    SELECT 1 FROM catalog_import_runs r WHERE r.id = NEW.run_id AND r.state IN ('open','running','blocked'));
+  SELECT RAISE(ABORT, 'IMPORT_ILLEGAL_TRANSITION') WHERE NEW.processing_state IS NOT 'DISCOVERED'
+    OR NEW.last_completed_stage IS NOT ''
+    OR EXISTS (SELECT 1 FROM catalog_import_items o
+                WHERE o.processing_state <> 'DISCOVERED'
+                  AND (o.id = NEW.id
+                       OR (o.run_id = NEW.run_id AND o.source = NEW.source AND o.source_product_id = NEW.source_product_id)
+                       OR (o.run_id = NEW.run_id AND o.queue_position = NEW.queue_position)));
 END;
 
 -- ---------------------------------------------------------------- 4. Events and the lease fence
@@ -365,50 +391,33 @@ CREATE TRIGGER IF NOT EXISTS trg_import_guard_procurement_selection_cost_default
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 
--- (b) Catalogue rows the import writes: money, stock and package columns stay at their defaults on a new row,
---     equal to the stored row on an upsert, and unchanged on an UPDATE.
-CREATE TRIGGER IF NOT EXISTS trg_import_guard_products_ins BEFORE INSERT ON products
+-- (b) Catalogue rows the import writes: money, stock and package columns stay at their defaults on a row the
+--     INSERT creates (AFTER INSERT: an upsert that resolves to DO UPDATE fires none, a REPLACE does) and
+--     unchanged on an UPDATE, the DO UPDATE of an upsert included.
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_products_ins AFTER INSERT ON products
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
- AND ((NOT EXISTS (SELECT 1 FROM products o WHERE o.id = NEW.id)
-       AND (NEW.price_iqd IS NOT 0
-            OR NEW.original_price_iqd IS NOT NULL
-            OR NEW.product_cost_iqd IS NOT NULL
-            OR NEW.prime_price_iqd IS NOT NULL
-            OR NEW.pro_price_iqd IS NOT NULL
-            OR COALESCE(NEW.direct_surcharge_iqd, 0) <> 0
-            OR NEW.membership_prices IS NOT '{}'
-            OR NEW.stock IS NOT NULL
-            OR NEW.stock_reserved IS NOT 0
-            OR NEW.low_stock_threshold IS NOT NULL
-            OR NEW.net_weight_g IS NOT NULL
-            OR NEW.width_mm IS NOT NULL
-            OR NEW.depth_mm IS NOT NULL
-            OR NEW.height_mm IS NOT NULL
-            OR NEW.package_weight_g IS NOT NULL
-            OR NEW.package_width_mm IS NOT NULL
-            OR NEW.package_depth_mm IS NOT NULL
-            OR NEW.package_height_mm IS NOT NULL))
-   OR EXISTS (SELECT 1 FROM products o WHERE o.id = NEW.id
-       AND (NEW.price_iqd IS NOT o.price_iqd
-            OR NEW.original_price_iqd IS NOT o.original_price_iqd
-            OR NEW.product_cost_iqd IS NOT o.product_cost_iqd
-            OR NEW.prime_price_iqd IS NOT o.prime_price_iqd
-            OR NEW.pro_price_iqd IS NOT o.pro_price_iqd
-            OR NEW.direct_surcharge_iqd IS NOT o.direct_surcharge_iqd
-            OR NEW.membership_prices IS NOT o.membership_prices
-            OR NEW.stock IS NOT o.stock
-            OR NEW.stock_reserved IS NOT o.stock_reserved
-            OR NEW.low_stock_threshold IS NOT o.low_stock_threshold
-            OR NEW.net_weight_g IS NOT o.net_weight_g
-            OR NEW.width_mm IS NOT o.width_mm
-            OR NEW.depth_mm IS NOT o.depth_mm
-            OR NEW.height_mm IS NOT o.height_mm
-            OR NEW.package_weight_g IS NOT o.package_weight_g
-            OR NEW.package_width_mm IS NOT o.package_width_mm
-            OR NEW.package_depth_mm IS NOT o.package_depth_mm
-            OR NEW.package_height_mm IS NOT o.package_height_mm)))
+ AND (NEW.price_iqd IS NOT 0
+      OR NEW.original_price_iqd IS NOT NULL
+      OR NEW.product_cost_iqd IS NOT NULL
+      OR NEW.prime_price_iqd IS NOT NULL
+      OR NEW.pro_price_iqd IS NOT NULL
+      OR COALESCE(NEW.direct_surcharge_iqd, 0) <> 0
+      OR NEW.membership_prices IS NOT '{}'
+      OR NEW.warranty_plans IS NOT '[]'
+      OR NEW.preorder_transports IS NOT '[]'
+      OR NEW.stock IS NOT NULL
+      OR NEW.stock_reserved IS NOT 0
+      OR NEW.low_stock_threshold IS NOT NULL
+      OR NEW.net_weight_g IS NOT NULL
+      OR NEW.width_mm IS NOT NULL
+      OR NEW.depth_mm IS NOT NULL
+      OR NEW.height_mm IS NOT NULL
+      OR NEW.package_weight_g IS NOT NULL
+      OR NEW.package_width_mm IS NOT NULL
+      OR NEW.package_depth_mm IS NOT NULL
+      OR NEW.package_height_mm IS NOT NULL)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
-CREATE TRIGGER IF NOT EXISTS trg_import_guard_products_upd BEFORE UPDATE OF price_iqd, original_price_iqd, product_cost_iqd, prime_price_iqd, pro_price_iqd, direct_surcharge_iqd, membership_prices, stock, stock_reserved, low_stock_threshold, net_weight_g, width_mm, depth_mm, height_mm, package_weight_g, package_width_mm, package_depth_mm, package_height_mm ON products
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_products_upd BEFORE UPDATE OF price_iqd, original_price_iqd, product_cost_iqd, prime_price_iqd, pro_price_iqd, direct_surcharge_iqd, membership_prices, warranty_plans, preorder_transports, stock, stock_reserved, low_stock_threshold, net_weight_g, width_mm, depth_mm, height_mm, package_weight_g, package_width_mm, package_depth_mm, package_height_mm ON products
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
  AND (NEW.price_iqd IS NOT OLD.price_iqd
       OR NEW.original_price_iqd IS NOT OLD.original_price_iqd
@@ -417,6 +426,8 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
       OR NEW.pro_price_iqd IS NOT OLD.pro_price_iqd
       OR NEW.direct_surcharge_iqd IS NOT OLD.direct_surcharge_iqd
       OR NEW.membership_prices IS NOT OLD.membership_prices
+      OR (SELECT group_concat(m, ',') FROM (SELECT COALESCE(json_extract(j.value, '$.fee_iqd'), json_extract(j.value, '$.price_iqd'), 0) || '|' || COALESCE(json_extract(j.value, '$.fee_percent'), '') || '|' || (json_extract(j.value, '$.active') IS NOT 0) AS m FROM json_each(CASE WHEN json_valid(NEW.warranty_plans) THEN NEW.warranty_plans ELSE '[]' END ) j WHERE j.type = 'object' ORDER BY m)) IS NOT (SELECT group_concat(m, ',') FROM (SELECT COALESCE(json_extract(j.value, '$.fee_iqd'), json_extract(j.value, '$.price_iqd'), 0) || '|' || COALESCE(json_extract(j.value, '$.fee_percent'), '') || '|' || (json_extract(j.value, '$.active') IS NOT 0) AS m FROM json_each(CASE WHEN json_valid(OLD.warranty_plans) THEN OLD.warranty_plans ELSE '[]' END ) j WHERE j.type = 'object' ORDER BY m))
+      OR (SELECT group_concat(m, ',') FROM (SELECT COALESCE(json_extract(j.value, '$.method'), '') || '|' || COALESCE(json_extract(j.value, '$.commission_iqd'), '') || '|' || (json_extract(j.value, '$.active') IS NOT 0) AS m FROM json_each(CASE WHEN json_valid(NEW.preorder_transports) THEN NEW.preorder_transports ELSE '[]' END ) j WHERE j.type = 'object' ORDER BY m)) IS NOT (SELECT group_concat(m, ',') FROM (SELECT COALESCE(json_extract(j.value, '$.method'), '') || '|' || COALESCE(json_extract(j.value, '$.commission_iqd'), '') || '|' || (json_extract(j.value, '$.active') IS NOT 0) AS m FROM json_each(CASE WHEN json_valid(OLD.preorder_transports) THEN OLD.preorder_transports ELSE '[]' END ) j WHERE j.type = 'object' ORDER BY m))
       OR NEW.stock IS NOT OLD.stock
       OR NEW.stock_reserved IS NOT OLD.stock_reserved
       OR NEW.low_stock_threshold IS NOT OLD.low_stock_threshold
@@ -429,48 +440,27 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
       OR NEW.package_depth_mm IS NOT OLD.package_depth_mm
       OR NEW.package_height_mm IS NOT OLD.package_height_mm)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
-CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_option_values_ins BEFORE INSERT ON product_option_values
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_option_values_ins AFTER INSERT ON product_option_values
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
- AND ((NOT EXISTS (SELECT 1 FROM product_option_values o WHERE o.id = NEW.id)
-       AND (NEW.regular_price_iqd IS NOT NULL
-            OR NEW.prime_price_iqd IS NOT NULL
-            OR NEW.pro_price_iqd IS NOT NULL
-            OR NEW.cost_iqd IS NOT NULL
-            OR NEW.regular_adjust_iqd IS NOT NULL
-            OR NEW.prime_adjust_iqd IS NOT NULL
-            OR NEW.pro_adjust_iqd IS NOT NULL
-            OR NEW.cost_adjust_iqd IS NOT NULL
-            OR NEW.stock IS NOT NULL
-            OR NEW.reserved IS NOT 0
-            OR NEW.low_stock_threshold IS NOT NULL
-            OR NEW.net_weight_g IS NOT NULL
-            OR NEW.width_mm IS NOT NULL
-            OR NEW.depth_mm IS NOT NULL
-            OR NEW.height_mm IS NOT NULL
-            OR NEW.package_weight_g IS NOT NULL
-            OR NEW.package_width_mm IS NOT NULL
-            OR NEW.package_depth_mm IS NOT NULL
-            OR NEW.package_height_mm IS NOT NULL))
-   OR EXISTS (SELECT 1 FROM product_option_values o WHERE o.id = NEW.id
-       AND (NEW.regular_price_iqd IS NOT o.regular_price_iqd
-            OR NEW.prime_price_iqd IS NOT o.prime_price_iqd
-            OR NEW.pro_price_iqd IS NOT o.pro_price_iqd
-            OR NEW.cost_iqd IS NOT o.cost_iqd
-            OR NEW.regular_adjust_iqd IS NOT o.regular_adjust_iqd
-            OR NEW.prime_adjust_iqd IS NOT o.prime_adjust_iqd
-            OR NEW.pro_adjust_iqd IS NOT o.pro_adjust_iqd
-            OR NEW.cost_adjust_iqd IS NOT o.cost_adjust_iqd
-            OR NEW.stock IS NOT o.stock
-            OR NEW.reserved IS NOT o.reserved
-            OR NEW.low_stock_threshold IS NOT o.low_stock_threshold
-            OR NEW.net_weight_g IS NOT o.net_weight_g
-            OR NEW.width_mm IS NOT o.width_mm
-            OR NEW.depth_mm IS NOT o.depth_mm
-            OR NEW.height_mm IS NOT o.height_mm
-            OR NEW.package_weight_g IS NOT o.package_weight_g
-            OR NEW.package_width_mm IS NOT o.package_width_mm
-            OR NEW.package_depth_mm IS NOT o.package_depth_mm
-            OR NEW.package_height_mm IS NOT o.package_height_mm)))
+ AND (NEW.regular_price_iqd IS NOT NULL
+      OR NEW.prime_price_iqd IS NOT NULL
+      OR NEW.pro_price_iqd IS NOT NULL
+      OR NEW.cost_iqd IS NOT NULL
+      OR NEW.regular_adjust_iqd IS NOT NULL
+      OR NEW.prime_adjust_iqd IS NOT NULL
+      OR NEW.pro_adjust_iqd IS NOT NULL
+      OR NEW.cost_adjust_iqd IS NOT NULL
+      OR NEW.stock IS NOT NULL
+      OR NEW.reserved IS NOT 0
+      OR NEW.low_stock_threshold IS NOT NULL
+      OR NEW.net_weight_g IS NOT NULL
+      OR NEW.width_mm IS NOT NULL
+      OR NEW.depth_mm IS NOT NULL
+      OR NEW.height_mm IS NOT NULL
+      OR NEW.package_weight_g IS NOT NULL
+      OR NEW.package_width_mm IS NOT NULL
+      OR NEW.package_depth_mm IS NOT NULL
+      OR NEW.package_height_mm IS NOT NULL)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_option_values_upd BEFORE UPDATE OF regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd, stock, reserved, low_stock_threshold, net_weight_g, width_mm, depth_mm, height_mm, package_weight_g, package_width_mm, package_depth_mm, package_height_mm ON product_option_values
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
@@ -494,40 +484,23 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
       OR NEW.package_depth_mm IS NOT OLD.package_depth_mm
       OR NEW.package_height_mm IS NOT OLD.package_height_mm)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
-CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_variants_ins BEFORE INSERT ON product_variants
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_variants_ins AFTER INSERT ON product_variants
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
- AND ((NOT EXISTS (SELECT 1 FROM product_variants o WHERE o.id = NEW.id)
-       AND (NEW.regular_price_iqd IS NOT NULL
-            OR NEW.prime_price_iqd IS NOT NULL
-            OR NEW.pro_price_iqd IS NOT NULL
-            OR NEW.cost_iqd IS NOT NULL
-            OR NEW.stock IS NOT NULL
-            OR NEW.reserved IS NOT 0
-            OR NEW.low_stock_threshold IS NOT NULL
-            OR NEW.net_weight_g IS NOT NULL
-            OR NEW.width_mm IS NOT NULL
-            OR NEW.depth_mm IS NOT NULL
-            OR NEW.height_mm IS NOT NULL
-            OR NEW.package_weight_g IS NOT NULL
-            OR NEW.package_width_mm IS NOT NULL
-            OR NEW.package_depth_mm IS NOT NULL
-            OR NEW.package_height_mm IS NOT NULL))
-   OR EXISTS (SELECT 1 FROM product_variants o WHERE o.id = NEW.id
-       AND (NEW.regular_price_iqd IS NOT o.regular_price_iqd
-            OR NEW.prime_price_iqd IS NOT o.prime_price_iqd
-            OR NEW.pro_price_iqd IS NOT o.pro_price_iqd
-            OR NEW.cost_iqd IS NOT o.cost_iqd
-            OR NEW.stock IS NOT o.stock
-            OR NEW.reserved IS NOT o.reserved
-            OR NEW.low_stock_threshold IS NOT o.low_stock_threshold
-            OR NEW.net_weight_g IS NOT o.net_weight_g
-            OR NEW.width_mm IS NOT o.width_mm
-            OR NEW.depth_mm IS NOT o.depth_mm
-            OR NEW.height_mm IS NOT o.height_mm
-            OR NEW.package_weight_g IS NOT o.package_weight_g
-            OR NEW.package_width_mm IS NOT o.package_width_mm
-            OR NEW.package_depth_mm IS NOT o.package_depth_mm
-            OR NEW.package_height_mm IS NOT o.package_height_mm)))
+ AND (NEW.regular_price_iqd IS NOT NULL
+      OR NEW.prime_price_iqd IS NOT NULL
+      OR NEW.pro_price_iqd IS NOT NULL
+      OR NEW.cost_iqd IS NOT NULL
+      OR NEW.stock IS NOT NULL
+      OR NEW.reserved IS NOT 0
+      OR NEW.low_stock_threshold IS NOT NULL
+      OR NEW.net_weight_g IS NOT NULL
+      OR NEW.width_mm IS NOT NULL
+      OR NEW.depth_mm IS NOT NULL
+      OR NEW.height_mm IS NOT NULL
+      OR NEW.package_weight_g IS NOT NULL
+      OR NEW.package_width_mm IS NOT NULL
+      OR NEW.package_depth_mm IS NOT NULL
+      OR NEW.package_height_mm IS NOT NULL)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_variants_upd BEFORE UPDATE OF regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, stock, reserved, low_stock_threshold, net_weight_g, width_mm, depth_mm, height_mm, package_weight_g, package_width_mm, package_depth_mm, package_height_mm ON product_variants
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
@@ -547,48 +520,27 @@ WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
       OR NEW.package_depth_mm IS NOT OLD.package_depth_mm
       OR NEW.package_height_mm IS NOT OLD.package_height_mm)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
-CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_colors_ins BEFORE INSERT ON product_colors
+CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_colors_ins AFTER INSERT ON product_colors
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')
- AND ((NOT EXISTS (SELECT 1 FROM product_colors o WHERE o.id = NEW.id)
-       AND (NEW.regular_price_iqd IS NOT NULL
-            OR NEW.prime_price_iqd IS NOT NULL
-            OR NEW.pro_price_iqd IS NOT NULL
-            OR NEW.cost_iqd IS NOT NULL
-            OR NEW.regular_adjust_iqd IS NOT NULL
-            OR NEW.prime_adjust_iqd IS NOT NULL
-            OR NEW.pro_adjust_iqd IS NOT NULL
-            OR NEW.cost_adjust_iqd IS NOT NULL
-            OR NEW.stock IS NOT NULL
-            OR NEW.reserved IS NOT 0
-            OR NEW.low_stock_threshold IS NOT NULL
-            OR NEW.net_weight_g IS NOT NULL
-            OR NEW.width_mm IS NOT NULL
-            OR NEW.depth_mm IS NOT NULL
-            OR NEW.height_mm IS NOT NULL
-            OR NEW.package_weight_g IS NOT NULL
-            OR NEW.package_width_mm IS NOT NULL
-            OR NEW.package_depth_mm IS NOT NULL
-            OR NEW.package_height_mm IS NOT NULL))
-   OR EXISTS (SELECT 1 FROM product_colors o WHERE o.id = NEW.id
-       AND (NEW.regular_price_iqd IS NOT o.regular_price_iqd
-            OR NEW.prime_price_iqd IS NOT o.prime_price_iqd
-            OR NEW.pro_price_iqd IS NOT o.pro_price_iqd
-            OR NEW.cost_iqd IS NOT o.cost_iqd
-            OR NEW.regular_adjust_iqd IS NOT o.regular_adjust_iqd
-            OR NEW.prime_adjust_iqd IS NOT o.prime_adjust_iqd
-            OR NEW.pro_adjust_iqd IS NOT o.pro_adjust_iqd
-            OR NEW.cost_adjust_iqd IS NOT o.cost_adjust_iqd
-            OR NEW.stock IS NOT o.stock
-            OR NEW.reserved IS NOT o.reserved
-            OR NEW.low_stock_threshold IS NOT o.low_stock_threshold
-            OR NEW.net_weight_g IS NOT o.net_weight_g
-            OR NEW.width_mm IS NOT o.width_mm
-            OR NEW.depth_mm IS NOT o.depth_mm
-            OR NEW.height_mm IS NOT o.height_mm
-            OR NEW.package_weight_g IS NOT o.package_weight_g
-            OR NEW.package_width_mm IS NOT o.package_width_mm
-            OR NEW.package_depth_mm IS NOT o.package_depth_mm
-            OR NEW.package_height_mm IS NOT o.package_height_mm)))
+ AND (NEW.regular_price_iqd IS NOT NULL
+      OR NEW.prime_price_iqd IS NOT NULL
+      OR NEW.pro_price_iqd IS NOT NULL
+      OR NEW.cost_iqd IS NOT NULL
+      OR NEW.regular_adjust_iqd IS NOT NULL
+      OR NEW.prime_adjust_iqd IS NOT NULL
+      OR NEW.pro_adjust_iqd IS NOT NULL
+      OR NEW.cost_adjust_iqd IS NOT NULL
+      OR NEW.stock IS NOT NULL
+      OR NEW.reserved IS NOT 0
+      OR NEW.low_stock_threshold IS NOT NULL
+      OR NEW.net_weight_g IS NOT NULL
+      OR NEW.width_mm IS NOT NULL
+      OR NEW.depth_mm IS NOT NULL
+      OR NEW.height_mm IS NOT NULL
+      OR NEW.package_weight_g IS NOT NULL
+      OR NEW.package_width_mm IS NOT NULL
+      OR NEW.package_depth_mm IS NOT NULL
+      OR NEW.package_height_mm IS NOT NULL)
 BEGIN SELECT RAISE(ABORT, 'IMPORT_FINANCIAL_WRITE_REFUSED'); END;
 CREATE TRIGGER IF NOT EXISTS trg_import_guard_product_colors_upd BEFORE UPDATE OF regular_price_iqd, prime_price_iqd, pro_price_iqd, cost_iqd, regular_adjust_iqd, prime_adjust_iqd, pro_adjust_iqd, cost_adjust_iqd, stock, reserved, low_stock_threshold, net_weight_g, width_mm, depth_mm, height_mm, package_weight_g, package_width_mm, package_depth_mm, package_height_mm ON product_colors
 WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = 'catalog-import-batch')

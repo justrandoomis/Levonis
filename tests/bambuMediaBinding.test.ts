@@ -135,6 +135,51 @@ test('AMS 2 Pro: the 13 variants on gallery #0 are bound to that one image; the 
   for (const v of bundles) assert.equal(gallery(p, v.valueIds.map(nameOf))[0], p.file(v.heroResourceFileId!));
 });
 
+/**
+ * R6 FOR EVERY FULL SELECTION (review 4, finding 3). A representative row is
+ * bound to a value but shows its source variant's hero; for every real
+ * variant of every fixture, no image left in the gallery may be the hero ONLY
+ * of variants that clash with the selection. PLA Basic Orange + Refill + 1 kg
+ * used to show the Jade White picture (the Refill representative).
+ */
+test('every fixture, every variant: no visible image is the hero only of contradicting variants', () => {
+  let selections = 0;
+  for (const h of SAMPLE_HANDLES) {
+    const p = plan(h);
+    const heroes = new Map<string, Set<string>>();
+    for (const v of p.model.variants) {
+      if (!v.heroResourceFileId) continue;
+      heroes.set(v.heroResourceFileId, new Set([...(heroes.get(v.heroResourceFileId) ?? []), v.id]));
+    }
+    // A collapsed copy shows the same picture as its canonical row.
+    for (const [copy, kept] of p.media.report.collapsed) {
+      const set = heroes.get(kept) ?? new Set<string>();
+      for (const id of heroes.get(copy) ?? []) set.add(id);
+      heroes.set(kept, set);
+    }
+    for (const v of p.model.variants) {
+      selections++;
+      const visible = p.media.rows.filter((r) => !contradicts(r, p.model, v.valueIds));
+      const wrong = visible.filter((r) => {
+        const of = heroes.get(r.resourceFileId);
+        return !!of && of.size > 0 && !of.has(v.id);
+      });
+      const names = v.valueIds.map((id) => p.model.groups.flatMap((g) => g.values).find((x) => x.id === id)!.nameEn).join(' + ');
+      assert.deepEqual(wrong.map((r) => `${p.file(r.resourceFileId)} (${r.rule})`), [], `${h}: ${names}`);
+    }
+  }
+  assert.ok(selections >= 80, `${selections} full selections`);
+  // The case the review named, by file.
+  const pla = plan('pla-basic-filament');
+  const orange = gallery(pla, ['Orange (10300)', 'Refill', '1kg']);
+  assert.ok(!orange.some((f) => /White/i.test(f)), orange.join(','));
+  // A representative still leads a PARTIAL selection: the store's own picture for that choice (§C.4 step 3).
+  const h2d = plan('h2d');
+  assert.equal(gallery(h2d, ['H2D AMS Combo'])[0], 'H2DC');
+  assert.ok(!gallery(h2d, ['H2D AMS Combo', 'Dual AMS 2 Pro Bundle']).includes('H2DC'), 'the Standard picture is gone once another bundle is chosen');
+  for (const r of h2d.media.rows) assert.equal(r.viaVariantId !== null, r.rule === 'representative', `${r.rule}: viaVariantId`);
+});
+
 test('every fixture: one primary on gallery index 0, deterministic pi_ ids, one binding per row, alt text in three languages', () => {
   for (const h of SAMPLE_HANDLES) {
     const p = plan(h);

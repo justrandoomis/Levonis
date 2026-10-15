@@ -75,12 +75,25 @@ export const PROTECTED_TABLES: readonly ProtectedTable[] = [
  *   zero         — must be 0 (a NOT NULL DEFAULT 0 counter or price)
  *   zero_or_null — NULL or 0
  *   empty_object — the JSON default '{}'
+ *   empty_array  — the JSON default '[]'
  */
-export type GuardedDefault = 'null' | 'zero' | 'zero_or_null' | 'empty_object';
+export type GuardedDefault = 'null' | 'zero' | 'zero_or_null' | 'empty_object' | 'empty_array';
 
 export interface GuardedColumn {
   name: string;
   insertDefault: GuardedDefault;
+  /**
+   * A JSON ARRAY WHOSE ELEMENTS CARRY MONEY (an extended-warranty fee, a
+   * pre-order route commission). An UPDATE is refused when the multiset of the
+   * elements' money tuples changes, not when the text does: the save path
+   * re-serialises these columns on every save (a legacy `{name, price_iqd}`
+   * plan is upgraded, a missing id is minted, keys are reordered), and that
+   * moves no fee. Each entry is one SQL expression over `j.value`, the element
+   * (`json_each` aliased `j`, objects only), matching what the save path's
+   * upgrade reads (worker/lib/productModel.ts upgradeWarranty /
+   * upgradeTransports). Absent: the column is compared as a whole value.
+   */
+  jsonElementMoney?: readonly string[];
 }
 
 export interface GuardedRowTable {
@@ -126,9 +139,22 @@ const ROW_STOCK: readonly GuardedColumn[] = [
 
 /**
  * Catalogue rows the import DOES write, whose money, stock and package columns
- * it may not set. An INSERT of a new row must leave every one at its default;
- * an INSERT that resolves to an existing row (an upsert, or a REPLACE) must not
- * differ from the stored value; an UPDATE must not change any of them.
+ * it may not set. A row the INSERT physically creates (a new row, or the row a
+ * REPLACE puts back) must leave every one at its default — an AFTER INSERT
+ * trigger, because an upsert that resolves to DO UPDATE fires no AFTER INSERT;
+ * an UPDATE — the DO UPDATE of an upsert included — must not change any of
+ * them.
+ *
+ * NOT a BEFORE INSERT comparison with the stored row (review 4, finding 1):
+ * the planner's upserts leave `reserved` out of their column list, bind a
+ * variant's cost as NULL without cost write and bind NULL for an omitted
+ * dimension, while their DO UPDATE keeps all three, so the INSERT's NEW row
+ * differs from the stored one on every merge that changes nothing. The one
+ * write that judgement used to catch on top — a REPLACE that resets an
+ * existing row to the defaults — is refused differently: no write path names
+ * these tables with REPLACE (tests/catalogImportGuards.test.ts reads the
+ * sources), and §E.4's per-write fingerprint compares every money, stock,
+ * reserved and package column before and after inside the same batch.
  *
  * `product_colors` is guarded although the spec names three tables: a create
  * sends no colours, but a merge re-upserts an existing product's colour rows
@@ -146,6 +172,28 @@ export const GUARDED_ROW_TABLES: readonly GuardedRowTable[] = [
       { name: 'pro_price_iqd', insertDefault: 'null' },
       { name: 'direct_surcharge_iqd', insertDefault: 'zero_or_null' },
       { name: 'membership_prices', insertDefault: 'empty_object' },
+      // The price of an extended warranty: a fixed fee or a percentage per plan
+      // (a legacy plan's `price_iqd` is the same fee). §E.2: never changed.
+      {
+        name: 'warranty_plans',
+        insertDefault: 'empty_array',
+        jsonElementMoney: [
+          "COALESCE(json_extract(j.value, '$.fee_iqd'), json_extract(j.value, '$.price_iqd'), 0)",
+          "COALESCE(json_extract(j.value, '$.fee_percent'), '')",
+          "(json_extract(j.value, '$.active') IS NOT 0)",
+        ],
+      },
+      // The commission per pre-order route (0073's precedence reads it before
+      // the option cell's own surcharge).
+      {
+        name: 'preorder_transports',
+        insertDefault: 'empty_array',
+        jsonElementMoney: [
+          "COALESCE(json_extract(j.value, '$.method'), '')",
+          "COALESCE(json_extract(j.value, '$.commission_iqd'), '')",
+          "(json_extract(j.value, '$.active') IS NOT 0)",
+        ],
+      },
     ],
     stock: [
       { name: 'stock', insertDefault: 'null' },

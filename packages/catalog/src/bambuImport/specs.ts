@@ -745,7 +745,8 @@ function rowsOfOptions(ctx: SpecContext): SpecRow[] {
         const m = /(\d(?:\.\d+)?)\s*mm\s*(.*)$/i.exec(v.nameEn);
         if (m) {
           rows.push(baseRow(ctx, 'nozzle.diameter', { ...scope, dataType: 'number', valueNum: Number(m[1]), unit: 'mm', valueText: `${m[1]} mm`, status: 'verified' }));
-          const material = collapseWs(m[2].replace(/\b(nozzle|hotend)\b/gi, ''));
+          // "(Standard Included)" (bambu-hotend-x1c) says what ships, not what the nozzle is made of.
+          const material = collapseWs(m[2].replace(/\([^)]*\)/g, ' ').replace(/\b(nozzle|hotend)\b/gi, ''));
           if (material) rows.push(baseRow(ctx, 'nozzle.material', { ...scope, dataType: 'string', valueText: material, status: 'verified' }));
         }
       }

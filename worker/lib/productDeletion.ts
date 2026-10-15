@@ -599,6 +599,29 @@ export const MEDIA_COLUMNS: Array<{ table: string; column: string; by: string }>
 ];
 
 /**
+ * JSON COLUMNS ON A PRODUCT'S OWN CHILD ROWS THAT NAME MEDIA (0194). An
+ * in-the-box item `{text, qty, media_key}` keeps its picture inside the list
+ * spec's `value_list`. The catalogue import shares objects by content hash
+ * across products (spec §B.8, §C.4), so the same key can be product A's box
+ * picture and product B's gallery image: collected for the product being
+ * deleted, and matched by substring — like MEDIA_JSON_COLUMNS — for the others.
+ */
+export const MEDIA_JSON_ROW_COLUMNS: Array<{ table: string; column: string; by: string }> = [
+  { table: 'product_spec_values', column: 'value_list', by: 'product_id' },
+];
+
+/**
+ * HOLDERS THAT BELONG TO NO PRODUCT YET (0195). An import item can sit BLOCKED
+ * for days between /media and /write; its ingested objects are named in
+ * `catalog_import_media.r2_key` and nowhere else, and one of them may already be
+ * the same object (by content hash) as a gallery image of the product being
+ * deleted. Any row here keeps the object; never collected by a product delete.
+ */
+export const MEDIA_STAGED_COLUMNS: Array<{ table: string; column: string }> = [
+  { table: 'catalog_import_media', column: 'r2_key' },
+];
+
+/**
  * JSON/text columns on `products` that can contain media URLs or keys.
  *
  * `options` and `colors` are here because the LEGACY embedded shape stored the
@@ -782,6 +805,25 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
     }
   }
 
+  for (const source of MEDIA_JSON_ROW_COLUMNS) {
+    const cols = await columnsOf(db, source.table);
+    if (!cols.has(source.column) || !cols.has(source.by)) continue;
+    const rows = await db
+      .prepare(`SELECT "${source.column}" AS v FROM "${source.table}" WHERE "${source.by}" = ?`)
+      .bind(productId)
+      .all<{ v: unknown }>();
+    for (const row of rows.results ?? []) {
+      if (typeof row.v !== 'string' || !row.v.trim()) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(row.v);
+      } catch {
+        parsed = row.v;
+      }
+      for (const k of mediaKeysInJson(parsed)) keys.add(k);
+    }
+  }
+
   const productCols = await columnsOf(db, 'products');
   const jsonCols = MEDIA_JSON_COLUMNS.filter((c) => productCols.has(c));
   if (jsonCols.length) {
@@ -814,7 +856,10 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
  * stored twice, and deleting product A must not blank product B's photo. Each
  * candidate is asked of every place a product can hold a reference, EXCLUDING
  * the product being deleted — if anything answers, the R2 object stays and only
- * the relation goes.
+ * the relation goes. That includes another product's in-the-box picture
+ * (MEDIA_JSON_ROW_COLUMNS) and an import item's staged media
+ * (MEDIA_STAGED_COLUMNS), which belongs to no product yet: `runMediaCleanup`
+ * deletes whatever this calls owned without asking again.
  *
  * The JSON columns are matched by SUBSTRING rather than parsed, deliberately: a
  * false POSITIVE here costs one orphaned file, which the scanner reports and an
@@ -880,6 +925,21 @@ export async function partitionSharedMedia(
         `SELECT 1 AS hit FROM products WHERE id <> ?1 AND (` +
         jsonCols.map((c) => `instr(lower("${c}"), lower(?2)) > 0`).join(' OR ') +
         `) LIMIT 1`,
+    });
+  }
+  for (const source of MEDIA_JSON_ROW_COLUMNS) {
+    const cols = await columnsOf(db, source.table);
+    if (!cols.has(source.column) || !cols.has(source.by)) continue;
+    probes.push({
+      sql: `SELECT 1 AS hit FROM "${source.table}" WHERE "${source.by}" <> ?1 AND instr(lower("${source.column}"), lower(?2)) > 0 LIMIT 1`,
+    });
+  }
+  for (const source of MEDIA_STAGED_COLUMNS) {
+    const cols = await columnsOf(db, source.table);
+    if (!cols.has(source.column)) continue;
+    // ?1 is bound and unused: every probe takes (productId, key).
+    probes.push({
+      sql: `SELECT 1 AS hit FROM "${source.table}" WHERE ?1 IS NOT NULL AND ("${source.column}" = ?2 OR "${source.column}" = '/files/' || ?2) LIMIT 1`,
     });
   }
 
@@ -1561,6 +1621,30 @@ export async function scanProductOrphans(
       // sets, so a junk string on one side and not the other reads as an orphan
       // and gets proposed for deletion.
       if (key && isSafeMediaKey(key)) referenced.add(key);
+    }
+  }
+  // The import's holders (0194/0195): an object named only by an in-the-box
+  // item, or only by an import item's staged media, is not an orphan.
+  for (const source of [...MEDIA_JSON_ROW_COLUMNS, ...MEDIA_STAGED_COLUMNS]) {
+    const cols = await columnsOf(db, source.table);
+    if (!cols.has(source.column)) continue;
+    const rows = await db
+      .prepare(`SELECT "${source.column}" AS v FROM "${source.table}" WHERE "${source.column}" IS NOT NULL AND "${source.column}" <> ''`)
+      .all<{ v: unknown }>();
+    for (const row of rows.results ?? []) {
+      if (typeof row.v !== 'string') continue;
+      let parsed: unknown = row.v;
+      if ('by' in source) {
+        try {
+          parsed = JSON.parse(row.v);
+        } catch {
+          parsed = row.v;
+        }
+        for (const k of mediaKeysInJson(parsed)) referenced.add(k);
+      } else {
+        const key = mediaKeyFromRef(row.v);
+        if (key && isSafeMediaKey(key)) referenced.add(key);
+      }
     }
   }
   const productCols = await columnsOf(db, 'products');

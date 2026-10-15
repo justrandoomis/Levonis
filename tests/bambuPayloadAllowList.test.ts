@@ -125,6 +125,13 @@ test('customer-facing text classed money, promotion, shipping policy or warranty
   assert.deepEqual([r?.reason, r?.textClass], ['refused_text', 'promotion']);
   r = at((p) => (p.content_blocks[0].body_en = 'Packaging may vary, shipping costs are the same for all orders placed at the same time.'));
   assert.deepEqual([r?.reason, r?.textClass], ['refused_text', 'shipping_policy']);
+  // Review 4, finding 2: the validator uses the same classifier, so a corpus promotion is refused too.
+  r = at((p) => (p.content_blocks[0].body_en = 'Best of all, this all-in-one bundle offers a 30% savings compared to individual sheets.'));
+  assert.deepEqual([r?.reason, r?.textClass], ['refused_text', 'promotion']);
+  r = at((p) => (p.product.short_description_en = 'Precise, easy to use, unbeatable price.'));
+  assert.deepEqual([r?.path, r?.textClass], ['$.product.short_description_en', 'money']);
+  r = at((p) => (p.content_blocks[0].body_en = 'PETG HF is discontinued and will not be restocked once sold out.'));
+  assert.deepEqual([r?.reason, r?.textClass], ['refused_text', 'shipping_policy']);
   const publicRow = base.specs.findIndex((s) => s.visibility === 'public');
   r = at((p) => (p.specs[publicRow].value_text = '2-year warranty & 30-day returns.'));
   assert.deepEqual([r?.path, r?.textClass], [`$.specs[${publicRow}].value_text`, 'warranty']);
@@ -167,7 +174,14 @@ function liveAnswers(p: ImportPayload, media: readonly MediaResult[]): { site: S
     site: {
       option_groups: [...p.groups].reverse().map((g) => ({ id: g.id, sort: g.sort, default_value_id: g.default_value_id, values: [...g.values].reverse().map((v) => ({ id: v.id, sort: v.sort })) })),
       variants: [...p.variants].reverse().map((v) => ({ id: v.id, combo_key: v.combo_key })),
-      images: [...p.images].reverse().map((i) => ({ id: i.id, url: url.get(i.source_media_id) ?? '', is_primary: i.is_primary, option_value_id: i.option_value_id, variant_id: i.variant_id })),
+      images: [...p.images].reverse().map((i) => ({
+        id: i.id,
+        url: url.get(i.source_media_id) ?? '',
+        is_primary: i.is_primary,
+        option_value_id: i.option_value_id,
+        variant_id: i.variant_id,
+        via_variant_id: i.via_variant_id,
+      })),
     },
     knowledge: {
       swatches: p.swatches.map((s) => ({ option_value_id: s.value_id, url: url.get(s.source_media_id) ?? '' })),
@@ -190,6 +204,14 @@ test('fingerprint: the expected value from the payload equals the live answers; 
     bound.option_value_id = null;
     bound.variant_id = null;
     assert.notEqual(projectionFingerprint(projectionFromSite(moved, knowledge)), expected, `${h}: an unbound image must change the fingerprint`);
+    // A representative row answered without its source variant would show another value's picture (R6, §G.3).
+    const representative = site.images.find((i) => i.via_variant_id);
+    if (h !== 'bambu-textured-pei-plate') assert.ok(representative, `${h}: a representative row carries its source variant`);
+    if (representative) {
+      const lost = clone(site);
+      lost.images.find((i) => i.id === representative.id)!.via_variant_id = null;
+      assert.notEqual(projectionFingerprint(projectionFromSite(lost, knowledge)), expected, `${h}: a lost source variant must change the fingerprint`);
+    }
     const extra = clone(knowledge);
     extra.specs.push({ key: 'x.extra', scope_kind: 'product', scope_id: '', region: '', status: 'unverified', unit: '', value_num: null });
     assert.notEqual(projectionFingerprint(projectionFromSite(site, extra)), expected);

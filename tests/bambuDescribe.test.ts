@@ -121,3 +121,139 @@ test('box item counts: "*2" after a word, "x4", "(x4)", "2x …" — never a dim
   assert.deepEqual(parseBoxItem('PTFE Tube x 2'), { text: 'PTFE Tube', qty: 2 });
   assert.deepEqual(parseBoxItem('M3*21'), { text: 'M3*21', qty: null });
 });
+
+/**
+ * DOCUMENT KINDS (review 4, finding 9): a safety data sheet is one whatever
+ * its spelling — `_MSDS` in a file name ('_' is a word character, so `\b`
+ * never matched before the m) or the plural "Safety Data Sheets". The five
+ * corpus documents that read as a plain 'Link' are now SDS.
+ */
+test('document kinds: _MSDS file names and "Safety Data Sheets" are SDS; a TDS file name the same way', async () => {
+  const { documentKindOf } = await import('../packages/catalog/src/bambuImport/registry/documents');
+  const corpus: Array<[string, string]> = [
+    ['Material Safety Data Sheets', 'https://store.bblcdn.com/s7/default/a/Glue_Stick_MSDS.pdf'], // glue-stick-for-build-plate
+    ['', 'https://store.bblcdn.com/s7/default/b/Liquid_Glue_MSDS.pdf'], // liquid-glue-for-build-plate
+    ['', 'https://store.bblcdn.com/s7/default/c/LGL001_MSDS.pdf'],
+    ['', 'https://store.bblcdn.com/s7/default/d/Bambu_Lab_FAZ030_MSDS.pdf'], // lubricant-grease
+    ['', 'https://store.bblcdn.com/s7/default/e/Lubricant_Oil_MSDS.pdf'], // lubricant-oil
+    ['Safety Data Sheet', 'https://store.bblcdn.com/x.pdf'],
+    ['SDS', 'https://store.bblcdn.com/x.pdf'],
+  ];
+  for (const [text, url] of corpus) assert.equal(documentKindOf(text, url), 'sds', `${text} ${url}`);
+  assert.equal(documentKindOf('', 'https://store.bblcdn.com/PLA_Basic_TDS_V2.pdf'), 'tds');
+  assert.equal(documentKindOf('Technical Data Sheets', 'https://store.bblcdn.com/x.pdf'), 'tds');
+  // Near misses stay what they are.
+  assert.equal(documentKindOf('Assembly guide', 'https://store.bblcdn.com/x.pdf'), 'guide');
+  assert.equal(documentKindOf('Downloads', 'https://store.bblcdn.com/x.pdf'), 'other');
+});
+
+/**
+ * A YOUTUBE WATCH LINK KEEPS ITS VIDEO (review 4, finding 11): its id is the
+ * query string, so stripping every query wrote the bare
+ * https://www.youtube.com/watch (obxidian-high-flow-hotend). It keeps `v`;
+ * one without an id is no link at all. Every other kept link still loses
+ * its query.
+ */
+test('kept links: a YouTube watch link keeps v=, a watch link without one is dropped, other queries go', async () => {
+  const { keptLinkUrl } = await import('../packages/catalog/src/bambuImport/normalize');
+  assert.equal(keptLinkUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s&si=abc'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  assert.equal(keptLinkUrl('https://youtube.com/watch?feature=share&v=dQw4w9WgXcQ'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  assert.equal(keptLinkUrl('https://m.youtube.com/watch?v=dQw4w9WgXcQ#x'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  assert.equal(keptLinkUrl('https://www.youtube.com/watch'), '');
+  assert.equal(keptLinkUrl('https://www.youtube.com/watch?list=PL123'), '');
+  assert.equal(keptLinkUrl('https://youtu.be/dQw4w9WgXcQ?si=abc'), 'https://youtu.be/dQw4w9WgXcQ');
+  assert.equal(keptLinkUrl('https://cdn.shopify.com/s/files/manual.pdf?v=2'), 'https://cdn.shopify.com/s/files/manual.pdf');
+  const d = describe({
+    kind: 'legacy_html',
+    html: '<p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3s">Install video</a> <a href="https://www.youtube.com/watch">bare</a></p>',
+  });
+  assert.deepEqual(d.videos.map((x) => x.url), ['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+  // Through the payload: the document is the watch link with its id, never the bare /watch.
+  const { buildImportPayload } = await import('../packages/catalog/src/bambuImport/payload');
+  const { extractionFingerprint } = await import('../packages/catalog/src/bambuImport/fingerprint');
+  const x = sample('bambu-hotend-a1-a2');
+  const y = { ...x, description: { kind: 'legacy_html' as const, html: '<p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3s">Install video</a> <a href="https://www.youtube.com/watch">bare</a></p>' }, videos: [] };
+  const p = buildImportPayload({ extraction: y, writeMode: 'create', extractionSha256: extractionFingerprint(y), targets: null, retrievedAt: '2026-10-15T00:00:00Z' }).payload;
+  const videos = p.documents.filter((doc) => doc.kind === 'video').map((doc) => doc.url);
+  assert.deepEqual(videos, ['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+});
+
+/**
+ * PER-OPTION IN-THE-BOX LISTS (review 4, finding 10; §C.5 scopes a section
+ * to the value it names, the A1 "Combo Add-ons" rule). A line "For H2D/H2C"
+ * or "For LightGrip Cutting Mat:" heads the items after it: they are scoped
+ * to the value(s) it names and the line itself is no item. A line naming no
+ * value stays a sub-title of the items after it, never an item.
+ */
+test('in the box: "For <value>" lines scope the items after them; an unresolved one is a sub-title, not an item', async () => {
+  const { buildImportPayload } = await import('../packages/catalog/src/bambuImport/payload');
+  const { extractionFingerprint } = await import('../packages/catalog/src/bambuImport/fingerprint');
+  const x = sample('bambu-textured-pei-plate');
+  const html =
+    '<h3>In the Box</h3><p>For H2D/H2C</p><ul><li>Nozzle Wiping Pad x5</li></ul>' +
+    '<p>For H2S:</p><ul><li>Nozzle Wiping Strips x3</li><li>BT3-8 Screws x3</li></ul>' +
+    '<p>For Only Laser Module</p><ul><li>Bracket x1</li></ul>';
+  const y = { ...x, description: { kind: 'legacy_html' as const, html } };
+  const res = buildImportPayload({ extraction: y, writeMode: 'create', extractionSha256: extractionFingerprint(y), targets: null, retrievedAt: '2026-10-15T00:00:00Z' });
+  const p = res.payload;
+  const valueName = (id: string) => p.groups.flatMap((g) => g.values).find((v) => v.id === id)?.name_en ?? '(product)';
+  const box = p.specs.filter((s) => s.key === 'package.contents');
+  const by = new Map(box.map((s) => [s.scope_kind === 'product' ? '(product)' : valueName(s.scope_id), (s.value_list as Array<{ text: string; qty: number | null; section: string }>)]));
+  assert.deepEqual(by.get('H2D')?.map((i) => [i.text, i.qty]), [['Nozzle Wiping Pad', 5]]);
+  assert.deepEqual(by.get('H2C')?.map((i) => [i.text, i.qty]), [['Nozzle Wiping Pad', 5]]);
+  assert.deepEqual(by.get('H2S')?.map((i) => [i.text, i.qty]), [['Nozzle Wiping Strips', 3], ['BT3-8 Screws', 3]]);
+  assert.deepEqual(by.get('(product)')?.map((i) => [i.text, i.qty, i.section]), [['Bracket', 1, 'Only Laser Module']]);
+  const all = box.flatMap((s) => s.value_list as Array<{ text: string }>).map((i) => i.text);
+  assert.ok(!all.some((t) => /^for\b/i.test(t)), `no header line is an item: ${all.join(' | ')}`);
+});
+
+/**
+ * Two corpus pages the first version of that rule got wrong. On
+ * bambu-4-in-1-ptfe-adapter the header "For A2L/X2D/P2S/P1 Series/X1 Series"
+ * names the value "A2L/X2D/P2S/P1/X1" only — the other value, "H2 Series/P1
+ * Series/X1 Series", shares two of its parts but does not name it — so the
+ * adapter must not appear in the H2 box. On cutting-mat-combo-3-pcs each item
+ * is the value's own name with a count ("LightGrip Cutting Mat*3"): a bare
+ * value name is a label, a counted one is the item, and the box was empty.
+ */
+test('in the box: a header names the one value covering all its parts; an item named like its value keeps its count', async () => {
+  const { buildImportPayload } = await import('../packages/catalog/src/bambuImport/payload');
+  const { extractionFingerprint } = await import('../packages/catalog/src/bambuImport/fingerprint');
+  const base = sample('bambu-textured-pei-plate');
+  /** The fixture with its one group's first values renamed (and only their SKUs kept). */
+  const withValues = (names: string[], html: string) => {
+    const g = base.groups[0];
+    const old = new Map(g.values.slice(0, names.length).map((v, i) => [v.value, names[i]]));
+    const x = {
+      ...base,
+      groups: [{ ...g, values: g.values.slice(0, names.length).map((v, i) => ({ ...v, value: names[i] })) }],
+      skus: base.skus.filter((s) => s.props.every((q) => old.has(q.value))).map((s) => ({ ...s, props: s.props.map((q) => ({ ...q, value: old.get(q.value)! })) })),
+      description: { kind: 'legacy_html' as const, html },
+    };
+    const p = buildImportPayload({ extraction: x, writeMode: 'create', extractionSha256: extractionFingerprint(x), targets: null, retrievedAt: '2026-10-15T00:00:00Z' }).payload;
+    const valueName = (id: string) => p.groups.flatMap((q) => q.values).find((v) => v.id === id)?.name_en ?? '(product)';
+    return new Map(
+      p.specs
+        .filter((s) => s.key === 'package.contents')
+        .map((s) => [s.scope_kind === 'product' ? '(product)' : valueName(s.scope_id), (s.value_list as Array<{ text: string; qty: number | null }>).map((i) => [i.text, i.qty])])
+    );
+  };
+  const adapter = withValues(
+    ['A2L/X2D/P2S/P1/X1', 'H2 Series/P1 Series/X1 Series'],
+    '<h3>In the Box</h3><p>For A2L/X2D/P2S/P1 Series/X1 Series</p><ul><li>Bambu 4-in-1 PTFE Adapter x1</li></ul>' +
+      '<p>For H2 Series/P1 Series/X1 Series</p><ul><li>4-In-1 PTFE Adapter II x1</li><li>4-in-1 PTFE adapter filament II cleaning pad x5</li></ul>'
+  );
+  assert.deepEqual(adapter.get('A2L/X2D/P2S/P1/X1'), [['Bambu 4-in-1 PTFE Adapter', 1]]);
+  assert.deepEqual(adapter.get('H2 Series/P1 Series/X1 Series'), [['4-In-1 PTFE Adapter II', 1], ['4-in-1 PTFE adapter filament II cleaning pad', 5]]);
+  assert.equal(adapter.get('(product)'), undefined);
+
+  const mats = withValues(
+    ['LightGrip Cutting Mat', 'StrongGrip Cutting Mat'],
+    '<h3>In the Box</h3><p>For LightGrip Cutting Mat:</p><p>- LightGrip Cutting Mat*3</p><p>For StrongGrip Cutting Mat:</p><p>- StrongGrip Cutting Mat*3</p>'
+  );
+  assert.deepEqual(mats.get('LightGrip Cutting Mat'), [['LightGrip Cutting Mat', 3]]);
+  assert.deepEqual(mats.get('StrongGrip Cutting Mat'), [['StrongGrip Cutting Mat', 3]]);
+  // A bare value name, with no count, is still a label and never an item.
+  const label = withValues(['LightGrip Cutting Mat', 'StrongGrip Cutting Mat'], '<h3>In the Box</h3><ul><li>LightGrip Cutting Mat</li><li>Blade x2</li></ul>');
+  assert.deepEqual(label.get('(product)'), [['Blade', 2]]);
+});

@@ -46,8 +46,10 @@ export function documentKindOf(text: string, url: string): DocumentKind {
   if (host.endsWith('youtube.com') || /\.mp4(\?|$)/i.test(url)) return 'video';
   if (/\.(zip|3mf|stl|step|stp)(\?|$)/i.test(url)) return 'model_file';
   if (host === 'makerworld.com') return 'other';
-  if (/\b(m?sds|safety data sheet|safety_data_sheet)\b|_sds|sds_|sds\d/.test(t)) return 'sds';
-  if (/\btds\b|technical data sheet|technical_data_sheet|_tds|tds_/.test(t)) return 'tds';
+  // Letters, not \b, bound the acronyms: '_' is a word character, so `\bmsds` never matched Glue_Stick_MSDS.pdf,
+  // and the plural "Safety Data Sheets" failed the trailing \b (review 4, finding 9).
+  if (/(?:^|[^a-z])m?sds(?:[^a-z]|$)|safety[\s_-]data[\s_-]sheets?/.test(t)) return 'sds';
+  if (/(?:^|[^a-z])tds(?:[^a-z]|$)|technical[\s_-]data[\s_-]sheets?/.test(t)) return 'tds';
   if (/hex[\s_-]?code/.test(t)) return 'hex_codes';
   if (/\b(rohs|en ?71|en71|tsca|cp ?65|cp65|pahs?|pops?|svhc|reach|fcc|ce\b|ul\b|certificat|declaration|compliance|doc\b)/.test(t)) return 'certificate';
   if (/quick[\s_-]?start/.test(t)) return 'quick_start';

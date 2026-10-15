@@ -156,3 +156,54 @@ test('labels map case- and punctuation-insensitively; values type by the key', (
   assert.equal(typeValue('Not supported', 'boolean', '').valueBool, 0);
   assert.equal(typeValue('256*256*256 mm³', 'object', 'mm').valueText, '256 × 256 × 256 mm');
 });
+
+/**
+ * THE §C.6 HOTEND RULE (review 4, finding 8): the Size value text gives
+ * nozzle.diameter and nozzle.material per value (value-scoped,
+ * official_variant). A group of bare "0.4 mm" values under a nozzle label
+ * (obxidian-high-flow-hotend: "Nozzle Diameter" 0.4 mm / 0.6 mm) is a nozzle
+ * group giving the diameter only; a parenthetical ("(Standard Included)",
+ * bambu-hotend-x1c) is never part of the material.
+ */
+test('hotend: per-value nozzle diameter and material; bare "0.4 mm" values; parentheticals dropped', async () => {
+  const { classifyGroup } = await import('../packages/catalog/src/bambuImport/registry/groups');
+  const { r, m, name } = specsOf('bambu-hotend-a1-a2');
+  const size = m.groups.find((g) => g.kind === 'nozzle');
+  assert.ok(size, 'the Size group is the nozzle group');
+  for (const v of size!.values) {
+    const want = /^(\d(?:\.\d+)?)mm (.+)$/.exec(v.nameEn)!;
+    const d = pick(r.rows, 'nozzle.diameter', v.nameEn, name);
+    const mat = pick(r.rows, 'nozzle.material', v.nameEn, name);
+    assert.equal(d.length, 1, `${v.nameEn}: diameter`);
+    assert.equal(d[0].valueNum, Number(want[1]));
+    assert.equal(d[0].unit, 'mm');
+    assert.equal(d[0].confidence, 'official_variant');
+    assert.equal(d[0].status, 'verified');
+    assert.equal(mat.length, 1, `${v.nameEn}: material`);
+    assert.equal(mat[0].valueText, want[2]);
+  }
+  assert.deepEqual(pick(r.rows, 'nozzle.diameter').filter((x) => x.status === 'not_found').length, 0, 'never not_found while the values publish it');
+
+  const g = (propertyKey: string, values: string[]) => classifyGroup({ propertyKey, type: 0, title: '', values: values.map((value) => ({ value, colorUrl: '' })) }).kind;
+  assert.equal(g('Nozzle Diameter', ['0.4 mm', '0.6 mm']), 'nozzle', 'obxidian-high-flow-hotend');
+  assert.equal(g('Nozzle Size', ['0.2mm', '0.4mm']), 'nozzle');
+  assert.equal(g('Diameter', ['1.75 mm', '2.85 mm']), 'other', 'a filament diameter is not a nozzle');
+  assert.equal(g('Thickness', ['0.2mm', '0.4mm']), 'size', 'black-aluminium-card: a thickness is not a nozzle');
+  assert.equal(g('Size', ['0.4 mm', '0.6 mm']), 'size', 'a bare size is not a nozzle without a nozzle label');
+
+  // The same product with bare values and a parenthetical: the specs read the value text the same way.
+  const x = sample('bambu-hotend-a1-a2');
+  const productId = newProductId(x.sourceProductId);
+  const bare = buildOptions(x, productId);
+  const grp = bare.groups.find((q) => q.kind === 'nozzle')!;
+  const renamed = ['0.2 mm', '0.4 mm', '0.6 mm', '0.8mm Hardened Steel (Standard Included)', '0.45 mm'];
+  grp.values.forEach((v, i) => (v.nameEn = renamed[i] ?? v.nameEn));
+  const r2 = buildSpecs(
+    { described: describe(x.description), features: x.features, featuresTitle: x.featuresTitle },
+    { productId, productType: productTypeOf(x.route), canonicalUrl: x.canonicalUrl, retrievedAt: '2026-10-15', model: bare, modelToken: modelsInText(x.title)[0]?.token ?? '' }
+  );
+  const nameOf = (id: string) => bare.groups.flatMap((q) => q.values).find((v) => v.id === id)?.nameEn ?? id;
+  assert.equal(pick(r2.rows, 'nozzle.diameter', '0.4 mm', nameOf)[0]?.valueNum, 0.4);
+  assert.equal(pick(r2.rows, 'nozzle.material', '0.4 mm', nameOf).length, 0, 'a bare value names no material');
+  assert.equal(pick(r2.rows, 'nozzle.material', '0.8mm Hardened Steel (Standard Included)', nameOf)[0]?.valueText, 'Hardened Steel');
+});

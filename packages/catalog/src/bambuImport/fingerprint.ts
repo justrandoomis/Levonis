@@ -13,7 +13,8 @@
  *     answer and the `/media` results with the same projection, and the live
  *     answers must hash to it. The projection holds: group, value and variant
  *     ids, order and combo keys; default values; image URLs with bindings and
- *     the primary; swatch URLs; public spec keys, scopes, regions, statuses,
+ *     the primary (a representative's source variant included: the page needs
+ *     it to keep R6, §G.3); swatch URLs; public spec keys, scopes, regions, statuses,
  *     units and numbers; document kinds and URLs; relation labels and targets.
  *     Owner-only rows are not public, so they are not projected.
  */
@@ -43,7 +44,7 @@ export function extractionFingerprint(x: Extraction): string {
 export interface Projection {
   groups: Array<{ id: string; sort: number; default_value_id: string; values: Array<{ id: string; sort: number }> }>;
   variants: Array<{ id: string; combo_key: string }>;
-  images: Array<{ id: string; url: string; is_primary: boolean; option_value_id: string; variant_id: string }>;
+  images: Array<{ id: string; url: string; is_primary: boolean; option_value_id: string; variant_id: string; via_variant_id: string }>;
   swatches: Array<{ value_id: string; url: string }>;
   specs: Array<{ key: string; scope_kind: string; scope_id: string; region: string; status: string; unit: string; value_num: number | null }>;
   documents: Array<{ kind: string; url: string }>;
@@ -101,6 +102,7 @@ export function projectionFromPayload(payload: ImportPayload, media: readonly Me
       is_primary: i.is_primary,
       option_value_id: i.option_value_id ?? '',
       variant_id: i.variant_id ?? '',
+      via_variant_id: i.via_variant_id ?? '',
     })),
     swatches: payload.swatches.map((s) => ({ value_id: s.value_id, url: urlOf.get(s.source_media_id) ?? '' })),
     specs: payload.specs
@@ -122,7 +124,7 @@ export function projectionFromPayload(payload: ImportPayload, media: readonly Me
 export interface SiteRelations {
   option_groups: Array<{ id: string; sort: number; default_value_id?: string; values: Array<{ id: string; sort: number }> }>;
   variants: Array<{ id: string; combo_key: string }>;
-  images: Array<{ id: string; url: string; is_primary: boolean; option_value_id: string | null; variant_id: string | null }>;
+  images: Array<{ id: string; url: string; is_primary: boolean; option_value_id: string | null; variant_id: string | null; via_variant_id?: string | null }>;
 }
 
 /** The knowledge answer (`/api/products/<slug>/knowledge`), as far as the projection reads it. Owner rows never appear in it. */
@@ -138,7 +140,14 @@ export function projectionFromSite(site: SiteRelations, knowledge: KnowledgeAnsw
   return {
     groups: site.option_groups.map((g) => ({ id: g.id, sort: g.sort, default_value_id: g.default_value_id ?? '', values: g.values.map((v) => ({ id: v.id, sort: v.sort })) })),
     variants: site.variants.map((v) => ({ id: v.id, combo_key: v.combo_key })),
-    images: site.images.map((i) => ({ id: i.id, url: i.url, is_primary: i.is_primary, option_value_id: i.option_value_id ?? '', variant_id: i.variant_id ?? '' })),
+    images: site.images.map((i) => ({
+      id: i.id,
+      url: i.url,
+      is_primary: i.is_primary,
+      option_value_id: i.option_value_id ?? '',
+      variant_id: i.variant_id ?? '',
+      via_variant_id: i.via_variant_id ?? '',
+    })),
     swatches: knowledge.swatches.map((s) => ({ value_id: s.option_value_id, url: s.url })),
     specs: knowledge.specs.map((s) => ({ key: s.key, scope_kind: s.scope_kind, scope_id: s.scope_id, region: s.region, status: s.status, unit: s.unit, value_num: s.value_num })),
     documents: knowledge.documents.map((d) => ({ kind: d.kind, url: d.url })),
