@@ -3538,6 +3538,23 @@ export async function saveProductAtomic(
   auditRows: Array<{ action: string; detail: Record<string, unknown> }> = []
 ): Promise<void> {
   if (plan.statements.length) await db.batch(plan.statements);
+  await postCommitProductSave(db, plan, auditRows);
+}
+
+/**
+ * THE BOOKKEEPING AFTER A PRODUCT BATCH HAS COMMITTED — `saveProductAtomic`'s
+ * own tail, exported so a writer that runs the plan inside a batch of its own
+ * (the catalogue import, worker/lib/catalogImport/writer.ts, whose batch also
+ * carries its guard row, side tables and checkpoint) leaves the same trail: the
+ * caller's audit rows, `product.relations.save` whenever relations were part of
+ * the batch, and the media the save dropped queued for removal. Call it only
+ * once the batch that carried `plan.statements` has returned successfully.
+ */
+export async function postCommitProductSave(
+  db: D1Database,
+  plan: ProductSavePlan,
+  auditRows: Array<{ action: string; detail: Record<string, unknown> }> = []
+): Promise<void> {
   /**
    * Everything below this point is post-commit bookkeeping. An audit outage
    * must never make a caller believe the atomic batch rolled back: import

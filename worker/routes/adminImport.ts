@@ -59,6 +59,7 @@ import {
   verifyStoredProductMedia,
 } from '../lib/productMediaIngest';
 import { verifyAndNormalizeProductMedia } from '../lib/productMediaWrite';
+import { uniqueProductSlug } from '../lib/productSlug';
 import {
   blankTemplate,
   labelRow,
@@ -2272,32 +2273,6 @@ adminImportRoutes.post('/confirm', async (c) => {
     }
   }
 });
-
-/** A free slug for a new product; mirrors the form's own rule. */
-async function uniqueProductSlug(db: D1Database, seed: string): Promise<string> {
-  const base =
-    seed
-      .toLowerCase()
-      .replace(/[^a-z0-9؀-ۿ]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || `product-${Math.abs(hashOf(seed)).toString(36)}`;
-  for (let i = 0; i < 40; i++) {
-    const candidate = i === 0 ? base : `${base}-${i + 1}`;
-    const clash = await db.prepare('SELECT id FROM products WHERE slug = ?').bind(candidate).first();
-    if (!clash) return candidate;
-  }
-  return `${base}-${newId('p').slice(-6)}`;
-}
-
-/** FNV-1a, only ever used to make a fallback slug deterministic. */
-function hashOf(s: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h | 0;
-}
 
 // ------------------------------------------------------------- reports
 
