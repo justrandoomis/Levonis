@@ -689,6 +689,10 @@ export async function claimFiledColumnsInstalled(db: D1Database): Promise<boolea
  * legacy rules as the function above, or a pre-0006 claim (stage NULL,
  * status 'in_review') would be listed under one stage and filtered under
  * another. Built from `CLAIM_STAGES` so the two cannot drift apart.
+ *
+ * `END )` keeps its space: migration 0191 spells this same text inside its
+ * triggers, and Wrangler closes a CASE only on whitespace + END + whitespace
+ * (tests/sqlSplit.test.ts refuses an END touching its parenthesis).
  */
 export function effectiveClaimStageSql(alias: string): string {
   const a = alias ? `${alias}.` : '';
@@ -697,7 +701,7 @@ export function effectiveClaimStageSql(alias: string): string {
        WHEN ${a}status = 'in_review' THEN 'diagnosing'
        WHEN ${a}status = 'approved' THEN 'resolved'
        WHEN ${a}status = 'rejected' THEN 'rejected'
-       ELSE 'received' END)`;
+       ELSE 'received' END )`;
 }
 
 /** Coarse mapping into the CHECK-constrained legacy status column (0001). */

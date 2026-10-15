@@ -14,7 +14,9 @@
 --
 -- «Open» for a warranty claim is spelled with the exact text closedClaimSql()
 -- (worker/lib/deviceOps.ts) generates, so the database and the Worker agree;
--- tests/sv2_warranty_claims.test.ts checks the two never drift.
+-- tests/sv2_warranty_desk.test.ts checks the two never drift. Each CASE ends
+-- `END )` with a space: Wrangler closes a CASE only on whitespace + END +
+-- whitespace (tests/sqlSplit.test.ts).
 --
 -- Every CREATE TRIGGER carries IF NOT EXISTS: those are the statements
 -- scripts/migrate-check.mjs re-runs to prove the file is idempotent.
@@ -47,14 +49,14 @@ WHEN NEW.unit_id IS NOT NULL
        WHEN NEW.status = 'in_review' THEN 'diagnosing'
        WHEN NEW.status = 'approved' THEN 'resolved'
        WHEN NEW.status = 'rejected' THEN 'rejected'
-       ELSE 'received' END) IN ('rejected','replaced','resolved'))
+       ELSE 'received' END ) IN ('rejected','replaced','resolved'))
  AND EXISTS (SELECT 1 FROM warranty_claims wc
               WHERE wc.unit_id = NEW.unit_id AND wc.id <> NEW.id
                 AND NOT ((CASE WHEN wc.stage IN ('received','diagnosing','approved','rejected','repairing','replaced','resolved') THEN wc.stage
                       WHEN wc.status = 'in_review' THEN 'diagnosing'
                       WHEN wc.status = 'approved' THEN 'resolved'
                       WHEN wc.status = 'rejected' THEN 'rejected'
-                      ELSE 'received' END) IN ('rejected','replaced','resolved')))
+                      ELSE 'received' END ) IN ('rejected','replaced','resolved')))
 BEGIN
   SELECT RAISE(ABORT, 'CLAIM_ALREADY_OPEN');
 END;
@@ -66,19 +68,19 @@ WHEN NEW.unit_id IS NOT NULL
        WHEN OLD.status = 'in_review' THEN 'diagnosing'
        WHEN OLD.status = 'approved' THEN 'resolved'
        WHEN OLD.status = 'rejected' THEN 'rejected'
-       ELSE 'received' END) IN ('rejected','replaced','resolved'))
+       ELSE 'received' END ) IN ('rejected','replaced','resolved'))
  AND NOT ((CASE WHEN NEW.stage IN ('received','diagnosing','approved','rejected','repairing','replaced','resolved') THEN NEW.stage
        WHEN NEW.status = 'in_review' THEN 'diagnosing'
        WHEN NEW.status = 'approved' THEN 'resolved'
        WHEN NEW.status = 'rejected' THEN 'rejected'
-       ELSE 'received' END) IN ('rejected','replaced','resolved'))
+       ELSE 'received' END ) IN ('rejected','replaced','resolved'))
  AND EXISTS (SELECT 1 FROM warranty_claims wc
               WHERE wc.unit_id = NEW.unit_id AND wc.id <> NEW.id
                 AND NOT ((CASE WHEN wc.stage IN ('received','diagnosing','approved','rejected','repairing','replaced','resolved') THEN wc.stage
                       WHEN wc.status = 'in_review' THEN 'diagnosing'
                       WHEN wc.status = 'approved' THEN 'resolved'
                       WHEN wc.status = 'rejected' THEN 'rejected'
-                      ELSE 'received' END) IN ('rejected','replaced','resolved')))
+                      ELSE 'received' END ) IN ('rejected','replaced','resolved')))
 BEGIN
   SELECT RAISE(ABORT, 'CLAIM_ALREADY_OPEN');
 END;
