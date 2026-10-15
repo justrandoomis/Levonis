@@ -5290,6 +5290,12 @@ export async function placeOrder(
     if (msg.includes('COUPON_PER_USER_LIMIT')) {
       throw badRequest('Coupon could not be applied (PER_USER_LIMIT_REACHED)', 'PER_USER_LIMIT_REACHED');
     }
+    // 0192 (decision 2, «الجهاز أولاً»): the database refuses to spend a trade-in
+    // credit before the shop has received the old device — a credit minted on
+    // photos before S-P2, or a request whose intake was never recorded.
+    if (msg.includes('TRADE_IN_DEVICE_NOT_RECEIVED')) {
+      throw new HttpError(409, 'The credit can be used once we receive your old device.', 'TRADE_IN_DEVICE_NOT_RECEIVED');
+    }
     // The trade-in request was cancelled (a return, or its owner) after the
     // checkout read it: the same answer a fresh checkout now gives.
     if (comp.couponTradeIn && isTradeInCreditFenceAbort(e)) {

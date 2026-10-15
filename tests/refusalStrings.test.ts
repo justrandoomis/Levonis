@@ -199,6 +199,8 @@ test('every code the table translates is one the server can actually emit', () =
     // «الاستبدال» (0143): eligibility, the draft, the photos, the value, the credit.
     'worker/lib/tradeIn.ts',
     'worker/routes/tradeIn.ts',
+    // Trade-in v2 (S-P2, row 238): the schema probe's 503, intake, completion, the credit given back.
+    'worker/lib/tradeInSchema.ts',
     // The store's conversation (docs/COMMUNITY_COMMERCE_CHAT.md): a card names
     // an entity of THIS thread or it is refused, in the thread's own words.
     'worker/lib/chatCards.ts',

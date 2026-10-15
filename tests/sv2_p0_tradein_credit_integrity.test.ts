@@ -26,7 +26,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { returnRoutes } from '../worker/routes/returns';
 import { tradeInRoutes } from '../worker/routes/tradeIn';
 import { adminRoutes } from '../worker/routes/admin';
-import { OWNER, STAFF, CUSTOMER, adminApp, customerApp, checkoutBody, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+import { OWNER, STAFF, CUSTOMER, adminApp, customerApp, checkoutBody, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
 
@@ -35,6 +35,7 @@ const cancels = (sqls: string[]) => sqls.some((s) => /SET status = 'cancelled'/.
 /** An approved trade-in with its credit code in hand and the P1S in the cart. */
 async function readyToPay(raw: DatabaseSync) {
   const id = await submitted(raw);
+  await received(raw, id);
   const approved = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`));
   assert.equal(approved.request.status, 'awaiting_payment', JSON.stringify(approved));
   const pay = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/checkout`));

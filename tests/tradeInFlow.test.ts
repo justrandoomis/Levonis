@@ -509,6 +509,8 @@ async function checkoutBody(extra: Record<string, unknown> = {}) {
 test('the accepted value is credited ONCE, on the target line only, for its owner only', async () => {
   const raw = seed();
   const id = await submitted(raw);
+  // Decision 2 (0192): the device is received before its credit is spent.
+  raw.prepare('UPDATE trade_in_requests SET intake_at = ? WHERE id = ?').run(new Date().toISOString(), id);
   const approved = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`));
   assert.equal(approved.request.status, 'awaiting_payment');
   const value = approved.request.final_value_iqd as number;

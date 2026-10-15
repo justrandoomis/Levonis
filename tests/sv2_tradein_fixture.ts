@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { freshDb, stubApp, post, send, json, pending, ctx, type StubUser } from './fixtures/app';
+import { dbThrough, stubApp, post, send, json, pending, ctx, type StubUser } from './fixtures/app';
 import { LimitD1 } from './fixtures/d1Limits';
 import { tradeInRoutes, adminTradeInRoutes } from '../worker/routes/tradeIn';
 import { fileRoutes } from '../worker/routes/uploads';
@@ -85,13 +85,14 @@ export const daysAhead = (d: number) => new Date(Date.now() + d * 86_400_000).to
  * days ago with a 12-month warranty. The catalogue sells the A1 today at `a1Now`
  * (A1 Combo `comboNow`) and a P1S at 1,500,000, all directly.
  */
-export function seed(opts: { paid?: number; a1Now?: number; comboNow?: number; deliveredDaysAgo?: number } = {}): DatabaseSync {
+export function seed(opts: { paid?: number; a1Now?: number; comboNow?: number; deliveredDaysAgo?: number; through?: string } = {}): DatabaseSync {
   const paid = opts.paid ?? 850_000;
   const a1Now = opts.a1Now ?? 850_000;
   const comboNow = opts.comboNow ?? 1_150_000;
   const delivered = daysAgo(opts.deliveredDaysAgo ?? 20);
   const warrantyEnd = new Date(Date.parse(delivered) + 365 * 86_400_000).toISOString();
-  const raw = freshDb();
+  // `through`: a database whose newest migration is that number (a Worker deployed ahead of its migration).
+  const raw = dbThrough(opts.through ?? null);
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,email_verified_at,locale) VALUES
       ('boss','Ali','boss@x.co','h','admin',NULL,'ar'),
@@ -167,8 +168,18 @@ export function checkoutBody(extra: Record<string, unknown> = {}) {
   };
 }
 
-/** Approves the estimate, places the P1S order with the credit, returns the order id. */
+/**
+ * THE SHOP RECEIVED THE DEVICE (decision 2, «الجهاز أولاً», migration 0192): no
+ * trade-in credit is spent before its device's intake is recorded
+ * (`trg_trade_in_credit_needs_intake`). Stamped here until the intake door lands.
+ */
+export async function received(raw: DatabaseSync, id: string): Promise<void> {
+  raw.prepare('UPDATE trade_in_requests SET intake_at = ? WHERE id = ? AND intake_at IS NULL').run(new Date().toISOString(), id);
+}
+
+/** Receives the device, approves the estimate, places the P1S order with the credit, returns the order id. */
 export async function approvedAndOrdered(raw: DatabaseSync, id: string): Promise<{ orderId: string; value: number }> {
+  await received(raw, id);
   const approved = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`));
   assert.equal(approved.request.status, 'awaiting_payment', JSON.stringify(approved));
   const a = customerApp(raw);

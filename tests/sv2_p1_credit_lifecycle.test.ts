@@ -36,7 +36,7 @@ import { RaceD1, redeems } from './fixtures/raceD1';
 import { orderRoutes } from '../worker/routes/orders';
 import { tradeInRoutes } from '../worker/routes/tradeIn';
 import { adminRoutes } from '../worker/routes/admin';
-import { OWNER, CUSTOMER, adminApp, customerApp, checkoutBody, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+import { OWNER, CUSTOMER, adminApp, customerApp, checkoutBody, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
 
@@ -46,6 +46,7 @@ const MINUTE = 60_000;
 /** An approved trade-in with its credit code in hand and the P1S in the cart. */
 async function readyToPay(raw: DatabaseSync) {
   const id = await submitted(raw);
+  await received(raw, id);
   const approved = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`));
   assert.equal(approved.request.status, 'awaiting_payment', JSON.stringify(approved));
   const pay = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/checkout`));
@@ -311,33 +312,39 @@ test('reopen: cancel → reopen → cancel moves the end by every period an orde
   assert.equal(restored(raw, t.id), 2);
 });
 
-test('closed: cancelling the order of a completed trade-in releases the use, but neither moves the credit\'s end nor tells the customer it is back', async () => {
+test('row 237 closed (0192): cancelling the undelivered order of a completed trade-in gives the same coupon back for 30 days, once', async () => {
   const raw = seed({ deliveredDaysAgo: 40 });
   const t = await readyToPay(raw);
   const a = await order(raw, t.code);
   assert.equal(a.status, 200, JSON.stringify(a.body));
-  // The desk took the old device while the order was live: the trade-in is done.
-  const done = await post(adminApp(raw), `/api/admin/trade-in/requests/${t.id}/complete`, { reason: 'handed over at the counter' });
-  assert.equal(done.status, 200, await done.clone().text());
+  // A request completed before S-P2 while its order was still live (the old manual door).
+  raw.prepare("UPDATE trade_in_requests SET status = 'completed', completed_at = ? WHERE id = ?").run(new Date().toISOString(), t.id);
   raw.prepare('UPDATE orders SET created_at = ? WHERE id = ?').run(new Date(Date.now() - 2 * DAY).toISOString(), a.id);
-  const before = endOf(raw, t.coupon);
 
   const admin = ownerAdmin(raw);
+  const t0 = Date.now();
   assert.equal((await patch(admin, `/api/admin/orders/${a.id}`, { status: 'cancelled' })).status, 200);
   assert.equal(row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', a.id)!.state, 'released', 'the release itself is unconditional');
-  assert.equal(endOf(raw, t.coupon), before, 'a credit its completed request can never spend again is not extended');
-  assert.equal(restored(raw, t.id), 0, 'no «credit_restored» in the log');
+  const reissue = row<{ coupon_id: string; reason: string; ends_at: string; amount_iqd: number }>(
+    raw,
+    'SELECT coupon_id, reason, ends_at, amount_iqd FROM trade_in_credit_reissues WHERE request_id = ? AND order_id = ?',
+    t.id,
+    a.id
+  )!;
+  assert.equal(reissue.coupon_id, t.coupon, 'the same coupon row, the same code (one credit for life)');
+  assert.equal(reissue.reason, 'order_cancelled');
+  near(Date.parse(reissue.ends_at), t0 + 30 * DAY, 'thirty days from the cancel');
+  assert.equal(endOf(raw, t.coupon), Date.parse(reissue.ends_at), "the coupon's end is the re-issue's");
+  assert.equal(coupons(raw, t.id), 1);
+  assert.equal(restored(raw, t.id), 0, 'no «credit_restored»: a re-issue is its own event');
   const view = await json(await get(customerApp(raw), `/api/trade-in/requests/${t.id}`));
-  assert.ok(Array.isArray(view.request?.events), JSON.stringify(view).slice(0, 200));
-  assert.equal(
-    (view.request.events as Array<{ action: string }>).filter((e) => e.action === 'credit_restored').length,
-    0,
-    'the customer is not told the credit is back'
-  );
+  assert.equal((view.request.events as Array<{ action: string }>).filter((e) => e.action === 'credit_reissued').length, 1, 'the customer reads that the credit is back');
 
-  // Reopened: the use comes back, and the end does not move the other way either.
+  // Reopened: the use comes back (0191), the end stays; cancelled again: still one re-issue.
   const re = await patch(admin, `/api/admin/orders/${a.id}`, { status: 'pending' });
   assert.equal(re.status, 200, await re.clone().text());
   assert.equal(row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', a.id)!.state, 'active');
-  assert.equal(endOf(raw, t.coupon), before);
+  assert.equal((await patch(admin, `/api/admin/orders/${a.id}`, { status: 'cancelled' })).status, 200);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM trade_in_credit_reissues WHERE request_id = ?', t.id), 1);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM trade_in_events WHERE request_id = ? AND action = 'credit_reissued'", t.id), 1);
 });

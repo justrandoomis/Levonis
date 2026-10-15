@@ -143,6 +143,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // checkout through a coupon the request mints (`coupons.trade_in_id`).
     'trade_in_rule_sets', 'trade_in_rules', 'trade_in_requests', 'trade_in_components',
     'trade_in_photos', 'trade_in_events', 'trade_in_claims',
+    // 0192 — trade-in v2 (DECISIONS row 238): the owner's valuation record and component
+    // references (private), the provenance of the lot a received device became, and the
+    // credit given back after a cancel or a return (both append-only).
+    'trade_in_valuations', 'trade_in_component_refs', 'trade_in_stock', 'trade_in_credit_reissues',
     // The buyer's choices behind one bundle cart line, and the fence that makes a
     // partial inventory movement impossible inside the order's own batch (§1.5, §1.7).
     'cart_bundle_choices', 'order_reservation_fence',

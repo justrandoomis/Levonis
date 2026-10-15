@@ -38,7 +38,7 @@ import { claimFiledColumnsInstalled } from '../worker/lib/deviceOps';
 import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { RaceD1 } from './fixtures/raceD1';
 import { ppWorld } from './sv2_price-protection_fixture';
-import { OWNER, adminApp, customerApp, checkoutBody, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+import { OWNER, adminApp, customerApp, checkoutBody, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
 
@@ -281,6 +281,7 @@ const useOf = (raw: DatabaseSync, orderId: string) => row<{ state: string }>(raw
 /** An approved trade-in with its credit code in hand. */
 async function readyToPay(raw: DatabaseSync) {
   const id = await submitted(raw);
+  await received(raw, id);
   const approved = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`));
   assert.equal(approved.request.status, 'awaiting_payment', JSON.stringify(approved));
   const pay = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/checkout`));

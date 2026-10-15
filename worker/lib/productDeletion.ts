@@ -181,6 +181,9 @@ export const OWNED_TABLES: OwnedTable[] = [
   // worthless without it (the FK cascades too; listed so the registry stays
   // the whole truth).
   { table: 'product_completeness', by: { column: 'product_id' } },
+  // 0192: the owner's private component reference for a Combo / device (trade-in B.4 rules 2–4) —
+  // worthless without the product it values.
+  { table: 'trade_in_component_refs', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
   // clear — and clearing it would be wrong even if it were possible: the row's
@@ -341,6 +344,14 @@ export interface FrozenTable {
 }
 
 export const FROZEN_HISTORY: FrozenTable[] = [
+  {
+    table: 'trade_in_stock',
+    columns: ['product_id'],
+    appendOnly: true,
+    why:
+      '0192. The provenance of a lot a received trade-in device became (request, lot, draft, cost basis); ' +
+      'append-only by trigger, keyed to the request — it outlives the used draft product it names.',
+  },
   {
     table: 'product_import_items',
     columns: ['product_id'],
@@ -515,6 +526,19 @@ export const BLOCKING_REFS: BlockingRef[] = [
     code: 'PRODUCT_IN_OPEN_GIFT',
     remedy: 'A customer holds a gift of this product that is not ordered yet — cancel that gift (Gifts → Grants) or wait until it is ordered, then delete it.',
     where: "state IN ('ready_to_redeem', 'redeemed')",
+  },
+  /**
+   * 0192 — A TRADED-IN DEVICE IS STILL ON THE SHELF AS THIS USED DRAFT. Its lot
+   * (`ilot_ti_<request>`, cost = the credit given) is the only record of what the
+   * device cost; the draft is the product it is sold as. Once the unit is sold or
+   * written off the delete is free (the provenance row stays, FROZEN_HISTORY).
+   */
+  {
+    table: 'trade_in_stock',
+    column: 'product_id',
+    code: 'PRODUCT_HAS_TRADE_IN_STOCK',
+    remedy: 'A traded-in device is still in stock under this used product. Sell it or write it off first, then delete it.',
+    where: 'lot_id IN (SELECT id FROM inventory_lots WHERE qty_remaining > 0)',
   },
 ];
 

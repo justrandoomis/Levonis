@@ -107,7 +107,7 @@ const allocationEvidenceTables = ['investor_finance_events','investor_allocation
  * fence the final batch, including when SQLite FK enforcement is unavailable. */
 async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
   const names = new Set(['orders','order_item_units','ops_guards','warranty_claims','wallet_transactions','wallet_holds','serial_assignments',
-    'product_file_grants','trade_in_requests','finance_posting_errors',...financialTables,...itemEvidenceTables,...allocationEvidenceTables,
+    'product_file_grants','trade_in_requests','trade_in_stock','trade_in_credit_reissues','finance_posting_errors',...financialTables,...itemEvidenceTables,...allocationEvidenceTables,
     ...ORDER_HISTORY_TABLES,...ORDER_OWNED_TABLES.map(t=>t.table)]);
   const columns = new Map<string, Set<string>>();
   for (const name of names) columns.set(name, await columnsOf(db, name));
@@ -121,6 +121,11 @@ async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
     'Serial, return inspection or trade-in evidence must be retained.',`SELECT 1 FROM ${table} WHERE order_item_id IN (SELECT id FROM order_items WHERE order_id=?1)`);
   add('trade_in_requests','order_id','ORDER_HAS_FULFILMENT_HISTORY','Trade-in evidence must be retained.',
     'SELECT 1 FROM trade_in_requests WHERE order_id=?1');
+  // 0192: the order that completed a trade-in (its device became stock) or gave its credit back.
+  add('trade_in_stock','order_id','ORDER_HAS_FULFILMENT_HISTORY','Trade-in evidence must be retained.',
+    'SELECT 1 FROM trade_in_stock WHERE order_id=?1');
+  add('trade_in_credit_reissues','order_id','ORDER_HAS_FULFILMENT_HISTORY','Trade-in evidence must be retained.',
+    'SELECT 1 FROM trade_in_credit_reissues WHERE order_id=?1');
   // 0178: a LIVE serial binding means a device is still promised by this
   // order. The cancel trigger releases them all, so this is the second guard.
   add('serial_assignments','order_id','ORDER_HAS_FULFILMENT_HISTORY','A serial is still bound to this order.',

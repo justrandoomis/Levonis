@@ -1364,6 +1364,18 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This device is part of a trade-in whose credit is in use or which is complete, so it cannot be returned here. Contact support.',
     ckb: 'ئەم ئامێرە بەشێکە لە گۆڕینەوەیەک کە باڵانسەکەی بەکارهاتووە یان تەواو بووە، بۆیە لێرەوە ناگەڕێندرێتەوە. پەیوەندی بە پشتگیرییەوە بکە.',
   },
+  // Trade-in v2 (S-P2, row 238): «الجهاز أولاً» — the credit is spent only after the shop received the old device.
+  TRADE_IN_DEVICE_NOT_RECEIVED: {
+    ar: 'يُستخدم الرصيد بعد استلام جهازك القديم.',
+    en: 'The credit can be used once we receive your old device.',
+    ckb: 'باڵانسەکە دوای وەرگرتنی ئامێرە کۆنەکەت بەکاردێت.',
+  },
+  // A Worker ahead of migration 0192: the new trade-in doors answer 503 until it lands.
+  TRADE_IN_V2_NOT_INSTALLED: {
+    ar: 'خدمة الاستبدال تُحدَّث الآن. حاول بعد قليل.',
+    en: 'The trade-in service is being updated. Try again shortly.',
+    ckb: 'خزمەتگوزاریی گۆڕینەوە نوێ دەکرێتەوە. کەمێکی تر هەوڵ بدەرەوە.',
+  },
   // One door per defect: an open return and an open warranty request do not run side by side.
   RETURN_CASE_OPEN: {
     ar: 'على هذا الجهاز طلب إرجاع مفتوح. تابعه من صفحة الطلب؛ يُعالَج العيب هناك.',

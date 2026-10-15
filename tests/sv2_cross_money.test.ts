@@ -21,7 +21,7 @@ import { deviceRoutes } from '../worker/routes/devices';
 import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { validateCoupon } from '../worker/lib/membershipOps';
 import { TRADE_IN_CREDIT_VALID_DAYS } from '../worker/lib/tradeIn';
-import { OWNER, STAFF, adminApp, approvedAndOrdered, customerApp, daysAgo, restoreFetch, seed, submitted, CUSTOMER } from './sv2_tradein_fixture';
+import { OWNER, STAFF, adminApp, approvedAndOrdered, customerApp, daysAgo, received, restoreFetch, seed, submitted, CUSTOMER } from './sv2_tradein_fixture';
 import { ppWorld } from './sv2_price-protection_fixture';
 import { repriceV2 } from './fixtures/v2Publish';
 import type { Env } from '../worker/lib/types';
@@ -248,6 +248,7 @@ test('the trade-in credit lasts seven days; an expired one closes «إتمام �
   const w = world();
   const id = await submitted(w.raw);
   const t0 = Date.now();
+  await received(w.raw, id);
   await post(adminApp(w.raw), `/api/admin/trade-in/requests/${id}/approve`);
   const coupon = row<{ id: string; code: string; ends_at: string }>(w.raw, 'SELECT id, code, ends_at FROM coupons WHERE trade_in_id = ?', id)!;
   const end = Date.parse(coupon.ends_at);
