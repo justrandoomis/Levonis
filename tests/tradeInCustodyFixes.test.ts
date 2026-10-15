@@ -66,10 +66,11 @@ function tradeIn(w: W, o: { user: string; order: string; item: string; scope?: '
   const now = new Date().toISOString();
   w.raw
     .prepare(
-      `INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, family, scope, credit_iqd, created_at, updated_at)
-       VALUES (?, ?, 'awaiting_payment', ?, ?, 1, 'fdm', ?, 0, ?, ?)`
+      // S-P2 (decision 2): the device was received before the exchange completes (intake recorded).
+      `INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, family, scope, credit_iqd, created_at, updated_at, intake_at)
+       VALUES (?, ?, 'awaiting_payment', ?, ?, 1, 'fdm', ?, 0, ?, ?, ?)`
     )
-    .run(id, o.user, o.order, o.item, o.scope ?? 'whole', now, now);
+    .run(id, o.user, o.order, o.item, o.scope ?? 'whole', now, now, now);
   return id;
 }
 const complete = (w: W, who: Who, id: string) => post(as(w, who), `/api/admin/trade-in/requests/${id}/complete`);
@@ -133,7 +134,7 @@ test('a trade-in of a slot whose device was REPLACED takes the replacement: hidd
   assert.equal((await json(await get(as(w, 'u1'), '/api/devices/mine'))).devices.length, 1, 'she holds the replacement');
 
   // The request names the slot she bought (unit_index 1), as eligibility does.
-  const done = await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  const done = await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   assert.equal(done.status, 200, await done.clone().text());
 
   assert.equal((await json(await get(as(w, 'u1'), '/api/devices/mine'))).devices.length, 0, '«أجهزتي» no longer lists the replacement');
@@ -190,7 +191,7 @@ test('a buyer who passed the device on cannot trade it in from under its holder:
 
   // A request opened before the device was passed on stops at completion — nothing moves.
   const id = tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' });
-  const res = await complete(w, 'adm', id);
+  const res = await complete(w, 'boss', id);
   assert.equal(res.status, 409);
   assert.equal((await json(res)).code, 'TRADE_IN_LINKED_ELSEWHERE');
   assert.equal(row(w.raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'awaiting_payment');
@@ -200,7 +201,7 @@ test('a buyer who passed the device on cannot trade it in from under its holder:
 
   // Once Omar releases it, the trade-in goes through.
   assert.equal((await send(as(w, 'u2'), 'DELETE', `/api/devices/units/${u.id}/registration`))!.status, 200);
-  assert.equal((await complete(w, 'adm', id)).status, 200);
+  assert.equal((await complete(w, 'boss', id)).status, 200);
 });
 
 test('the holder is re-checked INSIDE the completion batch: a link made by another account after the read aborts the whole completion', async () => {
@@ -248,7 +249,7 @@ for (const linkedToLine of [false, true]) {
     w.raw.exec(`INSERT INTO stock_serial_links (serial_norm, lot_id, order_item_id, linked_by, linked_at) VALUES ('${SN}','lotA',${linkedToLine ? "'l1'" : 'NULL'},'boss','2026-09-01T00:00:00.000Z')`);
     assert.equal((await json(await scan(w, 'adm', 'ORD-1', 'l1', 1, SN))).success, true);
     assert.equal((await deliver(w, 'ORD-1')).status, 200);
-    assert.equal((await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }))).status, 200);
+    assert.equal((await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }))).status, 200);
 
     order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
     w.raw.exec(`INSERT INTO order_item_inventory_allocations (id, order_id, order_item_id, lot_id, scope, scope_id, qty, unit_cost_iqd, cogs_iqd, idempotency_key)
@@ -267,7 +268,7 @@ for (const linkedToLine of [false, true]) {
 test('a resale whose delivery was undone and cancelled hands on the ORIGINAL warranty — never a fresh one from today, never the cancelled line\'s extension', async () => {
   const w = world();
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
   w.raw.exec(`UPDATE order_items SET warranty_snapshot = '{"plan_id":"wp_ext12","duration_kind":"extension","duration_months":12,"total_months":24,"base_months":12}' WHERE id = 'l2'`);
   assert.equal((await scan(w, 'adm', 'ORD-2', 'l2', 1, SN)).status, 200);
@@ -297,7 +298,7 @@ test('a resale whose delivery was undone and cancelled hands on the ORIGINAL war
 /** A resale whose activation failed at delivery: the unit carries the original window, the binding still pending. */
 async function headStartLeft(w: W) {
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
   assert.equal((await scan(w, 'adm', 'ORD-2', 'l2', 1, SN)).status, 200);
   const delivered = new Date().toISOString();
@@ -345,7 +346,7 @@ test('a slot whose device was traded in no longer reads «delivered without a se
   await saraBought(w);
   const before = (await json(await get(as(w, 'adm'), '/api/admin/orders/ORD-1/serials'))).serials.slots[0];
   assert.ok(!before.flags.includes('SERIAL_MISSING_AT_DELIVERY'));
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   const after = (await json(await get(as(w, 'adm'), '/api/admin/orders/ORD-1/serials'))).serials.slots[0];
   assert.equal(after.assignment, null, 'its binding was released on purpose');
   assert.ok(!after.flags.includes('SERIAL_MISSING_AT_DELIVERY'), JSON.stringify(after.flags));
@@ -357,7 +358,7 @@ test('a slot whose device was traded in no longer reads «delivered without a se
 async function usedResale(w: W, daysLeft: number) {
   usedListing(w, 1);
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1u' }], { user: 'u2' });
   assert.equal((await json(await scan(w, 'ast', 'ORD-2', 'l2', 1, SN))).success, true);
   assert.equal((await deliver(w, 'ORD-2')).status, 200);
@@ -436,7 +437,7 @@ test('every paper prints the used-sale period: a reissue with fresh terms keeps 
 test('a reissue of an OLDER resale (recorded before its origin was) prints the first delivery, as «generate» does', async () => {
   const w = world();
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
   assert.equal((await scan(w, 'adm', 'ORD-2', 'l2', 1, SN)).status, 200);
   assert.equal((await deliver(w, 'ORD-2')).status, 200);

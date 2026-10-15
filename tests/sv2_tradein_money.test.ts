@@ -7,16 +7,16 @@
  * M1 (owner decision 3: a value above the server's figure is the owner's) and
  * M2 (owner decision 2: the credit ends) since S-P0; M3 (the credit only after
  * the device is received, S-P2 «الجهاز أولاً»); M4 and M5 (completion on the
- * new order's delivery, the device booked into stock) land with S-P2's
- * completion. M6 (the customer reads the offer, not the formula) is green on
- * the default branch (DECISIONS rows 219/220).
+ * new order's delivery, the device booked into stock), S-P2. M6 (the customer
+ * reads the offer, not the formula) is green on the default branch (DECISIONS
+ * rows 219/220).
  *
  * Run: node --import tsx --test tests/sv2_tradein_money.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { count, json, post, row } from './fixtures/app';
-import { STAFF, adminApp, checkoutBody, customerApp, daysAhead, received, restoreFetch, seed, settle, submitted } from './sv2_tradein_fixture';
+import { STAFF, adminApp, approvedAndOrdered, checkoutBody, customerApp, daysAhead, delivered, received, restoreFetch, seed, settle, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
 
@@ -82,4 +82,33 @@ test('M3 the credit is not spendable before the old device is in the shop’s ha
   assert.equal(ok.status, 200, await ok.clone().text());
   await settle();
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ?', id), 1, 'one coupon for life (row 237)');
+});
+
+test('M4 a trade-in completes when the new order is DELIVERED — a cancel before that gives the same credit back, never leaving the customer with neither device nor credit', async () => {
+  const raw = seed();
+  const id = await submitted(raw);
+  const { orderId } = await approvedAndOrdered(raw, id);
+  // The desk cannot complete while the new order is on its way (the owner's door, after delivery only).
+  const early = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/complete`);
+  assert.deepEqual([early.status, (await json(early)).code], [409, 'TRADE_IN_ORDER_NOT_DELIVERED']);
+  // The order is cancelled (stock problem, courier failure): the credit comes back on the same code.
+  const code = row<{ code: string }>(raw, 'SELECT code FROM coupons WHERE trade_in_id = ?', id)!.code;
+  raw.prepare("UPDATE orders SET status = 'cancelled', cancelled_at = ? WHERE id = ?").run(new Date().toISOString(), orderId);
+  const again = await post(customerApp(raw), `/api/trade-in/requests/${id}/checkout`);
+  const body = await json(again);
+  assert.equal(again.status, 200, JSON.stringify(body));
+  assert.equal(body.coupon_code, code);
+  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'awaiting_payment');
+});
+
+test('M5 the delivery of the new order books the old device into stock with a cost basis (the credit given)', async () => {
+  const raw = seed();
+  const id = await submitted(raw);
+  const { orderId } = await approvedAndOrdered(raw, id);
+  const lotsBefore = count(raw, 'SELECT COUNT(*) AS n FROM inventory_lots');
+  await delivered(raw, orderId);
+  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'completed');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM inventory_lots'), lotsBefore + 1);
+  const credit = row<{ credit_iqd: number }>(raw, 'SELECT credit_iqd FROM trade_in_requests WHERE id = ?', id)!.credit_iqd;
+  assert.equal(row<{ unit_cost_iqd: number }>(raw, 'SELECT unit_cost_iqd FROM inventory_lots WHERE id = ?', `ilot_ti_${id}`)!.unit_cost_iqd, credit);
 });

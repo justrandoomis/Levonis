@@ -84,6 +84,7 @@ import {
 import { requireTradeInV2, tradeInV2Installed } from '../lib/tradeInSchema';
 import { requireCostRead } from '../lib/costAccess';
 import { deviceReturned, intakeRequest } from '../lib/tradeInIntake';
+import { bookTradeInStock } from '../lib/tradeInStock';
 import { overrideRecord } from '../lib/tradeInOffer';
 import { isListedDeviceTarget, searchTargets } from '../lib/tradeInTargets';
 import {
@@ -581,7 +582,12 @@ adminTradeInRoutes.post('/requests/:id/intake', async (c) => {
   if (out.revalued) {
     afterResponse(c, notifyCustomerOfValue(c.env, out.request).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${out.request.id}:` })));
   }
-  return c.json({ success: true, request: await requestView(c.env, out.request, adminAudience(c)) });
+  // A request completed before its device was received (cut-over, §7): the device is stock now.
+  let request = out.request;
+  if (request.status === 'completed' && (await run(() => bookTradeInStock(c.env, request, { id: admin.id, role: 'admin' })))) {
+    request = (await loadRequest(c.env.DB, request.id)) ?? request;
+  }
+  return c.json({ success: true, request: await requestView(c.env, request, adminAudience(c)) });
 });
 
 /**

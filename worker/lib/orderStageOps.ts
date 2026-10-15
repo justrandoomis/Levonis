@@ -122,7 +122,8 @@ export interface MoveResult {
     | 'REFUNDED_ORDER'
     | 'GIFT_ORDER_REOPEN_REFUSED'
     | 'SERIALS_REQUIRED'
-    | 'ORDER_REOPEN_COUPON_SPENT';
+    | 'ORDER_REOPEN_COUPON_SPENT'
+    | 'TRADE_IN_ORDER_DELIVERED';
 }
 
 export interface MoveOptions {
@@ -491,6 +492,13 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'GIFT_ORDER_REOPEN_REFUSED',
+      };
+    }
+    // 0192 (S-P2): a delivered order that completed a trade-in is returned, never cancelled.
+    if (msg.includes('TRADE_IN_ORDER_DELIVERED')) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'TRADE_IN_ORDER_DELIVERED',
       };
     }
     // The coupon use this order gave back at its cancellation was spent again,

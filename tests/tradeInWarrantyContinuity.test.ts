@@ -58,10 +58,11 @@ function tradeIn(w: W, o: { user: string; order: string; item: string; scope?: '
   const now = new Date().toISOString();
   w.raw
     .prepare(
-      `INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, family, scope, credit_iqd, created_at, updated_at)
-       VALUES (?, ?, 'awaiting_payment', ?, ?, 1, 'fdm', ?, 0, ?, ?)`
+      // S-P2 (decision 2): the device was received before the exchange completes (intake recorded).
+      `INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, family, scope, credit_iqd, created_at, updated_at, intake_at)
+       VALUES (?, ?, 'awaiting_payment', ?, ?, 1, 'fdm', ?, 0, ?, ?, ?)`
     )
-    .run(id, o.user, o.order, o.item, o.scope ?? 'whole', now, now);
+    .run(id, o.user, o.order, o.item, o.scope ?? 'whole', now, now, now);
   return id;
 }
 const complete = (w: W, who: Who, id: string) => post(as(w, who), `/api/admin/trade-in/requests/${id}/complete`);
@@ -101,7 +102,7 @@ test('the owner\'s example: 12 months, traded in on day 30 → about 11 months r
   const w = world();
   const u = await saraBought(w);
   const id = tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' });
-  const res = await complete(w, 'adm', id);
+  const res = await complete(w, 'boss', id);
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal((await json(res)).request.status, 'completed');
 
@@ -116,7 +117,7 @@ test('the owner\'s example: 12 months, traded in on day 30 → about 11 months r
   // The trader's link ends on the trade-in date; the serial is the shop's to sell again.
   assert.ok(row(w.raw, 'SELECT revoked_at FROM device_registrations WHERE unit_id = ?', u.id)!.revoked_at);
   const a = row<R>(w.raw, "SELECT release_reason, release_note, released_by FROM serial_assignments WHERE order_id = 'ORD-1'")!;
-  assert.deepEqual(a, { release_reason: 'traded_in', release_note: `trade_in:${id}`, released_by: 'adm' });
+  assert.deepEqual(a, { release_reason: 'traded_in', release_note: `trade_in:${id}`, released_by: 'boss' });
   assert.equal(row(w.raw, "SELECT status FROM warranty_receipts WHERE id = 'wr_ORD-1'")!.status, 'active', 'the receipt is untouched');
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM order_item_units'), 1, 'no new warranty record');
   const audit = JSON.parse(row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action = 'serial.traded_in' AND target = ?", SN)!.detail);
@@ -171,7 +172,7 @@ test('every customer door treats a traded-in device as no longer the trader\'s �
   const u = await saraBought(w);
   const mine = await json(await get(as(w, 'u1'), '/api/devices/mine'));
   assert.equal(mine.devices.length, 1, 'before the trade-in it is hers');
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   // A trade-in completed BEFORE this code left the link live: every door must still say no.
   w.raw.prepare('UPDATE device_registrations SET revoked_at = NULL WHERE unit_id = ?').run(u.id);
 
@@ -218,7 +219,7 @@ test('a returned device cannot be re-linked by its buyer through «من طلبا
 test('an AMS-only trade-in leaves the printer with its owner: linked, listed, its serial binding active', async () => {
   const w = world();
   const u = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1', scope: 'ams_only' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1', scope: 'ams_only' }));
   assert.equal(row(w.raw, 'SELECT revoked_at FROM device_registrations WHERE unit_id = ?', u.id)!.revoked_at, null);
   assert.equal((await json(await get(as(w, 'u1'), '/api/devices/mine'))).devices.length, 1);
   assert.equal(row(w.raw, "SELECT released_at FROM serial_assignments WHERE order_id = 'ORD-1'")!.released_at, null);
@@ -245,7 +246,7 @@ test('resale under the used listing: no owner exception, the SAME warranty (star
   const w = world();
   usedListing(w);
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
 
   // Staff scan it onto Omar's order for the used listing — a normal resale.
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1u' }], { user: 'u2' });
@@ -307,7 +308,7 @@ test('resale under the used listing: no owner exception, the SAME warranty (star
 
   // Omar trades it in too; resold again on a new listing: the SAME origin.
   w.raw.prepare('UPDATE device_registrations SET revoked_at = NULL WHERE unit_id = ?').run(u2.id);
-  await complete(w, 'adm', tradeIn(w, { user: 'u2', order: 'ORD-2', item: 'l2' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u2', order: 'ORD-2', item: 'l2' }));
   order(w.raw, 'ORD-3', [{ id: 'l3', product: 'pA1' }], { user: 'u1' });
   assert.equal((await scan(w, 'adm', 'ORD-3', 'l3', 1, SN)).status, 200);
   assert.equal((await deliver(w, 'ORD-3')).status, 200);
@@ -325,7 +326,7 @@ test('resale under the used listing: no owner exception, the SAME warranty (star
 test('a resale on a new listing with a purchased +12 plan: end = the ORIGINAL end + 12 months, start unchanged', async () => {
   const w = world();
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
   w.raw.exec(`UPDATE order_items SET warranty_snapshot = '{"plan_id":"wp_ext12","duration_kind":"extension","duration_months":12,"total_months":24,"base_months":12}' WHERE id = 'l2'`);
   assert.equal((await scan(w, 'adm', 'ORD-2', 'l2', 1, SN)).status, 200);
@@ -340,7 +341,7 @@ test('a resale on a new listing with a purchased +12 plan: end = the ORIGINAL en
 test('restart is retired: 409 WARRANTY_RESTART_RETIRED at the warranty-mode door and at the owner\'s override, for the owner too', async () => {
   const w = world();
   await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
   const mode = await post(as(w, 'boss'), `/api/devices/admin/serial-inventory/${SN}/warranty-mode`, { mode: 'restart', reason: 'a fresh year for the buyer' });
   assert.equal(mode.status, 409);
@@ -356,7 +357,7 @@ test('restart is retired: 409 WARRANTY_RESTART_RETIRED at the warranty-mode door
 test('S8 an activation that fails leaves NO reset window: the unit is born with the carried window, and the sweep only confirms it', async () => {
   const w = world();
   const u1 = await saraBought(w);
-  await complete(w, 'adm', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
+  await complete(w, 'boss', tradeIn(w, { user: 'u1', order: 'ORD-1', item: 'l1' }));
   order(w.raw, 'ORD-2', [{ id: 'l2', product: 'pA1' }], { user: 'u2' });
   assert.equal((await scan(w, 'adm', 'ORD-2', 'l2', 1, SN)).status, 200);
   const delivered = new Date().toISOString();
@@ -397,14 +398,15 @@ test('S9 recomputeUnitWindow keeps a carried START as well as its end; only the 
 
 // ============================================================ per-role authorization
 
-test('completion moves the device and the money it stands for (owner decision 3, G16): the owner and a full admin complete; an assistant or a preparer is refused; customers, merchants and strangers get nothing', async () => {
+test('completion moves the device and the money it stands for (owner decision 3, G16; S-P2): the manual door is the owner’s — a full admin, an assistant or a preparer is refused; customers, merchants and strangers get nothing', async () => {
   const w = world();
   w.raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role,admin_scope) VALUES ('prep','Prep','prep@x.co','h','admin','assistant'), ('m1','Shop','m1@x.co','h','merchant',NULL);
     INSERT INTO ops_permissions (user_id, capability, allowed) VALUES ('prep','receive',0);
   `);
   const admins = ['boss', 'adm', 'ast', 'prep'] as const;
-  const moneyScope = new Set<string>(['boss', 'adm']);
+  // S-P2 (DECISIONS row 238): completion is automatic on delivery; the manual door is the owner's alone.
+  const moneyScope = new Set<string>(['boss']);
   let n = 0;
   for (const who of admins) {
     n++;
@@ -416,7 +418,7 @@ test('completion moves the device and the money it stands for (owner decision 3,
     const res = await complete(w, who, id);
     if (!moneyScope.has(who)) {
       assert.equal(res.status, 403, `${who}: ${await res.clone().text()}`);
-      assert.equal((await json(res)).code, 'FINANCIAL_SCOPE_REQUIRED');
+      assert.equal((await json(res)).code, who === 'adm' ? 'OWNER_REQUIRED' : 'FINANCIAL_SCOPE_REQUIRED');
       assert.equal(row(w.raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'awaiting_payment', `${who}: nothing moved`);
       continue;
     }

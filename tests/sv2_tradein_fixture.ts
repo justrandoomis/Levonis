@@ -12,6 +12,8 @@ import { tradeInRoutes, adminTradeInRoutes } from '../worker/routes/tradeIn';
 import { fileRoutes } from '../worker/routes/uploads';
 import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
+import { returnRoutes } from '../worker/routes/returns';
+import { runOrderDeliveredEffects } from '../worker/lib/orderDeliveredEffects';
 import { REQUIRED_PHOTOS, blankInputs } from '../packages/pricing/src/tradeIn';
 import { acceptedPolicies } from './lib/policies';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
@@ -75,7 +77,17 @@ export const customerApp = (raw: DatabaseSync, user: StubUser = CUSTOMER) =>
 export const adminApp = (raw: DatabaseSync, user: StubUser = OWNER) =>
   stubApp(dbOf(raw), user, (a) => {
     a.route('/api/admin/trade-in', adminTradeInRoutes);
+    a.route('/api/returns', returnRoutes);
   }, { env: ENV });
+
+/**
+ * THE NEW ORDER IS DELIVERED — the delivered hook every door runs (`runOrderDeliveredEffects`):
+ * S-P2 completes the trade-in its credit paid for and books the old device into stock.
+ */
+export async function delivered(raw: DatabaseSync, orderId: string): Promise<void> {
+  raw.prepare("UPDATE orders SET status = 'delivered', stage = 'delivered', delivered_at = ? WHERE id = ?").run(new Date().toISOString(), orderId);
+  await runOrderDeliveredEffects({ DB: dbOf(raw), ...ENV } as never, orderId);
+}
 
 export const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 export const daysAhead = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();

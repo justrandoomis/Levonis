@@ -83,6 +83,9 @@ import { canMoveMoney, isOwner } from '../lib/adminScope';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { closedClaimSql } from '../lib/deviceOps';
 import { returnWinsStatements, tradedUnitsSql, tradeInInstalled, tradeInsOnLine } from '../lib/tradeIn';
+import { tradeInV2Installed } from '../lib/tradeInSchema';
+import { completeTradeInsForOrder } from '../lib/tradeInStock';
+import { returnReissueStatements, tradeInCreditOf } from '../lib/tradeInReissue';
 import { loadPricingContext, memberFallbackFor } from './cart';
 import {
   CHANNEL_CLOSED_ERRORS,
@@ -855,6 +858,9 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   let restoredCost: number | null | undefined;
 
   if (to === 'resolved' && resolution === 'refund') {
+    // S-P2 §6.9: a trade-in this order's credit paid for is completed first (idempotent — normally
+    // it already was, on delivery), so the credit it gives back below is a completed request's.
+    if (await tradeInV2Installed(c.env.DB)) await completeTradeInsForOrder(c.env, kase.order_id, { id: null, role: 'system' });
     // Read immutable invoice rows, including bundle parents. The finance
     // workspace's later cost/revenue edits never change customer refunds.
     const { results: orderItems } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id=? ORDER BY id')
@@ -863,6 +869,10 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id=?')
       .bind(kase.order_id).first<Record<string, unknown>>();
     if (!item || !order) throw notFound('Return invoice not found');
+    // THE TRADE-IN CREDIT IS THE NEW DEVICE'S, NOT THE ORDER'S (plan §1.2): attributed to the line
+    // it paid for, never spread as a residual over the other lines; given back, never paid as cash.
+    const tradeInCredit = (await tradeInV2Installed(c.env.DB)) ? await tradeInCreditOf(c.env.DB, order, orderItems as never) : null;
+    const creditLine = tradeInCredit?.lineId ?? null;
     {
       // Refund the paid amount for the returned qty, net of this line's
       // proportional share of order-level discounts. Shipping is NOT
@@ -896,7 +906,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const couponTotal = coupon ? Math.max(0, Math.trunc(Number(coupon.discount_iqd) || 0)) : 0;
       const couponDelivery = coupon ? Math.min(couponTotal, Math.max(0, Math.trunc(Number(coupon.delivery_iqd) || 0))) : 0;
       const lineCoupons = orderItems.reduce((sum, line) => sum + Math.max(0, Math.trunc(Number(line.coupon_discount_iqd) || 0)), 0);
-      const couponResidual = Math.max(0, couponTotal - couponDelivery - lineCoupons);
+      const couponResidual = Math.max(0, couponTotal - couponDelivery - lineCoupons - (creditLine ? tradeInCredit!.amount : 0));
       const discounts = couponResidual + (Number(order.points_discount_iqd) || 0);
       const base = (Number(order.subtotal_iqd) || 0) + (Number(order.shipping_iqd) || 0);
       // Unit-level savings are already inside the frozen price. The shared
@@ -947,8 +957,13 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       // Cumulative floors give the final returned unit the exact remainder.
       // Existing recorded credits count towards the cap without being edited.
       const endQty = Math.min(itemQty, prior.qty + kase.qty);
-      const refundIqd = Math.max(0, Math.min(fullRefund - prior.amount,
+      let refundIqd = Math.max(0, Math.min(fullRefund - prior.amount,
         Math.floor(fullRefund * endQty / itemQty) - Math.floor(fullRefund * Math.min(itemQty, prior.qty) / itemQty)));
+      // The line the trade-in credit paid for: its FIRST refund is cash net of the credit (the credit
+      // itself comes back as the same coupon, below); later units of the line are refunded as before,
+      // so the line's cash refunds sum to its basis − the credit (§16 D-13).
+      const givesCreditBack = !!tradeInCredit && creditLine === item.id && Number(prior.qty) === 0;
+      if (givesCreditBack) refundIqd = Math.max(0, refundIqd - tradeInCredit!.amount);
       // Lots/returns predate ops_guards: the return table's own positive-qty
       // CHECK supplies the transaction fence without a newer schema dependency.
       // No row is inserted on success. A concurrent refund must replan while
@@ -1030,9 +1045,15 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       const evidence = await auditStatements(c.env.DB, admin.id, 'return.refund_decided', id, {
         order_id: kase.order_id, order_item_id: kase.order_item_id, qty: kase.qty,
         refund: { amount_iqd: refundIqd, credited: credit !== null, channel: settledByGini ? 'gini' : 'wallet' },
+        ...(givesCreditBack ? { trade_in_credit_back: { request_id: tradeInCredit!.requestId, amount_iqd: tradeInCredit!.amount } } : {}),
       });
       try {
-        await c.env.DB.batch([refundFence, flipStatement, ...(credit ? [credit] : []), ...(restorePlan?.statements??[]), ...originStatements, ...evidence.statements]);
+        await c.env.DB.batch([
+          refundFence, flipStatement, ...(credit ? [credit] : []),
+          // S-P2 §6.9: the same coupon comes back for 30 days on any direct-sale device (completed requests only).
+          ...(givesCreditBack ? returnReissueStatements(c.env.DB, tradeInCredit!, { orderId: kase.order_id, returnCaseId: id, userId: kase.user_id, now: nowIso }) : []),
+          ...(restorePlan?.statements??[]), ...originStatements, ...evidence.statements,
+        ]);
       } catch (e) {
         if (/CHECK constraint failed:\s*qty\s*>\s*0/.test(String(e))) {
           throw badRequest(serverMessage('RETURN_RESOLUTION_RETRY'), 'RETURN_RESOLUTION_RETRY');

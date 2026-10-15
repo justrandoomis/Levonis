@@ -2836,13 +2836,13 @@ async function reissuedCredit(db: D1Database, req: RequestRow): Promise<{ code: 
   return { code: coupon.code, order_id: null, any_device: true, ends_at: coupon.ends_at ?? reissue.ends_at };
 }
 
-interface CustodyPlan {
+export interface CustodyPlan {
   unitId: string | null;
   statements: D1PreparedStatement[];
 }
 
 /** The live unit of the request's slot and who else holds it, or null for an AMS-only trade-in. */
-async function custodyTarget(db: D1Database, req: RequestRow) {
+export async function custodyTarget(db: D1Database, req: RequestRow) {
   if (req.scope === 'ams_only') return null;
   const unit = await liveUnitOfSlot<{ id: string; replaced_by_unit_id: string | null; warranty_start_at: string | null; warranty_end_at: string | null }>(
     db,
@@ -2881,7 +2881,7 @@ async function custodyTarget(db: D1Database, req: RequestRow) {
  * replacement chain) — nothing else marks the unit.
  * An `ams_only` trade-in leaves the device with the customer: nothing moves.
  */
-async function custodyStatements(env: Env, req: RequestRow, adminId: string, now: string): Promise<CustodyPlan> {
+export async function custodyStatements(env: Env, req: RequestRow, adminId: string | null, now: string): Promise<CustodyPlan> {
   const db = env.DB;
   const target = await custodyTarget(db, req);
   if (!target) return { unitId: null, statements: [] };
@@ -2926,6 +2926,12 @@ async function custodyStatements(env: Env, req: RequestRow, adminId: string, now
 
 export async function completeRequest(env: Env, req: RequestRow, adminId: string): Promise<RequestRow> {
   const db = env.DB;
+  // S-P2: completion books the device into stock and waits for the new order's delivery
+  // (worker/lib/tradeInStock.ts). Before 0192 the manual act below stands.
+  if (await tradeInV2Installed(db)) {
+    const { completeManually } = await import('./tradeInStock');
+    return completeManually(env, req, adminId);
+  }
   if (!canTransition(req.status, 'completed')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   const live = (await creditOrders(db, req.id)).find((o) => o.status !== 'cancelled');
   // A credit of zero has nothing to redeem; anything else must have been
@@ -3178,7 +3184,8 @@ export async function requestView(env: Env, req: RequestRow, audience: RequestAu
   const nowMs = Date.parse(now);
   const stored = safeParse<Estimate | null>(req.estimate_json, null);
   const blockers = req.status === 'draft' ? submitBlockers(req, comps, photos, book) : null;
-  const creditOrder = orders.find((o) => o.status !== 'cancelled') ?? null;
+  // The order holding the credit: not cancelled, its use still spent (a returned device's order gave it back).
+  const creditOrder = orders.find((o) => o.status !== 'cancelled' && o.redemption_state === 'active') ?? null;
   // The credit's last moment, as «إتمام الدفع» will judge it (`checkoutCredit`). A released
   // order's time is already in `ends_at`; only a cancellation from before 0191, whose use is
   // still spent, is added on read.

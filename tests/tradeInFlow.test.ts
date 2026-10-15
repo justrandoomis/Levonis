@@ -633,8 +633,14 @@ test('the accepted value is credited ONCE, on the target line only, for its owne
   const placed2 = await post(a, '/api/orders', await checkoutBody({ couponCode: re.coupon_code }));
   assert.equal(placed2.status, 200, await placed2.clone().text());
   raw.exec(`INSERT INTO device_registrations (unit_id, user_id) VALUES ('unit_combo','cust')`);
+  // S-P2: the exchange completes when the new device is DELIVERED (the owner's door after that).
+  const order2 = (await json(placed2)).order.id as string;
+  assert.equal((await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/complete`))).code, 'TRADE_IN_ORDER_NOT_DELIVERED');
+  raw.prepare("UPDATE orders SET status = 'delivered', delivered_at = ? WHERE id = ?").run(new Date().toISOString(), order2);
   const done = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/complete`));
   assert.equal(done.request.status, 'completed');
+  // The AMS alone became a used-AMS draft at cost = the credit.
+  assert.equal(row<{ sub_category_id: string; status: string }>(raw, 'SELECT sub_category_id, status FROM products WHERE id = ?', `prd_ti_${id}`)!.status, 'hidden');
   // Owner decision 3 (row 193): this was the AMS alone — the printer stays
   // with Sara: still linked, its warranty untouched, no custody written.
   assert.equal(row<{ revoked_at: string | null }>(raw, "SELECT revoked_at FROM device_registrations WHERE unit_id = 'unit_combo'")!.revoked_at, null);

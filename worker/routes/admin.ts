@@ -2579,6 +2579,11 @@ function couponSpentReopenRefusal(): HttpError {
   );
 }
 
+/** 409 for every admin door that would cancel a delivered order that completed a trade-in (0192): it is returned instead. */
+function tradeInDeliveredRefusal(): HttpError {
+  return new HttpError(409, 'A delivered order that completed a trade-in is not cancelled; open a return instead.', 'TRADE_IN_ORDER_DELIVERED');
+}
+
 /** 409 for every admin door that would move a price-held order (0140). */
 function priceHeldRefusal(orderId: string): HttpError {
   return new HttpError(409, PRICE_APPROVAL_PENDING_MESSAGE, 'PRICE_APPROVAL_PENDING', { order_id: orderId });
@@ -3419,6 +3424,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
     if (res.reason === 'GIFT_ORDER_REOPEN_REFUSED') throw giftReopenRefusal();
     if (res.reason === 'ORDER_REOPEN_COUPON_SPENT') throw couponSpentReopenRefusal();
+    if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // The re-claim trigger refused (§17 decision 4). The transition itself is
@@ -3560,6 +3566,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
     } catch (e) {
       const again = await c.env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(id).first<{ status: string }>();
       if (again && again.status !== from) throw badRequest('The order changed while you were editing — reload and retry');
+      // 0192 (S-P2): a delivered order that completed a trade-in is returned, never cancelled.
+      if (/TRADE_IN_ORDER_DELIVERED/.test(e instanceof Error ? e.message : String(e))) throw tradeInDeliveredRefusal();
       throw e;
     }
     stockNote = stockReturnNote(stock.kind, stock.plan?.applied ?? 0);

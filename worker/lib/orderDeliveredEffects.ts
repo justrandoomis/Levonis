@@ -47,6 +47,7 @@ import { createUnitsOnDelivery, type CreateUnitsResult } from './deviceOps';
 import { awardOrderPoints } from './pointsOps';
 import { onOrderDelivered } from './membershipOps';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
+import { completeTradeInsForOrder } from './tradeInStock';
 
 export interface DeliveredEffectsResult {
   deviceUnits: CreateUnitsResult | null;
@@ -111,6 +112,16 @@ export async function runOrderDeliveredEffects(
     console.error('device unit creation failed for order', orderId, e instanceof Error ? e.message : String(e));
     // Honest partial outcome: the order IS delivered, units are missing.
     deviceUnitsWarning = DEVICE_UNITS_WARNING;
+  }
+
+  // S-P2 (DECISIONS row 238): a trade-in whose credit this order spent completes NOW — the old
+  // device becomes stock at cost = the credit (a hidden used draft, its own lot). Total and
+  // idempotent (the request's status fence, the lot's and provenance's no-reinsert triggers); the
+  // services sweep retries one that failed here.
+  try {
+    await completeTradeInsForOrder(env, orderId, { id: null, role: 'system' });
+  } catch (e) {
+    console.error('trade-in completion failed for order', orderId, e instanceof Error ? e.message : String(e));
   }
 
   // Purchase points (decision row 20 defaults). Awaited — points are account

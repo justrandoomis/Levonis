@@ -39,7 +39,7 @@ export default {
       prefix: '/api/admin/trade-in',
       name: 'adminTradeInRoutes',
       router: adminTradeInRoutes,
-      writes: 'a trade-in request’s status (cancel); its valuation and completion are `money` routes',
+      writes: 'a trade-in request’s status (cancel); its valuation is a `money` route, its manual completion the owner’s',
       routes: {
         'GET /requests': 'op',
         'GET /requests/:id': 'op',
@@ -53,7 +53,8 @@ export default {
         // Decision 3: a financial admin up to the server's ceiling from intake; above it the owner (judged in the handler).
         'POST /requests/:id/approve': 'money',
         'POST /requests/:id/value': 'money',
-        'POST /requests/:id/complete': 'money',
+        // S-P2: completion is automatic on the new order's delivery; the manual door is the owner's, after delivery.
+        'POST /requests/:id/complete': 'owner',
         'POST /requests/:id/cancel': 'op',
         // B.10: the rules (weights, cap, floor, references, offer parameters) price every offer — the owner's to read.
         'GET /rules': 'cost_read',
