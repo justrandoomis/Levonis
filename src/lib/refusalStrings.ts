@@ -1370,6 +1370,71 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The credit can be used once we receive your old device.',
     ckb: 'باڵانسەکە دوای وەرگرتنی ئامێرە کۆنەکەت بەکاردێت.',
   },
+  TRADE_IN_NO_OFFER: {
+    ar: 'لا نستطيع تقديم عرض لهذا الجهاز حالياً.',
+    en: 'We can’t make an offer for this device right now.',
+    ckb: 'لە ئێستادا ناتوانین پێشنیار بۆ ئەم ئامێرە بکەین.',
+  },
+  TRADE_IN_TARGET_NOT_LISTED: {
+    ar: 'هذا الجهاز غير معروض للبيع الآن، فلا يمكن اختياره. اختر جهازاً آخر.',
+    en: 'This device is not on sale right now, so it can’t be chosen. Choose another one.',
+    ckb: 'ئەم ئامێرە ئێستا بۆ فرۆشتن نییە، بۆیە هەڵنابژێردرێت. ئامێرێکی تر هەڵبژێرە.',
+  },
+  TRADE_IN_OFFER_EXPIRED: {
+    ar: 'انتهت صلاحية العرض. أنشئ طلباً جديداً لتحصل على عرض بأسعار اليوم.',
+    en: 'The offer expired. Open a new request for an offer at today’s prices.',
+    ckb: 'ماوەی پێشنیارەکە بەسەرچوو. داواکارییەکی نوێ بکەرەوە بۆ پێشنیارێک بە نرخەکانی ئەمڕۆ.',
+  },
+  TRADE_IN_SERIAL_MISMATCH: {
+    ar: 'الرقم التسلسلي لا يطابق الجهاز المباع.',
+    en: 'The serial number does not match the device sold.',
+    ckb: 'ژمارەی زنجیرەیی لەگەڵ ئامێرە فرۆشراوەکە ناگونجێت.',
+  },
+  TRADE_IN_ALREADY_RECEIVED: {
+    ar: 'سُجّل استلام هذا الجهاز من قبل.',
+    en: 'This device’s receipt was already recorded.',
+    ckb: 'وەرگرتنی ئەم ئامێرە پێشتر تۆمار کراوە.',
+  },
+  TRADE_IN_INTAKE_REQUIRED: {
+    ar: 'استلم الجهاز وسجّل رقمه التسلسلي وساعاته أولاً.',
+    en: 'Receive the device and record its serial and hours first.',
+    ckb: 'سەرەتا ئامێرەکە وەربگرە و ژمارەی زنجیرەیی و کاتژمێرەکانی تۆمار بکە.',
+  },
+  TRADE_IN_OWN_REQUEST: {
+    ar: 'لا يستلم الموظف جهاز طلبه هو؛ يتولاه زميل.',
+    en: 'Staff do not receive their own trade-in; a colleague handles it.',
+    ckb: 'کارمەند ئامێری داواکاریی خۆی وەرناگرێت؛ هاوکارێکی تر ئەنجامی دەدات.',
+  },
+  TRADE_IN_ORDER_NOT_DELIVERED: {
+    ar: 'يكتمل الاستبدال عند تسليم الجهاز الجديد.',
+    en: 'The trade-in completes when the new device is delivered.',
+    ckb: 'گۆڕینەوەکە کاتێک تەواو دەبێت کە ئامێرە نوێیەکە گەیەندرا.',
+  },
+  TRADE_IN_ORDER_DELIVERED: {
+    ar: 'لا يُلغى طلب سُلّم واكتمل به استبدال؛ افتح طلب إرجاع بدلاً من ذلك.',
+    en: 'A delivered order that completed a trade-in is not cancelled; open a return instead.',
+    ckb: 'داواکارییەک کە گەیەندراوە و گۆڕینەوەیەکی پێ تەواو بووە هەڵناوەشێندرێتەوە؛ لە جیاتی ئەوە داواکاریی گەڕاندنەوە بکەرەوە.',
+  },
+  TRADE_IN_DEVICE_IN_SHOP: {
+    ar: 'هذا الجهاز لدينا ضمن طلب استبدال، فلا يمكن فتح طلب آخر عليه.',
+    en: 'This device is with us for a trade-in, so no other request can be opened on it.',
+    ckb: 'ئەم ئامێرە لای ئێمەیە بۆ گۆڕینەوە، بۆیە ناتوانرێت داواکارییەکی تری لەسەر بکرێتەوە.',
+  },
+  TRADE_IN_MARGIN_ACK_REQUIRED: {
+    ar: 'أكّد أنك تفهم أن الهامش يقل وقد يكون خسارة.',
+    en: 'Confirm you understand the margin shrinks and may be a loss.',
+    ckb: 'پشتڕاستی بکەرەوە کە تێدەگەیت پەراوێزەکە کەم دەبێتەوە و لەوانەیە زیان بێت.',
+  },
+  TRADE_IN_HOURS_PHOTO: {
+    ar: 'صوّر شاشة ساعات التشغيل.',
+    en: 'Photograph the hours screen.',
+    ckb: 'وێنەی شاشەی کاتژمێرەکانی کارکردن بگرە.',
+  },
+  TRADE_IN_DAMAGE_PHOTO: {
+    ar: 'أضف صورة لكل ضرر اخترته.',
+    en: 'Add a photo for each damage you ticked.',
+    ckb: 'بۆ هەر زیانێک کە هەڵتبژاردووە وێنەیەک زیاد بکە.',
+  },
   // A Worker ahead of migration 0192: the new trade-in doors answer 503 until it lands.
   TRADE_IN_V2_NOT_INSTALLED: {
     ar: 'خدمة الاستبدال تُحدَّث الآن. حاول بعد قليل.',

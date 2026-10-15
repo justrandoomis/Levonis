@@ -13,11 +13,11 @@
  * answer that the save would refuse must be refused the same way.
  *
  * Since Services V2 (trade-in G11) the preview is COUNTED and a draft's own
- * view carries no figure for its customer — saving answers and reading the
- * draft back would be an uncounted door to the same figure. So "the figure
- * the request then carries" is read where it still lives: the desk's view of
- * the saved draft (GET /api/admin/trade-in/requests/:id), which is the figure
- * the submit fixes.
+ * view carries no figure for anyone — saving answers and reading the draft
+ * back would be an uncounted door to the same figure. Since S-P2 the figure is
+ * ONE offer (no part value), and submit fixes it by pricing the SAVED answers
+ * with `offerFor` (worker/lib/tradeInOffer.ts): so "the figure the request then
+ * carries" is that same function over the saved draft.
  *
  * LOCAL ONLY: in-memory SQLite, the real trade-in routes, a stub session.
  */
@@ -25,8 +25,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, stubApp, post, get, json, send, OWNER, type StubUser } from './fixtures/app';
-import { tradeInRoutes, adminTradeInRoutes } from '../worker/routes/tradeIn';
-import { blankInputs } from '../packages/pricing/src/tradeIn';
+import { tradeInRoutes } from '../worker/routes/tradeIn';
+import { blankInputs, tradeInSettlement } from '../packages/pricing/src/tradeIn';
+import { loadComponents, loadRequest, loadRuleBook, resolveUnit, slotOf } from '../worker/lib/tradeIn';
+import { offerFor, storedInputs } from '../worker/lib/tradeInOffer';
+import type { Env } from '../worker/lib/types';
 
 const CUSTOMER: StubUser = { id: 'cust', role: 'customer', email: 'sara@x.co' };
 const DELIVERED = '2025-09-26T00:00:00.000Z';
@@ -57,18 +60,28 @@ function seed(): DatabaseSync {
   return raw;
 }
 const appOf = (raw: DatabaseSync) => stubApp(asD1(raw), CUSTOMER, (a) => a.route('/api/trade-in', tradeInRoutes));
-const deskOf = (raw: DatabaseSync) => stubApp(asD1(raw), OWNER, (a) => a.route('/api/admin/trade-in', adminTradeInRoutes));
+void OWNER;
+void get;
 
 type Est = { total_iqd: number; components: Array<{ role: string; value_iqd: number }>; settlement: { difference_iqd?: number } | null };
-type DeskEst = { total_iqd: number; components: Array<{ role: string; valuation: { value_iqd: number } }>; settlement: { difference_iqd?: number } | null };
 
-/** The saved draft's figure, as the desk reads it (and the submit will fix it). */
+/** The saved draft's figure, exactly as the submit will fix it (`offerFor` over the saved answers). */
 async function carried(raw: DatabaseSync, id: string): Promise<Est> {
-  const res = await get(deskOf(raw), `/api/admin/trade-in/requests/${id}`);
-  assert.equal(res.status, 200, await res.clone().text());
-  const e = (await json(res)).request.estimate as DeskEst;
-  assert.ok(e, 'the desk reads the saved draft\'s figure');
-  return { total_iqd: e.total_iqd, components: e.components.map((c) => ({ role: c.role, value_iqd: c.valuation.value_iqd })), settlement: e.settlement };
+  const env = { DB: asD1(raw) } as unknown as Env;
+  const req = (await loadRequest(env.DB, id))!;
+  const [comps, book, slot] = await Promise.all([loadComponents(env.DB, id), loadRuleBook(env.DB), slotOf(env.DB, req.order_item_id, req.unit_index)]);
+  const unit = await resolveUnit(env, req.user_id, req.order_item_id, req.unit_index);
+  const o = await offerFor(env, {
+    req,
+    unit,
+    comps,
+    book,
+    phase: 'submit',
+    inputsOf: (c) => storedInputs(comps.find((x) => x.role === c.role)!.inputs_json, book[c.family]),
+    slotUnitIds: slot.unitIds,
+    nowIso: new Date().toISOString(),
+  });
+  return { total_iqd: o.offer_iqd ?? 0, components: [], settlement: req.target_price_iqd && o.offer_iqd !== null ? tradeInSettlement(req.target_price_iqd, o.offer_iqd) : null };
 }
 
 async function open(raw: DatabaseSync, order_item_id: string, scope: string) {
@@ -106,7 +119,8 @@ for (const [label, item, scope, over] of [
     const saved = (await json(await send(a, 'PATCH', `/api/trade-in/requests/${req.id}`, { components }))).request;
     assert.equal(saved.estimate, null, 'saving answers does not hand the customer a figure');
     const desk = await carried(raw, req.id);
-    assert.deepEqual(parts(live), parts(desk), 'each part: the wizard\'s live value = the saved value');
+    assert.deepEqual(parts(live), [], 'no part value reaches the customer (S-P2, G11)');
+    assert.deepEqual(parts(desk), []);
     assert.equal(live.total_iqd, desk.total_iqd, 'the total: live = saved');
     assert.ok(live.total_iqd > 0, 'a real figure');
     assert.notEqual(live.total_iqd, blank.total_iqd, 'the answers moved the figure (the door read them)');

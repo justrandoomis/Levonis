@@ -4065,6 +4065,10 @@ adminRoutes.put('/settings/:key', async (c) => {
   // The farm's balancing document has exactly one write path — the route that
   // normalises it, refuses an unusable one, bumps its version and audits the
   // change per section. Storing it raw here would bypass all four.
+  // Trade-in v2 policy (S-P2): the owner's, through its own door, which validates and audits it.
+  if (key === 'tradeInPolicy') {
+    throw badRequest('سياسة الاستبدال تُحرَّر من مسارها الخاص / Use PUT /api/admin/trade-in/policy for the trade-in policy', 'TRADE_IN_POLICY_ROUTE');
+  }
   if (key === 'printerFarmConfig') {
     throw badRequest(
       'إعدادات مزرعة الطابعات تُحرَّر من مسارها الخاص / Use PUT /api/admin/farm/config/:section for the printer farm configuration',

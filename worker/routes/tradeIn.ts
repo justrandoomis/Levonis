@@ -35,7 +35,7 @@ import { HttpError, badRequest, int, notFound, oneOf, requireAdmin, requireAuth,
 import { rateLimit } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
-import { canMoveMoney, isOwner, isUnverifiedOwner } from '../lib/adminScope';
+import { canMoveMoney, canViewCost, isOwner, isUnverifiedOwner } from '../lib/adminScope';
 import { buildMediaKey, deleteMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { convertToWebp, extensionFor, isConvertibleToWebp } from '../lib/imageConvert';
 import { rasterDimensions } from '../lib/imageMetadata';
@@ -73,9 +73,12 @@ import {
   ruleSetHistory,
   saveDraft,
   saveRuleSet,
+  setHandover,
   stampCustomerPrompt,
   submitRequest,
 } from '../lib/tradeIn';
+import { requireTradeInV2, tradeInV2Installed } from '../lib/tradeInSchema';
+import { isListedDeviceTarget, searchTargets } from '../lib/tradeInTargets';
 import {
   MAX_DAMAGE_PHOTOS,
   MAX_PHOTOS_PER_ANGLE,
@@ -85,6 +88,7 @@ import {
   TRADE_IN_SCOPES,
   TRADE_IN_STATUSES,
   blankInputs,
+  checklistOf,
   isAllowedAngle,
   tradeInSettlement,
   validateInputs,
@@ -158,9 +162,36 @@ tradeInRoutes.get('/eligible', async (c) => {
   });
 });
 
+/**
+ * The devices a credit can buy. v2 (0192): the server's search — `q` (≥ 2
+ * characters; else the featured twenty), `family`, keyset `cursor` — each with
+ * THIS customer's lowest direct-sale price (never `products.price_iqd`).
+ */
 tradeInRoutes.get('/targets', async (c) => {
+  const user = c.get('user')!;
   await rateLimit(c, 'trade_in_read', 120, 60);
-  return c.json({ success: true, targets: await listTargets(c.env) });
+  if (!(await tradeInV2Installed(c.env.DB))) return c.json({ success: true, targets: await listTargets(c.env) });
+  const family = c.req.query('family') || null;
+  if (family && !(['fdm', 'resin', 'laser', 'ams'] as const).includes(family as 'fdm')) throw badRequest('Unknown family');
+  const out = await searchTargets(c.env, user.id, { q: c.req.query('q') ?? '', family: family as TradeInFamily | null, cursor: c.req.query('cursor') ?? null });
+  return c.json({ success: true, ...out });
+});
+
+/**
+ * THE PRODUCT-PAGE ENTRY (S-P2 §10.2): how many of the caller's units can be
+ * traded in now, and whether this product is a listed device a credit can buy.
+ * Signed in only (the router); a database without 0192 answers 503.
+ */
+tradeInRoutes.get('/entry', async (c) => {
+  const user = c.get('user')!;
+  await rateLimit(c, 'trade_in_read', 120, 60);
+  await requireTradeInV2(c.env.DB);
+  const productId = c.req.query('product_id') ?? '';
+  const [units, targetOk] = await Promise.all([
+    listEligible(c.env, user.id),
+    ITEM_ID_RE.test(productId) ? isListedDeviceTarget(c.env, productId) : Promise.resolve(false),
+  ]);
+  return c.json({ success: true, eligible_units: units.filter((u) => u.available).length, target_ok: targetOk });
 });
 
 tradeInRoutes.post('/target-quote', async (c) => {
@@ -201,7 +232,15 @@ tradeInRoutes.patch('/requests/:id', async (c) => {
   await rateLimit(c, 'trade_in_save', 240, 3600);
   const id = requestIdOf(c);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const req = await run(() => saveDraft(c.env, user.id, id, body));
+  // v2: how the device reaches the shop — while a draft, or sent and not yet received.
+  if (body.handover !== undefined) {
+    await requireTradeInV2(c.env.DB);
+    const handover = oneOf(body.handover, 'handover', ['store', 'pickup'] as const);
+    await run(() => setHandover(c.env, user.id, id, handover));
+  }
+  const { handover: _h, ...rest } = body;
+  void _h;
+  const req = Object.keys(rest).length ? await run(() => saveDraft(c.env, user.id, id, rest)) : await run(() => ownRequest(c.env.DB, user.id, id));
   return c.json({ success: true, request: await requestView(c.env, req, 'customer') });
 });
 
@@ -215,7 +254,8 @@ tradeInRoutes.post('/requests/:id/preview', async (c) => {
   await rateLimit(c, 'trade_in_preview', 60, 3600);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
   const answer = await run(() => previewDraft(c.env, user.id, requestIdOf(c), body));
-  return c.json({ success: true, estimate: answer.estimate, previews_left: answer.previews_left });
+  // v2: `offer` is the one figure; `estimate.total_iqd` repeats it for a phone still holding the old wizard (§7.4).
+  return c.json({ success: true, ...(answer.offer ? { offer: answer.offer } : {}), estimate: answer.estimate, previews_left: answer.previews_left });
 });
 
 /**
@@ -243,7 +283,15 @@ tradeInRoutes.post('/requests/:id/photos', async (c) => {
   const comps = await loadComponents(c.env.DB, id);
   const comp = comps.find((x) => x.role === role);
   if (!comp) throw badRequest('Unknown component', 'TRADE_IN_PHOTO_ANGLE');
-  if (!isAllowedAngle(comp.family, angle)) throw badRequest('That photo angle does not apply to this device.', 'TRADE_IN_PHOTO_ANGLE');
+  const version = req.valuation_version ?? 1;
+  if (!isAllowedAngle(comp.family, angle, version)) throw badRequest('That photo angle does not apply to this device.', 'TRADE_IN_PHOTO_ANGLE');
+  // v2 (G14): what the photograph proves — the hours screen, or one ticked fault (a fault id of the family's checklist).
+  const v2 = await tradeInV2Installed(c.env.DB);
+  const proves = v2 ? str(form.get('proves'), 'proves', { max: 40, required: false }) : '';
+  if (proves && proves !== 'hours') {
+    const faults = checklistOf((await loadRuleBook(c.env.DB))[comp.family], 'faults').map((f) => f.id);
+    if (!faults.includes(proves) || angle !== OPTIONAL_PHOTO.id) throw badRequest('That photo angle does not apply to this device.', 'TRADE_IN_PHOTO_ANGLE');
+  }
   const photos = await loadPhotos(c.env.DB, id);
   const sameAngle = photos.filter((p) => p.component_role === role && p.angle === angle).length;
   const perAngle = angle === OPTIONAL_PHOTO.id ? MAX_DAMAGE_PHOTOS : MAX_PHOTOS_PER_ANGLE;
@@ -300,18 +348,18 @@ tradeInRoutes.post('/requests/:id/photos', async (c) => {
   // Draft-fenced: a photo cannot attach to a request that was sent while the
   // bytes were in flight. The INSERT … SELECT writes nothing in that case.
   const res = await c.env.DB.prepare(
-    `INSERT INTO trade_in_photos (id, request_id, component_role, angle, file_key, mime, bytes, width, height, uploaded_by, created_at)
-     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
+    `INSERT INTO trade_in_photos (id, request_id, component_role, angle, file_key, mime, bytes, width, height, uploaded_by, created_at${v2 ? ', phase, proves' : ''})
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11${v2 ? ", 'customer', ?12" : ''}
       WHERE EXISTS (SELECT 1 FROM trade_in_requests WHERE id = ?2 AND user_id = ?10 AND status = 'draft')`
   )
-    .bind(photoId, id, role, angle, key, mime, buf.byteLength, dims?.width ?? null, dims?.height ?? null, user.id, now)
+    .bind(photoId, id, role, angle, key, mime, buf.byteLength, dims?.width ?? null, dims?.height ?? null, user.id, now, ...(v2 ? [proves] : []))
     .run();
   if (!res.meta?.changes) {
     await deleteMediaObject(c.env, 'private', key).catch(() => undefined);
     throw new HttpError(409, 'This request was already sent and can no longer be edited.', 'TRADE_IN_NOT_EDITABLE');
   }
   return c.json(
-    { success: true, photo: { id: photoId, component: role, angle, url: `/files/${key}`, width: dims?.width ?? null, height: dims?.height ?? null, created_at: now } },
+    { success: true, photo: { id: photoId, component: role, angle, proves, url: `/files/${key}`, width: dims?.width ?? null, height: dims?.height ?? null, created_at: now } },
     201
   );
 });
@@ -424,9 +472,12 @@ const ownerScope = (c: Context<AppContext>) => {
   return isOwner(c.env, user) && !isUnverifiedOwner(c.env, user);
 };
 
+/** B.10: the rules, the factor lines and the owner's own figures are the owner's; every other admin reads the staff view. */
+const adminAudience = (c: Context<AppContext>): 'owner' | 'staff' => (ownerScope(c) && canViewCost(c.env, c.get('user')) ? 'owner' : 'staff');
+
 adminTradeInRoutes.get('/requests/:id', async (c) => {
   const req = await adminRequest(c);
-  const view = await requestView(c.env, req, 'admin');
+  const view = await requestView(c.env, req, adminAudience(c));
   const customer = await c.env.DB.prepare('SELECT id, name, email, phone_e164, username FROM users WHERE id = ?').bind(req.user_id).first();
   return c.json({ success: true, request: view, customer, financial_scope: canMoveMoney(c.env, c.get('user')), owner_scope: ownerScope(c) });
 });
@@ -447,7 +498,7 @@ adminTradeInRoutes.post('/requests/:id/inspect', requireMoneyAuthority('trade_in
   const current = await adminRequest(c);
   assertMoneyAuthority(c, { act: 'trade_in_inspect', beneficiaryUserId: current.user_id, reason: await ownerReasonOf(c) });
   const req = await run(async () => markInspected(c.env, current, admin.id));
-  return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
+  return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
 /** The owner's private reason, when the body carries one (`owner_reason`); empty otherwise. */
@@ -469,7 +520,7 @@ adminTradeInRoutes.post('/requests/:id/approve', requireMoneyAuthority('trade_in
     reason: await ownerReasonOf(c),
   });
   const req = await run(async () => approveEstimate(c.env, current, admin.id, grant));
-  return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
+  return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
 adminTradeInRoutes.post('/requests/:id/value', requireMoneyAuthority('trade_in_value'), async (c) => {
@@ -493,7 +544,7 @@ adminTradeInRoutes.post('/requests/:id/value', requireMoneyAuthority('trade_in_v
     c,
     notifyCustomerOfValue(c.env, req).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${req.id}:` }))
   );
-  return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
+  return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
 adminTradeInRoutes.post('/requests/:id/complete', requireMoneyAuthority('trade_in_complete'), async (c) => {
@@ -501,7 +552,7 @@ adminTradeInRoutes.post('/requests/:id/complete', requireMoneyAuthority('trade_i
   const current = await adminRequest(c);
   assertMoneyAuthority(c, { act: 'trade_in_complete', beneficiaryUserId: current.user_id, reason: await ownerReasonOf(c) });
   const req = await run(async () => completeRequest(c.env, current, admin.id));
-  return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
+  return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
 adminTradeInRoutes.post('/requests/:id/cancel', async (c) => {
@@ -509,7 +560,7 @@ adminTradeInRoutes.post('/requests/:id/cancel', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const reason = str(body.reason, 'reason', { min: 3, max: 500 });
   const req = await run(async () => cancelRequest(c.env, await adminRequest(c), { id: admin.id, role: 'admin' }, reason));
-  return c.json({ success: true, request: await requestView(c.env, req, 'admin') });
+  return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
 adminTradeInRoutes.get('/rules', async (c) => {

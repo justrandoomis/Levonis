@@ -102,12 +102,13 @@ test('a customer recovers the owner’s tuned trade-in factor from two preview a
     const est = (await json(res)).estimate;
     // Control: the port's projection holds — no rule, line, floor or cap in the answer.
     assert.ok(!/effect_bp|weight_bp|floor_bp|cap_bp|"lines"/.test(JSON.stringify(est)), JSON.stringify(est).slice(0, 300));
-    return Number(est.components[0].value_iqd);
+    // S-P2: the one offer (no part value), rounded down to 5,000 and bounded by the store's own cap.
+    return Number(est.total_iqd);
   };
   const clean = await preview([]);
   const faulty = await preview(['heating_error']);
   const derivedBp = Math.round(((faulty - clean) / PAID) * 10_000);
-  const precisionBp = Math.ceil((1_000 / PAID) * 10_000);
+  const precisionBp = Math.ceil((5_000 / PAID) * 10_000);
   assert.ok(
     Math.abs(derivedBp - OWNER_HEATING_BP) > precisionBp,
     `two POST /api/trade-in/requests/:id/preview answers (${clean} → ${faulty} on a ${PAID} IQD base) give the owner's tuned ` +

@@ -665,16 +665,49 @@ export const OPTIONAL_PHOTO: PhotoAngle = A(
   ['أي خدش أو كسر أو عطل ظاهر.', 'Any visible scratch, crack or fault.', 'هەر ڕووشان، شکان یان تێکچوونێکی دیار.']
 );
 
+/**
+ * THE HOURS SCREEN of a resin printer or a laser (S-P2, G14): optional as an
+ * angle, and the photograph the hours answer is bound to on a v2 request
+ * (`proves = 'hours'`). The FDM list already asks for it.
+ */
+export const HOURS_PHOTO: PhotoAngle = A(
+  'screen_hours',
+  ['الشاشة وساعات التشغيل', 'Screen with hours', 'شاشە و کاتژمێرەکانی کارکردن'],
+  ['الشاشة مشغّلة وتظهر ساعات التشغيل.', 'The screen switched on, showing the hour counter.', 'شاشەکە هەڵکراو بێت و کاتژمێرەکانی کارکردن پیشان بدات.']
+);
+
 export const MAX_PHOTOS_PER_ANGLE = 3;
-export const MAX_DAMAGE_PHOTOS = 6;
+/** Damage close-ups: one per ticked fault at least (S-P2, G14), so twelve. */
+export const MAX_DAMAGE_PHOTOS = 12;
 export const MAX_PHOTOS_PER_REQUEST = 60;
 
-export function anglesFor(family: TradeInFamily): PhotoAngle[] {
-  return [...REQUIRED_PHOTOS[family], OPTIONAL_PHOTO];
+/** The angles a component may carry; a v2 request adds the hours screen for a resin printer or a laser. */
+export function anglesFor(family: TradeInFamily, valuationVersion = 1): PhotoAngle[] {
+  const extra = valuationVersion >= 2 && familyCountsHours(family) && !REQUIRED_PHOTOS[family].some((a) => a.id === HOURS_PHOTO.id) ? [HOURS_PHOTO] : [];
+  return [...REQUIRED_PHOTOS[family], ...extra, OPTIONAL_PHOTO];
 }
 
-export function isAllowedAngle(family: TradeInFamily, angle: string): boolean {
-  return anglesFor(family).some((a) => a.id === angle);
+export function isAllowedAngle(family: TradeInFamily, angle: string, valuationVersion = 1): boolean {
+  return anglesFor(family, valuationVersion).some((a) => a.id === angle);
+}
+
+/**
+ * THE PROOFS A v2 REQUEST STILL LACKS for one component (S-P2, G14): the hours
+ * answer bound to a photograph of the hours screen (`hours`), and a damage
+ * close-up for each ticked fault (`damage:<fault id>`). A photo proves what its
+ * `proves` names; the hours screen's own angle proves the hours too.
+ */
+export function missingProofs(
+  family: TradeInFamily,
+  inputs: Pick<ComponentInputs, 'hours' | 'faults'>,
+  photos: ReadonlyArray<{ angle: string; proves?: string | null }>
+): string[] {
+  const out: string[] = [];
+  if (familyCountsHours(family) && inputs.hours !== null && !photos.some((p) => p.proves === 'hours' || p.angle === HOURS_PHOTO.id)) out.push('hours');
+  for (const id of inputs.faults ?? []) {
+    if (!photos.some((p) => p.angle === OPTIONAL_PHOTO.id && p.proves === id)) out.push(`damage:${id}`);
+  }
+  return out;
 }
 
 /** The required angles this component still lacks. */
@@ -746,6 +779,78 @@ export const isTerminal = (s: TradeInStatus) => TERMINAL_STATUSES.includes(s);
 export const CLAIMING_STATUSES: readonly TradeInStatus[] = TRADE_IN_STATUSES.filter(
   (s) => s !== 'customer_rejected' && s !== 'cancelled'
 );
+
+/**
+ * WHERE A REQUEST STANDS, AS ITS CUSTOMER READS IT (Services S-P2 spec §6.4,
+ * §6.15) — derived from the stored status and the facts beside it, never stored
+ * (no CHECK is widened). `liveOrder`: an order that is not cancelled holds the
+ * credit; `liveReissue`: a credit given back (cancel / return) still valid and
+ * not spent again.
+ */
+export const TRADE_IN_STAGES = [
+  'draft',
+  'awaiting_device',
+  'inspecting',
+  'decision',
+  'credit_ready',
+  'awaiting_new_device',
+  'completed',
+  'credit_reissued',
+  'offer_expired',
+  'credit_expired',
+  'device_to_collect',
+  'cancelled',
+  'rejected',
+] as const;
+export type TradeInStage = (typeof TRADE_IN_STAGES)[number];
+
+export function stageOf(
+  r: { status: TradeInStatus; intake_at?: string | null; cancel_reason?: string | null; device_returned_at?: string | null },
+  liveOrder: boolean,
+  liveReissue: boolean
+): TradeInStage {
+  const received = !!r.intake_at;
+  switch (r.status) {
+    case 'draft':
+      return 'draft';
+    case 'submitted':
+      return received ? 'inspecting' : 'awaiting_device';
+    case 'under_review':
+      return received ? 'inspecting' : 'awaiting_device';
+    case 'value_changed':
+      return 'decision';
+    case 'approved_as_estimated':
+    case 'customer_accepted':
+    case 'awaiting_payment':
+      if (liveOrder) return 'awaiting_new_device';
+      return received ? 'credit_ready' : 'awaiting_device';
+    case 'completed':
+      return liveReissue && !liveOrder ? 'credit_reissued' : 'completed';
+    case 'customer_rejected':
+      return received && !r.device_returned_at ? 'device_to_collect' : 'rejected';
+    case 'cancelled':
+      if (r.cancel_reason === 'expired_offer') return 'offer_expired';
+      if (received && !r.device_returned_at) return 'device_to_collect';
+      return r.cancel_reason === 'expired_credit' ? 'credit_expired' : 'cancelled';
+  }
+}
+
+/** The customer's words for each stage (spec §6.15; the Sorani is its own, DECISIONS row 183). */
+export const STAGE_LABELS: Record<TradeInStage, Trilingual> = {
+  draft: { ar: 'مسودة', en: 'Draft', ckb: 'ڕەشنووس' },
+  awaiting_device: { ar: 'بانتظار جهازك', en: 'Waiting for your device', ckb: 'چاوەڕێی ئامێرەکەتین' },
+  inspecting: { ar: 'استلمنا جهازك، قيد الفحص', en: 'We received your device; it is being inspected', ckb: 'ئامێرەکەتمان وەرگرت، لە پشکنیندایە' },
+  decision: { ar: 'قيمة جديدة بانتظار موافقتك', en: 'A new value is waiting for your decision', ckb: 'بەهایەکی نوێ چاوەڕێی بڕیاری تۆیە' },
+  credit_ready: { ar: 'رصيد الاستبدال جاهز', en: 'Your trade-in credit is ready', ckb: 'باڵانسی گۆڕینەوەکەت ئامادەیە' },
+  awaiting_new_device: { ar: 'بانتظار وصول الجهاز الجديد', en: 'Waiting for your new device to arrive', ckb: 'چاوەڕێی گەیشتنی ئامێرە نوێیەکەین' },
+  completed: { ar: 'اكتمل الاستبدال', en: 'Trade-in complete', ckb: 'گۆڕینەوەکە تەواو بوو' },
+  credit_reissued: { ar: 'عاد رصيد الاستبدال', en: 'Your trade-in credit is back', ckb: 'باڵانسی گۆڕینەوەکەت گەڕایەوە' },
+  offer_expired: { ar: 'انتهت صلاحية العرض', en: 'The offer expired', ckb: 'ماوەی پێشنیارەکە بەسەرچوو' },
+  credit_expired: { ar: 'انتهت صلاحية الرصيد', en: 'The credit expired', ckb: 'ماوەی باڵانسەکە بەسەرچوو' },
+  device_to_collect: { ar: 'جهازك جاهز للاستلام من المتجر', en: 'Your device is ready to collect from the store', ckb: 'ئامێرەکەت ئامادەیە بۆ وەرگرتنەوە لە فرۆشگا' },
+  cancelled: { ar: 'ملغى', en: 'Cancelled', ckb: 'هەڵوەشێنرایەوە' },
+  rejected: { ar: 'رفضت القيمة', en: 'You declined the value', ckb: 'بەهاکەت ڕەت کردەوە' },
+};
 
 export const STATUS_LABELS: Record<TradeInStatus, Trilingual> = {
   draft: { ar: 'قيد التحضير', en: 'Draft', ckb: 'لە ئامادەکردندایە' },

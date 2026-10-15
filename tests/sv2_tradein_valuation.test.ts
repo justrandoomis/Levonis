@@ -13,10 +13,30 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { get, json, post } from './fixtures/app';
+import { get, json, post, send } from './fixtures/app';
+import { blankInputs } from '../packages/pricing/src/tradeIn';
 import { customerApp, daysAgo, restoreFetch, seed } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
+
+test('V1 (S-P2) a used printer is never valued at or above what the SAME model costs new today (bought 850,000, new today 500,000 → offer 300,000)', async () => {
+  // Bought 20 days ago at 850,000; the A1 sells new today at 500,000 (V2-published, direct sale).
+  const raw = seed({ paid: 850_000, a1Now: 500_000, comboNow: 700_000 });
+  const a = customerApp(raw);
+  const draft = await json(await post(a, '/api/trade-in/requests', { order_item_id: 'oi_a1', unit_index: 1, scope: 'whole' }));
+  assert.ok(draft.success, JSON.stringify(draft));
+  const id = draft.request.id as string;
+  await send(a, 'PATCH', `/api/trade-in/requests/${id}`, { components: { device: blankInputs('fdm') }, target: { product_id: 'p_p1s', option_value_ids: [], color_id: null } });
+  const preview = await json(await post(a, `/api/trade-in/requests/${id}/preview`, {}));
+  // Before S-P2: base = what was PAID (850,000) → +warranty −market → capped at 85% → 722,000.
+  assert.equal(preview.offer?.offer_iqd, 300_000, JSON.stringify(preview));
+  assert.ok(preview.offer.offer_iqd < 500_000, `offer ${preview.offer.offer_iqd} must stay below today's new price 500,000`);
+  assert.equal(preview.offer.now_price_iqd, 500_000, 'today\'s public price is the customer\'s to read');
+  assert.equal(preview.estimate.total_iqd, 300_000, 'the old key answers the same one figure');
+  assert.deepEqual(preview.estimate.components, [], 'no per-part value');
+  const view = (await json(await get(a, `/api/trade-in/requests/${id}`))).request;
+  assert.equal(view.estimated_iqd, null, 'a draft carries no figure (G11)');
+});
 
 test('V2 «what the customer actually paid» subtracts an order-level coupon (checkout never writes order_items.coupon_discount_iqd)', async () => {
   const raw = seed({ paid: 850_000 });

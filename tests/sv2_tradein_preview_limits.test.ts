@@ -134,10 +134,11 @@ test('G11: a draft\'s own views carry no figure for its customer — create, rea
   const view = (await json(saved)).request;
   assert.equal(view.estimate, null, 'saving answers hands back no figure');
   assert.equal(view.estimated_iqd, null);
-  for (const c of view.components) assert.equal(c.value_iqd, null, `${c.role}: no part value on a draft`);
+  for (const c of view.components) assert.ok(!('value_iqd' in c), `${c.role}: no part value on a draft`);
   assert.equal(previewRows(raw, id), 0, 'reading and saving count nothing');
 
-  // The desk reads the saved draft's figure as before (the figure the submit fixes).
+  // The owner's desk reads the engine's figure on the saved answers; no reader prices the v2 offer
+  // on a read (S-P2 §4.5: preview, submit, intake and an override only).
   const desk = (await json(await get(adminApp(raw), `/api/admin/trade-in/requests/${id}`))).request;
   assert.ok(desk.estimate?.total_iqd > 0, JSON.stringify(desk.estimate));
   raw.close();
@@ -157,9 +158,9 @@ test('G11: the counted figures stay out of the customer\'s timeline; the desk re
   const desk = (await json(await get(adminApp(raw), `/api/admin/trade-in/requests/${id}`))).request;
   assert.equal(desk.previews, 3);
   assert.ok(!desk.events.some((e: { action: string }) => e.action === 'preview'), 'the desk timeline is the request\'s steps');
-  // Each log line keeps the total it answered, for the desk.
+  // Each log line keeps the one offer it answered, for the desk (S-P2).
   const lines = raw.prepare(`SELECT detail_json FROM trade_in_events WHERE request_id = ? AND action = 'preview'`).all(id) as Array<{ detail_json: string }>;
-  assert.ok(lines.every((l) => Number(JSON.parse(l.detail_json).total_iqd) > 0));
+  assert.ok(lines.every((l) => Number(JSON.parse(l.detail_json).offer_iqd) > 0), JSON.stringify(lines));
   raw.close();
 });
 
@@ -168,8 +169,9 @@ test('G11: a sent request keeps the estimate fixed at submit for its customer, a
   const id = await submitted(raw);
   const a = customerApp(raw);
   const view = (await json(await get(a, `/api/trade-in/requests/${id}`))).request;
-  assert.ok(view.estimated_iqd > 0, 'the submitted estimate is the customer\'s to read');
-  assert.ok(view.estimate?.total_iqd > 0);
+  assert.ok(view.estimated_iqd > 0, 'the submitted offer is the customer\'s to read');
+  assert.equal(view.offer?.offer_iqd, view.estimated_iqd, 'S-P2: the one offer, fixed at submit');
+  assert.equal(view.estimate, null, 'no breakdown, no part value');
   assert.equal(view.previews_left, undefined);
   const res = await post(a, `/api/trade-in/requests/${id}/preview`, {});
   assert.equal(res.status, 409);

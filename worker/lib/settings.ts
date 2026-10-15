@@ -209,6 +209,50 @@ export function normalizePayoutMethods(value: unknown): PayoutMethod[] {
   return out.length > 0 ? out : DEFAULT_PAYOUT_METHODS.map((m) => ({ ...m }));
 }
 
+/** Trade-in v2 policy (spec §4.4): every field an integer in its range, or the default. */
+export interface TradeInPolicy {
+  offer_valid_days: number;
+  credit_valid_days: number;
+  reissue_valid_days: number;
+  pickup_fee_iqd: number;
+  hours_tolerance_pct: number;
+  hours_tolerance_abs: number;
+  require_serial_match: boolean;
+}
+
+export const TRADE_IN_POLICY_DEFAULTS: Readonly<TradeInPolicy> = {
+  offer_valid_days: 7,
+  credit_valid_days: 7,
+  reissue_valid_days: 30,
+  pickup_fee_iqd: 5_000,
+  hours_tolerance_pct: 10,
+  hours_tolerance_abs: 50,
+  require_serial_match: true,
+};
+
+/** The ranges an owner's edit must stay inside (PUT /api/admin/trade-in/policy). */
+export const TRADE_IN_POLICY_RANGES: Readonly<Record<Exclude<keyof TradeInPolicy, 'require_serial_match' | 'reissue_valid_days'>, readonly [number, number]>> = {
+  offer_valid_days: [1, 60],
+  credit_valid_days: [1, 60],
+  pickup_fee_iqd: [0, 1_000_000],
+  hours_tolerance_pct: [0, 100],
+  hours_tolerance_abs: [0, 10_000],
+};
+
+/** Any stored shape → a whole policy: each field in range, else the default. */
+export function normalizeTradeInPolicy(value: unknown): TradeInPolicy {
+  const o = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const out: TradeInPolicy = { ...TRADE_IN_POLICY_DEFAULTS };
+  for (const [k, [lo, hi]] of Object.entries(TRADE_IN_POLICY_RANGES) as Array<[keyof typeof TRADE_IN_POLICY_RANGES, readonly [number, number]]>) {
+    const v = o[k];
+    if (typeof v === 'number' && Number.isSafeInteger(v) && v >= lo && v <= hi) out[k] = v;
+  }
+  if (typeof o.require_serial_match === 'boolean') out.require_serial_match = o.require_serial_match;
+  // 30 is written literally by 0192's re-issue trigger: a different number here would lie.
+  out.reissue_valid_days = TRADE_IN_POLICY_DEFAULTS.reissue_valid_days;
+  return out;
+}
+
 export const SETTING_DEFAULTS = {
   /**
    * The warranty receipt's printed wording and the shop's own details.
@@ -552,6 +596,15 @@ export const SETTING_DEFAULTS = {
     enabled: boolean; ttl_minutes: number; batch_limit: number;
   },
   /**
+   * TRADE-IN V2 POLICY (Services S-P2, DECISIONS row 238; spec §4.4): how long an
+   * offer waits for the device, how long a fixed credit lasts, the collection
+   * fee, the hours tolerance at intake and the serial rule. The owner's —
+   * written only through PUT /api/admin/trade-in/policy (the generic settings
+   * door refuses it) and deliberately NOT in PUBLIC_SETTING_KEYS. The
+   * re-issue validity is 30 days, literal in migration 0192's trigger.
+   */
+  tradeInPolicy: { ...TRADE_IN_POLICY_DEFAULTS } as TradeInPolicy,
+  /**
    * The local courier's wire format — endpoint paths and the map from our
    * field names to theirs. NOT credentials: those are Worker secrets
    * (ALWASEET_*) and never a settings row, because a settings row is
@@ -853,6 +906,9 @@ function withShippedSorani(value: unknown, defaults: ReadonlyArray<Record<string
 }
 
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
+  if (key === 'tradeInPolicy') {
+    return normalizeTradeInPolicy(value) as (typeof SETTING_DEFAULTS)[K];
+  }
   if (key === 'serialPrepGate') {
     return normalizeSerialPrepGate(value) as (typeof SETTING_DEFAULTS)[K];
   }

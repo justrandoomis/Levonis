@@ -105,13 +105,17 @@ import { benefitFallbackFor, pricingCtxForUser, quoteOptionValueIds, saleAvailab
 import {
   FACTOR_IDS,
   REQUIRED_PHOTOS,
+  STAGE_LABELS,
   STATUS_LABELS,
+  anglesFor,
+  stageOf,
   TRADE_IN_FAMILIES,
   blankInputs,
   canTransition,
   checklistLabelCkb,
   checklistOf,
   daysBetween,
+  missingProofs,
   isTerminal,
   missingPhotoAngles,
   rolesForScope,
@@ -134,6 +138,10 @@ import {
 } from '@levonis/pricing/tradeIn';
 import { DEFAULT_RULE_SETS } from '@levonis/pricing/tradeInDefaults';
 import { paidNetPerUnit } from '@levonis/pricing/paidNet';
+import { OFFER_PARAM_COLUMNS, settlement as offerSettlement, validateOfferParams, type OfferParamColumn } from '@levonis/pricing/tradeInOffer';
+import { tradeInV2Installed } from './tradeInSchema';
+import { offerFor, storedInputs, valuationStatement } from './tradeInOffer';
+import { getSetting } from './settings';
 
 // ================================================================= errors
 
@@ -165,11 +173,26 @@ export type TradeInCode =
   | 'TRADE_IN_SERVICE_OPEN'
   | 'TRADE_IN_PROTECTION_OPEN'
   | 'TRADE_IN_CREDIT_EXPIRED'
-  | 'TRADE_IN_PREVIEW_LIMIT';
+  | 'TRADE_IN_PREVIEW_LIMIT'
+  // ---- trade-in v2 (S-P2, DECISIONS row 238)
+  | 'TRADE_IN_NO_OFFER'
+  | 'TRADE_IN_TARGET_NOT_LISTED'
+  | 'TRADE_IN_DEVICE_NOT_RECEIVED'
+  | 'TRADE_IN_OFFER_EXPIRED'
+  | 'TRADE_IN_SERIAL_MISMATCH'
+  | 'TRADE_IN_ALREADY_RECEIVED'
+  | 'TRADE_IN_INTAKE_REQUIRED'
+  | 'TRADE_IN_OWN_REQUEST'
+  | 'TRADE_IN_ORDER_NOT_DELIVERED'
+  | 'TRADE_IN_ORDER_DELIVERED'
+  | 'TRADE_IN_DEVICE_IN_SHOP'
+  | 'TRADE_IN_MARGIN_ACK_REQUIRED'
+  | 'TRADE_IN_HOURS_PHOTO'
+  | 'TRADE_IN_DAMAGE_PHOTO';
 
 export class TradeInError extends Error {
   constructor(
-    public readonly status: 400 | 404 | 409 | 429,
+    public readonly status: 400 | 403 | 404 | 409 | 429,
     public readonly code: TradeInCode | 'NOT_FOUND',
     message: string,
     public readonly details?: Record<string, unknown>
@@ -208,9 +231,23 @@ const MESSAGES: Record<TradeInCode, string> = {
   TRADE_IN_PROTECTION_OPEN: 'This item has a price-protection claim under review. It can be traded in once that claim is decided.',
   TRADE_IN_CREDIT_EXPIRED: 'The trade-in credit has expired.',
   TRADE_IN_PREVIEW_LIMIT: 'You have reached the number of estimates allowed. Send the request as it is, or try again tomorrow.',
+  TRADE_IN_NO_OFFER: 'We can’t make an offer for this device right now.',
+  TRADE_IN_TARGET_NOT_LISTED: 'This device is not on sale right now, so it can’t be chosen. Choose another one.',
+  TRADE_IN_DEVICE_NOT_RECEIVED: 'The credit can be used once we receive your old device.',
+  TRADE_IN_OFFER_EXPIRED: 'The offer expired. Open a new request for an offer at today’s prices.',
+  TRADE_IN_SERIAL_MISMATCH: 'The serial number does not match the device sold.',
+  TRADE_IN_ALREADY_RECEIVED: 'This device’s receipt was already recorded.',
+  TRADE_IN_INTAKE_REQUIRED: 'Receive the device and record its serial and hours first.',
+  TRADE_IN_OWN_REQUEST: 'Staff do not receive their own trade-in; a colleague handles it.',
+  TRADE_IN_ORDER_NOT_DELIVERED: 'The trade-in completes when the new device is delivered.',
+  TRADE_IN_ORDER_DELIVERED: 'A delivered order that completed a trade-in is not cancelled; open a return instead.',
+  TRADE_IN_DEVICE_IN_SHOP: 'This device is with us for a trade-in, so no other request can be opened on it.',
+  TRADE_IN_MARGIN_ACK_REQUIRED: 'Confirm you understand the margin shrinks and may be a loss.',
+  TRADE_IN_HOURS_PHOTO: 'Photograph the hours screen.',
+  TRADE_IN_DAMAGE_PHOTO: 'Add a photo for each damage you ticked.',
 };
 
-const STATUS_OF: Partial<Record<TradeInCode, 400 | 409 | 429>> = {
+const STATUS_OF: Partial<Record<TradeInCode, 400 | 403 | 409 | 429>> = {
   TRADE_IN_INPUTS_INVALID: 400,
   TRADE_IN_PHOTO_ANGLE: 400,
   TRADE_IN_INVALID_VALUE: 400,
@@ -218,6 +255,10 @@ const STATUS_OF: Partial<Record<TradeInCode, 400 | 409 | 429>> = {
   TRADE_IN_TARGET_REQUIRED: 400,
   TRADE_IN_COUPON_MISMATCH: 400,
   TRADE_IN_PREVIEW_LIMIT: 429,
+  TRADE_IN_MARGIN_ACK_REQUIRED: 400,
+  TRADE_IN_OWN_REQUEST: 403,
+  TRADE_IN_HOURS_PHOTO: 400,
+  TRADE_IN_DAMAGE_PHOTO: 400,
 };
 
 export const refuse = (code: TradeInCode, details?: Record<string, unknown>) =>
@@ -226,7 +267,14 @@ export const notFoundTI = (what = 'Trade-in request not found') => new TradeInEr
 
 // ================================================================= rules
 
-export type StoredRuleSet = TradeInRuleSet & { id: string; note: string; created_at: string; created_by: string | null };
+export type StoredRuleSet = TradeInRuleSet & {
+  id: string;
+  note: string;
+  created_at: string;
+  created_by: string | null;
+  /** The owner's offer parameters stored on this version (0192; NULL = the code default). Owner-only. */
+  offer_params?: Partial<Record<OfferParamColumn, number | null>>;
+};
 export type RuleBook = Record<TradeInFamily, StoredRuleSet>;
 
 interface RuleSetRow {
@@ -242,6 +290,22 @@ interface RuleSetRow {
   note: string;
   created_by: string | null;
   created_at: string;
+  /** 0192 — present (possibly NULL) on a migrated database, absent before it. */
+  resale_bp?: number | null;
+  handling_iqd?: number | null;
+  warranty_reserve_bp?: number | null;
+  margin_bp?: number | null;
+  margin_min_iqd?: number | null;
+  max_offer_bp?: number | null;
+  offer_rounding_iqd?: number | null;
+  min_offer_iqd?: number | null;
+}
+
+/** The 0192 columns a stored rule set row carries (absent → nothing; NULL → the default). */
+function offerParamsOfRow(row: RuleSetRow): Partial<Record<OfferParamColumn, number | null>> {
+  const out: Partial<Record<OfferParamColumn, number | null>> = {};
+  for (const k of OFFER_PARAM_COLUMNS) if (k in row) out[k] = row[k] ?? null;
+  return out;
 }
 
 function assemble(row: RuleSetRow, rules: Array<{ factor: string; enabled: number; weight_bp: number; config_json: string }>): StoredRuleSet {
@@ -259,6 +323,7 @@ function assemble(row: RuleSetRow, rules: Array<{ factor: string; enabled: numbe
     created_by: row.created_by,
     version: row.version,
     is_default: row.is_default === 1,
+    offer_params: offerParamsOfRow(row),
   };
   if (checked.ok) return { ...checked.value, ...base };
   // A stored version that no longer validates is a bug somewhere upstream —
@@ -312,6 +377,10 @@ export async function ruleSetHistory(db: D1Database, family: TradeInFamily) {
 export async function saveRuleSet(env: Env, family: TradeInFamily, raw: unknown, adminId: string, note: string): Promise<StoredRuleSet> {
   const checked = validateRuleSet(raw, family);
   if (!checked.ok) throw refuse('TRADE_IN_RULES_INVALID', { errors: checked.errors });
+  // The owner's offer parameters (0192), on the same rule set: each key sent is validated against its CHECK
+  // range; a key not sent keeps the version before it (an editor that predates them changes nothing).
+  const params = validateOfferParams(raw);
+  if (!params.ok) throw refuse('TRADE_IN_RULES_INVALID', { errors: params.errors });
   const db = env.DB;
   const cur = await db.prepare('SELECT MAX(version) AS v FROM trade_in_rule_sets WHERE family = ?').bind(family).first<{ v: number | null }>();
   const version = (cur?.v ?? 0) + 1;
@@ -319,14 +388,28 @@ export async function saveRuleSet(env: Env, family: TradeInFamily, raw: unknown,
   const now = new Date().toISOString();
   const r = checked.value;
   const audit = await auditStatements(db, adminId, 'trade_in.rules.save', id, { family, version, note });
+  const v2 = await tradeInV2Installed(db);
+  const before = v2 ? (await loadRuleBook(db))[family].offer_params ?? {} : {};
+  const merged = Object.fromEntries(OFFER_PARAM_COLUMNS.map((k) => [k, k in params.value ? (params.value[k] ?? null) : (before[k] ?? null)]));
   try {
     await db.batch([
-      db
-        .prepare(
-          `INSERT INTO trade_in_rule_sets (id, family, version, floor_bp, cap_bp, rounding_iqd, min_base_iqd, ams_reference_iqd, is_default, note, created_by, created_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, ?9, ?10, ?11)`
-        )
-        .bind(id, family, version, r.floor_bp, r.cap_bp, r.rounding_iqd, r.min_base_iqd, r.ams_reference_iqd, note, adminId, now),
+      v2
+        ? db
+            .prepare(
+              `INSERT INTO trade_in_rule_sets (id, family, version, floor_bp, cap_bp, rounding_iqd, min_base_iqd, ams_reference_iqd, is_default, note, created_by, created_at,
+                  resale_bp, handling_iqd, warranty_reserve_bp, margin_bp, margin_min_iqd, max_offer_bp, offer_rounding_iqd, min_offer_iqd)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)`
+            )
+            .bind(
+              id, family, version, r.floor_bp, r.cap_bp, r.rounding_iqd, r.min_base_iqd, r.ams_reference_iqd, note, adminId, now,
+              ...OFFER_PARAM_COLUMNS.map((k) => merged[k] ?? null)
+            )
+        : db
+            .prepare(
+              `INSERT INTO trade_in_rule_sets (id, family, version, floor_bp, cap_bp, rounding_iqd, min_base_iqd, ams_reference_iqd, is_default, note, created_by, created_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, ?9, ?10, ?11)`
+            )
+            .bind(id, family, version, r.floor_bp, r.cap_bp, r.rounding_iqd, r.min_base_iqd, r.ams_reference_iqd, note, adminId, now),
       ...r.factors.map((f) =>
         db
           .prepare('INSERT INTO trade_in_rules (rule_set_id, factor, enabled, weight_bp, config_json) VALUES (?1, ?2, ?3, ?4, ?5)')
@@ -395,6 +478,21 @@ export interface AmsSplit {
 /**
  * THE COMBO'S AMS SHARE — see the file header. Pure: every input is passed.
  */
+/**
+ * THE PLAIN SIBLING OF A COMBO OPTION: same group, its `variant_key` without
+ * «-combo», else the same name without «Combo», else the only plain value.
+ */
+export function plainSiblingOf<V extends Pick<OptionValueRow, 'id' | 'group_id' | 'variant_key' | 'name_en' | 'name_ar' | 'merged_into'>>(
+  c: V,
+  siblings: readonly V[]
+): V | undefined {
+  const key = String(c.variant_key ?? '').replace(/[-_ ]?combo$/i, '');
+  const plain = siblings.filter((v) => v.id !== c.id && v.group_id === c.group_id && !v.merged_into && !isComboValue(v as unknown as OptionValueRow));
+  const byKey = key ? plain.find((v) => String(v.variant_key ?? '') === key) : undefined;
+  const byName = plain.find((v) => v.name_en.trim().toLowerCase() === c.name_en.replace(COMBO_RE, '').trim().toLowerCase());
+  return byKey ?? byName ?? (plain.length === 1 ? plain[0] : undefined);
+}
+
 export function amsSplit(input: {
   paidIqd: number;
   combo: OptionValueRow | null;
@@ -405,11 +503,7 @@ export function amsSplit(input: {
   const paid = Math.max(0, input.paidIqd);
   const c = input.combo;
   if (c) {
-    const key = String(c.variant_key ?? '').replace(/[-_ ]?combo$/i, '');
-    const plain = input.siblings.filter((v) => v.id !== c.id && v.group_id === c.group_id && !v.merged_into && !isComboValue(v));
-    const byKey = key ? plain.find((v) => String(v.variant_key ?? '') === key) : undefined;
-    const byName = plain.find((v) => v.name_en.trim().toLowerCase() === c.name_en.replace(COMBO_RE, '').trim().toLowerCase());
-    const base = byKey ?? byName ?? (plain.length === 1 ? plain[0] : undefined);
+    const base = plainSiblingOf(c, input.siblings);
     if (base) {
       const comboPrice = valuePrice(c, input.productPriceIqd);
       const basePrice = valuePrice(base, input.productPriceIqd);
@@ -449,6 +543,8 @@ export interface EligibleUnit {
   family: TradeInFamily;
   is_combo: boolean;
   ams_split: AmsSplit;
+  /** What this unit was bought as (model values, colour) and, on a Combo, its Combo value and plain sibling (S-P2 B.4). */
+  selection: { option_value_ids: string[]; color_id: string | null; combo_value_id: string | null; plain_value_id: string | null };
   paid_iqd: number;
   ordered_at: string;
   delivered_at: string | null;
@@ -472,6 +568,7 @@ interface LineRow {
   option_snapshot: string;
   option_id: string | null;
   option_value_ids: string | null;
+  color_id: string | null;
   qty: number;
   unit_price_iqd: number;
   warranty_snapshot: string | null;
@@ -495,7 +592,7 @@ interface LineRow {
 }
 
 const LINE_SQL = `SELECT oi.id AS item_id, oi.order_id, oi.product_id, oi.name_snapshot, oi.image_snapshot, oi.option_snapshot,
-         oi.option_id, oi.option_value_ids, oi.qty, oi.unit_price_iqd, oi.warranty_snapshot,
+         oi.option_id, oi.option_value_ids, oi.color_id, oi.qty, oi.unit_price_iqd, oi.warranty_snapshot,
          oi.membership_discount_iqd, oi.membership_rule_id, oi.coupon_discount_iqd, oi.gift_entitlement_id,
          o.benefit_snapshot, o.status, o.created_at AS ordered_at, o.delivered_at AS order_delivered_at,
          p.slug, p.name, p.name_ar, p.template_family, p.category_id, p.sub_category_id, p.ops_policy, p.price_iqd
@@ -666,6 +763,13 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
       ...(line.option_id ? [line.option_id] : []),
     ]);
     const comboValue = productValues.find((v) => selected.has(v.id) && isComboValue(v)) ?? null;
+    const plainValue = comboValue ? plainSiblingOf(comboValue, productValues) ?? null : null;
+    const selection = {
+      option_value_ids: [...selected],
+      color_id: line.color_id ? String(line.color_id) : null,
+      combo_value_id: comboValue?.id ?? null,
+      plain_value_id: plainValue?.id ?? null,
+    };
     const isCombo = (family === 'fdm' || family === 'resin') && (comboValue !== null || COMBO_RE.test(`${line.option_snapshot} ${line.name_snapshot}`));
     const facts = paidNet.get(line.order_id);
     const pp = protectionOf.get(line.item_id);
@@ -766,6 +870,7 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
         family,
         is_combo: isCombo,
         ams_split: split,
+        selection,
         paid_iqd: paid,
         ordered_at: line.ordered_at,
         delivered_at: deliveredAt,
@@ -784,39 +889,72 @@ async function buildEligibility(env: Env, userId: string, lines: LineRow[], nowI
 }
 
 /**
- * A UNIT AS ITS CUSTOMER READS IT (DECISIONS row 220). A Combo's AMS share is
- * worked out from the gap between two PUBLIC option prices (`option_gap`: a
- * share of what the customer paid, theirs to read) or, when that cannot be
- * done, from the owner's private AMS REFERENCE (`ams_reference_iqd`, a
- * rule-set value) — and then `ams_split.ams_base_iqd` and each component's
- * `base_iqd` carried that reference word for word (and paid − reference
- * beside it). So on a `reference` split the customer reads the method alone:
- * no AMS base, no part base. Every scope also carries one `base_iqd` — what it
- * values from — or null where that figure would name the reference (any part
- * scope of a `reference` split; the whole device is always what they paid).
- * Each part's final value comes from the estimate. The admin view keeps it all.
+ * A UNIT AS ITS CUSTOMER READS IT (DECISIONS rows 220 and 238) — an ALLOW-LIST,
+ * built field by field, never a spread of the internal unit.
+ *
+ * Since S-P2 the offer is the only figure for the old device: no part base, no
+ * AMS share, no split method's numbers (they were the v1 valuation's inputs, and
+ * on a `reference` split the owner's private AMS reference). The keys the old
+ * wizard reads stay (`ams_split.method`, `scopes[].base_iqd` = null) so a phone
+ * still holding it keeps working until it reloads. What the customer paid is
+ * their own figure and stays.
  */
-export type PublicEligibleUnit = Omit<EligibleUnit, 'ams_split' | 'scopes'> & {
-  ams_split: Omit<AmsSplit, 'ams_base_iqd'> & { ams_base_iqd?: number };
-  scopes: Array<
-    Omit<ScopeOption, 'components'> & {
-      components: Array<{ role: ComponentRole; family: TradeInFamily; base_iqd?: number }>;
-      /** The scope's base, or null when it would name the owner's AMS reference. */
-      base_iqd: number | null;
-    }
-  >;
-};
+export interface PublicEligibleUnit {
+  key: string;
+  order_item_id: string;
+  unit_index: number;
+  order_id: string;
+  product_id: string;
+  product_slug: string;
+  name: string;
+  variant: string;
+  image: string;
+  family: TradeInFamily;
+  is_combo: boolean;
+  ams_split: { method: AmsSplit['method']; share_bp: null };
+  paid_iqd: number;
+  ordered_at: string;
+  delivered_at: string | null;
+  warranty_end_at: string | null;
+  usage_days: number;
+  usage_months: number;
+  warranty_remaining_months: number;
+  scopes: Array<{ scope: TradeInScope; available: boolean; reason: TradeInCode | null; components: Array<{ role: ComponentRole; family: TradeInFamily }>; base_iqd: null }>;
+  available: boolean;
+  reason: TradeInCode | null;
+  open_request_id: string | null;
+}
 export function publicUnit(u: EligibleUnit): PublicEligibleUnit {
-  const { ams_split: split, scopes, ...rest } = u;
-  const reference = split.method === 'reference';
   return {
-    ...rest,
-    ams_split: reference ? { method: split.method, share_bp: null } : split,
-    scopes: scopes.map((sc) => ({
-      ...sc,
-      components: reference ? sc.components.map(({ role, family }) => ({ role, family })) : sc.components,
-      base_iqd: reference && sc.scope !== 'whole' ? null : sc.components.reduce((n, c) => n + c.base_iqd, 0),
+    key: u.key,
+    order_item_id: u.order_item_id,
+    unit_index: u.unit_index,
+    order_id: u.order_id,
+    product_id: u.product_id,
+    product_slug: u.product_slug,
+    name: u.name,
+    variant: u.variant,
+    image: u.image,
+    family: u.family,
+    is_combo: u.is_combo,
+    ams_split: { method: u.ams_split.method, share_bp: null },
+    paid_iqd: u.paid_iqd,
+    ordered_at: u.ordered_at,
+    delivered_at: u.delivered_at,
+    warranty_end_at: u.warranty_end_at,
+    usage_days: u.usage_days,
+    usage_months: u.usage_months,
+    warranty_remaining_months: u.warranty_remaining_months,
+    scopes: u.scopes.map((sc) => ({
+      scope: sc.scope,
+      available: sc.available,
+      reason: sc.reason,
+      components: sc.components.map(({ role, family }) => ({ role, family })),
+      base_iqd: null,
     })),
+    available: u.available,
+    reason: u.reason,
+    open_request_id: u.open_request_id,
   };
 }
 
@@ -888,6 +1026,27 @@ export interface RequestRow {
   decided_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
+  // ---- 0192 (trade-in v2): present on a migrated database, absent before it.
+  valuation_version?: number;
+  paid_net_iqd?: number | null;
+  now_price_iqd?: number | null;
+  now_price_channel?: string | null;
+  offer_iqd?: number | null;
+  offer_at?: string | null;
+  offer_expires_at?: string | null;
+  /** The server's ceiling at intake: staff-visible, never the customer's. */
+  ceiling_iqd?: number | null;
+  ceiling_at?: string | null;
+  above_ceiling?: number;
+  intake_at?: string | null;
+  intake_by?: string | null;
+  intake_serial_norm?: string | null;
+  intake_serial_match?: 'match' | 'mismatch' | 'unrecorded' | 'not_applicable' | null;
+  intake_json?: string;
+  handover?: 'store' | 'pickup' | null;
+  pickup_fee_iqd?: number;
+  device_returned_at?: string | null;
+  device_returned_by?: string | null;
 }
 
 export interface ComponentRow {
@@ -902,6 +1061,8 @@ export interface ComponentRow {
   estimate_json: string;
   value_iqd: number | null;
   sort: number;
+  /** 0192: the condition recorded at intake (staff). */
+  intake_inputs_json?: string;
 }
 
 export interface PhotoRow {
@@ -915,6 +1076,9 @@ export interface PhotoRow {
   width: number | null;
   height: number | null;
   created_at: string;
+  /** 0192: who took it (the customer's evidence, or the desk's at intake) and what it proves (`hours`, a fault id). */
+  phase?: 'customer' | 'intake';
+  proves?: string;
 }
 
 export async function loadRequest(db: D1Database, id: string): Promise<RequestRow | null> {
@@ -1112,6 +1276,8 @@ export async function createDraft(
   if ((drafts?.n ?? 0) >= MAX_OPEN_DRAFTS) throw refuse('TRADE_IN_DRAFT_LIMIT');
 
   const id = newId('tin');
+  // Trade-in v2 (0192): a new draft is valued by the store-safe offer and asks for the v2 photo proofs.
+  const v2 = await tradeInV2Installed(db);
   const snapshot = {
     name: unit.name,
     variant: unit.variant,
@@ -1128,8 +1294,8 @@ export async function createDraft(
     db
       .prepare(
         `INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, unit_id, source_product_id,
-            family, scope, is_combo, source_snapshot_json, created_at, updated_at)
-         VALUES (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)`
+            family, scope, is_combo, source_snapshot_json, created_at, updated_at${v2 ? ', valuation_version' : ''})
+         VALUES (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12${v2 ? ', 2' : ''})`
       )
       .bind(
         id, userId, unit.order_id, unit.order_item_id, unit.unit_index, unit.unit_id, unit.product_id,
@@ -1224,7 +1390,8 @@ const coverOf = (doc: ReturnType<typeof parseProductRow>): string => {
 export async function priceTarget(env: Env, userId: string, sel: TargetSelection): Promise<PricedTarget> {
   const db = env.DB;
   const row = await db.prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).listed('products')}`).bind(sel.product_id).first<Record<string, unknown>>();
-  if (!row) throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'not_found' });
+  // S-P2: an unlisted target (hidden, held, «يحتاج تسعيرًا», gone) reads its own sentence.
+  if (!row) throw refuse('TRADE_IN_TARGET_NOT_LISTED');
   const parsed = parseProductRow(row);
   if (parsed.composition !== '') throw refuse('TRADE_IN_TARGET_UNAVAILABLE', { reason: 'composition' });
   const idx = await catalogIndexFor(db);
@@ -1518,12 +1685,24 @@ export async function previewCount(db: D1Database, requestId: string): Promise<n
  * conditional INSERT, so two presses at once cannot both slip under the
  * limit, and a refusal answers no figure at all.
  */
+/** The customer's ONE figure for the old device (S-P2 spec §6.4) — no part value, no formula. */
+export interface PreviewOffer {
+  offer_iqd: number | null;
+  no_offer_reason?: 'no_price_today' | 'below_minimum';
+  now_price_iqd: number | null;
+  target_price_iqd: number | null;
+  difference_iqd: number | null;
+  excess_iqd: number;
+  pickup_fee_if_collected_iqd: number;
+  valid_until_if_sent: string;
+}
+
 export async function previewDraft(
   env: Env,
   userId: string,
   id: string,
   body: { components?: unknown; target?: unknown }
-): Promise<{ estimate: PublicEstimate; previews_left: number }> {
+): Promise<{ estimate: PublicEstimate; previews_left: number; offer?: PreviewOffer }> {
   const db = env.DB;
   const req = await ownRequest(db, userId, id);
   if (req.status !== 'draft') throw refuse('TRADE_IN_NOT_EDITABLE');
@@ -1547,7 +1726,50 @@ export async function previewDraft(
     targetPrice = (await priceTarget(env, userId, sel)).price_iqd;
   }
   const now = new Date();
-  const estimate = publicEstimate(estimateFor({ ...req, target_price_iqd: targetPrice }, answered, book, now.toISOString()).estimate);
+  // Trade-in v2: the store-safe offer (owner decision 1). The old `estimate.total_iqd` key answers the
+  // same figure (no part value) so a phone still holding the old wizard keeps working (§7.4).
+  let offer: PreviewOffer | undefined;
+  let estimate: PublicEstimate;
+  if (await tradeInV2Installed(db)) {
+    const nowIso = now.toISOString();
+    const [unit, slot, policy] = await Promise.all([
+      resolveUnit(env, userId, req.order_item_id, req.unit_index, nowIso),
+      slotOf(db, req.order_item_id, req.unit_index),
+      getSetting(db, 'tradeInPolicy'),
+    ]);
+    const o = await offerFor(env, {
+      req,
+      unit,
+      comps: answered,
+      book,
+      phase: 'preview',
+      inputsOf: (c) => storedInputs(answered.find((x) => x.role === c.role)?.inputs_json ?? '{}', book[c.family]),
+      slotUnitIds: slot.unitIds,
+      nowIso,
+    });
+    if (o.no_offer_reason === 'scope_unavailable') throw refuse('TRADE_IN_SCOPE_UNAVAILABLE');
+    const s = targetPrice && o.offer_iqd !== null ? tradeInSettlement(targetPrice, o.offer_iqd) : null;
+    offer = {
+      offer_iqd: o.offer_iqd,
+      ...(o.no_offer_reason ? { no_offer_reason: o.no_offer_reason } : {}),
+      now_price_iqd: o.now_price_iqd,
+      target_price_iqd: targetPrice ?? null,
+      difference_iqd: s ? s.difference_iqd : targetPrice ?? null,
+      excess_iqd: s ? s.excess_iqd : 0,
+      pickup_fee_if_collected_iqd: policy.pickup_fee_iqd,
+      valid_until_if_sent: new Date(now.getTime() + policy.offer_valid_days * DAY_MS).toISOString(),
+    };
+    estimate = {
+      components: [],
+      total_iqd: o.offer_iqd ?? 0,
+      settlement: s,
+      usage_months: o.usage_months,
+      warranty_remaining_months: o.warranty_remaining_months,
+      computed_at: nowIso,
+    };
+  } else {
+    estimate = publicEstimate(estimateFor({ ...req, target_price_iqd: targetPrice }, answered, book, now.toISOString()).estimate);
+  }
 
   const since = new Date(now.getTime() - PREVIEW_DAY_MS).toISOString();
   const taken = await db
@@ -1560,7 +1782,7 @@ export async function previewDraft(
                 WHERE request_id IN (SELECT id FROM trade_in_requests WHERE user_id = ?3)
                   AND action = 'preview' AND created_at > ?7) < ?8`
     )
-    .bind(newId('tie'), id, userId, JSON.stringify({ total_iqd: estimate.total_iqd }), now.toISOString(), TRADE_IN_PREVIEW_PER_REQUEST, since, TRADE_IN_PREVIEW_PER_DAY)
+    .bind(newId('tie'), id, userId, JSON.stringify(offer ? { offer_iqd: offer.offer_iqd } : { total_iqd: estimate.total_iqd }), now.toISOString(), TRADE_IN_PREVIEW_PER_REQUEST, since, TRADE_IN_PREVIEW_PER_DAY)
     .run();
   const used = await previewCount(db, id);
   if (!taken.meta?.changes) {
@@ -1570,7 +1792,7 @@ export async function previewDraft(
     if (fresh.status !== 'draft') throw refuse('TRADE_IN_NOT_EDITABLE');
     throw refuse('TRADE_IN_PREVIEW_LIMIT', { scope: used >= TRADE_IN_PREVIEW_PER_REQUEST ? 'request' : 'day' });
   }
-  return { estimate, previews_left: Math.max(0, TRADE_IN_PREVIEW_PER_REQUEST - used) };
+  return { estimate, previews_left: Math.max(0, TRADE_IN_PREVIEW_PER_REQUEST - used), ...(offer ? { offer } : {}) };
 }
 
 // ================================================================= customer edits
@@ -1637,6 +1859,26 @@ export async function saveDraft(
   return (await loadRequest(db, id))!;
 }
 
+/**
+ * HOW THE DEVICE REACHES THE SHOP (decision 2): in the store, or collected
+ * (the policy's fee comes off the credit). While a draft, or sent and not yet
+ * received — one conditional UPDATE; anything else is not editable.
+ */
+export async function setHandover(env: Env, userId: string, id: string, handover: 'store' | 'pickup'): Promise<void> {
+  const db = env.DB;
+  await ownRequest(db, userId, id);
+  const policy = await getSetting(db, 'tradeInPolicy');
+  const fee = handover === 'pickup' ? policy.pickup_fee_iqd : 0;
+  const res = await db
+    .prepare(
+      `UPDATE trade_in_requests SET handover = ?3, pickup_fee_iqd = ?4, updated_at = ?5
+        WHERE id = ?1 AND user_id = ?2 AND (status = 'draft' OR (status = 'submitted' AND intake_at IS NULL))`
+    )
+    .bind(id, userId, handover, fee, new Date().toISOString())
+    .run();
+  if (!res.meta?.changes) throw refuse('TRADE_IN_NOT_EDITABLE');
+}
+
 /** What still stops a draft from being sent, per component — the wizard's checklist and the door's refusal. */
 export function submitBlockers(
   req: RequestRow,
@@ -1646,11 +1888,15 @@ export function submitBlockers(
 ): { inputs: Record<string, string[]>; photos: Record<string, string[]>; target: boolean } {
   const inputs: Record<string, string[]> = {};
   const missing: Record<string, string[]> = {};
+  // A v2 request (0192) also binds the hours answer to a photo of the hours screen and asks for a
+  // damage close-up per ticked fault (G14); a v1 draft is not blocked by proofs it was never asked for.
+  const v2 = (req.valuation_version ?? 1) >= 2;
   for (const c of comps) {
     const checked = validateInputs(safeParse(c.inputs_json, {}), book[c.family]);
     if (!checked.ok) inputs[c.role] = checked.errors;
-    const angles = photos.filter((p) => p.component_role === c.role).map((p) => p.angle);
-    const m = missingPhotoAngles(c.family, angles);
+    const mine = photos.filter((p) => p.component_role === c.role && (p.phase ?? 'customer') === 'customer');
+    const m = missingPhotoAngles(c.family, mine.map((p) => p.angle));
+    if (v2 && checked.ok) m.push(...missingProofs(c.family, checked.value, mine));
     if (m.length) missing[c.role] = m;
   }
   return { inputs, photos: missing, target: !req.target_product_id };
@@ -1663,7 +1909,15 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
   const [comps, photos, book] = await Promise.all([loadComponents(db, id), loadPhotos(db, id), loadRuleBook(db)]);
   const blockers = submitBlockers(req, comps, photos, book);
   if (Object.keys(blockers.inputs).length) throw refuse('TRADE_IN_INPUTS_INVALID', { errors: blockers.inputs });
-  if (Object.keys(blockers.photos).length) throw refuse('TRADE_IN_PHOTOS_MISSING', { missing: blockers.photos });
+  if (Object.keys(blockers.photos).length) {
+    const all = Object.values(blockers.photos).flat();
+    const code: TradeInCode = all.some((x) => !x.startsWith('damage:') && x !== 'hours')
+      ? 'TRADE_IN_PHOTOS_MISSING'
+      : all.includes('hours')
+        ? 'TRADE_IN_HOURS_PHOTO'
+        : 'TRADE_IN_DAMAGE_PHOTO';
+    throw refuse(code, { missing: blockers.photos });
+  }
   if (blockers.target) throw refuse('TRADE_IN_TARGET_REQUIRED');
   // The target's price NOW, not when it was picked — the estimate the admin
   // reviews must be against today's figure.
@@ -1672,6 +1926,7 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
     option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),
     color_id: req.target_color_id,
   });
+  if (await tradeInV2Installed(db)) return submitV2(env, req, comps, book, priced);
   const now = new Date().toISOString();
   const { estimate } = estimateFor({ ...req, target_price_iqd: priced.price_iqd }, comps, book, now);
   const token = randomToken(12);
@@ -1717,6 +1972,87 @@ export async function submitRequest(env: Env, userId: string, id: string): Promi
     throw e;
   }
   return (await loadRequest(db, id))!;
+}
+
+/**
+ * SEND A v2 REQUEST (spec §6.17-A): the ONE offer is computed here, by the
+ * server, on today's public prices; the customer reads «حتى X» and has
+ * `offer_valid_days` to hand the device in. No offer (no public price today,
+ * or below the minimum) → TRADE_IN_NO_OFFER and the draft stays, with a
+ * `no_offer` line for the desk. Per-part values are not stored for the customer
+ * to read (G11): the owner's figures go to `trade_in_valuations`.
+ */
+async function submitV2(env: Env, req: RequestRow, comps: ComponentRow[], book: RuleBook, priced: PricedTarget): Promise<RequestRow> {
+  const db = env.DB;
+  const nowIso = new Date().toISOString();
+  const [unit, slot, policy] = await Promise.all([
+    resolveUnit(env, req.user_id, req.order_item_id, req.unit_index, nowIso),
+    slotOf(db, req.order_item_id, req.unit_index),
+    getSetting(db, 'tradeInPolicy'),
+  ]);
+  const o = await offerFor(env, {
+    req,
+    unit,
+    comps,
+    book,
+    phase: 'submit',
+    inputsOf: (c) => storedInputs(comps.find((x) => x.role === c.role)?.inputs_json ?? '{}', book[c.family]),
+    slotUnitIds: slot.unitIds,
+    nowIso,
+  });
+  if (o.no_offer_reason === 'scope_unavailable') throw refuse('TRADE_IN_SCOPE_UNAVAILABLE');
+  if (o.offer_iqd === null) {
+    // The desk sees «بلا عرض» (§16 D-1): one log line, outside any money batch.
+    await eventStatement(db, req.id, { id: req.user_id, role: 'customer' }, 'no_offer', 'draft', 'draft', { reason: o.no_offer_reason }, nowIso)
+      .run()
+      .catch(() => undefined);
+    throw refuse('TRADE_IN_NO_OFFER', { reason: o.no_offer_reason ?? 'below_minimum' });
+  }
+  const offer = o.offer_iqd;
+  const expires = new Date(Date.parse(nowIso) + policy.offer_valid_days * DAY_MS).toISOString();
+  const token = randomToken(12);
+  const stmts: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `UPDATE trade_in_requests
+            SET status = 'submitted', submitted_at = ?2, updated_at = ?2, decision_token = ?3, valuation_version = 2,
+                target_price_iqd = ?4, target_snapshot_json = ?5, offer_iqd = ?6, offer_at = ?2, offer_expires_at = ?7,
+                now_price_iqd = ?8, now_price_channel = ?9, paid_net_iqd = ?10, estimated_iqd = ?6, estimate_json = ?11, rule_versions_json = ?12
+          WHERE id = ?1 AND status = 'draft'`
+      )
+      .bind(
+        req.id, nowIso, token, priced.price_iqd, JSON.stringify(priced.snapshot), offer, expires,
+        o.now_price_iqd, o.now_price_channel, o.paid_net_iqd, JSON.stringify({ offer_iqd: offer, computed_at: nowIso }), JSON.stringify(o.rule_versions)
+      ),
+    fence(db, req.id, token),
+    serviceFence(db, req.id, slot),
+    db.prepare(`UPDATE trade_in_components SET estimate_json = '{}', value_iqd = NULL WHERE request_id = ?`).bind(req.id),
+    valuationStatement(db, req.id, o.owner, req.user_id, nowIso),
+    eventStatement(db, req.id, { id: req.user_id, role: 'customer' }, 'submit', 'draft', 'submitted', { offer_iqd: offer, target_price_iqd: priced.price_iqd }, nowIso),
+    notifyStatement(db, {
+      userId: req.user_id,
+      kind: 'trade_in',
+      title_ar: 'استلمنا طلب الاستبدال',
+      title_en: 'We received your trade-in request',
+      body_ar: `عرضنا حتى ${iqdText(offer, 'ar')}. سلّم جهازك قبل ${dayText(expires)}.`,
+      body_en: `Our offer is up to ${iqdText(offer, 'en')}. Hand in your device by ${dayText(expires)}.`,
+      meta: {
+        title_ckb: 'داواکاریی گۆڕینەوەکەت وەرگیرا',
+        body_ckb: `پێشنیارەکەمان تا ${iqdText(offer, 'ckb')}ە. ئامێرەکەت پێش ${dayText(expires)} ڕادەست بکە.`,
+      },
+      link: requestPath(req.id),
+      entity_type: 'trade_in',
+      entity_id: req.id,
+      eventKey: `trade_in:${req.id}:submitted`,
+    }).stmt,
+  ];
+  try {
+    await db.batch(stmts);
+  } catch (e) {
+    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
+    throw e;
+  }
+  return (await loadRequest(db, req.id))!;
 }
 
 // ================================================================= transitions
@@ -2563,13 +2899,77 @@ function photoView(p: PhotoRow) {
   return { id: p.id, component: p.component_role, angle: p.angle, url: `/files/${p.file_key}`, width: p.width, height: p.height, created_at: p.created_at };
 }
 
-/** The request as its owner sees it; the admin view adds the customer and the audit detail. */
-export async function requestView(env: Env, req: RequestRow, audience: 'customer' | 'admin') {
+/** Who reads a request: its customer, a staff member (any admin), or the owner (cost scope). 'admin' = the owner's full view. */
+export type RequestAudience = 'customer' | 'staff' | 'owner' | 'admin';
+
+/** A credit given back (row 237) on this request, newest first; none on a database without 0192. */
+async function reissuesOf(db: D1Database, requestId: string): Promise<Array<{ order_id: string; reason: string; ends_at: string; created_at: string }>> {
+  try {
+    const { results } = await db
+      .prepare('SELECT order_id, reason, ends_at, created_at FROM trade_in_credit_reissues WHERE request_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 10')
+      .bind(requestId)
+      .all<{ order_id: string; reason: string; ends_at: string; created_at: string }>();
+    return results ?? [];
+  } catch (e) {
+    if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return [];
+    throw e;
+  }
+}
+
+/** The source device as its customer reads it: words and dates, never the paid split or an AMS share. */
+function publicSource(src: Record<string, unknown>) {
+  const pick = (k: string) => (typeof src[k] === 'string' ? (src[k] as string) : null);
+  return {
+    name: pick('name') ?? '',
+    variant: pick('variant') ?? '',
+    image: pick('image') ?? '',
+    product_slug: pick('product_slug') ?? '',
+    order_id: pick('order_id'),
+    delivered_at: pick('delivered_at'),
+    warranty_end_at: pick('warranty_end_at'),
+  };
+}
+
+/** The target snapshot as stored (the server's priced selection): public words and the price the customer pays. */
+function publicTarget(req: RequestRow) {
+  if (!req.target_product_id) return null;
+  const t = safeParse<Record<string, unknown>>(req.target_snapshot_json, {});
+  return {
+    product_id: req.target_product_id,
+    slug: typeof t.slug === 'string' ? t.slug : '',
+    name: typeof t.name === 'string' ? t.name : '',
+    name_ar: typeof t.name_ar === 'string' ? t.name_ar : '',
+    ...(typeof t.name_ckb === 'string' ? { name_ckb: t.name_ckb } : {}),
+    image: typeof t.image === 'string' ? t.image : '',
+    family: t.family ?? null,
+    options: Array.isArray(t.options) ? t.options : [],
+    color: t.color ?? null,
+    option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),
+    color_id: req.target_color_id,
+    price_iqd: req.target_price_iqd,
+  };
+}
+
+/**
+ * THE REQUEST AS EACH READER SEES IT (S-P2 spec §6.4, §6.13; DECISIONS rows 220, 238).
+ *
+ * Built from the columns, field by field — `loadRequest`'s `SELECT *` row is
+ * never spread into a response.
+ *   customer  the stage, the ONE offer, the final value, the credit and the
+ *             difference; never the ceiling, the intake record, the formula, a
+ *             per-part value, the rules or the owner's valuation;
+ *   staff     + the customer, the counted previews, the server's ceiling and the
+ *             intake record (any admin); no rules, no factor lines (B.10);
+ *   owner     + the rules, the full stored estimate and the source snapshot.
+ */
+export async function requestView(env: Env, req: RequestRow, audience: RequestAudience) {
   const db = env.DB;
+  const owner = audience === 'owner' || audience === 'admin';
+  const staff = owner || audience === 'staff';
   // The counted estimates: the admin reads how many a request used (a probe
   // shows as a long run of them); a customer's draft says how many are left.
-  const countsPreviews = audience === 'admin' || req.status === 'draft';
-  const [comps, photos, events, book, orders, credit, previews] = await Promise.all([
+  const countsPreviews = staff || req.status === 'draft';
+  const [comps, photos, events, book, orders, credit, previews, reissues] = await Promise.all([
     loadComponents(db, req.id),
     loadPhotos(db, req.id),
     loadEvents(db, req.id),
@@ -2579,9 +2979,10 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       ? db.prepare('SELECT ends_at FROM coupons WHERE id = ? AND trade_in_id = ?').bind(req.coupon_id, req.id).first<{ ends_at: string | null }>()
       : Promise.resolve(null),
     countsPreviews ? previewCount(db, req.id) : Promise.resolve(0),
+    req.status === 'completed' ? reissuesOf(db, req.id) : Promise.resolve([]),
   ]);
   const now = new Date().toISOString();
-  const live = estimateFor(req, comps, book, now);
+  const nowMs = Date.parse(now);
   const stored = safeParse<Estimate | null>(req.estimate_json, null);
   const blockers = req.status === 'draft' ? submitBlockers(req, comps, photos, book) : null;
   const creditOrder = orders.find((o) => o.status !== 'cancelled') ?? null;
@@ -2589,99 +2990,91 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
   // order's time is already in `ends_at`; only a cancellation from before 0191, whose use is
   // still spent, is added on read.
   const legacyHeld = orders.find((o) => o.coupon_id === req.coupon_id && o.status === 'cancelled' && o.redemption_state === 'active') ?? null;
-  const creditEnd = credit ? creditEndsAt(credit.ends_at, legacyHeld, Date.parse(now)) : null;
-  const creditLapsed = !creditOrder && creditExpired(creditEnd, Date.parse(now));
-  const offer =
+  const creditEnd = credit ? creditEndsAt(credit.ends_at, legacyHeld, nowMs) : null;
+  const creditLapsed = !creditOrder && creditExpired(creditEnd, nowMs);
+  const liveReissue = reissues.find((x) => Date.parse(x.ends_at) > nowMs) ?? null;
+  const stage = stageOf(req, !!creditOrder, !!liveReissue && !creditOrder);
+  const proposal =
     req.admin_value_iqd !== null
       ? {
           offer_no: req.offer_no,
           value_iqd: req.admin_value_iqd,
           reason: req.admin_reason,
-          settlement: tradeInSettlement(req.target_price_iqd ?? 0, req.admin_value_iqd),
+          settlement: settlementOf(req, req.admin_value_iqd),
           valued_at: req.valued_at,
         }
       : null;
+  const v2Offer = req.offer_iqd !== undefined && req.offer_iqd !== null ? { offer_iqd: req.offer_iqd, offer_at: req.offer_at ?? null, valid_until: req.offer_expires_at ?? null } : null;
   const families = [...new Set(comps.map((c) => c.family))];
   const source = safeParse<Record<string, unknown>>(req.source_snapshot_json, {});
-  const referenceSplit = (source.ams_split as { method?: unknown } | undefined)?.method === 'reference';
-  return {
+  const v2 = (req.valuation_version ?? 1) >= 2;
+  const received = !!req.intake_at;
+  const intakeFacts = safeParse<Record<string, unknown>>(req.intake_json ?? '{}', {});
+  const publicEst = stored && Array.isArray(stored.components) ? { ...publicEstimate(stored), components: [] } : null;
+  const base = {
     id: req.id,
     status: req.status,
     status_label: STATUS_LABELS[req.status],
+    stage,
+    stage_label: STAGE_LABELS[stage],
     scope: req.scope,
     family: req.family,
     is_combo: req.is_combo === 1,
+    valuation_version: req.valuation_version ?? 1,
     order_id: req.order_id,
     order_item_id: req.order_item_id,
     unit_index: req.unit_index,
-    source_product_id: req.source_product_id,
-    // On a `reference` split the snapshot's `ams_split` names the owner's AMS
-    // reference (see `publicUnit`): the customer reads the method alone.
-    source: referenceSplit && audience !== 'admin' ? { ...source, ams_split: { method: 'reference', share_bp: null } } : source,
-    target:
-      req.target_product_id
-        ? {
-            ...safeParse<Record<string, unknown>>(req.target_snapshot_json, {}),
-            option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),
-            color_id: req.target_color_id,
-            price_iqd: req.target_price_iqd,
-          }
-        : null,
+    source: owner ? source : publicSource(source),
+    target: publicTarget(req),
+    // The store-safe offer (v2); while a value proposal is open it also carries that proposal's
+    // keys, which a phone still holding the old request page reads (§7.4).
+    offer: v2Offer || proposal ? { ...(v2Offer ?? { offer_iqd: null, offer_at: null, valid_until: null }), ...(proposal ?? {}) } : null,
+    value_proposal: proposal,
+    now_price_iqd: req.now_price_iqd ?? null,
+    paid_net_iqd: req.paid_net_iqd ?? null,
+    handover: req.handover ?? null,
+    pickup_fee_iqd: req.pickup_fee_iqd ?? 0,
+    // The figure fixed at submit: v2 the offer, v1 the estimate. A draft carries none (G11: the counted
+    // preview is the only door to a draft's figure) — the owner reads the live engine figure.
+    estimate: req.status === 'draft' ? (owner ? estimateFor(req, comps, book, now).estimate : null) : owner ? stored : v2 ? null : publicEst,
+    estimated_iqd: req.status === 'draft' ? (owner ? estimateFor(req, comps, book, now).estimate.total_iqd : null) : req.estimated_iqd,
+    final_value_iqd: req.final_value_iqd,
+    credit_iqd: req.credit_iqd,
+    difference_iqd: req.difference_iqd,
+    excess_iqd: req.final_value_iqd !== null && req.credit_iqd !== null ? Math.max(0, req.final_value_iqd - (req.pickup_fee_iqd ?? 0) - req.credit_iqd) : null,
+    credit_order: creditOrder ? { id: creditOrder.order_id, status: creditOrder.status, amount_iqd: creditOrder.amount_iqd } : null,
+    /** The credit's last moment (owner decision 2), or null for a credit minted before credits ended. */
+    credit_expires_at: creditOrder ? null : liveReissue ? liveReissue.ends_at : creditEnd,
+    credit_expired: liveReissue ? false : creditLapsed,
+    reissue: liveReissue && !creditOrder ? { ends_at: liveReissue.ends_at, any_device: true as const } : null,
+    intake: received ? { received_at: req.intake_at!, serial_matched: req.intake_serial_match === 'match' } : null,
+    customer_note: req.customer_note,
+    cancel_reason: req.cancel_reason,
+    blockers,
     components: comps.map((c) => ({
       role: c.role,
       family: c.family,
       label_ar: c.label_ar,
       label_en: c.label_en,
-      // The base a part is valued from — on a `reference` split, the owner's
-      // AMS reference or paid − it: then the admin's alone.
-      ...(audience === 'admin' || !referenceSplit ? { base_iqd: c.base_iqd } : {}),
       inputs: safeParse<Record<string, unknown>>(c.inputs_json, {}),
-      value_iqd: c.value_iqd,
-      // The owner's own breakdown for the admin; a customer reads the part's value alone.
-      estimate: ((v) => (audience === 'admin' || !v ? v : { value_iqd: v.value_iqd }))(safeParse<ComponentValuation | null>(c.estimate_json, null)),
       required_angles: REQUIRED_PHOTOS[c.family].map((a) => a.id),
-      photos: photos.filter((p) => p.component_role === c.role).map(photoView),
+      allowed_angles: anglesFor(c.family, req.valuation_version ?? 1).map((a) => a.id),
+      photos: photos.filter((p) => p.component_role === c.role && (p.phase ?? 'customer') === 'customer').map(photoView),
+      ...(staff ? { intake_inputs: safeParse<Record<string, unknown>>(c.intake_inputs_json ?? '{}', {}) } : {}),
+      // The owner's own breakdown; staff and the customer read no part value (B.10, G11).
+      ...(owner ? { base_iqd: c.base_iqd, value_iqd: c.value_iqd, estimate: safeParse<ComponentValuation | null>(c.estimate_json, null) } : {}),
     })),
-    // The figure fixed at submit — what the admin reviews. While a draft, the
-    // admin reads the live figure from the saved answers; the CUSTOMER reads
-    // none: a draft's figure is the counted preview's alone (`previewDraft`,
-    // trade-in G11), or saving an answer and reading the draft back would be
-    // an uncounted door to the same figure. A request never submitted stores
-    // no estimate (`{}`): the customer reads none.
-    estimate:
-      req.status === 'draft'
-        ? audience === 'admin'
-          ? live.estimate
-          : null
-        : ((e) => (audience === 'admin' || !e ? e : Array.isArray(e.components) ? publicEstimate(e) : null))(stored),
-    estimated_iqd: req.status === 'draft' ? (audience === 'admin' ? live.estimate.total_iqd : null) : req.estimated_iqd,
-    ...(audience === 'admin'
-      ? { previews }
-      : req.status === 'draft'
-        ? { previews_left: Math.max(0, TRADE_IN_PREVIEW_PER_REQUEST - previews) }
-        : {}),
-    offer,
-    final_value_iqd: req.final_value_iqd,
-    credit_iqd: req.credit_iqd,
-    difference_iqd: req.difference_iqd,
-    excess_iqd: req.final_value_iqd !== null && req.credit_iqd !== null ? req.final_value_iqd - req.credit_iqd : null,
-    credit_order: creditOrder ? { id: creditOrder.order_id, status: creditOrder.status, amount_iqd: creditOrder.amount_iqd } : null,
-    /** The credit's last moment (owner decision 2), or null for a credit minted before credits ended. */
-    credit_expires_at: creditOrder ? null : creditEnd,
-    credit_expired: creditLapsed,
-    customer_note: req.customer_note,
-    cancel_reason: req.cancel_reason,
-    blockers,
     events: events.map((e) => ({
       action: e.action,
       actor_role: e.actor_role,
       from_status: e.from_status,
       to_status: e.to_status,
       created_at: e.created_at,
-      detail: audience === 'admin' ? e.detail : pickPublicDetail(e.detail),
+      detail: owner ? e.detail : pickPublicDetail(e.detail),
     })),
-    // The rules that price it are the admin's to read; the customer's wizard is told what to ask.
-    ...(audience === 'admin'
+    ...(staff ? { previews } : req.status === 'draft' ? { previews_left: Math.max(0, TRADE_IN_PREVIEW_PER_REQUEST - previews) } : {}),
+    // The rules that price it are the owner's to read (B.10); the customer's wizard is told what to ask.
+    ...(owner
       ? { rules: Object.fromEntries(families.map((f) => [f, publicRules(book[f])])) }
       : { questions: Object.fromEntries(families.map((f) => [f, publicQuestions(book[f])])) }),
     can: {
@@ -2689,7 +3082,8 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
       submit: req.status === 'draft' && !!blockers && !Object.keys(blockers.inputs).length && !Object.keys(blockers.photos).length && !blockers.target,
       cancel: !isTerminal(req.status) && !creditOrder,
       decide: req.status === 'value_changed',
-      pay: req.status === 'awaiting_payment' && !creditOrder && (req.credit_iqd ?? 0) > 0 && !creditLapsed,
+      pay: (req.status === 'awaiting_payment' && !creditOrder && (req.credit_iqd ?? 0) > 0 && !creditLapsed && (!v2 || received)) || (!!liveReissue && !creditOrder),
+      choose_handover: req.status === 'draft' || (req.status === 'submitted' && !received),
     },
     created_at: req.created_at,
     submitted_at: req.submitted_at,
@@ -2697,11 +3091,44 @@ export async function requestView(env: Env, req: RequestRow, audience: 'customer
     completed_at: req.completed_at,
     cancelled_at: req.cancelled_at,
   };
+  if (!staff) return base;
+  const intakePhotos = photos.filter((p) => p.phase === 'intake').map((p) => ({ ...photoView(p), proves: p.proves ?? '' }));
+  return {
+    ...base,
+    offer_expires_at: req.offer_expires_at ?? null,
+    // The server's ceiling at intake (staff), never the customer's.
+    ceiling_iqd: req.ceiling_iqd ?? null,
+    ceiling_at: req.ceiling_at ?? null,
+    above_ceiling: (req.above_ceiling ?? 0) === 1,
+    intake: received
+      ? {
+          received_at: req.intake_at!,
+          serial_matched: req.intake_serial_match === 'match',
+          by: req.intake_by ?? null,
+          serial_norm: req.intake_serial_norm ?? null,
+          serial_match: req.intake_serial_match ?? null,
+          hours_seen: intakeFacts.hours_seen ?? null,
+          hours_declared: intakeFacts.hours_declared ?? null,
+          hours_flag: intakeFacts.hours_flag === true,
+          findings: typeof intakeFacts.findings === 'string' ? intakeFacts.findings : '',
+          serial_override: intakeFacts.serial_override === true,
+        }
+      : null,
+    intake_photos: intakePhotos,
+    device_returned_at: req.device_returned_at ?? null,
+    cutover: v2 ? false : req.status !== 'draft' && !isTerminal(req.status),
+  };
+}
+
+/** The settlement a value would give against the request's target, the collection fee off the credit (v2). */
+function settlementOf(req: RequestRow, value: number): TradeInSettlement {
+  const s = offerSettlement(req.target_price_iqd ?? 0, value, req.pickup_fee_iqd ?? 0);
+  return { target_price_iqd: s.target_price_iqd, trade_in_value_iqd: s.trade_in_value_iqd, credit_iqd: s.credit_iqd, difference_iqd: s.difference_iqd, excess_iqd: s.excess_iqd };
 }
 
 function pickPublicDetail(d: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const k of ['value_iqd', 'estimated_iqd', 'reason', 'offer_no', 'via', 'difference_iqd', 'credit_iqd']) if (k in d) out[k] = d[k];
+  for (const k of ['value_iqd', 'estimated_iqd', 'offer_iqd', 'reason', 'offer_no', 'via', 'difference_iqd', 'credit_iqd', 'ends_at', 'order_id']) if (k in d) out[k] = d[k];
   return out;
 }
 

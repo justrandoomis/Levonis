@@ -32,7 +32,6 @@ import { orderRoutes } from '../worker/routes/orders';
 import { cartRoutes } from '../worker/routes/cart';
 import { tradeInCallbackData, parseTradeInCallbackData } from '../worker/lib/tradeIn';
 import { REQUIRED_PHOTOS, blankInputs, valuateComponent, wholeMonthsBetween } from '../packages/pricing/src/tradeIn';
-import { DEFAULT_RULE_SETS } from '../packages/pricing/src/tradeInDefaults';
 import { acceptedPolicies } from './lib/policies';
 import { PRINTER_STANDARD_DELIVERY_POLICY } from '../packages/shipping/src/printerDeliveryPolicy';
 
@@ -220,6 +219,20 @@ async function uploadAll(a: ReturnType<typeof customerApp>, id: string, componen
     const res = await upload(a, id, component, angle.id);
     assert.equal(res.status, 201, `${component}/${angle.id}: ${await res.clone().text()}`);
   }
+  // S-P2 (G14): a resin printer's hours answer is bound to a photo of its hours screen.
+  if (family === 'resin') {
+    const f = photoForm(component, 'screen_hours');
+    f.set('proves', 'hours');
+    const res = await a.request(`/api/trade-in/requests/${id}/photos`, { method: 'POST', body: f, headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx);
+    assert.equal(res.status, 201, `${component}/screen_hours: ${await res.clone().text()}`);
+  }
+}
+/** S-P2 (G14): a damage close-up that proves one ticked fault. */
+async function uploadProof(a: ReturnType<typeof customerApp>, id: string, component: 'device' | 'ams', fault: string) {
+  const f = photoForm(component, 'damage');
+  f.set('proves', fault);
+  const res = await a.request(`/api/trade-in/requests/${id}/photos`, { method: 'POST', body: f, headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx);
+  assert.equal(res.status, 201, `${component}/damage:${fault}: ${await res.clone().text()}`);
 }
 
 const settle = () => Promise.all(pending.splice(0));
@@ -244,8 +257,9 @@ test('only this customer’s delivered LEVONIS devices are offered; another’s 
   const combo = res.units.find((u: { order_item_id: string }) => u.order_item_id === 'oi_combo');
   assert.equal(combo.family, 'fdm');
   assert.equal(combo.is_combo, true);
-  assert.equal(combo.ams_split.method, 'option_gap');
-  assert.equal(combo.ams_split.ams_base_iqd, 286_880);
+  // S-P2: the customer reads the split's method only — no part base, no share (the offer is the one figure).
+  assert.deepEqual(combo.ams_split, { method: 'option_gap', share_bp: null });
+  assert.ok(combo.scopes.every((s: { base_iqd: unknown; components: Array<Record<string, unknown>> }) => s.base_iqd === null && s.components.every((c) => !('base_iqd' in c))));
   assert.equal(combo.paid_iqd, 1_100_000);
   assert.equal(combo.warranty_end_at, '2027-09-26T00:00:00.000Z');
   assert.deepEqual(combo.scopes.map((s: { scope: string }) => s.scope), ['whole', 'printer_only', 'ams_only']);
@@ -311,12 +325,14 @@ test('a part cannot be traded twice: the AMS alone blocks the whole Combo, not i
   const a = customerApp(raw);
   const ams = await json(await post(a, '/api/trade-in/requests', { order_item_id: 'oi_combo', unit_index: 1, scope: 'ams_only' }));
   assert.equal(ams.request.status, 'draft');
-  assert.deepEqual(ams.request.components.map((c: { role: string; base_iqd: number }) => [c.role, c.base_iqd]), [['ams', 286_880]]);
+  // The parts' bases stay the server's (G11): the customer's view names the roles only.
+  assert.deepEqual(ams.request.components.map((c: { role: string; base_iqd?: number }) => [c.role, c.base_iqd]), [['ams', undefined]]);
+  assert.equal(row<{ base_iqd: number }>(raw, 'SELECT base_iqd FROM trade_in_components WHERE request_id = ?', ams.request.id)!.base_iqd, 286_880);
   const whole = await post(a, '/api/trade-in/requests', { order_item_id: 'oi_combo', unit_index: 1, scope: 'whole' });
   assert.equal(whole.status, 409);
   assert.equal((await json(whole)).code, 'TRADE_IN_ALREADY_CLAIMED');
   const printer = await json(await post(a, '/api/trade-in/requests', { order_item_id: 'oi_combo', unit_index: 1, scope: 'printer_only' }));
-  assert.deepEqual(printer.request.components.map((c: { role: string; base_iqd: number }) => [c.role, c.base_iqd]), [['device', 1_100_000 - 286_880]]);
+  assert.deepEqual(printer.request.components.map((c: { role: string }) => c.role), ['device']);
   // The eligibility list says so too.
   const units = (await json(await get(a, '/api/trade-in/eligible'))).units;
   const combo = units.find((u: { order_item_id: string }) => u.order_item_id === 'oi_combo');
@@ -356,8 +372,9 @@ test('the server enforces the answers, every required photograph and the target 
   const early = await post(a, `/api/trade-in/requests/${id}/submit`);
   assert.equal(early.status, 409);
   const missing = (await json(early)).details.missing;
-  assert.deepEqual(missing.device, REQUIRED_PHOTOS.fdm.map((x) => x.id));
-  assert.deepEqual(missing.ams, REQUIRED_PHOTOS.ams.map((x) => x.id));
+  // S-P2 (G14): the hours answer needs its photo, each ticked fault its close-up.
+  assert.deepEqual(missing.device, [...REQUIRED_PHOTOS.fdm.map((x) => x.id), 'hours']);
+  assert.deepEqual(missing.ams, [...REQUIRED_PHOTOS.ams.map((x) => x.id), 'damage:rfid']);
 
   // An angle that belongs to another family is refused.
   const lens = await upload(a, id, 'ams', 'lens');
@@ -369,6 +386,14 @@ test('the server enforces the answers, every required photograph and the target 
 
   await uploadAll(a, id, 'device', 'fdm');
   await uploadAll(a, id, 'ams', 'ams');
+  const proofMissing = await post(a, `/api/trade-in/requests/${id}/submit`);
+  assert.equal(proofMissing.status, 400);
+  assert.deepEqual(await json(proofMissing).then((b) => [b.code, b.details.missing]), ['TRADE_IN_DAMAGE_PHOTO', { ams: ['damage:rfid'] }]);
+  // A «proves» that names no fault of the family, or on another angle, is refused.
+  const f = photoForm('ams', 'damage');
+  f.set('proves', 'free_money');
+  assert.equal((await a.request(`/api/trade-in/requests/${id}/photos`, { method: 'POST', body: f, headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx)).status, 400);
+  await uploadProof(a, id, 'ams', 'rfid');
   const photo = row<{ file_key: string }>(raw, 'SELECT file_key FROM trade_in_photos WHERE request_id = ? LIMIT 1', id)!;
   assert.match(photo.file_key, new RegExp(`^trade-in/${id}/photos/[a-z0-9]+\\.webp$`), 'converted, under the request’s own private folder');
   // The file gate: the owner reads it, a stranger does not.
@@ -378,13 +403,15 @@ test('the server enforces the answers, every required photograph and the target 
 
   const sent = await json(await post(a, `/api/trade-in/requests/${id}/submit`));
   assert.equal(sent.request.status, 'submitted');
-  // The server's estimate is the engine's, on the server's facts.
-  const months = wholeMonthsBetween(DELIVERED, new Date().toISOString());
-  const left = Math.max(0, Math.ceil((Date.parse('2027-09-26T00:00:00.000Z') - Date.now()) / 86_400_000 / 30));
-  const dev = valuateComponent(DEFAULT_RULE_SETS.fdm, { base_iqd: 1_100_000 - 286_880, usage_months: months, warranty_remaining_months: left, product_id: 'p_a1' }, { ...answers('fdm', { hours: 450, exterior: 3 }) } as never);
-  const amsV = valuateComponent(DEFAULT_RULE_SETS.ams, { base_iqd: 286_880, usage_months: months, warranty_remaining_months: left, product_id: 'p_a1' }, { ...answers('ams', { faults: ['rfid'] }), hours: null } as never);
-  assert.equal(sent.request.estimated_iqd, dev.value_iqd + amsV.value_iqd);
-  assert.equal(sent.request.estimate.settlement.target_price_iqd, 1_500_000);
+  // S-P2: the ONE offer, fixed at submit on today's public prices (the Combo 1,150,000), rounded down to 5,000.
+  assert.ok(wholeMonthsBetween(DELIVERED, new Date().toISOString()) >= 12);
+  const offer = sent.request.offer.offer_iqd as number;
+  assert.ok(offer > 0 && offer % 5_000 === 0 && offer <= Math.floor((1_150_000 * 7_000) / 10_000), String(offer));
+  assert.equal(sent.request.estimated_iqd, offer);
+  assert.equal(sent.request.now_price_iqd, 1_150_000, 'today\'s Combo price, public (rule 1)');
+  assert.equal(sent.request.estimate, null, 'no breakdown, no part value');
+  assert.equal(sent.request.target.price_iqd, 1_500_000);
+  void valuateComponent;
 
   // Sent is sent: no more edits, no more photographs.
   assert.equal((await send(a, 'PATCH', `/api/trade-in/requests/${id}`, { customer_note: 'late' })).status, 409);
@@ -426,7 +453,11 @@ test('a changed value asks the customer; only the linked owner may press, a stal
   assert.equal((await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/approve`)).status, 403);
 
   calls.length = 0;
-  const changed = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 150_000, reason: 'خدش في الغطاء' }));
+  // Below the server's figure (a financial admin's authority, owner decision 3).
+  const est = row<{ estimated_iqd: number }>(raw, 'SELECT estimated_iqd FROM trade_in_requests WHERE id = ?', id)!.estimated_iqd;
+  const low = est - 10_000;
+  const lower = est - 5_000;
+  const changed = await json(await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: low, reason: 'خدش في الغطاء' }));
   assert.equal(changed.request.status, 'value_changed');
   assert.equal(changed.request.offer.offer_no, 1);
   await settle();
@@ -439,7 +470,7 @@ test('a changed value asks the customer; only the linked owner may press, a stal
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'cust' AND kind = 'trade_in'") >= 2, true);
 
   // The admin changes it again: the first offer's buttons are stale.
-  await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 180_000, reason: '' });
+  await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: lower, reason: '' });
   const a = customerApp(raw);
   const stale = await post(a, `/api/trade-in/requests/${id}/accept`, { offer_no: 1 });
   assert.equal(stale.status, 409);
@@ -455,12 +486,12 @@ test('a changed value asks the customer; only the linked owner may press, a stal
   await press(raw, tradeInCallbackData('accept', id, 2));
   const r = row<Record<string, unknown>>(raw, 'SELECT * FROM trade_in_requests WHERE id = ?', id)!;
   assert.equal(r.status, 'awaiting_payment');
-  assert.equal(r.final_value_iqd, 180_000);
-  assert.equal(r.credit_iqd, 180_000);
-  assert.equal(r.difference_iqd, 1_320_000);
+  assert.equal(r.final_value_iqd, lower);
+  assert.equal(r.credit_iqd, lower);
+  assert.equal(r.difference_iqd, 1_500_000 - lower);
   assert.equal(r.decided_via, 'telegram');
   const coupon = row<Record<string, unknown>>(raw, 'SELECT * FROM coupons WHERE trade_in_id = ?', id)!;
-  assert.equal(coupon.value, 180_000);
+  assert.equal(coupon.value, lower);
   assert.equal(coupon.assigned_user_id, 'cust');
   assert.equal(coupon.product_id, 'p_p1s');
   assert.equal(coupon.max_global, 1);
@@ -604,7 +635,8 @@ test('an old device worth more than the new one: the credit is capped at the new
   const id = await submitted(raw, 'printer_only');
   // Retarget is not possible after submit, so price the cap against a cheaper device directly.
   raw.prepare("UPDATE trade_in_requests SET target_product_id = 'p_ams', target_price_iqd = 350000 WHERE id = ?").run(id);
-  await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 500_000, reason: 'حالة ممتازة' });
+  // Above the server's figure: the owner's alone, with a private reason (owner decision 3).
+  await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 500_000, reason: 'حالة ممتازة', owner_reason: 'عميل قديم، الجهاز ممتاز' });
   const res = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/accept`, { offer_no: 1 }));
   assert.equal(res.request.status, 'awaiting_payment');
   assert.equal(res.request.final_value_iqd, 500_000);

@@ -1,7 +1,8 @@
 /**
  * LEAK VERIFY (money) — GUARD: the trade-in figures a customer is offered are
  * the same dinar on 10c6541a and on HEAD (DECISIONS row 220 moved the
- * valuation off the phone: rules → server, `publicEstimate`).
+ * valuation off the phone: rules → server, `publicEstimate`). Re-baselined by
+ * Services S-P2 (row 238): the store-safe offer, never above the old figures.
  *
  * For the same unit, answers and target, the saved estimate's per-part value,
  * total and settlement must equal the figures 10c6541a saved (embedded below,
@@ -85,8 +86,69 @@ async function fingerprint() {
   return out;
 }
 
-/** Produced on the base worktree (10c6541a) by `fingerprint()` above. */
+/**
+ * Services S-P2 (DECISIONS row 238, owner decision 1): the store-safe offer replaced the
+ * paid-price formula, so the figures the guard holds were re-produced by `fingerprint()` on
+ * feat/services-p2 — ONE figure, no part value. Every one is at or below what 10c6541a offered
+ * (`V1_FIGURES`, kept below): the decision only ever lowers an offer the store could not resell.
+ */
 const BASE_FIGURES: Record<string, unknown> | null = {
+  "resin-blank": {
+    "estimate": {
+      "total": 220000,
+      "parts": [],
+      "settlement": null
+    },
+    "estimated_iqd": 220000
+  },
+  "resin-worn": {
+    "estimate": {
+      "total": 165000,
+      "parts": [],
+      "settlement": null
+    },
+    "estimated_iqd": 165000
+  },
+  "resin-worn-p1s": {
+    "estimate": {
+      "total": 165000,
+      "parts": [],
+      "settlement": {
+        "target_price_iqd": 1500000,
+        "trade_in_value_iqd": 165000,
+        "credit_iqd": 165000,
+        "difference_iqd": 1335000,
+        "excess_iqd": 0
+      }
+    },
+    "estimated_iqd": 165000
+  },
+  "combo": {
+    "estimate": {
+      "total": 550000,
+      "parts": [],
+      "settlement": null
+    },
+    "estimated_iqd": 550000
+  },
+  "combo-p1s": {
+    "estimate": {
+      "total": 470000,
+      "parts": [],
+      "settlement": {
+        "target_price_iqd": 1500000,
+        "trade_in_value_iqd": 470000,
+        "credit_iqd": 470000,
+        "difference_iqd": 1030000,
+        "excess_iqd": 0
+      }
+    },
+    "estimated_iqd": 470000
+  }
+};
+
+/** Produced on the base worktree (10c6541a) by the v1 `fingerprint()`: the paid-price formula. */
+const V1_FIGURES: Record<string, { estimated_iqd: number; estimate: unknown }> = {
   "resin-blank": {
     "estimate": {
       "total": 336000,
@@ -178,4 +240,7 @@ test('trade-in offers for the same unit, answers and target: HEAD saves the base
   const now = await fingerprint();
   console.log(`FINGERPRINT ${JSON.stringify(now)}`);
   if (BASE_FIGURES) assert.deepEqual(now, BASE_FIGURES);
+  for (const [label, v] of Object.entries(now as Record<string, { estimated_iqd: number }>)) {
+    assert.ok(v.estimated_iqd <= V1_FIGURES[label].estimated_iqd, `${label}: the store-safe offer ${v.estimated_iqd} never exceeds the old ${V1_FIGURES[label].estimated_iqd}`);
+  }
 });
