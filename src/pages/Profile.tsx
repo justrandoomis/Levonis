@@ -15,6 +15,8 @@ import ProfileIconGrid, { ProfileIconAction } from '../components/profile/Profil
 import GuestCard from '../components/profile/GuestCard';
 import MyReviewsTab from '../components/profile/MyReviewsTab';
 const MyProjectsTab = React.lazy(() => import('../components/profile/MyProjectsTab'));
+// «خدماتي» (Services V2 S-P2, spec §10.2): devices and warranty, and the trade-in's next step — its own chunk.
+const MyServicesCard = React.lazy(() => import('../components/tradeIn/MyServicesCard'));
 import { useProjectStrings } from '../components/community/projects/strings';
 import { IconButton } from '../components/ui/Button';
 import QrCodeModal from '../components/profile/QrCodeModal';
@@ -654,6 +656,13 @@ export default function Profile() {
             </button>
           )}
         </div>
+        )}
+
+        {/* «خدماتي» — after «طلباتي», members only. */}
+        {isAuthenticated && (
+          <React.Suspense fallback={null}>
+            <MyServicesCard />
+          </React.Suspense>
         )}
 
         {/* Fourth Card: Quick Tiles — members only (all targets need auth;

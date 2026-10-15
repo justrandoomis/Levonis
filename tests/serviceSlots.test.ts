@@ -235,7 +235,9 @@ test('the rail picks its language with loc(), never with the direction', () => {
         `${path} picks text with a TWO-way lang test — three languages need loc(ar, en, ckb):\n  ${m[0]}`
       );
     }
-    assert.match(source, /loc\(/, `${path} does not use loc() at all`);
+    // The trade-in page reads its three languages from one table (src/components/tradeIn/copy.ts,
+    // S-P2) through useT() — the same ar/en/ckb choice, never a direction test.
+    assert.match(source, path === 'src/pages/TradeIn.tsx' ? /\buseT\(\)/ : /loc\(/, `${path} does not use loc() at all`);
   }
 });
 
@@ -277,7 +279,8 @@ test('the two new pages exist, are routed, and state their own empty cases', () 
   assert.match(used, /<EmptyState/);
   assert.match(used, /data-used-printers-page/);
 
-  const trade = read('src/pages/TradeIn.tsx') + read('src/components/tradeIn/TradeInWizard.tsx');
+  // S-P2: the five phone screens (DECISIONS row 238) replaced the 7-step wizard.
+  const trade = ['src/pages/TradeIn.tsx', 'src/components/tradeIn/TradeInFlow.tsx', 'src/components/tradeIn/OfferScreen.tsx', 'src/components/tradeIn/copy.ts'].map(read).join('\n');
   /**
    * THE FORM MUST REACH SOMETHING REAL. A trade-in page whose submit button
    * resolves to a toast is worse than one that says «قريبًا». It used to file
@@ -288,12 +291,12 @@ test('the two new pages exist, are routed, and state their own empty cases', () 
    * nobody ever received their request.
    */
   assert.match(trade, /api\.post<[^>]*>\('\/api\/trade-in\/requests'/);
-  assert.match(trade, /\/api\/trade-in\/requests\/\$\{req\.id\}\/submit/);
+  assert.match(trade, /\/api\/trade-in\/requests\/\$\{encodeURIComponent\(req\.id\)\}\/submit/);
   assert.match(trade, /\/api\/trade-in\/eligible/);
   assert.match(trade, /data-trade-in-form/);
-  assert.match(trade, /data-trade-in-review/);
-  // The estimate is never presented as the price.
-  assert.match(trade, /تقدير أولي — القيمة النهائية بعد الفحص/);
+  assert.match(trade, /data-trade-in-offer/);
+  // The offer is never presented as the price: the final value follows the inspection and never exceeds it.
+  assert.match(trade, /القيمة النهائية بعد فحص الجهاز في المتجر، ولن تزيد على هذا العرض/);
 });
 
 test('resolve gives every service slot a url and its link', () => {

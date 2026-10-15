@@ -1,127 +1,189 @@
 /**
- * «استبدل جهازك» — trade a device bought from LEVONIS against a new one.
+ * «استبدل جهازك» — trade a device bought from LEVONIS against a new one (Services V2 S-P2,
+ * DECISIONS row 238; trade-in design B.2; spec §10.1).
  *
- * THIS REPLACES THE SUPPORT-TICKET FORM THAT STOOD HERE, and keeps its rules.
- * That form filed a ticket because there was no trade-in endpoint, and it said
- * so: a prettier form posting to nothing, with a «تم الإرسال» toast, was the
- * one outcome the page must not have. The endpoint now exists
- * (worker/routes/tradeIn.ts, migration 0143) with a valuation state machine,
- * photographs of the unit and a value the customer accepts — exactly the
- * «proper next step» the old header named — so the page is the real thing.
+ * FIVE PHONE SCREENS, ONE PRIMARY ACTION EACH: «أجهزتك» (this page's home) → «ماذا تستبدل؟» (a
+ * sheet, Combo only) → «حالة الجهاز» → «الجهاز الجديد» → «عرضك», then the request page's timeline.
  *
- * THE HONEST-UX PRINCIPLES IT KEEPS:
+ * THE HONEST-UX RULES IT KEEPS:
+ *   ONLY WHAT IS TRUE IS PROMISED. The customer sees ONE figure for the old device, «حتى X» — the
+ *   store-safe offer the server works out (owner decision 1) — with the two promises beside it:
+ *   the final value follows the in-store inspection and never exceeds it; the credit is taken off
+ *   the new device and is never cash.
+ *   ONLY LEVONIS DEVICES. The list is the customer's own delivered LEVONIS devices, from the server.
+ *   THE DEVICE BEFORE THE MONEY (decision 2): the credit exists once the shop has received the
+ *   device and matched its serial — the timeline says so at every step.
+ *   THE SERVER DECIDES EVERY FIGURE; nothing on these screens prices anything.
+ *   SIGNING IN IS ASKED FOR AT THE DOOR OF THE FORM: how it works is for everyone.
  *
- *   ONLY WHAT IS TRUE IS PROMISED. The estimate is labelled «تقدير أولي —
- *   القيمة النهائية بعد الفحص» wherever it appears, because it is: the shop
- *   inspects the machine and may change the value, and the customer then
- *   accepts or declines. The credit is a credit against the new device, never
- *   cash, and a value above the new device's price is said to be capped
- *   BEFORE the customer sends the request.
+ * URL: `?request=<id>` a request's timeline (the notifications link here); `?draft=<id>&step=
+ * condition|target|offer` the screens of a draft (the phone's back gesture walks them);
+ * `?item=<order item>&unit=<n>` starts on that device (the order page's «استبدل هذا الجهاز»);
+ * `?target=<product id>` preselects the new device (the product page's entry); `?tab=requests`.
  *
- *   ONLY LEVONIS DEVICES. The first step lists the customer's own delivered
- *   LEVONIS device lines, from the server — there is no field to type a model
- *   the shop never sold. «لا نقبل أي جهاز من خارج LEVONIS» is a list, not a
- *   warning.
- *
- *   THE SERVER DECIDES EVERY FIGURE. The price paid, the dates, the warranty
- *   left, the new device's direct-sale price and the estimate all come from
- *   the Worker, which keeps its valuation rules to itself: the customer is
- *   promised a clear offer before sending, never «published rules» (Services
- *   V2, trade-in G22), and each figure a draft asks for is counted (G11).
- *
- *   SIGNING IN IS ASKED FOR AT THE DOOR OF THE FORM, NOT OF THE PAGE. How a
- *   trade-in works is what someone came to read, so it is visible to everyone;
- *   the device list needs an account because it IS the account's orders.
- *
- * Reachable at /trade-in; `?request=<id>` opens one request (the notification
- * links), `?item=<order item>&unit=<n>` starts the wizard on that device (the
- * order page's «استبدل هذا الجهاز»), `?new=1` starts it on the device list.
- *
- * Every string is in Arabic, English and Sorani (DECISIONS row 183).
+ * Every string is in Arabic, English and Sorani (src/components/tradeIn/copy.ts; DECISIONS row 183).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Camera, ClipboardCheck, PackageSearch, Repeat, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, HelpCircle, Repeat } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
-import { api, failureText } from '../lib/api';
+import { api } from '../lib/api';
 import { Button, IconButton } from '../components/ui/Button';
-import { Money } from '../components/ui/Money';
 import Note from '../components/ui/Note';
-import SafeImage from '../components/ui/SafeImage';
-import Spinner from '../components/ui/Spinner';
-import TradeInWizard from '../components/tradeIn/TradeInWizard';
-import TradeInRequest from '../components/tradeIn/TradeInRequest';
-import type { RequestSummary, RequestView } from '../components/tradeIn/model';
-import { dateText } from '../components/tradeIn/model';
-
-type Mode = { kind: 'home' } | { kind: 'wizard'; unitKey: string | null; resume: RequestView | null } | { kind: 'request'; id: string };
+import { useT } from '../components/tradeIn/useT';
+import { useErrText } from '../components/tradeIn/parts';
+import DeviceList, { type DeviceTab } from '../components/tradeIn/DeviceList';
+import ScopeSheet from '../components/tradeIn/ScopeSheet';
+import HowItWorksSheet from '../components/tradeIn/HowItWorksSheet';
+import TradeInFlow, { FLOW_STEPS, type FlowStep } from '../components/tradeIn/TradeInFlow';
+import RequestTimeline from '../components/tradeIn/RequestTimeline';
+import type { EligibleUnit, RequestSummary, RequestView, TradeInScope } from '../components/tradeIn/model';
 
 const REQ_ID = /^tin_[0-9a-f]{20}$/;
+const PRODUCT_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
-function modeFromParams(p: URLSearchParams): Mode {
-  const id = p.get('request') ?? '';
-  if (REQ_ID.test(id)) return { kind: 'request', id };
-  const item = p.get('item');
-  if (item) return { kind: 'wizard', unitKey: `${item}:${Number(p.get('unit')) || 1}`, resume: null };
-  if (p.get('new') === '1') return { kind: 'wizard', unitKey: null, resume: null };
+type Mode = { kind: 'home' } | { kind: 'flow'; id: string; step: FlowStep } | { kind: 'request'; id: string };
+
+function modeOf(p: URLSearchParams): Mode {
+  const request = p.get('request') ?? '';
+  if (REQ_ID.test(request)) return { kind: 'request', id: request };
+  const draft = p.get('draft') ?? '';
+  if (REQ_ID.test(draft)) {
+    const step = p.get('step') as FlowStep;
+    return {
+      kind: 'flow',
+      id: draft,
+      step: FLOW_STEPS.includes(step) ? step : 'condition',
+    };
+  }
   return { kind: 'home' };
 }
 
 export default function TradeIn() {
-  const { loc, lang, dir } = useLanguage();
-  const L = (ar: string, en: string, ckb: string) => loc(ar, en, ckb);
+  const { t } = useT();
+  const { dir } = useLanguage();
   const { isAuthenticated } = useAuth();
   const { signIn } = useSignInPrompt();
+  const errText = useErrText();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
-  const [mode, setMode] = useState<Mode>(() => modeFromParams(params));
-  const [mine, setMine] = useState<RequestSummary[] | null>(null);
-  const [mineError, setMineError] = useState('');
+  const mode = modeOf(params);
+  const targetHint = PRODUCT_ID.test(params.get('target') ?? '') ? params.get('target') : null;
+  const from = (location.state as { from?: string } | null)?.from ?? null;
+
+  const [units, setUnits] = useState<EligibleUnit[] | null>(null);
+  const [requests, setRequests] = useState<RequestSummary[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<DeviceTab>(params.get('tab') === 'requests' ? 'requests' : 'devices');
+  const [scopeFor, setScopeFor] = useState<EligibleUnit | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState('');
+  const [how, setHow] = useState(false);
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
-  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
 
-  // The URL is the source of truth for which screen is open (a notification
-  // link, the back button), and the screen writes it back when it moves.
-  useEffect(() => {
-    setMode((cur) => {
-      const next = modeFromParams(params);
-      if (cur.kind === 'wizard' && cur.resume && next.kind === 'request' && next.id === cur.resume.id) return cur;
-      return next;
-    });
-  }, [params]);
-
-  const loadMine = useCallback(async () => {
-    setMineError('');
+  const load = useCallback(async () => {
+    setLoadError('');
     try {
-      const d = await api.get<{ requests: RequestSummary[] }>('/api/trade-in/requests');
-      setMine(d.requests);
-    } catch (e) {
-      setMineError(failureText(e, loc('تعذّر تحميل طلباتك.', 'Could not load your requests.', 'داواکارییەکانت بار نەکران.')));
+      const [e, r] = await Promise.all([api.get<{ units: EligibleUnit[] }>('/api/trade-in/eligible'), api.get<{ requests: RequestSummary[] }>('/api/trade-in/requests')]);
+      setUnits(e.units);
+      setRequests(r.requests);
+    } catch (err) {
+      setLoadError(errText(err, t('loadError')));
     }
-  }, [loc]);
+  }, [errText, t]);
 
   useEffect(() => {
-    if (isAuthenticated && mode.kind === 'home') void loadMine();
-  }, [isAuthenticated, mode.kind, loadMine]);
+    if (isAuthenticated && mode.kind === 'home') void load();
+  }, [isAuthenticated, mode.kind, load]);
 
-  // Both the URL and the screen: a resumed draft is already at ?request=<id>,
-  // and setting the same params again would leave the wizard on screen.
-  const openRequest = (id: string) => {
-    setMode({ kind: 'request', id });
-    setParams({ request: id });
-  };
-  const goHome = () => {
-    setMode({ kind: 'home' });
-    setParams({});
-  };
-  const start = () => (isAuthenticated ? setParams({ new: '1' }) : signIn());
+  /** Keep `?target=` across the screens: the product page's device stays chosen. */
+  const withTarget = useCallback(
+    (next: Record<string, string>) => {
+      const p = new URLSearchParams(next);
+      if (targetHint) p.set('target', targetHint);
+      return p;
+    },
+    [targetHint]
+  );
 
+  const openDraft = useCallback(
+    async (unit: EligibleUnit, scope: TradeInScope) => {
+      setOpening(true);
+      setOpenError('');
+      try {
+        const d = await api.post<{ request: RequestView }>('/api/trade-in/requests', {
+          order_item_id: unit.order_item_id,
+          unit_index: unit.unit_index,
+          scope,
+        });
+        setScopeFor(null);
+        setParams(withTarget({ draft: d.request.id, step: 'condition' }), {
+          state: { from: 'home' },
+        });
+      } catch (e) {
+        setOpenError(errText(e));
+        if (!unit.is_combo) setScopeFor(null);
+      } finally {
+        setOpening(false);
+      }
+    },
+    [errText, setParams, withTarget]
+  );
+
+  const pick = useCallback(
+    (u: EligibleUnit) => {
+      setOpenError('');
+      const open = u.scopes.filter((s) => s.available);
+      // Screen 2 is for a Combo with a real choice; anything else goes straight to its condition.
+      if (u.is_combo && u.scopes.length > 1) setScopeFor(u);
+      else void openDraft(u, open[0]?.scope ?? 'whole');
+    },
+    [openDraft]
+  );
+
+  // «استبدل هذا الجهاز» on an order page: that device, picked.
+  useEffect(() => {
+    const item = params.get('item');
+    if (!item || !units || mode.kind !== 'home') return;
+    const key = `${item}:${Number(params.get('unit')) || 1}`;
+    const u = units.find((x) => x.key === key);
+    const next = new URLSearchParams(params);
+    next.delete('item');
+    next.delete('unit');
+    setParams(next, { replace: true });
+    if (u?.open_request_id) setParams(withTarget({ request: u.open_request_id }), { replace: true });
+    else if (u?.available) pick(u);
+  }, [params, units, mode.kind, pick, setParams, withTarget]);
+
+  const openRequest = (id: string) => setParams(withTarget({ request: id }), { state: { from: 'home' } });
+  const home = () => {
+    if (from === 'home') navigate(-1);
+    else setParams(withTarget({}), { replace: true });
+  };
+  const goStep = (next: FlowStep, direction: 'forward' | 'back') => {
+    if (mode.kind !== 'flow') return;
+    if (direction === 'back' && from === next) {
+      navigate(-1);
+      return;
+    }
+    setParams(withTarget({ draft: mode.id, step: next }), {
+      state: { from: mode.step },
+      replace: direction === 'back',
+    });
+  };
   const goBack = () => {
-    if (mode.kind !== 'home') {
-      goHome();
+    if (mode.kind === 'flow') {
+      if (mode.step === 'condition') home();
+      else goStep(mode.step === 'offer' ? 'target' : 'condition', 'back');
+      return;
+    }
+    if (mode.kind === 'request') {
+      home();
       return;
     }
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
@@ -130,129 +192,93 @@ export default function TradeIn() {
   };
 
   return (
-    <div className="w-full min-h-screen text-text-secondary font-sans pb-28" data-trade-in-page>
-      <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
-        <IconButton variant="secondary" onClick={goBack} label={L('رجوع', 'Back', 'گەڕانەوە')} icon={<Back aria-hidden="true" className="w-5 h-5" />} />
-        <h1 className="text-text-primary font-bold text-lg leading-6 flex-1 min-w-0 truncate">
-          {mode.kind === 'request' ? L('طلب الاستبدال', 'Trade-in request', 'داواکاریی گۆڕینەوە') : L('استبدل جهازك بجديد', 'Trade in your device', 'ئامێرەکەت بە نوێ بگۆڕەوە')}
-        </h1>
+    <div className="w-full min-h-screen pb-28 font-sans text-text-secondary" data-trade-in-page>
+      <header className="material material-thin sticky top-0 z-40 flex items-center gap-3 px-4 py-3">
+        <IconButton variant="secondary" onClick={goBack} label={t('back')} icon={<Back aria-hidden="true" className="h-5 w-5" />} />
+        <h1 className="min-w-0 flex-1 truncate text-lg font-bold leading-6 text-text-primary">{mode.kind === 'request' ? t('requestTitle') : t('title')}</h1>
+        {mode.kind === 'home' ? (
+          <IconButton variant="ghost" onClick={() => setHow(true)} label={t('howItWorks')} icon={<HelpCircle aria-hidden="true" className="h-5 w-5" />} data-trade-in-how />
+        ) : null}
       </header>
 
-      <div className="px-4 pt-4 max-w-2xl lg:max-w-[1120px] mx-auto">
-        {mode.kind === 'wizard' && isAuthenticated ? (
-          <TradeInWizard
-            key={mode.resume?.id ?? mode.unitKey ?? 'new'}
-            initialUnitKey={mode.unitKey}
-            resume={mode.resume}
-            onDone={(id) => openRequest(id)}
-            onExit={goHome}
-          />
-        ) : mode.kind === 'request' && isAuthenticated ? (
-          <TradeInRequest id={mode.id} onBack={goHome} onResume={(r) => setMode({ kind: 'wizard', unitKey: null, resume: r })} />
-        ) : (
-          <div className="space-y-5 lg:max-w-2xl lg:mx-auto">
-            {/* WHAT THIS IS, in four steps a customer can hold in their head. */}
-            <section className="lv-surface p-5" data-trade-in-intro>
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full lv-well text-gold">
-                <Repeat className="w-5 h-5" aria-hidden />
-              </span>
-              <h2 className="text-text-primary text-[22px] font-black leading-8 mt-3">{L('جهازك من LEVONIS يصبح رصيداً لجهاز جديد', 'Your LEVONIS device becomes credit for a new one', 'ئامێرەکەت لە LEVONIS دەبێتە باڵانس بۆ ئامێرێکی نوێ')}</h2>
-              <p className="text-[13.5px] leading-6 text-text-secondary mt-1">
-                {L(
-                  'للطابعات (FDM و Resin) وأجهزة الليزر وأنظمة الكومبو ووحدات AMS المشتراة من LEVONIS فقط. لا نقبل أجهزة من خارج المتجر.',
-                  'For printers (FDM and Resin), lasers, Combo systems and AMS units bought from LEVONIS only. We do not accept devices bought elsewhere.',
-                  'تەنها بۆ چاپکەرەکان (FDM و Resin)، ئامێرەکانی لەیزەر، سیستەمەکانی Combo و یەکەکانی AMS کە لە LEVONIS کڕدراون. ئامێری کڕدراو لە دەرەوەی فرۆشگا وەرناگرین.'
-                )}
-              </p>
-              <ol className="mt-4 space-y-3">
-                {[
-                  { icon: PackageSearch, t: L('اختر الجهاز من طلباتك السابقة', 'Pick the device from your past orders', 'ئامێرەکە لە داواکارییەکانی پێشووت هەڵبژێرە'), d: L('نملأ السعر والتاريخ والضمان تلقائياً.', 'We fill in the price, dates and warranty.', 'نرخ و بەروار و گەرەنتی خۆکارانە پڕ دەکەینەوە.') },
-                  { icon: Camera, t: L('صف حالته وصوّره', 'Describe and photograph it', 'دۆخەکەی باس بکە و وێنەی بگرە'), d: L('كل جزء بمفرده — الطابعة والـ AMS.', 'Each part on its own — the printer and the AMS.', 'هەر بەشێک بە جیا — چاپکەر و AMS.') },
-                  { icon: ClipboardCheck, t: L('اختر الجهاز الجديد وشاهد التقدير', 'Choose the new device and see the estimate', 'ئامێرە نوێیەکە هەڵبژێرە و خەمڵاندنەکە ببینە'), d: L('بعرض واضح قبل الإرسال.', 'With a clear offer before you send.', 'بە پێشنیارێکی ڕوون پێش ناردن.') },
-                  { icon: ShieldCheck, t: L('نفحصه ونثبّت القيمة، وتدفع الفرق', 'We inspect, fix the value, you pay the difference', 'دەیپشکنین و بەهاکە جێگیر دەکەین، و تۆ جیاوازییەکە دەدەیت'), d: L('إن تغيّرت القيمة نطلب موافقتك أولاً.', 'If the value changes, we ask you first.', 'ئەگەر بەهاکە گۆڕا، سەرەتا ڕەزامەندیت وەردەگرین.') },
-                ].map((s, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="h-9 w-9 shrink-0 rounded-sm lv-well text-text-primary flex items-center justify-center">
-                      <s.icon className="w-4 h-4" aria-hidden />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-text-primary text-[14px] font-bold leading-5">{s.t}</span>
-                      <span className="block text-[12.5px] text-text-muted leading-5">{s.d}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-              <Button variant="primary" block className="mt-5" onClick={start} data-trade-in-start>
-                {isAuthenticated ? L('ابدأ الاستبدال', 'Start a trade-in', 'گۆڕینەوە دەست پێبکە') : L('سجّل الدخول للبدء', 'Sign in to start', 'بۆ دەستپێکردن بچۆ ژوورەوە')}
+      <div className="mx-auto max-w-2xl px-4 pt-4 lg:max-w-[880px]">
+        {!isAuthenticated ? (
+          <section className="lv-surface space-y-3 p-5" data-trade-in-intro>
+            <span className="lv-well inline-flex h-11 w-11 items-center justify-center rounded-full text-gold">
+              <Repeat className="h-5 w-5" aria-hidden />
+            </span>
+            <h2 className="text-[22px] font-black leading-8 text-text-primary">{t('intro.line')}</h2>
+            <p className="text-[13.5px] leading-6 text-text-secondary">{t('intro.only')}</p>
+            <p className="text-[13.5px] font-semibold text-gold">{t('promise')}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button variant="primary" block onClick={signIn} data-trade-in-start>
+                {t('signIn')}
               </Button>
-            </section>
-
-            {isAuthenticated ? (
-              <section aria-labelledby="ti-mine">
-                <h2 id="ti-mine" className="text-text-primary text-[17px] font-bold mb-2">
-                  {L('طلباتي للاستبدال', 'My trade-ins', 'داواکارییەکانی گۆڕینەوەم')}
-                </h2>
-                {mineError ? (
-                  <div className="rounded-2xl border border-border-subtle p-4">
-                    <p className="text-[13px] text-rose-300">{mineError}</p>
-                    <Button variant="secondary" className="mt-2" onClick={loadMine}>
-                      {L('إعادة المحاولة', 'Try again', 'دووبارە هەوڵ بدەرەوە')}
-                    </Button>
-                  </div>
-                ) : mine === null ? (
-                  <div className="flex justify-center py-6">
-                    <Spinner />
-                  </div>
-                ) : mine.length === 0 ? (
-                  <p className="text-[13px] text-text-muted rounded-2xl border border-dashed border-border-subtle p-4">
-                    {L('لا توجد طلبات استبدال بعد.', 'No trade-in requests yet.', 'هێشتا هیچ داواکارییەکی گۆڕینەوە نییە.')}
-                  </p>
-                ) : (
-                  <ul className="lv-surface overflow-hidden divide-y divide-border-subtle">
-                    {mine.map((r) => {
-                      const value = r.final_value_iqd ?? r.admin_value_iqd ?? r.estimated_iqd;
-                      const waiting = r.status === 'value_changed' || r.status === 'awaiting_payment' || r.status === 'draft';
-                      return (
-                        <li key={r.id}>
-                          <button
-                            type="button"
-                            onClick={() => openRequest(r.id)}
-                            data-request={r.id}
-                            className="w-full text-start flex items-center gap-3 p-3 transition-colors hover:bg-white/[0.04] active:bg-[var(--clay-well-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
-                          >
-                            <SafeImage sizes="48px" src={r.image} alt="" aspect="square" className="w-12 h-12 rounded-md shrink-0" bgClassName="bg-surface" />
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-text-primary text-[14px] font-bold leading-5 truncate">{r.name}</span>
-                              <span className={`block text-[12px] font-semibold ${waiting ? 'text-gold' : 'text-text-muted'}`}>
-                                {loc(r.status_label.ar, r.status_label.en, r.status_label.ckb)}
-                              </span>
-                              <span className="block text-[11.5px] text-text-muted">{dateText(r.created_at, lang)}</span>
-                            </span>
-                            {value !== null ? (
-                              <span className="text-[13px] font-bold text-text-primary shrink-0">
-                                <Money iqd={value} />
-                              </span>
-                            ) : null}
-                            <Chevron className="w-4 h-4 text-text-muted shrink-0" aria-hidden />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
+              <Button variant="secondary" block onClick={() => setHow(true)}>
+                {t('howItWorks')}
+              </Button>
+            </div>
+          </section>
+        ) : mode.kind === 'flow' ? (
+          <TradeInFlow
+            key={mode.id}
+            draftId={mode.id}
+            step={mode.step}
+            targetHint={targetHint}
+            onStep={goStep}
+            onSent={(id) => setParams({ request: id }, { replace: true })}
+            onNotDraft={(id) => setParams({ request: id }, { replace: true })}
+            onExit={home}
+          />
+        ) : mode.kind === 'request' ? (
+          <RequestTimeline
+            id={mode.id}
+            onBack={home}
+            onResume={(r) =>
+              setParams(withTarget({ draft: r.id, step: 'condition' }), {
+                state: { from: 'request' },
+              })
+            }
+          />
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 px-1">
+              <p className="min-w-0 text-[13px] leading-5 text-text-secondary">
+                {t('intro.line')} · <span className="font-semibold text-gold">{t('promise')}</span>
+              </p>
+            </div>
+            {openError && !scopeFor ? (
+              <p role="alert" className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">
+                {openError}
+              </p>
             ) : null}
-
+            <DeviceList
+              units={units}
+              requests={requests}
+              loadError={loadError}
+              onRetry={load}
+              tab={tab}
+              onTab={(next) => {
+                setTab(next);
+                const p = new URLSearchParams(params);
+                if (next === 'requests') p.set('tab', 'requests');
+                else p.delete('tab');
+                setParams(p, { replace: true });
+              }}
+              query={query}
+              onQuery={setQuery}
+              onPick={pick}
+              onOpenRequest={openRequest}
+            />
             <Note tone="zinc" compact animate={false}>
-              {L(
-                'قيمة الاستبدال رصيد يُخصم من سعر الجهاز الجديد عند الطلب، وليست مبلغاً نقدياً. إذا زادت قيمة جهازك عن سعر الجهاز الجديد يُحتسب منها سعر الجهاز الجديد فقط.',
-                'The trade-in value is credit taken off the new device’s price at checkout, not cash. If your device is worth more than the new one, only the new device’s price is credited.',
-                'بەهای گۆڕینەوە باڵانسێکە لە کاتی داواکردندا لە نرخی ئامێرە نوێیەکە کەم دەکرێتەوە، نەک پارەی نەقد. ئەگەر بەهای ئامێرەکەت لە نرخی ئامێرە نوێیەکە زیاتر بێت، تەنها نرخی ئامێرە نوێیەکەی لێ حیساب دەکرێت.'
-              )}
+              {t('credit.note')}
             </Note>
           </div>
         )}
       </div>
+
+      <ScopeSheet unit={scopeFor} busy={opening} error={openError} onClose={() => setScopeFor(null)} onChoose={(scope) => scopeFor && openDraft(scopeFor, scope)} />
+      <HowItWorksSheet open={how} onClose={() => setHow(false)} />
     </div>
   );
 }

@@ -21,7 +21,18 @@ test('S1 every customer-visible trade-in label has a Sorani slot (status, family
 });
 
 test('S2 the customer trade-in screens never call loc(ar, en) without the Sorani argument', () => {
-  const files = ['src/pages/TradeIn.tsx', 'src/components/tradeIn/TradeInWizard.tsx', 'src/components/tradeIn/TradeInRequest.tsx', 'src/components/tradeIn/controls.tsx'];
+  // S-P2 (DECISIONS row 238): the 7-step wizard became the five phone screens; their words live in copy.ts.
+  const files = [
+    'src/pages/TradeIn.tsx',
+    'src/components/tradeIn/TradeInFlow.tsx',
+    'src/components/tradeIn/DeviceList.tsx',
+    'src/components/tradeIn/ScopeSheet.tsx',
+    'src/components/tradeIn/ConditionScreen.tsx',
+    'src/components/tradeIn/TargetSearchSheet.tsx',
+    'src/components/tradeIn/OfferScreen.tsx',
+    'src/components/tradeIn/RequestTimeline.tsx',
+    'src/components/tradeIn/controls.tsx',
+  ];
   const twoArg = /\b(?:loc|L)\(\s*(['`])(?:\\.|(?!\1).)*\1\s*,\s*(['`])(?:\\.|(?!\2).)*\2\s*\)/gs;
   const counts = files.map((f) => [f, (readFileSync(f, 'utf8').match(twoArg) ?? []).length] as const);
   const total = counts.reduce((n, [, c]) => n + c, 0);

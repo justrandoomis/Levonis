@@ -19,6 +19,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { COPY } from '../src/components/tradeIn/copy';
 import ts from 'typescript';
 import type { DatabaseSync } from 'node:sqlite';
 import { get, json, post, send } from './fixtures/app';
@@ -179,29 +180,41 @@ test('G11: a sent request keeps the estimate fixed at submit for its customer, a
   raw.close();
 });
 
-test('G11: the refusal reads in Arabic, English and Sorani (not the Arabic copied), and the wizard asks rather than streams', () => {
+test('G11: the refusal reads in Arabic, English and Sorani (not the Arabic copied), and the offer screen asks rather than streams', () => {
   const r = REFUSAL_STRINGS.TRADE_IN_PREVIEW_LIMIT;
   assert.ok(r?.ar && r.en && r.ckb);
   assert.notEqual(r.ckb, r.ar);
-  const wizard = readFileSync('src/components/tradeIn/TradeInWizard.tsx', 'utf8');
-  // One door to the figure, behind «حدّث التقدير» and the last step's single ask — no timer re-pricing every tap.
-  assert.equal(wizard.match(/\/preview`/g)?.length ?? 0, 1, 'the wizard posts to the preview door in one place');
-  assert.ok(/const askFigure = useCallback/.test(wizard));
-  assert.ok(!/setTimeout\(/.test(wizard), 'no debounced ticker');
+  // S-P2: the figure is screen 5's alone («عرضك», src/components/tradeIn/OfferScreen.tsx).
+  const offer = readFileSync('src/components/tradeIn/OfferScreen.tsx', 'utf8');
+  // One door to the figure, behind «حدّث العرض» and the screen's single ask on opening — no timer re-pricing every tap.
+  assert.equal(offer.match(/\/preview`/g)?.length ?? 0, 1, 'the offer screen posts to the preview door in one place');
+  assert.ok(/const ask = useCallback/.test(offer));
+  assert.ok(!/setTimeout\(|setInterval\(/.test(offer), 'no debounced ticker');
+  for (const f of ['TradeInFlow.tsx', 'ConditionScreen.tsx', 'TargetSearchSheet.tsx', 'DeviceList.tsx', 'RequestTimeline.tsx']) {
+    assert.ok(!readFileSync(`src/components/tradeIn/${f}`, 'utf8').includes('/preview'), `${f} asks for a figure`);
+  }
 });
 
 // ------------------------------------------------------------------ G22
 
 test('G22: the trade-in screens promise a clear offer, never «published, transparent rules»', () => {
-  const files = ['src/pages/TradeIn.tsx', 'src/components/tradeIn/TradeInWizard.tsx', 'src/components/tradeIn/TradeInRequest.tsx', 'src/components/tradeIn/controls.tsx'];
+  const files = [
+    'src/pages/TradeIn.tsx',
+    'src/components/tradeIn/copy.ts',
+    'src/components/tradeIn/TradeInFlow.tsx',
+    'src/components/tradeIn/OfferScreen.tsx',
+    'src/components/tradeIn/RequestTimeline.tsx',
+    'src/components/tradeIn/controls.tsx',
+  ];
   for (const f of files) {
     const s = readFileSync(f, 'utf8');
     for (const banned of ['قواعد تقييم معلنة', 'معلنة وشفافة', 'published, transparent rules', 'transparent rules']) {
       assert.ok(!s.includes(banned), `${f} still says «${banned}»`);
     }
   }
-  const page = readFileSync('src/pages/TradeIn.tsx', 'utf8');
-  assert.ok(page.includes("L('بعرض واضح قبل الإرسال.', 'With a clear offer before you send.', 'بە پێشنیارێکی ڕوون پێش ناردن.')"));
+  // S-P2: the screens' words live in copy.ts (B.11 «Removed copy»).
+  const copy = readFileSync('src/components/tradeIn/copy.ts', 'utf8');
+  assert.ok(copy.includes("promise: ['بعرض واضح قبل الإرسال', 'With a clear offer before you send', 'بە پێشنیارێکی ڕوون پێش ناردن']"));
 });
 
 // ------------------------------------------------------------------ Sorani
@@ -224,8 +237,16 @@ const literal = (e: ts.Expression | undefined) =>
 
 const SORANI_SCREENS = [
   'src/pages/TradeIn.tsx',
-  'src/components/tradeIn/TradeInWizard.tsx',
-  'src/components/tradeIn/TradeInRequest.tsx',
+  'src/components/tradeIn/TradeInFlow.tsx',
+  'src/components/tradeIn/DeviceList.tsx',
+  'src/components/tradeIn/ScopeSheet.tsx',
+  'src/components/tradeIn/ConditionScreen.tsx',
+  'src/components/tradeIn/TargetSearchSheet.tsx',
+  'src/components/tradeIn/OfferScreen.tsx',
+  'src/components/tradeIn/RequestTimeline.tsx',
+  'src/components/tradeIn/HowItWorksSheet.tsx',
+  'src/components/tradeIn/ProductTradeInEntry.tsx',
+  'src/components/tradeIn/MyServicesCard.tsx',
   'src/components/tradeIn/controls.tsx',
   'src/components/tradeIn/model.ts',
   'src/pages/Rewards.tsx',
@@ -246,6 +267,13 @@ test('Sorani: every string on the trade-in, /points and services screens has a t
         if (ckb === ar) copied.push(`${f}:${c.line}`);
       }
     }
+  }
+  // S-P2: the five screens keep their words in one table (src/components/tradeIn/copy.ts), each a
+  // Sorani of its own — counted with the literal loc() calls.
+  for (const [key, [ar, , ckb]] of Object.entries(COPY) as Array<[string, readonly string[]]>) {
+    written++;
+    if (!ckb) missing.push(`copy.ts:${key}`);
+    else if (ckb === ar) copied.push(`copy.ts:${key}`);
   }
   assert.deepEqual(missing, [], `calls without Sorani: ${missing.join(', ')}`);
   assert.deepEqual(copied, [], `Sorani copied from the Arabic: ${copied.join(', ')}`);

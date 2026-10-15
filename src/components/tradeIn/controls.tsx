@@ -16,7 +16,7 @@ import React from 'react';
 import { Minus, Plus, Check } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { Money } from '../ui/Money';
-import type { TradeInSettlement } from './model';
+import type { TradeInSettlement } from '../../../packages/pricing/src/tradeIn';
 
 export function Card({ children, className = '', ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -114,8 +114,7 @@ export function Stepper({
 }) {
   const { loc } = useLanguage();
   const set = (v: number) => onChange(Math.max(0, Math.min(max, Math.round(v))));
-  const btn =
-    'lv-button lv-button-secondary h-11 w-11 shrink-0 px-0';
+  const btn = 'lv-button lv-button-secondary h-11 w-11 shrink-0 px-0';
   return (
     <div className="min-w-0" data-stepper={name}>
       <label htmlFor={`st-${name}`} className="block text-[13.5px] font-semibold text-text-primary mb-2">

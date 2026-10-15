@@ -112,6 +112,8 @@ const loadGiniSheet = () => import('../components/product/GiniInstalmentsSheet')
 const CheaperElsewhereSheet = React.lazy(loadCheaperSheet);
 const GiniInstalmentsSheet = React.lazy(loadGiniSheet);
 const ReviewSection = React.lazy(() => import('../components/reviews/ReviewSection'));
+/** «لديك جهاز قديم؟ استبدله بهذا» (Services V2 S-P2, spec §10.2): its own chunk, a signed-in printer page only. */
+const ProductTradeInEntry = React.lazy(() => import('../components/tradeIn/ProductTradeInEntry'));
 /**
  * QUICK BUY (docs/GIFTS_QUICK_BUY.md §3.5, owner spec §4). The page statically
  * carries only the purchase bar's two morphing capsules
@@ -4344,6 +4346,12 @@ export default function Product() {
                     {s.giniCta}
                   </button>
                 </div>
+              ) : null}
+
+              {source === 'catalog' && isAuthenticated && product.is_printer === true ? (
+                <React.Suspense fallback={null}>
+                  <ProductTradeInEntry productId={product.id} />
+                </React.Suspense>
               ) : null}
 
               {/* «مواد الصيانة لهذه الطابعة» — only on a printer with parts. */}

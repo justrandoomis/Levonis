@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { Settings, Package, Boxes, Warehouse, LayoutList, Users, Wallet, Bell, LayoutDashboard, ClipboardList, Megaphone, Star, ShieldCheck, Crown, Ticket, Tag, Truck, Store, Factory, Dice5, Layers, Percent as PercentIcon, BadgePercent, MessageCircle, TrendingUp, LifeBuoy, Repeat, Gift, Calculator, ShieldAlert } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import { supportTotal, useSupportCounts } from '../components/adminSupport/supportCounts';
+import { useServicesBadge } from '../components/adminTradeIn/servicesBadge';
 import { useAuth } from '../AuthContext';
 // The shared toast stack (src/components/ui/Toast.tsx), mounted once for the admin console.
 import { Toaster } from '../components/ui/Toast';
@@ -252,18 +253,13 @@ export default function Admin() {
 
   /** People waiting in the support console, for the sidebar badge. */
   const supportWaiting = supportTotal(useSupportCounts());
+  /** What waits on the services desks (trade-in, price protection), for their badges. */
+  const servicesWaiting = useServicesBadge();
 
   const section = (id: string, ar: string, en: string, ckb?: string) => ({ section: id, sectionLabel: loc(ar, en, ckb) });
   const sidebarItems = [
     { id: 'overview', icon: LayoutDashboard, label: loc('نظرة عامة', 'Overview', 'پێداچوونەوە'), ...section('operations', 'التشغيل', 'Operations', 'بەڕێوەبردن') },
     { id: 'orders', icon: ClipboardList, label: loc('الطلبات', 'Orders', 'داواکارییەکان'), ...section('operations', 'التشغيل', 'Operations') },
-    // «الاستبدال (Trade-in)» — under Operations beside the orders it turns
-    // into: a request the desk reviews, inspects and values. The Kurdish label
-    // is the owner's to write by hand; a Kurdish-reading admin gets the Arabic.
-    // OWNER: Sorani to be written by hand.
-    { id: 'trade_in', icon: Repeat, label: loc('الاستبدال (Trade-in)', 'Trade-in'), ...section('operations', 'التشغيل', 'Operations') },
-    // «حماية السعر» beside the trade-in desk: a service claim the desk decides with evidence.
-    { id: 'price_protection', icon: ShieldCheck, label: loc('حماية السعر', 'Price protection', 'پاراستنی نرخ'), ...section('operations', 'التشغيل', 'Operations') },
     ...(canSeeFinance || ownerMustVerify
       ? [{ id: 'finance', icon: TrendingUp, label: loc('الأرباح والتكاليف', 'Profit & costs', 'قازانج و تێچوون'), ...section('operations', 'التشغيل', 'Operations') }]
       : []),
@@ -275,6 +271,11 @@ export default function Admin() {
     // the server strips the costs out of what they are sent.
     { id: 'inventory', icon: Warehouse, label: loc('إدارة المخزون', 'Inventory', 'بەڕێوەبردنی کۆگا'), ...section('operations', 'التشغيل', 'Operations') },
     { id: 'wallet_requests', icon: Bell, label: loc('طلبات المحفظة', 'Wallet requests'), ...section('operations', 'التشغيل', 'Operations') },
+    // «الخدمات» (Services V2 S-P2, spec §10.3): the trade-in desk and the price-protection claims —
+    // services the desk runs on a customer's device — moved out of «التشغيل», each with what waits
+    // on it (GET /api/admin/services/badge: counts only).
+    { id: 'trade_in', icon: Repeat, label: loc('الاستبدال', 'Trade-in', 'گۆڕینەوە'), badge: servicesWaiting?.trade_in ?? 0, ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
+    { id: 'price_protection', icon: ShieldCheck, label: loc('حماية السعر', 'Price protection', 'پاراستنی نرخ'), badge: servicesWaiting?.price_protection ?? 0, ...section('services', 'الخدمات', 'Services', 'خزمەتگوزارییەکان') },
     { id: 'products', icon: Package, label: t('adminProducts'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') },
     ...(canSeePricing || pricingMustVerify
       ? [{ id: 'pricing', icon: Calculator, label: loc('التسعير والشحن', 'Pricing & shipping', 'نرخدانان و ناردنی بەرهەم'), ...section('catalog', 'الكتالوج', 'Catalog', 'کاتالۆگ') }]
