@@ -82,6 +82,9 @@ import type {
 import { tierLabel } from '../components/subscription/tierMeta';
 import ConditionPanel from '../components/product/ConditionPanel';
 import StockAlertPanel from '../components/product/StockAlertPanel';
+import { UNPRICED_TEXT } from '../lib/priceStatus';
+import { decodePriceRequestIntent, PRICE_REQUEST_PARAM, selectionKeyOf } from '../components/product/priceRequestState';
+import { useMediaQuery } from '../lib/useMediaQuery';
 import {
   decodeAlertIntent,
   type AlertColorOption,
@@ -114,6 +117,11 @@ const GiniInstalmentsSheet = React.lazy(loadGiniSheet);
 const ReviewSection = React.lazy(() => import('../components/reviews/ReviewSection'));
 /** «لديك جهاز قديم؟ استبدله بهذا» (Services V2 S-P2, spec §10.2): its own chunk, a signed-in printer page only. */
 const ProductTradeInEntry = React.lazy(() => import('../components/tradeIn/ProductTradeInEntry'));
+/**
+ * «طلب السعر» (DECISIONS rows 239 (4) and 240): mounted only for a product, or
+ * a selection, with no V2 price — a priced page never downloads it.
+ */
+const PriceRequestPanel = React.lazy(() => import('../components/product/PriceRequestPanel'));
 /**
  * QUICK BUY (docs/GIFTS_QUICK_BUY.md §3.5, owner spec §4). The page statically
  * carries only the purchase bar's two morphing capsules
@@ -170,6 +178,10 @@ const STRINGS = {
     upgradeTo: (tier: string) => `الترقية إلى ${tier}`,
     subscribe: 'اشترك الآن', updatingPrice: 'يجري تحديث السعر…',
     priceUnavailable: 'أكمل الاختيار لعرض السعر النهائي',
+    // Catalog-only (DECISIONS rows 239-240): shown, not sold yet.
+    browseNow: 'يمكنك تصفّح المنتج الآن، ويُفتح الشراء عند تحديد السعر.',
+    selectionNoPrice: 'هذا الاختيار بلا سعر بعد. باقي الخيارات تُشترى الآن، أو اطلب سعره.',
+    noPriceTag: 'بلا سعر',
     options: 'الخيارات المتاحة', colors: 'الألوان المتاحة', chooseOption: 'اختر خيارًا',
     chooseColor: 'اختر لونًا', transport: 'وسيلة النقل للطلب المسبق', chooseTransport: 'اختر وسيلة النقل',
     transportAir: 'شحن جوي', transportSea: 'شحن بحري', transportLand: 'شحن بري',
@@ -243,6 +255,9 @@ const STRINGS = {
     upgradeTo: (tier: string) => `Upgrade to ${tier}`,
     subscribe: 'Subscribe', updatingPrice: 'Updating price…',
     priceUnavailable: 'Complete your selection to see the final price',
+    browseNow: 'You can browse this product now; buying opens once it is priced.',
+    selectionNoPrice: 'This choice has no price yet. The other choices can be bought now, or request its price.',
+    noPriceTag: 'No price',
     options: 'Options', colors: 'Colours', chooseOption: 'Choose an option',
     chooseColor: 'Choose a colour', transport: 'Pre-order transport', chooseTransport: 'Choose transport',
     transportAir: 'Air freight', transportSea: 'Sea freight', transportLand: 'Land freight',
@@ -318,6 +333,9 @@ const STRINGS = {
     upgradeTo: (tier: string) => `بەشداری ${tier} بکە`,
     subscribe: 'بەشداربە', updatingPrice: 'نرخ نوێ دەکرێتەوە…',
     priceUnavailable: 'هەڵبژاردنەکەت تەواو بکە بۆ بینینی نرخی کۆتایی',
+    browseNow: 'ئێستا دەتوانیت سەیری بەرهەمەکە بکەیت؛ کڕین دەکرێتەوە کاتێک نرخی بۆ دیاری کرا.',
+    selectionNoPrice: 'ئەم هەڵبژاردنە هێشتا نرخی نییە. هەڵبژاردنەکانی تر ئێستا دەکڕدرێن، یان داوای نرخەکەی بکە.',
+    noPriceTag: 'بێ نرخ',
     options: 'هەڵبژاردەکان', colors: 'ڕەنگەکان', chooseOption: 'هەڵبژاردەیەک هەڵبژێرە',
     chooseColor: 'ڕەنگێک هەڵبژێرە', transport: 'گواستنەوەی پێشداواکاری', chooseTransport: 'شێوازی گواستنەوە هەڵبژێرە',
     transportAir: 'بار بە ئاسمان', transportSea: 'بار بە دەریا', transportLand: 'بار بە وشکانی',
@@ -664,6 +682,10 @@ interface MembershipPreview {
 
 interface DetailResponse {
   product: ProductDetail;
+  /** DECISIONS row 240: 'unpriced' = catalog-only — every money field below is null. Absent = priced. */
+  price_status?: 'priced' | 'unpriced';
+  /** A priced product's SKUs with no V2 price (canonical `skuComboKey`s). */
+  unpriced_selections?: string[];
   /** The opening selection's quote, already resolved by the server on this
    *  request. It is the first shelf-backed direct selection when one exists. */
   pricing?: Omit<Quote, 'qty' | 'line_total_iqd'>;
@@ -706,8 +728,10 @@ interface DetailResponse {
 }
 
 interface QuoteResponse {
-  quote: Quote;
-  availability: Availability;
+  /** 'unpriced': this complete selection has no V2 price — every figure below is null (row 240). */
+  price_status?: 'priced' | 'unpriced';
+  quote: Quote | null;
+  availability: Availability | null;
   /** The same preview, re-resolved for THIS selection. */
   membership_preview?: MembershipPreview;
   /** The extended-warranty options re-priced for THIS selection's regular price. */
@@ -862,6 +886,16 @@ export default function Product() {
   })();
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
+  /**
+   * CATALOG-ONLY AND PER-SKU PRICE STATE (DECISIONS rows 239-240). A product
+   * with no V2 price is shown and never sold; a priced product may still have
+   * SKUs with no price, which show the label and «طلب السعر» for that
+   * selection only and never inherit another SKU's figure.
+   */
+  const [priceStatus, setPriceStatus] = useState<'priced' | 'unpriced'>('priced');
+  const [unpricedSelections, setUnpricedSelections] = useState<string[]>([]);
+  /** The `priceKey` the quote answered `price_status: 'unpriced'` for. */
+  const [unpricedQuoteFor, setUnpricedQuoteFor] = useState<string | null>(null);
 
   /**
    * «تريدها أقساط؟» — WHETHER THE NOTE EXISTS AT ALL.
@@ -883,7 +917,8 @@ export default function Product() {
    * is the whole answer, as it was before the setting existed.
    */
   const giniPolicy = publicSettings?.giniPolicy;
-  const giniLink = publicSettings && giniPolicy?.enabled !== false ? giniLinkOf(product?.gini_url) : '';
+  // Instalments of a price that does not exist yet are not offered (catalog-only, rows 239-240).
+  const giniLink = publicSettings && giniPolicy?.enabled !== false && priceStatus !== 'unpriced' ? giniLinkOf(product?.gini_url) : '';
 
   /** Header signals: the sales TIER (never the exact count) and the score. */
   const [salesBadge, setSalesBadge] = useState<number | null>(null);
@@ -1144,6 +1179,9 @@ export default function Product() {
           brand_id: (data.product as { brand_id?: string | null }).brand_id ?? null,
         });
         setSource(data.source);
+        setPriceStatus(data.price_status === 'unpriced' ? 'unpriced' : 'priced');
+        setUnpricedSelections(Array.isArray(data.unpriced_selections) ? data.unpriced_selections : []);
+        setUnpricedQuoteFor(null);
         setFavorite(data.favorite);
         setRelations(data.relations ?? null);
         setBaseAvailability(data.availability ?? null);
@@ -1328,8 +1366,18 @@ export default function Product() {
 
   const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${effectiveTransport}|${warrantyPlanId}`;
   const productSlug = product?.slug ?? '';
+  /** Shown, not sold (rows 239-240): the quote door answers 409 for it, so the page never asks. */
+  const catalogOnly = priceStatus === 'unpriced';
+  /** The canonical key of what is chosen — the key `unpriced_selections` and the request door speak. */
+  const selectionKey = selectionKeyOf(optionValueIds, colorId);
+  /** The page body already named this SKU as having no V2 price: there is no figure to confirm. */
+  const knownUnpriced = !catalogOnly && unpricedSelections.includes(selectionKey);
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
+    if (catalogOnly || knownUnpriced) {
+      setQuoteLoading(false);
+      return;
+    }
     if (openingQuoteKey.current === `${productSlug}:${priceKey}`) {
       // The detail endpoint has already resolved pricing and availability
       // together for exactly this selection. Repeating that work after a
@@ -1363,6 +1411,19 @@ export default function Product() {
           { signal: ac.signal, timeoutMs: 12000 }
         );
         if (cancelled) return;
+        if (res.price_status === 'unpriced' || !res.quote) {
+          // This complete selection has no V2 price (row 240): no figure and no availability come back,
+          // and the previous selection's quote no longer answers anything. The page shows the label and
+          // «طلب السعر» for this selection only; the numbers are never taken from another SKU.
+          setUnpricedQuoteFor(priceKey);
+          setQuotedFor(null);
+          setLiveAvailability(null);
+          setQuotedPlans([]);
+          setQuotedPreview(null);
+          setQuoteError(null);
+          return;
+        }
+        setUnpricedQuoteFor(null);
         setQuote(res.quote);
         setQuotedFor(priceKey);
         setLiveAvailability(res.availability);
@@ -1391,7 +1452,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken]);
+  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken, catalogOnly, knownUnpriced]);
 
   /**
    * «يجب التاكد من ان السعر يتحدث» — ON THE SCREEN WHERE THE PRICE IS READ.
@@ -1557,6 +1618,35 @@ export default function Product() {
     const rest = params.toString();
     navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
   }, [navigate, location.search, location.pathname, location.hash]);
+
+  /**
+   * «طلب السعر» — THE SELECTION COMING BACK FROM /auth (DECISIONS row 240), the
+   * `?alert=` pattern above. `?price_request=` is decoded as UNTRUSTED input:
+   * only ids this product really has are kept (in the page's own group order),
+   * the selection is pre-chosen, the parameter leaves the URL with a REPLACE,
+   * and nothing is sent — the customer taps «طلب السعر» again.
+   */
+  useEffect(() => {
+    if (!product || !location.search || location.search.indexOf(`${PRICE_REQUEST_PARAM}=`) === -1) return;
+    const params = new URLSearchParams(location.search);
+    const wish = decodePriceRequestIntent(params.get(PRICE_REQUEST_PARAM));
+    if (wish) {
+      const wanted = new Set(wish.option_value_ids);
+      const groups = relations?.option_groups ?? [];
+      const ids = groups.length
+        ? groups.flatMap((g) => g.values.filter((v) => wanted.has(v.id)).map((v) => v.id))
+        : (product.options ?? []).filter((o) => wanted.has(o.id)).map((o) => o.id);
+      if (ids.length === wanted.size) setOptionValueIds(ids);
+      if (wish.color_id && (product.colors ?? []).some((c) => c.id === wish.color_id)) setColorId(wish.color_id);
+    }
+    params.delete(PRICE_REQUEST_PARAM);
+    const rest = params.toString();
+    navigate(`${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`, { replace: true });
+  }, [product, relations, location.search, location.pathname, location.hash, navigate]);
+  /** Where the request block sits: inside the price card from 1024 px, its button in the phone bar below. */
+  const wideLayout = useMediaQuery('(min-width: 1024px)');
+  /** The phone bar's slot the request button is drawn into (a callback ref, so the panel re-renders once it exists). */
+  const [requestBarSlot, setRequestBarSlot] = useState<HTMLDivElement | null>(null);
 
   /**
    * THE SUPPORT LINK IS FETCHED BEFORE THE TAP, NOT DURING IT.
@@ -2464,8 +2554,18 @@ export default function Product() {
    * with «شحن بري» untouched.
    */
   const routeReady = !(requestedOrderType === 'pre_order' && !effectiveTransport);
+  /**
+   * NOTHING ON SCREEN CAN BE BOUGHT (DECISIONS rows 239-240): the whole
+   * product is catalog-only, or this priced product's chosen SKU has no V2
+   * price (the body named it, or the quote just answered `unpriced`). The
+   * page then shows the label and «طلب السعر» instead of the price, and every
+   * buying control steps aside — for this selection only.
+   */
+  const selectionUnpriced = !catalogOnly && (knownUnpriced || unpricedQuoteFor === priceKey);
+  const noPrice = catalogOnly || selectionUnpriced;
   const canBuy =
     source === 'catalog' &&
+    !noPrice &&
     mode !== 'unavailable' &&
     selectionComplete &&
     routeReady &&
@@ -2539,6 +2639,8 @@ export default function Product() {
    * resolve it wrongly.
    */
   const stockNote = (() => {
+    // No shelf word without a price (rows 239-240): stock is not set for what cannot be bought.
+    if (noPrice) return '';
     if (!availability || effectiveMode !== 'direct_sale') return '';
     if (!availability.stock.tracked) return s.untracked;
     const left = availability.stock.available ?? 0;
@@ -2607,7 +2709,7 @@ export default function Product() {
    * A community listing is excluded for the same reason it cannot be bought:
    * it is not the shop's stock, and nothing here sweeps it.
    */
-  const stockAlertOffered = source === 'catalog' && directOutOfStock;
+  const stockAlertOffered = source === 'catalog' && !noPrice && directOutOfStock;
   /** The ONE option group's values, labelled exactly as the chooser labels
    *  them. Empty for a product with several groups — see buildAlertTargets:
    *  a stored alert has one `option_value_id`, so per-model rows would be a
@@ -2653,7 +2755,7 @@ export default function Product() {
    * button state, so a product whose only open route is pre-order still shows
    * its journeys on the first paint.
    */
-  const showTransports = effectivePreorder && (availability?.preorder.transports.length ?? 0) > 0;
+  const showTransports = effectivePreorder && !noPrice && (availability?.preorder.transports.length ?? 0) > 0;
   const pricingModes = quotedModes ?? detailModes;
   const directFinal: number | null = pricingModes?.direct?.unit_subtotal_iqd ?? null;
   const transportFinal = (t: TransportView): number | null =>
@@ -2670,7 +2772,8 @@ export default function Product() {
   const codReprices = pricingModes?.cod_reprices === true;
 
   // ------------------------------------------------------------ sub-renders
-  const priceBlock = (
+  // Without a price the card is `unpricedBlock` (below), drawn in the same place.
+  const priceBlock = noPrice ? null : (
     <div className="lv-surface p-4">
       {shownPrice ? (
         <>
@@ -2813,6 +2916,60 @@ export default function Product() {
     </div>
   );
 
+  /**
+   * «طلب السعر» (DECISIONS rows 239 (4) and 240). The block that replaces the
+   * price card when nothing on screen can be bought: the label in the price's
+   * own scale, one sentence, and the lazy request panel — inside the card from
+   * 1024 px, its 48 px button in the phone bar below that (`requestBarSlot`).
+   * Mounted in ONE of the two layouts only, so the caller's rows are read once.
+   */
+  const requestSelectionComplete =
+    (relationOptionGroups.length > 0
+      ? relationOptionGroups.every((g) => g.values.some((v) => optionValueIds.includes(v.id)))
+      : options.length === 0 || optionValueIds.length > 0) &&
+    (orderedColors.length === 0 || !!colorId);
+  const unpricedBlock = (wide: boolean) => (
+    <div className="lv-surface p-4" data-price-status="unpriced" data-unpriced-scope={catalogOnly ? 'product' : 'selection'}>
+      <p className="text-text-muted font-black text-xl sm:text-2xl leading-snug">{tr(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}</p>
+      <p className="mt-1.5 text-text-secondary text-[13px] leading-relaxed">{catalogOnly ? s.browseNow : s.selectionNoPrice}</p>
+      {source === 'catalog' && wideLayout === wide ? (
+        <div className="mt-3 border-t border-border-subtle pt-3">
+          <ChunkBoundary compact>
+            <React.Suspense fallback={<div className="min-h-12" aria-hidden="true" />}>
+              <PriceRequestPanel
+                key={product.id}
+                productId={product.id}
+                productSlug={product.slug}
+                productStatus={priceStatus}
+                selectionUnpriced={selectionUnpriced}
+                selectionKey={selectionKey}
+                optionValueIds={optionValueIds}
+                colorId={colorId}
+                selectionComplete={requestSelectionComplete}
+                isAuthenticated={isAuthenticated}
+                barSlot={wide ? null : requestBarSlot}
+                onPriced={() => setRetryToken((n) => n + 1)}
+              />
+            </React.Suspense>
+          </ChunkBoundary>
+        </div>
+      ) : null}
+    </div>
+  );
+  /**
+   * «بلا سعر» ON A CHOICE (row 239 (3), per SKU): a value or colour whose SKU
+   * in the current selection has no V2 price, or that has no priced SKU at all
+   * (`price_levels` null). Never disabled — the customer may want to request
+   * it. Catalog-only products carry no tag: the whole page already says so.
+   */
+  const unpricedKeys = new Set(catalogOnly ? [] : unpricedSelections);
+  const levelIsNull = (map: unknown, id: string) => !!map && (map as Record<string, unknown>)[id] === null;
+  const optionNoPrice = (candidate: string[], id: string): boolean =>
+    unpricedKeys.size > 0 && (unpricedKeys.has(selectionKeyOf(candidate, colorId)) || levelIsNull(priceLevels?.option, id));
+  const colorNoPrice = (id: string): boolean =>
+    unpricedKeys.size > 0 && (unpricedKeys.has(selectionKeyOf(optionValueIds, id)) || levelIsNull(priceLevels?.color, id));
+  const noPriceTag = <span data-no-price className="block text-[10px] font-bold leading-tight text-text-muted">{s.noPriceTag}</span>;
+
   const activeModel = models?.find((m) => m.key === modelKey) ?? null;
 
   /**
@@ -2892,7 +3049,7 @@ export default function Product() {
         Nothing else changed. Every block below is the same JSX it was, with
         the same gate, the same handlers and the same state — this is a move.
       */}
-      {offersBoth && !routeAskedPerVersion ? (
+      {offersBoth && !routeAskedPerVersion && !noPrice ? (
         <fieldset className="lv-section" data-fulfilment-chooser>
           <legend className="px-1 text-text-primary font-bold text-[14px] flex items-center gap-2">
             <Truck aria-hidden="true" className="w-4 h-4 text-text-secondary" />
@@ -3102,6 +3259,12 @@ export default function Product() {
                         : invMode === 'VARIANT_COMBINATION'
                           ? levelChip(variantTotalForOption(value.id))
                           : null;
+                    const unpricedChoice = optionNoPrice(
+                      relationOptionGroups.flatMap((g) =>
+                        g.id === group.id ? [value.id] : g.values.filter((v) => optionValueIds.includes(v.id)).map((v) => v.id)
+                      ),
+                      value.id
+                    );
                     return (
                       <button
                         key={value.id}
@@ -3157,6 +3320,7 @@ export default function Product() {
                         <span className="min-w-0 text-start">
                           <span className="block truncate max-w-[10rem]">{label}</span>
                           {chip ? <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span> : null}
+                          {unpricedChoice ? noPriceTag : null}
                         </span>
                         <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                       </button>
@@ -3341,6 +3505,7 @@ export default function Product() {
                   <span className="min-w-0 text-start">
                     <span className="block truncate max-w-[10rem]">{label}</span>
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
+                    {optionNoPrice([opt.id], opt.id) ? noPriceTag : null}
                   </span>
                   <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
@@ -3412,6 +3577,7 @@ export default function Product() {
                   <span className="min-w-0 text-start">
                     <span className="block truncate max-w-[9rem]">{label}</span>
                     {chip && <span className={`block text-[10px] font-medium leading-tight ${chip.cls}`}>{chip.text}</span>}
+                    {colorNoPrice(col.id) ? noPriceTag : null}
                   </span>
                   <span className="lv-choice-mark ms-auto"><Check aria-hidden="true" className="h-3 w-3" /></span>
                 </button>
@@ -3428,7 +3594,7 @@ export default function Product() {
           server) and the total months it yields; this block only lays those
           facts out. A plan can be chosen here or later in the cart, and only
           before the order is placed — the policy link says the rest. */}
-      {warrantyPlans.length > 0 ? (
+      {warrantyPlans.length > 0 && !noPrice ? (
         /*
           AN OPTIONAL UPSELL, SIZED LIKE ONE.
 
@@ -3777,10 +3943,13 @@ export default function Product() {
   */
   const signalsRow = (place: string) => (
     <div data-product-signals className={`flex items-center gap-x-2 gap-y-1.5 flex-wrap ${place}`}>
+      {/* No sales-mode chip without a price (rows 239-240): «بيع مباشر» over a product nobody can buy is false. */}
+      {noPrice ? null : (
       <span className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-[11px] leading-normal font-bold ${modeBadge.cls}`}>
         {modeBadge.icon}
         {modeBadge.label}
       </span>
+      )}
 
       {rating && rating.count > 0 ? (
         <span
@@ -4021,9 +4190,10 @@ export default function Product() {
               would leave no way to change quantity at all.
             */}
             <div className="mt-5 space-y-3 lg:hidden">
+              {noPrice ? unpricedBlock(false) : null}
               {priceBlock}
               {selectionBlocks}
-              {statusMessages}
+              {noPrice ? null : statusMessages}
             </div>
 
             {/* Content sections */}
@@ -4281,7 +4451,7 @@ export default function Product() {
                 JavaScript on the input path and nothing that depends on hover,
                 which never fires on the owner's own phone.
               */}
-              <div className="pt-4 grid grid-cols-2 gap-2">
+              <div className={`pt-4 grid gap-2 ${catalogOnly ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <button
                   type="button"
                   onClick={() => navigate(`/compare?ids=${encodeURIComponent(product.id)}`)}
@@ -4290,6 +4460,8 @@ export default function Product() {
                 >
                   {s.compareCta}
                 </button>
+                {/* «وجدتها بمكان أرخص» compares a price: a catalog-only product has none (rows 239-240). */}
+                {catalogOnly ? null : (
                 <button
                   type="button"
                   onClick={() => {
@@ -4308,6 +4480,7 @@ export default function Product() {
                 >
                   {s.cheaperCta}
                 </button>
+                )}
               </div>
 
               {/*
@@ -4420,20 +4593,30 @@ export default function Product() {
               </p>
               {signalsRow('mt-2')}
             </div>
+            {noPrice ? unpricedBlock(true) : null}
             {priceBlock}
             {selectionBlocks}
+            {noPrice ? null : (
             <div className="lv-surface space-y-3 p-4">
               {qtyControl}
               {buyButton}
               <p className="text-[11px] text-text-muted leading-relaxed">{s.serverChecks}</p>
             </div>
-            {statusMessages}
+            )}
+            {noPrice ? null : statusMessages}
           </aside>
         </div>
       </div>
 
       {/* ------------------------------------------------ phone purchase bar */}
       <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
+        {noPrice ? (
+          /* «طلب السعر» TAKES THE BAR'S PLACE (DECISIONS row 240): no price, no
+             stepper and no cart button — the lazy request panel draws its one
+             full-width 48 px button into this slot; its switch stays in the page. */
+          <div ref={setRequestBarSlot} data-price-request-bar className="mx-auto w-full max-w-[640px]" />
+        ) : (
+        <>
         {/*
           THE CONFIRMATION LIVES WHERE THE TAP HAPPENED. On a phone the CTA is
           this fixed bar while the status panel is hundreds of pixels above the
@@ -4486,6 +4669,8 @@ export default function Product() {
           {barStepper}
           <div className="col-span-2 min-w-0 sm:flex-1">{buyButton}</div>
         </div>
+        </>
+        )}
       </div>
 
       {/* ------------------------------------------------------- image zoom */}

@@ -443,14 +443,15 @@ function staticClosure(start: string): Set<string> {
   return seen;
 }
 
-test('opening a product excludes below-fold reviews, closed purchase dialogs and refusal translations', () => {
+test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations and the price-request panel', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
   const product = files.find((file) => file.startsWith('Product-'));
   assert.ok(product, 'the product page has its own route chunk');
   const opening = staticClosure(product!);
   const bytes = [...opening].reduce((sum, file) => sum + gz(join(ASSETS, file)), 0);
   console.log(`bundle: product opening ${kb(bytes)} gzip (complete static closure)`);
-  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings']) {
+  // «طلب السعر» (DECISIONS row 240) is mounted only for a product or selection with no price: a priced page never pays for it.
+  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings', 'PriceRequestPanel']) {
     const file = files.find((candidate) => candidate.startsWith(`${name}-`));
     assert.ok(file, `${name} remains available in its own deferred chunk`);
     assert.equal(opening.has(file!), false, `${name} became a static product import and would compete with the lead image`);

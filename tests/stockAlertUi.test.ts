@@ -325,7 +325,9 @@ test('the affordance sits under «طريقة التوفر» and only where an al
   // Offered exactly when the SERVER says direct sale is offered and empty.
   assert.match(product, /const directOutOfStock = modesArr\.some\(/);
   assert.match(product, /m\.type === 'direct_sale' && !m\.usable && m\.reason === 'OUT_OF_STOCK'/);
-  assert.match(product, /const stockAlertOffered = source === 'catalog' && directOutOfStock;/);
+  // …and never for a product or selection with no price (DECISIONS row 240, default D7): stock is not set
+  // for what cannot be bought, and «طلب السعر» is the affordance there.
+  assert.match(product, /const stockAlertOffered = source === 'catalog' && !noPrice && directOutOfStock;/);
   assert.match(product, /\{stockAlertOffered \? \([\s\S]{0,400}<StockAlertPanel/);
   // Placed between the fulfilment chooser and the transports, i.e. directly
   // under the disabled «بيع مباشر» card the customer just read.
