@@ -188,8 +188,8 @@ test('F-20: the hours are read off the device — required at intake, with the c
 });
 
 test('F-33: the product page offers the trade-in on every device a credit can buy — an AMS or a laser too', () => {
-  assert.match(read('worker/routes/products.ts'), /out\.trade_in_target = isPrinter \|\| type === 'printer' \|\| type === 'laser' \|\| \(type === 'parts' && /);
-  assert.match(read('src/pages/Product.tsx'), /product\.is_printer === true \|\| product\.trade_in_target === true/);
+  assert.match(read('worker/routes/products.ts'), /out\.accepts_trade_in = isPrinter \|\| type === 'printer' \|\| type === 'laser' \|\| \(type === 'parts' && /);
+  assert.match(read('src/pages/Product.tsx'), /product\.is_printer === true \|\| product\.accepts_trade_in === true/);
 });
 
 test('F-34: the browser journey runs the new screens at 360 px, measures horizontal overflow and runs once with reduced motion', () => {

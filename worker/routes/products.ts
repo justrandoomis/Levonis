@@ -3877,12 +3877,14 @@ export async function catalogProductDetail(
   out.is_printer = isPrinter;
   // A DEVICE A TRADE-IN CREDIT CAN BUY (S-P2, review F-33): an FDM or resin printer, a laser, an AMS
   // — the families `familyOfProduct` (worker/lib/tradeIn.ts) names as targets. The product page
-  // mounts its «استبدله بهذا» entry on it (the entry still asks the server); a fact, not a price.
+  // mounts its «استبدله بهذا» entry on it (the entry still asks the server); a boolean fact, not a
+  // price. Named `accepts_trade_in`, never `*target*`: the live probes forbid every key that reads as
+  // a cost target (scripts/live-cost-probes.d/s1.json), and this one carries no money.
   {
     const idx = await taxonomyPromise;
     const type = idx ? productTypeOf(row, idx) : null;
     const names = `${String(row.name ?? '')} ${String(row.name_ar ?? '')}`;
-    out.trade_in_target = isPrinter || type === 'printer' || type === 'laser' || (type === 'parts' && /\bAMS\b/i.test(names));
+    out.accepts_trade_in = isPrinter || type === 'printer' || type === 'laser' || (type === 'parts' && /\bAMS\b/i.test(names));
   }
   // The extended-warranty options with their fee resolved against the BASE
   // selection's regular price (the quote re-prices them per selection), and

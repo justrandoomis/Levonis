@@ -440,7 +440,7 @@ interface ProductDetail {
   /** The owner's catalog flag; the printer home-delivery note keys off it. */
   is_printer?: boolean;
   /** S-P2: a device a trade-in credit can buy (printer, laser, AMS) — the page's trade-in entry. */
-  trade_in_target?: boolean;
+  accepts_trade_in?: boolean;
   media?: MediaItem[]; images?: string[];
   dimensions?: ProductDimensionsV2;
   options?: OptionItem[]; colors?: ColorItem[];
@@ -4350,7 +4350,7 @@ export default function Product() {
                 </div>
               ) : null}
 
-              {source === 'catalog' && isAuthenticated && (product.is_printer === true || product.trade_in_target === true) ? (
+              {source === 'catalog' && isAuthenticated && (product.is_printer === true || product.accepts_trade_in === true) ? (
                 <React.Suspense fallback={null}>
                   <ProductTradeInEntry productId={product.id} />
                 </React.Suspense>

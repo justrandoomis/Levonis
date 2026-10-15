@@ -135,7 +135,7 @@ test('the entries and the owner\'s panels arrive lazily: the product page, the p
   assert.match(read('src/components/adminTradeIn/AdminTradeIn.tsx'), /const TradeInSettings = React\.lazy\(/);
   assert.match(read('src/components/adminTradeIn/IntakeSheet.tsx'), /const BarcodeScanner = React\.lazy\(/);
   // The product page asks for the entry only for a signed-in customer on a device a credit can buy (review F-33).
-  assert.match(read('src/pages/Product.tsx'), /source === 'catalog' && isAuthenticated && \(product\.is_printer === true \|\| product\.trade_in_target === true\) \? \(\s*<React\.Suspense fallback=\{null\}>\s*<ProductTradeInEntry/);
+  assert.match(read('src/pages/Product.tsx'), /source === 'catalog' && isAuthenticated && \(product\.is_printer === true \|\| product\.accepts_trade_in === true\) \? \(\s*<React\.Suspense fallback=\{null\}>\s*<ProductTradeInEntry/);
 });
 
 test('no client file imports the owner\'s offer parameters or the default rule sets (private: never in a bundle)', () => {

@@ -288,7 +288,7 @@ export default function ConditionScreen({
           <div className="relative" dir="ltr">
             <input
               id={`hours-input-${comp.role}`}
-              className="lv-input pe-16 text-[18px] font-bold tabular-nums"
+              className="lv-input pe-16 text-lg font-bold tabular-nums"
               inputMode="numeric"
               pattern="[0-9]*"
               dir="ltr"
