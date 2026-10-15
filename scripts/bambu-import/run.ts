@@ -1,0 +1,1215 @@
+/**
+ * THE IMPORT RUNNER (Bambu import spec §A.1, §A.7, §A.9, §B.5, §I, §J; build step 8).
+ *
+ * Run by workflow 60's importer step: `node --import tsx scripts/bambu-import/run.ts`.
+ * It never holds a Cloudflare credential. Its only door to production is the
+ * ops endpoint, through a per-job token it reads from a 0600 file and deletes
+ * at once (IMPORT_TOKEN_FILE). Every artifact it produces is sealed in memory
+ * to the dispatch's one-time key; only `*.sealed` files reach the disk.
+ *
+ * THE LOOP (§A.1), ONE item at a time:
+ *
+ *   lease ─► EXTRACT (store page: only after the previous COMPLETE has
+ *   committed, ≥ 11 s after the last store request; robots.txt read once per
+ *   job) ─► ENRICH ─► VALIDATE (local) ─► /stage ─► /media (≤ 4 per call)
+ *   ─► /write (only with ≥ 13 min left) ─► /publish-finish ─► VERIFY (the
+ *   public site) ─► /complete ─► next item.
+ *
+ * A BLOCKED item stops the loop (no SKIP exists). Every wait is checked
+ * against the absolute deadline; a wait that does not fit releases the lease
+ * (event RETRYING with retry_at) and the job exits `more=true blocked=false`,
+ * so the chain job continues. The durable state is D1; this process keeps
+ * nothing it cannot rebuild (a resumed item re-reads its page).
+ *
+ * Modes (workflow 60 §K.3): preflight (public checks), open (hello, the
+ * manifest, the taxonomy, the protected snapshot `before`), run, close (§A.9,
+ * §I.3), withdraw. snapshot, report, revoke and dryrun need no importer.
+ *
+ * Outputs (GITHUB_OUTPUT): more, blocked, run_id.
+ */
+import { createHash } from 'node:crypto';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { extractPage, identityCrossCheck, type Extraction } from '@levonis/catalog/bambuImport/extract';
+import { extractionFingerprint } from '@levonis/catalog/bambuImport/fingerprint';
+import { assertImportPayload, buildImportPayload, ImportPayloadRefused, type BuildResult, type ImportPayload } from '@levonis/catalog/bambuImport/payload';
+import { productTypeOf } from '@levonis/catalog/bambuImport/registry/types';
+import { backoff, Deadline, MAX_STAGE_ATTEMPTS, parseDeadlineEpoch, realClock, WORST, type Clock, type WorstKey } from './deadline';
+import {
+  bundleDigest,
+  DEFAULT_DATA_DIR,
+  loadReviewedBundle,
+  manifestBatches,
+  parseSitemap,
+  productHandles,
+  rawHandleOf,
+  reviewedDifferences,
+  sitemapDiff,
+  writeModeOf,
+  type ManifestRow,
+  type ReviewedBundle,
+} from './discover';
+import { curatedGate, enrich, type EnrichReport } from './enrich';
+import { blockedStop, HostFetcher, ImportStop, StoreFetcher, transientStop, type FetchLike } from './fetch';
+import { ImportLog, type LogStage } from './log';
+import { OpsClient, OpsError, type DocumentCheck, type MediaAnswerRow, type MediaRequest, type StatusAnswer, type WriteAnswer } from './opsClient';
+import { NO_ROBOTS, parseRobots, robotsAllows, SITEMAP_PATHS, type Robots } from './robots';
+import { renderSummary, SummaryWriter, type SummaryItem } from './summary';
+import { AFTER_CACHE_WAIT, cacheWaitOf, edgeEvidence, modelCodesOf, Site, verifyPublic, type VerifyOutcome } from './verify';
+import type { BrowserInput, BrowserResult } from './browser';
+// @ts-expect-error - plain ESM helper run by workflow 60, no types
+import { sealBuffer } from './seal.mjs';
+
+export const SITE_ORIGIN = 'https://levonis-iq.com';
+const LOCAL_ORIGIN = /^http:\/\/127\.0\.0\.1:\d{2,5}$/;
+const MEDIA_SPACING_MS = 1000;
+const HELLO_EVERY = 50;
+
+export const STAGES = ['EXTRACTING', 'ENRICHING', 'VALIDATING', 'INGESTING_MEDIA', 'WRITING', 'PUBLISHING', 'VERIFYING_LIVE'] as const;
+export type Stage = (typeof STAGES)[number];
+const WORST_OF: Readonly<Record<Stage, WorstKey>> = {
+  EXTRACTING: 'EXTRACT',
+  ENRICHING: 'ENRICH',
+  VALIDATING: 'VALIDATE',
+  INGESTING_MEDIA: 'MEDIA_CALL',
+  WRITING: 'WRITE',
+  PUBLISHING: 'PUBLISH_FINISH',
+  VERIFYING_LIVE: 'VERIFY',
+};
+
+/** The stage after `last_completed_stage` (the trigger's own CASE, §B.3). */
+export function stageAfter(lastCompleted: string): Stage | null {
+  if (lastCompleted === '') return 'EXTRACTING';
+  const at = STAGES.indexOf(lastCompleted as Stage);
+  return at >= 0 && at + 1 < STAGES.length ? STAGES[at + 1] : null;
+}
+
+// ------------------------------------------------------------------ configuration
+
+export type RunMode = 'preflight' | 'open' | 'run' | 'close' | 'withdraw';
+
+export interface RunConfig {
+  mode: RunMode;
+  runId: string;
+  maxItems: number;
+  resume: boolean;
+  chain: boolean;
+  chainCount: number;
+  item: string;
+  siteOrigin: string;
+  storeOrigin: string;
+  dataDir: string;
+  outDir: string;
+  sealKey: string;
+  githubRunId: string;
+  codeCommit: string;
+  deadlineMs: number;
+}
+
+export class ConfigError extends Error {}
+
+/** The importer's environment, every value validated before anything runs. */
+export function configFromEnv(env: NodeJS.ProcessEnv, root: string): RunConfig {
+  const mode = env.IN_MODE ?? '';
+  if (!/^(preflight|open|run|close|withdraw)$/.test(mode)) throw new ConfigError('the importer runs only in preflight, open, run, close and withdraw modes');
+  const runId = env.IN_RUN_ID ?? '';
+  if (runId && !/^cir_[0-9a-f]{24}$/.test(runId)) throw new ConfigError('run_id is not cir_ followed by 24 hex characters');
+  const maxItems = env.IN_MAX_ITEMS ?? '1';
+  if (!/^[0-9]{1,4}$/.test(maxItems)) throw new ConfigError('max_items is not a whole number');
+  const chainCount = env.IN_CHAIN_COUNT ?? '0';
+  if (!/^([0-9]|1[0-2])$/.test(chainCount)) throw new ConfigError('chain_count is not 0 to 12');
+  const item = env.IN_ITEM ?? '';
+  if (item && !/^[0-9]{1,20}$/.test(item)) throw new ConfigError('item is not a source product id');
+  const sealKey = env.IN_SEAL_PUBKEY ?? '';
+  if (!/^[A-Za-z0-9_-]{43}$/.test(sealKey)) throw new ConfigError('seal_pubkey is not a one-time public key');
+  const siteOrigin = (env.IMPORT_SITE_ORIGIN || SITE_ORIGIN).replace(/\/+$/, '');
+  if (siteOrigin !== SITE_ORIGIN && !LOCAL_ORIGIN.test(siteOrigin)) throw new ConfigError('the site origin is the live site or a local dry run, nothing else');
+  const storeOrigin = (env.IMPORT_STORE_ORIGIN || 'https://us.store.bambulab.com').replace(/\/+$/, '');
+  if (storeOrigin !== 'https://us.store.bambulab.com' && !LOCAL_ORIGIN.test(storeOrigin)) throw new ConfigError('the store origin is the US store or a local dry run, nothing else');
+  return {
+    mode: mode as RunMode,
+    runId,
+    maxItems: Number(maxItems),
+    resume: env.IN_RESUME === 'true',
+    chain: env.IN_CHAIN === 'true',
+    chainCount: Number(chainCount),
+    item,
+    siteOrigin,
+    storeOrigin,
+    dataDir: resolve(root, env.IMPORT_DATA_DIR || DEFAULT_DATA_DIR),
+    outDir: resolve(env.IMPORT_OUT_DIR || join(env.RUNNER_TEMP || resolve(root, '.bambu-import'), 'out')),
+    sealKey,
+    githubRunId: /^\d{1,20}$/.test(env.GITHUB_RUN_ID ?? '') ? (env.GITHUB_RUN_ID as string) : '',
+    codeCommit: /^[0-9a-f]{40}$/.test(env.GITHUB_SHA ?? '') ? (env.GITHUB_SHA as string) : '',
+    deadlineMs: parseDeadlineEpoch(env.DEADLINE_EPOCH),
+  };
+}
+
+/** Reads the job token from its 0600 file and deletes the file at once. */
+export function takeToken(file: string | undefined): string {
+  if (!file) throw new ConfigError('IMPORT_TOKEN_FILE is not set');
+  if (!existsSync(file)) throw new ConfigError('the token file does not exist (the mint step did not run)');
+  const mode = statSync(file).mode & 0o777;
+  const text = readFileSync(file, 'utf8');
+  rmSync(file, { force: true });
+  if (mode & 0o077) throw new ConfigError('the token file is readable by others');
+  const token = text.trim();
+  if (!/^[0-9a-f]{64}$/.test(token)) throw new ConfigError('the token file does not hold a 64-hex token');
+  return token;
+}
+
+// ------------------------------------------------------------------ dependencies
+
+export interface BrowserLike {
+  check(input: BrowserInput): Promise<BrowserResult>;
+  close(): Promise<void>;
+}
+
+export interface RunnerDeps {
+  clock: Clock;
+  fetch: FetchLike;
+  log: ImportLog;
+  token: string;
+  bundle: ReviewedBundle;
+  /** Writes `<name>.sealed` (sealed in memory) and returns its size. */
+  seal: (name: string, data: Buffer) => number;
+  output: (key: string, value: string) => void;
+  summary: SummaryWriter;
+  browser: () => Promise<BrowserLike | null>;
+  /** The run id an `open` mode's cf.mjs step created (read from its file). */
+  openedRunId?: string;
+  /** Store request hook (tests count and order them). */
+  onStoreRequest?: (path: string) => void;
+}
+
+// ------------------------------------------------------------------ the gate (§J.1)
+
+/**
+ * EXTRACT is never started before the previous item's COMPLETE has committed.
+ * The structural proof is the Worker's in-flight index (an item's EXTRACTING
+ * start fails while another item is in flight); the runner asserts it again
+ * against the event sequence: the EXTRACTING start event of an item must carry
+ * a sequence number above the previous item's COMPLETE.
+ */
+export class ExtractGate {
+  private lastCompleteSeq: number | null = null;
+  private inFlight: string | null = null;
+
+  noteStart(sid: string): void {
+    if (this.inFlight && this.inFlight !== sid) throw new ImportStop('ORDER_VIOLATION', 'blocked', 'another item of this job has not completed');
+    this.inFlight = sid;
+  }
+
+  /** Called with the EXTRACTING start event's sequence number, before the store page is fetched. */
+  assertMayExtract(sid: string, startSeq: number | null): void {
+    if (this.inFlight !== sid) throw new ImportStop('ORDER_VIOLATION', 'blocked', 'EXTRACT for an item this job did not start');
+    if (this.lastCompleteSeq !== null && startSeq !== null && startSeq <= this.lastCompleteSeq) {
+      throw new ImportStop('ORDER_VIOLATION', 'blocked', 'EXTRACT before the previous COMPLETE');
+    }
+  }
+
+  noteComplete(sid: string, seq: number | null): void {
+    if (this.inFlight !== sid) throw new ImportStop('ORDER_VIOLATION', 'blocked', 'COMPLETE for an item this job did not start');
+    if (seq !== null) this.lastCompleteSeq = seq;
+    this.inFlight = null;
+  }
+
+  /** An item that left the loop without COMPLETE (blocked, parked at the deadline): the job stops with it. */
+  release(): void {
+    this.inFlight = null;
+  }
+}
+
+// ------------------------------------------------------------------ one item's work (rebuilt after a restart)
+
+interface ItemWork {
+  sid: string;
+  row: ManifestRow;
+  leaseToken: string;
+  state: string;
+  lastCompleted: string;
+  stageAttempts: number;
+  extraction?: Extraction;
+  build?: BuildResult;
+  payload?: ImportPayload;
+  documentChecks: DocumentCheck[];
+  enrichReport?: EnrichReport;
+  stagedSha?: string;
+  estimate?: number;
+  stageAnswer?: { conflicts: number; warnings: number };
+  media: Map<string, MediaAnswerRow>;
+  write?: WriteAnswer;
+  productId: string;
+  slug: string;
+  verify?: VerifyOutcome;
+  browser?: BrowserResult | null;
+  shots: Buffer[];
+  leaseShaAtStart: string;
+}
+
+type ItemOutcome =
+  | { kind: 'complete'; url: string }
+  | { kind: 'blocked'; code: string }
+  | { kind: 'deadline' }
+  | { kind: 'skip' };
+
+class JobStop extends Error {
+  constructor(
+    readonly code: string,
+    readonly blocked: boolean
+  ) {
+    super(code);
+    this.name = 'JobStop';
+  }
+}
+
+// ------------------------------------------------------------------ the runner
+
+export class Importer {
+  readonly deadline: Deadline;
+  readonly ops: OpsClient;
+  readonly store: StoreFetcher;
+  readonly hosts: HostFetcher;
+  readonly site: Site;
+  readonly gate = new ExtractGate();
+  private robots: Robots | null = null;
+  /** When the current site-reading stage must be done by (VERIFY's worst case from its start); null outside one. */
+  private siteBudgetEnd: number | null = null;
+  private browserChecker: BrowserLike | null | undefined;
+  private readonly items: SummaryItem[] = [];
+  private status: StatusAnswer | null = null;
+  private runId: string;
+  private resumeUsed = false;
+
+  constructor(
+    readonly cfg: RunConfig,
+    readonly deps: RunnerDeps
+  ) {
+    this.deadline = new Deadline(cfg.deadlineMs, deps.clock);
+    this.runId = cfg.runId || deps.openedRunId || '';
+    this.ops = new OpsClient({
+      siteOrigin: cfg.siteOrigin,
+      token: deps.token,
+      fetch: deps.fetch,
+      clock: deps.clock,
+      deadline: this.deadline,
+      githubRunId: cfg.githubRunId,
+      codeCommit: cfg.codeCommit,
+    });
+    this.store = new StoreFetcher({ fetch: deps.fetch, clock: deps.clock, deadline: this.deadline, origin: cfg.storeOrigin, onRequest: deps.onStoreRequest });
+    this.hosts = new HostFetcher({ fetch: deps.fetch, clock: deps.clock, deadline: this.deadline, siteOrigin: cfg.siteOrigin });
+    this.site = new Site(cfg.siteOrigin, this.hosts, () => (this.siteBudgetEnd === null ? 0 : Math.max(0, this.siteBudgetEnd - deps.clock.now())));
+    deps.log.addSecret(deps.token);
+  }
+
+  private get log(): ImportLog {
+    return this.deps.log;
+  }
+
+  private now(): string {
+    return new Date(this.deps.clock.now()).toISOString();
+  }
+
+  private seal(name: string, value: unknown): void {
+    const data = Buffer.isBuffer(value) ? value : Buffer.from(JSON.stringify(value));
+    const bytes = this.deps.seal(name, data);
+    this.log.info('artifact', { name: `${name}.sealed`, bytes });
+  }
+
+  private writeSummary(more: boolean, closedState?: string): void {
+    const blocked = this.items.filter((i) => i.outcome === 'blocked').map((i) => ({ handle: i.handle, code: i.code ?? '' }));
+    this.deps.summary.write(
+      renderSummary({ mode: this.cfg.mode, runId: this.runId, siteOrigin: this.cfg.siteOrigin, status: this.status, items: this.items, blocked, withdrawn: [], more, closedState })
+    );
+  }
+
+  // ---------------------------------------------------------------- hello
+
+  /** /hello: the protocol, the migrations, and the reviewed files byte for byte. */
+  async hello(): Promise<void> {
+    let a;
+    try {
+      a = await this.ops.hello();
+    } catch (err) {
+      if (err instanceof OpsError && err.kind === 'gone') {
+        this.log.error('hello_gone');
+        throw new JobStop('OPS_GONE', true);
+      }
+      throw err;
+    }
+    const present = ['0193', '0194', '0195'].every((m) => a.migrations_present[m] === true);
+    const diff = reviewedDifferences(this.deps.bundle.sha256, a.reviewed);
+    this.log.info('hello_ok', { protocol: a.protocol, present, equal: diff.length === 0, files: Object.keys(this.deps.bundle.sha256).length });
+    if (a.protocol !== 2) throw new JobStop('PROTOCOL_MISMATCH', true);
+    if (!present) throw new JobStop('MIGRATIONS_MISSING', true);
+    if (diff.length) {
+      this.log.error('bundle_mismatch', { files: diff.length });
+      throw new JobStop('REVIEWED_BUNDLE_MISMATCH', true);
+    }
+    if (a.run.id && /^cir_[0-9a-f]{24}$/.test(a.run.id)) {
+      if (this.runId && this.runId !== a.run.id) throw new JobStop('RUN_MISMATCH', true);
+      this.runId = a.run.id;
+    }
+  }
+
+  // ---------------------------------------------------------------- modes
+
+  async main(): Promise<number> {
+    this.log.info('job_start', { mode: this.cfg.mode, max: this.cfg.maxItems, resume: this.cfg.resume, chain: this.cfg.chain, count: this.cfg.chainCount });
+    let more = false;
+    let blocked = false;
+    let code = 0;
+    try {
+      switch (this.cfg.mode) {
+        case 'preflight':
+          code = await this.preflight();
+          break;
+        case 'open':
+          await this.open();
+          break;
+        case 'run':
+          ({ more, blocked } = await this.runQueue());
+          break;
+        case 'close':
+          code = await this.close();
+          break;
+        case 'withdraw':
+          code = await this.withdraw();
+          break;
+      }
+    } catch (err) {
+      blocked = true;
+      more = false;
+      code = 1;
+      if (err instanceof JobStop) this.log.error('note', { code: err.code });
+      else if (err instanceof OpsError) this.log.error('ops_error', { call: err.call, code: err.code, status: err.status });
+      else if (err instanceof ImportStop) this.log.error('note', { code: err.code });
+      else this.log.exception('JOB', err);
+    } finally {
+      await this.browserChecker?.close().catch(() => {});
+    }
+    this.deps.output('more', more ? 'true' : 'false');
+    this.deps.output('blocked', blocked ? 'true' : 'false');
+    this.deps.output('run_id', this.runId);
+    this.log.info('job_end', { complete: this.items.filter((i) => i.outcome === 'complete').length, more, blocked });
+    return code;
+  }
+
+  /** mode=preflight: the public half (cf.mjs did the database half): catalog-only is live. */
+  async preflight(): Promise<number> {
+    const a = await this.site.read('GET', '/api/public/v1/context');
+    const content = a.json && typeof a.json.data === 'object' && a.json.data ? ((a.json.data as Record<string, unknown>).content as Record<string, unknown> | undefined) : undefined;
+    const priced = a.status === 200 && typeof content?.products_priced === 'number';
+    this.log.info('preflight', { priced });
+    return priced ? 0 : 1;
+  }
+
+  /** mode=open: /hello, the whole manifest, the taxonomy, the protected snapshot `before` (§K.2 step 11). */
+  async open(): Promise<void> {
+    await this.hello();
+    const batches = manifestBatches(this.deps.bundle.rows, this.now());
+    let rows = 0;
+    for (const batch of batches) rows += (await this.ops.manifest(batch)).accepted;
+    this.log.info('manifest_sent', { rows, calls: batches.length });
+    const tax = await this.ops.prepareTaxonomy();
+    this.log.info('taxonomy', { nodes: tax.created_nodes, brand: tax.brand_created, synonyms: tax.synonyms_inserted });
+    const snap = await this.ops.protectSnapshot('before');
+    this.log.info('protect', { phase: 'before', subjects: snap.subjects });
+    this.status = await this.ops.status();
+    this.seal('open-report.json', {
+      run_id: this.runId,
+      manifest_rows: this.deps.bundle.rows.length,
+      accepted: rows,
+      reviewed: this.deps.bundle.sha256,
+      reviewed_bundle_sha256: bundleDigest(this.deps.bundle.sha256),
+      taxonomy: tax,
+      protect_before: snap,
+      status: this.status,
+    });
+    this.writeSummary(true);
+  }
+
+  /** mode=run: the queue, one item at a time, until max_items, the deadline or a BLOCKED item. */
+  async runQueue(): Promise<{ more: boolean; blocked: boolean }> {
+    await this.hello();
+    let processed = 0;
+    let skips = 0;
+    for (;;) {
+      if (this.cfg.maxItems > 0 && processed >= this.cfg.maxItems) break;
+      if (processed > 0 && processed % HELLO_EVERY === 0) await this.hello();
+      this.status = await this.ops.status();
+      const ref = this.status.current ?? this.status.next;
+      if (!ref) {
+        this.writeSummary(false);
+        return { more: false, blocked: false };
+      }
+      const row = this.deps.bundle.bySid.get(ref.source_product_id);
+      if (!row) throw new JobStop('REVIEWED_SCOPE_REFUSED', true);
+      if ((ref.state === 'DISCOVERED' || ref.state === '') && !this.deadline.canStartItem()) {
+        this.log.info('deadline_exit', { need: Math.round((WORST.EXTRACT + WORST.ENRICH) / 1000), left: Math.round(this.deadline.left() / 1000) });
+        this.writeSummary(true);
+        return { more: true, blocked: false };
+      }
+      const outcome = await this.processItem(row);
+      if (outcome.kind === 'skip') {
+        // The status named an item its lease says is finished: a stale answer. Never loop on it.
+        if (++skips > 3) throw new JobStop('STATUS_INCONSISTENT', true);
+        continue;
+      }
+      skips = 0;
+      if (outcome.kind === 'complete') {
+        processed++;
+        this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'complete', url: outcome.url });
+        this.status = await this.ops.status().catch(() => this.status);
+        this.writeSummary(true);
+        continue;
+      }
+      if (outcome.kind === 'deadline') {
+        this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'deadline' });
+        this.writeSummary(true);
+        return { more: true, blocked: false };
+      }
+      this.items.push({ position: row.queue_position, handle: row.handle, outcome: 'blocked', code: outcome.code });
+      this.status = await this.ops.status().catch(() => this.status);
+      this.writeSummary(false);
+      return { more: false, blocked: true };
+    }
+    this.status = await this.ops.status();
+    const more = !!(this.status.current ?? this.status.next);
+    this.writeSummary(more);
+    return { more, blocked: false };
+  }
+
+  // ---------------------------------------------------------------- one item
+
+  private async processItem(row: ManifestRow): Promise<ItemOutcome> {
+    const sid = row.source_product_id;
+    const lease = await this.ops.lease(sid);
+    const w: ItemWork = {
+      sid,
+      row,
+      leaseToken: lease.lease_token,
+      state: lease.state,
+      lastCompleted: lease.last_completed_stage,
+      stageAttempts: lease.stage_attempts,
+      documentChecks: [],
+      media: new Map(),
+      productId: lease.levonis_product_id,
+      slug: lease.slug,
+      shots: [],
+      leaseShaAtStart: lease.payload_sha256,
+    };
+    const pos = row.queue_position;
+    const log = (stage: LogStage, t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(pos, row.handle, stage, t, p);
+    if (w.state === 'COMPLETE' || w.state === 'WITHDRAWN_AT_SOURCE') return { kind: 'skip' };
+    try {
+      this.gate.noteStart(sid);
+      if (w.state === 'BLOCKED') {
+        if (!this.cfg.resume || this.resumeUsed) {
+          log('BLOCKED', 'blocked', { code: lease.blocker_code || 'BLOCKED' });
+          this.gate.release();
+          return { kind: 'blocked', code: lease.blocker_code || 'BLOCKED' };
+        }
+        this.resumeUsed = true;
+        const target = stageAfter(w.lastCompleted);
+        if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
+        await this.event(w, target, 'resume');
+        log(target, 'resumed', { from: 'BLOCKED', stage: target });
+      } else if (w.state === 'RETRYING') {
+        const target = stageAfter(w.lastCompleted);
+        if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
+        const wait = Math.max(0, (Date.parse(lease.retry_at) || 0) - this.deps.clock.now());
+        if (!this.deadline.fitsStage(wait, WORST_OF[target])) {
+          log('RETRYING', 'deadline_exit', { need: Math.round((wait + WORST[WORST_OF[target]]) / 1000), left: Math.round(this.deadline.left() / 1000) });
+          this.gate.release();
+          return { kind: 'deadline' };
+        }
+        if (wait > 0) await this.deps.clock.sleep(wait);
+        await this.event(w, target, 'resume');
+        log(target, 'resumed', { from: 'RETRYING', stage: target });
+      } else if (w.state === 'DISCOVERED' || w.state === '') {
+        const a = await this.event(w, 'EXTRACTING', 'start');
+        this.gate.assertMayExtract(sid, a.seq);
+      } else if (!(STAGES as readonly string[]).includes(w.state)) {
+        throw new JobStop('ITEM_STATE_UNKNOWN', true);
+      }
+      return await this.runStages(w);
+    } catch (err) {
+      return this.stopItem(w, err);
+    }
+  }
+
+  /** Turns a stop into the item's state: BLOCKED (the queue stops), or released at the deadline. */
+  private async stopItem(w: ItemWork, err: unknown): Promise<ItemOutcome> {
+    const log = (stage: LogStage, t: Parameters<ImportLog['item']>[3], p: Parameters<ImportLog['item']>[4] = {}) => this.log.item(w.row.queue_position, w.row.handle, stage, t, p);
+    this.gate.release();
+    if (err instanceof JobStop) throw err;
+    if (err instanceof OpsError && err.kind === 'gone') throw new JobStop('OPS_GONE', true);
+    if (err instanceof ImportStop && err.code === 'ORDER_VIOLATION') {
+      this.log.error('order_violation');
+      throw new JobStop('ORDER_VIOLATION', true);
+    }
+    if (err instanceof ImportStop && err.kind === 'deadline') return { kind: 'deadline' };
+    const code = err instanceof ImportStop ? err.code : err instanceof OpsError && err.kind === 'permanent' ? err.code : '';
+    if (!code) throw err;
+    if (code === 'ACCESS_CHALLENGE') log('BLOCKED', 'challenge');
+    try {
+      if (w.state !== 'BLOCKED') await this.event(w, 'BLOCKED', 'blocked', { code });
+    } catch (e) {
+      if (e instanceof OpsError && e.kind === 'gone') throw new JobStop('OPS_GONE', true);
+      throw e;
+    }
+    log('BLOCKED', 'blocked', { code });
+    this.sealItem(w, { outcome: 'blocked', code });
+    return { kind: 'blocked', code };
+  }
+
+  private async event(w: ItemWork, state: string, outcome: 'start' | 'ok' | 'retry' | 'blocked' | 'resume', extra: { code?: string; retry_at?: string; release?: boolean; detail?: Record<string, unknown> } = {}) {
+    const a = await this.ops.event(w.sid, w.leaseToken, { state, outcome, code: extra.code, retry_at: extra.retry_at, release: extra.release, detail: extra.detail, message: '' });
+    w.state = a.state || state;
+    w.lastCompleted = a.last_completed_stage || w.lastCompleted;
+    if (typeof a.stage_attempts === 'number') w.stageAttempts = a.stage_attempts;
+    return a;
+  }
+
+  /** Re-lease to learn what committed (an ambiguous call, a lost lease, a stale transition). */
+  private async relearn(w: ItemWork): Promise<void> {
+    const lease = await this.ops.lease(w.sid, w.leaseToken);
+    w.leaseToken = lease.lease_token || w.leaseToken;
+    w.state = lease.state;
+    w.lastCompleted = lease.last_completed_stage;
+    w.stageAttempts = lease.stage_attempts;
+    if (lease.levonis_product_id) w.productId = lease.levonis_product_id;
+    if (lease.slug) w.slug = lease.slug;
+  }
+
+  private async runStages(w: ItemWork): Promise<ItemOutcome> {
+    for (;;) {
+      // A re-lease after an ambiguous call can report a state the runner did not set itself.
+      if (w.state === 'COMPLETE') {
+        this.gate.noteComplete(w.sid, null);
+        this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+        this.sealItem(w, { outcome: 'complete' });
+        return { kind: 'complete', url: this.liveUrl(w) };
+      }
+      if (w.state === 'BLOCKED') {
+        this.gate.release();
+        return { kind: 'blocked', code: 'BLOCKED' };
+      }
+      if (w.state === 'RETRYING') {
+        const target = stageAfter(w.lastCompleted);
+        if (!target) throw blockedStop('RETRIES_EXHAUSTED', 'nothing to resume');
+        await this.event(w, target, 'resume');
+        continue;
+      }
+      const stage = w.state as Stage;
+      if (!(STAGES as readonly string[]).includes(stage)) throw new JobStop('ITEM_STATE_UNKNOWN', true);
+      const done = await this.withRetries(w, stage, () => this.runStage(w, stage));
+      if (done) return done;
+    }
+  }
+
+  /**
+   * One stage with the §B.5 retry rules: transient → RETRYING with 30 s × 2^k
+   * (Retry-After honoured), within the deadline, 8 attempts at most; a stale
+   * view → re-lease; a permanent code → BLOCKED.
+   */
+  private async withRetries(w: ItemWork, stage: Stage, fn: () => Promise<ItemOutcome | null>): Promise<ItemOutcome | null> {
+    let stale = 0;
+    for (;;) {
+      if (!this.deadline.fitsStage(0, WORST_OF[stage])) {
+        await this.park(w, stage, 0, 'DEADLINE_EXIT');
+        return { kind: 'deadline' };
+      }
+      try {
+        return await fn();
+      } catch (err) {
+        if (err instanceof ImportStop && err.kind === 'deadline') {
+          await this.park(w, stage, err.detail.needMs ?? 0, 'DEADLINE_EXIT');
+          return { kind: 'deadline' };
+        }
+        if (err instanceof OpsError && err.kind === 'stale') {
+          // The Worker keeps saying the runner's view is stale: stop rather than spin.
+          if (++stale > 3) throw new JobStop('LEASE_UNSTABLE', true);
+          await this.relearn(w);
+          if (w.state !== stage) return null; // runStages reads the state the Worker reports
+          continue;
+        }
+        const transient = (err instanceof ImportStop && err.kind === 'transient') || (err instanceof OpsError && err.kind === 'transient');
+        if (!transient) throw err;
+        if (err instanceof OpsError && err.ambiguous) {
+          await this.relearn(w);
+          if (w.state !== stage) return null; // it committed: continue at the stage the Worker reports
+        }
+        const code = err instanceof ImportStop ? err.code : (err as OpsError).code;
+        const retryAfter = err instanceof ImportStop ? err.detail.retryAfterMs ?? null : (err as OpsError).retryAfterMs;
+        if (w.stageAttempts + 1 >= MAX_STAGE_ATTEMPTS) throw blockedStop('RETRIES_EXHAUSTED', 'eight attempts of one stage');
+        const wait = Math.max(retryAfter ?? 0, backoff(w.stageAttempts));
+        if (!this.deadline.fitsStage(wait, WORST_OF[stage])) {
+          await this.park(w, stage, wait, code);
+          return { kind: 'deadline' };
+        }
+        await this.event(w, 'RETRYING', 'retry', { code, retry_at: this.deadline.retryAt(wait) });
+        this.log.item(w.row.queue_position, w.row.handle, 'RETRYING', 'retrying', { code, seconds: Math.round(wait / 1000), attempt: w.stageAttempts });
+        await this.deps.clock.sleep(wait);
+        await this.event(w, stage, 'resume');
+      }
+    }
+  }
+
+  /** Rule 3: release the lease (event RETRYING, lease expires now) and let the job exit `more=true`. */
+  private async park(w: ItemWork, stage: Stage, waitMs: number, code: string): Promise<void> {
+    this.log.item(w.row.queue_position, w.row.handle, stage, 'deadline_exit', {
+      need: Math.round((waitMs + WORST[WORST_OF[stage]]) / 1000),
+      left: Math.round(this.deadline.left() / 1000),
+    });
+    await this.event(w, 'RETRYING', 'retry', { code, retry_at: this.deadline.retryAt(waitMs), release: true });
+    this.gate.release();
+  }
+
+  // ---------------------------------------------------------------- the stages
+
+  private async runStage(w: ItemWork, stage: Stage): Promise<ItemOutcome | null> {
+    switch (stage) {
+      case 'EXTRACTING':
+        await this.extract(w);
+        await this.event(w, 'ENRICHING', 'ok', { detail: { source_fingerprint: w.payload?.extraction_sha256 ?? '' } });
+        return null;
+      case 'ENRICHING':
+        await this.ensureExtracted(w);
+        await this.enrich(w);
+        await this.event(w, 'VALIDATING', 'ok', { detail: this.enrichDetail(w) });
+        return null;
+      case 'VALIDATING':
+        await this.ensureEnriched(w);
+        await this.validateAndStage(w);
+        await this.event(w, 'INGESTING_MEDIA', 'ok', { detail: { payload_sha256: w.stagedSha ?? '', invocation_estimate: w.estimate ?? 0 } });
+        return null;
+      case 'INGESTING_MEDIA':
+        await this.ensureStaged(w);
+        await this.ingest(w);
+        if (!this.deadline.canStartWrite()) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'not enough time to write, publish and verify', { needMs: 0 });
+        await this.event(w, 'WRITING', 'ok', { detail: this.mediaDetail(w) });
+        return null;
+      case 'WRITING':
+        await this.ensureStaged(w);
+        if (w.media.size === 0) await this.ingest(w);
+        if (!this.deadline.canStartWrite()) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'not enough time to write, publish and verify', { needMs: 0 });
+        await this.writeItem(w);
+        return null;
+      case 'PUBLISHING':
+        await this.publish(w);
+        return null;
+      case 'VERIFYING_LIVE':
+        return this.verifyAndComplete(w);
+    }
+  }
+
+  private robotsOk(): Robots {
+    return this.robots ?? NO_ROBOTS;
+  }
+
+  /** robots.txt, re-read once per job (§J.1); a Disallow of the planned path stops the item (policy). */
+  private async ensureRobots(): Promise<Robots> {
+    if (this.robots) return this.robots;
+    const text = await this.store.robotsTxt();
+    this.robots = text === null ? NO_ROBOTS : parseRobots(text);
+    this.log.info('robots_read', { rules: this.robots.rules.length, allowed: true });
+    return this.robots;
+  }
+
+  private async extract(w: ItemWork): Promise<void> {
+    // The item must be the one this job holds in flight (its EXTRACTING start, or a resumed item).
+    this.gate.assertMayExtract(w.sid, null);
+    const robots = await this.ensureRobots();
+    const raw = rawHandleOf(w.row);
+    if (!robotsAllows(robots, `/products/${raw}`)) {
+      this.log.item(w.row.queue_position, w.row.handle, 'EXTRACTING', 'robots_disallow');
+      throw blockedStop('ACCESS_CHALLENGE', 'robots.txt disallows the product page');
+    }
+    const started = this.deps.clock.now();
+    const page = await this.store.productPage(raw);
+    this.log.item(w.row.queue_position, w.row.handle, 'EXTRACTING', 'store_status', { status: page.status, ms: this.deps.clock.now() - started });
+    let x: Extraction;
+    try {
+      x = extractPage(page.html).extraction;
+    } catch {
+      throw blockedStop('IDENTITY_AMBIGUOUS', 'the page holds no product of the expected shape');
+    }
+    if (x.sourceProductId !== w.row.source_product_id || x.handle !== w.row.handle) throw blockedStop('IDENTITY_AMBIGUOUS', 'the page names another product');
+    const cross = identityCrossCheck(x);
+    if (!cross.ok) throw blockedStop('IDENTITY_AMBIGUOUS', 'the JSON-LD identity disagrees');
+    const mode = writeModeOf(this.deps.bundle, w.sid);
+    const build = buildImportPayload({
+      extraction: x,
+      writeMode: mode.mode === 'merge' ? 'merge' : 'create',
+      mergeProductId: mode.mode === 'merge' ? mode.productId : undefined,
+      extractionSha256: extractionFingerprint(x),
+      manifestRow: w.row,
+      identity: this.deps.bundle.identity[w.row.handle] ?? null,
+      targets: this.deps.bundle.targets,
+      overrides: this.deps.bundle.overrides,
+      retrievedAt: page.fetchedAt,
+    });
+    w.extraction = x;
+    w.build = build;
+    w.payload = build.payload;
+    const c = build.report.counts;
+    this.log.item(w.row.queue_position, w.row.handle, 'EXTRACTING', 'extracted', { groups: c.groups, values: c.values, variants: c.variants, images: c.images });
+  }
+
+  private async enrich(w: ItemWork): Promise<void> {
+    const gate = curatedGate(this.cfg.dataDir, w.row.handle, w.row.curated === true, this.deps.bundle.curatedIndex);
+    const end = this.deps.clock.now() + WORST.ENRICH;
+    const r = await enrich(
+      this.hosts,
+      {
+        payload: w.build!.payload,
+        productType: productTypeOf(w.extraction!.route),
+        trackerLinks: w.build!.described.trackerLinks,
+        retrievedAt: this.now(),
+        curated: gate,
+        afterMs: () => Math.max(0, end - this.deps.clock.now()),
+      },
+      () => this.now()
+    );
+    w.payload = r.payload;
+    w.documentChecks = r.documentChecks;
+    w.enrichReport = r.report;
+    this.log.item(w.row.queue_position, w.row.handle, 'ENRICHING', 'enriched', {
+      documents: r.report.documents_checked,
+      dead: r.report.documents_dead,
+      trackers: r.report.trackers_resolved,
+      tracker_links: r.report.tracker_links,
+      wiki: r.report.wiki_parsed,
+      wiki_specs: r.report.wiki_specs,
+    });
+  }
+
+  private enrichDetail(w: ItemWork): Record<string, unknown> {
+    const r = w.enrichReport;
+    return r
+      ? { documents_checked: r.documents_checked, documents_dead: r.documents_dead, trackers_resolved: r.trackers_resolved, tracker_links: r.tracker_links, wiki_parsed: r.wiki_parsed, wiki_specs: r.wiki_specs }
+      : {};
+  }
+
+  private mediaDetail(w: ItemWork): Record<string, unknown> {
+    const rows = [...w.media.values()];
+    return { stored: rows.filter((m) => m.status === 'stored').length, failed: rows.filter((m) => m.status === 'failed').length, omitted: rows.filter((m) => m.status === 'omitted_cap').length };
+  }
+
+  /** The holds and the gates the runner applies before the Worker's own (§B.5, §E.1.4, §F). */
+  private async validateAndStage(w: ItemWork): Promise<void> {
+    const build = w.build!;
+    const errors = build.report.errors;
+    if (errors.includes('IDENTITY_AMBIGUOUS') || errors.includes('DUPLICATE_VALUE_TEXT') || errors.includes('DUPLICATE_VARIANT')) throw blockedStop('IDENTITY_AMBIGUOUS', 'the options do not resolve');
+    if (errors.length) throw blockedStop('PAYLOAD_REFUSED', 'the builder refused the product');
+    const mode = writeModeOf(this.deps.bundle, w.sid);
+    const decided = this.deps.bundle.matches.has(w.sid);
+    if (mode.mode === 'hold' || (w.row.hold_code === 'OWNER_HIDDEN' && !decided)) throw blockedStop('OWNER_HIDDEN', 'an owner decision is pending');
+    if (build.report.hold === 'ORDER_TYPE_WORD') throw blockedStop('ORDER_TYPE_WORD', 'an option value reads as an order type');
+    const gate = curatedGate(this.cfg.dataDir, w.row.handle, w.row.curated === true, this.deps.bundle.curatedIndex);
+    if (gate.kind === 'mismatch') throw blockedStop('REVIEWED_BUNDLE_MISMATCH', 'the curated file is not the reviewed one');
+    if (gate.kind === 'pending') {
+      if (w.stageAttempts >= 2) throw blockedStop('CURATION_MISSING', 'the curated file never arrived');
+      throw new ImportStop('CURATION_PENDING', 'transient', 'the curated file is not in the bundled index', { retryAfterMs: 60 * 60_000 });
+    }
+    try {
+      assertImportPayload(JSON.parse(JSON.stringify(w.payload)));
+    } catch (err) {
+      if (err instanceof ImportPayloadRefused) throw blockedStop('PAYLOAD_REFUSED', 'the allow-list refused the payload');
+      throw err;
+    }
+    await this.stageOnly(w);
+    const p = w.payload!;
+    this.log.item(w.row.queue_position, w.row.handle, 'VALIDATING', 'validated', { specs: p.specs.length, relations: p.relations.length, documents: p.documents.length, estimate: w.estimate ?? 0 });
+  }
+
+  private async stageOnly(w: ItemWork): Promise<void> {
+    const a = await this.ops.stage(w.sid, w.leaseToken, w.payload!, w.documentChecks);
+    w.stagedSha = a.payload_sha256;
+    w.estimate = a.invocation_estimate;
+    w.stageAnswer = { conflicts: a.conflicts.length, warnings: a.warnings.length };
+    this.log.item(w.row.queue_position, w.row.handle, 'VALIDATING', 'staged', { estimate: a.invocation_estimate, conflicts: a.conflicts.length, warnings: a.warnings.length });
+    if (a.invocation_estimate > 900) throw blockedStop('PLAN_TOO_LARGE', 'the plan exceeds the invocation budget');
+  }
+
+  /** A resumed item rebuilds its work: the page again (≥ 11 s spacing), never a stored payload. */
+  private async ensureExtracted(w: ItemWork): Promise<void> {
+    if (!w.payload) await this.extract(w);
+  }
+
+  private async ensureEnriched(w: ItemWork): Promise<void> {
+    await this.ensureExtracted(w);
+    if (!w.enrichReport) await this.enrich(w);
+  }
+
+  private async ensureStaged(w: ItemWork): Promise<void> {
+    await this.ensureEnriched(w);
+    if (w.stagedSha) return;
+    await this.stageOnly(w);
+  }
+
+  /** §A.3 /media: ≤ 4 per call, ≥ 1 s apart; a stored medium is never fetched again (the Worker HEADs it). */
+  private async ingest(w: ItemWork): Promise<void> {
+    const p = w.payload!;
+    const wanted = new Map<string, MediaRequest>();
+    for (const i of p.images) if (i.source_media_id && i.source_url) wanted.set(i.source_media_id, { source_media_id: i.source_media_id, role: 'gallery', source_url: i.source_url });
+    for (const s of p.swatches) if (!wanted.has(s.source_media_id)) wanted.set(s.source_media_id, { source_media_id: s.source_media_id, role: 'swatch', source_url: s.source_url });
+    for (const b of p.content_blocks) if (b.kind === 'image' && b.source_media_id && !wanted.has(b.source_media_id)) wanted.set(b.source_media_id, { source_media_id: b.source_media_id, role: 'description', source_url: b.source_url });
+    for (const s of p.specs) {
+      if (s.key !== 'package.contents') continue;
+      for (const item of s.value_list) {
+        if (typeof item === 'object' && item && item.source_media_id && item.source_url && !wanted.has(item.source_media_id)) {
+          wanted.set(item.source_media_id, { source_media_id: item.source_media_id, role: 'in_the_box', source_url: item.source_url });
+        }
+      }
+    }
+    const pending = [...wanted.values()].filter((m) => w.media.get(m.source_media_id)?.status !== 'stored');
+    let lastCall: number | null = null;
+    let rounds = 0;
+    while (pending.length) {
+      const batch = pending.splice(0, 4);
+      const wait = lastCall === null ? 0 : Math.max(0, lastCall + MEDIA_SPACING_MS - this.deps.clock.now());
+      if (!this.deadline.fitsStage(wait, 'MEDIA_CALL')) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'a media call does not fit', { needMs: wait });
+      if (wait > 0) await this.deps.clock.sleep(wait);
+      const t0 = this.deps.clock.now();
+      lastCall = t0;
+      const rows = await this.ops.media(w.sid, w.leaseToken, batch);
+      for (const r of rows) w.media.set(r.source_media_id, r);
+      const again = batch.filter((m) => (w.media.get(m.source_media_id)?.status ?? 'pending') === 'pending');
+      this.log.item(w.row.queue_position, w.row.handle, 'INGESTING_MEDIA', 'media_call', {
+        sent: batch.length,
+        stored: rows.filter((r) => r.status === 'stored').length,
+        failed: rows.filter((r) => r.status === 'failed').length,
+        pending: again.length,
+        ms: this.deps.clock.now() - t0,
+      });
+      if (again.length) {
+        if (++rounds > 20) throw transientStop('MEDIA_TIMEOUT', 'media keep coming back pending');
+        pending.push(...again);
+      }
+    }
+    const primary = p.images.find((i) => i.is_primary);
+    const pm = primary ? w.media.get(primary.source_media_id) : undefined;
+    if (primary && pm?.status !== 'stored') {
+      if (pm?.error_code === 'MEDIA_HOST_NOT_ALLOWED') throw blockedStop('MEDIA_HOST_NOT_ALLOWED', 'the primary image is on a host outside the allow-list');
+      throw blockedStop('PRIMARY_MEDIA_FAILED', 'the primary image could not be stored');
+    }
+    const all = [...w.media.values()];
+    this.log.item(w.row.queue_position, w.row.handle, 'INGESTING_MEDIA', 'media_done', {
+      stored: all.filter((m) => m.status === 'stored').length,
+      failed: all.filter((m) => m.status === 'failed').length,
+      omitted: all.filter((m) => m.status === 'omitted_cap').length,
+      total: wanted.size,
+    });
+  }
+
+  private async writeItem(w: ItemWork): Promise<void> {
+    const a = await this.ops.write(w.sid, w.leaseToken, w.stagedSha!, w.payload!, w.documentChecks);
+    w.write = a;
+    w.productId = a.product_id || w.productId;
+    w.slug = a.slug || w.slug;
+    w.state = 'PUBLISHING';
+    w.lastCompleted = 'WRITING';
+    this.log.item(w.row.queue_position, w.row.handle, 'WRITING', 'written', {
+      created: a.created,
+      groups: a.counts.groups ?? w.payload!.groups.length,
+      variants: a.counts.variants ?? w.payload!.variants.length,
+      images: a.counts.images ?? w.payload!.images.length,
+      fp_equal: a.before_fp_equal,
+    });
+  }
+
+  private async publish(w: ItemWork): Promise<void> {
+    const t0 = this.deps.clock.now();
+    const a = await this.ops.publishFinish(w.sid, w.leaseToken);
+    w.state = a.state || 'VERIFYING_LIVE';
+    w.lastCompleted = 'PUBLISHING';
+    this.log.item(w.row.queue_position, w.row.handle, 'PUBLISHING', 'published', { ms: this.deps.clock.now() - t0 });
+  }
+
+  private liveUrl(w: ItemWork): string {
+    return `${this.cfg.siteOrigin}/product/${w.slug}`;
+  }
+
+  private async browserFor(): Promise<BrowserLike | null> {
+    if (this.browserChecker === undefined) this.browserChecker = await this.deps.browser().catch(() => null);
+    return this.browserChecker;
+  }
+
+  /** VERIFY (§I.1) with the cache rule (§I.1.9), then /complete. */
+  private async verifyAndComplete(w: ItemWork): Promise<ItemOutcome> {
+    if (!w.slug || !w.productId) await this.relearn(w);
+    if (!w.slug || !w.productId) throw blockedStop('VERIFY_FAILED_PERSISTENT', 'the write answer named no product');
+    await this.ensureEnriched(w);
+    if (w.media.size === 0) await this.ingest(w);
+    const ctx = {
+      payload: w.payload!,
+      productId: w.productId,
+      slug: w.slug,
+      media: w.media,
+      leaf: w.row.leaf ?? '',
+      also: w.row.also ?? [],
+      taxonomy: this.deps.bundle.taxonomy,
+      modelCodes: modelCodesOf(w.payload!.product.title_en, this.deps.bundle.rows.map((r) => r.title ?? '')),
+      merge: w.write && !w.write.created ? { before_fp_equal: w.write.before_fp_equal } : w.payload!.write_mode === 'merge' ? { before_fp_equal: w.write?.before_fp_equal ?? null } : null,
+      readback: () => this.ops.readback(w.sid),
+    };
+    const audit = (w.row.audit_classes ?? []).length > 0;
+    for (let round = 1; round <= 2; round++) {
+      // Each round's reads must fit in what is left of VERIFY's worst case (§A.7 rule 1).
+      this.siteBudgetEnd = this.deps.clock.now() + (round === 1 ? WORST.VERIFY : AFTER_CACHE_WAIT);
+      const outcome = await verifyPublic(this.site, ctx);
+      let browser: BrowserResult | null = null;
+      if (outcome.ok) {
+        const checker = await this.browserFor();
+        if (checker) {
+          browser = await checker.check({
+            slug: w.slug,
+            payload: w.payload!,
+            media: w.media,
+            leafName: outcome.leafName,
+            allValues: audit,
+            screenshot: audit || w.row.queue_position % 25 === 0,
+          });
+          w.shots.push(...browser.screenshots);
+          this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'browser', { checks: Object.keys(browser.checks).length, failed: Object.values(browser.checks).filter((v) => !v).length, screens: browser.screenshots.length });
+        }
+      }
+      const passed = Object.values(outcome.checks).filter((c) => c.ok).length;
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'verify_done', { passed, total: Object.keys(outcome.checks).length });
+      w.verify = outcome;
+      w.browser = browser;
+      const allOk = outcome.ok && (!browser || browser.ok);
+      if (allOk) {
+        const evidence = edgeEvidence(outcome, browser ? { ok: browser.ok, checks: browser.checks, counts: browser.counts, selections: browser.selections } : null, this.liveUrl(w), w.payload!, round);
+        const done = await this.ops.complete(w.sid, w.leaseToken, this.liveUrl(w), evidence);
+        if (done.state === 'COMPLETE') {
+          this.gate.noteComplete(w.sid, done.seq);
+          w.state = 'COMPLETE';
+          this.log.item(w.row.queue_position, w.row.handle, 'COMPLETE', 'complete', { url: this.liveUrl(w) });
+          this.sealItem(w, { outcome: 'complete', d1_checks: done.d1_checks });
+          return { kind: 'complete', url: this.liveUrl(w) };
+        }
+      }
+      if (round === 2) break;
+      // The cache rule: purge again and wait s-maxage + 60 s (≤ 360 s), within the deadline.
+      const wait = cacheWaitOf(outcome);
+      if (!this.deadline.fits(wait, AFTER_CACHE_WAIT)) throw new ImportStop('DEADLINE_EXIT', 'deadline', 'the cache wait does not fit', { needMs: wait });
+      this.log.item(w.row.queue_position, w.row.handle, 'VERIFYING_LIVE', 'cache_wait', { seconds: Math.round(wait / 1000) });
+      await this.ops.publishFinish(w.sid, w.leaseToken);
+      await this.deps.clock.sleep(wait);
+    }
+    throw blockedStop('VERIFY_FAILED_PERSISTENT', 'a check failed again after a purge and a wait');
+  }
+
+  /** The per-item report and its screenshots, sealed (they may name sources and media URLs). */
+  private sealItem(w: ItemWork, end: Record<string, unknown>): void {
+    const name = `item-${String(w.row.queue_position).padStart(4, '0')}`;
+    const b = w.build;
+    this.seal(`${name}.json`, {
+      source_product_id: w.sid,
+      handle: w.row.handle,
+      queue_position: w.row.queue_position,
+      ...end,
+      product_id: w.productId,
+      slug: w.slug,
+      build: b ? { report: b.report, media_report: b.media.report } : null,
+      enrich: w.enrichReport ?? null,
+      document_checks: w.documentChecks,
+      staged: { payload_sha256: w.stagedSha ?? '', invocation_estimate: w.estimate ?? 0, ...(w.stageAnswer ?? {}) },
+      media: [...w.media.values()],
+      write: w.write ?? null,
+      verify: w.verify ?? null,
+      browser: w.browser ? { ok: w.browser.ok, checks: w.browser.checks, counts: w.browser.counts } : null,
+    });
+    w.shots.forEach((shot, i) => this.seal(`${name}-shot-${i + 1}.png`, shot));
+    w.shots = [];
+  }
+
+  // ---------------------------------------------------------------- close (§A.9, §I.3)
+
+  async close(): Promise<number> {
+    await this.hello();
+    this.status = await this.ops.status();
+    const c = this.status.counts;
+    const open = (c.DISCOVERED ?? 0) + (c.RETRYING ?? 0) + STAGES.reduce((n, s) => n + (c[s] ?? 0), 0);
+    this.log.info('status', { complete: c.COMPLETE ?? 0, blocked: c.BLOCKED ?? 0, withdrawn: c.WITHDRAWN_AT_SOURCE ?? 0, remaining: open });
+    if (open > 0) {
+      this.log.error('note', { code: 'QUEUE_NOT_EMPTY' });
+      this.writeSummary(true);
+      return 1;
+    }
+    // §I.3.1: the three sitemaps again, at the store's pace, and the diff with the manifest.
+    const robots = await this.ensureRobots();
+    const urls: string[] = [];
+    for (const path of SITEMAP_PATHS) {
+      if (!robotsAllows(robots, path)) continue;
+      urls.push(...parseSitemap(await this.store.sitemap(path)));
+    }
+    const diff = sitemapDiff(productHandles(urls), this.deps.bundle.rows);
+    this.log.info('sitemap', { listed: diff.listed, new: diff.added.length, removed: diff.removed.length });
+    // §I.3.3: the public sweep of the brand's visible products (v1), at ≤ 4 requests per second.
+    const sweep = await this.publicSweep();
+    this.log.info('sweep', { what: 'public', passed: sweep.visible, total: c.COMPLETE ?? 0 });
+    const after = await this.ops.protectSnapshot('after');
+    this.log.info('protect', { phase: 'after', subjects: after.subjects });
+    const fin = await this.ops.finish();
+    this.log.info('finish', { state: fin.state });
+    let gone = false;
+    try {
+      await this.ops.hello();
+    } catch (err) {
+      gone = err instanceof OpsError && err.kind === 'gone';
+    }
+    this.log.info('token_gone', { gone });
+    this.seal('close-report.json', { run_id: this.runId, status: this.status, sitemap: diff, sweep, protect_after: after, finish: fin, token_gone: gone });
+    this.writeSummary(false, fin.state);
+    return gone && (fin.state === 'closed' || fin.state === 'partial') ? 0 : 1;
+  }
+
+  private async publicSweep(): Promise<{ visible: number; pages: number; unpriced: number }> {
+    let cursor = '';
+    let visible = 0;
+    let unpriced = 0;
+    let pages = 0;
+    do {
+      const a = await this.site.read('GET', `/api/public/v1/products?brand=bambu-lab&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+      pages++;
+      if (a.status !== 200 || !a.json) break;
+      const data = Array.isArray(a.json.data) ? (a.json.data as Array<Record<string, unknown>>) : [];
+      visible += data.length;
+      unpriced += data.filter((p) => typeof p.price === 'object' && p.price && (p.price as Record<string, unknown>).status === 'unpriced').length;
+      const pg = a.json.pagination as Record<string, unknown> | undefined;
+      cursor = typeof pg?.next_cursor === 'string' ? pg.next_cursor : '';
+    } while (cursor && pages < 200);
+    return { visible, pages, unpriced };
+  }
+
+  // ---------------------------------------------------------------- withdraw (§1 row 20, §A.3)
+
+  async withdraw(): Promise<number> {
+    if (!this.cfg.item) throw new ConfigError('withdraw needs the item');
+    await this.hello();
+    const row = this.deps.bundle.bySid.get(this.cfg.item);
+    if (!row) throw new JobStop('REVIEWED_SCOPE_REFUSED', true);
+    // The second fetch: the page is gone (404/410 or a redirect away) and the sitemap no longer lists it.
+    const robots = await this.ensureRobots();
+    let second: { at: string; outcome: string; status: number } = { at: this.now(), outcome: 'present', status: 200 };
+    if (robotsAllows(robots, `/products/${rawHandleOf(row)}`)) {
+      try {
+        const page = await this.store.productPage(rawHandleOf(row));
+        second = { at: this.now(), outcome: 'present', status: page.status };
+      } catch (err) {
+        if (!(err instanceof ImportStop) || err.code !== 'SOURCE_WITHDRAWN') throw err;
+        second = { at: this.now(), outcome: 'withdrawn', status: err.detail.status ?? 0 };
+      }
+    }
+    const listed = robotsAllows(robots, '/sitemap_products_1.xml') ? productHandles(parseSitemap(await this.store.sitemap('/sitemap_products_1.xml'))) : [];
+    const absent = !listed.includes(row.handle);
+    if (second.outcome !== 'withdrawn' || !absent) {
+      this.log.error('note', { code: 'SOURCE_STILL_PRESENT' });
+      return 1;
+    }
+    const approval = `workflow-60-run-${this.cfg.githubRunId || 'local'}`;
+    const a = await this.ops.withdraw(row.source_product_id, approval, { second_fetch: second, sitemap_absent: absent });
+    this.log.item(row.queue_position, row.handle, 'WITHDRAW', 'withdrawn', { state: a.state });
+    return a.state === 'WITHDRAWN_AT_SOURCE' ? 0 : 1;
+  }
+}
+
+// ------------------------------------------------------------------ the process entry
+
+/** A sealer writing only `<outDir>/<name>.sealed` (mode 0600, never over an existing file). */
+export function fileSealer(outDir: string, publicKey: string): (name: string, data: Buffer) => number {
+  mkdirSync(outDir, { recursive: true, mode: 0o700 });
+  return (name, data) => {
+    if (!/^[a-z0-9][a-z0-9._-]{0,80}$/.test(name)) throw new Error('an artifact name the import does not write');
+    const sealed: Buffer = sealBuffer(publicKey, data);
+    data.fill(0);
+    writeFileSync(join(outDir, `${name}.sealed`), sealed, { mode: 0o600, flag: 'wx' });
+    return sealed.length;
+  };
+}
+
+export function githubOutput(file: string | undefined): (key: string, value: string) => void {
+  return (key, value) => {
+    if (!/^[a-z_]+$/.test(key) || /[\r\n]/.test(value)) throw new Error('a malformed step output');
+    if (file) appendFileSync(file, `${key}=${value}\n`);
+  };
+}
+
+export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number> {
+  const root = resolve(new URL('../../', import.meta.url).pathname);
+  let cfg: RunConfig;
+  try {
+    cfg = configFromEnv(env, root);
+  } catch (err) {
+    process.stdout.write(`::error::[import] ${err instanceof ConfigError ? err.message : 'the importer configuration is invalid'}\n`);
+    return 2;
+  }
+  const log = new ImportLog((line) => process.stdout.write(`${line}\n`), { siteOrigin: cfg.siteOrigin });
+  const output = githubOutput(env.GITHUB_OUTPUT);
+  let token = '0'.repeat(64);
+  let openedRunId = '';
+  try {
+    if (cfg.mode !== 'preflight') token = takeToken(env.IMPORT_TOKEN_FILE);
+    if (env.IMPORT_RUN_FILE && existsSync(env.IMPORT_RUN_FILE)) {
+      const id = readFileSync(env.IMPORT_RUN_FILE, 'utf8').trim();
+      if (/^cir_[0-9a-f]{24}$/.test(id)) openedRunId = id;
+    }
+  } catch (err) {
+    log.error('note', { code: 'TOKEN_FILE_REFUSED' });
+    log.exception('JOB', err);
+    output('more', 'false');
+    output('blocked', 'true');
+    output('run_id', cfg.runId);
+    return 1;
+  }
+  let bundle: ReviewedBundle;
+  try {
+    bundle = loadReviewedBundle(cfg.dataDir);
+  } catch (err) {
+    log.exception('JOB', err);
+    output('more', 'false');
+    output('blocked', 'true');
+    output('run_id', cfg.runId || openedRunId);
+    return 1;
+  }
+  const summary = new SummaryWriter(env.GITHUB_STEP_SUMMARY);
+  if (env.GITHUB_STEP_SUMMARY && existsSync(env.GITHUB_STEP_SUMMARY)) summary.begin(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8'));
+  const importer = new Importer(cfg, {
+    clock: realClock,
+    fetch: (url, init) => fetch(url, init),
+    log,
+    token,
+    bundle,
+    seal: fileSealer(cfg.outDir, cfg.sealKey),
+    output,
+    summary,
+    openedRunId,
+    browser: async () => {
+      if (cfg.mode !== 'run') return null;
+      const { BrowserChecker } = await import('./browser');
+      return BrowserChecker.launch(cfg.siteOrigin, env);
+    },
+  });
+  return importer.main();
+}
+
+/** A digest that names a token without revealing it (tests compare it with the stored hash). */
+export const tokenSha256 = (token: string) => createHash('sha256').update(token).digest('hex');
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().then(
+    (code) => {
+      process.exitCode = code;
+    },
+    () => {
+      process.stdout.write('::error::[import] the importer stopped unexpectedly\n');
+      process.exitCode = 1;
+    }
+  );
+}
