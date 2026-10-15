@@ -127,6 +127,8 @@ test('the owner reads the count; the switch refuses a moved count and unchecked 
   await recount(w);
   const summary = (await json(await get(w.admin(), '/api/admin/products-v2/completeness/summary'))).summary;
   assert.equal(summary.would_hide, 1);
+  // A cost gap stops sale only (DECISIONS row 240): held, shown without a price, never counted as hidden.
+  assert.equal(summary.would_hide_from_catalog, 0);
   assert.equal(summary.enabled, false);
   assert.equal(summary.stale, 0);
   const wrong = await put(w.admin(), '/api/admin/products-v2/completeness/hide', { enabled: true, expected_count: 0 });
@@ -136,7 +138,9 @@ test('the owner reads the count; the switch refuses a moved count and unchecked 
   assert.equal(wrongBody.details.summary.would_hide, 1, 'the refusal carries the fresh count');
   const on = await put(w.admin(), '/api/admin/products-v2/completeness/hide', { enabled: true, expected_count: 1 });
   assert.equal(on.status, 200, await on.clone().text());
-  assert.equal((await json(on)).summary.held, 1);
+  const onSummary = (await json(on)).summary;
+  assert.equal(onSummary.held, 1);
+  assert.equal(onSummary.held_from_catalog, 0, 'held from sale, still shown');
   assert.deepEqual(
     w.raw.prepare('SELECT product_id FROM product_completeness WHERE held = 1').all().map((r) => r.product_id),
     ['p_gap']
@@ -184,8 +188,11 @@ test('ON, a commercial gap: the product stays shown catalog-only — no number a
   assert.equal((await json(add)).code, 'PRICE_NOT_AVAILABLE');
   // Admin: the list shows it, flagged.
   const list = await json(await get(w.admin(), '/api/admin/products-v2?limit=50'));
-  const row = (list.products as Array<{ id: string; held: boolean; missing_count: number | null }>).find((p) => p.id === 'p_gap')!;
+  const row = (list.products as Array<{ id: string; held: boolean; catalog_held: boolean; missing_count: number | null }>).find((p) => p.id === 'p_gap')!;
   assert.equal(row.held, true);
+  assert.equal(row.catalog_held, false, 'held from sale only: still shown');
+  const stats = await json(await get(w.admin(), '/api/admin/products-v2/stats'));
+  assert.equal(stats.totals.shown_unpriced, 1, '«ظاهر بلا سعر»: the one customers see without a price');
   assert.equal(w.raw.prepare("SELECT status FROM products WHERE id = 'p_gap'").get()!.status, 'active');
   // No legacy number of the product reached any customer answer.
   assert.doesNotMatch(JSON.stringify(s.detailBody), /100000|100,000/);
@@ -197,6 +204,8 @@ test('ON, a catalog gap (no picture): the product is gone from every customer su
   await recount(w);
   await recount(w);
   assert.equal((await setSwitch(w, true)).status, 200);
+  const held = (await json(await get(w.admin(), '/api/admin/products-v2/completeness/summary'))).summary;
+  assert.deepEqual([held.held, held.held_from_catalog], [1, 1], 'a picture gap: held AND hidden');
   const s = await surfaces(w);
   assert.ok(!s.listingAll.includes('gap-printer') && s.listingAll.includes('full-printer'), 'listing');
   assert.ok(!s.search.includes('gap-printer'), 'search');
@@ -217,9 +226,11 @@ test('ON, a catalog gap (no picture): the product is gone from every customer su
   assert.equal(add.status, 404);
   // Admin: the list shows it, flagged; its own read is unchanged.
   const list = await json(await get(w.admin(), '/api/admin/products-v2?limit=50'));
-  const row = (list.products as Array<{ id: string; held: boolean; missing_count: number | null }>).find((p) => p.id === 'p_gap')!;
+  const row = (list.products as Array<{ id: string; held: boolean; catalog_held: boolean; missing_count: number | null }>).find((p) => p.id === 'p_gap')!;
   assert.equal(row.held, true);
+  assert.equal(row.catalog_held, true, 'hidden, not «ظاهر بلا سعر»');
   assert.equal(row.missing_count, 1);
+  assert.equal((await json(await get(w.admin(), '/api/admin/products-v2/stats'))).totals.shown_unpriced, 0, 'a hidden product is not counted as shown');
   assert.equal((await get(w.admin(), '/api/admin/products-v2/p_gap')).status, 200);
   const only = await json(await get(w.admin(), '/api/admin/products-v2?incomplete=1'));
   assert.deepEqual((only.products as Array<{ id: string }>).map((p) => p.id), ['p_gap']);

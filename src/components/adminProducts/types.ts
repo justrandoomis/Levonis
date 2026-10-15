@@ -275,8 +275,12 @@ export interface ListingItem {
    * as one «owner data» item). null = not checked yet, or no migration 0184.
    */
   missing_count?: number | null;
-  /** Hidden from customers by the owner's «hide incomplete» switch. */
+  /** Held by the owner's «hide incomplete» switch (not sold). */
   held?: boolean;
+  /** Held for a catalogue gap (a missing image or section): hidden from customers too (DECISIONS row 240). */
+  catalog_held?: boolean;
+  /** '' on an ordinary product; 'bundle' / 'mystery' on a composition (hidden until sellable, D6). */
+  composition?: string;
   /** «طلبات السعر» (DECISIONS row 240): distinct signed-in requesters with an open request; null without 0193. */
   price_requests?: number | null;
 }

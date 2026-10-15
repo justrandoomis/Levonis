@@ -251,7 +251,11 @@ function workerSources(dir = join(ROOT, 'worker'), out: string[] = []): string[]
 }
 
 /** Files that call the predicates for a reason that is not a customer read (admin, sweeps), reviewed. */
-const NOT_CUSTOMER_CALLERS = new Set<string>(['worker/lib/listing.ts']);
+const NOT_CUSTOMER_CALLERS = new Set<string>([
+  'worker/lib/listing.ts',
+  // The admin's «ظاهر بلا سعر» count (stats `shown_unpriced`): visible and not sellable, an owner screen.
+  'worker/routes/adminProducts.ts',
+]);
 
 test('the count of each predicate family per file is the reviewed one (reclassify this site in docs and here)', () => {
   const diffs: string[] = [];

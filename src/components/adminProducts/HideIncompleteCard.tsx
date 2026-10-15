@@ -27,7 +27,11 @@ export interface HideSummary {
   evaluated: number;
   stale: number;
   would_hide: number;
+  /** …of which a catalogue gap also hides (absent from an older server). */
+  would_hide_from_catalog?: number;
   held: number;
+  /** …of which hidden right now (absent from an older server). */
+  held_from_catalog?: number;
   bundles_affected: number;
   sample: Array<{ id: string; name_ar: string; name_en: string; missing_count: number }>;
 }
@@ -129,9 +133,14 @@ export default function HideIncompleteCard({
         {t(COMPLETENESS_UI.switchExplain)} <span data-hide-scope>{t(COMPLETENESS_UI.switchScope)}</span>
       </p>
       <p className="mt-2 text-[13px] font-semibold text-[var(--ap-text-1)]" aria-live="polite">
+        {/* Every held product stops selling; only a catalogue gap (image, section) also hides it (row 240). */}
         {on
-          ? fill(t(COMPLETENESS_UI.hiddenNow), { n: summary.held })
-          : fill(t(COMPLETENESS_UI.willHide), { n: summary.would_hide, m: summary.bundles_affected })}
+          ? fill(t(COMPLETENESS_UI.hiddenNow), { n: summary.held, h: summary.held_from_catalog ?? summary.held })
+          : fill(t(COMPLETENESS_UI.willHide), {
+              n: summary.would_hide,
+              h: summary.would_hide_from_catalog ?? summary.would_hide,
+              m: summary.bundles_affected,
+            })}
       </p>
       {needsPricing !== null && needsPricing > 0 && (
         <p className="mt-1 text-[12px] leading-relaxed text-[var(--ap-text-2)]" data-hide-separate-list>

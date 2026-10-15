@@ -18,9 +18,9 @@ export const NEEDS_PRICING = {
   title: { ar: 'منتجات تحتاج تسعيرًا', en: 'Products that need pricing', ckb: 'ئەو بەرهەمانەی پێویستیان بە نرخدانانە' },
   // DECISIONS rows 239-240: an unpriced product is SHOWN to customers without a price and sold to nobody.
   intro: {
-    ar: 'كل منتج هنا ظاهر للزبائن بلا سعر ولا يُباع حتى يُنشر سعره الجديد بالدولار. الأكثر طلباً للسعر أولاً: افتحه، راجع أسعاره في ورقة المراجعة، ثم انشره.',
-    en: 'Every product here is shown to customers without a price and cannot be bought until its new dollar price is published. The most requested come first: open it, review its prices in the review sheet, then publish.',
-    ckb: 'هەموو بەرهەمێک لێرە بێ نرخ بە کڕیاران پیشان دەدرێت و ناکڕدرێت تا نرخە نوێیەکەی بە دۆلار بڵاو دەکرێتەوە. زۆرترین داواکراوەکان یەکەمن: بیکەرەوە، نرخەکانی لە پەڕەی پێداچوونەوەدا ببینە، پاشان بڵاوی بکەرەوە.',
+    ar: 'لا يُباع أي منتج هنا حتى يُنشر سعره الجديد بالدولار. الأكثر طلباً للسعر أولاً: افتحه، راجع أسعاره في ورقة المراجعة، ثم انشره.',
+    en: 'Nothing here can be bought until its new dollar price is published. The most requested come first: open it, review its prices in the review sheet, then publish.',
+    ckb: 'هیچ بەرهەمێک لێرە ناکڕدرێت تا نرخە نوێیەکەی بە دۆلار بڵاو دەکرێتەوە. زۆرترین داواکراوەکان یەکەمن: بیکەرەوە، نرخەکانی لە پەڕەی پێداچوونەوەدا ببینە، پاشان بڵاوی بکەرەوە.',
   },
   /** «تحديد السعر» (row 240): opens the existing V2 pricing section; no new pricing UI. */
   priceNow: PRICE_REQUEST_ADMIN_TEXT.set_price,
@@ -61,6 +61,18 @@ export const NEEDS_PRICING = {
     en: 'Nothing here — every product is priced and published.',
     ckb: 'هیچ شتێک لێرە نییە — هەموو بەرهەمەکان نرخیان هەیە و بڵاوکراونەتەوە.',
   },
+  /** «الأكثر طلباً» with nothing in it: no open request yet — never «every product is priced». */
+  emptyRequests: {
+    ar: 'لا طلبات سعر مفتوحة بعد.',
+    en: 'No open price requests yet.',
+    ckb: 'هێشتا هیچ داواکارییەکی نرخی کراوە نییە.',
+  },
+  /** Any other filter with nothing in it. */
+  emptyFilter: {
+    ar: 'لا منتجات تطابق هذا التصنيف.',
+    en: 'No products match this filter.',
+    ckb: 'هیچ بەرهەمێک لەگەڵ ئەم فلتەرە ناگونجێت.',
+  },
   loadFailed: { ar: 'تعذّر تحميل القائمة.', en: 'The list could not be loaded.', ckb: 'لیستەکە بار نەکرا.' },
   retry: { ar: 'إعادة المحاولة', en: 'Retry', ckb: 'دووبارە هەوڵبدەوە' },
   back: { ar: 'كل المنتجات', en: 'All products', ckb: 'هەموو بەرهەمەکان' },
@@ -87,27 +99,38 @@ export function hiddenBanner(n: number, lang: QueueLang): string {
   return `${n} منتجًا ظاهرًا للزبائن بلا سعر حتى يكتمل تسعيره`;
 }
 
+/** Arabic counting: the singular alone for 1, the dual for 2, the plural for 3–10, the singular after 11+. */
+const arCount = (n: number, [one, two, few, many]: readonly [string, string, string, string]): string =>
+  n === 1 ? one : n === 2 ? two : n <= 10 ? `${n} ${few}` : `${n} ${many}`;
+const AR_MIN = ['دقيقة', 'دقيقتين', 'دقائق', 'دقيقة'] as const;
+const AR_HOUR = ['ساعة', 'ساعتين', 'ساعات', 'ساعة'] as const;
+const AR_DAY = ['يوم', 'يومين', 'أيام', 'يومًا'] as const;
+
 /** «منذ 3 ساعات» — when the latest request arrived, in the reader's language. */
 export function agoText(iso: string | null | undefined, lang: QueueLang, now = Date.now()): string {
   if (!iso) return '—';
   const min = Math.floor((now - new Date(iso).getTime()) / 60_000);
   if (!Number.isFinite(min)) return '—';
   if (min < 1) return lang === 'en' ? 'now' : lang === 'ckb' ? 'ئێستا' : 'الآن';
-  if (min < 60) return lang === 'en' ? `${min}m ago` : lang === 'ckb' ? `${min} خولەک لەمەوبەر` : `منذ ${min} دقيقة`;
+  if (min < 60) return lang === 'en' ? `${min}m ago` : lang === 'ckb' ? `${min} خولەک لەمەوبەر` : `منذ ${arCount(min, AR_MIN)}`;
   const h = Math.floor(min / 60);
-  if (h < 24) return lang === 'en' ? `${h}h ago` : lang === 'ckb' ? `${h} کاتژمێر لەمەوبەر` : `منذ ${h} ساعة`;
+  if (h < 24) return lang === 'en' ? `${h}h ago` : lang === 'ckb' ? `${h} کاتژمێر لەمەوبەر` : `منذ ${arCount(h, AR_HOUR)}`;
   const d = Math.floor(h / 24);
-  return lang === 'en' ? `${d}d ago` : lang === 'ckb' ? `${d} ڕۆژ لەمەوبەر` : `منذ ${d} يوم`;
+  return lang === 'en' ? `${d}d ago` : lang === 'ckb' ? `${d} ڕۆژ لەمەوبەر` : `منذ ${arCount(d, AR_DAY)}`;
 }
 
 export const tri = (t: Tri, lang: QueueLang): string => (lang === 'en' ? t.en : lang === 'ckb' ? t.ckb : t.ar);
 
+/** The queue's empty state for its filter: «every product is priced and published» only when nothing at all is left. */
+export const queueEmptyText = (filter: string, lang: QueueLang): string =>
+  tri(filter === 'all' ? NEEDS_PRICING.empty : filter === 'most_requested' ? NEEDS_PRICING.emptyRequests : NEEDS_PRICING.emptyFilter, lang);
+
 /**
- * The «منتجات نشطة» tile's line (C5, review 2026-10-14): an active product still «يحتاج تسعيرًا» is hidden
- * from every customer, so the tile says how many of its products customers cannot see yet.
+ * The «منتجات نشطة» tile's line: how many of its products customers see without a price (DECISIONS row 240).
  */
-export function activeTileSub(totals: { active_needs_pricing?: number | null }, pct: number, lang: QueueLang): string {
-  const n = totals.active_needs_pricing ?? 0;
+export function activeTileSub(totals: { active_needs_pricing?: number | null; shown_unpriced?: number | null }, pct: number, lang: QueueLang): string {
+  // «ظاهر بلا سعر» counts what customers see (DECISIONS row 240); an older server sends only the wider count.
+  const n = totals.shown_unpriced ?? totals.active_needs_pricing ?? 0;
   if (n > 0) {
     if (lang === 'en') return `${pct}% of all · ${n} shown without a price`;
     if (lang === 'ckb') return `${pct}% · ${n} بێ نرخ پیشان دەدرێت`;
@@ -126,4 +149,19 @@ export function separateListNote(n: number, lang: QueueLang): string {
   if (lang === 'en') return `This count is the incomplete list only. ${n} more products are shown without a price until their pricing is published («Needs pricing»).`;
   if (lang === 'ckb') return `ئەم ژمارەیە تەنها لیستی ناتەواوەکانە. ${n} بەرهەمی تر بێ نرخ پیشان دەدرێن تا نرخدانانیان بڵاو دەکرێتەوە («پێویستی بە نرخدانانە»).`;
   return `هذا العدد لقائمة «ناقص» وحدها. ${n} منتجًا آخر ظاهر بلا سعر حتى يُنشر تسعيره («يحتاج تسعيرًا»).`;
+}
+
+/**
+ * The products list's status badge. An active product still «يحتاج تسعيرًا» is SHOWN to customers without a
+ * price (DECISIONS row 240), so its badge says so in the warning tone — never «نشط» beside «يحتاج تسعيرًا».
+ * Unless customers cannot see it at all: a composition (D6) or a product held for a missing picture or section
+ * reads «مخفي».
+ */
+export function statusBadgeKind(
+  status: string,
+  p: { needs_pricing?: boolean; composition?: string; catalog_held?: boolean } = {}
+): 'active' | 'hidden' | 'draft' | 'unpriced' {
+  const key = status === 'active' ? 'active' : status === 'hidden' ? 'hidden' : 'draft';
+  if (key !== 'active' || !p.needs_pricing) return key;
+  return (p.composition ?? '') !== '' || p.catalog_held ? 'hidden' : 'unpriced';
 }

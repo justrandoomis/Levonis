@@ -179,7 +179,8 @@ test('C5: the form header, the list badge, the Active tile and the completeness 
   const form = src('src/components/adminProducts/ProductForm.tsx');
   assert.match(form, /\{headerStatusText\(doc\.status, v2\.hidden, v2s\)\}/);
   const list = src('src/components/AdminProducts.tsx');
-  assert.equal((list.match(/<Badge status=\{p\.status\} needsPricing=\{!!p\.needs_pricing\} \/>/g) ?? []).length, 4, 'every row badge knows');
+  // Every row badge knows (row 240: from the row itself — a composition or a catalogue-held product reads «مخفي»).
+  assert.equal((list.match(/<Badge status=\{p\.status\} product=\{p\} \/>/g) ?? []).length, 4, 'every row badge knows');
   assert.match(list, /sub=\{activeSub\(stats\.totals, activePct/);
   assert.match(list, /needsPricing=\{hiddenCount\}/);
   // C17: on a phone the badge also sits under the name.

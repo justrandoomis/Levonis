@@ -44,7 +44,7 @@ import { COMPLETENESS_UI, tri } from './adminProducts/completeness';
 import HideIncompleteCard, { ListMissingBadge } from './adminProducts/HideIncompleteCard';
 import VariantImg from './ui/VariantImg';
 import NeedsPricingQueue from './adminProducts/NeedsPricingQueue';
-import { activeTileSub as activeSub, hiddenBanner, NEEDS_PRICING, tri as triQ } from './adminProducts/needsPricingStrings';
+import { activeTileSub as activeSub, hiddenBanner, NEEDS_PRICING, statusBadgeKind, tri as triQ } from './adminProducts/needsPricingStrings';
 import { PRICE_REQUEST_ADMIN_TEXT, requestersText } from '../../packages/contracts/src/priceRequests';
 
 // The rebuilt eight-section form (product-form mandate §1). The previous
@@ -74,8 +74,20 @@ type View = 'list' | 'grid' | 'compact';
 type Loc = (ar: string, en: string, ckb?: string) => string;
 
 interface AdminProductsStats {
-  /** `active_needs_pricing`: active products customers cannot see yet («يحتاج تسعيرًا»); null before 0189. */
-  totals: { total: number; active: number; draft: number; hidden: number; out_of_stock: number; featured: number; active_needs_pricing?: number | null };
+  /**
+   * `active_needs_pricing`: active products not V2-published yet; null before 0189. `shown_unpriced`: the ones
+   * customers SEE without a price (visible, not a composition, not sellable — DECISIONS row 240).
+   */
+  totals: {
+    total: number;
+    active: number;
+    draft: number;
+    hidden: number;
+    out_of_stock: number;
+    featured: number;
+    active_needs_pricing?: number | null;
+    shown_unpriced?: number | null;
+  };
   weekly: Array<{ week: string; added: number; active_added: number; draft_added: number; hidden_added: number }>;
   sales_30d: { units: number; orders: number; gross_iqd?: number };
   sales_daily: Array<{ day: string; orders: number; units: number }>;
@@ -391,17 +403,21 @@ export default function AdminProducts() {
   }, [load]);
 
   const loadAux = useCallback(() => {
-    api.get<AdminProductsStats>('/api/admin/products-v2/stats').then(setStats).catch(() => {});
+    api
+      .get<AdminProductsStats>('/api/admin/products-v2/stats')
+      .then((d) => {
+        setStats(d);
+        // The banner's count: what customers SEE without a price — never a composition or a product hidden
+        // for a missing picture or section, which need pricing too but are not shown (DECISIONS row 240).
+        setHiddenCount(typeof d.totals?.shown_unpriced === 'number' ? d.totals.shown_unpriced : null);
+      })
+      .catch(() => setHiddenCount(null));
     api.get<{ brands: Array<{ id: string; name_ar?: string; name?: string }> }>('/api/admin/products-v2/brands')
       .then((d) => setBrands(d.brands ?? []))
       .catch(() => {});
     api.get<{ catalogs: Array<{ id: string; name_ar?: string; name?: string }> }>('/api/admin/taxonomy/catalogs')
       .then((d) => setCatalogs(d.catalogs ?? []))
       .catch(() => {});
-    // The banner's count: one row is enough, `total` is the answer.
-    api.get<ListingResponse>('/api/admin/products-v2?needs_pricing=1&limit=1')
-      .then((d) => setHiddenCount(d.total ?? 0))
-      .catch(() => setHiddenCount(null));
   }, []);
   useEffect(loadAux, [loadAux]);
 
@@ -1106,7 +1122,7 @@ export default function AdminProducts() {
                       <Star className="w-3 h-3 text-[var(--ap-accent-text)] fill-current" />
                     </span>
                   )}
-                  <span className={`absolute top-2 end-2 ${T.badgeBed}`}><Badge status={p.status} needsPricing={!!p.needs_pricing} /></span>
+                  <span className={`absolute top-2 end-2 ${T.badgeBed}`}><Badge status={p.status} product={p} /></span>
                   {((p.missing_count ?? 0) > 0 || p.held) && (
                     <span className={`absolute bottom-2 end-2 ${T.badgeBed}`}><ListMissingBadge n={p.missing_count} held={p.held} lang={lang} /></span>
                   )}
@@ -1148,7 +1164,7 @@ export default function AdminProducts() {
                 <span className="text-[13px] font-semibold text-[var(--ap-text-1)] shrink-0"><PriceCell p={p} lang={lang} /></span>
                 <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
                 <PriceRequestsChip n={p.price_requests} lang={lang} compact />
-                <Badge status={p.status} needsPricing={!!p.needs_pricing} />
+                <Badge status={p.status} product={p} />
                 {rowActions(p, true)}
               </div>
             );
@@ -1213,7 +1229,7 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-3 py-3">
                       <span className="inline-flex flex-wrap items-center gap-1">
-                        <Badge status={p.status} needsPricing={!!p.needs_pricing} />
+                        <Badge status={p.status} product={p} />
                         <ListMissingBadge n={p.missing_count} held={p.held} lang={lang} />
                         <PriceRequestsChip n={p.price_requests} lang={lang} />
                       </span>
@@ -1407,14 +1423,12 @@ function Thumb({ p, size }: { p: ListingItem; size: string }) {
   );
 }
 
-/**
- * The row's status. The clean start (C5, review 2026-10-14): an active product still «يحتاج تسعيرًا» is hidden
- * from every customer, so its badge says so in the warning tone — never «نشط» beside «يحتاج تسعيرًا».
- */
-function Badge({ status, needsPricing = false }: { status: string; needsPricing?: boolean }) {
+/** The row's status (`statusBadgeKind`): «ظاهر بلا سعر» only for what customers can actually see. */
+function Badge({ status, product }: { status: string; product?: { needs_pricing?: boolean; composition?: string; catalog_held?: boolean } }) {
   const { loc } = useLanguage();
-  const key = status === 'active' ? 'active' : status === 'hidden' ? 'hidden' : 'draft';
-  const unpriced = key === 'active' && needsPricing;
+  const kind = statusBadgeKind(status, product);
+  const key = kind === 'unpriced' ? 'active' : kind;
+  const unpriced = kind === 'unpriced';
   const label = unpriced
     ? loc(NEEDS_PRICING.hiddenChip.ar, NEEDS_PRICING.hiddenChip.en, NEEDS_PRICING.hiddenChip.ckb)
     : key === 'active' ? loc('نشط', 'Active', 'چالاک') : key === 'hidden' ? loc('مخفي', 'Hidden', 'شاراوە') : loc('مسودة', 'Draft', 'ڕەشنووس');
@@ -1614,7 +1628,7 @@ function QuickFind({
                       <span dir="ltr">{p.sku || p.slug} · {formatIqd(p.price_iqd || 0)}</span>
                     </span>
                   </span>
-                  <Badge status={p.status} needsPricing={!!p.needs_pricing} />
+                  <Badge status={p.status} product={p} />
                   {i === idx && <CornerDownLeft className="w-3.5 h-3.5 text-[var(--ap-text-3)] shrink-0" />}
                 </button>
               ))}

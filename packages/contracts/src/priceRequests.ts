@@ -40,7 +40,6 @@ export function requestersText(n: number, lang: PriceRequestLang): string {
   if (lang === 'ckb') {
     if (count === 0) return 'هیچ داواکارییەکی نرخ نییە';
     if (count === 1) return 'یەک کەس داوای نرخی کردووە';
-    if (count === 2) return '٢ کەس داوای نرخیان کردووە';
     return `${count} کەس داوای نرخیان کردووە`;
   }
   if (count === 0) return 'لا طلبات سعر';

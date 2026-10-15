@@ -106,12 +106,18 @@ export const COMPLETENESS_UI = {
   },
   switchOff: { ar: 'متوقف', en: 'Off', ckb: 'ڕاگیراوە' },
   switchOn: { ar: 'مُفعّل', en: 'On', ckb: 'چالاکە' },
+  // Every held product stops selling; only {h} of them (a missing image or section) are also hidden — the rest
+  // stay shown without a price (DECISIONS rows 239-240).
   willHide: {
-    ar: 'سيُخفى {n} منتجاً (ويتوقف {m} عرضاً مجمّعاً).',
-    en: '{n} products will be hidden ({m} bundles stop).',
-    ckb: '{n} بەرهەم دەشاردرێتەوە ({m} پاکێج ڕادەگیرێت).',
+    ar: 'سيتوقف بيع {n} منتجاً: يُخفى منها {h} (صورة أو قسم ناقص) ويظهر الباقي بلا سعر (ويتوقف {m} عرضاً مجمّعاً).',
+    en: '{n} products will stop selling: {h} hidden (missing image or section), the rest shown without a price ({m} bundles stop).',
+    ckb: 'فرۆشتنی {n} بەرهەم ڕادەگیرێت: {h} دەشاردرێنەوە (وێنە یان بەش کەمە) و ئەوانی تر بێ نرخ پیشان دەدرێن ({m} پاکێج ڕادەگیرێت).',
   },
-  hiddenNow: { ar: 'مخفي الآن: {n} منتجاً.', en: 'Hidden now: {n} products.', ckb: 'ئێستا شاردراوە: {n} بەرهەم.' },
+  hiddenNow: {
+    ar: 'موقوف عن البيع الآن: {n} منتجاً — مخفي منها {h}، والباقي ظاهر بلا سعر.',
+    en: 'Not selling now: {n} products — {h} hidden, the rest shown without a price.',
+    ckb: 'ئێستا نافرۆشرێن: {n} بەرهەم — {h} شاردراونەتەوە، ئەوانی تر بێ نرخ پیشان دەدرێن.',
+  },
   stale: {
     ar: 'لم يُفحص {n} منتجاً بعد — حدّث العدّ أولاً.',
     en: '{n} products are not checked yet — recount first.',
@@ -122,9 +128,9 @@ export const COMPLETENESS_UI = {
   turnOn: { ar: 'تفعيل الإخفاء', en: 'Turn hiding on', ckb: 'شاردنەوە چالاک بکە' },
   turnOff: { ar: 'إيقاف الإخفاء', en: 'Turn hiding off', ckb: 'شاردنەوە ڕابگرە' },
   confirmOn: {
-    ar: 'تأكيد: إخفاء {n} منتجاً عن الزبائن الآن',
-    en: 'Confirm: hide {n} products from customers now',
-    ckb: 'پشتڕاستکردنەوە: ئێستا {n} بەرهەم لە کڕیاران بشارەوە',
+    ar: 'تأكيد: إيقاف بيع {n} منتجاً ناقصاً الآن',
+    en: 'Confirm: stop selling {n} incomplete products now',
+    ckb: 'پشتڕاستکردنەوە: ئێستا فرۆشتنی {n} بەرهەمی ناتەواو ڕابگرە',
   },
   showList: { ar: 'اعرض المنتجات الناقصة', en: 'Show the incomplete products', ckb: 'بەرهەمە ناتەواوەکان پیشان بدە' },
   failed: { ar: 'تعذّر تنفيذ الطلب — أعد المحاولة.', en: 'The request failed — try again.', ckb: 'داواکارییەکە سەرکەوتوو نەبوو — دووبارە هەوڵ بدەرەوە.' },

@@ -16,7 +16,7 @@ import { api } from '../../lib/api';
 import VariantImg from '../ui/VariantImg';
 import { useLanguage } from '../../LanguageContext';
 import * as T from './theme';
-import { agoText, NEEDS_PRICING as S, tri, type QueueLang } from './needsPricingStrings';
+import { agoText, NEEDS_PRICING as S, queueEmptyText, tri, type QueueLang } from './needsPricingStrings';
 import { requestersText } from '../../../packages/contracts/src/priceRequests';
 import { missingLabel } from './form/v2/missingLabel';
 import { v2Strings } from './form/v2/v2Strings';
@@ -269,7 +269,7 @@ export default function NeedsPricingQueue({ owner, onOpen, onBack }: { owner: bo
           ))}
         </div>
       ) : data.products.length === 0 ? (
-        <p className={`${T.surface} p-4 text-[14px] ${T.text2}`} data-queue-empty>{tri(S.empty, lang)}</p>
+        <p className={`${T.surface} p-4 text-[14px] ${T.text2}`} data-queue-empty={filter}>{queueEmptyText(filter, lang)}</p>
       ) : (
         <ul className="space-y-2">
           {data.products.map((p) => {

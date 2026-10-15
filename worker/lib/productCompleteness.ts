@@ -44,6 +44,7 @@
  * shown from their members, and a held member already makes them unavailable.
  */
 import {
+  CATALOG_BLOCKING_CODES,
   COMPLETENESS_ENTRIES,
   COMPLETENESS_LIST_VERSION,
   OWNER_DATA_CODE,
@@ -571,15 +572,22 @@ export interface HideSummary {
   total_ordinary: number;
   evaluated: number;
   stale: number;
-  /** Active ordinary products the switch hides (incomplete). */
+  /** Active ordinary products the switch HOLDS (incomplete): none of them is sold. */
   would_hide: number;
-  /** Held right now. */
+  /** …of which a catalogue gap (IMAGE, CATEGORY) also HIDES; the rest are shown without a price (DECISIONS row 240). */
+  would_hide_from_catalog: number;
+  /** Held right now (not sold). */
   held: number;
+  /** …of which hidden from customers right now (a catalogue gap); the rest are shown without a price. */
+  held_from_catalog: number;
   /** Active bundles with an active member that would be hidden. */
   bundles_affected: number;
   /** Up to ten names of products it hides. */
   sample: Array<{ id: string; name_ar: string; name_en: string; missing_count: number }>;
 }
+
+/** A stored verdict names a catalogue gap (the codes that HIDE, not only stop sale). A constant from the contract. */
+const CATALOG_GAP_SQL = `EXISTS (SELECT 1 FROM json_each(pc.missing_json) jg WHERE json_extract(jg.value, '$.c') IN (${CATALOG_BLOCKING_CODES.map((c) => `'${c}'`).join(',')}))`;
 
 /** The owner's card: what the switch does (or does) right now. */
 export async function hideSummary(db: D1Database, setting: { enabled: boolean; since: string | null }): Promise<HideSummary> {
@@ -589,7 +597,9 @@ export async function hideSummary(db: D1Database, setting: { enabled: boolean; s
     db.prepare(
       `SELECT COUNT(*) AS evaluated,
               TOTAL(pc.complete = 0 AND p.status = 'active') AS would_hide,
-              TOTAL(pc.held = 1) AS held
+              TOTAL(pc.complete = 0 AND p.status = 'active' AND ${CATALOG_GAP_SQL}) AS would_hide_from_catalog,
+              TOTAL(pc.held = 1) AS held,
+              TOTAL(pc.held = 1 AND ${CATALOG_GAP_SQL}) AS held_from_catalog
          FROM product_completeness pc JOIN products p ON p.id = pc.product_id
         WHERE COALESCE(p.composition, '') = ''`
     ),
@@ -607,7 +617,9 @@ export async function hideSummary(db: D1Database, setting: { enabled: boolean; s
         ORDER BY pc.missing_count DESC, p.id LIMIT 10`
     ),
   ]);
-  const c = ((counts as D1Result<{ evaluated: number; would_hide: number; held: number }>).results ?? [])[0];
+  const c = (
+    (counts as D1Result<{ evaluated: number; would_hide: number; would_hide_from_catalog: number; held: number; held_from_catalog: number }>).results ?? []
+  )[0];
   const b = ((bundles as D1Result<{ n: number }>).results ?? [])[0];
   return {
     enabled: setting.enabled,
@@ -616,7 +628,9 @@ export async function hideSummary(db: D1Database, setting: { enabled: boolean; s
     evaluated: Number(c?.evaluated ?? 0),
     stale: scan.stale.length,
     would_hide: Number(c?.would_hide ?? 0),
+    would_hide_from_catalog: Number(c?.would_hide_from_catalog ?? 0),
     held: Number(c?.held ?? 0),
+    held_from_catalog: Number(c?.held_from_catalog ?? 0),
     bundles_affected: Number(b?.n ?? 0),
     sample: ((sample as D1Result<{ id: string; name_ar: string; name_en: string; missing_count: number }>).results ?? []).map((r) => ({
       id: String(r.id),

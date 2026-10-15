@@ -32,7 +32,8 @@ import { audit } from '../lib/audit';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { registerCompletenessRoutes } from './adminCompleteness';
-import { completenessInstalled } from '../lib/listing';
+import { completenessInstalled, listing } from '../lib/listing';
+import { isCatalogBlockingCode } from '@levonis/contracts/productCompleteness';
 import { priceRequestsInstalled } from '../lib/priceRequests';
 import { parseMissing, projectItems } from '../lib/productCompleteness';
 import { newId } from '../lib/crypto';
@@ -867,6 +868,9 @@ adminProductsRoutes.get('/', async (c) => {
             ? null
             : projectItems(parseMissing(r.completeness_missing), seesPrivate).length,
         held: Number(r.completeness_held ?? 0) === 1,
+        // Held for a catalogue gap (a missing image or section): hidden from customers, not merely unsold.
+        catalog_held:
+          Number(r.completeness_held ?? 0) === 1 && parseMissing(r.completeness_missing).some((i) => isCatalogBlockingCode(String(i.code))),
         // Distinct people with an open «طلب السعر» (a count, never who): null without 0193.
         price_requests: requestsInstalled ? Number(r.price_requests ?? 0) : null,
         brand_id: (r.brand_id as string | null) ?? null,
@@ -1024,6 +1028,20 @@ adminProductsRoutes.get('/stats', async (c) => {
         .then((r) => Number(r?.n ?? 0))
         .catch(() => null)
     : null;
+  // SHOWN WITHOUT A PRICE (DECISIONS row 240): visible to customers, not a composition (D6), and not sellable —
+  // the products the «ظاهر بلا سعر» banner and tile mean. A composition or a product held for a catalogue gap
+  // needs pricing too but is hidden, so it is not counted here. An admin count, through the listing predicates.
+  const shownUnpriced = await (async () => {
+    try {
+      const L = await listing(db);
+      const r = await db
+        .prepare(`SELECT COUNT(*) AS n FROM products p WHERE ${L.visible('p')} AND COALESCE(p.composition, '') = '' AND NOT (${L.sellable('p')})`)
+        .first<{ n: number }>();
+      return Number(r?.n ?? 0);
+    } catch {
+      return null;
+    }
+  })();
   // Revenue is a MONEY figure, not a cost (owner decision 2 keeps it with
   // full-scope admins).
   const financial = canMoveMoney(c.env, c.get('user'));
@@ -1039,6 +1057,7 @@ adminProductsRoutes.get('/stats', async (c) => {
       incomplete: completenessTotals ? Number(completenessTotals.incomplete ?? 0) : null,
       held: completenessTotals ? Number(completenessTotals.held ?? 0) : null,
       active_needs_pricing: activeNeedsPricing,
+      shown_unpriced: shownUnpriced,
     },
     weekly: weeks,
     sales_30d: {
