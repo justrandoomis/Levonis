@@ -801,6 +801,14 @@ export const COST_REFUSALS = {
     en: 'To track quantity, enter the stock quantity first.',
     ckb: 'بۆ بەدواداچوونی بڕ، سەرەتا بڕی کۆگا بنووسە.',
   },
+  // «بلا تتبّع (حسب الطلب)» sells by pre-order only: a direct sale needs a recorded stock (worker/routes/products.ts
+  // `directUsable`), so the choice is refused while the product offers no pre-order — it would publish a price no
+  // customer can order.
+  IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER: {
+    ar: '«بلا تتبّع» يعني البيع بالطلب المسبق: فعّل الطلب المسبق لهذا المنتج أولاً، أو اختر «تتبّع الكمية».',
+    en: '"Untracked" sells by pre-order: enable pre-order for this product first, or choose "Track quantity".',
+    ckb: '«بێ بەدواداچوون» واتە فرۆشتن بە پێشداواکردن: سەرەتا پێشداواکردن بۆ ئەم بەرهەمە چالاک بکە، یان «بەدواداچوونی بڕ» هەڵبژێرە.',
+  },
 } as const satisfies Record<string, CostRefusal>;
 
 export type CostRefusalCode = keyof typeof COST_REFUSALS;

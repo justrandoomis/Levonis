@@ -191,7 +191,7 @@ const REQUIRED: Record<string, readonly string[]> = {
   ],
   // The Bambu import's stock gate (import spec §B.10, §C.11; DECISIONS row 241; owner decision L-16): a product the
   // catalogue import created is never V2-published until an admin chooses its stock mode.
-  'Bambu import stock gate (DECISIONS row 241)': ['IMPORT_STOCK_NOT_CONFIGURED', 'IMPORT_STOCK_TRACKED_EMPTY'],
+  'Bambu import stock gate (DECISIONS row 241)': ['IMPORT_STOCK_NOT_CONFIGURED', 'IMPORT_STOCK_TRACKED_EMPTY', 'IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER'],
 };
 
 /** §6.1 "Dropped codes": merged into one of the codes above, never raised. */

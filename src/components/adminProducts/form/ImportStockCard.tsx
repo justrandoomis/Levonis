@@ -12,8 +12,10 @@
  *   - «تتبّع الكمية»: every combination sells only the quantity in its stock —
  *     the server refuses (IMPORT_STOCK_TRACKED_EMPTY) while any of them has no
  *     number saved;
- *   - «بلا تتبّع (حسب الطلب)»: sold by pre-order, no quantity limit (a direct
- *     sale still needs a recorded stock: worker/routes/products.ts `directUsable`).
+ *   - «بلا تتبّع (حسب الطلب)»: sold by pre-order, no quantity limit — refused
+ *     (IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER) while the product offers no
+ *     pre-order, since a direct sale needs a recorded stock
+ *     (worker/routes/products.ts `directUsable`).
  *
  * One choice, then one confirm (agency: nothing is written by tapping a row).
  * The rows are the finder's radio rows (one tabbable row, arrows move,
@@ -45,9 +47,9 @@ export const IMPORT_STOCK_STRINGS = {
   // Honest about the shelf rule (worker/routes/products.ts `directUsable`): a direct sale needs a recorded stock, so
   // «بلا تتبّع» sells only by pre-order, through the routes the owner offers.
   untrackedHint: {
-    ar: 'يُباع بالطلب المسبق بلا حدّ للكمية، ولا يُتتبّع له مخزون. البيع المباشر يبقى متوقفاً ما دام لا مخزون مسجّلاً.',
-    en: 'Sold by pre-order with no quantity limit; no stock is tracked. Direct sale stays off while no stock is recorded.',
-    ckb: 'بە پێشداواکردن دەفرۆشرێت بەبێ سنووری بڕ، و هیچ کۆگایەکی بۆ بەدواداچوون ناکرێت. فرۆشتنی ڕاستەوخۆ ڕاگیراو دەمێنێت تا کۆگا تۆمار نەکرابێت.',
+    ar: 'يُباع بالطلب المسبق عبر طرق الشحن التي يقدّمها المنتج، بلا حدّ للكمية ولا تتبّع للمخزون. فعّل الطلب المسبق أولاً؛ البيع المباشر يحتاج مخزوناً مسجّلاً.',
+    en: 'Sold by pre-order through the routes this product offers, with no quantity limit and no stock tracked. Enable pre-order first; a direct sale needs a recorded stock.',
+    ckb: 'بە پێشداواکردن لە ڕێگەی ئەو ڕێگایانەی گواستنەوە کە ئەم بەرهەمە پێشکەشی دەکات دەفرۆشرێت، بەبێ سنووری بڕ و بەبێ بەدواداچوونی کۆگا. سەرەتا پێشداواکردن چالاک بکە؛ فرۆشتنی ڕاستەوخۆ پێویستی بە کۆگای تۆمارکراو هەیە.',
   },
   confirm: { ar: 'اعتمد طريقة المخزون', en: 'Confirm the stock mode', ckb: 'شێوازی کۆگا پەسەند بکە' },
   saveFirst: {

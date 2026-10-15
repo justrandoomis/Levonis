@@ -743,3 +743,27 @@ export function sectionOf(details: unknown): 3 | 5 | null {
   const s = details && typeof details === 'object' ? (details as Record<string, unknown>).section : null;
   return s === 3 || s === 5 ? s : null;
 }
+
+/**
+ * A CONTENT SAVE OF A VISIBLE, UNPRICED PRODUCT (catalog-only, DECISIONS rows
+ * 239–240; Bambu import spec §B.10): the product is stored ACTIVE, has no V2
+ * method yet, is saved ACTIVE again («نشر») and no price was typed. Such a save
+ * publishes nothing — the product stays visible and unpriced — so it sends no
+ * `pricing_v2` block and the server takes its structure-only save. With a block
+ * (the prefilled method alone) the server read it as publishing a price and
+ * refused it (409 PRICING_V2_PRICE_MISSING), so the only save that landed was
+ * «مسودة», which takes the product off the storefront: every translation fix
+ * and every stock entry of the imported catalogue went through hiding it. A
+ * hidden or draft product saved «نشر» keeps today's rule (its publish is
+ * refused until it is priced); a typed price, or the review sheet's answer,
+ * always travels.
+ */
+export function isContentOnlySave(o: {
+  status: 'draft' | 'active';
+  storedStatus: string;
+  needsMethod: boolean;
+  touched: boolean;
+  confirming: boolean;
+}): boolean {
+  return o.status === 'active' && o.storedStatus === 'active' && o.needsMethod && !o.touched && !o.confirming;
+}

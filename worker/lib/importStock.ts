@@ -13,7 +13,12 @@
  *   - «تتبّع الكمية» / tracked: every row the product's `inventory_mode` makes
  *     authoritative carries a stock number (one may be 0), else 400
  *     IMPORT_STOCK_TRACKED_EMPTY;
- *   - «بلا تتبّع (حسب الطلب)» / untracked: an explicit "to order, no limit".
+ *   - «بلا تتبّع (حسب الطلب)» / untracked: an explicit "to order, no limit" —
+ *     by pre-order, the one way an untracked product sells: a direct sale
+ *     needs a recorded stock (worker/routes/products.ts `directUsable` fails
+ *     closed on NULL), so the choice is refused (400
+ *     IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER) while the product offers no
+ *     pre-order: it would publish a price no customer can order.
  * A merged product keeps 'not_required' (its stock is the owner's existing
  * setup) and is never gated; a product with no source row is never gated.
  *
@@ -36,8 +41,8 @@
  * failed: ops_guards.ok» — no other statement in the codebase writes a NULL
  * there — and the batch's own failure names the reason: 409
  * IMPORT_STOCK_NOT_CONFIGURED. Otherwise it inserts nothing, so there is no
- * row to remove: ONE statement per batch (the quarter-hour repricing pays it
- * per product, tests/fxRepricing.test.ts).
+ * row to remove: ONE statement per publish batch (the quarter-hour repricing
+ * and the rate preview lay none: see below).
  *
  * DEPLOY-AHEAD (CLAUDE.md rule 2). Everything here asks for migration 0194
  * first (worker/lib/catalogKnowledge.ts). Without it there is no fence, no
@@ -158,6 +163,27 @@ export const TRACKED_STOCK_SQL = `CASE (SELECT inventory_mode FROM products WHER
     AND NOT EXISTS (SELECT 1 FROM product_option_values v WHERE v.group_id = g.id AND v.active = 1 AND v.stock IS NULL))
   ELSE 0 END`;
 
+/**
+ * «بلا تتبّع» SELLS BY PRE-ORDER: the product offers one — its sale types name
+ * it, or one of its option values has an enabled pre-order cell (the two doors
+ * that derive `sale_types` can lag a cell, worker/routes/products.ts
+ * `saleAvailability`). Anonymous `?` only (two, each the product id), for
+ * `fence()`.
+ */
+export const PREORDER_OFFERED_SQL = `EXISTS (SELECT 1 FROM products p WHERE p.id = ? AND (p.sale_types LIKE '%"pre_order"%'
+  OR EXISTS (SELECT 1 FROM product_option_fulfillment f WHERE f.product_id = ? AND f.fulfillment_type = 'pre_order' AND f.enabled = 1)))`;
+export const preorderOfferedBinds = (productId: string): string[] => [productId, productId];
+
+/** Does the product offer a pre-order (the one way an untracked product sells)? */
+export async function preorderOffered(db: D1Database, productId: string): Promise<boolean> {
+  const row = await db.prepare(`SELECT (${PREORDER_OFFERED_SQL}) AS ok`).bind(...preorderOfferedBinds(productId)).first<{ ok: number | null }>();
+  return Number(row?.ok) === 1;
+}
+
+/** 400 IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER: enable pre-order first. Codes only. */
+export const untrackedNeedsPreorderRefusal = (): HttpError =>
+  new HttpError(400, serverMessage('IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER'), 'IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER', { section: 3, import_stock: 'untracked' });
+
 /** `TRACKED_STOCK_SQL`'s bound values. */
 export const trackedStockBinds = (productId: string): string[] => Array.from({ length: 7 }, () => productId);
 
@@ -222,13 +248,16 @@ export async function decideImportStock(
     return { import_stock: { decision: choice, decided_at: row.stock_decided_at || null }, unchanged: true };
   }
   if (choice === 'tracked' && !(await trackedStockReady(db, productId))) throw trackedEmptyRefusal();
+  if (choice === 'untracked' && !(await preorderOffered(db, productId))) throw untrackedNeedsPreorderRefusal();
   const audit = await auditStatements(db, actorId, 'product.import_stock_decision', productId, {
     product_id: productId,
     before,
     after: choice,
   });
+  // The condition again as a fence: a stock row emptied, or the pre-order switched off, since it was read.
+  const condition = choice === 'tracked' ? fence(db, TRACKED_STOCK_SQL, trackedStockBinds(productId)) : fence(db, PREORDER_OFFERED_SQL, preorderOfferedBinds(productId));
   const statements = [
-    ...(choice === 'tracked' ? fence(db, TRACKED_STOCK_SQL, trackedStockBinds(productId)) : []),
+    ...condition,
     db
       .prepare(
         `UPDATE product_source_refs SET stock_decision = ?, stock_decided_by = ?, stock_decided_at = ?, updated_at = ?
@@ -241,11 +270,11 @@ export async function decideImportStock(
   try {
     results = await db.batch(statements);
   } catch (e) {
-    // The only fence here is the stock check: a stock row emptied since it was read.
-    if (isFenceMiss(e)) throw trackedEmptyRefusal();
+    // The only fence here is the choice's condition: a stock row emptied, or the pre-order switched off, meanwhile.
+    if (isFenceMiss(e)) throw choice === 'tracked' ? trackedEmptyRefusal() : untrackedNeedsPreorderRefusal();
     throw e;
   }
-  const update = results[choice === 'tracked' ? 2 : 0];
+  const update = results[condition.length];
   if (Number(update?.meta?.changes ?? 0) === 0) {
     // Decided meanwhile by someone else (or the product went): answer what is stored now.
     const current = await loadImportStock(db, productId);

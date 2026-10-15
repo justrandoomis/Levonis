@@ -52,7 +52,7 @@ import StatusChipV2 from './form/v2/StatusChipV2';
 import ReviewSheetV2 from './form/v2/ReviewSheetV2';
 import ModelPriceSelector from './form/v2/ModelPriceSelector';
 import ColourPriceSelector, { ColourBulkBar } from './form/v2/ColourPriceSelector';
-import { comboKeyOf, docWithoutLegacyMoney, iqdText, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
+import { comboKeyOf, docWithoutLegacyMoney, iqdText, isContentOnlySave, lineWithOption, lowestPrice, previewOf, sectionOf as refusalSection, skuLines, withoutLegacyMoney, type V2LiveIds } from './form/v2/v2Model';
 import { headerStatusText, v2Strings } from './form/v2/v2Strings';
 import { emptyDimensions } from '../../lib/productTypes';
 import type { BrandV2, CatalogV2 } from '../../lib/productTypes';
@@ -215,6 +215,8 @@ export default function ProductForm({
   const [rel, setRel] = useState<RelationsState>(() => emptyRelations());
   const [baseline, setBaseline] = useState('');
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState('');
+  /** The status the server holds (not the editor's): a content save keeps an active product active (`isContentOnlySave`). */
+  const [storedStatus, setStoredStatus] = useState('');
   const columnRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(!!productId);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -384,6 +386,7 @@ export default function ProductForm({
     // Both answers, never the first one alone (see `relationsCarryCost`).
     setCostLoaded(carriesCost(p.product) && relationsCarryCost(r));
     setLoadedUpdatedAt(p.product.updated_at ?? '');
+    setStoredStatus(String(p.product.status ?? ''));
     setBaseline(JSON.stringify({ d, rs }));
     setImportStock(p.import_stock ?? null);
     setImportStockDone(false);
@@ -815,8 +818,11 @@ export default function ProductForm({
     setSaving(true);
     setSaveErr(null);
     setSaveNote(null);
-    // The prices as typed now (and the review sheet's answer): they travel with the product.
-    const pricingBlock = v2.saveBlock(status, confirm);
+    // The prices as typed now (and the review sheet's answer): they travel with the product. A content save of
+    // a visible, unpriced product sends none (`isContentOnlySave`): it stays visible and unpriced.
+    const pricingBlock = isContentOnlySave({ status, storedStatus, needsMethod: v2.needsMethod, touched: v2.touched, confirming: !!confirm })
+      ? null
+      : v2.saveBlock(status, confirm);
     try {
       // The document WITHOUT its derived copies of the structure: `options`,
       // `colors` and `media` have no editor here, and the server rebuilds the
@@ -877,6 +883,7 @@ export default function ProductForm({
       // The echo and the structure read-back are two answers too.
       if (res.product) setCostLoaded(carriesCost(res.product) && relationsCarryCost(fresh));
       setLoadedUpdatedAt(res.product?.updated_at ?? loadedUpdatedAt);
+      setStoredStatus(String(res.product?.status ?? status));
       // The baseline is what the SERVER now holds — document and structure —
       // so the form is clean after a save instead of showing the read-back's
       // own normalisation (sort numbers, derived stock level) as unsaved work.
@@ -2067,8 +2074,8 @@ export default function ProductForm({
               </span>
             ) : stockMissing ? (
               // The price of an imported product waits for its stock mode (§B.10): said before the refusal is met,
-              // with the way to the card. «نشر» stays: a save that publishes no price (a description, a translation)
-              // is never refused, and «مسودة» would take the product off the storefront.
+              // with the way to the card. «نشر» stays: a content save of the visible, unpriced product sends no
+              // price (`isContentOnlySave`) and lands, where «مسودة» would take it off the storefront.
               <button
                 type="button"
                 className="text-amber-300 underline underline-offset-2 text-start"

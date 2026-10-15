@@ -473,7 +473,7 @@ test('the alias read rides inside the catch-up: a catch-up tick sends the 0194 p
   const catchUp = t.log.slice(t.own, t.jobs);
   const probes = t.log.flatMap((sql, i) => (ALIAS_PROBE.test(sql) ? [i] : []));
   const reads = t.log.flatMap((sql, i) => (ALIAS_READ.test(sql) ? [i] : []));
-  assert.equal(probes.length, 1, 'the presence probe once a tick (a fresh binding each tick here; once per isolate live)');
+  assert.equal(probes.length, 1, 'the presence probe once a tick (live, too: worker/index.ts wraps a fresh counting binding every tick)');
   assert.equal(reads.length, 1, 'ONE alias read: a pass selects 50 products, one statement per 90');
   assert.ok([...probes, ...reads].every((i) => i >= t.own && i < t.jobs), 'both inside the catch-up, before the sweep');
   assert.equal(catchUp.filter((sql) => ALIAS_PROBE.test(sql) || ALIAS_READ.test(sql)).length, 2);
