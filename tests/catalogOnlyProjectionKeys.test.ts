@@ -16,8 +16,10 @@
  *
  * The world: the catalog-only H2D (tests/fixtures/catalogOnly.ts) with a
  * picture bound to a value, one to a colour and one to a variant, a colour
- * linked to a value, and its group carrying the 0194 columns (added here with
- * the migration's own definitions, so the loader's `SELECT *` returns them).
+ * linked to a value, and its group carrying the 0194 columns (0194 is in the
+ * migrations the fixture applies; on a schema cut before it they are added here
+ * with the migration's own definitions, so the loader's `SELECT *` returns them
+ * either way).
  *
  * Run: node --import tsx --test tests/catalogOnlyProjectionKeys.test.ts
  */
@@ -45,13 +47,19 @@ function world(): Promise<CatalogOnlyWorld> {
     ins.run(COLOR_IMAGE.id, CAT.id, COLOR_IMAGE.url, COLOR_IMAGE.url.slice('/files/'.length), 2, null, CAT_SEL.white, null);
     ins.run(VARIANT_IMAGE.id, CAT.id, VARIANT_IMAGE.url, VARIANT_IMAGE.url.slice('/files/'.length), 3, null, null, 'pv_cat_1');
     w.raw.prepare('INSERT INTO product_color_option_links (color_id, option_value_id, group_id) VALUES (?, ?, ?)').run(CAT_SEL.grey, CAT_SEL.std, 'g_cat_model');
-    // 0194 (import spec §B.2 (1)), the four group columns exactly as the migration adds them.
+    // 0194 (import spec §B.2 (1)), the four group columns exactly as the migration adds them —
+    // only when the applied migrations predate it (with 0194 in migrations/ they already exist).
+    const has0194 = (w.raw.prepare('PRAGMA table_info(product_option_groups)').all() as Array<{ name: string }>).some((c) => c.name === 'name_ar');
+    if (!has0194) {
+      w.raw.exec(`
+        ALTER TABLE product_option_groups ADD COLUMN name_ar TEXT NOT NULL DEFAULT '';
+        ALTER TABLE product_option_groups ADD COLUMN name_ckb TEXT NOT NULL DEFAULT '';
+        ALTER TABLE product_option_groups ADD COLUMN kind TEXT NOT NULL DEFAULT ''
+          CHECK (kind IN ('','color','spool','printer','version','size','nozzle','plate','units','pack','item','other'));
+        ALTER TABLE product_option_groups ADD COLUMN default_value_id TEXT NOT NULL DEFAULT '';
+      `);
+    }
     w.raw.exec(`
-      ALTER TABLE product_option_groups ADD COLUMN name_ar TEXT NOT NULL DEFAULT '';
-      ALTER TABLE product_option_groups ADD COLUMN name_ckb TEXT NOT NULL DEFAULT '';
-      ALTER TABLE product_option_groups ADD COLUMN kind TEXT NOT NULL DEFAULT ''
-        CHECK (kind IN ('','color','spool','printer','version','size','nozzle','plate','units','pack','item','other'));
-      ALTER TABLE product_option_groups ADD COLUMN default_value_id TEXT NOT NULL DEFAULT '';
       UPDATE product_option_groups SET name_ar = 'الطراز', name_ckb = 'مۆدێل', kind = 'version', default_value_id = '${CAT_SEL.combo}'
        WHERE id = 'g_cat_model';
     `);
