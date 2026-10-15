@@ -543,7 +543,19 @@ test('P2 review: an admin product write and a benefit rule purge the listing, th
     });
     assert.equal(rule.status, 200, await rule.text());
     assert.deepEqual([...cache.store.keys()].sort(), [withCacheEpoch('https://localhost/api/settings/public'), withCacheEpoch(`https://localhost/api/products/${slug}`)].sort());
-    assert.deepEqual(cataloguePaths(['a', '']), ['/api/home', '/api/home/sections', '/api/products', '/api/products/a']);
+    // A shown product with no price (DECISIONS row 240): every price-state flip drops the public API's copies and
+    // the sitemap as well — the admin V2 write, FX-5 and the cron's completeness flip all purge through this list.
+    assert.deepEqual(cataloguePaths(['a', '', 'b c']), [
+      '/api/home',
+      '/api/home/sections',
+      '/api/products',
+      '/api/products/a',
+      '/api/products/b c',
+      '/api/public/v1/products',
+      '/api/public/v1/products/a',
+      '/api/public/v1/products/b%20c',
+      '/sitemap.xml',
+    ]);
   });
 });
 

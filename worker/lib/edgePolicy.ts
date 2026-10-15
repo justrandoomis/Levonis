@@ -319,9 +319,23 @@ export function storefrontDocumentPaths(slug: string, id?: string): string[] {
   return out;
 }
 
-/** The apex answers a catalogue or pricing write changes: the first screen, the shelves, the listing, and the product pages named. */
+/**
+ * The apex answers a catalogue or pricing write changes: the first screen, the shelves, the listing, and the
+ * product pages named — and, since a product with no price yet is SHOWN (DECISIONS row 240), the public API's
+ * list and its pages named and the sitemap, so every price-state flip (a V2 write, FX-5, a completeness flip in
+ * either direction) drops their copies too.
+ */
 export function cataloguePaths(slugs: readonly string[] = []): string[] {
-  return ['/api/home', '/api/home/sections', '/api/products', ...slugs.filter(Boolean).map((s) => `/api/products/${s}`)];
+  const named = slugs.filter(Boolean);
+  return [
+    '/api/home',
+    '/api/home/sections',
+    '/api/products',
+    ...named.map((s) => `/api/products/${s}`),
+    '/api/public/v1/products',
+    ...named.map((s) => `/api/public/v1/products/${encodeURIComponent(s)}`),
+    '/sitemap.xml',
+  ];
 }
 
 // ------------------------------------------------------------- the seams

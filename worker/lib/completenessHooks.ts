@@ -18,8 +18,7 @@
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import type { AppContext } from './types';
-import { afterCatalogueWrite, originOf, purgeAnonymousCache } from './edgePolicy';
-import { rootDomainFrom } from './hosts';
+import { afterCatalogueWrite } from './edgePolicy';
 import { recomputeMany } from './productCompleteness';
 import { completenessInstalled } from './listing';
 
@@ -59,13 +58,8 @@ async function touchedIds(c: Context<AppContext>): Promise<string[]> {
  * effort per colo, like every seam: elsewhere they age out within `s-maxage`.
  */
 export async function purgeVisibility(c: Context<AppContext>, slugs: readonly string[]): Promise<void> {
-  const named = [...new Set(slugs.filter(Boolean))];
-  await afterCatalogueWrite(c, named);
-  const origins = new Set<string>([originOf(c)]);
-  const root = rootDomainFrom(c.env);
-  if (root) origins.add(`https://${root}`);
-  const paths = ['/sitemap.xml', '/api/public/v1/products', ...named.map((s) => `/api/public/v1/products/${encodeURIComponent(s)}`)];
-  await Promise.all([...origins].map((o) => purgeAnonymousCache(o, paths)));
+  // The catalogue paths carry the public API's copies and the sitemap (worker/lib/edgePolicy.ts `cataloguePaths`).
+  await afterCatalogueWrite(c, [...new Set(slugs.filter(Boolean))]);
 }
 
 /**
