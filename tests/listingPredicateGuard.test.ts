@@ -235,9 +235,11 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/seo.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/routes/stockAlerts.ts': { visible: 2, sellable: 0, states: 0 },
   'worker/routes/support.ts': { visible: 4, sellable: 5, states: 0 },
-  // «طلب السعر» (migration 0193): the request door asks VISIBLE (and the flag); the sweep asks each product's state.
-  'worker/routes/priceRequests.ts': { visible: 1, sellable: 1, states: 0 },
-  'worker/lib/priceRequests.ts': { visible: 0, sellable: 0, states: 1 },
+  // «طلب السعر» (migration 0193): the request door's validation (`validatePriceRequestSelection`, shared with the
+  // Bambu import's /complete, its spec §K.1 D-5) asks VISIBLE and the SELLABLE flag; the sweep asks each
+  // product's state. The door itself (worker/routes/priceRequests.ts) asks neither.
+  'worker/routes/priceRequests.ts': { visible: 0, sellable: 0, states: 0 },
+  'worker/lib/priceRequests.ts': { visible: 1, sellable: 1, states: 1 },
 };
 
 /** Every .ts under worker/, relative to the repository root. */

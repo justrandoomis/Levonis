@@ -42,11 +42,12 @@ import {
 } from '@levonis/contracts/priceRequests';
 import type { Env } from './types';
 import type { ProductDoc } from './productModel';
-import { applyRelations, loadRelationsViews } from './productOverlay';
+import { applyRelations, loadRelationsView, loadRelationsViews } from './productOverlay';
 import { parseProductRow } from './productModel';
 import { unitNamesOf } from './pricingEngine/legacy';
 import { listing } from './listing';
-import { skuPriced } from './commercialState';
+import { checkSelection, skuPriced } from './commercialState';
+import { quoteOptionValueIds } from '../routes/products';
 import { notifyStatement } from './notifications';
 import { planNotifyCustomer, reachForMany, type CustomerMessage, type CustomerReach } from './customerNotify';
 import { channelsLive } from './channelReadiness';
@@ -100,6 +101,79 @@ ON CONFLICT(product_id) DO UPDATE SET requesters = excluded.requesters, selectio
 
 export const statsRecompute = (db: D1Database, productId: string, now: string): D1PreparedStatement =>
   db.prepare(STATS_SQL).bind(productId, now);
+
+// ------------------------------------------------------------- the selection, validated
+
+/** What a request asks about, as the door receives it: the option values and colour chosen (none: the product itself). */
+export interface PriceRequestSelectionInput {
+  option_value_ids?: readonly unknown[] | null;
+  color_id?: unknown;
+}
+
+/** The longest id a selection may name (the door's own bound). */
+const SELECTION_ID_MAX = 60;
+
+export type PriceRequestSelectionVerdict =
+  | { ok: true; product_id: string; key: string; option_value_ids: string[]; color_id: string | null; sellable: boolean }
+  /** Not VISIBLE: an invented id, a draft and a product hidden for a catalogue gap answer the same. */
+  | { ok: false; status: 404; code: 'PRODUCT_NOT_FOUND' }
+  | { ok: false; status: 400; code: 'PRICE_REQUEST_SELECTION_INVALID' | 'PRICE_REQUEST_SELECTION_REQUIRED' }
+  | { ok: false; status: 409; code: 'PRICE_REQUEST_ALREADY_PRICED'; key: string };
+
+/**
+ * IS THIS A SELECTION A CUSTOMER MAY ASK THE PRICE OF? (DECISIONS row 240; spec
+ * §4.3 steps 3–6; the Bambu import spec §K.1 D-5.) The pure validation of
+ * `POST /api/price-requests`, shared by the door and by the import's
+ * `/complete`, which checks each product's default selection the same way:
+ *
+ *   3. the product is VISIBLE (an ordinary product, not a composition) — else
+ *      404, the same for an invented id, a draft and a hidden product;
+ *   4. its document and relations are loaded;
+ *   5. the selection is parsed with the quote's own parser and checked against
+ *      the product's real options, colours and SKUs: a required group or
+ *      colour missing is SELECTION_REQUIRED, anything else that is not one of
+ *      its SKUs (another product's value, a retired colour, a colour not sold
+ *      with that model, a merged value, a non-text id) SELECTION_INVALID;
+ *   6. a sellable product whose SKU has a price is ALREADY_PRICED.
+ *
+ * READS ONLY: no row is created, no counter moves, and the 0193 tables are
+ * not touched (a database without them validates the same).
+ */
+export async function validatePriceRequestSelection(
+  db: D1Database,
+  productId: string,
+  selection: PriceRequestSelectionInput = {}
+): Promise<PriceRequestSelectionVerdict> {
+  const invalid = { ok: false, status: 400, code: 'PRICE_REQUEST_SELECTION_INVALID' } as const;
+  const raw = selection.option_value_ids;
+  const values = Array.isArray(raw)
+    ? raw.filter((v): v is string => typeof v === 'string' && v.length > 0 && v.length <= SELECTION_ID_MAX)
+    : [];
+  if (Array.isArray(raw) && values.length !== raw.length) return invalid;
+  const colorRaw = selection.color_id;
+  if (colorRaw !== undefined && colorRaw !== null && typeof colorRaw !== 'string') return invalid;
+  const color = typeof colorRaw === 'string' ? colorRaw.trim() : '';
+  if (color.length > SELECTION_ID_MAX) return invalid;
+
+  // 3. VISIBLE only, with the SELLABLE flag in the same read.
+  const L = await listing(db);
+  const row = await db
+    .prepare(`SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE id = ? AND ${L.visible('products')} AND composition = ''`)
+    .bind(productId)
+    .first<Record<string, unknown>>();
+  if (!row) return { ok: false, status: 404, code: 'PRODUCT_NOT_FOUND' };
+
+  // 4–5. The selection, checked on the server against the product's real options, colours and combinations.
+  const view = await loadRelationsView(db, productId, row.inventory_mode);
+  const doc = applyRelations(parseProductRow(row), view);
+  const checked = checkSelection(doc, view, quoteOptionValueIds(values, null, view), color || null);
+  if (!checked.ok) return { ok: false, status: 400, code: checked.code };
+
+  // 6. Already priced and sellable: there is nothing to ask — the page refreshes and sells it.
+  const sellable = Number(row.sellable_now) === 1;
+  if (sellable && skuPriced(doc, checked.key)) return { ok: false, status: 409, code: 'PRICE_REQUEST_ALREADY_PRICED', key: checked.key };
+  return { ok: true, product_id: productId, key: checked.key, option_value_ids: checked.optionValueIds, color_id: checked.colorId, sellable };
+}
 
 // ------------------------------------------------------------- the selection's words
 

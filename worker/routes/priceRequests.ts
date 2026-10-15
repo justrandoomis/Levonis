@@ -23,12 +23,13 @@ import { SESSION_CACHE_CONTROL } from '../lib/edgePolicy';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { PRICE_REQUEST_LIMITS } from '@levonis/contracts/priceRequests';
 import { fence, isFenceMiss } from '../lib/operations';
-import { listing } from '../lib/listing';
-import { parseProductRow } from '../lib/productModel';
-import { applyRelations, loadRelationsView } from '../lib/productOverlay';
-import { checkSelection, skuPriced } from '../lib/commercialState';
-import { isMissingPriceRequestTable, priceRequestsInstalled, rememberPriceRequestsPresent, statsRecompute } from '../lib/priceRequests';
-import { quoteOptionValueIds } from './products';
+import {
+  isMissingPriceRequestTable,
+  priceRequestsInstalled,
+  rememberPriceRequestsPresent,
+  statsRecompute,
+  validatePriceRequestSelection,
+} from '../lib/priceRequests';
 
 export const priceRequestRoutes = new Hono<AppContext>();
 // First, so the 401 of a signed-out caller and every refusal carry it too.
@@ -103,23 +104,16 @@ priceRequestRoutes.post('/', async (c) => {
   if (Array.isArray(body.option_value_ids) && rawValues.length !== body.option_value_ids.length) throw refusal(400, 'PRICE_REQUEST_SELECTION_INVALID');
 
   const db = c.env.DB;
-  // VISIBLE only: an invented id and a hidden product answer the same 404 (a request never confirms a draft exists).
-  const L = await listing(db);
-  const row = await db
-    .prepare(`SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products WHERE id = ? AND ${L.visible('products')} AND composition = ''`)
-    .bind(productId)
-    .first<Record<string, unknown>>();
-  if (!row) throw notFound('Product not found');
-
-  // The selection, checked on the server against the product's real options, colours and combinations.
-  const view = await loadRelationsView(db, productId, row.inventory_mode);
-  const doc = applyRelations(parseProductRow(row), view);
-  const valueIds = quoteOptionValueIds(rawValues, null, view);
-  const checked = checkSelection(doc, view, valueIds, rawColor);
-  if (!checked.ok) throw refusal(400, checked.code);
-  const key = checked.key;
-  // Already priced and sellable: there is nothing to ask — the page refreshes and sells it.
-  if (Number(row.sellable_now) === 1 && skuPriced(doc, key)) throw refusal(409, 'PRICE_REQUEST_ALREADY_PRICED', { selection: key });
+  // Steps 3–6, the one validation the import's `/complete` runs too (worker/lib/priceRequests.ts): VISIBLE only
+  // (an invented id and a hidden product answer the same 404 — a request never confirms a draft exists), the
+  // selection checked against the product's real options, colours and SKUs, and nothing to ask when priced.
+  const verdict = await validatePriceRequestSelection(db, productId, { option_value_ids: rawValues, color_id: rawColor });
+  if (!verdict.ok) {
+    if (verdict.status === 404) throw notFound('Product not found');
+    if (verdict.status === 409) throw refusal(409, verdict.code, { selection: verdict.key });
+    throw refusal(400, verdict.code);
+  }
+  const key = verdict.key;
 
   return guarded(async () => {
     const before = await db
