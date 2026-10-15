@@ -16,9 +16,30 @@
  *       is switched off, and the buffer is overwritten once sealed. The log
  *       carries row counts and migration names, never a row.
  *   node scripts/bambu-import/cf.mjs revoke --run <cir_ + 24 hex>
+ *   node scripts/bambu-import/cf.mjs revoke --run-file <file the open/mint step wrote>
  *       The kill switch (§A.3): `token_sha256 = ''` on that run, so every ops
  *       path answers 404. Until migration 0195 is live there is no
- *       catalog_import_runs table and no token: a notice, and exit 0.
+ *       catalog_import_runs table and no token: a notice, and exit 0. With
+ *       --run-file (the always() step after a mode that minted a token): no
+ *       file means no token was minted in this job — a notice, and exit 0.
+ *   node scripts/bambu-import/cf.mjs preflight --mode <mode> --run <run id or ''>
+ *       Every job that writes starts here (§A.1, §K.2 step 11): the live
+ *       migration count and last name equal the repository's, the 0195 table
+ *       exists, and the Time Travel bookmark (the restore point) is printed. For
+ *       preflight and open: no active run; for preflight also no CSV import
+ *       lease. For run, close and withdraw: the run exists and is active.
+ *   node scripts/bambu-import/cf.mjs open --token-file <file> --run-file <file>
+ *       Creates the run row (`cir_` + 24 hex, state open, the reviewed bundle's
+ *       digest, the manifest size, the commit) with a fresh 256-bit token:
+ *       the token goes to a 0600 file only the importer step reads, and only
+ *       its SHA-256 is stored. The run id goes to its own file.
+ *   node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --token-file <file> --run-file <file>
+ *       A fresh per-job token for an active run (run, close, withdraw): the
+ *       same 0600 file, the hash and its expiry on the run row.
+ *   node scripts/bambu-import/cf.mjs report --run <cir_ + 24 hex> --seal <public key> --out <dir>
+ *       The run's ledger read from D1 (§H.3: items, states, codes, counts,
+ *       public URLs, the Worker's checks next to the runner's evidence), sealed
+ *       in memory to report.sealed. The log carries counts by state only.
  *
  * THE TARGET IS FIXED: levonis-db-staging, the live database behind
  * levonis-iq.com (the "-staging" names are historical, docs/WORKERS.md), and
@@ -36,10 +57,10 @@
  * Exit codes: 0 done, 1 refused or failed, 2 usage.
  */
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parsePublicKey, sealBuffer } from './seal.mjs';
 
@@ -50,6 +71,24 @@ export const RUN_ID_PATTERN = /^cir_[0-9a-f]{24}$/;
 export const SNAPSHOT_SQL = fileURLToPath(new URL('./snapshot.sql', import.meta.url));
 export const SNAPSHOT_FILE = 'snapshot.sealed';
 export const SNAPSHOT_FORMAT = 'levonis-bambu-snapshot/1';
+export const REPORT_FILE = 'report.sealed';
+export const REPORT_FORMAT = 'levonis-bambu-report/1';
+/** The modes workflow 60 runs cf.mjs preflight for. */
+export const PREFLIGHT_MODES = ['preflight', 'open', 'run', 'close', 'withdraw'];
+/** The reviewed files the Worker bundles (scripts/bambu-import/discover.ts REVIEWED_FILES, §A.3). */
+export const REVIEWED_FILES = [
+  'manifest.json',
+  'taxonomy-map.json',
+  'existing-matches.json',
+  'compat-targets.json',
+  'identity-map.json',
+  'media-overrides.json',
+  'search-synonyms.json',
+  'curated/index.json',
+];
+const BOOKMARK_PATTERN = /[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}/;
+/** A job token outlives the 330-minute deadline by the 20 minutes left to the job's 350-minute timeout, never more. */
+const TOKEN_TAIL_MS = 20 * 60_000;
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -62,7 +101,11 @@ export class CfError extends Error {}
 
 const USAGE = [
   'usage: node scripts/bambu-import/cf.mjs snapshot --seal <public key> --out <dir>',
-  '       node scripts/bambu-import/cf.mjs revoke --run <cir_ + 24 hex>',
+  '       node scripts/bambu-import/cf.mjs revoke --run <cir_ + 24 hex> | --run-file <file>',
+  '       node scripts/bambu-import/cf.mjs preflight --mode <mode> --run <cir_ + 24 hex or empty>',
+  '       node scripts/bambu-import/cf.mjs open --token-file <file> --run-file <file>',
+  '       node scripts/bambu-import/cf.mjs mint --run <cir_ + 24 hex> --token-file <file> --run-file <file>',
+  '       node scripts/bambu-import/cf.mjs report --run <cir_ + 24 hex> --seal <public key> --out <dir>',
 ].join('\n');
 
 /**
@@ -148,19 +191,46 @@ export function parseArgs(argv) {
     }
     return seen;
   };
-  if (mode === 'snapshot') {
-    const given = options(['--seal', '--out']);
+  const runOf = (value, what = mode) => {
+    if (!RUN_ID_PATTERN.test(value ?? '')) throw new CfError(`${what}: --run must be cir_ followed by 24 lowercase hex characters`);
+    return value;
+  };
+  const fileOf = (value, flag) => {
+    if (!value || value.startsWith('-') || /[\0\n]/.test(value)) throw new CfError(`${mode}: ${flag} needs a file path`);
+    return resolve(value);
+  };
+  if (mode === 'snapshot' || mode === 'report') {
+    const given = options(mode === 'snapshot' ? ['--seal', '--out'] : ['--run', '--seal', '--out']);
     parsePublicKey(given['--seal']);
-    if (!given['--out'] || given['--out'].startsWith('-')) throw new CfError('snapshot: --out needs a directory');
-    return { mode, publicKey: given['--seal'], outDir: resolve(given['--out']) };
+    if (!given['--out'] || given['--out'].startsWith('-')) throw new CfError(`${mode}: --out needs a directory`);
+    return { mode, publicKey: given['--seal'], outDir: resolve(given['--out']), ...(mode === 'report' ? { runId: runOf(given['--run']) } : {}) };
   }
   if (mode === 'revoke') {
+    if (rest[0] === '--run-file') {
+      const given = options(['--run-file']);
+      return { mode, runFile: fileOf(given['--run-file'], '--run-file') };
+    }
     const given = options(['--run']);
     if (!RUN_ID_PATTERN.test(given['--run'] ?? '')) throw new CfError('revoke: --run must be cir_ followed by 24 lowercase hex characters');
     return { mode, runId: given['--run'] };
   }
-  if (['preflight', 'mint'].includes(mode)) throw new CfError(`${mode} is not yet built (import spec §K.2 step 8)`);
-  throw new CfError('the first argument is snapshot or revoke');
+  if (mode === 'preflight') {
+    const given = options(['--mode', '--run']);
+    if (!PREFLIGHT_MODES.includes(given['--mode'])) throw new CfError(`preflight: --mode must be one of ${PREFLIGHT_MODES.join(', ')}`);
+    const needsRun = ['run', 'close', 'withdraw'].includes(given['--mode']);
+    if (needsRun) runOf(given['--run'], `preflight for ${given['--mode']}`);
+    else if (given['--run'] !== '' && !RUN_ID_PATTERN.test(given['--run'] ?? '')) throw new CfError('preflight: --run is a run id or empty');
+    return { mode, forMode: given['--mode'], runId: given['--run'] };
+  }
+  if (mode === 'open') {
+    const given = options(['--token-file', '--run-file']);
+    return { mode, tokenFile: fileOf(given['--token-file'], '--token-file'), runFile: fileOf(given['--run-file'], '--run-file') };
+  }
+  if (mode === 'mint') {
+    const given = options(['--run', '--token-file', '--run-file']);
+    return { mode, runId: runOf(given['--run']), tokenFile: fileOf(given['--token-file'], '--token-file'), runFile: fileOf(given['--run-file'], '--run-file') };
+  }
+  throw new CfError('the first argument is snapshot, revoke, preflight, open, mint or report');
 }
 
 function parseDeadline(value) {
@@ -209,7 +279,7 @@ function wranglerReason(result, secrets) {
   return scrub(line.replace(/^.*?\[ERROR\]\s*/, ''), secrets);
 }
 
-function wrangler(context, args) {
+function wrangler(context, args, { raw = false } = {}) {
   const left = context.deadline === null ? CALL_LIMIT_MS : context.deadline - DEADLINE_MARGIN_MS - Date.now();
   if (left <= 0) throw new CfError('the job deadline leaves no time for another Cloudflare call');
   const result = spawnSync('npx', ['--no-install', 'wrangler', ...args, '--config', context.config], {
@@ -225,6 +295,7 @@ function wrangler(context, args) {
   if (result.status !== 0) {
     throw new CfError(`${what} failed (exit ${result.status ?? result.signal}): ${wranglerReason(result, context.secrets)}`);
   }
+  if (raw) return `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
   try {
     return JSON.parse(result.stdout);
   } catch {
@@ -336,6 +407,215 @@ export function revoke(context, { runId }) {
   return 0;
 }
 
+/** Revoke through the run-id file a mint/open step wrote; no file means no token was minted in this job. */
+export function revokeFromFile(context, { runFile }) {
+  if (!existsSync(runFile)) {
+    context.log('::notice::no run id file: this job minted no token, so there is nothing to revoke.');
+    return 0;
+  }
+  const runId = readFileSync(runFile, 'utf8').trim();
+  if (!RUN_ID_PATTERN.test(runId)) throw new CfError('revoke: the run id file does not hold a run id');
+  return revoke(context, { runId });
+}
+
+const iso = (ms) => new Date(ms).toISOString();
+const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/** The repository's migrations: the count and the last name the live database must report. */
+export function repoMigrations(root = ROOT) {
+  const names = readdirSync(join(root, 'migrations')).filter((name) => /^\d{4}_[A-Za-z0-9_-]+\.sql$/.test(name)).sort();
+  return { count: names.length, last: names.at(-1) ?? '' };
+}
+
+/** The reviewed bundle's combined digest and manifest size (discover.ts bundleDigest; the Worker compares it). */
+export function reviewedBundle(root = ROOT, dataDir = '') {
+  const dir = dataDir ? resolve(root, dataDir) : join(root, 'data', 'bambu-import');
+  const sums = {};
+  for (const file of REVIEWED_FILES) {
+    const path = join(dir, file);
+    if (!existsSync(path)) throw new CfError(`the reviewed file data/bambu-import/${file} is missing`);
+    sums[file] = createHash('sha256').update(readFileSync(path)).digest('hex');
+  }
+  const digest = createHash('sha256')
+    .update(Object.keys(sums).sort().map((file) => `${file} ${sums[file]}\n`).join(''))
+    .digest('hex');
+  let rows = 0;
+  try {
+    const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
+    rows = Array.isArray(manifest?.rows) ? manifest.rows.length : Array.isArray(manifest) ? manifest.length : 0;
+  } catch {
+    throw new CfError('data/bambu-import/manifest.json is not JSON');
+  }
+  return { digest, rows };
+}
+
+function tableExists(context, name) {
+  return Number(query(context, `SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = '${name}'`).results[0]?.n) === 1;
+}
+
+/** The restore point (§1 row 18): the Time Travel bookmark at this moment, printed and in the summary. */
+function bookmark(context) {
+  const text = wrangler(context, ['d1', 'time-travel', 'info', DATABASE], { raw: true });
+  const found = BOOKMARK_PATTERN.exec(text);
+  if (!found) throw new CfError('no Time Travel bookmark was returned: refusing to write the live database without a restore point');
+  return found[0];
+}
+
+export function preflight(context, { forMode, runId }) {
+  resolveDatabase(context);
+  const migrations = query(context, 'SELECT COUNT(*) AS n, (SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1) AS last FROM d1_migrations').results[0] ?? {};
+  const repo = repoMigrations();
+  const count = Number(migrations.n);
+  const last = String(migrations.last ?? '');
+  context.log(`preflight: migrations applied: ${count}; last ${/^\d{4}_[\w-]+\.sql$/.test(last) ? last : '?'}; the repository has ${repo.count}, the last ${repo.last}`);
+  if (count !== repo.count || last !== repo.last) throw new CfError('the live migrations are not the repository\'s: deploy through workflow 7 first');
+  if (!tableExists(context, 'catalog_import_runs')) throw new CfError('catalog_import_runs is not in the live database (migration 0195)');
+  const active = Number(query(context, "SELECT COUNT(*) AS n FROM catalog_import_runs WHERE state IN ('open','running','blocked')").results[0]?.n);
+  context.log(`preflight: active import runs: ${active}`);
+  if ((forMode === 'preflight' || forMode === 'open') && active !== 0) throw new CfError('an import run is already active');
+  let leases = 0;
+  if (forMode === 'preflight' && tableExists(context, 'product_imports')) {
+    leases = Number(query(context, "SELECT COUNT(*) AS n FROM product_imports WHERE apply_lease_until > strftime('%Y-%m-%dT%H:%M:%fZ','now')").results[0]?.n);
+    context.log(`preflight: CSV imports holding an apply lease: ${leases}`);
+    if (leases !== 0) throw new CfError('a CSV import is applying: wait for it');
+  }
+  if (['run', 'close', 'withdraw'].includes(forMode)) {
+    const run = query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND state IN ('open','running','blocked')`).results[0];
+    if (Number(run?.n) !== 1) throw new CfError(`run ${runId} is not an active import run`);
+    context.log(`preflight: run ${runId} is active`);
+  }
+  const bm = bookmark(context);
+  context.log(`preflight: Time Travel bookmark (restore point): ${bm}`);
+  summary(context.env, [
+    '## Bambu import: preflight and restore point',
+    '',
+    `Migrations applied: ${count}, the last \`${last}\`. Active import runs: ${active}.`,
+    `Time Travel bookmark: \`${bm}\``,
+    '```',
+    `wrangler d1 time-travel restore ${DATABASE} --bookmark ${bm}`,
+    '```',
+    '**استعادة نقطة الرجوع تمحو كل ما كُتب بعدها (طلبات، محافظ). الملاذ الأخير فقط؛ التراجع المضبوط هو §A.10.**',
+    'Restoring this bookmark erases everything written after it (orders, wallets). The last resort only; the controlled rollback is §A.10 of the import spec.',
+  ]);
+  return 0;
+}
+
+/** A fresh 256-bit token: the clear value to a 0600 file, its SHA-256 for the run row. */
+function newToken(tokenFile) {
+  const token = randomBytes(32).toString('hex');
+  mkdirSync(dirname(tokenFile), { recursive: true, mode: 0o700 });
+  writeFileSync(tokenFile, `${token}\n`, { mode: 0o600, flag: 'wx' });
+  const hash = createHash('sha256').update(token).digest('hex');
+  return hash;
+}
+
+function tokenExpiry(context) {
+  if (context.deadline === null) throw new CfError('DEADLINE_EPOCH is required to mint a token (it expires at the job end)');
+  const expires = iso(context.deadline + TOKEN_TAIL_MS);
+  if (!ISO_PATTERN.test(expires)) throw new CfError('the token expiry is malformed');
+  return expires;
+}
+
+function writeRunFile(runFile, runId) {
+  mkdirSync(dirname(runFile), { recursive: true, mode: 0o700 });
+  writeFileSync(runFile, `${runId}\n`, { mode: 0o600, flag: 'w' });
+}
+
+const githubRunOf = (env) => (/^\d{1,20}$/.test(env.GITHUB_RUN_ID ?? '') ? env.GITHUB_RUN_ID : '');
+const commitOf = (env) => (/^[0-9a-f]{40}$/.test(env.GITHUB_SHA ?? '') ? env.GITHUB_SHA : '');
+
+export function open(context, { tokenFile, runFile }) {
+  const expires = tokenExpiry(context);
+  // BAMBU_IMPORT_DATA_DIR exists for tests (a fixture bundle); workflow 60 never sets it.
+  const bundle = reviewedBundle(ROOT, context.env.BAMBU_IMPORT_DATA_DIR ?? '');
+  resolveDatabase(context);
+  if (!tableExists(context, 'catalog_import_runs')) throw new CfError('catalog_import_runs is not in the live database (migration 0195)');
+  const runId = `cir_${randomBytes(12).toString('hex')}`;
+  if (!RUN_ID_PATTERN.test(runId)) throw new CfError('the new run id is malformed');
+  // The run id file first: the always() revoke finds the run even if a later line fails.
+  writeRunFile(runFile, runId);
+  const hash = newToken(tokenFile);
+  try {
+    // Every value below is validated: the run id and digests are hex, the expiry ISO, the counts integers.
+    query(
+      context,
+      `INSERT INTO catalog_import_runs (id, source, state, token_sha256, token_expires_at, github_run_id, manifest_total, reviewed_bundle_sha256, code_commit) VALUES ('${runId}', 'bambu_us', 'open', '${hash}', '${expires}', '${githubRunOf(context.env)}', ${Number(bundle.rows) | 0}, '${bundle.digest}', '${commitOf(context.env)}')`
+    );
+    const check = query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND token_sha256 = '${hash}' AND state = 'open'`).results[0];
+    if (Number(check?.n) !== 1) throw new CfError('the new run was not stored');
+  } catch (failure) {
+    rmSync(tokenFile, { force: true });
+    throw failure;
+  }
+  context.log(`open: run ${runId} created (${bundle.rows} manifest rows); a job token was minted, only its hash is stored; it expires ${expires}`);
+  summary(context.env, ['## Bambu import: run opened', '', `Run \`${runId}\`: ${bundle.rows} manifest rows; reviewed bundle \`${bundle.digest}\`. The job token expires ${expires} and is revoked at the end of this job.`]);
+  return 0;
+}
+
+export function mint(context, { runId, tokenFile, runFile }) {
+  const expires = tokenExpiry(context);
+  resolveDatabase(context);
+  writeRunFile(runFile, runId);
+  const hash = newToken(tokenFile);
+  try {
+    query(
+      context,
+      `UPDATE catalog_import_runs SET token_sha256 = '${hash}', token_expires_at = '${expires}', github_run_id = '${githubRunOf(context.env)}' WHERE id = '${runId}' AND state IN ('open','running','blocked')`
+    );
+    const check = query(context, `SELECT COUNT(*) AS n FROM catalog_import_runs WHERE id = '${runId}' AND token_sha256 = '${hash}'`).results[0];
+    if (Number(check?.n) !== 1) throw new CfError(`run ${runId} is not an active import run: no token was stored`);
+  } catch (failure) {
+    rmSync(tokenFile, { force: true });
+    throw failure;
+  }
+  context.log(`mint: run ${runId}: a job token was minted, only its hash is stored; it expires ${expires}`);
+  return 0;
+}
+
+/** The run's ledger (§H.3) read from D1 and sealed in memory; the log carries counts by state only. */
+export function report(context, { runId, publicKey, outDir }) {
+  mkdirSync(outDir, { recursive: true, mode: 0o700 });
+  const target = join(outDir, REPORT_FILE);
+  if (existsSync(target) || existsSync(`${target}.partial`)) throw new CfError(`${REPORT_FILE} already exists in the output directory`);
+  resolveDatabase(context);
+  if (!tableExists(context, 'catalog_import_runs')) throw new CfError('catalog_import_runs is not in the live database (migration 0195)');
+  const statements = {
+    run: `SELECT id, state, manifest_total, started_at, closed_at, reviewed_bundle_sha256, sitemap_fingerprint, code_commit, github_run_id FROM catalog_import_runs WHERE id = '${runId}'`,
+    items: `SELECT source_product_id, handle, queue_position, product_type, curated_scope, hold_code, processing_state, last_completed_stage, attempts, stage_attempts, retry_at, last_error_code, blocker_code, match_kind, levonis_product_id, slug, live_url, unpublished_on_block, quality, d1_checks, edge_evidence, source_sold_out_variants, verified_at, completed_at, updated_at FROM catalog_import_items WHERE run_id = '${runId}' ORDER BY queue_position`,
+    media: `SELECT role, status, COUNT(*) AS n FROM catalog_import_media WHERE run_id = '${runId}' GROUP BY role, status ORDER BY role, status`,
+    conflicts: `SELECT kind, resolved, COUNT(*) AS n FROM catalog_import_conflicts WHERE run_id = '${runId}' GROUP BY kind, resolved ORDER BY kind`,
+    events: `SELECT stage, outcome, COUNT(*) AS n FROM catalog_import_events WHERE run_id = '${runId}' GROUP BY stage, outcome ORDER BY stage, outcome`,
+  };
+  const tables = {};
+  for (const [key, sql] of Object.entries(statements)) tables[key] = query(context, sql).results;
+  if ((tables.run ?? []).length !== 1) throw new CfError(`there is no run ${runId}`);
+  const byState = {};
+  for (const item of tables.items) byState[item.processing_state] = (byState[item.processing_state] ?? 0) + 1;
+  for (const [state, n] of Object.entries(byState).sort()) {
+    if (/^[A-Z_]{3,32}$/.test(state)) context.log(`report: ${state}: ${n}`);
+  }
+  const clear = Buffer.from(JSON.stringify({ format: REPORT_FORMAT, database: DATABASE, taken_at: new Date().toISOString(), run_id: runId, by_state: byState, tables }));
+  const sealed = sealBuffer(publicKey, clear);
+  clear.fill(0);
+  writeFileSync(`${target}.partial`, sealed, { flag: 'wx', mode: 0o600 });
+  renameSync(`${target}.partial`, target);
+  const digest = createHash('sha256').update(sealed).digest('hex');
+  context.log(`report: sealed ${REPORT_FILE}: ${sealed.length} bytes, sha256 ${digest}`);
+  summary(context.env, [
+    '## Bambu import: run report (sealed)',
+    '',
+    '| state | items |',
+    '|---|---|',
+    ...Object.entries(byState)
+      .filter(([state]) => /^[A-Z_]{3,32}$/.test(state))
+      .sort()
+      .map(([state, n]) => `| ${state} | ${n} |`),
+    '',
+    `Artifact \`bambu-import-sealed\` holds \`${REPORT_FILE}\`: ${sealed.length} bytes, SHA-256 \`${digest}\`.`,
+  ]);
+  return 0;
+}
+
 export function main(argv, { env = process.env, log = console.log, error = console.error } = {}) {
   let parsed;
   try {
@@ -348,7 +628,20 @@ export function main(argv, { env = process.env, log = console.log, error = conso
   let context;
   try {
     context = openContext(env, log);
-    return parsed.mode === 'snapshot' ? snapshot(context, parsed) : revoke(context, parsed);
+    switch (parsed.mode) {
+      case 'snapshot':
+        return snapshot(context, parsed);
+      case 'revoke':
+        return parsed.runFile ? revokeFromFile(context, parsed) : revoke(context, parsed);
+      case 'preflight':
+        return preflight(context, parsed);
+      case 'open':
+        return open(context, parsed);
+      case 'mint':
+        return mint(context, parsed);
+      default:
+        return report(context, parsed);
+    }
   } catch (failure) {
     const reason = failure instanceof CfError ? failure.message : `${failure?.name ?? 'Error'}: ${failure?.message ?? ''}`;
     error(`::error::cf.mjs ${parsed.mode}: ${scrub(reason, context?.secrets)}`);
