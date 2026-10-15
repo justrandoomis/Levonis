@@ -224,3 +224,28 @@ test('the extraction fingerprint is stable and changes with the source', () => {
   assert.match(extractionFingerprint(x), /^[0-9a-f]{64}$/);
   assert.notEqual(extractionFingerprint({ ...x, title: `${x.title} ` }), extractionFingerprint(x));
 });
+
+/**
+ * FORMAT E END TO END (owner-questions §E.5): the real H2C component list
+ * builds a payload the validator accepts; its in-the-box items land on the
+ * versions their columns name, its FAQ's wiki links become documents (the
+ * first one the official usage URL), and no content image comes from the
+ * store's test or dev CDN.
+ */
+test('format E (H2C): accepted whole, box items per version, wiki documents, production-CDN images only', () => {
+  const p = clone(build(sample('h2c')));
+  assert.equal(refusal(p), null);
+  const nameOf = new Map(p.groups.flatMap((g) => g.values).map((v) => [v.id, v.name_en]));
+  const box = p.specs.filter((s) => s.key === 'package.contents');
+  const scopes = box.map((s) => (s.scope_kind === 'product' ? 'product' : nameOf.get(s.scope_id))).sort();
+  assert.deepEqual(scopes, ['H2C AMS Combo', 'H2C Laser Full Combo', 'product']);
+  const laser = box.find((s) => nameOf.get(s.scope_id) === 'H2C Laser Full Combo')!;
+  assert.ok((laser.value_list as Array<{ text: string }>).some((i) => /Laser Module/.test(i.text)), 'the laser modules ship with the Laser Full Combo only');
+  const wiki = p.documents.filter((d) => d.kind === 'wiki').map((d) => d.url);
+  assert.equal(wiki.length, 3);
+  assert.equal(p.product.usage_official_url, wiki[0]);
+  const images = p.content_blocks.filter((b) => b.kind === 'image');
+  assert.ok(images.length > 10);
+  assert.ok(images.every((b) => b.source_url.startsWith('https://store.bblcdn.com/')), 'no test or dev CDN picture');
+  assert.ok(p.content_blocks.some((b) => b.title_en === 'Vortek Hotend Change System'));
+});

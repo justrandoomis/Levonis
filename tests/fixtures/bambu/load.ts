@@ -6,8 +6,9 @@
  * forbidden values replaced by `PLANTED-<key>` so a test can prove none is
  * ever read), the option structure (options, variants and gallery only) of
  * the AMS 2 Pro (with its real manifest row), the CyberBrick time-lapse kit
- * and the PTFE tubes, and the real P0 compat-targets.json (DRAFT of
- * 2026-10-15, copied verbatim).
+ * and the PTFE tubes, the H2C as a description-format-E sample (its
+ * component list through COMPONENT_KEYS), and the real P0 compat-targets.json
+ * (DRAFT of 2026-10-15, copied verbatim).
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,7 +29,7 @@ export const SAMPLE_HANDLES = [
   'refurbished-bambu-lab-h2d-3d-printer',
 ] as const;
 
-export type SampleHandle = (typeof SAMPLE_HANDLES)[number] | 'ams-2-pro.options' | 'cyberbrick-timelapse-kit.options' | 'ptfe-tubes.options';
+export type SampleHandle = (typeof SAMPLE_HANDLES)[number] | 'ams-2-pro.options' | 'cyberbrick-timelapse-kit.options' | 'ptfe-tubes.options' | 'h2c';
 
 export function sampleJson(handle: SampleHandle): { product: unknown; description: unknown; jsonld: unknown } {
   return JSON.parse(readFileSync(join(BAMBU_FIXTURES, `${handle}.json`), 'utf8'));

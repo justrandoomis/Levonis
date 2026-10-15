@@ -1,0 +1,1519 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/h2c",
+  "fetched_at": "2026-10-15",
+  "extracted_from": "P0 crawl, read through packages/catalog/src/bambuImport/extract.ts (the closed read lists): identity, options, variants, gallery, features and the format-E component list (COMPONENT_KEYS only); JSON-LD identity fields only",
+  "notes": "Description format E (component list). Sold-out flags blanked. No price, stock, discount or promotion key."
+ },
+ "product": {
+  "id": "667505441249849344",
+  "seoCode": "h2c",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/h2c",
+  "name": "Bambu Lab H2C",
+  "seoMetaDescription": "Vortek multi-material 3D printer from the No.1 best-selling brand. 2M+ free models. 30-day price protection, 2-year warranty & 30-day returns at official store.",
+  "currentAllIdRoute": "552709755391528960>666870992645718016>666871141714259968",
+  "isFilament": false,
+  "productPropertyList": [
+   {
+    "propertyKey": "Variant",
+    "propertyKeyId": "667505441262432256",
+    "type": 4,
+    "title": "3D Printer",
+    "position": 1,
+    "productPropertyValueList": [
+     {
+      "id": "667505441262432257",
+      "value": "H2C AMS Combo",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "667505441262432258",
+      "value": "H2C Laser Full Combo",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "761030943904460801",
+      "value": "H2C Vortek Ultimate Bundle",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   },
+   {
+    "propertyKey": "Options",
+    "propertyKeyId": "667505441262432259",
+    "type": 1,
+    "title": "",
+    "position": 2,
+    "productPropertyValueList": [
+     {
+      "id": "667505441262432260",
+      "value": "Standard",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "667505441262432262",
+      "value": "10W Laser",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "667505441262432263",
+      "value": "40W Laser",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "667505441262432266",
+    "mediaFile": {
+     "resourceFileId": "753808442993627136",
+     "url": "https://store.bblcdn.com/s7/default/26244e919174400ba25012f89f06abbb/H2CC-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "667505441262432256",
+      "propertyValue": "H2C AMS Combo"
+     },
+     {
+      "propertyKey": "Options",
+      "propertyKeyId": "667505441262432259",
+      "propertyValue": "Standard"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "667505441262432276",
+    "mediaFile": {
+     "resourceFileId": "753808443033092096",
+     "url": "https://store.bblcdn.com/s7/default/a3d44ab37d904b1682cf7d3b528aca7f/H2CL-10W-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "667505441262432256",
+      "propertyValue": "H2C Laser Full Combo"
+     },
+     {
+      "propertyKey": "Options",
+      "propertyKeyId": "667505441262432259",
+      "propertyValue": "10W Laser"
+     }
+    ],
+    "isSoldOut": false,
+    "description": "<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>Your order may be shipped in separate packages and arrive at different times. Please refer to the FAQ for details on how your specific configuration will be delivered.</strong></div>"
+   },
+   {
+    "id": "667505441262432281",
+    "mediaFile": {
+     "resourceFileId": "753808443033092096",
+     "url": "https://store.bblcdn.com/s7/default/a3d44ab37d904b1682cf7d3b528aca7f/H2CL-10W-compressed.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "667505441262432256",
+      "propertyValue": "H2C Laser Full Combo"
+     },
+     {
+      "propertyKey": "Options",
+      "propertyKeyId": "667505441262432259",
+      "propertyValue": "40W Laser"
+     }
+    ],
+    "isSoldOut": false,
+    "description": "<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>Your order may be shipped in separate packages and arrive at different times. Please refer to the FAQ for details on how your specific configuration will be delivered.</strong></div>"
+   },
+   {
+    "id": "761030943904460802",
+    "mediaFile": {
+     "resourceFileId": "761026294426120192",
+     "url": "https://store.bblcdn.com/s7/default/94726286a8274af7a6aeecb04b87aca7/H2C_vortek_bundle-freeship.jpg"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Variant",
+      "propertyKeyId": "667505441262432256",
+      "propertyValue": "H2C Vortek Ultimate Bundle"
+     },
+     {
+      "propertyKey": "Options",
+      "propertyKeyId": "667505441262432259",
+      "propertyValue": "Standard"
+     }
+    ],
+    "isSoldOut": false,
+    "description": "<div style=\"white-space: pre-wrap;\" data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Unlock the Full Power of the H2C Vortek System and save more with the ultimate all-in-one bundle.</div>\n<div style=\"white-space: pre-wrap;\" data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">The bundle includes:</div>\n<div style=\"white-space: pre-wrap;\" data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\">(1) H2C 3D Printer *1</div>\n<div style=\"white-space: pre-wrap;\" data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\">(2) AMS 2 Pro *2</div>\n<div style=\"white-space: pre-wrap;\" data-zone-id=\"0\" data-line-index=\"4\" data-line=\"true\">(3) <a href=\"https://us.store.bambulab.com/products/vortek-utility-hotends-bundle\" target=\"_blank\" rel=\"noopener\" data-lark-is-custom=\"true\"><u>Vortek Utility Hotends Bundle </u></a>includes: 0.4 mm Induction hardened Steel Nozzle (RHS) &times;2, 0.2 mm stainless steel nozzle (LHS) &times;1, 0.6 mm hardened steel nozzle (LHS) &times;1</div>\n<div style=\"white-space: pre-wrap;\" data-zone-id=\"0\" data-line-index=\"5\" data-line=\"true\">(4) <a href=\"https://us.store.bambulab.com/products/filament-track-switch\" target=\"_blank\" rel=\"noopener\" data-lark-is-custom=\"true\"><u>Filament Track Switch</u></a> *1</div>"
+   }
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "753808442993627136",
+    "url": "https://store.bblcdn.com/s7/default/26244e919174400ba25012f89f06abbb/H2CC-compressed.jpg"
+   },
+   {
+    "resourceFileId": "753808443033092096",
+    "url": "https://store.bblcdn.com/s7/default/a3d44ab37d904b1682cf7d3b528aca7f/H2CL-10W-compressed.jpg"
+   },
+   {
+    "resourceFileId": "684598361707581440",
+    "url": "https://store.bblcdn.com/s7/default/3f19a5313c094327a2d50d0923867299/H2CC.jpg"
+   },
+   {
+    "resourceFileId": "684598412201701376",
+    "url": "https://store.bblcdn.com/s7/default/ceb1e8c7ba13457f9147844e6bce5b11/H2CL.jpg"
+   },
+   {
+    "resourceFileId": "761026294426120192",
+    "url": "https://store.bblcdn.com/s7/default/94726286a8274af7a6aeecb04b87aca7/H2C_vortek_bundle-freeship.jpg"
+   },
+   {
+    "resourceFileId": "665744264834371584",
+    "url": "https://store.bblcdn.com/s7/default/46261d7d0a484f7c9b8f9b8b0bd424bc/3.jpg"
+   },
+   {
+    "resourceFileId": "665744383829209088",
+    "url": "https://store.bblcdn.com/s7/default/db73b54173b04296a6784f63ff1e6e80/4.jpg"
+   },
+   {
+    "resourceFileId": "665743981910028288",
+    "url": "https://store.bblcdn.com/s7/default/8e7435ab5f0c4d1d9879d047e72d34b5/1.jpg"
+   },
+   {
+    "resourceFileId": "665744523765534720",
+    "url": "https://store.bblcdn.com/s7/default/7f087cff869f4545ae69f6657f8246ba/5.jpg"
+   },
+   {
+    "resourceFileId": "665744546782113792",
+    "url": "https://store.bblcdn.com/s7/default/fb1c735b4f3f4f1eb7cf34d15f8a6db8/6.jpg"
+   },
+   {
+    "resourceFileId": "665744668354015232",
+    "url": "https://store.bblcdn.com/s7/default/5c595361df0e403aa2fac8a33ce1cd20/7.jpg"
+   },
+   {
+    "resourceFileId": "665744906338824192",
+    "url": "https://store.bblcdn.com/s7/default/d82d716569d34f64bf8485ea57b77ac9/9.jpg"
+   },
+   {
+    "resourceFileId": "665744753076523008",
+    "url": "https://store.bblcdn.com/s7/default/39c108de1e364ac1a4f0f7ec617601d4/8.jpg"
+   },
+   {
+    "resourceFileId": "698797105810325504",
+    "url": "https://store.bblcdn.com/s7/default/0fa7ec3f21e74444b109c39f903cbb2a/H2CCcompressed.jpg"
+   },
+   {
+    "resourceFileId": "698797141902864384",
+    "url": "https://store.bblcdn.com/s7/default/dade04c3601046759e3d32c0620a682c/H2CLcompressed.jpg"
+   }
+  ],
+  "productFeaturesTitle": "Product Features",
+  "productFeaturesModuleList": [
+   {
+    "title": "Product Features",
+    "content": "<ul>\n<li data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Hotend Change Multi-material Printing</li>\n<li data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Minimal Purge Waste Multi-Color Printing</li>\n<li data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\">Precise &amp; Fast Inductive Nozzle Heating</li>\n<li data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\">Close-loop Servo Extruder</li>\n<li data-zone-id=\"0\" data-line-index=\"4\" data-line=\"true\">Full Filament Path AI Error Detection</li>\n<li data-zone-id=\"0\" data-line-index=\"5\" data-line=\"true\">350&deg;C Nozzles &amp; 65&deg;C Active Heated Chamber</li>\n<li data-zone-id=\"0\" data-line-index=\"6\" data-line=\"true\">Optional 10W/40W Laser and Cutting Module(Self-installation required)</li>\n<li data-zone-id=\"0\" data-line-index=\"7\" data-line=\"true\">330*320*325 mm&sup3; Build Volume</li>\n</ul>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>* To connect more than two AMS(including AMS 2 Pro, AMS HT), a 4-in-1 PTFE Adapter (FAZ013-N) is needed.</strong></div>\n</div>\n<p><span style=\"color: #000000;\">* Cybersecurity compliant with EU RED Article 3.3(d)(e) and ETSI EN 303 645 V2.1.1:2020. <a href=\"https://bambulab.com/en/trust-center/certification\" target=\"_blank\" rel=\"noopener\">Learn more.</a> </span></p>"
+   }
+  ],
+  "externalVideoLinkList": []
+ },
+ "description": {
+  "kind": "component_list",
+  "components": [
+   {
+    "componentName": "Anchor",
+    "componentType": "Anchor",
+    "data": {
+     "componentType": "Anchor",
+     "list": [
+      {
+       "name": "Overview",
+       "id": "504624"
+      },
+      {
+       "name": "Specs",
+       "id": "697748"
+      },
+      {
+       "name": "Dive In",
+       "id": "139739"
+      },
+      {
+       "name": "FAQ",
+       "id": "386033"
+      }
+     ]
+    }
+   },
+   {
+    "componentName": "Banner",
+    "componentType": "Banner",
+    "data": {
+     "anchorId": "504624",
+     "mediaUrl": {
+      "id": "670777624116142080",
+      "fileOriginalName": "PC_2.mp4",
+      "dataType": "mp4",
+      "url": "https://store.bblcdn.com/s7/default/aa8be6b62b574ac984ff2beec3cec123/PC_2.mp4",
+      "resourceFileId": "670777626788491264"
+     },
+     "title": "Uncompromising <br>Multi-Material.",
+     "subtitle": "Bambu Lab H2C",
+     "alt": "",
+     "componentType": "Banner"
+    }
+   },
+   {
+    "componentName": "GlowHeading1",
+    "componentType": "GlowHeading",
+    "data": {
+     "anchorId": "504624",
+     "h2Text": "Revolutionize How You Print Your Projects",
+     "pcImage": {
+      "id": "665440638075002880",
+      "fileOriginalName": "EN_PCtuya.png",
+      "dataType": "png",
+      "url": "https://store.bblcdn.com/s7/default/3b1b2a40f6914e91a12e843b5481bb74/EN_PCtuya.png",
+      "resourceFileId": "665440639576870912"
+     },
+     "componentType": "GlowHeading"
+    }
+   },
+   {
+    "componentName": "Models",
+    "componentType": "Models",
+    "data": {
+     "anchorId": "504624",
+     "list": [
+      {
+       "id": "comp_1761201546091_houbmuagu",
+       "title": "Paint No More, Print 7 Colors in One-Piece.",
+       "alt": "Bambu Lab H2C Multi Color 3D Printer",
+       "pcImage": {
+        "id": "665440894339731456",
+        "fileOriginalName": "SizePCPic1WebsiteShopifytuya.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/68d1a3b7db174f1e94c4e539da4663cf/SizePCPic1WebsiteShopifytuya.jpg",
+        "resourceFileId": "665440896146640896"
+       }
+      },
+      {
+       "id": "comp_1762486625605_e362jeg1e",
+       "title": "No More Assembly — Print Multi-Material Parts in One Piece.",
+       "alt": "No More Assembly — Print Multi-Material Parts in One Piece.",
+       "pcImage": {
+        "id": "665441111161737216",
+        "fileOriginalName": "SizePCPic2WebsiteShopifytuya.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/2d396461718d4a6dab93703875f80258/SizePCPic2WebsiteShopifytuya.jpg",
+        "resourceFileId": "665441112908124160"
+       }
+      },
+      {
+       "id": "comp_1762486236715_jj7jvh0k9",
+       "title": "Print Durable Joints — Built Right Into the Parts.",
+       "alt": "Print Durable Joints — Built Right Into the Parts.",
+       "pcImage": {
+        "id": "665441165092753408",
+        "fileOriginalName": "PC3.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/983969dd8bc141d6a9e9cd9b7e30b147/PC3.jpg",
+        "resourceFileId": "665441166742163456"
+       }
+      }
+     ],
+     "componentType": "Models"
+    }
+   },
+   {
+    "componentName": "WhatIs1",
+    "componentType": "EndlessModels",
+    "data": {
+     "anchorId": "504624",
+     "title": "Vortek Hotend Change System",
+     "items": [
+      {
+       "id": "comp_1761632746453_sefzm7844",
+       "featureTitle": "Multi-Material Printing with Minimal Purge Waste",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665736401968324608",
+         "fileOriginalName": "PC1.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/ec971bd3a124430d82349819e6f42061/PC1.jpg",
+         "resourceFileId": "665736409165459456"
+        }
+       },
+       "description": "In traditional single-nozzle multi-material printing, purging is needed to clear leftover material between filament changes.Vortek changes that with an intelligent hotend-swapping system that replaces the entire hotend — delivering faster, cleaner prints with minimal waste.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://us.store.bambulab.com/"
+       }
+      },
+      {
+       "id": "comp_1761632853136_vlgt2flzo",
+       "featureTitle": "Fully Automatic Filament Change",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665736898618265600",
+         "fileOriginalName": "PC2.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/e0bfaf0d28de4bf68ef5d965f110f60c/PC2.jpg",
+         "resourceFileId": "665736900341190656"
+        }
+       },
+       "description": "The Vortek system works seamlessly with our highly reliable AMS (Automatic Material System), making the entire filament change process fully automatic — no need to manually load each filament into the toolhead.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761632996643_dc5ajugkr",
+       "featureTitle": "Always Delivering the Most Efficient Combination",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "667150680204267520",
+         "fileOriginalName": "PC3.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/5d60ad23af4b4cb0935d3167aea92e33/PC3.jpg",
+         "resourceFileId": "667150682745524224"
+        }
+       },
+       "description": "The Vortek system can store filament information in the hotend’s memory, ensuring the correct filament is matched to each hotend. If you are printing with more than seven filament types, the system can calculate the optimal combination to minimize purge waste.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      }
+     ],
+     "componentType": "EndlessModels"
+    }
+   },
+   {
+    "componentName": "WhatIs2",
+    "componentType": "EndlessModels",
+    "data": {
+     "anchorId": "504624",
+     "title": "Why Vortek?",
+     "items": [
+      {
+       "id": "comp_1761633062147_7dn5tvwhy",
+       "featureTitle": "Small Form Factor, More Filaments",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665443938329411584",
+         "fileOriginalName": "Number4ENPC.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/22d93c58b80745c6a08677a5abf52c1c/Number4ENPC.jpg",
+         "resourceFileId": "665443941383311360"
+        }
+       },
+       "description": "Because only the hotend is swapped, the system can house up to six replaceable hotends without significantly reducing the build volume.That means more materials, more colors, and more possibilities — all in one print.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761633153620_gdtia3t85",
+       "featureTitle": "8-Second Induction Heating",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665444210245623808",
+         "fileOriginalName": "PC5.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/1599080ebe7f448d8f5a23792928c958/PC5.jpg",
+         "resourceFileId": "665444212255510528"
+        }
+       },
+       "description": "Our industry-leading induction heating technology brings the nozzle to temperature in 8-sec, significantly reducing the preheating time for each material swap compared to traditional methods.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761633222992_x4vf6ee0y",
+       "featureTitle": "Contactless Design For Reliability",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665444738141241344",
+         "fileOriginalName": "PC6.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/9f5628721f3047019433c49209a8bbd1/PC6.jpg",
+         "resourceFileId": "665444739559362560"
+        }
+       },
+       "description": "Our high standards for reliability led us to move away from contact-based metal pins, which are prone to oxidation and unstable connections.We developed a contactless solution that ensures a stable, high-frequency connection — the foundation for precise temperature control and intelligent hotend sync.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761735493203_i1fgjxq3s",
+       "featureTitle": "Colors Are No Longer Limited By How Many Toolheads You Have",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665445006924824576",
+         "fileOriginalName": "PC7_EN.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/e6a641ecb83c4394bfcf698fb5dd5f06/PC7_EN.jpg",
+         "resourceFileId": "665445008632205312"
+        }
+       },
+       "description": "Unlike traditional toolchanger printers that limit color count by the number of toolheads, the H2C supports up to 24 materials in a single print through parallel-connected AMS units. Its intelligent algorithm optimizes filament-to-hotend allocation to minimize purge waste while delivering outstanding multi-color and multi-material results.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761735703753_0k68bszty",
+       "featureTitle": "Enclosed for High-Performance Printing",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665473018974158848",
+         "fileOriginalName": "PC8.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/e74ff2af4e194beda0749314e7db43ed/PC8.jpg",
+         "resourceFileId": "665473022254551040"
+        }
+       },
+       "description": "With its seamless enclosure and adaptive airflow system, the H2C maintains a stable chamber temperature for high-performance materials and filters the air to keep your workspace clean and safe.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761735792948_f0mutlzen",
+       "featureTitle": "Fully Automatic Nozzle Offset Calibration",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665467393118941184",
+         "fileOriginalName": "PC9.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/2bcf2dff0c364d9898758232bdcee29a/PC9.jpg",
+         "resourceFileId": "665467407453032448"
+        }
+       },
+       "description": "Our inductive nozzle offset calibration is fully automated — no manual steps, no calibration plates, no extra setup. In just a few minutes, the H2C precisely calibrates nozzle offset to within 25 microns.*",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      },
+      {
+       "id": "comp_1761735938511_vdee5c31o",
+       "featureTitle": "Dedicated Hotends for Specific Filaments",
+       "featureSubtitle": "",
+       "featureImage": {
+        "src": {
+         "id": "665446901469261824",
+         "fileOriginalName": "PC10.jpg",
+         "dataType": "jpg",
+         "url": "https://store.bblcdn.com/s7/default/b84f29af58244700be7e1057db101679/PC10.jpg",
+         "resourceFileId": "665446903094464512"
+        }
+       },
+       "description": "The H2C's Vortek system lets you dedicate one of its six interchangeable hotends to specific filaments — a game-changer for valuable engineering materials.This ensures superior consistency and reliability across prints. Each hotend can even automatically store filament information, so the next time you load that material, it's instantly matched to the correct hotend.",
+       "link": {
+        "text": "Learn More",
+        "url": "https://bambulab.com"
+       }
+      }
+     ],
+     "componentType": "EndlessModels"
+    }
+   },
+   {
+    "componentName": "GlowHeading2",
+    "componentType": "GlowHeading",
+    "data": {
+     "anchorId": "504624",
+     "h2Text": "Not A Toy, A Serious Production Powerhouse",
+     "pcImage": {
+      "id": "665447351009366016",
+      "fileOriginalName": "ENPC.png",
+      "dataType": "png",
+      "url": "https://store.bblcdn.com/s7/default/94c9cde2f36c4e5bb7bcca89364f1e35/ENPC.png",
+      "resourceFileId": "665447352954687488"
+     },
+     "componentType": "GlowHeading"
+    }
+   },
+   {
+    "componentName": "SellPoints1",
+    "componentType": "SellPoint",
+    "data": {
+     "anchorId": "504624",
+     "title": "Top Tier Printing Performance",
+     "infoList": [
+      {
+       "id": 1761127492504.7717,
+       "title": "Better High-Speed Reliability & Real-Time Error Detection.",
+       "subtitle": "",
+       "description": {
+        "originalText": "The PMSM servo extruder delivers up to 10 kg of maximum extrusion force—70% more than stepper motor—dramatically improves high-flowrate extrusion stability. Our proprietary servo architecture samples resistance and position at 20 kHz, actively detecting filament grinding and clogs in real time."
+       },
+       "pcImage": {
+        "id": "657470614187823104",
+        "fileOriginalName": "second-pc.jpg",
+        "dataType": "jpg",
+        "url": "https://store-dev.bblcdn.com/s1/default/5d70cb0d848b4b079151014b91eefbff/second-pc.jpg",
+        "resourceFileId": "657470626036350976"
+       },
+       "subModules": [],
+       "mediaUrl": {
+        "id": "665447994967363584",
+        "fileOriginalName": "dianjibaozha_PC_MO.mp4",
+        "dataType": "mp4",
+        "url": "https://store.bblcdn.com/s7/default/461c37fa9bb4487d83f4eea727f9479a/dianjibaozha_PC_MO.mp4",
+        "resourceFileId": "665447996809711616"
+       }
+      },
+      {
+       "id": 1761188133213.2239,
+       "title": "50 µm Ultra-Fine Motion Accuracy*",
+       "subtitle": "",
+       "description": {
+        "originalText": "With its Vision Encoder, the H2C achieves a distance-independent motion accuracy of less than 50 μm—thinner than human hair. The system automatically compensates for any mechanical drift during calibration, ensuring consistent precision and peak performance over time.*"
+       },
+       "subModules": [],
+       "leftImage": {
+        "id": "659277389437386752",
+        "fileOriginalName": "cc_1.png",
+        "dataType": "png",
+        "url": "https://store-test.bblcdn.com/s7/default/ec784a9e9f3b4bd68dd32166ad882c8f/cc_1.png",
+        "resourceFileId": "659277391017250816"
+       },
+       "rightImage": {
+        "id": "659277445536202752",
+        "fileOriginalName": "cc_1.png",
+        "dataType": "png",
+        "url": "https://store-test.bblcdn.com/s7/default/6b0915eaa925417cb15d9f52574264f8/cc_1.png",
+        "resourceFileId": "659277447371919360"
+       },
+       "mediaUrl": {
+        "id": "665739077590343680",
+        "fileOriginalName": "biaodingban_pc.mp4",
+        "dataType": "mp4",
+        "url": "https://store.bblcdn.com/s7/default/7ce389fd52544525ab401ccc0e45c352/biaodingban_pc.mp4",
+        "resourceFileId": "665739079554748416"
+       }
+      },
+      {
+       "id": 1761619340417.2764,
+       "title": "Smooth Surface, Sharp Edges",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C leverages both the servo motor on the extruder and the high-resolution eddy current sensors on the nozzle to sense extrusion dynamics. This enables precise extrusion control and automatic calibration of Pressure Advance (PA) parameters for each filament, resulting in smoother surfaces and cleaner, sharper edges."
+       },
+       "images": [],
+       "subModules": [],
+       "mainImage": {
+        "id": "665448561172131840",
+        "fileOriginalName": "PC3.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/2d6e446dc3dc4968af1435581211be02/PC3.jpg",
+        "resourceFileId": "665448563149803520"
+       },
+       "leftImage": {
+        "id": "665448632192794624",
+        "fileOriginalName": "PC_ON.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/51067076bd1545419b2c1fa2c1f9b2e6/PC_ON.jpg",
+        "resourceFileId": "665448633513299968"
+       },
+       "rightImage": {
+        "id": "665448688185892864",
+        "fileOriginalName": "PC_OFF.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/a5859466afe04b50b99de54a298bb618/PC_OFF.jpg",
+        "resourceFileId": "665448689532424192"
+       },
+       "leftLabel": "ON",
+       "rightLabel": "OFF"
+      },
+      {
+       "id": 1761621058774.1443,
+       "title": "Unleash The Full Potential of High-Performance Materials",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C's 65 °C actively heated chamber & 350°C Nozzles minimizes warping and deformation while enhancing layer adhesion for high-performance, high-temperature filaments."
+       },
+       "pcImage": {
+        "id": "659541850660323328",
+        "fileOriginalName": "1920qiangwen.jpg",
+        "dataType": "jpg",
+        "url": "https://store-test.bblcdn.com/s7/default/93019250c18647c7ab0dfabdc00d0a4e/1920qiangwen.jpg",
+        "resourceFileId": "659541852319879168"
+       },
+       "subModules": [],
+       "images": [
+        {
+         "pcImage": {
+          "id": "665448768566677504",
+          "fileOriginalName": "PC6.jpg",
+          "dataType": "jpg",
+          "url": "https://store.bblcdn.com/s7/default/e72335e7225b46ffb4535c20e0422413/PC6.jpg",
+          "resourceFileId": "665448770033848320"
+         },
+         "title": "Chamber Heater",
+         "alt": ""
+        },
+        {
+         "pcImage": {
+          "id": "665448829408108544",
+          "fileOriginalName": "PC5.jpg",
+          "dataType": "jpg",
+          "url": "https://store.bblcdn.com/s7/default/c15bba147e8a47eeb3ed7d54b9b8333f/PC5.jpg",
+          "resourceFileId": "665448831073554432"
+         },
+         "title": "350°C Nozzles",
+         "alt": ""
+        }
+       ]
+      },
+      {
+       "id": 1761621499967.5417,
+       "title": "Comprehensive Print Monitoring",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C is equipped with an array of 59 sensors* and a quad-camera computer vision system, all orchestrated by our proprietary neural algorithm. During printing, this system delivers intelligent, real-time diagnostics that can detect even the most subtle print anomalies as they happen. You don't have to be an expert to solve problems—your printer does the job for you."
+       },
+       "pcImage": {
+        "id": "665448943031148544",
+        "fileOriginalName": "PC8.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/a96427eb335c4e02a5686f1b40c2e64c/PC8.jpg",
+        "resourceFileId": "665448944630140928"
+       },
+       "subModules": []
+      },
+      {
+       "id": 1761621731139.1936,
+       "title": "AI Camera",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C features an AI-backed camera system. This intelligent monitoring system continuously tracks extrusion patterns, immediately detecting material accumulation, filament deviations, and extrusion failures. Also runs a pre-flight scan to ensure a safe start."
+       },
+       "pcImage": {
+        "id": "659543640856379392",
+        "fileOriginalName": "1920sizhangtu.jpg",
+        "dataType": "jpg",
+        "url": "https://store-test.bblcdn.com/s7/default/b0d87f64ef0b473b83aac0e4f9c8dbe7/1920sizhangtu.jpg",
+        "resourceFileId": "659543642570461184"
+       },
+       "subModules": [],
+       "images": [
+        {
+         "pcImage": {
+          "id": "665449119422517248",
+          "fileOriginalName": "PC10.jpg",
+          "dataType": "jpg",
+          "url": "https://store.bblcdn.com/s7/default/261c67f6eb374c4f953b2b35d8553f14/PC10.jpg",
+          "resourceFileId": "665449121843679232"
+         },
+         "title": "Pre-Flight ",
+         "alt": ""
+        },
+        {
+         "pcImage": {
+          "id": "665449315075817472",
+          "fileOriginalName": "PC9-1.jpg",
+          "dataType": "jpg",
+          "url": "https://store.bblcdn.com/s7/default/8a9b6dc7fb5a4f7dadfaadf5d1944b91/PC9-1.jpg",
+          "resourceFileId": "665449316656517120"
+         },
+         "title": "Spaghetti",
+         "alt": ""
+        },
+        {
+         "pcImage": {
+          "id": "665449616081530880",
+          "fileOriginalName": "PC_9-2.jpg",
+          "dataType": "jpg",
+          "url": "https://store.bblcdn.com/s7/default/b90a0f81a8fa4c249ec87bf766ec9dd4/PC_9-2.jpg",
+          "resourceFileId": "665449617727705088"
+         },
+         "title": "Nozzle Clumping",
+         "alt": ""
+        },
+        {
+         "pcImage": {
+          "id": "665449697209606144",
+          "fileOriginalName": "PC_9-3.jpg",
+          "dataType": "jpg",
+          "url": "https://store.bblcdn.com/s7/default/0699a9387bb847da8eba7fa9d4258180/PC_9-3.jpg",
+          "resourceFileId": "665449698686160896"
+         },
+         "title": "Air Printing",
+         "alt": ""
+        }
+       ]
+      }
+     ],
+     "componentType": "SellPoint"
+    }
+   },
+   {
+    "componentName": "SellPoints2",
+    "componentType": "SellPoint",
+    "data": {
+     "anchorId": "504624",
+     "title": "Safety, Checked!",
+     "infoList": [
+      {
+       "id": 1761127544231.807,
+       "title": "Best-In-Class Air Filtration",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C's three-stage filtration system is essential for printing with engineering filaments. This powerful combination of a G3 pre-filter, an H12 HEPA filter, and a coconut shell activated carbon filter effectively minimizes the odors and harmful particulates often released by engineering materials."
+       },
+       "subModules": [],
+       "pcImage": {
+        "id": "665738688903942144",
+        "fileOriginalName": "PC7.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/7f7ac6cced164aab901ce39a4ebb20dd/PC7.jpg",
+        "resourceFileId": "665738692011880448"
+       },
+       "mainImage": {
+        "resourceFileId": "657081546584784896",
+        "url": "https://store-dev.bblcdn.com/s1/default/0af0bbc98b364acbad9be74faff6f47e/biaodingmo.mp4",
+        "fileOriginalName": "biaodingmo.mp4"
+       },
+       "leftImage": null,
+       "rightImage": null,
+       "leftLabel": "ON",
+       "rightLabel": "OFF"
+      },
+      {
+       "id": 1761189596061.1963,
+       "title": "Fire-Retardant Construction",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C's chamber is constructed entirely with flame-retardant material, providing robust, passive fire safety protection across the entire enclosure."
+       },
+       "pcImage": {
+        "id": "665449853694754816",
+        "fileOriginalName": "PC11.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/e9ef00b012e546ceb68f0cfcc7ae9328/PC11.jpg",
+        "resourceFileId": "665449855364534272"
+       },
+       "subModules": []
+      },
+      {
+       "id": 1761622411125.5278,
+       "title": "Flexible Network Security & Connectivity",
+       "subtitle": "",
+       "description": {
+        "originalText": "The H2C offers convenient cloud connectivity for remote control from any device. For security-sensitive applications, it also provides full offline functionality, ensuring complete physical isolation. Users can operate the printer, send files, and update firmware without an internet connection. For advanced users, Developer Mode enables MQTT port access for integrating third-party components and software.*"
+       },
+       "pcImage": {
+        "id": "665449929846677504",
+        "fileOriginalName": "PC13.jpg",
+        "dataType": "jpg",
+        "url": "https://store.bblcdn.com/s7/default/2d87d2f0582845748a42e66c6420e7b3/PC13.jpg",
+        "resourceFileId": "665449931298213888"
+       },
+       "subModules": []
+      }
+     ],
+     "componentType": "SellPoint"
+    }
+   },
+   {
+    "componentName": "SpecTable",
+    "componentType": "SpecTable",
+    "data": {
+     "anchorId": "697748",
+     "title": "H2C Specs",
+     "link": "https://store.bblcdn.com/s7/default/d741f5a073c94245885065ff89a0b2da/H2C_Spec.pdf",
+     "notCollapseTable": "<table style=\"border-collapse: collapse; height: 1560px; width: 955px;\">\n<thead>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 342px;\" colspan=\"2\">Item</td>\n<td style=\"height: 19px; width: 613px;\">Specifications</td>\n</tr>\n</thead>\n<tbody>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 342px;\" colspan=\"2\">Printing Technology</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Fused Deposition Modeling</div>\n</div>\n<!--StartFragment--><!--EndFragment--></td>\n</tr>\n<tr style=\"height: 58px;\">\n<td style=\"height: 96px; width: 118px;\" rowspan=\"3\">Body</td>\n<td style=\"height: 58px; width: 224px;\">Build Volume (W*D*H)</td>\n<td style=\"height: 58px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Single Nozzle Printing: 325*320*320 mm&sup3; (Left)</div>\n<div data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">Single Nozzle Printing: 305*320*325 mm&sup3; (Right)</div>\n<div data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\">Dual Nozzle Printing: 300*320*325 mm&sup3;</div>\n<div data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\">Total Volume for Two Nozzles: 330*320*325 mm&sup3;</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Chassis</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Aluminum and Steel</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Outer Frame</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Plastic and Glass</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 77px; width: 118px;\" rowspan=\"2\">Physical Dimensions</td>\n<td style=\"height: 19px; width: 224px;\">Physical Dimensions</td>\n<td style=\"height: 19px; width: 613px;\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">492*514*626 mm&sup3;</div>\n</div>\n</div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Recommended Space for Printer: 700mm*700mm*1100mm</div>\n</td>\n</tr>\n<tr style=\"height: 58px;\">\n<td style=\"height: 58px; width: 224px;\">Net Weight</td>\n<td style=\"height: 58px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">32.5 kg</div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">(Gross Weight: H2C AMS Combo 44.7 kg; H2C Laser Full Combo-10W 49.0kg;</div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C Laser Full Combo-10W 49.5 kg)</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 133px; width: 118px;\" rowspan=\"7\">Toolhead</td>\n<td style=\"height: 19px; width: 224px;\">Extruder Gear</td>\n<td style=\"height: 19px; width: 613px;\">Hardened Steel</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Nozzle</td>\n<td style=\"height: 19px; width: 613px;\">Hardened Steel</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Max Nozzle Temperature</td>\n<td style=\"height: 19px; width: 613px;\">350 &deg;C</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Supported Nozzle Diameter</td>\n<td style=\"height: 19px; width: 613px;\">0.2 mm, 0.4 mm, 0.6 mm, 0.8 mm</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Filament Cutter</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Built-in</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Filament Diameter</td>\n<td style=\"height: 19px; width: 613px;\">1.75 mm</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Extruder Motor</td>\n<td style=\"height: 19px; width: 613px;\">Bambu Lab High-precision Permanent Magnet Synchronous Motor</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 118px; height: 76px;\" rowspan=\"4\">Heatbed</td>\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Build Plate Material</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Flexible Steel Plate</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Included Build Plate Type</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Textured PEI Plate</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Supported Build Plate Type</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Textured PEI plate, Engineering Plate</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Max Heatbed Temperature</td>\n<td style=\"height: 19px; width: 613px;\">120 ℃</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 96px; width: 118px;\" rowspan=\"3\">Speed</td>\n<td style=\"height: 19px; width: 224px;\">Max Speed of Toolhead</td>\n<td style=\"height: 19px; width: 613px;\">1000 mm/s</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Max Acceleration of Toolhead</td>\n<td style=\"height: 19px; width: 613px;\">20,000 mm/s&sup2;</td>\n</tr>\n<tr style=\"height: 58px;\">\n<td style=\"height: 58px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Max Flow for Hotend</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"height: 58px; width: 613px;\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">40 mm&sup3;/s</div>\n<div data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">(Test parameters: 250 mm round model with a single outer wall; Bambu Lab ABS; 280 &deg;C printing temperature)</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 38px; width: 118px;\" rowspan=\"2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Chamber Temperature Control</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Active Chamber Heating</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Supported</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Max Temperature</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">65 &deg;C</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 86px; width: 118px;\" rowspan=\"5\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Air Purification</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Pre-filter Grade</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">G3</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">HEPA Filter Grade</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H12</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Activated Carbon Filter Type</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Granulated Coconut Shell</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 10px;\">\n<td style=\"width: 224px; height: 10px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">VOC Filtration</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 10px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Superior</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Particulate Matter Filtration</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Supported</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 118px; height: 133px;\" rowspan=\"7\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Cooling</div>\n</div>\n</td>\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Part Cooling Fan</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Cooling Fan for Hotend</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Main Control Board Fan</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Chamber Exhaust Fan</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Chamber Heat Circulation Fan</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Auxiliary Part Cooling Fan</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Toolhead Enhanced Cooling Fan</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Closed Loop Control</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 98px;\">\n<td style=\"height: 98px; width: 118px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Supported Filament Type</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"height: 98px; width: 837px;\" colspan=\"2\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">PLA, PETG, TPU, PVA, BVOH, ABS, ASA, PC, PA, PET, PPS;Carbon/Glass Fiber Reinforced PLA, PETG, PA, PET, PC, ABS, ASA, PPA, PPS</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 171px; width: 118px;\" rowspan=\"9\">Sensor</td>\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Live View Camera</div>\n</div>\n</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Built-in; 1920*1080</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Nozzle Camera</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Built-in; 1920*1080</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">BirdsEye Camera</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Built-in; 3264*2448 (Equipped with Laser Edition)</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Toolhead Camera</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Built-in; 1600*1200</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Door Sensor</td>\n<td style=\"height: 19px; width: 613px;\">Supported</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Filament Run Out Sensor</td>\n<td style=\"height: 19px; width: 613px;\">Supported</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Filament Tangle Sensor</td>\n<td style=\"height: 19px; width: 613px;\">Supported</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Filament Odometry</td>\n<td style=\"height: 19px; width: 613px;\">Supported with AMS</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Power Loss Recovery</td>\n<td style=\"height: 19px; width: 613px;\">Supported</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 57px; width: 118px;\" rowspan=\"4\">Electrical Requirements</td>\n<td style=\"height: 19px; width: 224px;\">Voltage</td>\n<td style=\"height: 19px; width: 613px;\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">100-120 VAC, 50/60 Hz</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Max Power*</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">1250 W@110 V</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Typical Power</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">200 W@110 V (Single Nozzle Printing PLA)</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px;\" colspan=\"2\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Please purchase the version corresponding to your region's voltage. Using the Printer in different regions, you may need to purchase a transformer accordingly.</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 39px;\">\n<td style=\"width: 118px; height: 39px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Working Temperature</div>\n</div>\n</td>\n<td style=\"width: 224px; height: 39px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">&nbsp;</div>\n</div>\n</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 39px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">10 &deg;C-30 &deg;C</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 95px; width: 118px;\" rowspan=\"5\">Electronics</td>\n<td style=\"height: 19px; width: 224px;\">Touchscreen</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">5-inch 720*1280 Touchscreen</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Storage</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Built-in 8 GB EMMC and USB Port</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Control Interface</td>\n<td style=\"height: 19px; width: 613px;\">Touchscreen, mobile App, PC App</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Motion Controller</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Dual-core Cortex-M4 and Single-core Cortex-M7</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Application Processor</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Quad-core ARM with NPU</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 58px;\">\n<td style=\"height: 77px; width: 118px;\" rowspan=\"2\">Software</td>\n<td style=\"height: 58px; width: 224px;\">Slicer</td>\n<td style=\"height: 58px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Bambu Studio</div>\n<div data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">Supports third-party slicers which export standard G-code, such as Super Slicer, PrusaSlicer and Cura, but certain advanced features may not be supported.</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Supported Operating System</td>\n<td style=\"height: 19px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">MacOS, Windows, Linux</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 118px; height: 95px;\" rowspan=\"5\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Network Control</div>\n</div>\n</td>\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Ethernet</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Not Available</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Wireless Network</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Wi-Fi</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Network Kill Switch</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Not Available</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Removable Network Module</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Not Available</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 224px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">802.1X Network Access Control</div>\n</div>\n</td>\n<td style=\"width: 613px; height: 19px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Not Available</div>\n</div>\n</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 39px;\">\n<td style=\"height: 136px; width: 118px;\" rowspan=\"3\">Wi-Fi</td>\n<td style=\"height: 39px; width: 224px;\">Operating Frequency</td>\n<td style=\"height: 39px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">2412 - 2472 MHz, 5150 - 5850 MHz (FCC/CE)</div>\n<div data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">2400 - 2483.5 MHz, 5150 - 5850 MHz (SRRC)</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 78px;\">\n<td style=\"height: 78px; width: 224px;\">Wi-Fi Transmitter Power (EIRP)</td>\n<td style=\"height: 78px; width: 613px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">2.4 GHz: &lt;23 dBm (FCC); &lt;20 dBm (CE/SRRC/MIC)</div>\n<div data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">5 GHz Band1/2: &lt;23 dBm (FCC/CE/SRRC/MIC)</div>\n<div data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\">5 GHz Band3: &lt;30 dBm (CE); &lt;24 dBm (FCC)</div>\n<div data-zone-id=\"0\" data-line-index=\"3\" data-line=\"true\">5 GHz Band4: &lt;23 dBm (FCC/SRRC); &lt;14 dBm (CE)</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"height: 19px; width: 224px;\">Wi-Fi Protocol</td>\n<td style=\"height: 19px; width: 613px;\">IEEE 802.11 a/b/g/n</td>\n</tr>\n</tbody>\n</table>",
+     "tableNote": "឵",
+     "collapseText": "Expand table",
+     "notCollapseText": "Collapse table"
+    }
+   },
+   {
+    "componentName": "UnboxInfo",
+    "componentType": "Unbox",
+    "data": {
+     "anchorId": "139739",
+     "title": "Unboxing Video",
+     "note": "",
+     "videoUrl": {
+      "resourceFileId": "667214039966412800",
+      "url": "https://store.bblcdn.com/s7/default/6ae0b54126df45deba1d495efc1a4045/kaixiang_shipin.mp4",
+      "fileOriginalName": "kaixiang_shipin.mp4"
+     },
+     "componentType": "Unbox"
+    }
+   },
+   {
+    "componentName": "InboxInfo",
+    "componentType": "Inbox",
+    "data": {
+     "title": "What's in the box",
+     "headers": {
+      "column1": "",
+      "column2": "H2C AMS Combo",
+      "column3": "H2C Laser Full Combo",
+      "column4": ""
+     },
+     "items": [
+      {
+       "id": "comp_1761789070257_upappk1xk",
+       "column1": {
+        "image": [
+         {
+          "id": "665450600908754944",
+          "fileOriginalName": "H2C-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/810d3a49fa08482590e01931698c5bec/H2C-tuya.png",
+          "resourceFileId": "665450602252488704"
+         }
+        ],
+        "text": "H2C"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1761789251966_0zc9ksfnd",
+       "column1": {
+        "image": [
+         {
+          "id": "665450632136003584",
+          "fileOriginalName": "H2C_Laser_Edition-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/b3dc5d91991e47cdbc9f7794e13b1a5d/H2C_Laser_Edition-tuya.png",
+          "resourceFileId": "665450633550532608"
+         }
+        ],
+        "text": "H2C Laser Edition"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500081524_iee7qvg55",
+       "column1": {
+        "image": [
+         {
+          "id": "665450665383596032",
+          "fileOriginalName": "Build_Plate-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/767aa5776c0e464086558aa563648a29/Build_Plate-tuya.png",
+          "resourceFileId": "665450666924609536"
+         }
+        ],
+        "text": "Build Plate"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500081993_rtx3avqgb",
+       "column1": {
+        "image": [
+         {
+          "id": "665450709291827200",
+          "fileOriginalName": "Spool_Holder-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/2da50a9e531a4c58af5c3ce7f5afbf71/Spool_Holder-tuya.png",
+          "resourceFileId": "665450710922711040"
+         }
+        ],
+        "text": "Spool Holder"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500082580_o0mm4j30s",
+       "column1": {
+        "image": [
+         {
+          "id": "665450739479719936",
+          "fileOriginalName": "0.4mm_Induction_Hotend-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/58bb1e92eb9f442f9a8cb9dc3651a886/0.4mm_Induction_Hotend-tuya.png",
+          "resourceFileId": "665450741117505536"
+         }
+        ],
+        "text": "0.4mm Induction Hotend"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "4"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "4"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500082852_s6ay2fsoq",
+       "column1": {
+        "image": [
+         {
+          "id": "665450770620940288",
+          "fileOriginalName": "0.2mm_Induction_Hotend-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/247562cfb77d485facf6f6c99520c284/0.2mm_Induction_Hotend-tuya.png",
+          "resourceFileId": "665450772121948160"
+         }
+        ],
+        "text": "0.2mm Induction Hotend"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500083193_w2oa6jb1d",
+       "column1": {
+        "image": [
+         {
+          "id": "665450800319807488",
+          "fileOriginalName": "0.6mm_Induction_Hotend-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/1dff4b99bad341478baff115aba2e449/0.6mm_Induction_Hotend-tuya.png",
+          "resourceFileId": "665450801842786304"
+         }
+        ],
+        "text": "0.6mm Induction Hotend"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1763534860332_a4z9wrrmg",
+       "column1": {
+        "image": [
+         {
+          "id": "667567889277456384",
+          "fileOriginalName": "0.4mm_regular_Hotend.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/fdca641d70604e8f822e7dccfbfb14b8/0.4mm_regular_Hotend.png",
+          "resourceFileId": "667567891827781632"
+         }
+        ],
+        "text": "0.4mm Hardened Steel Hotend"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "2"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "2"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1763529688435_67gccn9br",
+       "column1": {
+        "image": [
+         {
+          "id": "667546273457319936",
+          "fileOriginalName": "0.2mm_regular_Hotend.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/bf20c78682964124a790c55ea51ec41c/0.2mm_regular_Hotend.png",
+          "resourceFileId": "667546276943491072"
+         }
+        ],
+        "text": "0.2mm Stainless Steel Hotend"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1763529689064_hdjmqidc4",
+       "column1": {
+        "image": [
+         {
+          "id": "667546343629864960",
+          "fileOriginalName": "0.6mm_regular_Hotend.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/3f89b6a86ab04939a8cb0b36f805fd8f/0.6mm_regular_Hotend.png",
+          "resourceFileId": "667546345002029056"
+         }
+        ],
+        "text": "0.6mm Hardened Steel Hotend"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500343821_nrwxlmtme",
+       "column1": {
+        "image": [
+         {
+          "id": "665450831620190208",
+          "fileOriginalName": "4-in-1_PTFE_Adapter_II.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/5d997e9316ed4f7f95b859fa8300613c/4-in-1_PTFE_Adapter_II.png",
+          "resourceFileId": "665450833106980864"
+         }
+        ],
+        "text": "4-in-1 PTFE Adapter II"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500344567_88a230k85",
+       "column1": {
+        "image": [
+         {
+          "id": "665450859010703360",
+          "fileOriginalName": "Accessory_Box-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/b3f8ba1040604c93940c091384ad01e1/Accessory_Box-tuya.png",
+          "resourceFileId": "665450860361568256"
+         }
+        ],
+        "text": "Accessory Box"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500345446_hv5ovs600",
+       "column1": {
+        "image": [
+         {
+          "id": "665450891743191040",
+          "fileOriginalName": "AMS_2_Pro-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/268028914d83486d9e60729e07d21d22/AMS_2_Pro-tuya.png",
+          "resourceFileId": "665450893110841344"
+         }
+        ],
+        "text": "AMS 2 Pro"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500346254_dn6eibcqe",
+       "column1": {
+        "image": [
+         {
+          "id": "665450921950568448",
+          "fileOriginalName": "AMS_HT.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/bd22ba9893fd40f2bb5b6f4bb991a2f6/AMS_HT.png",
+          "resourceFileId": "665450923204972544"
+         }
+        ],
+        "text": "AMS HT"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500452437_0z2wky5s6",
+       "column1": {
+        "image": [
+         {
+          "id": "665450957674598400",
+          "fileOriginalName": "10W_Laser_Module-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/a31ad107bfd94d618d84f43be48cc294/10W_Laser_Module-tuya.png",
+          "resourceFileId": "665450959074512896"
+         }
+        ],
+        "text": "10W Laser Module"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "depending on option"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500452997_e2wyvsf2s",
+       "column1": {
+        "image": [
+         {
+          "id": "665450984596037632",
+          "fileOriginalName": "40W_Laser_Module-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/d4cb7aae8fc84c228f55772050dd9534/40W_Laser_Module-tuya.png",
+          "resourceFileId": "665450986035499008"
+         }
+        ],
+        "text": "40W Laser Module"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "depending on option"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500458925_0i4oh0jl5",
+       "column1": {
+        "image": [
+         {
+          "id": "665451022275268608",
+          "fileOriginalName": "Cutting_Module_(with_Pen_holder)-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/03a096c4f99c48e8b5ec7f9104e8e128/Cutting_Module_(with_Pen_holder)-tuya.png",
+          "resourceFileId": "665451023650164736"
+         }
+        ],
+        "text": "Cutting Module (with Pen holder)"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500459709_3hcwkllqf",
+       "column1": {
+        "image": [
+         {
+          "id": "665451060735152128",
+          "fileOriginalName": "Laser_Platform-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/8831fd4d6bc7425dacc1e7d2d6b4bfa3/Laser_Platform-tuya.png",
+          "resourceFileId": "665451062136950784"
+         }
+        ],
+        "text": "Laser Platform"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500460414_yz1a8z303",
+       "column1": {
+        "image": [
+         {
+          "id": "665451094893649920",
+          "fileOriginalName": "Cutting_Platform.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/8cf4b918d02843ca95caf6fff3ad4c50/Cutting_Platform.png",
+          "resourceFileId": "665451096626860032"
+         }
+        ],
+        "text": "Cutting Platform"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      },
+      {
+       "id": "comp_1762500461122_4fxn9nnr1",
+       "column1": {
+        "image": [
+         {
+          "id": "665451129416880128",
+          "fileOriginalName": "Emergency_Stop_Button-tuya.png",
+          "dataType": "png",
+          "url": "https://store.bblcdn.com/s7/default/29e403f4d80e4827a43bc54c57f36533/Emergency_Stop_Button-tuya.png",
+          "resourceFileId": "665451130768494592"
+         }
+        ],
+        "text": "Emergency Stop Button"
+       },
+       "column2": {
+        "showCheckIcon": false,
+        "text": ""
+       },
+       "column3": {
+        "showCheckIcon": false,
+        "text": "1"
+       },
+       "column4": {
+        "showCheckIcon": false,
+        "text": ""
+       }
+      }
+     ],
+     "componentType": "Inbox"
+    }
+   },
+   {
+    "componentName": "ExploreMoreInfo",
+    "componentType": "ExploreMoreInfo",
+    "data": null
+   },
+   {
+    "componentName": "FAQConfig",
+    "componentType": "FAQ",
+    "data": {
+     "anchorId": "386033",
+     "title": "FAQ",
+     "faqItems": [
+      {
+       "question": "1. What hotends are included in the H2C Combo? ",
+       "answer": "<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">The <strong>H2C AMS Combo/Laser Full Combo</strong> includes <strong>8 hotends </strong>and <strong>1 AMS 2 Pro</strong>: <strong>Right hotends (Induction hotends)</strong>: 4 &times;<strong> 0.4 mm hardened steel induction hotends</strong>, of which <strong>1 </strong>is pre-installed on the printer and<strong> 3</strong> are included in the accessory box. The accessory box also includes <strong>1 &times; 0.2 mm induction hotend</strong> and <strong>1 &times; 0.6 mm induction hotend</strong>. <strong>Left hotends (Standard hotends):</strong> 2 &times; <strong>0.4 mm hardened steel standard hotends</strong>, of which<strong> 1</strong> is pre-installed and <strong>1 </strong>is included in the accessory box. <br>Currently, the firmware supports <strong>mixed flow-rate printing</strong> (standard flow + high flow), but <strong>does not yet support mixing different nozzle sizes during printing</strong>. If this feature is added in the future, we will provide details through a software update.</div>"
+      },
+      {
+       "question": "2. If I want full hotend-swap capability, what additional hotends do I need? How should the AMS be connected?",
+       "answer": "<div>To fully experience the Vortek 6-hotend automatic swap system, we recommend purchasing extra AMS and Hotends which include: 3 &times; 0.4 mm induction hotends, 1 &times; 0.2 mm left hotend, 1 &times; 0.6 mm left hotend, 1 x AMS 2 Pro, 1 x AMS HT.<br>Combined with the AMS 2 Pro that comes with the H2C Combo, you will then have 2 &times; AMS 2 Pro + 1 &times; AMS HT.<br>To setup: Two AMS 2 Pro feed the right induction hotends; AMS HT feeds the left hotends. This gives you full 7-hotend automatic swapping with AMS support on both sides.<br>In addition to the above options, you can also try:<br>Multi-AMS Setup: Add 2 &times; AMS HT. All three AMS feed the right-side hotends.<br>Future Setup (2026): A Filament Track Switch Module will be released, allowing full 7-hotend support with only 2 AMS units, enabling free filament switching between left &amp; right filament paths.</div>"
+      },
+      {
+       "question": "3. Does the H2C support laser and blade-cutting functions?",
+       "answer": "<div>The H2C Laser Edition supports both 10W and 40W laser modules and is also compatible with the blade-cutting module.<br>The non-laser H2C supports blade-cutting by default, but can be upgraded to support laser functions via an upgrade kit.</div>"
+      },
+      {
+       "question": "4. Can H2S or H2D be upgraded to H2C?",
+       "answer": "<div>Both H2D and H2S users may upgrade to H2C by installing the Vortek Upgrade Kit.<br>However, the upgrade process is complex and time-consuming, so users who want the Vortek experience are recommended to purchase H2C directly.<br>Purchasing H2S/H2D first and upgrading later will incur extra cost.<br>The Vortek Upgrade Kit is expected to be available in early 2026.</div>"
+      },
+      {
+       "question": "5. Can H2C dual-nozzle printing be used with different nozzle sizes simultaneously?",
+       "answer": "<div>Not currently.<br>The firmware does not yet support mixing nozzle sizes (left vs. right or within Vortek hotend sets).<br>However, mixed nozzle types of the same size (e.g., 0.4 mm standard flow + 0.4 mm high flow) are supported.</div>"
+      },
+      {
+       "question": "6. Are the H2C buildplates, calibration plates, laser platform, and blade-cutting mats compatible with H2D?",
+       "answer": "<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">Because the Vortek hotend rack occupies additional space, the H2C print bed is slightly smaller than the H2D.</div>\n<div data-zone-id=\"0\" data-line-index=\"1\" data-line=\"true\">Therefore, buildplates are not interchangeable between H2C and H2D.</div>\n<div data-zone-id=\"0\" data-line-index=\"2\" data-line=\"true\">However, the vision calibration plates, laser platform, and blade-cutting mats are fully compatible across all H2 series models. For more details, please refer to <a href=\"https://wiki.bambulab.com/en/h2c/manual/h2c-faq\" target=\"_blank\" rel=\"noopener noreferrer\">Wiki</a>.</div>\n</div>"
+      },
+      {
+       "question": "7. How will my order be shipped and divided into packages?",
+       "answer": "<div>\n<table style=\"border-collapse: collapse; width: 100%; height: 82px;\" border=\"1px\">\n<tbody>\n<tr style=\"height: 23px;\">\n<td style=\"width: 20%; height: 16px; text-align: left; border: 1px solid #d9d9d9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>Item</strong></div>\n</div>\n</td>\n<td style=\"width: 20%; height: 16px; text-align: left; border: 1px solid #d9d9d9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>Package Amount</strong></div>\n</div>\n</td>\n<td style=\"width: 20%; height: 16px; text-align: left; border: 1px solid #d9d9d9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>Package 1</strong></div>\n</div>\n</td>\n<td style=\"width: 20%; height: 16px; text-align: left; border: 1px solid #d9d9d9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\"><strong>Package 2</strong></div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 20%; height: 28px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C AMS Combo</div>\n</div>\n</td>\n<td style=\"width: 20%; height: 28px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">1</td>\n<td style=\"width: 20%; height: 28px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C AMS Combo</div>\n</div>\n</td>\n<td style=\"width: 20%; height: 28px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">&nbsp;</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C Laser Full Combo - 10W Laser</div>\n</div>\n</td>\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">2</td>\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C Laser Full Combo</div>\n</div>\n</td>\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">10W Laser</div>\n</div>\n</td>\n</tr>\n<tr style=\"height: 19px;\">\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C Laser Full Combo - 40W Laser</div>\n</div>\n</td>\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">2</td>\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">H2C Laser Full Combo</div>\n</div>\n</td>\n<td style=\"width: 20%; height: 19px; text-align: left; border: 1px solid #D9D9D9; padding: 4px;\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">40W Laser</div>\n</div>\n</td>\n</tr>\n</tbody>\n</table>\n</div>"
+      },
+      {
+       "question": "8. Are there any limitation of the Left and Right Hotends when using different filaments？",
+       "answer": "<div>Please check <a href=\"https://wiki.bambulab.com/en/h2c/h2c-filament-printing-guide\" target=\"_blank\" rel=\"noopener\">WIKI</a> for detailed information. For TPU please check <a href=\"https://wiki.bambulab.com/en/h2/h2d-tpu-printing-guide\" target=\"_blank\" rel=\"noopener\">TPU 85A&amp;90A printing guide</a> for H2 series.</div>"
+      }
+     ],
+     "componentType": "FAQ"
+    }
+   },
+   {
+    "componentName": "FootNoteInfo",
+    "componentType": "FootNote",
+    "data": {
+     "anchorId": "386033",
+     "footNote": "<div>Note:<br>* All the demonstrated print time &amp; purge waste data are calculated results by Bambu Studio.<br>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">* The advertised Vortek features &amp; advantages are based on fully utilizing 6 induction hotends of same diameter and corresponding AMS units.</div>\n</div>\n* All product data for the H2C is based on Bambu Lab&rsquo;s internal testing. Actual results may vary due to individual product differences, user habits, and environmental conditions. Please refer to actual usage for reference.<br>* The optional Vision Encoder is required for Motion Accuracy Enhancement.<br>* Auto Holes-contour Compensation must be enabled in Bambu Studio, and designated Bambu filament must be used.<br>* DynaSense Extruder filament grinding feature limited by filament type.<br>* \"59 sensors\" is refer to fully equipped H2C Laser Edition with Bird's Eye camera and 6 induction hotends.<br>* High-flow Hotends are optional equipments, buy at official store.<br>* Due to safety protocol, Developer mode cannot be enabled when using Laser and Cutting functions.<br>* Push notifications require use of Bambu Handy and cloud connectivity.<br>* Creator projects are provided for illustrative purposes only. Bambu Lab does not endorse, and disclaims any representations or warranties regarding creator projects, including, without limitation, the safety, marketability, or usability of any 3D printed works based on such projects. See our Terms of Service for more information.<br><!--EndFragment--></div>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">* The 8-second heating time for induction hotend is based on Bambu PLA Basic printing temperature.</div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">* The &ldquo;no purging&rdquo; claim does not include the initial purge required when loading a brand-new filament into a hotend.</div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">* The fire-retardant chamber is made using UL94 V-0 grade materials.</div>\n</div>\n</div>\n</div>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">* Big thanks to everyone who created these amazing projects: Geminaraptor by @FireBird(Sophie); Bambu Lab Racer by @Mr.Rod; Bl&eacute;riot Rider - XI by @CrazyJN; Heavy Second Core Mecha by @Kit Crafters; Aero Mobius Drone Frame by @极尘悦; Multi-color Sneaker by @CloudBerry; Gridfinity Anatomical Kidney by @Azrael; Plant Cell by @suezou; EV Charger by @Bambu Lab</div>\n</div>\n</div>\n</div>\n<div>&nbsp;</div>\n<div>\n<div data-zone-id=\"0\" data-line-index=\"0\" data-line=\"true\">&nbsp;</div>\n</div>\n<div>&nbsp;</div>",
+     "componentType": "FootNote"
+    }
+   },
+   {
+    "componentName": "Showcase",
+    "componentType": "Showcase",
+    "data": null
+   }
+  ]
+ },
+ "jsonld": [
+  {
+   "@type": "ProductGroup",
+   "productGroupID": "667505441249849344",
+   "hasVariant": [
+    {
+     "sku": "667505441262432266"
+    },
+    {
+     "sku": "667505441262432276"
+    },
+    {
+     "sku": "667505441262432281"
+    },
+    {
+     "sku": "761030943904460802"
+    }
+   ],
+   "brand": {
+    "name": "Bambu Lab"
+   }
+  }
+ ]
+}

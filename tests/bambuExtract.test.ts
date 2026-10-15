@@ -94,12 +94,13 @@ test('the identity cross-check holds on the page and all 8 samples; handles are 
   }
 });
 
-test('the description format of each sample is detected (A, B, C, D1, D2)', () => {
+test('the description format of each sample is detected (A, B, C, D1, D2, E)', () => {
   const kinds = Object.fromEntries(SAMPLE_HANDLES.map((h) => [h, sample(h).description.kind]));
   assert.equal(kinds['ams-2-pro-feeder-unit'], 'legacy_html');
   assert.equal(kinds['build-plate-combo'], 'sections_html');
   assert.equal(kinds['pla-basic-filament'], 'page_builder');
   assert.equal(kinds.a1, 'bespoke_shopify_port');
   assert.equal(kinds.h2d, 'bespoke_new');
+  assert.equal(sample('h2c').description.kind, 'component_list', 'a format-E sample keeps its component list');
   assert.equal(page().extraction.description.kind, 'legacy_html');
 });

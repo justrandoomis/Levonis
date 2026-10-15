@@ -10,7 +10,8 @@
  *                          plus the messages spec table where the page renders one
  *
  * Cleaning on every format: no <style>, comments, paste-helper buttons or the
- * placeholder alt `图片加载失败文案`; store-test images ignored; queries stripped
+ * placeholder alt `图片加载失败文案`; images and videos on the store's test and
+ * dev CDNs (`store-test` / `store-dev.bblcdn.com`) ignored; queries stripped
  * from kept links; tracker links collected for ENRICH (never followed here);
  * relative store links turned into handles. Every sentence is classified
  * later (sentences.ts) — nothing here decides what a customer may read.
@@ -99,9 +100,12 @@ function cleanAlt(alt: string): string {
   return a === PLACEHOLDER_ALT ? '' : a;
 }
 
+/** The store's non-production CDNs: a page that still points at them is never ingested from them (§C.4 rights). */
+const NON_PRODUCTION_CDN = /^https:\/\/store-(?:test|dev)\.bblcdn\.com\//i;
+
 function imageUrl(raw: string): string {
   const u = absolutize(raw.trim());
-  return /^https:\/\//i.test(u) ? u : '';
+  return /^https:\/\//i.test(u) && !NON_PRODUCTION_CDN.test(u) ? u : '';
 }
 
 /** Flattens nodes into events in document order. */
@@ -147,7 +151,7 @@ function flatten(nodes: readonly HtmlNode[], out: Ev[]): void {
     }
     if (tag === 'img') {
       const url = imageUrl(n.attrs['data-src'] || n.attrs.src || '');
-      if (url && !/store-test\.bblcdn\.com/i.test(url)) {
+      if (url) {
         flush();
         out.push({ e: 'image', url, alt: cleanAlt(n.attrs.alt ?? '') });
       }
@@ -655,8 +659,8 @@ function bespokeNew(src: Extract<DescriptionSource, { kind: 'bespoke_new' }>, d:
 // ---------------------------------------------------------------- E: the component list (H2S, P2S, H2C …)
 
 const E_KIND: Readonly<Record<string, SectionKind>> = { SpecTable: 'specs', Inbox: 'in_the_box', FAQ: 'faq', FootNote: 'other' };
-/** Components that are no product description: the anchor bar and the MakerWorld model showcase. */
-const E_SKIP: ReadonlySet<string> = new Set(['Anchor', 'EndlessModels']);
+/** The anchor bar is navigation, never a description. */
+const E_SKIP: ReadonlySet<string> = new Set(['Anchor']);
 const E_TEXT_KEYS: ReadonlySet<string> = new Set([
   'title', 'subtitle', 'subTitle', 'mainTitleText', 'subtitleText', 'description', 'text', 'originalText', 'h2Text', 'caption', 'note',
   'footNote', 'featureTitle', 'featureSubtitle', 'descriptionInfoTitle', 'descriptionInfoDescription', 'label', 'leftLabel',
@@ -665,6 +669,30 @@ const E_TEXT_KEYS: ReadonlySet<string> = new Set([
 const E_LINK_KEYS: ReadonlySet<string> = new Set(['link', 'downloadLink', 'buttonUrl']);
 const E_VIDEO_KEYS: ReadonlySet<string> = new Set(['videoUrl', 'mediaUrl', 'pcVideo']);
 const VIDEO_FILE = /\.(mp4|mov|webm|m3u8)(\?|#|$)/i;
+
+/** A text prop: a string, or an object holding one (`mainTitle: {text}`, `title: {text}`). */
+const eStr = (v: unknown): string => (typeof v === 'string' ? v : str(obj(v).text));
+
+/**
+ * The MakerWorld model showcase: an `EndlessModels` component whose cards are
+ * the MakerWorld / MakerLab / Maker's Supply promotion (`EndlessModels` on the
+ * H2S, `MakerWorldDialog` on the P2S). The same component type carries real
+ * product content elsewhere (the H2C's "Vortek Hotend Change System" and "Why
+ * Vortek?", the H2S's integrated ecosystem), which is kept.
+ */
+function isModelShowcase(componentType: string, data: Record<string, unknown>): boolean {
+  if (componentType !== 'EndlessModels') return false;
+  return arr(data.items).some((it) => /makerworld/i.test(`${str(obj(it).featureSubtitle)} ${str(obj(it).featureTitle)}`));
+}
+
+/** The `<a href>` links of a rich-text prop (FAQ answers and foot notes link the wiki), with their text. */
+function linksOfHtml(raw: string): Array<{ url: string; text: string }> {
+  if (!/<a\s/i.test(raw)) return [];
+  return findAll(parseHtml(raw), (n) => n.type === 'el' && n.tag === 'a' && !!n.attrs.href).map((a) => {
+    const el = a as ElementNode;
+    return { url: el.attrs.href.trim(), text: textOf(el.children) };
+  });
+}
 
 function componentList(components: unknown, d: Described): void {
   const comps = arr(components).map(obj);
@@ -675,16 +703,19 @@ function componentList(components: unknown, d: Described): void {
   }
   comps.forEach((c, i) => {
     const ct = str(c.componentType);
-    if (!ct || E_SKIP.has(ct)) return;
     const data = obj(c.data);
+    if (!ct || E_SKIP.has(ct) || isModelShowcase(ct, data)) return;
     const anchorName = anchors.get(String(data.anchorId ?? '')) ?? '';
     // E titles mark line breaks with '#' ("Multi-Color#3D Printing").
     const eText = (raw: string) => richText(raw).replace(/\s*#\s*/g, ' ').trim();
-    const title = collapseWs(eText(str(data.title) || str(data.mainTitleText) || str(obj(data.pc).title)));
+    const title = collapseWs(eText(eStr(data.title) || str(data.mainTitleText) || eStr(data.mainTitle) || str(obj(data.pc).title) || str(data.h2Text)));
     const byTitle = sectionKindOf(title);
     const byAnchor = sectionKindOf(anchorName);
     const kind: SectionKind = E_KIND[ct] ?? (byTitle !== 'other' ? byTitle : byAnchor !== 'other' ? byAnchor : 'features');
     const s: Section = { kind, title: title || anchorName, path: `e:${str(c.componentName) || ct}[${i}]`, blocks: [] };
+    const htmlLinks = (raw: string) => {
+      for (const l of linksOfHtml(raw)) s.blocks.push({ t: 'link', url: l.url, text: l.text });
+    };
     if (ct === 'SpecTable') {
       const note = richText(str(data.tableNote)) || undefined;
       for (const key of ['notCollapseTable', 'collapseTable'] as const) {
@@ -693,19 +724,21 @@ function componentList(components: unknown, d: Described): void {
         for (const t of findAll(parseHtml(html), (n) => n.type === 'el' && n.tag === 'table', true)) {
           s.blocks.push({ t: 'table', grid: tableGrid(t as ElementNode), note });
         }
+        htmlLinks(html);
       }
       if (note) s.blocks.push({ t: 'text', text: note });
       if (str(data.link)) s.blocks.push({ t: 'link', url: str(data.link), text: 'TDS' });
     } else if (ct === 'Inbox') {
-      // Columns 2… are the versions an item ships with ("H2S AMS Combo", "H2S Laser Full Combo", "H2S").
+      // Two shapes. H2S / H2C: a table whose column 1 is the item and columns 2… the versions it ships with
+      // ("H2S AMS Combo", "H2S Laser Full Combo", "H2S"). P2S: a list of items, each a title and a picture.
       const headers = obj(data.headers);
       const cols = ['column2', 'column3', 'column4', 'column5'].filter((k) => collapseWs(str(headers[k])));
       for (const it of arr(data.items)) {
         const o = obj(it);
         const c1 = obj(o.column1);
-        const parsed = parseBoxItem(richText(str(c1.text)));
+        const parsed = parseBoxItem(richText(str(c1.text) || str(o.title)));
         if (!parsed.text) continue;
-        const image = arr(c1.image).map((x) => imageUrl(str(obj(x).url))).find(Boolean) ?? null;
+        const image = [...arr(c1.image).map((x) => str(obj(x).url)), str(obj(o.imageSrc).url)].map(imageUrl).find(Boolean) ?? null;
         let qty = parsed.qty;
         const scopes: string[] = [];
         for (const k of cols) {
@@ -723,6 +756,7 @@ function componentList(components: unknown, d: Described): void {
         const q = collapseWs(richText(str(o.question)));
         const a = richText(str(o.answer));
         if (q || a) s.blocks.push({ t: 'faq', question: q, answer: a });
+        htmlLinks(str(o.answer));
       }
     } else {
       const seenText = new Set<string>([title]);
@@ -732,6 +766,7 @@ function componentList(components: unknown, d: Described): void {
           if (!raw) return;
           if (/<table/i.test(raw)) {
             for (const t of findAll(parseHtml(raw), (n) => n.type === 'el' && n.tag === 'table', true)) s.blocks.push({ t: 'table', grid: tableGrid(t as ElementNode) });
+            htmlLinks(raw);
             return;
           }
           if (E_LINK_KEYS.has(key)) {
@@ -739,7 +774,8 @@ function componentList(components: unknown, d: Described): void {
             return;
           }
           if (E_VIDEO_KEYS.has(key)) {
-            if (/^https?:\/\//i.test(raw)) s.blocks.push({ t: 'video', url: raw });
+            const u = imageUrl(raw);
+            if (u) s.blocks.push({ t: 'video', url: u });
             return;
           }
           if (E_TEXT_KEYS.has(key) || /^image\d{1,2}(?:Title|Subtitle)$/.test(key)) {
@@ -748,6 +784,7 @@ function componentList(components: unknown, d: Described): void {
               seenText.add(t);
               s.blocks.push({ t: 'text', text: t });
             }
+            htmlLinks(raw);
           }
           return;
         }
@@ -758,6 +795,11 @@ function componentList(components: unknown, d: Described): void {
         const o = obj(v);
         const url = str(o.url);
         if (url) {
+          // A "Learn More" button ({text, url}) is a link, never a picture.
+          if (E_LINK_KEYS.has(key)) {
+            if (/^https?:\/\//i.test(url.trim())) s.blocks.push({ t: 'link', url: url.trim(), text: collapseWs(str(o.text)) });
+            return;
+          }
           const u = imageUrl(url);
           if (!u) return;
           if (VIDEO_FILE.test(u) || E_VIDEO_KEYS.has(key)) s.blocks.push({ t: 'video', url: u });
@@ -766,7 +808,8 @@ function componentList(components: unknown, d: Described): void {
         }
         for (const [k, x] of Object.entries(o)) walk(x, k);
       };
-      for (const [k, x] of Object.entries(data)) if (k !== 'title' && k !== 'anchorId') walk(x, k);
+      for (const [k, x] of Object.entries(data)) if (k !== 'title' && k !== 'anchorId' && k !== 'mainTitle') walk(x, k);
+      // A `title: {text}` object is the section title, already taken; a plain string title was skipped above.
     }
     if (s.blocks.length) d.sections.push(s);
   });
