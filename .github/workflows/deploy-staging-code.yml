@@ -689,8 +689,41 @@ jobs:
       # 200), but it would have reported "an endpoint did not answer 200",
       # leaving whoever read it to work out why. /api/health now carries the
       # answer, so the failure names its own cause in one line.
+      # WAIT FOR THE NEW WORKER BEFORE ANYTHING IS JUDGED (2026-10-15).
+      #
+      # The run of 711d1b9e deployed catalog-only and then failed its cost
+      # probes: for about half a minute some requests were still answered by
+      # the previous Worker (its /api/health said it expected 0192 while the
+      # database was already at 0193 — "ahead", which this step accepted), so
+      # the probes read the OLD code's 404 for a product the NEW code shows.
+      # The live API therefore has to report the schema THIS checkout expects
+      # (worker/lib/schemaVersion.ts: the migration name and the file count)
+      # three times in a row before the database check, the live verify and
+      # the probes run. A commit that changes no migration cannot be told
+      # apart this way; the deploys that change the schema — the ones whose
+      # probes depend on it — can.
       - name: The live database is as new as the code that just shipped
         run: |
+          want=$(sed -nE "s/^export const EXPECTED_MIGRATION = '([^']+)';.*/\1/p" worker/lib/schemaVersion.ts)
+          want_count=$(sed -nE 's/^export const EXPECTED_MIGRATION_COUNT = ([0-9]+);.*/\1/p' worker/lib/schemaVersion.ts)
+          [ -n "$want" ] && [ -n "$want_count" ] || { echo "::error::cannot read EXPECTED_MIGRATION / EXPECTED_MIGRATION_COUNT from worker/lib/schemaVersion.ts"; exit 1; }
+          streak=0
+          for i in $(seq 1 30); do
+            seen=$(curl -s --max-time 25 "https://levonis-iq.com/api/health" | jq -r '"\(.schema.expected // "?") \(.schema.expected_count // "?")"' 2>/dev/null || echo "? ?")
+            if [ "$seen" = "$want $want_count" ]; then
+              streak=$((streak + 1))
+              [ "$streak" -ge 3 ] && break
+            else
+              streak=0
+              echo "attempt $i: the live Worker expects $seen, this run built $want $want_count — waiting for the new Worker"
+            fi
+            sleep 6
+          done
+          if [ "$streak" -lt 3 ]; then
+            echo "::error::after 3 minutes the live API still answers from a Worker that does not expect $want ($want_count files) — the new code is not serving every request"
+            exit 1
+          fi
+          echo "the live Worker expects $want ($want_count files), three answers in a row"
           body=$(curl -s --max-time 25 "https://levonis-iq.com/api/health")
           echo "$body" | jq -c '.schema' || { echo "::error::/api/health did not answer JSON"; exit 1; }
           state=$(echo "$body" | jq -r '.schema.state // "missing"')

@@ -48,6 +48,20 @@ Read `docs/PRICING-V2.md` §9.
 
 ## Releases of 2026-10-14/15 (all live, workflow 7 green)
 
+- `711d1b9e` — **Catalog-only + price requests** (DECISIONS 239/240), deployed 2026-10-15 18:25 UTC,
+  migration 0193 (restore point `0000162c-000003c8-00005105-45cba74b6e57de3cd17f0626180fab0e`). Every
+  active product without a V2 price — the old ones hidden since the clean start and every new one —
+  is shown with «السعر غير متوفر حالياً», `price_status: 'unpriced'`, price `null` (never 0) and no
+  stock word; every purchase door refuses it on the server. Signed-in customers can «طلب السعر» (one
+  person counts once per product and selection); the needs-pricing queue sorts by requesters, the
+  owner gets an hourly Telegram digest at thresholds, and consenting requesters are notified when the
+  price is published. Import dependencies D-1…D-7 (Bambu spec §K.1) are in: probe rules `priceKeys` /
+  `requirePriceKeys` / `expectValues`, `cleanstart.json` expects a VISIBLE unpriced product.
+  Workflow 7 of this commit deployed correctly but its cost probes ran while some requests were
+  still answered by the previous Worker (health said "expected 0192, ahead"), so they read the old
+  404; a read-only check right after showed the product live as designed (200, unpriced, null price,
+  public v1 200). Fixed in the next push: the freshness step now waits until /api/health reports this
+  checkout's EXPECTED_MIGRATION and count three times in a row before any check runs.
 - `abd1d411` — **Services S-P2, trade-in v2** (DECISIONS 238), deployed 2026-10-15 15:20 UTC, migration
   0192 (restore point `0000162c-0000005a-00005105-86d5325af4632a5f14b13b3fe9380172`; 21 probes, 0
   failed). Store-safe offer from today's V2 published price (owner parameters, owner-only valuation);
