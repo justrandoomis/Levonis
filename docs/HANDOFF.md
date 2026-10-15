@@ -6,9 +6,12 @@ force-pushes, or alternate deployment path.
 
 ## Bambu Lab one-time catalogue import (DECISIONS 239–241, in progress)
 
-> **Work paused 2026-10-15 ≈20:20 UTC on the owner's request. Continue from `docs/bambu-import/HANDOFF-PLAN.md`**
-> (the build-plan status, the three saved work-in-progress branches `wip/import-ops`, `wip/import-ui`,
-> `wip/import-pkg`, the exact agent briefs, and every procedure). The spec and the P0 data are in `docs/bambu-import/`.
+> **Resumed 2026-10-15 ≈20:40 UTC.** The resume plan is `docs/bambu-import/HANDOFF-PLAN.md`; the spec and the
+> P0 data are in `docs/bambu-import/`. Landed since: the package follow-ups (live) and step 5 (search aliases and the
+> import stock gate). Steps 6, 7 and 8 are built in local worktrees and land one at a time through `ci/<lane>` and
+> workflow 7. The data steps (re-crawl, sealed snapshot, curated files) wait on this environment's network policy:
+> `us.store.bambulab.com`, `store.bblcdn.com`, `wiki.bambulab.com`, the GitHub artifact host
+> `productionresultssa*.blob.core.windows.net` and `levonis-iq.com` are refused from the sandbox.
 
 The owner's brief of 2026-10-15: import every product of us.store.bambulab.com (1,115 in its sitemap) as a
 native, catalog-only Levonis product, one product at a time with a live check before the next, no price,
@@ -28,7 +31,12 @@ for this import only. Catalog-only visibility and «طلب السعر» (row 240
   (`scripts/bambu-import/seal.mjs --keygen <dir>` outside any checkout; open with `unseal.mjs`); only
   `*.sealed` files are uploaded. `scripts/bambu-import/cf.mjs` is the only code that holds Cloudflare
   credentials. The other modes refuse "not yet" until build step 8.
-- **Next (spec §K.2):** step 5 search aliases + the import stock gate; step 6 the token-protected ops endpoint
+- **Stock setup of an imported product (step 5, live with it):** an imported product's V2 price cannot be published
+  (409 `IMPORT_STOCK_NOT_CONFIGURED`) until an admin chooses, in the product form's section ٣ card, «تتبّع الكمية»
+  (every row a sale can reach carries a number) or «بلا تتبّع (حسب الطلب)» — sold by pre-order without a limit, so it
+  needs a pre-order on the product (`IMPORT_STOCK_UNTRACKED_NEEDS_PREORDER`): a direct sale with no recorded stock
+  is closed anyway. «نشر» of a visible, unpriced product with no price typed is a content save (it stays visible).
+- **Next (spec §K.2):** step 6 the token-protected ops endpoint
   and writer; step 7 the product page's knowledge tabs, swatches and gallery; step 8 the runner and the other
   workflow 60 modes; then the reviewed data files, dry runs, the canary `filament-buffer`, the eight audit
   classes and the bulk run. Every code step deploys through workflow 7 like any other push.
