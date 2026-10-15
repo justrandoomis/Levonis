@@ -43,7 +43,10 @@ import {
   creditOrders,
   eventStatement,
   fence,
+  heldInShopElsewhere,
+  heldInShopFence,
   iqdText,
+  partsMeetSql,
   isAbort,
   loadComponents,
   loadRequest,
@@ -101,6 +104,9 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
   if (req.user_id === admin.id) throw refuse('TRADE_IN_OWN_REQUEST');
   if (req.intake_at) throw refuse('TRADE_IN_ALREADY_RECEIVED');
   if (!RECEIVABLE.has(req.status)) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
+  // Review F-4: the slot's device is already in the shop under another request (received, then
+  // cancelled or declined, not handed back) — hand that one back first; never receive it twice.
+  if (await heldInShopElsewhere(db, req.id, req.order_item_id, req.unit_index, req.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');
   const nowIso = new Date().toISOString();
   // §16 D-3: no grace — an offer past its end is gone (the sweep cancels it); a credit already fixed is not an offer.
   if (req.offer_expires_at && Date.parse(req.offer_expires_at) < Date.parse(nowIso) && req.status !== 'awaiting_payment' && req.status !== 'completed') {
@@ -214,6 +220,7 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
       .bind(req.id, nowIso, admin.id, scanned || null, match, intakeJson, handover, pickupFee, ceiling, nextStatus, token, lowered ? 1 : 0, reason, offerNo, req.status),
     fence(db, req.id, token),
     serviceFence(db, req.id, slot),
+    heldInShopFence(db, req.id, req.order_item_id, req.unit_index, req.scope),
     ...comps.map((c) =>
       db.prepare('UPDATE trade_in_components SET intake_inputs_json = ?1 WHERE request_id = ?2 AND role = ?3').bind(JSON.stringify(inputs.get(c.role)), req.id, c.role)
     ),
@@ -285,6 +292,7 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
     if (isAbort(e)) {
       const again = await loadRequest(db, req.id);
       if (again?.intake_at) throw refuse('TRADE_IN_ALREADY_RECEIVED');
+      if (await heldInShopElsewhere(db, req.id, req.order_item_id, req.unit_index, req.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');
       throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
     }
     throw e;
@@ -303,12 +311,23 @@ export async function deviceReturned(env: Env, req: RequestRow, adminId: string)
     throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   }
   const now = new Date().toISOString();
+  // Review F-4: never hand back a device another request on the same slot has received since (it is
+  // that request's now — in the shop, or already stock). The write asks it again.
+  const liveElsewhere = (self: string, item: string, unit: string, scope: string) =>
+    `EXISTS (SELECT 1 FROM trade_in_requests o WHERE o.order_item_id = ${item} AND o.unit_index = ${unit} AND o.id <> ${self}
+              AND o.intake_at IS NOT NULL AND o.status NOT IN ('cancelled','customer_rejected') AND ${partsMeetSql('o.scope', scope)})`;
+  const live = await db
+    .prepare(`SELECT ${liveElsewhere('?1', '?2', '?3', '?4')} AS held`)
+    .bind(req.id, req.order_item_id, req.unit_index, req.scope)
+    .first<{ held: number }>();
+  if (live?.held) throw refuse('TRADE_IN_BAD_STATE', { status: req.status, held_by_other_request: true });
   const res = await db
     .prepare(
       `UPDATE trade_in_requests SET device_returned_at = ?2, device_returned_by = ?3, updated_at = ?2
-        WHERE id = ?1 AND status IN ('cancelled','customer_rejected') AND intake_at IS NOT NULL AND device_returned_at IS NULL`
+        WHERE id = ?1 AND status IN ('cancelled','customer_rejected') AND intake_at IS NOT NULL AND device_returned_at IS NULL
+          AND NOT ${liveElsewhere('?1', '?4', '?5', '?6')}`
     )
-    .bind(req.id, now, adminId)
+    .bind(req.id, now, adminId, req.order_item_id, req.unit_index, req.scope)
     .run();
   if (!res.meta?.changes) throw refuse('TRADE_IN_STALE');
   await db.batch([

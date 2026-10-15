@@ -2,8 +2,9 @@
  * THE CREDIT IS NEVER LOST (DECISIONS rows 237 and 238; Services S-P2 spec §6.9, plan §1.2).
  *
  * A completed trade-in's credit paid for a new device. Two ways it comes back — always as the SAME
- * coupon row (same code; one coupon per request for life), for 30 days, on any device sold
- * directly, never as cash (decision 2 / C14a):
+ * coupon row (same code; one coupon per request for life), on any device sold directly, never as
+ * cash (decision 2 / C14a); for 30 days the first time, for the time it had left after that
+ * (`reissueEndsAt`):
  *
  *   - the order is CANCELLED before delivery, by any door: migration 0192's
  *     `trg_orders_tradein_reissue_on_cancel` writes the re-issue, moves the coupon's end and logs
@@ -65,17 +66,46 @@ export async function tradeInCreditOf(
 }
 
 /**
+ * WHEN A CREDIT GIVEN BACK ENDS (review F-2; the 0192 cancel trigger states the same rule in SQL):
+ * the FIRST time a request's credit comes back it lives 30 days; when it comes back again (the
+ * re-issued credit was spent on this order, which is now returned or cancelled) it keeps the time it
+ * had left — the latest earlier re-issue's end plus the time this order held it — never more than 30
+ * days from now. Giving a credit back can never renew it.
+ */
+export async function reissueEndsAt(db: D1Database, requestId: string, orderId: string, nowIso: string): Promise<string> {
+  const now = Date.parse(nowIso);
+  const fresh = new Date(now + REISSUE_VALID_DAYS * 86_400_000).toISOString();
+  const row = await db
+    .prepare(
+      `SELECT (SELECT MAX(x.ends_at) FROM trade_in_credit_reissues x WHERE x.request_id = ?1 AND x.order_id <> ?2) AS prev_end,
+              (SELECT o.created_at FROM orders o WHERE o.id = ?2) AS order_at`
+    )
+    .bind(requestId, orderId)
+    .first<{ prev_end: string | null; order_at: string | null }>();
+  const prev = row?.prev_end ? Date.parse(row.prev_end) : NaN;
+  if (!Number.isFinite(prev)) return fresh;
+  const since = row?.order_at ? Date.parse(row.order_at) : NaN;
+  const held = Number.isFinite(since) ? Math.max(0, now - since) : 0;
+  const carried = new Date(prev + held).toISOString();
+  return carried < fresh ? carried : fresh;
+}
+
+/**
  * The statements that give a returned device's credit back, for the refund batch (after the
  * wallet credit, before the evidence). Each is conditional on the request being COMPLETED, and the
  * re-issue on none existing for this (request, order) — a second press of the refund, or a second
- * case on the same line, re-issues nothing.
+ * case on the same line, re-issues nothing. `ctx.endsAt` comes from `reissueEndsAt`.
+ *
+ * An order that was cancelled (its credit given back then), reopened, delivered and now returned
+ * already has its (request, order) row: the coupon's end still moves to `endsAt`, the return is
+ * logged, and the FENCE (last) refuses the whole refund when no re-issue row stands for this
+ * (request, order) — a refund netted of the credit never commits without the credit coming back.
  */
 export function returnReissueStatements(
   db: D1Database,
   credit: OrderTradeInCredit,
-  ctx: { orderId: string; returnCaseId: string; userId: string; now: string }
+  ctx: { orderId: string; returnCaseId: string; userId: string; now: string; endsAt: string }
 ): D1PreparedStatement[] {
-  const ends = new Date(Date.parse(ctx.now) + REISSUE_VALID_DAYS * 86_400_000).toISOString();
   const completed = `EXISTS (SELECT 1 FROM trade_in_requests t WHERE t.id = ?1 AND t.status = 'completed')`;
   return [
     db
@@ -87,39 +117,52 @@ export function returnReissueStatements(
          SELECT ?5, ?1, ?2, ?3, 'returned', ?4, ?6, ?7, ?8
           WHERE ${completed} AND NOT EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = ?1 AND x.order_id = ?3)`
       )
-      .bind(credit.requestId, credit.couponId, ctx.orderId, ctx.returnCaseId, newId('tcr'), credit.amount, ends, ctx.now),
+      .bind(credit.requestId, credit.couponId, ctx.orderId, ctx.returnCaseId, newId('tcr'), credit.amount, ctx.endsAt, ctx.now),
     db
       .prepare(
-        `UPDATE coupons SET ends_at = (SELECT x.ends_at FROM trade_in_credit_reissues x WHERE x.request_id = ?1 AND x.order_id = ?3)
-          WHERE id = ?2 AND trade_in_id = ?1 AND EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = ?1 AND x.order_id = ?3 AND x.reason = 'returned')`
+        `UPDATE coupons SET ends_at = ?4
+          WHERE id = ?2 AND trade_in_id = ?1 AND ${completed}
+            AND EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = ?1 AND x.order_id = ?3)`
       )
-      .bind(credit.requestId, credit.couponId, ctx.orderId),
+      .bind(credit.requestId, credit.couponId, ctx.orderId, ctx.endsAt),
     db
       .prepare(
         `INSERT INTO trade_in_events (id, request_id, actor_id, actor_role, action, from_status, to_status, detail_json, created_at)
-         SELECT ?2, x.request_id, NULL, 'system', 'credit_reissued', 'completed', 'completed',
-                json_object('order_id', x.order_id, 'coupon_id', x.coupon_id, 'ends_at', x.ends_at, 'reason', x.reason), ?3
-           FROM trade_in_credit_reissues x
-          WHERE x.request_id = ?1 AND x.order_id = ?4 AND x.reason = 'returned'
-            AND NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = x.request_id AND e.action = 'credit_reissued'
-                              AND json_valid(e.detail_json) AND json_extract(e.detail_json, '$.order_id') = x.order_id)`
+         SELECT ?2, ?1, NULL, 'system', 'credit_reissued', 'completed', 'completed',
+                json_object('order_id', ?4, 'coupon_id', ?5, 'ends_at', ?6, 'reason', 'returned'), ?3
+          WHERE ${completed}
+            AND NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = ?1 AND e.action = 'credit_reissued'
+                              AND json_valid(e.detail_json) AND json_extract(e.detail_json, '$.order_id') = ?4
+                              AND json_extract(e.detail_json, '$.reason') = 'returned')`
       )
-      .bind(credit.requestId, newId('tie'), ctx.now, ctx.orderId),
-    reissueNotice(db, { requestId: credit.requestId, userId: ctx.userId, orderId: ctx.orderId }),
+      .bind(credit.requestId, newId('tie'), ctx.now, ctx.orderId, credit.couponId, ctx.endsAt),
+    reissueNotice(db, { requestId: credit.requestId, userId: ctx.userId, orderId: ctx.orderId, endsAt: ctx.endsAt }),
+    // THE FENCE (review F-5/F-10): no re-issue for this (request, order) → the case's quantity turns
+    // negative, its CHECK aborts the batch: no cash refund netted of a credit that did not come back.
+    db
+      .prepare(`UPDATE return_cases SET qty = -1 WHERE id = ?3 AND NOT EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = ?1 AND x.order_id = ?2)`)
+      .bind(credit.requestId, ctx.orderId, ctx.returnCaseId),
   ];
 }
 
-/** «عاد رصيد الاستبدال — صالح 30 يوماً لأي جهاز متوفر للبيع المباشر» (ar/en/ckb), once per (request, order). */
-export function reissueNotice(db: D1Database, x: { requestId: string; userId: string; orderId: string }): D1PreparedStatement {
+/** «2026-11-14» — the day a credit given back ends, as every language states it. */
+const dayOf = (iso: string) => iso.slice(0, 10);
+
+/**
+ * «عاد رصيد الاستبدال — صالح حتى <اليوم> لأي جهاز متوفر للبيع المباشر» (ar/en/ckb), once per
+ * (request, order). The day is the credit's own end (30 days the first time, what was left after).
+ */
+export function reissueNotice(db: D1Database, x: { requestId: string; userId: string; orderId: string; endsAt: string }): D1PreparedStatement {
+  const d = dayOf(x.endsAt);
   return notifyStatement(db, {
     userId: x.userId,
     kind: 'trade_in',
-    title_ar: 'عاد رصيد الاستبدال — صالح 30 يوماً لأي جهاز متوفر للبيع المباشر',
-    title_en: 'Your trade-in credit is back — valid 30 days on any device in stock for direct sale',
+    title_ar: `عاد رصيد الاستبدال — صالح حتى ${d} لأي جهاز متوفر للبيع المباشر`,
+    title_en: `Your trade-in credit is back — valid until ${d} on any device in stock for direct sale`,
     body_ar: 'يُصرف على أي جهاز متوفر للبيع المباشر، ولا يُصرف نقداً.',
     body_en: 'Usable on any device in stock for direct sale, never as cash.',
     meta: {
-      title_ckb: 'باڵانسی گۆڕینەوەکەت گەڕایەوە — بۆ ٣٠ ڕۆژ بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت',
+      title_ckb: `باڵانسی گۆڕینەوەکەت گەڕایەوە — تا ${d} بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت`,
       body_ckb: 'بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت، نەک وەک پارەی نەقد.',
     },
     link: requestPath(x.requestId),

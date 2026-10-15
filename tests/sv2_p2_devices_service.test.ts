@@ -104,6 +104,21 @@ test('X5 a device the shop received is not with the customer: no warranty claim,
   assert.equal((await json(await fileClaim(raw, 'sv2-p2-x5-claim-03'))).success, true);
 });
 
+test('review F-5: a device the shop received is not taken by serial — unlinked by its customer, no other account links it while it is in the shop', async () => {
+  const raw = world({ deliveredDaysAgo: 2 });
+  raw.exec(`INSERT INTO users (id,name,email,password_hash,role,email_verified_at,locale) VALUES ('cust2','Omar','omar@x.co','h','customer','2026-01-01T00:00:00.000Z','ar')`);
+  const id = await submitted(raw);
+  await received(raw, id);
+  // The customer unlinks it (the transfer's first step) …
+  const unlink = await doors(raw).request('/api/devices/units/unit_a1/registration', { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } });
+  assert.equal(unlink.status, 200, await unlink.clone().text());
+  // … and another account types the serial while the device sits in the shop: the same «no match» as a serial that matches nothing.
+  const other: StubUser = { id: 'cust2', role: 'customer', email: 'omar@x.co' };
+  const taken = await post(doors(raw, other), '/api/devices/register', { serial: '01P00A123456789' });
+  assert.equal(taken.status, 404, await taken.clone().text());
+  assert.equal(row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM device_registrations WHERE unit_id = 'unit_a1' AND user_id = 'cust2'")!.n, 0);
+});
+
 test('X10 intake on the only printer drops the printer perk at once; the new printer counts from its seventh day', async () => {
   const raw = world();
   const now = new Date().toISOString();

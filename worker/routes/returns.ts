@@ -85,7 +85,7 @@ import { closedClaimSql } from '../lib/deviceOps';
 import { returnWinsStatements, tradedUnitsSql, tradeInInstalled, tradeInsOnLine } from '../lib/tradeIn';
 import { tradeInV2Installed } from '../lib/tradeInSchema';
 import { completeTradeInsForOrder } from '../lib/tradeInStock';
-import { returnReissueStatements, tradeInCreditOf } from '../lib/tradeInReissue';
+import { reissueEndsAt, returnReissueStatements, tradeInCreditOf } from '../lib/tradeInReissue';
 import { inShopOnLine, inShopSlotsSql } from '../lib/services/myDevices';
 import { loadPricingContext, memberFallbackFor } from './cart';
 import {
@@ -885,6 +885,17 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     // it paid for, never spread as a residual over the other lines; given back, never paid as cash.
     const tradeInCredit = (await tradeInV2Installed(c.env.DB)) ? await tradeInCreditOf(c.env.DB, order, orderItems as never) : null;
     const creditLine = tradeInCredit?.lineId ?? null;
+    // THE CREDIT COMES BACK OR THE REFUND WAITS (review F-5/F-10). The netting below and the re-issue
+    // that gives the credit back go together: the re-issue needs a COMPLETED request. A request whose
+    // completion did not happen (it is retried; the desk sees it as overdue) is not refunded netted of
+    // a credit that would then be lost — the desk completes it first. A request that died otherwise
+    // (cancelled before S-P2) keeps the old rule: its credit is not cash, and does not come back.
+    const creditRequestStatus = tradeInCredit && creditLine === item.id
+      ? ((await c.env.DB.prepare('SELECT status FROM trade_in_requests WHERE id = ?').bind(tradeInCredit.requestId).first<{ status: string }>())?.status ?? null)
+      : null;
+    if (creditRequestStatus === 'awaiting_payment') {
+      throw new HttpError(409, 'The trade-in this order paid with is not complete yet. Complete it first, then refund the return.', 'TRADE_IN_COMPLETION_PENDING', { request_id: tradeInCredit!.requestId });
+    }
     {
       // Refund the paid amount for the returned qty, net of this line's
       // proportional share of order-level discounts. Shipping is NOT
@@ -969,13 +980,20 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
       // Cumulative floors give the final returned unit the exact remainder.
       // Existing recorded credits count towards the cap without being edited.
       const endQty = Math.min(itemQty, prior.qty + kase.qty);
-      let refundIqd = Math.max(0, Math.min(fullRefund - prior.amount,
-        Math.floor(fullRefund * endQty / itemQty) - Math.floor(fullRefund * Math.min(itemQty, prior.qty) / itemQty)));
-      // The line the trade-in credit paid for: its FIRST refund is cash net of the credit (the credit
-      // itself comes back as the same coupon, below); later units of the line are refunded as before,
-      // so the line's cash refunds sum to its basis − the credit (§16 D-13).
-      const givesCreditBack = !!tradeInCredit && creditLine === item.id && Number(prior.qty) === 0;
-      if (givesCreditBack) refundIqd = Math.max(0, refundIqd - tradeInCredit!.amount);
+      // The line the trade-in credit paid for (§16 D-13; review F-8): its CASH comes back net of the
+      // credit, CUMULATIVELY — after q of its n units the cash refunded is floor(F·q/n) − the credit,
+      // never below 0 — so however the line is split into cases its cash refunds sum to exactly
+      // F − the credit, even when one unit's share is smaller than the credit (points, a member
+      // price). The credit itself comes back as the same coupon with the FIRST case (below).
+      const creditNetted = !!tradeInCredit && creditLine === item.id;
+      const creditAmount = creditNetted ? tradeInCredit!.amount : 0;
+      const cashTarget = (q: number) => Math.max(0, Math.floor(fullRefund * q / itemQty) - creditAmount);
+      const refundIqd = creditNetted
+        ? Math.max(0, Math.min(Math.max(0, fullRefund - creditAmount) - prior.amount, cashTarget(endQty) - prior.amount))
+        : Math.max(0, Math.min(fullRefund - prior.amount,
+          Math.floor(fullRefund * endQty / itemQty) - Math.floor(fullRefund * Math.min(itemQty, prior.qty) / itemQty)));
+      const givesCreditBack = creditNetted && creditRequestStatus === 'completed' && Number(prior.qty) === 0;
+      const reissueEnds = givesCreditBack ? await reissueEndsAt(c.env.DB, tradeInCredit!.requestId, kase.order_id, nowIso) : null;
       // Lots/returns predate ops_guards: the return table's own positive-qty
       // CHECK supplies the transaction fence without a newer schema dependency.
       // No row is inserted on success. A concurrent refund must replan while
@@ -1063,7 +1081,7 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         await c.env.DB.batch([
           refundFence, flipStatement, ...(credit ? [credit] : []),
           // S-P2 §6.9: the same coupon comes back for 30 days on any direct-sale device (completed requests only).
-          ...(givesCreditBack ? returnReissueStatements(c.env.DB, tradeInCredit!, { orderId: kase.order_id, returnCaseId: id, userId: kase.user_id, now: nowIso }) : []),
+          ...(givesCreditBack ? returnReissueStatements(c.env.DB, tradeInCredit!, { orderId: kase.order_id, returnCaseId: id, userId: kase.user_id, now: nowIso, endsAt: reissueEnds! }) : []),
           ...(restorePlan?.statements??[]), ...originStatements, ...evidence.statements,
         ]);
       } catch (e) {

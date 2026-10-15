@@ -34,10 +34,16 @@ const CHIP_SQL = `CASE
     WHEN r.intake_at IS NULL THEN 'awaiting_device'
     WHEN r.status IN ('submitted','under_review') THEN 'inspecting'
     ELSE 'credit_ready' END`;
-/** ?1 = now + 24 h, ?2 = now − 48 h: a device due within a day, or a received one waiting over two. */
+/**
+ * ?1 = now + 24 h, ?2 = now − 48 h: a device due within a day, a received one waiting over two — or
+ * a credit whose order was DELIVERED but whose completion did not happen (review F-7/F-16: it failed
+ * and the sweep retries it; the desk sees it, and a return of that order waits for it).
+ */
 const OVERDUE_SQL = (soon: string, stale: string) =>
   `((${CHIP_SQL}) = 'awaiting_device' AND r.offer_expires_at IS NOT NULL AND r.offer_expires_at < ${soon})
-   OR ((${CHIP_SQL}) = 'inspecting' AND r.intake_at < ${stale})`;
+   OR ((${CHIP_SQL}) = 'inspecting' AND r.intake_at < ${stale})
+   OR (r.status = 'awaiting_payment' AND EXISTS (SELECT 1 FROM coupon_redemptions dr JOIN orders dlo ON dlo.id = dr.order_id
+                                                  WHERE dr.coupon_id = r.coupon_id AND dr.state = 'active' AND dlo.status = 'delivered'))`;
 const SORT_AT = `COALESCE(r.submitted_at, r.created_at)`;
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`);

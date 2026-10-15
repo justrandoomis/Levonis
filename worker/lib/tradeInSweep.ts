@@ -5,7 +5,8 @@
  * Seven sub-steps, in order, each at most 25 requests, each idempotent by its WHERE and its event
  * key (a second tick does nothing the first one did):
  *   1. cut-over: a request open when S-P2 landed gets its 7 days to hand the device in
- *      (`offer_expires_at`), a legacy credit with no end gets one (`coupons.ends_at`) — the
+ *      (`offer_expires_at`); a legacy credit not spent is told, once, that the device comes first,
+ *      and its end is at least the owner's credit window from then (`coupons.ends_at`) — the
  *      only writes on old rows, both on trade-in rows and coupons, never on orders or money;
  *   2. an offer ending within 24 hours: a reminder;
  *   3. an offer past its end, device not received: cancelled (`expired_offer`), claims released;
@@ -61,6 +62,8 @@ export const SWEEP_COMPLETIONS = 2;
 export const COMPLETION_STATEMENT_BOUND = 45;
 /** The most statements one late stock booking sends, reads included (measured the same way). */
 export const STOCK_BOOKING_STATEMENT_BOUND = 25;
+/** A completion or stock booking that failed waits this long before the sweep tries it again. */
+export const RETRY_AFTER_HOURS = 6;
 /** Reissue rows this recent still owe their notice. */
 const REISSUE_NOTICE_DAYS = 14;
 const DAY = 86_400_000;
@@ -188,8 +191,13 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
     charge(1);
     const { results: legacy } = await db
       .prepare(
+        // Every credit minted on photos before S-P2 and not spent (review F-17) — whether or not it
+        // already had an end (S-P0's seven days): it cannot be spent until the device is received
+        // (0192), so its customer is told so once and gets the owner's window to hand it in.
         `SELECT t.id, t.user_id, t.coupon_id FROM trade_in_requests t JOIN coupons c ON c.id = t.coupon_id AND c.trade_in_id = t.id
-          WHERE t.status = 'awaiting_payment' AND t.intake_at IS NULL AND c.ends_at IS NULL
+          WHERE t.status = 'awaiting_payment' AND t.intake_at IS NULL AND c.active = 1
+            AND NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'cutover')
+            AND NOT ${LIVE_CREDIT_ORDER('c.id')}
           ORDER BY t.id LIMIT ?`
       )
       .bind(SWEEP_STEP_LIMIT)
@@ -211,7 +219,9 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
     const cutoverExt = await external(cutoverItems);
     for (const i of cutoverItems) {
       const stamp = i.legacy
-        ? db.prepare(`UPDATE coupons SET ends_at = ?3 WHERE id = ?1 AND trade_in_id = ?2 AND ends_at IS NULL`).bind(i.legacy, i.requestId, creditUntil)
+        ? db
+            .prepare(`UPDATE coupons SET ends_at = CASE WHEN ends_at IS NULL OR ends_at < ?3 THEN ?3 ELSE ends_at END WHERE id = ?1 AND trade_in_id = ?2`)
+            .bind(i.legacy, i.requestId, creditUntil)
         : db
             .prepare(
               `UPDATE trade_in_requests SET offer_expires_at = ?2, updated_at = ?3
@@ -285,8 +295,9 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
     charge(1);
     const { results: creditEnding } = await db
       .prepare(
-        `SELECT t.id, t.user_id, c.ends_at FROM trade_in_requests t JOIN coupons c ON c.id = t.coupon_id AND c.trade_in_id = t.id
-          WHERE ((t.status = 'awaiting_payment' AND t.intake_at IS NOT NULL)
+        `SELECT t.id, t.user_id, c.ends_at, t.intake_at FROM trade_in_requests t JOIN coupons c ON c.id = t.coupon_id AND c.trade_in_id = t.id
+          WHERE ((t.status = 'awaiting_payment' AND (t.intake_at IS NOT NULL
+                   OR EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'cutover')))
                  OR (t.status = 'completed' AND EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = t.id AND x.ends_at > ?1)))
             AND c.active = 1 AND c.ends_at > ?1 AND c.ends_at <= ?2
             AND NOT ${LIVE_CREDIT_ORDER('c.id')}
@@ -294,12 +305,13 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
           ORDER BY c.ends_at LIMIT ?3`
       )
       .bind(nowIso, new Date(now.getTime() + DAY).toISOString(), SWEEP_STEP_LIMIT)
-      .all<{ id: string; user_id: string; ends_at: string }>();
+      .all<{ id: string; user_id: string; ends_at: string; intake_at: string | null }>();
     const creditItems = (creditEnding ?? []).map((r) => ({
       userId: r.user_id,
       requestId: r.id,
       key: `trade_in:${r.id}:credit_expiring:${dayText(r.ends_at)}`,
-      copy: CREDIT_EXPIRING,
+      // A credit minted on photos before S-P2 is spent only once the device is in: say so (review F-17).
+      copy: r.intake_at ? CREDIT_EXPIRING : CREDIT_EXPIRING_NO_DEVICE,
     }));
     const creditExt = await external(creditItems);
     for (const i of creditItems) {
@@ -333,22 +345,31 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
         noLiveCreditOrderFence(db, r.id),
         ...(await releaseStatements(db, { id: r.id })),
         eventStatement(db, r.id, { id: null, role: 'system' }, 'cancel', 'awaiting_payment', 'cancelled', { reason: 'expired_credit' }, nowIso),
-        inApp(r.user_id, r.id, `trade_in:${r.id}:expired_credit`, CREDIT_EXPIRED),
+        inApp(r.user_id, r.id, `trade_in:${r.id}:expired_credit`, r.intake_at ? CREDIT_EXPIRED : CREDIT_EXPIRED_NO_DEVICE),
         ...(r.intake_at ? [deviceReadyNotice(db, { id: r.id, user_id: r.user_id })] : []),
       ]);
       if (ok) report.credits_expired += 1;
     }
 
     // ---------------------------------------------------------------- 6. completion catch-up
+    // Rotating (review F-7/F-16): a request whose completion failed within the last
+    // RETRY_AFTER_HOURS waits, and the oldest last attempt goes first — one that keeps failing
+    // never holds the two places every tick (the desk sees it as overdue meanwhile).
+    const retryAfter = new Date(now.getTime() - RETRY_AFTER_HOURS * 3_600_000).toISOString();
     charge(1);
     const { results: deliveredOrders } = await db
       .prepare(
-        `SELECT DISTINCT r.order_id FROM trade_in_requests t
+        `SELECT r.order_id,
+                MAX((SELECT MAX(e.created_at) FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'completion_failed')) AS last_failed
+           FROM trade_in_requests t
            JOIN coupon_redemptions r ON r.coupon_id = t.coupon_id AND r.state = 'active'
            JOIN orders o ON o.id = r.order_id AND o.status = 'delivered'
-          WHERE t.status = 'awaiting_payment' LIMIT ?`
+          WHERE t.status = 'awaiting_payment'
+            AND NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'completion_failed' AND e.created_at > ?1)
+          GROUP BY r.order_id
+          ORDER BY last_failed IS NOT NULL, last_failed, r.order_id LIMIT ?2`
       )
-      .bind(SWEEP_COMPLETIONS)
+      .bind(retryAfter, SWEEP_COMPLETIONS)
       .all<{ order_id: string }>();
     for (const o of deliveredOrders ?? []) {
       charge(COMPLETION_STATEMENT_BOUND);
@@ -361,9 +382,11 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
           WHERE t.status = 'completed' AND t.intake_at IS NOT NULL
             AND NOT EXISTS (SELECT 1 FROM trade_in_stock s WHERE s.request_id = t.id)
             AND NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'stock_skipped')
-          ORDER BY t.intake_at LIMIT ?`
+            AND NOT EXISTS (SELECT 1 FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'stock_failed' AND e.created_at > ?1)
+          ORDER BY (SELECT MAX(e.created_at) FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'stock_failed') IS NOT NULL,
+                   (SELECT MAX(e.created_at) FROM trade_in_events e WHERE e.request_id = t.id AND e.action = 'stock_failed'), t.intake_at LIMIT ?2`
       )
-      .bind(SWEEP_COMPLETIONS)
+      .bind(retryAfter, SWEEP_COMPLETIONS)
       .all<{ id: string }>();
     for (const u of unbooked ?? []) {
       charge(STOCK_BOOKING_STATEMENT_BOUND);
@@ -379,18 +402,25 @@ export async function runServicesSweep(env: Env, budget: StatementBudget, now: D
     charge(1);
     const { results: reissued } = await db
       .prepare(
-        `SELECT x.request_id, x.order_id, t.user_id FROM trade_in_credit_reissues x JOIN trade_in_requests t ON t.id = x.request_id
+        `SELECT x.request_id, x.order_id, x.ends_at, t.user_id FROM trade_in_credit_reissues x JOIN trade_in_requests t ON t.id = x.request_id
           WHERE x.created_at > ?1
             AND NOT EXISTS (SELECT 1 FROM user_notifications n WHERE n.event_key = 'trade_in:' || x.request_id || ':reissued:' || x.order_id)
           ORDER BY x.created_at LIMIT ?2`
       )
       .bind(new Date(now.getTime() - REISSUE_NOTICE_DAYS * DAY).toISOString(), SWEEP_STEP_LIMIT)
-      .all<{ request_id: string; order_id: string; user_id: string }>();
-    const reissueItems = (reissued ?? []).map((r) => ({ userId: r.user_id, requestId: r.request_id, orderId: r.order_id, key: `trade_in:${r.request_id}:reissued:${r.order_id}`, copy: REISSUED }));
+      .all<{ request_id: string; order_id: string; ends_at: string; user_id: string }>();
+    const reissueItems = (reissued ?? []).map((r) => ({
+      userId: r.user_id,
+      requestId: r.request_id,
+      orderId: r.order_id,
+      endsAt: r.ends_at,
+      key: `trade_in:${r.request_id}:reissued:${r.order_id}`,
+      copy: reissuedCopy(r.ends_at),
+    }));
     const reissueExt = await external(reissueItems);
     for (const i of reissueItems) {
       charge(1 + (reissueExt.get(i.key)?.length ?? 0));
-      await db.batch([reissueNotice(db, { requestId: i.requestId, userId: i.userId, orderId: i.orderId }), ...(reissueExt.get(i.key) ?? [])]);
+      await db.batch([reissueNotice(db, { requestId: i.requestId, userId: i.userId, orderId: i.orderId, endsAt: i.endsAt }), ...(reissueExt.get(i.key) ?? [])]);
       report.reissue_notices += 1;
     }
   } catch (e) {
@@ -453,6 +483,25 @@ const CREDIT_EXPIRING: Copy = {
   body_ckb: 'پێش کۆتاییهاتنی، بۆ ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاری بهێنە.',
 };
 
+/** A credit minted on photos before S-P2, its device not received yet (review F-17). */
+const CREDIT_EXPIRING_NO_DEVICE: Copy = {
+  title_ar: 'ينتهي رصيد الاستبدال خلال 24 ساعة',
+  title_en: 'Your trade-in credit ends within 24 hours',
+  title_ckb: 'باڵانسی گۆڕینەوەکەت لە ماوەی ٢٤ کاتژمێردا کۆتایی دێت',
+  body_ar: 'سلّم جهازك القديم للمتجر قبل انتهائه ليصبح الرصيد قابلاً للصرف.',
+  body_en: 'Hand your old device in to the store before it ends, so the credit can be used.',
+  body_ckb: 'پێش کۆتاییهاتنی، ئامێرە کۆنەکەت ڕادەستی فرۆشگا بکە بۆ ئەوەی باڵانسەکە بەکاربهێنرێت.',
+};
+
+const CREDIT_EXPIRED_NO_DEVICE: Copy = {
+  title_ar: 'انتهت صلاحية رصيد الاستبدال',
+  title_en: 'Your trade-in credit has ended',
+  title_ckb: 'ماوەی باڵانسی گۆڕینەوەکەت تەواو بوو',
+  body_ar: 'لم يصل جهازك القديم إلى المتجر خلال المدة، ولا يُصرف الرصيد نقداً.',
+  body_en: 'Your old device did not reach the store in time, and the credit is never paid out as cash.',
+  body_ckb: 'ئامێرە کۆنەکەت لە کاتی خۆیدا نەگەیشتە فرۆشگا، و باڵانسەکە هەرگیز وەک پارەی نەقد نادرێتەوە.',
+};
+
 const CREDIT_EXPIRED: Copy = {
   title_ar: 'انتهت صلاحية رصيد الاستبدال',
   title_en: 'Your trade-in credit has ended',
@@ -462,11 +511,15 @@ const CREDIT_EXPIRED: Copy = {
   body_ckb: 'باڵانسەکە لە کاتی خۆیدا بەکارنەهات، و هەرگیز وەک پارەی نەقد نادرێتەوە.',
 };
 
-const REISSUED: Copy = {
-  title_ar: 'عاد رصيد الاستبدال — صالح 30 يوماً لأي جهاز متوفر للبيع المباشر',
-  title_en: 'Your trade-in credit is back — valid 30 days on any device in stock for direct sale',
-  title_ckb: 'باڵانسی گۆڕینەوەکەت گەڕایەوە — بۆ ٣٠ ڕۆژ بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت',
-  body_ar: 'يُصرف على أي جهاز متوفر للبيع المباشر، ولا يُصرف نقداً.',
-  body_en: 'Usable on any device in stock for direct sale, never as cash.',
-  body_ckb: 'بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت، نەک وەک پارەی نەقد.',
-};
+/** The credit given back, with the day it ends (30 days the first time, what was left after that). */
+function reissuedCopy(endsAt: string): Copy {
+  const d = dayText(endsAt);
+  return {
+    title_ar: `عاد رصيد الاستبدال — صالح حتى ${d} لأي جهاز متوفر للبيع المباشر`,
+    title_en: `Your trade-in credit is back — valid until ${d} on any device in stock for direct sale`,
+    title_ckb: `باڵانسی گۆڕینەوەکەت گەڕایەوە — تا ${d} بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت`,
+    body_ar: 'يُصرف على أي جهاز متوفر للبيع المباشر، ولا يُصرف نقداً.',
+    body_en: 'Usable on any device in stock for direct sale, never as cash.',
+    body_ckb: 'بۆ هەر ئامێرێکی بەردەست بۆ فرۆشتنی ڕاستەوخۆ بەکاردێت، نەک وەک پارەی نەقد.',
+  };
+}

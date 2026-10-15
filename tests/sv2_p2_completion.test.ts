@@ -15,7 +15,7 @@ import { asD1, count, json, post, row } from './fixtures/app';
 import { serialD1 } from './fixtures/serialD1';
 import { completeTradeInsForOrder, bookTradeInStock } from '../worker/lib/tradeInStock';
 import { loadRequest } from '../worker/lib/tradeIn';
-import { OWNER, STAFF, adminApp, approvedAndOrdered, daysAgo, delivered, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+import { OWNER, STAFF, adminApp, approvedAndOrdered, checkoutBody, customerApp, daysAgo, delivered, received, restoreFetch, seed, settle, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
 
@@ -124,4 +124,29 @@ test('an undelivered order’s cancel before completion leaves the request await
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM trade_in_stock WHERE request_id = ?', id), 0);
   assert.equal(row<{ state: string }>(raw, 'SELECT state FROM coupon_redemptions WHERE order_id = ?', orderId)!.state, 'released');
   void received;
+});
+
+test('review F-11: the lot costs what the credit actually took off the order — a reprice between the value and the checkout leaves part unused, and the stock does not carry it', async () => {
+  const raw = seed();
+  const id = await submitted(raw);
+  await received(raw, id);
+  const ap = await json(await post(adminApp(raw, OWNER), `/api/admin/trade-in/requests/${id}/approve`));
+  assert.equal(ap.request.status, 'awaiting_payment', JSON.stringify(ap));
+  const credit = ap.request.credit_iqd as number;
+  const { repriceV2 } = await import('./fixtures/v2Publish');
+  await repriceV2(raw, 'p_p1s', 400_000);
+  assert.ok(credit > 400_000, 'the credit is worth more than the repriced target');
+  const a = customerApp(raw);
+  const pay = await json(await post(a, `/api/trade-in/requests/${id}/checkout`));
+  raw.exec(`INSERT INTO cart_items (id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,warranty_plan_id,qty) VALUES ('c_x','cust','p_p1s','','[]','','','','',1)`);
+  const placed = await post(a, '/api/orders', checkoutBody({ couponCode: pay.coupon_code }));
+  const pb = await json(placed);
+  assert.equal(placed.status, 200, JSON.stringify(pb));
+  await settle();
+  await delivered(raw, pb.order.id);
+  const spent = JSON.parse(row<{ coupon_snapshot: string }>(raw, 'SELECT coupon_snapshot FROM orders WHERE id = ?', pb.order.id)!.coupon_snapshot).discount_iqd as number;
+  assert.equal(spent, 400_000);
+  assert.equal(row<{ cost_basis_iqd: number }>(raw, 'SELECT cost_basis_iqd FROM trade_in_stock WHERE request_id = ?', id)!.cost_basis_iqd, spent);
+  const lot = row<{ unit_cost_iqd: number; total_cost_iqd: number }>(raw, 'SELECT unit_cost_iqd, total_cost_iqd FROM inventory_lots WHERE id = ?', `ilot_ti_${id}`)!;
+  assert.deepEqual([lot.unit_cost_iqd, lot.total_cost_iqd], [spent, spent]);
 });

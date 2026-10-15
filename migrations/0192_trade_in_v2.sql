@@ -14,7 +14,8 @@
 -- cannot be SPENT (or reclaimed by a reopen) until the device's intake is
 -- recorded (8). A delivered order that completed a trade-in is returned, never
 -- cancelled (9). Cancelling an undelivered order that spent a COMPLETED
--- request's credit gives the same coupon back for 30 days (10, row 237); 0191's
+-- request's credit gives the same coupon back — 30 days the first time, the
+-- time it had left after that (10, row 237); 0191's
 -- trg_orders_coupon_released releases the use in the same statement — neither
 -- trigger reads what the other writes.
 --
@@ -159,24 +160,38 @@ WHEN NEW.state = 'active' AND OLD.state <> 'active'
 BEGIN SELECT RAISE(ABORT, 'TRADE_IN_DEVICE_NOT_RECEIVED'); END;
 
 -- 9. A delivered order that completed a trade-in is returned, never cancelled (the device is already stock).
+--    «Delivered» is the stamp, not the stage: a stage moved one step back to undo a mis-tap keeps
+--    `delivered_at`, so delivered → out_for_delivery → cancelled is refused too (review F-3).
 CREATE TRIGGER IF NOT EXISTS trg_orders_tradein_delivered_cancel
 BEFORE UPDATE OF status ON orders
-WHEN OLD.status = 'delivered' AND NEW.status = 'cancelled'
+WHEN NEW.status = 'cancelled' AND OLD.status <> 'cancelled'
+ AND (OLD.status = 'delivered' OR NULLIF(OLD.delivered_at, '') IS NOT NULL)
  AND EXISTS (SELECT 1 FROM coupon_redemptions r JOIN coupons c ON c.id = r.coupon_id
               JOIN trade_in_requests t ON t.id = c.trade_in_id
              WHERE r.order_id = NEW.id AND t.status = 'completed')
 BEGIN SELECT RAISE(ABORT, 'TRADE_IN_ORDER_DELIVERED'); END;
 
 -- 10. Row 237: cancelling (any door) an undelivered order that spent a COMPLETED request's credit gives the
---     same coupon back for 30 days. 0191's trg_orders_coupon_released releases the use (both fire; neither
---     reads the other's write: this one selects the redemption by order, whatever its state).
+--     same coupon back. 0191's trg_orders_coupon_released releases the use (both fire; neither reads the
+--     other's write: this one selects the redemption by order, whatever its state).
+--     THE END IS GIVEN ONCE (review F-2): the first credit given back for a request lives 30 days; a
+--     credit given back again (the re-issued credit spent on an order that was then cancelled) keeps
+--     the time it had left — the previous re-issue's end plus the time this order held it, never more
+--     than 30 days from now — so cancelling an order cannot renew it.
 CREATE TRIGGER IF NOT EXISTS trg_orders_tradein_reissue_on_cancel
 AFTER UPDATE OF status ON orders
-WHEN NEW.status = 'cancelled' AND OLD.status NOT IN ('cancelled', 'delivered')
+WHEN NEW.status = 'cancelled' AND OLD.status NOT IN ('cancelled', 'delivered') AND NULLIF(OLD.delivered_at, '') IS NULL
 BEGIN
   INSERT INTO trade_in_credit_reissues (id, request_id, coupon_id, order_id, reason, return_case_id, amount_iqd, ends_at, created_at)
   SELECT 'tcr_' || lower(hex(randomblob(10))), t.id, c.id, NEW.id, 'order_cancelled', NULL, COALESCE(t.credit_iqd, 0),
-         strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         COALESCE(
+           CASE WHEN (SELECT MAX(p.ends_at) FROM trade_in_credit_reissues p WHERE p.request_id = t.id AND p.order_id <> NEW.id) IS NULL THEN NULL
+                ELSE MIN(strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'),
+                         strftime('%Y-%m-%dT%H:%M:%fZ',
+                                  julianday((SELECT MAX(p.ends_at) FROM trade_in_credit_reissues p WHERE p.request_id = t.id AND p.order_id <> NEW.id))
+                                  + MAX(0, COALESCE(julianday('now') - julianday(NEW.created_at), 0)))) END,
+           strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days')),
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     FROM coupon_redemptions r JOIN coupons c ON c.id = r.coupon_id JOIN trade_in_requests t ON t.id = c.trade_in_id
    WHERE r.order_id = NEW.id AND t.status = 'completed'
      AND NOT EXISTS (SELECT 1 FROM trade_in_credit_reissues x WHERE x.request_id = t.id AND x.order_id = NEW.id);

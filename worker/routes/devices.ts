@@ -755,7 +755,9 @@ deviceRoutes.post('/register', async (c) => {
   // A unit TRADED IN to Levonis (owner decision 3) is no longer anyone's to
   // take by typing its serial or receipt — the trader's included: its warranty
   // stays with the device for its next buyer, and only that sale links it.
-  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id || row.warranty_closed_at || row.traded_in_at) throw SERIAL_NO_MATCH();
+  // S-P2 (review F-5): a device the shop RECEIVED for a trade-in is the shop's until it is handed
+  // back — no account takes it by serial meanwhile (the completion would then find it linked elsewhere).
+  if (!unitId || !row || !row.delivered_at || row.replaced_by_unit_id || row.warranty_closed_at || row.traded_in_at || row.in_shop_at) throw SERIAL_NO_MATCH();
   // A device that was never linked belongs to the account that bought it. A
   // stranger may take a device only after its holder — or an admin — RELEASED
   // it (a revoked registration), which is the transfer the owner described.

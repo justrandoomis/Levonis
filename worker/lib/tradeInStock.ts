@@ -15,8 +15,9 @@
  *   4. a HIDDEN «used» draft product `prd_ti_<request>` copied from the source product by an
  *      allow-list (words, brand, family, photos of the MODEL, specs) — never a price, a cost, an
  *      option or a colour: the owner prices it in V2 before it lists (§16 D-8);
- *   5. its lot `ilot_ti_<request>`, one unit at cost = the credit given (0181's
- *      `inventory_lot_no_reinsert` makes a replay abort the batch);
+ *   5. its lot `ilot_ti_<request>`, one unit at cost = what the credit took off the order that
+ *      completed it (never more than the credit; 0181's `inventory_lot_no_reinsert` makes a replay
+ *      abort the batch);
  *   6. the provenance row in `trade_in_stock` (append-only, one per request);
  *   7. stock +1 on the draft; 8. the ledger row `trade_in_stock:<request>`;
  *   9. events, the customer's notice, the audit row.
@@ -49,6 +50,7 @@ import {
   loadRuleBook,
   refuse,
   requestPath,
+  TradeInError,
   type RequestRow,
 } from './tradeIn';
 import { checklistOf, checklistLabelCkb, type ComponentInputs } from '@levonis/pricing/tradeIn';
@@ -129,7 +131,24 @@ export async function stockStatements(env: Env, req: RequestRow, opts: { orderId
   const lotId = lotIdOf(req.id);
   const slug = `${model.slug}-used-${randomToken(3)}`.slice(0, 120);
   const usedSub = req.scope === 'ams_only' || comp?.family === 'ams' || comp?.family === 'accessory' ? 'cat_used_pacc' : 'cat_used_printers';
-  const cost = Math.max(0, Math.trunc(req.credit_iqd ?? 0));
+  // THE COST IS WHAT WAS GIVEN FOR THE DEVICE (review F-11): what the credit actually took off the
+  // order that completed it — the checkout caps it at one unit of the line, and a reprice between
+  // fixing the value and the checkout can leave part of the credit unused (never paid out). The
+  // finance report counts that same figure as the payment in kind. No order (a zero credit): the credit.
+  const credit = Math.max(0, Math.trunc(req.credit_iqd ?? 0));
+  const spent = opts.orderId
+    ? await db
+        .prepare(
+          `SELECT COALESCE(
+                    (SELECT CAST(json_extract(o.coupon_snapshot, '$.discount_iqd') AS INTEGER) FROM orders o
+                      WHERE o.id = ?1 AND json_valid(o.coupon_snapshot) AND json_extract(o.coupon_snapshot, '$.coupon_id') = ?2),
+                    (SELECT r.amount_iqd FROM coupon_redemptions r WHERE r.order_id = ?1 AND r.coupon_id = ?2)) AS amount`
+        )
+        .bind(opts.orderId, req.coupon_id)
+        .first<{ amount: number | null }>()
+    : null;
+  const paid = spent?.amount === null || spent?.amount === undefined ? null : Math.max(0, Math.trunc(Number(spent.amount) || 0));
+  const cost = paid === null ? credit : Math.min(credit, paid);
   const day = opts.now.slice(0, 10);
   const amsName = req.scope === 'ams_only' && modelId === sourceId;
   const statements: D1PreparedStatement[] = [
@@ -236,6 +255,21 @@ async function completeOne(env: Env, req: RequestRow, orderId: string | null, ac
 }
 
 /**
+ * A COMPLETION OR A STOCK BOOKING THAT FAILED, ON RECORD (review F-7/F-16): one event per attempt
+ * (`completion_failed` / `stock_failed`, the desk's history; never the customer's), so the services
+ * sweep rotates past what keeps failing instead of retrying the same two forever, and the desk sees
+ * it. Total: a failure to record is logged, never thrown.
+ */
+export const ATTEMPT_FAILED_ACTIONS = ['completion_failed', 'stock_failed'] as const;
+async function recordAttemptFailed(db: D1Database, requestId: string, action: (typeof ATTEMPT_FAILED_ACTIONS)[number], detail: Record<string, unknown>): Promise<void> {
+  try {
+    await eventStatement(db, requestId, { id: null, role: 'system' }, action, null, null, detail, new Date().toISOString()).run();
+  } catch (e) {
+    console.error('trade-in: could not record a failed attempt', requestId, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
  * EVERY TRADE-IN THIS DELIVERED ORDER COMPLETES — total: each request is contained, a failure is
  * logged and the services sweep retries it. Returns the ids completed.
  */
@@ -260,7 +294,9 @@ export async function completeTradeInsForOrder(env: Env, orderId: string, actor:
         await completeOne(env, req, orderId, actor);
         done.push(id);
       } catch (e) {
+        const reason = e instanceof TradeInError ? e.code : 'error';
         console.error('trade-in completion on delivery failed', id, e instanceof Error ? e.message : String(e));
+        await recordAttemptFailed(db, id, 'completion_failed', { order_id: orderId, reason });
       }
     }
     return done;
@@ -327,7 +363,13 @@ export async function bookTradeInStock(env: Env, req: RequestRow, actor: Complet
     ]);
     return true;
   } catch (e) {
-    if (isAbort(e) || /BATCH_COST_IMMUTABLE|TRADE_IN_STOCK_IMMUTABLE/.test(e instanceof Error ? e.message : String(e))) return false;
+    if (isAbort(e) || /BATCH_COST_IMMUTABLE|TRADE_IN_STOCK_IMMUTABLE/.test(e instanceof Error ? e.message : String(e))) {
+      // A replay (the lot is already there) is not a failure; anything else is put on record.
+      if (!(await db.prepare('SELECT 1 AS x FROM trade_in_stock WHERE request_id = ?').bind(req.id).first())) {
+        await recordAttemptFailed(db, req.id, 'stock_failed', { order_id: orderId || null });
+      }
+      return false;
+    }
     throw e;
   }
 }

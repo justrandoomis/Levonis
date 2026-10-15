@@ -217,3 +217,60 @@ test('concurrency: the intake and the offer-expiry sweep at once — one wins: e
   }
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM trade_in_events WHERE request_id = ? AND action IN ('intake','cancel')", id), 1, 'exactly one of them happened');
 });
+
+test('review F-7/F-16: completions that keep failing do not hold the catch-up — they are put on record, wait their turn, and the next one completes; the desk sees them as overdue', async () => {
+  const raw = seed();
+  raw.exec(`INSERT INTO users (id,name,email,password_hash,role,email_verified_at,locale) VALUES ('other','Other','o@x.co','h','customer','2026-01-01T00:00:00.000Z','ar')`);
+  for (const k of ['b', 'c']) {
+    raw.exec(`
+      INSERT INTO orders (id,user_id,status,stage,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,shipping_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,updated_at,delivered_at)
+        VALUES ('ORD-OLD-${k}','cust','delivered','delivered','{}','standard','{}','cash',850000,0,1400,850000,0,'${daysAgo(25)}','${daysAgo(20)}','${daysAgo(20)}');
+      INSERT INTO order_items (id,order_id,product_id,name_snapshot,image_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,option_id,option_value_ids)
+        VALUES ('oi_${k}1','ORD-OLD-${k}','p_a1','Bambu Lab A1','','A1',1,850000,850000,'v_a1','["v_a1"]');
+      INSERT INTO order_item_units (id,order_id,order_item_id,product_id,owner_user_id,unit_index,delivered_at,warranty_base_months,warranty_ext_months,warranty_start_at,warranty_end_at,policy_version)
+        VALUES ('unit_${k}1','ORD-OLD-${k}','oi_${k}1','p_a1','cust',1,'${daysAgo(20)}',12,0,'${daysAgo(20)}','${new Date(Date.now() + 340 * DAY).toISOString()}','{}');`);
+  }
+  const ids: string[] = [];
+  const orders: string[] = [];
+  for (const item of ['oi_a1', 'oi_b1', 'oi_c1']) {
+    const id = await submitted(raw, item);
+    ids.push(id);
+    orders.push((await approvedAndOrdered(raw, id)).orderId);
+  }
+  // A and B: their devices were linked to another account behind the doors' back — their completion fails every time.
+  raw.exec(`INSERT INTO device_registrations (unit_id, user_id) VALUES ('unit_a1', 'other'), ('unit_b1', 'other')`);
+  // All three orders delivered by a door that missed the hook.
+  for (const o of orders) raw.prepare("UPDATE orders SET status = 'delivered', stage = 'delivered', delivered_at = ? WHERE id = ?").run(new Date().toISOString(), o);
+  await sweep(raw);
+  await sweep(raw);
+  assert.equal(req(raw, ids[2]).status, 'completed', 'the third completes — the failing two do not hold the two places');
+  assert.deepEqual([req(raw, ids[0]).status, req(raw, ids[1]).status], ['awaiting_payment', 'awaiting_payment']);
+  for (const id of ids.slice(0, 2)) assert.ok(count(raw, "SELECT COUNT(*) AS n FROM trade_in_events WHERE request_id = ? AND action = 'completion_failed'", id) >= 1);
+  // The desk's «overdue» chip carries them; the customer's view never shows the failed attempt.
+  const q = await json(await get(adminApp(raw, STAFF), '/api/admin/trade-in/requests?chip=overdue'));
+  const overdue = (q.requests as Array<{ id: string }>).map((r) => r.id).sort();
+  assert.deepEqual(overdue, ids.slice(0, 2).sort());
+  const mine = await json(await get(customerApp(raw), `/api/trade-in/requests/${ids[0]}`));
+  assert.ok(!JSON.stringify(mine).includes('completion_failed'));
+});
+
+test('review F-17: a legacy credit minted on photos that already had an end is told, once, to bring the device in — and gets the owner’s window to do it', async () => {
+  const raw = seed();
+  const id = await submitted(raw);
+  const offer = req(raw, id).offer_iqd as number;
+  const soon = new Date(Date.now() + 2 * DAY).toISOString();
+  raw.exec(`
+    INSERT INTO coupons (id, code, tier_required, kind, value, min_total_iqd, max_global, max_per_user, active, created_at, assigned_user_id, scope,
+                         product_id, fulfillment_types, applies_to, cap_scope, max_quantity, stacks, trade_in_id, ends_at)
+      VALUES ('cpn_s0', 'TIS0CREDIT1', NULL, 'fixed_iqd', ${offer}, 0, 1, 1, 1, '${daysAgo(5)}', 'cust', 'product',
+              'p_p1s', '["direct_sale"]', 'merchandise', 'per_order', 1, 0, '${id}', '${soon}');
+    UPDATE trade_in_requests SET status = 'awaiting_payment', final_value_iqd = ${offer}, credit_iqd = ${offer}, coupon_id = 'cpn_s0' WHERE id = '${id}';
+  `);
+  await sweep(raw);
+  assert.equal(notices(raw, `trade_in:${id}:cutover`), 1);
+  const ends = row<{ ends_at: string }>(raw, "SELECT ends_at FROM coupons WHERE id = 'cpn_s0'")!.ends_at;
+  assert.ok(Date.parse(ends) > Date.now() + 6 * DAY, ends);
+  await sweep(raw);
+  assert.equal(notices(raw, `trade_in:${id}:cutover`), 1, 'told once');
+  assert.equal(row<{ ends_at: string }>(raw, "SELECT ends_at FROM coupons WHERE id = 'cpn_s0'")!.ends_at, ends);
+});

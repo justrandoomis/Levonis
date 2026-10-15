@@ -297,6 +297,50 @@ test('review F-14: no offer today (the source model is not sold) is not an offer
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE event_key LIKE ?", `trade_in:${id}:offer:%`), 0);
 });
 
+test('review F-4: a device the shop still holds (received, then cancelled, not handed back) takes no second request — and is never handed back under one request while another holds it', async () => {
+  const raw = seed();
+  serialOnRecord(raw);
+  const a = await submitted(raw);
+  await intake(raw, a, STAFF, { serial: 'A1SERIAL0001' });
+  await settle();
+  const c = customerApp(raw);
+  assert.equal((await post(c, `/api/trade-in/requests/${a}/cancel`, { reason: 'changed my mind' })).status, 200);
+  await settle();
+  assert.deepEqual([req(raw, a).status, !!req(raw, a).intake_at, req(raw, a).device_returned_at], ['cancelled', true, null]);
+  // A second request on the same slot is refused while the device is in the shop.
+  assert.deepEqual(await code(await post(c, '/api/trade-in/requests', { order_item_id: 'oi_a1', unit_index: 1, scope: 'whole' })), [409, 'TRADE_IN_DEVICE_IN_SHOP']);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM trade_in_requests WHERE status = 'draft'"), 0);
+  // A draft that slipped in before (written straight to the table) cannot be sent nor received.
+  raw.exec(`INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, unit_id, source_product_id, family, scope, is_combo, source_snapshot_json, created_at, updated_at, valuation_version, submitted_at, offer_iqd)
+            SELECT 'tin_bbbbbbbbbbbbbbbbbbbb', user_id, 'submitted', order_id, order_item_id, unit_index, unit_id, source_product_id, family, scope, is_combo, source_snapshot_json, created_at, updated_at, 2, created_at, offer_iqd
+              FROM trade_in_requests WHERE id = '${a}'`);
+  raw.exec(`INSERT INTO trade_in_components (id, request_id, role, family, label_ar, label_en, base_iqd, inputs_json, sort)
+            SELECT 'tic_b_' || role, 'tin_bbbbbbbbbbbbbbbbbbbb', role, family, label_ar, label_en, base_iqd, inputs_json, sort FROM trade_in_components WHERE request_id = '${a}'`);
+  assert.deepEqual(await code(await intake(raw, 'tin_bbbbbbbbbbbbbbbbbbbb', STAFF, { serial: 'A1SERIAL0001' })), [409, 'TRADE_IN_DEVICE_IN_SHOP']);
+  assert.equal(req(raw, 'tin_bbbbbbbbbbbbbbbbbbbb').intake_at, null);
+  // Handed back: the slot is free again.
+  assert.equal((await post(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${a}/device-returned`)).status, 200);
+  const r2 = await intake(raw, 'tin_bbbbbbbbbbbbbbbbbbbb', STAFF, { serial: 'A1SERIAL0001' });
+  assert.equal(r2.status, 200, await r2.clone().text());
+});
+
+test('review F-4: the hand-back of a cancelled request is refused while another request on the slot has received the device', async () => {
+  const raw = seed();
+  serialOnRecord(raw);
+  const a = await submitted(raw);
+  await intake(raw, a, STAFF, { serial: 'A1SERIAL0001' });
+  await settle();
+  assert.equal((await post(customerApp(raw), `/api/trade-in/requests/${a}/cancel`, { reason: 'changed my mind' })).status, 200);
+  await settle();
+  // An older state (before the guard): B received on the same slot while A was never handed back.
+  raw.exec(`INSERT INTO trade_in_requests (id, user_id, status, order_id, order_item_id, unit_index, unit_id, source_product_id, family, scope, is_combo, source_snapshot_json, created_at, updated_at, valuation_version, submitted_at, offer_iqd, intake_at)
+            SELECT 'tin_cccccccccccccccccccc', user_id, 'under_review', order_id, order_item_id, unit_index, unit_id, source_product_id, family, scope, is_combo, source_snapshot_json, created_at, updated_at, 2, created_at, offer_iqd, '${new Date().toISOString()}'
+              FROM trade_in_requests WHERE id = '${a}'`);
+  const back = await post(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${a}/device-returned`);
+  assert.equal(back.status, 409, await back.clone().text());
+  assert.equal(req(raw, a).device_returned_at, null);
+});
+
 test('concurrency: two desks receive the same device at once — one wins, the other hears TRADE_IN_ALREADY_RECEIVED', async () => {
   const raw = seed();
   serialOnRecord(raw);

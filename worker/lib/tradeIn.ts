@@ -1244,6 +1244,37 @@ export async function serviceBlocker(db: D1Database, slot: Slot): Promise<TradeI
   return null;
 }
 
+/**
+ * ANOTHER REQUEST ON THIS SLOT STILL HOLDS A RECEIVED DEVICE (review F-4): it was received, then
+ * cancelled or declined, and not handed back yet — its claims are gone, but the device is in the
+ * shop. No new request is opened, sent or received on the slot until it is handed back
+ * (TRADE_IN_DEVICE_IN_SHOP): the desk could otherwise «receive» the same device for a second
+ * request, hand it back under the first, and fix a credit for a device the customer took home.
+ * Parts that cannot meet do not block each other: a Combo's AMS held alone does not hold its printer
+ * (`printer_only`), nor the printer its AMS. Binds: ?1 this request (or '' when none yet), ?2 the
+ * line, ?3 the unit index, ?4 this request's scope. v2 only.
+ */
+export const partsMeetSql = (a: string, b: string) =>
+  `NOT ((${a} = 'ams_only' AND ${b} = 'printer_only') OR (${a} = 'printer_only' AND ${b} = 'ams_only'))`;
+const HELD_IN_SHOP_SQL = `EXISTS (SELECT 1 FROM trade_in_requests h
+   WHERE h.order_item_id = ?2 AND h.unit_index = ?3 AND h.id <> ?1
+     AND h.intake_at IS NOT NULL AND h.status IN ('cancelled','customer_rejected') AND h.device_returned_at IS NULL
+     AND ${partsMeetSql('h.scope', '?4')})`;
+
+/** Whether the slot's device is in the shop under another request (v2 only; false on an older database). */
+export async function heldInShopElsewhere(db: D1Database, requestId: string, orderItemId: string, unitIndex: number, scope: string): Promise<boolean> {
+  if (!(await tradeInV2Installed(db))) return false;
+  const row = await db.prepare(`SELECT ${HELD_IN_SHOP_SQL} AS held`).bind(requestId, orderItemId, unitIndex, scope).first<{ held: number }>();
+  return !!row?.held;
+}
+
+/** The same question inside a write: trips the request's NOT NULL status when the slot's device is held. */
+export function heldInShopFence(db: D1Database, requestId: string, orderItemId: string, unitIndex: number, scope: string): D1PreparedStatement {
+  return db
+    .prepare(`UPDATE trade_in_requests SET status = CASE WHEN ${HELD_IN_SHOP_SQL} THEN NULL ELSE status END WHERE id = ?1`)
+    .bind(requestId, orderItemId, unitIndex, scope);
+}
+
 /** Owner decision 2: a trade-in credit is usable for seven days from the moment it is minted. */
 export const TRADE_IN_CREDIT_VALID_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -1291,6 +1322,7 @@ export async function createDraft(
     }
     throw refuse(scope.reason ?? 'TRADE_IN_NOT_ELIGIBLE');
   }
+  if (await heldInShopElsewhere(db, '', input.orderItemId, input.unitIndex, input.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');
   const drafts = await db
     .prepare("SELECT COUNT(*) AS n FROM trade_in_requests WHERE user_id = ? AND status = 'draft'")
     .bind(userId)
@@ -1347,10 +1379,14 @@ export async function createDraft(
   stmts.push(eventStatement(db, id, { id: userId, role: 'customer' }, 'create', null, 'draft', { scope: input.scope }, nowIso));
   const slot = await slotOf(db, unit.order_item_id, unit.unit_index);
   stmts.push(serviceFence(db, id, slot));
+  if (v2) stmts.push(heldInShopFence(db, id, unit.order_item_id, unit.unit_index, input.scope));
   try {
     await db.batch(stmts);
   } catch (e) {
-    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_ALREADY_CLAIMED');
+    if (isAbort(e)) {
+      if (await heldInShopElsewhere(db, id, unit.order_item_id, unit.unit_index, input.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');
+      throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_ALREADY_CLAIMED');
+    }
     throw e;
   }
   return (await loadRequest(db, id))!;
@@ -2023,6 +2059,7 @@ async function submitV2(env: Env, req: RequestRow, comps: ComponentRow[], book: 
     nowIso,
   });
   if (o.no_offer_reason === 'scope_unavailable') throw refuse('TRADE_IN_SCOPE_UNAVAILABLE');
+  if (await heldInShopElsewhere(db, req.id, req.order_item_id, req.unit_index, req.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');
   if (o.offer_iqd === null) {
     // The desk sees «بلا عرض» (§16 D-1): one log line, outside any money batch.
     await eventStatement(db, req.id, { id: req.user_id, role: 'customer' }, 'no_offer', 'draft', 'draft', { reason: o.no_offer_reason }, nowIso)
@@ -2048,6 +2085,7 @@ async function submitV2(env: Env, req: RequestRow, comps: ComponentRow[], book: 
       ),
     fence(db, req.id, token),
     serviceFence(db, req.id, slot),
+    heldInShopFence(db, req.id, req.order_item_id, req.unit_index, req.scope),
     db.prepare(`UPDATE trade_in_components SET estimate_json = '{}', value_iqd = NULL WHERE request_id = ?`).bind(req.id),
     valuationStatement(db, req.id, o.owner, req.user_id, nowIso),
     eventStatement(db, req.id, { id: req.user_id, role: 'customer' }, 'submit', 'draft', 'submitted', { offer_iqd: offer, target_price_iqd: priced.price_iqd }, nowIso),
@@ -2071,7 +2109,10 @@ async function submitV2(env: Env, req: RequestRow, comps: ComponentRow[], book: 
   try {
     await db.batch(stmts);
   } catch (e) {
-    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
+    if (isAbort(e)) {
+      if (await heldInShopElsewhere(db, req.id, req.order_item_id, req.unit_index, req.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');
+      throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
+    }
     throw e;
   }
   return (await loadRequest(db, req.id))!;
@@ -3264,7 +3305,8 @@ export async function requestView(env: Env, req: RequestRow, audience: RequestAu
       // The owner's own breakdown; staff and the customer read no part value (B.10, G11).
       ...(owner ? { base_iqd: c.base_iqd, value_iqd: c.value_iqd, estimate: safeParse<ComponentValuation | null>(c.estimate_json, null) } : {}),
     })),
-    events: events.map((e) => ({
+    // A completion or stock booking that failed is the desk's to see (review F-7), never the customer's.
+    events: events.filter((e) => staff || !INTERNAL_EVENTS.has(e.action)).map((e) => ({
       action: e.action,
       actor_role: e.actor_role,
       from_status: e.from_status,
@@ -3337,6 +3379,9 @@ function settlementOf(req: RequestRow, value: number): TradeInSettlement {
   const s = offerSettlement(req.target_price_iqd ?? 0, value, req.pickup_fee_iqd ?? 0);
   return { target_price_iqd: s.target_price_iqd, trade_in_value_iqd: s.trade_in_value_iqd, credit_iqd: s.credit_iqd, difference_iqd: s.difference_iqd, excess_iqd: s.excess_iqd };
 }
+
+/** Events the desk reads and the customer does not (failed attempts the sweep retries). */
+const INTERNAL_EVENTS: ReadonlySet<string> = new Set(['completion_failed', 'stock_failed']);
 
 function pickPublicDetail(d: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
