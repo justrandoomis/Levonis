@@ -65,6 +65,17 @@ rest (queue position, leaf, plan estimate, a label's evidence …):
 `tests/bambuValueLabels.test.ts` proves it on the trimmed real AMS 2 Pro page
 (`tests/fixtures/bambu/ams-2-pro.page.html`) and its real manifest row.
 
+`targets` is the reviewed `compat-targets.json`. A label resolves through its
+entry's `to` or `members`; an entry whose members depend on the product that
+names it ("A1 Series", owner question P0-1) has neither, on purpose, and
+carries `by_subject[<subject handle>]` and `default` instead: relations.ts
+reads the subject's own members first and the default otherwise
+(`entryTargetsFor`). The same file decides two printer questions the group
+registry cannot read alone (owner-questions §E.9): "Select your printer
+series" and "Device" are printer groups (the latter labelled «الجهاز» /
+Device / «ئامێر») only when every value is a label the file maps or lists as
+reviewed-unresolvable (`compatLabelReviewed`).
+
 `tests/bambu*.test.ts` pin the import mapping on `tests/fixtures/bambu/`.
 `tests/catalogModel.test.ts` pins the model; `tests/catalogRoutes.test.ts`,
 `tests/catalogCheckout.test.ts` and `tests/catalogMigration.test.ts` pin the

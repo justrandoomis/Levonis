@@ -1,0 +1,409 @@
+{
+ "_meta": {
+  "source_url": "https://us.store.bambulab.com/products/cyberbrick-timelapse-kit",
+  "fetched_at": "2026-10-15",
+  "extracted_from": "P0 crawl, read through packages/catalog/src/bambuImport/extract.ts (the closed read list): identity, options, variants and the gallery only",
+  "notes": "Option, variant and gallery structure only (variant notes and sold-out flags blanked). No price, stock, promotion or description."
+ },
+ "product": {
+  "id": "593291025936302080",
+  "seoCode": "cyberbrick-timelapse-kit",
+  "seoUrlHandle": "https://us.store.bambulab.com/products/cyberbrick-timelapse-kit",
+  "name": "CyberBrick Time-lapse Kit",
+  "currentAllIdRoute": "552709760852512768>591521224512909312>644774372685770752",
+  "isFilament": false,
+  "productPropertyList": [
+   {
+    "propertyKey": "Select your printer series",
+    "propertyKeyId": "645152574177898497",
+    "type": 1,
+    "title": "",
+    "position": 1,
+    "productPropertyValueList": [
+     {
+      "id": "645152574177898498",
+      "value": "A1 Series",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "722685315026853889",
+      "value": "X2 / A2 Series",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "645152574177898501",
+      "value": "H2 / P1 / X1 Series",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "687903460763865089",
+      "value": "P2 Series",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "645152574177898502",
+      "value": "CyberBrick Time-lapse Kit - ZK005",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "645152574177898503",
+      "value": "Expansion Board Only - XA015",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   },
+   {
+    "propertyKey": "Do you have an AMS connected?",
+    "propertyKeyId": "645152574177898504",
+    "type": 1,
+    "title": "",
+    "position": 2,
+    "productPropertyValueList": [
+     {
+      "id": "645152574177898505",
+      "value": "Yes",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "645152574177898506",
+      "value": "No",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   },
+   {
+    "propertyKey": "Time-lapse kit type",
+    "propertyKeyId": "645152574177898507",
+    "type": 1,
+    "title": "",
+    "position": 3,
+    "productPropertyValueList": [
+     {
+      "id": "645152574177898508",
+      "value": "With 260mm 4 Pin Cable - ZH074",
+      "selectedDefault": 1,
+      "colorUrl": null
+     },
+     {
+      "id": "645152574177898509",
+      "value": "With 510mm 6 Pin Cable - ZH075",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "645152574177898510",
+      "value": "No",
+      "selectedDefault": 0,
+      "colorUrl": null
+     },
+     {
+      "id": "687903460763865090",
+      "value": "With 510mm 6 Pin Cable - ZH075 (Requires a P2S AMS Buffer)",
+      "selectedDefault": 0,
+      "colorUrl": null
+     }
+    ]
+   }
+  ],
+  "productSkuList": [
+   {
+    "id": "645152574177898511",
+    "mediaFile": {
+     "resourceFileId": "609151077247205376",
+     "url": "https://store.bblcdn.com/s7/default/92e65689feec4fe99760d59868cc637e/4_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "A1 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "Yes"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 260mm 4 Pin Cable - ZH074"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "645152574177898517",
+    "mediaFile": {
+     "resourceFileId": "609151077247205376",
+     "url": "https://store.bblcdn.com/s7/default/92e65689feec4fe99760d59868cc637e/4_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "A1 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "No"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 260mm 4 Pin Cable - ZH074"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "645152574177898547",
+    "mediaFile": {
+     "resourceFileId": "609151077703712768",
+     "url": "https://store.bblcdn.com/s7/default/a6ca19cfa8bb434592d5ab212ddc3252/6_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "H2 / P1 / X1 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "Yes"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 510mm 6 Pin Cable - ZH075"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "645152574177898553",
+    "mediaFile": {
+     "resourceFileId": "609151077247205376",
+     "url": "https://store.bblcdn.com/s7/default/92e65689feec4fe99760d59868cc637e/4_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "H2 / P1 / X1 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "No"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 260mm 4 Pin Cable - ZH074"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "645152574177898559",
+    "mediaFile": {
+     "resourceFileId": "609151077658443776",
+     "url": "https://store.bblcdn.com/s7/default/3ffd52aeacd64a32a027f8261b939e4d/ZK005_V.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "CyberBrick Time-lapse Kit - ZK005"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "No"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "No"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "645152574177898565",
+    "mediaFile": {
+     "resourceFileId": "609151078952087552",
+     "url": "https://store.bblcdn.com/s7/default/d9059be467b5405eadc0a37b3cd93592/B-XA015.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "Expansion Board Only - XA015"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "No"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "No"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "687903460763865091",
+    "mediaFile": {
+     "resourceFileId": "609151077703712768",
+     "url": "https://store.bblcdn.com/s7/default/a6ca19cfa8bb434592d5ab212ddc3252/6_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "P2 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "Yes"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 510mm 6 Pin Cable - ZH075"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "687903460763865097",
+    "mediaFile": {
+     "resourceFileId": "609151077703712768",
+     "url": "https://store.bblcdn.com/s7/default/a6ca19cfa8bb434592d5ab212ddc3252/6_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "P2 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "No"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 510mm 6 Pin Cable - ZH075 (Requires a P2S AMS Buffer)"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "722685315031048192",
+    "mediaFile": {
+     "resourceFileId": "609151077703712768",
+     "url": "https://store.bblcdn.com/s7/default/a6ca19cfa8bb434592d5ab212ddc3252/6_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "X2 / A2 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "Yes"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 510mm 6 Pin Cable - ZH075"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   },
+   {
+    "id": "722685315035242499",
+    "mediaFile": {
+     "resourceFileId": "609151077703712768",
+     "url": "https://store.bblcdn.com/s7/default/a6ca19cfa8bb434592d5ab212ddc3252/6_PIN.png"
+    },
+    "productSkuPropertyList": [
+     {
+      "propertyKey": "Select your printer series",
+      "propertyKeyId": "645152574177898497",
+      "propertyValue": "X2 / A2 Series"
+     },
+     {
+      "propertyKey": "Do you have an AMS connected?",
+      "propertyKeyId": "645152574177898504",
+      "propertyValue": "No"
+     },
+     {
+      "propertyKey": "Time-lapse kit type",
+      "propertyKeyId": "645152574177898507",
+      "propertyValue": "With 510mm 6 Pin Cable - ZH075"
+     }
+    ],
+    "isSoldOut": false,
+    "description": ""
+   }
+  ],
+  "mediaFiles": [
+   {
+    "resourceFileId": "635346424522633216",
+    "url": "https://store.bblcdn.com/s7/default/e560ef07dae74d1db99c70d398f252a2/ZK005-F.png"
+   },
+   {
+    "resourceFileId": "593290905136173056",
+    "url": "https://store.bblcdn.com/s7/default/8bb6ccf18bd84499a971e680dbc13ae5/ZK005-D.png"
+   },
+   {
+    "resourceFileId": "609151077658443776",
+    "url": "https://store.bblcdn.com/s7/default/3ffd52aeacd64a32a027f8261b939e4d/ZK005_V.png"
+   },
+   {
+    "resourceFileId": "609151077247205376",
+    "url": "https://store.bblcdn.com/s7/default/92e65689feec4fe99760d59868cc637e/4_PIN.png"
+   },
+   {
+    "resourceFileId": "609151077703712768",
+    "url": "https://store.bblcdn.com/s7/default/a6ca19cfa8bb434592d5ab212ddc3252/6_PIN.png"
+   },
+   {
+    "resourceFileId": "609151078952087552",
+    "url": "https://store.bblcdn.com/s7/default/d9059be467b5405eadc0a37b3cd93592/B-XA015.png"
+   }
+  ]
+ },
+ "description": {
+  "kind": "none"
+ },
+ "jsonld": []
+}

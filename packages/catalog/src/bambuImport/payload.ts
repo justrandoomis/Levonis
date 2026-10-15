@@ -26,7 +26,7 @@ import { buildOptions, sourceTextOf, type OptionModel, type ReviewedValueLabel }
 import { describe, parseBoxItem, type Described } from './describe';
 import { planMedia, type MediaOverride, type MediaPlan } from './media';
 import { buildSpecs, specRowId, variantNoteRows, type SpecResult, type SpecRow } from './specs';
-import { buildRelations, type CompatTargets, type RelationResult } from './relations';
+import { buildRelations, compatLabelReviewed, type CompatTargets, type RelationResult } from './relations';
 import { classifySentence, scrubProse, type SentenceClass } from './sentences';
 import { productTypeOf, type ProductType } from './registry/types';
 import { modelsInText } from './registry/models';
@@ -764,7 +764,10 @@ export function buildImportPayload(inp: BuildInputs): BuildResult {
   const rowMismatch = !!row && (String(row.source_product_id) !== x.sourceProductId || row.handle !== x.handle);
   const rowOk = row && !rowMismatch ? row : null;
   const skuCodes = row ? (rowOk?.sku_codes ?? {}) : (inp.skuCodes ?? {});
-  const model = buildOptions(x, productId, { valueLabels: rowOk?.value_labels ?? null });
+  const model = buildOptions(x, productId, {
+    valueLabels: rowOk?.value_labels ?? null,
+    isReviewedTarget: inp.targets ? (label: string) => compatLabelReviewed(inp.targets, label) : null,
+  });
   if (rowMismatch) model.errors.push({ code: 'IDENTITY_AMBIGUOUS', detail: 'the manifest row names another product' });
   const described = describe(x.description);
   const modelToken = modelsInText(x.title)[0]?.token ?? '';

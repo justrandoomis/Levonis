@@ -73,6 +73,13 @@ export type ReviewedValueLabels = Readonly<Record<string, ReviewedValueLabel>>;
 export interface BuildOptionsExtras {
   /** The manifest row's reviewed value labels, by source value id. */
   valueLabels?: ReviewedValueLabels | null;
+  /**
+   * Whether compat-targets.json maps a label or lists it as reviewed-unresolvable
+   * (relations.ts `compatLabelReviewed`): the printer matcher reads the
+   * "Select your printer series" and "Device" groups as printer groups only
+   * when every value is such a label (owner-questions §E.9).
+   */
+  isReviewedTarget?: ((label: string) => boolean) | null;
 }
 
 export interface ModelGroup {
@@ -162,7 +169,7 @@ export function buildOptions(x: Extraction, productId: string, extras: BuildOpti
   const groups: ModelGroup[] = [];
   const sorted = [...x.groups].sort((a, b) => a.position - b.position);
   for (const g of sorted) {
-    const cls = classifyGroup(g);
+    const cls = classifyGroup(g, { isReviewedTarget: extras.isReviewedTarget ?? undefined });
     const gid = groupIdOf(productId, g.propertyKeyId);
     const label = cleanText(g.propertyKey);
     const values: ModelValue[] = [];

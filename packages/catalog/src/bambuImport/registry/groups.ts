@@ -32,7 +32,17 @@ export const CANONICAL_GROUPS: Readonly<Record<string, CanonicalGroup>> = {
   pack: { canonical: 'pack', kind: 'pack', label: tri('الحزمة', 'Pack', 'پاکێت') },
   type: { canonical: 'type', kind: 'other', label: tri('النوع', 'Type', 'جۆر') },
   compatibility: { canonical: 'compatibility', kind: 'other', label: tri('التوافق', 'Compatibility', 'گونجاوی') },
+  /** "Device" on ptfe-tubes: printers AND AMS units, so not «الطابعة» (owner-questions §E.9). */
+  device: { canonical: 'device', kind: 'printer', label: tri('الجهاز', 'Device', 'ئامێر') },
 };
+
+/**
+ * Group labels that name printers (or AMS units) only when the reviewed
+ * compat-targets.json knows every value (owner-questions §E.9): "Select your
+ * printer series" (cyberbrick-timelapse-kit) and "Device" (ptfe-tubes). The
+ * registry alone cannot tell; the caller passes the reviewed-label test.
+ */
+const PRINTER_QUESTION = /^select your printer series$|^device$/;
 
 /** Spool-type value words (a `Type` group made only of these is the spool group). */
 export const SPOOL_WORDS: ReadonlySet<string> = new Set(
@@ -66,8 +76,13 @@ export interface GroupClass {
   kind: GroupKind;
 }
 
+export interface ClassifyOptions {
+  /** Whether compat-targets.json maps a label or lists it as reviewed-unresolvable (relations.ts compatLabelReviewed). */
+  isReviewedTarget?: (label: string) => boolean;
+}
+
 /** The canonical group of a source option group (first rule that matches). */
-export function classifyGroup(g: GroupInput): GroupClass {
+export function classifyGroup(g: GroupInput, opts: ClassifyOptions = {}): GroupClass {
   const key = labelKey(g.propertyKey);
   const values = g.values.map((v) => v.value);
   const hit = (c: string): GroupClass => ({ group: CANONICAL_GROUPS[c], kind: CANONICAL_GROUPS[c].kind });
@@ -76,6 +91,9 @@ export function classifyGroup(g: GroupInput): GroupClass {
   if (/^(size|weight|net weight)$/.test(key) && values.length > 0 && values.every((v) => WEIGHT_VALUE.test(v))) return hit('net_weight');
   if (/^printer model$|^printer$|^select the type of printer|^compatible printer|^printer type$/.test(key)) return hit('printer');
   if (/^compatibility$|^compatible with$/.test(key) && allPrinterLabels(values)) return hit('printer');
+  if (PRINTER_QUESTION.test(key) && opts.isReviewedTarget && values.length > 0 && values.every((v) => opts.isReviewedTarget!(v))) {
+    return hit(key === 'device' ? 'device' : 'printer');
+  }
   if (g.type === 4 || /^variant$|^version$|^model$/.test(key)) return hit('version');
   if (/^how many .*unit/.test(key) || /^units?$|^quantity$/.test(key)) return hit('units');
   if (/^(size|nozzle|nozzle size|nozzle diameter|diameter)$/.test(key) && values.length > 0 && values.every((v) => NOZZLE_VALUE.test(v))) return hit('nozzle');
