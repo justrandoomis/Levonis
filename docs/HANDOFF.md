@@ -16,8 +16,11 @@ force-pushes, or alternate deployment path.
   per order line (`CLAIM_PENDING`); each new warranty claim records the cover it was filed under
   (four frozen `filed_cover_*` columns). Uses spent by orders cancelled before 0191 stay spent.
   Open for S-P2: cancelling the order of an already completed trade-in loses its credit.
-  Local note: `communityEscrowReview` F1/F2 and `storeOrderMoneyReview` F7 (race tests) fail on
-  this container on 433537c1 too, but pass on GitHub's runners; they need a deterministic fix.
+- `e7637338` — the three money race tests (`communityEscrowReview` F1/F2, `storeOrderMoneyReview`
+  F7) force their interleaving with `RaceD1` instead of timing it. Cause: on Node < 22.22.3 tsx
+  uses the off-thread loader, so `stubApp`'s per-request `import('./autoPublish')` costs an event
+  turn and the other side always won. Other `Promise.all` race tests share the exposure; a local
+  Node >= 22.22.3 (CI runs 22.23.x) or a static import in `stubApp` removes it for all of them.
 - `a6203c29` — **Pricing V2 clean start** (DECISIONS 233–236; design `docs/PRICING-V2.md`),
   deployed 22:37 UTC. Migrations 0189 (V2 core) and 0190 (archive of the old values, D1 purchase
   reviews, line estimate). At this deploy every store product was hidden; each returns on its own
