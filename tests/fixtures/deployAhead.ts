@@ -40,6 +40,9 @@ export const DESIGNED_ON_OLDER_DB: readonly DesignedRefusal[] = [
   // same 403 on both databases (the cost door comes first) and stays strict.
   { path: '/api/admin/pricing/rates', who: ['owner'], status: 503, code: 'PRICING_NOT_INSTALLED', migration: '0179_fx_rates.sql' },
   { path: '/api/admin/pricing/rates/history', who: ['owner'], status: 503, code: 'PRICING_NOT_INSTALLED', migration: '0179_fx_rates.sql' },
+  // «طلب السعر» (DECISIONS row 240): the caller's own requests live only in 0193's table. Every signed-in
+  // caller gets the same designed 503 there (the doors probe the table first); no listing or page reads it.
+  { path: '/api/price-requests/mine', who: ['owner', 'full'], status: 503, code: 'PRICE_REQUESTS_UNAVAILABLE', migration: '0193_price_requests.sql' },
   // The Inputs stage's /products/:id/rules and /inputs were listed here (0181);
   // the clean start (spec addendum A.6) closed both: 409 PRICING_V2_MANAGED on
   // every database, so they are held to strict equality like any other route.

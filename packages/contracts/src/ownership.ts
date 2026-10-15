@@ -112,6 +112,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // `products.price_iqd`, so filing it anywhere else would mean a second
     // service holding a snapshot of a column Catalogue owns.
     'price_reports',
+    // «طلب السعر» (DECISIONS row 240, migration 0193): the same tie-break as `price_reports` — a request
+    // exists only to answer "which product should be priced next", a catalogue and pricing decision, and
+    // the catalogue writes it. Its customer notice goes through the notification writers' own statements.
+    'product_price_requests', 'product_price_request_stats',
     // THE SEARCH INDEX (migration 0089) and the dictionary it reads. Both are
     // derived from the catalogue and rebuilt from it, so they belong to the
     // owner that writes it — a search index owned by anyone but the catalogue

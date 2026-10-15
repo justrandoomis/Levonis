@@ -228,6 +228,7 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/stockAlerts.ts': { visible: 2, sellable: 0, states: 0 },
   'worker/routes/support.ts': { visible: 4, sellable: 5, states: 0 },
   // «طلب السعر» (migration 0193): the request door asks VISIBLE (and the flag); the sweep asks each product's state.
+  'worker/routes/priceRequests.ts': { visible: 1, sellable: 1, states: 0 },
 };
 
 /** Every .ts under worker/, relative to the repository root. */

@@ -98,6 +98,7 @@ import { compareRoutes } from './routes/compare';
 import { catalogRoutes } from './routes/catalog';
 import { printerFinderRoutes } from './routes/printerFinder';
 import { priceReportRoutes, adminPriceReportRoutes } from './routes/priceReports';
+import { priceRequestRoutes } from './routes/priceRequests';
 import { merchantPrinterRoutes } from './routes/merchantPrinters';
 import { merchantWorkshopRoutes } from './routes/merchantWorkshop';
 import { merchantCatalogRoutes } from './routes/merchantCatalog';
@@ -479,6 +480,8 @@ app.route('/api/public/v1', publicApiRoutes);
 // behind its own requireAuth: an anonymous form that writes a row the owner
 // reads is a spam endpoint.
 app.route('/api/price-reports', priceReportRoutes);
+// «طلب السعر» (DECISIONS row 240, migration 0193): signed-in customers ask for a catalog-only product's price.
+app.route('/api/price-requests', priceRequestRoutes);
 app.route('/api', miscRoutes);
 app.route('/api/admin', adminRoutes);
 // The farm's balancing console. Under /api/admin/* on purpose: the apex-only

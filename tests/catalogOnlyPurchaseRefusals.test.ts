@@ -159,6 +159,7 @@ test('a product hidden for a catalogue gap (no picture) answers 404 at every doo
     assert.equal((await post(app, `/api/products/${CAT.slug}/quote`, { qty: 1, ...SELECTION })).status, 404, 'the quote');
     assert.equal((await post(app, '/api/cart/items', { productId: CAT.id, qty: 1, ...SELECTION })).status, 404, 'the cart');
     assert.equal((await post(app, '/api/price-reports', { productId: CAT.id, priceIqd: 2_000_000 })).status, 404, 'a price report');
+    assert.equal((await post(app, '/api/price-requests', { product_id: CAT.id, option_value_ids: [CAT_SEL.std], color_id: CAT_SEL.grey })).status, 404, 'a price request');
     const list = await json(await get(app, '/api/products?limit=50'));
     assert.equal((list.products as Array<{ id: string }>).some((p) => p.id === CAT.id), false, 'the listing');
   } finally {

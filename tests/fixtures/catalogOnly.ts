@@ -35,6 +35,7 @@ import { communitySearchRoutes } from '../../worker/routes/communitySearch';
 import { communityFavoriteRoutes } from '../../worker/routes/communityFavorites';
 import { profileRoutes } from '../../worker/routes/profile';
 import { priceReportRoutes } from '../../worker/routes/priceReports';
+import { priceRequestRoutes } from '../../worker/routes/priceRequests';
 import { stockAlertRoutes } from '../../worker/routes/stockAlerts';
 import { tradeInRoutes } from '../../worker/routes/tradeIn';
 import { printQuoteRoutes } from '../../worker/routes/printQuote';
@@ -203,6 +204,7 @@ export function mountCustomer(a: Parameters<Parameters<typeof stubApp>[2]>[0]): 
   a.route('/api/community-favorites', communityFavoriteRoutes);
   a.route('/api/profile', profileRoutes);
   a.route('/api/price-reports', priceReportRoutes);
+  a.route('/api/price-requests', priceRequestRoutes);
   a.route('/api/stock-alerts', stockAlertRoutes);
   a.route('/api/trade-in', tradeInRoutes);
   a.route('/api/print-quote', printQuoteRoutes);

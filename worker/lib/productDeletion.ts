@@ -113,6 +113,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   // would otherwise take this line for an oversight and add a guard that
   // strands rows.
   { table: 'product_stock_alerts', by: { column: 'product_id' } },
+  // «طلب السعر» (migration 0193): the requests and their per-product counts go with the product (D1 does not
+  // enforce the declared ON DELETE CASCADE).
+  { table: 'product_price_requests', by: { column: 'product_id' } },
+  { table: 'product_price_request_stats', by: { column: 'product_id' } },
   { table: 'product_images', by: { column: 'product_id' } },
   { table: 'product_variants', by: { column: 'product_id' } },
   // The fulfilment/transport cells (migration 0073) hang off an option row and

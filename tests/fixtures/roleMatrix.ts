@@ -87,6 +87,7 @@ import { financeEarningsRoutes } from '../../worker/routes/financeEarnings';
 import { farmAdminRoutes } from '../../worker/routes/farmAdmin';
 import { adminPrintQuoteRoutes, printQuoteRoutes } from '../../worker/routes/printQuote';
 import { adminPriceReportRoutes, priceReportRoutes } from '../../worker/routes/priceReports';
+import { priceRequestRoutes } from '../../worker/routes/priceRequests';
 import { warrantyAdminRoutes, warrantyPublicRoutes } from '../../worker/routes/warranty';
 import { adminCommunityRoutes } from '../../worker/routes/adminCommunity';
 import { adminChatRoutes } from '../../worker/routes/adminChats';
@@ -209,6 +210,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/print-quote', printQuoteRoutes as Router],
   ['/api/admin/print-quote', adminPrintQuoteRoutes as Router],
   ['/api/price-reports', priceReportRoutes as Router],
+  ['/api/price-requests', priceRequestRoutes as Router],
   ['/api/admin/price-reports', adminPriceReportRoutes as Router],
   ['/api/admin/products-v2', adminProductsRoutes as Router],
   ['/api/admin/template', templateRoutes as Router],
