@@ -130,9 +130,9 @@ function photoForm(component: string, angle: string): FormData {
 }
 
 /** Opens, answers («good» everywhere), photographs and submits a trade-in of Sara's A1 toward the P1S. */
-export async function submitted(raw: DatabaseSync, item = 'oi_a1'): Promise<string> {
+export async function submitted(raw: DatabaseSync, item = 'oi_a1', scope: 'whole' | 'printer_only' | 'ams_only' = 'whole'): Promise<string> {
   const a = customerApp(raw);
-  const r = await json(await post(a, '/api/trade-in/requests', { order_item_id: item, unit_index: 1, scope: 'whole' }));
+  const r = await json(await post(a, '/api/trade-in/requests', { order_item_id: item, unit_index: 1, scope }));
   assert.ok(r.success, JSON.stringify(r));
   const id = r.request.id as string;
   const comps = r.request.components as Array<{ role: 'device' | 'ams'; family: 'fdm' | 'ams' }>;
@@ -171,10 +171,26 @@ export function checkoutBody(extra: Record<string, unknown> = {}) {
 /**
  * THE SHOP RECEIVED THE DEVICE (decision 2, «الجهاز أولاً», migration 0192): no
  * trade-in credit is spent before its device's intake is recorded
- * (`trg_trade_in_credit_needs_intake`). Stamped here until the intake door lands.
+ * (`trg_trade_in_credit_needs_intake`). Through the real door, by STAFF (any
+ * admin may receive; no money moves): the slot's unit gets a serial on record
+ * when it has none, and the desk scans that serial — a match.
  */
-export async function received(raw: DatabaseSync, id: string): Promise<void> {
-  raw.prepare('UPDATE trade_in_requests SET intake_at = ? WHERE id = ? AND intake_at IS NULL').run(new Date().toISOString(), id);
+export async function received(raw: DatabaseSync, id: string, opts: { by?: StubUser; body?: Record<string, unknown> } = {}): Promise<Record<string, any>> {
+  const req = raw.prepare('SELECT order_item_id, unit_index, scope FROM trade_in_requests WHERE id = ?').get(id) as { order_item_id: string; unit_index: number; scope: string };
+  let serial = '';
+  if (req.scope !== 'ams_only') {
+    const unit = raw.prepare('SELECT id FROM order_item_units WHERE order_item_id = ? AND unit_index = ?').get(req.order_item_id, req.unit_index) as { id: string } | undefined;
+    if (unit) {
+      const have = raw.prepare('SELECT serial_norm FROM device_serials WHERE unit_id = ?').get(unit.id) as { serial_norm: string } | undefined;
+      serial = have?.serial_norm ?? `SN${unit.id.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}01`;
+      if (!have) raw.prepare('INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by) VALUES (?, ?, ?, ?)').run(serial, serial, unit.id, 'staff');
+    }
+  }
+  const res = await post(adminApp(raw, opts.by ?? STAFF), `/api/admin/trade-in/requests/${id}/intake`, { serial, handover: 'store', ...(opts.body ?? {}) });
+  const body = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(body));
+  await settle();
+  return body;
 }
 
 /** Receives the device, approves the estimate, places the P1S order with the credit, returns the order id. */

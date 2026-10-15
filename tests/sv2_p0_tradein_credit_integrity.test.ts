@@ -48,27 +48,27 @@ async function readyToPay(raw: DatabaseSync) {
 
 const ordersOf = (raw: DatabaseSync) => count(raw, "SELECT COUNT(*) AS n FROM orders WHERE user_id = 'cust' AND id <> 'ORD-OLD'");
 
-test('F1: a return opened mid-checkout cancels the trade-in, and the order that would spend its credit rolls back', async () => {
+test('F1: once the shop holds the device (S-P2 intake) a return opened mid-checkout is refused — TRADE_IN_ACTIVE — and the order that spends the credit lands', async () => {
   const raw = seed({ deliveredDaysAgo: 2 });
   const t = await readyToPay(raw);
   const race = new RaceD1(raw);
   race.when = redeems;
-  let returnStatus = 0;
+  let returned: { status: number; code?: string } = { status: 0 };
   race.hook = async () => {
     const returnsApp = stubApp(new LimitD1(raw) as unknown as D1Database, CUSTOMER, (a) => a.route('/api/returns', returnRoutes));
     const r = await post(returnsApp, '/api/returns', { orderItemId: 'oi_a1', unitId: 'unit_a1', qty: 1, reason: 'defective', description: 'It stopped heating.' });
-    returnStatus = r.status;
+    returned = { status: r.status, code: (await json(r)).code };
   };
   const placed = await post(stubApp(race as unknown as D1Database, CUSTOMER, (a) => a.route('/api/orders', orderRoutes)), '/api/orders', checkoutBody({ couponCode: t.code }));
   const body = await json(placed);
   await Promise.all(pending.splice(0));
-  assert.equal(returnStatus, 200, 'the return wins: it was opened');
-  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', t.id)!.status, 'cancelled');
-  // The order did not land, and the retired credit was not spent.
-  assert.equal(placed.status, 400, JSON.stringify(body));
-  assert.equal(body.code, 'TRADE_IN_COUPON_MISMATCH');
-  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ?', t.coupon), 0);
-  assert.equal(ordersOf(raw), 0);
+  // Plan §1.3 «after intake ✗ everything»: the device is the shop's to resell, not the customer's to return.
+  assert.deepEqual(returned, { status: 409, code: 'TRADE_IN_ACTIVE' });
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM return_cases WHERE order_item_id = 'oi_a1'"), 0);
+  assert.equal(placed.status, 200, JSON.stringify(body));
+  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', t.id)!.status, 'awaiting_payment');
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ? AND state = 'active'", t.coupon), 1);
+  assert.equal(ordersOf(raw), 1);
 });
 
 test('F2: a cancel that lands mid-checkout refuses the order; the device is free once, with one credit at most', async () => {

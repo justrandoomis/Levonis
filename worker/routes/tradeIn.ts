@@ -20,13 +20,16 @@
  *
  * ADMIN (mounted at /api/admin/trade-in):
  *   GET    /requests  · GET /requests/:id
- *   POST   /requests/:id/inspect              any admin
- *   POST   /requests/:id/approve              FINANCIAL — fixes money
- *   POST   /requests/:id/value                FINANCIAL — proposes money
- *   POST   /requests/:id/complete             any admin (the exchange happened)
+ *   POST   /requests/:id/intake               any admin (not their own request) — the device is received (S-P2)
+ *   POST   /requests/:id/photos               any admin — an intake photograph
+ *   POST   /requests/:id/device-returned      any admin — a received device handed back
+ *   POST   /requests/:id/inspect              retired by intake: 409 TRADE_IN_INTAKE_REQUIRED
+ *   POST   /requests/:id/approve              FINANCIAL up to the ceiling — fixes money (or proposes the ceiling)
+ *   POST   /requests/:id/value                FINANCIAL up to the ceiling; above it the OWNER with a reason
+ *   POST   /requests/:id/complete             OWNER — after the new order is delivered (normally automatic)
  *   POST   /requests/:id/cancel               any admin, with a reason
- *   GET    /rules                             every family's rules in force + history
- *   PUT    /rules/:family                     FINANCIAL — saves a NEW version
+ *   GET    /rules                             OWNER (cost read) — every family's rules in force + history
+ *   PUT    /rules/:family                     OWNER — saves a NEW version
  *   POST   /rules/:family/test                validate a draft rule set and price a sample
  */
 import { Hono, type Context } from 'hono';
@@ -45,6 +48,7 @@ import { safeParse } from '../lib/types';
 import {
   TradeInError,
   adminList,
+  approvalCeiling,
   approveEstimate,
   cancelRequest,
   changeValue,
@@ -78,6 +82,9 @@ import {
   submitRequest,
 } from '../lib/tradeIn';
 import { requireTradeInV2, tradeInV2Installed } from '../lib/tradeInSchema';
+import { requireCostRead } from '../lib/costAccess';
+import { deviceReturned, intakeRequest } from '../lib/tradeInIntake';
+import { overrideRecord } from '../lib/tradeInOffer';
 import { isListedDeviceTarget, searchTargets } from '../lib/tradeInTargets';
 import {
   MAX_DAMAGE_PHOTOS,
@@ -103,6 +110,8 @@ const PHOTO_ID_RE = /^tip_[0-9a-f]{20}$/;
 const ITEM_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 /** The same ceiling a support or chat photograph has (worker/routes/uploads.ts). */
 const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
+/** Photographs the desk may add at intake (the serial plate, the hours screen, every finding). */
+const MAX_INTAKE_PHOTOS = 20;
 
 function toHttp(e: unknown): never {
   if (e instanceof TradeInError) throw new HttpError(e.status, e.message, e.code, e.details);
@@ -137,6 +146,65 @@ function offerNoOf(body: Record<string, unknown>): number {
   const n = body.offer_no;
   if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1) throw badRequest('offer_no is required', 'TRADE_IN_OFFER_STALE');
   return n;
+}
+
+/**
+ * The uploads door's rules for one photograph of a request: the bytes are sniffed (the declared type
+ * is never trusted), only a still image is taken, HEIC is named, the server converts to WebP, and the
+ * object lands under `trade-in/<request id>/<kind>/` (the file gate serves `photos/` to the request's
+ * customer and to admins, `intake/` to admins only).
+ */
+async function storePhoto(
+  c: Context<AppContext>,
+  file: File,
+  where: { requestId: string; ownerId: string; kind: 'photos' | 'intake'; originalName: string }
+): Promise<{ key: string; mime: string; buf: Uint8Array; dims: { width: number; height: number } | null }> {
+  if (file.size > PHOTO_MAX_BYTES) throw badRequest(`Image is too large (max ${PHOTO_MAX_BYTES / 1024 / 1024} MB)`);
+  let buf = new Uint8Array(await file.arrayBuffer());
+  const kind = sniff(buf);
+  if (!kind && isHeifBytes(buf)) throw badRequest(HEIF_REFUSAL, 'IMAGE_HEIC_UNSUPPORTED');
+  if (!kind || !['image/jpeg', 'image/png', 'image/webp'].includes(kind.mime)) {
+    throw badRequest('Unsupported file type — please upload a JPEG, PNG or WebP photo');
+  }
+  let mime = kind.mime;
+  let ext = kind.ext;
+  if (isConvertibleToWebp(kind.mime)) {
+    const converted = await convertToWebp(c.env, buf, kind.mime);
+    if (converted.ok) {
+      buf = converted.bytes;
+      mime = converted.mime;
+      ext = extensionFor(converted.mime);
+    } else if (converted.reason === 'unavailable') {
+      throw unavailable(
+        'تحويل الصور غير مفعّل على الخادم حالياً. / Server-side image conversion is not enabled on this deployment.',
+        'IMAGE_CONVERT_UNAVAILABLE'
+      );
+    } else if (converted.reason === 'too_large') {
+      throw badRequest('Image is too large to convert.', 'IMAGE_TOO_LARGE_TO_CONVERT');
+    } else if (converted.reason === 'failed') {
+      throw badRequest('This image could not be converted. Try another one.', 'IMAGE_CONVERT_FAILED');
+    }
+  }
+  const dims = rasterDimensions(buf, mime);
+  const key = buildMediaKey({ visibility: 'private', domain: 'trade-in', entityId: where.requestId, kind: where.kind, extension: ext, objectId: newId() });
+  await putMediaObject(
+    c.env,
+    {
+      key,
+      visibility: 'private',
+      domain: 'trade-in',
+      mime,
+      bytes: buf.byteLength,
+      ownerId: where.ownerId,
+      entityId: where.requestId,
+      width: dims?.width ?? null,
+      height: dims?.height ?? null,
+      originalName: where.originalName.slice(0, 200),
+    },
+    buf,
+    { httpMetadata: { contentType: mime, cacheControl: 'private, max-age=300' } }
+  );
+  return { key, mime, buf, dims: dims ? { width: dims.width, height: dims.height } : null };
 }
 
 // =========================================================================
@@ -298,52 +366,9 @@ tradeInRoutes.post('/requests/:id/photos', async (c) => {
   if (sameAngle >= perAngle || photos.length >= MAX_PHOTOS_PER_REQUEST) {
     throw new HttpError(409, 'You reached the photo limit for this angle or request.', 'TRADE_IN_PHOTO_LIMIT');
   }
-  if (file.size > PHOTO_MAX_BYTES) throw badRequest(`Image is too large (max ${PHOTO_MAX_BYTES / 1024 / 1024} MB)`);
-  let buf = new Uint8Array(await file.arrayBuffer());
-  const kind = sniff(buf);
-  if (!kind && isHeifBytes(buf)) throw badRequest(HEIF_REFUSAL, 'IMAGE_HEIC_UNSUPPORTED');
-  if (!kind || !['image/jpeg', 'image/png', 'image/webp'].includes(kind.mime)) {
-    throw badRequest('Unsupported file type — please upload a JPEG, PNG or WebP photo');
-  }
-  let mime = kind.mime;
-  let ext = kind.ext;
-  if (isConvertibleToWebp(kind.mime)) {
-    const converted = await convertToWebp(c.env, buf, kind.mime);
-    if (converted.ok) {
-      buf = converted.bytes;
-      mime = converted.mime;
-      ext = extensionFor(converted.mime);
-    } else if (converted.reason === 'unavailable') {
-      throw unavailable(
-        'تحويل الصور غير مفعّل على الخادم حالياً. / Server-side image conversion is not enabled on this deployment.',
-        'IMAGE_CONVERT_UNAVAILABLE'
-      );
-    } else if (converted.reason === 'too_large') {
-      throw badRequest('Image is too large to convert.', 'IMAGE_TOO_LARGE_TO_CONVERT');
-    } else if (converted.reason === 'failed') {
-      throw badRequest('This image could not be converted. Try another one.', 'IMAGE_CONVERT_FAILED');
-    }
-  }
-  const dims = rasterDimensions(buf, mime);
+  const stored = await storePhoto(c, file, { requestId: id, ownerId: user.id, kind: 'photos', originalName: String(form.get('originalName') || file.name || '') });
+  const { key, mime, buf, dims } = stored;
   const photoId = newId('tip');
-  const key = buildMediaKey({ visibility: 'private', domain: 'trade-in', entityId: id, kind: 'photos', extension: ext, objectId: newId() });
-  await putMediaObject(
-    c.env,
-    {
-      key,
-      visibility: 'private',
-      domain: 'trade-in',
-      mime,
-      bytes: buf.byteLength,
-      ownerId: user.id,
-      entityId: id,
-      width: dims?.width ?? null,
-      height: dims?.height ?? null,
-      originalName: String(form.get('originalName') || file.name || '').slice(0, 200),
-    },
-    buf,
-    { httpMetadata: { contentType: mime, cacheControl: 'private, max-age=300' } }
-  );
   const now = new Date().toISOString();
   // Draft-fenced: a photo cannot attach to a request that was sent while the
   // bytes were in flight. The INSERT … SELECT writes nothing in that case.
@@ -426,18 +451,24 @@ tradeInRoutes.post('/requests/:id/checkout', async (c) => {
   const req = await run(() => ownRequest(c.env.DB, user.id, requestIdOf(c)));
   const credit = await run(() => checkoutCredit(c.env, req));
   const tgt = safeParse<Record<string, unknown>>(req.target_snapshot_json, {});
+  // A credit given back (row 237) buys any device sold directly: no target, the customer chooses.
+  const any = credit.any_device === true;
   return c.json({
     success: true,
     coupon_code: credit.code,
     order_id: credit.order_id,
-    target: {
-      product_id: req.target_product_id,
-      slug: tgt.slug ?? null,
-      option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),
-      color_id: req.target_color_id,
-    },
+    target: any
+      ? null
+      : {
+          product_id: req.target_product_id,
+          slug: tgt.slug ?? null,
+          option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),
+          color_id: req.target_color_id,
+        },
+    any_device: any,
     credit_iqd: req.credit_iqd,
-    difference_iqd: req.difference_iqd,
+    difference_iqd: any ? null : req.difference_iqd,
+    ends_at: credit.ends_at ?? null,
   });
 });
 
@@ -483,17 +514,22 @@ adminTradeInRoutes.get('/requests/:id', async (c) => {
 });
 
 /**
- * WHO MAY DO WHAT HERE (owner decision 3, worker/lib/moneyAuthority.ts).
- * An assistant reads the queue and nothing more: starting the inspection and
- * completing the exchange move the device and the money it stands for (G16).
- * A financial admin approves the estimate, proposes a value up to it, and
- * completes; a value ABOVE the estimate the server computed is the owner's
- * alone, with a private reason (`owner_reason`) recorded and flagged (M1).
- * None of these acts is the customer's own: an admin who is the trade-in's
- * customer — who answered its condition questions — leaves them to the owner
- * (a conflict of interest, decided with a reason).
+ * WHO MAY DO WHAT HERE (owner decision 3, worker/lib/moneyAuthority.ts; S-P2 spec §6.5–§6.6).
+ *   intake, intake photos, device hand-back   ANY admin (an assistant too: no money moves) — never on
+ *                                             their own request (TRADE_IN_OWN_REQUEST); a serial that
+ *                                             does not match is the owner's, with a recorded reason
+ *   approve, value                            FINANCIAL, up to the server's ceiling from intake; above
+ *                                             it the owner, with a private reason (`owner_reason`) and,
+ *                                             past the store's own cap, an acknowledgement
+ *   complete                                  the OWNER, after the new order is delivered (it is
+ *                                             normally automatic on delivery)
+ * None of these acts is the customer's own: an admin who is the trade-in's customer leaves them to
+ * the owner (a conflict of interest, decided with a reason). A unit with no serial on record, or one
+ * received over a mismatch, is the owner's to approve (§16 D-5).
  */
-adminTradeInRoutes.post('/requests/:id/inspect', requireMoneyAuthority('trade_in_inspect'), async (c) => {
+adminTradeInRoutes.post('/requests/:id/inspect', async (c) => {
+  // S-P2: retired — the device is received at intake. A cached desk tab reads a sentence.
+  if (await tradeInV2Installed(c.env.DB)) throw new HttpError(409, 'Receive the device and record its serial and hours first.', 'TRADE_IN_INTAKE_REQUIRED');
   const admin = c.get('user')!;
   const current = await adminRequest(c);
   assertMoneyAuthority(c, { act: 'trade_in_inspect', beneficiaryUserId: current.user_id, reason: await ownerReasonOf(c) });
@@ -507,19 +543,112 @@ async function ownerReasonOf(c: Context<AppContext>): Promise<string> {
   return str(body.owner_reason, 'owner_reason', { max: 500, required: false });
 }
 
+const intakeRequired = () => new HttpError(409, 'Receive the device and record its serial and hours first.', 'TRADE_IN_INTAKE_REQUIRED');
+
+/** A unit with no serial on record, or received over a mismatch: approving its money is the owner's (§16 D-5). */
+const serialNeedsOwner = (req: Awaited<ReturnType<typeof adminRequest>>) =>
+  req.intake_serial_match === 'unrecorded' || req.intake_serial_match === 'mismatch';
+
+/**
+ * «استلام الجهاز» — the device is in the shop (decision 2). Any admin; never the request's own
+ * customer. Body: `{ serial, hours, components: { device?, ams? }, findings, handover,
+ * serial_override_reason? }`. The server checks the serial, flags the hours, recomputes the ceiling.
+ */
+adminTradeInRoutes.post('/requests/:id/intake', async (c) => {
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in', 120, 3600);
+  await requireTradeInV2(c.env.DB);
+  const current = await adminRequest(c);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const serial = str(body.serial, 'serial', { max: 80, required: false });
+  const hours = body.hours === null || body.hours === undefined || body.hours === '' ? null : int(body.hours, 'hours', { min: 0, max: 1_000_000 });
+  const handover = oneOf(body.handover ?? current.handover ?? 'store', 'handover', ['store', 'pickup'] as const);
+  const findings = str(body.findings, 'findings', { max: 1000, required: false });
+  const components = typeof body.components === 'object' && body.components !== null && !Array.isArray(body.components) ? (body.components as Record<string, unknown>) : {};
+  const overrideReason = str(body.serial_override_reason, 'serial_override_reason', { max: 500, required: false });
+  const out = await run(() =>
+    intakeRequest(c.env, current, { id: admin.id }, {
+      serial,
+      hours,
+      components: { ...(components.device !== undefined ? { device: components.device } : {}), ...(components.ams !== undefined ? { ams: components.ams } : {}) },
+      findings,
+      handover,
+      serialOverrideReason: overrideReason || null,
+      authorizeSerialOverride: (reason) =>
+        void assertMoneyAuthority(c, { act: 'trade_in_serial_override', beneficiaryUserId: current.user_id, reason }),
+    })
+  );
+  if (out.revalued) {
+    afterResponse(c, notifyCustomerOfValue(c.env, out.request).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${out.request.id}:` })));
+  }
+  return c.json({ success: true, request: await requestView(c.env, out.request, adminAudience(c)) });
+});
+
+/**
+ * An intake photograph (multipart: file, component, proves?) — any admin, never on their own request;
+ * stored under `trade-in/<id>/intake/` (admins only). Not on a draft (nothing was sent).
+ */
+adminTradeInRoutes.post('/requests/:id/photos', async (c) => {
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in-upload', 120, 3600);
+  await requireTradeInV2(c.env.DB);
+  const current = await adminRequest(c);
+  if (current.user_id === admin.id) throw new HttpError(403, 'Staff do not receive their own trade-in; a colleague handles it.', 'TRADE_IN_OWN_REQUEST');
+  if (current.status === 'draft') throw new HttpError(409, 'This request is not in a state that allows this action.', 'TRADE_IN_BAD_STATE');
+  const form = await c.req.formData().catch(() => null);
+  if (!form) throw badRequest('Expected multipart form data');
+  const file = form.get('file');
+  if (!(file instanceof File)) throw badRequest('No file uploaded');
+  const role = oneOf(form.get('component') ?? 'device', 'component', ['device', 'ams'] as const);
+  const proves = str(form.get('proves'), 'proves', { max: 40, required: false });
+  if (proves && !/^[a-z0-9_:-]{1,40}$/.test(proves)) throw badRequest('That photo angle does not apply to this device.', 'TRADE_IN_PHOTO_ANGLE');
+  const photos = await loadPhotos(c.env.DB, current.id);
+  if (photos.filter((p) => p.phase === 'intake').length >= MAX_INTAKE_PHOTOS) {
+    throw new HttpError(409, 'You reached the photo limit for this angle or request.', 'TRADE_IN_PHOTO_LIMIT');
+  }
+  const { key, mime, buf, dims } = await storePhoto(c, file, { requestId: current.id, ownerId: admin.id, kind: 'intake', originalName: String(form.get('originalName') || file.name || '') });
+  const photoId = newId('tip');
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(
+    `INSERT INTO trade_in_photos (id, request_id, component_role, angle, file_key, mime, bytes, width, height, uploaded_by, created_at, phase, proves)
+     VALUES (?1, ?2, ?3, 'intake', ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'intake', ?11)`
+  )
+    .bind(photoId, current.id, role, key, mime, buf.byteLength, dims?.width ?? null, dims?.height ?? null, admin.id, now, proves)
+    .run();
+  return c.json({ success: true, photo: { id: photoId, component: role, angle: 'intake', proves, url: `/files/${key}`, width: dims?.width ?? null, height: dims?.height ?? null, created_at: now } }, 201);
+});
+
+/** «أُعيد الجهاز للزبون» — a received device handed back after a cancel or a decline. Any admin, once. */
+adminTradeInRoutes.post('/requests/:id/device-returned', async (c) => {
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in', 120, 3600);
+  await requireTradeInV2(c.env.DB);
+  const req = await run(async () => deviceReturned(c.env, await adminRequest(c), admin.id));
+  return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
+});
+
 adminTradeInRoutes.post('/requests/:id/approve', requireMoneyAuthority('trade_in_approve'), async (c) => {
   const admin = c.get('user')!;
   await rateLimit(c, 'admin-trade-in', 120, 3600);
   const current = await adminRequest(c);
-  // The estimate IS the server's figure: approving it is within a financial admin's authority.
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const reason = str(body.reason, 'reason', { max: 500, required: false });
+  const v2 = await tradeInV2Installed(c.env.DB);
+  if (v2 && !current.intake_at) throw intakeRequired();
+  // v2: the figure is the server's ceiling from intake; before S-P2, the submit-time estimate.
+  const ceiling = v2 ? approvalCeiling(current) : current.estimated_iqd;
   const grant = assertMoneyAuthority(c, {
     act: 'trade_in_approve',
-    amountIqd: current.estimated_iqd,
-    ceilingIqd: current.estimated_iqd,
+    amountIqd: ceiling,
+    ceilingIqd: ceiling,
+    conflictOfInterest: v2 && serialNeedsOwner(current),
     beneficiaryUserId: current.user_id,
     reason: await ownerReasonOf(c),
   });
-  const req = await run(async () => approveEstimate(c.env, current, admin.id, grant));
+  const req = await run(async () => approveEstimate(c.env, current, admin.id, grant, reason));
+  if (req.status === 'value_changed') {
+    afterResponse(c, notifyCustomerOfValue(c.env, req).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${req.id}:` })));
+  }
   return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
@@ -528,18 +657,34 @@ adminTradeInRoutes.post('/requests/:id/value', requireMoneyAuthority('trade_in_v
   await rateLimit(c, 'admin-trade-in', 120, 3600);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const reason = str(body.reason, 'reason', { max: 500, required: false });
-  // The owner's reason for going above the estimate: the audit row and the
-  // reports read it, the customer never does (`reason` above is theirs).
+  // The owner's reason for going above the ceiling: the audit row, the owner's valuation record and
+  // the reports read it, the customer never does (`reason` above is theirs).
   const ownerReason = str(body.owner_reason, 'owner_reason', { max: 500, required: false });
   const raw = body.value_iqd;
   if (typeof raw !== 'number' || !Number.isSafeInteger(raw)) {
     throw badRequest('The value must be a whole number of dinars.', 'TRADE_IN_INVALID_VALUE');
   }
   const current = await adminRequest(c);
-  // M1: «value ≤ estimate unless owner». The ceiling is the estimate the
-  // server fixed at submit — never a figure the client sends.
-  const grant = assertMoneyAuthority(c, { act: 'trade_in_value', amountIqd: raw, ceilingIqd: current.estimated_iqd ?? 0, beneficiaryUserId: current.user_id, reason: ownerReason });
-  const req = await run(async () => changeValue(c.env, current, admin.id, raw, reason, grant));
+  const v2 = await tradeInV2Installed(c.env.DB);
+  if (v2 && !current.intake_at) throw intakeRequired();
+  // M1 / decision 3: «value ≤ the server's figure unless owner». v2: the ceiling from intake; before
+  // S-P2 the estimate fixed at submit — never a figure the client sends.
+  const ceiling = v2 ? approvalCeiling(current) : (current.estimated_iqd ?? 0);
+  const grant = assertMoneyAuthority(c, {
+    act: 'trade_in_value',
+    amountIqd: raw,
+    ceilingIqd: ceiling,
+    conflictOfInterest: v2 && serialNeedsOwner(current),
+    beneficiaryUserId: current.user_id,
+    reason: ownerReason,
+  });
+  let override: Awaited<ReturnType<typeof overrideRecord>> | null = null;
+  if (v2 && grant.above_ceiling) {
+    // Past the store's own cap (owner-only figure) the owner acknowledges the margin may be a loss.
+    override = await overrideRecord(c.env.DB, current.id, raw, ceiling, ownerReason, body.ack_below_margin === true);
+    if (override.needs_ack) throw new HttpError(400, 'Confirm you understand the margin shrinks and may be a loss.', 'TRADE_IN_MARGIN_ACK_REQUIRED');
+  }
+  const req = await run(async () => changeValue(c.env, current, admin.id, raw, reason, grant, override?.row ?? null));
   afterResponse(
     c,
     notifyCustomerOfValue(c.env, req).then(() => processOutbox(c.env, 5, { eventKeyPrefix: `trade_in:${req.id}:` }))
@@ -563,7 +708,8 @@ adminTradeInRoutes.post('/requests/:id/cancel', async (c) => {
   return c.json({ success: true, request: await requestView(c.env, req, adminAudience(c)) });
 });
 
-adminTradeInRoutes.get('/rules', async (c) => {
+/** The rules (weights, cap, floor, references, offer parameters) price every offer: the owner's to read (B.10). */
+adminTradeInRoutes.get('/rules', requireCostRead, async (c) => {
   const book = await loadRuleBook(c.env.DB);
   const history = Object.fromEntries(await Promise.all(TRADE_IN_FAMILIES.map(async (f) => [f, await ruleSetHistory(c.env.DB, f)] as const)));
   return c.json({

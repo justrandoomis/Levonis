@@ -375,3 +375,54 @@ export async function valuationsOf(db: D1Database, requestId: string) {
     created_at: r.created_at,
   }));
 }
+
+/** The newest valuation row of one request (named columns; null when none or on a database without 0192). */
+export async function latestValuation(db: D1Database, requestId: string) {
+  try {
+    return (
+      (await db
+        .prepare(
+          `SELECT phase, offer_iqd, ceiling_iqd, store_cap_iqd, expected_margin_iqd, params_json, components_json
+             FROM trade_in_valuations WHERE request_id = ? AND phase IN ('submit','intake','cutover') ORDER BY created_at DESC, rowid DESC LIMIT 1`
+        )
+        .bind(requestId)
+        .first<{ phase: string; offer_iqd: number | null; ceiling_iqd: number | null; store_cap_iqd: number | null; expected_margin_iqd: number | null; params_json: string; components_json: string }>()) ?? null
+    );
+  } catch (e) {
+    if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return null;
+    throw e;
+  }
+}
+
+/**
+ * THE OWNER'S RECORD OF A VALUE ABOVE THE CEILING (decision 3, spec §6.6): the store's own cap (Σ of
+ * each part's E − K − M, owner-only) and the expected margin at that value, from the newest
+ * computation. `needs_ack`: the value passes the store's cap and the owner did not acknowledge that
+ * the margin may be a loss (TRADE_IN_MARGIN_ACK_REQUIRED). No computation on record (a request sent
+ * before S-P2 and never received): the cap is unknown, so the acknowledgement is asked.
+ */
+export async function overrideRecord(
+  db: D1Database,
+  requestId: string,
+  value: number,
+  ceiling: number,
+  ownerReason: string,
+  acknowledged: boolean
+): Promise<{ needs_ack: boolean; row: ValuationDraft }> {
+  const last = await latestValuation(db, requestId);
+  const cap = last?.store_cap_iqd ?? null;
+  // Σ(E − K) − value: the newest record's margin plus its offer is Σ(E − K).
+  const margin = last && last.expected_margin_iqd !== null && last.offer_iqd !== null ? last.expected_margin_iqd + last.offer_iqd - value : null;
+  return {
+    needs_ack: (cap === null || value > cap) && !acknowledged,
+    row: {
+      phase: 'override',
+      offer_iqd: value,
+      ceiling_iqd: ceiling,
+      store_cap_iqd: cap,
+      expected_margin_iqd: margin,
+      params_json: JSON.stringify({ from_phase: last?.phase ?? null, owner_reason: ownerReason, ack_below_margin: acknowledged }),
+      components_json: last?.components_json ?? '[]',
+    },
+  };
+}

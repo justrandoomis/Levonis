@@ -763,7 +763,9 @@ const TRANSITIONS: Record<TradeInStatus, readonly TradeInStatus[]> = {
   value_changed: ['value_changed', 'customer_accepted', 'customer_rejected', 'cancelled'],
   customer_accepted: ['awaiting_payment', 'cancelled'],
   customer_rejected: [],
-  awaiting_payment: ['completed', 'cancelled'],
+  // S-P2 cut-over: a credit minted on photos before S-P2 is re-valued at intake, and a lower ceiling
+  // goes back to the customer as a new value (the same coupon row comes back on accept).
+  awaiting_payment: ['completed', 'cancelled', 'value_changed'],
   completed: [],
   cancelled: [],
 };

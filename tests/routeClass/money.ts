@@ -39,17 +39,24 @@ export default {
       prefix: '/api/admin/trade-in',
       name: 'adminTradeInRoutes',
       router: adminTradeInRoutes,
-      writes: 'a trade-in request’s status (cancel); its inspection, valuation and completion are `money` routes',
+      writes: 'a trade-in request’s status (cancel); its valuation and completion are `money` routes',
       routes: {
         'GET /requests': 'op',
         'GET /requests/:id': 'op',
-        // Owner decision 3 (G16): starting the inspection and completing move the device and the money it stands for.
-        'POST /requests/:id/inspect': 'money',
+        // S-P2 (DECISIONS row 238, decision 2): the device is RECEIVED by any admin — no money moves at intake;
+        // never on one's own request (TRADE_IN_OWN_REQUEST); a serial mismatch is the owner's, judged in the handler.
+        'POST /requests/:id/intake': { cls: 'op', noBody: 'receives a sent trade-in device (serial, hours, condition); needs a sent request the role fixture does not seed' },
+        'POST /requests/:id/photos': { cls: 'op', noBody: 'an intake photograph, multipart; needs a sent trade-in request the role fixture does not seed' },
+        'POST /requests/:id/device-returned': { cls: 'op', noBody: 'stamps a received device as handed back after a cancel; needs such a request the role fixture does not seed' },
+        // Retired by intake: every admin reads 409 TRADE_IN_INTAKE_REQUIRED (a cached desk tab reads a sentence).
+        'POST /requests/:id/inspect': { cls: 'op', noBody: 'the retired inspection door; it answers 409 TRADE_IN_INTAKE_REQUIRED to every admin and writes nothing' },
+        // Decision 3: a financial admin up to the server's ceiling from intake; above it the owner (judged in the handler).
         'POST /requests/:id/approve': 'money',
         'POST /requests/:id/value': 'money',
         'POST /requests/:id/complete': 'money',
         'POST /requests/:id/cancel': 'op',
-        'GET /rules': 'op',
+        // B.10: the rules (weights, cap, floor, references, offer parameters) price every offer — the owner's to read.
+        'GET /rules': 'cost_read',
         // The rules decide every estimate a financial admin may approve: the owner's alone (owner decision 3).
         'PUT /rules/:family': 'owner',
         'POST /rules/:family/test': { cls: 'op', noBody: 'tries a valuation rule of one device family on a sample; needs a family the role fixture does not seed' },

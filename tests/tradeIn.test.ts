@@ -315,6 +315,9 @@ test('the status machine: only the owner’s arrows exist', () => {
     ['customer_accepted', 'awaiting_payment'],
     ['awaiting_payment', 'completed'],
     ['awaiting_payment', 'cancelled'],
+    // S-P2 cut-over: a credit fixed on photos before S-P2 is re-valued at intake; a lower ceiling goes
+    // back to the customer as a new value (the intake's own batch — the value door refuses it).
+    ['awaiting_payment', 'value_changed'],
     ['draft', 'cancelled'],
   ];
   for (const [a, b] of yes) assert.equal(canTransition(a as never, b as never), true, `${a} → ${b}`);
@@ -325,7 +328,6 @@ test('the status machine: only the owner’s arrows exist', () => {
     ['customer_rejected', 'awaiting_payment'],
     ['completed', 'cancelled'],
     ['cancelled', 'submitted'],
-    ['awaiting_payment', 'value_changed'],
   ];
   for (const [a, b] of no) assert.equal(canTransition(a as never, b as never), false, `${a} ↛ ${b}`);
   assert.equal(TRADE_IN_STATUSES.length, 10);

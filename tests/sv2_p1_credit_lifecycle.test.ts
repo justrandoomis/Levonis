@@ -217,6 +217,7 @@ test('X1: a personal code reassigned between the checkout\'s read and its batch 
 test('X1: approving a request that somehow already holds a credit coupon mints no second one — TRADE_IN_STALE', async () => {
   const raw = seed({ deliveredDaysAgo: 40 });
   const id = await submitted(raw);
+  await received(raw, id);
   raw.exec(`INSERT INTO coupons (id, code, kind, value, min_total_iqd, max_global, max_per_user, active, assigned_user_id, trade_in_id)
             VALUES ('cpn_pre', 'TIPRE0000000', 'fixed_iqd', 1000, 0, 1, 1, 0, 'cust', '${id}')`);
   const res = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/approve`);
@@ -224,7 +225,7 @@ test('X1: approving a request that somehow already holds a credit coupon mints n
   assert.equal(res.status, 409, JSON.stringify(body));
   assert.equal(body.code, 'TRADE_IN_STALE', 'trg_trade_in_one_credit (TRADE_IN_CREDIT_EXISTS) is answered as the stale refusal, never a 500');
   assert.equal(coupons(raw, id), 1);
-  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'submitted');
+  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'under_review');
 });
 
 test('legacy: an order cancelled before 0191 still holds the use; «إتمام الدفع» releases it once, with the time that order held it', async () => {

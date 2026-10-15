@@ -1216,6 +1216,8 @@ fileRoutes.get('/*', async (c) => {
        */
       const requestId = key.split('/')[1] ?? '';
       if (user.role !== 'admin') {
+        // S-P2: the desk's intake photographs (`trade-in/<id>/intake/…`) are the staff's record, not the customer's.
+        if (key.split('/')[2] === 'intake') throw forbidden('Not your file');
         const own = await c.env.DB.prepare('SELECT 1 AS x FROM trade_in_requests WHERE id = ? AND user_id = ? LIMIT 1')
           .bind(requestId, user.id)
           .first();

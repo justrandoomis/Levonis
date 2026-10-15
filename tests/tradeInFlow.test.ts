@@ -437,17 +437,36 @@ async function submitted(raw: DatabaseSync, scope: 'whole' | 'printer_only' | 'a
   return id;
 }
 
+/**
+ * «استلام الجهاز» (S-P2, decision 2): the shop receives the device — any admin, an assistant
+ * included (no money moves). The unit gets a serial on record if it has none, and the desk scans it.
+ */
+async function receive(raw: DatabaseSync, id: string, who: StubUser = ASSISTANT, extra: Record<string, unknown> = {}) {
+  const r = row<{ order_item_id: string; unit_index: number; scope: string }>(raw, 'SELECT order_item_id, unit_index, scope FROM trade_in_requests WHERE id = ?', id)!;
+  let serial = r.scope === 'ams_only' ? '' : `SN${r.order_item_id.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}0001`;
+  const unit = row<{ id: string }>(raw, 'SELECT id FROM order_item_units WHERE order_item_id = ? AND unit_index = ?', r.order_item_id, r.unit_index);
+  if (unit && r.scope !== 'ams_only') {
+    const have = row<{ serial_norm: string }>(raw, 'SELECT serial_norm FROM device_serials WHERE unit_id = ?', unit.id);
+    if (have) serial = have.serial_norm;
+    else raw.prepare('INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by) VALUES (?, ?, ?, ?)').run(serial, serial, unit.id, 'boss');
+  }
+  const res = await post(adminApp(raw, who), `/api/admin/trade-in/requests/${id}/intake`, { serial, handover: 'store', ...extra });
+  assert.equal(res.status, 200, await res.clone().text());
+  await settle();
+  return (await json(res)).request;
+}
+
 // ================================================================ the admin's value, the customer's answer
 
 test('a changed value asks the customer; only the linked owner may press, a stale offer cannot be accepted', async () => {
   const raw = seed();
   const id = await submitted(raw);
-  // An assistant admin neither inspects nor puts a number on it (owner decision 3, G16): starting the
-  // inspection moves the device and the money it stands for.
-  const noInspect = await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/inspect`);
-  assert.equal(noInspect.status, 403);
-  assert.equal((await json(noInspect)).code, 'FINANCIAL_SCOPE_REQUIRED');
-  assert.equal((await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/inspect`)).status, 200);
+  // S-P2: «بدأ الفحص» is retired; the device is RECEIVED at intake — by any admin, an assistant too
+  // (no money moves there) — and an assistant still puts no number on it (owner decision 3, G16).
+  const retired = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/inspect`);
+  assert.equal(retired.status, 409);
+  assert.equal((await json(retired)).code, 'TRADE_IN_INTAKE_REQUIRED');
+  assert.equal((await receive(raw, id, ASSISTANT)).status, 'under_review');
   const denied = await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 150_000 });
   assert.equal(denied.status, 403);
   assert.equal((await post(adminApp(raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/approve`)).status, 403);
@@ -502,7 +521,7 @@ test('a changed value asks the customer; only the linked owner may press, a stal
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ?', id), 1);
   assert.deepEqual(
     (await json(await get(a, `/api/trade-in/requests/${id}`))).request.events.map((e: { action: string }) => e.action),
-    ['create', 'submit', 'inspect', 'change_value', 'change_value', 'accept', 'awaiting_payment']
+    ['create', 'submit', 'intake', 'change_value', 'change_value', 'accept', 'awaiting_payment']
   );
   assert.deepEqual(violations, []);
 });
@@ -510,10 +529,13 @@ test('a changed value asks the customer; only the linked owner may press, a stal
 test('the customer can decline: the request closes and the device is free again', async () => {
   const raw = seed();
   const id = await submitted(raw, 'printer_only');
+  await receive(raw, id);
   await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 100_000 });
   const a = customerApp(raw);
   const res = await json(await post(a, `/api/trade-in/requests/${id}/reject`, { offer_no: 1 }));
   assert.equal(res.request.status, 'customer_rejected');
+  // The shop holds the device: it goes back to its customer (S-P2 «أجهزة تُعاد للزبون»).
+  assert.equal(res.request.stage, 'device_to_collect');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM trade_in_claims WHERE request_id = ?', id), 0);
   assert.equal((await post(a, `/api/trade-in/requests/${id}/accept`, { offer_no: 1 })).status, 409);
   // Declined is terminal; the admin cannot resurrect it with a new value.
@@ -635,8 +657,11 @@ test('an old device worth more than the new one: the credit is capped at the new
   const id = await submitted(raw, 'printer_only');
   // Retarget is not possible after submit, so price the cap against a cheaper device directly.
   raw.prepare("UPDATE trade_in_requests SET target_product_id = 'p_ams', target_price_iqd = 350000 WHERE id = ?").run(id);
-  // Above the server's figure: the owner's alone, with a private reason (owner decision 3).
-  await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 500_000, reason: 'حالة ممتازة', owner_reason: 'عميل قديم، الجهاز ممتاز' });
+  await receive(raw, id);
+  // Above the server's ceiling: the owner's alone, with a private reason and, past the store's own cap,
+  // the acknowledgement that the margin may be a loss (owner decision 3, S-P2 §6.6).
+  const raised = await post(adminApp(raw), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 500_000, reason: 'حالة ممتازة', owner_reason: 'عميل قديم، الجهاز ممتاز', ack_below_margin: true });
+  assert.equal(raised.status, 200, await raised.clone().text());
   const res = await json(await post(customerApp(raw), `/api/trade-in/requests/${id}/accept`, { offer_no: 1 }));
   assert.equal(res.request.status, 'awaiting_payment');
   assert.equal(res.request.final_value_iqd, 500_000);
@@ -650,7 +675,11 @@ test('an old device worth more than the new one: the credit is capped at the new
 
 test('the rules editor: financial scope to save, a new version each time, validation before anything is stored', async () => {
   const raw = seed();
-  const rules = (await json(await get(adminApp(raw, ASSISTANT), '/api/admin/trade-in/rules'))).rules;
+  // B.10 (S-P2): the rules price every offer — the owner's to read; another admin hears the cost refusal.
+  const staffRead = await get(adminApp(raw, ASSISTANT), '/api/admin/trade-in/rules');
+  assert.equal(staffRead.status, 403);
+  assert.equal((await json(staffRead)).code, 'COST_ACCESS_DENIED');
+  const rules = (await json(await get(adminApp(raw), '/api/admin/trade-in/rules'))).rules;
   assert.equal(rules.fdm.version, 1);
   assert.equal(rules.fdm.is_default, true);
   const next = { ...rules.fdm, floor_bp: 1500 };

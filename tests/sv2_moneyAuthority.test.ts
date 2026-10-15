@@ -34,6 +34,7 @@ const ACTS: MoneyAct[] = [
   'trade_in_inspect',
   'trade_in_complete',
   'trade_in_rules',
+  'trade_in_serial_override',
   'warranty_lengthen',
   'warranty_delivery_later',
   'warranty_replace',

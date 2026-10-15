@@ -177,7 +177,8 @@ import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/pr
 import { validateCoupon } from '../lib/membershipOps';
 import { allocateCoupon, type CouponContext, type CouponRule } from '@levonis/pricing/coupons';
 import { couponDeliveryMethod, couponLinesOf, couponNamesDelivery, productCouponFactsFromRows, transportOf } from '../lib/couponLines';
-import { TradeInError, isTradeInCreditFenceAbort, tradeInCouponCap, tradeInCreditFence } from '../lib/tradeIn';
+import { TradeInError, isTradeInCreditFenceAbort, tradeInCouponLine, tradeInCreditFence } from '../lib/tradeIn';
+import { tradeInV2Installed } from '../lib/tradeInSchema';
 import {
   getAvailableBalances,
   readWalletDust,
@@ -3359,6 +3360,8 @@ export async function computeCheckout(
     let couponSnapshot: string | null = null;
     /** The coupon is a trade-in credit: the order batch re-checks it is still the request's (`tradeInCreditFence`). */
     let couponTradeIn = false;
+    /** The line a trade-in credit pays for (`coupon_snapshot.trade_in_line_id`). */
+    let tradeInLineId: string | null = null;
     const couponLines = couponLinesOf(
       p.lines.map((l) => {
         const member = benefitByLine.get(l.id);
@@ -3407,11 +3410,16 @@ export async function computeCheckout(
       // refuses it unless this customer's cart holds the target line bought
       // directly, and caps it at ONE unit of that line: «cap the credit at the
       // new product's price». Ordinary coupons get null and are untouched.
-      const tradeInCap = await tradeInCouponCap(c.env.DB, user.id, check.coupon_id, p.lines).catch((e: unknown) => {
-        if (e instanceof TradeInError) throw badRequest(e.message, e.code);
+      const tradeInPick = await tradeInCouponLine(c.env.DB, user.id, check.coupon_id, p.lines).catch((e: unknown) => {
+        // S-P2: a credit whose device the shop has not received yet is a 409 with its own sentence.
+        if (e instanceof TradeInError) throw new HttpError(e.code === 'TRADE_IN_DEVICE_NOT_RECEIVED' ? 409 : 400, e.message, e.code);
         throw e;
       });
+      const tradeInCap = tradeInPick ? tradeInPick.cap : null;
       couponTradeIn = tradeInCap !== null;
+      // The line the credit pays for, frozen on the order: a return of that line gives the credit back
+      // and nets it from that line's refund only (S-P2 §6.9).
+      tradeInLineId = tradeInPick?.lineId ?? null;
       // ---- end TRADE-IN CREDIT
       if (check.payment_in_kind || !check.allocation || !check.rule) {
         // PAYMENT IN KIND (owner decision 5): the credit is one order-level
@@ -3492,7 +3500,7 @@ export async function computeCheckout(
               merchandise_iqd: couponMerchandise,
               delivery_iqd: couponDelivery,
             }
-          : { coupon_id: couponId, code: couponCode, discount_iqd: couponDiscount }
+          : { coupon_id: couponId, code: couponCode, discount_iqd: couponDiscount, ...(tradeInLineId ? { trade_in_line_id: tradeInLineId } : {}) }
       );
     }
 
@@ -4802,7 +4810,7 @@ export async function placeOrder(
     // A TRADE-IN CREDIT IS SPENT ONLY WHILE IT IS STILL THE REQUEST'S (plan
     // §1.3): a return or a cancel that landed after the checkout read it
     // retired the coupon and released the device, and the order rolls back.
-    stmts.push(tradeInCreditFence(c.env.DB, comp.couponId, user.id));
+    stmts.push(tradeInCreditFence(c.env.DB, comp.couponId, user.id, await tradeInV2Installed(c.env.DB)));
   }
   if (comp.couponId) {
     // UNIQUE(order_id) makes the redemption idempotent with the order itself.

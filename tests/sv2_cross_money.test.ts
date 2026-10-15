@@ -61,9 +61,11 @@ test('X19 an assistant moves no money on any service door: trade-in, warranty, r
   const w = world({ deliveredDaysAgo: 2 });
   const id = await submitted(w.raw);
   const before = row(w.raw, 'SELECT status, admin_value_iqd FROM trade_in_requests WHERE id = ?', id);
-  for (const path of ['inspect', 'approve', 'complete']) {
+  for (const path of ['approve', 'complete']) {
     assert.deepEqual(await code(await post(adminApp(w.raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/${path}`)), [403, 'FINANCIAL_SCOPE_REQUIRED'], path);
   }
+  // S-P2: «بدأ الفحص» is retired by the intake (any admin, no money moves): the old door reads a sentence.
+  assert.deepEqual(await code(await post(adminApp(w.raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/inspect`)), [409, 'TRADE_IN_INTAKE_REQUIRED']);
   assert.deepEqual(await code(await post(adminApp(w.raw, ASSISTANT), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: 100_000 })), [403, 'FINANCIAL_SCOPE_REQUIRED']);
   assert.deepEqual(await code(await send(adminApp(w.raw, ASSISTANT), 'PUT', '/api/admin/trade-in/rules/fdm', { rules: {} })), [403, 'FINANCIAL_SCOPE_REQUIRED']);
   assert.deepEqual(row(w.raw, 'SELECT status, admin_value_iqd FROM trade_in_requests WHERE id = ?', id), before);
@@ -100,10 +102,14 @@ test('X19 trade-in: a financial admin values up to the estimate; above it only t
   const id = await submitted(w.raw);
   const est = row<{ estimated_iqd: number }>(w.raw, 'SELECT estimated_iqd FROM trade_in_requests WHERE id = ?', id)!.estimated_iqd;
   assert.ok(est > 0);
+  // S-P2: the value is judged on the device in the shop; the ceiling is the server's, from intake.
+  assert.deepEqual(await code(await post(adminApp(w.raw, STAFF), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: est - 5_000 })), [409, 'TRADE_IN_INTAKE_REQUIRED']);
+  await received(w.raw, id);
+  assert.equal(row<{ ceiling_iqd: number }>(w.raw, 'SELECT ceiling_iqd FROM trade_in_requests WHERE id = ?', id)!.ceiling_iqd, est);
   assert.deepEqual(await code(await post(adminApp(w.raw, STAFF), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: est + 5_000 })), [403, 'OWNER_REQUIRED']);
   assert.deepEqual(await code(await post(adminApp(w.raw, OWNER), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: est + 5_000 })), [400, 'OWNER_REASON_REQUIRED']);
   const reasonText = 'mint condition with every original accessory';
-  const raised = await post(adminApp(w.raw, OWNER), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: est + 5_000, reason: '', owner_reason: reasonText });
+  const raised = await post(adminApp(w.raw, OWNER), `/api/admin/trade-in/requests/${id}/value`, { value_iqd: est + 5_000, reason: '', owner_reason: reasonText, ack_below_margin: true });
   assert.equal(raised.status, 200, await raised.clone().text());
   const audit = JSON.parse(row<{ detail: string }>(w.raw, "SELECT detail FROM audit_log WHERE action = 'trade_in.change_value' AND target = ? ORDER BY id DESC", id)!.detail);
   assert.deepEqual(
@@ -185,11 +191,12 @@ test('X4/X5 a device whose price-protection claim or warranty case is open is no
   await repriceV2(b.raw, 'p_a1', 800_000);
   assert.deepEqual(await code(await post(b.as(CUSTOMER), '/api/price-protection/claims', { orderItemId: 'oi_a1' })), [400, 'TRADE_IN_UNIT']);
 
-  // A warranty case opened between the submit and the approval: no credit is minted.
+  // A warranty case opened between the submit and the intake: the device is not received, no credit is minted.
   const c = world();
   const id = await submitted(c.raw);
   assert.equal((await json(await fileClaim(c, 'sv2-x5-claim-0001'))).success, true);
-  assert.deepEqual(await code(await post(adminApp(c.raw), `/api/admin/trade-in/requests/${id}/approve`)), [409, 'TRADE_IN_SERVICE_OPEN']);
+  assert.deepEqual(await code(await post(adminApp(c.raw, STAFF), `/api/admin/trade-in/requests/${id}/intake`, { serial: 'SNX5000001', handover: 'store' })), [409, 'TRADE_IN_SERVICE_OPEN']);
+  assert.deepEqual(await code(await post(adminApp(c.raw), `/api/admin/trade-in/requests/${id}/approve`)), [409, 'TRADE_IN_INTAKE_REQUIRED']);
   assert.equal(count(c.raw, 'SELECT COUNT(*) AS n FROM coupons WHERE trade_in_id = ?', id), 0);
   assert.equal(row<{ status: string }>(c.raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'submitted');
 });

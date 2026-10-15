@@ -140,7 +140,7 @@ import { DEFAULT_RULE_SETS } from '@levonis/pricing/tradeInDefaults';
 import { paidNetPerUnit } from '@levonis/pricing/paidNet';
 import { OFFER_PARAM_COLUMNS, settlement as offerSettlement, validateOfferParams, type OfferParamColumn } from '@levonis/pricing/tradeInOffer';
 import { tradeInV2Installed } from './tradeInSchema';
-import { offerFor, storedInputs, valuationStatement } from './tradeInOffer';
+import { offerFor, storedInputs, valuationStatement, type ValuationDraft } from './tradeInOffer';
 import { getSetting } from './settings';
 
 // ================================================================= errors
@@ -1081,6 +1081,33 @@ export interface PhotoRow {
   proves?: string;
 }
 
+/**
+ * THE FIGURE A RECEIVED DEVICE IS HELD TO (spec §6.5): the v2 offer — or the lower value the desk
+ * already proposed against it — or, for a request sent before S-P2, its figure at that stage (the
+ * estimate, the proposal, the value fixed on photos). The intake ceiling is min(this, the formula).
+ */
+export function referenceOf(
+  req: Pick<RequestRow, 'status' | 'offer_iqd' | 'estimated_iqd' | 'admin_value_iqd' | 'final_value_iqd'> & { valuation_version?: number }
+): number {
+  const nonNeg = (n: number | null | undefined) => Math.max(0, Math.trunc(Number(n) || 0));
+  if ((req.valuation_version ?? 1) >= 2 && req.offer_iqd !== null && req.offer_iqd !== undefined) {
+    if (req.status === 'value_changed' && req.admin_value_iqd !== null) return Math.min(nonNeg(req.offer_iqd), nonNeg(req.admin_value_iqd));
+    if ((req.status === 'awaiting_payment' || req.status === 'completed') && req.final_value_iqd !== null) return nonNeg(req.final_value_iqd);
+    return nonNeg(req.offer_iqd);
+  }
+  if (req.status === 'value_changed') return nonNeg(req.admin_value_iqd ?? req.estimated_iqd);
+  if (req.status === 'awaiting_payment' || req.status === 'completed') return nonNeg(req.final_value_iqd ?? req.estimated_iqd);
+  return nonNeg(req.estimated_iqd);
+}
+
+/**
+ * THE MOST A FINANCIAL ADMIN MAY FIX (decision 3): the server's ceiling recorded at intake — never
+ * a figure the client sends, never the submit-time estimate once the device was received. A
+ * request received before the ceiling was recorded (none in production) is held to its reference.
+ */
+export const approvalCeiling = (req: RequestRow): number =>
+  req.ceiling_iqd !== null && req.ceiling_iqd !== undefined ? Math.max(0, Math.trunc(req.ceiling_iqd)) : referenceOf(req);
+
 export async function loadRequest(db: D1Database, id: string): Promise<RequestRow | null> {
   return (await db.prepare('SELECT * FROM trade_in_requests WHERE id = ?').bind(id).first<RequestRow>()) ?? null;
 }
@@ -1118,7 +1145,7 @@ async function loadEvents(db: D1Database, requestId: string) {
   return (results ?? []).map((e) => ({ ...e, detail: safeParse<Record<string, unknown>>(e.detail_json, {}), detail_json: undefined }));
 }
 
-function eventStatement(
+export function eventStatement(
   db: D1Database,
   requestId: string,
   actor: { id: string | null; role: 'customer' | 'admin' | 'system' },
@@ -1142,13 +1169,13 @@ function eventStatement(
  * not there, `status` becomes NULL, the NOT NULL constraint aborts the batch,
  * and nothing after it happens. The 0140 pattern, one table over.
  */
-function fence(db: D1Database, id: string, token: string): D1PreparedStatement {
+export function fence(db: D1Database, id: string, token: string): D1PreparedStatement {
   return db
     .prepare(`UPDATE trade_in_requests SET status = CASE WHEN decision_token = ?2 THEN status ELSE NULL END WHERE id = ?1`)
     .bind(id, token);
 }
 
-const isAbort = (e: unknown) => /NOT NULL|constraint|UNIQUE/i.test(e instanceof Error ? e.message : String(e));
+export const isAbort = (e: unknown) => /NOT NULL|constraint|UNIQUE/i.test(e instanceof Error ? e.message : String(e));
 
 /**
  * ONE MONEY PROCESS PER UNIT (Services V2 plan §1.3), inside the batch.
@@ -1180,7 +1207,7 @@ const SERVICE_OPEN_SQL = `EXISTS (SELECT 1 FROM warranty_claims wc
      AND NOT ${closedClaimSql('wc')})`;
 const PROTECTION_OPEN_SQL = `EXISTS (SELECT 1 FROM price_protection_claims pc WHERE pc.order_item_id = ?2 AND pc.state IN ('requested','approved'))`;
 
-interface Slot {
+export interface Slot {
   orderItemId: string;
   unitIds: string[];
 }
@@ -1201,7 +1228,7 @@ export async function slotOf(db: D1Database, orderItemId: string, unitIndex: num
   return { orderItemId, unitIds };
 }
 
-function serviceFence(db: D1Database, requestId: string, slot: Slot): D1PreparedStatement {
+export function serviceFence(db: D1Database, requestId: string, slot: Slot): D1PreparedStatement {
   return db
     .prepare(
       `UPDATE trade_in_requests SET status = CASE WHEN ${RETURN_OPEN_SQL} OR ${SERVICE_OPEN_SQL} OR ${PROTECTION_OPEN_SQL} THEN NULL ELSE status END
@@ -1211,7 +1238,7 @@ function serviceFence(db: D1Database, requestId: string, slot: Slot): D1Prepared
 }
 
 /** Which process holds the unit now, after a fenced batch aborted — the honest refusal, or null. */
-async function serviceBlocker(db: D1Database, slot: Slot): Promise<TradeInCode | null> {
+export async function serviceBlocker(db: D1Database, slot: Slot): Promise<TradeInCode | null> {
   const row = await db
     .prepare(`SELECT ${RETURN_OPEN_SQL} AS ret, ${SERVICE_OPEN_SQL} AS svc, ${PROTECTION_OPEN_SQL} AS pp WHERE ?1 IS NULL OR ?1 IS NOT NULL`)
     .bind(null, slot.orderItemId, JSON.stringify(slot.unitIds))
@@ -2119,6 +2146,8 @@ export async function cancelRequest(
     ...(await releaseStatements(db, req)),
     eventStatement(db, req.id, actor, 'cancel', req.status, 'cancelled', { reason }, now),
   ];
+  // S-P2: the shop already holds the device — it goes back to its customer (no money moves).
+  if (req.intake_at) stmts.push(deviceReadyNotice(db, req));
   if (actor.role === 'admin') {
     stmts.push(
       notifyStatement(db, {
@@ -2148,6 +2177,21 @@ export async function cancelRequest(
     throw e;
   }
   return (await loadRequest(db, req.id))!;
+}
+
+/** «جهازك جاهز للاستلام من المتجر» — a received device whose request was cancelled or declined (S-P2 §6.12). */
+export function deviceReadyNotice(db: D1Database, req: Pick<RequestRow, 'id' | 'user_id'>): D1PreparedStatement {
+  return notifyStatement(db, {
+    userId: req.user_id,
+    kind: 'trade_in',
+    title_ar: 'جهازك جاهز للاستلام من المتجر',
+    title_en: 'Your device is ready to collect from the store',
+    meta: { title_ckb: 'ئامێرەکەت ئامادەیە بۆ وەرگرتنەوە لە فرۆشگا' },
+    link: requestPath(req.id),
+    entity_type: 'trade_in',
+    entity_id: req.id,
+    eventKey: `trade_in:${req.id}:device_ready`,
+  }).stmt;
 }
 
 /**
@@ -2186,11 +2230,18 @@ function noLiveCreditOrderFence(db: D1Database, requestId: string): D1PreparedSt
  * too. (A use of this same coupon is the limit trigger's to refuse.) The
  * fence runs before this order's own redemption is inserted.
  */
-export function tradeInCreditFence(db: D1Database, couponId: string, userId: string): D1PreparedStatement {
+export function tradeInCreditFence(db: D1Database, couponId: string, userId: string, v2 = false): D1PreparedStatement {
+  // S-P2 (0192, decision 2): the device must have been received; and a COMPLETED request's credit is
+  // spendable again only while a re-issue (row 237: a cancel or a return gave it back) is live.
+  const spendable = v2
+    ? `intake_at IS NOT NULL AND (status = 'awaiting_payment'
+         OR (status = 'completed' AND EXISTS (SELECT 1 FROM trade_in_credit_reissues x
+                                               WHERE x.request_id = trade_in_requests.id AND x.ends_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))))`
+    : `status = 'awaiting_payment'`;
   return db
     .prepare(
       `UPDATE trade_in_requests
-          SET status = CASE WHEN status = 'awaiting_payment' AND coupon_id = ?1 AND user_id = ?2
+          SET status = CASE WHEN ${spendable} AND coupon_id = ?1 AND user_id = ?2
                              AND EXISTS (SELECT 1 FROM coupons c WHERE c.id = ?1 AND c.active = 1 AND c.trade_in_id = trade_in_requests.id)
                              AND NOT EXISTS (SELECT 1 FROM coupons c2
                                                JOIN coupon_redemptions r ON r.coupon_id = c2.id
@@ -2305,7 +2356,9 @@ export async function tradeInsOnLine(db: D1Database, orderItemId: string): Promi
       request,
       unitIds,
       units: indexes.length,
-      committed: live || isTerminal(request.status) || !canTransition(request.status, 'cancelled'),
+      // S-P2 (§1.3, «after intake ✗ everything»): a device the shop has received is no longer the
+      // customer's to return either — the return door answers TRADE_IN_ACTIVE.
+      committed: live || isTerminal(request.status) || !canTransition(request.status, 'cancelled') || !!request.intake_at,
     });
   }
   return out;
@@ -2355,6 +2408,9 @@ export async function returnWinsStatements(db: D1Database, req: RequestRow, acto
 
 export async function markInspected(env: Env, req: RequestRow, adminId: string): Promise<RequestRow> {
   const db = env.DB;
+  // S-P2: «بدأ الفحص» was a label; the device is now received for real at intake (serial, hours,
+  // findings). The old door stays mounted so a cached desk tab reads a sentence, not a 404.
+  if (await tradeInV2Installed(db)) throw refuse('TRADE_IN_INTAKE_REQUIRED');
   if (req.status === 'under_review') return req;
   if (!canTransition(req.status, 'under_review')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   const now = new Date().toISOString();
@@ -2424,7 +2480,7 @@ function couponStatement(db: D1Database, req: RequestRow, credit: number, coupon
 }
 
 /** «2026-10-21» — the credit's last day, as the notification states it in every language. */
-const dayText = (iso: string) => iso.slice(0, 10);
+export const dayText = (iso: string) => iso.slice(0, 10);
 
 /**
  * FIX THE VALUE AND OPEN THE PAYMENT STAGE — the shared tail of «اعتماد
@@ -2445,18 +2501,28 @@ async function fixValue(
   }
 ): Promise<RequestRow> {
   const db = env.DB;
+  const v2 = await tradeInV2Installed(db);
+  // Decision 2 (S-P2): no value is fixed, and no credit minted, before the device is in the shop.
+  // The desk hears what to do; a customer accepting a proposal made on photos before S-P2 hears why.
+  if (v2 && !req.intake_at) throw refuse(step.actor.role === 'admin' ? 'TRADE_IN_INTAKE_REQUIRED' : 'TRADE_IN_DEVICE_NOT_RECEIVED');
   const priced = await priceTarget(env, req.user_id, {
     product_id: req.target_product_id ?? '',
     option_value_ids: safeParse<string[]>(req.target_option_value_ids, []),
     color_id: req.target_color_id,
   });
-  const s = tradeInSettlement(priced.price_iqd, value);
+  const policy = v2 ? await getSetting(db, 'tradeInPolicy') : null;
+  // v2: the collection fee comes off the credit (decision 2); the excess is never paid out.
+  const s = v2 ? offerSettlement(priced.price_iqd, value, req.pickup_fee_iqd ?? 0) : tradeInSettlement(priced.price_iqd, value);
   const now = new Date().toISOString();
   const token = randomToken(12);
-  const couponId = s.credit_iqd > 0 ? newId('cpn') : null;
-  const code = couponId ? couponCode() : null;
-  const endsAt = new Date(Date.parse(now) + TRADE_IN_CREDIT_VALID_DAYS * DAY_MS).toISOString();
-  const until = couponId
+  // THE ONE COUPON FOR LIFE (row 237): a credit minted on photos before S-P2 and re-valued at
+  // intake comes back on the SAME row (same code), re-targeted and re-dated; else one is minted.
+  const reuse = v2 && !!req.coupon_id;
+  const couponId = reuse ? req.coupon_id : s.credit_iqd > 0 ? newId('cpn') : null;
+  const code = couponId && !reuse ? couponCode() : null;
+  const validDays = policy?.credit_valid_days ?? TRADE_IN_CREDIT_VALID_DAYS;
+  const endsAt = new Date(Date.parse(now) + validDays * DAY_MS).toISOString();
+  const until = s.credit_iqd > 0
     ? {
         ar: ` الرصيد صالح حتى ${dayText(endsAt)}.`,
         en: ` The credit is valid until ${dayText(endsAt)}.`,
@@ -2465,6 +2531,7 @@ async function fixValue(
     : { ar: '', en: '', ckb: '' };
   const slot = await slotOf(db, req.order_item_id, req.unit_index);
   const from = req.status;
+  const optionIds = safeParse<string[]>(req.target_option_value_ids, []);
   const stmts: D1PreparedStatement[] = [
     db
       .prepare(
@@ -2472,7 +2539,7 @@ async function fixValue(
             SET status = 'awaiting_payment', final_value_iqd = ?2, credit_iqd = ?3, difference_iqd = ?4,
                 target_price_iqd = ?5, target_snapshot_json = ?6, coupon_id = ?7, decided_at = ?8, updated_at = ?8,
                 decided_via = ?9, decision_token = ?10
-          WHERE id = ?1 AND status = ?11 AND offer_no = ?12`
+          WHERE id = ?1 AND status = ?11 AND offer_no = ?12${v2 ? ' AND intake_at IS NOT NULL' : ''}`
       )
       .bind(req.id, s.trade_in_value_iqd, s.credit_iqd, s.difference_iqd, s.target_price_iqd, JSON.stringify(priced.snapshot), couponId, now, step.via, token, from, req.offer_no),
     fence(db, req.id, token),
@@ -2480,17 +2547,28 @@ async function fixValue(
     // being compensated, or that a return is bringing back (plan §1.3).
     serviceFence(db, req.id, slot),
     eventStatement(db, req.id, step.actor, step.passThrough === 'approved_as_estimated' ? 'approve' : 'accept', from, step.passThrough, { value_iqd: value, via: step.via }, now),
-    eventStatement(db, req.id, { id: null, role: 'system' }, 'awaiting_payment', step.passThrough, 'awaiting_payment', { ...s }, now),
-    ...(couponId && code ? [couponStatement(db, req, s.credit_iqd, couponId, code, now, endsAt)] : []),
+    eventStatement(db, req.id, { id: null, role: 'system' }, 'awaiting_payment', step.passThrough, 'awaiting_payment', { ...s, ends_at: s.credit_iqd > 0 ? endsAt : null }, now),
+    ...(reuse
+      ? [
+          db
+            .prepare(
+              `UPDATE coupons SET value = ?3, active = CASE WHEN ?3 > 0 THEN 1 ELSE 0 END, ends_at = ?4, product_id = ?5, option_value_id = ?6, color_id = ?7
+                WHERE id = ?1 AND trade_in_id = ?2`
+            )
+            .bind(req.coupon_id, req.id, s.credit_iqd, endsAt, req.target_product_id, optionIds[0] ?? null, req.target_color_id),
+        ]
+      : couponId && code
+        ? [couponStatement(db, req, s.credit_iqd, couponId, code, now, endsAt)]
+        : []),
     notifyStatement(db, {
       userId: req.user_id,
       kind: 'trade_in',
-      title_ar: 'ثُبّتت قيمة الاستبدال — أكمل الدفع',
-      title_en: 'Your trade-in value is fixed — complete the payment',
+      title_ar: v2 && s.credit_iqd > 0 ? `رصيد الاستبدال جاهز حتى ${dayText(endsAt)}` : 'ثُبّتت قيمة الاستبدال — أكمل الدفع',
+      title_en: v2 && s.credit_iqd > 0 ? `Your trade-in credit is ready until ${dayText(endsAt)}` : 'Your trade-in value is fixed — complete the payment',
       body_ar: `قيمة جهازك ${iqdText(s.trade_in_value_iqd, 'ar')}. المطلوب للجهاز الجديد ${iqdText(s.difference_iqd, 'ar')} + التوصيل.${until.ar}`,
       body_en: `Your device is worth ${iqdText(s.trade_in_value_iqd, 'en')}. You pay ${iqdText(s.difference_iqd, 'en')} for the new device, plus delivery.${until.en}`,
       meta: {
-        title_ckb: 'بەهای گۆڕینەوە جێگیر کرا — پارەدان تەواو بکە',
+        title_ckb: v2 && s.credit_iqd > 0 ? `باڵانسی گۆڕینەوەکەت تا ${dayText(endsAt)} ئامادەیە` : 'بەهای گۆڕینەوە جێگیر کرا — پارەدان تەواو بکە',
         body_ckb: `بەهای ئامێرەکەت ${iqdText(s.trade_in_value_iqd, 'ckb')}. بۆ ئامێرە نوێیەکە ${iqdText(s.difference_iqd, 'ckb')} دەدەیت، لەگەڵ کرێی گەیاندن.${until.ckb}`,
       },
       link: requestPath(req.id),
@@ -2517,7 +2595,23 @@ async function fixValue(
   return (await loadRequest(db, req.id))!;
 }
 
-export async function approveEstimate(env: Env, req: RequestRow, adminId: string, grant?: MoneyGrant): Promise<RequestRow> {
+/** The customer's line when the desk proposes the ceiling after intake (the owner may type another). */
+export const INTAKE_REASON = 'بعد فحص الجهاز في المتجر';
+
+/**
+ * «اعتماد» (decision 3). Before S-P2: the submit-time estimate is fixed. v2: the device must have been
+ * received (TRADE_IN_INTAKE_REQUIRED); the figure is the server's ceiling from intake. When it equals
+ * the reference (the offer, or the legacy figure) the value is fixed and the credit minted; when it is
+ * lower the customer is asked (`changeValue`), with the owner's line or «بعد فحص الجهاز في المتجر».
+ */
+export async function approveEstimate(env: Env, req: RequestRow, adminId: string, grant?: MoneyGrant, reason = ''): Promise<RequestRow> {
+  if (await tradeInV2Installed(env.DB)) {
+    if (!req.intake_at) throw refuse('TRADE_IN_INTAKE_REQUIRED');
+    if (!canTransition(req.status, 'approved_as_estimated')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
+    const ceiling = approvalCeiling(req);
+    if (ceiling < referenceOf(req)) return changeValue(env, req, adminId, ceiling, reason.trim() || INTAKE_REASON, grant);
+    return fixValue(env, req, ceiling, { via: 'admin', actor: { id: adminId, role: 'admin' }, passThrough: 'approved_as_estimated', grant });
+  }
   if (!canTransition(req.status, 'approved_as_estimated')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   if (req.estimated_iqd === null) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   return fixValue(env, req, req.estimated_iqd, { via: 'admin', actor: { id: adminId, role: 'admin' }, passThrough: 'approved_as_estimated', grant });
@@ -2537,31 +2631,38 @@ export async function changeValue(
   adminId: string,
   value: number,
   reason: string,
-  grant?: MoneyGrant
+  grant?: MoneyGrant,
+  /** S-P2: the owner's record of a value above the ceiling (`trade_in_valuations`, phase 'override'). */
+  override?: ValuationDraft | null
 ): Promise<RequestRow> {
   const db = env.DB;
   if (!Number.isSafeInteger(value) || value < 0 || value > TRADE_IN_VALUE_MAX_IQD) throw refuse('TRADE_IN_INVALID_VALUE');
-  if (!canTransition(req.status, 'value_changed')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
+  const v2 = await tradeInV2Installed(db);
+  // Decision 2: the value is judged on the device in the shop. A credit fixed on photos before S-P2 is
+  // re-valued by the intake itself (worker/lib/tradeInIntake.ts), never by this door.
+  if (v2 && !req.intake_at) throw refuse('TRADE_IN_INTAKE_REQUIRED');
+  if (req.status === 'awaiting_payment' || !canTransition(req.status, 'value_changed')) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
   const now = new Date().toISOString();
   const token = randomToken(12);
   const slot = await slotOf(db, req.order_item_id, req.unit_index);
   const offer = req.offer_no + 1;
-  const est = req.estimated_iqd ?? 0;
-  const target = req.target_price_iqd ?? 0;
-  const s = tradeInSettlement(target, value);
+  const est = req.offer_iqd ?? req.estimated_iqd ?? 0;
+  const s = settlementOf(req, value);
+  const above = grant?.above_ceiling === true;
   try {
     await db.batch([
       db
         .prepare(
           `UPDATE trade_in_requests
               SET status = 'value_changed', admin_value_iqd = ?2, admin_reason = ?3, offer_no = ?4, valued_at = ?5, updated_at = ?5,
-                  decision_token = ?6, tg_chat_id = NULL, tg_message_id = NULL
-            WHERE id = ?1 AND status = ?7 AND offer_no = ?8`
+                  decision_token = ?6, tg_chat_id = NULL, tg_message_id = NULL${v2 ? ', above_ceiling = ?9' : ''}
+            WHERE id = ?1 AND status = ?7 AND offer_no = ?8${v2 ? ' AND intake_at IS NOT NULL' : ''}`
         )
-        .bind(req.id, value, reason, offer, now, token, req.status, req.offer_no),
+        .bind(req.id, value, reason, offer, now, token, req.status, req.offer_no, ...(v2 ? [above ? 1 : 0] : [])),
       fence(db, req.id, token),
       serviceFence(db, req.id, slot),
-      eventStatement(db, req.id, { id: adminId, role: 'admin' }, 'change_value', req.status, 'value_changed', { value_iqd: value, estimated_iqd: est, reason, offer_no: offer, above_estimate: grant?.above_ceiling === true }, now),
+      ...(v2 && override ? [valuationStatement(db, req.id, { ...override, phase: 'override' }, adminId, now)] : []),
+      eventStatement(db, req.id, { id: adminId, role: 'admin' }, 'change_value', req.status, 'value_changed', { value_iqd: value, estimated_iqd: est, reason, offer_no: offer, above_estimate: above }, now),
       notifyStatement(db, {
         userId: req.user_id,
         kind: 'trade_in',
@@ -2582,7 +2683,11 @@ export async function changeValue(
       ...(await auditStatements(db, adminId, 'trade_in.change_value', req.id, { value_iqd: value, estimated_iqd: est, reason, offer_no: offer, authority: grant?.audit ?? null })).statements,
     ]);
   } catch (e) {
-    if (isAbort(e)) throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
+    if (isAbort(e)) {
+      const again = await loadRequest(db, req.id);
+      if (again && again.offer_no !== req.offer_no) throw refuse('TRADE_IN_OFFER_STALE');
+      throw refuse((await serviceBlocker(db, slot)) ?? 'TRADE_IN_STALE');
+    }
     throw e;
   }
   return (await loadRequest(db, req.id))!;
@@ -2631,6 +2736,7 @@ export async function decideValue(
       fence(db, req.id, token),
       ...(await releaseStatements(db, req)),
       eventStatement(db, req.id, actor, 'reject', 'value_changed', 'customer_rejected', { value_iqd: req.admin_value_iqd, via }, now),
+      ...(req.intake_at ? [deviceReadyNotice(db, req)] : []),
     ]);
   } catch (e) {
     if (isAbort(e)) {
@@ -2658,9 +2764,16 @@ export async function decideValue(
  * presses at the same moment release once and extend once (the end is
  * assigned, never added to).
  */
-export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code: string | null; order_id: string | null }> {
+export async function checkoutCredit(
+  env: Env,
+  req: RequestRow
+): Promise<{ code: string | null; order_id: string | null; any_device?: boolean; ends_at?: string | null }> {
   const db = env.DB;
+  const v2 = await tradeInV2Installed(db);
+  if (v2 && req.status === 'completed') return reissuedCredit(db, req);
   if (req.status !== 'awaiting_payment') throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
+  // Decision 2 (0192): the credit is spent once the shop holds the old device.
+  if (v2 && !req.intake_at) throw refuse('TRADE_IN_DEVICE_NOT_RECEIVED');
   const orders = await creditOrders(db, req.id);
   const live = orders.find((o) => o.status !== 'cancelled');
   if (live) return { code: null, order_id: live.order_id };
@@ -2701,6 +2814,26 @@ export async function checkoutCredit(env: Env, req: RequestRow): Promise<{ code:
     ]);
   }
   return { code: current.code, order_id: null };
+}
+
+/**
+ * A COMPLETED REQUEST'S CREDIT, GIVEN BACK (row 237, S-P2 §6.9): the order it bought was cancelled
+ * before delivery, or the new device was returned. The SAME coupon (same code) is live for 30 days
+ * on any device sold directly; «إتمام الدفع» answers its code, no target (the customer chooses).
+ */
+async function reissuedCredit(db: D1Database, req: RequestRow): Promise<{ code: string | null; order_id: string | null; any_device: boolean; ends_at: string | null }> {
+  const reissue = await liveReissue(db, req.id);
+  if (!reissue || !req.coupon_id) throw refuse('TRADE_IN_BAD_STATE', { status: req.status });
+  if (!req.intake_at) throw refuse('TRADE_IN_DEVICE_NOT_RECEIVED');
+  const live = (await creditOrders(db, req.id)).find((o) => o.status !== 'cancelled' && o.redemption_state === 'active');
+  if (live) return { code: null, order_id: live.order_id, any_device: true, ends_at: null };
+  const coupon = await db
+    .prepare('SELECT code, active, ends_at FROM coupons WHERE id = ? AND trade_in_id = ?')
+    .bind(req.coupon_id, req.id)
+    .first<{ code: string; active: number; ends_at: string | null }>();
+  if (!coupon || coupon.active !== 1) throw refuse('TRADE_IN_COUPON_MISMATCH');
+  if (creditExpired(coupon.ends_at, Date.now())) throw refuse('TRADE_IN_CREDIT_EXPIRED');
+  return { code: coupon.code, order_id: null, any_device: true, ends_at: coupon.ends_at ?? reissue.ends_at };
 }
 
 interface CustodyPlan {
@@ -2836,54 +2969,114 @@ export async function completeRequest(env: Env, req: RequestRow, adminId: string
 
 // ================================================================= checkout guard
 
+export interface TradeInCapLine {
+  /** The order line's id (the checkout's `ComputedLine.id`, which becomes `order_items.id`). */
+  id?: string;
+  product_id: string;
+  option_value_ids?: readonly string[];
+  color_id?: string | null;
+  unit: number;
+  pricing_basis?: string;
+  gift?: unknown;
+}
+
+const DEVICE_FAMILIES: ReadonlySet<TradeInFamily> = new Set<TradeInFamily>(['fdm', 'resin', 'laser', 'ams']);
+
+/** A credit given back (row 237) is still live on this request (0192; none on an older database). */
+async function liveReissue(db: D1Database, requestId: string): Promise<{ ends_at: string } | null> {
+  try {
+    return (
+      (await db
+        .prepare(`SELECT ends_at FROM trade_in_credit_reissues WHERE request_id = ? AND ends_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ORDER BY ends_at DESC LIMIT 1`)
+        .bind(requestId)
+        .first<{ ends_at: string }>()) ?? null
+    );
+  } catch (e) {
+    if (/no such table/i.test(e instanceof Error ? e.message : String(e))) return null;
+    throw e;
+  }
+}
+
 /**
  * THE CHECKOUT'S TRADE-IN RULE — called from computeCheckout's coupon block.
  *
  * null      the coupon is not a trade-in credit; nothing changes.
- * a number  the most this coupon may take off: ONE unit of the target line.
- * throws    the coupon IS a trade-in credit and this cart cannot use it —
- *           another customer, a request no longer awaiting payment, or no
- *           direct-sale line of the target product and model in the cart.
+ * an answer the most this coupon may take off — ONE unit of the line it pays
+ *           for — and that line's id (frozen as `coupon_snapshot.trade_in_line_id`).
+ * throws    the coupon IS a trade-in credit and this cart cannot use it:
+ *   - another customer, or a request that no longer holds it → TRADE_IN_COUPON_MISMATCH;
+ *   - the shop has not received the old device (0192, decision 2) → TRADE_IN_DEVICE_NOT_RECEIVED;
+ *   - awaiting payment: no direct-sale line of the target product and model → MISMATCH;
+ *   - completed with a credit given back (row 237, a cancel or a return): the
+ *     credit buys ANY device sold directly — the most expensive non-gift direct
+ *     FDM / resin / laser / AMS line of the cart; none → MISMATCH.
  */
-export async function tradeInCouponCap(
+export async function tradeInCouponLine(
   db: D1Database,
   userId: string,
   couponId: string,
-  lines: ReadonlyArray<{ product_id: string; option_value_ids?: readonly string[]; color_id?: string | null; unit: number; pricing_basis?: string; gift?: unknown }>
-): Promise<number | null> {
-  const c = await db
-    .prepare(
-      `SELECT c.trade_in_id, c.assigned_user_id, c.product_id, c.option_value_id, c.color_id, r.status, r.user_id, r.coupon_id
-         FROM coupons c LEFT JOIN trade_in_requests r ON r.id = c.trade_in_id
-        WHERE c.id = ?`
-    )
-    .bind(couponId)
-    .first<{
-      trade_in_id: string | null;
-      assigned_user_id: string | null;
-      product_id: string | null;
-      option_value_id: string | null;
-      color_id: string | null;
-      status: string | null;
-      user_id: string | null;
-      coupon_id: string | null;
-    }>();
-  if (!c || !c.trade_in_id) return null;
-  if (c.user_id !== userId || c.assigned_user_id !== userId || c.status !== 'awaiting_payment' || c.coupon_id !== couponId) {
-    throw refuse('TRADE_IN_COUPON_MISMATCH');
+  lines: ReadonlyArray<TradeInCapLine>
+): Promise<{ cap: number; lineId: string | null; anyDevice: boolean } | null> {
+  type Row = {
+    trade_in_id: string | null;
+    assigned_user_id: string | null;
+    product_id: string | null;
+    option_value_id: string | null;
+    color_id: string | null;
+    status: string | null;
+    user_id: string | null;
+    coupon_id: string | null;
+    /** Absent on a database without 0192 (the v1 rule); null = the device was not received. */
+    intake_at?: string | null;
+  };
+  const head = 'SELECT c.trade_in_id, c.assigned_user_id, c.product_id, c.option_value_id, c.color_id, r.status, r.user_id, r.coupon_id';
+  const tail = 'FROM coupons c LEFT JOIN trade_in_requests r ON r.id = c.trade_in_id WHERE c.id = ?';
+  let c: Row | null;
+  try {
+    c = await db.prepare(`${head}, r.intake_at ${tail}`).bind(couponId).first<Row>();
+  } catch (e) {
+    if (!/no such column/i.test(e instanceof Error ? e.message : String(e))) throw e;
+    c = await db.prepare(`${head} ${tail}`).bind(couponId).first<Row>();
   }
-  const line = lines.find(
-    (l) =>
-      // A gift line (0175, S8) is never the bought target: its 0 IQD would cap
-      // the credit at nothing, and a product given free earns no trade-in.
-      !l.gift &&
-      l.product_id === c.product_id &&
-      (!c.option_value_id || (l.option_value_ids ?? []).includes(c.option_value_id)) &&
-      (!c.color_id || l.color_id === c.color_id) &&
-      (l.pricing_basis === undefined || l.pricing_basis === 'direct')
-  );
-  if (!line) throw refuse('TRADE_IN_COUPON_MISMATCH');
-  return Math.max(0, Math.trunc(line.unit));
+  if (!c || !c.trade_in_id) return null;
+  if (c.user_id !== userId || c.assigned_user_id !== userId || c.coupon_id !== couponId) throw refuse('TRADE_IN_COUPON_MISMATCH');
+  if (c.status !== 'awaiting_payment' && c.status !== 'completed') throw refuse('TRADE_IN_COUPON_MISMATCH');
+  if (c.intake_at === null) throw refuse('TRADE_IN_DEVICE_NOT_RECEIVED');
+  const bought = (l: TradeInCapLine) => !l.gift && (l.pricing_basis === undefined || l.pricing_basis === 'direct');
+  if (c.status === 'awaiting_payment') {
+    const line = lines.find(
+      (l) =>
+        // A gift line (0175, S8) is never the bought target: its 0 IQD would cap
+        // the credit at nothing, and a product given free earns no trade-in.
+        bought(l) &&
+        l.product_id === c!.product_id &&
+        (!c!.option_value_id || (l.option_value_ids ?? []).includes(c!.option_value_id)) &&
+        (!c!.color_id || l.color_id === c!.color_id)
+    );
+    if (!line) throw refuse('TRADE_IN_COUPON_MISMATCH');
+    return { cap: Math.max(0, Math.trunc(line.unit)), lineId: line.id ?? null, anyDevice: false };
+  }
+  // A completed request: only a live re-issue makes its credit spendable again (0192 only).
+  if (c.intake_at === undefined || !(await liveReissue(db, c.trade_in_id))) throw refuse('TRADE_IN_COUPON_MISMATCH');
+  const candidates = lines.filter(bought);
+  if (!candidates.length) throw refuse('TRADE_IN_COUPON_MISMATCH');
+  const ids = [...new Set(candidates.map((l) => l.product_id))];
+  const [idx, rows] = await Promise.all([
+    catalogIndexFor(db),
+    db
+      .prepare('SELECT id, template_family, category_id, sub_category_id, name, name_ar FROM products WHERE id IN (SELECT value FROM json_each(?))')
+      .bind(JSON.stringify(ids))
+      .all<{ id: string; template_family: string | null; category_id: string | null; sub_category_id: string | null; name: string | null; name_ar: string | null }>(),
+  ]);
+  const device = new Set((rows.results ?? []).filter((r) => DEVICE_FAMILIES.has(familyOfProduct(r, idx) as TradeInFamily)).map((r) => r.id));
+  const best = candidates.filter((l) => device.has(l.product_id)).sort((a, b) => Math.trunc(b.unit) - Math.trunc(a.unit))[0];
+  if (!best) throw refuse('TRADE_IN_COUPON_MISMATCH');
+  return { cap: Math.max(0, Math.trunc(best.unit)), lineId: best.id ?? null, anyDevice: true };
+}
+
+/** `tradeInCouponLine`'s figure alone (the most this credit may take off this cart), or null. */
+export async function tradeInCouponCap(db: D1Database, userId: string, couponId: string, lines: ReadonlyArray<TradeInCapLine>): Promise<number | null> {
+  return (await tradeInCouponLine(db, userId, couponId, lines))?.cap ?? null;
 }
 
 // ================================================================= views
@@ -3081,7 +3274,8 @@ export async function requestView(env: Env, req: RequestRow, audience: RequestAu
       edit: req.status === 'draft',
       submit: req.status === 'draft' && !!blockers && !Object.keys(blockers.inputs).length && !Object.keys(blockers.photos).length && !blockers.target,
       cancel: !isTerminal(req.status) && !creditOrder,
-      decide: req.status === 'value_changed',
+      // A proposal made on photos before S-P2 is answered once the device is received (0192 columns present).
+      decide: req.status === 'value_changed' && (req.intake_at === undefined || received),
       pay: (req.status === 'awaiting_payment' && !creditOrder && (req.credit_iqd ?? 0) > 0 && !creditLapsed && (!v2 || received)) || (!!liveReissue && !creditOrder),
       choose_handover: req.status === 'draft' || (req.status === 'submitted' && !received),
     },
@@ -3258,7 +3452,7 @@ function promptText(req: RequestRow, lang: EmailLang): string {
   const t = copyFor(lang);
   const L = lang === 'en' ? 'en' : 'ar';
   const src = safeParse<{ name?: string }>(req.source_snapshot_json, {});
-  const s = tradeInSettlement(req.target_price_iqd ?? 0, req.admin_value_iqd ?? 0);
+  const s = settlementOf(req, req.admin_value_iqd ?? 0);
   return `LEVONIS\n${t.body(
     sanitizeUserText(String(src.name ?? ''), { max: 120 }),
     iqdText(req.estimated_iqd ?? 0, L),
@@ -3281,7 +3475,7 @@ export async function notifyCustomerOfValue(env: Env, req: RequestRow): Promise<
     const L = lang === 'en' ? 'en' : 'ar';
     const origin = appOrigin(env);
     const src = safeParse<{ name?: string }>(req.source_snapshot_json, {});
-    const s = tradeInSettlement(req.target_price_iqd ?? 0, req.admin_value_iqd ?? 0);
+    const s = settlementOf(req, req.admin_value_iqd ?? 0);
     await notifyCustomer(
       env,
       req.user_id,

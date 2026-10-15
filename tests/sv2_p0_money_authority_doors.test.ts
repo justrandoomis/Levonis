@@ -24,7 +24,7 @@ import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { adminMembershipBenefitRoutes } from '../worker/routes/adminMembershipBenefits';
 import { ppWorld, PRE_V5 } from './sv2_price-protection_fixture';
 import { legacyBox } from './fixtures/giftWorld';
-import { adminApp, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+import { adminApp, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
 
@@ -159,9 +159,14 @@ test('F5: a financial admin who is the trade-in customer cannot approve their ow
   const raw = seed({ deliveredDaysAgo: 20 });
   raw.exec(`UPDATE users SET role = 'admin', admin_scope = 'full' WHERE id = 'cust';`);
   const id = await submitted(raw);
-  const self = await post(adminApp(raw, { id: 'cust', role: 'admin', email: 'sara@x.co', admin_scope: 'full' }), `/api/admin/trade-in/requests/${id}/approve`);
+  // S-P2: the device is received first (by a colleague: never on one's own request).
+  const selfUser: StubUser = { id: 'cust', role: 'admin', email: 'sara@x.co', admin_scope: 'full' };
+  const ownIntake = await post(adminApp(raw, selfUser), `/api/admin/trade-in/requests/${id}/intake`, { serial: 'SELF000001', handover: 'store' });
+  assert.deepEqual([ownIntake.status, await code(ownIntake)], [403, 'TRADE_IN_OWN_REQUEST']);
+  await received(raw, id);
+  const self = await post(adminApp(raw, selfUser), `/api/admin/trade-in/requests/${id}/approve`);
   assert.deepEqual([self.status, await code(self)], [403, 'OWNER_REQUIRED']);
-  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'submitted');
+  assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'under_review');
   // Any other financial admin approves it as before.
   const other = await post(adminApp(raw, FINANCE), `/api/admin/trade-in/requests/${id}/approve`);
   assert.equal(other.status, 200, await other.clone().text());

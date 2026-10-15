@@ -23,7 +23,7 @@ import { priceProtectionRoutes, returnRoutes } from '../worker/routes/returns';
 import { deviceRoutes } from '../worker/routes/devices';
 import { PRE_V5, ppWorld } from './sv2_price-protection_fixture';
 import { repriceV2 } from './fixtures/v2Publish';
-import { CUSTOMER, STAFF, adminApp, customerApp, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
+import { CUSTOMER, STAFF, adminApp, customerApp, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 import { REQUIRED_PHOTOS, blankInputs } from '../packages/pricing/src/tradeIn';
 
 test.after(restoreFetch);
@@ -88,9 +88,12 @@ test('F7: the protection credited for unit 2 alone comes off unit 2’s trade-in
   assert.equal(decided.success, true, JSON.stringify(decided));
   const credited = decided.credit.amount_iqd as number;
   assert.equal(credited, 50_000);
-  // Unit 1 carries on at its frozen base; unit 2 is listed at paid − the whole credit it received.
+  // Unit 1 carries on (S-P2: its ceiling at intake is priced on TODAY's lower price, so the approval asks
+  // the customer — never more than the offer); unit 2 is listed at paid − the whole credit it received.
+  await received(raw, t1);
   const a1 = await json(await post(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${t1}/approve`));
-  assert.equal(a1.request.status, 'awaiting_payment', JSON.stringify(a1));
+  assert.equal(a1.request.status, 'value_changed', JSON.stringify(a1).slice(0, 300));
+  assert.ok(a1.request.value_proposal.value_iqd < a1.request.offer.offer_iqd);
   const units = (await json(await get(customerApp(raw), '/api/trade-in/eligible'))).units as Array<{ order_item_id: string; unit_index: number; paid_iqd: number }>;
   assert.equal(units.find((u) => u.order_item_id === 'oi_a1' && u.unit_index === 2)!.paid_iqd, paid - credited);
   const t2 = await json(await post(customerApp(raw), '/api/trade-in/requests', { order_item_id: 'oi_a1', unit_index: 2, scope: 'whole' }));
@@ -155,6 +158,7 @@ test('R1: a return on unit 1 does not hold the trade-in of unit 2, and a finishe
   const ret = stubApp(dbOf(raw), CUSTOMER, (a) => a.route('/api/returns', returnRoutes));
   const opened = await post(ret, '/api/returns', { orderItemId: 'oi_a1', unitId: 'unit_a1', qty: 1, reason: 'defective' });
   assert.equal(opened.status, 200, await opened.clone().text());
+  await received(raw, id);
   const approve = await post(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${id}/approve`);
   assert.equal(approve.status, 200, await approve.clone().text());
   assert.equal(row<{ status: string }>(raw, 'SELECT status FROM trade_in_requests WHERE id = ?', id)!.status, 'awaiting_payment');
@@ -167,6 +171,7 @@ test('R1: a resolved return on the other device of the line no longer blocks the
   const ret = stubApp(dbOf(raw), CUSTOMER, (a) => a.route('/api/returns', returnRoutes));
   assert.equal((await post(ret, '/api/returns', { orderItemId: 'oi_a1', unitId: 'unit_a1', qty: 1, reason: 'defective' })).status, 200);
   raw.prepare("UPDATE return_cases SET state = 'resolved', resolution = 'declined' WHERE order_item_id = 'oi_a1'").run();
+  await received(raw, id);
   const approve = await post(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${id}/approve`);
   assert.equal(approve.status, 200, await approve.clone().text());
 });
@@ -178,6 +183,7 @@ test('R1: a return that names no device holds the trade-in only when it cannot b
   // One of two, line-level: the other device can be the returned one.
   raw.exec(`INSERT INTO return_cases (id, order_id, order_item_id, unit_id, user_id, qty, reason, state)
               VALUES ('ret_line', 'ORD-OLD', 'oi_a1', NULL, 'cust', 1, 'defective', 'requested')`);
+  await received(raw, id);
   assert.equal((await post(adminApp(raw, STAFF), `/api/admin/trade-in/requests/${id}/approve`)).status, 200);
   // Both of two: it covers the traded device too.
   const raw2 = seed({ deliveredDaysAgo: 3 });
@@ -185,7 +191,9 @@ test('R1: a return that names no device holds the trade-in only when it cannot b
   const id2 = await submittedUnit(raw2, 2);
   raw2.exec(`INSERT INTO return_cases (id, order_id, order_item_id, unit_id, user_id, qty, reason, state)
                VALUES ('ret_both', 'ORD-OLD', 'oi_a1', NULL, 'cust', 2, 'defective', 'requested')`);
-  const held = await post(adminApp(raw2, STAFF), `/api/admin/trade-in/requests/${id2}/approve`);
+  // S-P2: the device is received first, and the intake batch carries the same one-process fence.
+  raw2.prepare("INSERT INTO device_serials (serial_norm, serial_raw, unit_id, assigned_by) VALUES ('A2SER0001', 'A2SER0001', 'unit_a2', 'staff')").run();
+  const held = await post(adminApp(raw2, STAFF), `/api/admin/trade-in/requests/${id2}/intake`, { serial: 'A2SER0001', handover: 'store' });
   assert.equal(held.status, 409, await held.clone().text());
   assert.equal((await json(held)).code, 'TRADE_IN_RETURN_OPEN');
 });

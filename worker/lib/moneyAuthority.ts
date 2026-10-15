@@ -55,6 +55,8 @@ export type MoneyAct =
   | 'trade_in_inspect'
   | 'trade_in_complete'
   | 'trade_in_rules'
+  /** S-P2: receiving a device whose serial does not match the unit sold (owner, with a recorded reason). */
+  | 'trade_in_serial_override'
   | 'warranty_lengthen'
   | 'warranty_delivery_later'
   | 'warranty_replace'
@@ -67,6 +69,8 @@ export type MoneyAct =
 /** The acts only the owner performs, whatever the amount (decision 3). */
 export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
   'trade_in_rules',
+  // S-P2 (DECISIONS row 238): a device whose serial does not match the unit sold is the owner's to receive.
+  'trade_in_serial_override',
   'warranty_lengthen',
   'warranty_delivery_later',
   'warranty_replace',
