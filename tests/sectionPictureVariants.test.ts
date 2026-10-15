@@ -327,14 +327,13 @@ test('before 0149: the first screen and the explorer still answer, with the pict
   const first = await home.request('/api/home', { headers: IP }, undefined, ctx);
   assert.equal(first.status, 200, 'never a 500 on the first screen');
   const body = await json(first);
-  // The clean start (A.12.4 item 6): a database without 0189 lists no product, so the first screen offers
-  // no section with products in it — the pictures are read back from the admin list below instead.
-  assert.ok(Array.isArray(body.categories));
-  assert.equal(
-    (body.categories as Array<{ id: string }>).some((c) => c.id === 'cat_printers'),
-    false,
-    'nothing is listed before 0189'
-  );
+  // Catalog-only (DECISIONS rows 239/240): a database without 0189 shows every product without a price, so the
+  // first screen offers the section again — and draws the cover that exists, with nothing in the new column.
+  const sub = (body.categories as Array<{ id: string; children?: Array<Record<string, unknown>> }>)
+    .find((c) => c.id === 'cat_printers')!
+    .children!.find((c) => c.id === SUB)!;
+  assert.equal(sub.image_url, coverUrl, 'the cover that exists is still drawn');
+  assert.equal(sub.mobile_image_url, '', 'a column that does not exist yet holds nothing — which is what it will hold');
 
   const tree = await get(catalog, '/api/catalog/tree');
   assert.equal(tree.status, 200);
