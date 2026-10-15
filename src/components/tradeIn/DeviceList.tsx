@@ -75,7 +75,7 @@ export default function DeviceList({
   onPick: (u: EligibleUnit) => void;
   onOpenRequest: (id: string) => void;
 }) {
-  const { t } = useT();
+  const { t, tx } = useT();
   const { loc, lang, dir } = useLanguage();
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
   const openCount = (requests ?? []).filter(
@@ -187,11 +187,17 @@ export default function DeviceList({
                         <span className="block text-[14px] font-bold leading-5 text-text-primary line-clamp-2">{u.name}</span>
                         {u.variant ? <span className="block truncate text-[12px] text-text-muted">{u.variant}</span> : null}
                         <span className="flex flex-wrap gap-x-1.5 text-[12px] text-text-secondary tabular-nums">
-                          <bdi dir="ltr" className="whitespace-nowrap">
-                            {t('orderNo', { id: u.order_id })}
-                          </bdi>
-                          <span aria-hidden>·</span>
-                          <span className="whitespace-nowrap">{t('delivered', { date: dateText(u.delivered_at, lang) })}</span>
+                          {/* The label reads in the reader's direction; only the order number is isolated
+                              left-to-right (review F-18). The «·» belongs to the date, so it never ends a line. */}
+                          <span className="whitespace-nowrap" data-order-no>
+                            {tx('orderNo', { id: <bdi dir="ltr">{u.order_id}</bdi> })}
+                          </span>
+                          <span className="whitespace-nowrap">
+                            <span aria-hidden className="pe-1.5">
+                              ·
+                            </span>
+                            {t('delivered', { date: dateText(u.delivered_at, lang) })}
+                          </span>
                         </span>
                         <span className="block text-[12px] text-text-secondary">{warranty(u)}</span>
                         {opens && u.stage ? (
@@ -223,7 +229,9 @@ export default function DeviceList({
           ) : (
             <ul className="space-y-2">
               {requests.map((r) => {
-                const figure = r.final_value_iqd ?? r.offer_iqd ?? null;
+                // A fixed value is the device's value; an offer is only ever «حتى X» (review F-25).
+                const fixed = r.final_value_iqd ?? null;
+                const upTo = fixed === null ? (r.offer_iqd ?? null) : null;
                 const label = r.stage ? triText(STAGE_LABELS[r.stage], loc) : triText(r.status_label, loc);
                 return (
                   <li key={r.id}>
@@ -236,9 +244,13 @@ export default function DeviceList({
                         </StatusChip>
                         <span className="mt-1 block text-[11.5px] text-text-muted tabular-nums">{dateText(r.created_at, lang)}</span>
                       </span>
-                      {figure !== null ? (
-                        <span className="shrink-0 text-[13px] font-bold text-text-primary">
-                          <Money iqd={figure} />
+                      {fixed !== null ? (
+                        <span className="shrink-0 text-[13px] font-bold text-text-primary" data-request-figure="final">
+                          <Money iqd={fixed} />
+                        </span>
+                      ) : upTo !== null ? (
+                        <span className="shrink-0 text-[13px] font-bold text-text-primary" data-request-figure="up-to">
+                          {tx('offer.upTo', { x: <Money iqd={upTo} /> })}
                         </span>
                       ) : null}
                       <Chevron className="h-5 w-5 shrink-0 text-text-muted" aria-hidden />

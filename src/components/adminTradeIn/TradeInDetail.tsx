@@ -17,7 +17,7 @@ import { AlertTriangle, Ban, ExternalLink, PackageCheck, Undo2 } from 'lucide-re
 import * as T from '../adminProducts/theme';
 import { Modal } from '../adminProducts/ui';
 import { api } from '../../lib/api';
-import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
+import { apiRefusal, refusalLang, refusalText } from '../../lib/refusalStrings';
 import { FAMILY_LABELS, OPTIONAL_PHOTO, REQUIRED_PHOTOS, anglesFor, type TradeInFamily } from '../../../packages/pricing/src/tradeIn';
 import { timeLeftWords, warrantyTimeLeft } from '../../../packages/pricing/src/warrantyTime';
 import VariantImg from '../ui/VariantImg';
@@ -28,7 +28,7 @@ import { refreshServicesBadge } from './servicesBadge';
 import IntakeSheet from './IntakeSheet';
 import ValuePanel from './ValuePanel';
 import type { AdminRequestView, DetailResponse, QueueChip } from './types';
-import type { AdminKey } from './copy';
+import { ADMIN_COPY, type AdminKey } from './copy';
 
 /** The owner's record of the computation: its own chunk, fetched by the owner only. */
 const OwnerValuationPanel = React.lazy(() => import('./OwnerValuationPanel'));
@@ -168,6 +168,20 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
     const x = [...anglesFor(family, 2), ...REQUIRED_PHOTOS[family], OPTIONAL_PHOTO].find((p) => p.id === id);
     return x ? loc(x.label_ar, x.label_en, x.label_ckb) : id;
   };
+  /** A photograph's caption: a damage close-up by its fault's name in the reader's language, else its angle. */
+  const photoCaption = (family: TradeInFamily, p: { angle: string; proves?: string | null }) => {
+    if (p.proves && p.proves !== 'hours') {
+      const f = r?.questions?.[family]?.faults.find((x) => x.id === p.proves);
+      if (f) return labelOf(f, loc);
+    }
+    return angleLabel(family, p.angle);
+  };
+  /** An event's reason: a system code in words (the desk's copy, or a refusal's sentence), a person's own words as typed. */
+  const reasonText = (raw: string) => {
+    if (`reason.${raw}` in ADMIN_COPY) return a(`reason.${raw}` as AdminKey);
+    if (/^[A-Z][A-Z0-9_]+$/.test(raw)) return refusalText(raw, refusalLang(lang), raw);
+    return raw;
+  };
   const answerLabel = (field: string) => (ANSWER_LABELS[field] ? a(ANSWER_LABELS[field]) : field.replace(/_/g, ' '));
   /** One answer in words: checklist ids by their names, scores out of five, the accessories by name. */
   const answerText = (role: string, field: string, v: unknown): string => {
@@ -303,7 +317,7 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                         <thead>
                           <tr className={T.text3}>
                             <th className="py-1 text-start font-medium" scope="col">
-                              {a('col.answer')}
+                              {a('col.field')}
                             </th>
                             <th className="py-1 text-start font-medium" scope="col">
                               {a('col.declared')}
@@ -366,12 +380,10 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                         type="button"
                         onClick={() => setPhoto(p.url)}
                         className="relative aspect-square overflow-hidden rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-3)]"
-                        title={angleLabel(c.family, p.angle)}
+                        title={photoCaption(c.family, p)}
                       >
-                        <img src={p.url} alt={angleLabel(c.family, p.angle)} className="h-full w-full object-cover" loading="lazy" />
-                        <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 text-[10px] text-white">
-                          {p.proves && p.proves !== 'hours' ? p.proves : angleLabel(c.family, p.angle)}
-                        </span>
+                        <img src={p.url} alt={photoCaption(c.family, p)} className="h-full w-full object-cover" loading="lazy" />
+                        <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 text-[10px] text-white">{photoCaption(c.family, p)}</span>
                       </button>
                     ))}
                   </div>
@@ -403,6 +415,7 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                 <ol className="space-y-2 text-[12.5px]">
                   {r.events.map((e, n) => {
                     const label = a(`ev.${e.action}` as AdminKey).replace(/^ev\./, '');
+                    const reason = typeof e.detail.reason === 'string' && e.detail.reason ? reasonText(e.detail.reason as string) : '';
                     return (
                       <li key={n}>
                         <span className="font-semibold">{label}</span>
@@ -411,7 +424,7 @@ export default function TradeInDetail({ id, onClose, onChanged }: { id: string; 
                           {a(`role.${e.actor_role}` as AdminKey)} · {dateText(e.created_at, lang)}
                         </span>
                         {typeof e.detail.value_iqd === 'number' ? <span className={T.text2}> · {money(e.detail.value_iqd as number)}</span> : null}
-                        {typeof e.detail.reason === 'string' && e.detail.reason ? <p className={T.text3}>{e.detail.reason as string}</p> : null}
+                        {reason ? <p className={T.text3}>{reason}</p> : null}
                       </li>
                     );
                   })}

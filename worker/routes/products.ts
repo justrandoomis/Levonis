@@ -3752,6 +3752,9 @@ export async function catalogProductDetail(
   // product page, for reads that depend on nothing this wave returns.
   const productId = String(row.id);
   const printerPromise = isPrinterProduct(db, productId);
+  // S-P2 (review F-33): the taxonomy says whether a trade-in credit can buy this device — memoised
+  // per isolate, read beside the rest of the wave.
+  const taxonomyPromise = catalogIndexFor(db).catch(() => null);
   // The maintenance shelf depends only on printer identity, not on pricing,
   // options or ratings. Its 2–3 reads used to start after that entire wave;
   // overlap them, and the shared taxonomy lookup, with the main detail work.
@@ -3872,6 +3875,15 @@ export async function catalogProductDetail(
   // A fact about the product, not a price: the storefront renders the
   // home-delivery note beside a printer's price block from this flag.
   out.is_printer = isPrinter;
+  // A DEVICE A TRADE-IN CREDIT CAN BUY (S-P2, review F-33): an FDM or resin printer, a laser, an AMS
+  // — the families `familyOfProduct` (worker/lib/tradeIn.ts) names as targets. The product page
+  // mounts its «استبدله بهذا» entry on it (the entry still asks the server); a fact, not a price.
+  {
+    const idx = await taxonomyPromise;
+    const type = idx ? productTypeOf(row, idx) : null;
+    const names = `${String(row.name ?? '')} ${String(row.name_ar ?? '')}`;
+    out.trade_in_target = isPrinter || type === 'printer' || type === 'laser' || (type === 'parts' && /\bAMS\b/i.test(names));
+  }
   // The extended-warranty options with their fee resolved against the BASE
   // selection's regular price (the quote re-prices them per selection), and
   // the total months each yields — so "+12 months → 24 total · +67,425"

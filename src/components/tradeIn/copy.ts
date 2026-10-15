@@ -151,6 +151,9 @@ export const COPY = {
   'notes.label': ['ملاحظات (اختياري)', 'Notes (optional)', 'تێبینی (ئارەزوومەندانە)'],
   'missing.title': ['قبل المتابعة:', 'Before you continue:', 'پێش بەردەوامبوون:'],
   'missing.condition': ['اختر الحالة العامة', 'Choose the overall condition', 'دۆخی گشتی هەڵبژێرە'],
+  'missing.hours': ['اكتب عدد ساعات التشغيل', 'Type the hours it has run', 'ژمارەی کاتژمێرەکانی کارکردن بنووسە'],
+  'missing.accessories': ['اختر حال الملحقات الأصلية', 'Choose what is left of the original accessories', 'دۆخی پاشکۆ ڕەسەنەکان هەڵبژێرە'],
+  'missing.answer': ['أكمل: {x}', 'Complete: {x}', 'تەواوی بکە: {x}'],
   'missing.damagePick': ['اختر الضرر أو «لا يوجد ضرر»', 'Pick the damage, or “No damage”', 'زیانەکە هەڵبژێرە، یان «هیچ زیانێک نییە»'],
   'missing.damagePhoto': ['صورة لـ «{x}»', 'A photo of “{x}”', 'وێنەیەک بۆ «{x}»'],
   'missing.angle': ['صورة: {x}', 'Photo: {x}', 'وێنە: {x}'],
@@ -181,7 +184,6 @@ export const COPY = {
   'offer.title': ['عرضنا لجهازك', 'Our offer for your device', 'پێشنیارەکەمان بۆ ئامێرەکەت'],
   'offer.upTo': ['حتى {x}', 'Up to {x}', 'تا {x}'],
   'offer.refresh': ['حدّث العرض', 'Refresh the offer', 'پێشنیارەکە نوێ بکەرەوە'],
-  'offer.left': ['تبقى {n} عروض لهذا الطلب', '{n} offers left for this request', '{n} پێشنیار بۆ ئەم داواکارییە ماوە'],
   'offer.computing': ['نحسب عرضك…', 'Working out your offer…', 'پێشنیارەکەت حیساب دەکەین…'],
   'offer.limit': [
     'لا عروض متبقية لهذا الطلب؛ يُحسب العرض عند الإرسال ويظهر في صفحة الطلب.',
@@ -194,6 +196,7 @@ export const COPY = {
     'A request is not sent without an offer. Try later, or contact us.',
     'داواکاری بێ پێشنیار نانێردرێت. دواتر هەوڵ بدەرەوە، یان پەیوەندیمان پێوە بکە.',
   ],
+  'offer.contact': ['تواصل معنا', 'Contact us', 'پەیوەندیمان پێوە بکە'],
   'offer.credit': ['رصيد الاستبدال', 'Trade-in credit', 'باڵانسی گۆڕینەوە'],
   'offer.pay': ['تدفع للجهاز الجديد', 'You pay for the new device', 'بۆ ئامێرە نوێیەکە دەدەیت'],
   'offer.delivery': ['+ التوصيل', '+ delivery', '+ گەیاندن'],
@@ -306,9 +309,7 @@ export const COPY = {
   'services.title': ['خدماتي', 'My services', 'خزمەتگوزارییەکانم'],
   'services.devices': ['أجهزتي والضمان', 'My devices and warranty', 'ئامێرەکانم و گەرەنتی'],
   'services.tradeIn': ['الاستبدال', 'Trade-in', 'گۆڕینەوە'],
-  'services.openCases': ['{n} طلبات مفتوحة', '{n} open requests', '{n} داواکاریی کراوە'],
   'services.noCases': ['لا طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە'],
-  'services.devicesCount': ['{n} أجهزة', '{n} devices', '{n} ئامێر'],
   'services.nothing': ['استبدل جهازك القديم بجديد', 'Trade your old device for a new one', 'ئامێرە کۆنەکەت بە نوێ بگۆڕەوە'],
   'next.handIn': ['سلّم جهازك قبل {date}', 'Hand in your device by {date}', 'ئامێرەکەت پێش {date} ڕادەست بکە'],
   'next.handInNow': ['سلّم جهازك', 'Hand in your device', 'ئامێرەکەت ڕادەست بکە'],
@@ -317,6 +318,64 @@ export const COPY = {
   'next.collect': ['استلم جهازك من المتجر', 'Collect your device from the store', 'ئامێرەکەت لە فرۆشگا وەربگرەوە'],
   'next.reissued': ['عاد رصيدك حتى {date}', 'Your credit is back until {date}', 'باڵانسەکەت تا {date} گەڕایەوە'],
 } as const satisfies Record<string, Tri>;
+
+/**
+ * COUNTED SENTENCES (review F-26): the count decides the words. Arabic: none / one / two / 3–10
+ * (plural) / 11–99 (singular, accusative) / 100+ (singular, genitive) — the rule of
+ * src/lib/catalog/copy.ts countNoun; English: none / one / other; Sorani counts with the singular
+ * noun: none / other.
+ */
+export interface Counted {
+  ar: { zero: string; one: string; two: string; few: string; many: string; hundred: string };
+  en: { zero: string; one: string; other: string };
+  ckb: { zero: string; other: string };
+}
+
+export function countedText(c: Counted, n: number, lang: Language): string {
+  const count = Math.max(0, Math.floor(n));
+  const fill = (s: string) => s.replace(/\{n\}/g, String(count));
+  if (lang === 'en') return fill(count === 0 ? c.en.zero : count === 1 ? c.en.one : c.en.other);
+  if (lang === 'ckb') return fill(count === 0 ? c.ckb.zero : c.ckb.other);
+  if (count === 0) return c.ar.zero;
+  if (count === 1) return c.ar.one;
+  if (count === 2) return c.ar.two;
+  const r = count % 100;
+  return fill(r >= 3 && r <= 10 ? c.ar.few : r >= 11 && r <= 99 ? c.ar.many : c.ar.hundred);
+}
+
+export const COUNTED = {
+  'offer.left': {
+    ar: {
+      zero: 'لا عروض متبقية لهذا الطلب',
+      one: 'بقي عرض واحد لهذا الطلب',
+      two: 'بقي عرضان لهذا الطلب',
+      few: 'بقيت {n} عروض لهذا الطلب',
+      many: 'بقي {n} عرضاً لهذا الطلب',
+      hundred: 'بقي {n} عرض لهذا الطلب',
+    },
+    en: { zero: 'No offers left for this request', one: '1 offer left for this request', other: '{n} offers left for this request' },
+    ckb: { zero: 'هیچ پێشنیارێک بۆ ئەم داواکارییە نەماوە', other: '{n} پێشنیار بۆ ئەم داواکارییە ماوە' },
+  },
+  'services.openCases': {
+    ar: {
+      zero: 'لا طلبات مفتوحة',
+      one: 'طلب مفتوح واحد',
+      two: 'طلبان مفتوحان',
+      few: '{n} طلبات مفتوحة',
+      many: '{n} طلباً مفتوحاً',
+      hundred: '{n} طلب مفتوح',
+    },
+    en: { zero: 'No open requests', one: '1 open request', other: '{n} open requests' },
+    ckb: { zero: 'هیچ داواکارییەکی کراوە نییە', other: '{n} داواکاریی کراوە' },
+  },
+  'services.devicesCount': {
+    ar: { zero: 'لا أجهزة', one: 'جهاز واحد', two: 'جهازان', few: '{n} أجهزة', many: '{n} جهازاً', hundred: '{n} جهاز' },
+    en: { zero: 'No devices', one: '1 device', other: '{n} devices' },
+    ckb: { zero: 'هیچ ئامێرێک نییە', other: '{n} ئامێر' },
+  },
+} as const satisfies Record<string, Counted>;
+export type CountedKey = keyof typeof COUNTED;
+export const countText = (key: CountedKey, n: number, lang: Language) => countedText(COUNTED[key], n, lang);
 
 export type CopyKey = keyof typeof COPY;
 export type CopyVars = Record<string, string | number>;

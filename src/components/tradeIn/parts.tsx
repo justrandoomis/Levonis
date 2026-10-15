@@ -4,7 +4,7 @@
  * is `lv-surface`, a button is `lv-button`, a refusal is a flat `lv-alert`. Every target is 44 px,
  * every focus ring visible; nothing here moves on its own.
  */
-import React, { useCallback, useId } from 'react';
+import React, { useCallback, useId, useLayoutEffect, useRef } from 'react';
 import { Camera, Check, Loader2, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { failureText } from '../../lib/api';
@@ -19,6 +19,52 @@ export function useErrText() {
   return useCallback(
     (e: unknown, fallback?: string) => apiRefusal(e, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar') || failureText(e, fallback ?? t('genericError')),
     [lang, t]
+  );
+}
+
+/**
+ * Where an arrow key goes in a radio group (review F-31): Down / Right-in-LTR / Left-in-RTL move
+ * on, Up and the other side move back, Home and End jump to the ends; it wraps. `current` −1 (focus
+ * on no option) starts from the first. Null: not a key this group answers.
+ */
+export function radioStep(key: string, dir: 'rtl' | 'ltr', current: number, count: number): number | null {
+  if (count <= 0) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  const step =
+    key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : key === 'ArrowRight' ? (dir === 'rtl' ? -1 : 1) : key === 'ArrowLeft' ? (dir === 'rtl' ? 1 : -1) : 0;
+  if (!step) return null;
+  if (current < 0) return 0;
+  return (current + step + count) % count;
+}
+
+const radiosIn = (el: HTMLElement | null) => (el ? Array.from(el.querySelectorAll<HTMLButtonElement>('[role="radio"]')) : []);
+
+/**
+ * A RADIO GROUP THE KEYBOARD CAN WALK (review F-31): one Tab stop — the checked option, or the
+ * first that can be chosen — and the arrow keys move AND choose, skipping disabled options. The
+ * options stay the screen's own `role="radio"` buttons.
+ */
+export function RadioGroup({ children, className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { dir } = useLanguage();
+  useLayoutEffect(() => {
+    const radios = radiosIn(ref.current);
+    const stop = radios.find((r) => !r.disabled && r.getAttribute('aria-checked') === 'true') ?? radios.find((r) => !r.disabled);
+    for (const r of radios) r.tabIndex = r === stop ? 0 : -1;
+  });
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const radios = radiosIn(ref.current).filter((r) => !r.disabled);
+    const at = radioStep(e.key, dir === 'rtl' ? 'rtl' : 'ltr', radios.indexOf(document.activeElement as HTMLButtonElement), radios.length);
+    if (at === null) return;
+    e.preventDefault();
+    radios[at].focus();
+    radios[at].click();
+  };
+  return (
+    <div ref={ref} role="radiogroup" onKeyDown={onKeyDown} className={className} {...rest}>
+      {children}
+    </div>
   );
 }
 

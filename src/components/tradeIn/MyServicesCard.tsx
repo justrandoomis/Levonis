@@ -13,6 +13,7 @@ import { api } from '../../lib/api';
 import type { ServicesSummary } from '../../../packages/contracts/src/myDevices';
 import { useT } from './useT';
 import { dateText } from './model';
+import { countText } from './copy';
 
 export default function MyServicesCard() {
   const { t } = useT();
@@ -34,9 +35,9 @@ export default function MyServicesCard() {
 
   const devicesLine = s
     ? s.devices.open_cases > 0
-      ? t('services.openCases', { n: s.devices.open_cases })
+      ? countText('services.openCases', s.devices.open_cases, lang)
       : s.devices.count > 0
-        ? t('services.devicesCount', { n: s.devices.count })
+        ? countText('services.devicesCount', s.devices.count, lang)
         : t('services.noCases')
     : '';
   const tin = s?.trade_in;
@@ -56,7 +57,7 @@ export default function MyServicesCard() {
             : tin.next_action === 'reissued'
               ? t('next.reissued', { date })
               : tin.open > 0
-                ? t('services.openCases', { n: tin.open })
+                ? countText('services.openCases', tin.open, lang)
                 : t('services.nothing');
 
   const rows = [

@@ -78,7 +78,7 @@ export default function AdminTradeIn() {
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
                 data-trade-in-view={v}
-                className={`min-h-[36px] rounded-sm border px-4 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                className={`min-h-[44px] rounded-sm border px-4 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                   view === v ? 'border-border-subtle bg-surface-raised text-text-primary shadow-1' : 'border-transparent text-[var(--ap-text-3)] hover:text-[var(--ap-text-2)]'
                 }`}
               >

@@ -26,7 +26,7 @@ export function chipTone(chip: QueueChip): string {
 }
 
 export default function TradeInQueue({ onOpen, version }: { onOpen: (id: string) => void; version: number }) {
-  const { a, money, loc, lang } = useA();
+  const { a, money, loc, lang, dir } = useA();
   const [q, setQ] = useState('');
   const [chip, setChip] = useState<QueueChip | ''>('');
   const [family, setFamily] = useState<TradeInFamily | ''>('');
@@ -80,9 +80,9 @@ export default function TradeInQueue({ onOpen, version }: { onOpen: (id: string)
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className={`absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 ${T.text3}`} aria-hidden />
-          <input className={`${T.input} w-full ps-9 pe-10`} value={q} onChange={(e) => setQ(e.target.value)} placeholder={a('search')} aria-label={a('search')} data-queue-search />
+          <input className={`${T.input} w-full ps-9 pe-12`} value={q} onChange={(e) => setQ(e.target.value)} placeholder={a('search')} aria-label={a('search')} data-queue-search />
           {q ? (
-            <button type="button" className={`${T.btnIconGhost} absolute end-1 top-1/2 -translate-y-1/2`} onClick={() => setQ('')} aria-label={a('clear')}>
+            <button type="button" className={`${T.btnIconGhost} absolute end-1 top-1/2 h-11 w-11 -translate-y-1/2`} onClick={() => setQ('')} aria-label={a('clear')}>
               <X className="h-4 w-4" aria-hidden />
             </button>
           ) : null}
@@ -101,11 +101,11 @@ export default function TradeInQueue({ onOpen, version }: { onOpen: (id: string)
       </div>
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label={a('needsAction')}>
-        <button type="button" aria-pressed={chip === ''} className={`${T.chip} shrink-0`} onClick={() => setChip('')} data-chip="all">
+        <button type="button" aria-pressed={chip === ''} className={`${T.chip} min-h-[44px] shrink-0`} onClick={() => setChip('')} data-chip="all">
           {a('chip.all')}
         </button>
         {QUEUE_CHIPS.map((c) => (
-          <button key={c} type="button" aria-pressed={chip === c} className={`${T.chip} shrink-0`} onClick={() => setChip(c)} data-chip={c}>
+          <button key={c} type="button" aria-pressed={chip === c} className={`${T.chip} min-h-[44px] shrink-0`} onClick={() => setChip(c)} data-chip={c}>
             {a(`chip.${c}` as AdminKey)}
             {counts[c] ? <span className="tabular-nums opacity-80">{counts[c]}</span> : null}
           </button>
@@ -149,7 +149,7 @@ export default function TradeInQueue({ onOpen, version }: { onOpen: (id: string)
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-semibold">{r.name}</span>
                     <span className={`block truncate text-[12px] ${T.text3}`}>
-                      {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en, FAMILY_LABELS[r.family].ckb)} → {r.target_name || '—'}
+                      {loc(FAMILY_LABELS[r.family].ar, FAMILY_LABELS[r.family].en, FAMILY_LABELS[r.family].ckb)} {dir === 'rtl' ? '←' : '→'} {r.target_name || '—'}
                     </span>
                     <span className={`block truncate text-[11.5px] ${T.text3}`}>
                       {r.customer_name ?? '—'} · <bdi dir="ltr">{r.customer_phone ?? ''}</bdi> · <bdi dir="ltr">{r.order_id}</bdi>

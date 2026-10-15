@@ -58,6 +58,14 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
   const [error, setError] = useState('');
   const countsHours = req.components.some((c) => c.role === 'device' && familyCountsHours(c.family));
   const amsOnly = req.scope === 'ams_only';
+  // The hours are READ OFF THE DEVICE (review F-20): never left to default to the customer's own figure.
+  const declaredHours = (() => {
+    const h = (req.components.find((c) => c.role === 'device')?.inputs as { hours?: unknown } | undefined)?.hours;
+    return typeof h === 'number' && Number.isFinite(h) ? h : null;
+  })();
+  const hoursMissing = countsHours && hours.trim() === '';
+  /** A chip the desk taps on a phone at the counter: 44 px tall (review F-30). */
+  const chip = `${T.chip} min-h-[44px]`;
 
   const faultsOf = (family: TradeInFamily) => {
     const q = req.questions?.[family]?.faults;
@@ -100,7 +108,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
       }
       const d = await api.post<{ request: AdminRequestView }>(`/api/admin/trade-in/requests/${encodeURIComponent(req.id)}/intake`, {
         serial: serial.trim(),
-        hours: countsHours && hours.trim() !== '' ? Number(hours) : null,
+        hours: countsHours ? Number(hours) : null,
         components,
         findings: findings.trim(),
         handover,
@@ -146,7 +154,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
               }}
               data-intake-serial
             />
-            <button ref={scanButton} type="button" className={`${T.btnSecondary} min-h-[40px]`} onClick={() => setScanner(true)} data-intake-scan>
+            <button ref={scanButton} type="button" className={`${T.btnSecondary} min-h-[44px]`} onClick={() => setScanner(true)} data-intake-scan>
               <ScanLine className="h-4 w-4" aria-hidden />
               {a('intake.scan')}
             </button>
@@ -155,17 +163,28 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
       ) : null}
 
       {countsHours ? (
-        <label className="block">
-          <span className={`mb-1 block text-[12px] ${T.text3}`}>{a('intake.hours')}</span>
+        <div>
+          <label htmlFor="ti-hours" className={`mb-1 block text-[12px] ${T.text3}`}>
+            {a('intake.hours')} <span aria-hidden>*</span>
+          </label>
           <input
+            id="ti-hours"
             className={`${T.input} w-40 tabular-nums`}
             dir="ltr"
             inputMode="numeric"
+            required
+            aria-required="true"
+            aria-describedby="ti-hours-hint"
             value={hours}
-            onChange={(e) => setHours(e.target.value.replace(/[^0-9]/g, ''))}
+            onChange={(e) => setHours(e.target.value.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[^0-9]/g, ''))}
             data-intake-hours
           />
-        </label>
+          <p id="ti-hours-hint" className={`mt-1 text-[12px] ${hoursMissing ? 'text-[var(--ap-warning)]' : T.text3}`} data-intake-hours-hint>
+            {declaredHours !== null ? a('intake.hoursDeclared', { n: declaredHours }) : null}
+            {declaredHours !== null && hoursMissing ? ' · ' : null}
+            {hoursMissing ? a('intake.hoursRequired') : null}
+          </p>
+        </div>
       ) : null}
 
       {req.components.map((c) => {
@@ -178,7 +197,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
             <p className={`text-[12px] ${T.text3}`}>{a('intake.condition')}</p>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label={a('intake.condition')}>
               {(['excellent', 'good', 'care'] as const).map((o) => (
-                <button key={o} type="button" aria-pressed={p.overall === o} className={T.chip} onClick={() => set({ overall: o })} data-intake-overall={o}>
+                <button key={o} type="button" aria-pressed={p.overall === o} className={chip} onClick={() => set({ overall: o })} data-intake-overall={o}>
                   {a(`cond.${o}` as AdminKey)}
                 </button>
               ))}
@@ -187,7 +206,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
               <>
                 <p className={`text-[12px] ${T.text3}`}>{a('intake.faults')}</p>
                 <div className="flex flex-wrap gap-1.5">
-                  <button type="button" aria-pressed={p.faults.length === 0} className={T.chip} onClick={() => set({ faults: [] })}>
+                  <button type="button" aria-pressed={p.faults.length === 0} className={chip} onClick={() => set({ faults: [] })}>
                     {a('intake.noFaults')}
                   </button>
                   {faults.map((f) => {
@@ -197,7 +216,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
                         key={f.id}
                         type="button"
                         aria-pressed={on}
-                        className={T.chip}
+                        className={chip}
                         onClick={() => set({ faults: on ? p.faults.filter((x) => x !== f.id) : [...p.faults, f.id] })}
                         data-intake-fault={f.id}
                       >
@@ -217,7 +236,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
                   ['none', 'acc.none'],
                 ] as const
               ).map(([id, key]) => (
-                <button key={id} type="button" aria-pressed={p.original_accessories === id} className={T.chip} onClick={() => set({ original_accessories: id })}>
+                <button key={id} type="button" aria-pressed={p.original_accessories === id} className={chip} onClick={() => set({ original_accessories: id })}>
                   {a(key)}
                 </button>
               ))}
@@ -247,7 +266,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
             </a>
           ))}
           {uploading > 0 ? <Spinner size="sm" /> : null}
-          <label className={`${T.btnSecondary} cursor-pointer focus-within:ring-2 focus-within:ring-focus`}>
+          <label className={`${T.btnSecondary} min-h-[44px] cursor-pointer focus-within:ring-2 focus-within:ring-focus`}>
             <Camera className="h-4 w-4" aria-hidden />
             {a('intake.addPhoto')}
             <input
@@ -270,7 +289,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
         <p className={`mb-1 text-[12px] ${T.text3}`}>{a('f.handover')}</p>
         <div className="flex flex-wrap gap-1.5">
           {(['store', 'pickup'] as const).map((h) => (
-            <button key={h} type="button" aria-pressed={handover === h} className={T.chip} onClick={() => setHandover(h)} data-intake-handover={h}>
+            <button key={h} type="button" aria-pressed={handover === h} className={chip} onClick={() => setHandover(h)} data-intake-handover={h}>
               {a(`handover.${h}` as AdminKey)}
             </button>
           ))}
@@ -297,7 +316,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
       <button
         type="button"
         className={`${T.btnPrimary} min-h-[44px] w-full`}
-        disabled={busy || uploading > 0 || (!amsOnly && !serial.trim()) || (mismatch && ownerScope && overrideReason.trim().length < 5)}
+        disabled={busy || uploading > 0 || (!amsOnly && !serial.trim()) || hoursMissing || (mismatch && ownerScope && overrideReason.trim().length < 5)}
         onClick={submit}
         data-intake-submit
       >

@@ -25,7 +25,7 @@ import Note from '../ui/Note';
 import SafeImage from '../ui/SafeImage';
 import Spinner from '../ui/Spinner';
 import { useT } from './useT';
-import { ErrorLine, useErrText } from './parts';
+import { ErrorLine, RadioGroup, useErrText } from './parts';
 import TargetSearchSheet from './TargetSearchSheet';
 import { dateText, labelOf, nameOf, stageTone, triText, type CheckoutAnswer, type RequestView, type TradeInStage } from './model';
 import type { CopyKey } from './copy';
@@ -245,7 +245,7 @@ export default function RequestTimeline({ id, onResume, onBack }: { id: string; 
             {handIn ? <p className="text-[13.5px] font-semibold text-text-primary">{t('tl.handIn', { date: dateText(handIn, lang) })}</p> : null}
             <p className="text-[12.5px] text-text-secondary">{t('tl.handover')}</p>
             {req.can.choose_handover ? (
-              <div role="radiogroup" aria-label={t('handover.title')} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <RadioGroup aria-label={t('handover.title')} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {(
                   [
                     ['store', Store, 'handover.store'],
@@ -266,7 +266,7 @@ export default function RequestTimeline({ id, onResume, onBack }: { id: string; 
                     {t(key)}
                   </button>
                 ))}
-              </div>
+              </RadioGroup>
             ) : null}
             {req.handover === 'pickup' ? (
               <p className="text-[12px] text-text-muted">

@@ -9,7 +9,8 @@ import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import SafeImage from '../ui/SafeImage';
 import { useT } from './useT';
-import { ErrorLine } from './parts';
+import { ErrorLine, RadioGroup } from './parts';
+import { reasonKey } from './DeviceList';
 import type { EligibleUnit, TradeInScope } from './model';
 import type { CopyKey } from './copy';
 
@@ -18,6 +19,13 @@ const LABEL: Record<TradeInScope, [CopyKey, CopyKey]> = {
   printer_only: ['scope.printer', 'scope.printerHint'],
   ams_only: ['scope.ams', 'scope.amsHint'],
 };
+
+/** Why one part cannot be traded, in the customer's words (review F-24): the server's reason, else the generic line. */
+export function scopeReasonKey(reason: string | null | undefined): CopyKey {
+  if (!reason || reason === 'TRADE_IN_SCOPE_UNAVAILABLE') return 'reason.scope';
+  const k = reasonKey({ reason, open_request_id: null, in_shop: false });
+  return k === 'reason.other' ? 'reason.scope' : k;
+}
 
 export default function ScopeSheet({
   unit,
@@ -71,7 +79,7 @@ export default function ScopeSheet({
             <SafeImage sizes="48px" src={unit.image} alt="" aspect="square" className="h-12 w-12 shrink-0 rounded-md" bgClassName="bg-surface" />
             <p className="min-w-0 text-[14px] font-bold leading-5 text-text-primary line-clamp-2">{unit.name}</p>
           </div>
-          <div role="radiogroup" aria-labelledby={titleId} className="space-y-2">
+          <RadioGroup aria-labelledby={titleId} className="space-y-2">
             {unit.scopes.map((s) => {
               const on = s.scope === scope;
               const [title, hint] = LABEL[s.scope];
@@ -88,7 +96,7 @@ export default function ScopeSheet({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block text-[14.5px] font-bold text-text-primary">{t(title)}</span>
-                    <span className="block text-[12.5px] leading-5 text-text-muted">{s.available ? t(hint) : t('reason.scope')}</span>
+                    <span className="block text-[12.5px] leading-5 text-text-muted">{s.available ? t(hint) : t(scopeReasonKey(s.reason))}</span>
                   </span>
                   <span className="lv-choice-mark" aria-hidden>
                     <Check className="h-3 w-3" strokeWidth={3} />
@@ -96,7 +104,7 @@ export default function ScopeSheet({
                 </button>
               );
             })}
-          </div>
+          </RadioGroup>
         </div>
       ) : null}
     </Sheet>

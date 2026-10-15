@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
-import { COPY, copyText } from '../src/components/tradeIn/copy';
+import { COPY, countText } from '../src/components/tradeIn/copy';
 import { dateText } from '../src/components/tradeIn/model';
 import { ADMIN_COPY, adminText } from '../src/components/adminTradeIn/copy';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
@@ -62,7 +62,7 @@ test('the spec\'s own sentences are the screens\' sentences (§11.1, §11.4, B.1
   ];
   for (const [k, ar, en, ckb] of desk) assert.deepEqual([...ADMIN_COPY[k]], [ar, en, ckb], k);
   // The marks fill in every language; an unknown desk key reads as itself, never a crash.
-  assert.equal(copyText('offer.left', 'ckb', { n: 3 }), '3 پێشنیار بۆ ئەم داواکارییە ماوە');
+  assert.equal(countText('offer.left', 3, 'ckb'), '3 پێشنیار بۆ ئەم داواکارییە ماوە');
   assert.equal(adminText('approveX', 'en', { x: '545,000 IQD' }), 'Approve 545,000 IQD');
   assert.equal(adminText('ev.unheard_of' as keyof typeof ADMIN_COPY, 'ar'), 'ev.unheard_of');
 });
@@ -134,8 +134,8 @@ test('the entries and the owner\'s panels arrive lazily: the product page, the p
   assert.match(read('src/components/adminTradeIn/TradeInDetail.tsx'), /const OwnerValuationPanel = React\.lazy\(/);
   assert.match(read('src/components/adminTradeIn/AdminTradeIn.tsx'), /const TradeInSettings = React\.lazy\(/);
   assert.match(read('src/components/adminTradeIn/IntakeSheet.tsx'), /const BarcodeScanner = React\.lazy\(/);
-  // The product page asks for the entry only for a signed-in customer on a printer.
-  assert.match(read('src/pages/Product.tsx'), /source === 'catalog' && isAuthenticated && product\.is_printer === true \? \(\s*<React\.Suspense fallback=\{null\}>\s*<ProductTradeInEntry/);
+  // The product page asks for the entry only for a signed-in customer on a device a credit can buy (review F-33).
+  assert.match(read('src/pages/Product.tsx'), /source === 'catalog' && isAuthenticated && \(product\.is_printer === true \|\| product\.trade_in_target === true\) \? \(\s*<React\.Suspense fallback=\{null\}>\s*<ProductTradeInEntry/);
 });
 
 test('no client file imports the owner\'s offer parameters or the default rule sets (private: never in a bundle)', () => {

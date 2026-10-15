@@ -8,6 +8,7 @@
  * the sentence, and no send button.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Info, RefreshCw, Store, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError } from '../../lib/api';
@@ -17,19 +18,29 @@ import Note from '../ui/Note';
 import SafeImage from '../ui/SafeImage';
 import Spinner from '../ui/Spinner';
 import { useT } from './useT';
-import { ErrorLine, useErrText } from './parts';
+import { ErrorLine, RadioGroup, useErrText } from './parts';
 import { dateText, nameOf, withFee, type PreviewOffer, type RequestView } from './model';
+import { countText } from './copy';
+
+/** Which preview limit the server answered: this request's ('request') or the customer's day ('day'). */
+export function previewLimitScope(details: unknown): 'request' | 'day' {
+  const scope = details && typeof details === 'object' ? (details as { scope?: unknown }).scope : undefined;
+  return scope === 'day' ? 'day' : 'request';
+}
 
 export default function OfferScreen({
   req,
   onReq,
   onSent,
   onBackToCondition,
+  onCancelled,
 }: {
   req: RequestView;
   onReq: (r: RequestView) => void;
   onSent: (id: string) => void;
   onBackToCondition: () => void;
+  /** The draft was cancelled from the no-offer screen: back to the devices (the device is free again). */
+  onCancelled?: () => void;
 }) {
   const { t, tx } = useT();
   const { loc, lang } = useLanguage();
@@ -42,6 +53,7 @@ export default function OfferScreen({
   const [sendError, setSendError] = useState('');
   const [proofError, setProofError] = useState(false);
   const [handoverBusy, setHandoverBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const asked = useRef(false);
 
   const ask = useCallback(async () => {
@@ -58,7 +70,9 @@ export default function OfferScreen({
       }
       if (typeof d.previews_left === 'number') setLeft(d.previews_left);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'TRADE_IN_PREVIEW_LIMIT') setLeft(0);
+      // Review F-21: the request's own limit leaves no offers; the day's limit (scope 'day') does not —
+      // the server's sentence («… or try again tomorrow») is shown and the request keeps its count.
+      if (e instanceof ApiError && e.code === 'TRADE_IN_PREVIEW_LIMIT' && previewLimitScope(e.details) === 'request') setLeft(0);
       if (e instanceof ApiError && e.code === 'TRADE_IN_NO_OFFER') setNoOffer(true);
       setAskError(errText(e));
     } finally {
@@ -83,6 +97,20 @@ export default function OfferScreen({
       setSendError(errText(e));
     } finally {
       setHandoverBusy(false);
+    }
+  };
+
+  /** Review F-22: no offer is not a dead end — the draft can be cancelled, which frees the device. */
+  const cancelDraft = async () => {
+    setCancelling(true);
+    setSendError('');
+    try {
+      await api.post(`/api/trade-in/requests/${encodeURIComponent(req.id)}/cancel`, {});
+      onCancelled?.();
+    } catch (e) {
+      setSendError(errText(e));
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -121,6 +149,14 @@ export default function OfferScreen({
           <div className="space-y-1 py-2" data-no-offer>
             <p className="text-[16px] font-bold text-text-primary">{t('offer.noOffer')}</p>
             <p className="text-[12.5px] leading-5 text-text-secondary">{t('offer.noOfferHint')}</p>
+            <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
+              <Link to="/support" className="lv-button lv-button-secondary" data-no-offer-contact>
+                {t('offer.contact')}
+              </Link>
+              <Button variant="ghost" onClick={() => void cancelDraft()} loading={cancelling} data-no-offer-cancel>
+                {t('cancel.btn')}
+              </Button>
+            </div>
           </div>
         ) : x !== null ? (
           <p className="mt-1 text-[30px] font-black leading-10 text-text-primary" data-offer-iqd={x}>
@@ -136,7 +172,7 @@ export default function OfferScreen({
             <Button variant="ghost" size="sm" icon={<RefreshCw className="h-4 w-4" aria-hidden />} onClick={() => void ask()} loading={asking} data-offer-refresh>
               {t('offer.refresh')}
             </Button>
-            {left !== null ? <span className="text-[11.5px] text-text-muted tabular-nums">{t('offer.left', { n: left })}</span> : null}
+            {left !== null ? <span className="text-[11.5px] text-text-muted tabular-nums">{countText('offer.left', left, lang)}</span> : null}
           </div>
         ) : null}
       </section>
@@ -204,7 +240,7 @@ export default function OfferScreen({
           <h3 id="ti-handover" className="text-[15px] font-bold text-text-primary">
             {t('handover.title')}
           </h3>
-          <div role="radiogroup" aria-labelledby="ti-handover" className="space-y-2">
+          <RadioGroup aria-labelledby="ti-handover" className="space-y-2">
             {(
               [
                 ['store', Store, t('handover.store'), t('handover.storeHint')],
@@ -235,7 +271,7 @@ export default function OfferScreen({
                 </span>
               </button>
             ))}
-          </div>
+          </RadioGroup>
         </section>
       ) : null}
 

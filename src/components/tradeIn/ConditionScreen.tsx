@@ -33,7 +33,7 @@ import {
   type PhotoAngle,
 } from '../../../packages/pricing/src/tradeIn';
 import { useT } from './useT';
-import { Choice, ErrorLine, PhotoButton, Thumb, Uploading, useErrText } from './parts';
+import { Choice, ErrorLine, PhotoButton, RadioGroup, Thumb, Uploading, useErrText } from './parts';
 import { uploadTradeInPhoto } from './photoUpload';
 import { labelOf, type ComponentInputs, type ComponentRole, type ComponentView, type PhotoView, type RequestView } from './model';
 import type { CopyKey } from './copy';
@@ -58,23 +58,84 @@ const damagePhotos = (c: ComponentView, fault: string) => c.photos.filter((p) =>
 /** The angles of the grid: the family's required list, the hours screen shown with the hours instead. */
 export const gridAngles = (c: ComponentView): PhotoAngle[] => REQUIRED_PHOTOS[c.family].filter((a) => !(familyCountsHours(c.family) && a.id === HOURS_PHOTO.id));
 
-/** What one part still lacks before «متابعة», in the customer's words. */
+/**
+ * WHAT THE CUSTOMER HAS ANSWERED, per part (review F-23). The stored answers start as the rule
+ * set's blanks («good», «no damage», «all», 0 hours), so a value alone cannot say whether it was
+ * chosen: the screen keeps its own record, and nothing reads as chosen until it was.
+ */
+export interface Answered {
+  overall?: boolean;
+  accessories?: boolean;
+  hours?: boolean;
+}
+
+/** What one part still lacks before «متابعة», in the customer's words. `damage` undefined: not answered yet. */
 export function missingFor(
   c: ComponentView,
   inputs: ComponentInputs | undefined,
-  damageYes: boolean,
+  damage: boolean | undefined,
   version: number,
   t: (k: CopyKey, v?: Record<string, string | number>) => string,
   loc: (ar: string, en: string, ckb?: string) => string,
-  faultLabel: (id: string) => string
+  faultLabel: (id: string) => string,
+  answered: Answered = { overall: true, accessories: true, hours: true },
+  faultsAsked = false
 ): string[] {
   const out: string[] = [];
   const v2 = version >= 2;
+  const damageYes = damage === true;
+  if (familyCountsHours(c.family) && inputs?.hours !== null && inputs?.hours !== undefined && !answered.hours) out.push(t('missing.hours'));
   if (hoursPhotoAsked(c, version) && inputs?.hours !== null && !hasHoursPhoto(c)) out.push(t('photo.hoursBound'));
+  if (!answered.overall) out.push(t('missing.condition'));
+  if (faultsAsked && damage === undefined) out.push(t('missing.damagePick'));
   if (damageYes && (inputs?.faults ?? []).length === 0) out.push(t('missing.damagePick'));
+  if (!answered.accessories) out.push(t('missing.accessories'));
   if (v2) for (const f of inputs?.faults ?? []) if (damagePhotos(c, f).length === 0) out.push(t('missing.damagePhoto', { x: faultLabel(f) }));
   for (const a of gridAngles(c)) if (!c.photos.some((p) => p.angle === a.id)) out.push(t('missing.angle', { x: loc(a.label_ar, a.label_en, a.label_ckb) }));
   return out;
+}
+
+/**
+ * THE SERVER'S BLOCKERS IN WORDS (review F-32): when the saved answers still lack something the
+ * screen did not see (a photo removed in another tab, a rule changed), «قبل المتابعة:» names it —
+ * a field, a photograph by its angle, the hours photo, a damage close-up by its fault.
+ */
+export function blockerLines(
+  req: Pick<RequestView, 'components'>,
+  blockers: { inputs: Record<string, string[]>; photos: Record<string, string[]> },
+  t: (k: CopyKey, v?: Record<string, string | number>) => string,
+  loc: (ar: string, en: string, ckb?: string) => string,
+  faultLabel: (family: string) => (id: string) => string
+): string[] {
+  const out: string[] = [];
+  const SCORE = new Set(['cleanliness', 'exterior', 'scratches', 'accessory_condition']);
+  for (const c of req.components) {
+    const prefix = req.components.length > 1 ? `${t(c.role === 'ams' ? 'part.ams' : 'part.device')}: ` : '';
+    for (const f of blockers.inputs[c.role] ?? []) {
+      const field = f.split(':')[0];
+      out.push(
+        prefix +
+          (field === 'hours'
+            ? t('missing.hours')
+            : field === 'original_accessories'
+              ? t('missing.accessories')
+              : field === 'faults'
+                ? t('missing.damagePick')
+                : SCORE.has(field)
+                  ? t('missing.condition')
+                  : t('missing.answer', { x: t('cond.title') }))
+      );
+    }
+    for (const p of blockers.photos[c.role] ?? []) {
+      if (p === 'hours') out.push(prefix + t('photo.hoursBound'));
+      else if (p.startsWith('damage:')) out.push(prefix + t('missing.damagePhoto', { x: faultLabel(c.family)(p.slice('damage:'.length)) }));
+      else {
+        const a = [...REQUIRED_PHOTOS[c.family], HOURS_PHOTO, OPTIONAL_PHOTO].find((x) => x.id === p);
+        out.push(prefix + t('missing.angle', { x: a ? loc(a.label_ar, a.label_en, a.label_ckb) : p }));
+      }
+    }
+  }
+  return [...new Set(out)];
 }
 
 export default function ConditionScreen({
@@ -85,6 +146,8 @@ export default function ConditionScreen({
   setInputs,
   damage,
   setDamage,
+  answered: answeredAll,
+  setAnswered,
   onPhoto,
   onPhotoRemoved,
 }: {
@@ -95,6 +158,8 @@ export default function ConditionScreen({
   setInputs: React.Dispatch<React.SetStateAction<Inputs>>;
   damage: Partial<Record<ComponentRole, boolean>>;
   setDamage: React.Dispatch<React.SetStateAction<Partial<Record<ComponentRole, boolean>>>>;
+  answered: Partial<Record<ComponentRole, Answered>>;
+  setAnswered: React.Dispatch<React.SetStateAction<Partial<Record<ComponentRole, Answered>>>>;
   onPhoto: (p: PhotoView) => void;
   onPhotoRemoved: (id: string) => void;
 }) {
@@ -125,8 +190,11 @@ export default function ConditionScreen({
         label: labelOf(p, loc),
       }))
     : [];
-  const overall = overallOf(value);
-  const damageYes = damage[comp.role] ?? value.faults.length > 0;
+  const answered = answeredAll[comp.role] ?? {};
+  const answer = (k: keyof Answered) => setAnswered((cur) => ({ ...cur, [comp.role]: { ...(cur[comp.role] ?? {}), [k]: true } }));
+  const overall = answered.overall ? overallOf(value) : null;
+  const damageAnswer = damage[comp.role] ?? (value.faults.length > 0 ? true : undefined);
+  const damageYes = damageAnswer === true;
   const hoursAsked = familyCountsHours(comp.family) && value.hours !== null;
 
   const upload = async (slot: string, file: File, angle: string, proves?: string) => {
@@ -224,12 +292,14 @@ export default function ConditionScreen({
               inputMode="numeric"
               pattern="[0-9]*"
               dir="ltr"
-              value={String(value.hours ?? 0)}
+              value={answered.hours ? String(value.hours ?? 0) : ''}
+              placeholder="0"
               onChange={(e) => {
                 const digits = e.target.value.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[^0-9]/g, '');
                 set({
                   hours: Math.min(MAX_HOURS, digits ? Number(digits) : 0),
                 });
+                setAnswered((cur) => ({ ...cur, [comp.role]: { ...(cur[comp.role] ?? {}), hours: digits !== '' } }));
               }}
               aria-describedby={`hours-hint-${comp.role}`}
               data-hours
@@ -255,36 +325,37 @@ export default function ConditionScreen({
 
       <section className="lv-surface space-y-3 p-4">
         <h3 className="text-[15px] font-bold text-text-primary">{t('cond.q')}</h3>
-        <div role="radiogroup" aria-label={t('cond.q')} className="grid grid-cols-3 gap-2">
+        <RadioGroup aria-label={t('cond.q')} className="grid grid-cols-3 gap-2">
           {(['excellent', 'good', 'care'] as const).map((o) => (
             <Choice
               key={o}
               radio
               on={overall === o}
-              onClick={() =>
+              onClick={() => {
                 set({
                   cleanliness: PRESET[o],
                   exterior: PRESET[o],
                   scratches: PRESET[o],
-                })
-              }
+                });
+                answer('overall');
+              }}
               className="min-h-[52px] flex-col px-2 text-center leading-4"
               data-overall={o}
             >
               {t(`cond.${o}` as CopyKey)}
             </Choice>
           ))}
-        </div>
+        </RadioGroup>
         {overall ? <p className="text-[12.5px] text-text-secondary">{t(`cond.${overall}Hint` as CopyKey)}</p> : null}
       </section>
 
       {faults.length > 0 ? (
         <section className="lv-surface space-y-3 p-4">
           <h3 className="text-[15px] font-bold text-text-primary">{t('damage.q')}</h3>
-          <div role="radiogroup" aria-label={t('damage.q')} className="grid grid-cols-2 gap-2">
+          <RadioGroup aria-label={t('damage.q')} className="grid grid-cols-2 gap-2">
             <Choice
               radio
-              on={!damageYes}
+              on={damageAnswer === false}
               onClick={() => {
                 setDamage((d) => ({ ...d, [comp.role]: false }));
                 set({ faults: [] });
@@ -296,7 +367,7 @@ export default function ConditionScreen({
             <Choice radio on={damageYes} onClick={() => setDamage((d) => ({ ...d, [comp.role]: true }))} data-damage="yes">
               {t('damage.yes')}
             </Choice>
-          </div>
+          </RadioGroup>
           {damageYes ? (
             <div className="space-y-3">
               <p className="text-[12.5px] text-text-secondary">{t('damage.pick')}</p>
@@ -364,7 +435,7 @@ export default function ConditionScreen({
 
       <section className="lv-surface space-y-3 p-4">
         <h3 className="text-[15px] font-bold text-text-primary">{t('acc.q')}</h3>
-        <div role="radiogroup" aria-label={t('acc.q')} className="grid grid-cols-3 gap-2">
+        <RadioGroup aria-label={t('acc.q')} className="grid grid-cols-3 gap-2">
           {(
             [
               ['all', 'acc.all'],
@@ -372,11 +443,20 @@ export default function ConditionScreen({
               ['none', 'acc.none'],
             ] as const
           ).map(([id, key]) => (
-            <Choice key={id} radio on={value.original_accessories === id} onClick={() => set({ original_accessories: id })} data-accessories={id}>
+            <Choice
+              key={id}
+              radio
+              on={!!answered.accessories && value.original_accessories === id}
+              onClick={() => {
+                set({ original_accessories: id });
+                answer('accessories');
+              }}
+              data-accessories={id}
+            >
               {t(key)}
             </Choice>
           ))}
-        </div>
+        </RadioGroup>
       </section>
 
       <section className="lv-surface space-y-3 p-4" aria-labelledby={`photos-${comp.role}`}>

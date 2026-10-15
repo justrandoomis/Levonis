@@ -6,6 +6,7 @@
  * Pure data: no React. `{name}` marks a value the desk fills in.
  */
 import type { Language } from '../../translations';
+import type { Counted } from '../tradeIn/copy';
 
 export type Tri = readonly [ar: string, en: string, ckb: string];
 
@@ -95,7 +96,7 @@ export const ADMIN_COPY = {
   customer: ['الزبون', 'Customer', 'کڕیار'],
   customerNote: ['ملاحظة الزبون', 'Customer note', 'تێبینیی کڕیار'],
   declaredVsSeen: ['المعلن مقابل الفحص', 'Declared vs inspected', 'ڕاگەیەندراو بەرامبەر پشکنراو'],
-  'col.answer': ['السؤال', 'Answer', 'وەڵام'],
+  'col.field': ['السؤال', 'Question', 'پرسیار'],
   'col.declared': ['المعلن', 'Declared', 'ڕاگەیەندراو'],
   'col.seen': ['الفحص', 'Inspected', 'پشکنراو'],
   'f.hours': ['ساعات التشغيل', 'Operating hours', 'کاتژمێرەکانی کارکردن'],
@@ -136,12 +137,27 @@ export const ADMIN_COPY = {
   'ev.cancel': ['أُلغي', 'Cancelled', 'هەڵوەشێنرایەوە'],
   'ev.device_returned': ['أُعيد الجهاز', 'Device handed back', 'ئامێرەکە درایەوە'],
   'ev.no_offer': ['بلا عرض', 'No offer', 'بێ پێشنیار'],
+  'ev.credit_restored': ['عاد الرصيد بعد إلغاء الطلب', 'Credit back after the order was cancelled', 'باڵانس دوای هەڵوەشاندنەوەی داواکارییەکە گەڕایەوە'],
+  'ev.cutover': ['أُبلغ الزبون بالطريقة الجديدة', 'Customer told of the new way', 'کڕیار لە شێوازە نوێیەکە ئاگادار کرایەوە'],
+  'ev.stock_skipped': ['لم يدخل المخزون', 'Not booked into stock', 'نەخرایە کۆگاوە'],
+  'ev.completion_failed': ['تعذّر إكمال الاستبدال', 'Completion failed', 'تەواوکردنی گۆڕینەوە سەرکەوتوو نەبوو'],
+  'ev.stock_failed': ['تعذّر إدخاله المخزون', 'Stock booking failed', 'خستنە کۆگاوە سەرکەوتوو نەبوو'],
+  // System reasons on an event (never free text): the desk reads words, not codes.
+  'reason.expired_offer': ['انتهت مدة العرض ولم يصل الجهاز', 'The offer ended before the device arrived', 'ماوەی پێشنیارەکە تەواو بوو پێش گەیشتنی ئامێرەکە'],
+  'reason.expired_credit': ['انتهت مدة الرصيد دون صرفه', 'The credit ended unspent', 'ماوەی باڵانسەکە تەواو بوو بەبێ بەکارهێنان'],
+  'reason.source_missing': ['موديل الجهاز لم يعد في الكتالوج؛ يُدخَل يدوياً', 'The model is no longer in the catalogue; book it by hand', 'مۆدێلەکە ئیتر لە کاتالۆگدا نییە؛ بە دەست تۆماری بکە'],
+  'reason.no_price_today': ['لا سعر منشور اليوم', 'No published price today', 'ئەمڕۆ هیچ نرخێکی بڵاوکراوە نییە'],
+  'reason.below_minimum': ['أقل من الحد الأدنى للعرض', 'Below the minimum offer', 'کەمترە لە کەمترین پێشنیار'],
+  'reason.returned': ['أُرجع الجهاز الجديد', 'The new device was returned', 'ئامێرە نوێیەکە گەڕێندرایەوە'],
+  'reason.order_cancelled': ['أُلغي الطلب', 'The order was cancelled', 'داواکارییەکە هەڵوەشێنرایەوە'],
 
   // ------------------------------------------------------------ intake
   intake: ['استلام الجهاز', 'Receive device', 'وەرگرتنی ئامێر'],
   'intake.scan': ['امسح الرقم التسلسلي', 'Scan the serial', 'ژمارەی زنجیرەیی سکان بکە'],
   'intake.serial': ['الرقم التسلسلي', 'Serial number', 'ژمارەی زنجیرەیی'],
   'intake.hours': ['الساعات الظاهرة على الجهاز', 'Hours shown on the device', 'ئەو کاتژمێرانەی لەسەر ئامێرەکە دیارن'],
+  'intake.hoursDeclared': ['أعلن الزبون: {n} ساعة — اكتب ما تراه على الشاشة', 'The customer declared {n} h — type what the screen shows', 'کڕیار ڕایگەیاند: {n} کاتژمێر — ئەوەی لەسەر شاشەکە دەیبینیت بنووسە'],
+  'intake.hoursRequired': ['اكتب الساعات الظاهرة على الجهاز قبل تسجيل الاستلام', 'Type the hours the device shows before recording the receipt', 'پێش تۆمارکردنی وەرگرتن، ئەو کاتژمێرانە بنووسە کە ئامێرەکە پیشانی دەدات'],
   'intake.findings': ['ملاحظات الفحص', 'Inspection findings', 'تێبینییەکانی پشکنین'],
   'intake.photos': ['صور الاستلام', 'Intake photos', 'وێنەکانی وەرگرتن'],
   'intake.condition': ['الحالة كما فُحصت', 'Condition as inspected', 'دۆخ وەک پشکنرا'],
@@ -283,10 +299,16 @@ export const ADMIN_COPY = {
   'pnl.writeOffs': ['شُطبت', 'Written off', 'سڕانەوە'],
   'pnl.overrides': ['تجاوزات المالك', 'Owner overrides', 'تێپەڕاندنەکانی خاوەن'],
   'pnl.reissued': ['رصيد أُعيد', 'Credits given back', 'باڵانسی گەڕێنراوە'],
-  'pnl.count': ['{n} طلب', '{n} requests', '{n} داواکاری'],
   'pnl.revenue': ['الإيراد', 'Revenue', 'داهات'],
   'rules.title': ['قواعد الحالة', 'Condition rules', 'یاساکانی دۆخ'],
 } as const satisfies Record<string, Tri>;
+
+/** The P&L's request count, counted (review F-26). */
+export const PNL_COUNT: Counted = {
+  ar: { zero: 'لا طلبات', one: 'طلب واحد', two: 'طلبان', few: '{n} طلبات', many: '{n} طلباً', hundred: '{n} طلب' },
+  en: { zero: 'No requests', one: '1 request', other: '{n} requests' },
+  ckb: { zero: 'هیچ داواکارییەک نییە', other: '{n} داواکاری' },
+};
 
 export type AdminKey = keyof typeof ADMIN_COPY;
 export type AdminVars = Record<string, string | number>;

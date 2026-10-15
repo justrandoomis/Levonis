@@ -23,7 +23,7 @@ import Spinner from '../ui/Spinner';
 import { blankInputs } from '../../../packages/pricing/src/tradeIn';
 import { useT } from './useT';
 import { ErrorLine, useErrText } from './parts';
-import ConditionScreen, { missingFor, type Inputs } from './ConditionScreen';
+import ConditionScreen, { blockerLines, missingFor, type Answered, type Inputs } from './ConditionScreen';
 import TargetSearchSheet, { firstPick, needsChoice, quoteTarget } from './TargetSearchSheet';
 import OfferScreen from './OfferScreen';
 import { labelOf, nameOf, type ComponentRole, type RequestView, type TargetOption, type TargetView } from './model';
@@ -77,6 +77,7 @@ export default function TradeInFlow({
   const [loadError, setLoadError] = useState('');
   const [inputs, setInputs] = useState<Inputs>({});
   const [damage, setDamage] = useState<Partial<Record<ComponentRole, boolean>>>({});
+  const [answered, setAnswered] = useState<Partial<Record<ComponentRole, Answered>>>({});
   const [role, setRole] = useState<ComponentRole>('device');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -94,7 +95,18 @@ export default function TradeInFlow({
       }
       setReq(d.request);
       setInputs(inputsOf(d.request));
-      setDamage(Object.fromEntries(d.request.components.map((c) => [c.role, Array.isArray(c.inputs.faults) && c.inputs.faults.length > 0])));
+      // Review F-23: a draft whose condition was already saved (it went on to the new device) was
+      // answered; a new one starts with nothing chosen — the blanks are not the customer's answers.
+      const seen = !!d.request.target;
+      setDamage(
+        Object.fromEntries(
+          d.request.components.flatMap((c): Array<[ComponentRole, boolean]> => {
+            const ticked = Array.isArray(c.inputs.faults) && c.inputs.faults.length > 0;
+            return ticked ? [[c.role, true]] : seen ? [[c.role, false]] : [];
+          })
+        )
+      );
+      setAnswered(seen ? Object.fromEntries(d.request.components.map((c) => [c.role, { overall: true, accessories: true, hours: true }])) : {});
       setRole(d.request.components[0]?.role ?? 'device');
     } catch (e) {
       setLoadError(errText(e, t('loadRequestError')));
@@ -166,10 +178,20 @@ export default function TradeInFlow({
     return req.components
       .map((c) => ({
         role: c.role,
-        items: missingFor(c, inputs[c.role], damage[c.role] ?? false, req.valuation_version ?? 1, t, loc, faultLabel(c.family)),
+        items: missingFor(
+          c,
+          inputs[c.role],
+          damage[c.role] ?? ((inputs[c.role]?.faults ?? []).length > 0 ? true : undefined),
+          req.valuation_version ?? 1,
+          t,
+          loc,
+          faultLabel(c.family),
+          answered[c.role] ?? {},
+          (req.questions?.[c.family as keyof NonNullable<RequestView['questions']>]?.faults.length ?? 0) > 0
+        ),
       }))
       .filter((m) => m.items.length > 0);
-  }, [req, inputs, damage, t, loc, faultLabel]);
+  }, [req, inputs, damage, answered, t, loc, faultLabel]);
 
   if (loadError) {
     return (
@@ -204,9 +226,9 @@ export default function TradeInFlow({
       const d = await api.patch<{ request: RequestView }>(`/api/trade-in/requests/${encodeURIComponent(req.id)}`, { components: inputs });
       setReq(d.request);
       const b = d.request.blockers;
-      const left = b ? [...Object.values(b.inputs).flat(), ...Object.values(b.photos).flat()] : [];
+      const left = b ? blockerLines(d.request, b, t, loc, faultLabel) : [];
       if (left.length) {
-        setError(t('missing.title'));
+        setError(`${t('missing.title')} ${left.join(' · ')}`);
         return;
       }
       onStep('target', 'forward');
@@ -246,6 +268,8 @@ export default function TradeInFlow({
           setInputs={setInputs}
           damage={damage}
           setDamage={setDamage}
+          answered={answered}
+          setAnswered={setAnswered}
           onPhoto={(p) =>
             setReq((cur) =>
               cur
@@ -303,7 +327,7 @@ export default function TradeInFlow({
         </div>
       ) : null}
 
-      {step === 'offer' ? <OfferScreen req={req} onReq={setReq} onSent={onSent} onBackToCondition={() => onStep('condition', 'back')} /> : null}
+      {step === 'offer' ? <OfferScreen req={req} onReq={setReq} onSent={onSent} onBackToCondition={() => onStep('condition', 'back')} onCancelled={onExit} /> : null}
 
       {step !== 'offer' ? (
         <>

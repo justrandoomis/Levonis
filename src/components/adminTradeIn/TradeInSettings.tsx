@@ -14,7 +14,8 @@ import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useA } from './useA';
 import ComponentRefs from './ComponentRefs';
 import RulesEditor from './RulesEditor';
-import type { AdminKey } from './copy';
+import { PNL_COUNT, type AdminKey } from './copy';
+import { countedText } from '../tradeIn/copy';
 
 interface Policy {
   offer_valid_days: number;
@@ -91,7 +92,7 @@ export default function TradeInSettings() {
     <div className="min-w-0 rounded-[var(--ap-radius-md)] bg-[var(--ap-surface-2)] p-3" data-pnl={k}>
       <p className={`text-[12px] ${T.text3}`}>{a(k)}</p>
       <p className="text-[16px] font-bold tabular-nums">{money(figure)}</p>
-      <p className={`text-[11.5px] ${T.text3}`}>{a('pnl.count', { n: count })}</p>
+      <p className={`text-[11.5px] ${T.text3}`}>{countedText(PNL_COUNT, count, lang)}</p>
       {extra}
     </div>
   );
